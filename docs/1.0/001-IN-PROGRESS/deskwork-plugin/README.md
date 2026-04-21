@@ -6,7 +6,7 @@ Extract the editorial calendar skills from audiocontrol.org into an open-source 
 
 | Phase | Description | Status |
 |---|---|---|
-| 1 | Monorepo bootstrap and plugin skeleton | Not started |
+| 1 | Monorepo bootstrap and plugin skeleton | Complete |
 | 2 | Adapter layer and config schema | Not started |
 | 3 | Core lifecycle skills | Not started |
 | 4 | Dogfood in audiocontrol.org | Not started |

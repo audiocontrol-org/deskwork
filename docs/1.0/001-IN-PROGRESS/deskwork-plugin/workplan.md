@@ -5,15 +5,18 @@
 **Deliverable:** Empty but valid plugin that installs via Claude Code marketplace
 
 Tasks:
-- [ ] Create the monorepo with README and LICENSE
-- [ ] Create plugins/deskwork/.claude-plugin/plugin.json
-- [ ] Create root .claude-plugin/marketplace.json with git-subdir entry for deskwork
-- [ ] Create the install skill skeleton (SKILL.md only, no logic yet)
-- [ ] Validate the plugin installs with `claude plugin validate` and `claude --plugin-dir`
+- [x] Create the monorepo with README and LICENSE
+- [x] Create plugins/deskwork/.claude-plugin/plugin.json
+- [x] Create root .claude-plugin/marketplace.json (relative-path source; pluginRoot=./plugins — see note below)
+- [x] Create the install skill skeleton (SKILL.md only, no logic yet)
+- [x] Validate the plugin installs with `claude plugin validate` and `claude --plugin-dir`
 
 **Acceptance Criteria:**
-- `claude --plugin-dir plugins/deskwork` loads without errors
-- `/deskwork:install` is visible in the skill list
+- [x] `claude --plugin-dir plugins/deskwork` loads without errors
+- [x] `/deskwork:install` is visible in the skill list
+
+**Notes:**
+- The workplan originally specified a `git-subdir` entry, but since the marketplace and plugin share a repo the correct pattern is a relative-path source under `metadata.pluginRoot: "./plugins"`. `git-subdir` is for pointing at a plugin inside a *different* monorepo. The marketplace.json uses the relative-path form and still works for users who add the marketplace via git.
 
 ---
 
