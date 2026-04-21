@@ -1,0 +1,6 @@
+{
+  "$schema": "https://claude.com/schemas/marketplace.json",
+  "name": "deskwork",
+  "description": "Open-source Claude Code plugins",
+  "plugins": []
+}

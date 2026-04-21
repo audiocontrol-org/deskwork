@@ -1,0 +1,59 @@
+name: feature-development
+description: Standard feature development workflow for the deskwork repo
+trigger: new_feature
+
+phases:
+  - name: requirements
+    description: Define feature requirements and acceptance criteria
+    agents:
+      - project-orchestrator
+      - documentation-engineer
+    outputs:
+      - prd.md
+      - workplan.md
+      - README.md
+      - GitHub issues
+
+  - name: design
+    description: Review approach and architecture
+    agents:
+      - architect-reviewer
+      - typescript-pro
+    outputs:
+      - Approved technical approach
+      - Identified files to modify
+
+  - name: development
+    description: Implement workplan tasks
+    agents:
+      - feature-orchestrator
+      - typescript-pro
+    outputs:
+      - Implementation code
+      - Tests
+
+  - name: testing
+    description: Verify implementation
+    agents:
+      - feature-orchestrator
+    outputs:
+      - All tests passing
+      - Plugin validates and loads
+
+  - name: review
+    description: Code review and quality check
+    agents:
+      - code-reviewer
+      - codebase-auditor
+    outputs:
+      - Review report
+      - Issues addressed
+
+  - name: documentation
+    description: Update docs and close out
+    agents:
+      - documentation-engineer
+    outputs:
+      - Updated workplan
+      - Session journal entry
+      - Implementation summary

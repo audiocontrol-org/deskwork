@@ -1,0 +1,30 @@
+## Dependencies
+node_modules/
+.pnp/
+.pnp.*
+.yarn/
+
+## Build output
+dist/
+build/
+*.tsbuildinfo
+
+## Runtime / local state
+.env
+.env.*
+!.env.example
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+## Editors / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+
+## Claude Code local
+.claude/settings.local.json
+.claude/worktrees/

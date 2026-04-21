@@ -1,0 +1,94 @@
+name: deskwork
+description: Open-source Claude Code plugins monorepo — deskwork editorial calendar plugin, feature-image, analytics
+version: 0.0.0
+type: plugin-monorepo
+
+metadata:
+  created: 2026-04-21
+  team_size: small
+  complexity: moderate
+  domain: developer-tooling
+
+technology_stack:
+  languages:
+    - typescript
+  runtime:
+    - node
+  build_tools:
+    - tsx
+    - typescript
+  testing:
+    - vitest
+
+agents:
+  - id: project-orchestrator
+    role: Project Planning and Feature Infrastructure
+    priority: essential
+    focus:
+      - Feature planning and PRD creation
+      - Workplan creation and task decomposition
+      - GitHub issue management
+      - Branch, worktree, and docs directory setup
+
+  - id: feature-orchestrator
+    role: Implementation Delegation and Phase Management
+    priority: essential
+    focus:
+      - Implementation delegation to sub-agents
+      - Workplan progress tracking
+      - PR delivery
+
+  - id: typescript-pro
+    role: TypeScript Expert
+    priority: essential
+    focus:
+      - Type safety and strict mode
+      - Adapter layer and helper scripts
+      - Build configuration
+
+  - id: code-reviewer
+    role: Code Quality Guardian
+    priority: essential
+    focus:
+      - Code reviews and best practices
+      - Security review
+      - Performance review
+
+  - id: documentation-engineer
+    role: Documentation Specialist
+    priority: high
+    focus:
+      - Feature docs (PRDs, workplans)
+      - Plugin READMEs
+      - SKILL.md authoring
+
+  - id: codebase-auditor
+    role: Codebase Health Monitor
+    priority: high
+    focus:
+      - DRY violations
+      - Guideline adherence
+      - Dead code detection
+
+  - id: architect-reviewer
+    role: Architecture Reviewer
+    priority: high
+    focus:
+      - Plugin structure and skill composition
+      - Adapter boundary
+      - Dependency management
+
+workflows:
+  feature_development:
+    trigger: new_feature
+    agents:
+      - project-orchestrator
+      - feature-orchestrator
+      - typescript-pro
+      - documentation-engineer
+
+settings:
+  code_review: enabled
+  auto_testing: enabled
+  documentation_required: true
+  type_checking: strict
