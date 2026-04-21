@@ -42,7 +42,7 @@ import {
   type DistributionRecord,
   type EditorialCalendar,
   type Stage,
-} from '@/lib/types.ts';
+} from './types.ts';
 
 // ---------------------------------------------------------------------------
 // Parser

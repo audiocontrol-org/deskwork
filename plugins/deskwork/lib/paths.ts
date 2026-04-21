@@ -6,7 +6,7 @@
  */
 
 import { join } from 'node:path';
-import type { DeskworkConfig, SiteConfig } from '@/lib/config.ts';
+import type { DeskworkConfig, SiteConfig } from './config.ts';
 
 /**
  * Resolve a user-supplied site argument to a configured site slug.

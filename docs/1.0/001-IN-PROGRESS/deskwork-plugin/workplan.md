@@ -25,17 +25,21 @@ Tasks:
 **Deliverable:** Working adapter that reads a config file and resolves paths, frontmatter, and calendar location
 
 Tasks:
-- [ ] Define the config JSON schema
-- [ ] Write the config reader (lib/config.ts or similar)
-- [ ] Write the path resolver (content directory, calendar file)
-- [ ] Write the frontmatter reader/writer
-- [ ] Write the calendar parser (read/write pipe-delimited markdown tables)
-- [ ] Write the install skill: explore project, ask questions, write config, create calendar file
+- [x] Define the config JSON schema (`lib/config.ts` — `DeskworkConfig`, version 1)
+- [x] Write the config reader (`lib/config.ts` — `parseConfig` + `readConfig`)
+- [x] Write the path resolver (`lib/paths.ts`)
+- [x] Write the frontmatter reader/writer (`lib/frontmatter.ts`, uses `yaml`)
+- [x] Write the calendar parser (`lib/calendar.ts` + `lib/calendar-mutations.ts`)
+- [x] Write the install skill: explore project, ask questions, write config, create calendar file (`bin/deskwork-install.ts` + `skills/install/SKILL.md`)
 
 **Acceptance Criteria:**
-- The install skill can run against audiocontrol.org and produce a valid config
-- The adapter correctly resolves paths for both audiocontrol and editorialcontrol sites
-- The calendar parser reads the existing audiocontrol.org calendar without data loss
+- [x] The install helper can run against an audiocontrol-shaped project and produce a valid config (verified end-to-end — the helper validates, writes `.deskwork/config.json`, and seeds calendar files). The skill itself drives Claude through exploring, confirming, and invoking the helper.
+- [x] The adapter correctly resolves paths for both audiocontrol and editorialcontrol sites (covered by `paths.test.ts` using the actual dual-site config shape)
+- [x] The calendar parser reads the existing audiocontrol.org calendar without data loss (round-trip test against the live `~/work/audiocontrol.org/docs/editorial-calendar-audiocontrol.md` passes — parse → render → parse produces identical data)
+
+**Notes:**
+- Library-internal imports use sibling-relative paths (`./types.ts`) instead of `@/lib/...` — the `@/` alias is a build-time convenience that doesn't resolve under tsx at runtime, which bin/ scripts need. Tests keep `@/` because Vitest resolves the alias.
+- The install helper ships as `bin/deskwork-install.ts` (tsx shebang) — Node/tsx require a file extension to recognize TypeScript, so the plugin's bin/ entries are `.ts` files rather than extensionless scripts.
 
 ---
 

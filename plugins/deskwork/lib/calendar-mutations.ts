@@ -10,7 +10,7 @@ import type {
   CalendarEntry,
   DistributionRecord,
   EditorialCalendar,
-} from '@/lib/types.ts';
+} from './types.ts';
 
 /** Convert a title to a URL-safe slug. */
 export function slugify(title: string): string {
