@@ -27,6 +27,12 @@ export interface SiteConfig {
   calendarPath: string;
   /** Optional cross-posting channels JSON file, relative to the project root */
   channelsPath?: string;
+  /**
+   * Value to set on new blog posts' `layout:` frontmatter field. Typically a
+   * relative path like `../../layouts/BlogLayout.astro`. Only needed when the
+   * draft skill scaffolds a blog post for this site.
+   */
+  blogLayout?: string;
 }
 
 /** Top-level deskwork config. */
@@ -36,11 +42,17 @@ export interface DeskworkConfig {
   sites: Record<string, SiteConfig>;
   /** Which site to target when no `--site` argument is passed. */
   defaultSite: string;
+  /** Author name for new blog posts' `author:` frontmatter field (optional). */
+  author?: string;
 }
 
-const ALLOWED_TOP_LEVEL_KEYS = new Set(['version', 'sites', 'defaultSite']);
+const ALLOWED_TOP_LEVEL_KEYS = new Set(['version', 'sites', 'defaultSite', 'author']);
 const REQUIRED_SITE_KEYS = ['host', 'contentDir', 'calendarPath'] as const;
-const ALLOWED_SITE_KEYS = new Set([...REQUIRED_SITE_KEYS, 'channelsPath']);
+const ALLOWED_SITE_KEYS = new Set([
+  ...REQUIRED_SITE_KEYS,
+  'channelsPath',
+  'blogLayout',
+]);
 
 /** Return the absolute path to `.deskwork/config.json` under a project root. */
 export function configPath(projectRoot: string): string {
@@ -105,7 +117,16 @@ export function parseConfig(value: unknown): DeskworkConfig {
 
   const defaultSite = resolveDefaultSite(obj.defaultSite, siteSlugs);
 
-  return { version: CONFIG_VERSION, sites, defaultSite };
+  const config: DeskworkConfig = { version: CONFIG_VERSION, sites, defaultSite };
+  if (obj.author !== undefined) {
+    if (typeof obj.author !== 'string' || obj.author.length === 0) {
+      throw new Error(
+        `Invalid deskwork config: "author" must be a non-empty string when set.`,
+      );
+    }
+    config.author = obj.author;
+  }
+  return config;
 }
 
 function parseSiteConfig(slug: string, value: unknown): SiteConfig {
@@ -151,6 +172,16 @@ function parseSiteConfig(slug: string, value: unknown): SiteConfig {
       );
     }
     site.channelsPath = obj.channelsPath;
+  }
+
+  if (obj.blogLayout !== undefined) {
+    if (typeof obj.blogLayout !== 'string' || obj.blogLayout.length === 0) {
+      throw new Error(
+        `Invalid deskwork config: site "${slug}" has invalid "blogLayout" ` +
+          `(must be a non-empty string when set).`,
+      );
+    }
+    site.blogLayout = obj.blogLayout;
   }
 
   return site;

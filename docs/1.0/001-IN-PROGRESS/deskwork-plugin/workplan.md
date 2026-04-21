@@ -48,17 +48,23 @@ Tasks:
 **Deliverable:** add, plan, draft, publish skills working through the adapter
 
 Tasks:
-- [ ] Extract editorial-add logic into plugins/deskwork/skills/add/SKILL.md
-- [ ] Extract editorial-plan logic into plugins/deskwork/skills/plan/SKILL.md
-- [ ] Extract editorial-draft logic into plugins/deskwork/skills/draft/SKILL.md
-- [ ] Extract editorial-publish logic into plugins/deskwork/skills/publish/SKILL.md
-- [ ] Parameterize all hardcoded paths and site names to use adapter config
-- [ ] Extract any backing scripts needed into plugins/deskwork/bin/
+- [x] Extract editorial-add logic into plugins/deskwork/skills/add/SKILL.md (+ `bin/deskwork-add.ts`)
+- [x] Extract editorial-plan logic into plugins/deskwork/skills/plan/SKILL.md (+ `bin/deskwork-plan.ts`)
+- [x] Extract editorial-draft logic into plugins/deskwork/skills/draft/SKILL.md (+ `bin/deskwork-draft.ts`, `lib/scaffold.ts`)
+- [x] Extract editorial-publish logic into plugins/deskwork/skills/publish/SKILL.md (+ `bin/deskwork-publish.ts`)
+- [x] Parameterize all hardcoded paths and site names to use adapter config — zero audiocontrol-specific strings in plugin code
+- [x] Extract backing scripts into plugins/deskwork/bin/ — four helper scripts plus `lib/cli.ts` for shared argv parsing
 
 **Acceptance Criteria:**
-- Each skill produces identical results to the project-local version when run against audiocontrol.org
-- Skills read config via the adapter, not hardcoded paths
-- No audiocontrol-specific assumptions in skill logic
+- [x] Each skill produces the same calendar mutations as the project-local version — lifecycle integration tests exercise add→plan→draft→publish against a tmp project
+- [x] Skills read config via the adapter (`readConfig` + `resolvePaths`), not hardcoded paths
+- [x] No audiocontrol-specific assumptions in skill logic — `SITES` constant removed, sites come from config, layout/author are config fields
+- [x] Plugin validates and all 5 skills (`install` + 4 lifecycle) appear in `/deskwork:*`
+
+**Notes:**
+- GitHub issue creation/closing is intentionally outside the helpers — Claude runs `gh issue create` / `gh issue close` and feeds the number to `deskwork-draft --issue <n>`. This keeps the helpers dep-free and testable without a GitHub stub.
+- `lib/cli.ts` holds shared argv parsing (`parseArgs`, `absolutize`, `fail`, `emit`) used by all 5 `bin/` scripts.
+- Config schema grew two optional fields: top-level `author` and per-site `blogLayout`, both required by `deskwork-draft` when scaffolding a blog post. The draft helper fails loudly with guidance if either is missing.
 
 ---
 

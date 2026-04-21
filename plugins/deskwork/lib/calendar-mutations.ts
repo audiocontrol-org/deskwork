@@ -8,6 +8,7 @@
 
 import type {
   CalendarEntry,
+  ContentType,
   DistributionRecord,
   EditorialCalendar,
 } from './types.ts';
@@ -24,7 +25,12 @@ export function slugify(title: string): string {
 export function addEntry(
   calendar: EditorialCalendar,
   title: string,
-  opts?: { description?: string; source?: CalendarEntry['source'] },
+  opts?: {
+    description?: string;
+    source?: CalendarEntry['source'];
+    contentType?: ContentType;
+    contentUrl?: string;
+  },
 ): CalendarEntry {
   const slug = slugify(title);
 
@@ -43,16 +49,21 @@ export function addEntry(
     targetKeywords: [],
     source: opts?.source ?? 'manual',
   };
+  if (opts?.contentType !== undefined) entry.contentType = opts.contentType;
+  if (opts?.contentUrl !== undefined && opts.contentUrl.length > 0) {
+    entry.contentUrl = opts.contentUrl;
+  }
 
   calendar.entries.push(entry);
   return entry;
 }
 
-/** Move an entry to Planned and set target keywords. */
+/** Move an entry to Planned and set target keywords (and optionally topics). */
 export function planEntry(
   calendar: EditorialCalendar,
   slug: string,
   keywords: string[],
+  opts?: { topics?: string[] },
 ): CalendarEntry {
   const entry = calendar.entries.find((e) => e.slug === slug);
   if (!entry) {
@@ -65,6 +76,30 @@ export function planEntry(
   }
   entry.stage = 'Planned';
   entry.targetKeywords = keywords;
+  if (opts?.topics !== undefined && opts.topics.length > 0) {
+    entry.topics = opts.topics;
+  }
+  return entry;
+}
+
+/**
+ * Set or clear an entry's `contentUrl`. Used when late-setting a URL on a
+ * youtube or tool entry before publishing. Pass `undefined` to unset.
+ */
+export function setContentUrl(
+  calendar: EditorialCalendar,
+  slug: string,
+  url: string | undefined,
+): CalendarEntry {
+  const entry = calendar.entries.find((e) => e.slug === slug);
+  if (!entry) {
+    throw new Error(`No calendar entry found with slug: ${slug}`);
+  }
+  if (url === undefined || url.length === 0) {
+    delete entry.contentUrl;
+  } else {
+    entry.contentUrl = url;
+  }
   return entry;
 }
 

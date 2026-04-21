@@ -121,6 +121,46 @@ describe('parseConfig', () => {
       }),
     ).toThrow(/unknown key/i);
   });
+
+  it('accepts optional top-level author', () => {
+    const cfg = parseConfig({
+      version: 1,
+      sites: { main: stubSite() },
+      author: 'Jane Doe',
+    });
+    expect(cfg.author).toBe('Jane Doe');
+  });
+
+  it('rejects author that is empty or not a string', () => {
+    expect(() =>
+      parseConfig({ version: 1, sites: { main: stubSite() }, author: '' }),
+    ).toThrow(/author/);
+    expect(() =>
+      parseConfig({ version: 1, sites: { main: stubSite() }, author: 42 }),
+    ).toThrow(/author/);
+  });
+
+  it('accepts optional per-site blogLayout', () => {
+    const cfg = parseConfig({
+      version: 1,
+      sites: {
+        main: {
+          ...stubSite(),
+          blogLayout: '../../layouts/BlogLayout.astro',
+        },
+      },
+    });
+    expect(cfg.sites.main.blogLayout).toBe('../../layouts/BlogLayout.astro');
+  });
+
+  it('rejects per-site blogLayout that is empty or not a string', () => {
+    expect(() =>
+      parseConfig({
+        version: 1,
+        sites: { main: { ...stubSite(), blogLayout: '' } },
+      }),
+    ).toThrow(/blogLayout/);
+  });
 });
 
 describe('readConfig', () => {
