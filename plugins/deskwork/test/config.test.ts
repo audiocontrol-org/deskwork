@@ -161,6 +161,51 @@ describe('parseConfig', () => {
       }),
     ).toThrow(/blogLayout/);
   });
+
+  it('accepts blogFilenameTemplate and requires {slug} placeholder', () => {
+    const cfg = parseConfig({
+      version: 1,
+      sites: { main: { ...stubSite(), blogFilenameTemplate: '{slug}.md' } },
+    });
+    expect(cfg.sites.main.blogFilenameTemplate).toBe('{slug}.md');
+
+    expect(() =>
+      parseConfig({
+        version: 1,
+        sites: { main: { ...stubSite(), blogFilenameTemplate: 'static.md' } },
+      }),
+    ).toThrow(/\{slug\}/);
+  });
+
+  it('accepts blogInitialState and rejects empty string', () => {
+    const cfg = parseConfig({
+      version: 1,
+      sites: { main: { ...stubSite(), blogInitialState: 'draft' } },
+    });
+    expect(cfg.sites.main.blogInitialState).toBe('draft');
+
+    expect(() =>
+      parseConfig({
+        version: 1,
+        sites: { main: { ...stubSite(), blogInitialState: '' } },
+      }),
+    ).toThrow(/blogInitialState/);
+  });
+
+  it('accepts blogOutlineSection boolean and rejects non-boolean', () => {
+    const cfg = parseConfig({
+      version: 1,
+      sites: { main: { ...stubSite(), blogOutlineSection: true } },
+    });
+    expect(cfg.sites.main.blogOutlineSection).toBe(true);
+
+    expect(() =>
+      parseConfig({
+        version: 1,
+        sites: { main: { ...stubSite(), blogOutlineSection: 'yes' } },
+      }),
+    ).toThrow(/blogOutlineSection/);
+  });
 });
 
 describe('readConfig', () => {

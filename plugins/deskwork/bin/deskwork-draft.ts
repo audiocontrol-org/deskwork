@@ -1,44 +1,34 @@
 #!/usr/bin/env tsx
 /**
- * deskwork-draft — move a Planned entry to Drafting.
+ * deskwork-draft — move an Outlining entry to Drafting.
  *
- * For blog entries, scaffolds a blog post directory with an `index.md` and
- * YAML frontmatter. For youtube/tool entries, no filesystem artifact is
- * created — the content lives outside the repo. In either case the
- * calendar entry's stage flips to Drafting.
- *
- * GitHub issue creation is intentionally outside this helper's scope —
- * the calling skill invokes `gh issue create` and may pass the resulting
- * issue number via --issue to persist it on the calendar entry.
+ * Blog file scaffolding happens in the outline step (see deskwork-outline).
+ * By the time this helper runs, the blog markdown already exists with an
+ * approved outline. Draft just flips the stage and optionally records a
+ * linked GitHub issue number (Claude invokes `gh issue create` separately
+ * and passes the resulting number via --issue).
  *
  * Usage:
- *   deskwork-draft <project-root> [--site <slug>] [--issue <n>]
- *                  [--author "Name"] <slug>
+ *   deskwork-draft <project-root> [--site <slug>] [--issue <n>] <slug>
  *
  * Emits a JSON result:
- *   { slug, stage, contentType, scaffolded: {filePath, relativePath} | null,
- *     issueNumber?, site, calendarPath }
+ *   { slug, stage, contentType, issueNumber?, site, calendarPath }
  */
 
 import { readConfig } from '../lib/config.ts';
 import { readCalendar, writeCalendar } from '../lib/calendar.ts';
 import { draftEntry, findEntry } from '../lib/calendar-mutations.ts';
-import { scaffoldBlogPost, type ScaffoldResult } from '../lib/scaffold.ts';
-import {
-  effectiveContentType,
-  hasRepoContent,
-} from '../lib/types.ts';
+import { effectiveContentType } from '../lib/types.ts';
 import { resolveSite, resolveCalendarPath } from '../lib/paths.ts';
 import { absolutize, emit, fail, parseArgs } from '../lib/cli.ts';
 
-const KNOWN_FLAGS = ['site', 'issue', 'author'] as const;
+const KNOWN_FLAGS = ['site', 'issue'] as const;
 
 const { positional, flags } = parse();
 
 if (positional.length < 2) {
   fail(
-    'Usage: deskwork-draft <project-root> [--site <slug>] [--issue <n>] ' +
-      '[--author "Name"] <slug>',
+    'Usage: deskwork-draft <project-root> [--site <slug>] [--issue <n>] <slug>',
     2,
   );
 }
@@ -66,35 +56,18 @@ const site = resolveSite(config, flags.site);
 const calendarPath = resolveCalendarPath(projectRoot, config, site);
 const calendar = readCalendar(calendarPath);
 
-// Preflight: find the entry and verify stage before scaffolding anything.
-// We do not want the blog file created if the calendar state is wrong.
 const existing = findEntry(calendar, slug);
 if (!existing) {
-  const available = calendar.entries.map((e) => e.slug).join(', ') || '(none)';
-  fail(`No calendar entry found with slug "${slug}". Available: ${available}`);
-}
-if (existing.stage !== 'Planned') {
+  const outlining = calendar.entries
+    .filter((e) => e.stage === 'Outlining')
+    .map((e) => e.slug)
+    .join(', ') || '(none)';
   fail(
-    `Entry "${slug}" is in stage "${existing.stage}" — must be in Planned to draft.`,
+    `No calendar entry found with slug "${slug}". Outlining entries: ${outlining}`,
   );
 }
 
 const contentType = effectiveContentType(existing);
-let scaffolded: ScaffoldResult | null = null;
-if (hasRepoContent(contentType)) {
-  try {
-    scaffolded = scaffoldBlogPost(
-      projectRoot,
-      config,
-      site,
-      existing,
-      flags.author,
-    );
-  } catch (err) {
-    fail(err instanceof Error ? err.message : String(err));
-  }
-}
-
 const updated = draftEntry(calendar, slug, issueNumber);
 writeCalendar(calendarPath, calendar);
 
@@ -103,7 +76,6 @@ emit({
   title: updated.title,
   stage: updated.stage,
   contentType,
-  scaffolded,
   issueNumber: updated.issueNumber,
   site,
   calendarPath,

@@ -1,54 +1,50 @@
 ---
 name: draft
-description: Move a Planned entry to Drafting. For blog entries, scaffolds a blog post directory with YAML frontmatter. For youtube and tool entries, no file is created (content lives outside the repo). Optionally creates and records a GitHub issue.
+description: Move an Outlining entry to Drafting. The blog file already exists (scaffolded at outline time) — draft is where the body gets written. Optionally records a linked GitHub issue number.
 ---
 
 ## Draft
 
-Start drafting a Planned entry. For blog entries, this scaffolds the blog post directory and `index.md` with the site's configured layout and the author from the deskwork config. For `youtube` and `tool` entries, no file is created — the content lives outside the repo.
+Advance an Outlining entry to Drafting. The blog post markdown was created at outline time with an empty body placeholder; this step is where the agent (or operator) writes the body.
 
 ### Input
 
-The user provides the slug of a Planned entry. Examples:
+The user provides the slug of an Outlining entry. Examples:
 
 - `/deskwork:draft scsi-protocol-deep-dive`
 - `/deskwork:draft --site editorialcontrol agent-as-workflow`
 
+### Prerequisite
+
+The entry must be in **Outlining**, with the blog file already scaffolded (for blog entries). If the outline step wasn't run, stop and point the user at `/deskwork:outline <slug>` first.
+
 ### GitHub issue (optional)
 
-GitHub issue creation is **not** handled by the helper. After scaffolding:
+GitHub issue creation is outside the helper's scope. If the operator wants a tracking issue:
 
-1. Use `gh issue create` to file a tracking issue. Suggested shape:
+1. Use `gh issue create` to open one. Suggested shape:
    - Title: `[<contentType>] <entry title>`
    - Body: Description, target keywords, acceptance criteria (draft, review, publish)
-2. Capture the issue number from the `gh` output.
-3. Pass `--issue <n>` to the helper so the calendar entry records the linked issue.
+2. Capture the number and pass `--issue <n>` so the calendar records it.
 
-Ask the user whether to open an issue. If they say yes, do so before invoking the helper (so the number is available). If they say no, invoke the helper without `--issue`.
+Ask first — do not open issues unless the user confirms.
 
 ### Steps
 
 1. Resolve `--site` (or default).
-2. Read the calendar to confirm the slug is in Planned. (Optional — the helper also checks.)
-3. Optionally create a GitHub issue with `gh issue create` and capture its number.
-4. Invoke the helper:
+2. Read the calendar; confirm the entry is in Outlining.
+3. For blog entries: load the site's voice skill (if one exists in the host project) before writing any body copy. The outline set the shape; the voice skill tells you which register actually fits the site.
+4. Optionally create a GitHub issue and capture its number.
+5. Invoke the helper to flip the stage:
 
 ```
-deskwork-draft.ts <project-root> [--site <slug>] [--issue <n>] [--author "Name"] <slug>
+deskwork-draft.ts <project-root> [--site <slug>] [--issue <n>] <slug>
 ```
 
-For blog entries, the helper creates the directory and `index.md` with filled-in frontmatter. For `youtube`/`tool`, it only flips the stage and optionally records the issue number.
-
-5. Report what was created:
-   - For blog: path to the `index.md` and the issue number (if any). Suggest the user begin writing.
-   - For non-blog: the issue number (if any) and a reminder that `/deskwork:publish` will require `contentUrl` to be set before advancing.
-
-### Author
-
-The helper pulls the author from `config.author`. Pass `--author "Name"` to override for a single invocation (useful for guest posts). If neither is set, the helper errors with guidance.
+6. For blog entries: use the Edit tool to replace the `<!-- Write your post here -->` placeholder in the scaffolded file with body copy grounded in the outline and voice skill.
+7. Report: slug, new stage (Drafting), issue number (if recorded). Suggest `/deskwork:publish <slug>` once the body is complete.
 
 ### Error handling
 
-- **blogLayout not configured** — the helper tells the user to add `blogLayout` to the site config. Do not try to scaffold without it.
-- **File already exists** — surface the helper's error. The existing file is not overwritten.
-- **Entry not in Planned** — surface the error with current stage. Do NOT try to move forward anyway.
+- **Entry not in Outlining** — helper refuses. If the stage is Planned, direct the user to `/deskwork:outline` first. Don't try to bypass the outline step.
+- **Voice skill not present** — proceed without it if the project genuinely lacks one; don't fabricate voice guidance.

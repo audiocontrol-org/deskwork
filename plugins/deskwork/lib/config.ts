@@ -29,10 +29,29 @@ export interface SiteConfig {
   channelsPath?: string;
   /**
    * Value to set on new blog posts' `layout:` frontmatter field. Typically a
-   * relative path like `../../layouts/BlogLayout.astro`. Only needed when the
-   * draft skill scaffolds a blog post for this site.
+   * relative path like `../../layouts/BlogLayout.astro`. Only emitted when
+   * set — projects using Astro content collections usually leave this unset
+   * (layout resolution happens in the collection config instead).
    */
   blogLayout?: string;
+  /**
+   * Path template for scaffolded blog files, relative to `contentDir`. Uses
+   * `{slug}` as the placeholder. Defaults to `"{slug}/index.md"` (directory-
+   * style). Astro content collections typically use `"{slug}.md"` (flat).
+   */
+  blogFilenameTemplate?: string;
+  /**
+   * Value to set on the scaffolded post's `state:` frontmatter field. When
+   * set, the line `state: <value>` is emitted. Typical value: `"draft"`.
+   * Host projects that gate prod builds on `state !== "draft"` use this to
+   * keep in-flight posts out of production.
+   */
+  blogInitialState?: string;
+  /**
+   * If true, the scaffolder inserts a `## Outline` section (with a placeholder
+   * comment) between the H1 and the body placeholder. Default false.
+   */
+  blogOutlineSection?: boolean;
 }
 
 /** Top-level deskwork config. */
@@ -52,6 +71,9 @@ const ALLOWED_SITE_KEYS = new Set([
   ...REQUIRED_SITE_KEYS,
   'channelsPath',
   'blogLayout',
+  'blogFilenameTemplate',
+  'blogInitialState',
+  'blogOutlineSection',
 ]);
 
 /** Return the absolute path to `.deskwork/config.json` under a project root. */
@@ -182,6 +204,48 @@ function parseSiteConfig(slug: string, value: unknown): SiteConfig {
       );
     }
     site.blogLayout = obj.blogLayout;
+  }
+
+  if (obj.blogFilenameTemplate !== undefined) {
+    if (
+      typeof obj.blogFilenameTemplate !== 'string' ||
+      obj.blogFilenameTemplate.length === 0
+    ) {
+      throw new Error(
+        `Invalid deskwork config: site "${slug}" has invalid ` +
+          `"blogFilenameTemplate" (must be a non-empty string when set).`,
+      );
+    }
+    if (!obj.blogFilenameTemplate.includes('{slug}')) {
+      throw new Error(
+        `Invalid deskwork config: site "${slug}" blogFilenameTemplate ` +
+          `"${obj.blogFilenameTemplate}" must contain the "{slug}" placeholder.`,
+      );
+    }
+    site.blogFilenameTemplate = obj.blogFilenameTemplate;
+  }
+
+  if (obj.blogInitialState !== undefined) {
+    if (
+      typeof obj.blogInitialState !== 'string' ||
+      obj.blogInitialState.length === 0
+    ) {
+      throw new Error(
+        `Invalid deskwork config: site "${slug}" has invalid ` +
+          `"blogInitialState" (must be a non-empty string when set).`,
+      );
+    }
+    site.blogInitialState = obj.blogInitialState;
+  }
+
+  if (obj.blogOutlineSection !== undefined) {
+    if (typeof obj.blogOutlineSection !== 'boolean') {
+      throw new Error(
+        `Invalid deskwork config: site "${slug}" has invalid ` +
+          `"blogOutlineSection" (must be a boolean when set).`,
+      );
+    }
+    site.blogOutlineSection = obj.blogOutlineSection;
   }
 
   return site;

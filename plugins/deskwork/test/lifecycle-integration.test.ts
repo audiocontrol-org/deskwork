@@ -187,20 +187,19 @@ describe('deskwork-plan', () => {
   });
 });
 
-describe('deskwork-draft', () => {
-  it('scaffolds a blog post and moves entry to Drafting', () => {
+describe('deskwork-outline', () => {
+  it('scaffolds a blog post and moves entry to Outlining', () => {
     const project = bootstrapProject();
     try {
-      run('deskwork-add', [project, 'Draft Me']);
-      run('deskwork-plan', [project, 'draft-me', 'keyword']);
+      run('deskwork-add', [project, 'Outline Me']);
+      run('deskwork-plan', [project, 'outline-me', 'keyword']);
 
-      const res = run('deskwork-draft', [project, '--issue', '42', 'draft-me']);
+      const res = run('deskwork-outline', [project, 'outline-me']);
       expect(res.code).toBe(0);
       expect(res.json).toMatchObject({
-        slug: 'draft-me',
-        stage: 'Drafting',
+        slug: 'outline-me',
+        stage: 'Outlining',
         contentType: 'blog',
-        issueNumber: 42,
       });
       const scaffolded = (res.json as { scaffolded?: { filePath: string } })
         .scaffolded;
@@ -208,14 +207,14 @@ describe('deskwork-draft', () => {
       expect(existsSync(scaffolded!.filePath)).toBe(true);
 
       const body = readFileSync(scaffolded!.filePath, 'utf-8');
-      expect(body).toContain('title: Draft Me');
+      expect(body).toContain('title: Outline Me');
       expect(body).toContain('author: Test Author');
     } finally {
       rmSync(project, { recursive: true, force: true });
     }
   });
 
-  it('does NOT scaffold a file for a youtube entry', () => {
+  it('does NOT scaffold a file for a youtube entry (but still flips stage)', () => {
     const project = bootstrapProject();
     try {
       run('deskwork-add', [
@@ -228,10 +227,10 @@ describe('deskwork-draft', () => {
       ]);
       run('deskwork-plan', [project, 'youtube-idea']);
 
-      const res = run('deskwork-draft', [project, 'youtube-idea']);
+      const res = run('deskwork-outline', [project, 'youtube-idea']);
       expect(res.code).toBe(0);
       expect(res.json).toMatchObject({
-        stage: 'Drafting',
+        stage: 'Outlining',
         contentType: 'youtube',
         scaffolded: null,
       });
@@ -249,23 +248,45 @@ describe('deskwork-draft', () => {
   it('errors when the entry is not in Planned', () => {
     const project = bootstrapProject();
     try {
-      run('deskwork-add', [project, 'Fresh Idea']);
-      const res = run('deskwork-draft', [project, 'fresh-idea']);
+      run('deskwork-add', [project, 'Just Ideas']);
+      const res = run('deskwork-outline', [project, 'just-ideas']);
       expect(res.code).not.toBe(0);
       expect(res.stderr).toMatch(/must be in Planned/);
     } finally {
       rmSync(project, { recursive: true, force: true });
     }
   });
+});
 
-  it('errors with a helpful message when blogLayout is not configured', () => {
-    const project = bootstrapProject({ withBlogLayout: false });
+describe('deskwork-draft', () => {
+  it('moves Outlining to Drafting and records issue number', () => {
+    const project = bootstrapProject();
     try {
-      run('deskwork-add', [project, 'No Layout']);
-      run('deskwork-plan', [project, 'no-layout', 'kw']);
-      const res = run('deskwork-draft', [project, 'no-layout']);
+      run('deskwork-add', [project, 'Draft Me']);
+      run('deskwork-plan', [project, 'draft-me', 'keyword']);
+      run('deskwork-outline', [project, 'draft-me']);
+
+      const res = run('deskwork-draft', [project, '--issue', '42', 'draft-me']);
+      expect(res.code).toBe(0);
+      expect(res.json).toMatchObject({
+        slug: 'draft-me',
+        stage: 'Drafting',
+        contentType: 'blog',
+        issueNumber: 42,
+      });
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+
+  it('errors when the entry is not in Outlining', () => {
+    const project = bootstrapProject();
+    try {
+      run('deskwork-add', [project, 'Fresh Idea']);
+      run('deskwork-plan', [project, 'fresh-idea', 'kw']);
+      const res = run('deskwork-draft', [project, 'fresh-idea']);
       expect(res.code).not.toBe(0);
-      expect(res.stderr).toMatch(/blogLayout/);
+      expect(res.stderr).toMatch(/must be in Outlining/);
     } finally {
       rmSync(project, { recursive: true, force: true });
     }
@@ -278,6 +299,7 @@ describe('deskwork-publish', () => {
     try {
       run('deskwork-add', [project, 'To Publish']);
       run('deskwork-plan', [project, 'to-publish', 'kw']);
+      run('deskwork-outline', [project, 'to-publish']);
       run('deskwork-draft', [project, 'to-publish']);
 
       const res = run('deskwork-publish', [project, 'to-publish']);
@@ -301,10 +323,11 @@ describe('deskwork-publish', () => {
       // Draft then delete the blog file to simulate a missing source.
       run('deskwork-add', [project, 'Missing File']);
       run('deskwork-plan', [project, 'missing-file', 'kw']);
-      const draftRes = run('deskwork-draft', [project, 'missing-file']);
+      const outlineRes = run('deskwork-outline', [project, 'missing-file']);
       const scaffolded = (
-        draftRes.json as { scaffolded: { filePath: string } }
+        outlineRes.json as { scaffolded: { filePath: string } }
       ).scaffolded;
+      run('deskwork-draft', [project, 'missing-file']);
       rmSync(dirname(scaffolded.filePath), { recursive: true });
 
       const res = run('deskwork-publish', [project, 'missing-file']);
@@ -320,6 +343,7 @@ describe('deskwork-publish', () => {
     try {
       run('deskwork-add', [project, '--type', 'youtube', 'YT One']);
       run('deskwork-plan', [project, 'yt-one', 'kw']);
+      run('deskwork-outline', [project, 'yt-one']);
       run('deskwork-draft', [project, 'yt-one']);
 
       const missing = run('deskwork-publish', [project, 'yt-one']);
@@ -347,6 +371,7 @@ describe('deskwork-publish', () => {
     try {
       run('deskwork-add', [project, 'Dated']);
       run('deskwork-plan', [project, 'dated', 'kw']);
+      run('deskwork-outline', [project, 'dated']);
       run('deskwork-draft', [project, 'dated']);
 
       const res = run('deskwork-publish', [project, '--date', '2020-01-15', 'dated']);
@@ -362,6 +387,7 @@ describe('deskwork-publish', () => {
     try {
       run('deskwork-add', [project, 'Already Pub']);
       run('deskwork-plan', [project, 'already-pub', 'kw']);
+      run('deskwork-outline', [project, 'already-pub']);
       run('deskwork-draft', [project, 'already-pub']);
       run('deskwork-publish', [project, 'already-pub']);
 

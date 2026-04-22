@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   addEntry,
   planEntry,
+  outlineEntry,
   draftEntry,
   publishEntry,
   findEntry,
@@ -79,11 +80,34 @@ describe('planEntry', () => {
   });
 });
 
+describe('outlineEntry', () => {
+  it('moves Planned to Outlining', () => {
+    const cal = emptyCalendar();
+    addEntry(cal, 'Outliner');
+    planEntry(cal, 'outliner', ['kw']);
+    const out = outlineEntry(cal, 'outliner');
+    expect(out.stage).toBe('Outlining');
+  });
+
+  it('throws for unknown slug', () => {
+    expect(() => outlineEntry(emptyCalendar(), 'missing')).toThrow(
+      /No calendar entry found/,
+    );
+  });
+
+  it('throws when entry is not in Planned', () => {
+    const cal = emptyCalendar();
+    addEntry(cal, 'Still Ideas');
+    expect(() => outlineEntry(cal, 'still-ideas')).toThrow(/must be in Planned/);
+  });
+});
+
 describe('draftEntry', () => {
-  it('moves Planned to Drafting and records issue number', () => {
+  it('moves Outlining to Drafting and records issue number', () => {
     const cal = emptyCalendar();
     addEntry(cal, 'A');
     planEntry(cal, 'a', []);
+    outlineEntry(cal, 'a');
     const drafted = draftEntry(cal, 'a', 99);
     expect(drafted.stage).toBe('Drafting');
     expect(drafted.issueNumber).toBe(99);
@@ -93,14 +117,16 @@ describe('draftEntry', () => {
     const cal = emptyCalendar();
     addEntry(cal, 'B');
     planEntry(cal, 'b', []);
+    outlineEntry(cal, 'b');
     const drafted = draftEntry(cal, 'b');
     expect(drafted.issueNumber).toBeUndefined();
   });
 
-  it('throws when entry is not in Planned', () => {
+  it('throws when entry is not in Outlining', () => {
     const cal = emptyCalendar();
     addEntry(cal, 'C');
-    expect(() => draftEntry(cal, 'c')).toThrow(/must be in Planned/);
+    planEntry(cal, 'c', []);
+    expect(() => draftEntry(cal, 'c')).toThrow(/must be in Outlining/);
   });
 });
 
@@ -113,7 +139,7 @@ describe('publishEntry', () => {
     expect(published.datePublished).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
-  it('accepts an explicit datePublished', () => {
+  it('accepts an explicit datePublished and works from any non-Published stage', () => {
     const cal = emptyCalendar();
     addEntry(cal, 'E');
     const published = publishEntry(cal, 'e', '2026-01-01');

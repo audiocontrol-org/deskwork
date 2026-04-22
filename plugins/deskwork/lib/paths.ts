@@ -82,3 +82,22 @@ export function resolveSiteBaseUrl(
 ): string {
   return `https://${resolveSiteHost(config, site)}/`;
 }
+
+const DEFAULT_BLOG_FILENAME_TEMPLATE = '{slug}/index.md';
+
+/**
+ * Absolute path to the blog post markdown for a given slug, using the
+ * site's configured `blogFilenameTemplate` (or the legacy
+ * `<slug>/index.md` default). The scaffolder and publish helper both
+ * go through this to stay in sync on where a blog post lives.
+ */
+export function resolveBlogFilePath(
+  projectRoot: string,
+  config: DeskworkConfig,
+  site: string | null | undefined,
+  slug: string,
+): string {
+  const entry = siteConfig(config, site);
+  const template = entry.blogFilenameTemplate ?? DEFAULT_BLOG_FILENAME_TEMPLATE;
+  return join(projectRoot, entry.contentDir, template.replaceAll('{slug}', slug));
+}

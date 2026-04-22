@@ -103,7 +103,36 @@ export function setContentUrl(
   return entry;
 }
 
-/** Move an entry to Drafting and record its GitHub issue. */
+/**
+ * Move an entry to Outlining. Precondition: Planned.
+ *
+ * The outline skill scaffolds the blog file (for blog entries) and
+ * advances the entry to this stage; an outline review can happen
+ * before the entry moves on to Drafting.
+ */
+export function outlineEntry(
+  calendar: EditorialCalendar,
+  slug: string,
+): CalendarEntry {
+  const entry = calendar.entries.find((e) => e.slug === slug);
+  if (!entry) {
+    throw new Error(`No calendar entry found with slug: ${slug}`);
+  }
+  if (entry.stage !== 'Planned') {
+    throw new Error(
+      `Entry "${slug}" is in stage "${entry.stage}" — must be in Planned to outline`,
+    );
+  }
+  entry.stage = 'Outlining';
+  return entry;
+}
+
+/**
+ * Move an entry to Drafting. Precondition: Outlining (the approved
+ * outline is the handoff into body-drafting). The issueNumber
+ * argument records a previously-created GitHub issue if the caller
+ * opened one; the helper does not call gh itself.
+ */
 export function draftEntry(
   calendar: EditorialCalendar,
   slug: string,
@@ -113,9 +142,9 @@ export function draftEntry(
   if (!entry) {
     throw new Error(`No calendar entry found with slug: ${slug}`);
   }
-  if (entry.stage !== 'Planned') {
+  if (entry.stage !== 'Outlining') {
     throw new Error(
-      `Entry "${slug}" is in stage "${entry.stage}" — must be in Planned to draft`,
+      `Entry "${slug}" is in stage "${entry.stage}" — must be in Outlining to draft`,
     );
   }
   entry.stage = 'Drafting';

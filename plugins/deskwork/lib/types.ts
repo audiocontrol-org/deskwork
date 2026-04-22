@@ -6,10 +6,20 @@
  * (see `config.ts`) rather than hardcoded here.
  */
 
-/** Ordered editorial stages — content moves forward through these. */
+/**
+ * Ordered editorial stages — content moves forward through these.
+ *
+ * Outlining sits between Planned and Drafting: the blog file is
+ * scaffolded at outline time with an empty `## Outline` section,
+ * and the operator approves the shape before the body is drafted.
+ * Real editorial teams outline first; skipping this step wastes
+ * iteration cycles on structural problems a 30-second outline
+ * review would have caught.
+ */
 export const STAGES = [
   'Ideas',
   'Planned',
+  'Outlining',
   'Drafting',
   'Review',
   'Published',

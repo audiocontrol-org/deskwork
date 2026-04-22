@@ -109,14 +109,81 @@ describe('scaffoldBlogPost', () => {
     }
   });
 
-  it('throws when site has no blogLayout configured', () => {
+  it('skips the layout frontmatter when site has no blogLayout configured', () => {
     const config = makeConfig();
     delete config.sites.audiocontrol.blogLayout;
     const root = mkdtempSync(join(tmpdir(), 'deskwork-scaffold-'));
     try {
-      expect(() =>
-        scaffoldBlogPost(root, config, 'audiocontrol', makeEntry()),
-      ).toThrow(/blogLayout/);
+      const result = scaffoldBlogPost(
+        root,
+        config,
+        'audiocontrol',
+        makeEntry(),
+      );
+      const body = readFileSync(result.filePath, 'utf-8');
+      expect(body).not.toMatch(/^layout:/m);
+      expect(body).toContain('title: My First Post');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('honors blogFilenameTemplate for flat-file layouts', () => {
+    const config = makeConfig();
+    config.sites.audiocontrol.blogFilenameTemplate = '{slug}.md';
+    const root = mkdtempSync(join(tmpdir(), 'deskwork-scaffold-'));
+    try {
+      const result = scaffoldBlogPost(
+        root,
+        config,
+        'audiocontrol',
+        makeEntry(),
+      );
+      expect(result.relativePath).toBe(
+        'src/sites/audiocontrol/pages/blog/my-first-post.md',
+      );
+      expect(existsSync(result.filePath)).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('emits state frontmatter when blogInitialState is set', () => {
+    const config = makeConfig();
+    config.sites.audiocontrol.blogInitialState = 'draft';
+    const root = mkdtempSync(join(tmpdir(), 'deskwork-scaffold-'));
+    try {
+      const result = scaffoldBlogPost(
+        root,
+        config,
+        'audiocontrol',
+        makeEntry(),
+      );
+      const body = readFileSync(result.filePath, 'utf-8');
+      expect(body).toMatch(/^state: draft$/m);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('inserts an ## Outline section when blogOutlineSection is true', () => {
+    const config = makeConfig();
+    config.sites.audiocontrol.blogOutlineSection = true;
+    const root = mkdtempSync(join(tmpdir(), 'deskwork-scaffold-'));
+    try {
+      const result = scaffoldBlogPost(
+        root,
+        config,
+        'audiocontrol',
+        makeEntry(),
+      );
+      const body = readFileSync(result.filePath, 'utf-8');
+      expect(body).toContain('## Outline');
+      expect(body).toContain('Sketch the shape of the post here');
+      // Outline section must come BEFORE the body placeholder.
+      expect(body.indexOf('## Outline')).toBeLessThan(
+        body.indexOf('Write your post here'),
+      );
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

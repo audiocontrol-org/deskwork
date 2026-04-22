@@ -17,7 +17,6 @@
  */
 
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
 import { readConfig } from '../lib/config.ts';
 import { readCalendar, writeCalendar } from '../lib/calendar.ts';
 import {
@@ -33,7 +32,7 @@ import {
 import {
   resolveSite,
   resolveCalendarPath,
-  resolveContentDir,
+  resolveBlogFilePath,
 } from '../lib/paths.ts';
 import { absolutize, emit, fail, parseArgs } from '../lib/cli.ts';
 
@@ -89,8 +88,7 @@ if (flags['content-url'] !== undefined) {
 
 let filePath: string | undefined;
 if (hasRepoContent(contentType)) {
-  const dir = resolveContentDir(projectRoot, config, site);
-  filePath = join(dir, slug, 'index.md');
+  filePath = resolveBlogFilePath(projectRoot, config, site, slug);
   if (!existsSync(filePath)) {
     fail(
       `Cannot publish blog post "${slug}": no file at ${filePath}. ` +
