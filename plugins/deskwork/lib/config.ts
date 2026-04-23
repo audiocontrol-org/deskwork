@@ -63,9 +63,21 @@ export interface DeskworkConfig {
   defaultSite: string;
   /** Author name for new blog posts' `author:` frontmatter field (optional). */
   author?: string;
+  /**
+   * Review journal directory relative to the project root. Defaults to
+   * `.deskwork/review-journal`. Host projects migrating from a prior layout
+   * can point this at an existing directory (e.g. `journal/editorial`).
+   */
+  reviewJournalDir?: string;
 }
 
-const ALLOWED_TOP_LEVEL_KEYS = new Set(['version', 'sites', 'defaultSite', 'author']);
+const ALLOWED_TOP_LEVEL_KEYS = new Set([
+  'version',
+  'sites',
+  'defaultSite',
+  'author',
+  'reviewJournalDir',
+]);
 const REQUIRED_SITE_KEYS = ['host', 'contentDir', 'calendarPath'] as const;
 const ALLOWED_SITE_KEYS = new Set([
   ...REQUIRED_SITE_KEYS,
@@ -147,6 +159,17 @@ export function parseConfig(value: unknown): DeskworkConfig {
       );
     }
     config.author = obj.author;
+  }
+  if (obj.reviewJournalDir !== undefined) {
+    if (
+      typeof obj.reviewJournalDir !== 'string' ||
+      obj.reviewJournalDir.length === 0
+    ) {
+      throw new Error(
+        `Invalid deskwork config: "reviewJournalDir" must be a non-empty string when set.`,
+      );
+    }
+    config.reviewJournalDir = obj.reviewJournalDir;
   }
   return config;
 }

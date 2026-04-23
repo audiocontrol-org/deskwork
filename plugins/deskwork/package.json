@@ -19,6 +19,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "rehype-stringify": "^10.0.0",
+    "remark-parse": "^11.0.0",
+    "remark-rehype": "^11.1.0",
+    "unified": "^11.0.5",
     "yaml": "^2.8.0"
   },
   "devDependencies": {
