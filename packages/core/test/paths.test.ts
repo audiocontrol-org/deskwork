@@ -6,8 +6,8 @@ import {
   resolveContentDir,
   resolveSiteHost,
   resolveSiteBaseUrl,
-} from '@/lib/paths.ts';
-import type { DeskworkConfig } from '@/lib/config.ts';
+} from '../src/paths.ts';
+import type { DeskworkConfig } from '../src/config.ts';
 
 const singleSite: DeskworkConfig = {
   version: 1,

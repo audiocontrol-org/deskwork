@@ -13,13 +13,13 @@
  *   deskwork-review-cancel <project-root> [--kind outline] <slug>
  */
 
-import { readConfig } from '../lib/config.ts';
-import { resolveSite } from '../lib/paths.ts';
-import { handleGetWorkflow } from '../lib/review/handlers.ts';
-import { transitionState } from '../lib/review/pipeline.ts';
-import type { DraftWorkflowItem } from '../lib/review/types.ts';
-import { isPlatform } from '../lib/types.ts';
-import { absolutize, emit, fail, parseArgs } from '../lib/cli.ts';
+import { readConfig } from '@deskwork/core/config';
+import { resolveSite } from '@deskwork/core/paths';
+import { handleGetWorkflow } from '@deskwork/core/review/handlers';
+import { transitionState } from '@deskwork/core/review/pipeline';
+import type { DraftWorkflowItem } from '@deskwork/core/review/types';
+import { isPlatform } from '@deskwork/core/types';
+import { absolutize, emit, fail, parseArgs } from '@deskwork/core/cli-args';
 
 const KNOWN_FLAGS = ['site', 'platform', 'channel', 'kind'] as const;
 

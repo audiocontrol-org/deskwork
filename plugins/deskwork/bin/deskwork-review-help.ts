@@ -10,9 +10,9 @@
  *   deskwork-review-help <project-root> [--site <slug>]
  */
 
-import { readConfig } from '../lib/config.ts';
-import { listOpen } from '../lib/review/pipeline.ts';
-import { absolutize, emit, fail, parseArgs } from '../lib/cli.ts';
+import { readConfig } from '@deskwork/core/config';
+import { listOpen } from '@deskwork/core/review/pipeline';
+import { absolutize, emit, fail, parseArgs } from '@deskwork/core/cli-args';
 
 const KNOWN_FLAGS = ['site'] as const;
 

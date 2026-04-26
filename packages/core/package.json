@@ -1,0 +1,53 @@
+{
+  "name": "@deskwork/core",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Editorial calendar + review pipeline library — shared by @deskwork/cli and @deskwork/studio",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/audiocontrol-org/deskwork.git",
+    "directory": "packages/core"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./body-state": "./src/body-state.ts",
+    "./calendar": "./src/calendar.ts",
+    "./calendar-mutations": "./src/calendar-mutations.ts",
+    "./cli-args": "./src/cli.ts",
+    "./config": "./src/config.ts",
+    "./frontmatter": "./src/frontmatter.ts",
+    "./journal": "./src/journal.ts",
+    "./paths": "./src/paths.ts",
+    "./review": "./src/review/index.ts",
+    "./review/handlers": "./src/review/handlers.ts",
+    "./review/pipeline": "./src/review/pipeline.ts",
+    "./review/render": "./src/review/render.ts",
+    "./review/report": "./src/review/report.ts",
+    "./review/types": "./src/review/types.ts",
+    "./scaffold": "./src/scaffold.ts",
+    "./types": "./src/types.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "rehype-stringify": "^10.0.0",
+    "remark-parse": "^11.0.0",
+    "remark-rehype": "^11.1.0",
+    "unified": "^11.0.5",
+    "yaml": "^2.8.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.2"
+  }
+}

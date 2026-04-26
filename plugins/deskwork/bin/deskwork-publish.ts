@@ -17,24 +17,24 @@
  */
 
 import { existsSync } from 'node:fs';
-import { readConfig } from '../lib/config.ts';
-import { readCalendar, writeCalendar } from '../lib/calendar.ts';
+import { readConfig } from '@deskwork/core/config';
+import { readCalendar, writeCalendar } from '@deskwork/core/calendar';
 import {
   findEntry,
   publishEntry,
   setContentUrl,
-} from '../lib/calendar-mutations.ts';
+} from '@deskwork/core/calendar-mutations';
 import {
   effectiveContentType,
   hasRepoContent,
   requiresContentUrl,
-} from '../lib/types.ts';
+} from '@deskwork/core/types';
 import {
   resolveSite,
   resolveCalendarPath,
   resolveBlogFilePath,
-} from '../lib/paths.ts';
-import { absolutize, emit, fail, parseArgs } from '../lib/cli.ts';
+} from '@deskwork/core/paths';
+import { absolutize, emit, fail, parseArgs } from '@deskwork/core/cli-args';
 
 const KNOWN_FLAGS = ['site', 'date', 'content-url'] as const;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;

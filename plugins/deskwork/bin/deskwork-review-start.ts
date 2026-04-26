@@ -17,11 +17,11 @@
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { readConfig } from '../lib/config.ts';
-import { resolveSite, resolveBlogFilePath } from '../lib/paths.ts';
-import { createWorkflow, readVersions } from '../lib/review/pipeline.ts';
-import { bodyState } from '../lib/body-state.ts';
-import { absolutize, emit, fail, parseArgs } from '../lib/cli.ts';
+import { readConfig } from '@deskwork/core/config';
+import { resolveSite, resolveBlogFilePath } from '@deskwork/core/paths';
+import { createWorkflow, readVersions } from '@deskwork/core/review/pipeline';
+import { bodyState } from '@deskwork/core/body-state';
+import { absolutize, emit, fail, parseArgs } from '@deskwork/core/cli-args';
 
 const KNOWN_FLAGS = ['site'] as const;
 const SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;

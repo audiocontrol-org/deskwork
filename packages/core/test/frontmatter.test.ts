@@ -5,7 +5,7 @@ import {
   updateFrontmatter,
   readFrontmatter,
   writeFrontmatter,
-} from '@/lib/frontmatter.ts';
+} from '../src/frontmatter.ts';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

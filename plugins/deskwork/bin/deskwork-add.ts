@@ -11,12 +11,12 @@
  *   { "slug": "...", "stage": "Ideas", "site": "...", "calendarPath": "..." }
  */
 
-import { readConfig } from '../lib/config.ts';
-import { readCalendar, writeCalendar } from '../lib/calendar.ts';
-import { addEntry } from '../lib/calendar-mutations.ts';
-import { resolveSite, resolveCalendarPath } from '../lib/paths.ts';
-import { isContentType, type ContentType } from '../lib/types.ts';
-import { absolutize, emit, fail, parseArgs } from '../lib/cli.ts';
+import { readConfig } from '@deskwork/core/config';
+import { readCalendar, writeCalendar } from '@deskwork/core/calendar';
+import { addEntry } from '@deskwork/core/calendar-mutations';
+import { resolveSite, resolveCalendarPath } from '@deskwork/core/paths';
+import { isContentType, type ContentType } from '@deskwork/core/types';
+import { absolutize, emit, fail, parseArgs } from '@deskwork/core/cli-args';
 
 const KNOWN_FLAGS = ['site', 'type', 'content-url', 'source'] as const;
 

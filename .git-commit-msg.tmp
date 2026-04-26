@@ -1,0 +1,41 @@
+refactor(deskwork): extract @deskwork/core npm package
+
+First commit toward severing the plugin from in-tree code. Per the plan
+in /Users/orion/.claude/plans/i-would-like-to-wiggly-hennessy.md, the
+target is a thin SKILL-only plugin pointing at npm-published packages
+(@deskwork/cli, @deskwork/studio later) so:
+  - Headless skills don't carry studio weight
+  - Studio doesn't depend on Astro
+  - Plugin updates decouple from npm-package updates
+
+This commit moves the lib code out of the plugin tree into its own
+workspace package. Behavior unchanged. The bin/ scripts and
+integration tests now resolve `@deskwork/core/<subpath>` through the
+npm-workspace symlink instead of relative `../lib/X.ts` imports.
+
+Changes:
+- Add packages/core/ workspace with src/, test/, package.json, tsconfig,
+  vitest config. Subpath exports cover all internal modules.
+- Move plugins/deskwork/lib/* → packages/core/src/* (git mv preserves
+  history)
+- Move 9 lib tests → packages/core/test/* with `../src/X.ts` imports
+- Update plugins/deskwork/package.json: drop yaml/unified/remark/
+  rehype-stringify (now @deskwork/core deps); declare @deskwork/core: *
+- Update plugins/deskwork/bin/* and 3 integration tests to import from
+  @deskwork/core/<subpath>
+- Update root package.json workspaces: ["packages/*", "plugins/*"]
+- Update review-lifecycle-integration.test.ts inline tsx scripts to
+  use @deskwork/core/review/pipeline + @deskwork/core/config (no more
+  pluginRoot/lib/...)
+
+Verified:
+- 126/126 @deskwork/core tests pass
+- 27/27 @deskwork/plugin tests pass (3 integration files spawning real
+  bin scripts via tsx)
+- npm --workspaces run typecheck clean
+- claude plugin validate plugins/deskwork passes
+- claude --plugin-dir lists all 12 skills
+
+Next commits per the plan: extract @deskwork/cli (bin/ → packages/cli/),
+build @deskwork/studio (Hono server + UI), add deskwork-studio plugin
+shell.

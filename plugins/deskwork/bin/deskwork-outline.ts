@@ -17,16 +17,16 @@
  *     site, calendarPath }
  */
 
-import { readConfig } from '../lib/config.ts';
-import { readCalendar, writeCalendar } from '../lib/calendar.ts';
-import { outlineEntry, findEntry } from '../lib/calendar-mutations.ts';
-import { scaffoldBlogPost, type ScaffoldResult } from '../lib/scaffold.ts';
+import { readConfig } from '@deskwork/core/config';
+import { readCalendar, writeCalendar } from '@deskwork/core/calendar';
+import { outlineEntry, findEntry } from '@deskwork/core/calendar-mutations';
+import { scaffoldBlogPost, type ScaffoldResult } from '@deskwork/core/scaffold';
 import {
   effectiveContentType,
   hasRepoContent,
-} from '../lib/types.ts';
-import { resolveSite, resolveCalendarPath } from '../lib/paths.ts';
-import { absolutize, emit, fail, parseArgs } from '../lib/cli.ts';
+} from '@deskwork/core/types';
+import { resolveSite, resolveCalendarPath } from '@deskwork/core/paths';
+import { absolutize, emit, fail, parseArgs } from '@deskwork/core/cli-args';
 
 const KNOWN_FLAGS = ['site', 'author'] as const;
 

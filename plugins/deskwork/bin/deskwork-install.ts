@@ -19,8 +19,8 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
-import { parseConfig, configPath } from '../lib/config.ts';
-import { renderEmptyCalendar } from '../lib/calendar.ts';
+import { parseConfig, configPath } from '@deskwork/core/config';
+import { renderEmptyCalendar } from '@deskwork/core/calendar';
 
 function usage(): never {
   console.error('Usage: deskwork-install <project-root> <config-file>');

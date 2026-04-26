@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { scaffoldBlogPost } from '@/lib/scaffold.ts';
-import type { DeskworkConfig } from '@/lib/config.ts';
-import type { CalendarEntry } from '@/lib/types.ts';
+import { scaffoldBlogPost } from '../src/scaffold.ts';
+import type { DeskworkConfig } from '../src/config.ts';
+import type { CalendarEntry } from '../src/types.ts';
 
 function makeConfig(overrides?: Partial<DeskworkConfig>): DeskworkConfig {
   return {

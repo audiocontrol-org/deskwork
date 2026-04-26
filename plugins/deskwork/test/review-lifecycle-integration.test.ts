@@ -119,8 +119,8 @@ describe('review loop', () => {
     // Simulate the operator clicking "Start Review" → "Request Iteration" via
     // direct pipeline transitions. In the studio these would be API calls.
     const pipeline = `
-      import { transitionState } from '${pluginRoot}/lib/review/pipeline.ts';
-      import { readConfig } from '${pluginRoot}/lib/config.ts';
+      import { transitionState } from '@deskwork/core/review/pipeline';
+      import { readConfig } from '@deskwork/core/config';
       const cfg = readConfig('${project}');
       transitionState('${project}', cfg, '${workflowId}', 'in-review');
       transitionState('${project}', cfg, '${workflowId}', 'iterating');
@@ -147,8 +147,8 @@ describe('review loop', () => {
 
     // Operator approves v2 — simulate via pipeline API calls.
     const approveScript = `
-      import { transitionState, mintAnnotation, appendAnnotation } from '${pluginRoot}/lib/review/pipeline.ts';
-      import { readConfig } from '${pluginRoot}/lib/config.ts';
+      import { transitionState, mintAnnotation, appendAnnotation } from '@deskwork/core/review/pipeline';
+      import { readConfig } from '@deskwork/core/config';
       const cfg = readConfig('${project}');
       const ann = mintAnnotation({ type: 'approve', workflowId: '${workflowId}', version: 2 });
       appendAnnotation('${project}', cfg, ann);
@@ -184,8 +184,8 @@ describe('review loop', () => {
       [
         '-e',
         `
-          import { transitionState } from '${pluginRoot}/lib/review/pipeline.ts';
-          import { readConfig } from '${pluginRoot}/lib/config.ts';
+          import { transitionState } from '@deskwork/core/review/pipeline';
+          import { readConfig } from '@deskwork/core/config';
           const cfg = readConfig('${project}');
           transitionState('${project}', cfg, '${workflowId}', 'in-review');
           transitionState('${project}', cfg, '${workflowId}', 'iterating');

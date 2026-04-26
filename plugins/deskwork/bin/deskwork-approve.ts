@@ -17,25 +17,25 @@
  */
 
 import { existsSync } from 'node:fs';
-import { readConfig } from '../lib/config.ts';
-import { resolveSite, resolveBlogFilePath, resolveCalendarPath } from '../lib/paths.ts';
-import { readCalendar, writeCalendar } from '../lib/calendar.ts';
+import { readConfig } from '@deskwork/core/config';
+import { resolveSite, resolveBlogFilePath, resolveCalendarPath } from '@deskwork/core/paths';
+import { readCalendar, writeCalendar } from '@deskwork/core/calendar';
 import {
   handleGetWorkflow,
-} from '../lib/review/handlers.ts';
+} from '@deskwork/core/review/handlers';
 import {
   readAnnotations,
   transitionState,
-} from '../lib/review/pipeline.ts';
+} from '@deskwork/core/review/pipeline';
 import type {
   ApproveAnnotation,
   DraftAnnotation,
   DraftVersion,
   DraftWorkflowItem,
-} from '../lib/review/types.ts';
-import { isPlatform } from '../lib/types.ts';
-import type { DeskworkConfig } from '../lib/config.ts';
-import { absolutize, emit, fail, parseArgs } from '../lib/cli.ts';
+} from '@deskwork/core/review/types';
+import { isPlatform } from '@deskwork/core/types';
+import type { DeskworkConfig } from '@deskwork/core/config';
+import { absolutize, emit, fail, parseArgs } from '@deskwork/core/cli-args';
 
 const KNOWN_FLAGS = ['site', 'platform', 'channel'] as const;
 const SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;

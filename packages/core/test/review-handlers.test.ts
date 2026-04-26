@@ -11,9 +11,9 @@ import {
   handleStartLongform,
   lineDiff,
   applyLineDiff,
-} from '@/lib/review/handlers.ts';
-import { createWorkflow } from '@/lib/review/pipeline.ts';
-import type { DeskworkConfig } from '@/lib/config.ts';
+} from '../src/review/handlers.ts';
+import { createWorkflow } from '../src/review/pipeline.ts';
+import type { DeskworkConfig } from '../src/config.ts';
 
 function config(): DeskworkConfig {
   return {

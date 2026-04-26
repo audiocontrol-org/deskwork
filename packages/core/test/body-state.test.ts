@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { bodyState, PLACEHOLDER_MARKER } from '@/lib/body-state.ts';
+import { bodyState, PLACEHOLDER_MARKER } from '../src/body-state.ts';
 
 describe('bodyState', () => {
   let dir: string;

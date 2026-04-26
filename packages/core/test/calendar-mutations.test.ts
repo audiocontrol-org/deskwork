@@ -8,8 +8,8 @@ import {
   findEntry,
   addDistribution,
   slugify,
-} from '@/lib/calendar-mutations.ts';
-import type { EditorialCalendar } from '@/lib/types.ts';
+} from '../src/calendar-mutations.ts';
+import type { EditorialCalendar } from '../src/types.ts';
 
 function emptyCalendar(): EditorialCalendar {
   return { entries: [], distributions: [] };

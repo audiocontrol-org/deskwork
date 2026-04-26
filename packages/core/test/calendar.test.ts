@@ -5,8 +5,8 @@ import {
   renderCalendar,
   renderEmptyCalendar,
   readCalendar,
-} from '@/lib/calendar.ts';
-import type { EditorialCalendar } from '@/lib/types.ts';
+} from '../src/calendar.ts';
+import type { EditorialCalendar } from '../src/types.ts';
 
 describe('parseCalendar', () => {
   it('parses an empty calendar', () => {

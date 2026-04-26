@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { parseConfig, readConfig, configPath } from '@/lib/config.ts';
+import { parseConfig, readConfig, configPath } from '../src/config.ts';
 
 describe('parseConfig', () => {
   it('accepts a minimal single-site config and infers defaultSite', () => {

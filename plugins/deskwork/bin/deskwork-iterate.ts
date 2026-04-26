@@ -24,8 +24,8 @@
  */
 
 import { existsSync, readFileSync } from 'node:fs';
-import { readConfig } from '../lib/config.ts';
-import { resolveSite, resolveBlogFilePath } from '../lib/paths.ts';
+import { readConfig } from '@deskwork/core/config';
+import { resolveSite, resolveBlogFilePath } from '@deskwork/core/paths';
 import {
   appendAnnotation,
   appendVersion,
@@ -34,8 +34,8 @@ import {
   readVersions,
   readWorkflows,
   transitionState,
-} from '../lib/review/pipeline.ts';
-import { absolutize, emit, fail, parseArgs } from '../lib/cli.ts';
+} from '@deskwork/core/review/pipeline';
+import { absolutize, emit, fail, parseArgs } from '@deskwork/core/cli-args';
 
 const KNOWN_FLAGS = ['site', 'kind', 'dispositions'] as const;
 const DISPOSITIONS = new Set(['addressed', 'deferred', 'wontfix'] as const);

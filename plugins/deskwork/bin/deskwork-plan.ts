@@ -10,11 +10,11 @@
  * comma-separated string. Emits a JSON result with the updated entry.
  */
 
-import { readConfig } from '../lib/config.ts';
-import { readCalendar, writeCalendar } from '../lib/calendar.ts';
-import { planEntry } from '../lib/calendar-mutations.ts';
-import { resolveSite, resolveCalendarPath } from '../lib/paths.ts';
-import { absolutize, emit, fail, parseArgs } from '../lib/cli.ts';
+import { readConfig } from '@deskwork/core/config';
+import { readCalendar, writeCalendar } from '@deskwork/core/calendar';
+import { planEntry } from '@deskwork/core/calendar-mutations';
+import { resolveSite, resolveCalendarPath } from '@deskwork/core/paths';
+import { absolutize, emit, fail, parseArgs } from '@deskwork/core/cli-args';
 
 const KNOWN_FLAGS = ['site', 'topics'] as const;
 

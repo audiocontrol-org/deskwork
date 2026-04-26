@@ -19,7 +19,7 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseCalendar } from '@/lib/calendar.ts';
+import { parseCalendar } from '@deskwork/core/calendar';
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 const pluginRoot = resolve(testDir, '..');

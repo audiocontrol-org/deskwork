@@ -11,9 +11,9 @@
  *   deskwork-review-report <project-root> --format text
  */
 
-import { readConfig } from '../lib/config.ts';
-import { buildReport, renderReport } from '../lib/review/report.ts';
-import { absolutize, emit, fail, parseArgs } from '../lib/cli.ts';
+import { readConfig } from '@deskwork/core/config';
+import { buildReport, renderReport } from '@deskwork/core/review/report';
+import { absolutize, emit, fail, parseArgs } from '@deskwork/core/cli-args';
 
 const KNOWN_FLAGS = ['site', 'format'] as const;
 const BOOLEAN_FLAGS = ['include-active'] as const;

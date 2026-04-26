@@ -16,9 +16,9 @@ import {
   listOpen,
   pipelinePath,
   historyPath,
-} from '@/lib/review/pipeline.ts';
-import { isValidTransition } from '@/lib/review/types.ts';
-import type { DeskworkConfig } from '@/lib/config.ts';
+} from '../src/review/pipeline.ts';
+import { isValidTransition } from '../src/review/types.ts';
+import type { DeskworkConfig } from '../src/config.ts';
 
 function config(journalDir?: string): DeskworkConfig {
   const c: DeskworkConfig = {
