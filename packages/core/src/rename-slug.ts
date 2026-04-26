@@ -49,7 +49,7 @@ export interface RenameSlugResult {
   dryRun: boolean;
 }
 
-const SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
+const SLUG_RE = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
 
 export function validateSlug(slug: string): void {
   if (!SLUG_RE.test(slug)) {

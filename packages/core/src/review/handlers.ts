@@ -335,7 +335,7 @@ interface StartLongformBody {
   entryId?: string;
 }
 
-const SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
+const SLUG_RE = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
 
 /**
  * Enqueue a longform draft review from the studio dashboard. Reads the

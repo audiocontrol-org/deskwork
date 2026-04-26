@@ -62,7 +62,19 @@ export interface ScrapbookSummary {
 // Validation
 // ---------------------------------------------------------------------------
 
-const SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
+/**
+ * A single slug segment — kebab-case lowercase. Used both for flat
+ * slugs and as the building block of hierarchical paths.
+ */
+const SLUG_SEGMENT_RE = /^[a-z0-9][a-z0-9-]*$/;
+
+/**
+ * A full slug path — one or more `/`-separated kebab-case segments.
+ * Accepts both legacy flat slugs ("scsi-over-wifi") and hierarchical
+ * paths ("the-outbound/characters/strivers"). No leading or trailing
+ * slash; no empty segments.
+ */
+const SLUG_RE = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
 const FILENAME_RE = /^[a-zA-Z0-9._-][a-zA-Z0-9._ -]*$/;
 
 export function assertSlug(slug: string): void {
@@ -70,6 +82,25 @@ export function assertSlug(slug: string): void {
     throw new Error(`invalid slug "${slug}" — must match ${SLUG_RE}`);
   }
 }
+
+/**
+ * Split a hierarchical slug into its segments. Each segment is a
+ * standalone kebab-case identifier.
+ */
+export function slugSegments(slug: string): string[] {
+  return slug.split('/');
+}
+
+/**
+ * True if a slug refers to a nested entry (has at least one `/`).
+ */
+export function isNestedSlug(slug: string): boolean {
+  return slug.includes('/');
+}
+
+// `SLUG_SEGMENT_RE` is exported for callers that need to validate one
+// segment at a time (e.g. when assembling a path interactively).
+export { SLUG_SEGMENT_RE };
 
 export function assertFilename(name: string): void {
   if (!name || name === '.' || name === '..') {
