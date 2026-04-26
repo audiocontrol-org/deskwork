@@ -121,3 +121,132 @@ Tasks:
 - No project-local editorial skills remain in audiocontrol.org
 - The editorial calendar operates identically to pre-migration
 - Plugin is tagged v0.1.0 and installable via marketplace
+
+---
+
+## Extension: severance from Astro + headless/UI split
+
+Added mid-implementation. See PRD "Extension" section for motivation. Approved plan: `/Users/orion/.claude/plans/i-would-like-to-wiggly-hennessy.md`.
+
+The original Phase 4 (dogfood in audiocontrol.org) moves to Phase 12 to follow the architectural restructure. Phase 5 (visibility/distribution skills) and Phase 6 (cutover) remain unchanged but happen after Phase 12.
+
+---
+
+### Phase 7: Extract @deskwork/core npm package
+
+**Deliverable:** Pure library package consumable as `@deskwork/core` from cli and studio packages
+
+Tasks:
+- [x] Convert repo to npm workspaces (`packages/*` + `plugins/*`)
+- [x] Move `plugins/deskwork/lib/*` → `packages/core/src/*`
+- [x] Define subpath exports (`@deskwork/core/calendar`, `@deskwork/core/review/handlers`, etc.)
+- [x] Update test imports across the workspace
+- [x] All 126 core tests pass under the new layout
+
+**Acceptance Criteria:**
+- [x] `packages/core/package.json` declares 16 subpath exports mapping to `.ts` source files
+- [x] Tests resolve `@deskwork/core/*` via npm workspace symlinks
+- [x] No cross-plugin `../` imports remain
+
+**Commit:** `b8d49c5`
+
+---
+
+### Phase 8: Extract @deskwork/cli with single dispatcher
+
+**Deliverable:** A `deskwork` CLI binary exposing all 12 lifecycle subcommands via one entry point
+
+Tasks:
+- [x] Create `packages/cli/src/cli.ts` dispatcher with SUBCOMMANDS map
+- [x] Move 12 bin scripts → `packages/cli/src/commands/<name>.ts` exporting `run(argv)`
+- [x] Inject `process.cwd()` as project root when first positional isn't path-like
+- [x] Replace `bin/deskwork-X.ts` references in 12 SKILL.md files with `deskwork <subcommand>`
+- [x] Add bash wrapper at `plugins/deskwork/bin/deskwork` that finds workspace bin first, falls back to `npx -y @deskwork/cli@latest`
+- [x] Delete obsolete plugin-local `bin/`, `lib/`, `test/`, `tsconfig.json`, `vitest.config.ts`
+
+**Acceptance Criteria:**
+- [x] All 27 cli integration tests pass
+- [x] SKILL.md invocations exercise the dispatcher, not bin scripts
+- [x] Plugin shell ships zero TypeScript
+
+**Commit:** `7c2d64c`
+
+---
+
+### Phase 9: Build @deskwork/studio (Hono server + scaffolds)
+
+**Deliverable:** Standalone web server exposing the 6 review API routes + 3 page renders
+
+Tasks:
+- [x] Add Hono + @hono/node-server deps under `packages/studio/`
+- [x] Build `packages/studio/src/server.ts` with createApp(ctx) factory + main() loop
+- [x] Wire 6 route handlers in `routes/api.ts` (annotate, listAnnotations, decision, getWorkflow, createVersion, startLongform)
+- [x] Add CLI args `--project-root` (default cwd) and `--port` (default 4321)
+- [x] Detect symlinked bin entry via `realpathSync(process.argv[1])`
+- [x] Scaffold 3 page renderers (dashboard, review, shortform) embedding data as `<script type="application/json">`
+- [x] In-process tests via `app.fetch(new Request(...))`
+
+**Acceptance Criteria:**
+- [x] 12/12 studio tests pass (covers all 6 API routes + 3 page renders + redirect)
+- [x] Live boot: `deskwork-studio --port 47321` returns 200 on dashboard, 302 on root, 200 on shortform, 404 on missing workflow
+- [x] No Astro deps anywhere in the studio package
+
+**Commit:** `3c47709`
+
+---
+
+### Phase 10: Port studio UI assets verbatim from audiocontrol
+
+**Deliverable:** Studio dashboard renders identically to audiocontrol's Astro version
+
+Tasks:
+- [ ] Copy `editorial-review-client.ts` (~1,609 lines) → `packages/studio/public/client.ts`
+- [ ] Copy `editorial-review-editor.ts` (~201 lines) → `packages/studio/public/editor.ts`
+- [ ] Copy `editorial-studio-client.ts` (~643 lines) → `packages/studio/public/studio-client.ts`
+- [ ] Copy `editorial-review.css` (~2,269 lines) → `packages/studio/public/review.css`
+- [ ] Copy `editorial-studio.css` (~171 lines) → `packages/studio/public/studio.css`
+- [ ] Replace 3 page render scaffolds with full template ports (~400 lines of HTML-string conversion)
+- [ ] Pre-bundle TS for v0.1 (no esbuild step at install time)
+- [ ] Wire `app.use('/static/*', serveStatic(...))` for assets
+
+**Acceptance Criteria:**
+- Manual: open `http://localhost:4321/dev/editorial-studio` against sandbox-audiocontrol; dashboard loads with live workflows
+- Browser: dashboard → review → approve click-through works
+- API responses match audiocontrol's existing routes byte-for-byte (handlers are reused; only HTTP plumbing differs)
+
+---
+
+### Phase 11: Add deskwork-studio plugin shell + marketplace entry
+
+**Deliverable:** Second plugin in the marketplace that wraps the studio launch
+
+Tasks:
+- [ ] Create `plugins/deskwork-studio/.claude-plugin/plugin.json`
+- [ ] Create `plugins/deskwork-studio/skills/studio/SKILL.md` invoking `npx @deskwork/studio`
+- [ ] Add bash wrapper at `plugins/deskwork-studio/bin/deskwork-studio` (workspace-first, npx fallback)
+- [ ] Register `deskwork-studio` plugin in `.claude-plugin/marketplace.json` alongside `deskwork`
+- [ ] `claude plugin validate plugins/deskwork-studio` passes
+
+**Acceptance Criteria:**
+- Marketplace lists both plugins
+- `claude --plugin-dir plugins/deskwork-studio` shows `/deskwork-studio:studio` in the picker
+- Headless users can install `deskwork` alone with no Hono in their tree
+
+---
+
+### Phase 12: End-to-end dogfood (CLI + studio) against sandbox
+
+**Deliverable:** Full editorial lifecycle exercised through the new architecture
+
+Tasks:
+- [ ] Run `add → outline → plan → draft → review-start → iterate → approve` via `deskwork` CLI against `~/work/deskwork-work/sandbox-audiocontrol`
+- [ ] Boot studio against the sandbox; visit `http://localhost:4321/dev/editorial-studio`
+- [ ] Click through review/approve in the browser
+- [ ] Verify calendar + journal mutations are byte-identical to what the old Astro studio would produce
+- [ ] Re-run the live-audiocontrol round-trip test (parse → render → diff is empty)
+
+**Acceptance Criteria:**
+- All lifecycle skills succeed end-to-end through the CLI
+- Studio UI loads and a full review/approve cycle completes against the sandbox
+- Calendar parity preserved against `~/work/audiocontrol.org/docs/editorial-calendar-audiocontrol.md`
+- Decision: ready to publish to npm registry as v0.1.0, or defer further
