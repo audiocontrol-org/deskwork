@@ -1,0 +1,306 @@
+/**
+ * Scrapbook tests — addressed by hierarchical path, with public/secret split.
+ *
+ * Uses real on-disk fixture trees (per the project's testing rule —
+ * "Use fixture project trees on disk, never mock the filesystem"); the
+ * scrapbook module touches readdirSync/statSync directly, so a mock
+ * would just be testing the mock.
+ */
+
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  rmSync,
+} from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import {
+  assertSlug,
+  classify,
+  countScrapbook,
+  createScrapbookMarkdown,
+  isNestedSlug,
+  listScrapbook,
+  readScrapbookFile,
+  scrapbookDir,
+  scrapbookFilePath,
+  slugSegments,
+  SECRET_SUBDIR,
+} from '../src/scrapbook.ts';
+import type { DeskworkConfig } from '../src/config.ts';
+
+function makeConfig(): DeskworkConfig {
+  return {
+    version: 1,
+    sites: {
+      wc: {
+        host: 'wc.example',
+        contentDir: 'src/content/projects',
+        calendarPath: 'docs/cal.md',
+        blogFilenameTemplate: '{slug}/index.md',
+      },
+    },
+    defaultSite: 'wc',
+  };
+}
+
+describe('slug helpers', () => {
+  it('assertSlug accepts hierarchical paths', () => {
+    expect(() => assertSlug('the-outbound')).not.toThrow();
+    expect(() => assertSlug('the-outbound/characters')).not.toThrow();
+    expect(() => assertSlug('the-outbound/characters/strivers')).not.toThrow();
+  });
+
+  it('assertSlug rejects malformed paths', () => {
+    expect(() => assertSlug('')).toThrow();
+    expect(() => assertSlug('/leading')).toThrow();
+    expect(() => assertSlug('trailing/')).toThrow();
+    expect(() => assertSlug('double//slash')).toThrow();
+    expect(() => assertSlug('UpperCase')).toThrow();
+    expect(() => assertSlug('with spaces')).toThrow();
+    expect(() => assertSlug('the-outbound/Characters')).toThrow(); // mid-path uppercase
+  });
+
+  it('slugSegments splits on /', () => {
+    expect(slugSegments('flat')).toEqual(['flat']);
+    expect(slugSegments('a/b/c')).toEqual(['a', 'b', 'c']);
+  });
+
+  it('isNestedSlug detects hierarchy', () => {
+    expect(isNestedSlug('flat')).toBe(false);
+    expect(isNestedSlug('a/b')).toBe(true);
+  });
+});
+
+describe('scrapbookDir + scrapbookFilePath path containment', () => {
+  let root: string;
+  const cfg = makeConfig();
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'deskwork-scrapbook-'));
+  });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it('resolves to <contentDir>/<slug>/scrapbook for flat slugs', () => {
+    const dir = scrapbookDir(root, cfg, 'wc', 'flat-piece');
+    expect(dir).toBe(join(root, 'src/content/projects/flat-piece/scrapbook'));
+  });
+
+  it('resolves to <contentDir>/<deep-slug>/scrapbook for hierarchical slugs', () => {
+    const dir = scrapbookDir(
+      root,
+      cfg,
+      'wc',
+      'the-outbound/characters/strivers',
+    );
+    expect(dir).toBe(
+      join(
+        root,
+        'src/content/projects/the-outbound/characters/strivers/scrapbook',
+      ),
+    );
+  });
+
+  it('scrapbookFilePath with secret:false returns top-level path', () => {
+    const p = scrapbookFilePath(root, cfg, 'wc', 'pillar', 'note.md');
+    expect(p).toBe(
+      join(root, 'src/content/projects/pillar/scrapbook/note.md'),
+    );
+  });
+
+  it('scrapbookFilePath with secret:true joins the secret subdir', () => {
+    const p = scrapbookFilePath(
+      root,
+      cfg,
+      'wc',
+      'pillar',
+      'private.md',
+      { secret: true },
+    );
+    expect(p).toBe(
+      join(
+        root,
+        'src/content/projects/pillar/scrapbook',
+        SECRET_SUBDIR,
+        'private.md',
+      ),
+    );
+  });
+
+  it('rejects a path-traversal filename', () => {
+    expect(() =>
+      scrapbookFilePath(root, cfg, 'wc', 'pillar', '../escape.md'),
+    ).toThrow();
+  });
+});
+
+describe('listScrapbook public + secret split', () => {
+  let root: string;
+  const cfg = makeConfig();
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'deskwork-scrapbook-list-'));
+  });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it('returns empty when scrapbook does not exist', () => {
+    const summary = listScrapbook(root, cfg, 'wc', 'no-scrapbook');
+    expect(summary.exists).toBe(false);
+    expect(summary.items).toEqual([]);
+    expect(summary.secretItems).toEqual([]);
+  });
+
+  it('lists top-level files as public items', () => {
+    const dir = join(root, 'src/content/projects/pillar/scrapbook');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'README.md'), '# notes');
+    writeFileSync(join(dir, 'reference.json'), '{}');
+    const summary = listScrapbook(root, cfg, 'wc', 'pillar');
+    expect(summary.exists).toBe(true);
+    const names = summary.items.map((i) => i.name).sort();
+    expect(names).toEqual(['README.md', 'reference.json']);
+    expect(summary.secretItems).toEqual([]);
+  });
+
+  it('lists files inside scrapbook/secret/ as secret items', () => {
+    const sb = join(root, 'src/content/projects/pillar/scrapbook');
+    const secret = join(sb, SECRET_SUBDIR);
+    mkdirSync(secret, { recursive: true });
+    writeFileSync(join(sb, 'public.md'), '# public');
+    writeFileSync(join(secret, 'draft.md'), '# secret draft');
+    writeFileSync(join(secret, 'sensitive.json'), '{}');
+    const summary = listScrapbook(root, cfg, 'wc', 'pillar');
+    expect(summary.items.map((i) => i.name)).toEqual(['public.md']);
+    const secretNames = summary.secretItems.map((i) => i.name).sort();
+    expect(secretNames).toEqual(['draft.md', 'sensitive.json']);
+  });
+
+  it('does NOT count secret/ as a top-level item', () => {
+    const sb = join(root, 'src/content/projects/pillar/scrapbook');
+    mkdirSync(join(sb, SECRET_SUBDIR), { recursive: true });
+    writeFileSync(join(sb, 'public.md'), '#');
+    const summary = listScrapbook(root, cfg, 'wc', 'pillar');
+    expect(summary.items.map((i) => i.name)).toEqual(['public.md']);
+  });
+
+  it('ignores other subdirectories at the top level', () => {
+    const sb = join(root, 'src/content/projects/pillar/scrapbook');
+    mkdirSync(join(sb, 'archive'), { recursive: true });
+    writeFileSync(join(sb, 'archive', 'old.md'), '#');
+    writeFileSync(join(sb, 'kept.md'), '#');
+    const summary = listScrapbook(root, cfg, 'wc', 'pillar');
+    expect(summary.items.map((i) => i.name)).toEqual(['kept.md']);
+  });
+
+  it('addresses scrapbooks at hierarchical paths', () => {
+    const dir = join(
+      root,
+      'src/content/projects/the-outbound/characters/scrapbook',
+    );
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'archetypes.md'), '#');
+    const summary = listScrapbook(
+      root,
+      cfg,
+      'wc',
+      'the-outbound/characters',
+    );
+    expect(summary.exists).toBe(true);
+    expect(summary.items.map((i) => i.name)).toEqual(['archetypes.md']);
+  });
+});
+
+describe('countScrapbook', () => {
+  let root: string;
+  const cfg = makeConfig();
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'deskwork-scrapbook-count-'));
+  });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it('counts public + secret items together', () => {
+    const sb = join(root, 'src/content/projects/p/scrapbook');
+    const secret = join(sb, SECRET_SUBDIR);
+    mkdirSync(secret, { recursive: true });
+    writeFileSync(join(sb, 'a.md'), '#');
+    writeFileSync(join(sb, 'b.md'), '#');
+    writeFileSync(join(secret, 'c.md'), '#');
+    expect(countScrapbook(root, cfg, 'wc', 'p')).toBe(3);
+  });
+
+  it('returns 0 for non-existent scrapbook', () => {
+    expect(countScrapbook(root, cfg, 'wc', 'p')).toBe(0);
+  });
+});
+
+describe('createScrapbookMarkdown with secret flag', () => {
+  let root: string;
+  const cfg = makeConfig();
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'deskwork-scrapbook-create-'));
+  });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it('creates a public file at scrapbook/<filename> by default', () => {
+    createScrapbookMarkdown(
+      root,
+      cfg,
+      'wc',
+      'p',
+      'public-note.md',
+      '# public',
+    );
+    const summary = listScrapbook(root, cfg, 'wc', 'p');
+    expect(summary.items.map((i) => i.name)).toEqual(['public-note.md']);
+    expect(summary.secretItems).toEqual([]);
+  });
+
+  it('creates a secret file at scrapbook/secret/<filename> when secret:true', () => {
+    createScrapbookMarkdown(
+      root,
+      cfg,
+      'wc',
+      'p',
+      'private-note.md',
+      '# private',
+      { secret: true },
+    );
+    const summary = listScrapbook(root, cfg, 'wc', 'p');
+    expect(summary.items).toEqual([]);
+    expect(summary.secretItems.map((i) => i.name)).toEqual(['private-note.md']);
+  });
+
+  it('readScrapbookFile finds a secret file via the secret flag', () => {
+    createScrapbookMarkdown(
+      root,
+      cfg,
+      'wc',
+      'p',
+      'private.md',
+      '# private body',
+      { secret: true },
+    );
+    // Reading without the flag fails (looks at the public path)
+    expect(() => readScrapbookFile(root, cfg, 'wc', 'p', 'private.md')).toThrow();
+    // With the flag, it resolves
+    const f = readScrapbookFile(root, cfg, 'wc', 'p', 'private.md', {
+      secret: true,
+    });
+    expect(f.content.toString('utf-8')).toBe('# private body');
+  });
+});
+
+describe('classify (existing behavior, unchanged)', () => {
+  it('buckets by extension', () => {
+    expect(classify('a.md')).toBe('md');
+    expect(classify('a.markdown')).toBe('md');
+    expect(classify('a.json')).toBe('json');
+    expect(classify('a.png')).toBe('img');
+    expect(classify('a.txt')).toBe('txt');
+    expect(classify('a.unknown')).toBe('other');
+  });
+});

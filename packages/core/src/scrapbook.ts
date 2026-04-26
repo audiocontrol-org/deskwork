@@ -52,11 +52,27 @@ export interface ScrapbookItem {
 
 export interface ScrapbookSummary {
   site: string;
+  /**
+   * The scrapbook's location identifier — a slug for entries tied to a
+   * calendar row, or any directory path within `contentDir` for
+   * scrapbooks that hang off purely organizational nodes (e.g. an
+   * intermediate project directory that isn't itself a calendar entry).
+   */
   slug: string;
-  dir: string; // absolute path
+  dir: string; // absolute path to the scrapbook root directory
   exists: boolean;
+  /** Files at the top of `scrapbook/` (public/published-side notes). */
   items: ScrapbookItem[];
+  /**
+   * Files inside `scrapbook/secret/` — never to be published. Operators
+   * can drop research, drafts, or sensitive notes here knowing the host
+   * project's content collection patterns won't pick them up.
+   */
+  secretItems: ScrapbookItem[];
 }
+
+/** Well-known subdirectory name for editorially-private scrapbook items. */
+export const SECRET_SUBDIR = 'secret';
 
 // ---------------------------------------------------------------------------
 // Validation
@@ -139,10 +155,19 @@ export function scrapbookDir(
   return join(articleDir, 'scrapbook');
 }
 
+/** Options that select between the public scrapbook root and `secret/`. */
+export interface ScrapbookLocation {
+  /** When true, the file lives under `scrapbook/secret/`. Default: false. */
+  secret?: boolean;
+}
+
 /**
  * Resolve a filename INSIDE a scrapbook dir and return the absolute
  * path. Throws if the resolved path escapes the scrapbook dir (guards
  * against `..` sequences that slipped through assertFilename).
+ *
+ * When `opts.secret` is true, the returned path is rooted at
+ * `<scrapbook>/secret/<filename>` instead of `<scrapbook>/<filename>`.
  */
 export function scrapbookFilePath(
   projectRoot: string,
@@ -150,10 +175,15 @@ export function scrapbookFilePath(
   site: string,
   slug: string,
   filename: string,
+  opts: ScrapbookLocation = {},
 ): string {
   assertFilename(filename);
   const dir = scrapbookDir(projectRoot, config, site, slug);
-  const abs = resolve(dir, filename);
+  const target = opts.secret ? join(dir, SECRET_SUBDIR) : dir;
+  const abs = resolve(target, filename);
+  // Guard either against `..` escape from secret/ AND escape from the
+  // top-level scrapbook dir. The base of the containment check is the
+  // top-level dir so secret/ always sits inside it.
   if (!abs.startsWith(dir + '/') && abs !== dir) {
     throw new Error(
       `resolved path escapes scrapbook dir: "${filename}" → ${abs}`,
@@ -201,7 +231,13 @@ export function classify(filename: string): ScrapbookItemKind {
 // Listing
 // ---------------------------------------------------------------------------
 
-/** List the items in a scrapbook, sorted newest-mtime first. */
+/**
+ * List the items in a scrapbook, sorted newest-mtime first. Returns
+ * both public items (top-level files) and secret items (files inside
+ * `scrapbook/secret/`). Subdirectories at the top level OTHER than
+ * `secret/` are ignored — deskwork doesn't recurse into arbitrary
+ * trees inside a scrapbook.
+ */
 export function listScrapbook(
   projectRoot: string,
   config: DeskworkConfig,
@@ -210,11 +246,18 @@ export function listScrapbook(
 ): ScrapbookSummary {
   const dir = scrapbookDir(projectRoot, config, site, slug);
   if (!existsSync(dir)) {
-    return { site, slug, dir, exists: false, items: [] };
+    return { site, slug, dir, exists: false, items: [], secretItems: [] };
   }
-  const entries = readdirSync(dir, { withFileTypes: true });
+  const items = listFilesInDir(dir);
+  const secretDir = join(dir, SECRET_SUBDIR);
+  const secretItems = existsSync(secretDir) ? listFilesInDir(secretDir) : [];
+  return { site, slug, dir, exists: true, items, secretItems };
+}
+
+/** Internal helper — list files (not subdirs/dotfiles) at a given path. */
+function listFilesInDir(dir: string): ScrapbookItem[] {
   const items: ScrapbookItem[] = [];
-  for (const e of entries) {
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
     if (!e.isFile()) continue;
     if (e.name.startsWith('.')) continue;
     const abs = join(dir, e.name);
@@ -227,10 +270,14 @@ export function listScrapbook(
     });
   }
   items.sort((a, b) => b.mtime.localeCompare(a.mtime));
-  return { site, slug, dir, exists: true, items };
+  return items;
 }
 
-/** Just the item count — used by the studio chip for the badge. */
+/**
+ * Total item count (public + secret). Used by the studio chip for the
+ * badge — operators want a single "has scrapbook content" signal that
+ * counts everything attached to this entry.
+ */
 export function countScrapbook(
   projectRoot: string,
   config: DeskworkConfig,
@@ -238,7 +285,8 @@ export function countScrapbook(
   slug: string,
 ): number {
   try {
-    return listScrapbook(projectRoot, config, site, slug).items.length;
+    const summary = listScrapbook(projectRoot, config, site, slug);
+    return summary.items.length + summary.secretItems.length;
   } catch {
     return 0;
   }
@@ -254,6 +302,7 @@ export function readScrapbookFile(
   site: string,
   slug: string,
   filename: string,
+  opts: ScrapbookLocation = {},
 ): {
   name: string;
   kind: ScrapbookItemKind;
@@ -261,7 +310,7 @@ export function readScrapbookFile(
   mtime: string;
   content: Buffer;
 } {
-  const abs = scrapbookFilePath(projectRoot, config, site, slug, filename);
+  const abs = scrapbookFilePath(projectRoot, config, site, slug, filename, opts);
   if (!existsSync(abs)) throw new Error(`not found: ${filename}`);
   const st = statSync(abs);
   if (!st.isFile()) throw new Error(`not a file: ${filename}`);
@@ -277,7 +326,8 @@ export function readScrapbookFile(
 
 /**
  * Create a new markdown note in the scrapbook. Creates the scrapbook
- * dir if it doesn't exist. Refuses to overwrite existing files.
+ * dir (and `secret/` subdir, if needed) if it doesn't exist. Refuses
+ * to overwrite existing files.
  */
 export function createScrapbookMarkdown(
   projectRoot: string,
@@ -286,11 +336,12 @@ export function createScrapbookMarkdown(
   slug: string,
   filename: string,
   body: string,
+  opts: ScrapbookLocation = {},
 ): ScrapbookItem {
   if (!filename.endsWith('.md')) {
     throw new Error(`create endpoint only accepts .md files: "${filename}"`);
   }
-  const abs = scrapbookFilePath(projectRoot, config, site, slug, filename);
+  const abs = scrapbookFilePath(projectRoot, config, site, slug, filename, opts);
   if (existsSync(abs)) {
     throw new Error(`file already exists: "${filename}"`);
   }
@@ -313,8 +364,9 @@ export function saveScrapbookFile(
   slug: string,
   filename: string,
   body: string | Buffer,
+  opts: ScrapbookLocation = {},
 ): ScrapbookItem {
-  const abs = scrapbookFilePath(projectRoot, config, site, slug, filename);
+  const abs = scrapbookFilePath(projectRoot, config, site, slug, filename, opts);
   if (!existsSync(abs)) throw new Error(`file not found: "${filename}"`);
   writeFileSync(abs, body);
   const st = statSync(abs);
@@ -333,9 +385,10 @@ export function renameScrapbookFile(
   slug: string,
   oldName: string,
   newName: string,
+  opts: ScrapbookLocation = {},
 ): ScrapbookItem {
-  const oldAbs = scrapbookFilePath(projectRoot, config, site, slug, oldName);
-  const newAbs = scrapbookFilePath(projectRoot, config, site, slug, newName);
+  const oldAbs = scrapbookFilePath(projectRoot, config, site, slug, oldName, opts);
+  const newAbs = scrapbookFilePath(projectRoot, config, site, slug, newName, opts);
   if (!existsSync(oldAbs)) throw new Error(`file not found: "${oldName}"`);
   if (existsSync(newAbs) && oldAbs !== newAbs) {
     throw new Error(`target name already exists: "${newName}"`);
@@ -356,8 +409,9 @@ export function deleteScrapbookFile(
   site: string,
   slug: string,
   filename: string,
+  opts: ScrapbookLocation = {},
 ): void {
-  const abs = scrapbookFilePath(projectRoot, config, site, slug, filename);
+  const abs = scrapbookFilePath(projectRoot, config, site, slug, filename, opts);
   if (!existsSync(abs)) throw new Error(`file not found: "${filename}"`);
   rmSync(abs);
 }
@@ -412,8 +466,9 @@ export function writeScrapbookUpload(
   slug: string,
   filename: string,
   content: Buffer,
+  opts: ScrapbookLocation = {},
 ): ScrapbookItem {
-  const abs = scrapbookFilePath(projectRoot, config, site, slug, filename);
+  const abs = scrapbookFilePath(projectRoot, config, site, slug, filename, opts);
   if (existsSync(abs)) {
     throw new Error(`file already exists: "${filename}" — rename first`);
   }
