@@ -18,14 +18,23 @@ import { isContentType, type ContentType } from '@deskwork/core/types';
 import { absolutize, emit, fail, parseArgs } from '@deskwork/core/cli-args';
 
 export async function run(argv: string[]): Promise<void> {
-  const KNOWN_FLAGS = ['site', 'type', 'content-url', 'source'] as const;
+  const KNOWN_FLAGS = ['site', 'type', 'content-url', 'source', 'slug'] as const;
+  const SLUG_RE = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
 
   const { positional, flags } = parse();
 
   if (positional.length < 2) {
     fail(
       'Usage: deskwork-add <project-root> [--site <slug>] [--type blog|youtube|tool] ' +
-        '[--content-url URL] [--source manual|analytics] <title> [description]',
+        '[--content-url URL] [--source manual|analytics] [--slug <path>] ' +
+        '<title> [description]',
+      2,
+    );
+  }
+  if (flags.slug !== undefined && !SLUG_RE.test(flags.slug)) {
+    fail(
+      `--slug must be one or more /-separated kebab-case segments ` +
+        `(got "${flags.slug}")`,
       2,
     );
   }
@@ -69,6 +78,7 @@ export async function run(argv: string[]): Promise<void> {
       source,
       ...(contentType !== undefined ? { contentType } : {}),
       ...(flags['content-url'] !== undefined ? { contentUrl: flags['content-url'] } : {}),
+      ...(flags.slug !== undefined ? { slug: flags.slug } : {}),
     });
   } catch (err) {
     fail(err instanceof Error ? err.message : String(err));

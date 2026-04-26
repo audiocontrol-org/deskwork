@@ -403,5 +403,103 @@ describe('deskwork-publish', () => {
   });
 });
 
+describe('hierarchical slugs', () => {
+  let project: string;
+  beforeEach(() => {
+    project = bootstrapProject();
+  });
+
+  it('add --slug accepts a /-separated path and stores it', () => {
+    const res = run('deskwork-add', [
+      project,
+      '--slug',
+      'the-outbound/characters/strivers',
+      'Strivers',
+      'A character study',
+    ]);
+    expect(res.code).toBe(0);
+    const cal = readProjectCalendar(project);
+    expect(cal.entries).toHaveLength(1);
+    expect(cal.entries[0].slug).toBe('the-outbound/characters/strivers');
+    expect(cal.entries[0].title).toBe('Strivers');
+  });
+
+  it('add --slug rejects malformed paths', () => {
+    const res = run('deskwork-add', [
+      project,
+      '--slug',
+      'BadCase/here',
+      'X',
+    ]);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toMatch(/--slug must be/);
+  });
+
+  it('plan + outline accept hierarchical slug positional', () => {
+    run('deskwork-add', [
+      project,
+      '--slug',
+      'a/b/c',
+      'C piece',
+    ]);
+    const planRes = run('deskwork-plan', [project, 'a/b/c', 'kw']);
+    expect(planRes.code).toBe(0);
+    const outlineRes = run('deskwork-outline', [project, 'a/b/c']);
+    expect(outlineRes.code).toBe(0);
+    const cal = readProjectCalendar(project);
+    expect(cal.entries[0].stage).toBe('Outlining');
+    // default layout (no --layout) -> template-derived path on disk
+    expect(existsSync(join(project, 'src/sites/main/pages/blog/a/b/c/index.md')))
+      .toBe(true);
+  });
+
+  it('outline --layout flat writes <slug>.md and records filePath', () => {
+    run('deskwork-add', [project, '--slug', 'parent/leaf', 'Leaf']);
+    run('deskwork-plan', [project, 'parent/leaf', 'kw']);
+    const res = run('deskwork-outline', [
+      project,
+      '--layout',
+      'flat',
+      'parent/leaf',
+    ]);
+    expect(res.code).toBe(0);
+    expect(
+      existsSync(join(project, 'src/sites/main/pages/blog/parent/leaf.md')),
+    ).toBe(true);
+    const cal = readProjectCalendar(project);
+    expect(cal.entries[0].filePath).toBe('parent/leaf.md');
+  });
+
+  it('outline --layout readme writes <slug>/README.md', () => {
+    run('deskwork-add', [project, '--slug', 'p/q/r', 'R']);
+    run('deskwork-plan', [project, 'p/q/r', 'kw']);
+    const res = run('deskwork-outline', [
+      project,
+      '--layout',
+      'readme',
+      'p/q/r',
+    ]);
+    expect(res.code).toBe(0);
+    expect(
+      existsSync(join(project, 'src/sites/main/pages/blog/p/q/r/README.md')),
+    ).toBe(true);
+    const cal = readProjectCalendar(project);
+    expect(cal.entries[0].filePath).toBe('p/q/r/README.md');
+  });
+
+  it('outline rejects an unknown --layout value', () => {
+    run('deskwork-add', [project, '--slug', 'x/y', 'Y']);
+    run('deskwork-plan', [project, 'x/y', 'kw']);
+    const res = run('deskwork-outline', [
+      project,
+      '--layout',
+      'sideways',
+      'x/y',
+    ]);
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toMatch(/--layout must be/);
+  });
+});
+
 // Suppress the unused mkdirSync import warning — kept for symmetry if tests grow.
 void mkdirSync;
