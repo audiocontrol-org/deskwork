@@ -24,8 +24,27 @@ Extract the editorial skills into a Claude Code plugin called "deskwork" (codena
 - Analytics plugin (future, same monorepo)
 - Reddit, YouTube, or analytics integrations (future additions to deskwork)
 - Codex or other agent plugin formats
-- Astro dev server studio pages
-- Editorial skills not in the core set: suggest, performance, reddit-sync, reddit-opportunities, cross-link-review, iterate, approve, shortform-draft
+- ~~Astro dev server studio pages~~ (now in scope — see Extension below; rendered as a standalone Hono server, not Astro)
+- Editorial skills not in the core set: suggest, performance, reddit-sync, reddit-opportunities, cross-link-review, ~~iterate, approve, shortform-draft~~ (review-loop ported in commit 4b3255e; shortform/cross-link still deferred)
+
+### Extension: severance from Astro + headless/UI split (added mid-implementation)
+
+**Why now.** The original PRD assumed the editorial studio would remain in audiocontrol.org's Astro app. Reviewing the live workflow showed this is where most of the editorial time is actually spent, and locking it to one host project's framework defeats the open-source goal. The studio surface needs to run independently of any host project's framework.
+
+**Friction principle.** Past MCP server experiences (notably Codex's GitHub tooling) wasted cycles via deceptive failures and security theater. Tools that aspire to elegance but introduce protocol failure surfaces are worse than nothing. The extension prefers proven CLIs invoked via Bash over MCP for v0.1.
+
+**Plugin pattern survey.** Of 8 official Anthropic plugins surveyed, 7 ship zero code (markdown + `.mcp.json` only); the 8th (`superpowers`) ships pure bash. The `playwright` plugin demonstrates the pattern that fits us: a thin plugin pointing at an npm package the agent invokes via npx.
+
+**New scope.**
+
+- Three npm packages: `@deskwork/core` (lib, no entry point), `@deskwork/cli` (subcommand dispatcher invoked via npx), `@deskwork/studio` (Hono web server depending on `@deskwork/core`)
+- Two plugin shells: `deskwork` (lifecycle skills invoking `@deskwork/cli`) and `deskwork-studio` (single skill that launches `@deskwork/studio`)
+- Headless users install `deskwork` only — no Hono, no UI assets. Studio users opt in by enabling `deskwork-studio`.
+- Studio UI assets ported verbatim from `~/work/audiocontrol.org/src/shared/` (~5,000 lines of TS + CSS that have zero Astro dependencies). The 3 Astro pages convert to HTML-string render functions (~400 lines of mechanical rewrite).
+- MCP server explicitly deferred. Revisit only if friction with the CLI emerges. If it later becomes interesting, it ships as a fourth package (`@deskwork/mcp-server`) importing from `@deskwork/core`.
+- npm registry publishing deferred to v0.1 cut. Initial dev uses `file:` workspace deps for local dogfood.
+
+**Plan reference.** Approved plan: `/Users/orion/.claude/plans/i-would-like-to-wiggly-hennessy.md`
 
 ### Technical Approach
 
@@ -103,3 +122,45 @@ deskwork/
 ### Design Spec
 
 See `docs/superpowers/specs/2026-04-20-deskwork-plugin-design.md`
+
+---
+
+## Philosophical Pillar: Agent-Improvable Tooling
+
+### The pillar
+
+The editorial calendar was built inside a coding agent's reach precisely so that **the operator can ask the agent to improve the tooling as friction emerges**. Hit a rough edge mid-workflow → "fix this for me" → agent reads the source, edits, runs tests, commits. This tight feedback loop is the central reason for building the tooling agent-side rather than as a hosted service.
+
+Deskwork plugin users must retain this property. A plugin that the agent cannot read, edit, or contribute back to is just a SaaS API in a different costume.
+
+### How the current architecture undermines the pillar
+
+The Phase 7-12 plan optimized for distribution elegance (thin plugin shell → npm packages invoked via npx). That choice quietly defeats the pillar:
+
+1. **Source is not on the user's disk.** Once installed, deskwork's TypeScript lives inside the npm cache or `node_modules` — read-only, deeply nested, not part of any project the agent reasons about. "Fix this rough edge" becomes "first locate the cache, then choose between bypassing node_modules or rebuilding the package."
+2. **The plugin shell is thin.** Under `<plugin>/skills/` there is only SKILL.md prose and a bash wrapper. No backing logic to read, no tests to run, no diff to commit.
+
+Reference frame: Playwright gets away with this because Playwright is **a tool you call**. Deskwork is **a workflow you live in** — the operator's editorial life happens through it daily. The thin-shell-over-npm pattern was the wrong reference; the closer pattern is `superpowers`, which ships its repo as the plugin and is freely agent-editable.
+
+### Options under consideration
+
+Documented for future decision; **not being implemented in v0.1**.
+
+| Option | Sketch | Strengths | Weaknesses |
+|---|---|---|---|
+| A. Local-clone fallback | Plugin checks for a developer clone (e.g., `~/.deskwork-dev/`); uses local TS via tsx if present, npm otherwise | Familiar pattern; opt-in | User must set up; two install modes to reason about |
+| B. Source ships in plugin | Plugin distributes TS source under `<plugin>/source/`; user edits it directly | Source available immediately; no setup | Edits clobbered on update; no versioning; hard to upstream |
+| C. Customization seams | Core ships read-only; plugin defines extension points (project-local skills, commands, hooks); user customizes in `<project>/.deskwork/` | Clean separation; updates safe | Limits customization scope; extension API needs design |
+| D. Eject-to-local | `deskwork eject` copies source from npm package into the user's project | Maximum freedom after eject | One-way street; loses upstream updates |
+| E. Hybrid override + contribute | Core in npm package (updateable); user overrides in `<project>/.deskwork/overrides/`; `deskwork contribute` opens PR from local diff | Locally improveable AND upstreamable | Two layers to think about |
+| F. Plugin-as-clone | Install model is `git clone` of the deskwork repo; plugin lives at `~/.claude/plugins/deskwork/` with full source on disk; agent edits in place; `git pull` updates; `gh pr create` contributes back | Source always present; workflow already familiar to agents; trivial contribution path | Bigger install footprint (~20MB); requires git at install time |
+
+### Tentative direction
+
+**Option F + Option C** appear to be the natural synthesis: the plugin is a clone (full source, agent-editable, contributable), with project-level extension seams in `<user-project>/.deskwork/{skills,commands,hooks}/` for customizations that should not live in the shared plugin. This combination preserves agent-fixability for shared logic and gives the operator a private surface for project-specific tweaks.
+
+### Deferred
+
+The pillar question is captured here for the record; the architectural decision is deferred. v0.1 implementation continues with the npm-package distribution model (Phases 7-12). A future phase will revisit, propose a concrete design, and migrate.
+
+**Trigger to revisit:** the first time a deskwork user (the project author or anyone else) reports difficulty fixing a rough edge in the plugin from within their project.

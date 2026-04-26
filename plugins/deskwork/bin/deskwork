@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+#
+# deskwork — wrapper that locates the @deskwork/cli binary and invokes it.
+#
+# Behavior:
+#   1. If a workspace-linked binary is reachable from the plugin tree
+#      (npm install in the deskwork-plugin monorepo creates this), use it.
+#      This is the dev path — fast, no network.
+#   2. Otherwise, fall back to `npx -y @deskwork/cli@latest`. Slow on the
+#      first call (network pull); cached after.
+#
+# Either way, the user's experience is the same: `deskwork <subcommand>`.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Walk up from the plugin's bin/ to find a workspace node_modules/.bin/deskwork.
+# Plugin layouts cached by Claude Code can be deep; check a few candidates.
+candidates=(
+  "${SCRIPT_DIR}/../../../node_modules/.bin/deskwork"          # plugins/deskwork/bin → repo root
+  "${SCRIPT_DIR}/../node_modules/.bin/deskwork"                # if installed as standalone package
+  "${SCRIPT_DIR}/../../node_modules/.bin/deskwork"             # cache layouts
+)
+
+for candidate in "${candidates[@]}"; do
+  if [ -x "$candidate" ]; then
+    exec "$candidate" "$@"
+  fi
+done
+
+# No workspace binary located. @deskwork/cli is not yet published to npm
+# (v0.1 has not shipped). Fail loud rather than silently chasing an npx
+# fallback that resolves to nothing.
+cat >&2 <<EOF
+deskwork: cannot locate the @deskwork/cli binary.
+
+Looked in:
+  ${candidates[0]}
+  ${candidates[1]}
+  ${candidates[2]}
+
+The deskwork plugin currently expects the package to be available through
+the workspace. If you are running this from a clone of the deskwork repo,
+run 'npm install' at the repo root. If you installed the plugin some other
+way, the package is not yet published to npm — track v0.1 release for the
+public install path.
+EOF
+exit 127

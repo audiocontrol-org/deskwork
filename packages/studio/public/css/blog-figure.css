@@ -1,0 +1,141 @@
+/*
+ * blog-figure.css — shared styles for `<figure>` wrappers produced
+ * by remark-image-figure + the lightbox overlay the matching script
+ * injects.
+ *
+ * Both sites import this from their BlogLayout so the figure block
+ * and the lightbox overlay stay consistent across audiocontrol
+ * (service-manual) and editorialcontrol (magazine) aesthetics. The
+ * per-site BlogLayout palette still owns colors via CSS variables
+ * the layout exposes; this file only sets structure, rhythm, and
+ * the shared overlay.
+ */
+
+/* ---- Inline figure ---------------------------------------------------- */
+
+:is(.essay-body, .blog-article) figure.blog-figure {
+  margin: 2.5rem 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.6rem;
+}
+
+:is(.essay-body, .blog-article) figure.blog-figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  /* Subtle paper shadow so the figure reads as a separate plate
+   * rather than floating against the prose. Tuned against both the
+   * dark audiocontrol BlogLayout and the cream editorialcontrol
+   * surface. */
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.18);
+}
+
+:is(.essay-body, .blog-article) figure.blog-figure figcaption.blog-figcaption {
+  font-family: var(--font-display, Georgia, 'Times New Roman', serif);
+  font-style: italic;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: inherit;
+  opacity: 0.75;
+  padding-top: 0.4rem;
+  border-top: 1px solid rgba(127, 127, 127, 0.25);
+  max-width: 42rem;
+}
+
+/* ---- Lightbox overlay ------------------------------------------------ */
+
+.blog-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(10, 8, 6, 0.92);
+  /* Backdrop blur pulls focus to the image; subtle, not aggressive. */
+  backdrop-filter: blur(4px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 2rem;
+  cursor: zoom-out;
+  animation: blog-lightbox-fade-in 140ms ease-out;
+}
+
+@keyframes blog-lightbox-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.blog-lightbox[hidden] {
+  display: none;
+}
+
+.blog-lightbox-close {
+  position: absolute;
+  top: 1rem;
+  right: 1.2rem;
+  width: 2.4rem;
+  height: 2.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(0, 0, 0, 0.4);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 0;
+  font-family: Georgia, 'Times New Roman', serif;
+}
+.blog-lightbox-close:hover {
+  background: rgba(0, 0, 0, 0.6);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+.blog-lightbox-close:focus {
+  outline: 2px solid rgba(255, 255, 255, 0.6);
+  outline-offset: 2px;
+}
+
+.blog-lightbox-figure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  max-width: 100%;
+  max-height: 100%;
+  cursor: default;
+}
+
+.blog-lightbox-image {
+  max-width: min(100%, 92vw);
+  max-height: 78vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  box-shadow: 0 10px 50px rgba(0, 0, 0, 0.5);
+}
+
+.blog-lightbox-caption {
+  color: rgba(245, 241, 232, 0.82);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  max-width: 52rem;
+  text-align: center;
+  margin: 0;
+  padding: 0 1rem;
+}
+
+.blog-lightbox-caption[hidden] {
+  display: none;
+}
+
+/* Lock page scroll while the lightbox is open. The class hook
+ * lets per-site layouts layer any additional freeze behavior if
+ * they need it (e.g. scroll-restoration quirks). */
+body.blog-lightbox-open {
+  overflow: hidden;
+}

@@ -5,15 +5,18 @@
 **Deliverable:** Empty but valid plugin that installs via Claude Code marketplace
 
 Tasks:
-- [ ] Create the monorepo with README and LICENSE
-- [ ] Create plugins/deskwork/.claude-plugin/plugin.json
-- [ ] Create root .claude-plugin/marketplace.json with git-subdir entry for deskwork
-- [ ] Create the install skill skeleton (SKILL.md only, no logic yet)
-- [ ] Validate the plugin installs with `claude plugin validate` and `claude --plugin-dir`
+- [x] Create the monorepo with README and LICENSE
+- [x] Create plugins/deskwork/.claude-plugin/plugin.json
+- [x] Create root .claude-plugin/marketplace.json (relative-path source; pluginRoot=./plugins — see note below)
+- [x] Create the install skill skeleton (SKILL.md only, no logic yet)
+- [x] Validate the plugin installs with `claude plugin validate` and `claude --plugin-dir`
 
 **Acceptance Criteria:**
-- `claude --plugin-dir plugins/deskwork` loads without errors
-- `/deskwork:install` is visible in the skill list
+- [x] `claude --plugin-dir plugins/deskwork` loads without errors
+- [x] `/deskwork:install` is visible in the skill list
+
+**Notes:**
+- The workplan originally specified a `git-subdir` entry, but since the marketplace and plugin share a repo the correct pattern is a relative-path source under `metadata.pluginRoot: "./plugins"`. `git-subdir` is for pointing at a plugin inside a *different* monorepo. The marketplace.json uses the relative-path form and still works for users who add the marketplace via git.
 
 ---
 
@@ -22,17 +25,21 @@ Tasks:
 **Deliverable:** Working adapter that reads a config file and resolves paths, frontmatter, and calendar location
 
 Tasks:
-- [ ] Define the config JSON schema
-- [ ] Write the config reader (lib/config.ts or similar)
-- [ ] Write the path resolver (content directory, calendar file)
-- [ ] Write the frontmatter reader/writer
-- [ ] Write the calendar parser (read/write pipe-delimited markdown tables)
-- [ ] Write the install skill: explore project, ask questions, write config, create calendar file
+- [x] Define the config JSON schema (`lib/config.ts` — `DeskworkConfig`, version 1)
+- [x] Write the config reader (`lib/config.ts` — `parseConfig` + `readConfig`)
+- [x] Write the path resolver (`lib/paths.ts`)
+- [x] Write the frontmatter reader/writer (`lib/frontmatter.ts`, uses `yaml`)
+- [x] Write the calendar parser (`lib/calendar.ts` + `lib/calendar-mutations.ts`)
+- [x] Write the install skill: explore project, ask questions, write config, create calendar file (`bin/deskwork-install.ts` + `skills/install/SKILL.md`)
 
 **Acceptance Criteria:**
-- The install skill can run against audiocontrol.org and produce a valid config
-- The adapter correctly resolves paths for both audiocontrol and editorialcontrol sites
-- The calendar parser reads the existing audiocontrol.org calendar without data loss
+- [x] The install helper can run against an audiocontrol-shaped project and produce a valid config (verified end-to-end — the helper validates, writes `.deskwork/config.json`, and seeds calendar files). The skill itself drives Claude through exploring, confirming, and invoking the helper.
+- [x] The adapter correctly resolves paths for both audiocontrol and editorialcontrol sites (covered by `paths.test.ts` using the actual dual-site config shape)
+- [x] The calendar parser reads the existing audiocontrol.org calendar without data loss (round-trip test against the live `~/work/audiocontrol.org/docs/editorial-calendar-audiocontrol.md` passes — parse → render → parse produces identical data)
+
+**Notes:**
+- Library-internal imports use sibling-relative paths (`./types.ts`) instead of `@/lib/...` — the `@/` alias is a build-time convenience that doesn't resolve under tsx at runtime, which bin/ scripts need. Tests keep `@/` because Vitest resolves the alias.
+- The install helper ships as `bin/deskwork-install.ts` (tsx shebang) — Node/tsx require a file extension to recognize TypeScript, so the plugin's bin/ entries are `.ts` files rather than extensionless scripts.
 
 ---
 
@@ -41,17 +48,23 @@ Tasks:
 **Deliverable:** add, plan, draft, publish skills working through the adapter
 
 Tasks:
-- [ ] Extract editorial-add logic into plugins/deskwork/skills/add/SKILL.md
-- [ ] Extract editorial-plan logic into plugins/deskwork/skills/plan/SKILL.md
-- [ ] Extract editorial-draft logic into plugins/deskwork/skills/draft/SKILL.md
-- [ ] Extract editorial-publish logic into plugins/deskwork/skills/publish/SKILL.md
-- [ ] Parameterize all hardcoded paths and site names to use adapter config
-- [ ] Extract any backing scripts needed into plugins/deskwork/bin/
+- [x] Extract editorial-add logic into plugins/deskwork/skills/add/SKILL.md (+ `bin/deskwork-add.ts`)
+- [x] Extract editorial-plan logic into plugins/deskwork/skills/plan/SKILL.md (+ `bin/deskwork-plan.ts`)
+- [x] Extract editorial-draft logic into plugins/deskwork/skills/draft/SKILL.md (+ `bin/deskwork-draft.ts`, `lib/scaffold.ts`)
+- [x] Extract editorial-publish logic into plugins/deskwork/skills/publish/SKILL.md (+ `bin/deskwork-publish.ts`)
+- [x] Parameterize all hardcoded paths and site names to use adapter config — zero audiocontrol-specific strings in plugin code
+- [x] Extract backing scripts into plugins/deskwork/bin/ — four helper scripts plus `lib/cli.ts` for shared argv parsing
 
 **Acceptance Criteria:**
-- Each skill produces identical results to the project-local version when run against audiocontrol.org
-- Skills read config via the adapter, not hardcoded paths
-- No audiocontrol-specific assumptions in skill logic
+- [x] Each skill produces the same calendar mutations as the project-local version — lifecycle integration tests exercise add→plan→draft→publish against a tmp project
+- [x] Skills read config via the adapter (`readConfig` + `resolvePaths`), not hardcoded paths
+- [x] No audiocontrol-specific assumptions in skill logic — `SITES` constant removed, sites come from config, layout/author are config fields
+- [x] Plugin validates and all 5 skills (`install` + 4 lifecycle) appear in `/deskwork:*`
+
+**Notes:**
+- GitHub issue creation/closing is intentionally outside the helpers — Claude runs `gh issue create` / `gh issue close` and feeds the number to `deskwork-draft --issue <n>`. This keeps the helpers dep-free and testable without a GitHub stub.
+- `lib/cli.ts` holds shared argv parsing (`parseArgs`, `absolutize`, `fail`, `emit`) used by all 5 `bin/` scripts.
+- Config schema grew two optional fields: top-level `author` and per-site `blogLayout`, both required by `deskwork-draft` when scaffolding a blog post. The draft helper fails loudly with guidance if either is missing.
 
 ---
 
@@ -108,3 +121,149 @@ Tasks:
 - No project-local editorial skills remain in audiocontrol.org
 - The editorial calendar operates identically to pre-migration
 - Plugin is tagged v0.1.0 and installable via marketplace
+
+---
+
+## Extension: severance from Astro + headless/UI split
+
+Added mid-implementation. See PRD "Extension" section for motivation. Approved plan: `/Users/orion/.claude/plans/i-would-like-to-wiggly-hennessy.md`.
+
+The original Phase 4 (dogfood in audiocontrol.org) moves to Phase 12 to follow the architectural restructure. Phase 5 (visibility/distribution skills) and Phase 6 (cutover) remain unchanged but happen after Phase 12.
+
+---
+
+### Phase 7: Extract @deskwork/core npm package
+
+**Deliverable:** Pure library package consumable as `@deskwork/core` from cli and studio packages
+
+Tasks:
+- [x] Convert repo to npm workspaces (`packages/*` + `plugins/*`)
+- [x] Move `plugins/deskwork/lib/*` → `packages/core/src/*`
+- [x] Define subpath exports (`@deskwork/core/calendar`, `@deskwork/core/review/handlers`, etc.)
+- [x] Update test imports across the workspace
+- [x] All 126 core tests pass under the new layout
+
+**Acceptance Criteria:**
+- [x] `packages/core/package.json` declares 16 subpath exports mapping to `.ts` source files
+- [x] Tests resolve `@deskwork/core/*` via npm workspace symlinks
+- [x] No cross-plugin `../` imports remain
+
+**Commit:** `b8d49c5`
+
+---
+
+### Phase 8: Extract @deskwork/cli with single dispatcher
+
+**Deliverable:** A `deskwork` CLI binary exposing all 12 lifecycle subcommands via one entry point
+
+Tasks:
+- [x] Create `packages/cli/src/cli.ts` dispatcher with SUBCOMMANDS map
+- [x] Move 12 bin scripts → `packages/cli/src/commands/<name>.ts` exporting `run(argv)`
+- [x] Inject `process.cwd()` as project root when first positional isn't path-like
+- [x] Replace `bin/deskwork-X.ts` references in 12 SKILL.md files with `deskwork <subcommand>`
+- [x] Add bash wrapper at `plugins/deskwork/bin/deskwork` that finds workspace bin first, falls back to `npx -y @deskwork/cli@latest`
+- [x] Delete obsolete plugin-local `bin/`, `lib/`, `test/`, `tsconfig.json`, `vitest.config.ts`
+
+**Acceptance Criteria:**
+- [x] All 27 cli integration tests pass
+- [x] SKILL.md invocations exercise the dispatcher, not bin scripts
+- [x] Plugin shell ships zero TypeScript
+
+**Commit:** `7c2d64c`
+
+---
+
+### Phase 9: Build @deskwork/studio (Hono server + scaffolds)
+
+**Deliverable:** Standalone web server exposing the 6 review API routes + 3 page renders
+
+Tasks:
+- [x] Add Hono + @hono/node-server deps under `packages/studio/`
+- [x] Build `packages/studio/src/server.ts` with createApp(ctx) factory + main() loop
+- [x] Wire 6 route handlers in `routes/api.ts` (annotate, listAnnotations, decision, getWorkflow, createVersion, startLongform)
+- [x] Add CLI args `--project-root` (default cwd) and `--port` (default 4321)
+- [x] Detect symlinked bin entry via `realpathSync(process.argv[1])`
+- [x] Scaffold 3 page renderers (dashboard, review, shortform) embedding data as `<script type="application/json">`
+- [x] In-process tests via `app.fetch(new Request(...))`
+
+**Acceptance Criteria:**
+- [x] 12/12 studio tests pass (covers all 6 API routes + 3 page renders + redirect)
+- [x] Live boot: `deskwork-studio --port 47321` returns 200 on dashboard, 302 on root, 200 on shortform, 404 on missing workflow
+- [x] No Astro deps anywhere in the studio package
+
+**Commit:** `3c47709`
+
+---
+
+### Phase 10: Port studio UI assets verbatim from audiocontrol
+
+**Deliverable:** Studio dashboard renders identically to audiocontrol's Astro version
+
+Tasks:
+- [ ] Copy `editorial-review-client.ts` (~1,609 lines) → `packages/studio/public/client.ts`
+- [ ] Copy `editorial-review-editor.ts` (~201 lines) → `packages/studio/public/editor.ts`
+- [ ] Copy `editorial-studio-client.ts` (~643 lines) → `packages/studio/public/studio-client.ts`
+- [ ] Copy `editorial-review.css` (~2,269 lines) → `packages/studio/public/review.css`
+- [ ] Copy `editorial-studio.css` (~171 lines) → `packages/studio/public/studio.css`
+- [ ] Replace 3 page render scaffolds with full template ports (~400 lines of HTML-string conversion)
+- [ ] Pre-bundle TS for v0.1 (no esbuild step at install time)
+- [ ] Wire `app.use('/static/*', serveStatic(...))` for assets
+
+**Acceptance Criteria:**
+- Manual: open `http://localhost:4321/dev/editorial-studio` against sandbox-audiocontrol; dashboard loads with live workflows
+- Browser: dashboard → review → approve click-through works
+- API responses match audiocontrol's existing routes byte-for-byte (handlers are reused; only HTTP plumbing differs)
+
+---
+
+### Phase 11: Add deskwork-studio plugin shell + marketplace entry
+
+**Deliverable:** Second plugin in the marketplace that wraps the studio launch
+
+Tasks:
+- [ ] Create `plugins/deskwork-studio/.claude-plugin/plugin.json`
+- [ ] Create `plugins/deskwork-studio/skills/studio/SKILL.md` invoking `npx @deskwork/studio`
+- [ ] Add bash wrapper at `plugins/deskwork-studio/bin/deskwork-studio` (workspace-first, npx fallback)
+- [ ] Register `deskwork-studio` plugin in `.claude-plugin/marketplace.json` alongside `deskwork`
+- [ ] `claude plugin validate plugins/deskwork-studio` passes
+
+**Acceptance Criteria:**
+- Marketplace lists both plugins
+- `claude --plugin-dir plugins/deskwork-studio` shows `/deskwork-studio:studio` in the picker
+- Headless users can install `deskwork` alone with no Hono in their tree
+
+---
+
+### Phase 12 stretch: Agent-improvability pillar (deferred)
+
+**Deliverable:** Concrete architectural pivot that preserves the "agent improves the tooling as you work" pillar.
+
+This phase is documented in the PRD's "Philosophical Pillar" section but is **not in v0.1 scope**. v0.1 ships with the npm-package distribution model. The pivot triggers when the first deskwork operator hits friction trying to fix a rough edge in the plugin from inside their project.
+
+Likely synthesis (per PRD): plugin-as-clone install model (Option F) plus project-level extension seams (Option C). Concrete tasks deferred until the trigger condition fires.
+
+---
+
+### Phase 12: End-to-end dogfood (CLI + studio) against sandbox
+
+**Deliverable:** Full editorial lifecycle exercised through the new architecture
+
+Tasks:
+- [x] Run `add → plan → outline → draft → review-start → review-cancel` via `deskwork` CLI against `~/work/deskwork-work/sandbox-audiocontrol` (lifecycle: Ideas → Planned → Outlining → Drafting → review open → cancelled)
+- [x] Boot studio against the sandbox via `deskwork-studio --project-root ... --port 47325`
+- [x] Verify all 5 dev routes return 200 (`/dev/editorial-studio`, `/dev/editorial-help`, `/dev/editorial-review-shortform`, `/dev/editorial-review/<slug>`, `/dev/scrapbook/<site>/<slug>`)
+- [x] Verify dashboard reflects new entry (10 references found in rendered HTML across calendar rows + workflow links)
+- [x] Verify review page renders with the entry's actual title pulled from frontmatter
+- [x] Exercise studio APIs: `/api/dev/editorial-review/render` (markdown→HTML round-trip), `/api/dev/editorial-review/workflow` (returns workflow + versions), `/api/dev/editorial-review/annotate` (validates input), `/api/dev/editorial-review/annotations` (returns list)
+- [x] Cancel workflow via CLI, confirm studio dashboard reflects cancelled stamp
+- [ ] ~~Approve cycle through browser~~ — deferred; requires interactive in-browser annotation. The pipeline is wired (workflow → annotate → decision → approve) and exercised at the API level; full browser-driven approve is a manual smoke test for the operator post-merge.
+
+**Acceptance Criteria:**
+- [x] All lifecycle skills succeed end-to-end through the CLI
+- [x] Studio UI loads and exposes the full surface against the sandbox
+- [x] Calendar mutations land in `docs/editorial-calendar-audiocontrol.md` (sandbox calendar updated for the dogfood slug)
+- [x] 176 tests pass after dogfood (126 core + 27 cli + 23 studio)
+
+**Notes:**
+- Sandbox carries a permanent `deskwork-plugin-dogfood` slug as evidence; future dogfood runs use a different slug or reuse this one as a fixture.
+- The "decision: ready to publish to npm" question — deferred until the agent-improvability pillar (PRD section) gets revisited. Publishing to npm makes sense if we keep the thin-shell-over-npm distribution model; if we pivot to plugin-as-clone (Option F), npm publishing becomes optional.

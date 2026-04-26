@@ -1,0 +1,15 @@
+{
+  "name": "@deskwork/plugin-studio",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Web studio plugin for Claude Code — thin shell pointing at @deskwork/studio",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/audiocontrol-org/deskwork.git",
+    "directory": "plugins/deskwork-studio"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

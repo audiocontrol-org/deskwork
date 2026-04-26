@@ -1,6 +1,26 @@
 {
-  "$schema": "https://claude.com/schemas/marketplace.json",
   "name": "deskwork",
-  "description": "Open-source Claude Code plugins",
-  "plugins": []
+  "owner": {
+    "name": "audiocontrol.org",
+    "url": "https://github.com/audiocontrol-org/deskwork"
+  },
+  "metadata": {
+    "description": "Open-source Claude Code plugins — editorial calendar, feature images, analytics",
+    "version": "0.0.1",
+    "pluginRoot": "./plugins"
+  },
+  "plugins": [
+    {
+      "name": "deskwork",
+      "source": "./plugins/deskwork",
+      "description": "Editorial calendar lifecycle: capture, plan, draft, publish, distribute",
+      "version": "0.0.1"
+    },
+    {
+      "name": "deskwork-studio",
+      "source": "./plugins/deskwork-studio",
+      "description": "Web studio for deskwork — dashboard, longform review, scrapbook, manual. Optional companion to the deskwork plugin",
+      "version": "0.0.1"
+    }
+  ]
 }

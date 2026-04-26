@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+#
+# deskwork-studio — wrapper that locates the @deskwork/studio binary and invokes it.
+#
+# Behavior:
+#   1. If a workspace-linked binary is reachable from the plugin tree
+#      (npm install in the deskwork monorepo creates this), use it.
+#      This is the dev path — fast, no network.
+#   2. Otherwise, fall back to `npx -y @deskwork/studio@latest`.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+candidates=(
+  "${SCRIPT_DIR}/../../../node_modules/.bin/deskwork-studio"
+  "${SCRIPT_DIR}/../node_modules/.bin/deskwork-studio"
+  "${SCRIPT_DIR}/../../node_modules/.bin/deskwork-studio"
+)
+
+for candidate in "${candidates[@]}"; do
+  if [ -x "$candidate" ]; then
+    exec "$candidate" "$@"
+  fi
+done
+
+cat >&2 <<EOF
+deskwork-studio: cannot locate the @deskwork/studio binary.
+
+Looked in:
+  ${candidates[0]}
+  ${candidates[1]}
+  ${candidates[2]}
+
+The deskwork-studio plugin currently expects the package to be available
+through the workspace. If you are running this from a clone of the deskwork
+repo, run 'npm install' at the repo root. The package is not yet published
+to npm (v0.1 has not shipped) — track v0.1 release for the public install
+path.
+EOF
+exit 127

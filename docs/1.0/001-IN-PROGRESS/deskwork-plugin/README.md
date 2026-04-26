@@ -6,14 +6,22 @@ Extract the editorial calendar skills from audiocontrol.org into an open-source 
 
 | Phase | Description | Status |
 |---|---|---|
-| 1 | Monorepo bootstrap and plugin skeleton | Not started |
-| 2 | Adapter layer and config schema | Not started |
-| 3 | Core lifecycle skills | Not started |
-| 4 | Dogfood in audiocontrol.org | Not started |
+| 1 | Monorepo bootstrap and plugin skeleton | Complete |
+| 2 | Adapter layer and config schema | Complete |
+| 3 | Core lifecycle skills | Complete |
+| 4 | Dogfood in audiocontrol.org | Deferred to Phase 12 |
 | 5 | Visibility and distribution skills | Not started |
 | 6 | Cut over and cleanup | Not started |
+| 7 | Extract @deskwork/core npm package | Complete |
+| 8 | Extract @deskwork/cli with single dispatcher | Complete |
+| 9 | Build @deskwork/studio (Hono server + scaffolds) | Complete |
+| 10a | Re-sync @deskwork/core from upstream editorial-calendar | Complete |
+| 10b | Port studio UI assets + page renders | Complete |
+| 11 | Add deskwork-studio plugin shell + marketplace entry | Complete |
+| 12 | End-to-end dogfood (CLI + studio) against sandbox | Complete |
 
 ### Key Links
 
 - Design spec: `docs/superpowers/specs/2026-04-20-deskwork-plugin-design.md`
 - Feature definition: `/tmp/feature-definition-deskwork-plugin.md`
+- Pull request: https://github.com/audiocontrol-org/deskwork/pull/1

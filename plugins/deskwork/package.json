@@ -1,0 +1,15 @@
+{
+  "name": "@deskwork/plugin",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Editorial calendar lifecycle plugin for Claude Code — thin shell pointing at @deskwork/cli",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/audiocontrol-org/deskwork.git",
+    "directory": "plugins/deskwork"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
