@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+#
+# deskwork — wrapper that locates the @deskwork/cli binary and invokes it.
+#
+# Behavior:
+#   1. If a workspace-linked binary is reachable from the plugin tree
+#      (npm install in the deskwork-plugin monorepo creates this), use it.
+#      This is the dev path — fast, no network.
+#   2. Otherwise, fall back to `npx -y @deskwork/cli@latest`. Slow on the
+#      first call (network pull); cached after.
+#
+# Either way, the user's experience is the same: `deskwork <subcommand>`.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Walk up from the plugin's bin/ to find a workspace node_modules/.bin/deskwork.
+# Plugin layouts cached by Claude Code can be deep; check a few candidates.
+candidates=(
+  "${SCRIPT_DIR}/../../../node_modules/.bin/deskwork"          # plugins/deskwork/bin → repo root
+  "${SCRIPT_DIR}/../node_modules/.bin/deskwork"                # if installed as standalone package
+  "${SCRIPT_DIR}/../../node_modules/.bin/deskwork"             # cache layouts
+)
+
+for candidate in "${candidates[@]}"; do
+  if [ -x "$candidate" ]; then
+    exec "$candidate" "$@"
+  fi
+done
+
+# Production fallback: pull from npm. `-y` skips the prompt; npx caches the
+# package locally after the first run, so subsequent calls are fast.
+exec npx -y @deskwork/cli@latest "$@"

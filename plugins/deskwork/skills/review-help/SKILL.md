@@ -20,7 +20,7 @@ List every non-terminal review workflow across the project.
 2. Invoke the helper:
 
 ```
-deskwork-review-help.ts <project-root> [--site <slug>]
+deskwork review-help [--site <slug>]
 ```
 
 3. Report to the operator in a human-readable table:

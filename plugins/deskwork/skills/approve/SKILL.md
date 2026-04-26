@@ -39,7 +39,7 @@ There is no per-post file for shortform. The approved markdown gets written into
 3. Invoke the helper:
 
 ```
-deskwork-approve.ts <project-root> [--site <slug>] <slug> \
+deskwork approve [--site <slug>] <slug> \
                     [--platform <p>] [--channel <c>]
 ```
 

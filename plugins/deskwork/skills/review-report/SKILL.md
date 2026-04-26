@@ -21,7 +21,7 @@ Build the voice-drift report from the review journal. Counts terminal workflows 
 1. Invoke the helper:
 
 ```
-deskwork-review-report.ts <project-root> [--site <slug>] [--include-active] [--format text|json]
+deskwork review-report [--site <slug>] [--include-active] [--format text|json]
 ```
 
 2. Report the result. `--format text` gives a human-readable pre-formatted block; `--format json` (default) returns structured data for further aggregation.

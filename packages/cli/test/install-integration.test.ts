@@ -1,6 +1,6 @@
 /**
- * Integration test for the bin/deskwork-install helper. Exercises the script
- * against real fixture directories, not mocked filesystem.
+ * Integration test for the install subcommand. Exercises the deskwork
+ * dispatcher against real fixture directories, not mocked filesystem.
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -18,11 +18,11 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const testDir = dirname(fileURLToPath(import.meta.url));
-const pluginRoot = resolve(testDir, '..');
-const installBin = join(pluginRoot, 'bin/deskwork-install.ts');
+const workspaceRoot = resolve(testDir, '../../..');
+const deskworkBin = join(workspaceRoot, 'node_modules/.bin/deskwork');
 
 function run(args: string[]): { code: number; stdout: string; stderr: string } {
-  const r = spawnSync(installBin, args, { encoding: 'utf-8' });
+  const r = spawnSync(deskworkBin, ['install', ...args], { encoding: 'utf-8' });
   return {
     code: r.status ?? -1,
     stdout: r.stdout ?? '',
@@ -41,8 +41,8 @@ describe('deskwork-install', () => {
   let tmpConfigs: string;
 
   beforeAll(() => {
-    // Sanity check the script exists and is runnable before every test runs it.
-    expect(existsSync(installBin)).toBe(true);
+    // Sanity check the dispatcher exists before every test runs it.
+    expect(existsSync(deskworkBin)).toBe(true);
   });
 
   function newProject(): string {

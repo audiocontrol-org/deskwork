@@ -27,7 +27,7 @@ For **youtube** and **tool** entries, no file is created — the content lives o
 3. Invoke the helper:
 
 ```
-deskwork-outline.ts <project-root> [--site <slug>] [--author "Name"] <slug>
+deskwork outline [--site <slug>] [--author "Name"] <slug>
 ```
 
 4. For blog entries, Claude should now sketch the outline in the scaffolded file's `## Outline` section. Use the Edit tool to replace the placeholder comment with a structured outline (headings, sub-points). If the project has a voice skill, load it first — the outline sets the article's shape, so voice-appropriate structure saves a rewrite later.

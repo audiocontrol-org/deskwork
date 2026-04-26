@@ -29,7 +29,7 @@ Before invoking the helper, the skill should know:
 3. Invoke the helper:
 
 ```
-deskwork-publish.ts <project-root> [--site <slug>] [--date YYYY-MM-DD] \
+deskwork publish [--site <slug>] [--date YYYY-MM-DD] \
                     [--content-url URL] <slug>
 ```
 

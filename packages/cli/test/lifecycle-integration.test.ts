@@ -22,8 +22,8 @@ import { fileURLToPath } from 'node:url';
 import { parseCalendar } from '@deskwork/core/calendar';
 
 const testDir = dirname(fileURLToPath(import.meta.url));
-const pluginRoot = resolve(testDir, '..');
-const bin = (name: string) => join(pluginRoot, 'bin', `${name}.ts`);
+const workspaceRoot = resolve(testDir, '../../..');
+const deskworkBin = join(workspaceRoot, 'node_modules/.bin/deskwork');
 
 interface RunResult {
   code: number;
@@ -33,7 +33,10 @@ interface RunResult {
 }
 
 function run(script: string, args: string[]): RunResult {
-  const r = spawnSync(bin(script), args, { encoding: 'utf-8' });
+  // Accept legacy "deskwork-X" names; strip the prefix so the
+  // dispatcher receives "X" as the subcommand.
+  const subcommand = script.replace(/^deskwork-/, '');
+  const r = spawnSync(deskworkBin, [subcommand, ...args], { encoding: 'utf-8' });
   const stdout = r.stdout ?? '';
   let json: unknown;
   try {

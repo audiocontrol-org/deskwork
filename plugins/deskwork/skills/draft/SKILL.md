@@ -38,7 +38,7 @@ Ask first — do not open issues unless the user confirms.
 5. Invoke the helper to flip the stage:
 
 ```
-deskwork-draft.ts <project-root> [--site <slug>] [--issue <n>] <slug>
+deskwork draft [--site <slug>] [--issue <n>] <slug>
 ```
 
 6. For blog entries: use the Edit tool to replace the `<!-- Write your post here -->` placeholder in the scaffolded file with body copy grounded in the outline and voice skill.

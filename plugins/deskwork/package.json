@@ -2,8 +2,7 @@
   "name": "@deskwork/plugin",
   "version": "0.0.1",
   "private": true,
-  "type": "module",
-  "description": "Editorial calendar lifecycle plugin for Claude Code",
+  "description": "Editorial calendar lifecycle plugin for Claude Code — thin shell pointing at @deskwork/cli",
   "license": "GPL-3.0-or-later",
   "repository": {
     "type": "git",
@@ -12,19 +11,5 @@
   },
   "engines": {
     "node": ">=20"
-  },
-  "scripts": {
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@deskwork/core": "*"
-  },
-  "devDependencies": {
-    "@types/node": "^22.10.0",
-    "tsx": "^4.21.0",
-    "typescript": "^5.7.0",
-    "vitest": "^4.1.2"
   }
 }

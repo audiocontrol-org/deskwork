@@ -36,7 +36,7 @@ The workflow must be in state `iterating`. The operator clicks "Request iteratio
 6. Invoke the helper:
 
 ```
-deskwork-iterate.ts <project-root> [--site <slug>] [--kind longform|outline] \
+deskwork iterate [--site <slug>] [--kind longform|outline] \
                     [--dispositions <path>] <slug>
 ```
 

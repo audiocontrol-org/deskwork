@@ -59,7 +59,7 @@ Use the Write tool to create a temporary config file (e.g. `/tmp/deskwork-instal
 Invoke the helper script (available on PATH because it lives under the plugin's `bin/`):
 
 ```
-deskwork-install.ts <project-root> /tmp/deskwork-install-config.json
+deskwork install /tmp/deskwork-install-config.json
 ```
 
 Pass the absolute path to the project root. The script:

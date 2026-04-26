@@ -20,7 +20,7 @@ Begin a review cycle for a blog post that's already been scaffolded and drafted.
 2. Invoke the helper:
 
 ```
-deskwork-review-start.ts <project-root> [--site <slug>] <slug>
+deskwork review-start [--site <slug>] <slug>
 ```
 
 The helper:

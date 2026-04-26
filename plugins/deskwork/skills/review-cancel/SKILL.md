@@ -23,7 +23,7 @@ Mark a non-terminal review workflow as cancelled.
 3. Invoke the helper:
 
 ```
-deskwork-review-cancel.ts <project-root> [--site <slug>] \
+deskwork review-cancel [--site <slug>] \
                           [--platform <p>] [--channel <c>] [--kind longform|outline|shortform] \
                           <slug>
 ```

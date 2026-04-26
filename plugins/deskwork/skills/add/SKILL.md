@@ -35,7 +35,7 @@ For `youtube` and `tool` entries, capture the URL now if the content is already 
 4. Invoke the helper:
 
 ```
-deskwork-add.ts <project-root> [--site <slug>] [--type blog|youtube|tool] \
+deskwork add [--site <slug>] [--type blog|youtube|tool] \
                 [--content-url URL] <title> [description]
 ```
 

@@ -30,7 +30,7 @@ After keywords, optionally prompt for **topics** — coarse tags used for cross-
 5. Invoke the helper:
 
 ```
-deskwork-plan.ts <project-root> [--site <slug>] [--topics t1,t2,...] \
+deskwork plan [--site <slug>] [--topics t1,t2,...] \
                  <slug> [<keyword1> <keyword2> ...]
 ```
 
