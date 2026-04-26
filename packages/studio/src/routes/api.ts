@@ -18,11 +18,19 @@ import {
   handleCreateVersion,
   handleStartLongform,
 } from '@deskwork/core/review/handlers';
+import { renderMarkdownToHtml } from '@deskwork/core/review/render';
 import type { DeskworkConfig } from '@deskwork/core/config';
 
 export interface StudioContext {
   projectRoot: string;
   config: DeskworkConfig;
+  /**
+   * Clock injection point for tests. The dashboard / help pages render
+   * a press-check date in the masthead; passing `now` lets tests stub a
+   * deterministic value rather than asserting on `new Date()` output.
+   * Defaults to "live" (a fresh `Date()` per render) in `createApp`.
+   */
+  now?: () => Date;
 }
 
 export function createApiRouter(ctx: StudioContext): Hono {
@@ -96,6 +104,38 @@ export function createApiRouter(ctx: StudioContext): Hono {
     }
     const r = handleStartLongform(ctx.projectRoot, ctx.config, body);
     return c.json(r.body, r.status as never);
+  });
+
+  // POST /api/dev/editorial-review/render
+  //
+  // Replaces the upstream client-side dynamic import of
+  // `scripts/lib/editorial-review/render.js`. The preview pane in
+  // `editorial-review-client.ts` POSTs the markdown source here and
+  // gets HTML back. Centralising the render keeps the unified pipeline
+  // (remark-parse + remark-strip-first-h1 + remark-image-figure +
+  // remark-rehype + rehype-stringify) on the server, where it already
+  // runs for the initial review-page render — one source of truth.
+  app.post('/render', async (c) => {
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'invalid JSON body' }, 400);
+    }
+    if (!body || typeof body !== 'object') {
+      return c.json({ error: 'expected JSON object body' }, 400);
+    }
+    const markdown = (body as { markdown?: unknown }).markdown;
+    if (typeof markdown !== 'string') {
+      return c.json({ error: 'markdown (string) is required' }, 400);
+    }
+    try {
+      const html = await renderMarkdownToHtml(markdown);
+      return c.json({ html });
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      return c.json({ error: `render failed: ${reason}` }, 500);
+    }
   });
 
   return app;

@@ -3,34 +3,64 @@
  * Astro component with a plain string-builder.
  */
 
+import { escapeHtml } from './html.ts';
+
+export interface EmbeddedJson {
+  /** `id` attribute of the `<script type="application/json">` tag. */
+  id: string;
+  /** Value to JSON-stringify into the tag body. */
+  data: unknown;
+  /** Optional extra attribute (e.g. `data-rename-slugs`). */
+  attr?: string;
+}
+
 export interface LayoutOptions {
   title: string;
   cssHrefs: string[];
   bodyHtml: string;
   /**
-   * Embed a JSON payload as `<script type="application/json" id="...">`.
+   * Optional attributes for the `<body>` tag itself, e.g.
+   * `data-review-ui="studio"`. Caller is responsible for any escaping
+   * inside the string — typically these are static.
+   */
+  bodyAttrs?: string;
+  /**
+   * Embed JSON payloads as `<script type="application/json" id="...">`.
    * The client reads `document.getElementById(id).textContent` and
    * `JSON.parse`s it for hydration.
    */
-  embeddedJson: { id: string; data: unknown } | null;
+  embeddedJson?: ReadonlyArray<EmbeddedJson>;
   /** Module scripts loaded after the body. */
   scriptModules: string[];
 }
 
 export function layout(options: LayoutOptions): string {
-  const { title, cssHrefs, bodyHtml, embeddedJson, scriptModules } = options;
+  const {
+    title,
+    cssHrefs,
+    bodyHtml,
+    bodyAttrs,
+    embeddedJson,
+    scriptModules,
+  } = options;
 
   const cssTags = cssHrefs
     .map((href) => `    <link rel="stylesheet" href="${escapeAttr(href)}">`)
     .join('\n');
 
-  const jsonTag = embeddedJson
-    ? `    <script type="application/json" id="${escapeAttr(embeddedJson.id)}">${escapeForScriptTag(JSON.stringify(embeddedJson.data))}</script>`
-    : '';
+  const jsonTags = (embeddedJson ?? [])
+    .map((j) => {
+      const attrPart = j.attr ? ` ${j.attr}` : '';
+      const idPart = j.id ? ` id="${escapeAttr(j.id)}"` : '';
+      return `    <script type="application/json"${idPart}${attrPart}>${escapeForScriptTag(JSON.stringify(j.data))}</script>`;
+    })
+    .join('\n');
 
   const scriptTags = scriptModules
     .map((src) => `    <script type="module" src="${escapeAttr(src)}"></script>`)
     .join('\n');
+
+  const bodyOpen = bodyAttrs ? `<body ${bodyAttrs}>` : '<body>';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -41,24 +71,17 @@ export function layout(options: LayoutOptions): string {
     <title>${escapeHtml(title)}</title>
 ${cssTags}
   </head>
-  <body>
+  ${bodyOpen}
 ${bodyHtml}
-${jsonTag}
+${jsonTags}
 ${scriptTags}
   </body>
 </html>
 `;
 }
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
-
 function escapeAttr(s: string): string {
-  return escapeHtml(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  return escapeHtml(s);
 }
 
 /**

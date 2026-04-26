@@ -35,6 +35,8 @@ import { createApiRouter, type StudioContext } from './routes/api.ts';
 import { renderDashboard } from './pages/dashboard.ts';
 import { renderReviewPage } from './pages/review.ts';
 import { renderShortformPage } from './pages/shortform.ts';
+import { renderHelpPage } from './pages/help.ts';
+import { renderScrapbookPage } from './pages/scrapbook.ts';
 
 interface CliArgs {
   projectRoot: string;
@@ -101,13 +103,22 @@ export function createApp(ctx: StudioContext): Hono {
 
   // Page routes
   app.get('/dev/editorial-studio', (c) => c.html(renderDashboard(ctx)));
-  app.get('/dev/editorial-review-shortform', (c) => c.html(renderShortformPage(ctx)));
-  app.get('/dev/editorial-review/:slug', (c) =>
+  app.get('/dev/editorial-help', (c) => c.html(renderHelpPage(ctx)));
+  app.get('/dev/editorial-review-shortform', (c) =>
+    c.html(renderShortformPage(ctx, c.req.query('focus') ?? null)),
+  );
+  app.get('/dev/editorial-review/:slug', async (c) =>
     c.html(
-      renderReviewPage(ctx, c.req.param('slug'), {
+      await renderReviewPage(ctx, c.req.param('slug'), {
         site: c.req.query('site') ?? null,
         version: c.req.query('v') ?? null,
+        kind: c.req.query('kind') ?? null,
       }),
+    ),
+  );
+  app.get('/dev/scrapbook/:site/:slug', (c) =>
+    c.html(
+      renderScrapbookPage(ctx, c.req.param('site'), c.req.param('slug')),
     ),
   );
 

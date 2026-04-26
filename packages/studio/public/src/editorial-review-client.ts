@@ -894,21 +894,68 @@ export function initEditorialReview(): void {
     if (previewDebounce !== null) window.clearTimeout(previewDebounce);
     previewDebounce = window.setTimeout(async () => {
       try {
-        const [{ renderMarkdownToHtml, parseDraftFrontmatter }, { splitOutline }] = await Promise.all([
-          import('../../scripts/lib/editorial-review/render.js'),
-          import('./outline-split.ts'),
-        ]);
-        const parsed = parseDraftFrontmatter(md);
+        const { splitOutline } = await import('./outline-split.ts');
+        const bodyOnly = stripFrontmatter(md);
         const isOutlineKind = state.workflow.contentKind === 'outline';
         const bodyForPreview = isOutlineKind
-          ? parsed.body
-          : splitOutline(parsed.body).body;
-        const html = await renderMarkdownToHtml(bodyForPreview);
+          ? bodyOnly
+          : splitOutline(bodyOnly).body;
+        const html = await fetchRenderedHtml(bodyForPreview);
         editPreviewHost.innerHTML = html;
       } catch (e) {
         editPreviewHost.innerHTML = `<p class="er-edit-preview-error">Preview failed: ${(e as Error).message}</p>`;
       }
     }, 120);
+  }
+
+  /**
+   * Strip a leading YAML frontmatter block (`---` … `---`) from a
+   * markdown source string. Mirrors the parse done by
+   * `@deskwork/core/review/render`'s `parseDraftFrontmatter`, but
+   * only returns the body — the preview doesn't need the parsed
+   * fields. Idempotent: a doc without frontmatter passes through.
+   */
+  function stripFrontmatter(md: string): string {
+    if (!md.startsWith('---\n')) return md;
+    const end = md.indexOf('\n---', 4);
+    if (end < 0) return md;
+    const after = md.slice(end + 4);
+    return after.startsWith('\n') ? after.slice(1) : after;
+  }
+
+  /**
+   * Render markdown via the studio's `/api/dev/editorial-review/render`
+   * endpoint. Replaces what was previously a dynamic ESM import of the
+   * server-side render module — that path didn't exist in the bundle and
+   * relied on Vite/Astro's same-origin source resolution.
+   */
+  async function fetchRenderedHtml(markdown: string): Promise<string> {
+    const res = await fetch('/api/dev/editorial-review/render', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ markdown }),
+    });
+    if (!res.ok) {
+      const errBody: unknown = await res.json().catch(() => ({}));
+      const message =
+        typeof errBody === 'object' &&
+        errBody !== null &&
+        'error' in errBody &&
+        typeof (errBody as { error: unknown }).error === 'string'
+          ? (errBody as { error: string }).error
+          : `render endpoint returned ${res.status}`;
+      throw new Error(message);
+    }
+    const json: unknown = await res.json();
+    if (
+      typeof json !== 'object' ||
+      json === null ||
+      !('html' in json) ||
+      typeof (json as { html: unknown }).html !== 'string'
+    ) {
+      throw new Error('render endpoint returned malformed body');
+    }
+    return (json as { html: string }).html;
   }
 
   /** Flip the three-way Source / Split / Preview toggle. */

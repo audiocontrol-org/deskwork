@@ -227,10 +227,12 @@ describe('studio API', () => {
 describe('studio pages', () => {
   let root: string;
   let app: ReturnType<typeof createApp>;
+  let cfg: DeskworkConfig;
 
   beforeEach(() => {
     root = mkdtempSync(join(tmpdir(), 'deskwork-studio-pages-'));
-    app = createApp({ projectRoot: root, config: makeConfig() });
+    cfg = makeConfig();
+    app = createApp({ projectRoot: root, config: cfg });
   });
 
   afterEach(() => {
@@ -240,19 +242,137 @@ describe('studio pages', () => {
   it('GET /dev/editorial-studio renders the dashboard', async () => {
     const r = await getText(app, '/dev/editorial-studio');
     expect(r.status).toBe(200);
-    expect(r.text).toContain('Editorial Studio');
-    expect(r.text).toContain('id="studio-state"');
+    expect(r.text).toContain('<title>Editorial Studio');
+    expect(r.text).toContain('Editorial <em>Studio</em>');
+    expect(r.text).toContain('/static/css/editorial-review.css');
+    expect(r.text).toContain('/static/css/editorial-studio.css');
+    expect(r.text).toContain('/static/dist/editorial-studio-client.js');
+  });
+
+  it('GET /dev/editorial-studio surfaces approved workflows in awaiting-press', async () => {
+    // Approved workflows show up in the "Awaiting press" section even
+    // without a calendar entry — the dashboard reads them from the
+    // pipeline journal directly.
+    const w = createWorkflow(root, cfg, {
+      site: 'a',
+      slug: 'awaiting',
+      contentKind: 'longform',
+      initialMarkdown: '# v1',
+    });
+    // open → in-review → approved
+    const path = '/api/dev/editorial-review/decision';
+    await postJson(app, path, { workflowId: w.id, to: 'in-review' });
+    await postJson(app, path, { workflowId: w.id, to: 'approved' });
+
+    const r = await getText(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    expect(r.text).toContain('Awaiting press');
+    expect(r.text).toContain('awaiting');
   });
 
   it('GET /dev/editorial-review-shortform renders', async () => {
     const r = await getText(app, '/dev/editorial-review-shortform');
     expect(r.status).toBe(200);
-    expect(r.text).toContain('Shortform Review');
+    expect(r.text).toContain('compositor');
+    expect(r.text).toContain('No short-form galleys on the desk.');
+    expect(r.text).toContain('/static/css/editorial-review.css');
+  });
+
+  it('GET /dev/editorial-help renders the manual', async () => {
+    const r = await getText(app, '/dev/editorial-help');
+    expect(r.status).toBe(200);
+    expect(r.text).toContain("Compositor's");
+    expect(r.text).toContain('End of manual');
+    // Sections present
+    expect(r.text).toContain('id="sec-model"');
+    expect(r.text).toContain('id="sec-tracks"');
+    expect(r.text).toContain('id="sec-catalogue"');
+    expect(r.text).toContain('/static/css/editorial-help.css');
+  });
+
+  it('GET /dev/scrapbook/:site/:slug renders empty state', async () => {
+    const r = await getText(app, '/dev/scrapbook/a/some-post');
+    expect(r.status).toBe(200);
+    expect(r.text).toContain('Scrapbook');
+    expect(r.text).toContain('This scrapbook is empty');
+    expect(r.text).toContain('/static/css/scrapbook.css');
+    expect(r.text).toContain('/static/dist/scrapbook-client.js');
+  });
+
+  it('GET /dev/scrapbook/:site/:slug lists items when present', async () => {
+    const dir = join(root, 'src/sites/a/content/blog/note-able/scrapbook');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'README.md'), '# Notes\n', 'utf-8');
+    writeFileSync(join(dir, 'reference.md'), '# Refs\n', 'utf-8');
+    const r = await getText(app, '/dev/scrapbook/a/note-able');
+    expect(r.status).toBe(200);
+    expect(r.text).toContain('README.md');
+    expect(r.text).toContain('reference.md');
+  });
+
+  it('GET /dev/editorial-review/:slug returns an error page for unknown slug', async () => {
+    const r = await getText(app, '/dev/editorial-review/nonexistent?site=a');
+    expect(r.status).toBe(200);
+    expect(r.text).toContain('No galley to review');
+    expect(r.text).toContain('/static/css/editorial-review.css');
+  });
+
+  it('GET /dev/editorial-review/:slug renders a real workflow', async () => {
+    const w = createWorkflow(root, cfg, {
+      site: 'a',
+      slug: 'rendered',
+      contentKind: 'longform',
+      initialMarkdown: '---\ntitle: Hello World\ndescription: A dispatch.\n---\n\n# Hello World\n\nBody prose.\n',
+    });
+    const r = await getText(app, `/dev/editorial-review/${w.slug}?site=a`);
+    expect(r.status).toBe(200);
+    expect(r.text).toContain('Margin notes');
+    expect(r.text).toContain('Hello World');
+    expect(r.text).toContain('id="draft-state"');
+    expect(r.text).toContain('/static/dist/editorial-review-client.js');
   });
 
   it('GET / redirects to the dashboard', async () => {
     const res = await app.fetch(new Request('http://x/'), {});
     expect(res.status).toBe(302);
     expect(res.headers.get('location')).toBe('/dev/editorial-studio');
+  });
+});
+
+describe('POST /api/dev/editorial-review/render', () => {
+  let root: string;
+  let app: ReturnType<typeof createApp>;
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'deskwork-studio-render-'));
+    app = createApp({ projectRoot: root, config: makeConfig() });
+  });
+
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('renders markdown to HTML', async () => {
+    const r = await postJson(app, '/api/dev/editorial-review/render', {
+      markdown: '# Hello\n\nBody.\n',
+    });
+    expect(r.status).toBe(200);
+    const body = r.body as { html: string };
+    expect(typeof body.html).toBe('string');
+    // The render pipeline strips the first H1 so the title doesn't repeat.
+    expect(body.html).toContain('<p>Body.</p>');
+    expect(body.html).not.toContain('<h1');
+  });
+
+  it('returns 400 when markdown is missing', async () => {
+    const r = await postJson(app, '/api/dev/editorial-review/render', {});
+    expect(r.status).toBe(400);
+  });
+
+  it('returns 400 for non-string markdown', async () => {
+    const r = await postJson(app, '/api/dev/editorial-review/render', {
+      markdown: 42,
+    });
+    expect(r.status).toBe(400);
   });
 });

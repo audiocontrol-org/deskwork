@@ -37,19 +37,6 @@ async function findEntries(dir: string): Promise<readonly string[]> {
   return entries;
 }
 
-/**
- * Module specifiers we deliberately leave unresolved at bundle time.
- *
- * The upstream client code dynamically imports a markdown render helper
- * via a relative path (`../../scripts/lib/editorial-review/render.js`)
- * that doesn't exist in this monorepo yet — the page-wiring phase will
- * either port that module or substitute a fetch-based equivalent. Until
- * then we treat the path as external so the bundle still emits.
- */
-const EXTERNAL_PATHS: readonly string[] = [
-  '../../scripts/lib/editorial-review/render.js',
-];
-
 async function bundleOne(entryPoint: string): Promise<BundleSummary> {
   const baseName = entryPoint
     .slice(SRC_DIR.length + 1)
@@ -63,7 +50,6 @@ async function bundleOne(entryPoint: string): Promise<BundleSummary> {
     target: 'es2022',
     minify: false,
     sourcemap: 'linked',
-    external: [...EXTERNAL_PATHS],
     logLevel: 'warning',
   };
   const result: BuildResult = await build(opts);
