@@ -1,57 +1,63 @@
-refactor(deskwork): extract @deskwork/cli; collapse plugin to a thin shell
+feat(studio): @deskwork/studio Hono server + page render scaffolds
 
-Second commit toward separating headless skills from in-tree code.
-The plugin now contains only SKILL.md files plus a small bin/ wrapper
-that delegates to the @deskwork/cli npm package. CLI logic lives in its
-own workspace and exposes a single dispatch entry, `deskwork`.
+Severs the editorial review surface from Astro by standing up an
+independent Hono web server that exposes the same JSON API and rough
+HTML page shape audiocontrol's Astro routes provide today.
 
-Architecture before:
-  plugins/deskwork/
-    bin/deskwork-add.ts            (and 11 more — top-level scripts)
-    package.json                    (tsx, vitest, typescript devDeps)
-    skills/<name>/SKILL.md         (invoked bin/X.ts)
-    test/*-integration.test.ts     (spawned bin/X.ts)
-    tsconfig.json, vitest.config.ts
+Per the plan, this commit lands the architecture (server, route
+adapters, page render skeletons, in-process tests). Phase 4 ports
+the audiocontrol UI assets (~5,000 lines of HTML/CSS/JS) into
+public/ and replaces the page render scaffolds with full templates.
 
-After:
-  packages/cli/
-    src/cli.ts                      (single dispatch entry — `bin: deskwork`)
-    src/commands/<name>.ts          (export run(argv) — refactored from bin/X.ts)
-    test/*-integration.test.ts      (spawn node_modules/.bin/deskwork)
-    tsconfig.json, vitest.config.ts, package.json
+Added:
+- packages/studio/src/server.ts — Hono entry. CLI: `deskwork-studio
+  [--project-root <path>] [--port <n>]`. Defaults: cwd / 4321.
+  Reads .deskwork/config.json on startup; routes share a {projectRoot,
+  config} StudioContext.
+- packages/studio/src/routes/api.ts — 6 route handlers, each a thin
+  wrapper over @deskwork/core/review/handlers (handleAnnotate,
+  handleListAnnotations, handleDecision, handleGetWorkflow,
+  handleCreateVersion, handleStartLongform). Path shapes match
+  audiocontrol's /api/dev/editorial-review/* routes byte-for-byte.
+- packages/studio/src/pages/{dashboard,review,shortform}.ts —
+  minimal page render functions. Each reads relevant data from disk
+  (calendar, workflows, versions, annotations) and emits HTML with
+  data embedded as `<script type="application/json">` for the client
+  to hydrate. Phase 4 fills in the full audiocontrol templates.
+- packages/studio/src/pages/layout.ts — shared HTML shell (replaces
+  audiocontrol's `<BlogLayout>` Astro component).
+- packages/studio/test/api.test.ts — 12 in-process integration tests
+  using `app.fetch(new Request(...))`. No real port binding. Covers
+  every route + the page renders + the / redirect.
 
-  plugins/deskwork/
-    bin/deskwork                    (bash wrapper — workspace-link first,
-                                     `npx -y @deskwork/cli@latest` fallback)
-    package.json                    (metadata only)
-    skills/<name>/SKILL.md          (invoke `deskwork <subcommand>`)
+Wired up:
+- npm workspace @deskwork/studio added to root.
+- Hono + @hono/node-server runtime deps.
+- bin/deskwork-studio symlink (npm-workspaces creates it).
 
-What this enables:
-- The plugin updates independently of the CLI. Skill prose changes
-  don't require a new CLI release; CLI bug fixes don't require a
-  plugin update.
-- Headless skills don't carry tsx/vitest/typescript weight in the
-  plugin tree — those are dev deps of @deskwork/cli only.
-- After publishing @deskwork/cli to npm, the plugin install becomes
-  a few KB of markdown + a 30-line shell wrapper that fetches the
-  CLI from npm via npx.
+Bug-found-and-fixed: the server's "is this the entry module"
+guard used `import.meta.url === \`file://\${process.argv[1]}\``,
+which fails when the user invokes via the symlinked bin
+(node_modules/.bin/deskwork-studio). Replaced with a
+realpathSync(argv[1]) === fileURLToPath(import.meta.url) check —
+resolves the symlink before comparing.
 
-Path-injection convenience: cli.ts inserts process.cwd() as the
-project-root positional when the user doesn't pass one. So
-`deskwork add 'My Post'` from /work/myproject is equivalent to
-`deskwork add /work/myproject 'My Post'`. Tests that pass an
-explicit project-root keep working — the heuristic only triggers
-when argv[0] doesn't look path-like (no `/`, `./`, `../`, or `.`).
+Verified end-to-end:
+- 12/12 studio tests pass
+- 126/126 core, 27/27 cli still pass (165/165 total)
+- All three workspaces typecheck clean
+- `deskwork-studio --project-root <tmp> --port 47321` boots, serves
+  /dev/editorial-studio (200), /dev/editorial-review-shortform (200),
+  /api/dev/editorial-review/workflow (404 on missing — correct), and
+  / (302 → /dev/editorial-studio)
 
-Verified:
-- 126/126 @deskwork/core tests pass
-- 27/27 @deskwork/cli tests pass (3 integration files spawn the
-  workspace `deskwork` binary; same coverage as before the move)
-- Both packages typecheck clean
-- claude plugin validate plugins/deskwork passes
-- claude --plugin-dir plugins/deskwork lists all 12 skills
-- bin/deskwork wrapper resolves the workspace-linked binary and
-  dispatches correctly
+Note: The static file server emits a "public/ not found" warning
+because Phase 4 hasn't created the directory yet. This is expected
+and harmless — only /static/* asset requests fail; dynamic routes
+work fine.
 
-Next commits: build @deskwork/studio (Hono server + UI), add the
-deskwork-studio plugin shell, end-to-end dogfood.
+Next: Phase 4 ports the UI assets (audiocontrol's editorial-review-
+client.ts ~1,609L, editorial-studio-client.ts ~643L, editorial-
+review-editor.ts ~201L, editorial-review.css ~2,269L, editorial-
+studio.css ~171L) and replaces the page render scaffolds with full
+template ports.
