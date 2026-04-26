@@ -33,7 +33,6 @@ import type { StudioContext } from '../routes/api.ts';
 import { html, unsafe, type RawHtml } from './html.ts';
 import { layout } from './layout.ts';
 import { escapeHtml } from './html.ts';
-import { discoverHostTheme, hostThemeUrl } from '../host-theme.ts';
 
 interface ReviewQuery {
   /** ?site=<slug> override; null falls back to config.defaultSite. */
@@ -350,19 +349,12 @@ export async function renderReviewPage(
       <div class="er-poll-indicator" data-poll>auto-refresh · 8s</div>
     </div>`;
 
-  // Discovered host blog theme — applied AFTER deskwork's own review CSS
-  // so host styles override any conflicting rules in the article body.
-  // Deskwork's chrome (margin notes, masthead, controls) uses the `.er-*`
-  // namespace that host CSS won't touch.
-  const hostTheme = discoverHostTheme(ctx.projectRoot, ctx.config, site);
-  const hostThemeHrefs = hostTheme.map((a) => hostThemeUrl(site, a.filename));
-
   return layout({
     title: `${titleField} — Review`,
     cssHrefs: [
       '/static/css/editorial-review.css',
       '/static/css/blog-figure.css',
-      ...hostThemeHrefs,
+      '/static/css/review-viewport.css',
     ],
     bodyHtml: body,
     embeddedJson: [{ id: 'draft-state', data: draftState }],

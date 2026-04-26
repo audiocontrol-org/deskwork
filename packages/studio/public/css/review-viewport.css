@@ -1,0 +1,401 @@
+/* ─────────────────────────────────────────────────────────────────
+ * review-viewport.css
+ *
+ * The "viewport" inside the review surface — the scrolling article
+ * body where the operator reads, edits, and leaves margin notes. The
+ * surrounding chrome (masthead, marginalia column, control strip,
+ * decision buttons) keeps deskwork's distinctive editorial look. The
+ * viewport itself is intentionally style-neutral: nothing publication-
+ * specific, nothing skeuomorphic, just calm and pleasant to read in
+ * for hours.
+ *
+ * Scoped to the rendered draft body (`#draft-body`) and the live
+ * markdown preview pane (`[data-edit-preview]`). Deskwork's `.er-*`
+ * namespace governs everything else and is not touched here.
+ * ───────────────────────────────────────────────────────────────── */
+
+#draft-body,
+[data-edit-preview] {
+  /* ── Typography stack (system-only; no network deps) ───────────── */
+  --vp-font-prose: 'Iowan Old Style', 'Charter', 'Source Serif Pro',
+    'Source Serif 4', 'Georgia', serif;
+  --vp-font-display: 'Avenir Next', 'Optima', 'Lucida Grande',
+    'Helvetica Neue', system-ui, sans-serif;
+  --vp-font-mono: 'JetBrains Mono', 'SF Mono', 'Menlo', 'Consolas',
+    monospace;
+
+  /* ── Palette — warm paper, ink-near-black, single calm accent ──── */
+  --vp-paper:        #f9f6f0;
+  --vp-paper-soft:   #f3eee2;
+  --vp-paper-deep:   #ece6d6;
+  --vp-ink:          #1c1c20;
+  --vp-ink-soft:     #4a4a52;
+  --vp-ink-muted:    #8a8a82;
+  --vp-rule:         #ddd6c5;
+  --vp-rule-strong:  #c8c0a8;
+  --vp-accent:       #2e6b6e;       /* deep teal — restrained */
+  --vp-accent-soft:  #4d8a8d;
+  --vp-mark:         #f1d36b;       /* warm highlight */
+
+  /* ── Spatial system ────────────────────────────────────────────── */
+  --vp-measure: 36rem;
+  --vp-rhythm: 1.7;
+
+  font-family: var(--vp-font-prose);
+  font-size: 1.0625rem;
+  line-height: var(--vp-rhythm);
+  color: var(--vp-ink);
+  background: var(--vp-paper);
+  font-feature-settings: 'kern' on, 'liga' on, 'onum' on;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* The scrolling draft canvas takes a comfortable measure with generous
+ * gutters; the split-preview pane (narrower column) gets a tighter
+ * measure so the operator can still read it at half-width. */
+#draft-body {
+  max-width: var(--vp-measure);
+  margin: 0 auto;
+  padding: 3.5rem 2rem 6rem;
+}
+
+[data-edit-preview] {
+  padding: 1.5rem 1.75rem 3rem;
+}
+
+/* ── Headings ────────────────────────────────────────────────────── */
+#draft-body h1,
+#draft-body h2,
+#draft-body h3,
+#draft-body h4,
+#draft-body h5,
+#draft-body h6,
+[data-edit-preview] h1,
+[data-edit-preview] h2,
+[data-edit-preview] h3,
+[data-edit-preview] h4,
+[data-edit-preview] h5,
+[data-edit-preview] h6 {
+  font-family: var(--vp-font-display);
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  color: var(--vp-ink);
+  line-height: 1.25;
+  margin-top: 2.6rem;
+  margin-bottom: 0.7rem;
+}
+
+#draft-body h1,
+[data-edit-preview] h1 {
+  font-size: 1.95rem;
+  font-weight: 700;
+  letter-spacing: -0.022em;
+  margin-top: 0;
+  margin-bottom: 1.4rem;
+}
+
+#draft-body h2,
+[data-edit-preview] h2 {
+  font-size: 1.4rem;
+  margin-top: 3rem;
+  padding-top: 1.4rem;
+  border-top: 1px solid var(--vp-rule);
+}
+
+#draft-body h3,
+[data-edit-preview] h3 {
+  font-size: 1.15rem;
+}
+
+#draft-body h4,
+[data-edit-preview] h4 {
+  font-size: 1rem;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  color: var(--vp-ink-soft);
+}
+
+#draft-body h5,
+#draft-body h6,
+[data-edit-preview] h5,
+[data-edit-preview] h6 {
+  font-size: 0.95rem;
+  color: var(--vp-ink-soft);
+}
+
+/* ── Paragraphs and inline ───────────────────────────────────────── */
+#draft-body p,
+[data-edit-preview] p {
+  margin: 0 0 1.1rem 0;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  hyphenate-limit-chars: 8 4 4;
+}
+
+#draft-body em,
+[data-edit-preview] em {
+  font-style: italic;
+}
+
+#draft-body strong,
+[data-edit-preview] strong {
+  font-weight: 600;
+  color: var(--vp-ink);
+}
+
+/* ── Links — accent color with a hairline rule under, no flat
+ *  underline. Hover lifts to soft accent and dims the rule. ─────── */
+#draft-body a,
+[data-edit-preview] a {
+  color: var(--vp-accent);
+  text-decoration: none;
+  background-image: linear-gradient(
+    to top,
+    var(--vp-accent) 0,
+    var(--vp-accent) 1px,
+    transparent 1px
+  );
+  padding-bottom: 1px;
+  transition: color 140ms ease, background-image 140ms ease;
+}
+
+#draft-body a:hover,
+[data-edit-preview] a:hover {
+  color: var(--vp-accent-soft);
+  background-image: linear-gradient(
+    to top,
+    var(--vp-accent-soft) 0,
+    var(--vp-accent-soft) 1px,
+    transparent 1px
+  );
+}
+
+/* ── Lists ───────────────────────────────────────────────────────── */
+#draft-body ul,
+#draft-body ol,
+[data-edit-preview] ul,
+[data-edit-preview] ol {
+  margin: 0.6rem 0 1.2rem 0;
+  padding-left: 1.5rem;
+}
+
+#draft-body li,
+[data-edit-preview] li {
+  margin: 0.35rem 0;
+  padding-left: 0.2rem;
+}
+
+#draft-body li > p,
+[data-edit-preview] li > p {
+  margin-bottom: 0.5rem;
+}
+
+#draft-body ul li::marker,
+[data-edit-preview] ul li::marker {
+  color: var(--vp-accent);
+}
+
+#draft-body ol li::marker,
+[data-edit-preview] ol li::marker {
+  font-family: var(--vp-font-display);
+  font-feature-settings: 'tnum' on;
+  font-size: 0.9em;
+  color: var(--vp-accent);
+}
+
+/* Nested lists — calmer rhythm */
+#draft-body li ul,
+#draft-body li ol,
+[data-edit-preview] li ul,
+[data-edit-preview] li ol {
+  margin-top: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+/* ── Blockquotes ─────────────────────────────────────────────────── */
+#draft-body blockquote,
+[data-edit-preview] blockquote {
+  margin: 1.5rem 0 1.5rem 0.25rem;
+  padding: 0.2rem 0 0.2rem 1.25rem;
+  border-left: 2px solid var(--vp-accent);
+  color: var(--vp-ink-soft);
+  font-style: italic;
+}
+
+#draft-body blockquote p,
+[data-edit-preview] blockquote p {
+  margin-bottom: 0.6rem;
+}
+
+#draft-body blockquote p:last-child,
+[data-edit-preview] blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+#draft-body blockquote em,
+[data-edit-preview] blockquote em {
+  font-style: normal;
+}
+
+/* ── Code ────────────────────────────────────────────────────────── */
+#draft-body code,
+[data-edit-preview] code {
+  font-family: var(--vp-font-mono);
+  font-size: 0.88em;
+  background: var(--vp-paper-soft);
+  border: 1px solid var(--vp-rule);
+  padding: 0.08em 0.4em;
+  border-radius: 3px;
+  font-feature-settings: 'liga' off;
+}
+
+#draft-body pre,
+[data-edit-preview] pre {
+  font-family: var(--vp-font-mono);
+  background: var(--vp-paper-soft);
+  border: 1px solid var(--vp-rule);
+  border-radius: 4px;
+  padding: 1rem 1.2rem;
+  margin: 1.4rem 0;
+  overflow-x: auto;
+  font-size: 0.86em;
+  line-height: 1.55;
+  color: var(--vp-ink-soft);
+}
+
+#draft-body pre code,
+[data-edit-preview] pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
+}
+
+/* ── Horizontal rules ────────────────────────────────────────────── */
+#draft-body hr,
+[data-edit-preview] hr {
+  border: none;
+  margin: 2.6rem auto;
+  width: 4rem;
+  height: 1px;
+  background: var(--vp-rule-strong);
+}
+
+/* ── Tables ──────────────────────────────────────────────────────── */
+#draft-body table,
+[data-edit-preview] table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.4rem 0;
+  font-family: var(--vp-font-display);
+  font-size: 0.95em;
+  font-feature-settings: 'tnum' on, 'lnum' on;
+}
+
+#draft-body th,
+[data-edit-preview] th {
+  text-align: left;
+  font-weight: 600;
+  padding: 0.55rem 0.75rem;
+  border-bottom: 2px solid var(--vp-rule-strong);
+  color: var(--vp-ink);
+}
+
+#draft-body td,
+[data-edit-preview] td {
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--vp-rule);
+}
+
+#draft-body tr:last-child td,
+[data-edit-preview] tr:last-child td {
+  border-bottom: none;
+}
+
+/* ── Figures ─────────────────────────────────────────────────────── */
+#draft-body figure,
+[data-edit-preview] figure {
+  margin: 1.7rem 0;
+}
+
+#draft-body img,
+[data-edit-preview] img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 2px;
+}
+
+#draft-body figcaption,
+[data-edit-preview] figcaption {
+  font-family: var(--vp-font-display);
+  font-size: 0.82rem;
+  color: var(--vp-ink-muted);
+  text-align: center;
+  margin-top: 0.5rem;
+  letter-spacing: 0.012em;
+  font-style: italic;
+}
+
+/* ── Selection — accent-colored ──────────────────────────────────── */
+#draft-body::selection,
+#draft-body *::selection,
+[data-edit-preview]::selection,
+[data-edit-preview] *::selection {
+  background: var(--vp-accent);
+  color: var(--vp-paper);
+}
+
+/* ── Margin-note highlight overlay (the existing mark from the
+ *  review pipeline). Subtle warm-yellow underlay rather than a flat
+ *  background block — feels like a real highlight pass. ─────────── */
+#draft-body .er-comment-highlight {
+  background: linear-gradient(
+    to top,
+    var(--vp-mark) 0,
+    var(--vp-mark) 0.5em,
+    transparent 0.5em
+  );
+  padding-left: 0.06em;
+  padding-right: 0.06em;
+  border-radius: 1px;
+}
+
+/* Keyboard hints inside the body — small monospace pill */
+#draft-body kbd,
+[data-edit-preview] kbd {
+  font-family: var(--vp-font-mono);
+  font-size: 0.78em;
+  background: var(--vp-paper-deep);
+  border: 1px solid var(--vp-rule-strong);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  padding: 0.05em 0.4em;
+  color: var(--vp-ink);
+  vertical-align: 0.05em;
+}
+
+/* ── First-paragraph dek styling — when present ──────────────────── */
+#draft-body .er-dispatch-dek,
+[data-edit-preview] .er-dispatch-dek {
+  font-family: var(--vp-font-display);
+  font-size: 1.1rem;
+  font-weight: 400;
+  font-style: italic;
+  color: var(--vp-ink-soft);
+  letter-spacing: -0.008em;
+  line-height: 1.5;
+  margin: -0.5rem 0 2rem 0;
+  padding-bottom: 1.2rem;
+  border-bottom: 1px solid var(--vp-rule);
+}
+
+/* ── Contenteditable focus state — calm accent ring ──────────────── */
+#draft-body[contenteditable='true']:focus,
+#draft-body[contenteditable='true']:focus-visible {
+  outline: none;
+}

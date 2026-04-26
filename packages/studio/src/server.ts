@@ -38,7 +38,6 @@ import { renderReviewPage } from './pages/review.ts';
 import { renderShortformPage } from './pages/shortform.ts';
 import { renderHelpPage } from './pages/help.ts';
 import { renderScrapbookPage } from './pages/scrapbook.ts';
-import { discoverHostTheme } from './host-theme.ts';
 
 interface CliArgs {
   projectRoot: string;
@@ -123,24 +122,6 @@ export function createApp(ctx: StudioContext): Hono {
       renderScrapbookPage(ctx, c.req.param('site'), c.req.param('slug')),
     ),
   );
-
-  // Auto-discovered host blog theme — only the review page consumes
-  // these. Assets are filtered by site so a multi-site project can have
-  // distinct article styling per site.
-  app.get('/static/host-theme/:site/:filename', (c) => {
-    const site = c.req.param('site');
-    const filename = c.req.param('filename');
-    if (!(site in ctx.config.sites)) {
-      return c.notFound();
-    }
-    const assets = discoverHostTheme(ctx.projectRoot, ctx.config, site);
-    const asset = assets.find((a) => a.filename === filename);
-    if (!asset) return c.notFound();
-    return c.body(asset.content, 200, {
-      'content-type': 'text/css; charset=utf-8',
-      'cache-control': 'no-store',
-    });
-  });
 
   // Static assets — UI client JS, CSS, etc.
   app.use(
