@@ -318,6 +318,57 @@ describe('studio pages', () => {
     expect(r.status).toBe(500);
   });
 
+  it('GET /dev/scrapbook/:site/<deep-path> renders a hierarchical scrapbook', async () => {
+    const dir = join(
+      root,
+      'src/sites/a/content/blog/the-outbound/characters/strivers/scrapbook',
+    );
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'archetypes.md'), '# notes', 'utf-8');
+    const r = await getText(
+      app,
+      '/dev/scrapbook/a/the-outbound/characters/strivers',
+    );
+    expect(r.status).toBe(200);
+    expect(r.text).toContain('archetypes.md');
+    // Breadcrumb shows each path segment as a link, with the leaf
+    // rendered as the current span.
+    expect(r.text).toContain('scrapbook-breadcrumb');
+    expect(r.text).toContain('href="/dev/scrapbook/a/the-outbound"');
+    expect(r.text).toContain('href="/dev/scrapbook/a/the-outbound/characters"');
+    expect(r.text).toContain('scrapbook-breadcrumb-current');
+  });
+
+  it('GET /dev/scrapbook/:site/<path> exposes secret items in a separate section', async () => {
+    const sb = join(
+      root,
+      'src/sites/a/content/blog/the-outbound/scrapbook',
+    );
+    const secret = join(sb, 'secret');
+    mkdirSync(secret, { recursive: true });
+    writeFileSync(join(sb, 'public-note.md'), '#', 'utf-8');
+    writeFileSync(join(secret, 'draft-thoughts.md'), '#', 'utf-8');
+    const r = await getText(app, '/dev/scrapbook/a/the-outbound');
+    expect(r.status).toBe(200);
+    expect(r.text).toContain('public-note.md');
+    expect(r.text).toContain('scrapbook-secret');
+    expect(r.text).toContain('draft-thoughts.md');
+    // Public-section item should NOT carry data-secret; secret-section
+    // item should.
+    expect(r.text).toMatch(
+      /data-filename="draft-thoughts.md"[^>]*data-secret="true"/,
+    );
+  });
+
+  it('GET /dev/scrapbook/:site/<path> hides secret section when no secret items', async () => {
+    const sb = join(root, 'src/sites/a/content/blog/clean/scrapbook');
+    mkdirSync(sb, { recursive: true });
+    writeFileSync(join(sb, 'note.md'), '#', 'utf-8');
+    const r = await getText(app, '/dev/scrapbook/a/clean');
+    expect(r.status).toBe(200);
+    expect(r.text).not.toContain('scrapbook-secret');
+  });
+
   it('GET /dev/editorial-review/:slug returns an error page for unknown slug', async () => {
     const r = await getText(app, '/dev/editorial-review/nonexistent?site=a');
     expect(r.status).toBe(200);
