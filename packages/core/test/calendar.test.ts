@@ -29,7 +29,10 @@ describe('parseCalendar', () => {
 
     const cal = parseCalendar(md);
     expect(cal.entries).toHaveLength(1);
-    expect(cal.entries[0]).toEqual({
+    const { id, ...rest } = cal.entries[0];
+    // Parser auto-assigns a UUID for legacy rows missing the column.
+    expect(id).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(rest).toEqual({
       slug: 'my-post',
       title: 'My Post',
       description: 'A post about things',
@@ -51,7 +54,9 @@ describe('parseCalendar', () => {
     ].join('\n');
 
     const cal = parseCalendar(md);
-    expect(cal.entries[0]).toEqual({
+    const { id, ...rest } = cal.entries[0];
+    expect(id).toMatch(/^[0-9a-f-]{36}$/i);
+    expect(rest).toEqual({
       slug: 'my-video',
       title: 'My Video',
       description: 'A cool video',
@@ -80,6 +85,8 @@ describe('parseCalendar', () => {
     const cal = parseCalendar(md);
     expect(cal.distributions).toEqual([
       {
+        // No matching entry in this fixture — entryId stays empty.
+        entryId: '',
         slug: 'my-post',
         platform: 'reddit',
         url: 'https://reddit.com/r/foo/abc',
@@ -212,9 +219,14 @@ describe('renderCalendar', () => {
 describe('round-trip', () => {
   it('round-trips a calendar with all optional columns and distributions', () => {
     // Entries in canonical render order: Ideas, then Planned, ..., then Published.
+    // UUIDs pre-assigned so the round-trip is deterministic — the parser
+    // would otherwise mint fresh ones for the legacy fixture.
+    const p1Id = '11111111-1111-4111-8111-111111111111';
+    const p2Id = '22222222-2222-4222-8222-222222222222';
     const cal: EditorialCalendar = {
       entries: [
         {
+          id: p2Id,
           slug: 'p2',
           title: 'Idea Two',
           description: 'desc two',
@@ -223,6 +235,7 @@ describe('round-trip', () => {
           source: 'analytics',
         },
         {
+          id: p1Id,
           slug: 'p1',
           title: 'Post One',
           description: 'desc one',
@@ -238,6 +251,7 @@ describe('round-trip', () => {
       ],
       distributions: [
         {
+          entryId: p1Id,
           slug: 'p1',
           platform: 'reddit',
           url: 'https://reddit.com/r/foo/abc',

@@ -23,6 +23,7 @@
     "./frontmatter": "./src/frontmatter.ts",
     "./journal": "./src/journal.ts",
     "./paths": "./src/paths.ts",
+    "./rename-slug": "./src/rename-slug.ts",
     "./review": "./src/review/index.ts",
     "./review/handlers": "./src/review/handlers.ts",
     "./review/pipeline": "./src/review/pipeline.ts",
@@ -30,6 +31,7 @@
     "./review/report": "./src/review/report.ts",
     "./review/types": "./src/review/types.ts",
     "./scaffold": "./src/scaffold.ts",
+    "./scrapbook": "./src/scrapbook.ts",
     "./types": "./src/types.ts"
   },
   "scripts": {

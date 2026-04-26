@@ -12,25 +12,28 @@
  *
  * ## Ideas
  *
- * | Slug | Title | Description | Keywords | Source |
- * |------|-------|-------------|----------|--------|
- * | my-post | My Post | A post about things | kw1, kw2 | manual |
+ * | UUID | Slug | Title | Description | Keywords | Source |
+ * |------|------|-------|-------------|----------|--------|
+ * | abc-123 | my-post | My Post | A post about things | kw1, kw2 | manual |
  *
  * ## Planned
  * ...
  *
  * ## Published
  *
- * | Slug | Title | Description | Keywords | Source | Published | Issue |
- * |------|-------|-------------|----------|--------|-----------|-------|
+ * | UUID | Slug | Title | Description | Keywords | Source | Published | Issue |
+ * |------|------|-------|-------------|----------|--------|-----------|-------|
  * ```
  *
  * Optional columns (Topics, Type, URL) are emitted only when any entry uses
  * them, so a calendar with no cross-posting stays visually simple. Published
- * entries always include Published and Issue columns.
+ * entries always include Published and Issue columns. The UUID column is
+ * always emitted at render time — pre-UUID calendars get backfilled lazily
+ * (parser assigns missing UUIDs in-memory; the next write persists them).
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import {
   PLATFORMS,
   STAGES,
@@ -96,7 +99,12 @@ function parseEntries(lines: string[], stage: Stage): CalendarEntry[] {
     const slug = col(cells, cols, 'slug');
     const title = col(cells, cols, 'title');
     if (slug && title) {
+      // UUID column is optional for backward compatibility. Missing IDs
+      // get a fresh v4 assigned in-memory; the next writeCalendar
+      // persists them, so one save fully migrates a legacy calendar.
+      const existingId = col(cells, cols, 'uuid') ?? col(cells, cols, 'id');
       const entry: CalendarEntry = {
+        id: existingId ?? randomUUID(),
         slug,
         title,
         description: col(cells, cols, 'description') ?? '',
@@ -156,7 +164,12 @@ function parseDistributions(lines: string[]): DistributionRecord[] {
     const dateShared = col(cells, cols, 'shared');
 
     if (slug && platformValue && url && dateShared && isPlatform(platformValue)) {
+      // entryId may be missing on legacy rows. Left empty here and
+      // backfilled in parseCalendar once entries are parsed and a
+      // slug → entry lookup table is available.
+      const entryIdCell = col(cells, cols, 'entryid') ?? col(cells, cols, 'uuid');
       const rec: DistributionRecord = {
+        entryId: entryIdCell ?? '',
         slug,
         platform: platformValue,
         url,
@@ -256,6 +269,8 @@ export function parseCalendar(markdown: string): EditorialCalendar {
   }
   flushSection();
 
+  // Merge shortform blocks onto their matching DistributionRecord by
+  // (slug, platform, channel) — normalize channel to avoid case drift.
   for (const b of shortformBlocks) {
     const rec = distributions.find(
       (d) =>
@@ -264,6 +279,19 @@ export function parseCalendar(markdown: string): EditorialCalendar {
         (d.channel ?? '').toLowerCase() === (b.channel ?? '').toLowerCase(),
     );
     if (rec) rec.shortform = b.text;
+  }
+
+  // Backfill missing entryIds on DistributionRecords by slug match
+  // against the entries we just parsed. Records whose slug doesn't
+  // resolve to a known entry keep an empty entryId — writeCalendar
+  // preserves that (the row is still parseable), and a subsequent
+  // distribute or migration run will fix it.
+  const entryBySlug = new Map(entries.map((e) => [e.slug, e]));
+  for (const d of distributions) {
+    if (!d.entryId) {
+      const match = entryBySlug.get(d.slug);
+      if (match && match.id) d.entryId = match.id;
+    }
   }
 
   return { entries, distributions };
@@ -296,7 +324,7 @@ function renderStageTable(entries: CalendarEntry[], stage: Stage): string {
   );
   const isPublished = stage === 'Published';
 
-  const headers: string[] = ['Slug', 'Title', 'Description', 'Keywords'];
+  const headers: string[] = ['UUID', 'Slug', 'Title', 'Description', 'Keywords'];
   if (hasTopics) headers.push('Topics');
   if (hasType) headers.push('Type');
   if (hasUrl) headers.push('URL');
@@ -308,7 +336,11 @@ function renderStageTable(entries: CalendarEntry[], stage: Stage): string {
   lines.push(`|${headers.map(() => '------').join('|')}|`);
 
   for (const e of entries) {
+    // Backfill a UUID at render time if one is missing. Mutates the
+    // entry so subsequent reads/writes see a stable id.
+    if (!e.id) e.id = randomUUID();
     const row: string[] = [
+      e.id,
       escapeCell(e.slug),
       escapeCell(e.title),
       escapeCell(e.description),
@@ -332,7 +364,7 @@ function renderDistributionTable(records: DistributionRecord[]): string {
     (r) => r.channel !== undefined && r.channel !== '',
   );
 
-  const headers: string[] = ['Slug', 'Platform', 'URL', 'Shared'];
+  const headers: string[] = ['EntryID', 'Slug', 'Platform', 'URL', 'Shared'];
   if (hasChannel) headers.push('Channel');
   headers.push('Notes');
 
@@ -341,6 +373,7 @@ function renderDistributionTable(records: DistributionRecord[]): string {
 
   for (const r of records) {
     const row: string[] = [
+      r.entryId ?? '',
       escapeCell(r.slug),
       r.platform,
       escapeCell(r.url),

@@ -190,14 +190,22 @@ export function handleDecision(
 }
 
 /**
- * Return a workflow plus its full version history. Lookup is by workflow
- * id or by (site, slug, contentKind, platform?, channel?).
+ * Return a workflow plus its full version history. The client looks up
+ * by one of (in priority order):
+ *   1. Workflow id — exact match on `DraftWorkflowItem.id`.
+ *   2. `entryId` — stable calendar-entry UUID; join survives slug renames.
+ *      Preferred over slug when available.
+ *   3. (site, slug) — legacy lookup, still supported for workflows that
+ *      have no entryId stamped.
+ *
+ * All lookups can additionally filter by (contentKind, platform, channel).
  */
 export function handleGetWorkflow(
   projectRoot: string,
   config: DeskworkConfig,
   query: {
     id: string | null;
+    entryId?: string | null;
     site: string | null;
     slug: string | null;
     contentKind: string | null;
@@ -213,10 +221,10 @@ export function handleGetWorkflow(
       versions: readVersions(projectRoot, config, workflow.id),
     });
   }
-  if (!query.site || !query.slug) {
-    return err(400, 'either id or (site & slug) query params are required');
+  if (!query.entryId && (!query.site || !query.slug)) {
+    return err(400, 'either id, entryId, or (site & slug) query params are required');
   }
-  if (!(query.site in config.sites)) {
+  if (query.site && !(query.site in config.sites)) {
     const known = Object.keys(config.sites).join(', ');
     return err(400, `unknown site: ${query.site}. Configured: ${known}`);
   }
@@ -224,16 +232,28 @@ export function handleGetWorkflow(
     | 'longform'
     | 'shortform'
     | 'outline';
-  const candidates = readWorkflows(projectRoot, config).filter(
-    (w) =>
-      w.site === query.site &&
-      w.slug === query.slug &&
+  const candidates = readWorkflows(projectRoot, config).filter((w) => {
+    // Stable-identity join when entryId is present on both sides;
+    // fall back to (site, slug) for legacy workflows. Always still
+    // filter by contentKind + platform + channel to keep scope.
+    const identityMatch =
+      query.entryId && w.entryId
+        ? w.entryId === query.entryId
+        : query.site && query.slug
+          ? w.site === query.site && w.slug === query.slug
+          : false;
+    return (
+      identityMatch &&
       w.contentKind === contentKind &&
       (w.platform ?? null) === (query.platform ?? null) &&
-      (w.channel ?? null) === (query.channel ?? null),
-  );
+      (w.channel ?? null) === (query.channel ?? null)
+    );
+  });
   if (candidates.length === 0) {
-    return err(404, `no workflow for ${query.site}/${query.slug} (${contentKind})`);
+    const key = query.entryId
+      ? `entryId=${query.entryId}`
+      : `${query.site ?? '?'}/${query.slug ?? '?'}`;
+    return err(404, `no workflow for ${key} (${contentKind})`);
   }
   // Prefer active over terminal; within each tier, prefer most-recently created.
   const isTerminal = (s: DraftWorkflowState) => s === 'applied' || s === 'cancelled';
@@ -311,6 +331,8 @@ export function handleCreateVersion(
 interface StartLongformBody {
   site: string;
   slug: string;
+  /** Optional stable id of the calendar entry — stamped onto the workflow. */
+  entryId?: string;
 }
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
@@ -318,7 +340,7 @@ const SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
 /**
  * Enqueue a longform draft review from the studio dashboard. Reads the
  * blog post markdown from disk (honoring blogFilenameTemplate) and calls
- * createWorkflow. Idempotent on (site, slug, 'longform').
+ * createWorkflow. Idempotent on (entryId | (site, slug), 'longform').
  */
 export function handleStartLongform(
   projectRoot: string,
@@ -343,17 +365,22 @@ export function handleStartLongform(
   }
 
   const markdown = readFileSync(path, 'utf-8');
-  const before = readWorkflows(projectRoot, config).find(
-    (w) =>
-      w.site === b.site &&
-      w.slug === b.slug &&
+  const before = readWorkflows(projectRoot, config).find((w) => {
+    const identityMatch =
+      b.entryId && w.entryId
+        ? w.entryId === b.entryId
+        : w.site === b.site && w.slug === b.slug;
+    return (
+      identityMatch &&
       w.contentKind === 'longform' &&
       w.state !== 'applied' &&
-      w.state !== 'cancelled',
-  );
+      w.state !== 'cancelled'
+    );
+  });
   const workflow = createWorkflow(projectRoot, config, {
-    site: b.site as string,
+    site: b.site,
     slug: b.slug,
+    ...(b.entryId !== undefined ? { entryId: b.entryId } : {}),
     contentKind: 'longform',
     initialMarkdown: markdown,
     initialOriginatedBy: 'agent',

@@ -101,3 +101,21 @@ export function resolveBlogFilePath(
   const template = entry.blogFilenameTemplate ?? DEFAULT_BLOG_FILENAME_TEMPLATE;
   return join(projectRoot, entry.contentDir, template.replaceAll('{slug}', slug));
 }
+
+/**
+ * Absolute path to the per-post directory for a slug —
+ * `<contentDir>/<slug>/`. Used by features that co-locate per-post
+ * artifacts (scrapbook, feature images) regardless of whether the
+ * blog markdown lives at `<slug>/index.md` or as a flat `<slug>.md`.
+ *
+ * The directory is not guaranteed to exist. Callers that need it
+ * created should `mkdirSync({ recursive: true })`.
+ */
+export function resolveBlogPostDir(
+  projectRoot: string,
+  config: DeskworkConfig,
+  site: string | null | undefined,
+  slug: string,
+): string {
+  return join(projectRoot, siteConfig(config, site).contentDir, slug);
+}

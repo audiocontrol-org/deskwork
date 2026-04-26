@@ -52,6 +52,13 @@ export interface SiteConfig {
    * comment) between the H1 and the body placeholder. Default false.
    */
   blogOutlineSection?: boolean;
+  /**
+   * Path to the site's `_redirects` file (Netlify-style), relative to
+   * the project root. The slug-rename helper appends 301 redirects here
+   * when an existing post is renamed. Optional — when unset, slug-rename
+   * skips the redirect-append step.
+   */
+  redirectsPath?: string;
 }
 
 /** Top-level deskwork config. */
@@ -86,6 +93,7 @@ const ALLOWED_SITE_KEYS = new Set([
   'blogFilenameTemplate',
   'blogInitialState',
   'blogOutlineSection',
+  'redirectsPath',
 ]);
 
 /** Return the absolute path to `.deskwork/config.json` under a project root. */
@@ -269,6 +277,16 @@ function parseSiteConfig(slug: string, value: unknown): SiteConfig {
       );
     }
     site.blogOutlineSection = obj.blogOutlineSection;
+  }
+
+  if (obj.redirectsPath !== undefined) {
+    if (typeof obj.redirectsPath !== 'string' || obj.redirectsPath.length === 0) {
+      throw new Error(
+        `Invalid deskwork config: site "${slug}" has invalid "redirectsPath" ` +
+          `(must be a non-empty string when set).`,
+      );
+    }
+    site.redirectsPath = obj.redirectsPath;
   }
 
   return site;

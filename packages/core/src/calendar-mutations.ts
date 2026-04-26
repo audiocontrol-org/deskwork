@@ -6,6 +6,7 @@
  * Planned to be drafted, etc.) and throws a descriptive Error if violated.
  */
 
+import { randomUUID } from 'node:crypto';
 import type {
   CalendarEntry,
   ContentType,
@@ -42,6 +43,7 @@ export function addEntry(
   }
 
   const entry: CalendarEntry = {
+    id: randomUUID(),
     slug,
     title,
     description: opts?.description ?? '',
@@ -56,6 +58,19 @@ export function addEntry(
 
   calendar.entries.push(entry);
   return entry;
+}
+
+/**
+ * Find a calendar entry by its stable UUID. Prefer this over `findEntry`
+ * (slug lookup) anywhere the caller has an entry already and wants the
+ * join to survive a future slug rename.
+ */
+export function findEntryById(
+  calendar: EditorialCalendar,
+  id: string,
+): CalendarEntry | undefined {
+  if (!id) return undefined;
+  return calendar.entries.find((e) => e.id === id);
 }
 
 /** Move an entry to Planned and set target keywords (and optionally topics). */
@@ -182,20 +197,31 @@ export function findEntry(
  * Append a distribution record for a published post. The referenced entry
  * must exist and be in the Published stage — we don't record shares for
  * posts that haven't shipped yet.
+ *
+ * Resolves by entryId when present (stable) or falls back to slug
+ * (legacy callers). On success, stamps entryId onto the record so
+ * downstream joins use the stable identity even if the slug later
+ * changes.
  */
 export function addDistribution(
   calendar: EditorialCalendar,
   record: DistributionRecord,
 ): DistributionRecord {
-  const entry = calendar.entries.find((e) => e.slug === record.slug);
+  const entry =
+    (record.entryId && calendar.entries.find((e) => e.id === record.entryId)) ||
+    calendar.entries.find((e) => e.slug === record.slug);
   if (!entry) {
-    throw new Error(`No calendar entry found with slug: ${record.slug}`);
+    throw new Error(
+      `No calendar entry found with entryId "${record.entryId ?? ''}" or slug "${record.slug}"`,
+    );
   }
   if (entry.stage !== 'Published') {
     throw new Error(
-      `Entry "${record.slug}" is in stage "${entry.stage}" — must be Published to record a distribution`,
+      `Entry "${entry.slug}" is in stage "${entry.stage}" — must be Published to record a distribution`,
     );
   }
+  if (entry.id !== undefined) record.entryId = entry.id;
+  record.slug = entry.slug;
   calendar.distributions.push(record);
   return record;
 }

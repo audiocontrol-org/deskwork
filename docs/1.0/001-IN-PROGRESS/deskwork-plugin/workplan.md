@@ -234,6 +234,16 @@ Tasks:
 
 ---
 
+### Phase 12 stretch: Agent-improvability pillar (deferred)
+
+**Deliverable:** Concrete architectural pivot that preserves the "agent improves the tooling as you work" pillar.
+
+This phase is documented in the PRD's "Philosophical Pillar" section but is **not in v0.1 scope**. v0.1 ships with the npm-package distribution model. The pivot triggers when the first deskwork operator hits friction trying to fix a rough edge in the plugin from inside their project.
+
+Likely synthesis (per PRD): plugin-as-clone install model (Option F) plus project-level extension seams (Option C). Concrete tasks deferred until the trigger condition fires.
+
+---
+
 ### Phase 12: End-to-end dogfood (CLI + studio) against sandbox
 
 **Deliverable:** Full editorial lifecycle exercised through the new architecture

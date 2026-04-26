@@ -110,6 +110,14 @@ function writeHistory(
 }
 
 export interface CreateWorkflowParams {
+  /**
+   * Stable UUID of the target calendar entry. Preferred over `slug` as
+   * the natural key so renames don't split a single entry's workflow
+   * history across two keys. Optional for callers that haven't migrated
+   * yet; when present, it replaces the (site, slug) match in idempotent
+   * lookup.
+   */
+  entryId?: string;
   site: string;
   slug: string;
   contentKind: ContentKind;
@@ -120,9 +128,15 @@ export interface CreateWorkflowParams {
 }
 
 function matchesKey(w: DraftWorkflowItem, k: CreateWorkflowParams): boolean {
+  // Prefer entryId when both sides have it — stable identity survives
+  // slug renames. Fall back to (site, slug) otherwise so legacy
+  // workflows remain matchable.
+  const idMatch =
+    k.entryId && w.entryId
+      ? w.entryId === k.entryId
+      : w.site === k.site && w.slug === k.slug;
   return (
-    w.site === k.site &&
-    w.slug === k.slug &&
+    idMatch &&
     w.contentKind === k.contentKind &&
     (w.platform ?? null) === (k.platform ?? null) &&
     (w.channel ?? null) === (k.channel ?? null)
@@ -168,6 +182,7 @@ export function createWorkflow(
     createdAt: now,
     updatedAt: now,
   };
+  if (params.entryId !== undefined) item.entryId = params.entryId;
   if (params.platform !== undefined) item.platform = params.platform;
   if (params.channel !== undefined) item.channel = params.channel;
 

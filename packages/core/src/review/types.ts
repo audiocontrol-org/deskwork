@@ -146,6 +146,13 @@ export interface DraftVersion {
 export interface DraftWorkflowItem {
   /** Stable UUID for this workflow. */
   id: string;
+  /**
+   * Stable UUID of the target calendar entry. Preferred join key for
+   * `matchesKey` / `findOpenByKey` — survives slug renames. Optional
+   * for legacy workflows created before entry UUIDs landed; those keep
+   * joining via the slug fallback.
+   */
+  entryId?: string;
   /** Which site this draft belongs to (deskwork config site slug). */
   site: string;
   /** Post slug (blog entry slug for longform; calendar entry slug for shortform). */

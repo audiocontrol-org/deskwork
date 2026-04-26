@@ -50,6 +50,18 @@ export function isContentType(value: string): value is ContentType {
 
 /** A single entry in the editorial calendar. */
 export interface CalendarEntry {
+  /**
+   * Stable internal identifier (UUID v4). Persists across slug changes so
+   * workflows, distribution records, and journal entries can join through
+   * it without rewriting history when the public slug is renamed for SEO.
+   *
+   * Optional on this interface so pre-id test fixtures compile. At runtime
+   * every parseCalendar / addEntry path sets id to a UUID. Treat missing
+   * on disk as "legacy, not yet migrated" — the parser assigns a fresh
+   * UUID in-memory and the next `writeCalendar` persists it. One save
+   * fully populates a legacy calendar.
+   */
+  id?: string;
   /** URL-safe identifier, e.g. "scsi-over-wifi-raspberry-pi-bridge" */
   slug: string;
   /** Human-readable title */
@@ -120,6 +132,19 @@ export function isPlatform(value: string): value is Platform {
 
 /** A single social share of a published post. */
 export interface DistributionRecord {
+  /**
+   * Stable id of the CalendarEntry this share refers to — the real
+   * join key. Slug is kept as a human-readable cross-reference and for
+   * legacy compatibility, but lookups should prefer entryId.
+   *
+   * Optional on this interface to keep test fixtures and pre-id call
+   * sites compiling. At runtime: the parser and `addDistribution`
+   * always set entryId (to the matching entry's id, or empty string
+   * if no match found). Treat missing/empty as "legacy, not yet
+   * migrated" — all code paths that resolve records do so by slug
+   * as a fallback.
+   */
+  entryId?: string;
   /** Slug of the published CalendarEntry this share refers to */
   slug: string;
   /** Which platform the post was shared on */
@@ -163,4 +188,26 @@ export function distributionsBySlug(
   slug: string,
 ): DistributionRecord[] {
   return calendar.distributions.filter((d) => d.slug === slug);
+}
+
+/**
+ * Return distribution records for a given calendar entry id. This is the
+ * stable-identity join — prefer this over `distributionsBySlug` anywhere
+ * you have the entry already and just want its distributions.
+ */
+export function distributionsByEntryId(
+  calendar: EditorialCalendar,
+  entryId: string,
+): DistributionRecord[] {
+  if (!entryId) return [];
+  return calendar.distributions.filter((d) => d.entryId === entryId);
+}
+
+/** Find a calendar entry by its stable UUID. */
+export function entryById(
+  calendar: EditorialCalendar,
+  id: string,
+): CalendarEntry | undefined {
+  if (!id) return undefined;
+  return calendar.entries.find((e) => e.id === id);
 }
