@@ -17,6 +17,35 @@
 .er-calendar-row:hover { background: rgba(26,22,20,0.03); }
 .er-calendar-row[hidden] { display: none !important; }
 
+/*
+ * Hierarchical entries: rows wrapped in [data-row-wrap data-depth="N"]
+ * indent the row content N steps. The wrap also gets a faint vertical
+ * rule on the left so a tree of nested chapters reads as belonging to
+ * the same parent, without trying to imitate a real tree-view widget.
+ */
+.er-calendar-row-wrap[data-depth] {
+  position: relative;
+  padding-left: calc(var(--er-row-depth, 0) * 1.4rem);
+}
+.er-calendar-row-wrap[data-depth]::before {
+  content: "";
+  position: absolute;
+  left: calc((var(--er-row-depth, 0) - 0.5) * 1.4rem);
+  top: 0.4rem;
+  bottom: 0.4rem;
+  width: 1px;
+  background: var(--er-rule-mid, currentColor);
+  opacity: 0.18;
+}
+.er-row-slug-ancestors {
+  font-variation-settings: "opsz" 28, "wght" 350;
+  color: var(--er-faded, #9c9591);
+  font-size: 0.85em;
+}
+.er-row-slug-leaf {
+  font-variation-settings: "opsz" 36, "wght" 600;
+}
+
 .er-calendar-body {
   min-width: 0;
   display: flex;

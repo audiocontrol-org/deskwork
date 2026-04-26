@@ -462,14 +462,34 @@ function renderRow(
         </form>`)
       : '';
 
+  // Hierarchical entries (slugs containing `/`) get a depth indicator the
+  // CSS layer indents off of. Storage stays flat; this is a display-only
+  // marker. Depth = number of `/` in the slug (so "the-outbound" → 0,
+  // "the-outbound/characters" → 1, etc.).
+  const depth = entry.slug.split('/').length - 1;
+  const depthAttrs =
+    depth > 0
+      ? unsafe(html` data-depth="${depth}" style="--er-row-depth: ${depth}"`)
+      : '';
+  // For nested entries, show only the leaf segment as the prominent
+  // identifier — the ancestor segments are implied by the visual indent
+  // and the position in the sorted list.
+  const slugDisplay =
+    depth > 0
+      ? unsafe(
+          html`<span class="er-row-slug-ancestors" aria-hidden="true">${entry.slug.slice(0, entry.slug.lastIndexOf('/') + 1)}</span><span class="er-row-slug-leaf">${entry.slug.slice(entry.slug.lastIndexOf('/') + 1)}</span>`,
+        )
+      : '';
+  const slugCellWithHierarchy = depth > 0 ? slugDisplay : slugCell;
+
   return unsafe(html`
-    <div class="er-calendar-row-wrap" data-row-wrap data-search="${search}">
+    <div class="er-calendar-row-wrap" data-row-wrap data-search="${search}"${depthAttrs}>
       <div class="er-calendar-row" data-stage="${stage}" data-site="${site}"
         data-slug="${entry.slug}" data-search="${search}">
         <span class="er-row-num">№ ${String(index + 1).padStart(2, '0')}</span>
         <div class="er-calendar-body">
           <span class="er-row-site er-row-site--${site}" title="${host}">${siteLabel(site)}</span>
-          <span class="er-row-slug">${slugCell}</span>
+          <span class="er-row-slug">${depth > 0 ? slugCellWithHierarchy : slugCell}</span>
           <span class="er-calendar-title">${entry.title}</span>
           ${renderRowMeta(ctx, site, entry, stage, hasFile)}
         </div>
@@ -737,7 +757,17 @@ export function renderDashboard(ctx: StudioContext): string {
   const now = ctx.now ? ctx.now() : new Date();
 
   const stageSections = STAGES.map((stage) => {
-    const stageEntries = data.calendarEntries.filter((e) => e.entry.stage === stage);
+    // Sort by (site, slug) so hierarchical entries cluster under their
+    // ancestor — `the-outbound` immediately precedes `the-outbound/characters`
+    // and `the-outbound/characters/strivers`. This is purely a display
+    // ordering; the underlying calendar storage stays a flat table.
+    const stageEntries = data.calendarEntries
+      .filter((e) => e.entry.stage === stage)
+      .sort((a, b) => {
+        const siteCmp = a.site.localeCompare(b.site);
+        if (siteCmp !== 0) return siteCmp;
+        return a.entry.slug.localeCompare(b.entry.slug);
+      });
     return renderStageSection(ctx, data, stage, stageEntries, sites).__raw;
   }).join('\n');
 
