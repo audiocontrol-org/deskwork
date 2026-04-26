@@ -86,18 +86,30 @@ export function resolveSiteBaseUrl(
 const DEFAULT_BLOG_FILENAME_TEMPLATE = '{slug}/index.md';
 
 /**
- * Absolute path to the blog post markdown for a given slug, using the
- * site's configured `blogFilenameTemplate` (or the legacy
- * `<slug>/index.md` default). The scaffolder and publish helper both
- * go through this to stay in sync on where a blog post lives.
+ * Absolute path to the blog post markdown for a given slug.
+ *
+ * Resolution order (first match wins):
+ *   1. Explicit `filePath` argument — joined with the site's `contentDir`.
+ *      Set this when an entry stores its own `filePath` (e.g. a flat
+ *      `characters/alice.md` next to `characters/bob.md`, or a `README.md`
+ *      instead of `index.md` on a nested editorial-private node).
+ *   2. The site's configured `blogFilenameTemplate` (default
+ *      `{slug}/index.md`). Audiocontrol-shaped flat blogs hit this path.
+ *
+ * The scaffolder and publish helper both go through this to stay in
+ * sync on where a blog post lives.
  */
 export function resolveBlogFilePath(
   projectRoot: string,
   config: DeskworkConfig,
   site: string | null | undefined,
   slug: string,
+  filePath?: string,
 ): string {
   const entry = siteConfig(config, site);
+  if (filePath !== undefined && filePath !== '') {
+    return join(projectRoot, entry.contentDir, filePath);
+  }
   const template = entry.blogFilenameTemplate ?? DEFAULT_BLOG_FILENAME_TEMPLATE;
   return join(projectRoot, entry.contentDir, template.replaceAll('{slug}', slug));
 }
