@@ -24,3 +24,4 @@ Extract the editorial calendar skills from audiocontrol.org into an open-source 
 
 - Design spec: `docs/superpowers/specs/2026-04-20-deskwork-plugin-design.md`
 - Feature definition: `/tmp/feature-definition-deskwork-plugin.md`
+- Pull request: https://github.com/audiocontrol-org/deskwork/pull/1
