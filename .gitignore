@@ -28,3 +28,10 @@ yarn-error.log*
 ## Claude Code local
 .claude/settings.local.json
 .claude/worktrees/
+
+## Local dogfood sandbox — a clone of audiocontrol.org used to drive the
+## editorial-calendar lifecycle end-to-end against a real-shaped project
+## tree. Lives inside this worktree (not a sibling) to avoid confusion
+## with other audiocontrol.org worktrees and to keep tool-permission
+## scope inside one directory. Never committed.
+/.audiocontrol.org/

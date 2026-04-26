@@ -210,7 +210,7 @@ Tasks:
 - [ ] Wire `app.use('/static/*', serveStatic(...))` for assets
 
 **Acceptance Criteria:**
-- Manual: open `http://localhost:4321/dev/editorial-studio` against sandbox-audiocontrol; dashboard loads with live workflows
+- Manual: open `http://localhost:4321/dev/editorial-studio` against the local audiocontrol clone (`./.audiocontrol.org/`, gitignored); dashboard loads with live workflows
 - Browser: dashboard → review → approve click-through works
 - API responses match audiocontrol's existing routes byte-for-byte (handlers are reused; only HTTP plumbing differs)
 
@@ -249,7 +249,7 @@ Likely synthesis (per PRD): plugin-as-clone install model (Option F) plus projec
 **Deliverable:** Full editorial lifecycle exercised through the new architecture
 
 Tasks:
-- [x] Run `add → plan → outline → draft → review-start → review-cancel` via `deskwork` CLI against `~/work/deskwork-work/sandbox-audiocontrol` (lifecycle: Ideas → Planned → Outlining → Drafting → review open → cancelled)
+- [x] Run `add → plan → outline → draft → review-start → review-cancel` via `deskwork` CLI against the in-tree audiocontrol clone at `./.audiocontrol.org/` (lifecycle: Ideas → Planned → Outlining → Drafting → review open → cancelled)
 - [x] Boot studio against the sandbox via `deskwork-studio --project-root ... --port 47325`
 - [x] Verify all 5 dev routes return 200 (`/dev/editorial-studio`, `/dev/editorial-help`, `/dev/editorial-review-shortform`, `/dev/editorial-review/<slug>`, `/dev/scrapbook/<site>/<slug>`)
 - [x] Verify dashboard reflects new entry (10 references found in rendered HTML across calendar rows + workflow links)
