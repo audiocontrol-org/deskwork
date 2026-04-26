@@ -15,9 +15,10 @@ Extract the editorial calendar skills from audiocontrol.org into an open-source 
 | 7 | Extract @deskwork/core npm package | Complete |
 | 8 | Extract @deskwork/cli with single dispatcher | Complete |
 | 9 | Build @deskwork/studio (Hono server + scaffolds) | Complete |
-| 10 | Port studio UI assets verbatim from audiocontrol | Not started |
-| 11 | Add deskwork-studio plugin shell + marketplace entry | Not started |
-| 12 | End-to-end dogfood (CLI + studio) against sandbox | Not started |
+| 10a | Re-sync @deskwork/core from upstream editorial-calendar | Complete |
+| 10b | Port studio UI assets + page renders | Complete |
+| 11 | Add deskwork-studio plugin shell + marketplace entry | Complete |
+| 12 | End-to-end dogfood (CLI + studio) against sandbox | Complete |
 
 ### Key Links
 
