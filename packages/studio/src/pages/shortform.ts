@@ -162,7 +162,7 @@ export function renderShortformPage(
     bodyHtml: body,
     embeddedJson: focus
       ? [{ id: '', attr: 'data-shortform-focus', data: focus }]
-      : undefined,
+      : [],
     scriptModules: ['/static/dist/editorial-studio-client.js'],
   });
 }
