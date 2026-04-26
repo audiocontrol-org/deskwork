@@ -29,6 +29,21 @@ for candidate in "${candidates[@]}"; do
   fi
 done
 
-# Production fallback: pull from npm. `-y` skips the prompt; npx caches the
-# package locally after the first run, so subsequent calls are fast.
-exec npx -y @deskwork/cli@latest "$@"
+# No workspace binary located. @deskwork/cli is not yet published to npm
+# (v0.1 has not shipped). Fail loud rather than silently chasing an npx
+# fallback that resolves to nothing.
+cat >&2 <<EOF
+deskwork: cannot locate the @deskwork/cli binary.
+
+Looked in:
+  ${candidates[0]}
+  ${candidates[1]}
+  ${candidates[2]}
+
+The deskwork plugin currently expects the package to be available through
+the workspace. If you are running this from a clone of the deskwork repo,
+run 'npm install' at the repo root. If you installed the plugin some other
+way, the package is not yet published to npm — track v0.1 release for the
+public install path.
+EOF
+exit 127

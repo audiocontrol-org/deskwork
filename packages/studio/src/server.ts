@@ -28,7 +28,8 @@
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
-import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { realpathSync } from 'node:fs';
+import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readConfig } from '@deskwork/core/config';
 import { createApiRouter, type StudioContext } from './routes/api.ts';
@@ -152,7 +153,11 @@ async function main(): Promise<void> {
   const ctx: StudioContext = { projectRoot, config };
   const app = createApp(ctx);
 
-  serve({ fetch: app.fetch, port }, (info) => {
+  // Bind to loopback only. The studio is dev-only — no auth, no review of
+  // mutation handlers against a hostile caller. Binding 0.0.0.0 (Hono's
+  // default) would expose the project tree and review APIs to anyone on the
+  // local network.
+  serve({ fetch: app.fetch, port, hostname: '127.0.0.1' }, (info) => {
     process.stdout.write(`deskwork-studio listening on http://localhost:${info.port}/\n`);
     process.stdout.write(`  project: ${projectRoot}\n`);
     process.stdout.write(`  sites:   ${Object.keys(config.sites).join(', ')}\n`);
@@ -162,16 +167,6 @@ async function main(): Promise<void> {
 // Only run when invoked directly, not when imported from tests. Resolve
 // argv[1] to an absolute path before comparing to import.meta.url, since the
 // shell may invoke us through a symlink (npm's node_modules/.bin/...).
-import { realpathSync } from 'node:fs';
-import { pathToFileURL } from 'node:url';
-
 if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   await main();
 }
-
-// Suppress unused-import warning when imported as a module (test setup).
-void pathToFileURL;
-void realpathSync;
-
-// Export the join helper so tests don't need to recompute paths.
-export { join };

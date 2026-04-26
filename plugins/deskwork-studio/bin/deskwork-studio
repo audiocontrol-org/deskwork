@@ -24,4 +24,18 @@ for candidate in "${candidates[@]}"; do
   fi
 done
 
-exec npx -y @deskwork/studio@latest "$@"
+cat >&2 <<EOF
+deskwork-studio: cannot locate the @deskwork/studio binary.
+
+Looked in:
+  ${candidates[0]}
+  ${candidates[1]}
+  ${candidates[2]}
+
+The deskwork-studio plugin currently expects the package to be available
+through the workspace. If you are running this from a clone of the deskwork
+repo, run 'npm install' at the repo root. The package is not yet published
+to npm (v0.1 has not shipped) — track v0.1 release for the public install
+path.
+EOF
+exit 127

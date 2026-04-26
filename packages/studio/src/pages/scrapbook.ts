@@ -143,6 +143,13 @@ export function renderScrapbookPage(
   site: string,
   slug: string,
 ): string {
+  // Validate site against the project's configured site list. Without this
+  // check, an unknown site key reaches the path resolver and produces either
+  // an opaque error or a path traversal vector. Mirrors the dashboard /
+  // review page validation.
+  if (!(site in ctx.config.sites)) {
+    throw new Error(`unknown site: ${site}`);
+  }
   const summary = listScrapbook(ctx.projectRoot, ctx.config, site, slug);
   const items = summary.items;
 

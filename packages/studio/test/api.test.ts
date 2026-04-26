@@ -310,6 +310,14 @@ describe('studio pages', () => {
     expect(r.text).toContain('reference.md');
   });
 
+  it('GET /dev/scrapbook/:site/:slug rejects unknown site', async () => {
+    // Site param must be one of the configured sites — otherwise the path
+    // resolver would receive an undefined SiteConfig (path traversal vector
+    // and confusing errors for the operator).
+    const r = await getText(app, '/dev/scrapbook/unknown-site/some-slug');
+    expect(r.status).toBe(500);
+  });
+
   it('GET /dev/editorial-review/:slug returns an error page for unknown slug', async () => {
     const r = await getText(app, '/dev/editorial-review/nonexistent?site=a');
     expect(r.status).toBe(200);

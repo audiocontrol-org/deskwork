@@ -132,10 +132,6 @@ export function renderShortformPage(
         .map((p) => renderPlatformSection(p, byPlatform.get(p) ?? []).__raw)
         .join('');
 
-  const focusScript = focus
-    ? html`<script type="application/json" data-shortform-focus>${unsafe(JSON.stringify(focus))}</script>`
-    : '';
-
   const body = html`
     <header class="er-masthead">
       <div class="er-masthead-kicker">All sites · short form</div>
@@ -154,8 +150,7 @@ export function renderShortformPage(
       </p>
     </main>
     <div class="er-toast" id="toast" hidden></div>
-    <div class="er-poll-indicator" data-poll>auto-refresh · 10s</div>
-    ${unsafe(focusScript)}`;
+    <div class="er-poll-indicator" data-poll>auto-refresh · 10s</div>`;
 
   return layout({
     title: 'Short form — all sites — dev',
@@ -165,6 +160,9 @@ export function renderShortformPage(
     ],
     bodyAttrs: 'data-review-ui="shortform"',
     bodyHtml: body,
+    embeddedJson: focus
+      ? [{ id: '', attr: 'data-shortform-focus', data: focus }]
+      : undefined,
     scriptModules: ['/static/dist/editorial-studio-client.js'],
   });
 }

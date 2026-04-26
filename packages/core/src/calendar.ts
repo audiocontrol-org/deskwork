@@ -297,9 +297,25 @@ export function parseCalendar(markdown: string): EditorialCalendar {
   return { entries, distributions };
 }
 
-/** Read and parse the editorial calendar from an absolute path. */
+/**
+ * Read and parse the editorial calendar from an absolute path.
+ *
+ * A non-existent file is treated as a logically empty calendar — the user
+ * hasn't written anything yet. Any other error (e.g. unreadable, malformed)
+ * propagates so the operator sees the problem instead of a silently-empty
+ * dashboard.
+ */
 export function readCalendar(calendarPath: string): EditorialCalendar {
-  return parseCalendar(readFileSync(calendarPath, 'utf-8'));
+  let raw: string;
+  try {
+    raw = readFileSync(calendarPath, 'utf-8');
+  } catch (err) {
+    if (err instanceof Error && 'code' in err && err.code === 'ENOENT') {
+      return { entries: [], distributions: [] };
+    }
+    throw err;
+  }
+  return parseCalendar(raw);
 }
 
 // ---------------------------------------------------------------------------

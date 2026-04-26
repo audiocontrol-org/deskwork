@@ -35,7 +35,6 @@ import {
   hasRepoContent,
   type CalendarEntry,
   type DistributionRecord,
-  type EditorialCalendar,
   type Platform,
   type Stage,
 } from '@deskwork/core/types';
@@ -131,14 +130,6 @@ interface DashboardData {
   report: ReviewReport;
 }
 
-function safeReadCalendar(path: string): EditorialCalendar {
-  try {
-    return readCalendar(path);
-  } catch {
-    return { entries: [], distributions: [] };
-  }
-}
-
 function loadDashboardData(ctx: StudioContext): DashboardData {
   const calendarEntries: SitedEntry[] = [];
   const distributions: SitedDistribution[] = [];
@@ -148,7 +139,7 @@ function loadDashboardData(ctx: StudioContext): DashboardData {
   for (const site of sites) {
     slugsBySite[site] = [];
     const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
-    const cal = safeReadCalendar(calendarPath);
+    const cal = readCalendar(calendarPath);
     for (const entry of cal.entries) {
       calendarEntries.push({ site, entry });
       slugsBySite[site].push(entry.slug);
@@ -199,30 +190,7 @@ function loadDashboardData(ctx: StudioContext): DashboardData {
     activeBySitedSlug.set(key, list);
   }
 
-  let report: ReviewReport;
-  try {
-    report = buildReport(ctx.projectRoot, ctx.config, {});
-  } catch {
-    report = {
-      all: {
-        approvedCount: 0,
-        cancelledCount: 0,
-        totalComments: 0,
-        commentsByCategory: {
-          voiceDrift: 0,
-          missingReceipt: 0,
-          tutorialFraming: 0,
-          saasVocabulary: 0,
-          fakeAuthority: 0,
-          structural: 0,
-          other: 0,
-        },
-        rejectCount: 0,
-      },
-      bySite: {},
-      topCategories: [],
-    };
-  }
+  const report: ReviewReport = buildReport(ctx.projectRoot, ctx.config, {});
 
   return {
     calendarEntries,
