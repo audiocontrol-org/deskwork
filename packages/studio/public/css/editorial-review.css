@@ -1,0 +1,2269 @@
+/*
+ * editorial-review.css — the design system for the /dev/editorial-* routes.
+ *
+ * Metaphor: a press-check desk. Galley proofs under a pool of light.
+ * Red pencil. Rubber stamps. Marginalia. A pot of ink, not a dashboard.
+ *
+ * Scoped via [data-review-ui="studio"|"longform"|"shortform"] on an
+ * ancestor element so the longform route (which mounts inside the
+ * production BlogLayout) doesn't leak chrome styles into the site.
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..900,0..100;1,9..144,300..900,0..100&family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* Paper & ink */
+  --er-paper: #F5F1E8;
+  --er-paper-2: #ECE6D4;
+  --er-paper-3: #DFD7BF;
+  --er-ink: #1A1614;
+  --er-ink-soft: #3A332E;
+  --er-faded: #8A7F70;
+  --er-faded-2: #B5AC9B;
+
+  /* Marking pigments */
+  --er-red-pencil: #B8362A;
+  --er-red-soft: #D9867A;
+  --er-proof-blue: #2A4B7C;
+  --er-proof-blue-soft: #6E8AAF;
+  --er-highlight: #F4D58D;
+  --er-highlight-soft: #F9E8BE;
+  --er-stamp-green: #2E5D45;
+  --er-stamp-purple: #5A3E5F;
+
+  /* Type */
+  --er-font-display: 'Fraunces', 'Newsreader', Georgia, 'Times New Roman', serif;
+  --er-font-body: 'Newsreader', Georgia, 'Times New Roman', serif;
+  --er-font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+
+  /* Rhythm */
+  --er-space-0: 0.25rem;
+  --er-space-1: 0.5rem;
+  --er-space-2: 0.875rem;
+  --er-space-3: 1.25rem;
+  --er-space-4: 1.75rem;
+  --er-space-5: 2.5rem;
+  --er-space-6: 4rem;
+
+  --er-rule-thin: 0.5px solid var(--er-ink);
+  --er-rule-med: 1px solid var(--er-ink);
+  --er-rule-heavy: 3px solid var(--er-ink);
+  --er-rule-double: 2px double var(--er-ink);
+}
+
+/* ---------- Scoped reset + page chrome ---------- */
+
+[data-review-ui] {
+  color: var(--er-ink);
+  font-family: var(--er-font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+[data-review-ui] * { box-sizing: border-box; }
+
+/* The `hidden` attribute must beat explicit display values (flex/grid) on our
+ * overlay elements. Scoped to CSS consumers of this file (the three dev
+ * routes); does not leak to other pages. */
+[hidden] { display: none !important; }
+
+[data-review-ui] a {
+  color: var(--er-proof-blue);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+[data-review-ui] code {
+  font-family: var(--er-font-mono);
+  font-size: 0.8em;
+  background: var(--er-paper-2);
+  padding: 0.1em 0.35em;
+  border-radius: 2px;
+  color: var(--er-ink-soft);
+}
+
+/* Full-page variants (studio + shortform own html/body) */
+body[data-review-ui="studio"],
+body[data-review-ui="shortform"] {
+  margin: 0;
+  background-color: var(--er-paper);
+  background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.05 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  min-height: 100vh;
+  color: var(--er-ink);
+  font-family: var(--er-font-body);
+  line-height: 1.55;
+}
+
+/* ---------- Masthead ---------- */
+
+.er-masthead {
+  padding: var(--er-space-6) var(--er-space-5) var(--er-space-4);
+  text-align: center;
+  border-bottom: var(--er-rule-double);
+  position: relative;
+}
+
+.er-masthead-kicker {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  margin-bottom: var(--er-space-2);
+}
+
+.er-masthead-title {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 144, "wght" 400, "SOFT" 0;
+  font-size: clamp(3rem, 8vw, 6rem);
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  font-weight: 400;
+  margin: 0;
+  color: var(--er-ink);
+}
+
+.er-masthead-title em {
+  font-style: italic;
+  font-variation-settings: "opsz" 144, "wght" 400, "SOFT" 100;
+}
+
+.er-masthead-deck {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-variation-settings: "opsz" 48, "wght" 400;
+  font-size: 1.25rem;
+  color: var(--er-ink-soft);
+  margin: var(--er-space-2) 0 var(--er-space-3);
+  max-width: 44rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.er-masthead-meta {
+  font-family: var(--er-font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  display: inline-flex;
+  gap: var(--er-space-2);
+  align-items: center;
+}
+
+.er-masthead-meta .sep { color: var(--er-faded-2); }
+
+/* ---------- Layout primitives ---------- */
+
+.er-container {
+  max-width: 78rem;
+  margin: 0 auto;
+  padding: 0 var(--er-space-4);
+}
+
+.er-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(20rem, 1fr);
+  gap: var(--er-space-6);
+  padding: var(--er-space-5) 0 var(--er-space-6);
+}
+@media (max-width: 960px) {
+  .er-layout { grid-template-columns: 1fr; gap: var(--er-space-4); }
+}
+
+.er-section-title {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 48, "wght" 500;
+  font-size: 1.6rem;
+  margin: 0 0 var(--er-space-2);
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: baseline;
+  gap: var(--er-space-2);
+}
+
+.er-section-title .ornament {
+  color: var(--er-red-pencil);
+  font-size: 0.9em;
+}
+
+.er-section-title .count {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  font-variation-settings: normal;
+  font-weight: 500;
+  margin-left: auto;
+}
+
+/* Stage-level action button — sits at the right edge of the
+ * section title, a small nudge off the count. Currently used by
+ * the Ideas stage for the "intake new idea" toggle. */
+.er-section-title .er-section-action {
+  margin-left: var(--er-space-2);
+  align-self: center;
+  font-variation-settings: normal;
+}
+
+/* ---- Intake sheet (Ideas section) ------------------------------------
+ *
+ * Inline form that unfolds below the Ideas section header when the
+ * operator clicks "intake new idea". Keeps the press-check palette:
+ * parchment panel, red-pencil rule, monospaced field labels with
+ * serif italic hints. The copy button assembles a self-contained
+ * paste that the agent executes without a second round of prompts. */
+.er-intake-form {
+  margin: 0 0 var(--er-space-3);
+  padding: var(--er-space-3);
+  background: var(--er-paper-2);
+  border-left: 3px solid var(--er-red-pencil);
+  border-top: 1px dashed var(--er-faded-2);
+  border-bottom: 1px dashed var(--er-faded-2);
+}
+.er-intake-hint {
+  margin: 0 0 var(--er-space-2);
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-size: 0.9rem;
+  color: var(--er-ink-soft);
+}
+.er-intake-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--er-space-2) var(--er-space-3);
+}
+.er-intake-grid > label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-family: var(--er-font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+}
+.er-intake-grid > label > span {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.er-intake-grid > label em {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-size: 0.78rem;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--er-ink-soft);
+}
+.er-intake-grid .er-intake-wide {
+  grid-column: 1 / -1;
+}
+.er-intake-grid input,
+.er-intake-grid select,
+.er-intake-grid textarea {
+  font-family: var(--er-font-body);
+  font-size: 0.95rem;
+  line-height: 1.4;
+  color: var(--er-ink);
+  background: var(--er-paper);
+  border: 1px solid var(--er-faded-2);
+  border-radius: 0;
+  padding: 0.4rem 0.55rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.er-intake-grid textarea {
+  resize: vertical;
+  min-height: 5rem;
+}
+.er-intake-grid input:focus,
+.er-intake-grid select:focus,
+.er-intake-grid textarea:focus {
+  outline: none;
+  border-color: var(--er-red-pencil);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--er-red-pencil) 15%, transparent);
+}
+.er-intake-actions {
+  margin-top: var(--er-space-3);
+  display: flex;
+  gap: var(--er-space-2);
+  justify-content: flex-end;
+}
+
+.er-section + .er-section { margin-top: var(--er-space-5); }
+
+.er-section-rule {
+  height: 0;
+  border-bottom: var(--er-rule-med);
+  margin-bottom: var(--er-space-3);
+}
+
+/* ---------- Filter strip ---------- */
+
+.er-filter {
+  display: flex;
+  align-items: center;
+  gap: var(--er-space-3);
+  padding: var(--er-space-3) 0;
+  border-bottom: var(--er-rule-thin);
+  margin-bottom: var(--er-space-4);
+  flex-wrap: wrap;
+  font-size: 0.9rem;
+}
+
+.er-filter-label {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+}
+
+.er-filter input[type="search"] {
+  border: none;
+  border-bottom: var(--er-rule-med);
+  background: transparent;
+  font: inherit;
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 48, "wght" 400;
+  font-size: 1rem;
+  padding: var(--er-space-1) var(--er-space-1);
+  min-width: 18rem;
+  color: var(--er-ink);
+}
+
+.er-filter input[type="search"]:focus {
+  outline: none;
+  border-bottom-color: var(--er-red-pencil);
+  border-bottom-width: 2px;
+}
+
+.er-chips { display: inline-flex; gap: var(--er-space-1); flex-wrap: wrap; }
+
+.er-chip {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: var(--er-space-0) var(--er-space-2);
+  border: var(--er-rule-med);
+  background: transparent;
+  color: var(--er-ink);
+  cursor: pointer;
+  border-radius: 999px;
+  transition: background 120ms ease, color 120ms ease;
+}
+.er-chip:hover { background: var(--er-paper-2); }
+.er-chip[aria-pressed="true"] {
+  background: var(--er-ink);
+  color: var(--er-paper);
+}
+
+/* ---------- Workflow rows / galley slips ---------- */
+
+.er-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  align-items: baseline;
+  gap: var(--er-space-3);
+  padding: var(--er-space-3) var(--er-space-3);
+  border-bottom: var(--er-rule-thin);
+  position: relative;
+  transition: background 120ms ease, transform 200ms ease;
+}
+.er-row:first-of-type { border-top: var(--er-rule-thin); }
+.er-row:hover { background: rgba(26,22,20,0.03); }
+.er-row.focused {
+  background: var(--er-highlight-soft);
+  animation: er-focus-pulse 2.4s ease-out;
+}
+@keyframes er-focus-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(184,54,42,0.35); }
+  50% { box-shadow: 0 0 0 8px rgba(184,54,42,0); }
+  100% { box-shadow: 0 0 0 0 rgba(184,54,42,0); }
+}
+
+.er-row[hidden] { display: none !important; }
+
+.er-row-num {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  color: var(--er-faded);
+  letter-spacing: 0.1em;
+  font-variant-numeric: tabular-nums;
+  min-width: 2.5rem;
+}
+
+.er-row-slug {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 36, "wght" 500, "SOFT" 0;
+  font-size: 1.15rem;
+  color: var(--er-ink);
+  text-decoration: none;
+  line-height: 1.2;
+}
+.er-row-slug:hover { text-decoration: underline; text-decoration-color: var(--er-red-pencil); }
+
+.er-row-kind {
+  font-family: var(--er-font-mono);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--er-faded);
+}
+
+.er-row-channel {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-size: 0.9rem;
+  color: var(--er-ink-soft);
+}
+
+.er-row-ts {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  color: var(--er-faded);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.er-row-hint {
+  grid-column: 2 / -1;
+  font-family: var(--er-font-mono);
+  font-size: 0.75rem;
+  color: var(--er-ink-soft);
+  margin-top: var(--er-space-0);
+}
+
+.er-row-hint code { font-size: 0.75rem; }
+
+/* ---------- State stamps ---------- */
+
+.er-stamp {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 14, "wght" 600;
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.55rem;
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+  display: inline-block;
+  white-space: nowrap;
+  background: transparent;
+  line-height: 1.3;
+}
+
+.er-stamp-open        { color: var(--er-faded); border-style: dashed; }
+.er-stamp-in-review   { color: var(--er-proof-blue); }
+.er-stamp-iterating   { color: var(--er-stamp-purple); border-style: dotted; }
+.er-stamp-approved    { color: var(--er-stamp-green); border-width: 2px; }
+.er-stamp-applied     { color: var(--er-faded); background: var(--er-paper-3); }
+.er-stamp-cancelled   { color: var(--er-red-pencil); text-decoration: line-through; }
+
+/* Big-stamp variant for the review strip */
+.er-stamp-big {
+  font-size: 0.95rem;
+  letter-spacing: 0.22em;
+  padding: 0.35rem 0.9rem;
+  border-width: 2px;
+  font-variation-settings: "opsz" 14, "wght" 700;
+  transform: rotate(-1.5deg);
+  box-shadow: 1px 1px 0 rgba(26,22,20,0.06);
+}
+
+/* ---------- Buttons ---------- */
+
+.er-btn {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 14, "wght" 500;
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  padding: 0.4rem 0.9rem;
+  border: var(--er-rule-med);
+  background: var(--er-paper);
+  color: var(--er-ink);
+  cursor: pointer;
+  border-radius: 2px;
+  transition: background 120ms ease, color 120ms ease, transform 120ms ease;
+}
+.er-btn:hover:not(:disabled) { background: var(--er-ink); color: var(--er-paper); }
+.er-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.er-btn:active:not(:disabled) { transform: translateY(1px); }
+
+.er-btn-primary { border-color: var(--er-proof-blue); color: var(--er-proof-blue); }
+.er-btn-primary:hover:not(:disabled) { background: var(--er-proof-blue); color: var(--er-paper); }
+
+.er-btn-approve { border-color: var(--er-stamp-green); color: var(--er-stamp-green); }
+.er-btn-approve:hover:not(:disabled) { background: var(--er-stamp-green); color: var(--er-paper); }
+
+.er-btn-reject { border-color: var(--er-red-pencil); color: var(--er-red-pencil); }
+.er-btn-reject:hover:not(:disabled) { background: var(--er-red-pencil); color: var(--er-paper); }
+
+.er-btn-small { font-size: 0.72rem; padding: 0.25rem 0.7rem; }
+
+/* ---------- Start-new slip (studio sidebar) ---------- */
+
+.er-slip {
+  background: var(--er-paper);
+  border: var(--er-rule-med);
+  padding: var(--er-space-3);
+  position: relative;
+}
+.er-slip::before {
+  /* red perforation */
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--er-red-pencil) 0 6px,
+    transparent 6px 10px
+  );
+}
+
+.er-slip-header {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--er-faded);
+  margin: var(--er-space-1) 0 var(--er-space-3);
+}
+
+.er-slip-title {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 48, "wght" 500;
+  font-size: 1.3rem;
+  margin: 0 0 var(--er-space-2);
+}
+
+.er-slip form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--er-space-2);
+}
+.er-slip select {
+  font: inherit;
+  font-family: var(--er-font-mono);
+  font-size: 0.85rem;
+  padding: var(--er-space-1) var(--er-space-2);
+  border: var(--er-rule-thin);
+  background: var(--er-paper);
+  color: var(--er-ink);
+  border-radius: 2px;
+}
+
+.er-slip-hint {
+  font-family: var(--er-font-mono);
+  font-size: 0.72rem;
+  color: var(--er-faded);
+  margin-top: var(--er-space-1);
+  min-height: 1rem;
+}
+
+/* ---------- Drift panel ---------- */
+
+.er-drift {
+  background: linear-gradient(
+    180deg,
+    var(--er-highlight-soft) 0%,
+    var(--er-paper) 100%
+  );
+  border: var(--er-rule-thin);
+  border-top: 3px solid var(--er-red-pencil);
+  padding: var(--er-space-3);
+}
+
+.er-drift-label {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--er-ink-soft);
+}
+
+.er-drift-primary {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-variation-settings: "opsz" 72, "wght" 400, "SOFT" 100;
+  font-size: 1.8rem;
+  line-height: 1.15;
+  margin: var(--er-space-1) 0 var(--er-space-2);
+}
+
+.er-drift-primary .count {
+  font-style: normal;
+  font-variation-settings: "opsz" 72, "wght" 500, "SOFT" 0;
+  color: var(--er-red-pencil);
+}
+
+.er-drift-secondary {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 48, "wght" 400;
+  font-size: 1.1rem;
+  color: var(--er-ink-soft);
+}
+
+/* ---------- Empty states ---------- */
+
+.er-empty {
+  padding: var(--er-space-4) var(--er-space-2);
+  text-align: center;
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-variation-settings: "opsz" 48, "wght" 400, "SOFT" 50;
+  font-size: 1.15rem;
+  color: var(--er-faded);
+  line-height: 1.5;
+}
+.er-empty::before {
+  content: '※';
+  display: block;
+  font-size: 1.6rem;
+  color: var(--er-red-pencil);
+  margin-bottom: var(--er-space-2);
+  font-style: normal;
+}
+
+/* ---------- Shortform cards ---------- */
+
+.er-platform-section + .er-platform-section { margin-top: var(--er-space-5); }
+
+.er-platform-header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--er-space-2);
+  border-bottom: var(--er-rule-med);
+  padding-bottom: var(--er-space-1);
+  margin-bottom: var(--er-space-3);
+}
+
+.er-platform-header h2 {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 72, "wght" 500;
+  font-size: 2.2rem;
+  margin: 0;
+  text-transform: lowercase;
+  letter-spacing: -0.01em;
+}
+
+.er-platform-count {
+  font-family: var(--er-font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  color: var(--er-faded);
+  margin-left: auto;
+}
+
+.er-galley {
+  background: var(--er-paper);
+  border: var(--er-rule-thin);
+  margin-bottom: var(--er-space-3);
+  padding: var(--er-space-3) var(--er-space-3) var(--er-space-3) var(--er-space-4);
+  position: relative;
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+.er-galley:hover {
+  transform: translateY(-1px);
+  box-shadow: 2px 2px 0 rgba(26,22,20,0.08);
+}
+.er-galley.focused {
+  border-color: var(--er-red-pencil);
+  box-shadow: 0 0 0 3px rgba(184,54,42,0.15);
+  animation: er-focus-pulse 2.4s ease-out;
+}
+
+.er-galley-accent {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 6px;
+}
+.er-galley[data-platform="reddit"]    .er-galley-accent { background: #E26A3A; }
+.er-galley[data-platform="youtube"]   .er-galley-accent { background: #C2322A; }
+.er-galley[data-platform="linkedin"]  .er-galley-accent { background: #2A4B7C; }
+.er-galley[data-platform="instagram"] .er-galley-accent { background: #9B3D73; }
+
+.er-galley-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--er-space-2);
+  margin-bottom: var(--er-space-2);
+  flex-wrap: wrap;
+}
+.er-galley-head h3 {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 36, "wght" 500;
+  font-size: 1.3rem;
+  margin: 0;
+}
+.er-galley-head .channel {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-size: 0.95rem;
+  color: var(--er-ink-soft);
+}
+.er-galley-head .version {
+  margin-left: auto;
+  font-family: var(--er-font-mono);
+  font-size: 0.75rem;
+  color: var(--er-faded);
+}
+
+.er-galley textarea {
+  width: 100%;
+  min-height: 7rem;
+  padding: var(--er-space-2);
+  font: inherit;
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 18, "wght" 400;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  background: var(--er-paper-2);
+  border: var(--er-rule-thin);
+  color: var(--er-ink);
+  resize: vertical;
+  border-radius: 2px;
+}
+.er-galley textarea:focus {
+  outline: none;
+  border-color: var(--er-proof-blue);
+  background: var(--er-paper);
+}
+
+.er-galley-actions {
+  display: flex;
+  gap: var(--er-space-1);
+  margin-top: var(--er-space-2);
+  flex-wrap: wrap;
+}
+
+/* ---------- Longform review chrome ---------- */
+
+[data-review-ui="longform"] {
+  /* shell that wraps the BlogLayout-owned content area */
+  position: relative;
+}
+
+[data-review-ui="longform"] .er-strip {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  background: var(--er-paper);
+  border-bottom: var(--er-rule-med);
+  padding: var(--er-space-2) var(--er-space-3);
+  display: flex;
+  align-items: center;
+  gap: var(--er-space-3);
+  font-family: var(--er-font-mono);
+  font-size: 0.8rem;
+  box-shadow: 0 2px 8px rgba(26,22,20,0.08);
+  backdrop-filter: blur(6px);
+}
+
+/* Push the page content down so it doesn't hide behind the fixed strip.
+ * Applied only on the longform route via a body-level rule injected by
+ * the chrome wrapper. */
+body:has([data-review-ui="longform"] .er-strip) { padding-top: 3.2rem; }
+
+/* Suppress the host site's sticky header + footer on longform review
+ * pages. The review chrome (press-check strip, margin-notes sidebar)
+ * owns the top-of-viewport slot; the site nav competes for it (it's
+ * `position: sticky; top: 0; z-index: 100` on editorialcontrol), wins
+ * on z-index, and occludes the strip + the fixed marginalia as the
+ * operator scrolls. On a dev review page the site nav is noise
+ * anyway — the operator is reviewing a draft, not browsing the
+ * publication. `:has()` scopes this to pages that actually mount the
+ * review chrome, so the published blog pages are untouched. */
+body:has([data-review-ui="longform"]) .header-wrapper,
+body:has([data-review-ui="longform"]) .site-footer {
+  display: none !important;
+}
+
+[data-review-ui="longform"] .er-strip::before {
+  /* registration marks on the left edge */
+  content: '+';
+  font-family: var(--er-font-mono);
+  color: var(--er-red-pencil);
+  font-size: 1.1rem;
+  padding: 0 var(--er-space-1);
+}
+
+/* Scoped under [data-review-ui="longform"] so it beats BlogLayout's
+ * prose.css link color, which is a bright accent calibrated for the
+ * host site's dark theme — unreadable on the press-check cream
+ * chrome the review strip sits on. */
+[data-review-ui="longform"] .er-strip .er-strip-back {
+  font-family: var(--er-font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--er-ink-soft);
+  text-decoration: none;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--er-border-soft, rgba(0, 0, 0, 0.15));
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  align-self: center;
+  background: transparent;
+}
+[data-review-ui="longform"] .er-strip .er-strip-back:hover {
+  color: var(--er-red-pencil, var(--er-red-soft));
+  border-color: var(--er-red-pencil, var(--er-red-soft));
+  text-decoration: none;
+}
+
+.er-strip-galley {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 36, "wght" 500;
+  font-size: 1.1rem;
+  letter-spacing: -0.01em;
+}
+.er-strip-galley em {
+  font-style: italic;
+  color: var(--er-ink-soft);
+}
+.er-strip-slug {
+  font-family: var(--er-font-mono);
+  font-size: 0.72rem;
+  color: var(--er-faded);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.er-strip-center {
+  margin-left: auto;
+  margin-right: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--er-space-2);
+}
+.er-strip-hint {
+  font-family: var(--er-font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  color: var(--er-faded);
+  text-transform: lowercase;
+}
+.er-strip-hint kbd {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  padding: 0.05rem 0.3rem;
+  border: 1px solid var(--er-faded-2);
+  border-radius: 2px;
+  color: var(--er-ink-soft);
+  background: var(--er-paper);
+}
+@media (max-width: 900px) {
+  .er-strip-hint { display: none; }
+}
+.er-strip-right { margin-left: auto; display: flex; gap: var(--er-space-1); flex-wrap: wrap; }
+
+.er-strip-versions {
+  display: inline-flex;
+  gap: 0;
+  margin-left: var(--er-space-1);
+}
+.er-strip-versions a {
+  font-family: var(--er-font-mono);
+  font-size: 0.72rem;
+  padding: 0.15rem 0.4rem;
+  color: var(--er-faded);
+  text-decoration: none;
+  border: 1px solid transparent;
+}
+.er-strip-versions a:hover { color: var(--er-ink); }
+.er-strip-versions a.active {
+  color: var(--er-red-pencil);
+  border-color: var(--er-red-pencil);
+  border-radius: 2px;
+}
+/* Higher-specificity override for the longform route. BlogLayout
+ * (both sites) has `.essay-body :global(a) { color: ...primary }` +
+ * a decorative chartreuse border-bottom. Specificity (0,1,1) ties
+ * with `.er-strip-versions a` and the cascade tiebreak goes to the
+ * host rule, which turns the strip's v1..vN links chartreuse on
+ * cream — unreadable. Scoping the review rule under
+ * `[data-review-ui="longform"]` takes specificity to (0,2,1) and
+ * the press-check ink tokens win. Same fix pattern as the draft-
+ * body color bug in earlier phase. */
+[data-review-ui="longform"] .er-strip .er-strip-versions a {
+  color: var(--er-ink-soft);
+  border-bottom: 0;
+  text-decoration: none;
+}
+[data-review-ui="longform"] .er-strip .er-strip-versions a:hover {
+  color: var(--er-ink);
+  border-bottom: 0;
+}
+[data-review-ui="longform"] .er-strip .er-strip-versions a.active {
+  color: var(--er-red-pencil);
+  border: 1px solid var(--er-red-pencil);
+  border-radius: 2px;
+}
+
+/* Margin notes (marginalia sidebar) */
+.er-marginalia {
+  position: fixed;
+  right: var(--er-space-3);
+  top: 5.5rem;
+  bottom: var(--er-space-3);
+  width: 18rem;
+  overflow-y: auto;
+  padding: var(--er-space-3);
+  font-family: var(--er-font-body);
+  z-index: 30;
+  background: var(--er-paper);
+  border-left: var(--er-rule-thin);
+  box-shadow: -4px 0 12px rgba(26,22,20,0.04);
+}
+
+.er-marginalia-head {
+  font-family: var(--er-font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  border-bottom: 1px solid var(--er-red-pencil);
+  padding-bottom: var(--er-space-1);
+  margin: 0 0 var(--er-space-2);
+}
+
+.er-marginalia-empty {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-size: 0.95rem;
+  color: var(--er-faded);
+  line-height: 1.4;
+}
+
+.er-marginalia-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  counter-reset: margin-note;
+}
+
+.er-marginalia-item {
+  counter-increment: margin-note;
+  padding: var(--er-space-2) 0 var(--er-space-2) var(--er-space-3);
+  border-bottom: 1px dashed var(--er-faded-2);
+  position: relative;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  transition: background 120ms ease;
+  cursor: default;
+}
+.er-marginalia-item::before {
+  content: counter(margin-note);
+  position: absolute;
+  left: 0;
+  top: var(--er-space-2);
+  font-family: var(--er-font-mono);
+  font-size: 0.65rem;
+  color: var(--er-red-pencil);
+  font-weight: 600;
+  width: 2rem;
+}
+.er-marginalia-item:hover, .er-marginalia-item.active {
+  background: var(--er-highlight-soft);
+}
+.er-marginalia-item .cat {
+  font-family: var(--er-font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  margin-bottom: 0.2rem;
+}
+.er-marginalia-item .quote {
+  color: var(--er-ink-soft);
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-size: 0.85rem;
+  line-height: 1.35;
+  border-left: 2px solid var(--er-red-soft);
+  padding-left: var(--er-space-1);
+  margin-bottom: var(--er-space-1);
+}
+.er-marginalia-item .note {
+  color: var(--er-ink);
+}
+
+/* ---- Per-iteration disposition stamp --------------------------------- *
+ *
+ * Agent-written "addressed / deferred / wontfix" marker for each
+ * comment. Sits between the quote and the note. Visually modeled on
+ * a copy-editor's margin proof-mark: a colored glyph keyed to the
+ * disposition (◆ addressed, ◇ deferred, ✕ wontfix), a thin monospaced
+ * label, and an optional reason line in italic small type.
+ *
+ * Layout is a subgrid so the glyph column aligns across all stamps
+ * in the sidebar — reads as a proof-column when three in a row.
+ */
+.er-marginalia-stamp {
+  display: grid;
+  grid-template-columns: 0.9rem 1fr;
+  column-gap: 0.45rem;
+  align-items: baseline;
+  margin: 0 0 0.4rem;
+  padding: 0.25rem 0.5rem 0.3rem;
+  background: var(--er-paper-2);
+  border-left: 2px solid currentColor;
+  font-family: var(--er-font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1.25;
+  color: var(--er-faded);
+}
+.er-marginalia-stamp-mark {
+  font-family: var(--er-font-display);
+  font-size: 0.78rem;
+  line-height: 1;
+  letter-spacing: 0;
+  text-align: center;
+  color: currentColor;
+  align-self: center;
+}
+.er-marginalia-stamp-label {
+  font-weight: 600;
+  color: currentColor;
+}
+.er-marginalia-stamp-reason {
+  grid-column: 2;
+  display: block;
+  margin-top: 0.2rem;
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-size: 0.78rem;
+  letter-spacing: 0;
+  line-height: 1.35;
+  text-transform: none;
+  color: var(--er-ink-soft);
+}
+
+/* Addressed — chartreuse/amber accent. The "done" color in this
+ * palette; matches the highlight swatch used for selection glow. */
+.er-marginalia-stamp--addressed {
+  color: #8B6914; /* deeper amber, readable on paper-2 */
+  background: var(--er-highlight-soft);
+}
+
+/* Deferred — graphite. Neutral by design: "we saw it, we carried it
+ * forward, no judgment." */
+.er-marginalia-stamp--deferred {
+  color: var(--er-ink-soft);
+  background: var(--er-paper-2);
+}
+
+/* Won't fix — red-pencil. Rare, final. Signals a rejection the
+ * operator may want to re-comment on. */
+.er-marginalia-stamp--wontfix {
+  color: var(--er-red-pencil);
+  background: var(--er-paper-2);
+  border-left-style: double;
+  border-left-width: 3px;
+}
+
+/* On resolved-history items, fade the stamp slightly so it reads as
+ * historical rather than active. */
+.er-marginalia-item--resolved .er-marginalia-stamp {
+  opacity: 0.75;
+}
+
+/* BlogLayout renders the title + dek in .essay-header, outside
+ * #draft-body. Margin notes only attach to selections inside
+ * #draft-body — so the operator couldn't annotate the title or
+ * description. Suppress BlogLayout's header on the review surface
+ * and inject the dek into #draft-body (the title H1 is already
+ * there via the "repeat the title" scaffold convention). This
+ * makes both title and description natively commentable. */
+body:has([data-review-ui="longform"]) .essay-header {
+  display: none;
+}
+
+/* In-body dek, injected after the H1. Matches the dispatch
+ * voice's dek typography (Fraunces italic, soft ink on cream). */
+[data-review-ui="longform"] #draft-body .er-dispatch-dek {
+  font-family: var(--font-display, var(--er-font-display));
+  font-style: italic;
+  font-size: 1.15rem;
+  line-height: 1.5;
+  color: hsl(var(--foreground)) !important;
+  margin: 0 0 2.25rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid hsl(var(--border, 0 0% 70%));
+}
+
+/* Prior-version comments that survived rebasing. Subtle left-rail
+ * treatment so they read as "carried forward" rather than pristine. */
+.er-marginalia-item--rebased .cat {
+  color: var(--er-red-pencil, var(--er-red-soft));
+}
+.er-marginalia-item--rebased .quote {
+  border-left-color: var(--er-red-pencil, var(--er-red-soft));
+  opacity: 0.88;
+}
+
+/* Unresolved prior-version comments — anchor no longer in the text
+ * (edit removed it or collapsed it). Rendered desaturated and
+ * non-interactive; the operator decides whether to re-anchor
+ * manually or treat it as resolved by the edit. */
+.er-marginalia-item--unresolved {
+  opacity: 0.65;
+  cursor: default;
+}
+.er-marginalia-item--unresolved:hover,
+.er-marginalia-item--unresolved.active {
+  background: transparent;
+}
+.er-marginalia-item--unresolved .quote {
+  font-style: normal;
+  border-left-style: dashed;
+  color: var(--er-faded);
+}
+
+/* Per-item action row — Resolve / Re-open button sits flush-right
+ * under the note so it's reachable without displacing the quote or
+ * the prose. */
+.er-marginalia-actions {
+  margin-top: var(--er-space-1);
+  display: flex;
+  justify-content: flex-end;
+}
+.er-marginalia-action {
+  font-family: var(--er-font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  background: transparent;
+  border: 1px solid var(--er-border-soft, rgba(0, 0, 0, 0.15));
+  padding: 0.2rem 0.55rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.er-marginalia-action:hover {
+  color: var(--er-red-pencil, var(--er-red-soft));
+  border-color: var(--er-red-pencil, var(--er-red-soft));
+}
+
+/* Collapsible "Resolved (N) ▾" footer at the bottom of the sidebar.
+ * Resolved comments live here until the operator chooses to re-open
+ * one; they're archived, not deleted. */
+.er-marginalia-resolved {
+  margin-top: var(--er-space-2);
+  padding-top: var(--er-space-1);
+  border-top: 1px dashed var(--er-border-soft, rgba(0, 0, 0, 0.15));
+}
+.er-marginalia-resolved-header {
+  font-family: var(--er-font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  background: transparent;
+  border: 0;
+  padding: var(--er-space-1) 0;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+.er-marginalia-resolved-header:hover {
+  color: var(--er-ink);
+}
+.er-marginalia-resolved-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.er-marginalia-item--resolved {
+  opacity: 0.55;
+}
+.er-marginalia-item--resolved .quote {
+  text-decoration: line-through;
+  text-decoration-color: var(--er-faded);
+  text-decoration-thickness: 1px;
+}
+
+/* Draft body wrapper within BlogLayout */
+.er-draft-frame {
+  position: relative;
+}
+
+/* Per-row site badge. Two letters (AC / EC) so the operator can scan a
+ * mixed-site list without reading slugs. Colour differs per site so the
+ * signal is pre-linguistic. Shared across studio, shortform, longform —
+ * scoped under `[data-review-ui]` so the rule honours this file's
+ * documented scoping invariant (see header comment, line 6–9). */
+[data-review-ui] .er-row-site {
+  display: inline-block;
+  font-family: var(--er-font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.14em;
+  padding: 0.1rem 0.35rem;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  margin-right: 0.45rem;
+  vertical-align: 1px;
+  line-height: 1;
+  font-weight: 500;
+}
+[data-review-ui] .er-row-site--audiocontrol    { color: var(--er-proof-blue); }
+[data-review-ui] .er-row-site--editorialcontrol { color: var(--er-red-pencil); }
+
+/* When the operator flips to edit mode the client toggles `.hidden` on
+ * #draft-body. Without this rule it stays visible and the textarea
+ * renders below a 5000+ px tall hidden-in-name-only element. */
+#draft-body.hidden { display: none; }
+
+/* Un-inherit the press-check ink color inside the rendered draft body.
+ *
+ * `[data-review-ui]` sets `color: var(--er-ink)` for the studio and
+ * shortform routes (both of which sit on cream paper), but on the
+ * longform route the draft renders INSIDE BlogLayout on the host
+ * site's background (dark on editorialcontrol, darker still on
+ * audiocontrol). Inheriting the press-check ink produces dark text
+ * on a dark background — unreadable.
+ *
+ * Set an explicit host-token color ON #draft-body itself (not a
+ * universal descendant selector — that would override the host's
+ * `.essay-body em { color: accent }` rule and mis-color italics).
+ * Block-level descendants (p, li, blockquote) inherit this value
+ * through normal CSS inheritance; inline rules (em, strong, a, code)
+ * that target specific tags keep their host-side colors and cascade
+ * correctly. */
+[data-review-ui="longform"] #draft-body {
+  color: hsl(var(--foreground));
+}
+
+/* Signal that the rendered draft is interactive — the client attaches a
+ * double-click → edit-mode handler. Keep the `text` cursor within
+ * paragraphs (so selection-to-comment still feels natural), and show
+ * the native tooltip on hover so the gesture is discoverable. */
+.er-review-shell #draft-body {
+  cursor: text;
+}
+.er-review-shell #draft-body[title]:hover {
+  /* the browser renders the title attribute as a tooltip automatically */
+}
+
+/* Reading-mode overrides for the review view.
+ * The host BlogLayouts on both sites optimize for published reading (drop
+ * caps on editorialcontrol, large 2.75–3rem h2 top margins on both).
+ * In review mode the operator wants density and a clean signal for where
+ * to select text, so suppress the drop cap and tighten the heading rhythm.
+ * Scoped to the review-shell so we don't leak into real blog pages. */
+.er-review-shell #draft-body :is(p, h1, h2, h3, h4, h5, h6):first-child {
+  margin-top: 0;
+}
+/* Neutralize the editorialcontrol drop cap anywhere inside the review
+ * shell. The host `.essay-body :global(p:first-of-type:first-letter)`
+ * rule compiles to a scoped selector with specificity (0,3,2); the cascade
+ * winner at equal specificity is whichever is declared later, which tends
+ * to be the host. `!important` is used sparingly and intentionally here
+ * because the host styles are deliberate for published reading and we're
+ * opting out for the review view only. Without this, the first paragraph
+ * of any sidebar/panel gets a giant floated letter (the "M" on Margin Notes). */
+.er-review-shell p::first-letter {
+  float: none !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+  padding: 0 !important;
+  font-family: inherit !important;
+  font-weight: inherit !important;
+  color: inherit !important;
+}
+.er-review-shell #draft-body h2 { margin-top: 1.75rem; }
+.er-review-shell #draft-body h3 { margin-top: 1.25rem; }
+.er-review-shell #draft-body p  { margin-bottom: 0.9rem; }
+
+/* Selection highlights within the draft body */
+#draft-body .draft-comment-highlight,
+[data-review-ui="longform"] .draft-comment-highlight {
+  background: var(--er-highlight-soft);
+  border-bottom: 1.5px solid var(--er-red-pencil);
+  padding: 0.05em 0;
+  cursor: default;
+  transition: background 120ms ease;
+}
+#draft-body .draft-comment-highlight.active,
+[data-review-ui="longform"] .draft-comment-highlight.active {
+  background: var(--er-highlight);
+}
+
+/* Floating red-pencil button. Bigger + higher-contrast + a gentle
+ * pulse on spawn so the operator's eye lands on it before the click
+ * that would clear the selection. The pulse uses opacity (not scale)
+ * so the pointing triangle below stays stable. */
+.er-pencil-btn {
+  position: absolute;
+  /* The client sets top/left to the selection's midpoint (in
+   * offsetParent coordinates); CSS then translates back by half the
+   * button's own width so it centers on that point regardless of
+   * rendered width. Translate-Y is zero; hover scales around center. */
+  transform: translate(-50%, 0);
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 36, "wght" 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 0.55rem 1.1rem;
+  background: var(--er-red-pencil);
+  color: var(--er-paper);
+  border: 2px solid var(--er-red-pencil);
+  border-radius: 3px;
+  cursor: pointer;
+  z-index: 50;
+  box-shadow: 0 6px 14px rgba(184,54,42,0.4), 0 0 0 3px rgba(245,241,232,0.18);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+  animation: er-pencil-pulse 1.6s ease-out 1;
+}
+.er-pencil-btn:hover {
+  transform: translate(-50%, 0) scale(1.06);
+  box-shadow: 0 8px 18px rgba(184,54,42,0.55), 0 0 0 3px rgba(245,241,232,0.25);
+}
+.er-pencil-btn::before { content: '✎ '; }
+.er-pencil-btn::after {
+  /* downward-pointing triangle tip that anchors the button to the
+   * selected text beneath it */
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -8px;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 8px solid var(--er-red-pencil);
+}
+@keyframes er-pencil-pulse {
+  0%   { box-shadow: 0 6px 14px rgba(184,54,42,0.4), 0 0 0 3px rgba(245,241,232,0.18); }
+  35%  { box-shadow: 0 6px 14px rgba(184,54,42,0.55), 0 0 0 10px rgba(184,54,42,0.18); }
+  100% { box-shadow: 0 6px 14px rgba(184,54,42,0.4), 0 0 0 3px rgba(245,241,232,0.18); }
+}
+
+/* Edit-mode shell — CodeMirror 6 source editor plus a live preview
+ * pane, toggled via Source / Split / Preview. The mounted CM instance
+ * is themed in the editor module (editorial-review-editor.ts); this
+ * block wires the layout chrome around it. */
+
+.er-edit-mode {
+  background: var(--er-paper-2);
+  border-top: var(--er-rule-med);
+  padding: var(--er-space-3);
+  margin-top: var(--er-space-3);
+  scroll-margin-top: 5rem;
+}
+
+/* When the edit mode is active, widen BlogLayout's host column
+ * AND collapse its reserved TOC slot so the source/preview panes
+ * can use the full width. BlogLayout uses
+ *   .essay-body-wrap { grid-template-columns: 1fr 14rem }
+ * to reserve space for a TOC on the right. In edit mode we don't
+ * need the TOC column; flattening it frees up 17rem. Also widen
+ * .essay (66rem cap) and .essay-body (34rem cap). Specificity via
+ * :has() + body beats the component-scoped Astro rules without
+ * reaching into BlogLayout internals. 19rem reserved for the
+ * fixed margin rail. */
+body:has(.er-edit-mode:not([hidden])) .essay,
+body:has(.er-edit-mode:not([hidden])) .essay-body {
+  max-width: calc(100vw - 19rem);
+  /* Left-align in edit mode so the content doesn't center under the
+   * fixed margin rail (18rem wide) on the right. The .essay's
+   * `margin: 0 auto` would otherwise split the viewport-minus-rail
+   * remainder on both sides, pulling the preview pane under the rail. */
+  margin-left: 0;
+  margin-right: auto;
+}
+body:has(.er-edit-mode:not([hidden])) .essay-body-wrap {
+  grid-template-columns: 1fr !important;
+}
+body:has(.er-edit-mode:not([hidden])) .toc {
+  display: none;
+}
+
+.er-edit-chrome {
+  display: flex;
+  gap: var(--er-space-2);
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  margin-bottom: var(--er-space-2);
+  padding-bottom: var(--er-space-2);
+  border-bottom: 1px dashed var(--er-faded-2);
+}
+
+/* Source / Split / Preview tabs. Three-way pill; the active state
+ * gets filled ink. */
+.er-edit-modes {
+  display: inline-flex;
+  gap: 0;
+  border: 1px solid var(--er-faded-2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.er-edit-mode-btn {
+  font-family: var(--er-font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 0.35rem 0.7rem;
+  border: 0;
+  border-right: 1px solid var(--er-faded-2);
+  background: transparent;
+  color: var(--er-faded);
+  cursor: pointer;
+  transition: color 120ms ease, background 120ms ease;
+}
+.er-edit-mode-btn:last-child { border-right: 0; }
+.er-edit-mode-btn:hover { color: var(--er-ink); }
+.er-edit-mode-btn[aria-pressed="true"] {
+  background: var(--er-ink);
+  color: var(--er-paper);
+}
+
+.er-edit-actions {
+  display: flex;
+  gap: var(--er-space-1);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.er-edit-hint {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  margin-left: var(--er-space-1);
+}
+
+/* Split container. `data-view` drives whether each child pane is
+ * visible; split shows both at 1fr/1fr, source/preview show one.
+ * Height is fixed at a generous reading depth so scroll happens
+ * inside each pane, not the page. */
+.er-edit-panes {
+  display: grid;
+  gap: var(--er-space-2);
+  height: 70vh;
+  min-height: 30rem;
+  border: var(--er-rule-thin);
+  background: var(--er-paper);
+  overflow: hidden;
+}
+.er-edit-panes[data-view="source"]  { grid-template-columns: 1fr 0; }
+.er-edit-panes[data-view="preview"] { grid-template-columns: 0 1fr; }
+.er-edit-panes[data-view="split"]   { grid-template-columns: 1fr 1fr; }
+.er-edit-panes[data-view="source"]  .er-edit-preview { display: none; }
+.er-edit-panes[data-view="preview"] .er-edit-source  { display: none; }
+
+.er-edit-source {
+  overflow: hidden;
+  height: 100%;
+  border-right: 1px dashed var(--er-faded-2);
+}
+.er-edit-panes[data-view="source"] .er-edit-source  { border-right: 0; }
+.er-edit-panes[data-view="preview"] .er-edit-source { border-right: 0; }
+
+/* Let the CodeMirror instance fill its host. */
+.er-edit-source .cm-editor { height: 100%; }
+.er-edit-source .cm-editor.cm-focused { outline: none; }
+
+/* Preview pane. Read-only rendered HTML that mirrors the published
+ * layout as close as we can match it without re-importing the full
+ * BlogLayout typography.
+ *
+ * !important on color values — same BlogLayout cascade collision
+ * that bit the outline drawer and margin-note composer: the preview
+ * lives inside .essay-body, so BlogLayout's Astro-scoped
+ * .essay-body :global(h2) / :global(strong) / :global(em) rules
+ * cascade into these elements with equal specificity and win on
+ * source order, painting cream-on-cream. */
+.er-edit-preview {
+  overflow: auto;
+  padding: var(--er-space-3) var(--er-space-4);
+  font-family: var(--er-font-body);
+  line-height: 1.65;
+  color: var(--er-ink) !important;
+  background: var(--er-paper);
+}
+.er-edit-preview,
+.er-edit-preview p,
+.er-edit-preview li,
+.er-edit-preview ul,
+.er-edit-preview ol {
+  color: var(--er-ink) !important;
+}
+.er-edit-preview h1,
+.er-edit-preview h2,
+.er-edit-preview h3,
+.er-edit-preview h4 {
+  font-family: var(--er-font-display);
+  color: var(--er-ink) !important;
+  letter-spacing: -0.01em;
+  margin: 1.6em 0 0.4em;
+  line-height: 1.2;
+}
+.er-edit-preview h1 { font-size: 2rem;   font-weight: 700; }
+.er-edit-preview h2 { font-size: 1.4rem; font-weight: 600; }
+.er-edit-preview h3 { font-size: 1.15rem; font-weight: 600; }
+.er-edit-preview h4 { font-size: 1rem;   font-weight: 600; }
+.er-edit-preview p  { margin: 0 0 1em; }
+.er-edit-preview ul, .er-edit-preview ol { padding-left: 1.5em; margin: 0 0 1em; }
+.er-edit-preview li { margin-bottom: 0.35em; }
+.er-edit-preview strong {
+  color: var(--er-ink) !important;
+  font-weight: 700;
+}
+.er-edit-preview em,
+.er-edit-preview i {
+  color: var(--er-ink-soft) !important;
+  font-style: italic;
+}
+.er-edit-preview blockquote {
+  border-left: 3px solid var(--er-red-soft);
+  padding: 0.2em 1em;
+  margin: 0 0 1em;
+  color: var(--er-ink-soft) !important;
+  font-style: italic;
+  background: transparent;
+}
+.er-edit-preview code {
+  font-family: var(--er-font-mono);
+  font-size: 0.85em;
+  background: var(--er-paper-2);
+  padding: 0.1em 0.35em;
+  border-radius: 2px;
+  color: var(--er-ink-soft) !important;
+}
+.er-edit-preview pre {
+  background: var(--er-paper-2);
+  padding: var(--er-space-2);
+  overflow-x: auto;
+  border: 1px solid var(--er-faded-2);
+  border-radius: 2px;
+  font-family: var(--er-font-mono);
+  font-size: 0.85em;
+  margin: 0 0 1em;
+}
+.er-edit-preview hr {
+  border: 0;
+  border-top: 1px solid var(--er-faded-2);
+  margin: 2em 0;
+}
+.er-edit-preview a {
+  color: var(--er-proof-blue) !important;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.er-edit-preview-error {
+  font-family: var(--er-font-mono);
+  font-size: 0.85rem;
+  color: var(--er-red-pencil);
+  padding: var(--er-space-2);
+}
+
+/* Phone: stack Split vertically. */
+@media (max-width: 900px) {
+  .er-edit-panes[data-view="split"] {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 1fr;
+  }
+  .er-edit-source { border-right: 0; border-bottom: 1px dashed var(--er-faded-2); }
+}
+
+/* ---------- Focus mode ----------
+ *
+ * "The galley under the lamp." Full viewport, cream paper, single
+ * editor column, generous typography, all other chrome receded.
+ * Entered via the Focus button in the edit toolbar, Shift+F, or
+ * double-click-on-prose if the composer isn't open. Exits via Esc
+ * or the floating affordance in the top-left corner.
+ *
+ * The affordances (er-focus-exit, er-focus-save) live in the DOM
+ * always but are display:none outside focus mode, so they're
+ * invisible to screen readers and layout when not in use. */
+
+.er-focus-exit,
+.er-focus-save {
+  display: none;
+}
+
+body.er-focus-mode {
+  overflow: hidden; /* kill page scroll; the editor pane scrolls */
+}
+
+/* Hide everything that isn't the editor. */
+body.er-focus-mode .er-strip,
+body.er-focus-mode [data-comments-sidebar],
+body.er-focus-mode .er-pencil-btn,
+body.er-focus-mode .er-poll-indicator,
+body.er-focus-mode .er-toast,
+body.er-focus-mode .header-wrapper,
+body.er-focus-mode .site-footer,
+body.er-focus-mode .essay-header,
+body.er-focus-mode .essay-hero-image,
+body.er-focus-mode .er-edit-chrome {
+  display: none !important;
+}
+
+/* The edit-mode container becomes a full-viewport canvas. */
+body.er-focus-mode .er-edit-mode {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: var(--er-paper);
+  /* Soft paper grain, stronger than the normal chrome, matching the
+   * "galley pulled out onto a bare tabletop" framing. */
+  background-image:
+    url("data:image/svg+xml;utf8,<svg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.07 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+
+body.er-focus-mode .er-edit-panes {
+  border: 0;
+  background: transparent;
+  height: 100vh;
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: clamp(3rem, 8vh, 6rem) var(--er-space-3);
+  grid-template-columns: 1fr !important;
+  box-sizing: border-box;
+}
+
+body.er-focus-mode .er-edit-source {
+  border: 0;
+  height: 100%;
+  background: transparent;
+}
+
+/* Loosen the editor typography for comfortable long-form writing.
+ * CodeMirror scoped overrides — these only apply inside the
+ * focus-mode body class, so the non-focus edit still renders at
+ * its standard size. */
+body.er-focus-mode .cm-editor {
+  font-size: 1.125rem;
+  line-height: 1.75;
+  background: transparent;
+}
+body.er-focus-mode .cm-scroller {
+  padding: 0;
+}
+body.er-focus-mode .cm-content {
+  padding: 0;
+  max-width: 38rem;
+  margin: 0 auto;
+}
+body.er-focus-mode .cm-gutters {
+  display: none; /* line numbers are noise in focus mode */
+}
+
+/* Floating affordances: exit pill (top-left) and save pill (bottom-
+ * right). Resting state is very faded, rising toward legible when
+ * the mouse approaches their corner. No hover-only reveal — the
+ * resting affordance is present enough to spot but quiet enough to
+ * read through. */
+body.er-focus-mode .er-focus-exit,
+body.er-focus-mode .er-focus-save {
+  display: block;
+  position: fixed;
+  z-index: 210;
+  font-family: var(--er-font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.35;
+  transition: opacity 200ms ease;
+  pointer-events: auto;
+}
+body.er-focus-mode .er-focus-exit:hover,
+body.er-focus-mode .er-focus-save:hover,
+body.er-focus-mode .er-focus-exit:focus-within,
+body.er-focus-mode .er-focus-save:focus-within {
+  opacity: 1;
+}
+
+body.er-focus-mode .er-focus-exit {
+  top: var(--er-space-3);
+  left: var(--er-space-3);
+}
+body.er-focus-mode .er-focus-exit button {
+  font: inherit;
+  background: transparent;
+  color: var(--er-faded);
+  border: 1px solid var(--er-faded-2);
+  padding: 0.3rem 0.7rem;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+body.er-focus-mode .er-focus-exit button:hover {
+  color: var(--er-red-pencil);
+  border-color: var(--er-red-pencil);
+}
+
+body.er-focus-mode .er-focus-save {
+  top: var(--er-space-3);
+  right: var(--er-space-3);
+  display: flex !important;
+  gap: var(--er-space-1);
+  align-items: center;
+}
+body.er-focus-mode .er-focus-save-hint {
+  color: var(--er-faded);
+}
+
+/* ---------- Outline drawer ----------
+ *
+ * Press-check briefing sheet. The outline lives in the source on
+ * disk (SSOT) but is split out of the editor view on mount — it's
+ * reference material during body editing, not editing material.
+ * A bookmark tab pins to the left edge of the viewport while
+ * editing; clicking it (or pressing O) slides the drawer out.
+ *
+ * Rendered read-only. To edit the outline, the operator flips the
+ * calendar back to Outlining and runs /editorial-iterate --kind
+ * outline. Guarded by the footer note inside the drawer. */
+
+.er-outline-tab {
+  position: fixed;
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+  z-index: 205;
+  background: var(--er-paper);
+  border: 1px solid var(--er-red-pencil);
+  border-left: 0;
+  border-radius: 0 3px 3px 0;
+  padding: var(--er-space-2) 0.45rem;
+  cursor: pointer;
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--er-red-pencil);
+  transition: background 150ms ease, padding-left 200ms ease, opacity 200ms ease;
+  box-shadow: 2px 0 6px rgba(26, 22, 20, 0.08);
+}
+.er-outline-tab:hover {
+  background: var(--er-paper-2);
+  padding-left: 0.7rem;
+}
+.er-outline-tab-label {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  display: inline-block;
+}
+/* When the drawer is open, the tab stows (fades out). */
+.er-outline-tab--stowed {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.er-outline-drawer {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 26rem;
+  max-width: 92vw;
+  z-index: 206;
+  background: var(--er-paper);
+  background-image:
+    url("data:image/svg+xml;utf8,<svg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  border-right: 1px solid var(--er-red-pencil);
+  box-shadow: 4px 0 16px rgba(26, 22, 20, 0.12);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(-101%);
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.er-outline-drawer--open {
+  transform: translateX(0);
+}
+
+.er-outline-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--er-space-3);
+  border-bottom: 1px solid var(--er-faded-2);
+}
+.er-outline-drawer-kicker {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--er-red-pencil);
+}
+.er-outline-drawer-close {
+  font-family: var(--er-font-display);
+  font-size: 1.5rem;
+  line-height: 1;
+  background: transparent;
+  border: 0;
+  color: var(--er-faded);
+  cursor: pointer;
+  padding: 0 0.35rem;
+  transition: color 120ms ease;
+}
+.er-outline-drawer-close:hover {
+  color: var(--er-red-pencil);
+}
+
+/* Drawer body typography. Every rule carries the parent
+ * .er-outline-drawer-body class so the selector specificity beats
+ * BlogLayout's .essay-body :global(tag) { color: hsl(var(--foreground)) }
+ * rules, which otherwise paint dark-theme foreground colors (a
+ * cream tint) onto our cream paper — invisible text. */
+
+.er-outline-drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--er-space-3) var(--er-space-4);
+  font-family: var(--er-font-body);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--er-ink);
+}
+/* !important on color declarations — BlogLayout's Astro-scoped
+ * .essay-body :global(h2) / :global(strong) rules compute to the
+ * same specificity as ours but win on source order. Using
+ * !important on the color value alone is the least-invasive
+ * escape. Same pattern used in er-strip-back and
+ * er-marginalia-composer-quote for the same BlogLayout collision. */
+.er-outline-drawer-body,
+.er-outline-drawer-body p,
+.er-outline-drawer-body li,
+.er-outline-drawer-body ul,
+.er-outline-drawer-body ol {
+  color: var(--er-ink) !important;
+}
+.er-outline-drawer-body h1,
+.er-outline-drawer-body h2,
+.er-outline-drawer-body h3,
+.er-outline-drawer-body h4 {
+  color: var(--er-ink) !important;
+}
+.er-outline-drawer-body h2 {
+  font-family: var(--er-font-display);
+  font-size: 1.3rem;
+  font-weight: 500;
+  font-style: italic;
+  margin: 0 0 var(--er-space-2);
+}
+.er-outline-drawer-body h3 {
+  font-family: var(--er-font-display);
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 1.2rem 0 0.5rem;
+}
+.er-outline-drawer-body p {
+  margin: 0 0 0.85em;
+}
+.er-outline-drawer-body ul,
+.er-outline-drawer-body ol {
+  padding-left: 1.25em;
+  margin: 0 0 1em;
+}
+.er-outline-drawer-body li {
+  margin-bottom: 0.5em;
+}
+.er-outline-drawer-body li li {
+  margin-bottom: 0.25em;
+}
+.er-outline-drawer-body strong {
+  color: var(--er-ink) !important;
+  font-weight: 700;
+}
+.er-outline-drawer-body em,
+.er-outline-drawer-body i {
+  color: var(--er-ink-soft) !important;
+  font-style: italic;
+}
+.er-outline-drawer-body a {
+  color: var(--er-proof-blue);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.er-outline-drawer-body blockquote {
+  border-left: 2px solid var(--er-red-soft);
+  padding: 0.2em 1em;
+  margin: 0 0 1em;
+  color: var(--er-ink-soft);
+  font-style: italic;
+  background: transparent;
+}
+.er-outline-drawer-body code {
+  font-family: var(--er-font-mono);
+  font-size: 0.85em;
+  background: var(--er-paper-2);
+  padding: 0.1em 0.3em;
+  border-radius: 2px;
+  color: var(--er-ink-soft);
+}
+.er-outline-drawer-body hr {
+  border: 0;
+  border-top: 1px dashed var(--er-faded-2);
+  margin: 1.5em 0;
+}
+
+.er-outline-drawer-foot {
+  padding: var(--er-space-2) var(--er-space-3);
+  border-top: 1px dashed var(--er-faded-2);
+  font-family: var(--er-font-mono);
+  font-size: 0.68rem;
+  color: var(--er-faded);
+}
+.er-outline-drawer-foot code {
+  font-size: 0.85em;
+  color: var(--er-ink-soft);
+  background: transparent;
+  padding: 0;
+}
+
+/* In focus mode, the drawer still works — it slides over the
+ * fullscreen canvas. The tab, however, hides since focus-mode is
+ * an intentional "no chrome" state; the Outline button in the
+ * edit chrome is also hidden. Operator uses the O keyboard
+ * shortcut or clicks the stowed tab by mousing to the edge. */
+body.er-focus-mode .er-outline-tab {
+  display: none;
+}
+
+/* ---------- Margin-note composer ----------
+ *
+ * In-situ replacement for the old comment modal. Lives inside the
+ * margin rail (same `[data-comments-sidebar]` aside that hosts
+ * saved notes) so starting a new mark never pulls focus off the
+ * draft. Saving promotes the composer contents into a normal
+ * margin item rendered below; cancel dismisses without leaving
+ * a trace. Scoped under [data-review-ui="longform"] so the
+ * cream-on-dark host theme can't leak its link colors onto our
+ * controls. */
+
+[data-review-ui="longform"] .er-marginalia-composer {
+  position: relative;
+  padding: var(--er-space-2) var(--er-space-2) var(--er-space-2) var(--er-space-3);
+  margin: 0 0 var(--er-space-2);
+  /* Red-pencil left rail distinguishes a draft slip from saved
+   * notes (which use the softer --er-red-soft). Same rhythm; a
+   * single degree warmer. */
+  border-left: 3px solid var(--er-red-pencil);
+  border-bottom: 1px solid var(--er-red-pencil);
+  background: linear-gradient(180deg, var(--er-paper-2) 0%, var(--er-paper) 100%);
+  transition: opacity 220ms ease-out, transform 220ms ease-out;
+}
+
+/* Entry frame: composer is translated up + faded when first
+ * revealed; a single frame later the class is removed and the
+ * transition slides it home. Gives the operator a clear "arrived
+ * on the rail" moment without being precious about it. */
+[data-review-ui="longform"] .er-marginalia-composer--entering {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+[data-review-ui="longform"] .er-marginalia-composer-head {
+  font-family: var(--er-font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--er-red-pencil);
+  margin: 0 0 var(--er-space-1);
+}
+
+[data-review-ui="longform"] .er-marginalia-composer-quote {
+  /* Match saved-item quote styling exactly so the composer reads
+   * as a draft in the same rhythm as the marks below it. Known
+   * legible on cream. */
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: var(--er-ink-soft);
+  border-left: 2px solid var(--er-red-soft);
+  padding: 0 var(--er-space-1);
+  margin: 0 0 var(--er-space-2);
+  /* Belt-and-suspenders against any host-theme color bleed: be
+   * explicit that the text is the soft-ink, not whatever a parent
+   * `<blockquote>` rule might have set. */
+  background: transparent;
+}
+
+[data-review-ui="longform"] .er-marginalia-composer-label {
+  font-family: var(--er-font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  display: block;
+  margin: var(--er-space-1) 0 0.15rem;
+}
+
+[data-review-ui="longform"] .er-marginalia-composer-select,
+[data-review-ui="longform"] .er-marginalia-composer-textarea {
+  width: 100%;
+  font: inherit;
+  padding: 0.35rem var(--er-space-1);
+  background: var(--er-paper);
+  color: var(--er-ink);
+  border: 1px solid var(--er-faded-2);
+  border-radius: 0;
+  margin-bottom: var(--er-space-1);
+  transition: border-color 120ms ease;
+}
+
+[data-review-ui="longform"] .er-marginalia-composer-select:focus,
+[data-review-ui="longform"] .er-marginalia-composer-textarea:focus {
+  outline: none;
+  border-color: var(--er-red-pencil);
+}
+
+[data-review-ui="longform"] .er-marginalia-composer-textarea {
+  font-family: var(--er-font-body);
+  font-size: 0.92rem;
+  min-height: 4.5rem;
+  line-height: 1.5;
+  resize: vertical;
+  color: var(--er-ink);
+}
+[data-review-ui="longform"] .er-marginalia-composer-textarea::placeholder {
+  color: var(--er-faded);
+  font-style: italic;
+}
+
+[data-review-ui="longform"] .er-marginalia-composer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--er-space-1);
+  margin-top: var(--er-space-1);
+}
+
+/* ---------- Toast ---------- */
+
+.er-toast {
+  position: fixed;
+  top: var(--er-space-3);
+  right: var(--er-space-3);
+  z-index: 200;
+  background: var(--er-ink);
+  color: var(--er-paper);
+  padding: var(--er-space-2) var(--er-space-3);
+  font-family: var(--er-font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  max-width: 24rem;
+  border-radius: 2px;
+  box-shadow: 2px 2px 0 rgba(26,22,20,0.15);
+  animation: er-toast-in 200ms ease-out;
+}
+.er-toast.error { background: var(--er-red-pencil); }
+@keyframes er-toast-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------- Rename-slug inline form (one per blog row) ----------
+ *
+ * Expands in-place under the row when the operator clicks that row's
+ * "rename →" button. No modal — the operator's eye stays on the row
+ * they're acting on. Matches the press-check palette: paper-2
+ * background, red-pencil left rail (same visual register as the
+ * intake sheet), monospace "rename →" kicker, and a diff-style
+ * old-slug → new-input row. */
+.er-calendar-row-wrap { display: contents; }
+.er-rename-inline {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  margin: 0 0 var(--er-space-2) 0;
+  padding: var(--er-space-2) var(--er-space-3);
+  background: var(--er-paper-2);
+  border-left: 3px solid var(--er-red-pencil);
+  font-family: var(--er-font-mono);
+  font-size: 0.78rem;
+  animation: er-rename-in 160ms ease-out;
+}
+@keyframes er-rename-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.er-rename-inline .er-rename-kicker {
+  color: var(--er-red-pencil);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-size: 0.62rem;
+  font-weight: 600;
+}
+.er-rename-inline .er-rename-old {
+  padding: 0.1em 0.4em;
+  border: 1px dashed var(--er-faded-2);
+  color: var(--er-ink-soft);
+  background: var(--er-paper);
+  text-decoration: line-through;
+  text-decoration-color: var(--er-red-pencil);
+  text-decoration-thickness: 1px;
+  font-family: var(--er-font-mono);
+  font-size: 0.78rem;
+}
+.er-rename-inline .er-rename-arrow {
+  color: var(--er-red-pencil);
+  font-weight: 600;
+}
+.er-rename-inline input[data-rename-input] {
+  font-family: var(--er-font-mono);
+  font-size: 0.85rem;
+  line-height: 1.3;
+  color: var(--er-ink);
+  background: var(--er-paper);
+  border: 1px solid var(--er-faded-2);
+  border-radius: 0;
+  padding: 0.25rem 0.45rem;
+  min-width: 20rem;
+  flex: 1 1 20rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.er-rename-inline input[data-rename-input]:focus {
+  outline: none;
+  border-color: var(--er-red-pencil);
+  box-shadow: 0 0 0 2px rgba(188, 63, 50, 0.2);
+}
+.er-rename-inline .er-rename-hint {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-size: 0.82rem;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--er-ink-soft);
+  margin: 0;
+  flex-basis: 100%;
+}
+.er-rename-inline .er-rename-hint[data-error='true'] {
+  color: var(--er-red-pencil);
+}
+.er-rename-inline button.copied {
+  background: var(--er-stamp-green);
+  border-color: var(--er-stamp-green);
+  color: var(--er-paper);
+}
+
+/* ---------- Keyboard shortcut overlay ---------- */
+
+.er-shortcuts {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--er-space-3);
+}
+.er-shortcuts-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(245,241,232,0.92);
+  backdrop-filter: blur(8px);
+}
+.er-shortcuts-panel {
+  position: relative;
+  max-width: 28rem;
+  width: 100%;
+  padding: var(--er-space-5);
+  background: var(--er-paper);
+  border: var(--er-rule-med);
+  box-shadow: 6px 6px 0 rgba(26,22,20,0.1);
+}
+.er-shortcuts-panel h2 {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 48, "wght" 500;
+  font-size: 1.4rem;
+  margin: 0 0 var(--er-space-3);
+  border-bottom: var(--er-rule-med);
+  padding-bottom: var(--er-space-1);
+}
+.er-shortcuts-panel dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--er-space-2) var(--er-space-3);
+  margin: 0;
+}
+.er-shortcuts-panel dt { margin: 0; }
+.er-shortcuts-panel dd { margin: 0; font-family: var(--er-font-display); }
+.er-shortcuts-panel kbd {
+  font-family: var(--er-font-mono);
+  font-size: 0.8rem;
+  padding: 0.15rem 0.5rem;
+  background: var(--er-paper-2);
+  border: var(--er-rule-thin);
+  border-radius: 2px;
+  box-shadow: 1px 1px 0 rgba(26,22,20,0.08);
+}
+.er-shortcuts-footer {
+  margin-top: var(--er-space-3);
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  color: var(--er-faded);
+  text-align: right;
+}
+
+/* ---------- Footer + poll indicator ---------- */
+
+.er-poll-indicator {
+  position: fixed;
+  bottom: var(--er-space-2);
+  right: var(--er-space-2);
+  font-family: var(--er-font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  color: var(--er-faded-2);
+  background: var(--er-paper);
+  padding: 0.3rem 0.7rem;
+  border: var(--er-rule-thin);
+  border-radius: 2px;
+  opacity: 0.7;
+  z-index: 10;
+}
+.er-poll-indicator.polling::after {
+  content: '';
+  display: inline-block;
+  width: 6px; height: 6px;
+  background: var(--er-stamp-green);
+  border-radius: 50%;
+  margin-left: 0.5em;
+  animation: er-poll-pulse 1.2s ease-in-out infinite;
+}
+@keyframes er-poll-pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+/* ---------- Error banner (longform route when workflow missing) ---------- */
+
+.er-error {
+  max-width: 42rem;
+  margin: var(--er-space-6) auto;
+  padding: var(--er-space-4);
+  background: var(--er-paper);
+  border: 2px solid var(--er-red-pencil);
+  font-family: var(--er-font-display);
+}
+.er-error h1 {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 72, "wght" 500;
+  font-size: 2rem;
+  margin: 0 0 var(--er-space-2);
+  color: var(--er-red-pencil);
+}
+.er-error p { margin: 0 0 var(--er-space-2); font-size: 1rem; line-height: 1.5; }
+.er-error code { font-size: 0.85em; }

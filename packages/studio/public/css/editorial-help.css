@@ -1,0 +1,795 @@
+/*
+ * editorial-help.css — The Compositor's Manual.
+ *
+ * A companion stylesheet to editorial-review.css, used only by the
+ * `/dev/editorial-help` routes on both sites. Inherits all the
+ * press-check tokens (cream paper, ink, red pencil, Fraunces/Newsreader/
+ * JetBrains Mono) and adds a manual/runbook layout on top of them.
+ *
+ * Scope: every rule lives under `body[data-review-ui="manual"]` so it
+ * does not leak into the studio, longform review, or shortform review.
+ */
+
+/* ---------- Page shell ---------- */
+
+body[data-review-ui="manual"] {
+  /* paper + ink from editorial-review.css take care of the base chrome */
+  font-size: 16.5px;
+  line-height: 1.6;
+}
+
+[data-review-ui="manual"] .eh-rail {
+  /* A thin printer's registration rail down the left margin */
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 3rem;
+  background:
+    linear-gradient(var(--er-red-pencil), var(--er-red-pencil)) left / 2px 100% no-repeat,
+    linear-gradient(var(--er-ink), var(--er-ink)) 2.5rem / 1px 100% no-repeat;
+  z-index: 1;
+  pointer-events: none;
+}
+
+[data-review-ui="manual"] .eh-rail::before,
+[data-review-ui="manual"] .eh-rail::after {
+  content: '+';
+  position: absolute;
+  left: 0.65rem;
+  font-family: var(--er-font-mono);
+  font-size: 0.85rem;
+  color: var(--er-red-pencil);
+  font-weight: 600;
+}
+[data-review-ui="manual"] .eh-rail::before { top: 1.2rem; }
+[data-review-ui="manual"] .eh-rail::after  { bottom: 1.2rem; }
+
+[data-review-ui="manual"] .eh-container {
+  max-width: 66rem;
+  margin: 0 auto;
+  padding: 3rem 3.5rem 5rem;
+  position: relative;
+}
+
+@media (max-width: 900px) {
+  [data-review-ui="manual"] .eh-container { padding: 2rem 1.25rem 4rem; }
+  [data-review-ui="manual"] .eh-rail { display: none; }
+}
+
+/* ---------- Cover plate (masthead) ---------- */
+
+.eh-cover {
+  border-top: var(--er-rule-heavy);
+  border-bottom: var(--er-rule-med);
+  padding: 2.25rem 0 1.5rem;
+  margin-bottom: 2.5rem;
+  position: relative;
+}
+
+.eh-cover-kicker {
+  font-family: var(--er-font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--er-red-pencil);
+  margin-bottom: 0.75rem;
+}
+.eh-cover-kicker .dot { color: var(--er-ink-soft); padding: 0 0.35em; }
+
+.eh-cover-title {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 144, "wght" 500, "SOFT" 30;
+  font-size: clamp(2.6rem, 6vw, 4.4rem);
+  line-height: 0.98;
+  letter-spacing: -0.02em;
+  color: var(--er-ink);
+  margin: 0 0 0.6rem 0;
+}
+.eh-cover-title em {
+  font-style: italic;
+  font-variation-settings: "opsz" 144, "wght" 400, "SOFT" 80;
+  color: var(--er-ink-soft);
+}
+
+.eh-cover-dek {
+  font-family: var(--er-font-body);
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(1.1rem, 1.8vw, 1.35rem);
+  line-height: 1.45;
+  color: var(--er-ink-soft);
+  margin: 0 0 1.4rem 0;
+  max-width: 42rem;
+}
+
+.eh-imprint {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+  font-family: var(--er-font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+}
+.eh-imprint span.sep { color: var(--er-faded-2); }
+.eh-imprint strong {
+  font-weight: 500;
+  color: var(--er-ink-soft);
+  letter-spacing: 0.1em;
+}
+.eh-imprint a { color: var(--er-red-pencil); text-decoration-thickness: 1px; }
+
+/* ---------- ToC (compositor's guide) ---------- */
+
+.eh-toc {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  column-gap: 2.5rem;
+  row-gap: 0.25rem;
+  margin: 0 0 3.5rem;
+  padding: 1rem 0 1.25rem;
+  border-bottom: var(--er-rule-med);
+}
+.eh-toc-label {
+  grid-column: 1 / -1;
+  font-family: var(--er-font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  margin-bottom: 0.6rem;
+  border-left: 2px solid var(--er-red-pencil);
+  padding-left: 0.6rem;
+}
+.eh-toc a {
+  display: grid;
+  grid-template-columns: 3rem 1fr auto;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.35rem 0;
+  font-family: var(--er-font-body);
+  font-size: 0.95rem;
+  color: var(--er-ink);
+  border-bottom: 1px dotted var(--er-faded-2);
+  text-decoration: none;
+}
+.eh-toc a:hover { color: var(--er-red-pencil); }
+.eh-toc-num {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  color: var(--er-red-pencil);
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+.eh-toc-page {
+  font-family: var(--er-font-mono);
+  font-size: 0.65rem;
+  color: var(--er-faded);
+  letter-spacing: 0.08em;
+}
+
+@media (max-width: 700px) { .eh-toc { grid-template-columns: 1fr; } }
+
+/* ---------- Section headers ---------- */
+
+.eh-section {
+  margin: 3rem 0 2.25rem;
+  scroll-margin-top: 1.5rem;
+}
+.eh-section-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  border-bottom: var(--er-rule-med);
+  padding-bottom: 0.5rem;
+}
+.eh-section-num {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  color: var(--er-red-pencil);
+  font-weight: 500;
+}
+.eh-section-title {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 48, "wght" 500;
+  font-size: clamp(1.45rem, 2.4vw, 1.95rem);
+  font-style: italic;
+  letter-spacing: -0.01em;
+  margin: 0;
+  color: var(--er-ink);
+}
+.eh-section-sig {
+  font-family: var(--er-font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  color: var(--er-faded);
+}
+
+.eh-section p,
+.eh-section li {
+  font-family: var(--er-font-body);
+  color: var(--er-ink-soft);
+  font-size: 1rem;
+  line-height: 1.65;
+}
+.eh-section p:first-of-type { margin-top: 0; }
+
+.eh-lead {
+  font-family: var(--er-font-body);
+  font-style: italic;
+  font-size: 1.12rem !important;
+  line-height: 1.55;
+  color: var(--er-ink) !important;
+  border-left: 2px solid var(--er-red-pencil);
+  padding-left: 1rem;
+  margin: 0 0 1.5rem;
+}
+
+/* ---------- §1 State machine diagrams ---------- */
+
+.eh-state-diagram {
+  background: var(--er-paper-2);
+  border: var(--er-rule-thin);
+  padding: 2rem 1.5rem;
+  margin: 1.5rem 0 2rem;
+  position: relative;
+  overflow-x: auto;
+}
+
+.eh-state-label {
+  position: absolute;
+  top: 0.75rem;
+  left: 1rem;
+  font-family: var(--er-font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+}
+.eh-state-caption {
+  font-family: var(--er-font-mono);
+  font-size: 0.68rem;
+  color: var(--er-faded);
+  text-align: center;
+  margin: 0.85rem 0 0;
+  letter-spacing: 0.04em;
+}
+
+.eh-stage-chain {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 0.35rem;
+  flex-wrap: nowrap;
+  min-width: max-content;
+}
+.eh-stage-box {
+  flex: 1 1 0;
+  min-width: 7.5rem;
+  border: 1.5px solid var(--er-ink);
+  padding: 0.9rem 0.6rem 0.8rem;
+  background: var(--er-paper);
+  text-align: center;
+  position: relative;
+}
+.eh-stage-box .num {
+  position: absolute;
+  top: -0.65rem;
+  left: 0.6rem;
+  background: var(--er-paper-2);
+  padding: 0 0.4rem;
+  font-family: var(--er-font-mono);
+  font-size: 0.62rem;
+  color: var(--er-red-pencil);
+  letter-spacing: 0.12em;
+}
+.eh-stage-box .ornament {
+  font-family: var(--er-font-display);
+  font-size: 1.2rem;
+  color: var(--er-red-pencil);
+  margin-bottom: 0.1rem;
+  line-height: 1;
+}
+.eh-stage-box .name {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 36, "wght" 500;
+  font-size: 1.1rem;
+  color: var(--er-ink);
+  letter-spacing: -0.005em;
+}
+.eh-stage-box .hint {
+  font-family: var(--er-font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  margin-top: 0.35rem;
+}
+.eh-stage-arrow {
+  display: flex;
+  align-items: center;
+  font-family: var(--er-font-mono);
+  font-size: 1.3rem;
+  color: var(--er-red-pencil);
+  padding: 0 0.1rem;
+}
+
+/* Orthogonal review loop — rendered as inset */
+.eh-review-loop {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(5.5rem, 1fr));
+  align-items: center;
+  gap: 0.3rem;
+  margin: 1rem auto 0;
+  font-family: var(--er-font-mono);
+  font-size: 0.72rem;
+  max-width: 48rem;
+}
+.eh-review-loop .loop-node {
+  text-align: center;
+  padding: 0.35rem 0.2rem;
+  border: 1px dashed var(--er-ink-soft);
+  background: var(--er-paper);
+  color: var(--er-ink);
+  letter-spacing: 0.04em;
+}
+.eh-review-loop .loop-node.terminal-ok { border-color: var(--er-stamp-green); color: var(--er-stamp-green); }
+.eh-review-loop .loop-node.terminal-x  { border-color: var(--er-red-pencil); color: var(--er-red-pencil); }
+.eh-review-loop .loop-arrow {
+  text-align: center;
+  color: var(--er-faded);
+  font-size: 0.9rem;
+}
+
+/* ---------- §2 Three tracks ---------- */
+
+.eh-tracks {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+  margin: 1.25rem 0 1rem;
+}
+@media (max-width: 900px) { .eh-tracks { grid-template-columns: 1fr; } }
+
+.eh-track {
+  border-top: 3px solid var(--er-ink);
+  padding-top: 0.65rem;
+}
+.eh-track-title {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 36, "wght" 500;
+  font-size: 1.15rem;
+  font-style: italic;
+  color: var(--er-ink);
+  margin: 0 0 0.15rem;
+}
+.eh-track-sub {
+  font-family: var(--er-font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  margin: 0 0 0.8rem;
+}
+.eh-track-steps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  counter-reset: ts;
+}
+.eh-track-steps li {
+  counter-increment: ts;
+  padding: 0.5rem 0 0.5rem 2rem;
+  position: relative;
+  font-family: var(--er-font-body);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  border-bottom: 1px dotted var(--er-faded-2);
+  color: var(--er-ink);
+}
+.eh-track-steps li::before {
+  content: counter(ts, decimal-leading-zero);
+  position: absolute;
+  left: 0;
+  top: 0.55rem;
+  font-family: var(--er-font-mono);
+  font-size: 0.62rem;
+  color: var(--er-red-pencil);
+  letter-spacing: 0.08em;
+}
+.eh-track-steps code {
+  display: block;
+  font-family: var(--er-font-mono);
+  font-size: 0.78rem;
+  margin-top: 0.1rem;
+  background: transparent;
+  padding: 0;
+  color: var(--er-red-pencil);
+}
+.eh-track-steps .note {
+  display: block;
+  font-family: var(--er-font-body);
+  font-style: italic;
+  font-size: 0.82rem;
+  color: var(--er-ink-soft);
+  margin-top: 0.1rem;
+}
+
+/* ---------- §3 Skill specimen cards ---------- */
+
+.eh-specimens {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.6rem;
+  margin: 1.25rem 0 1.5rem;
+}
+@media (max-width: 760px) { .eh-specimens { grid-template-columns: 1fr; } }
+
+.eh-specimen {
+  border: var(--er-rule-thin);
+  padding: 0.85rem 0.95rem;
+  background: var(--er-paper);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 0.15rem 0.75rem;
+  position: relative;
+}
+.eh-specimen::after {
+  /* corner registration mark */
+  content: '';
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 10px;
+  height: 10px;
+  border-top: 1px solid var(--er-red-pencil);
+  border-right: 1px solid var(--er-red-pencil);
+}
+.eh-specimen-slug {
+  grid-column: 1;
+  font-family: var(--er-font-mono);
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--er-ink);
+  letter-spacing: 0.01em;
+}
+.eh-specimen-slug::before {
+  content: '/';
+  color: var(--er-red-pencil);
+  margin-right: 0.02em;
+}
+.eh-specimen-stamp {
+  grid-column: 2;
+  justify-self: end;
+  align-self: start;
+  font-family: var(--er-font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 0.1rem 0.4rem;
+  border: 1px solid var(--er-ink-soft);
+  color: var(--er-ink-soft);
+  white-space: nowrap;
+}
+.eh-specimen-stamp[data-kind="mechanical"] {
+  border-color: var(--er-proof-blue);
+  color: var(--er-proof-blue);
+}
+.eh-specimen-stamp[data-kind="cognitive"] {
+  border-color: var(--er-red-pencil);
+  color: var(--er-red-pencil);
+}
+.eh-specimen-stamp[data-kind="readonly"] {
+  border-color: var(--er-faded);
+  color: var(--er-faded);
+}
+.eh-specimen-stamp[data-kind="voice"] {
+  border-color: var(--er-stamp-purple);
+  color: var(--er-stamp-purple);
+}
+.eh-specimen-desc {
+  grid-column: 1 / -1;
+  font-family: var(--er-font-body);
+  font-size: 0.9rem;
+  color: var(--er-ink-soft);
+  line-height: 1.45;
+  margin-top: 0.15rem;
+}
+.eh-specimen-meta {
+  grid-column: 1 / -1;
+  margin-top: 0.45rem;
+  padding-top: 0.4rem;
+  border-top: 1px dashed var(--er-faded-2);
+  font-family: var(--er-font-mono);
+  font-size: 0.65rem;
+  line-height: 1.55;
+  color: var(--er-faded);
+  letter-spacing: 0.02em;
+}
+.eh-specimen-meta strong {
+  color: var(--er-ink-soft);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.6rem;
+  margin-right: 0.35rem;
+}
+.eh-specimen-meta em {
+  font-style: italic;
+  color: var(--er-ink-soft);
+}
+.eh-specimen-meta .row { display: block; margin-top: 0.1rem; }
+
+/* Skills legend */
+.eh-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  font-family: var(--er-font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  color: var(--er-ink-soft);
+  margin: 0.5rem 0 1.2rem;
+}
+.eh-legend .swatch {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  border: 1px solid;
+  margin-right: 0.4rem;
+  vertical-align: -2px;
+}
+.eh-legend .s-cog { border-color: var(--er-red-pencil); background: var(--er-red-soft); }
+.eh-legend .s-mech { border-color: var(--er-proof-blue); background: var(--er-proof-blue-soft); }
+.eh-legend .s-ro { border-color: var(--er-faded); background: var(--er-paper-3); }
+.eh-legend .s-voice { border-color: var(--er-stamp-purple); background: #D7C5DC; }
+
+/* ---------- §4 Studio map ---------- */
+
+.eh-studio-map {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 1.25rem;
+  margin: 1.25rem 0 1.5rem;
+}
+@media (max-width: 900px) { .eh-studio-map { grid-template-columns: 1fr; } }
+
+.eh-panel {
+  border: var(--er-rule-thin);
+  padding: 0.9rem 1rem 1rem;
+  background: var(--er-paper);
+}
+.eh-panel-head {
+  font-family: var(--er-font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  margin: 0 0 0.5rem;
+  border-bottom: 1px dashed var(--er-faded-2);
+  padding-bottom: 0.35rem;
+}
+.eh-panel h4 {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 36, "wght" 500;
+  font-size: 1.05rem;
+  font-style: italic;
+  color: var(--er-ink);
+  margin: 0 0 0.5rem;
+}
+.eh-panel p, .eh-panel ul {
+  font-family: var(--er-font-body);
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--er-ink-soft);
+  margin: 0 0 0.6rem;
+}
+.eh-panel ul { padding-left: 1.2rem; }
+.eh-panel li { margin-bottom: 0.25rem; }
+.eh-panel code {
+  background: var(--er-paper-2);
+  font-size: 0.8em;
+}
+
+/* ---------- §5 Worked example ---------- */
+
+.eh-walkthrough {
+  counter-reset: wt;
+  margin: 1rem 0 1.5rem;
+  border-top: var(--er-rule-med);
+}
+.eh-walkthrough-step {
+  counter-increment: wt;
+  display: grid;
+  grid-template-columns: 3.5rem 1fr;
+  gap: 1rem;
+  padding: 1rem 0;
+  border-bottom: 1px dashed var(--er-faded-2);
+}
+.eh-walkthrough-step::before {
+  content: counter(wt, decimal-leading-zero);
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 48, "wght" 400;
+  font-size: 2.2rem;
+  color: var(--er-red-pencil);
+  font-style: italic;
+  line-height: 1;
+  padding-top: 0.1rem;
+}
+.eh-walkthrough-step h4 {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 36, "wght" 500;
+  font-size: 1.1rem;
+  color: var(--er-ink);
+  font-style: italic;
+  margin: 0 0 0.4rem;
+}
+.eh-walkthrough-step h4 .op {
+  font-family: var(--er-font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  font-style: normal;
+  margin-left: 0.6rem;
+}
+.eh-walkthrough-step p {
+  font-family: var(--er-font-body);
+  font-size: 0.95rem;
+  color: var(--er-ink-soft);
+  margin: 0 0 0.5rem;
+  line-height: 1.55;
+}
+.eh-walkthrough-step code {
+  font-family: var(--er-font-mono);
+  font-size: 0.78rem;
+  color: var(--er-red-pencil);
+  background: var(--er-paper-2);
+  padding: 0.1em 0.4em;
+}
+
+/* ---------- §6 Reference card ---------- */
+
+.eh-reference {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+  margin: 1rem 0 2rem;
+}
+@media (max-width: 760px) { .eh-reference { grid-template-columns: 1fr; } }
+
+.eh-ref-block h4 {
+  font-family: var(--er-font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--er-red-pencil);
+  margin: 0 0 0.65rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--er-ink);
+}
+.eh-ref-block dl {
+  display: grid;
+  grid-template-columns: minmax(7rem, max-content) 1fr;
+  gap: 0.5rem 0.85rem;
+  margin: 0;
+  font-family: var(--er-font-body);
+}
+.eh-ref-block dt {
+  font-family: var(--er-font-mono);
+  font-size: 0.76rem;
+  color: var(--er-ink);
+  word-break: break-all;
+  align-self: start;
+}
+.eh-ref-block dd {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--er-ink-soft);
+  line-height: 1.45;
+  align-self: start;
+}
+
+/* For the blocks where the dt side is a long path (URL patterns, file
+ * locations): stack dt above dd so the path has full width. */
+.eh-ref-block--stacked dl {
+  grid-template-columns: 1fr;
+  gap: 0.15rem;
+}
+.eh-ref-block--stacked dd {
+  margin-bottom: 0.6rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px dotted var(--er-faded-2);
+}
+.eh-ref-block--stacked dd:last-of-type {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+.eh-ref-block kbd {
+  font-family: var(--er-font-mono);
+  font-size: 0.72rem;
+  padding: 0.1rem 0.35rem;
+  border: 1px solid var(--er-faded);
+  border-bottom-width: 2px;
+  background: var(--er-paper);
+  color: var(--er-ink);
+  margin: 0 0.1rem;
+  border-radius: 2px;
+  font-weight: 500;
+}
+
+/* transitions table */
+.eh-transitions {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.25rem;
+  font-family: var(--er-font-mono);
+  font-size: 0.78rem;
+}
+.eh-transitions th,
+.eh-transitions td {
+  text-align: left;
+  padding: 0.35rem 0.5rem 0.35rem 0;
+  border-bottom: 1px dotted var(--er-faded-2);
+  color: var(--er-ink);
+}
+.eh-transitions th {
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  border-bottom-color: var(--er-ink);
+}
+.eh-transitions .arrow { color: var(--er-red-pencil); }
+
+/* ---------- Colophon ---------- */
+
+.eh-colophon {
+  margin-top: 4rem;
+  padding-top: 1rem;
+  border-top: 4px double var(--er-ink);
+  text-align: center;
+  font-family: var(--er-font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+}
+.eh-colophon span { padding: 0 0.35em; }
+.eh-colophon em {
+  font-style: italic;
+  color: var(--er-red-pencil);
+  font-family: var(--er-font-body);
+  letter-spacing: 0.04em;
+  text-transform: none;
+  font-size: 0.78rem;
+}
+
+/* Back-to-studio pill */
+.eh-back {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 30;
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  background: var(--er-paper);
+  color: var(--er-ink);
+  border: var(--er-rule-thin);
+  padding: 0.35rem 0.7rem;
+  text-decoration: none;
+}
+.eh-back:hover {
+  background: var(--er-ink);
+  color: var(--er-paper);
+}
+.eh-back::before { content: '← '; color: var(--er-red-pencil); }
+.eh-back:hover::before { color: var(--er-paper); }

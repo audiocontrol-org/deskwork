@@ -1,0 +1,171 @@
+/*
+ * editorial-studio.css — studio-specific additions on top of
+ * `editorial-review.css` (tokens + chrome). Used only by the two
+ * `/dev/editorial-studio` routes.
+ */
+
+/* Calendar stage rows */
+.er-calendar-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: start;
+  gap: var(--er-space-2);
+  padding: var(--er-space-2) var(--er-space-3);
+  border-bottom: var(--er-rule-thin);
+}
+.er-calendar-row:first-of-type { border-top: var(--er-rule-thin); }
+.er-calendar-row:hover { background: rgba(26,22,20,0.03); }
+.er-calendar-row[hidden] { display: none !important; }
+
+.er-calendar-body {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--er-space-2);
+  row-gap: 0.2rem;
+}
+.er-calendar-body .er-row-slug {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 36, "wght" 500;
+  font-size: 1.05rem;
+}
+.er-calendar-title {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-variation-settings: "opsz" 24, "wght" 400;
+  font-size: 0.95rem;
+  color: var(--er-ink-soft);
+}
+.er-calendar-meta {
+  font-family: var(--er-font-mono);
+  font-size: 0.68rem;
+  color: var(--er-faded);
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+}
+.er-calendar-meta em {
+  font-style: normal;
+  color: var(--er-ink-soft);
+  margin-right: 0.2em;
+}
+.er-calendar-meta-kind {
+  background: var(--er-paper-2);
+  padding: 0.1em 0.4em;
+  border-radius: 2px;
+}
+/* "✓ feature image" chip — signals that feature-og.png has been baked
+ * into this post's public dir. Amber because the feature-image pipeline
+ * is the amber pigment in the studio's palette. */
+.er-calendar-meta-baked {
+  background: var(--er-highlight-soft);
+  color: #8B6914;
+  padding: 0.1em 0.45em;
+  border-radius: 2px;
+  font-weight: 600;
+}
+
+/* When the baked chip is a link to the og-preview page, give it a
+ * subtle hover cue. The link variant only differs on :hover — default
+ * state should look identical to the plain chip so existing rows don't
+ * shift visually. */
+a.er-calendar-meta-link {
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.12s ease, box-shadow 0.12s ease;
+}
+a.er-calendar-meta-link:hover,
+a.er-calendar-meta-link:focus-visible {
+  background: var(--er-highlight);
+  box-shadow: 0 0 0 1px rgba(139, 105, 20, 0.3);
+  outline: none;
+}
+.er-calendar-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--er-space-1);
+  white-space: nowrap;
+}
+.er-file-dot {
+  font-size: 0.7rem;
+  line-height: 1;
+}
+.er-file-written     { color: var(--er-stamp-green); }
+.er-file-placeholder { color: var(--er-highlight); }
+.er-file-missing     { color: var(--er-faded-2); }
+/* Back-compat shims in case any old class names linger */
+.er-file-yes { color: var(--er-stamp-green); }
+.er-file-no  { color: var(--er-faded-2); }
+
+.er-calendar-action {
+  display: inline-flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.er-copy-btn {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem !important;
+}
+
+/* (Site badge rule moved to editorial-review.css so shortform + longform
+ * review pages inherit it. Kept empty here; grep for `.er-row-site`.) */
+.er-copy-btn.copied {
+  background: var(--er-stamp-green) !important;
+  color: var(--er-paper) !important;
+  border-color: var(--er-stamp-green) !important;
+}
+
+/* Shortform coverage matrix */
+.er-sf-matrix {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--er-font-display);
+  font-size: 0.85rem;
+  margin-top: var(--er-space-1);
+}
+.er-sf-matrix th,
+.er-sf-matrix td {
+  padding: var(--er-space-1) var(--er-space-2);
+  text-align: left;
+  border-bottom: var(--er-rule-thin);
+}
+.er-sf-matrix thead th {
+  font-family: var(--er-font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  font-weight: 500;
+  border-bottom: var(--er-rule-med);
+  padding-bottom: 0.25rem;
+}
+.er-sf-slug-col { width: auto; }
+.er-sf-slug {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 36, "wght" 500;
+  font-weight: normal;
+  color: var(--er-ink);
+}
+.er-sf-platform { text-align: center !important; }
+.er-sf-platform-reddit    { color: #E26A3A; }
+.er-sf-platform-youtube   { color: #C2322A; }
+.er-sf-platform-linkedin  { color: #2A4B7C; }
+.er-sf-platform-instagram { color: #9B3D73; }
+.er-sf-cell {
+  text-align: center;
+  vertical-align: middle;
+  width: 6rem;
+}
+.er-sf-check {
+  color: var(--er-stamp-green);
+  font-size: 1.2rem;
+  font-weight: 500;
+}
+.er-sf-draft-btn {
+  opacity: 0.5;
+  padding: 0.15rem 0.45rem !important;
+  font-size: 0.65rem !important;
+}
+.er-sf-draft-btn:hover { opacity: 1; }
+.er-sf-cell-covered { background: rgba(46, 93, 69, 0.06); }
