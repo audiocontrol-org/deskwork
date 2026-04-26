@@ -267,3 +267,30 @@ Tasks:
 **Notes:**
 - Sandbox carries a permanent `deskwork-plugin-dogfood` slug as evidence; future dogfood runs use a different slug or reuse this one as a fixture.
 - The "decision: ready to publish to npm" question — deferred until the agent-improvability pillar (PRD section) gets revisited. Publishing to npm makes sense if we keep the thin-shell-over-npm distribution model; if we pivot to plugin-as-clone (Option F), npm publishing becomes optional.
+
+---
+
+### Phase 13: Hierarchical content + scrapbook secret subdir
+
+**Deliverable:** Calendar entries support hierarchical slugs with operator-chosen file layouts; scrapbooks are addressable at any directory path within `contentDir` and segregate `scrapbook/secret/*` from public items.
+
+Scope settled on (after exploring the writingcontrol.org dogfood site, which uses both flat `essays/<slug>/index.md` and hierarchical `projects/<slug>/<sub>/<sub-sub>/...` collections):
+
+Tasks:
+- [x] Slug regex relaxed to accept `/`-separated kebab segments; `CalendarEntry.filePath?` records the per-entry on-disk path; calendar parser/renderer adds optional `FilePath` column (legacy calendars unchanged).
+- [x] `scrapbook.ts` — `listScrapbook` returns `{ items, secretItems }`; `SECRET_SUBDIR = 'secret'` is the well-known private path; `ScrapbookLocation { secret? }` threaded through the CRUD API.
+- [x] `scaffold.ts` — `ScaffoldOptions { authorOverride?, layout? }`; layout values `'index' | 'readme' | 'flat'` produce `<slug>/index.md`, `<slug>/README.md`, `<slug>.md` respectively.
+- [x] CLI: `add --slug <path>` for explicit hierarchical slug; `outline --layout <index|readme|flat>` for per-entry on-disk shape; lifecycle commands accept hierarchical slugs (regex relaxation only).
+- [x] Studio scrapbook route `/dev/scrapbook/:site/:path{.+}` accepts arbitrary depth; page renders ancestor breadcrumb + secret section; secret items carry `data-secret="true"`.
+- [x] Studio dashboard sorts by (site, slug) so hierarchical clusters are contiguous; rows under a slug with `/`s carry `data-depth=N` + `--er-row-depth` CSS variable; CSS adds an indent + faint vertical rule + leaf vs. ancestor styling.
+- [x] Skill prose: `outline/SKILL.md` documents `--layout`, `add/SKILL.md` documents `--slug` and the leaf-on-demand rule.
+
+**Acceptance Criteria:**
+- [x] All 7 sub-phases land as separate commits for granular review.
+- [x] Total tests after Phase 13: ≥ 217 (126 + 30 hierarchy = 156 core, 27 + 6 = 33 cli, 24 + 4 = 28 studio).
+- [x] audiocontrol's flat-blog calendars and the studio dashboard for that project render unchanged (full backward-compat verified by pre-existing tests still passing).
+- [x] writingcontrol.org sandbox can be driven through `add → plan → outline --layout readme` for a depth-3 slug.
+
+**Notes:**
+- `addEntry` does NOT auto-create ancestor entries when a deep leaf is added — each entry stands alone. The operator promotes intermediate directories to tracked entries explicitly when they want them tracked through the lifecycle.
+- The host project's content-collection patterns determine which on-disk shapes ship publicly; deskwork's job is to honor whatever the operator picks per-entry, not to enforce a public/private distinction at the file-naming layer.
