@@ -2,7 +2,7 @@
 
 Web studio for the deskwork editorial calendar — a local Hono server exposing a dashboard, longform review surface, shortform review desk, scrapbook viewer, and the compositor's manual.
 
-This is a thin Claude Code plugin shell. The actual server lives in the [@deskwork/studio](../../packages/studio/) npm package; this plugin's `bin/deskwork-studio` wrapper resolves to the workspace-linked binary inside the monorepo. Until `@deskwork/studio` is published to npm, running the skill against a fresh plugin install requires a one-time `npm install` inside the cloned plugin tree.
+This is a thin Claude Code plugin shell. The actual server lives in the [@deskwork/studio](../../packages/studio/) npm package; this plugin's `bin/deskwork-studio` wrapper resolves to the workspace-linked binary on dev installs, or falls back to the self-contained bundle at `packages/studio/bundle/server.mjs` (committed to git) for fresh `claude plugin install` users. No `npm install` ceremony required either way.
 
 ### Install
 

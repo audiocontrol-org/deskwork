@@ -64,11 +64,15 @@ Every node in a content tree can host its own scrapbook at `<contentDir>/<path>/
 
 Lives in `.deskwork/config.json` in the host project. Written by `/deskwork:install`. Schema includes per-site `host`, `contentDir`, `calendarPath`, optional `channelsPath`, and content-shape knobs (`blogFilenameTemplate`, `blogInitialState`, `blogOutlineSection`).
 
-### Heads-up on running the skills
+### How `bin/deskwork` resolves the binary
 
-The plugin's `bin/deskwork` wrapper resolves to the workspace's `node_modules/.bin/deskwork` (a tsx-runtime binary symlinked into the deskwork monorepo). Until `@deskwork/cli` is published to npm, running a skill from a fresh `claude plugin install` will fail loudly with a clear message — **the plugin's clone needs `npm install` run inside it once** to populate the workspace symlinks.
+The wrapper tries, in order:
 
-Local-development install (via `claude --plugin-dir plugins/deskwork` from this monorepo) sidesteps this.
+1. **Workspace-linked binary** at `node_modules/.bin/deskwork` (tsx-runtime symlink, present after `npm install` in the monorepo). Dev path — runs source, edits show up immediately.
+2. **Self-contained bundle** at `packages/cli/bundle/cli.mjs` (committed to git; produced by `npm --workspace packages/cli run build`). Plain `node bundle.mjs` — no install ceremony, ships with every clone.
+3. Loud error pointing at the two recovery paths.
+
+Fresh `claude plugin install` users hit path 2 — nothing extra to do. Local-dev installs hit path 1.
 
 ### License
 
