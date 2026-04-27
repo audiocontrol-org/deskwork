@@ -36,6 +36,7 @@
     "./scaffold": "./src/scaffold.ts",
     "./scrapbook": "./src/scrapbook.ts",
     "./content-tree": "./src/content-tree.ts",
+    "./content-index": "./src/content-index.ts",
     "./types": "./src/types.ts"
   },
   "scripts": {

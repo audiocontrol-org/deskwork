@@ -453,7 +453,7 @@ describe('hierarchical slugs', () => {
       .toBe(true);
   });
 
-  it('outline --layout flat writes <slug>.md and records filePath', () => {
+  it('outline --layout flat writes <slug>.md (Phase 19a: filePath no longer stored on calendar)', () => {
     run('deskwork-add', [project, '--slug', 'parent/leaf', 'Leaf']);
     run('deskwork-plan', [project, 'parent/leaf', 'kw']);
     const res = run('deskwork-outline', [
@@ -466,8 +466,14 @@ describe('hierarchical slugs', () => {
     expect(
       existsSync(join(project, 'src/sites/main/pages/blog/parent/leaf.md')),
     ).toBe(true);
-    const cal = readProjectCalendar(project);
-    expect(cal.entries[0].filePath).toBe('parent/leaf.md');
+    // The scaffolder still reports contentRelativePath in its JSON
+    // result for operator visibility, but the calendar no longer
+    // stores it (Phase 19c will rebind via frontmatter id + content
+    // index instead).
+    const scaffolded = (
+      res.json as { scaffolded?: { contentRelativePath?: string } }
+    ).scaffolded;
+    expect(scaffolded?.contentRelativePath).toBe('parent/leaf.md');
   });
 
   it('outline --layout readme writes <slug>/README.md', () => {
@@ -483,8 +489,10 @@ describe('hierarchical slugs', () => {
     expect(
       existsSync(join(project, 'src/sites/main/pages/blog/p/q/r/README.md')),
     ).toBe(true);
-    const cal = readProjectCalendar(project);
-    expect(cal.entries[0].filePath).toBe('p/q/r/README.md');
+    const scaffolded = (
+      res.json as { scaffolded?: { contentRelativePath?: string } }
+    ).scaffolded;
+    expect(scaffolded?.contentRelativePath).toBe('p/q/r/README.md');
   });
 
   it('outline rejects an unknown --layout value', () => {

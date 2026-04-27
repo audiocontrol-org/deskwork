@@ -25,6 +25,7 @@ Extract the editorial calendar skills from audiocontrol.org into an open-source 
 | 16 | Hierarchical content gaps + scrapbook-in-review + bird's-eye content view | Complete ([#18](https://github.com/audiocontrol-org/deskwork/issues/18); design mockup at [`mockups/birds-eye-content-view.html`](mockups/birds-eye-content-view.html)) |
 | 17 | Cross-page editorial nav + studio index at `/dev/` | Complete (v0.5.0; design mockup at [`mockups/editorial-nav-and-index.html`](mockups/editorial-nav-and-index.html)) |
 | 18 | Deferral catalog — finish the deferred work | Group A code items shipped in v0.6.0 ([#16](https://github.com/audiocontrol-org/deskwork/issues/16), [#24](https://github.com/audiocontrol-org/deskwork/issues/24), [#27](https://github.com/audiocontrol-org/deskwork/issues/27), [#28](https://github.com/audiocontrol-org/deskwork/issues/28), [#29](https://github.com/audiocontrol-org/deskwork/issues/29), [#31](https://github.com/audiocontrol-org/deskwork/issues/31) — all 10 cross-surface design audit unifications). [#30](https://github.com/audiocontrol-org/deskwork/issues/30) conditional. Group B (Phase 4/5/6) and Group C (MCP/npm/shortform-cross-link) remain operator decisions. |
+| 19 | Separate identity (UUID) and path-encoding (frontmatter id) from slug; `deskwork doctor` validate/repair | Not started ([#33](https://github.com/audiocontrol-org/deskwork/issues/33)); plan at `~/.claude/plans/i-would-like-to-wiggly-hennessy.md` |
 
 ### Key Links
 

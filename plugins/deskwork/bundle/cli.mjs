@@ -360,8 +360,6 @@ function parseEntries(lines, stage) {
       }
       const url = col(cells, cols, "url");
       if (url) entry.contentUrl = url;
-      const filePath = col(cells, cols, "filepath");
-      if (filePath) entry.filePath = filePath;
       const pausedFrom = col(cells, cols, "pausedfrom");
       if (pausedFrom && isStage(pausedFrom) && isPausable(pausedFrom)) {
         entry.pausedFrom = pausedFrom;
@@ -522,16 +520,12 @@ function renderStageTable(entries, stage) {
   const hasUrl = entries.some(
     (e) => e.contentUrl !== void 0 && e.contentUrl !== ""
   );
-  const hasFilePath = entries.some(
-    (e) => e.filePath !== void 0 && e.filePath !== ""
-  );
   const isPublished = stage === "Published";
   const isPaused = stage === "Paused";
   const headers = ["UUID", "Slug", "Title", "Description", "Keywords"];
   if (hasTopics) headers.push("Topics");
   if (hasType) headers.push("Type");
   if (hasUrl) headers.push("URL");
-  if (hasFilePath) headers.push("FilePath");
   headers.push("Source");
   if (isPaused) headers.push("PausedFrom");
   if (isPublished) headers.push("Published");
@@ -550,7 +544,6 @@ function renderStageTable(entries, stage) {
     if (hasTopics) row.push(escapeCell((e.topics ?? []).join(", ")));
     if (hasType) row.push(effectiveContentType(e));
     if (hasUrl) row.push(escapeCell(e.contentUrl ?? ""));
-    if (hasFilePath) row.push(escapeCell(e.filePath ?? ""));
     row.push(e.source);
     if (isPaused) row.push(e.pausedFrom ?? "");
     if (isPublished) row.push(e.datePublished ?? "");
@@ -9912,7 +9905,13 @@ function scaffoldBlogPost(projectRoot, config, site, entry, opts = {}) {
     throw new Error(`Blog post already exists at ${relativePath}`);
   }
   const dateStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  if (!entry.id || entry.id.trim() === "") {
+    throw new Error(
+      `Cannot scaffold entry without id; this is a bug in calendar-mutations or upstream. Entry slug: "${entry.slug}".`
+    );
+  }
   const data = {};
+  data.id = entry.id;
   if (siteCfg.blogLayout) data.layout = siteCfg.blogLayout;
   data.title = entry.title;
   data.description = entry.description;
@@ -10016,9 +10015,6 @@ async function run7(argv2) {
     } catch (err2) {
       fail(err2 instanceof Error ? err2.message : String(err2));
     }
-  }
-  if (scaffolded && layout !== void 0) {
-    existing.filePath = scaffolded.contentRelativePath;
   }
   const updated = outlineEntry(calendar, slug);
   writeCalendar(calendarPath, calendar);

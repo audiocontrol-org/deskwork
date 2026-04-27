@@ -171,7 +171,10 @@ function loadDetailRender(
   let scrapbook: ScrapbookSummary | null = null;
 
   if (node.entry !== null) {
-    const filePath = node.entry.filePath ?? `${node.slug}/index.md`;
+    // Phase 19a dropped CalendarEntry.filePath; fall back to the host
+    // template (`<slug>/index.md`). Phase 19c will resolve this
+    // through the per-request content index using frontmatter id.
+    const filePath = `${node.slug}/index.md`;
     const abs = join(contentDir, filePath);
     const raw = safeReadFile(abs);
     if (raw !== null) {

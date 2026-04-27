@@ -150,22 +150,23 @@ describe('content view — drilldown', () => {
           slug: 'the-outbound/characters',
           title: 'Characters',
           stage: 'Outlining',
-          filePath: 'the-outbound/characters/README.md',
         }),
         entry({
           slug: 'the-outbound/characters/strivers',
           title: 'Strivers',
           stage: 'Drafting',
           description: 'Those who keep moving.',
-          filePath: 'the-outbound/characters/strivers/README.md',
         }),
       ],
       files: {
+        // Phase 19a removed CalendarEntry.filePath. The detail panel
+        // now reads `<slug>/index.md` for tracked entries. Fixture
+        // uses index.md to exercise the post-19a code path.
         'src/content/projects/the-outbound/index.md':
           '---\ntitle: The Outbound\nstate: drafting\n---\n\n# The Outbound\n\nA novel about a one-way exodus.\n',
-        'src/content/projects/the-outbound/characters/README.md':
+        'src/content/projects/the-outbound/characters/index.md':
           '---\ntitle: Characters\n---\n\n# Characters\n',
-        'src/content/projects/the-outbound/characters/strivers/README.md':
+        'src/content/projects/the-outbound/characters/strivers/index.md':
           '---\ntitle: Strivers\nlogline: They run because nothing has ever stood still.\n---\n\n# Strivers\n\nThe strivers were the ones who kept moving.\n',
         'src/content/projects/the-outbound/characters/strivers/scrapbook/archetypes.md':
           '# archetypes notes\n',

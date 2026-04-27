@@ -270,17 +270,13 @@ function rootSegment(slug: string): string {
   return idx < 0 ? slug : slug.slice(0, idx);
 }
 
-function basenameLooksLikeIndex(filePath: string): boolean {
-  const last = filePath.split('/').pop() ?? '';
-  const lower = last.toLowerCase();
-  return INDEX_BASENAMES.has(lower) || README_BASENAMES.has(lower);
-}
-
-function entryHasOwnIndex(entry: CalendarEntry): boolean {
-  if (entry.filePath !== undefined && entry.filePath !== '') {
-    return basenameLooksLikeIndex(entry.filePath);
-  }
-  // Default template `<slug>/index.md` → has own index.
+function entryHasOwnIndex(_entry: CalendarEntry): boolean {
+  // Phase 19a dropped `CalendarEntry.filePath`; path-encoding now lives
+  // in frontmatter `id:` resolved via the content index. Without an
+  // explicit per-entry path override on the calendar row, the tree
+  // assumes the host's default template (`<slug>/index.md`) — Phase
+  // 19c will rewire this to consult the content index for the file's
+  // real basename and decide hasOwnIndex from there.
   return true;
 }
 
@@ -377,9 +373,10 @@ export function buildContentTree(
       (fsEntry?.title ?? null) ??
       leafOfSlug(slug);
 
-    // hasOwnIndex resolution: calendar's filePath / template wins, else
-    // fs walk's hasIndex || hasReadme. Organizational nodes set this
-    // true when README.md is present on disk.
+    // hasOwnIndex resolution: calendar entry implies the host template
+    // (currently always `<slug>/index.md`); else fs walk's hasIndex ||
+    // hasReadme. Phase 19c will route this through the content index
+    // once entries bind to files via frontmatter id.
     let hasOwnIndex = false;
     if (entry !== null) {
       hasOwnIndex = entryHasOwnIndex(entry);

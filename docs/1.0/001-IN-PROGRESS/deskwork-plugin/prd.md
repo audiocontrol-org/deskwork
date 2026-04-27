@@ -299,3 +299,46 @@ The catalog covers four groups (full list in workplan Phase 18):
 - **Group D**: Skills explicitly out of scope per the original PRD — listed for completeness, not for action
 
 Phase 18 is a CATALOG, not a single shippable unit. Items close as their issues close.
+
+---
+
+## Extension: separate identity (UUID) and path-encoding (frontmatter id) from slug
+
+Added as Phase 19. Triggered by writingcontrol.org acceptance: the studio's bird's-eye view at `/dev/content/writingcontrol` showed `the-outbound` as a calendar-only ghost root with no fs subtree, while the actual content under `src/content/projects/the-outbound/` appeared as a disjoint untracked tree. The two never merged.
+
+### Why now
+
+Root cause: deskwork conflates three roles into the slug field. Slug is owned by the host's rendering engine — Astro for writingcontrol.org derives the public URL from the file's collection + filename, and the operator can rename it freely for SEO. Deskwork can read it but cannot manipulate it for internal joins or path-encoding without breaking the renderer's contract. Yet deskwork uses slug for:
+
+1. **Public URL** (legitimate — read-only).
+2. **Internal identity**: workflow state keys, scrapbook addressing, studio routes, content-tree node placement.
+3. **Path encoding**: filesystem location inferred via `blogFilenameTemplate`.
+
+The mismatch surfaces immediately in writingcontrol's two-collection layout: calendar slug `the-outbound` (correct public URL) maps via the template to `<contentDir>/the-outbound/index.md`, but the file actually lives at `<contentDir>/projects/the-outbound/index.md`. The studio places nodes by slug, so it creates a calendar-only ghost root and a separate untracked subtree under `projects/`. They never merge.
+
+A second concern from the operator: caching `filePath` on the calendar entry is fragile. When the operator refactors content (renames a directory, archives an essay), a cached path goes stale silently. Deskwork doesn't know the file moved. Any binding mechanism must survive content refactoring.
+
+### Scope
+
+Half the migration is already done: every entry has a stable `id` (UUID v4) populated at parse / `addEntry` time, the calendar serializes a `UUID` column, `findEntryById` exists with a comment "Prefer this over slug lookup", and `DistributionRecord` already joins through `entryId`. Phase 19 finishes that migration AND eliminates the cached-path fragility.
+
+**Identity**: `entry.id` (UUID) becomes the deskwork-internal identifier across all internal lookups (workflow state, scrapbook, studio routes, tree placement). Slug stays as the host-owned external label and the operator-facing CLI argument.
+
+**Path-encoding (refactor-proof)**: the markdown file's frontmatter is the source of truth for binding. Each deskwork-managed file carries `id: <uuid>` in its frontmatter, matching its calendar entry's id. Deskwork scans `contentDir` on demand, builds an in-memory `uuid → absolutePath` index per request, and resolves entry → file dynamically. The calendar entry's `filePath` field is removed; it was never refactor-safe. The id moves with the file because it's *inside* the file.
+
+**Frontmatter contract**: Astro content schemas are strict by default. The operator's content schema must permit `id` (one-line edit: `z.object({...}).passthrough()` or explicit `id: z.string().uuid().optional()`). Deskwork surfaces clear errors when scaffold/repair hits a schema-rejection, with the exact patch instruction.
+
+**`deskwork doctor` skill**: a new validate/repair command for both initial migration AND ongoing maintenance. Read-only by default (suitable for pre-commit / CI); `--fix=<rule>` engages interactive repair. Rules cover `missing-frontmatter-id`, `orphan-frontmatter-id`, `duplicate-id`, `slug-collision`, `schema-rejected`, `workflow-stale`, `calendar-uuid-missing`. The initial writingcontrol migration runs `deskwork doctor --fix=missing-frontmatter-id` once.
+
+### Calendar editing in scope
+
+The deskwork calendar markdown is plugin-managed metadata (not site content). Editing it as part of this fix is in scope. Site source under `src/content/` is touched only for the single frontmatter `id:` line per file written by `doctor` or `scaffold` — no other content changes.
+
+### What this is not
+
+- **Not removing slug.** Slug remains the operator-facing CLI argument and the public URL field. It just stops being load-bearing for deskwork's internal joins or fs placement.
+- **Not adding per-collection blog templates.** Operators who need a destination different from the site-level template specify `--path` at scaffold time.
+- **Not migrating audiocontrol's calendar.** Audiocontrol's flat layout works perfectly with the existing template fallback. After running `doctor` once, audiocontrol files just gain `id:` in frontmatter — same render, same routes.
+- **Not a full re-architecture of the calendar parser.** Regex-based table parsing is in places (pipe-escape gap, shortform header detection). These are outside the new hot path; they're flagged for a future hardening pass, not addressed in Phase 19.
+
+**Plan reference.** Approved plan: `/Users/orion/.claude/plans/i-would-like-to-wiggly-hennessy.md` (rewritten during this `/feature-extend` invocation; supersedes the prior slug-as-path plan that was never implemented at the level the new design requires).

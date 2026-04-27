@@ -275,7 +275,10 @@ function nodeIcon(node: ContentNode): RawHtml {
 }
 
 function nodeFilePathHint(node: ContentNode): string {
-  if (node.entry?.filePath) return `/${node.entry.filePath}`;
+  // Phase 19a removed CalendarEntry.filePath. Until Phase 19c wires
+  // the studio through the content index, fall back to the host
+  // template (`<slug>/index.md`) for tracked entries and the
+  // directory shape for organizational nodes.
   if (node.entry !== null) return `/${node.slug}/index.md`;
   return `/${node.slug}/`;
 }

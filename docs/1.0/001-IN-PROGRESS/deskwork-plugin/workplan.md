@@ -536,3 +536,104 @@ If any of these are now in scope, file as new issues.
 - The pattern that produced the un-filed deferrals (1–4 in Group A) is captured in `~/.claude/projects/-Users-orion-work-deskwork-work-deskwork-plugin/memory/feedback_dont_unilaterally_defer.md`. Future phases should not repeat it.
 - Group B items (Phase 4/5/6) may be reframed if the operator decides the original specs no longer apply. The architecture pivot in 2026-04-21 changed the meaning of "audiocontrol.org cutover" — what was originally "remove project-local skills and replace with plugin skills" might now be "verify the plugin runs cleanly alongside the existing project-local skills, then cut over when the operator chooses."
 - Group C items are decisions, not implementations. The operator's call is yes/no, not how-to.
+
+---
+
+### Phase 19: Separate identity (UUID) and path-encoding (frontmatter id) from slug
+
+**Deliverable:** Deskwork's internal logic no longer uses slug as identity or as the basis for filesystem placement. Calendar entries are joined by `id` (UUID); markdown files carry that id in their frontmatter; path discovery scans `contentDir` and binds entry → file dynamically per request. The bird's-eye content view at `/dev/content/<site>` shows tracked content lit up at its actual filesystem location regardless of the public slug. A new `deskwork doctor` skill validates and repairs the binding metadata.
+
+**Plan reference:** `~/.claude/plans/i-would-like-to-wiggly-hennessy.md`
+
+**GitHub tracking:** [#33](https://github.com/audiocontrol-org/deskwork/issues/33)
+
+**Why this phase exists:** writingcontrol.org acceptance surfaced the bug: calendar slug `the-outbound` (the correct public URL) doesn't match the file's filesystem path (`projects/the-outbound/index.md`), so the studio places the entry at top-level slug `the-outbound` while the actual content sits orphaned under `projects/`. They never merge. Root cause: slug is host-owned (the renderer derives it from the file's collection + filename); deskwork can't repurpose it for internal joins or path-encoding. The architecture is already half-migrated to UUID-as-internal-identity (`entry.id` exists, `findEntryById` exists, distribution joins through `entryId`); Phase 19 finishes the migration AND replaces the fragile cached-path model with refactor-proof frontmatter-UUID binding.
+
+Tasks are grouped by sub-phase. Sub-phases are sequential (19a → 19b → 19c → 19d → 19e). Each lands as one or more commits inside a single PR.
+
+#### 19a — Foundation: content-index module, drop `filePath`, scaffold writes id
+
+- [x] `packages/core/src/content-index.ts` (NEW): `buildContentIndex(projectRoot, config, site)` returns `{ byId: Map<uuid, absolutePath>, byPath: Map<relPath, uuid>, invalid: [...] }` after walking `<contentDir>/` and parsing every `.md`/`.mdx` frontmatter. Skips `scrapbook/`, `node_modules/`, `dist/`, dotfiles. Pure walk-and-scan; depends only on `frontmatter.ts`.
+- [x] `packages/core/test/content-index.test.ts` (NEW): 9 fixture tests — empty/missing dir, mixed frontmatter, skip rules, hierarchical paths, .mdx/.markdown, duplicate-id determinism, malformed-id reporting.
+- [x] `packages/core/src/types.ts`: dropped `CalendarEntry.filePath` field. Slug doc rewritten to clarify it's host-rendering-engine-owned.
+- [x] `packages/core/src/calendar.ts`: dropped `FilePath` column parser and renderer branches. Calendar parser is now column-tolerant (ignores legacy `FilePath` columns gracefully — locked by a new test).
+- [x] `packages/core/src/calendar-mutations.ts`: added `findEntryBySlugOrId(calendar, slugOrId)` helper (id-first, slug-fallback). Removed `filePath` from any mutation signatures (the only consumer was `outline.ts`'s `existing.filePath = …` write — also removed).
+- [x] `packages/core/src/scaffold.ts`: emits `id: <entry.id>` as the FIRST frontmatter field; throws "Cannot scaffold entry without id" defensively when entry id is missing/empty.
+- [x] `packages/core/test/scaffold.test.ts`: 4-test `frontmatter id binding (Phase 19a)` suite covering the id-first emit, round-trip via `readFrontmatter`, and the defensive throws.
+
+**Acceptance:** ✅ All existing tests pass (459 total: 247 core + 64 cli + 148 studio; +12 new core tests). Calendar parser ignores any `FilePath` column it sees in legacy files (verified by test). New scaffolded files carry `id` in frontmatter (verified by test). Typecheck clean for all 3 packages.
+
+**Notes:**
+- `content-tree.ts`'s `entryHasOwnIndex` no longer reads `entry.filePath`; returns `true` for all tracked entries until 19c rewires through the content index.
+- `content-detail.ts` reads `<slug>/index.md` for tracked nodes (was `entry.filePath`); 19c restores the proper lookup via the content index.
+- Studio integration fixture's `README.md` files renamed to `index.md` so the post-19a content-detail code path finds them. The fixture's intent is preserved.
+
+#### 19b — `deskwork doctor` validate + repair
+
+- [ ] `packages/cli/src/commands/doctor.ts` (NEW): subcommand entry. Parses `--fix=<rule>`, `--fix=all`, `--yes` flags. Default = audit-only.
+- [ ] Audit-only mode walks the calendar + content index + workflow store and reports findings grouped by rule. Exit 0 if clean; exit 1 if any findings (suitable for pre-commit / CI).
+- [ ] Rule checkers (each with its own validator function in `packages/core/src/doctor/rules/`):
+  - `missing-frontmatter-id` — calendar entry exists, no file under contentDir has matching frontmatter id.
+  - `orphan-frontmatter-id` — file has `id: X`, no calendar entry with id X.
+  - `duplicate-id` — two or more files share the same frontmatter id.
+  - `slug-collision` — two calendar entries share the same slug.
+  - `schema-rejected` — host's content schema rejects `id` field on write (caught at write attempt; doctor surfaces the schema-patch instructions).
+  - `workflow-stale` — workflow record keys by old slug or has no `entryId`.
+  - `calendar-uuid-missing` — pre-UUID calendar entry parsed; UUID assigned in-memory but never persisted.
+- [ ] Repair engine (`--fix=<rule>` or `--fix=all`): each rule has a repair action. Interactive prompts per finding; `--yes` non-interactive variant skips ambiguous cases and reports them.
+- [ ] `packages/cli/test/doctor.test.ts` (NEW): one fixture per rule. Audit reports findings without mutation; `--fix` produces the expected repair on a fixture calendar + content tree; not-at-template-path case for `missing-frontmatter-id`; schema-rejection surfaces the exact patch instruction.
+- [ ] `plugins/deskwork/skills/doctor/SKILL.md` (NEW): one-arg-at-a-time prompting (which rule to check / fix; whether to apply). Plain-English explanation of each rule.
+
+**Acceptance:** `deskwork doctor` (no flags) on a healthy fixture exits 0 with a clean report. Each rule, with a fixture that violates it, is correctly diagnosed in audit mode and correctly repaired in fix mode.
+
+#### 19c — Path encoding rewire + content-tree inversion
+
+- [ ] `packages/core/src/paths.ts`: new `findEntryFile(projectRoot, config, site, entryId, index?)` — looks up the file by id via the content index. `resolveBlogFilePath` becomes a thin wrapper with template-fallback for legacy entries (entries whose file doesn't yet have `id` in frontmatter).
+- [ ] `packages/core/src/scrapbook.ts`: new `scrapbookDirForEntry(projectRoot, config, site, entryId, index?)` — derives `<dirname(file)>/scrapbook/` from the content index. The path-addressed `scrapbookDirAtPath` (already present) stays for direct path lookups.
+- [ ] `packages/core/src/content-tree.ts` (**epicenter**): `ContentNode.slug` → `ContentNode.path`. Tree assembly: walk fs (already does this), for each fs node parse frontmatter, look up the calendar entry by id, overlay state. Calendar entries whose file lacks an id (pre-doctor) fall back to today's slug-based join with a one-time warning per entry.
+- [ ] `packages/core/test/content-tree.test.ts` (extend): the writingcontrol scenario — calendar entry id=X with file at `projects/the-outbound/index.md` (frontmatter `id: X`) overlays onto fs node `projects/the-outbound`. No ghost root. The audiocontrol-shape scenario (flat fs, frontmatter id present) renders identically to today's tree.
+- [ ] `packages/core/src/body-state.ts:53`: opportunistic regex consistency fix — bring its frontmatter regex in line with `frontmatter.ts` (`\r?\n` for Windows files).
+
+**Acceptance:** writingcontrol scenario test passes (entry → fs node binding via frontmatter id); audiocontrol scenario unchanged; legacy slug-fallback path still works for entries pre-doctor.
+
+#### 19d — Studio id-routing + workflow id-keying
+
+- [ ] `packages/studio/src/server.ts`: new canonical route `GET /dev/editorial-review/:id` (uuid). Legacy `/dev/editorial-review/:slug{.+}` resolves slug → id → 302-redirects. New route shape `/dev/content/:site/:project?node=<path>` — `path` is fs-relative.
+- [ ] `packages/studio/src/pages/dashboard.ts`: workflow `covKey()` keys by `(site, entryId)`. Display still shows slug as label.
+- [ ] `packages/studio/src/pages/content.ts`, `content-detail.ts`: tree uses fs `path` for href construction and selection. Each tree row shows: title (primary) + path (small annotation) + slug ("public URL: /blog/<slug>" hover hint when overlay entry exists).
+- [ ] `packages/studio/src/pages/review.ts`: looks up workflow + entry by id; renders slug as display only.
+- [ ] Per-request content-index memoization in studio: built once per HTTP request, reused for all subsequent lookups in that request. Re-builds on each new request — keeps the index always-fresh against fs changes.
+- [ ] `packages/core/src/review/types.ts`: add `entryId` to `DraftWorkflowItem`.
+- [ ] `packages/core/src/review/handlers.ts`: prefer `entryId`; fall back to `(site, slug)` for legacy reads.
+- [ ] `packages/studio/test/`: review route resolves uuid → renders; content tree page uses path-based hrefs; legacy slug review URL 302-redirects to uuid URL.
+
+**Acceptance:** All studio tests green. Hitting an old `/dev/editorial-review/<slug>` URL redirects to the canonical id-based URL. Workflow records carry `entryId` after first interaction.
+
+#### 19e — writingcontrol migration + docs
+
+- [ ] **Operator runs** (we don't auto-execute against writingcontrol): one-time content-schema patch in `src/content/config.ts` if needed (`z.string().uuid().optional()` for `id`, or `.passthrough()`).
+- [ ] **Operator runs**: `deskwork doctor` (audit) → expect findings for 5 calendar entries with `missing-frontmatter-id`.
+- [ ] **Operator runs**: `deskwork doctor --fix=missing-frontmatter-id` → interactive prompts; doctor writes ids into the discovered files (`projects/the-outbound/index.md`, `projects/field-notes/index.md`, `essays/whats-in-a-name/index.md`, etc.).
+- [ ] **Operator runs**: `deskwork doctor` again → expect no findings.
+- [ ] **Operator verifies** in studio: `/dev/content/writingcontrol` shows 2 root entries (essays, projects); no ghost roots. `/dev/content/writingcontrol/projects` shows `the-outbound` lit up Published, descendants intact.
+- [ ] **Operator verifies refactor-proofing**: rename `projects/the-outbound/` → `projects/the-outbound-novel/`, reload studio, confirm tree shows the entry at the new path with lane unchanged. No `relocate` command needed.
+- [ ] Update `plugins/deskwork/README.md` and `plugins/deskwork/skills/*/SKILL.md`: document `--path` flag on `outline`; reference `doctor/SKILL.md`. Document the host content-schema requirement (`id` permitted in frontmatter).
+- [ ] Update root `README.md` "Capabilities" section: mention refactor-proof binding via frontmatter id.
+- [ ] Update PRD/workplan: mark Phase 19 sub-phases complete; note the body-state regex fix and the calendar-table-parser flag for future hardening in DEVELOPMENT-NOTES.
+
+**Acceptance:**
+- `npm --workspaces test` green; `tsc --noEmit` clean for all 3 packages.
+- writingcontrol bird's-eye view shows tracked content at its actual filesystem location, no ghosts.
+- Refactor-proofing demonstrated end-to-end.
+- Skill docs explain the new `doctor` flow and the schema requirement.
+
+---
+
+**Phase 19 Acceptance (overall):** All sub-phases complete; the writingcontrol bug is fixed; audiocontrol behavior unchanged for end users (frontmatter `id:` becomes ambient on next save / doctor run); the doctor command provides ongoing maintenance; no internal logic depends on slug shape or hierarchy.
+
+**Notes:**
+
+- This phase supersedes the unimplemented "slug-as-path" approach from the prior plan. Hierarchical slug support (`/`-separated kebab in slug regex) was relaxed in Phase 13 — that relaxation stays (no need to re-tighten now that slug isn't load-bearing internally), but no new code parses slug for hierarchy.
+- The `filePath` field on `CalendarEntry` was added in the prior plan but never populated by any real calendar. Removing it is a no-op for existing data.
+- Calendar table parser hardening (escape-pipe round-trip, AST-based parsing) is OUT OF SCOPE for Phase 19 — out of the new hot path. Flag in DEVELOPMENT-NOTES.
+- Performance: per-request content-index scan is fine for the current scale (writingcontrol ~10 files, audiocontrol ~30). For sites with thousands of files, switch to a watched in-memory index with fs-event invalidation. Not needed at present scale.

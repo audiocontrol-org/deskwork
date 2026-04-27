@@ -23797,8 +23797,6 @@ function parseEntries(lines, stage) {
       }
       const url = col(cells2, cols, "url");
       if (url) entry.contentUrl = url;
-      const filePath = col(cells2, cols, "filepath");
-      if (filePath) entry.filePath = filePath;
       const pausedFrom = col(cells2, cols, "pausedfrom");
       if (pausedFrom && isStage(pausedFrom) && isPausable(pausedFrom)) {
         entry.pausedFrom = pausedFrom;
@@ -26263,15 +26261,7 @@ function rootSegment(slug) {
   const idx = slug.indexOf("/");
   return idx < 0 ? slug : slug.slice(0, idx);
 }
-function basenameLooksLikeIndex(filePath) {
-  const last = filePath.split("/").pop() ?? "";
-  const lower = last.toLowerCase();
-  return INDEX_BASENAMES.has(lower) || README_BASENAMES.has(lower);
-}
-function entryHasOwnIndex(entry) {
-  if (entry.filePath !== void 0 && entry.filePath !== "") {
-    return basenameLooksLikeIndex(entry.filePath);
-  }
+function entryHasOwnIndex(_entry) {
   return true;
 }
 function pickLatestMtime(a, b) {
@@ -26575,7 +26565,7 @@ function loadDetailRender(ctx, site, node2) {
   let bodyPreview = "";
   let scrapbook = null;
   if (node2.entry !== null) {
-    const filePath = node2.entry.filePath ?? `${node2.slug}/index.md`;
+    const filePath = `${node2.slug}/index.md`;
     const abs = join9(contentDir, filePath);
     const raw3 = safeReadFile(abs);
     if (raw3 !== null) {
@@ -26821,7 +26811,6 @@ function nodeIcon(node2) {
   return unsafe(html6`<span class="tree-row__icon" aria-hidden="true">·</span>`);
 }
 function nodeFilePathHint(node2) {
-  if (node2.entry?.filePath) return `/${node2.entry.filePath}`;
   if (node2.entry !== null) return `/${node2.slug}/index.md`;
   return `/${node2.slug}/`;
 }

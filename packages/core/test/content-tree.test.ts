@@ -221,22 +221,11 @@ describe('buildContentTree — scrapbook aggregation', () => {
 });
 
 describe('hasOwnIndex', () => {
-  it('honors filePath when set', () => {
-    const entries = [
-      entry({ slug: 'a', title: 'A', stage: 'Drafting', filePath: 'a/index.md' }),
-      entry({ slug: 'b', title: 'B', stage: 'Drafting', filePath: 'b/README.md' }),
-      entry({ slug: 'c', title: 'C', stage: 'Drafting', filePath: 'c.md' }),
-    ];
-    const projects = buildContentTree('wc', entries, makeConfig(), '/tmp/x', {
-      scrapbookLookup: emptyLookup,
-    });
-    const byRoot = new Map(projects.map((p) => [p.rootSlug, p.root]));
-    expect(byRoot.get('a')?.hasOwnIndex).toBe(true);
-    expect(byRoot.get('b')?.hasOwnIndex).toBe(true);
-    expect(byRoot.get('c')?.hasOwnIndex).toBe(false);
-  });
-
-  it('defaults to true for entries with no filePath (template path → index.md)', () => {
+  // Phase 19a dropped CalendarEntry.filePath. Calendar-driven nodes
+  // now always report hasOwnIndex=true (host template default
+  // `<slug>/index.md`). Phase 19c rewires this to read the content
+  // index for the real on-disk basename.
+  it('defaults to true for tracked entries (calendar-only path)', () => {
     const entries = [entry({ slug: 'a', title: 'A', stage: 'Ideas' })];
     const projects = buildContentTree('wc', entries, makeConfig(), '/tmp/x', {
       scrapbookLookup: emptyLookup,

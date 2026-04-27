@@ -90,9 +90,9 @@ const DEFAULT_BLOG_FILENAME_TEMPLATE = '{slug}/index.md';
  *
  * Resolution order (first match wins):
  *   1. Explicit `filePath` argument — joined with the site's `contentDir`.
- *      Set this when an entry stores its own `filePath` (e.g. a flat
- *      `characters/alice.md` next to `characters/bob.md`, or a `README.md`
- *      instead of `index.md` on a nested editorial-private node).
+ *      Used by the scaffolder when an explicit layout (`index` /
+ *      `readme` / `flat`) was requested. Phase 19c will route most
+ *      callers through the content index instead.
  *   2. The site's configured `blogFilenameTemplate` (default
  *      `{slug}/index.md`). Audiocontrol-shaped flat blogs hit this path.
  *
