@@ -28,7 +28,7 @@
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
-import { realpathSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readConfig } from '@deskwork/core/config';
@@ -90,10 +90,24 @@ function usage(error: string | null): never {
 }
 
 function publicDir(): string {
-  // Resolve `public/` relative to this module so the server finds the UI
-  // assets regardless of where it's invoked from.
+  // Two runtime layouts share this resolver:
+  //   - Bundle: plugins/deskwork-studio/bundle/server.mjs → ../public
+  //   - Source: packages/studio/src/server.ts → repo-relative
+  //     plugins/deskwork-studio/public (the assets moved into the
+  //     plugin tree so marketplace install ships them).
+  // Both candidates resolve to the same absolute path on a real
+  // checkout; the dev fallback only matters when running source via tsx.
   const here = dirname(fileURLToPath(import.meta.url));
-  return resolve(here, '..', 'public');
+  const candidates = [
+    resolve(here, '..', 'public'),
+    resolve(here, '..', '..', '..', 'plugins', 'deskwork-studio', 'public'),
+  ];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate;
+  }
+  throw new Error(
+    `deskwork-studio: could not find public/ assets. Tried:\n  ${candidates.join('\n  ')}`,
+  );
 }
 
 export function createApp(ctx: StudioContext): Hono {
