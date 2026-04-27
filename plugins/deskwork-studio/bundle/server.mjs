@@ -10347,7 +10347,7 @@ var serveStatic = (options = { root: "" }) => {
 };
 
 // src/server.ts
-import { existsSync as existsSync8, realpathSync } from "node:fs";
+import { existsSync as existsSync9, realpathSync } from "node:fs";
 import { dirname as dirname2, isAbsolute, resolve as resolve2 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
@@ -26112,6 +26112,75 @@ function renderScrapbookPage(ctx, site, path) {
 }
 
 // ../core/src/content-tree.ts
+import { existsSync as existsSync7, readdirSync as readdirSync3, readFileSync as readFileSync8, statSync as statSync3 } from "node:fs";
+import { join as join8 } from "node:path";
+var INDEX_BASENAMES = /* @__PURE__ */ new Set([
+  "index.md",
+  "index.mdx",
+  "index.markdown"
+]);
+var README_BASENAMES = /* @__PURE__ */ new Set([
+  "readme.md",
+  "readme.mdx",
+  "readme.markdown"
+]);
+function readTitleFromMarkdown(absPath) {
+  try {
+    const raw3 = readFileSync8(absPath, "utf-8");
+    const parsed = parseFrontmatter(raw3);
+    const t = parsed.data.title;
+    if (typeof t === "string" && t.trim().length > 0) return t.trim();
+  } catch {
+  }
+  return null;
+}
+function defaultFsWalk(projectRoot, config, site) {
+  const root3 = resolveContentDir(projectRoot, config, site);
+  if (!existsSync7(root3)) return [];
+  const out = [];
+  const SKIP2 = /* @__PURE__ */ new Set(["scrapbook", "node_modules", "dist", ".git"]);
+  const visit2 = (dirAbs, slugSoFar) => {
+    let names;
+    try {
+      names = readdirSync3(dirAbs);
+    } catch {
+      return;
+    }
+    let hasIndex = false;
+    let hasReadme = false;
+    let titleSource = null;
+    for (const name of names) {
+      const lower = name.toLowerCase();
+      if (INDEX_BASENAMES.has(lower)) {
+        hasIndex = true;
+        if (titleSource === null) titleSource = join8(dirAbs, name);
+      } else if (README_BASENAMES.has(lower)) {
+        hasReadme = true;
+        if (titleSource === null && !hasIndex) titleSource = join8(dirAbs, name);
+      }
+    }
+    if (slugSoFar !== "") {
+      const title = titleSource ? readTitleFromMarkdown(titleSource) : null;
+      out.push({ slug: slugSoFar, hasIndex, hasReadme, title });
+    }
+    for (const name of names) {
+      if (name.startsWith(".")) continue;
+      if (SKIP2.has(name.toLowerCase())) continue;
+      const childAbs = join8(dirAbs, name);
+      let childStat;
+      try {
+        childStat = statSync3(childAbs);
+      } catch {
+        continue;
+      }
+      if (!childStat.isDirectory()) continue;
+      const childSlug = slugSoFar === "" ? name : `${slugSoFar}/${name}`;
+      visit2(childAbs, childSlug);
+    }
+  };
+  visit2(root3, "");
+  return out;
+}
 function leafOfSlug(slug) {
   const idx = slug.lastIndexOf("/");
   return idx < 0 ? slug : slug.slice(idx + 1);
@@ -26131,7 +26200,7 @@ function rootSegment(slug) {
 function basenameLooksLikeIndex(filePath) {
   const last = filePath.split("/").pop() ?? "";
   const lower = last.toLowerCase();
-  return lower === "index.md" || lower === "index.mdx" || lower === "index.markdown" || lower === "readme.md" || lower === "readme.mdx" || lower === "readme.markdown";
+  return INDEX_BASENAMES.has(lower) || README_BASENAMES.has(lower);
 }
 function entryHasOwnIndex(entry) {
   if (entry.filePath !== void 0 && entry.filePath !== "") {
@@ -26152,6 +26221,10 @@ function buildContentTree(site, entries, config, projectRoot, options = {}) {
       return { items: [], secretItems: [] };
     }
   });
+  const fsWalk = options.fsWalk ?? ((siteArg) => defaultFsWalk(projectRoot, config, siteArg));
+  const fsEntries = fsWalk(site);
+  const fsEntryBySlug = /* @__PURE__ */ new Map();
+  for (const e of fsEntries) fsEntryBySlug.set(e.slug, e);
   const entryBySlug = /* @__PURE__ */ new Map();
   const allSlugs = /* @__PURE__ */ new Set();
   for (const e of entries) {
@@ -26159,23 +26232,38 @@ function buildContentTree(site, entries, config, projectRoot, options = {}) {
     allSlugs.add(e.slug);
     for (const a of ancestorsOf(e.slug)) allSlugs.add(a);
   }
+  for (const e of fsEntries) {
+    if (e.hasReadme || e.hasIndex) {
+      allSlugs.add(e.slug);
+      for (const a of ancestorsOf(e.slug)) allSlugs.add(a);
+    }
+  }
   const sortedSlugs = [...allSlugs].sort();
   const nodeBySlug = /* @__PURE__ */ new Map();
   for (const slug of sortedSlugs) {
     const entry = entryBySlug.get(slug) ?? null;
+    const fsEntry = fsEntryBySlug.get(slug) ?? null;
     const sb = lookup(site, slug);
     const items = [...sb.items, ...sb.secretItems];
     const mostRecent = items.reduce(
       (acc, it) => pickLatestMtime(acc, it.mtime),
       null
     );
+    const title = entry?.title ?? (fsEntry?.title ?? null) ?? leafOfSlug(slug);
+    let hasOwnIndex = false;
+    if (entry !== null) {
+      hasOwnIndex = entryHasOwnIndex(entry);
+    } else if (fsEntry !== null) {
+      hasOwnIndex = fsEntry.hasIndex || fsEntry.hasReadme;
+    }
     const node2 = {
       site,
       slug,
-      title: entry?.title ?? leafOfSlug(slug),
+      title,
       lane: entry?.stage ?? null,
       entry,
-      hasOwnIndex: entry === null ? false : entryHasOwnIndex(entry),
+      hasOwnIndex,
+      hasFsDir: fsEntry !== null,
       scrapbookCount: items.length,
       scrapbookMostRecentMtime: mostRecent,
       children: []
@@ -26216,6 +26304,7 @@ function buildContentTree(site, entries, config, projectRoot, options = {}) {
         lane: null,
         entry: null,
         hasOwnIndex: false,
+        hasFsDir: fsEntryBySlug.has(root3),
         scrapbookCount: items.length,
         scrapbookMostRecentMtime: mostRecent,
         children: []
@@ -26311,8 +26400,8 @@ function flattenForRender(root3) {
 }
 
 // src/pages/content-detail.ts
-import { readFileSync as readFileSync8, existsSync as existsSync7 } from "node:fs";
-import { join as join8 } from "node:path";
+import { readFileSync as readFileSync9, existsSync as existsSync8 } from "node:fs";
+import { join as join9 } from "node:path";
 var PREVIEW_CHAR_BUDGET = 480;
 function renderEmptyDetail() {
   return unsafe(html6`
@@ -26326,8 +26415,8 @@ function renderEmptyDetail() {
 }
 function safeReadFile(absPath) {
   try {
-    if (!existsSync7(absPath)) return null;
-    return readFileSync8(absPath, "utf-8");
+    if (!existsSync8(absPath)) return null;
+    return readFileSync9(absPath, "utf-8");
   } catch {
     return null;
   }
@@ -26364,10 +26453,10 @@ async function renderBodyPreview(body3) {
 }
 function makeInlineTextLoaderForNode(ctx, site, slug) {
   const contentDir = resolveContentDir(ctx.projectRoot, ctx.config, site);
-  const scrapbookDir2 = join8(contentDir, slug, "scrapbook");
+  const scrapbookDir2 = join9(contentDir, slug, "scrapbook");
   return (filename, maxBytes) => {
     try {
-      const buf = readFileSync8(join8(scrapbookDir2, filename));
+      const buf = readFileSync9(join9(scrapbookDir2, filename));
       const slice = buf.subarray(0, Math.min(buf.byteLength, maxBytes));
       return slice.toString("utf-8");
     } catch {
@@ -26399,6 +26488,21 @@ function renderScrapbookList(site, slug, summary, loader) {
     </p>
     <div class="scraplist scraplist--secret">${secretRows}</div>`);
 }
+function findOrganizationalIndex(contentDir, slug) {
+  const candidates = [
+    "index.md",
+    "index.mdx",
+    "index.markdown",
+    "README.md",
+    "README.mdx",
+    "README.markdown"
+  ];
+  for (const name of candidates) {
+    const abs = join9(contentDir, slug, name);
+    if (existsSync8(abs)) return abs;
+  }
+  return null;
+}
 function loadDetailRender(ctx, site, node2) {
   const contentDir = resolveContentDir(ctx.projectRoot, ctx.config, site);
   let frontmatter = {};
@@ -26406,12 +26510,22 @@ function loadDetailRender(ctx, site, node2) {
   let scrapbook = null;
   if (node2.entry !== null) {
     const filePath = node2.entry.filePath ?? `${node2.slug}/index.md`;
-    const abs = join8(contentDir, filePath);
+    const abs = join9(contentDir, filePath);
     const raw3 = safeReadFile(abs);
     if (raw3 !== null) {
       const parsed = parseFrontmatter(raw3);
       frontmatter = parsed.data;
       bodyPreview = parsed.body;
+    }
+  } else if (node2.hasFsDir && node2.hasOwnIndex) {
+    const abs = findOrganizationalIndex(contentDir, node2.slug);
+    if (abs !== null) {
+      const raw3 = safeReadFile(abs);
+      if (raw3 !== null) {
+        const parsed = parseFrontmatter(raw3);
+        frontmatter = parsed.data;
+        bodyPreview = parsed.body;
+      }
     }
   }
   try {
@@ -27047,7 +27161,7 @@ function publicDir() {
     resolve2(here, "..", "..", "..", "plugins", "deskwork-studio", "public")
   ];
   for (const candidate of candidates) {
-    if (existsSync8(candidate)) return candidate;
+    if (existsSync9(candidate)) return candidate;
   }
   throw new Error(
     `deskwork-studio: could not find public/ assets. Tried:

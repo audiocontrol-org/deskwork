@@ -12,6 +12,7 @@ import {
   findNode,
   flattenForRender,
   type BuildOptions,
+  type FsWalkEntry,
 } from '../src/content-tree.ts';
 import type { CalendarEntry } from '../src/types.ts';
 import type { DeskworkConfig } from '../src/config.ts';
@@ -259,6 +260,156 @@ describe('findNode', () => {
     expect(findNode(project, 'p/q')?.title).toBe('Q');
     expect(findNode(project, 'p/q/r')?.title).toBe('R');
     expect(findNode(project, 'p/missing')).toBeNull();
+  });
+});
+
+describe('buildContentTree — organizational README nodes (#24)', () => {
+  // The fs-as-primary inversion. A directory with a README.md but no
+  // calendar entry should appear as an organizational node in the tree
+  // — visible to the operator, but with no lane and no review action.
+
+  const fsWithReadmes: FsWalkEntry[] = [
+    { slug: 'the-outbound', hasIndex: true, hasReadme: false, title: 'The Outbound' },
+    { slug: 'the-outbound/characters', hasIndex: false, hasReadme: true, title: 'Characters' },
+    { slug: 'the-outbound/characters/strivers', hasIndex: true, hasReadme: false, title: 'Strivers' },
+    { slug: 'the-outbound/characters/dreamers', hasIndex: false, hasReadme: true, title: 'Dreamers' },
+    { slug: 'the-outbound/places', hasIndex: false, hasReadme: true, title: 'Places' },
+  ];
+
+  it('surfaces a top-level fs directory with a README as an organizational node', () => {
+    // Calendar has only `the-outbound/characters/strivers`. The fs walk
+    // contributes the-outbound, /characters, /places as ancestors and
+    // organizational siblings.
+    const entries = [
+      entry({
+        slug: 'the-outbound/characters/strivers',
+        title: 'Strivers',
+        stage: 'Drafting',
+      }),
+    ];
+    const projects = buildContentTree('wc', entries, makeConfig(), '/tmp/x', {
+      scrapbookLookup: emptyLookup,
+      fsWalk: () => fsWithReadmes,
+    });
+    expect(projects).toHaveLength(1);
+    const project = projects[0];
+    // 5 fs nodes + 0 ancestor synthetics that aren't already covered
+    // = 5 total. (the-outbound, characters, strivers, dreamers, places)
+    expect(project.totalNodes).toBe(5);
+    expect(project.trackedCount).toBe(1);
+
+    const root = project.root;
+    expect(root.slug).toBe('the-outbound');
+    // README/index frontmatter title beats leaf-segment fallback.
+    expect(root.title).toBe('The Outbound');
+    expect(root.entry).toBeNull(); // no calendar entry
+    expect(root.lane).toBeNull();
+    expect(root.hasFsDir).toBe(true);
+    expect(root.hasOwnIndex).toBe(true);
+
+    const characters = root.children.find(
+      (c) => c.slug === 'the-outbound/characters',
+    );
+    expect(characters).toBeDefined();
+    expect(characters!.entry).toBeNull();
+    expect(characters!.lane).toBeNull();
+    expect(characters!.title).toBe('Characters');
+    expect(characters!.hasFsDir).toBe(true);
+    expect(characters!.hasOwnIndex).toBe(true);
+
+    // Sibling places node — also organizational.
+    const places = root.children.find((c) => c.slug === 'the-outbound/places');
+    expect(places).toBeDefined();
+    expect(places!.entry).toBeNull();
+    expect(places!.title).toBe('Places');
+  });
+
+  it('lets the calendar overlay win when both calendar and README have a title', () => {
+    const entries = [
+      entry({
+        slug: 'the-outbound/characters',
+        title: 'CALENDAR-WINS',
+        stage: 'Outlining',
+      }),
+    ];
+    const projects = buildContentTree('wc', entries, makeConfig(), '/tmp/x', {
+      scrapbookLookup: emptyLookup,
+      fsWalk: () => fsWithReadmes,
+    });
+    const characters = findNode(projects[0], 'the-outbound/characters');
+    expect(characters?.title).toBe('CALENDAR-WINS');
+    expect(characters?.lane).toBe('Outlining');
+  });
+
+  it('renders a deep organizational node when its parent has no calendar entry', () => {
+    // No calendar entries at all; the entire tree is organizational.
+    const projects = buildContentTree('wc', [], makeConfig(), '/tmp/x', {
+      scrapbookLookup: emptyLookup,
+      fsWalk: () => fsWithReadmes,
+    });
+    expect(projects).toHaveLength(1);
+    const project = projects[0];
+    expect(project.trackedCount).toBe(0);
+    expect(project.predominantLane).toBeNull();
+    // Tree includes every fs node.
+    expect(project.totalNodes).toBeGreaterThanOrEqual(4);
+    const dreamers = findNode(project, 'the-outbound/characters/dreamers');
+    expect(dreamers).not.toBeNull();
+    expect(dreamers?.entry).toBeNull();
+    expect(dreamers?.title).toBe('Dreamers');
+  });
+
+  it('still includes calendar entries that have no fs directory (calendar is authoritative)', () => {
+    // The calendar lists "ghost" — a slug with no on-disk presence.
+    // The tree still surfaces it; the studio detail panel will show
+    // hasFsDir=false so the README-excerpt path can be skipped.
+    const entries = [
+      entry({ slug: 'ghost', title: 'Ghost', stage: 'Ideas' }),
+    ];
+    const projects = buildContentTree('wc', entries, makeConfig(), '/tmp/x', {
+      scrapbookLookup: emptyLookup,
+      fsWalk: () => [],
+    });
+    expect(projects).toHaveLength(1);
+    const ghost = findNode(projects[0], 'ghost');
+    expect(ghost).not.toBeNull();
+    expect(ghost?.entry).not.toBeNull();
+    expect(ghost?.lane).toBe('Ideas');
+    expect(ghost?.hasFsDir).toBe(false);
+  });
+
+  it('marks intermediate directories without README as organizational anchors', () => {
+    // Operator has an intermediate directory `groups` that has no
+    // README and no calendar entry, but its child does. The tree
+    // should still place the child correctly (groups becomes a
+    // synthetic ancestor without hasFsDir).
+    const fs: FsWalkEntry[] = [
+      // `groups` itself isn't surfaced — no README, no index — so it
+      // doesn't contribute to allSlugs from the fs side. Calendar
+      // ancestor walk still covers it.
+      { slug: 'groups/strivers', hasIndex: true, hasReadme: false, title: 'Strivers' },
+    ];
+    const entries = [
+      entry({
+        slug: 'groups/strivers',
+        title: 'Strivers',
+        stage: 'Drafting',
+      }),
+    ];
+    const projects = buildContentTree('wc', entries, makeConfig(), '/tmp/x', {
+      scrapbookLookup: emptyLookup,
+      fsWalk: () => fs,
+    });
+    const project = projects[0];
+    expect(project.rootSlug).toBe('groups');
+    const groups = project.root;
+    // `groups` is a synthetic ancestor — no calendar entry, no fs entry.
+    expect(groups.entry).toBeNull();
+    expect(groups.hasFsDir).toBe(false);
+    // The leaf still has its tracked entry.
+    const strivers = findNode(project, 'groups/strivers');
+    expect(strivers?.entry).not.toBeNull();
+    expect(strivers?.lane).toBe('Drafting');
   });
 });
 
