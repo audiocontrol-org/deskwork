@@ -378,6 +378,23 @@ function relativeTo(projectRoot: string, filePath: string): string {
 }
 
 function isUnderScrapbook(filePath: string, roots?: string[]): boolean {
+  // Path-segment match: any `scrapbook` directory segment anywhere in
+  // the path counts. The configured `roots` list still works (its
+  // entries are absolute prefixes) but is no longer required — a
+  // hierarchical content tree can have `scrapbook/` dirs at any depth
+  // (e.g. `the-outbound/scrapbook/` AND `the-outbound/characters/scrapbook/`)
+  // and every one of them must be skipped to avoid duplicate calendar
+  // rows from same-named files at different depths (issue #20).
+  //
+  // We split on the platform separator and test for an exact `scrapbook`
+  // segment so a directory literally named `scrapbookery/` does NOT
+  // false-positive.
+  const segments = filePath.split(sep);
+  if (segments.includes('scrapbook')) return true;
+
+  // Honor any explicit roots passed in too — preserves the original
+  // contract for callers that pass absolute paths (the CLI threads the
+  // configured `<contentDir>/scrapbook` per site here).
   if (!roots || roots.length === 0) return false;
   for (const root of roots) {
     const r = root.endsWith(sep) ? root : root + sep;
