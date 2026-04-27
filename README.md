@@ -6,8 +6,8 @@ Open-source plugins for [Claude Code](https://claude.com/claude-code). Flagship 
 
 | Name | Status | Purpose |
 |---|---|---|
-| `deskwork` | Shipping (v0 — pre-npm publish; see caveat below) | Editorial calendar lifecycle: capture, plan, outline, draft, review, publish |
-| `deskwork-studio` | Shipping (v0 — pre-npm publish; see caveat below) | Optional local Hono web surface — dashboard, review pane, scrapbook, manual |
+| `deskwork` | Shipping (v0) | Editorial calendar lifecycle: capture, plan, outline, draft, review, publish |
+| `deskwork-studio` | Shipping (v0) | Optional local Hono web surface — dashboard, review pane, scrapbook, manual |
 | `feature-image` | Planned | Feature image generation for blog posts and pages |
 | `analytics` | Planned | Content performance analytics |
 
@@ -27,7 +27,7 @@ Then bootstrap the host project:
 /deskwork:install
 ```
 
-**Pre-publish caveat:** `@deskwork/cli` and `@deskwork/studio` aren't on npm yet. The plugins' bin wrappers resolve to workspace-linked binaries inside the monorepo. To make a fresh `claude plugin install` runnable end-to-end, run `npm install` once inside the cloned plugin's directory (Claude's plugin cache). Tracked for fix in v0.1 (npm publish + npx fallback restoration).
+The plugins ship with self-contained ESM bundles (`packages/cli/bundle/cli.mjs`, `packages/studio/bundle/server.mjs`) so a fresh install runs end-to-end with nothing more than the cloned repo and `node` on PATH. Local-development installs (`claude --plugin-dir plugins/deskwork`) use the workspace-linked tsx binary instead — same wrapper, layered resolution.
 
 See each plugin's `README.md` under `plugins/` for configuration and usage.
 

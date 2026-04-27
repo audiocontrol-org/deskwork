@@ -1,49 +1,59 @@
 #!/usr/bin/env bash
 #
-# deskwork — wrapper that locates the @deskwork/cli binary and invokes it.
+# deskwork — wrapper that locates and runs @deskwork/cli.
 #
-# Behavior:
-#   1. If a workspace-linked binary is reachable from the plugin tree
-#      (npm install in the deskwork-plugin monorepo creates this), use it.
-#      This is the dev path — fast, no network.
-#   2. Otherwise, fall back to `npx -y @deskwork/cli@latest`. Slow on the
-#      first call (network pull); cached after.
+# Resolution order (first match wins):
+#   1. Workspace-linked binary (`node_modules/.bin/deskwork`) — the dev
+#      path; runs source via tsx, supports edits without rebuild.
+#   2. Self-contained ESM bundle at `packages/cli/bundle/cli.mjs` —
+#      shipped in the repo, runs via plain `node` with no `npm install`
+#      step. This is what fresh `git clone` installs use.
+#   3. Loud error.
 #
-# Either way, the user's experience is the same: `deskwork <subcommand>`.
+# Either way, the operator's experience is the same: `deskwork <sub>`.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Walk up from the plugin's bin/ to find a workspace node_modules/.bin/deskwork.
-# Plugin layouts cached by Claude Code can be deep; check a few candidates.
-candidates=(
-  "${SCRIPT_DIR}/../../../node_modules/.bin/deskwork"          # plugins/deskwork/bin → repo root
-  "${SCRIPT_DIR}/../node_modules/.bin/deskwork"                # if installed as standalone package
-  "${SCRIPT_DIR}/../../node_modules/.bin/deskwork"             # cache layouts
+# (1) Workspace symlink — fastest, supports source-level edits.
+workspace_candidates=(
+  "${SCRIPT_DIR}/../../../node_modules/.bin/deskwork"
+  "${SCRIPT_DIR}/../node_modules/.bin/deskwork"
+  "${SCRIPT_DIR}/../../node_modules/.bin/deskwork"
 )
-
-for candidate in "${candidates[@]}"; do
+for candidate in "${workspace_candidates[@]}"; do
   if [ -x "$candidate" ]; then
     exec "$candidate" "$@"
   fi
 done
 
-# No workspace binary located. @deskwork/cli is not yet published to npm
-# (v0.1 has not shipped). Fail loud rather than silently chasing an npx
-# fallback that resolves to nothing.
+# (2) Self-contained bundle — ships in the repo at packages/cli/bundle/.
+bundle_candidates=(
+  "${SCRIPT_DIR}/../../../packages/cli/bundle/cli.mjs"
+  "${SCRIPT_DIR}/../../packages/cli/bundle/cli.mjs"
+)
+for candidate in "${bundle_candidates[@]}"; do
+  if [ -f "$candidate" ]; then
+    exec node "$candidate" "$@"
+  fi
+done
+
+# (3) Nothing found.
 cat >&2 <<EOF
-deskwork: cannot locate the @deskwork/cli binary.
+deskwork: cannot locate the @deskwork/cli binary or bundle.
 
-Looked in:
-  ${candidates[0]}
-  ${candidates[1]}
-  ${candidates[2]}
+Looked for workspace bin in:
+  ${workspace_candidates[0]}
+  ${workspace_candidates[1]}
+  ${workspace_candidates[2]}
 
-The deskwork plugin currently expects the package to be available through
-the workspace. If you are running this from a clone of the deskwork repo,
-run 'npm install' at the repo root. If you installed the plugin some other
-way, the package is not yet published to npm — track v0.1 release for the
-public install path.
+Looked for bundle in:
+  ${bundle_candidates[0]}
+  ${bundle_candidates[1]}
+
+If you cloned the deskwork repo manually, run 'npm install' at the repo
+root to populate node_modules/.bin/, or run 'npm --workspace packages/cli
+run build' to produce the bundle.
 EOF
 exit 127
