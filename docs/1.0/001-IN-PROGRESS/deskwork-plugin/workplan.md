@@ -489,13 +489,13 @@ Tasks:
 
 #### Group A — Bug-fix-shaped follow-ups (issues filed late)
 
-- [ ] **[#16](https://github.com/audiocontrol-org/deskwork/issues/16)** — Move bundle-rebuild from pre-commit to pre-push hook. Husky friction reduction. Filed when operator said "probably want to" — never executed.
-- [ ] **[#24](https://github.com/audiocontrol-org/deskwork/issues/24)** — Bird's-eye view should render organizational README nodes. Tree-assembly inversion: filesystem as primary, calendar as state overlay. Was the "underlying intent" half of [#23](https://github.com/audiocontrol-org/deskwork/issues/23) that I split off without asking.
-- [ ] **[#27](https://github.com/audiocontrol-org/deskwork/issues/27)** — `Paused` 7th lifecycle stage. The only piece of "per-type lifecycle vocabulary" with real merit (per #18 design discussion). Floated, never filed.
-- [ ] **[#28](https://github.com/audiocontrol-org/deskwork/issues/28)** — Standalone scrapbook viewer client UI exposes `secret/` toggle. Server endpoints (v0.4.1) support secret/, client doesn't.
-- [ ] **[#29](https://github.com/audiocontrol-org/deskwork/issues/29)** — Lightbox component for scrapbook image preview. Currently full-window navigation; should be in-context.
+- [x] **[#16](https://github.com/audiocontrol-org/deskwork/issues/16)** — Move bundle-rebuild from pre-commit to pre-push hook. Done in v0.6.0 (commit e8c058d).
+- [x] **[#24](https://github.com/audiocontrol-org/deskwork/issues/24)** — Bird's-eye view renders organizational README nodes. Tree-assembly inverted to filesystem-primary, calendar-as-state-overlay. Done in v0.6.0.
+- [x] **[#27](https://github.com/audiocontrol-org/deskwork/issues/27)** — `Paused` 7th lifecycle stage shipped. Done in v0.6.0 (commit 7880813).
+- [x] **[#28](https://github.com/audiocontrol-org/deskwork/issues/28)** — Standalone scrapbook viewer client UI exposes `secret/` toggle. Composer + upload checkboxes; per-item "mark secret"/"mark public" cross-section rename. Done in v0.6.0.
+- [x] **[#29](https://github.com/audiocontrol-org/deskwork/issues/29)** — Lightbox component for scrapbook image preview. ESC closes, ← / → cycles adjacent images. Done in v0.6.0.
 - [ ] **[#30](https://github.com/audiocontrol-org/deskwork/issues/30)** — Cache content-tree assembly (CONDITIONAL — only act when perf is observed as a problem).
-- [ ] **[#31](https://github.com/audiocontrol-org/deskwork/issues/31)** — Cross-surface design audit (chrome + content layout consistency). Run `/frontend-design` against all 7 studio surfaces; produce audit report + unification mockup. Implementation follows in a separate issue if the operator approves.
+- [x] **[#31](https://github.com/audiocontrol-org/deskwork/issues/31)** — Cross-surface design audit (chrome + content layout consistency). Audit report + unification mockup landed in v0.5.0 deferred docs; **all 10 CSF unifications implemented** in v0.6.0 (CSF-1/2 token cleanup; CSF-3 unified `er-pagehead-*`; CSF-4 unified `er-section-head`; CSF-5 unified `er-row` base; CSF-6 scrap-row tokens; CSF-7 container-width tokens; CSF-8 inline-style removal; CSF-9 TOC family documented; CSF-10 review-surface BlogLayout exception documented).
 
 #### Group B — Original workplan items still unchecked
 
