@@ -361,3 +361,81 @@ Tasks:
 - Glob handling uses Node 22+ built-in `fs.glob` (already in use elsewhere in the codebase) rather than adding a new dependency.
 
 **GitHub tracking:** [#15](https://github.com/audiocontrol-org/deskwork/issues/15) is the implementation issue.
+
+---
+
+### Phase 16: Hierarchical content gaps + scrapbook-in-review + bird's-eye content view
+
+**Deliverable:** Three things that close [#18](https://github.com/audiocontrol-org/deskwork/issues/18):
+1. Operator-facing documentation that surfaces the hierarchical-content capabilities Phase 13 + Phase 15 already shipped (closes the perception gap that triggered the issue).
+2. A scrapbook drawer inside the longform review/edit surface, scoped to the entry's immediate node, modeled on audiocontrol's per-article scrapbook drawer.
+3. A new studio surface — `/dev/content` — that shows tracked content as a tree of nodes, drillable, with a per-node detail panel. Complementary to the pipeline-focused dashboard.
+
+Tasks are grouped by sub-phase to allow each to land as a separate PR if needed. Sub-phases are sequential (16a → 16b → 16c → 16d).
+
+#### 16a — Documentation (close perception gap)
+
+- [x] Add a "Hierarchical content" section to `plugins/deskwork/README.md` showing: hierarchical slugs (`<project>/<chapter>`), per-entry on-disk shape (`<slug>/index.md`, `<slug>/README.md`, flat `<slug>.md`), and the `outline --layout {index|readme|flat}` flag.
+- [x] Add a "Hierarchical layouts" example block to `plugins/deskwork/skills/ingest/SKILL.md` using the `the-outbound/characters/strivers` shape — show the actual command, the actual slugs produced, and the `directoryIsHierarchicalNode` rule (ancestors prefix the slug only when they have their own `index.md`/`README.md`).
+- [x] Add a "Hierarchical content" line to the root `README.md` "Features" / "Capabilities" section so prospective adopters see it before installing.
+- [x] Add `docs/1.0/001-IN-PROGRESS/deskwork-plugin/mockups/birds-eye-content-view.html` reference to the feature README.
+
+**Acceptance:** The writingcontrol team — or anyone reading the docs cold — can answer "does deskwork support hierarchical content?" with "yes" within 60 seconds, and find the working example without source-diving.
+
+#### 16b — Smoke verification against writingcontrol.org
+
+- [x] Drive `deskwork ingest src/content/projects/the-outbound/` against the actual writingcontrol.org repo (commit `69cb868` or current HEAD).
+- [x] Verify slugs produced match what the design says: `the-outbound`, `the-outbound/characters`, `the-outbound/characters/strivers`, `the-outbound/settings`, `the-outbound/settings/libertardistan`, `the-outbound/structure`. Pure organizational dirs (those without their own `index.md`) do not produce slugs.
+- [x] Boot studio against writingcontrol; verify scrapbook viewer at `/dev/scrapbook/writingcontrol/the-outbound/characters/strivers` returns 200 with breadcrumb.
+- [x] Capture findings in `docs/1.0/001-IN-PROGRESS/deskwork-plugin/implementation-summary.md` under a new "Phase 16 — writingcontrol.org dogfood" section.
+
+**Acceptance:** End-to-end ingest + studio works against writingcontrol's actual hierarchical project tree; findings recorded.
+
+#### 16c — Scrapbook drawer in longform review/edit surface
+
+- [x] `packages/studio/src/pages/review.ts` — add a scrapbook drawer to the right-hand panel of the review page, scoped to **just the immediate node** (no ancestors). For a review of `the-outbound/characters/strivers`, list items at `<contentDir>/the-outbound/characters/strivers/scrapbook/` (and the `secret/` subdir, separated as on the standalone scrapbook page).
+- [x] Reuse `listScrapbook` from `packages/core/src/scrapbook.ts` — the function is already path-addressable per Phase 13.
+- [x] Drawer renders item rows with kind badge + name + size + mtime; clicking an item opens the scrapbook viewer at that path. Match the existing scrapbook-page item style for visual continuity.
+- [x] **In-browser preview for non-editable items** — image kinds (`png`, `jpg`, `jpeg`, `webp`, `gif`, `svg`) render an inline thumbnail in the drawer row, not just a kind badge; clicking expands to a full preview (lightbox or dedicated `/dev/scrapbook/<site>/<path>/<file>` view). PDFs render via the browser's native PDF viewer in an embedded frame. Plain `.txt` and `.json` files render their content inline (truncated, with a "view full" link) since the browser can show them without download. Markdown items (`md`/`mdx`) continue to be handled as the editable/reviewable path. Anything the browser genuinely can't render (binary blobs, archives, audio/video formats not in scope yet) shows a download link.
+- [x] Empty-scrapbook state: render a faded "no scrapbook items" indicator rather than hiding the section entirely. Operators should always see that the drawer exists for this node.
+- [x] `packages/studio/test/api.test.ts` (or a new `review-scrapbook.test.ts`) — integration test confirming the review page for an entry with a scrapbook renders the drawer with the expected items, and the review page for an entry without renders the empty state.
+
+**Acceptance:** When reviewing any hierarchical entry, the operator can see the immediate node's scrapbook without leaving the page; clicking through opens the standalone viewer at that path.
+
+#### 16d — Bird's-eye content view
+
+Design reference: [`mockups/birds-eye-content-view.html`](mockups/birds-eye-content-view.html). Three states (top-level, drilldown, drilldown-with-detail) — implementation should match the typographic and spatial language of the mockup, not the literal HTML.
+
+- [x] `packages/studio/src/pages/content.ts` (NEW) — three render functions: `renderContentTopLevel`, `renderContentProject(site, project)`, `renderContentNodeDetail(site, slug)`. Each returns a fully-rendered HTML string per the existing studio convention.
+- [x] `packages/core/src/content-tree.ts` (NEW) — derives a tree representation from the calendar's flat entry list plus filesystem walks for directories that aren't tracked entries but have content beneath them. Returns `ContentNode[]` with `{ site, slug, title, lane, hasOwnIndex, scrapbookCount, scrapbookMostRecentMtime, children: ContentNode[] }`.
+- [x] `packages/studio/public/content.css` (NEW) — extracted from the mockup: paper/ink palette, Fraunces + Newsreader + JetBrains Mono via Google Fonts (or local copies if Google Fonts is unavailable in dev), tree connectors, detail-panel layout. Loaded only on `/dev/content/*` routes.
+- [x] `packages/studio/src/server.ts` — add three routes:
+  - `GET /dev/content` → top-level (lists sites + their root projects)
+  - `GET /dev/content/:site` → project list for a site (when site has multiple)
+  - `GET /dev/content/:site/:project` → drilldown view (`project` accepts `/`-separated slugs)
+  - `GET /dev/content/:site/:project?node=<slug>` → drilldown with node detail (or use a separate endpoint that returns just the panel HTML — operator's choice)
+- [x] Top-nav in editorial chrome — add a "Content" link alongside "Dashboard" / "Reviews" / "Manual" so the new surface is reachable.
+- [x] **Inline review links** — every tree row that corresponds to a tracked calendar entry must expose a direct affordance to `/dev/editorial-review/<slug>`. Suggested treatment: a small marginalia-style action on the right edge of the row (e.g. `→ review`) that's quiet at rest and stronger on row-hover. Pure organizational directories (no tracked entry) get no review link — the affordance is only present where review makes sense. The detail panel's "Open in Review" button stays as the primary affordance for the selected node; the row-level link is the secondary affordance for fast scanning.
+- [x] **Inline scrapbook link** — same treatment for nodes whose scrapbook count > 0: a quiet `→ scrapbook` action that jumps to `/dev/scrapbook/<site>/<path>`. Hidden when scrapbook is empty. Both inline links should be reachable by keyboard (focusable with Tab, activatable with Enter) without requiring hover.
+- [x] Tests:
+  - `packages/core/test/content-tree.test.ts` — unit coverage for tree assembly: flat calendar with hierarchical slugs, mixed (some entries hierarchical + some flat), pure organizational dirs that aren't entries but contain entries beneath, scrapbook count aggregation.
+  - `packages/studio/test/content-page.test.ts` — integration: top-level returns 200 with site cards; drilldown returns 200 with tree; node-selected state includes detail panel; routes return 404 for unknown sites/projects.
+
+**Acceptance:**
+- The writingcontrol.org sandbox renders the content view at `http://localhost:47321/dev/content/writingcontrol/the-outbound` showing the actual tree.
+- Selecting a node populates the detail panel with frontmatter, content preview, and the node's scrapbook listing.
+- "Open in Review" jumps to `/dev/editorial-review/<slug>`; "Open Scrapbook" jumps to `/dev/scrapbook/<site>/<path>`.
+- Inline `→ review` and `→ scrapbook` affordances appear on every tracked tree row (review link only when the row is a tracked entry; scrapbook link only when scrapbook count > 0). Both keyboard-accessible.
+- Non-editable scrapbook items in the node-detail panel preview in the browser using the same rules as the review-page drawer (16c) — image thumbnails inline, full preview on click; plain text / JSON inline-truncated; PDFs in embedded viewer; download fallback for anything else.
+- Visual posture matches the Writer's Catalog mockup — the surface feels like a content-author's workspace, not a generic admin dashboard.
+
+**Notes:**
+- This phase explicitly does NOT introduce new content types or new lifecycle stages. It operates over the existing calendar + the hierarchical capabilities already shipped in Phase 13/15.
+- Scrapbook items are read-only in the bird's-eye view (and in the review drawer). Mutations stay in the standalone scrapbook viewer where the existing UX lives.
+- The scrapbook drawer in 16c and the node-detail panel in 16d both list the immediate node's scrapbook. Use the same renderer for both.
+- **Shared scrapbook-item renderer**: factor the in-browser preview logic (image thumbnails + lightbox, plain-text / JSON inline truncation, PDF embed, download fallback for genuinely-unrenderable types) into a shared module under `packages/studio/src/components/scrapbook-item.ts` (or similar). All three surfaces consume it: the review-page drawer (16c), the content-view detail panel (16d), and the standalone scrapbook viewer (Phase 13's `/dev/scrapbook/<site>/<path>`). The standalone viewer benefits from the same upgrade — apply it there too as part of 16d so the operator gets consistent preview behavior across surfaces.
+- If the tree assembly in 16d is too expensive on large projects (50+ nodes), cache the result per `(site, project)` for the lifetime of the studio process. The tree is bounded by what's on disk + the calendar, so a cache invalidation on either change is straightforward.
+
+**GitHub tracking:** [#18](https://github.com/audiocontrol-org/deskwork/issues/18) is the implementation issue.
+
+**Ships in:** v0.4.0.

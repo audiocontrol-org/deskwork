@@ -68,20 +68,33 @@ deskwork ingest src/content/essays/
 #### Hierarchical content nodes (own `index.md` at each level)
 
 ```
-src/content/the-outbound/
+src/content/projects/the-outbound/
 ├── index.md                              → slug "the-outbound"
 ├── characters/
 │   ├── index.md                          → slug "the-outbound/characters"
-│   ├── strivers/index.md                 → slug "the-outbound/characters/strivers"
+│   ├── strivers/
+│   │   ├── index.md                      → slug "the-outbound/characters/strivers"
+│   │   └── archetype-notes.md            → slug "the-outbound/characters/strivers/archetype-notes"
 │   └── dreamers/index.md                 → slug "the-outbound/characters/dreamers"
+├── settings/
+│   ├── index.md                          → slug "the-outbound/settings"
+│   └── libertardistan/index.md           → slug "the-outbound/settings/libertardistan"
 └── structure/index.md                    → slug "the-outbound/structure"
 ```
 
 ```
-deskwork ingest src/content/the-outbound/
+deskwork ingest src/content/projects/the-outbound/
 ```
 
-Each directory with its own `index.md` is itself a tracked content node, so its name prefixes child slugs.
+The **`directoryIsHierarchicalNode`** rule: a directory's name prefixes the slugs of files inside it **only when that directory has its own `index.md` or `README.md`**. Above:
+
+- `the-outbound/` has its own `index.md` → it's a tracked node → its name prefixes children
+- `characters/` has its own `index.md` → it's a tracked node → its name prefixes children
+- `strivers/` has its own `index.md` → it's a tracked node → `archetype-notes.md` becomes `the-outbound/characters/strivers/archetype-notes`
+
+Pure organizational directories (no `index.md` / `README.md` of their own) do **not** prefix. If `characters/` had no `index.md`, `strivers/index.md` would be slugged just `the-outbound/strivers` — `characters/` would be a folder for organization only.
+
+This is why `/deskwork:ingest` works on layout-agnostic trees without configuration: the shape on disk encodes the intended tree.
 
 #### Jekyll `_posts/YYYY-MM-DD-<slug>.md`
 

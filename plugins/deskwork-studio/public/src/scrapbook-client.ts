@@ -145,9 +145,14 @@ async function renderBody(
   filename: string,
 ): Promise<void> {
   target.textContent = '';
+  // Read-only file URL — same endpoint the bird's-eye content view
+  // and the review-page scrapbook drawer use. The standalone viewer
+  // gets the consistent in-browser preview behavior here too.
+  const fileUrl = `/api/dev/scrapbook-file?site=${encodeURIComponent(ctx.site)}&path=${encodeURIComponent(ctx.slug)}&name=${encodeURIComponent(filename)}`;
+
   if (kind === 'img') {
     const img = document.createElement('img');
-    img.src = `/api/dev/scrapbook/read?site=${ctx.site}&slug=${ctx.slug}&file=${encodeURIComponent(filename)}`;
+    img.src = fileUrl;
     img.alt = '';
     const wrap = document.createElement('div');
     wrap.className = 'scrapbook-body-img';
@@ -162,12 +167,11 @@ async function renderBody(
     return;
   }
 
-  const res = await fetch(
-    `/api/dev/scrapbook/read?site=${ctx.site}&slug=${ctx.slug}&file=${encodeURIComponent(filename)}`,
-  );
+  const res = await fetch(fileUrl);
   if (!res.ok) throw new Error(await res.text());
-  const data = (await res.json()) as { content: string; kind: Kind };
-  const content = data.content;
+  // The new endpoint returns raw bytes, not JSON-wrapped content.
+  // Decode to a string for the text/json/markdown branches below.
+  const content = await res.text();
 
   if (kind === 'md') {
     const wrap = document.createElement('div');
@@ -198,7 +202,7 @@ async function renderBody(
   const wrap = document.createElement('div');
   wrap.className = 'scrapbook-body-other';
   const a = document.createElement('a');
-  a.href = `/api/dev/scrapbook/read?site=${ctx.site}&slug=${ctx.slug}&file=${encodeURIComponent(filename)}`;
+  a.href = `/api/dev/scrapbook-file?site=${encodeURIComponent(ctx.site)}&path=${encodeURIComponent(ctx.slug)}&name=${encodeURIComponent(filename)}`;
   a.textContent = `download ${filename} →`;
   wrap.appendChild(a);
   target.appendChild(wrap);
@@ -344,13 +348,13 @@ async function enterEditMode(ctx: Ctx, item: HTMLLIElement): Promise<void> {
   if (!bodyContent) return;
   await expandItem(ctx, item);
 
-  // Fetch raw content
+  // Fetch raw content via the read-only binary endpoint. Decode as
+  // text — the edit-mode path is only reached for markdown items.
   let raw = '';
   try {
-    const res = await fetch(`/api/dev/scrapbook/read?site=${ctx.site}&slug=${ctx.slug}&file=${encodeURIComponent(filename)}`);
+    const res = await fetch(`/api/dev/scrapbook-file?site=${encodeURIComponent(ctx.site)}&path=${encodeURIComponent(ctx.slug)}&name=${encodeURIComponent(filename)}`);
     if (!res.ok) throw new Error(await res.text());
-    const data = (await res.json()) as { content: string };
-    raw = data.content;
+    raw = await res.text();
   } catch (e) { flashError(ctx, `read failed: ${msg(e)}`); return; }
 
   bodyContent.textContent = '';

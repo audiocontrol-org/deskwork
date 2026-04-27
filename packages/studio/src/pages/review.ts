@@ -30,11 +30,21 @@ import {
   parseDraftFrontmatter,
   renderMarkdownToHtml,
 } from '@deskwork/core/review/render';
+import { listScrapbook, type ScrapbookItem } from '@deskwork/core/scrapbook';
 import { splitOutline } from '../../../../plugins/deskwork-studio/public/src/outline-split.ts';
 import type { StudioContext } from '../routes/api.ts';
 import { html, unsafe, type RawHtml } from './html.ts';
 import { layout } from './layout.ts';
 import { escapeHtml } from './html.ts';
+import {
+  renderEmptyScrapbookRow,
+  renderReadOnlyScrapbookRow,
+  scrapbookViewerUrl,
+  type InlineTextLoader,
+} from '../components/scrapbook-item.ts';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { resolveContentDir } from '@deskwork/core/paths';
 
 interface ReviewQuery {
   /** ?site=<slug> override; null falls back to config.defaultSite. */
@@ -284,6 +294,101 @@ function renderOutlineDrawer(outlineHtml: string): RawHtml {
     </aside>`);
 }
 
+/**
+ * Build an inline-text loader for the shared scrapbook-item renderer.
+ * Reads at most `maxBytes` from the file at `<contentDir>/<slug>/scrapbook/<name>`
+ * and returns the bytes decoded as UTF-8. Returns null when the file
+ * isn't readable as text — the renderer falls back to a download link.
+ */
+function makeInlineTextLoader(
+  ctx: StudioContext,
+  site: string,
+  slug: string,
+): InlineTextLoader {
+  const contentDir = resolveContentDir(ctx.projectRoot, ctx.config, site);
+  const scrapbookDir = join(contentDir, slug, 'scrapbook');
+  return (filename, maxBytes) => {
+    try {
+      const buf = readFileSync(join(scrapbookDir, filename));
+      const slice = buf.subarray(0, Math.min(buf.byteLength, maxBytes));
+      return slice.toString('utf-8');
+    } catch {
+      return null;
+    }
+  };
+}
+
+function renderScrapbookDrawerItems(
+  site: string,
+  slug: string,
+  items: readonly ScrapbookItem[],
+  loader: InlineTextLoader,
+): RawHtml {
+  if (items.length === 0) {
+    return renderEmptyScrapbookRow();
+  }
+  const rows = items.map((item) =>
+    renderReadOnlyScrapbookRow(
+      { site, path: slug },
+      item,
+      { inlinePreviewLoader: loader },
+    ),
+  );
+  return unsafe(rows.map((r) => r.__raw).join(''));
+}
+
+/**
+ * Scrapbook drawer for the review surface — shows the IMMEDIATE node's
+ * scrapbook (no ancestors) per Phase 16c. Always visible: an empty
+ * scrapbook still renders the section so the operator sees the
+ * affordance for this node.
+ */
+function renderScrapbookDrawer(
+  ctx: StudioContext,
+  site: string,
+  slug: string,
+): RawHtml {
+  const summary = (() => {
+    try {
+      return listScrapbook(ctx.projectRoot, ctx.config, site, slug);
+    } catch {
+      // listScrapbook validates the slug; an invalid slug shouldn't
+      // tank the whole review page. Treat as empty drawer + log via
+      // the unobtrusive empty state.
+      return null;
+    }
+  })();
+
+  const items = summary?.items ?? [];
+  const secretItems = summary?.secretItems ?? [];
+  const total = items.length + secretItems.length;
+  const loader = makeInlineTextLoader(ctx, site, slug);
+
+  return unsafe(html`
+    <aside class="er-scrapbook-drawer" data-scrapbook-drawer aria-label="Scrapbook for this entry">
+      <header class="er-scrapbook-drawer-head">
+        <span class="er-scrapbook-drawer-kicker">§ Scrapbook</span>
+        <span class="er-scrapbook-drawer-count">${total} ${total === 1 ? 'item' : 'items'}</span>
+        <a class="er-scrapbook-drawer-open" href="${scrapbookViewerUrl({ site, path: slug })}"
+          title="Open the standalone scrapbook viewer">open ↗</a>
+      </header>
+      <div class="er-scrapbook-drawer-body">
+        ${renderScrapbookDrawerItems(site, slug, items, loader)}
+        ${
+          secretItems.length > 0
+            ? unsafe(html`
+                <div class="er-scrapbook-drawer-secret">
+                  <p class="er-scrapbook-drawer-secret-head">
+                    <span aria-hidden="true">⚿</span> secret · ${secretItems.length}
+                  </p>
+                  ${renderScrapbookDrawerItems(site, slug, secretItems, loader)}
+                </div>`)
+            : ''
+        }
+      </div>
+    </aside>`);
+}
+
 export async function renderReviewPage(
   ctx: StudioContext,
   slug: string,
@@ -346,6 +451,7 @@ export async function renderReviewPage(
       ${renderMarginalia()}
       <button class="er-pencil-btn" data-add-comment-btn hidden type="button">Mark</button>
       ${renderOutlineDrawer(outlineHtml)}
+      ${renderScrapbookDrawer(ctx, site, workflow.slug)}
       <div class="er-toast" data-toast hidden></div>
       ${renderShortcutsOverlay()}
       <div class="er-poll-indicator" data-poll>auto-refresh · 8s</div>
@@ -357,6 +463,7 @@ export async function renderReviewPage(
       '/static/css/editorial-review.css',
       '/static/css/blog-figure.css',
       '/static/css/review-viewport.css',
+      '/static/css/scrap-row.css',
     ],
     bodyHtml: body,
     embeddedJson: [{ id: 'draft-state', data: draftState }],

@@ -225,3 +225,42 @@ Layout-agnostic discovery — `<slug>/index.md`, flat `<slug>.md`, dated `YYYY-M
 - **Not auto-detection of the content tree.** The operator passes paths explicitly. Walking the entire repo to "discover" content is intentionally out of scope — too easy to scoop up `node_modules/` test fixtures, vendored docs, or unrelated markdown.
 
 **Plan reference.** Issue #15 design; expanded into Phase 15 of the workplan during this `/feature-extend` invocation.
+
+---
+
+## Extension: hierarchical content gaps + scrapbook-in-review + bird's-eye content view
+
+Added as Phase 16. Issue: [#18](https://github.com/audiocontrol-org/deskwork/issues/18). Triggered by the writingcontrol.org adoption — the team filed a "single content type and flat layout" gap, and the design discussion resolved which parts of that claim are actual gaps, which are documentation gaps, and which are out of scope for v1.
+
+### Why now
+
+Phase 13 (shipped in v0.1.0) and Phase 15 (shipped in v0.3.0) cover hierarchical content end-to-end for the blog content type — calendar accepts `/`-separated slugs, per-entry `filePath` records on-disk shape, scrapbook viewer at arbitrary depth, ingest derives hierarchical slugs from path layout. Yet the writingcontrol team filed an issue claiming hierarchical content "doesn't exist" — because none of these capabilities are surfaced in the operator-facing READMEs or SKILL.md prose. The perception gap was real.
+
+Beyond docs, two genuine product gaps surfaced in the same conversation:
+
+1. **Scrapbook isn't reachable from inside the review surface.** Today the studio's scrapbook viewer is a standalone route. When an operator is reviewing `the-outbound/characters/strivers/index.md`, they must navigate away to browse the node's scrapbook. audiocontrol's review surface had a per-article scrapbook drawer; the deskwork review surface needs the equivalent, scoped to the immediate node.
+2. **No content-shape-focused view.** The studio dashboard groups content by editorial-lifecycle lane (Ideas → Planned → … → Published). For a long-form literary site with hierarchical project trees, operators also want to browse content by *shape* — the tree itself, with drillable nodes and at-a-glance signal about each node's state and scrapbook accumulation. This is complementary to the dashboard, not a replacement.
+
+### Scope
+
+| Concern | In scope (Phase 16) | Out of scope |
+|---|---|---|
+| Calendar tracking + review/edit for **hierarchical markdown** at any depth | ✅ verify + docs | — |
+| Calendar tracking for **organizational READMEs** (`<node>/README.md` with no frontmatter) | — | ❌ |
+| **Scrapbook drawer** in the longform review/edit surface, scoped to the immediate node | ✅ | — |
+| Scrapbook items as **calendar entries** | — | ❌ free-form, not pipeline-bound |
+| **Bird's-eye content-shape view** — new studio surface complementary to the dashboard | ✅ | — |
+| **Per-type lifecycle vocabulary** (project's `drafting/revising/paused/shopping/complete`) | — | ❌ existing 6-stage vocabulary maps cleanly; only `Paused` is a real gap and that's a tiny addition rather than pluggable lifecycles |
+| **Per-type frontmatter schema** (`logline`, `form`, `status`) | — | ❌ deskwork ignores frontmatter fields it doesn't recognize; project-shaped frontmatter passes through untouched |
+
+### Design reference
+
+A static HTML/CSS mockup of the bird's-eye content view ships alongside this PRD as design reference: [`mockups/birds-eye-content-view.html`](mockups/birds-eye-content-view.html). It shows three states (top-level sites + projects, drilldown with empty detail, drilldown with selected node) using realistic content from the writingcontrol.org `the-outbound` tree. Aesthetic direction: **Writer's Catalog** — a quiet study desk's reference card catalog. Typography commits to Fraunces (display), Newsreader (body), JetBrains Mono (paths/metadata). Color palette is warm paper + ink + oxblood marginalia.
+
+### What this is not
+
+- **Not a multi-content-type system.** Content types remain `blog | youtube | tool`. Project pages, organizational READMEs, and scrapbook notes are not new first-class types in v1. The bird's-eye view operates over the existing calendar entries (which already support hierarchy) plus the per-node scrapbook listings.
+- **Not a tree editor.** The bird's-eye view is read-only — drill, browse, jump to review. Mutations (rename, reorganize) stay in the existing per-node CLI surface.
+- **Not a navigation rewrite.** The pipeline-focused dashboard remains the default landing page. The content view is a sibling, surfaced via top-nav.
+
+**Plan reference.** Issue #18 design discussion; mockup produced via `/frontend-design` skill; expanded into Phase 16 of the workplan during this `/feature-extend` invocation.

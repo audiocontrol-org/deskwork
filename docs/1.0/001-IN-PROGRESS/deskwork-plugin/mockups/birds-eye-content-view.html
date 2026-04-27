@@ -1,0 +1,1539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>deskwork — content view (mockup)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,300..900,0..100,0..1&family=Newsreader:opsz,wght@6..72,300..700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    /* ============================================================
+       Writer's Catalog — Bird's-Eye Content View
+       A quiet study desk's reference card catalog.
+       ============================================================ */
+
+    :root {
+      /* Paper & ink */
+      --paper:       #faf6ee;
+      --paper-deep:  #f3eee2;
+      --paper-soft:  #f7f1e2;
+      --ink:         #1c1816;
+      --ink-mid:     #5a534c;
+      --ink-light:   #8a8278;
+      --ink-faint:   #b8b0a2;
+
+      /* Rules & dividers */
+      --rule:        #d8cfbd;
+      --rule-soft:   #ebe5d4;
+      --rule-deep:   #c4b89e;
+
+      /* Accents */
+      --accent:      #6e2e2e;
+      --accent-soft: #c0a4a4;
+      --highlight:   #f5e6c0;
+      --highlight-deep: #e8d28a;
+
+      /* Lane indicators (muted, signal-not-shout) */
+      --lane-ideas:     #b39872;
+      --lane-planned:   #8a9a7a;
+      --lane-outlining: #7e8aa6;
+      --lane-drafting:  #b08a5e;
+      --lane-review:    #a37882;
+      --lane-published: #6f8265;
+      --lane-paused:    #9a8a7a;
+
+      /* Type */
+      --font-display: 'Fraunces', Georgia, serif;
+      --font-body:    'Newsreader', Georgia, serif;
+      --font-mono:    'JetBrains Mono', ui-monospace, monospace;
+
+      /* Rhythm */
+      --row-h: 38px;
+      --indent: 22px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--font-body);
+      font-variation-settings: "opsz" 14;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      font-feature-settings: "kern", "liga", "onum";
+    }
+
+    body {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 56px 120px;
+    }
+
+    /* Subtle paper grain — barely perceptible */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      background-image:
+        radial-gradient(circle at 1px 1px, rgba(28, 24, 22, 0.018) 1px, transparent 0);
+      background-size: 3px 3px;
+    }
+
+    /* ============================================================
+       Editorial chrome (header)
+       ============================================================ */
+
+    .ed-chrome {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      padding: 24px 0 18px;
+      background: linear-gradient(to bottom, var(--paper) 60%, rgba(250, 246, 238, 0));
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+
+    .ed-chrome__inner {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: baseline;
+      gap: 32px;
+      border-bottom: 1px solid var(--rule);
+      padding-bottom: 14px;
+    }
+
+    .ed-chrome__brand {
+      font-family: var(--font-display);
+      font-variation-settings: "opsz" 144, "SOFT" 30, "WONK" 0;
+      font-weight: 500;
+      font-size: 24px;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+    }
+
+    .ed-chrome__brand sup {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      color: var(--ink-light);
+      margin-left: 8px;
+      vertical-align: top;
+      position: relative;
+      top: 4px;
+    }
+
+    .ed-chrome__nav {
+      display: flex;
+      gap: 28px;
+      justify-self: end;
+      margin-right: 20px;
+    }
+
+    .ed-chrome__nav a {
+      font-family: var(--font-body);
+      font-size: 13px;
+      color: var(--ink-mid);
+      text-decoration: none;
+      letter-spacing: 0.005em;
+      padding-bottom: 2px;
+      border-bottom: 1px solid transparent;
+      transition: color 0.18s ease, border-color 0.18s ease;
+    }
+
+    .ed-chrome__nav a:hover {
+      color: var(--ink);
+      border-bottom-color: var(--rule);
+    }
+
+    .ed-chrome__nav a.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    .ed-chrome__site {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--ink-light);
+      letter-spacing: 0.04em;
+    }
+
+    .ed-chrome__site b {
+      font-weight: 500;
+      color: var(--ink-mid);
+    }
+
+    /* ============================================================
+       Section labels (between mockup states)
+       ============================================================ */
+
+    .mockup-label {
+      margin: 80px 0 24px;
+      padding: 16px 0;
+      border-top: 1px dashed var(--rule);
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 24px;
+      align-items: baseline;
+    }
+
+    .mockup-label__num {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--accent);
+      letter-spacing: 0.18em;
+      font-weight: 500;
+    }
+
+    .mockup-label__title {
+      font-family: var(--font-display);
+      font-variation-settings: "opsz" 60, "SOFT" 20, "WONK" 0;
+      font-size: 18px;
+      font-weight: 400;
+      color: var(--ink);
+      letter-spacing: -0.005em;
+    }
+
+    .mockup-label__hint {
+      font-family: var(--font-body);
+      font-size: 12px;
+      color: var(--ink-light);
+      font-style: italic;
+    }
+
+    /* ============================================================
+       Page head — running folio for the content view
+       ============================================================ */
+
+    .page-head {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: end;
+      gap: 32px;
+      padding: 32px 0 28px;
+    }
+
+    .page-head__title {
+      font-family: var(--font-display);
+      font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+      font-size: 56px;
+      font-weight: 300;
+      letter-spacing: -0.025em;
+      line-height: 0.95;
+      margin: 0 0 8px;
+      color: var(--ink);
+    }
+
+    .page-head__title em {
+      font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 1;
+      font-style: italic;
+      color: var(--accent);
+    }
+
+    .page-head__sub {
+      font-family: var(--font-body);
+      font-size: 14px;
+      font-style: italic;
+      color: var(--ink-mid);
+      max-width: 540px;
+      line-height: 1.5;
+      margin: 0;
+    }
+
+    .page-head__meta {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--ink-light);
+      letter-spacing: 0.12em;
+      text-align: right;
+      line-height: 1.7;
+    }
+
+    .page-head__meta b {
+      font-weight: 500;
+      color: var(--ink-mid);
+    }
+
+    /* ============================================================
+       Top-level view — sites and projects
+       ============================================================ */
+
+    .toplevel {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px;
+      background: var(--rule);
+      border: 1px solid var(--rule);
+      margin-top: 32px;
+    }
+
+    .site-card {
+      background: var(--paper);
+      padding: 28px 32px 32px;
+      position: relative;
+    }
+
+    .site-card__tag {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      color: var(--ink-light);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .site-card__name {
+      font-family: var(--font-display);
+      font-variation-settings: "opsz" 60, "SOFT" 30, "WONK" 0;
+      font-size: 30px;
+      font-weight: 400;
+      letter-spacing: -0.015em;
+      line-height: 1;
+      margin: 0 0 4px;
+      color: var(--ink);
+    }
+
+    .site-card__host {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--ink-light);
+      margin-bottom: 24px;
+    }
+
+    .site-card__counts {
+      font-family: var(--font-body);
+      font-size: 12px;
+      color: var(--ink-mid);
+      margin-bottom: 22px;
+      padding-bottom: 22px;
+      border-bottom: 1px dashed var(--rule);
+    }
+
+    .site-card__counts b {
+      font-weight: 500;
+      color: var(--ink);
+      font-variation-settings: "opsz" 14;
+      font-feature-settings: "tnum";
+    }
+
+    .site-card__projects {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .project-row {
+      display: grid;
+      grid-template-columns: auto 1fr auto auto;
+      align-items: baseline;
+      gap: 14px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--rule-soft);
+      cursor: pointer;
+      transition: background 0.14s ease;
+    }
+
+    .project-row:hover {
+      background: var(--paper-soft);
+    }
+
+    .project-row:last-child {
+      border-bottom: none;
+    }
+
+    .project-row__num {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--ink-faint);
+      letter-spacing: 0.08em;
+      font-feature-settings: "tnum";
+    }
+
+    .project-row__name {
+      font-family: var(--font-display);
+      font-variation-settings: "opsz" 36, "SOFT" 30, "WONK" 0;
+      font-size: 17px;
+      font-weight: 400;
+      letter-spacing: -0.005em;
+      color: var(--ink);
+    }
+
+    .project-row__name em {
+      font-variation-settings: "opsz" 36, "SOFT" 30, "WONK" 1;
+      font-style: italic;
+      color: var(--ink-mid);
+      font-size: 14px;
+    }
+
+    .project-row__nodes {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--ink-light);
+      letter-spacing: 0.04em;
+      font-feature-settings: "tnum";
+    }
+
+    .project-row__lane {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      color: var(--ink-mid);
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .lane-dot {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--ink-light);
+    }
+
+    .lane-dot--ideas     { background: var(--lane-ideas); }
+    .lane-dot--planned   { background: var(--lane-planned); }
+    .lane-dot--outlining { background: var(--lane-outlining); }
+    .lane-dot--drafting  { background: var(--lane-drafting); }
+    .lane-dot--review    { background: var(--lane-review); }
+    .lane-dot--published { background: var(--lane-published); }
+    .lane-dot--paused    { background: var(--lane-paused); }
+
+    /* ============================================================
+       Drilldown — split view, tree on left, detail on right
+       ============================================================ */
+
+    .drilldown {
+      display: grid;
+      grid-template-columns: 1.6fr 1fr;
+      gap: 0;
+      border: 1px solid var(--rule);
+      background: var(--paper);
+      min-height: 720px;
+    }
+
+    .drilldown__tree {
+      padding: 32px 36px;
+      border-right: 1px solid var(--rule);
+      background:
+        repeating-linear-gradient(
+          to right,
+          transparent 0,
+          transparent calc(var(--indent) - 1px),
+          rgba(216, 207, 189, 0.18) calc(var(--indent) - 1px),
+          rgba(216, 207, 189, 0.18) var(--indent)
+        );
+      background-size: 100% 100%;
+      background-position: 36px 0;
+      background-repeat: no-repeat;
+      background-clip: content-box;
+      overflow: hidden;
+    }
+
+    .breadcrumb {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--ink-light);
+      letter-spacing: 0.04em;
+      margin-bottom: 24px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--rule-soft);
+    }
+
+    .breadcrumb a {
+      color: var(--ink-mid);
+      text-decoration: none;
+    }
+
+    .breadcrumb a:hover {
+      color: var(--accent);
+    }
+
+    .breadcrumb b {
+      color: var(--ink);
+      font-weight: 500;
+    }
+
+    .breadcrumb__sep {
+      color: var(--ink-faint);
+      margin: 0 8px;
+    }
+
+    .tree-head {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: baseline;
+      margin-bottom: 18px;
+      padding-bottom: 12px;
+      border-bottom: 1px dashed var(--rule);
+    }
+
+    .tree-head__title {
+      font-family: var(--font-display);
+      font-variation-settings: "opsz" 60, "SOFT" 30, "WONK" 0;
+      font-size: 28px;
+      font-weight: 400;
+      letter-spacing: -0.015em;
+      color: var(--ink);
+      margin: 0;
+    }
+
+    .tree-head__title em {
+      font-variation-settings: "opsz" 60, "SOFT" 30, "WONK" 1;
+      font-style: italic;
+      color: var(--accent);
+    }
+
+    .tree-head__count {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      color: var(--ink-light);
+      text-transform: uppercase;
+    }
+
+    .tree {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .tree-row {
+      position: relative;
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      align-items: baseline;
+      gap: 14px;
+      padding: 9px 12px 9px calc(var(--depth, 0) * var(--indent) + 24px);
+      cursor: pointer;
+      border-radius: 2px;
+      transition: background 0.14s ease;
+    }
+
+    .tree-row:hover {
+      background: var(--paper-soft);
+    }
+
+    .tree-row.is-selected {
+      background: var(--paper-deep);
+      box-shadow: inset 3px 0 0 var(--accent);
+    }
+
+    /* Connector lines drawn from each row's leader position */
+    .tree-row::before {
+      content: '';
+      position: absolute;
+      left: calc(var(--depth, 0) * var(--indent) + 8px);
+      top: 0;
+      bottom: 0;
+      width: 1px;
+      background: var(--rule-soft);
+      pointer-events: none;
+    }
+
+    .tree-row.is-last::before {
+      bottom: 50%;
+    }
+
+    .tree-row::after {
+      content: '';
+      position: absolute;
+      left: calc(var(--depth, 0) * var(--indent) + 8px);
+      top: 50%;
+      width: 11px;
+      height: 1px;
+      background: var(--rule-soft);
+      pointer-events: none;
+    }
+
+    .tree-row[style*="--depth: 0"]::before,
+    .tree-row[style*="--depth: 0"]::after {
+      display: none;
+    }
+
+    .tree-row__main {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .tree-row__icon {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--ink-faint);
+      width: 12px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .tree-row__icon.is-branch {
+      color: var(--ink-light);
+    }
+
+    .tree-row__title {
+      font-family: var(--font-display);
+      font-variation-settings: "opsz" 24, "SOFT" 30, "WONK" 0;
+      font-size: 15px;
+      font-weight: 400;
+      color: var(--ink);
+      letter-spacing: -0.003em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .tree-row.is-leaf .tree-row__title {
+      font-variation-settings: "opsz" 24, "SOFT" 30, "WONK" 1;
+      font-style: italic;
+    }
+
+    .tree-row__slug {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--ink-faint);
+      letter-spacing: 0.02em;
+      margin-left: 4px;
+    }
+
+    .tree-row__lane {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      color: var(--ink-mid);
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    .tree-row__meta {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--ink-light);
+      letter-spacing: 0.04em;
+      font-feature-settings: "tnum";
+      white-space: nowrap;
+    }
+
+    .tree-row__meta .scrap-count {
+      color: var(--ink-mid);
+    }
+
+    .tree-row__meta .mtime {
+      color: var(--ink-faint);
+      margin-left: 10px;
+    }
+
+    /* Inline action links — quiet at rest, stronger on hover/focus.
+       Surfaces on every tracked row so operators can jump to review
+       or scrapbook without first selecting the node. */
+    .tree-row__actions {
+      display: flex;
+      gap: 14px;
+      opacity: 0;
+      transition: opacity 0.16s ease;
+      white-space: nowrap;
+    }
+
+    .tree-row:hover .tree-row__actions,
+    .tree-row.is-selected .tree-row__actions,
+    .tree-row__actions:focus-within {
+      opacity: 1;
+    }
+
+    .tree-row__action {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      color: var(--ink-mid);
+      text-transform: uppercase;
+      text-decoration: none;
+      padding: 2px 0;
+      border-bottom: 1px solid transparent;
+      transition: color 0.14s ease, border-color 0.14s ease;
+    }
+
+    .tree-row__action:hover,
+    .tree-row__action:focus {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+      outline: none;
+    }
+
+    .tree-row__action--review {
+      color: var(--accent);
+    }
+
+    /* Adjust grid to make room for the actions column */
+    .tree-row {
+      grid-template-columns: 1fr auto auto auto;
+    }
+
+    /* Mockup-only — forces actions visible without interaction */
+    .tree-row.is-hover-demo .tree-row__actions {
+      opacity: 1;
+    }
+
+    /* ============================================================
+       Detail panel — open notebook on the right
+       ============================================================ */
+
+    .detail {
+      padding: 32px 36px;
+      background: var(--paper-deep);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .detail::before {
+      /* Subtle inset shadow to feel like an open page */
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 12px;
+      background: linear-gradient(to right, rgba(28, 24, 22, 0.04), transparent);
+      pointer-events: none;
+    }
+
+    .detail__crumb {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--ink-light);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .detail__title {
+      font-family: var(--font-display);
+      font-variation-settings: "opsz" 96, "SOFT" 50, "WONK" 0;
+      font-size: 38px;
+      font-weight: 400;
+      line-height: 1;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      margin: 0 0 6px;
+    }
+
+    .detail__title em {
+      font-variation-settings: "opsz" 96, "SOFT" 50, "WONK" 1;
+      font-style: italic;
+      color: var(--accent);
+    }
+
+    .detail__sub {
+      font-family: var(--font-body);
+      font-size: 13px;
+      font-style: italic;
+      color: var(--ink-mid);
+      line-height: 1.55;
+      margin: 0 0 24px;
+    }
+
+    .detail__sectionhead {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin: 28px 0 10px;
+      padding-top: 14px;
+      border-top: 1px solid var(--rule);
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+
+    .detail__sectionhead .marg {
+      color: var(--ink-faint);
+      letter-spacing: 0.06em;
+      font-weight: 400;
+      text-transform: none;
+    }
+
+    .frontmatter {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 4px 18px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      line-height: 1.7;
+    }
+
+    .frontmatter dt {
+      color: var(--ink-light);
+      letter-spacing: 0.04em;
+    }
+
+    .frontmatter dd {
+      color: var(--ink);
+      margin: 0;
+      font-weight: 500;
+    }
+
+    .frontmatter dd em {
+      color: var(--ink-mid);
+      font-style: italic;
+      font-weight: 400;
+    }
+
+    .preview {
+      font-family: var(--font-body);
+      font-variation-settings: "opsz" 14;
+      font-size: 14px;
+      line-height: 1.55;
+      color: var(--ink-mid);
+      max-height: 168px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .preview::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 48px;
+      background: linear-gradient(to bottom, rgba(243, 238, 226, 0), var(--paper-deep));
+    }
+
+    .preview p:first-child {
+      margin-top: 0;
+    }
+
+    .preview p {
+      margin: 0 0 10px;
+    }
+
+    .preview p::first-letter {
+      font-family: var(--font-display);
+      font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+      font-size: 38px;
+      float: left;
+      line-height: 0.85;
+      margin: 4px 6px 0 -2px;
+      color: var(--ink);
+    }
+
+    .scraplist {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .scrap {
+      display: grid;
+      grid-template-columns: auto 1fr auto auto;
+      align-items: baseline;
+      gap: 12px;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--rule-soft);
+      cursor: pointer;
+      transition: background 0.14s ease;
+    }
+
+    .scrap:hover {
+      background: rgba(245, 230, 192, 0.4);
+      padding-left: 6px;
+      padding-right: 6px;
+      margin-left: -6px;
+      margin-right: -6px;
+    }
+
+    .scrap:last-child {
+      border-bottom: none;
+    }
+
+    /* Scrap variants — in-browser preview for non-editable items */
+    .scrap--img {
+      grid-template-columns: 56px auto 1fr auto auto;
+    }
+
+    .scrap__thumb {
+      width: 56px;
+      height: 42px;
+      object-fit: cover;
+      border: 1px solid var(--rule);
+      background: var(--paper);
+      display: block;
+      transition: transform 0.16s ease;
+    }
+
+    .scrap--img:hover .scrap__thumb {
+      transform: scale(1.04);
+    }
+
+    .scrap__inline-preview {
+      grid-column: 2 / -1;
+      margin-top: 6px;
+      padding: 10px 12px;
+      background: var(--paper);
+      border: 1px solid var(--rule-soft);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--ink-mid);
+      line-height: 1.6;
+      max-height: 60px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .scrap__inline-preview::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 18px;
+      background: linear-gradient(to bottom, rgba(250, 246, 238, 0), var(--paper));
+    }
+
+    .scrap--with-preview {
+      display: grid;
+      grid-template-columns: auto 1fr auto auto;
+      grid-template-rows: auto auto;
+      align-items: baseline;
+      column-gap: 12px;
+      padding-bottom: 14px;
+    }
+
+    .scrap__kind {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      color: var(--ink-mid);
+      text-transform: uppercase;
+      width: 32px;
+      text-align: center;
+      padding: 1px 5px;
+      border: 1px solid var(--rule);
+      border-radius: 1px;
+      background: var(--paper);
+      font-weight: 500;
+    }
+
+    .scrap__name {
+      font-family: var(--font-body);
+      font-size: 13px;
+      color: var(--ink);
+      letter-spacing: -0.003em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .scrap__size {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--ink-light);
+      font-feature-settings: "tnum";
+    }
+
+    .scrap__mtime {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--ink-faint);
+      font-feature-settings: "tnum";
+    }
+
+    .actions {
+      margin-top: 28px;
+      padding-top: 18px;
+      border-top: 1px solid var(--rule);
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      color: var(--ink);
+      text-transform: uppercase;
+      text-decoration: none;
+      padding: 9px 14px;
+      border: 1px solid var(--rule-deep);
+      background: var(--paper);
+      transition: all 0.16s ease;
+      cursor: pointer;
+      font-weight: 500;
+    }
+
+    .btn:hover {
+      background: var(--ink);
+      color: var(--paper);
+      border-color: var(--ink);
+    }
+
+    .btn--accent {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .btn--accent:hover {
+      background: var(--accent);
+      color: var(--paper);
+    }
+
+    /* ============================================================
+       Empty / placeholder state for detail panel
+       ============================================================ */
+
+    .detail--empty {
+      display: grid;
+      place-items: center;
+      text-align: center;
+      padding: 80px 40px;
+    }
+
+    .detail--empty .ornament {
+      font-family: var(--font-display);
+      font-size: 32px;
+      color: var(--ink-faint);
+      margin-bottom: 16px;
+      letter-spacing: 0.4em;
+    }
+
+    .detail--empty .text {
+      font-family: var(--font-body);
+      font-size: 14px;
+      color: var(--ink-light);
+      font-style: italic;
+      max-width: 280px;
+      line-height: 1.5;
+    }
+
+    /* ============================================================
+       Misc
+       ============================================================ */
+
+    .small-caps {
+      font-variant-caps: small-caps;
+      letter-spacing: 0.04em;
+    }
+
+    /* Subtle entrance animation */
+    @keyframes settle {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .tree-row {
+      animation: settle 0.4s ease backwards;
+    }
+
+    .tree-row:nth-child(1) { animation-delay: 0.02s; }
+    .tree-row:nth-child(2) { animation-delay: 0.05s; }
+    .tree-row:nth-child(3) { animation-delay: 0.08s; }
+    .tree-row:nth-child(4) { animation-delay: 0.11s; }
+    .tree-row:nth-child(5) { animation-delay: 0.14s; }
+    .tree-row:nth-child(6) { animation-delay: 0.17s; }
+    .tree-row:nth-child(7) { animation-delay: 0.20s; }
+    .tree-row:nth-child(8) { animation-delay: 0.23s; }
+    .tree-row:nth-child(9) { animation-delay: 0.26s; }
+    .tree-row:nth-child(10) { animation-delay: 0.29s; }
+  </style>
+</head>
+<body>
+
+  <!-- ============================================================
+       EDITORIAL CHROME (persistent across all studio pages)
+       ============================================================ -->
+  <header class="ed-chrome">
+    <div class="ed-chrome__inner">
+      <div class="ed-chrome__brand">deskwork<sup>STUDIO</sup></div>
+      <div class="ed-chrome__site"><b>writingcontrol</b> · localhost:47321</div>
+      <nav class="ed-chrome__nav">
+        <a href="#">Dashboard</a>
+        <a href="#" class="active">Content</a>
+        <a href="#">Reviews</a>
+        <a href="#">Manual</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ============================================================
+       STATE 1 — TOP LEVEL
+       ============================================================ -->
+
+  <div class="mockup-label">
+    <span class="mockup-label__num">01 — STATE</span>
+    <span class="mockup-label__title">Top level — sites and projects</span>
+    <span class="mockup-label__hint">first page on landing</span>
+  </div>
+
+  <header class="page-head">
+    <div>
+      <h1 class="page-head__title">A <em>shape</em> of the work.</h1>
+      <p class="page-head__sub">The pipeline view shows where things are. This shows what's there. Browse the corpus by its tree on disk; drill into any node to see its content and the scrapbook hanging off it.</p>
+    </div>
+    <div class="page-head__meta">
+      <b>2</b> SITES<br>
+      <b>34</b> TRACKED NODES<br>
+      <b>117</b> SCRAPBOOK ITEMS<br>
+      <b>1.4M</b> WORDS · DRAFT
+    </div>
+  </header>
+
+  <section class="toplevel">
+
+    <article class="site-card">
+      <div class="site-card__tag">Site · primary</div>
+      <h2 class="site-card__name">writingcontrol</h2>
+      <div class="site-card__host">writingcontrol.org</div>
+      <div class="site-card__counts">
+        <b>5</b> root entries · <b>29</b> total nodes · <b>106</b> scrapbook items
+      </div>
+      <div class="site-card__projects">
+
+        <div class="project-row">
+          <span class="project-row__num">01</span>
+          <span class="project-row__name">Essays <em>flat collection · 3 entries</em></span>
+          <span class="project-row__nodes">3 nodes</span>
+          <span class="project-row__lane">
+            <span class="lane-dot lane-dot--published"></span> mostly published
+          </span>
+        </div>
+
+        <div class="project-row">
+          <span class="project-row__num">02</span>
+          <span class="project-row__name">the-outbound <em>novel · 14 nodes</em></span>
+          <span class="project-row__nodes">14 nodes</span>
+          <span class="project-row__lane">
+            <span class="lane-dot lane-dot--drafting"></span> drafting
+          </span>
+        </div>
+
+        <div class="project-row">
+          <span class="project-row__num">03</span>
+          <span class="project-row__name">field-notes <em>essay project · 9 nodes</em></span>
+          <span class="project-row__nodes">9 nodes</span>
+          <span class="project-row__lane">
+            <span class="lane-dot lane-dot--outlining"></span> outlining
+          </span>
+        </div>
+
+      </div>
+    </article>
+
+    <article class="site-card">
+      <div class="site-card__tag">Site · auxiliary</div>
+      <h2 class="site-card__name">deskwork.dev</h2>
+      <div class="site-card__host">deskwork.dev</div>
+      <div class="site-card__counts">
+        <b>2</b> root entries · <b>5</b> total nodes · <b>11</b> scrapbook items
+      </div>
+      <div class="site-card__projects">
+
+        <div class="project-row">
+          <span class="project-row__num">01</span>
+          <span class="project-row__name">guides <em>plugin documentation</em></span>
+          <span class="project-row__nodes">4 nodes</span>
+          <span class="project-row__lane">
+            <span class="lane-dot lane-dot--review"></span> review
+          </span>
+        </div>
+
+        <div class="project-row">
+          <span class="project-row__num">02</span>
+          <span class="project-row__name">changelog <em>release notes</em></span>
+          <span class="project-row__nodes">1 node</span>
+          <span class="project-row__lane">
+            <span class="lane-dot lane-dot--published"></span> published
+          </span>
+        </div>
+
+      </div>
+    </article>
+
+  </section>
+
+  <!-- ============================================================
+       STATE 2 — DRILLDOWN (no node selected)
+       ============================================================ -->
+
+  <div class="mockup-label">
+    <span class="mockup-label__num">02 — STATE</span>
+    <span class="mockup-label__title">Drilldown — no node selected</span>
+    <span class="mockup-label__hint">after clicking <em>the-outbound</em></span>
+  </div>
+
+  <section class="drilldown">
+
+    <div class="drilldown__tree">
+
+      <div class="breadcrumb">
+        <a href="#">writingcontrol</a>
+        <span class="breadcrumb__sep">›</span>
+        <b>the-outbound</b>
+      </div>
+
+      <header class="tree-head">
+        <h2 class="tree-head__title">the-<em>outbound</em></h2>
+        <span class="tree-head__count">14 NODES · 5 LEVELS DEEP</span>
+      </header>
+
+      <div class="tree">
+
+        <div class="tree-row is-branch is-hover-demo" style="--depth: 0">
+          <div class="tree-row__main">
+            <span class="tree-row__icon is-branch">◐</span>
+            <span class="tree-row__title">The Outbound</span>
+            <span class="tree-row__slug">/index.md</span>
+          </div>
+          <span class="tree-row__lane"><span class="lane-dot lane-dot--drafting"></span> drafting</span>
+          <span class="tree-row__meta"><span class="scrap-count">7 notes</span><span class="mtime">2d ago</span></span>
+          <span class="tree-row__actions">
+            <a href="#" class="tree-row__action tree-row__action--review">→ review</a>
+            <a href="#" class="tree-row__action">→ scrapbook</a>
+          </span>
+        </div>
+
+        <div class="tree-row is-branch" style="--depth: 1">
+          <div class="tree-row__main">
+            <span class="tree-row__icon is-branch">◐</span>
+            <span class="tree-row__title">Characters</span>
+            <span class="tree-row__slug">/characters/index.md</span>
+          </div>
+          <span class="tree-row__lane"><span class="lane-dot lane-dot--outlining"></span> outlining</span>
+          <span class="tree-row__meta"><span class="scrap-count">3 notes</span><span class="mtime">5d ago</span></span>
+          <span class="tree-row__actions">
+            <a href="#" class="tree-row__action tree-row__action--review">→ review</a>
+            <a href="#" class="tree-row__action">→ scrapbook</a>
+          </span>
+        </div>
+
+        <div class="tree-row is-branch" style="--depth: 2">
+          <div class="tree-row__main">
+            <span class="tree-row__icon is-branch">◐</span>
+            <span class="tree-row__title">Strivers</span>
+            <span class="tree-row__slug">/characters/strivers/index.md</span>
+          </div>
+          <span class="tree-row__lane"><span class="lane-dot lane-dot--drafting"></span> drafting</span>
+          <span class="tree-row__meta"><span class="scrap-count">2 notes</span><span class="mtime">1d ago</span></span>
+          <span class="tree-row__actions">
+            <a href="#" class="tree-row__action tree-row__action--review">→ review</a>
+            <a href="#" class="tree-row__action">→ scrapbook</a>
+          </span>
+        </div>
+
+        <div class="tree-row is-leaf" style="--depth: 3">
+          <div class="tree-row__main">
+            <span class="tree-row__icon">·</span>
+            <span class="tree-row__title">Preemptive Capitulation</span>
+            <span class="tree-row__slug">/strivers/preemptive-capitulation/index.md</span>
+          </div>
+          <span class="tree-row__lane"><span class="lane-dot lane-dot--ideas"></span> ideas</span>
+          <span class="tree-row__meta"><span class="mtime">11d ago</span></span>
+          <span class="tree-row__actions">
+            <a href="#" class="tree-row__action tree-row__action--review">→ review</a>
+          </span>
+        </div>
+
+        <div class="tree-row is-leaf is-last" style="--depth: 3">
+          <div class="tree-row__main">
+            <span class="tree-row__icon">·</span>
+            <span class="tree-row__title">Archetype Notes</span>
+            <span class="tree-row__slug">/strivers/archetype-notes/index.md</span>
+          </div>
+          <span class="tree-row__lane"><span class="lane-dot lane-dot--ideas"></span> ideas</span>
+          <span class="tree-row__meta"><span class="mtime">14d ago</span></span>
+          <span class="tree-row__actions">
+            <a href="#" class="tree-row__action tree-row__action--review">→ review</a>
+          </span>
+        </div>
+
+        <div class="tree-row is-branch is-last" style="--depth: 2">
+          <div class="tree-row__main">
+            <span class="tree-row__icon is-branch">◐</span>
+            <span class="tree-row__title">Dreamers</span>
+            <span class="tree-row__slug">/characters/dreamers/index.md</span>
+          </div>
+          <span class="tree-row__lane"><span class="lane-dot lane-dot--planned"></span> planned</span>
+          <span class="tree-row__meta"><span class="scrap-count">1 note</span><span class="mtime">8d ago</span></span>
+          <span class="tree-row__actions">
+            <a href="#" class="tree-row__action tree-row__action--review">→ review</a>
+            <a href="#" class="tree-row__action">→ scrapbook</a>
+          </span>
+        </div>
+
+        <div class="tree-row is-branch" style="--depth: 1">
+          <div class="tree-row__main">
+            <span class="tree-row__icon is-branch">◐</span>
+            <span class="tree-row__title">Settings</span>
+            <span class="tree-row__slug">/settings/index.md</span>
+          </div>
+          <span class="tree-row__lane"><span class="lane-dot lane-dot--outlining"></span> outlining</span>
+          <span class="tree-row__meta"><span class="mtime">9d ago</span></span>
+          <span class="tree-row__actions">
+            <a href="#" class="tree-row__action tree-row__action--review">→ review</a>
+          </span>
+        </div>
+
+        <div class="tree-row is-branch is-last" style="--depth: 2">
+          <div class="tree-row__main">
+            <span class="tree-row__icon is-branch">◐</span>
+            <span class="tree-row__title">Libertardistan</span>
+            <span class="tree-row__slug">/settings/libertardistan/index.md</span>
+          </div>
+          <span class="tree-row__lane"><span class="lane-dot lane-dot--drafting"></span> drafting</span>
+          <span class="tree-row__meta"><span class="scrap-count">1 note</span><span class="mtime">3d ago</span></span>
+          <span class="tree-row__actions">
+            <a href="#" class="tree-row__action tree-row__action--review">→ review</a>
+            <a href="#" class="tree-row__action">→ scrapbook</a>
+          </span>
+        </div>
+
+        <div class="tree-row is-branch is-last" style="--depth: 1">
+          <div class="tree-row__main">
+            <span class="tree-row__icon is-branch">◐</span>
+            <span class="tree-row__title">Structure</span>
+            <span class="tree-row__slug">/structure/index.md</span>
+          </div>
+          <span class="tree-row__lane"><span class="lane-dot lane-dot--drafting"></span> drafting</span>
+          <span class="tree-row__meta"><span class="scrap-count">1 note</span><span class="mtime">6d ago</span></span>
+          <span class="tree-row__actions">
+            <a href="#" class="tree-row__action tree-row__action--review">→ review</a>
+            <a href="#" class="tree-row__action">→ scrapbook</a>
+          </span>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="detail detail--empty">
+      <div class="ornament">· · ·</div>
+      <p class="text">Select a node to read its head matter, preview its body, and browse its scrapbook.</p>
+    </div>
+
+  </section>
+
+  <!-- ============================================================
+       STATE 3 — DRILLDOWN with node selected
+       ============================================================ -->
+
+  <div class="mockup-label">
+    <span class="mockup-label__num">03 — STATE</span>
+    <span class="mockup-label__title">Drilldown — node selected, detail panel filled</span>
+    <span class="mockup-label__hint">after clicking <em>strivers</em></span>
+  </div>
+
+  <section class="drilldown">
+
+    <div class="drilldown__tree">
+
+      <div class="breadcrumb">
+        <a href="#">writingcontrol</a>
+        <span class="breadcrumb__sep">›</span>
+        <a href="#">the-outbound</a>
+        <span class="breadcrumb__sep">›</span>
+        <a href="#">characters</a>
+        <span class="breadcrumb__sep">›</span>
+        <b>strivers</b>
+      </div>
+
+      <header class="tree-head">
+        <h2 class="tree-head__title">the-<em>outbound</em></h2>
+        <span class="tree-head__count">14 NODES · 5 LEVELS DEEP</span>
+      </header>
+
+      <div class="tree">
+
+        <div class="tree-row is-branch" style="--depth: 0">
+          <div class="tree-row__main">
+            <span class="tree-row__icon is-branch">◐</span>
+            <span class="tree-row__title">The Outbound</span>
+            <span class="tree-row__slug">/index.md</span>
+          </div>
+          <span class="tree-row__lane"><span class="lane-dot lane-dot--drafting"></span> drafting</span>
+          <span class="tree-row__meta"><span class="scrap-count">7 notes</span><span class="mtime">2d ago</span></span>
+          <span class="tree-row__actions">
+            <a href="#" class="tree-row__action tree-row__action--review">→ review</a>
+            <a href="#" class="tree-row__action">→ scrapbook</a>
+          </span>
+        </div>
+
+        <div class="tree-row is-branch" style="--depth: 1">
+          <div class="tree-row__main">
+            <span class="tree-row__icon is-branch">◐</span>
+            <span class="tree-row__title">Characters</span>
+            <span class="tree-row__slug">/characters/index.md</span>
+          </div>
+          <span class="tree-row__lane"><span class="lane-dot lane-dot--outlining"></span> outlining</span>
+          <span class="tree-row__meta"><span class="scrap-count">3 notes</span><span class="mtime">5d ago</span></span>
+          <span class="tree-row__actions">
+            <a href="#" class="tree-row__action tree-row__action--review">→ review</a>
+            <a href="#" class="tree-row__action">→ scrapbook</a>
+          </span>
+        </div>
+
+        <div class="tree-row is-branch is-selected" style="--depth: 2">
+          <div class="tree-row__main">
+            <span class="tree-row__icon is-branch">◐</span>
+            <span class="tree-row__title">Strivers</span>
+            <span class="tree-row__slug">/characters/strivers/index.md</span>
+          </div>
+          <span class="tree-row__lane"><span class="lane-dot lane-dot--drafting"></span> drafting</span>
+          <span class="tree-row__meta"><span class="scrap-count">2 notes</span><span class="mtime">1d ago</span></span>
+          <span class="tree-row__actions">
+            <a href="#" class="tree-row__action tree-row__action--review">→ review</a>
+            <a href="#" class="tree-row__action">→ scrapbook</a>
+          </span>
+        </div>
+
+        <div class="tree-row is-leaf" style="--depth: 3">
+          <div class="tree-row__main">
+            <span class="tree-row__icon">·</span>
+            <span class="tree-row__title">Preemptive Capitulation</span>
+            <span class="tree-row__slug">/strivers/preemptive-capitulation/index.md</span>
+          </div>
+          <span class="tree-row__lane"><span class="lane-dot lane-dot--ideas"></span> ideas</span>
+          <span class="tree-row__meta"><span class="mtime">11d ago</span></span>
+          <span class="tree-row__actions">
+            <a href="#" class="tree-row__action tree-row__action--review">→ review</a>
+          </span>
+        </div>
+
+        <div class="tree-row is-leaf is-last" style="--depth: 3">
+          <div class="tree-row__main">
+            <span class="tree-row__icon">·</span>
+            <span class="tree-row__title">Archetype Notes</span>
+            <span class="tree-row__slug">/strivers/archetype-notes/index.md</span>
+          </div>
+          <span class="tree-row__lane"><span class="lane-dot lane-dot--ideas"></span> ideas</span>
+          <span class="tree-row__meta"><span class="mtime">14d ago</span></span>
+          <span class="tree-row__actions">
+            <a href="#" class="tree-row__action tree-row__action--review">→ review</a>
+          </span>
+        </div>
+
+        <div class="tree-row is-branch is-last" style="--depth: 2">
+          <div class="tree-row__main">
+            <span class="tree-row__icon is-branch">◐</span>
+            <span class="tree-row__title">Dreamers</span>
+            <span class="tree-row__slug">/characters/dreamers/index.md</span>
+          </div>
+          <span class="tree-row__lane"><span class="lane-dot lane-dot--planned"></span> planned</span>
+          <span class="tree-row__meta"><span class="scrap-count">1 note</span><span class="mtime">8d ago</span></span>
+          <span class="tree-row__actions">
+            <a href="#" class="tree-row__action tree-row__action--review">→ review</a>
+            <a href="#" class="tree-row__action">→ scrapbook</a>
+          </span>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="detail">
+
+      <div class="detail__crumb">the-outbound · characters · strivers</div>
+
+      <h2 class="detail__title"><em>Strivers</em></h2>
+      <p class="detail__sub">A character study of those whose forward motion never registers as enough — to themselves, to their families, or to the gravity of their own history.</p>
+
+      <div class="detail__sectionhead">
+        Frontmatter
+        <span class="marg">9 fields · raw</span>
+      </div>
+      <dl class="frontmatter">
+        <dt>title</dt>          <dd>Strivers</dd>
+        <dt>form</dt>           <dd>character study</dd>
+        <dt>status</dt>         <dd>drafting <em>· revision pass 2</em></dd>
+        <dt>state</dt>          <dd>draft</dd>
+        <dt>logline</dt>        <dd><em>"They run because nothing has ever stood still."</em></dd>
+        <dt>updated</dt>        <dd>2026-04-26</dd>
+      </dl>
+
+      <div class="detail__sectionhead">
+        Preview
+        <span class="marg">first 480 chars · markdown rendered</span>
+      </div>
+      <div class="preview">
+        <p>The strivers were the ones who kept moving. Not because they had somewhere to go — most of them didn't, not really — but because stopping had been disqualified as a posture in their families a generation back, and refusing the family inheritance turned out to be more expensive than just running with it.</p>
+        <p>They were the cousins who showed up to weddings with three new credentials. The brothers-in-law who could explain compound interest at a barbecue. The high-school friends who never missed a fundraiser and never once mentioned the anxiety underneath…</p>
+      </div>
+
+      <div class="detail__sectionhead">
+        Scrapbook
+        <span class="marg">5 items · /strivers/scrapbook</span>
+      </div>
+      <div class="scraplist">
+
+        <!-- Markdown — opens in scrapbook viewer for editing -->
+        <div class="scrap">
+          <span class="scrap__kind">md</span>
+          <span class="scrap__name">archetypes.md</span>
+          <span class="scrap__size">4.2 KB</span>
+          <span class="scrap__mtime">3d ago</span>
+        </div>
+
+        <div class="scrap">
+          <span class="scrap__kind">md</span>
+          <span class="scrap__name">preemptive-capitulation.md</span>
+          <span class="scrap__size">1.8 KB</span>
+          <span class="scrap__mtime">1d ago</span>
+        </div>
+
+        <!-- Image — inline thumbnail; click opens lightbox at full resolution -->
+        <div class="scrap scrap--img">
+          <img class="scrap__thumb" alt="" src="data:image/svg+xml;utf8,&lt;svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 56 42'&gt;&lt;defs&gt;&lt;linearGradient id='g' x1='0' y1='0' x2='1' y2='1'&gt;&lt;stop offset='0' stop-color='%23b08a5e'/&gt;&lt;stop offset='1' stop-color='%236e2e2e'/&gt;&lt;/linearGradient&gt;&lt;/defs&gt;&lt;rect width='56' height='42' fill='url(%23g)'/&gt;&lt;circle cx='14' cy='14' r='6' fill='%23faf6ee' opacity='0.5'/&gt;&lt;path d='M0 32 L18 22 L30 28 L42 18 L56 26 L56 42 L0 42 Z' fill='%231c1816' opacity='0.4'/&gt;&lt;/svg&gt;">
+          <span class="scrap__name">cover-sketch.png</span>
+          <span class="scrap__size">128 KB</span>
+          <span class="scrap__mtime">5d ago</span>
+        </div>
+
+        <!-- JSON — inline-truncated preview; click opens full -->
+        <div class="scrap scrap--with-preview">
+          <span class="scrap__kind">json</span>
+          <span class="scrap__name">archetype-graph.json</span>
+          <span class="scrap__size">3.4 KB</span>
+          <span class="scrap__mtime">2d ago</span>
+          <pre class="scrap__inline-preview">{
+  "nodes": ["striver", "dreamer", "settler", "outsider"],
+  "edges": [
+    { "from": "striver", "to": "dreamer", "weight": 0.7 },
+    { "from": "striver", "to": "settler", "weight": 0.4 },
+…</pre>
+        </div>
+
+        <!-- Plain text — inline-truncated preview -->
+        <div class="scrap scrap--with-preview">
+          <span class="scrap__kind">txt</span>
+          <span class="scrap__name">working-quotes.txt</span>
+          <span class="scrap__size">812 B</span>
+          <span class="scrap__mtime">7d ago</span>
+          <pre class="scrap__inline-preview">"What you call drift is just gravity catching up."
+   — interview, S., 2024-11-09
+
+"They mistook momentum for direction. Most do."
+   — overheard, Brooklyn, 2025-02
+…</pre>
+        </div>
+
+      </div>
+
+      <div class="actions">
+        <a href="#" class="btn btn--accent">Open in Review</a>
+        <a href="#" class="btn">Open Scrapbook</a>
+        <a href="#" class="btn">Reveal in Finder</a>
+      </div>
+
+    </div>
+
+  </section>
+
+</body>
+</html>

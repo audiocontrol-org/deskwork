@@ -34,11 +34,16 @@ import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readConfig } from '@deskwork/core/config';
 import { createApiRouter, type StudioContext } from './routes/api.ts';
+import { serveScrapbookFile } from './routes/scrapbook-file.ts';
 import { renderDashboard } from './pages/dashboard.ts';
 import { renderReviewPage } from './pages/review.ts';
 import { renderShortformPage } from './pages/shortform.ts';
 import { renderHelpPage } from './pages/help.ts';
 import { renderScrapbookPage } from './pages/scrapbook.ts';
+import {
+  renderContentTopLevel,
+  renderContentProject,
+} from './pages/content.ts';
 import { detectTailscale, type TailscaleInfo } from './tailscale.ts';
 
 interface CliArgs {
@@ -158,9 +163,14 @@ export function createApp(ctx: StudioContext): Hono {
   app.get('/dev/editorial-review-shortform', (c) =>
     c.html(renderShortformPage(ctx, c.req.query('focus') ?? null)),
   );
-  app.get('/dev/editorial-review/:slug', async (c) =>
+  // `:slug{.+}` captures hierarchical slugs (`/`-separated kebab-case
+  // segments) — anything from a flat `scsi-protocol` to a deeply nested
+  // `the-outbound/characters/strivers`. Without the regex matcher, Hono
+  // treats `:slug` as a single-segment match and returns 404 for any
+  // slug containing `/`.
+  app.get('/dev/editorial-review/:slug{.+}', async (c) =>
     c.html(
-      await renderReviewPage(ctx, c.req.param('slug'), {
+      await renderReviewPage(ctx, decodeURIComponent(c.req.param('slug')), {
         site: c.req.query('site') ?? null,
         version: c.req.query('v') ?? null,
         kind: c.req.query('kind') ?? null,
@@ -180,6 +190,28 @@ export function createApp(ctx: StudioContext): Hono {
       ),
     ),
   );
+
+  // Read-only binary endpoint for scrapbook files. Used by the
+  // shared scrapbook-item renderer (`components/scrapbook-item.ts`)
+  // to source image thumbnails, PDF iframes, and download fallbacks.
+  // Distinct from the (not-yet-ported) full scrapbook CRUD API — the
+  // bird's-eye and review-drawer surfaces are read-only.
+  app.get('/api/dev/scrapbook-file', (c) => serveScrapbookFile(c, ctx));
+
+  // Bird's-eye content view (Phase 16d). Three routes:
+  //   GET /dev/content                     — top-level (sites + projects)
+  //   GET /dev/content/:site               — same shape filtered to one site
+  //   GET /dev/content/:site/:project{.+}  — drilldown for one project
+  // The `?node=<slug>` query param toggles the detail panel.
+  app.get('/dev/content', (c) => c.html(renderContentTopLevel(ctx)));
+  app.get('/dev/content/:site', (c) => c.html(renderContentTopLevel(ctx)));
+  app.get('/dev/content/:site/:project{.+}', async (c) => {
+    const site = c.req.param('site');
+    const project = decodeURIComponent(c.req.param('project'));
+    const node = c.req.query('node') ?? null;
+    const r = await renderContentProject(ctx, site, project, node);
+    return c.html(r.html, r.status as never);
+  });
 
   // Static assets — UI client JS, CSS, etc.
   app.use(

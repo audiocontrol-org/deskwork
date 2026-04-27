@@ -1,0 +1,193 @@
+/* ============================================================
+   Shared scrap-row styling
+   ============================================================
+   Used by:
+     - the review-page scrapbook drawer (Phase 16c)
+     - the bird's-eye content view detail panel (Phase 16d)
+   Keeps the in-browser preview rules consistent across surfaces:
+   image kinds → inline thumbnail, PDF → embedded iframe,
+   text/json → inline-truncated <pre>, markdown + everything else →
+   single-line row with a kind chip.
+
+   Visual language tracks the Writer's Catalog mockup
+   (mockups/birds-eye-content-view.html) — paper + ink + monospace
+   accents, dashed rules, no shadows beyond the natural inset.
+   Surface-specific outer chrome (drawer wrapping, panel padding)
+   lives in the surface's own stylesheet; this file styles the
+   row itself.
+   ============================================================ */
+
+.scraplist {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.scrap {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: baseline;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--er-rule-soft, #ebe5d4);
+  transition: background 0.14s ease;
+  text-decoration: none;
+  color: inherit;
+}
+
+.scrap:last-child {
+  border-bottom: none;
+}
+
+.scrap:hover {
+  background: rgba(245, 230, 192, 0.4);
+}
+
+.scrap--img {
+  grid-template-columns: 56px 1fr auto auto;
+}
+
+.scrap__thumb-link {
+  display: block;
+  text-decoration: none;
+  line-height: 0;
+}
+
+.scrap__thumb {
+  width: 56px;
+  height: 42px;
+  object-fit: cover;
+  border: 1px solid var(--er-rule, #d8cfbd);
+  background: var(--er-paper, #faf6ee);
+  display: block;
+  transition: transform 0.16s ease;
+}
+
+.scrap--img:hover .scrap__thumb {
+  transform: scale(1.04);
+}
+
+.scrap__kind {
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--er-ink-mid, #5a534c);
+  text-transform: uppercase;
+  width: 32px;
+  text-align: center;
+  padding: 1px 5px;
+  border: 1px solid var(--er-rule, #d8cfbd);
+  border-radius: 1px;
+  background: var(--er-paper, #faf6ee);
+  font-weight: 500;
+  align-self: center;
+}
+
+.scrap__name {
+  font-family: var(--er-font-body, Newsreader, Georgia, serif);
+  font-size: 13px;
+  color: var(--er-ink, #1c1816);
+  letter-spacing: -0.003em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.scrap__name-link {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.14s ease;
+}
+
+.scrap__name-link:hover,
+.scrap__name-link:focus {
+  border-bottom-color: var(--er-accent, #6e2e2e);
+  outline: none;
+}
+
+.scrap__size {
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 10px;
+  color: var(--er-ink-light, #8a8278);
+  font-feature-settings: "tnum";
+}
+
+.scrap__mtime {
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 10px;
+  color: var(--er-ink-faint, #b8b0a2);
+  font-feature-settings: "tnum";
+}
+
+.scrap__inline-preview {
+  grid-column: 1 / -1;
+  margin: 6px 0 0;
+  padding: 10px 12px;
+  background: var(--er-paper, #faf6ee);
+  border: 1px solid var(--er-rule-soft, #ebe5d4);
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 10px;
+  color: var(--er-ink-mid, #5a534c);
+  line-height: 1.6;
+  max-height: 88px;
+  overflow: hidden;
+  white-space: pre-wrap;
+  word-break: break-word;
+  position: relative;
+}
+
+.scrap__inline-preview::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 22px;
+  background: linear-gradient(
+    to bottom,
+    rgba(250, 246, 238, 0),
+    var(--er-paper, #faf6ee)
+  );
+  pointer-events: none;
+}
+
+.scrap--with-preview {
+  grid-template-columns: auto 1fr auto auto;
+  grid-template-rows: auto auto;
+  padding-bottom: 14px;
+}
+
+.scrap--pdf {
+  grid-template-columns: auto 1fr auto auto;
+  grid-template-rows: auto auto;
+  padding-bottom: 14px;
+}
+
+.scrap__pdf-frame {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 240px;
+  border: 1px solid var(--er-rule-soft, #ebe5d4);
+  margin-top: 6px;
+  background: var(--er-paper, #faf6ee);
+}
+
+.scrap--empty {
+  display: block;
+  padding: 16px 0;
+  text-align: center;
+  border-bottom: none;
+  color: var(--er-ink-faint, #b8b0a2);
+}
+
+.scrap--empty:hover {
+  background: transparent;
+}
+
+.scrap__empty-text {
+  font-family: var(--er-font-body, Newsreader, Georgia, serif);
+  font-style: italic;
+  font-size: 12px;
+}

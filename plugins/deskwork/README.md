@@ -46,15 +46,48 @@ All skills are under the `/deskwork:` namespace. Slugs accept `/`-separated keba
 
 ### Hierarchical content
 
-Each calendar entry's slug is its logical tree position. Three on-disk shapes for the scaffolded content file, picked per-entry at outline time:
+deskwork is **not** a flat-blog tool. Slugs accept `/`-separated segments and the lifecycle skills + studio surfaces work at any depth. Long-form projects (novels, essay collections, multi-chapter guides) live alongside flat blog posts in the same calendar.
 
-- `--layout index` (default) → `<slug>/index.md` — typical for top-level pieces that should become public routes
-- `--layout readme` → `<slug>/README.md` — editorial-private nested chapters / sub-pieces
-- `--layout flat` → `<slug>.md` — many small chapters under one parent (no own dir)
+#### Hierarchical slugs
+
+Slugs are URL-safe paths — kebab-case segments, optionally separated by `/`:
+
+```
+scsi-over-wifi-raspberry-pi-bridge          flat
+the-outbound                                hierarchical root
+the-outbound/characters                     intermediate node
+the-outbound/characters/strivers            nested chapter
+```
+
+Each segment must match `[a-z0-9][a-z0-9-]*`. Both `add` and `ingest` accept hierarchical slugs without ceremony.
+
+#### Per-entry on-disk shape
+
+The content file's location is picked per-entry at outline time via `--layout`:
+
+| Flag | Resulting path | Use when |
+|---|---|---|
+| `--layout index` (default) | `<slug>/index.md` | Top-level pieces that should become public routes |
+| `--layout readme` | `<slug>/README.md` | Editorial-private nested chapters (often paired with content-collection patterns that exclude `README.md`) |
+| `--layout flat` | `<slug>.md` | Many small siblings under one parent (no per-entry dir) |
 
 Each entry's actual file path is recorded in the calendar's `FilePath` column, so subsequent reads find the right file regardless of the site's default `blogFilenameTemplate`.
 
-Adding `the-outbound/characters/strivers` does **not** auto-create entries for `the-outbound` or `the-outbound/characters` — each entry stands alone. Promote intermediate directories to tracked entries explicitly when they should run through the lifecycle.
+#### Each entry stands alone
+
+Adding `the-outbound/characters/strivers` does **not** auto-create entries for `the-outbound` or `the-outbound/characters`. Promote intermediate directories to tracked entries explicitly when they should run through the lifecycle (with `add` or `ingest`). Pure organizational directories — those without their own `index.md` / `README.md` — stay untracked and don't appear in the calendar.
+
+#### Backfilling existing trees
+
+`/deskwork:ingest` walks paths and derives hierarchical slugs from the on-disk layout. A directory's name prefixes child slugs only when the directory itself has an `index.md` or `README.md` (i.e. it's a tracked node). See the ingest skill for examples.
+
+#### Studio surfaces
+
+The studio (`deskwork-studio`) renders hierarchical content at any depth:
+
+- `/dev/editorial-review/<slug>` — review surface, accepts hierarchical slugs (`the-outbound/characters/strivers`)
+- `/dev/scrapbook/<site>/<path>` — scrapbook viewer at any path; works for tracked entries AND untracked organizational nodes
+- `/dev/content/<site>/<project>` — bird's-eye tree view (Phase 16) showing the entire content shape with drillable detail panel
 
 ### Scrapbooks
 
