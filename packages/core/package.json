@@ -21,6 +21,7 @@
     "./cli-args": "./src/cli.ts",
     "./config": "./src/config.ts",
     "./frontmatter": "./src/frontmatter.ts",
+    "./ingest": "./src/ingest.ts",
     "./journal": "./src/journal.ts",
     "./paths": "./src/paths.ts",
     "./rename-slug": "./src/rename-slug.ts",
