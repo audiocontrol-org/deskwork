@@ -5,8 +5,13 @@
  * drag-drop upload + full-page overlay, index-rail jump + scroll
  * sync, localStorage persistence.
  *
+ * v0.6.0 (#29) wires the scrapbook lightbox: image-kind items now
+ * open in an in-context overlay instead of full-window nav.
+ *
  * See docs/design/scrapbook-phase-19a-design.md for the contract.
  */
+
+import { initScrapbookLightbox } from './lightbox.ts';
 
 type Kind = 'md' | 'json' | 'js' | 'img' | 'txt' | 'other';
 
@@ -44,6 +49,9 @@ export function initScrapbook(): void {
   wireOverlay(ctx);
   wireIndexScrollSync(ctx);
   restoreOpenStates(ctx);
+  // #29: bind clicks on image thumbnails (and on expanded image
+  // bodies once they render) to the in-context lightbox overlay.
+  initScrapbookLightbox(ctx.root);
 }
 
 // ---------------------------------------------------------------------------
@@ -141,6 +149,10 @@ async function expandItem(ctx: Ctx, item: HTMLLIElement): Promise<void> {
   try {
     await renderBody(ctx, bodyContent, kind, filename);
     bodyContent.dataset.loaded = 'true';
+    // #29: image bodies are injected lazily; re-bind the lightbox
+    // so the new <img> becomes clickable. Idempotent — items already
+    // bound carry data-lightbox-ready and are skipped.
+    if (kind === 'img') initScrapbookLightbox(ctx.root);
   } catch (e) {
     flashError(ctx, `couldn't read ${filename}: ${msg(e)}`);
   }

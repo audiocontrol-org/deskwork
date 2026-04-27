@@ -290,6 +290,7 @@ export function renderScrapbookPage(
       '/static/css/editorial-review.css',
       '/static/css/editorial-nav.css',
       '/static/css/scrapbook.css',
+      '/static/css/blog-figure.css',
     ],
     bodyAttrs: 'data-review-ui="studio"',
     bodyHtml: body,

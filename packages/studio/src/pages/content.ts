@@ -219,10 +219,14 @@ export function renderContentTopLevel(ctx: StudioContext): string {
       '/static/css/editorial-nav.css',
       '/static/css/content.css',
       '/static/css/scrap-row.css',
+      '/static/css/blog-figure.css',
     ],
     bodyAttrs: 'data-review-ui="studio"',
     bodyHtml: body,
-    scriptModules: [],
+    // #29: lightbox listener for image thumbnails in detail-panel
+    // scrap rows. Idempotent — safe to load on the top-level page
+    // too (no scrap rows there → no work).
+    scriptModules: ['/static/dist/content-view-client.js'],
   });
 }
 
@@ -408,10 +412,13 @@ export async function renderContentProject(
         '/static/css/editorial-nav.css',
         '/static/css/content.css',
         '/static/css/scrap-row.css',
+        '/static/css/blog-figure.css',
       ],
       bodyAttrs: 'data-review-ui="studio"',
       bodyHtml: body,
-      scriptModules: [],
+      // #29: scrap rows in the detail panel have image thumbnails;
+      // wire up the lightbox.
+      scriptModules: ['/static/dist/content-view-client.js'],
     }),
   };
 }
