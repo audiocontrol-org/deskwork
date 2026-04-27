@@ -19,6 +19,7 @@
 const SUBCOMMANDS: Record<string, () => Promise<{ run: (argv: string[]) => Promise<void> }>> = {
   add: () => import('./commands/add.ts'),
   approve: () => import('./commands/approve.ts'),
+  distribute: () => import('./commands/distribute.ts'),
   doctor: () => import('./commands/doctor.ts'),
   draft: () => import('./commands/draft.ts'),
   ingest: () => import('./commands/ingest.ts'),
@@ -33,6 +34,7 @@ const SUBCOMMANDS: Record<string, () => Promise<{ run: (argv: string[]) => Promi
   'review-help': () => import('./commands/review-help.ts'),
   'review-report': () => import('./commands/review-report.ts'),
   'review-start': () => import('./commands/review-start.ts'),
+  'shortform-start': () => import('./commands/shortform-start.ts'),
 };
 
 const subcommand = process.argv[2];
@@ -88,10 +90,13 @@ function printUsage(): void {
   out.write('  doctor          audit/repair binding metadata\n\n');
   out.write('Review loop:\n');
   out.write('  review-start    enqueue a longform draft for review\n');
+  out.write('  shortform-start enqueue a shortform draft for review\n');
   out.write('  iterate         snapshot agent revision; back to in-review\n');
   out.write('  approve         finalize an approved workflow\n');
   out.write('  review-cancel   cancel a workflow\n');
   out.write('  review-help     list open workflows\n');
   out.write('  review-report   voice-drift report\n\n');
+  out.write('Distribution:\n');
+  out.write('  distribute      record a posted shortform URL on the calendar\n\n');
   out.write('Run `deskwork <subcommand>` with no further args to see its usage.\n');
 }

@@ -652,6 +652,10 @@ function addEntry(calendar, title, opts) {
   calendar.entries.push(entry);
   return entry;
 }
+function findEntryById(calendar, id) {
+  if (!id) return void 0;
+  return calendar.entries.find((e) => e.id === id);
+}
 function planEntry(calendar, slug, keywords, opts) {
   const entry = calendar.entries.find((e) => e.slug === slug);
   if (!entry) {
@@ -757,6 +761,73 @@ function publishEntry(calendar, slug, datePublished) {
 }
 function findEntry(calendar, slug) {
   return calendar.entries.find((e) => e.slug === slug);
+}
+function addDistribution(calendar, record) {
+  const entry = record.entryId && calendar.entries.find((e) => e.id === record.entryId) || calendar.entries.find((e) => e.slug === record.slug);
+  if (!entry) {
+    throw new Error(
+      `No calendar entry found with entryId "${record.entryId ?? ""}" or slug "${record.slug}"`
+    );
+  }
+  if (entry.stage !== "Published") {
+    throw new Error(
+      `Entry "${entry.slug}" is in stage "${entry.stage}" \u2014 must be Published to record a distribution`
+    );
+  }
+  if (entry.id !== void 0) record.entryId = entry.id;
+  record.slug = entry.slug;
+  calendar.distributions.push(record);
+  return record;
+}
+function updateDistributionUrl(calendar, match, url, dateShared, notes) {
+  if (!match.platform) {
+    throw new Error("updateDistributionUrl: platform is required");
+  }
+  if ((match.entryId === void 0 || match.entryId === "") && (match.slug === void 0 || match.slug === "")) {
+    throw new Error("updateDistributionUrl: entryId or slug is required");
+  }
+  const channelKey = match.channel?.toLowerCase();
+  const channelMatches = (recChannel) => {
+    if (channelKey === void 0) return !recChannel;
+    return (recChannel?.toLowerCase() ?? "") === channelKey;
+  };
+  const existing = calendar.distributions.find((d) => {
+    if (d.platform !== match.platform) return false;
+    if (!channelMatches(d.channel)) return false;
+    if (match.entryId !== void 0 && match.entryId !== "" && d.entryId === match.entryId) {
+      return true;
+    }
+    if (match.slug !== void 0 && match.slug !== "" && d.slug === match.slug) {
+      return true;
+    }
+    return false;
+  });
+  const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  if (existing) {
+    existing.url = url;
+    existing.dateShared = dateShared ?? existing.dateShared ?? today;
+    if (notes !== void 0) {
+      existing.notes = notes;
+    }
+    return existing;
+  }
+  const slug = match.slug ?? "";
+  const record = {
+    slug,
+    platform: match.platform,
+    url,
+    dateShared: dateShared ?? today
+  };
+  if (match.entryId !== void 0 && match.entryId !== "") {
+    record.entryId = match.entryId;
+  }
+  if (match.channel !== void 0 && match.channel !== "") {
+    record.channel = match.channel;
+  }
+  if (notes !== void 0) {
+    record.notes = notes;
+  }
+  return addDistribution(calendar, record);
 }
 var init_calendar_mutations = __esm({
   "../core/src/calendar-mutations.ts"() {
@@ -8503,7 +8574,7 @@ __export(add_exports, {
 });
 async function run(argv2) {
   const KNOWN_FLAGS3 = ["site", "type", "content-url", "source", "slug"];
-  const SLUG_RE2 = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
+  const SLUG_RE3 = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
   const { positional, flags } = parse();
   if (positional.length < 2) {
     fail(
@@ -8511,7 +8582,7 @@ async function run(argv2) {
       2
     );
   }
-  if (flags.slug !== void 0 && !SLUG_RE2.test(flags.slug)) {
+  if (flags.slug !== void 0 && !SLUG_RE3.test(flags.slug)) {
     fail(
       `--slug must be one or more /-separated kebab-case segments (got "${flags.slug}")`,
       2
@@ -8890,6 +8961,73 @@ var init_pipeline = __esm({
 });
 
 // ../core/src/review/workflow-paths.ts
+import { existsSync as existsSync2 } from "node:fs";
+function lookupEntry(projectRoot, config, site, match) {
+  try {
+    const calendarPath = resolveCalendarPath(projectRoot, config, site);
+    if (!existsSync2(calendarPath)) return void 0;
+    const cal = readCalendar(calendarPath);
+    if (match.entryId !== void 0 && match.entryId !== "") {
+      const byId = findEntryById(cal, match.entryId);
+      if (byId !== void 0) return byId;
+    }
+    if (match.slug !== void 0 && match.slug !== "") {
+      return findEntry(cal, match.slug);
+    }
+    return void 0;
+  } catch {
+    return void 0;
+  }
+}
+function resolveLongformFilePath(projectRoot, config, site, slug, hint) {
+  let entry = hint.entry;
+  let entryId = hint.entryId;
+  if (entry === void 0 && (entryId === void 0 || entryId === "")) {
+    entry = lookupEntry(projectRoot, config, site, { slug });
+    entryId = entry?.id;
+  } else if (entry === void 0 && entryId !== void 0) {
+    entry = lookupEntry(projectRoot, config, site, { entryId });
+  } else if (entryId === void 0 || entryId === "") {
+    entryId = entry?.id;
+  }
+  if (entryId !== void 0 && entryId !== "") {
+    const idx = hint.index ?? buildContentIndex(projectRoot, config, site);
+    const fromIndex = findEntryFile(
+      projectRoot,
+      config,
+      site,
+      entryId,
+      idx,
+      entry !== void 0 ? { slug: entry.slug } : { slug }
+    );
+    if (fromIndex !== void 0) return fromIndex;
+  }
+  return resolveBlogFilePath(projectRoot, config, site, slug);
+}
+function resolveShortformWorkflowFilePath(projectRoot, config, site, slug, platform, channel, hint) {
+  let entry = hint.entry;
+  let entryId = hint.entryId;
+  if (entry === void 0 && (entryId === void 0 || entryId === "")) {
+    entry = lookupEntry(projectRoot, config, site, { slug });
+    entryId = entry?.id;
+  } else if (entry === void 0 && entryId !== void 0) {
+    entry = lookupEntry(projectRoot, config, site, { entryId });
+  } else if (entryId === void 0 || entryId === "") {
+    entryId = entry?.id;
+  }
+  return resolveShortformFilePath(
+    projectRoot,
+    config,
+    site,
+    {
+      ...entryId !== void 0 && entryId !== "" ? { id: entryId } : {},
+      slug: entry?.slug ?? slug
+    },
+    platform,
+    channel,
+    hint.index
+  );
+}
 var init_workflow_paths = __esm({
   "../core/src/review/workflow-paths.ts"() {
     "use strict";
@@ -8914,6 +9052,102 @@ var init_result = __esm({
 });
 
 // ../core/src/review/start-handlers.ts
+import { existsSync as existsSync3, mkdirSync as mkdirSync2, readFileSync as readFileSync5 } from "node:fs";
+import { dirname as dirname2 } from "node:path";
+function handleStartShortform(projectRoot, config, body) {
+  if (!body || typeof body !== "object") return err(400, "expected JSON object body");
+  const b = body;
+  if (!b.site) return err(400, "site is required");
+  if (!(b.site in config.sites)) {
+    const known = Object.keys(config.sites).join(", ");
+    return err(400, `unknown site: ${b.site}. Configured: ${known}`);
+  }
+  if (!b.slug || typeof b.slug !== "string") return err(400, "slug is required");
+  if (!SLUG_RE.test(b.slug)) {
+    return err(400, `invalid slug: ${b.slug}. Must match ${SLUG_RE}`);
+  }
+  if (!b.platform) return err(400, "platform is required");
+  if (!isPlatform(b.platform)) {
+    return err(400, `invalid platform: ${String(b.platform)}`);
+  }
+  const channel = b.channel !== void 0 && b.channel !== "" ? b.channel : void 0;
+  const callerEntryId = b.entryId !== void 0 && b.entryId !== "" ? b.entryId : void 0;
+  const entry = lookupEntry(projectRoot, config, b.site, {
+    ...callerEntryId !== void 0 ? { entryId: callerEntryId } : {},
+    slug: b.slug
+  });
+  if (!entry) {
+    return err(404, `no calendar entry for site=${b.site} slug=${b.slug}`);
+  }
+  const entryId = callerEntryId ?? entry.id;
+  let filePath;
+  try {
+    filePath = resolveShortformWorkflowFilePath(
+      projectRoot,
+      config,
+      b.site,
+      b.slug,
+      b.platform,
+      channel,
+      {
+        ...entryId !== void 0 ? { entryId } : {},
+        entry
+      }
+    );
+  } catch (e) {
+    return err(400, e instanceof Error ? e.message : String(e));
+  }
+  if (filePath === void 0) {
+    const fallback = resolveLongformFilePath(
+      projectRoot,
+      config,
+      b.site,
+      b.slug,
+      { ...entryId !== void 0 ? { entryId } : {}, entry }
+    );
+    const entryDir = dirname2(fallback);
+    const filename = channel !== void 0 ? `${b.platform}-${channel}.md` : `${b.platform}.md`;
+    filePath = `${entryDir}/scrapbook/shortform/${filename}`;
+  }
+  let markdown;
+  if (existsSync3(filePath)) {
+    markdown = readFileSync5(filePath, "utf-8");
+  } else {
+    mkdirSync2(dirname2(filePath), { recursive: true });
+    const initialBody = b.initialMarkdown ?? "";
+    const deskworkMeta = {
+      platform: b.platform
+    };
+    if (channel !== void 0) deskworkMeta.channel = channel;
+    if (entryId !== void 0 && entryId !== "") deskworkMeta.id = entryId;
+    const fmData = {
+      title: entry.title,
+      deskwork: deskworkMeta
+    };
+    writeFrontmatter(filePath, fmData, initialBody);
+    markdown = initialBody;
+  }
+  const before = readWorkflows(projectRoot, config).find((w) => {
+    const identityMatch = entryId && w.entryId ? w.entryId === entryId : w.site === b.site && w.slug === b.slug;
+    return identityMatch && w.contentKind === "shortform" && (w.platform ?? null) === (b.platform ?? null) && (w.channel ?? null) === (channel ?? null) && w.state !== "applied" && w.state !== "cancelled";
+  });
+  const workflow = createWorkflow(projectRoot, config, {
+    site: b.site,
+    slug: b.slug,
+    ...entryId !== void 0 && entryId !== "" ? { entryId } : {},
+    contentKind: "shortform",
+    platform: b.platform,
+    ...channel !== void 0 ? { channel } : {},
+    initialMarkdown: markdown,
+    initialOriginatedBy: "agent"
+  });
+  return ok({
+    workflow,
+    existing: !!before && before.id === workflow.id,
+    filePath
+  });
+}
+var SLUG_RE;
 var init_start_handlers = __esm({
   "../core/src/review/start-handlers.ts"() {
     "use strict";
@@ -8922,6 +9156,7 @@ var init_start_handlers = __esm({
     init_pipeline();
     init_workflow_paths();
     init_result();
+    SLUG_RE = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
   }
 });
 
@@ -8975,10 +9210,10 @@ var approve_exports = {};
 __export(approve_exports, {
   run: () => run2
 });
-import { existsSync as existsSync2, readFileSync as readFileSync5 } from "node:fs";
+import { existsSync as existsSync4, readFileSync as readFileSync6 } from "node:fs";
 async function run2(argv2) {
   const KNOWN_FLAGS3 = ["site", "platform", "channel"];
-  const SLUG_RE2 = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
+  const SLUG_RE3 = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
   const { positional, flags } = parse();
   if (positional.length < 2) {
     fail(
@@ -8988,8 +9223,8 @@ async function run2(argv2) {
   }
   const [rootArg, slug] = positional;
   const projectRoot = absolutize(rootArg);
-  if (!SLUG_RE2.test(slug)) {
-    fail(`invalid slug: ${slug} (must match ${SLUG_RE2})`);
+  if (!SLUG_RE3.test(slug)) {
+    fail(`invalid slug: ${slug} (must match ${SLUG_RE3})`);
   }
   if (flags.platform !== void 0 && !isPlatform(flags.platform)) {
     fail(`Invalid --platform "${flags.platform}".`);
@@ -9037,7 +9272,7 @@ async function run2(argv2) {
       );
     }
     const blogFile = resolveBlogFilePath(projectRoot, config, site, slug);
-    if (!existsSync2(blogFile)) {
+    if (!existsSync4(blogFile)) {
       fail(`Blog file missing at ${blogFile}. Nothing to approve against.`);
     }
     transitionState(projectRoot, config, workflow2.id, "applied");
@@ -9062,13 +9297,13 @@ async function run2(argv2) {
       flags.platform,
       flags.channel
     );
-    if (filePath === void 0 || !existsSync2(filePath)) {
+    if (filePath === void 0 || !existsSync4(filePath)) {
       const shown = filePath ?? "(unresolved)";
       fail(
         `Shortform file missing at ${shown}. The file is the SSOT \u2014 re-run /deskwork:shortform-start if needed.`
       );
     }
-    const fileSrc = readFileSync5(filePath, "utf-8");
+    const fileSrc = readFileSync6(filePath, "utf-8");
     const approvedMarkdown = parseFrontmatter(fileSrc).body.replace(/^\n+/, "");
     const calendarPath = resolveCalendarPath(projectRoot, config, site);
     const cal = readCalendar(calendarPath);
@@ -9143,10 +9378,142 @@ var init_approve = __esm({
   }
 });
 
+// src/commands/distribute.ts
+var distribute_exports = {};
+__export(distribute_exports, {
+  run: () => run3
+});
+async function run3(argv2) {
+  const KNOWN_FLAGS3 = [
+    "site",
+    "platform",
+    "channel",
+    "url",
+    "date",
+    "notes"
+  ];
+  const SLUG_RE3 = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
+  const DATE_RE2 = /^\d{4}-\d{2}-\d{2}$/;
+  const { positional, flags } = parse();
+  if (positional.length < 2) {
+    fail(
+      "Usage: deskwork distribute <project-root> [--site <slug>] --platform <p> [--channel <c>] --url <posted-url> [--date YYYY-MM-DD] [--notes <text>] <slug>",
+      2
+    );
+  }
+  const [rootArg, slug] = positional;
+  const projectRoot = absolutize(rootArg);
+  if (!SLUG_RE3.test(slug)) {
+    fail(`invalid slug: ${slug} (must match ${SLUG_RE3})`);
+  }
+  const platform = flags.platform;
+  if (platform === void 0) {
+    fail(
+      `--platform is required. Must be one of: ${PLATFORMS.join(", ")}.`,
+      2
+    );
+  }
+  if (!isPlatform(platform)) {
+    fail(
+      `Invalid --platform "${platform}". Must be one of: ${PLATFORMS.join(", ")}.`
+    );
+  }
+  const url = flags.url;
+  if (url === void 0 || url === "") {
+    fail("--url is required (the URL of the posted share).", 2);
+  }
+  if (flags.date !== void 0 && !DATE_RE2.test(flags.date)) {
+    fail(`Invalid --date "${flags.date}". Must match YYYY-MM-DD.`);
+  }
+  const channel = flags.channel;
+  const dateShared = flags.date;
+  const notes = flags.notes;
+  let config;
+  try {
+    config = readConfig(projectRoot);
+  } catch (err2) {
+    fail(err2 instanceof Error ? err2.message : String(err2));
+  }
+  let site;
+  try {
+    site = resolveSite(config, flags.site);
+  } catch (err2) {
+    fail(err2 instanceof Error ? err2.message : String(err2));
+  }
+  const calendarPath = resolveCalendarPath(projectRoot, config, site);
+  const calendar = readCalendar(calendarPath);
+  const entry = findEntryById(calendar, slug) ?? findEntry(calendar, slug);
+  if (!entry) {
+    const slugs = calendar.entries.map((e) => e.slug).join(", ") || "(none)";
+    fail(
+      `No calendar entry with slug "${slug}" on site "${site}". Known slugs: ${slugs}.`
+    );
+  }
+  const hasPriorRecord = calendar.distributions.some((d) => {
+    if (d.platform !== platform) return false;
+    const channelMatches = channel === void 0 ? !d.channel : (d.channel?.toLowerCase() ?? "") === channel.toLowerCase();
+    if (!channelMatches) return false;
+    if (entry.id !== void 0 && d.entryId === entry.id) return true;
+    return d.slug === entry.slug;
+  });
+  if (!hasPriorRecord && entry.stage !== "Published") {
+    fail(
+      `Cannot record distribution for non-Published entry "${entry.slug}" (current stage: ${entry.stage}). Run /deskwork:publish ${entry.slug} first.`
+    );
+  }
+  let record;
+  try {
+    record = updateDistributionUrl(
+      calendar,
+      {
+        ...entry.id !== void 0 ? { entryId: entry.id } : {},
+        slug: entry.slug,
+        platform,
+        ...channel !== void 0 ? { channel } : {}
+      },
+      url,
+      dateShared,
+      notes
+    );
+  } catch (err2) {
+    fail(err2 instanceof Error ? err2.message : String(err2));
+  }
+  writeCalendar(calendarPath, calendar);
+  emit({
+    slug: record.slug,
+    ...record.entryId !== void 0 ? { entryId: record.entryId } : {},
+    platform: record.platform,
+    ...record.channel !== void 0 ? { channel: record.channel } : {},
+    url: record.url,
+    dateShared: record.dateShared,
+    ...record.notes !== void 0 ? { notes: record.notes } : {},
+    site,
+    calendarPath
+  });
+  function parse() {
+    try {
+      return parseArgs(argv2, KNOWN_FLAGS3);
+    } catch (err2) {
+      fail(err2 instanceof Error ? err2.message : String(err2), 2);
+    }
+  }
+}
+var init_distribute = __esm({
+  "src/commands/distribute.ts"() {
+    "use strict";
+    init_config();
+    init_calendar();
+    init_calendar_mutations();
+    init_paths();
+    init_types();
+    init_cli();
+  }
+});
+
 // ../core/src/doctor/rules/missing-frontmatter-id.ts
-import { existsSync as existsSync3, readdirSync as readdirSync3, statSync as statSync2 } from "node:fs";
+import { existsSync as existsSync5, readdirSync as readdirSync3, statSync as statSync2 } from "node:fs";
 import { basename, extname, join as join6, relative as relative2 } from "node:path";
-import { readFileSync as readFileSync6, writeFileSync as writeFileSync4 } from "node:fs";
+import { readFileSync as readFileSync7, writeFileSync as writeFileSync4 } from "node:fs";
 function shouldSkipDir2(name) {
   if (name.startsWith(".")) return true;
   return SKIP_DIRS2.has(name.toLowerCase());
@@ -9200,7 +9567,7 @@ function findCandidatesForEntry(projectRoot, config, site, entry) {
   const seen = /* @__PURE__ */ new Set();
   const contentDir = resolveContentDir(projectRoot, config, site);
   function consider(abs, reason) {
-    if (!existsSync3(abs)) return;
+    if (!existsSync5(abs)) return;
     if (seen.has(abs)) return;
     try {
       const parsed = readFrontmatter(abs);
@@ -9243,7 +9610,7 @@ function findCandidatesForEntry(projectRoot, config, site, entry) {
   return candidates;
 }
 function bindFrontmatterId(absPath, entryId) {
-  const raw = readFileSync6(absPath, "utf-8");
+  const raw = readFileSync7(absPath, "utf-8");
   const updated = updateFrontmatter(raw, { deskwork: { id: entryId } });
   if (updated === raw) return;
   writeFileSync4(absPath, updated, "utf-8");
@@ -9375,10 +9742,10 @@ var init_missing_frontmatter_id = __esm({
 });
 
 // ../core/src/doctor/rules/orphan-frontmatter-id.ts
-import { readFileSync as readFileSync7, writeFileSync as writeFileSync5 } from "node:fs";
+import { readFileSync as readFileSync8, writeFileSync as writeFileSync5 } from "node:fs";
 import { relative as relative3 } from "node:path";
 function clearFrontmatterId(absPath) {
-  const raw = readFileSync7(absPath, "utf-8");
+  const raw = readFileSync8(absPath, "utf-8");
   const { data } = parseFrontmatter(raw);
   const block = data.deskwork;
   if (block === void 0 || block === null) return false;
@@ -9499,10 +9866,10 @@ var init_orphan_frontmatter_id = __esm({
 });
 
 // ../core/src/doctor/rules/duplicate-id.ts
-import { readFileSync as readFileSync8, writeFileSync as writeFileSync6 } from "node:fs";
+import { readFileSync as readFileSync9, writeFileSync as writeFileSync6 } from "node:fs";
 import { join as join7, relative as relative4 } from "node:path";
 function clearFrontmatterId2(absPath) {
-  const raw = readFileSync8(absPath, "utf-8");
+  const raw = readFileSync9(absPath, "utf-8");
   const { data } = parseFrontmatter(raw);
   const block = data.deskwork;
   if (block === void 0 || block === null) return false;
@@ -9896,7 +10263,7 @@ var init_workflow_stale = __esm({
 });
 
 // ../core/src/doctor/rules/calendar-uuid-missing.ts
-import { readFileSync as readFileSync9, existsSync as existsSync4 } from "node:fs";
+import { readFileSync as readFileSync10, existsSync as existsSync6 } from "node:fs";
 function scanRowsMissingUuid(markdown) {
   const lines = markdown.split("\n");
   const rows = [];
@@ -9966,10 +10333,10 @@ var init_calendar_uuid_missing = __esm({
           ctx.config,
           ctx.site
         );
-        if (!existsSync4(calendarPath)) return [];
+        if (!existsSync6(calendarPath)) return [];
         let raw;
         try {
-          raw = readFileSync9(calendarPath, "utf-8");
+          raw = readFileSync10(calendarPath, "utf-8");
         } catch {
           return [];
         }
@@ -10044,7 +10411,7 @@ var init_calendar_uuid_missing = __esm({
 });
 
 // ../core/src/doctor/rules/legacy-top-level-id-migration.ts
-import { readFileSync as readFileSync10, readdirSync as readdirSync5, statSync as statSync3, writeFileSync as writeFileSync7 } from "node:fs";
+import { readFileSync as readFileSync11, readdirSync as readdirSync5, statSync as statSync3, writeFileSync as writeFileSync7 } from "node:fs";
 import { extname as extname2, join as join9, relative as relative5 } from "node:path";
 function shouldSkipDir3(name) {
   if (name.startsWith(".")) return true;
@@ -10085,7 +10452,7 @@ function collectMarkdownFiles3(dir) {
 function classify(absPath, calendarIds) {
   let parsed;
   try {
-    parsed = parseFrontmatter(readFileSync10(absPath, "utf-8"));
+    parsed = parseFrontmatter(readFileSync11(absPath, "utf-8"));
   } catch {
     return null;
   }
@@ -10106,7 +10473,7 @@ function classify(absPath, calendarIds) {
   return { absolutePath: absPath, legacyId: trimmed };
 }
 function migrateLegacyTopLevelId(absPath, legacyId) {
-  const raw = readFileSync10(absPath, "utf-8");
+  const raw = readFileSync11(absPath, "utf-8");
   const withDeskwork = updateFrontmatter(raw, { deskwork: { id: legacyId } });
   const withoutTopLevel = removeFrontmatterPaths(withDeskwork, [["id"]]);
   if (withoutTopLevel === raw) return;
@@ -10407,11 +10774,11 @@ var init_doctor = __esm({
 // src/commands/doctor.ts
 var doctor_exports = {};
 __export(doctor_exports, {
-  run: () => run3
+  run: () => run4
 });
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
-async function run3(argv2) {
+async function run4(argv2) {
   const { positional, flags, booleans } = parseInput(argv2);
   if (positional.length < 1) {
     fail(
@@ -10627,9 +10994,9 @@ var init_doctor2 = __esm({
 // src/commands/draft.ts
 var draft_exports = {};
 __export(draft_exports, {
-  run: () => run4
+  run: () => run5
 });
-async function run4(argv2) {
+async function run5(argv2) {
   const KNOWN_FLAGS3 = ["site", "issue"];
   const { positional, flags } = parse();
   if (positional.length < 2) {
@@ -10698,7 +11065,7 @@ var init_draft = __esm({
 
 // ../core/src/ingest-paths.ts
 import {
-  existsSync as existsSync5,
+  existsSync as existsSync7,
   readdirSync as readdirSync6,
   statSync as statSync4
 } from "node:fs";
@@ -10721,7 +11088,7 @@ function expandPath(input) {
   if (containsGlob(input)) {
     return expandGlob(absolute);
   }
-  if (!existsSync5(absolute)) {
+  if (!existsSync7(absolute)) {
     throw new Error(`Path does not exist: ${input}`);
   }
   const stat = statSync4(absolute);
@@ -10768,7 +11135,7 @@ function expandGlob(absolutePattern) {
   }
   const root = segments.slice(0, rootEnd + 1).join(sep) || sep;
   const remainder = segments.slice(rootEnd + 1);
-  if (!existsSync5(root)) {
+  if (!existsSync7(root)) {
     return [];
   }
   return matchPattern(root, remainder, root);
@@ -11048,7 +11415,7 @@ var init_ingest_derive = __esm({
 
 // ../core/src/ingest.ts
 import { basename as basename2, isAbsolute as isAbsolute3, relative as relative7, sep as sep3 } from "node:path";
-import { readFileSync as readFileSync11 } from "node:fs";
+import { readFileSync as readFileSync12 } from "node:fs";
 function discoverIngestCandidates(paths, options) {
   if (paths.length === 0) {
     throw new Error("discoverIngestCandidates: at least one path is required");
@@ -11079,7 +11446,7 @@ function discoverIngestCandidates(paths, options) {
     }
     let raw;
     try {
-      raw = readFileSync11(filePath, "utf-8");
+      raw = readFileSync12(filePath, "utf-8");
     } catch (err2) {
       skips.push({
         filePath,
@@ -11123,7 +11490,7 @@ function discoverIngestCandidates(paths, options) {
       });
       continue;
     }
-    if (!SLUG_RE.test(slug.value)) {
+    if (!SLUG_RE2.test(slug.value)) {
       skips.push({
         filePath,
         relativePath: relPath,
@@ -11208,14 +11575,14 @@ function isUnderScrapbook(filePath, roots) {
   }
   return false;
 }
-var SLUG_RE, DEFAULT_FIELDS;
+var SLUG_RE2, DEFAULT_FIELDS;
 var init_ingest = __esm({
   "../core/src/ingest.ts"() {
     "use strict";
     init_frontmatter();
     init_ingest_paths();
     init_ingest_derive();
-    SLUG_RE = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
+    SLUG_RE2 = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
     DEFAULT_FIELDS = {
       title: "title",
       description: "description",
@@ -11229,12 +11596,12 @@ var init_ingest = __esm({
 // src/commands/ingest.ts
 var ingest_exports = {};
 __export(ingest_exports, {
-  run: () => run5
+  run: () => run6
 });
-import { existsSync as existsSync6, mkdirSync as mkdirSync2 } from "node:fs";
+import { existsSync as existsSync8, mkdirSync as mkdirSync3 } from "node:fs";
 import { isAbsolute as isAbsolute4, join as join12, resolve as resolve3 } from "node:path";
 import { randomUUID as randomUUID4 } from "node:crypto";
-async function run5(argv2) {
+async function run6(argv2) {
   const { positional, flags, booleans } = parseInput2(argv2);
   if (positional.length < 2) {
     fail(
@@ -11417,8 +11784,8 @@ function writeIngestJournalEntry(projectRoot, config, site, candidate, entry) {
     config.reviewJournalDir ?? ".deskwork/review-journal",
     "ingest"
   );
-  if (!existsSync6(journalRoot)) {
-    mkdirSync2(journalRoot, { recursive: true });
+  if (!existsSync8(journalRoot)) {
+    mkdirSync3(journalRoot, { recursive: true });
   }
   const record = {
     id: entry.id ?? randomUUID4(),
@@ -11470,11 +11837,11 @@ var init_ingest2 = __esm({
 // src/commands/install.ts
 var install_exports = {};
 __export(install_exports, {
-  run: () => run6
+  run: () => run7
 });
-import { readFileSync as readFileSync12, writeFileSync as writeFileSync8, existsSync as existsSync7, mkdirSync as mkdirSync3 } from "node:fs";
-import { dirname as dirname2, isAbsolute as isAbsolute5, join as join13, resolve as resolve4 } from "node:path";
-async function run6(argv2) {
+import { readFileSync as readFileSync13, writeFileSync as writeFileSync8, existsSync as existsSync9, mkdirSync as mkdirSync4 } from "node:fs";
+import { dirname as dirname3, isAbsolute as isAbsolute5, join as join13, resolve as resolve4 } from "node:path";
+async function run7(argv2) {
   function usage() {
     console.error(
       "Usage: deskwork install [<project-root>] <config-file>"
@@ -11494,17 +11861,17 @@ async function run6(argv2) {
   const projectRoot = isAbsolute5(projectRootArg) ? projectRootArg : resolve4(process.cwd(), projectRootArg);
   const configFile = isAbsolute5(configFileArg) ? configFileArg : resolve4(process.cwd(), configFileArg);
   console.log(`Installing into: ${projectRoot}`);
-  if (!existsSync7(projectRoot)) {
+  if (!existsSync9(projectRoot)) {
     console.error(`Project root does not exist: ${projectRoot}`);
     process.exit(1);
   }
-  if (!existsSync7(configFile)) {
+  if (!existsSync9(configFile)) {
     console.error(`Config file does not exist: ${configFile}`);
     process.exit(1);
   }
   let rawConfig;
   try {
-    rawConfig = JSON.parse(readFileSync12(configFile, "utf-8"));
+    rawConfig = JSON.parse(readFileSync13(configFile, "utf-8"));
   } catch (err2) {
     const reason = err2 instanceof Error ? err2.message : String(err2);
     console.error(`Config file is not valid JSON: ${reason}`);
@@ -11519,7 +11886,7 @@ async function run6(argv2) {
     process.exit(1);
   }
   const writtenConfigPath = configPath(projectRoot);
-  mkdirSync3(dirname2(writtenConfigPath), { recursive: true });
+  mkdirSync4(dirname3(writtenConfigPath), { recursive: true });
   writeFileSync8(
     writtenConfigPath,
     JSON.stringify(config, null, 2) + "\n",
@@ -11529,11 +11896,11 @@ async function run6(argv2) {
   const preservedCalendars = [];
   for (const [slug, site] of Object.entries(config.sites)) {
     const absPath = join13(projectRoot, site.calendarPath);
-    if (existsSync7(absPath)) {
+    if (existsSync9(absPath)) {
       preservedCalendars.push(`${slug}: ${site.calendarPath}`);
       continue;
     }
-    mkdirSync3(dirname2(absPath), { recursive: true });
+    mkdirSync4(dirname3(absPath), { recursive: true });
     writeFileSync8(absPath, renderEmptyCalendar(), "utf-8");
     createdCalendars.push(`${slug}: ${site.calendarPath}`);
   }
@@ -11560,10 +11927,10 @@ var init_install = __esm({
 // src/commands/iterate.ts
 var iterate_exports = {};
 __export(iterate_exports, {
-  run: () => run7
+  run: () => run8
 });
-import { existsSync as existsSync8, readFileSync as readFileSync13 } from "node:fs";
-async function run7(argv2) {
+import { existsSync as existsSync10, readFileSync as readFileSync14 } from "node:fs";
+async function run8(argv2) {
   const KNOWN_FLAGS3 = ["site", "kind", "platform", "channel", "dispositions"];
   const DISPOSITIONS = /* @__PURE__ */ new Set(["addressed", "deferred", "wontfix"]);
   const VALID_KINDS = ["longform", "outline", "shortform"];
@@ -11623,12 +11990,12 @@ async function run7(argv2) {
   } else {
     file = resolveBlogFilePath(projectRoot, config, site, slug);
   }
-  if (!existsSync8(file)) {
+  if (!existsSync10(file)) {
     fail(
       kind === "shortform" ? `No shortform file at ${file}. Run /deskwork:shortform-start first.` : `No blog file at ${file}.`
     );
   }
-  const diskMarkdown = readFileSync13(file, "utf8");
+  const diskMarkdown = readFileSync14(file, "utf8");
   const workflow = readWorkflows(projectRoot, config).find(
     (w) => w.site === site && w.slug === slug && w.contentKind === kind && (kind !== "shortform" || w.platform === flags.platform) && (kind !== "shortform" || (w.channel ?? null) === (flags.channel ?? null)) && w.state !== "applied" && w.state !== "cancelled"
   );
@@ -11653,12 +12020,12 @@ The studio must click 'Request iteration' to move the workflow to 'iterating' be
   let dispositions = null;
   if (flags.dispositions !== void 0) {
     const path = absolutize(flags.dispositions);
-    if (!existsSync8(path)) {
+    if (!existsSync10(path)) {
       fail(`--dispositions file not found: ${path}`);
     }
     let parsed;
     try {
-      parsed = JSON.parse(readFileSync13(path, "utf8"));
+      parsed = JSON.parse(readFileSync14(path, "utf8"));
     } catch (err2) {
       const reason = err2 instanceof Error ? err2.message : String(err2);
       fail(`--dispositions: invalid JSON at ${path}: ${reason}`);
@@ -11739,8 +12106,8 @@ var init_iterate = __esm({
 });
 
 // ../core/src/scaffold.ts
-import { existsSync as existsSync9, mkdirSync as mkdirSync4 } from "node:fs";
-import { dirname as dirname3, join as join14, relative as relative8 } from "node:path";
+import { existsSync as existsSync11, mkdirSync as mkdirSync5 } from "node:fs";
+import { dirname as dirname4, join as join14, relative as relative8 } from "node:path";
 function scaffoldBlogPost(projectRoot, config, site, entry, opts = {}) {
   const slug = resolveSite(config, site);
   const siteCfg = config.sites[slug];
@@ -11759,7 +12126,7 @@ function scaffoldBlogPost(projectRoot, config, site, entry, opts = {}) {
     contentRelativePath
   );
   const relativePath = relative8(projectRoot, filePath);
-  if (existsSync9(filePath)) {
+  if (existsSync11(filePath)) {
     throw new Error(`Blog post already exists at ${relativePath}`);
   }
   const dateStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
@@ -11779,7 +12146,7 @@ function scaffoldBlogPost(projectRoot, config, site, entry, opts = {}) {
   data.author = author;
   if (siteCfg.blogInitialState) data.state = siteCfg.blogInitialState;
   const body = buildBody(entry.title, siteCfg.blogOutlineSection === true);
-  mkdirSync4(dirname3(filePath), { recursive: true });
+  mkdirSync5(dirname4(filePath), { recursive: true });
   writeFrontmatter(filePath, data, body);
   const reported = contentRelativePath ?? relative8(join14(projectRoot, siteCfg.contentDir), filePath);
   return { filePath, relativePath, contentRelativePath: reported };
@@ -11822,9 +12189,9 @@ var init_scaffold = __esm({
 // src/commands/outline.ts
 var outline_exports = {};
 __export(outline_exports, {
-  run: () => run8
+  run: () => run9
 });
-async function run8(argv2) {
+async function run9(argv2) {
   const KNOWN_FLAGS3 = ["site", "author", "layout"];
   const VALID_LAYOUTS = ["index", "readme", "flat"];
   const { positional, flags } = parse();
@@ -11909,9 +12276,9 @@ var init_outline = __esm({
 // src/commands/pause.ts
 var pause_exports = {};
 __export(pause_exports, {
-  run: () => run9
+  run: () => run10
 });
-async function run9(argv2) {
+async function run10(argv2) {
   const KNOWN_FLAGS3 = ["site"];
   const { positional, flags } = parse();
   if (positional.length < 2) {
@@ -11972,9 +12339,9 @@ var init_pause = __esm({
 // src/commands/plan.ts
 var plan_exports = {};
 __export(plan_exports, {
-  run: () => run10
+  run: () => run11
 });
-async function run10(argv2) {
+async function run11(argv2) {
   const KNOWN_FLAGS3 = ["site", "topics"];
   const { positional, flags } = parse();
   if (positional.length < 2) {
@@ -12037,10 +12404,10 @@ var init_plan = __esm({
 // src/commands/publish.ts
 var publish_exports = {};
 __export(publish_exports, {
-  run: () => run11
+  run: () => run12
 });
-import { existsSync as existsSync10 } from "node:fs";
-async function run11(argv2) {
+import { existsSync as existsSync12 } from "node:fs";
+async function run12(argv2) {
   const KNOWN_FLAGS3 = ["site", "date", "content-url"];
   const DATE_RE2 = /^\d{4}-\d{2}-\d{2}$/;
   const { positional, flags } = parse();
@@ -12079,7 +12446,7 @@ async function run11(argv2) {
   let filePath;
   if (hasRepoContent(contentType)) {
     filePath = resolveBlogFilePath(projectRoot, config, site, slug);
-    if (!existsSync10(filePath)) {
+    if (!existsSync12(filePath)) {
       fail(
         `Cannot publish blog post "${slug}": no file at ${filePath}. Write the post before publishing.`
       );
@@ -12129,9 +12496,9 @@ var init_publish = __esm({
 // src/commands/resume.ts
 var resume_exports = {};
 __export(resume_exports, {
-  run: () => run12
+  run: () => run13
 });
-async function run12(argv2) {
+async function run13(argv2) {
   const KNOWN_FLAGS3 = ["site"];
   const { positional, flags } = parse();
   if (positional.length < 2) {
@@ -12191,9 +12558,9 @@ var init_resume = __esm({
 // src/commands/review-cancel.ts
 var review_cancel_exports = {};
 __export(review_cancel_exports, {
-  run: () => run13
+  run: () => run14
 });
-async function run13(argv2) {
+async function run14(argv2) {
   const KNOWN_FLAGS3 = ["site", "platform", "channel", "kind"];
   const { positional, flags } = parse();
   if (positional.length < 2) {
@@ -12279,9 +12646,9 @@ var init_review_cancel = __esm({
 // src/commands/review-help.ts
 var review_help_exports = {};
 __export(review_help_exports, {
-  run: () => run14
+  run: () => run15
 });
-async function run14(argv2) {
+async function run15(argv2) {
   const KNOWN_FLAGS3 = ["site"];
   const { positional, flags } = parse();
   if (positional.length < 1) {
@@ -12489,9 +12856,9 @@ var init_report = __esm({
 // src/commands/review-report.ts
 var review_report_exports = {};
 __export(review_report_exports, {
-  run: () => run15
+  run: () => run16
 });
-async function run15(argv2) {
+async function run16(argv2) {
   const KNOWN_FLAGS3 = ["site", "format"];
   const BOOLEAN_FLAGS3 = ["include-active"];
   const { positional, flags, booleans } = parse();
@@ -12539,7 +12906,7 @@ var init_review_report = __esm({
 });
 
 // ../core/src/body-state.ts
-import { existsSync as existsSync11, readFileSync as readFileSync14 } from "node:fs";
+import { existsSync as existsSync13, readFileSync as readFileSync15 } from "node:fs";
 function stripOutlineSection(body) {
   const lines = body.split("\n");
   const startIdx = lines.findIndex((line) => /^##[ \t]+Outline\b/.test(line));
@@ -12554,8 +12921,8 @@ function stripOutlineSection(body) {
   return [...lines.slice(0, startIdx), ...lines.slice(endIdx)].join("\n");
 }
 function bodyState(filePath) {
-  if (!existsSync11(filePath)) return "missing";
-  const content = readFileSync14(filePath, "utf8");
+  if (!existsSync13(filePath)) return "missing";
+  const content = readFileSync15(filePath, "utf8");
   const fmMatch = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
   const body = fmMatch ? content.slice(fmMatch[0].length) : content;
   const withoutH1 = body.replace(/^\s*#[^\n]*\n?/, "");
@@ -12577,21 +12944,21 @@ var init_body_state = __esm({
 // src/commands/review-start.ts
 var review_start_exports = {};
 __export(review_start_exports, {
-  run: () => run16
+  run: () => run17
 });
-import { existsSync as existsSync12, readFileSync as readFileSync15, readdirSync as readdirSync8 } from "node:fs";
-import { dirname as dirname4 } from "node:path";
-async function run16(argv2) {
+import { existsSync as existsSync14, readFileSync as readFileSync16, readdirSync as readdirSync8 } from "node:fs";
+import { dirname as dirname5 } from "node:path";
+async function run17(argv2) {
   const KNOWN_FLAGS3 = ["site"];
-  const SLUG_RE2 = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
+  const SLUG_RE3 = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
   const { positional, flags } = parse();
   if (positional.length < 2) {
     fail("Usage: deskwork-review-start <project-root> [--site <slug>] <slug>", 2);
   }
   const [rootArg, slug] = positional;
   const projectRoot = absolutize(rootArg);
-  if (!SLUG_RE2.test(slug)) {
-    fail(`invalid slug: ${slug} (must match ${SLUG_RE2})`);
+  if (!SLUG_RE3.test(slug)) {
+    fail(`invalid slug: ${slug} (must match ${SLUG_RE3})`);
   }
   let config;
   try {
@@ -12601,7 +12968,7 @@ async function run16(argv2) {
   }
   const site = resolveSite(config, flags.site);
   const file = resolveBlogFilePath(projectRoot, config, site, slug);
-  if (!existsSync12(file)) {
+  if (!existsSync14(file)) {
     const siblings = listSiblingSlugs(file);
     const list = siblings.length > 0 ? siblings.join(", ") : "(none)";
     fail(
@@ -12610,12 +12977,12 @@ Existing slugs on ${site}: ${list}.
 Run /deskwork:outline <slug> (or /deskwork:draft) to scaffold it first.`
     );
   }
-  const initialMarkdown = readFileSync15(file, "utf8");
+  const initialMarkdown = readFileSync16(file, "utf8");
   const body = bodyState(file);
   let entryId;
   try {
     const calendarPath = resolveCalendarPath(projectRoot, config, site);
-    if (existsSync12(calendarPath)) {
+    if (existsSync14(calendarPath)) {
       const cal = readCalendar(calendarPath);
       entryId = cal.entries.find((e) => e.slug === slug)?.id;
     }
@@ -12661,8 +13028,8 @@ Run /deskwork:outline <slug> (or /deskwork:draft) to scaffold it first.`
     }
   }
   function listSiblingSlugs(blogFile) {
-    const dir = dirname4(blogFile);
-    if (!existsSync12(dir)) return [];
+    const dir = dirname5(blogFile);
+    if (!existsSync14(dir)) return [];
     return readdirSync8(dir).filter((name) => name.endsWith(".md")).map((name) => name.replace(/\.md$/, ""));
   }
 }
@@ -12678,10 +13045,116 @@ var init_review_start = __esm({
   }
 });
 
+// src/commands/shortform-start.ts
+var shortform_start_exports = {};
+__export(shortform_start_exports, {
+  run: () => run18
+});
+async function run18(argv2) {
+  const KNOWN_FLAGS3 = ["site", "platform", "channel", "initial-markdown"];
+  const SLUG_RE3 = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
+  const { positional, flags } = parse();
+  if (positional.length < 2) {
+    fail(
+      "Usage: deskwork shortform-start <project-root> [--site <slug>] --platform <p> [--channel <c>] [--initial-markdown <text>] <slug>",
+      2
+    );
+  }
+  const [rootArg, slug] = positional;
+  const projectRoot = absolutize(rootArg);
+  if (!SLUG_RE3.test(slug)) {
+    fail(`invalid slug: ${slug} (must match ${SLUG_RE3})`);
+  }
+  const platform = flags.platform;
+  if (platform === void 0) {
+    fail(
+      `--platform is required. Must be one of: ${PLATFORMS.join(", ")}.`,
+      2
+    );
+  }
+  if (!isPlatform(platform)) {
+    fail(
+      `Invalid --platform "${platform}". Must be one of: ${PLATFORMS.join(", ")}.`
+    );
+  }
+  const channel = flags.channel;
+  const initialMarkdown = flags["initial-markdown"];
+  let config;
+  try {
+    config = readConfig(projectRoot);
+  } catch (err2) {
+    fail(err2 instanceof Error ? err2.message : String(err2));
+  }
+  let site;
+  try {
+    site = resolveSite(config, flags.site);
+  } catch (err2) {
+    fail(err2 instanceof Error ? err2.message : String(err2));
+  }
+  const result = handleStartShortform(projectRoot, config, {
+    site,
+    slug,
+    platform,
+    ...channel !== void 0 ? { channel } : {},
+    ...initialMarkdown !== void 0 ? { initialMarkdown } : {}
+  });
+  if (result.status !== 200) {
+    fail(errorMessage(result.body));
+  }
+  if (!isSuccessBody(result.body)) {
+    fail("shortform-start: handler returned a malformed response");
+  }
+  const { workflow, existing, filePath } = result.body;
+  emit({
+    workflowId: workflow.id,
+    site: workflow.site,
+    slug: workflow.slug,
+    state: workflow.state,
+    version: workflow.currentVersion,
+    fresh: !existing,
+    platform: workflow.platform,
+    ...workflow.channel !== void 0 ? { channel: workflow.channel } : {},
+    filePath,
+    reviewUrl: `/dev/editorial-review/${workflow.id}`
+  });
+  function parse() {
+    try {
+      return parseArgs(argv2, KNOWN_FLAGS3);
+    } catch (err2) {
+      fail(err2 instanceof Error ? err2.message : String(err2), 2);
+    }
+  }
+  function isSuccessBody(body) {
+    if (typeof body !== "object" || body === null) return false;
+    if (!("workflow" in body) || !("filePath" in body)) return false;
+    const workflowVal = Reflect.get(body, "workflow");
+    const filePathVal = Reflect.get(body, "filePath");
+    return typeof workflowVal === "object" && workflowVal !== null && typeof filePathVal === "string";
+  }
+  function errorMessage(body) {
+    if (typeof body === "object" && body !== null) {
+      const value = Reflect.get(body, "error");
+      if (typeof value === "string") return value;
+    }
+    return "shortform-start: unknown error";
+  }
+}
+var init_shortform_start = __esm({
+  "src/commands/shortform-start.ts"() {
+    "use strict";
+    init_config();
+    init_paths();
+    init_handlers();
+    init_types();
+    init_cli();
+  }
+});
+
 // src/cli.ts
 var SUBCOMMANDS = {
   add: () => Promise.resolve().then(() => (init_add(), add_exports)),
   approve: () => Promise.resolve().then(() => (init_approve(), approve_exports)),
+  distribute: () => Promise.resolve().then(() => (init_distribute(), distribute_exports)),
   doctor: () => Promise.resolve().then(() => (init_doctor2(), doctor_exports)),
   draft: () => Promise.resolve().then(() => (init_draft(), draft_exports)),
   ingest: () => Promise.resolve().then(() => (init_ingest2(), ingest_exports)),
@@ -12695,7 +13168,8 @@ var SUBCOMMANDS = {
   "review-cancel": () => Promise.resolve().then(() => (init_review_cancel(), review_cancel_exports)),
   "review-help": () => Promise.resolve().then(() => (init_review_help(), review_help_exports)),
   "review-report": () => Promise.resolve().then(() => (init_review_report(), review_report_exports)),
-  "review-start": () => Promise.resolve().then(() => (init_review_start(), review_start_exports))
+  "review-start": () => Promise.resolve().then(() => (init_review_start(), review_start_exports)),
+  "shortform-start": () => Promise.resolve().then(() => (init_shortform_start(), shortform_start_exports))
 };
 var subcommand = process.argv[2];
 var rawArgv = process.argv.slice(3);
@@ -12739,10 +13213,13 @@ function printUsage() {
   out.write("  doctor          audit/repair binding metadata\n\n");
   out.write("Review loop:\n");
   out.write("  review-start    enqueue a longform draft for review\n");
+  out.write("  shortform-start enqueue a shortform draft for review\n");
   out.write("  iterate         snapshot agent revision; back to in-review\n");
   out.write("  approve         finalize an approved workflow\n");
   out.write("  review-cancel   cancel a workflow\n");
   out.write("  review-help     list open workflows\n");
   out.write("  review-report   voice-drift report\n\n");
+  out.write("Distribution:\n");
+  out.write("  distribute      record a posted shortform URL on the calendar\n\n");
   out.write("Run `deskwork <subcommand>` with no further args to see its usage.\n");
 }
