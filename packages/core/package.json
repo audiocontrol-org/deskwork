@@ -22,6 +22,8 @@
     "./config": "./src/config.ts",
     "./frontmatter": "./src/frontmatter.ts",
     "./ingest": "./src/ingest.ts",
+    "./ingest-derive": "./src/ingest-derive.ts",
+    "./ingest-paths": "./src/ingest-paths.ts",
     "./journal": "./src/journal.ts",
     "./paths": "./src/paths.ts",
     "./rename-slug": "./src/rename-slug.ts",

@@ -5439,10 +5439,10 @@ var require_resolve_block_map = __commonJS({
       let offset = bm.offset;
       let commentEnd = null;
       for (const collItem of bm.items) {
-        const { start, key, sep: sep2, value } = collItem;
+        const { start, key, sep: sep4, value } = collItem;
         const keyProps = resolveProps.resolveProps(start, {
           indicator: "explicit-key-ind",
-          next: key ?? sep2?.[0],
+          next: key ?? sep4?.[0],
           offset,
           onError,
           parentIndent: bm.indent,
@@ -5456,7 +5456,7 @@ var require_resolve_block_map = __commonJS({
             else if ("indent" in key && key.indent !== bm.indent)
               onError(offset, "BAD_INDENT", startColMsg);
           }
-          if (!keyProps.anchor && !keyProps.tag && !sep2) {
+          if (!keyProps.anchor && !keyProps.tag && !sep4) {
             commentEnd = keyProps.end;
             if (keyProps.comment) {
               if (map.comment)
@@ -5480,7 +5480,7 @@ var require_resolve_block_map = __commonJS({
         ctx.atKey = false;
         if (utilMapIncludes.mapIncludes(ctx, map.items, keyNode))
           onError(keyStart, "DUPLICATE_KEY", "Map keys must be unique");
-        const valueProps = resolveProps.resolveProps(sep2 ?? [], {
+        const valueProps = resolveProps.resolveProps(sep4 ?? [], {
           indicator: "map-value-ind",
           next: value,
           offset: keyNode.range[2],
@@ -5496,7 +5496,7 @@ var require_resolve_block_map = __commonJS({
             if (ctx.options.strict && keyProps.start < valueProps.found.offset - 1024)
               onError(keyNode.range, "KEY_OVER_1024_CHARS", "The : indicator must be at most 1024 chars after the start of an implicit block mapping key");
           }
-          const valueNode = value ? composeNode(ctx, value, valueProps, onError) : composeEmptyNode(ctx, offset, sep2, null, valueProps, onError);
+          const valueNode = value ? composeNode(ctx, value, valueProps, onError) : composeEmptyNode(ctx, offset, sep4, null, valueProps, onError);
           if (ctx.schema.compat)
             utilFlowIndentCheck.flowIndentCheck(bm.indent, value, onError);
           offset = valueNode.range[2];
@@ -5587,7 +5587,7 @@ var require_resolve_end = __commonJS({
       let comment = "";
       if (end) {
         let hasSpace = false;
-        let sep2 = "";
+        let sep4 = "";
         for (const token of end) {
           const { source, type } = token;
           switch (type) {
@@ -5601,13 +5601,13 @@ var require_resolve_end = __commonJS({
               if (!comment)
                 comment = cb;
               else
-                comment += sep2 + cb;
-              sep2 = "";
+                comment += sep4 + cb;
+              sep4 = "";
               break;
             }
             case "newline":
               if (comment)
-                sep2 += source;
+                sep4 += source;
               hasSpace = true;
               break;
             default:
@@ -5650,18 +5650,18 @@ var require_resolve_flow_collection = __commonJS({
       let offset = fc.offset + fc.start.source.length;
       for (let i = 0; i < fc.items.length; ++i) {
         const collItem = fc.items[i];
-        const { start, key, sep: sep2, value } = collItem;
+        const { start, key, sep: sep4, value } = collItem;
         const props = resolveProps.resolveProps(start, {
           flow: fcName,
           indicator: "explicit-key-ind",
-          next: key ?? sep2?.[0],
+          next: key ?? sep4?.[0],
           offset,
           onError,
           parentIndent: fc.indent,
           startOnNewline: false
         });
         if (!props.found) {
-          if (!props.anchor && !props.tag && !sep2 && !value) {
+          if (!props.anchor && !props.tag && !sep4 && !value) {
             if (i === 0 && props.comma)
               onError(props.comma, "UNEXPECTED_TOKEN", `Unexpected , in ${fcName}`);
             else if (i < fc.items.length - 1)
@@ -5715,8 +5715,8 @@ var require_resolve_flow_collection = __commonJS({
             }
           }
         }
-        if (!isMap && !sep2 && !props.found) {
-          const valueNode = value ? composeNode(ctx, value, props, onError) : composeEmptyNode(ctx, props.end, sep2, null, props, onError);
+        if (!isMap && !sep4 && !props.found) {
+          const valueNode = value ? composeNode(ctx, value, props, onError) : composeEmptyNode(ctx, props.end, sep4, null, props, onError);
           coll.items.push(valueNode);
           offset = valueNode.range[2];
           if (isBlock(value))
@@ -5728,7 +5728,7 @@ var require_resolve_flow_collection = __commonJS({
           if (isBlock(key))
             onError(keyNode.range, "BLOCK_IN_FLOW", blockMsg);
           ctx.atKey = false;
-          const valueProps = resolveProps.resolveProps(sep2 ?? [], {
+          const valueProps = resolveProps.resolveProps(sep4 ?? [], {
             flow: fcName,
             indicator: "map-value-ind",
             next: value,
@@ -5739,8 +5739,8 @@ var require_resolve_flow_collection = __commonJS({
           });
           if (valueProps.found) {
             if (!isMap && !props.found && ctx.options.strict) {
-              if (sep2)
-                for (const st of sep2) {
+              if (sep4)
+                for (const st of sep4) {
                   if (st === valueProps.found)
                     break;
                   if (st.type === "newline") {
@@ -5757,7 +5757,7 @@ var require_resolve_flow_collection = __commonJS({
             else
               onError(valueProps.start, "MISSING_CHAR", `Missing , or : between ${fcName} items`);
           }
-          const valueNode = value ? composeNode(ctx, value, valueProps, onError) : valueProps.found ? composeEmptyNode(ctx, valueProps.end, sep2, null, valueProps, onError) : null;
+          const valueNode = value ? composeNode(ctx, value, valueProps, onError) : valueProps.found ? composeEmptyNode(ctx, valueProps.end, sep4, null, valueProps, onError) : null;
           if (valueNode) {
             if (isBlock(value))
               onError(valueNode.range, "BLOCK_IN_FLOW", blockMsg);
@@ -5937,7 +5937,7 @@ var require_resolve_block_scalar = __commonJS({
           chompStart = i + 1;
       }
       let value = "";
-      let sep2 = "";
+      let sep4 = "";
       let prevMoreIndented = false;
       for (let i = 0; i < contentStart; ++i)
         value += lines[i][0].slice(trimIndent) + "\n";
@@ -5954,24 +5954,24 @@ var require_resolve_block_scalar = __commonJS({
           indent = "";
         }
         if (type === Scalar.Scalar.BLOCK_LITERAL) {
-          value += sep2 + indent.slice(trimIndent) + content;
-          sep2 = "\n";
+          value += sep4 + indent.slice(trimIndent) + content;
+          sep4 = "\n";
         } else if (indent.length > trimIndent || content[0] === "	") {
-          if (sep2 === " ")
-            sep2 = "\n";
-          else if (!prevMoreIndented && sep2 === "\n")
-            sep2 = "\n\n";
-          value += sep2 + indent.slice(trimIndent) + content;
-          sep2 = "\n";
+          if (sep4 === " ")
+            sep4 = "\n";
+          else if (!prevMoreIndented && sep4 === "\n")
+            sep4 = "\n\n";
+          value += sep4 + indent.slice(trimIndent) + content;
+          sep4 = "\n";
           prevMoreIndented = true;
         } else if (content === "") {
-          if (sep2 === "\n")
+          if (sep4 === "\n")
             value += "\n";
           else
-            sep2 = "\n";
+            sep4 = "\n";
         } else {
-          value += sep2 + content;
-          sep2 = " ";
+          value += sep4 + content;
+          sep4 = " ";
           prevMoreIndented = false;
         }
       }
@@ -6153,25 +6153,25 @@ var require_resolve_flow_scalar = __commonJS({
       if (!match)
         return source;
       let res = match[1];
-      let sep2 = " ";
+      let sep4 = " ";
       let pos = first.lastIndex;
       line.lastIndex = pos;
       while (match = line.exec(source)) {
         if (match[1] === "") {
-          if (sep2 === "\n")
-            res += sep2;
+          if (sep4 === "\n")
+            res += sep4;
           else
-            sep2 = "\n";
+            sep4 = "\n";
         } else {
-          res += sep2 + match[1];
-          sep2 = " ";
+          res += sep4 + match[1];
+          sep4 = " ";
         }
         pos = line.lastIndex;
       }
       const last = /[ \t]*(.*)/sy;
       last.lastIndex = pos;
       match = last.exec(source);
-      return res + sep2 + (match?.[1] ?? "");
+      return res + sep4 + (match?.[1] ?? "");
     }
     function doubleQuotedValue(source, onError) {
       let res = "";
@@ -6978,14 +6978,14 @@ var require_cst_stringify = __commonJS({
         }
       }
     }
-    function stringifyItem({ start, key, sep: sep2, value }) {
+    function stringifyItem({ start, key, sep: sep4, value }) {
       let res = "";
       for (const st of start)
         res += st.source;
       if (key)
         res += stringifyToken(key);
-      if (sep2)
-        for (const st of sep2)
+      if (sep4)
+        for (const st of sep4)
           res += st.source;
       if (value)
         res += stringifyToken(value);
@@ -8135,18 +8135,18 @@ var require_parser = __commonJS({
         if (this.type === "map-value-ind") {
           const prev = getPrevProps(this.peek(2));
           const start = getFirstKeyStartProps(prev);
-          let sep2;
+          let sep4;
           if (scalar.end) {
-            sep2 = scalar.end;
-            sep2.push(this.sourceToken);
+            sep4 = scalar.end;
+            sep4.push(this.sourceToken);
             delete scalar.end;
           } else
-            sep2 = [this.sourceToken];
+            sep4 = [this.sourceToken];
           const map = {
             type: "block-map",
             offset: scalar.offset,
             indent: scalar.indent,
-            items: [{ start, key: scalar, sep: sep2 }]
+            items: [{ start, key: scalar, sep: sep4 }]
           };
           this.onKeyLine = true;
           this.stack[this.stack.length - 1] = map;
@@ -8299,15 +8299,15 @@ var require_parser = __commonJS({
                 } else if (isFlowToken(it.key) && !includesToken(it.sep, "newline")) {
                   const start2 = getFirstKeyStartProps(it.start);
                   const key = it.key;
-                  const sep2 = it.sep;
-                  sep2.push(this.sourceToken);
+                  const sep4 = it.sep;
+                  sep4.push(this.sourceToken);
                   delete it.key;
                   delete it.sep;
                   this.stack.push({
                     type: "block-map",
                     offset: this.offset,
                     indent: this.indent,
-                    items: [{ start: start2, key, sep: sep2 }]
+                    items: [{ start: start2, key, sep: sep4 }]
                   });
                 } else if (start.length > 0) {
                   it.sep = it.sep.concat(start, this.sourceToken);
@@ -8501,13 +8501,13 @@ var require_parser = __commonJS({
             const prev = getPrevProps(parent);
             const start = getFirstKeyStartProps(prev);
             fixFlowSeqItems(fc);
-            const sep2 = fc.end.splice(1, fc.end.length);
-            sep2.push(this.sourceToken);
+            const sep4 = fc.end.splice(1, fc.end.length);
+            sep4.push(this.sourceToken);
             const map = {
               type: "block-map",
               offset: fc.offset,
               indent: fc.indent,
-              items: [{ start, key: fc, sep: sep2 }]
+              items: [{ start, key: fc, sep: sep4 }]
             };
             this.onKeyLine = true;
             this.stack[this.stack.length - 1] = map;
@@ -8829,298 +8829,25 @@ var init_frontmatter = __esm({
   }
 });
 
-// ../core/src/ingest.ts
+// ../core/src/ingest-paths.ts
 import {
   existsSync as existsSync3,
-  readFileSync as readFileSync5,
   readdirSync as readdirSync2,
   statSync
 } from "node:fs";
-import { isAbsolute as isAbsolute2, join as join5, relative, resolve as resolve2, sep } from "node:path";
-function discoverIngestCandidates(paths, options) {
-  if (paths.length === 0) {
-    throw new Error("discoverIngestCandidates: at least one path is required");
-  }
-  if (!options.projectRoot || !isAbsolute2(options.projectRoot)) {
-    throw new Error(
-      `discoverIngestCandidates: projectRoot must be an absolute path (got "${options.projectRoot ?? ""}")`
-    );
-  }
-  const collected = collectMarkdownFiles(paths);
-  if (options.explicitSlug !== void 0 && collected.length !== 1) {
-    throw new Error(
-      `--slug requires exactly one matched file; ${collected.length} matched`
-    );
-  }
-  const candidates = [];
-  const skips = [];
-  const fields = { ...DEFAULT_FIELDS, ...options.fieldNames ?? {} };
-  for (const { filePath, root } of collected) {
-    if (isUnderScrapbook(filePath, options.scrapbookRoots)) {
-      skips.push({
-        filePath,
-        relativePath: relativeTo(options.projectRoot, filePath),
-        reason: "file is under scrapbook/ (skipped by default)"
-      });
-      continue;
-    }
-    let raw;
-    try {
-      raw = readFileSync5(filePath, "utf-8");
-    } catch (err2) {
-      skips.push({
-        filePath,
-        relativePath: relativeTo(options.projectRoot, filePath),
-        reason: `unreadable: ${err2 instanceof Error ? err2.message : String(err2)}`
-      });
-      continue;
-    }
-    let parsed;
-    try {
-      parsed = parseFrontmatter(raw);
-    } catch (err2) {
-      skips.push({
-        filePath,
-        relativePath: relativeTo(options.projectRoot, filePath),
-        reason: `frontmatter parse failed: ${err2 instanceof Error ? err2.message : String(err2)}`
-      });
-      continue;
-    }
-    const slug = deriveSlug(filePath, root, parsed.data, fields, options);
-    if (!slug.value) {
-      skips.push({
-        filePath,
-        relativePath: relativeTo(options.projectRoot, filePath),
-        reason: slug.reason ?? "could not derive slug"
-      });
-      continue;
-    }
-    if (!SLUG_RE.test(slug.value)) {
-      skips.push({
-        filePath,
-        relativePath: relativeTo(options.projectRoot, filePath),
-        slug: slug.value,
-        reason: `derived slug "${slug.value}" is not valid kebab-case (must match [a-z0-9][a-z0-9-]* segments separated by '/')`
-      });
-      continue;
-    }
-    if (options.calendar && !options.force && options.calendar.entries.some((e) => e.slug === slug.value)) {
-      skips.push({
-        filePath,
-        relativePath: relativeTo(options.projectRoot, filePath),
-        slug: slug.value,
-        reason: `calendar already has an entry with slug "${slug.value}" (use --force to override)`
-      });
-      continue;
-    }
-    const state = deriveState(parsed.data, fields, options);
-    const date = deriveDate(filePath, parsed.data, fields, options);
-    const title = deriveTitle(parsed.data, fields.title, slug.value);
-    const description = deriveDescription(parsed.data, fields.description);
-    candidates.push({
-      filePath,
-      relativePath: relativeTo(options.projectRoot, filePath),
-      frontmatter: parsed.data,
-      body: parsed.body,
-      derivedSlug: slug.value,
-      slugSource: slug.source,
-      derivedState: state.value,
-      stateSource: state.source,
-      ...state.rawValue !== void 0 ? { rawState: state.rawValue } : {},
-      derivedDate: date.value,
-      dateSource: date.source,
-      title,
-      description
-    });
-  }
-  return { candidates, skips };
-}
-function deriveSlug(filePath, root, frontmatter, fields, options) {
-  if (options.explicitSlug !== void 0) {
-    return { value: options.explicitSlug, source: "explicit" };
-  }
-  const slugFrom = options.slugFrom ?? "path";
-  if (slugFrom === "frontmatter") {
-    const fmSlug = readStringField(frontmatter, fields.slug);
-    if (fmSlug !== void 0) {
-      return { value: fmSlug, source: "frontmatter" };
-    }
-  }
-  return slugFromPath(filePath, root);
-}
-function slugFromPath(filePath, root) {
-  const rel = relative(root, filePath);
-  const segments = rel.split(sep).filter((s) => s.length > 0);
-  if (segments.length === 0) {
-    return { value: "", source: "path", reason: "file path equals root" };
-  }
-  const filename = segments[segments.length - 1];
-  const dot = filename.lastIndexOf(".");
-  const base = dot > 0 ? filename.slice(0, dot) : filename;
-  const baseLower = base.toLowerCase();
-  let leafSegments;
-  let dirSegments;
-  if (baseLower === "index" || baseLower === "readme") {
-    if (segments.length < 2) {
-      const rootSegments = root.split(sep).filter((s) => s.length > 0);
-      const rootLeaf = rootSegments[rootSegments.length - 1];
-      if (!rootLeaf) {
-        return {
-          value: "",
-          source: "path",
-          reason: `${filename} at the filesystem root has no directory name to derive a slug from`
-        };
-      }
-      leafSegments = [rootLeaf];
-      dirSegments = [];
-    } else {
-      leafSegments = [segments[segments.length - 2]];
-      dirSegments = segments.slice(0, -2);
-    }
-  } else {
-    const jekyll = base.match(JEKYLL_RE);
-    leafSegments = [jekyll ? jekyll[4] : base];
-    dirSegments = segments.slice(0, -1);
-  }
-  const prefix = [];
-  if (dirSegments.length > 0 || leafSegments.length > 0) {
-    if (directoryIsHierarchicalNode(root)) {
-      const rootSegments = root.split(sep).filter((s) => s.length > 0);
-      const rootLeaf = rootSegments[rootSegments.length - 1];
-      if (rootLeaf && leafSegments[0] !== rootLeaf) {
-        prefix.push(rootLeaf);
-      }
-    }
-  }
-  let cursor = root;
-  for (const dir of dirSegments) {
-    cursor = join5(cursor, dir);
-    if (directoryIsHierarchicalNode(cursor)) {
-      prefix.push(dir);
-    } else {
-      prefix.length = 0;
-    }
-  }
-  const slug = [...prefix, ...leafSegments].join("/");
-  return { value: slug, source: "path" };
-}
-function directoryIsHierarchicalNode(dir) {
-  let entries;
-  try {
-    entries = readdirSync2(dir, { withFileTypes: true });
-  } catch {
-    return false;
-  }
-  for (const entry of entries) {
-    if (!entry.isFile()) continue;
-    const lower = entry.name.toLowerCase();
-    for (const ext of MARKDOWN_EXTENSIONS) {
-      if (lower === `index${ext}` || lower === `readme${ext}`) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-function deriveState(frontmatter, fields, options) {
-  if (options.explicitState !== void 0) {
-    return { value: options.explicitState, source: "explicit" };
-  }
-  const stateFrom = options.stateFrom ?? "frontmatter";
-  if (stateFrom === "frontmatter") {
-    const raw = readStringField(frontmatter, fields.state);
-    if (raw === void 0) {
-      return { value: "Ideas", source: "frontmatter" };
-    }
-    const normalized = normalizeStateString(raw);
-    if (normalized === null) {
-      return { value: null, source: "frontmatter", rawValue: raw };
-    }
-    return { value: normalized, source: "frontmatter" };
-  }
-  const dateRaw = readDateField(frontmatter, fields.date);
-  if (dateRaw === void 0) {
-    return { value: "Ideas", source: "frontmatter" };
-  }
-  const today = (options.now ?? /* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-  if (dateRaw <= today) {
-    return { value: "Published", source: "frontmatter" };
-  }
-  return { value: "Drafting", source: "frontmatter" };
-}
-function normalizeStateString(raw) {
-  const key = raw.trim().toLowerCase();
-  if (key.length === 0) return null;
-  const direct = STATE_ALIASES[key];
-  if (direct) return direct;
-  const titled = key.charAt(0).toUpperCase() + key.slice(1);
-  if (isStage(titled)) return titled;
-  return null;
-}
-function deriveDate(filePath, frontmatter, fields, options) {
-  if (options.explicitDate !== void 0) {
-    return { value: options.explicitDate, source: "explicit" };
-  }
-  const fmDate = readDateField(frontmatter, fields.date);
-  if (fmDate !== void 0) {
-    return { value: fmDate, source: "frontmatter" };
-  }
-  if (fields.date !== "date") {
-    const generic = readDateField(frontmatter, "date");
-    if (generic !== void 0) {
-      return { value: generic, source: "frontmatter" };
-    }
-  }
-  try {
-    const stat = statSync(filePath);
-    return { value: stat.mtime.toISOString().slice(0, 10), source: "mtime" };
-  } catch {
-  }
-  const today = (options.now ?? /* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-  return { value: today, source: "today" };
-}
-function deriveTitle(frontmatter, fieldName, slug) {
-  const raw = readStringField(frontmatter, fieldName);
-  if (raw !== void 0 && raw.length > 0) return raw;
-  const leaf = slug.split("/").pop() ?? slug;
-  return leaf.split("-").map((word) => word.length > 0 ? word[0].toUpperCase() + word.slice(1) : word).join(" ");
-}
-function deriveDescription(frontmatter, fieldName) {
-  return readStringField(frontmatter, fieldName) ?? "";
-}
-function readStringField(frontmatter, field) {
-  const value = frontmatter[field];
-  if (typeof value !== "string") return void 0;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : void 0;
-}
-function readDateField(frontmatter, field) {
-  const value = frontmatter[field];
-  if (value === void 0 || value === null) return void 0;
-  if (value instanceof Date) {
-    return value.toISOString().slice(0, 10);
-  }
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (ISO_DATE_RE.test(trimmed)) return trimmed;
-    const parsed = Date.parse(trimmed);
-    if (!Number.isNaN(parsed)) {
-      return new Date(parsed).toISOString().slice(0, 10);
-    }
-  }
-  return void 0;
-}
+import { isAbsolute as isAbsolute2, join as join5, resolve as resolve2, sep } from "node:path";
 function collectMarkdownFiles(paths) {
   const seen = /* @__PURE__ */ new Map();
   for (const p of paths) {
-    const expanded = expandPath(p);
-    for (const file of expanded) {
+    for (const file of expandPath(p)) {
       if (!seen.has(file.filePath)) {
         seen.set(file.filePath, file);
       }
     }
   }
-  return [...seen.values()].sort((a, b) => a.filePath.localeCompare(b.filePath));
+  return [...seen.values()].sort(
+    (a, b) => a.filePath.localeCompare(b.filePath)
+  );
 }
 function expandPath(input) {
   const absolute = isAbsolute2(input) ? input : resolve2(process.cwd(), input);
@@ -9198,7 +8925,9 @@ function matchPattern(currentDir, remaining, root) {
     out.push(...matchPattern(currentDir, rest, root));
     for (const entry of entries) {
       if (entry.isDirectory()) {
-        out.push(...matchPattern(join5(currentDir, entry.name), remaining, root));
+        out.push(
+          ...matchPattern(join5(currentDir, entry.name), remaining, root)
+        );
       }
     }
     return out;
@@ -9242,17 +8971,335 @@ function hasMarkdownExtension(filename) {
   const lower = filename.toLowerCase();
   return MARKDOWN_EXTENSIONS.some((ext) => lower.endsWith(ext));
 }
-function relativeTo(projectRoot, filePath) {
-  const rel = relative(projectRoot, filePath);
-  return rel.length > 0 ? rel : filePath;
+var MARKDOWN_EXTENSIONS;
+var init_ingest_paths = __esm({
+  "../core/src/ingest-paths.ts"() {
+    "use strict";
+    MARKDOWN_EXTENSIONS = [".md", ".mdx", ".markdown"];
+  }
+});
+
+// ../core/src/ingest-derive.ts
+import { readdirSync as readdirSync3, statSync as statSync2 } from "node:fs";
+import { join as join6, relative, sep as sep2 } from "node:path";
+function deriveSlug(input) {
+  if (input.explicitSlug !== void 0) {
+    return { value: input.explicitSlug, source: "explicit" };
+  }
+  if (input.slugFrom === "frontmatter") {
+    const fmSlug = readStringField(input.frontmatter, input.fieldName);
+    if (fmSlug !== void 0) {
+      return { value: fmSlug, source: "frontmatter" };
+    }
+  }
+  return slugFromPath(input.filePath, input.root);
 }
-function isUnderScrapbook(filePath, roots) {
-  if (!roots || roots.length === 0) return false;
-  for (const root of roots) {
-    const r = root.endsWith(sep) ? root : root + sep;
-    if (filePath.startsWith(r)) return true;
+function slugFromPath(filePath, root) {
+  const rel = relative(root, filePath);
+  const segments = rel.split(sep2).filter((s) => s.length > 0);
+  if (segments.length === 0) {
+    return { value: "", source: "path", reason: "file path equals root" };
+  }
+  const filename = segments[segments.length - 1];
+  const dot = filename.lastIndexOf(".");
+  const base = dot > 0 ? filename.slice(0, dot) : filename;
+  const baseLower = base.toLowerCase();
+  let leafSegments;
+  let dirSegments;
+  if (baseLower === "index" || baseLower === "readme") {
+    if (segments.length < 2) {
+      const rootSegments = root.split(sep2).filter((s) => s.length > 0);
+      const rootLeaf = rootSegments[rootSegments.length - 1];
+      if (!rootLeaf) {
+        return {
+          value: "",
+          source: "path",
+          reason: `${filename} at the filesystem root has no directory name to derive a slug from`
+        };
+      }
+      leafSegments = [rootLeaf];
+      dirSegments = [];
+    } else {
+      leafSegments = [segments[segments.length - 2]];
+      dirSegments = segments.slice(0, -2);
+    }
+  } else {
+    const jekyll = base.match(JEKYLL_RE);
+    leafSegments = [jekyll ? jekyll[4] : base];
+    dirSegments = segments.slice(0, -1);
+  }
+  const prefix = [];
+  if (directoryIsHierarchicalNode(root)) {
+    const rootSegments = root.split(sep2).filter((s) => s.length > 0);
+    const rootLeaf = rootSegments[rootSegments.length - 1];
+    if (rootLeaf && leafSegments[0] !== rootLeaf) {
+      prefix.push(rootLeaf);
+    }
+  }
+  let cursor = root;
+  for (const dir of dirSegments) {
+    cursor = join6(cursor, dir);
+    if (directoryIsHierarchicalNode(cursor)) {
+      prefix.push(dir);
+    } else {
+      prefix.length = 0;
+    }
+  }
+  return { value: [...prefix, ...leafSegments].join("/"), source: "path" };
+}
+function directoryIsHierarchicalNode(dir) {
+  let entries;
+  try {
+    entries = readdirSync3(dir, { withFileTypes: true });
+  } catch {
+    return false;
+  }
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    const lower = entry.name.toLowerCase();
+    for (const ext of MARKDOWN_EXTENSIONS) {
+      if (lower === `index${ext}` || lower === `readme${ext}`) {
+        return true;
+      }
+    }
   }
   return false;
+}
+function deriveState(input) {
+  if (input.explicitState !== void 0) {
+    return { value: input.explicitState, source: "explicit" };
+  }
+  if (input.stateFrom === "frontmatter") {
+    const raw = readStringField(input.frontmatter, input.stateField);
+    if (raw === void 0) {
+      return { value: "Ideas", source: "frontmatter" };
+    }
+    const normalized = normalizeStateString(raw);
+    if (normalized === null) {
+      return { value: null, source: "frontmatter", rawValue: raw };
+    }
+    return { value: normalized, source: "frontmatter" };
+  }
+  const dateRaw = readDateField(input.frontmatter, input.dateField);
+  if (dateRaw === void 0) {
+    return { value: "Ideas", source: "frontmatter" };
+  }
+  const today = (input.now ?? /* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  if (dateRaw <= today) {
+    return { value: "Published", source: "frontmatter" };
+  }
+  return { value: "Drafting", source: "frontmatter" };
+}
+function normalizeStateString(raw) {
+  const key = raw.trim().toLowerCase();
+  if (key.length === 0) return null;
+  const direct = STATE_ALIASES[key];
+  if (direct) return direct;
+  const titled = key.charAt(0).toUpperCase() + key.slice(1);
+  if (isStage(titled)) return titled;
+  return null;
+}
+function deriveDate(input) {
+  if (input.explicitDate !== void 0) {
+    return { value: input.explicitDate, source: "explicit" };
+  }
+  const fmDate = readDateField(input.frontmatter, input.dateField);
+  if (fmDate !== void 0) {
+    return { value: fmDate, source: "frontmatter" };
+  }
+  if (input.dateField !== "date") {
+    const generic = readDateField(input.frontmatter, "date");
+    if (generic !== void 0) {
+      return { value: generic, source: "frontmatter" };
+    }
+  }
+  try {
+    const stat = statSync2(input.filePath);
+    return { value: stat.mtime.toISOString().slice(0, 10), source: "mtime" };
+  } catch {
+  }
+  const today = (input.now ?? /* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  return { value: today, source: "today" };
+}
+function deriveTitle(frontmatter, fieldName, slug) {
+  const raw = readStringField(frontmatter, fieldName);
+  if (raw !== void 0 && raw.length > 0) return raw;
+  const leaf = slug.split("/").pop() ?? slug;
+  return leaf.split("-").map((w) => w.length > 0 ? w[0].toUpperCase() + w.slice(1) : w).join(" ");
+}
+function deriveDescription(frontmatter, fieldName) {
+  return readStringField(frontmatter, fieldName) ?? "";
+}
+function readStringField(frontmatter, field) {
+  const value = frontmatter[field];
+  if (typeof value !== "string") return void 0;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : void 0;
+}
+function readDateField(frontmatter, field) {
+  const value = frontmatter[field];
+  if (value === void 0 || value === null) return void 0;
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10);
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (ISO_DATE_RE.test(trimmed)) return trimmed;
+    const parsed = Date.parse(trimmed);
+    if (!Number.isNaN(parsed)) {
+      return new Date(parsed).toISOString().slice(0, 10);
+    }
+  }
+  return void 0;
+}
+var JEKYLL_RE, ISO_DATE_RE, STATE_ALIASES;
+var init_ingest_derive = __esm({
+  "../core/src/ingest-derive.ts"() {
+    "use strict";
+    init_types();
+    init_ingest_paths();
+    JEKYLL_RE = /^(\d{4})-(\d{2})-(\d{2})-(.+)$/;
+    ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+    STATE_ALIASES = {
+      ideas: "Ideas",
+      idea: "Ideas",
+      ideas_lane: "Ideas",
+      planned: "Planned",
+      outlining: "Outlining",
+      outline: "Outlining",
+      drafting: "Drafting",
+      draft: "Drafting",
+      review: "Review",
+      reviewing: "Review",
+      "in-review": "Review",
+      in_review: "Review",
+      published: "Published",
+      publish: "Published"
+    };
+  }
+});
+
+// ../core/src/ingest.ts
+import { isAbsolute as isAbsolute3, relative as relative2, sep as sep3 } from "node:path";
+import { readFileSync as readFileSync5 } from "node:fs";
+function discoverIngestCandidates(paths, options) {
+  if (paths.length === 0) {
+    throw new Error("discoverIngestCandidates: at least one path is required");
+  }
+  if (!options.projectRoot || !isAbsolute3(options.projectRoot)) {
+    throw new Error(
+      `discoverIngestCandidates: projectRoot must be an absolute path (got "${options.projectRoot ?? ""}")`
+    );
+  }
+  const collected = collectMarkdownFiles(paths);
+  if (options.explicitSlug !== void 0 && collected.length !== 1) {
+    throw new Error(
+      `--slug requires exactly one matched file; ${collected.length} matched`
+    );
+  }
+  const candidates = [];
+  const skips = [];
+  const fields = { ...DEFAULT_FIELDS, ...options.fieldNames ?? {} };
+  for (const { filePath, root } of collected) {
+    const relPath = relativeTo(options.projectRoot, filePath);
+    if (isUnderScrapbook(filePath, options.scrapbookRoots)) {
+      skips.push({
+        filePath,
+        relativePath: relPath,
+        reason: "file is under scrapbook/ (skipped by default)"
+      });
+      continue;
+    }
+    let raw;
+    try {
+      raw = readFileSync5(filePath, "utf-8");
+    } catch (err2) {
+      skips.push({
+        filePath,
+        relativePath: relPath,
+        reason: `unreadable: ${err2 instanceof Error ? err2.message : String(err2)}`
+      });
+      continue;
+    }
+    let parsed;
+    try {
+      parsed = parseFrontmatter(raw);
+    } catch (err2) {
+      skips.push({
+        filePath,
+        relativePath: relPath,
+        reason: `frontmatter parse failed: ${err2 instanceof Error ? err2.message : String(err2)}`
+      });
+      continue;
+    }
+    const slug = deriveSlug({
+      filePath,
+      root,
+      frontmatter: parsed.data,
+      fieldName: fields.slug,
+      slugFrom: options.slugFrom ?? "path",
+      ...options.explicitSlug !== void 0 ? { explicitSlug: options.explicitSlug } : {}
+    });
+    if (!slug.value) {
+      skips.push({
+        filePath,
+        relativePath: relPath,
+        reason: slug.reason ?? "could not derive slug"
+      });
+      continue;
+    }
+    if (!SLUG_RE.test(slug.value)) {
+      skips.push({
+        filePath,
+        relativePath: relPath,
+        slug: slug.value,
+        reason: `derived slug "${slug.value}" is not valid kebab-case (must match [a-z0-9][a-z0-9-]* segments separated by '/')`
+      });
+      continue;
+    }
+    if (options.calendar && !options.force && options.calendar.entries.some((e) => e.slug === slug.value)) {
+      skips.push({
+        filePath,
+        relativePath: relPath,
+        slug: slug.value,
+        reason: `calendar already has an entry with slug "${slug.value}" (use --force to override)`
+      });
+      continue;
+    }
+    const state = deriveState({
+      frontmatter: parsed.data,
+      stateField: fields.state,
+      dateField: fields.date,
+      stateFrom: options.stateFrom ?? "frontmatter",
+      ...options.explicitState !== void 0 ? { explicitState: options.explicitState } : {},
+      ...options.now !== void 0 ? { now: options.now } : {}
+    });
+    const date = deriveDate({
+      filePath,
+      frontmatter: parsed.data,
+      dateField: fields.date,
+      ...options.explicitDate !== void 0 ? { explicitDate: options.explicitDate } : {},
+      ...options.now !== void 0 ? { now: options.now } : {}
+    });
+    const title = deriveTitle(parsed.data, fields.title, slug.value);
+    const description = deriveDescription(parsed.data, fields.description);
+    candidates.push({
+      filePath,
+      relativePath: relPath,
+      frontmatter: parsed.data,
+      body: parsed.body,
+      derivedSlug: slug.value,
+      slugSource: slug.source,
+      derivedState: state.value,
+      stateSource: state.source,
+      ...state.rawValue !== void 0 ? { rawState: state.rawValue } : {},
+      derivedDate: date.value,
+      dateSource: date.source,
+      title,
+      description
+    });
+  }
+  return { candidates, skips };
 }
 function candidateToEntry(candidate, stage) {
   const entry = {
@@ -9268,38 +9315,32 @@ function candidateToEntry(candidate, stage) {
   }
   return entry;
 }
-var MARKDOWN_EXTENSIONS, SLUG_RE, JEKYLL_RE, ISO_DATE_RE, DEFAULT_FIELDS, STATE_ALIASES;
+function relativeTo(projectRoot, filePath) {
+  const rel = relative2(projectRoot, filePath);
+  return rel.length > 0 ? rel : filePath;
+}
+function isUnderScrapbook(filePath, roots) {
+  if (!roots || roots.length === 0) return false;
+  for (const root of roots) {
+    const r = root.endsWith(sep3) ? root : root + sep3;
+    if (filePath.startsWith(r)) return true;
+  }
+  return false;
+}
+var SLUG_RE, DEFAULT_FIELDS;
 var init_ingest = __esm({
   "../core/src/ingest.ts"() {
     "use strict";
     init_frontmatter();
-    init_types();
-    MARKDOWN_EXTENSIONS = [".md", ".mdx", ".markdown"];
+    init_ingest_paths();
+    init_ingest_derive();
     SLUG_RE = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
-    JEKYLL_RE = /^(\d{4})-(\d{2})-(\d{2})-(.+)$/;
-    ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
     DEFAULT_FIELDS = {
       title: "title",
       description: "description",
       slug: "slug",
       state: "state",
       date: "datePublished"
-    };
-    STATE_ALIASES = {
-      ideas: "Ideas",
-      idea: "Ideas",
-      planned: "Planned",
-      outlining: "Outlining",
-      outline: "Outlining",
-      drafting: "Drafting",
-      draft: "Drafting",
-      review: "Review",
-      reviewing: "Review",
-      "in-review": "Review",
-      in_review: "Review",
-      published: "Published",
-      publish: "Published",
-      ideas_lane: "Ideas"
     };
   }
 });
@@ -9310,7 +9351,7 @@ __export(ingest_exports, {
   run: () => run4
 });
 import { existsSync as existsSync4, mkdirSync as mkdirSync2 } from "node:fs";
-import { isAbsolute as isAbsolute3, join as join6, resolve as resolve3 } from "node:path";
+import { isAbsolute as isAbsolute4, join as join7, resolve as resolve3 } from "node:path";
 import { randomUUID as randomUUID4 } from "node:crypto";
 async function run4(argv2) {
   const { positional, flags, booleans } = parseInput(argv2);
@@ -9336,10 +9377,10 @@ async function run4(argv2) {
   const calendarPath = resolveCalendarPath(projectRoot, config, site);
   const calendar = readCalendar(calendarPath);
   const absolutePaths = paths.map(
-    (p) => isAbsolute3(p) ? p : resolve3(projectRoot, p)
+    (p) => isAbsolute4(p) ? p : resolve3(projectRoot, p)
   );
   const contentDir = resolveContentDir(projectRoot, config, site);
-  const scrapbookRoots = [join6(contentDir, "scrapbook")];
+  const scrapbookRoots = [join7(contentDir, "scrapbook")];
   let discovery;
   try {
     discovery = discoverIngestCandidates(absolutePaths, {
@@ -9490,7 +9531,7 @@ function pad(s, n) {
   return s + " ".repeat(n - s.length);
 }
 function writeIngestJournalEntry(projectRoot, config, site, candidate, entry) {
-  const journalRoot = join6(
+  const journalRoot = join7(
     projectRoot,
     config.reviewJournalDir ?? ".deskwork/review-journal",
     "ingest"
@@ -9551,7 +9592,7 @@ __export(install_exports, {
   run: () => run5
 });
 import { readFileSync as readFileSync6, writeFileSync as writeFileSync4, existsSync as existsSync5, mkdirSync as mkdirSync3 } from "node:fs";
-import { dirname, isAbsolute as isAbsolute4, join as join7, resolve as resolve4 } from "node:path";
+import { dirname, isAbsolute as isAbsolute5, join as join8, resolve as resolve4 } from "node:path";
 async function run5(argv2) {
   function usage() {
     console.error(
@@ -9569,8 +9610,8 @@ async function run5(argv2) {
   } else {
     usage();
   }
-  const projectRoot = isAbsolute4(projectRootArg) ? projectRootArg : resolve4(process.cwd(), projectRootArg);
-  const configFile = isAbsolute4(configFileArg) ? configFileArg : resolve4(process.cwd(), configFileArg);
+  const projectRoot = isAbsolute5(projectRootArg) ? projectRootArg : resolve4(process.cwd(), projectRootArg);
+  const configFile = isAbsolute5(configFileArg) ? configFileArg : resolve4(process.cwd(), configFileArg);
   console.log(`Installing into: ${projectRoot}`);
   if (!existsSync5(projectRoot)) {
     console.error(`Project root does not exist: ${projectRoot}`);
@@ -9606,7 +9647,7 @@ async function run5(argv2) {
   const createdCalendars = [];
   const preservedCalendars = [];
   for (const [slug, site] of Object.entries(config.sites)) {
-    const absPath = join7(projectRoot, site.calendarPath);
+    const absPath = join8(projectRoot, site.calendarPath);
     if (existsSync5(absPath)) {
       preservedCalendars.push(`${slug}: ${site.calendarPath}`);
       continue;
@@ -9779,7 +9820,7 @@ var init_iterate = __esm({
 
 // ../core/src/scaffold.ts
 import { existsSync as existsSync7, mkdirSync as mkdirSync4 } from "node:fs";
-import { dirname as dirname2, join as join8, relative as relative2 } from "node:path";
+import { dirname as dirname2, join as join9, relative as relative3 } from "node:path";
 function scaffoldBlogPost(projectRoot, config, site, entry, opts = {}) {
   const slug = resolveSite(config, site);
   const siteCfg = config.sites[slug];
@@ -9797,7 +9838,7 @@ function scaffoldBlogPost(projectRoot, config, site, entry, opts = {}) {
     entry.slug,
     contentRelativePath
   );
-  const relativePath = relative2(projectRoot, filePath);
+  const relativePath = relative3(projectRoot, filePath);
   if (existsSync7(filePath)) {
     throw new Error(`Blog post already exists at ${relativePath}`);
   }
@@ -9814,7 +9855,7 @@ function scaffoldBlogPost(projectRoot, config, site, entry, opts = {}) {
   const body = buildBody(entry.title, siteCfg.blogOutlineSection === true);
   mkdirSync4(dirname2(filePath), { recursive: true });
   writeFrontmatter(filePath, data, body);
-  const reported = contentRelativePath ?? relative2(join8(projectRoot, siteCfg.contentDir), filePath);
+  const reported = contentRelativePath ?? relative3(join9(projectRoot, siteCfg.contentDir), filePath);
   return { filePath, relativePath, contentRelativePath: reported };
 }
 function layoutToContentRelativePath(layout, slug) {
@@ -10490,7 +10531,7 @@ var review_start_exports = {};
 __export(review_start_exports, {
   run: () => run13
 });
-import { existsSync as existsSync10, readFileSync as readFileSync9, readdirSync as readdirSync3 } from "node:fs";
+import { existsSync as existsSync10, readFileSync as readFileSync9, readdirSync as readdirSync4 } from "node:fs";
 import { dirname as dirname3 } from "node:path";
 async function run13(argv2) {
   const KNOWN_FLAGS2 = ["site"];
@@ -10563,7 +10604,7 @@ Run /deskwork:outline <slug> (or /deskwork:draft) to scaffold it first.`
   function listSiblingSlugs(blogFile) {
     const dir = dirname3(blogFile);
     if (!existsSync10(dir)) return [];
-    return readdirSync3(dir).filter((name) => name.endsWith(".md")).map((name) => name.replace(/\.md$/, ""));
+    return readdirSync4(dir).filter((name) => name.endsWith(".md")).map((name) => name.replace(/\.md$/, ""));
   }
 }
 var init_review_start = __esm({
