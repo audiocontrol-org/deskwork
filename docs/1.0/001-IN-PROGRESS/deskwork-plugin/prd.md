@@ -192,3 +192,36 @@ Three workstreams that share infrastructure (the `npm run build` invocation):
 - **Not a migration path for breaking changes.** When we eventually break a calendar format or config schema, that's a separate concern handled by the calendar parser's own backward-compat (which already does UUID backfill and column-presence detection).
 
 **Plan reference.** Approved during the `/feature-extend` invocation that produced Phase 14.
+
+---
+
+## Extension: backfill existing content via `deskwork ingest`
+
+Added as Phase 15. Issue: [#15](https://github.com/audiocontrol-org/deskwork/issues/15). Triggered while installing deskwork into writingcontrol.org, a literary site that already had three published essays — the calendar starts empty and there is no first-class way to populate it from existing content.
+
+### Why now
+
+The lifecycle is forward-only: every entry must enter at `add` (Ideas) and walk through `plan → outline → draft → publish`. Anyone adopting deskwork on a project that already has content hits this on day one. Today's workarounds are all bad: walking the lifecycle per file overwrites existing scaffolds (and stamps today's date on every transition); hand-editing the calendar bypasses the validated state machine and produces no journal entry; doing nothing leaves the calendar inaccurate forever.
+
+This is the kind of feature that can't be added later in a way that doesn't feel bolted-on, because it touches the calendar's row schema (provenance — `add` vs. `ingest`?), the journal (event shape), and the operator's mental model (when do I reach for `ingest` vs. `add`?). Better to land it before there's a body of users with their own ad-hoc backfill scripts.
+
+### Scope
+
+A new `deskwork ingest [<project-root>] [--site <slug>] [options] <path>...` subcommand. `<path>` accepts a single file, a directory walked recursively, a glob, or multiple of those in one call. For each discovered file:
+
+1. **Parse YAML frontmatter** (any frontmatter — no Astro-specific fields required).
+2. **Derive slug** from `--slug-from {frontmatter,path}` (default `path` — `<dir>/index.md` → parent dir name; Jekyll `YYYY-MM-DD-<slug>.md` recognized; otherwise filename) or explicit `--slug` (single-file only).
+3. **Derive state** from `--state-from {frontmatter,datePublished}` (default `frontmatter` — reads the `state:` field) or explicit `--state <ideas|planned|outlining|drafting|published>`.
+4. **Derive date** from frontmatter (`datePublished` then `date`), falling back to file mtime, falling back to today.
+5. **Idempotency**: skip slugs already in the calendar; report skipped + reason. `--force` overrides after operator manually reconciles.
+6. **Dry-run by default.** Print the plan; nothing on disk changes until `--apply`.
+
+Layout-agnostic discovery — `<slug>/index.md`, flat `<slug>.md`, dated `YYYY-MM-DD-<slug>.md`, Hugo leaf bundles, Eleventy `src/posts/`, Jekyll `_posts/`, Next.js `pages/blog/`, plain markdown notes folders all work without configuration. Frontmatter field names are configurable: `--title-field`, `--date-field`, `--state-field`, `--slug-field`.
+
+### What this is not
+
+- **Not a migration tool for other editorial-calendar formats.** Source is markdown files on disk + their frontmatter. Importing from Notion / Airtable / a different calendar markdown shape is a separate concern.
+- **Not a publishing-platform sync.** `ingest` reads the host project's content tree; it does not pull from Substack, Ghost, or RSS.
+- **Not auto-detection of the content tree.** The operator passes paths explicitly. Walking the entire repo to "discover" content is intentionally out of scope — too easy to scoop up `node_modules/` test fixtures, vendored docs, or unrelated markdown.
+
+**Plan reference.** Issue #15 design; expanded into Phase 15 of the workplan during this `/feature-extend` invocation.
