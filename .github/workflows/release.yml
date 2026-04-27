@@ -37,7 +37,7 @@ jobs:
 
       - name: Verify bundles match the tagged source
         run: |
-          if ! git diff --exit-code -- packages/cli/bundle/ packages/studio/bundle/; then
+          if ! git diff --exit-code -- plugins/deskwork/bundle/ plugins/deskwork-studio/bundle/; then
             echo "::error::Tagged commit ships stale bundles. Bump the tag, rebuild, and re-tag."
             exit 1
           fi

@@ -36,10 +36,12 @@ jobs:
       # The committed bundle paths. If `npm install` (which ran prepare
       # → build) produced output that differs from what's checked in,
       # `git diff --exit-code` fails and the PR is flagged with the
-      # specific path(s) that drifted.
+      # specific path(s) that drifted. Bundles live inside the plugin
+      # tree per 956cd2d (so marketplace installs find them in the
+      # ~/.claude/plugins/cache copy of plugins/<name>/).
       - name: Verify bundles are not stale
         run: |
-          if ! git diff --exit-code -- packages/cli/bundle/ packages/studio/bundle/; then
+          if ! git diff --exit-code -- plugins/deskwork/bundle/ plugins/deskwork-studio/bundle/; then
             echo "::error::Committed bundles diverge from a fresh build. Run 'npm install' or 'npm --workspaces run build' locally and re-stage the bundle files, then push again."
             exit 1
           fi
