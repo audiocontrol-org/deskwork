@@ -26883,6 +26883,16 @@ function loadDetailRender(ctx, site, node2) {
       frontmatter = parsed.data;
       bodyPreview = parsed.body;
     }
+  } else if (node2.hasFsDir && node2.hasOwnIndex) {
+    const abs = findOrganizationalIndex(contentDir, node2.slug);
+    if (abs !== null) {
+      const raw3 = safeReadFile(abs);
+      if (raw3 !== null) {
+        const parsed = parseFrontmatter(raw3);
+        frontmatter = parsed.data;
+        bodyPreview = parsed.body;
+      }
+    }
   }
   try {
     scrapbook = listScrapbook(ctx.projectRoot, ctx.config, site, node2.path);
