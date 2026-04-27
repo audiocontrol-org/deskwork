@@ -10585,6 +10585,9 @@ function siteConfig(config, site) {
 function resolveCalendarPath(projectRoot, config, site) {
   return join3(projectRoot, siteConfig(config, site).calendarPath);
 }
+function resolveContentDir(projectRoot, config, site) {
+  return join3(projectRoot, siteConfig(config, site).contentDir);
+}
 var DEFAULT_BLOG_FILENAME_TEMPLATE = "{slug}/index.md";
 function resolveBlogFilePath(projectRoot, config, site, slug, filePath) {
   const entry = siteConfig(config, site);
@@ -11545,18 +11548,18 @@ var VFile = class {
    * @returns {undefined}
    *   Nothing.
    */
-  set extname(extname2) {
-    assertPart(extname2, "extname");
+  set extname(extname3) {
+    assertPart(extname3, "extname");
     assertPath(this.dirname, "extname");
-    if (extname2) {
-      if (extname2.codePointAt(0) !== 46) {
+    if (extname3) {
+      if (extname3.codePointAt(0) !== 46) {
         throw new Error("`extname` must start with `.`");
       }
-      if (extname2.includes(".", 1)) {
+      if (extname3.includes(".", 1)) {
         throw new Error("`extname` cannot contain multiple dots");
       }
     }
-    this.path = default2.join(this.dirname, this.stem + (extname2 || ""));
+    this.path = default2.join(this.dirname, this.stem + (extname3 || ""));
   }
   /**
    * Get the full path (example: `'~/index.min.js'`).
@@ -23137,8 +23140,225 @@ function createApiRouter(ctx) {
   return app;
 }
 
+// src/routes/scrapbook-file.ts
+import { extname as extname2 } from "node:path";
+
+// ../core/src/scrapbook.ts
+import {
+  existsSync as existsSync4,
+  mkdirSync as mkdirSync2,
+  readdirSync as readdirSync2,
+  readFileSync as readFileSync4,
+  renameSync,
+  rmSync,
+  statSync as statSync2,
+  writeFileSync as writeFileSync3
+} from "node:fs";
+import { dirname, extname, join as join6, resolve } from "node:path";
+var SECRET_SUBDIR = "secret";
+var SLUG_RE2 = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
+var FILENAME_RE = /^[a-zA-Z0-9._-][a-zA-Z0-9._ -]*$/;
+function assertSlug(slug) {
+  if (!SLUG_RE2.test(slug)) {
+    throw new Error(`invalid slug "${slug}" \u2014 must match ${SLUG_RE2}`);
+  }
+}
+function assertFilename(name) {
+  if (!name || name === "." || name === "..") {
+    throw new Error(`invalid filename "${name}"`);
+  }
+  if (name.includes("/") || name.includes("\\") || name.includes("\0")) {
+    throw new Error(`filename may not contain path separators: "${name}"`);
+  }
+  if (name.startsWith(".")) {
+    throw new Error(`filename may not start with a dot: "${name}"`);
+  }
+  if (!FILENAME_RE.test(name)) {
+    throw new Error(
+      `filename may only contain [A-Za-z0-9._ -]: "${name}"`
+    );
+  }
+  if (name.length > 200) {
+    throw new Error(`filename too long (> 200 chars): "${name}"`);
+  }
+}
+function scrapbookDir(projectRoot, config, site, slug) {
+  assertSlug(slug);
+  const articleDir = resolveBlogPostDir(projectRoot, config, site, slug);
+  return join6(articleDir, "scrapbook");
+}
+function scrapbookFilePath(projectRoot, config, site, slug, filename, opts = {}) {
+  assertFilename(filename);
+  const dir = scrapbookDir(projectRoot, config, site, slug);
+  const target = opts.secret ? join6(dir, SECRET_SUBDIR) : dir;
+  const abs = resolve(target, filename);
+  if (!abs.startsWith(dir + "/") && abs !== dir) {
+    throw new Error(
+      `resolved path escapes scrapbook dir: "${filename}" \u2192 ${abs}`
+    );
+  }
+  return abs;
+}
+function classify(filename) {
+  const ext = extname(filename).toLowerCase();
+  switch (ext) {
+    case ".md":
+    case ".markdown":
+      return "md";
+    case ".json":
+    case ".jsonl":
+      return "json";
+    case ".js":
+    case ".mjs":
+    case ".cjs":
+    case ".ts":
+    case ".tsx":
+    case ".mts":
+      return "js";
+    case ".png":
+    case ".jpg":
+    case ".jpeg":
+    case ".gif":
+    case ".webp":
+    case ".svg":
+      return "img";
+    case ".txt":
+    case ".log":
+      return "txt";
+    default:
+      return "other";
+  }
+}
+function listScrapbook(projectRoot, config, site, slug) {
+  const dir = scrapbookDir(projectRoot, config, site, slug);
+  if (!existsSync4(dir)) {
+    return { site, slug, dir, exists: false, items: [], secretItems: [] };
+  }
+  const items = listFilesInDir(dir);
+  const secretDir = join6(dir, SECRET_SUBDIR);
+  const secretItems = existsSync4(secretDir) ? listFilesInDir(secretDir) : [];
+  return { site, slug, dir, exists: true, items, secretItems };
+}
+function listFilesInDir(dir) {
+  const items = [];
+  for (const e of readdirSync2(dir, { withFileTypes: true })) {
+    if (!e.isFile()) continue;
+    if (e.name.startsWith(".")) continue;
+    const abs = join6(dir, e.name);
+    const st = statSync2(abs);
+    items.push({
+      name: e.name,
+      kind: classify(e.name),
+      size: st.size,
+      mtime: st.mtime.toISOString()
+    });
+  }
+  items.sort((a, b) => b.mtime.localeCompare(a.mtime));
+  return items;
+}
+function countScrapbook(projectRoot, config, site, slug) {
+  try {
+    const summary = listScrapbook(projectRoot, config, site, slug);
+    return summary.items.length + summary.secretItems.length;
+  } catch {
+    return 0;
+  }
+}
+function readScrapbookFile(projectRoot, config, site, slug, filename, opts = {}) {
+  const abs = scrapbookFilePath(projectRoot, config, site, slug, filename, opts);
+  if (!existsSync4(abs)) throw new Error(`not found: ${filename}`);
+  const st = statSync2(abs);
+  if (!st.isFile()) throw new Error(`not a file: ${filename}`);
+  const content3 = readFileSync4(abs);
+  return {
+    name: filename,
+    kind: classify(filename),
+    size: st.size,
+    mtime: st.mtime.toISOString(),
+    content: content3
+  };
+}
+function formatRelativeTime(iso, now = /* @__PURE__ */ new Date()) {
+  const then = new Date(iso).getTime();
+  const diff = now.getTime() - then;
+  if (diff < 0) return "just now";
+  const s = Math.floor(diff / 1e3);
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 48) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 14) return `${d}d ago`;
+  const w = Math.floor(d / 7);
+  if (w < 9) return `${w}w ago`;
+  const months = Math.floor(d / 30);
+  if (months < 18) return `${months}mo ago`;
+  const y = Math.floor(d / 365);
+  return `${y}y ago`;
+}
+function formatSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// src/routes/scrapbook-file.ts
+var MIME_TYPES = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+  ".svg": "image/svg+xml",
+  ".pdf": "application/pdf",
+  ".json": "application/json; charset=utf-8",
+  ".jsonl": "application/jsonl; charset=utf-8",
+  ".txt": "text/plain; charset=utf-8",
+  ".log": "text/plain; charset=utf-8",
+  ".md": "text/markdown; charset=utf-8",
+  ".markdown": "text/markdown; charset=utf-8",
+  ".mdx": "text/markdown; charset=utf-8"
+};
+function contentTypeFor(filename) {
+  const ext = extname2(filename).toLowerCase();
+  return MIME_TYPES[ext] ?? "application/octet-stream";
+}
+async function serveScrapbookFile(c, ctx) {
+  const site = c.req.query("site");
+  const path = c.req.query("path");
+  const name = c.req.query("name");
+  const secret = c.req.query("secret") === "1";
+  if (!site || !path || !name) {
+    return c.json(
+      { error: "site, path, and name query params are required" },
+      400
+    );
+  }
+  if (!(site in ctx.config.sites)) {
+    return c.json({ error: `unknown site: ${site}` }, 404);
+  }
+  let result;
+  try {
+    result = readScrapbookFile(ctx.projectRoot, ctx.config, site, path, name, {
+      secret
+    });
+  } catch (err2) {
+    const reason = err2 instanceof Error ? err2.message : String(err2);
+    return c.json({ error: reason }, 404);
+  }
+  const src = result.content;
+  const copy = new Uint8Array(src.byteLength);
+  copy.set(src);
+  return c.body(copy, 200, {
+    "Content-Type": contentTypeFor(result.name),
+    "Content-Length": String(result.size),
+    "Cache-Control": "private, max-age=10"
+  });
+}
+
 // ../core/src/calendar.ts
-import { readFileSync as readFileSync4, writeFileSync as writeFileSync3 } from "node:fs";
+import { readFileSync as readFileSync5, writeFileSync as writeFileSync4 } from "node:fs";
 import { randomUUID as randomUUID2 } from "node:crypto";
 
 // ../core/src/types.ts
@@ -23357,7 +23577,7 @@ function parseCalendar(markdown) {
 function readCalendar(calendarPath) {
   let raw3;
   try {
-    raw3 = readFileSync4(calendarPath, "utf-8");
+    raw3 = readFileSync5(calendarPath, "utf-8");
   } catch (err2) {
     if (err2 instanceof Error && "code" in err2 && err2.code === "ENOENT") {
       return { entries: [], distributions: [] };
@@ -23490,7 +23710,7 @@ function buildReport(projectRoot, config, opts = {}) {
 }
 
 // ../core/src/body-state.ts
-import { existsSync as existsSync4, readFileSync as readFileSync5 } from "node:fs";
+import { existsSync as existsSync5, readFileSync as readFileSync6 } from "node:fs";
 var PLACEHOLDER_MARKER = "<!-- Write your post here -->";
 function stripOutlineSection(body3) {
   const lines = body3.split("\n");
@@ -23506,8 +23726,8 @@ function stripOutlineSection(body3) {
   return [...lines.slice(0, startIdx), ...lines.slice(endIdx)].join("\n");
 }
 function bodyState(filePath) {
-  if (!existsSync4(filePath)) return "missing";
-  const content3 = readFileSync5(filePath, "utf8");
+  if (!existsSync5(filePath)) return "missing";
+  const content3 = readFileSync6(filePath, "utf8");
   const fmMatch = content3.match(/^---\n[\s\S]*?\n---\n?/);
   const body3 = fmMatch ? content3.slice(fmMatch[0].length) : content3;
   const withoutH1 = body3.replace(/^\s*#[^\n]*\n?/, "");
@@ -23517,120 +23737,6 @@ function bodyState(filePath) {
   if (trimmed === "") return "placeholder";
   const withoutPlaceholder = trimmed.replace(PLACEHOLDER_MARKER, "").trim();
   return withoutPlaceholder.length > 0 ? "written" : "placeholder";
-}
-
-// ../core/src/scrapbook.ts
-import {
-  existsSync as existsSync5,
-  mkdirSync as mkdirSync2,
-  readdirSync as readdirSync2,
-  readFileSync as readFileSync6,
-  renameSync,
-  rmSync,
-  statSync as statSync2,
-  writeFileSync as writeFileSync4
-} from "node:fs";
-import { dirname, extname, join as join6, resolve } from "node:path";
-var SECRET_SUBDIR = "secret";
-var SLUG_RE2 = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
-function assertSlug(slug) {
-  if (!SLUG_RE2.test(slug)) {
-    throw new Error(`invalid slug "${slug}" \u2014 must match ${SLUG_RE2}`);
-  }
-}
-function scrapbookDir(projectRoot, config, site, slug) {
-  assertSlug(slug);
-  const articleDir = resolveBlogPostDir(projectRoot, config, site, slug);
-  return join6(articleDir, "scrapbook");
-}
-function classify(filename) {
-  const ext = extname(filename).toLowerCase();
-  switch (ext) {
-    case ".md":
-    case ".markdown":
-      return "md";
-    case ".json":
-    case ".jsonl":
-      return "json";
-    case ".js":
-    case ".mjs":
-    case ".cjs":
-    case ".ts":
-    case ".tsx":
-    case ".mts":
-      return "js";
-    case ".png":
-    case ".jpg":
-    case ".jpeg":
-    case ".gif":
-    case ".webp":
-    case ".svg":
-      return "img";
-    case ".txt":
-    case ".log":
-      return "txt";
-    default:
-      return "other";
-  }
-}
-function listScrapbook(projectRoot, config, site, slug) {
-  const dir = scrapbookDir(projectRoot, config, site, slug);
-  if (!existsSync5(dir)) {
-    return { site, slug, dir, exists: false, items: [], secretItems: [] };
-  }
-  const items = listFilesInDir(dir);
-  const secretDir = join6(dir, SECRET_SUBDIR);
-  const secretItems = existsSync5(secretDir) ? listFilesInDir(secretDir) : [];
-  return { site, slug, dir, exists: true, items, secretItems };
-}
-function listFilesInDir(dir) {
-  const items = [];
-  for (const e of readdirSync2(dir, { withFileTypes: true })) {
-    if (!e.isFile()) continue;
-    if (e.name.startsWith(".")) continue;
-    const abs = join6(dir, e.name);
-    const st = statSync2(abs);
-    items.push({
-      name: e.name,
-      kind: classify(e.name),
-      size: st.size,
-      mtime: st.mtime.toISOString()
-    });
-  }
-  items.sort((a, b) => b.mtime.localeCompare(a.mtime));
-  return items;
-}
-function countScrapbook(projectRoot, config, site, slug) {
-  try {
-    const summary = listScrapbook(projectRoot, config, site, slug);
-    return summary.items.length + summary.secretItems.length;
-  } catch {
-    return 0;
-  }
-}
-function formatRelativeTime(iso, now = /* @__PURE__ */ new Date()) {
-  const then = new Date(iso).getTime();
-  const diff = now.getTime() - then;
-  if (diff < 0) return "just now";
-  const s = Math.floor(diff / 1e3);
-  if (s < 60) return `${s}s ago`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 48) return `${h}h ago`;
-  const d = Math.floor(h / 24);
-  if (d < 14) return `${d}d ago`;
-  const w = Math.floor(d / 7);
-  if (w < 9) return `${w}w ago`;
-  const months = Math.floor(d / 30);
-  if (months < 18) return `${months}mo ago`;
-  const y = Math.floor(d / 365);
-  return `${y}y ago`;
-}
-function formatSize(bytes) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 // src/pages/html.ts
@@ -24301,7 +24407,123 @@ function splitOutline(md) {
   return { outline, body: body3, present: true, startLine: startIdx, endLine: endIdx };
 }
 
+// src/components/scrapbook-item.ts
+var DEFAULT_PREVIEW_BYTES = 800;
+var TEXT_PREVIEW_LINES = 8;
+function scrapbookFileUrl(address, filename, opts = {}) {
+  const params = new URLSearchParams({
+    site: address.site,
+    path: address.path,
+    name: filename
+  });
+  if (opts.secret) params.set("secret", "1");
+  return `/api/dev/scrapbook-file?${params.toString()}`;
+}
+function scrapbookViewerUrl(address) {
+  return `/dev/scrapbook/${address.site}/${encodeURI(address.path)}`;
+}
+var IMAGE_EXTENSIONS = /* @__PURE__ */ new Set([
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".webp",
+  ".svg"
+]);
+var PDF_EXTENSIONS = /* @__PURE__ */ new Set([".pdf"]);
+function lowerExt(filename) {
+  const dot = filename.lastIndexOf(".");
+  return dot < 0 ? "" : filename.slice(dot).toLowerCase();
+}
+function isImageFilename(filename) {
+  return IMAGE_EXTENSIONS.has(lowerExt(filename));
+}
+function isPdfFilename(filename) {
+  return PDF_EXTENSIONS.has(lowerExt(filename));
+}
+function kindLabel(kind) {
+  return kind === "other" ? "\xB7" : kind.toUpperCase();
+}
+function truncateForInline(raw3, lines) {
+  const split = raw3.split("\n").slice(0, lines);
+  const truncated = raw3.split("\n").length > lines || raw3.length > 1024;
+  return truncated ? `${split.join("\n")}
+\u2026` : split.join("\n");
+}
+function loadInlineText(filename, options) {
+  const loader = options.inlinePreviewLoader;
+  if (!loader) return null;
+  const max = options.inlinePreviewMaxBytes ?? DEFAULT_PREVIEW_BYTES;
+  const raw3 = loader(filename, max);
+  if (raw3 === null) return null;
+  return truncateForInline(raw3, TEXT_PREVIEW_LINES);
+}
+function renderReadOnlyScrapbookRow(address, item, opts = {}) {
+  const fileUrl = scrapbookFileUrl(address, item.name);
+  const sizeText = formatSize(item.size);
+  const mtimeText = formatRelativeTime(item.mtime);
+  if (isImageFilename(item.name)) {
+    return unsafe(html6`
+      <div class="scrap scrap--img" data-kind="img" data-filename="${item.name}">
+        <a class="scrap__thumb-link" href="${fileUrl}" target="_blank" rel="noopener"
+          aria-label="Open ${item.name} in a new tab">
+          <img class="scrap__thumb" loading="lazy" alt="" src="${fileUrl}">
+        </a>
+        <span class="scrap__name">${item.name}</span>
+        <span class="scrap__size">${sizeText}</span>
+        <span class="scrap__mtime">${mtimeText}</span>
+      </div>`);
+  }
+  if (isPdfFilename(item.name)) {
+    return unsafe(html6`
+      <div class="scrap scrap--pdf" data-kind="pdf" data-filename="${item.name}">
+        <span class="scrap__kind">PDF</span>
+        <span class="scrap__name">
+          <a class="scrap__name-link" href="${fileUrl}" target="_blank" rel="noopener">${item.name}</a>
+        </span>
+        <span class="scrap__size">${sizeText}</span>
+        <span class="scrap__mtime">${mtimeText}</span>
+        <iframe class="scrap__pdf-frame" src="${fileUrl}#view=FitH" title="${item.name}"
+          aria-label="PDF preview of ${item.name}"></iframe>
+      </div>`);
+  }
+  if (item.kind === "txt" || item.kind === "json") {
+    const inline = loadInlineText(item.name, opts);
+    if (inline !== null) {
+      return unsafe(html6`
+        <div class="scrap scrap--with-preview" data-kind="${item.kind}" data-filename="${item.name}">
+          <span class="scrap__kind">${kindLabel(item.kind)}</span>
+          <span class="scrap__name">
+            <a class="scrap__name-link" href="${fileUrl}" target="_blank" rel="noopener">${item.name}</a>
+          </span>
+          <span class="scrap__size">${sizeText}</span>
+          <span class="scrap__mtime">${mtimeText}</span>
+          <pre class="scrap__inline-preview">${inline}</pre>
+        </div>`);
+    }
+  }
+  const linkAttr = item.kind === "md" ? "" : ' target="_blank" rel="noopener"';
+  const href = item.kind === "md" ? scrapbookViewerUrl(address) : fileUrl;
+  return unsafe(html6`
+    <div class="scrap" data-kind="${item.kind}" data-filename="${item.name}">
+      <span class="scrap__kind">${kindLabel(item.kind)}</span>
+      <span class="scrap__name">
+        <a class="scrap__name-link" href="${href}"${unsafe(linkAttr)}>${item.name}</a>
+      </span>
+      <span class="scrap__size">${sizeText}</span>
+      <span class="scrap__mtime">${mtimeText}</span>
+    </div>`);
+}
+function renderEmptyScrapbookRow() {
+  return unsafe(html6`
+    <div class="scrap scrap--empty" data-state="empty">
+      <span class="scrap__empty-text">no scrapbook items</span>
+    </div>`);
+}
+
 // src/pages/review.ts
+import { readFileSync as readFileSync7 } from "node:fs";
+import { join as join7 } from "node:path";
 function isSuccessBody(body3) {
   if (typeof body3 !== "object" || body3 === null) return false;
   return "workflow" in body3 && "versions" in body3;
@@ -24492,6 +24714,64 @@ function renderOutlineDrawer(outlineHtml) {
       </footer>
     </aside>`);
 }
+function makeInlineTextLoader(ctx, site, slug) {
+  const contentDir = resolveContentDir(ctx.projectRoot, ctx.config, site);
+  const scrapbookDir2 = join7(contentDir, slug, "scrapbook");
+  return (filename, maxBytes) => {
+    try {
+      const buf = readFileSync7(join7(scrapbookDir2, filename));
+      const slice = buf.subarray(0, Math.min(buf.byteLength, maxBytes));
+      return slice.toString("utf-8");
+    } catch {
+      return null;
+    }
+  };
+}
+function renderScrapbookDrawerItems(site, slug, items, loader) {
+  if (items.length === 0) {
+    return renderEmptyScrapbookRow();
+  }
+  const rows = items.map(
+    (item) => renderReadOnlyScrapbookRow(
+      { site, path: slug },
+      item,
+      { inlinePreviewLoader: loader }
+    )
+  );
+  return unsafe(rows.map((r) => r.__raw).join(""));
+}
+function renderScrapbookDrawer(ctx, site, slug) {
+  const summary = (() => {
+    try {
+      return listScrapbook(ctx.projectRoot, ctx.config, site, slug);
+    } catch {
+      return null;
+    }
+  })();
+  const items = summary?.items ?? [];
+  const secretItems = summary?.secretItems ?? [];
+  const total = items.length + secretItems.length;
+  const loader = makeInlineTextLoader(ctx, site, slug);
+  return unsafe(html6`
+    <aside class="er-scrapbook-drawer" data-scrapbook-drawer aria-label="Scrapbook for this entry">
+      <header class="er-scrapbook-drawer-head">
+        <span class="er-scrapbook-drawer-kicker">§ Scrapbook</span>
+        <span class="er-scrapbook-drawer-count">${total} ${total === 1 ? "item" : "items"}</span>
+        <a class="er-scrapbook-drawer-open" href="${scrapbookViewerUrl({ site, path: slug })}"
+          title="Open the standalone scrapbook viewer">open ↗</a>
+      </header>
+      <div class="er-scrapbook-drawer-body">
+        ${renderScrapbookDrawerItems(site, slug, items, loader)}
+        ${secretItems.length > 0 ? unsafe(html6`
+                <div class="er-scrapbook-drawer-secret">
+                  <p class="er-scrapbook-drawer-secret-head">
+                    <span aria-hidden="true">⚿</span> secret · ${secretItems.length}
+                  </p>
+                  ${renderScrapbookDrawerItems(site, slug, secretItems, loader)}
+                </div>`) : ""}
+      </div>
+    </aside>`);
+}
 async function renderReviewPage(ctx, slug, query) {
   const site = pickSite(ctx, query.site);
   const contentKind = pickContentKind(query.kind ?? null);
@@ -24541,6 +24821,7 @@ async function renderReviewPage(ctx, slug, query) {
       ${renderMarginalia()}
       <button class="er-pencil-btn" data-add-comment-btn hidden type="button">Mark</button>
       ${renderOutlineDrawer(outlineHtml)}
+      ${renderScrapbookDrawer(ctx, site, workflow.slug)}
       <div class="er-toast" data-toast hidden></div>
       ${renderShortcutsOverlay()}
       <div class="er-poll-indicator" data-poll>auto-refresh · 8s</div>
@@ -24550,7 +24831,8 @@ async function renderReviewPage(ctx, slug, query) {
     cssHrefs: [
       "/static/css/editorial-review.css",
       "/static/css/blog-figure.css",
-      "/static/css/review-viewport.css"
+      "/static/css/review-viewport.css",
+      "/static/css/scrap-row.css"
     ],
     bodyHtml: body3,
     embeddedJson: [{ id: "draft-state", data: draftState }],
@@ -25279,7 +25561,7 @@ function renderItemRow(item, index2, opts = {}) {
   const { secret = false, withTools = true } = opts;
   const editBtn = withTools && item.kind === "md" ? unsafe(html6`<button type="button" class="scrapbook-tool" data-action="edit">edit</button>`) : "";
   const seq = String(index2 + 1).padStart(2, "0");
-  const kindLabel = item.kind === "other" ? "\xB7" : item.kind.toUpperCase();
+  const kindLabel2 = item.kind === "other" ? "\xB7" : item.kind.toUpperCase();
   const idPrefix = secret ? "secret-" : "";
   const dataSecret = secret ? ' data-secret="true"' : "";
   const toolbar = withTools ? unsafe(html6`<div class="scrapbook-toolbar" data-toolbar>
@@ -25294,7 +25576,7 @@ function renderItemRow(item, index2, opts = {}) {
       id="${idPrefix}item-${encodeURIComponent(item.name)}">
       <button type="button" class="scrapbook-item-header" aria-expanded="false">
         <span class="scrapbook-seq" aria-hidden="true">§ ${seq}</span>
-        <span class="scrapbook-kind scrapbook-kind--${item.kind}" aria-hidden="true">${kindLabel}</span>
+        <span class="scrapbook-kind scrapbook-kind--${item.kind}" aria-hidden="true">${kindLabel2}</span>
         <span class="scrapbook-filename" data-filename-cell>${item.name}</span>
         <time class="scrapbook-mtime" datetime="${item.mtime}">${formatRelativeTime(item.mtime)}</time>
         <span class="scrapbook-disclosure" aria-hidden="true">▸</span>
@@ -25632,6 +25914,7 @@ function createApp(ctx) {
       )
     )
   );
+  app.get("/api/dev/scrapbook-file", (c) => serveScrapbookFile(c, ctx));
   app.use(
     "/static/*",
     serveStatic({

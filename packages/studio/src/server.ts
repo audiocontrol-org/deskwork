@@ -34,6 +34,7 @@ import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readConfig } from '@deskwork/core/config';
 import { createApiRouter, type StudioContext } from './routes/api.ts';
+import { serveScrapbookFile } from './routes/scrapbook-file.ts';
 import { renderDashboard } from './pages/dashboard.ts';
 import { renderReviewPage } from './pages/review.ts';
 import { renderShortformPage } from './pages/shortform.ts';
@@ -185,6 +186,13 @@ export function createApp(ctx: StudioContext): Hono {
       ),
     ),
   );
+
+  // Read-only binary endpoint for scrapbook files. Used by the
+  // shared scrapbook-item renderer (`components/scrapbook-item.ts`)
+  // to source image thumbnails, PDF iframes, and download fallbacks.
+  // Distinct from the (not-yet-ported) full scrapbook CRUD API — the
+  // bird's-eye and review-drawer surfaces are read-only.
+  app.get('/api/dev/scrapbook-file', (c) => serveScrapbookFile(c, ctx));
 
   // Static assets — UI client JS, CSS, etc.
   app.use(
