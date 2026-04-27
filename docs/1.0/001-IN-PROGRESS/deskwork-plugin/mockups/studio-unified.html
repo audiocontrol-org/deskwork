@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>deskwork — studio unification (mockup)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..900,0..100;1,9..144,300..900,0..100&family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    /* ============================================================
+       Editorial-print tokens — VERBATIM from
+       plugins/deskwork-studio/public/css/editorial-review.css
+       (lines 14-52). Do not redefine; do not parallel.
+       ============================================================ */
+
+    :root {
+      /* Paper & ink */
+      --er-paper:       #F5F1E8;
+      --er-paper-2:     #ECE6D4;
+      --er-paper-3:     #DFD7BF;
+      --er-ink:         #1A1614;
+      --er-ink-soft:    #3A332E;
+      --er-faded:       #8A7F70;
+      --er-faded-2:     #B5AC9B;
+
+      /* Marking pigments */
+      --er-red-pencil:  #B8362A;
+      --er-red-soft:    #D9867A;
+      --er-proof-blue:  #2A4B7C;
+      --er-highlight:   #F4D58D;
+      --er-stamp-green: #2E5D45;
+
+      /* Type */
+      --er-font-display: 'Fraunces', 'Newsreader', Georgia, 'Times New Roman', serif;
+      --er-font-body:    'Newsreader', Georgia, 'Times New Roman', serif;
+      --er-font-mono:    'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+
+      /* Rhythm */
+      --er-space-0: 0.25rem;
+      --er-space-1: 0.5rem;
+      --er-space-2: 0.875rem;
+      --er-space-3: 1.25rem;
+      --er-space-4: 1.75rem;
+      --er-space-5: 2.5rem;
+      --er-space-6: 4rem;
+
+      --er-rule-thin:  0.5px solid var(--er-ink);
+      --er-rule-med:   1px solid var(--er-ink);
+      --er-rule-heavy: 3px solid var(--er-ink);
+      --er-rule-double: 2px double var(--er-ink);
+
+      /* PROPOSED — to be added to editorial-review.css */
+      --er-container-wide:   78rem;
+      --er-container-narrow: 56rem;
+
+      /* Lane indicators (from content.css; survive but recolored to harmonize) */
+      --er-lane-ideas:     #b39872;
+      --er-lane-planned:   #8a9a7a;
+      --er-lane-outlining: #7e8aa6;
+      --er-lane-drafting:  #b08a5e;
+      --er-lane-review:    #a37882;
+      --er-lane-published: #6f8265;
+      --er-lane-paused:    #9a8a7a;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      background: var(--er-paper);
+      color: var(--er-ink);
+      font-family: var(--er-font-body);
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.05 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+      min-height: 100vh;
+    }
+
+    a {
+      color: var(--er-proof-blue);
+      text-decoration-thickness: 1px;
+      text-underline-offset: 2px;
+    }
+
+    /* ============================================================
+       Section labels (mockup-only)
+       ============================================================ */
+
+    .mockup-shell {
+      max-width: var(--er-container-wide);
+      margin: 0 auto;
+      padding: 0 var(--er-space-4) var(--er-space-6);
+    }
+
+    .mockup-section {
+      margin: var(--er-space-6) 0 var(--er-space-3);
+      padding-top: var(--er-space-4);
+      border-top: 1px dashed var(--er-faded-2);
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: var(--er-space-3);
+      align-items: baseline;
+    }
+    .mockup-section:first-of-type { border-top: none; margin-top: var(--er-space-3); }
+
+    .mockup-section__num {
+      font-family: var(--er-font-mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      color: var(--er-red-pencil);
+      font-weight: 500;
+      text-transform: uppercase;
+    }
+    .mockup-section__title {
+      font-family: var(--er-font-display);
+      font-variation-settings: "opsz" 60, "wght" 400, "SOFT" 30;
+      font-size: 1.3rem;
+      color: var(--er-ink);
+      letter-spacing: -0.005em;
+    }
+    .mockup-section__desc {
+      grid-column: 2;
+      font-family: var(--er-font-body);
+      font-style: italic;
+      font-size: 0.9rem;
+      color: var(--er-ink-soft);
+      max-width: 60ch;
+      margin: 0.3rem 0 0;
+      line-height: 1.5;
+    }
+
+    .compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px;
+      background: var(--er-faded-2);
+      border: 1px solid var(--er-faded-2);
+      margin-top: var(--er-space-3);
+    }
+    .compare-pane {
+      background: var(--er-paper);
+      padding: var(--er-space-3) var(--er-space-3) var(--er-space-4);
+      min-height: 14rem;
+    }
+    .compare-pane__label {
+      font-family: var(--er-font-mono);
+      font-size: 0.6rem;
+      letter-spacing: 0.18em;
+      color: var(--er-faded);
+      text-transform: uppercase;
+      margin-bottom: var(--er-space-2);
+      display: flex;
+      gap: var(--er-space-2);
+      align-items: baseline;
+    }
+    .compare-pane__label .mark {
+      color: var(--er-red-pencil);
+      font-weight: 600;
+    }
+
+    /* ============================================================
+       FOLIO STRIP — already consistent post-Phase 17, included for
+       visual continuity and to anchor each surface in the chrome.
+       ============================================================ */
+
+    .er-folio {
+      border-bottom: var(--er-rule-double);
+      background: var(--er-paper);
+    }
+    .er-folio-inner {
+      max-width: var(--er-container-wide);
+      margin: 0 auto;
+      padding: var(--er-space-1) var(--er-space-4);
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: var(--er-space-3);
+      min-height: 2.4rem;
+    }
+    .er-folio-name {
+      font-family: var(--er-font-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: var(--er-ink);
+      font-weight: 600;
+    }
+    .er-folio-name em {
+      font-style: normal;
+      color: var(--er-red-pencil);
+      letter-spacing: 0.32em;
+    }
+    .er-folio-spine {
+      font-family: var(--er-font-mono);
+      font-size: 0.6rem;
+      letter-spacing: 0.18em;
+      text-transform: lowercase;
+      color: var(--er-faded);
+    }
+    .er-folio-nav {
+      display: flex;
+      justify-content: center;
+      align-items: baseline;
+    }
+    .er-folio-nav a {
+      font-family: var(--er-font-display);
+      font-variation-settings: "opsz" 28, "wght" 400, "SOFT" 30;
+      font-size: 0.95rem;
+      color: var(--er-ink);
+      text-decoration: none;
+      padding: 0.3rem 0.85rem;
+      position: relative;
+    }
+    .er-folio-nav a:not(:last-child)::after {
+      content: '·';
+      position: absolute;
+      right: -0.15rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--er-faded-2);
+      font-size: 1rem;
+    }
+    .er-folio-nav a.active {
+      color: var(--er-red-pencil);
+      font-variation-settings: "opsz" 28, "wght" 500, "SOFT" 30;
+    }
+
+    /* ============================================================
+       PROPOSED — er-pagehead unified slot system (CSF-3)
+       ============================================================
+       One class hierarchy. Each slot is optional — surfaces fill
+       what they need. Replaces er-masthead (dashboard, shortform),
+       page-head (content), er-toc-head (index), eh-cover (manual),
+       scrapbook-header (scrapbook), er-dispatch (review).
+       ============================================================ */
+
+    .er-pagehead {
+      padding: var(--er-space-6) var(--er-space-5) var(--er-space-4);
+      border-bottom: var(--er-rule-double);
+      position: relative;
+      max-width: var(--er-container-wide);
+      margin: 0 auto;
+    }
+
+    /* Layout variants — control alignment */
+    .er-pagehead--centered { text-align: center; }
+    .er-pagehead--split {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: end;
+      gap: var(--er-space-4);
+      text-align: left;
+    }
+
+    .er-pagehead__kicker {
+      font-family: var(--er-font-mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--er-faded);
+      margin-bottom: var(--er-space-2);
+    }
+    .er-pagehead__kicker em {
+      font-style: normal;
+      color: var(--er-red-pencil);
+    }
+
+    .er-pagehead__title {
+      font-family: var(--er-font-display);
+      font-variation-settings: "opsz" 144, "wght" 400, "SOFT" 0;
+      font-size: clamp(3rem, 7vw, 5.5rem);
+      line-height: 0.95;
+      letter-spacing: -0.022em;
+      margin: 0;
+      color: var(--er-ink);
+    }
+    .er-pagehead__title em {
+      font-style: italic;
+      font-variation-settings: "opsz" 144, "wght" 400, "SOFT" 100;
+    }
+
+    /* Smaller variant for surfaces that don't want a giant title (content drilldown, scrapbook) */
+    .er-pagehead--compact .er-pagehead__title {
+      font-size: clamp(1.8rem, 3.5vw, 2.6rem);
+    }
+
+    .er-pagehead__deck {
+      font-family: var(--er-font-display);
+      font-style: italic;
+      font-variation-settings: "opsz" 48, "wght" 400;
+      font-size: 1.15rem;
+      color: var(--er-ink-soft);
+      margin: var(--er-space-2) 0 var(--er-space-3);
+      max-width: 44rem;
+      line-height: 1.45;
+    }
+    .er-pagehead--centered .er-pagehead__deck {
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .er-pagehead__meta {
+      font-family: var(--er-font-mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--er-faded);
+      display: inline-flex;
+      gap: var(--er-space-2);
+      align-items: center;
+    }
+    .er-pagehead__meta .sep { color: var(--er-faded-2); }
+
+    /* split variant — meta block aligned to the right column */
+    .er-pagehead--split .er-pagehead__meta {
+      flex-direction: column;
+      align-items: flex-end;
+      text-align: right;
+      gap: 0.2rem;
+    }
+
+    /* imprint variant for the manual — strong/span pairs */
+    .er-pagehead__imprint {
+      font-family: var(--er-font-mono);
+      font-size: 0.62rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--er-faded);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: var(--er-space-2);
+      margin-top: var(--er-space-3);
+      padding-top: var(--er-space-2);
+      border-top: var(--er-rule-thin);
+      border-bottom: var(--er-rule-thin);
+      padding-bottom: var(--er-space-2);
+    }
+    .er-pagehead__imprint strong {
+      color: var(--er-ink);
+      font-weight: 500;
+      margin-right: 0.4em;
+    }
+    .er-pagehead__imprint .sep { color: var(--er-faded-2); }
+
+    /* breadcrumb (used by scrapbook + drilldown) */
+    .er-pagehead__crumbs {
+      font-family: var(--er-font-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.06em;
+      color: var(--er-faded);
+      margin-bottom: var(--er-space-1);
+    }
+    .er-pagehead__crumbs a { color: var(--er-ink-soft); text-decoration: none; }
+    .er-pagehead__crumbs a:hover { color: var(--er-red-pencil); }
+    .er-pagehead__crumbs .sep { color: var(--er-faded-2); margin: 0 0.4em; }
+
+    /* ============================================================
+       PROPOSED — er-section-head unified component (CSF-4)
+       ============================================================
+       Replaces er-section-title, er-toc-section-head,
+       eh-section-head, .detail__sectionhead.
+       ============================================================ */
+
+    .er-section-head {
+      display: flex;
+      align-items: baseline;
+      gap: var(--er-space-2);
+      margin: var(--er-space-4) 0 var(--er-space-2);
+      padding-bottom: var(--er-space-1);
+      border-bottom: var(--er-rule-thin);
+    }
+    .er-section-head__ornament {
+      color: var(--er-red-pencil);
+      font-family: var(--er-font-display);
+      font-size: 1rem;
+      line-height: 1;
+    }
+    .er-section-head__title {
+      font-family: var(--er-font-display);
+      font-variation-settings: "opsz" 48, "wght" 500;
+      font-size: 1.4rem;
+      letter-spacing: -0.005em;
+      color: var(--er-ink);
+      margin: 0;
+    }
+    .er-section-head__count {
+      margin-left: auto;
+      font-family: var(--er-font-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--er-faded);
+    }
+
+    /* Variant: small caps name (used by index TOC sections) */
+    .er-section-head--smallcaps .er-section-head__title {
+      font-size: 0.9rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    /* ============================================================
+       PROPOSED — er-row base + modifiers (CSF-5)
+       ============================================================
+       Replaces er-calendar-row, scrap, tree-row, er-toc-entry,
+       project-row. Each modifier handles surface specifics.
+       ============================================================ */
+
+    .er-row {
+      display: grid;
+      align-items: baseline;
+      gap: var(--er-space-2);
+      padding: var(--er-space-1) var(--er-space-2);
+      border-bottom: 1px dotted var(--er-faded-2);
+      transition: background 0.14s ease;
+    }
+    .er-row:hover { background: rgba(26, 22, 20, 0.03); }
+    .er-row:last-child { border-bottom: none; }
+
+    /* Calendar row variant — 4col grid, full lifecycle context */
+    .er-row--calendar {
+      grid-template-columns: auto minmax(0, 1fr) auto auto;
+    }
+
+    /* TOC entry variant — leader dots between title and route */
+    .er-row--toc {
+      grid-template-columns: auto 1fr auto;
+      padding: var(--er-space-2) 0;
+    }
+    .er-row--toc .er-row__leaders {
+      flex: 1;
+      border-bottom: 1px dotted var(--er-faded);
+      position: relative;
+      bottom: 0.32rem;
+      margin: 0 0.4rem;
+      min-width: 1rem;
+      opacity: 0.7;
+    }
+
+    /* Tree depth variant — depth-indented w/ optional hover bar */
+    .er-row--tree {
+      grid-template-columns: 1fr auto auto;
+      padding-left: calc(var(--er-row-depth, 0) * 1.4rem);
+    }
+    .er-row--tree[data-depth]::before {
+      content: "";
+      position: absolute;
+      left: calc((var(--er-row-depth, 0) - 0.5) * 1.4rem);
+      top: 0.4rem;
+      bottom: 0.4rem;
+      width: 1px;
+      background: var(--er-faded-2);
+      opacity: 0.4;
+    }
+
+    /* Scrap row variant — kind chip + name + size + mtime */
+    .er-row--scrap {
+      grid-template-columns: auto 1fr auto auto;
+    }
+
+    .er-row__num {
+      font-family: var(--er-font-display);
+      font-variation-settings: "opsz" 24, "wght" 500;
+      font-style: italic;
+      font-size: 0.95rem;
+      color: var(--er-faded);
+      width: 2.4rem;
+      text-align: right;
+    }
+    .er-row__title {
+      font-family: var(--er-font-display);
+      font-variation-settings: "opsz" 36, "wght" 500;
+      font-size: 1.05rem;
+      color: var(--er-ink);
+      letter-spacing: -0.005em;
+    }
+    .er-row__title em {
+      font-style: italic;
+      font-variation-settings: "opsz" 36, "wght" 500, "SOFT" 80;
+      color: var(--er-ink-soft);
+    }
+    .er-row__route {
+      font-family: var(--er-font-mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.04em;
+      color: var(--er-ink-soft);
+      white-space: nowrap;
+    }
+    .er-row__meta {
+      font-family: var(--er-font-mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.04em;
+      color: var(--er-faded);
+      white-space: nowrap;
+    }
+    .er-row__lane {
+      font-family: var(--er-font-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--er-ink-soft);
+      display: flex;
+      align-items: center;
+      gap: 0.4em;
+    }
+    .er-lane-dot {
+      display: inline-block;
+      width: 0.4em;
+      height: 0.4em;
+      border-radius: 50%;
+      background: var(--er-faded);
+    }
+    .er-lane-dot--ideas     { background: var(--er-lane-ideas); }
+    .er-lane-dot--planned   { background: var(--er-lane-planned); }
+    .er-lane-dot--outlining { background: var(--er-lane-outlining); }
+    .er-lane-dot--drafting  { background: var(--er-lane-drafting); }
+    .er-lane-dot--review    { background: var(--er-lane-review); }
+    .er-lane-dot--published { background: var(--er-lane-published); }
+    .er-lane-dot--paused    { background: var(--er-lane-paused); }
+
+    .er-row__chip {
+      font-family: var(--er-font-mono);
+      font-size: 0.55rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--er-ink-soft);
+      padding: 0.1em 0.4em;
+      border: 1px solid var(--er-faded-2);
+      background: var(--er-paper-2);
+      border-radius: 1px;
+      width: 2.2rem;
+      text-align: center;
+    }
+
+    /* Critical / Harmful / Cosmetic flag colors */
+    .audit-tag {
+      font-family: var(--er-font-mono);
+      font-size: 0.55rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      padding: 0.15em 0.5em;
+      border-radius: 1px;
+      font-weight: 600;
+    }
+    .audit-tag--harmful  { background: rgba(184, 54, 42, 0.12); color: var(--er-red-pencil); border: 1px solid rgba(184, 54, 42, 0.3); }
+    .audit-tag--cosmetic { background: rgba(46, 93, 69, 0.12); color: var(--er-stamp-green); border: 1px solid rgba(46, 93, 69, 0.3); }
+
+    /* Drift demo paper-color blocks */
+    .swatch-block {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: var(--er-space-1);
+      margin: var(--er-space-2) 0;
+    }
+    .swatch {
+      padding: var(--er-space-2);
+      border: 1px solid var(--er-faded-2);
+      font-family: var(--er-font-mono);
+      font-size: 0.6rem;
+      letter-spacing: 0.04em;
+    }
+    .swatch__hex {
+      display: block;
+      font-weight: 600;
+      color: var(--er-ink);
+      margin-top: 0.3em;
+    }
+    .swatch--paper-er  { background: #F5F1E8; }
+    .swatch--paper-wc  { background: #faf6ee; }
+    .swatch--ink-er    { background: #F5F1E8; color: #1A1614; }
+    .swatch--ink-wc    { background: #faf6ee; color: #1c1816; }
+    .swatch--accent-er { background: #F5F1E8; color: #B8362A; }
+    .swatch--accent-wc { background: #faf6ee; color: #6e2e2e; }
+
+    .audit-pre {
+      font-family: var(--er-font-mono);
+      font-size: 0.7rem;
+      background: var(--er-paper-2);
+      padding: var(--er-space-2);
+      border: 1px solid var(--er-faded-2);
+      margin: var(--er-space-2) 0;
+      color: var(--er-ink);
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Folio strip -->
+  <header class="er-folio">
+    <div class="er-folio-inner">
+      <div class="er-folio-name">deskwork <em>STUDIO</em></div>
+      <nav class="er-folio-nav">
+        <a href="#">Index</a>
+        <a href="#">Dashboard</a>
+        <a href="#" class="active">Audit</a>
+        <a href="#">Reviews</a>
+        <a href="#">Manual</a>
+      </nav>
+      <div class="er-folio-spine">vol. <b>xxvi</b> · № <b>04</b> · cross-surface audit</div>
+    </div>
+  </header>
+
+  <main class="mockup-shell">
+
+    <!-- ================================================================
+         CSF-1 — Token alignment
+         ================================================================ -->
+
+    <header class="mockup-section">
+      <span class="mockup-section__num">CSF-1</span>
+      <span class="mockup-section__title">Token alignment <span class="audit-tag audit-tag--harmful">harmful</span></span>
+      <p class="mockup-section__desc">
+        <code>content.css</code> defines parallel <code>--paper</code> / <code>--ink</code> / <code>--accent</code>
+        tokens with subtly different hex values than the editorial-print tokens. Operators see palette drift moving
+        between surfaces. Fix: delete the parallel definitions and let <code>--er-*</code> flow through.
+      </p>
+    </header>
+
+    <div class="compare">
+      <div class="compare-pane">
+        <div class="compare-pane__label"><span class="mark">▲</span> Current — drift</div>
+        <div class="swatch-block">
+          <div class="swatch swatch--paper-er">paper / editorial<span class="swatch__hex">#F5F1E8</span></div>
+          <div class="swatch swatch--paper-wc">paper / writers-cat<span class="swatch__hex">#faf6ee</span></div>
+          <div class="swatch swatch--accent-er">red-pencil<span class="swatch__hex">#B8362A</span></div>
+          <div class="swatch swatch--accent-wc">accent (oxblood)<span class="swatch__hex">#6e2e2e</span></div>
+        </div>
+        <p style="font-style: italic; font-size: 0.85rem; color: var(--er-ink-soft); margin-top: var(--er-space-2);">
+          Same token name, different hex. The cream is yellower in the content view; the red is darker.
+        </p>
+      </div>
+      <div class="compare-pane">
+        <div class="compare-pane__label"><span class="mark">●</span> Proposed — single source</div>
+        <div class="swatch-block">
+          <div class="swatch swatch--paper-er">paper<span class="swatch__hex">#F5F1E8</span></div>
+          <div class="swatch swatch--paper-er">paper-2<span class="swatch__hex">#ECE6D4</span></div>
+          <div class="swatch swatch--accent-er">red-pencil<span class="swatch__hex">#B8362A</span></div>
+          <div class="swatch swatch--accent-er">red-soft<span class="swatch__hex">#D9867A</span></div>
+        </div>
+        <p style="font-style: italic; font-size: 0.85rem; color: var(--er-ink-soft); margin-top: var(--er-space-2);">
+          One palette across all surfaces. Marginalia is one red. Paper is one cream.
+        </p>
+      </div>
+    </div>
+
+    <!-- ================================================================
+         CSF-2 — Pixel spacing leak
+         ================================================================ -->
+
+    <header class="mockup-section">
+      <span class="mockup-section__num">CSF-2</span>
+      <span class="mockup-section__title">Pixel spacing → tokens <span class="audit-tag audit-tag--harmful">harmful</span></span>
+      <p class="mockup-section__desc">
+        35 spacing-in-px declarations in <code>content.css</code>. Replace with <code>--er-space-*</code>.
+      </p>
+    </header>
+
+    <div class="compare">
+      <div class="compare-pane">
+        <div class="compare-pane__label"><span class="mark">▲</span> Current</div>
+        <pre class="audit-pre">.page-head {
+  gap: 32px;
+  padding: 32px 0 28px;
+}
+.site-card {
+  padding: 28px 32px 32px;
+}
+body {
+  padding: 0 56px 120px;
+}</pre>
+      </div>
+      <div class="compare-pane">
+        <div class="compare-pane__label"><span class="mark">●</span> Proposed</div>
+        <pre class="audit-pre">.page-head {
+  gap: var(--er-space-4);
+  padding: var(--er-space-4) 0 var(--er-space-3);
+}
+.site-card {
+  padding: var(--er-space-3) var(--er-space-4)
+           var(--er-space-4);
+}
+body {
+  padding: 0 var(--er-space-4) var(--er-space-6);
+}</pre>
+      </div>
+    </div>
+
+    <!-- ================================================================
+         CSF-3 — Unified pagehead
+         ================================================================ -->
+
+    <header class="mockup-section">
+      <span class="mockup-section__num">CSF-3</span>
+      <span class="mockup-section__title">Unified <code>er-pagehead</code> <span class="audit-tag audit-tag--harmful">harmful</span></span>
+      <p class="mockup-section__desc">
+        Six different page-head class hierarchies for the same conceptual component. Below: every studio surface rendered with the same
+        <code>er-pagehead-*</code> markup, varied by modifier and slot content. No surface loses its identity.
+      </p>
+    </header>
+
+    <!-- Dashboard pagehead -->
+    <div class="compare-pane" style="border: 1px solid var(--er-faded-2); margin-top: var(--er-space-3);">
+      <div class="compare-pane__label">Dashboard · <code>er-pagehead--centered</code></div>
+      <header class="er-pagehead er-pagehead--centered" style="padding-left: 0; padding-right: 0;">
+        <p class="er-pagehead__kicker">Vol. 26 · № 04 · Press-check</p>
+        <h1 class="er-pagehead__title">Editorial <em>Studio</em></h1>
+        <p class="er-pagehead__deck">Project: <code>~/work/writingcontrol.org</code></p>
+        <p class="er-pagehead__meta">
+          <span>27 Apr 2026</span><span class="sep">·</span>
+          <span>14 on the calendar</span><span class="sep">·</span>
+          <span>2 in review</span><span class="sep">·</span>
+          <span>1 awaiting press</span>
+        </p>
+      </header>
+    </div>
+
+    <!-- Content top-level pagehead -->
+    <div class="compare-pane" style="border: 1px solid var(--er-faded-2); margin-top: var(--er-space-3);">
+      <div class="compare-pane__label">Content top-level · <code>er-pagehead--split</code></div>
+      <header class="er-pagehead er-pagehead--split" style="padding-left: 0; padding-right: 0;">
+        <div>
+          <h1 class="er-pagehead__title">A <em>shape</em> of the work.</h1>
+          <p class="er-pagehead__deck">The pipeline view shows where things are. This shows what's there. Browse the corpus by its tree on disk.</p>
+        </div>
+        <p class="er-pagehead__meta">
+          <span><strong style="color: var(--er-ink-soft);">2</strong> SITES</span>
+          <span><strong style="color: var(--er-ink-soft);">34</strong> NODES</span>
+          <span><strong style="color: var(--er-ink-soft);">117</strong> SCRAPBOOK ITEMS</span>
+        </p>
+      </header>
+    </div>
+
+    <!-- Manual pagehead -->
+    <div class="compare-pane" style="border: 1px solid var(--er-faded-2); margin-top: var(--er-space-3);">
+      <div class="compare-pane__label">Manual · <code>er-pagehead--centered</code> + <code>__imprint</code></div>
+      <header class="er-pagehead er-pagehead--centered" style="padding-left: 0; padding-right: 0;">
+        <p class="er-pagehead__kicker">Vol. 01 · Manual · <em>Internal — for operators</em></p>
+        <h1 class="er-pagehead__title">The Compositor's <em>Manual</em></h1>
+        <p class="er-pagehead__deck">Everything you need to move a thought from notebook to published dispatch without asking a colleague.</p>
+        <p class="er-pagehead__imprint">
+          <span><strong>Sites</strong>writingcontrol.org · audiocontrol.org</span>
+          <span class="sep">§</span>
+          <span><strong>Issued</strong>27 Apr 2026</span>
+          <span class="sep">§</span>
+          <span><strong>Revision</strong>1.0</span>
+        </p>
+      </header>
+    </div>
+
+    <!-- Scrapbook pagehead -->
+    <div class="compare-pane" style="border: 1px solid var(--er-faded-2); margin-top: var(--er-space-3);">
+      <div class="compare-pane__label">Scrapbook · <code>er-pagehead--compact</code> + <code>__crumbs</code></div>
+      <header class="er-pagehead er-pagehead--compact" style="padding-left: 0; padding-right: 0; padding-top: var(--er-space-3); padding-bottom: var(--er-space-2); text-align: left;">
+        <p class="er-pagehead__crumbs">
+          <a href="#">writingcontrol</a><span class="sep">›</span>
+          <a href="#">the-outbound</a><span class="sep">›</span>
+          <a href="#">characters</a><span class="sep">›</span>
+          strivers
+        </p>
+        <p class="er-pagehead__kicker">§ Scrapbook</p>
+        <h1 class="er-pagehead__title">the-outbound / characters / <em>strivers</em></h1>
+      </header>
+    </div>
+
+    <p style="font-family: var(--er-font-body); font-style: italic; color: var(--er-ink-soft); margin-top: var(--er-space-3); font-size: 0.9rem;">
+      Same component, different slots. Each surface keeps its identity (the dashboard's volume / № kicker; the manual's
+      imprint strip; the scrapbook's breadcrumb-led head; the content view's split layout) without inventing a new class hierarchy.
+    </p>
+
+    <!-- ================================================================
+         CSF-4 — Unified section-head
+         ================================================================ -->
+
+    <header class="mockup-section">
+      <span class="mockup-section__num">CSF-4</span>
+      <span class="mockup-section__title">Unified <code>er-section-head</code> <span class="audit-tag audit-tag--cosmetic">cosmetic</span></span>
+      <p class="mockup-section__desc">
+        Four section-head class hierarchies become one. Display title scale + small-caps variant cover every existing use.
+      </p>
+    </header>
+
+    <!-- Default -->
+    <header class="er-section-head">
+      <span class="er-section-head__ornament">¶</span>
+      <h2 class="er-section-head__title">Awaiting press</h2>
+      <span class="er-section-head__count">3 entries</span>
+    </header>
+
+    <!-- Smallcaps variant (used by the index TOC) -->
+    <header class="er-section-head er-section-head--smallcaps">
+      <span class="er-section-head__ornament">¶</span>
+      <h2 class="er-section-head__title">Pipeline</h2>
+      <span class="er-section-head__count">i. — 1 surface</span>
+    </header>
+
+    <!-- ================================================================
+         CSF-5 — Unified row
+         ================================================================ -->
+
+    <header class="mockup-section">
+      <span class="mockup-section__num">CSF-5</span>
+      <span class="mockup-section__title">Unified <code>er-row</code> base + modifiers <span class="audit-tag audit-tag--harmful">harmful</span></span>
+      <p class="mockup-section__desc">
+        Five row class hierarchies become one base + four modifiers. Tree depth, leader dots, scrap kind chip, lane dot — all variants of
+        the same component.
+      </p>
+    </header>
+
+    <!-- Calendar row (from dashboard) -->
+    <div class="compare-pane" style="border: 1px solid var(--er-faded-2); margin-top: var(--er-space-3);">
+      <div class="compare-pane__label">Calendar row · <code>er-row--calendar</code></div>
+      <div class="er-row er-row--calendar">
+        <span style="color: var(--er-faded); font-family: var(--er-font-mono); font-size: 0.7rem;">◇</span>
+        <div>
+          <span class="er-row__title"><em>Strivers</em></span>
+          <span style="font-family: var(--er-font-mono); font-size: 0.7rem; color: var(--er-faded); margin-left: 0.5em;">the-outbound/characters/strivers</span>
+        </div>
+        <span class="er-row__lane"><span class="er-lane-dot er-lane-dot--drafting"></span> drafting</span>
+        <span class="er-row__meta">2d ago</span>
+      </div>
+      <div class="er-row er-row--calendar">
+        <span style="color: var(--er-faded); font-family: var(--er-font-mono); font-size: 0.7rem;">◇</span>
+        <div>
+          <span class="er-row__title">Preemptive Capitulation</span>
+          <span style="font-family: var(--er-font-mono); font-size: 0.7rem; color: var(--er-faded); margin-left: 0.5em;">.../preemptive-capitulation</span>
+        </div>
+        <span class="er-row__lane"><span class="er-lane-dot er-lane-dot--ideas"></span> ideas</span>
+        <span class="er-row__meta">11d ago</span>
+      </div>
+    </div>
+
+    <!-- TOC row (from studio index) -->
+    <div class="compare-pane" style="border: 1px solid var(--er-faded-2); margin-top: var(--er-space-3);">
+      <div class="compare-pane__label">TOC entry · <code>er-row--toc</code></div>
+      <div class="er-row er-row--toc">
+        <span class="er-row__num">I</span>
+        <a class="er-row__title" href="#">Dashboard</a>
+        <span class="er-row__route">/dev/editorial-studio</span>
+      </div>
+      <div class="er-row er-row--toc">
+        <span class="er-row__num">II</span>
+        <a class="er-row__title" href="#">Shortform reviews</a>
+        <span class="er-row__route">/dev/editorial-review-shortform</span>
+      </div>
+      <div class="er-row er-row--toc">
+        <span class="er-row__num">III</span>
+        <a class="er-row__title" href="#">Content view</a>
+        <span class="er-row__route">/dev/content</span>
+      </div>
+    </div>
+
+    <!-- Tree row (from content drilldown) -->
+    <div class="compare-pane" style="border: 1px solid var(--er-faded-2); margin-top: var(--er-space-3);">
+      <div class="compare-pane__label">Tree entry · <code>er-row--tree</code> with depth</div>
+      <div class="er-row er-row--tree" style="--er-row-depth: 0; position: relative;">
+        <span class="er-row__title">The Outbound</span>
+        <span class="er-row__lane"><span class="er-lane-dot er-lane-dot--drafting"></span> drafting</span>
+        <span class="er-row__meta">7 notes · 2d ago</span>
+      </div>
+      <div class="er-row er-row--tree" style="--er-row-depth: 1; position: relative;">
+        <span class="er-row__title">Characters</span>
+        <span class="er-row__lane"><span class="er-lane-dot er-lane-dot--outlining"></span> outlining</span>
+        <span class="er-row__meta">3 notes · 5d ago</span>
+      </div>
+      <div class="er-row er-row--tree" style="--er-row-depth: 2; position: relative;">
+        <span class="er-row__title">Strivers</span>
+        <span class="er-row__lane"><span class="er-lane-dot er-lane-dot--drafting"></span> drafting</span>
+        <span class="er-row__meta">2 notes · 1d ago</span>
+      </div>
+      <div class="er-row er-row--tree" style="--er-row-depth: 3; position: relative;">
+        <span class="er-row__title"><em>Preemptive Capitulation</em></span>
+        <span class="er-row__lane"><span class="er-lane-dot er-lane-dot--ideas"></span> ideas</span>
+        <span class="er-row__meta">11d ago</span>
+      </div>
+    </div>
+
+    <!-- Scrap row -->
+    <div class="compare-pane" style="border: 1px solid var(--er-faded-2); margin-top: var(--er-space-3);">
+      <div class="compare-pane__label">Scrap row · <code>er-row--scrap</code></div>
+      <div class="er-row er-row--scrap">
+        <span class="er-row__chip">md</span>
+        <span class="er-row__title" style="font-size: 0.9rem;">archetypes.md</span>
+        <span class="er-row__meta">4.2 KB</span>
+        <span class="er-row__meta">3d ago</span>
+      </div>
+      <div class="er-row er-row--scrap">
+        <span class="er-row__chip">md</span>
+        <span class="er-row__title" style="font-size: 0.9rem;">preemptive-capitulation.md</span>
+        <span class="er-row__meta">1.8 KB</span>
+        <span class="er-row__meta">1d ago</span>
+      </div>
+      <div class="er-row er-row--scrap">
+        <span class="er-row__chip">json</span>
+        <span class="er-row__title" style="font-size: 0.9rem;">archetype-graph.json</span>
+        <span class="er-row__meta">3.4 KB</span>
+        <span class="er-row__meta">2d ago</span>
+      </div>
+    </div>
+
+    <p style="font-family: var(--er-font-body); font-style: italic; color: var(--er-ink-soft); margin-top: var(--er-space-3); font-size: 0.9rem;">
+      Four surfaces. One base class. Each row's identity comes from its content slots and one modifier — not from a parallel
+      class family. Hover, border-bottom, padding rhythm all unified.
+    </p>
+
+    <!-- ================================================================
+         CSF-6 / 7 / 8 / 9 — Cosmetic cluster
+         ================================================================ -->
+
+    <header class="mockup-section">
+      <span class="mockup-section__num">CSF-6 → 9</span>
+      <span class="mockup-section__title">Cosmetic cleanups <span class="audit-tag audit-tag--cosmetic">cosmetic</span></span>
+      <p class="mockup-section__desc">
+        Px in scrap-row.css; container width drift; inline <code>style=</code> in dashboard.ts; TOC duplication between
+        studio-index and manual. None of these visibly hurt the operator; together they erode the design system's
+        grep-ability and discipline.
+      </p>
+    </header>
+
+    <pre class="audit-pre">/* CSF-6 — scrap-row.css px → tokens */
+- gap: 12px;
++ gap: var(--er-space-2);
+
+- padding: 9px 0;
++ padding: var(--er-space-1) 0;
+
+/* CSF-7 — container width tokens */
++ :root {
++   --er-container-wide:   78rem;
++   --er-container-narrow: 56rem;
++ }
+- max-width: 78rem;        /* er-container, er-folio-inner */
++ max-width: var(--er-container-wide);
+- max-width: 56rem;        /* er-toc-page */
++ max-width: var(--er-container-narrow);
+- max-width: 1280px;       /* content.css body */
++ max-width: var(--er-container-wide);
+
+/* CSF-8 — inline style attr → class */
+- &lt;a href="..." style="color: var(--er-red-pencil);"&gt;
++ &lt;a href="..." class="er-link-marginalia"&gt;
+
+- &lt;span class="er-filter-label" style="margin-left: 1rem;"&gt;
++ &lt;span class="er-filter-label er-filter-label--gap"&gt;</pre>
+
+    <!-- ================================================================
+         Closing colophon
+         ================================================================ -->
+
+    <header class="mockup-section">
+      <span class="mockup-section__num">END</span>
+      <span class="mockup-section__title">Path forward</span>
+      <p class="mockup-section__desc">
+        See <code>design-audit-v0.5.0.md</code> for the recommended order of operations. Each CSF can land as its own PR;
+        nothing in this audit requires a single big-bang refactor. CSF-1 + CSF-2 are the highest impact-to-effort move and
+        a reasonable first PR.
+      </p>
+    </header>
+
+    <p style="text-align: center; font-family: var(--er-font-display); font-style: italic; color: var(--er-faded); margin-top: var(--er-space-5); font-size: 0.95rem;">
+      ❦ &nbsp; Pressed for the desk; for review only. &nbsp; ❦
+    </p>
+
+  </main>
+
+</body>
+</html>

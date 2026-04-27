@@ -138,6 +138,28 @@ interface DetailRender {
   scrapbook: ScrapbookSummary | null;
 }
 
+/**
+ * Find the on-disk markdown for an organizational node — try
+ * `<slug>/index.md`, then `<slug>/README.md` (and `.mdx`/`.markdown`
+ * variants). Used when the node has no calendar entry but the
+ * filesystem walk found a directory with a recognizable index file
+ * (#24, v0.6.0). Returns the first match, or null.
+ */
+function findOrganizationalIndex(
+  contentDir: string,
+  slug: string,
+): string | null {
+  const candidates = [
+    'index.md', 'index.mdx', 'index.markdown',
+    'README.md', 'README.mdx', 'README.markdown',
+  ];
+  for (const name of candidates) {
+    const abs = join(contentDir, slug, name);
+    if (existsSync(abs)) return abs;
+  }
+  return null;
+}
+
 function loadDetailRender(
   ctx: StudioContext,
   site: string,
@@ -156,6 +178,21 @@ function loadDetailRender(
       const parsed = parseFrontmatter(raw);
       frontmatter = parsed.data as Record<string, unknown>;
       bodyPreview = parsed.body;
+    }
+  } else if (node.hasFsDir && node.hasOwnIndex) {
+    // Organizational node (#24, v0.6.0): no calendar entry, but the
+    // fs walk found a directory with an index/README. Read that file
+    // for the detail panel so the operator sees the structural prose
+    // (e.g. "These are the characters in The Outbound") even though
+    // nothing about this node ships through the lifecycle pipeline.
+    const abs = findOrganizationalIndex(contentDir, node.slug);
+    if (abs !== null) {
+      const raw = safeReadFile(abs);
+      if (raw !== null) {
+        const parsed = parseFrontmatter(raw);
+        frontmatter = parsed.data as Record<string, unknown>;
+        bodyPreview = parsed.body;
+      }
     }
   }
 

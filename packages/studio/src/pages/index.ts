@@ -185,10 +185,10 @@ export function renderStudioIndex(_ctx: StudioContext): string {
   const body = html`
     ${renderEditorialFolio('index', 'index of the press')}
     <main class="er-toc-page">
-      <header class="er-toc-head">
-        <div class="er-toc-head__kicker">Index of the <em>Press</em></div>
-        <h1 class="er-toc-head__title">Editorial <em>Studio</em></h1>
-        <p class="er-toc-head__deck">
+      <header class="er-pagehead er-pagehead--centered er-pagehead--toc">
+        <p class="er-pagehead__kicker">Index of the <em>Press</em></p>
+        <h1 class="er-pagehead__title">Editorial <em>Studio</em></h1>
+        <p class="er-pagehead__deck">
           A reference of the dev surfaces — pipeline, review desk, browse, manual.
           Begin where the work is.
         </p>

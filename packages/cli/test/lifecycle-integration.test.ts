@@ -501,5 +501,71 @@ describe('hierarchical slugs', () => {
   });
 });
 
+describe('deskwork-pause / deskwork-resume (#27)', () => {
+  it('pauses an Outlining entry and resumes it back to Outlining', () => {
+    const project = bootstrapProject();
+    try {
+      run('deskwork-add', [project, 'Pause Test']);
+      run('deskwork-plan', [project, 'pause-test', 'kw']);
+      run('deskwork-outline', [project, 'pause-test']);
+
+      const pauseRes = run('deskwork-pause', [project, 'pause-test']);
+      expect(pauseRes.code).toBe(0);
+      expect(pauseRes.json).toMatchObject({
+        slug: 'pause-test',
+        stage: 'Paused',
+        pausedFrom: 'Outlining',
+      });
+
+      // Verify the on-disk calendar
+      let cal = readProjectCalendar(project);
+      expect(cal.entries[0].stage).toBe('Paused');
+      expect(cal.entries[0].pausedFrom).toBe('Outlining');
+
+      const resumeRes = run('deskwork-resume', [project, 'pause-test']);
+      expect(resumeRes.code).toBe(0);
+      expect(resumeRes.json).toMatchObject({
+        slug: 'pause-test',
+        stage: 'Outlining',
+      });
+
+      cal = readProjectCalendar(project);
+      expect(cal.entries[0].stage).toBe('Outlining');
+      expect(cal.entries[0].pausedFrom).toBeUndefined();
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses to pause a Published entry', () => {
+    const project = bootstrapProject();
+    try {
+      run('deskwork-add', [project, 'Already Shipped']);
+      run('deskwork-plan', [project, 'already-shipped', 'kw']);
+      run('deskwork-outline', [project, 'already-shipped']);
+      run('deskwork-draft', [project, 'already-shipped']);
+      run('deskwork-publish', [project, 'already-shipped']);
+
+      const res = run('deskwork-pause', [project, 'already-shipped']);
+      expect(res.code).not.toBe(0);
+      expect(res.stderr).toMatch(/non-terminal/);
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses to resume a non-Paused entry', () => {
+    const project = bootstrapProject();
+    try {
+      run('deskwork-add', [project, 'Idle Idea']);
+      const res = run('deskwork-resume', [project, 'idle-idea']);
+      expect(res.code).not.toBe(0);
+      expect(res.stderr).toMatch(/only Paused/);
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+});
+
 // Suppress the unused mkdirSync import warning — kept for symmetry if tests grow.
 void mkdirSync;

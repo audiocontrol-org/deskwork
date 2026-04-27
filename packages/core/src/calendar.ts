@@ -39,6 +39,7 @@ import {
   STAGES,
   effectiveContentType,
   isContentType,
+  isPausable,
   isPlatform,
   isStage,
   type CalendarEntry,
@@ -131,6 +132,14 @@ function parseEntries(lines: string[], stage: Stage): CalendarEntry[] {
 
       const filePath = col(cells, cols, 'filepath');
       if (filePath) entry.filePath = filePath;
+
+      // PausedFrom column round-trips on the Paused section. Other
+      // sections that happen to carry the column (legacy hand-edits)
+      // ignore the value since `entry.stage !== 'Paused'`.
+      const pausedFrom = col(cells, cols, 'pausedfrom');
+      if (pausedFrom && isStage(pausedFrom) && isPausable(pausedFrom)) {
+        entry.pausedFrom = pausedFrom;
+      }
 
       const published = col(cells, cols, 'published');
       if (published) entry.datePublished = published;
@@ -345,6 +354,7 @@ function renderStageTable(entries: CalendarEntry[], stage: Stage): string {
     (e) => e.filePath !== undefined && e.filePath !== '',
   );
   const isPublished = stage === 'Published';
+  const isPaused = stage === 'Paused';
 
   const headers: string[] = ['UUID', 'Slug', 'Title', 'Description', 'Keywords'];
   if (hasTopics) headers.push('Topics');
@@ -352,6 +362,7 @@ function renderStageTable(entries: CalendarEntry[], stage: Stage): string {
   if (hasUrl) headers.push('URL');
   if (hasFilePath) headers.push('FilePath');
   headers.push('Source');
+  if (isPaused) headers.push('PausedFrom');
   if (isPublished) headers.push('Published');
   if (hasIssue || isPublished) headers.push('Issue');
 
@@ -374,6 +385,7 @@ function renderStageTable(entries: CalendarEntry[], stage: Stage): string {
     if (hasUrl) row.push(escapeCell(e.contentUrl ?? ''));
     if (hasFilePath) row.push(escapeCell(e.filePath ?? ''));
     row.push(e.source);
+    if (isPaused) row.push(e.pausedFrom ?? '');
     if (isPublished) row.push(e.datePublished ?? '');
     if (hasIssue || isPublished) row.push(e.issueNumber ? `#${e.issueNumber}` : '');
     lines.push(`| ${row.join(' | ')} |`);

@@ -7,11 +7,12 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import type {
-  CalendarEntry,
-  ContentType,
-  DistributionRecord,
-  EditorialCalendar,
+import {
+  isPausable,
+  type CalendarEntry,
+  type ContentType,
+  type DistributionRecord,
+  type EditorialCalendar,
 } from './types.ts';
 
 /** Convert a title to a URL-safe slug. */
@@ -172,6 +173,61 @@ export function draftEntry(
   if (issueNumber !== undefined) {
     entry.issueNumber = issueNumber;
   }
+  return entry;
+}
+
+/**
+ * Move an entry to `Paused`, recording its prior stage so `unpauseEntry`
+ * can restore it. Refuses to pause an already-Paused entry (would lose
+ * the original `pausedFrom`) and refuses to pause a `Published` entry
+ * (terminal; a shipped post can't be "in progress again"). See #27.
+ */
+export function pauseEntry(
+  calendar: EditorialCalendar,
+  slug: string,
+): CalendarEntry {
+  const entry = calendar.entries.find((e) => e.slug === slug);
+  if (!entry) {
+    throw new Error(`No calendar entry found with slug: ${slug}`);
+  }
+  if (entry.stage === 'Paused') {
+    throw new Error(`Entry "${slug}" is already Paused.`);
+  }
+  if (!isPausable(entry.stage)) {
+    throw new Error(
+      `Entry "${slug}" is in stage "${entry.stage}" — only non-terminal stages (Ideas / Planned / Outlining / Drafting / Review) can be paused.`,
+    );
+  }
+  entry.pausedFrom = entry.stage;
+  entry.stage = 'Paused';
+  return entry;
+}
+
+/**
+ * Restore a `Paused` entry to its `pausedFrom` stage. Throws if the
+ * entry isn't Paused, or if `pausedFrom` is missing (legacy / corrupt
+ * state — operator must move the entry by hand). See #27.
+ */
+export function unpauseEntry(
+  calendar: EditorialCalendar,
+  slug: string,
+): CalendarEntry {
+  const entry = calendar.entries.find((e) => e.slug === slug);
+  if (!entry) {
+    throw new Error(`No calendar entry found with slug: ${slug}`);
+  }
+  if (entry.stage !== 'Paused') {
+    throw new Error(
+      `Entry "${slug}" is in stage "${entry.stage}" — only Paused entries can be resumed.`,
+    );
+  }
+  if (entry.pausedFrom === undefined) {
+    throw new Error(
+      `Entry "${slug}" is Paused but has no pausedFrom — cannot resume automatically. Edit the calendar by hand to move it back to the right stage.`,
+    );
+  }
+  entry.stage = entry.pausedFrom;
+  delete entry.pausedFrom;
   return entry;
 }
 

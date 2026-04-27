@@ -9,7 +9,12 @@
  *
  * Both dev routes (audiocontrol and editorialcontrol) bundle this module via
  * a non-inline <script> tag; Astro/Vite dedupe it across entry points.
+ *
+ * v0.6.0 (#29): also wires the scrapbook drawer's image thumbnails to
+ * the in-context lightbox.
  */
+
+import { initScrapbookLightbox } from './lightbox.ts';
 
 interface DraftRange {
   start: number;
@@ -1666,6 +1671,10 @@ export function initEditorialReview(): void {
   // ---- Boot ----
 
   loadAnnotations();
+  // #29: scrapbook drawer's image thumbnails open in the lightbox.
+  // The drawer is server-rendered, so we can bind on first boot and
+  // skip re-binding (the drawer doesn't lazy-render new image rows).
+  initScrapbookLightbox(document);
 }
 
 initEditorialReview();

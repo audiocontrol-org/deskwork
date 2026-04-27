@@ -476,3 +476,63 @@ Tasks:
 - Active-link tick mark uses CSS `::before` with skewed borders — no images, no inline SVG.
 
 **GitHub tracking:** No standalone issue; surfaced during #18 acceptance follow-up. Ships in v0.5.0 (minor bump — new user-visible surface at `/dev/`).
+
+---
+
+### Phase 18: Deferral catalog — finish the deferred work
+
+**Deliverable:** Surface and complete every outstanding deferred work item across the feature. This is a catalog, not a single piece of work — each item below is its own sub-task with its own GitHub issue. The phase exists to make the deferral surface area visible in one place so nothing slips.
+
+**Why this phase exists:** Audited the project for deferrals after the operator pushed back on a pattern of unilaterally splitting work into "in scope" + "deferred" without explicit approval. This catalog includes (a) issues filed late in the session that capture work I had quietly deferred, (b) original workplan items still unchecked, and (c) PRD-deferred items (originally user-approved but worth re-surfacing for closure decisions).
+
+**No "in scope" / "out of scope" split here.** The operator decides which items to act on and in what order. Unchecked = not done; the operator's call whether to do, drop, or postpone with explicit acknowledgment.
+
+#### Group A — Bug-fix-shaped follow-ups (issues filed late)
+
+- [x] **[#16](https://github.com/audiocontrol-org/deskwork/issues/16)** — Move bundle-rebuild from pre-commit to pre-push hook. Done in v0.6.0 (commit e8c058d).
+- [x] **[#24](https://github.com/audiocontrol-org/deskwork/issues/24)** — Bird's-eye view renders organizational README nodes. Tree-assembly inverted to filesystem-primary, calendar-as-state-overlay. Done in v0.6.0.
+- [x] **[#27](https://github.com/audiocontrol-org/deskwork/issues/27)** — `Paused` 7th lifecycle stage shipped. Done in v0.6.0 (commit 7880813).
+- [x] **[#28](https://github.com/audiocontrol-org/deskwork/issues/28)** — Standalone scrapbook viewer client UI exposes `secret/` toggle. Composer + upload checkboxes; per-item "mark secret"/"mark public" cross-section rename. Done in v0.6.0.
+- [x] **[#29](https://github.com/audiocontrol-org/deskwork/issues/29)** — Lightbox component for scrapbook image preview. ESC closes, ← / → cycles adjacent images. Done in v0.6.0.
+- [ ] **[#30](https://github.com/audiocontrol-org/deskwork/issues/30)** — Cache content-tree assembly (CONDITIONAL — only act when perf is observed as a problem).
+- [x] **[#31](https://github.com/audiocontrol-org/deskwork/issues/31)** — Cross-surface design audit (chrome + content layout consistency). Audit report + unification mockup landed in v0.5.0 deferred docs; **all 10 CSF unifications implemented** in v0.6.0 (CSF-1/2 token cleanup; CSF-3 unified `er-pagehead-*`; CSF-4 unified `er-section-head`; CSF-5 unified `er-row` base; CSF-6 scrap-row tokens; CSF-7 container-width tokens; CSF-8 inline-style removal; CSF-9 TOC family documented; CSF-10 review-surface BlogLayout exception documented).
+
+#### Group B — Original workplan items still unchecked
+
+These were marked "deferred to Phase 12" or simply never executed. The architecture pivoted between drafting them and shipping it; whether they still apply as written is a question for the operator.
+
+- [ ] **Phase 4 — Dogfood in audiocontrol.org (live calendar).** Workplan tasks 76–82 are all unchecked. Phase 12 dogfooded against a sandbox (`./.audiocontrol.org/` copy), not the live editorial calendar at `~/work/audiocontrol.org/`. The architecture pivot (npm packages + plugin shells, Phases 7–11) means the original "side-by-side validation against project-local skills" task may no longer be the right shape — but the live-calendar smoke against the deployed plugin still hasn't happened.
+- [ ] **Phase 5 — Visibility/distribution skills.** Four skills never shipped: `help`, `status`, `distribute`, `social-review`. Currently shipped: `install / add / plan / outline / draft / publish / review-* / iterate / approve / ingest`. The four originally-planned skills are absent from the deskwork plugin manifest.
+- [ ] **Phase 6 — Cut over and cleanup.** Remove project-local `editorial-*` skills from audiocontrol.org's `.claude/skills/`. Verify the editorial calendar runs entirely on plugin skills. This was originally the v0.1.0 finishing task; v0.1.0 shipped without it because the architecture pivot made the cutover-from-project-local-skills less critical (the plugin can run alongside without conflict).
+- [ ] **Phase 12 task — "Approve cycle through browser."** Manual smoke test, never done. Pipeline is wired (workflow → annotate → decision → approve) and exercised at the API level; full browser-driven approve through the studio UI has not been verified by an operator.
+- [ ] **Phase 12 stretch — Agent-improvability pillar.** PRD says deferred until trigger fires: "first time a deskwork user reports difficulty fixing a rough edge in the plugin from within their project." writingcontrol.org adoption may have triggered this — operator should verify whether the plugin-as-clone vs. npm-package distribution decision needs to be made now or can continue to defer.
+
+#### Group C — PRD-deferred items (user-approved at the time; surfacing for closure)
+
+These were called out in the original PRD as deferred. The user approved deferring them at the time, but they remain undone — surfacing here so the operator can confirm they're still deferred, drop them, or schedule them.
+
+- [ ] **MCP server (`@deskwork/mcp-server` package).** PRD: *"explicitly deferred. Revisit only if friction with the CLI emerges."* Has friction emerged? Probably not — operator hasn't asked. But worth a yes/no.
+- [ ] **npm registry publishing.** PRD: *"deferred to v0.1 cut. Initial dev uses `file:` workspace deps for local dogfood."* Bundles in the plugin tree close the install gap; npm is still optional. Still deferred? Or worth publishing now that the plugin is shipping releases?
+- [ ] **Shortform / cross-link review skills.** PRD line 28: *"shortform/cross-link still deferred."* Shortform review surface ships in the studio (`/dev/editorial-review-shortform`); the CLI-side `shortform-draft` skill from the original list and the `cross-link-review` skill never shipped.
+
+#### Group D — Skills explicitly out of scope per original PRD (NOT deferred — listing for completeness)
+
+These were excluded from v0.1, not deferred. Listing only so the operator sees the full skill-surface gap if they're considering Phase 5 / 6 work:
+
+- `editorial-suggest`
+- `editorial-performance`
+- `editorial-reddit-sync`
+- `editorial-reddit-opportunities`
+
+If any of these are now in scope, file as new issues.
+
+---
+
+**Acceptance Criteria:** This phase has no single acceptance gate — each Group A and Group B item completes when its issue closes. Phase 18 itself is "done" when the operator decides every item has been resolved (acted on, explicitly dropped, or moved to a different release).
+
+**Notes:**
+
+- This phase is a CATALOG, not a single shippable unit. Don't expect a single PR / version bump. Each item ships when it ships.
+- The pattern that produced the un-filed deferrals (1–4 in Group A) is captured in `~/.claude/projects/-Users-orion-work-deskwork-work-deskwork-plugin/memory/feedback_dont_unilaterally_defer.md`. Future phases should not repeat it.
+- Group B items (Phase 4/5/6) may be reframed if the operator decides the original specs no longer apply. The architecture pivot in 2026-04-21 changed the meaning of "audiocontrol.org cutover" — what was originally "remove project-local skills and replace with plugin skills" might now be "verify the plugin runs cleanly alongside the existing project-local skills, then cut over when the operator chooses."
+- Group C items are decisions, not implementations. The operator's call is yes/no, not how-to.

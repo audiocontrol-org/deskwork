@@ -257,6 +257,9 @@ var init_config = __esm({
 });
 
 // ../core/src/types.ts
+function isPausable(stage) {
+  return PAUSABLE_STAGES.includes(stage);
+}
 function isStage(value) {
   return STAGES.includes(value);
 }
@@ -275,7 +278,7 @@ function requiresContentUrl(contentType) {
 function isPlatform(value) {
   return PLATFORMS.includes(value);
 }
-var STAGES, CONTENT_TYPES, PLATFORMS;
+var STAGES, PAUSABLE_STAGES, CONTENT_TYPES, PLATFORMS;
 var init_types = __esm({
   "../core/src/types.ts"() {
     "use strict";
@@ -285,7 +288,15 @@ var init_types = __esm({
       "Outlining",
       "Drafting",
       "Review",
+      "Paused",
       "Published"
+    ];
+    PAUSABLE_STAGES = [
+      "Ideas",
+      "Planned",
+      "Outlining",
+      "Drafting",
+      "Review"
     ];
     CONTENT_TYPES = ["blog", "youtube", "tool"];
     PLATFORMS = ["reddit", "youtube", "linkedin", "instagram"];
@@ -351,6 +362,10 @@ function parseEntries(lines, stage) {
       if (url) entry.contentUrl = url;
       const filePath = col(cells, cols, "filepath");
       if (filePath) entry.filePath = filePath;
+      const pausedFrom = col(cells, cols, "pausedfrom");
+      if (pausedFrom && isStage(pausedFrom) && isPausable(pausedFrom)) {
+        entry.pausedFrom = pausedFrom;
+      }
       const published = col(cells, cols, "published");
       if (published) entry.datePublished = published;
       const issue = col(cells, cols, "issue");
@@ -511,12 +526,14 @@ function renderStageTable(entries, stage) {
     (e) => e.filePath !== void 0 && e.filePath !== ""
   );
   const isPublished = stage === "Published";
+  const isPaused = stage === "Paused";
   const headers = ["UUID", "Slug", "Title", "Description", "Keywords"];
   if (hasTopics) headers.push("Topics");
   if (hasType) headers.push("Type");
   if (hasUrl) headers.push("URL");
   if (hasFilePath) headers.push("FilePath");
   headers.push("Source");
+  if (isPaused) headers.push("PausedFrom");
   if (isPublished) headers.push("Published");
   if (hasIssue || isPublished) headers.push("Issue");
   lines.push(`| ${headers.join(" | ")} |`);
@@ -535,6 +552,7 @@ function renderStageTable(entries, stage) {
     if (hasUrl) row.push(escapeCell(e.contentUrl ?? ""));
     if (hasFilePath) row.push(escapeCell(e.filePath ?? ""));
     row.push(e.source);
+    if (isPaused) row.push(e.pausedFrom ?? "");
     if (isPublished) row.push(e.datePublished ?? "");
     if (hasIssue || isPublished) row.push(e.issueNumber ? `#${e.issueNumber}` : "");
     lines.push(`| ${row.join(" | ")} |`);
@@ -699,6 +717,42 @@ function draftEntry(calendar, slug, issueNumber) {
   }
   return entry;
 }
+function pauseEntry(calendar, slug) {
+  const entry = calendar.entries.find((e) => e.slug === slug);
+  if (!entry) {
+    throw new Error(`No calendar entry found with slug: ${slug}`);
+  }
+  if (entry.stage === "Paused") {
+    throw new Error(`Entry "${slug}" is already Paused.`);
+  }
+  if (!isPausable(entry.stage)) {
+    throw new Error(
+      `Entry "${slug}" is in stage "${entry.stage}" \u2014 only non-terminal stages (Ideas / Planned / Outlining / Drafting / Review) can be paused.`
+    );
+  }
+  entry.pausedFrom = entry.stage;
+  entry.stage = "Paused";
+  return entry;
+}
+function unpauseEntry(calendar, slug) {
+  const entry = calendar.entries.find((e) => e.slug === slug);
+  if (!entry) {
+    throw new Error(`No calendar entry found with slug: ${slug}`);
+  }
+  if (entry.stage !== "Paused") {
+    throw new Error(
+      `Entry "${slug}" is in stage "${entry.stage}" \u2014 only Paused entries can be resumed.`
+    );
+  }
+  if (entry.pausedFrom === void 0) {
+    throw new Error(
+      `Entry "${slug}" is Paused but has no pausedFrom \u2014 cannot resume automatically. Edit the calendar by hand to move it back to the right stage.`
+    );
+  }
+  entry.stage = entry.pausedFrom;
+  delete entry.pausedFrom;
+  return entry;
+}
 function publishEntry(calendar, slug, datePublished) {
   const entry = calendar.entries.find((e) => e.slug === slug);
   if (!entry) {
@@ -714,6 +768,7 @@ function findEntry(calendar, slug) {
 var init_calendar_mutations = __esm({
   "../core/src/calendar-mutations.ts"() {
     "use strict";
+    init_types();
   }
 });
 
@@ -9997,12 +10052,75 @@ var init_outline = __esm({
   }
 });
 
-// src/commands/plan.ts
-var plan_exports = {};
-__export(plan_exports, {
+// src/commands/pause.ts
+var pause_exports = {};
+__export(pause_exports, {
   run: () => run8
 });
 async function run8(argv2) {
+  const KNOWN_FLAGS2 = ["site"];
+  const { positional, flags } = parse();
+  if (positional.length < 2) {
+    fail("Usage: deskwork-pause <project-root> [--site <slug>] <slug>", 2);
+  }
+  const [rootArg, slug] = positional;
+  const projectRoot = absolutize(rootArg);
+  let config;
+  try {
+    config = readConfig(projectRoot);
+  } catch (err2) {
+    fail(err2 instanceof Error ? err2.message : String(err2));
+  }
+  const site = resolveSite(config, flags.site);
+  const calendarPath = resolveCalendarPath(projectRoot, config, site);
+  const calendar = readCalendar(calendarPath);
+  const existing = findEntry(calendar, slug);
+  if (!existing) {
+    const available = calendar.entries.filter((e) => e.stage !== "Published" && e.stage !== "Paused").map((e) => e.slug).join(", ") || "(none)";
+    fail(
+      `No calendar entry found with slug "${slug}". Pausable entries: ${available}`
+    );
+  }
+  let paused;
+  try {
+    paused = pauseEntry(calendar, slug);
+  } catch (err2) {
+    fail(err2 instanceof Error ? err2.message : String(err2));
+  }
+  writeCalendar(calendarPath, calendar);
+  emit({
+    slug: paused.slug,
+    title: paused.title,
+    stage: paused.stage,
+    pausedFrom: paused.pausedFrom,
+    site,
+    calendarPath
+  });
+  function parse() {
+    try {
+      return parseArgs(argv2, KNOWN_FLAGS2);
+    } catch (err2) {
+      fail(err2 instanceof Error ? err2.message : String(err2), 2);
+    }
+  }
+}
+var init_pause = __esm({
+  "src/commands/pause.ts"() {
+    "use strict";
+    init_config();
+    init_calendar();
+    init_calendar_mutations();
+    init_paths();
+    init_cli();
+  }
+});
+
+// src/commands/plan.ts
+var plan_exports = {};
+__export(plan_exports, {
+  run: () => run9
+});
+async function run9(argv2) {
   const KNOWN_FLAGS2 = ["site", "topics"];
   const { positional, flags } = parse();
   if (positional.length < 2) {
@@ -10065,10 +10183,10 @@ var init_plan = __esm({
 // src/commands/publish.ts
 var publish_exports = {};
 __export(publish_exports, {
-  run: () => run9
+  run: () => run10
 });
 import { existsSync as existsSync8 } from "node:fs";
-async function run9(argv2) {
+async function run10(argv2) {
   const KNOWN_FLAGS2 = ["site", "date", "content-url"];
   const DATE_RE2 = /^\d{4}-\d{2}-\d{2}$/;
   const { positional, flags } = parse();
@@ -10154,12 +10272,74 @@ var init_publish = __esm({
   }
 });
 
+// src/commands/resume.ts
+var resume_exports = {};
+__export(resume_exports, {
+  run: () => run11
+});
+async function run11(argv2) {
+  const KNOWN_FLAGS2 = ["site"];
+  const { positional, flags } = parse();
+  if (positional.length < 2) {
+    fail("Usage: deskwork-resume <project-root> [--site <slug>] <slug>", 2);
+  }
+  const [rootArg, slug] = positional;
+  const projectRoot = absolutize(rootArg);
+  let config;
+  try {
+    config = readConfig(projectRoot);
+  } catch (err2) {
+    fail(err2 instanceof Error ? err2.message : String(err2));
+  }
+  const site = resolveSite(config, flags.site);
+  const calendarPath = resolveCalendarPath(projectRoot, config, site);
+  const calendar = readCalendar(calendarPath);
+  const existing = findEntry(calendar, slug);
+  if (!existing) {
+    const paused = calendar.entries.filter((e) => e.stage === "Paused").map((e) => e.slug).join(", ") || "(none)";
+    fail(
+      `No calendar entry found with slug "${slug}". Paused entries: ${paused}`
+    );
+  }
+  let resumed;
+  try {
+    resumed = unpauseEntry(calendar, slug);
+  } catch (err2) {
+    fail(err2 instanceof Error ? err2.message : String(err2));
+  }
+  writeCalendar(calendarPath, calendar);
+  emit({
+    slug: resumed.slug,
+    title: resumed.title,
+    stage: resumed.stage,
+    site,
+    calendarPath
+  });
+  function parse() {
+    try {
+      return parseArgs(argv2, KNOWN_FLAGS2);
+    } catch (err2) {
+      fail(err2 instanceof Error ? err2.message : String(err2), 2);
+    }
+  }
+}
+var init_resume = __esm({
+  "src/commands/resume.ts"() {
+    "use strict";
+    init_config();
+    init_calendar();
+    init_calendar_mutations();
+    init_paths();
+    init_cli();
+  }
+});
+
 // src/commands/review-cancel.ts
 var review_cancel_exports = {};
 __export(review_cancel_exports, {
-  run: () => run10
+  run: () => run12
 });
-async function run10(argv2) {
+async function run12(argv2) {
   const KNOWN_FLAGS2 = ["site", "platform", "channel", "kind"];
   const { positional, flags } = parse();
   if (positional.length < 2) {
@@ -10245,9 +10425,9 @@ var init_review_cancel = __esm({
 // src/commands/review-help.ts
 var review_help_exports = {};
 __export(review_help_exports, {
-  run: () => run11
+  run: () => run13
 });
-async function run11(argv2) {
+async function run13(argv2) {
   const KNOWN_FLAGS2 = ["site"];
   const { positional, flags } = parse();
   if (positional.length < 1) {
@@ -10455,9 +10635,9 @@ var init_report = __esm({
 // src/commands/review-report.ts
 var review_report_exports = {};
 __export(review_report_exports, {
-  run: () => run12
+  run: () => run14
 });
-async function run12(argv2) {
+async function run14(argv2) {
   const KNOWN_FLAGS2 = ["site", "format"];
   const BOOLEAN_FLAGS2 = ["include-active"];
   const { positional, flags, booleans } = parse();
@@ -10543,11 +10723,11 @@ var init_body_state = __esm({
 // src/commands/review-start.ts
 var review_start_exports = {};
 __export(review_start_exports, {
-  run: () => run13
+  run: () => run15
 });
 import { existsSync as existsSync10, readFileSync as readFileSync9, readdirSync as readdirSync4 } from "node:fs";
 import { dirname as dirname3 } from "node:path";
-async function run13(argv2) {
+async function run15(argv2) {
   const KNOWN_FLAGS2 = ["site"];
   const SLUG_RE2 = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
   const { positional, flags } = parse();
@@ -10641,8 +10821,10 @@ var SUBCOMMANDS = {
   install: () => Promise.resolve().then(() => (init_install(), install_exports)),
   iterate: () => Promise.resolve().then(() => (init_iterate(), iterate_exports)),
   outline: () => Promise.resolve().then(() => (init_outline(), outline_exports)),
+  pause: () => Promise.resolve().then(() => (init_pause(), pause_exports)),
   plan: () => Promise.resolve().then(() => (init_plan(), plan_exports)),
   publish: () => Promise.resolve().then(() => (init_publish(), publish_exports)),
+  resume: () => Promise.resolve().then(() => (init_resume(), resume_exports)),
   "review-cancel": () => Promise.resolve().then(() => (init_review_cancel(), review_cancel_exports)),
   "review-help": () => Promise.resolve().then(() => (init_review_help(), review_help_exports)),
   "review-report": () => Promise.resolve().then(() => (init_review_report(), review_report_exports)),
@@ -10683,7 +10865,9 @@ function printUsage() {
   out.write("  plan            move Ideas \u2192 Planned with keywords\n");
   out.write("  outline         scaffold + move Planned \u2192 Outlining\n");
   out.write("  draft           move Outlining \u2192 Drafting\n");
-  out.write("  publish         move to Published\n\n");
+  out.write("  publish         move to Published\n");
+  out.write("  pause           move a non-terminal entry to Paused\n");
+  out.write("  resume          restore a Paused entry to its prior stage\n\n");
   out.write("Review loop:\n");
   out.write("  review-start    enqueue a longform draft for review\n");
   out.write("  iterate         snapshot agent revision; back to in-review\n");

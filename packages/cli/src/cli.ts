@@ -24,8 +24,10 @@ const SUBCOMMANDS: Record<string, () => Promise<{ run: (argv: string[]) => Promi
   install: () => import('./commands/install.ts'),
   iterate: () => import('./commands/iterate.ts'),
   outline: () => import('./commands/outline.ts'),
+  pause: () => import('./commands/pause.ts'),
   plan: () => import('./commands/plan.ts'),
   publish: () => import('./commands/publish.ts'),
+  resume: () => import('./commands/resume.ts'),
   'review-cancel': () => import('./commands/review-cancel.ts'),
   'review-help': () => import('./commands/review-help.ts'),
   'review-report': () => import('./commands/review-report.ts'),
@@ -78,7 +80,9 @@ function printUsage(): void {
   out.write('  plan            move Ideas → Planned with keywords\n');
   out.write('  outline         scaffold + move Planned → Outlining\n');
   out.write('  draft           move Outlining → Drafting\n');
-  out.write('  publish         move to Published\n\n');
+  out.write('  publish         move to Published\n');
+  out.write('  pause           move a non-terminal entry to Paused\n');
+  out.write('  resume          restore a Paused entry to its prior stage\n\n');
   out.write('Review loop:\n');
   out.write('  review-start    enqueue a longform draft for review\n');
   out.write('  iterate         snapshot agent revision; back to in-review\n');

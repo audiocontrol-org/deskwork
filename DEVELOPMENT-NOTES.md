@@ -4,6 +4,55 @@ Session journal for `deskwork`. Each entry records what was tried, what worked, 
 
 ---
 
+## 2026-04-27: v0.6.0 — Phase 18 Group A code items + cross-surface design unification
+
+### Feature: deskwork-plugin
+### Worktree: deskwork-plugin
+
+**Goal:** Single PR: every remaining v0.6.0 item — three open Group A code issues (#24, #28, #29) + ten cross-surface audit findings (#31 CSF-1 through CSF-10). Operator: "do everything in a single PR — there's a lot of overhead in shipping a release."
+
+**Accomplished:**
+
+- CSS / chrome unification (CSF-1 → CSF-10):
+  - Token cleanup: `content.css` no longer redefines `--paper`/`--ink`/`--accent` with drifting hex; aliases now read from `--er-*` editorial-print tokens. ~35 spacing-in-px declarations replaced with `--er-space-*`.
+  - Container width tokens (`--er-container-wide`, `--er-container-narrow`) introduced and consumed by every page.
+  - `scrap-row.css` px → tokens; dead-code hex fallbacks removed.
+  - Inline `style=` attrs in `dashboard.ts` replaced with `er-link-marginalia` and `er-filter-label--gap` classes.
+  - Unified `er-section-head` (rename from `er-section-title`) — dashboard now emits the new class; legacy aliases kept.
+  - Unified `er-pagehead-*` family with `--centered`/`--split`/`--compact`/`--toc`/`--imprint` modifiers and `__kicker`/`__title`/`__deck`/`__meta`/`__imprint`/`__crumbs` slots — every surface (dashboard, shortform, content, index, manual, scrapbook) migrated.
+  - `er-row` base + 4 modifiers added to editorial-review.css; the five existing row classes documented as members of the same family.
+  - CSF-9 (TOC family) and CSF-10 (review-surface BlogLayout exception) documented in stylesheet headers.
+- #24 — Bird's-eye view organizational README nodes:
+  - `packages/core/src/content-tree.ts` inverted: filesystem-as-primary, calendar-as-state-overlay. New `defaultFsWalk()` recursively scans contentDir; `BuildOptions.fsWalk` injection lets tests provide synthetic walks.
+  - `ContentNode.hasFsDir` field added; calendar entries with no on-disk presence still surface (calendar is authoritative for "exists").
+  - `content-detail.ts` reads `<slug>/README.md` for organizational nodes' detail panel.
+  - 5 new tests in `content-tree.test.ts`.
+- #28 — Scrapbook viewer secret toggle UI:
+  - Server `/save`, `/create`, `/delete` accept `secret: boolean`; `/upload` accepts `secret: "true"` form field.
+  - `/rename` now supports cross-section moves (`secret` + `toSecret`); 409 on collision, 404 on source missing.
+  - Client composer + upload forms gain `[ ] secret` checkboxes; per-item toolbar gains "mark secret"/"mark public" toggle; save/rename/delete/edit-mode-read thread the source item's secret status.
+  - 10 new tests in `scrapbook-mutations.test.ts`.
+- #29 — Lightbox component for scrapbook image preview:
+  - `lightbox.ts` extended with `initScrapbookLightbox()`. Click thumbnail → overlay; ESC closes; ← / → cycle adjacent image-kind items.
+  - New tiny `content-view-client.ts` bundle wires it on the bird's-eye detail panel.
+  - `editorial-review-client.ts` and `scrapbook-client.ts` already-on-page bundles wire it on the review drawer / standalone viewer.
+  - 5 new tests in `scrap-row.test.ts`.
+
+**Tests:** 447 passing total (core 235, cli 64, studio 148). Pre-session: 427.
+
+**Quantitative:**
+- Messages: ~1 (autonomous dispatch)
+- Commits: 8 (Chunks A-H + version bump + workplan/README updates)
+- Corrections: 0
+- Files changed: ~30
+
+**Insights:**
+- Adding `er-pagehead-*` as a unified family while keeping the legacy class names as styled aliases turned out to be the only safe path — the existing renderers, tests, and (especially) the studio's client JS reference the old class names in dozens of places. Coexistence is fine; the visual unification was achieved by harmonizing tokens (CSF-1) so all the legacy classes already speak the same palette.
+- `er-row` got similar treatment: rather than rename five hierarchies, a base class block coexists with all five, and the audit's "they're conceptually the same component" observation is documented inline. New rendering work has the unified class to reach for.
+- The fs-walk inversion for #24 was structurally clean: the ancestor-fill code path stays as a fallback (a calendar entry with a slug whose ancestors don't exist still gets synthetic ancestors). The fs walk just contributes more slugs to the union. No test regressions.
+
+---
+
 ## 2026-04-21: Phases 1–3 in one session
 
 ### Feature: deskwork-plugin

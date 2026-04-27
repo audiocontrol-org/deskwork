@@ -1,27 +1,39 @@
 /**
- * Bird's-eye content-tree builder (Phase 16d).
+ * Bird's-eye content-tree builder (Phase 16d, inverted in v0.6.0 / #24).
  *
- * Derives a tree-of-nodes representation from the editorial calendar +
- * the on-disk scrapbook layout. Used by the studio's `/dev/content`
- * surface to render hierarchical content as a drillable tree.
+ * Derives a tree-of-nodes representation from the host project's
+ * filesystem, with the editorial calendar overlaid as a state layer.
  *
- * Inputs: a per-site list of calendar entries (already loaded by the
- * caller via `readCalendar`) and the host project's `DeskworkConfig`
- * for path resolution. The builder walks the slugs to assemble the
- * tree, fills in synthetic "organizational" nodes when a hierarchical
- * slug has missing intermediate parents (e.g. tracked
- * `the-outbound/characters/strivers` with no entry for
- * `the-outbound/characters`), and aggregates each node's scrapbook
- * count + most-recent mtime via the existing scrapbook lister.
+ *   - The **filesystem walk** is the primary structure source. Every
+ *     directory under `<contentDir>/` becomes a node. Directories that
+ *     contain a `README.md` (or `index.md`) are surfaced as
+ *     organizational nodes when no calendar entry covers their slug.
+ *   - The **calendar** is the state overlay. A calendar entry whose
+ *     slug matches a fs node sets the node's lane (its lifecycle
+ *     stage) and its display title. A calendar entry whose slug has
+ *     no fs counterpart still appears (the calendar is authoritative
+ *     for "this entry exists"); it just doesn't get a README excerpt.
  *
  * Read-only — never mutates the calendar or the filesystem. Callers
  * cache the result for the lifetime of a single request unless the
  * caller knows the underlying data has changed.
+ *
+ * Inversion rationale (#24): the studio's bird's-eye view should
+ * surface organizational README nodes (e.g.
+ * `the-outbound/characters/README.md` with no calendar entry) so the
+ * operator sees the structure of the work — not just the calendar's
+ * subset of it. Until v0.6.0 the calendar was primary and fs was an
+ * ancestor-fill mechanism; that meant orgnizational READMEs were
+ * invisible. Inverted: fs walks first; calendar overlays state.
  */
 
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import type { CalendarEntry, Stage } from './types.ts';
 import type { DeskworkConfig } from './config.ts';
 import { listScrapbook } from './scrapbook.ts';
+import { resolveContentDir } from './paths.ts';
+import { parseFrontmatter } from './frontmatter.ts';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -32,30 +44,38 @@ export interface ContentNode {
   /** Site slug — passed through from the input. */
   site: string;
   /**
-   * Hierarchical slug (`/`-separated). For synthetic organizational
-   * nodes, this is the prefix path; no calendar entry exists at this
-   * slug (`entry === null`).
+   * Hierarchical slug (`/`-separated). Either a tracked entry's slug
+   * or a filesystem-discovered directory path under contentDir.
    */
   slug: string;
-  /** Display title — `entry.title` when tracked, else the leaf slug segment. */
+  /** Display title. Resolution order: calendar entry title → README/index frontmatter title → leaf slug segment. */
   title: string;
   /**
    * Lifecycle stage when the node corresponds to a tracked calendar
-   * entry. `null` for synthetic organizational nodes.
+   * entry. `null` for organizational nodes (filesystem-only — no
+   * calendar entry).
    */
   lane: Stage | null;
   /**
-   * Underlying calendar entry, when present. `null` for synthetic
-   * organizational nodes that fill in missing parents.
+   * Underlying calendar entry, when present. `null` for organizational
+   * filesystem nodes. Distinguishes "tracked / has lane" from
+   * "structural only / no lane".
    */
   entry: CalendarEntry | null;
   /**
-   * True when the node has its own `index.md` / `README.md` on disk —
-   * derived from the entry's `filePath` (or the default template) and
-   * the file's basename. Used by the UI to pick branch / leaf icons.
-   * Synthetic nodes are reported as `false`.
+   * True when the node has its own `index.md` / `README.md` on disk.
+   * Used by the UI to pick branch / leaf icons and (for organizational
+   * nodes) to decide whether the detail panel can show a README excerpt.
    */
   hasOwnIndex: boolean;
+  /**
+   * True when the node was discovered by the filesystem walk
+   * (independent of whether it has a calendar entry). Pure-calendar
+   * nodes (entry exists, no fs directory) report false here. Used by
+   * the studio detail panel to decide whether organizational README
+   * content is fetchable.
+   */
+  hasFsDir: boolean;
   /** Items at `<contentDir>/<slug>/scrapbook/` (public + secret). */
   scrapbookCount: number;
   /**
@@ -78,12 +98,13 @@ export interface ContentProject {
   rootSlug: string;
   /**
    * Display name for the project. When a tracked entry exists at the
-   * root slug, its `title` is used; otherwise the rootSlug verbatim.
+   * root slug, its `title` is used; otherwise the README frontmatter
+   * title or the rootSlug verbatim.
    */
   title: string;
   /** Total tracked entries beneath this project (recursive). */
   trackedCount: number;
-  /** Total tree nodes including synthetic parents (recursive). */
+  /** Total tree nodes including organizational nodes (recursive). */
   totalNodes: number;
   /** Maximum depth (1 = single root node, 2 = root + leaves, …). */
   maxDepth: number;
@@ -99,6 +120,26 @@ export interface ContentProject {
   root: ContentNode;
 }
 
+/**
+ * One row of the filesystem walk: a directory found under contentDir,
+ * plus the on-disk markers (README / index) used to decide whether
+ * it's a candidate organizational node.
+ */
+export interface FsWalkEntry {
+  /** Slug-style relative path from contentDir (e.g. `the-outbound/characters`). */
+  slug: string;
+  /** True when the directory has an `index.md` / `index.mdx` file. */
+  hasIndex: boolean;
+  /**
+   * True when the directory has a `README.md` / `README.mdx` file.
+   * Used to surface organizational nodes that aren't part of the
+   * calendar's tracked set.
+   */
+  hasReadme: boolean;
+  /** Title from the README/index frontmatter `title` field, when present. */
+  title: string | null;
+}
+
 export interface BuildOptions {
   /**
    * Override scrapbook lookups — useful for tests that don't want to
@@ -109,6 +150,101 @@ export interface BuildOptions {
     site: string,
     slug: string,
   ) => { items: { mtime: string }[]; secretItems: { mtime: string }[] };
+  /**
+   * Override the filesystem walk — used by tests to inject a synthetic
+   * directory shape without writing to disk. Defaults to
+   * `defaultFsWalk` (recursive walk under `resolveContentDir`).
+   */
+  fsWalk?: (site: string) => readonly FsWalkEntry[];
+}
+
+// ---------------------------------------------------------------------------
+// Filesystem walk
+// ---------------------------------------------------------------------------
+
+/** Match the index/README basenames the studio recognizes as a node marker. */
+const INDEX_BASENAMES = new Set([
+  'index.md', 'index.mdx', 'index.markdown',
+]);
+const README_BASENAMES = new Set([
+  'readme.md', 'readme.mdx', 'readme.markdown',
+]);
+
+function readTitleFromMarkdown(absPath: string): string | null {
+  try {
+    const raw = readFileSync(absPath, 'utf-8');
+    const parsed = parseFrontmatter(raw);
+    const t = parsed.data.title;
+    if (typeof t === 'string' && t.trim().length > 0) return t.trim();
+  } catch {
+    // Unreadable / unparseable — fall through.
+  }
+  return null;
+}
+
+/**
+ * Default filesystem walk — recursively scan a site's contentDir for
+ * directories. Returns one `FsWalkEntry` per directory beneath
+ * contentDir (not contentDir itself). Skips dotfiles and the
+ * conventional non-content names (`scrapbook`, `node_modules`, etc.).
+ *
+ * Per-directory the walk records whether an `index.md` / `README.md`
+ * is present and (when present) reads the frontmatter `title`.
+ */
+export function defaultFsWalk(
+  projectRoot: string,
+  config: DeskworkConfig,
+  site: string,
+): FsWalkEntry[] {
+  const root = resolveContentDir(projectRoot, config, site);
+  if (!existsSync(root)) return [];
+  const out: FsWalkEntry[] = [];
+  const SKIP = new Set(['scrapbook', 'node_modules', 'dist', '.git']);
+
+  const visit = (dirAbs: string, slugSoFar: string): void => {
+    let names: string[];
+    try {
+      names = readdirSync(dirAbs);
+    } catch {
+      return;
+    }
+    let hasIndex = false;
+    let hasReadme = false;
+    let titleSource: string | null = null;
+    for (const name of names) {
+      const lower = name.toLowerCase();
+      if (INDEX_BASENAMES.has(lower)) {
+        hasIndex = true;
+        if (titleSource === null) titleSource = join(dirAbs, name);
+      } else if (README_BASENAMES.has(lower)) {
+        hasReadme = true;
+        // Prefer index.md as the title source when both exist; only
+        // fall back to README when there is no index.
+        if (titleSource === null && !hasIndex) titleSource = join(dirAbs, name);
+      }
+    }
+    if (slugSoFar !== '') {
+      const title = titleSource ? readTitleFromMarkdown(titleSource) : null;
+      out.push({ slug: slugSoFar, hasIndex, hasReadme, title });
+    }
+    for (const name of names) {
+      if (name.startsWith('.')) continue;
+      if (SKIP.has(name.toLowerCase())) continue;
+      const childAbs = join(dirAbs, name);
+      let childStat;
+      try {
+        childStat = statSync(childAbs);
+      } catch {
+        continue;
+      }
+      if (!childStat.isDirectory()) continue;
+      const childSlug = slugSoFar === '' ? name : `${slugSoFar}/${name}`;
+      visit(childAbs, childSlug);
+    }
+  };
+
+  visit(root, '');
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -137,14 +273,7 @@ function rootSegment(slug: string): string {
 function basenameLooksLikeIndex(filePath: string): boolean {
   const last = filePath.split('/').pop() ?? '';
   const lower = last.toLowerCase();
-  return (
-    lower === 'index.md' ||
-    lower === 'index.mdx' ||
-    lower === 'index.markdown' ||
-    lower === 'readme.md' ||
-    lower === 'readme.mdx' ||
-    lower === 'readme.markdown'
-  );
+  return INDEX_BASENAMES.has(lower) || README_BASENAMES.has(lower);
 }
 
 function entryHasOwnIndex(entry: CalendarEntry): boolean {
@@ -172,6 +301,14 @@ function pickLatestMtime(
 /**
  * Build the content-tree projects for one site. Pure data — no HTML,
  * no path-style decisions.
+ *
+ * Tree assembly is filesystem-primary (per #24): the walk returns every
+ * directory under contentDir; the calendar entries layer state (lane,
+ * title) on top. Slugs that exist in the calendar but have no fs
+ * counterpart are still surfaced (the calendar is authoritative for
+ * "this entry exists"); they render as nodes with `hasFsDir: false`.
+ * Slugs that exist in the fs walk but have no calendar entry render
+ * as organizational nodes (`entry: null`, `lane: null`).
  */
 export function buildContentTree(
   site: string,
@@ -190,16 +327,35 @@ export function buildContentTree(
       }
     });
 
+  const fsWalk =
+    options.fsWalk ?? ((siteArg) => defaultFsWalk(projectRoot, config, siteArg));
+  const fsEntries = fsWalk(site);
+  const fsEntryBySlug = new Map<string, FsWalkEntry>();
+  for (const e of fsEntries) fsEntryBySlug.set(e.slug, e);
+
   // Two passes:
-  //   1. Index entries by slug; assemble synthetic ancestor slugs that
-  //      need filling in.
-  //   2. Build the tree from the union of real + synthetic slugs.
+  //   1. Index calendar entries by slug; assemble the union of slugs
+  //      that need nodes (calendar slugs ∪ ancestors ∪ fs slugs).
+  //   2. Build the tree from the union, sourcing each node's title
+  //      and lane from the right authority (calendar wins when both
+  //      sources have data).
   const entryBySlug = new Map<string, CalendarEntry>();
   const allSlugs = new Set<string>();
+
+  // Calendar contributes its slugs and their ancestors.
   for (const e of entries) {
     entryBySlug.set(e.slug, e);
     allSlugs.add(e.slug);
     for (const a of ancestorsOf(e.slug)) allSlugs.add(a);
+  }
+  // Filesystem contributes any directory that has a README.md or
+  // index.md (these are the candidates for organizational nodes), plus
+  // the ancestors of those directories so the tree assembles.
+  for (const e of fsEntries) {
+    if (e.hasReadme || e.hasIndex) {
+      allSlugs.add(e.slug);
+      for (const a of ancestorsOf(e.slug)) allSlugs.add(a);
+    }
   }
 
   const sortedSlugs = [...allSlugs].sort();
@@ -207,19 +363,38 @@ export function buildContentTree(
 
   for (const slug of sortedSlugs) {
     const entry = entryBySlug.get(slug) ?? null;
+    const fsEntry = fsEntryBySlug.get(slug) ?? null;
     const sb = lookup(site, slug);
     const items = [...sb.items, ...sb.secretItems];
     const mostRecent = items.reduce<string | null>(
       (acc, it) => pickLatestMtime(acc, it.mtime),
       null,
     );
+
+    // Title resolution: calendar wins, then fs frontmatter, then leaf.
+    const title =
+      entry?.title ??
+      (fsEntry?.title ?? null) ??
+      leafOfSlug(slug);
+
+    // hasOwnIndex resolution: calendar's filePath / template wins, else
+    // fs walk's hasIndex || hasReadme. Organizational nodes set this
+    // true when README.md is present on disk.
+    let hasOwnIndex = false;
+    if (entry !== null) {
+      hasOwnIndex = entryHasOwnIndex(entry);
+    } else if (fsEntry !== null) {
+      hasOwnIndex = fsEntry.hasIndex || fsEntry.hasReadme;
+    }
+
     const node: ContentNode = {
       site,
       slug,
-      title: entry?.title ?? leafOfSlug(slug),
+      title,
       lane: entry?.stage ?? null,
       entry,
-      hasOwnIndex: entry === null ? false : entryHasOwnIndex(entry),
+      hasOwnIndex,
+      hasFsDir: fsEntry !== null,
       scrapbookCount: items.length,
       scrapbookMostRecentMtime: mostRecent,
       children: [],
@@ -271,6 +446,7 @@ export function buildContentTree(
         lane: null,
         entry: null,
         hasOwnIndex: false,
+        hasFsDir: fsEntryBySlug.has(root),
         scrapbookCount: items.length,
         scrapbookMostRecentMtime: mostRecent,
         children: [],

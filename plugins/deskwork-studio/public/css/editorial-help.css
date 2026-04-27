@@ -121,7 +121,13 @@ body[data-review-ui="manual"] {
 }
 .eh-imprint a { color: var(--er-red-pencil); text-decoration-thickness: 1px; }
 
-/* ---------- ToC (compositor's guide) ---------- */
+/* ---------- ToC (compositor's guide) ----------
+ * CSF-9 (cross-surface audit v0.5.0): the manual's `eh-toc` is the
+ * in-page anchor variant of the studio index's `er-toc-list` (which
+ * is the cross-page variant). Both share editorial-print tokens.
+ * Different markup (here: anchor links in a 2-col grid; index: an
+ * <ol>) so they don't merge cleanly into a single class today, but
+ * the family relationship is documented in editorial-nav.css too. */
 
 .eh-toc {
   display: grid;

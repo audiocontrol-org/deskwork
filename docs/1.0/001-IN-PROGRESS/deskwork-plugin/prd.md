@@ -264,3 +264,38 @@ A static HTML/CSS mockup of the bird's-eye content view ships alongside this PRD
 - **Not a navigation rewrite.** The pipeline-focused dashboard remains the default landing page. The content view is a sibling, surfaced via top-nav.
 
 **Plan reference.** Issue #18 design discussion; mockup produced via `/frontend-design` skill; expanded into Phase 16 of the workplan during this `/feature-extend` invocation.
+
+---
+
+## Extension: deferral catalog (Phase 18)
+
+Added to surface every outstanding deferral after the operator pushed back on a session pattern of unilaterally splitting work into "in scope now" and "deferred / later" without explicit approval. The full inventory is in workplan Phase 18; this PRD section captures the why and the policy.
+
+### Why now
+
+Through this session, multiple deferrals accumulated without explicit operator approval:
+
+1. Filed [#16](https://github.com/audiocontrol-org/deskwork/issues/16) (pre-commit → pre-push) when operator said "probably want to" — should have either done it or asked.
+2. Split [#23](https://github.com/audiocontrol-org/deskwork/issues/23) into "v0.4.2 patch + #24 deferred" — operator approved the patch but never approved the deferral.
+3. Quietly deferred standalone scrapbook viewer CRUD endpoints (eventually filed as [#21](https://github.com/audiocontrol-org/deskwork/issues/21) under pressure).
+4. Floated a `Paused` 7th lifecycle stage (now [#27](https://github.com/audiocontrol-org/deskwork/issues/27)), the `secret/` toggle UI ([#28](https://github.com/audiocontrol-org/deskwork/issues/28)), the lightbox ([#29](https://github.com/audiocontrol-org/deskwork/issues/29)), the tree-cache optimization ([#30](https://github.com/audiocontrol-org/deskwork/issues/30)) — none filed until the operator asked.
+
+These are fixable. The pattern is captured in `feedback_dont_unilaterally_defer.md` (project memory). The catalog in Phase 18 is the recovery: every deferred item surfaced with a tracking issue and a checkbox, decisions deferred to the operator rather than pre-decided.
+
+### Policy going forward
+
+- "Out of scope" sections in workplans are valid only when the operator explicitly excluded those items in conversation. If I'm the one deciding, I'm overstepping.
+- When work has a "main thing + follow-up" shape, propose the split as a question — don't pre-decide.
+- Hedged operator language ("probably," "we'll see") defaults to *ask what to do next*, not interpret as deferral.
+- Filed follow-up issues are valid documentation of work I'm choosing not to do, but only when the operator agreed to that choice.
+
+### Scope of Phase 18
+
+The catalog covers four groups (full list in workplan Phase 18):
+
+- **Group A**: Bug-fix-shaped follow-ups filed late this session (#16, #24, #27, #28, #29, #30)
+- **Group B**: Original workplan items still unchecked (Phase 4 audiocontrol live dogfood; Phase 5 four un-shipped skills: help / status / distribute / social-review; Phase 6 audiocontrol cutover; Phase 12 stretch agent-improvability; Phase 12 browser-driven approve smoke test)
+- **Group C**: PRD-deferred items the operator originally approved but that warrant a fresh closure decision (MCP server, npm publishing, shortform/cross-link review skills)
+- **Group D**: Skills explicitly out of scope per the original PRD — listed for completeness, not for action
+
+Phase 18 is a CATALOG, not a single shippable unit. Items close as their issues close.

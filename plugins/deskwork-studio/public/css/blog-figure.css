@@ -139,3 +139,43 @@
 body.blog-lightbox-open {
   overflow: hidden;
 }
+
+/* ---- Lightbox navigation (#29 — adjacent-image cycle) ---------------- */
+
+.blog-lightbox-prev,
+.blog-lightbox-next {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2.6rem;
+  height: 4rem;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(0, 0, 0, 0.35);
+  color: rgba(245, 241, 232, 0.92);
+  font-size: 2rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.16s ease, border-color 0.16s ease;
+}
+.blog-lightbox-prev { left: 1rem; }
+.blog-lightbox-next { right: 1rem; }
+.blog-lightbox-prev:hover,
+.blog-lightbox-next:hover {
+  background: rgba(0, 0, 0, 0.6);
+  border-color: rgba(255, 255, 255, 0.55);
+}
+.blog-lightbox-prev:focus,
+.blog-lightbox-next:focus {
+  outline: 2px solid rgba(255, 255, 255, 0.6);
+  outline-offset: 2px;
+}
+.blog-lightbox-prev[hidden],
+.blog-lightbox-next[hidden] {
+  display: none;
+}

@@ -68,6 +68,7 @@ const STAGE_ORNAMENTS: Record<Stage, string> = {
   Outlining: '⊹',
   Drafting: '✎',
   Review: '※',
+  Paused: '⏸',
   Published: '✓',
 };
 
@@ -241,18 +242,18 @@ function renderHeader(
   const issueNum = String(data.workflows.length).padStart(2, '0');
   const issueDate = `${now.getDate()} ${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`;
   return unsafe(html`
-  <header class="er-masthead">
-    <div class="er-masthead-kicker">
+  <header class="er-pagehead er-pagehead--centered">
+    <p class="er-pagehead__kicker">
       Vol. ${volume} &middot; № ${issueNum} &middot; Press-check
-    </div>
-    <h1 class="er-masthead-title">
+    </p>
+    <h1 class="er-pagehead__title">
       Editorial <em>Studio</em>
     </h1>
-    <p class="er-masthead-deck">
+    <p class="er-pagehead__deck">
       Project: <code>${ctx.projectRoot}</code>
-      &nbsp;·&nbsp; <a href="/dev/editorial-help" style="color: var(--er-red-pencil);">the manual</a>
+      &nbsp;·&nbsp; <a class="er-link-marginalia" href="/dev/editorial-help">the manual</a>
     </p>
-    <div class="er-masthead-meta">
+    <p class="er-pagehead__meta">
       <span>${issueDate}</span>
       <span class="sep">·</span>
       <span>${data.calendarEntries.length} on the calendar</span>
@@ -260,7 +261,7 @@ function renderHeader(
       <span>${data.activeBySitedSlug.size} in review</span>
       <span class="sep">·</span>
       <span>${data.approved.length} awaiting press</span>
-    </div>
+    </p>
   </header>`);
 }
 
@@ -269,7 +270,7 @@ function renderFilterStrip(sites: readonly string[]): RawHtml {
     <section class="er-filter" data-filter-strip>
       <span class="er-filter-label">Find</span>
       <input type="search" data-filter-input placeholder="slug, title…" autocomplete="off" />
-      <span class="er-filter-label" style="margin-left: 1rem;">Site</span>
+      <span class="er-filter-label er-filter-label--gap">Site</span>
       <div class="er-chips" role="tablist">
         <button class="er-chip" aria-pressed="true" data-site-chip="all">all</button>
         ${sites.map(
@@ -277,7 +278,7 @@ function renderFilterStrip(sites: readonly string[]): RawHtml {
             unsafe(html`<button class="er-chip" data-site-chip="${s}">${siteLabel(s).toLowerCase()}</button>`),
         )}
       </div>
-      <span class="er-filter-label" style="margin-left: 1rem;">Stage</span>
+      <span class="er-filter-label er-filter-label--gap">Stage</span>
       <div class="er-chips" role="tablist">
         <button class="er-chip" aria-pressed="true" data-stage-chip="all">all</button>
         ${STAGES.map(
@@ -294,6 +295,7 @@ const STAGE_EMPTY_MESSAGES: Record<Stage, string> = {
   Outlining: 'Nothing in outlining. /editorial-outline <slug> to start one.',
   Drafting: 'No posts in drafting.',
   Review: 'Nothing in review stage.',
+  Paused: 'Nothing paused. /deskwork:pause <slug> sets an entry aside without losing where it was.',
   Published: 'No published posts yet.',
 };
 
@@ -316,6 +318,11 @@ function renderRowMeta(
   }
   if (entry.datePublished && stage === 'Published') {
     parts.push(unsafe(html`<span class="er-calendar-meta">${entry.datePublished}</span>`));
+  }
+  if (stage === 'Paused' && entry.pausedFrom) {
+    parts.push(
+      unsafe(html`<span class="er-calendar-meta"><em>was:</em> ${entry.pausedFrom}</span>`),
+    );
   }
   if (kind !== 'blog') {
     parts.push(unsafe(html`<span class="er-calendar-meta er-calendar-meta-kind">${kind}</span>`));
@@ -399,6 +406,22 @@ function renderRowActions(
     buttons.push(html`<button class="er-btn er-btn-small er-copy-btn" type="button"
       data-copy="/editorial-draft-review --site ${site} ${entry.slug}"
       title="re-review a published post">re-review</button>`);
+  }
+  // #27 — Paused gets a "resume" copy; pausable stages get a "pause" copy.
+  if (stage === 'Paused') {
+    buttons.push(html`<button class="er-btn er-btn-small er-btn-primary er-copy-btn" type="button"
+      data-copy="/deskwork:resume --site ${site} ${entry.slug}"
+      title="restore to ${entry.pausedFrom ?? 'prior stage'}">resume →</button>`);
+  } else if (
+    stage === 'Ideas' ||
+    stage === 'Planned' ||
+    stage === 'Outlining' ||
+    stage === 'Drafting' ||
+    stage === 'Review'
+  ) {
+    buttons.push(html`<button class="er-btn er-btn-small er-copy-btn" type="button"
+      data-copy="/deskwork:pause --site ${site} ${entry.slug}"
+      title="set aside without losing the prior stage">pause</button>`);
   }
   if (kind === 'blog') {
     buttons.push(html`<button class="er-btn er-btn-small" type="button" data-action="rename-open"
@@ -571,7 +594,7 @@ function renderStageSection(
 
   return unsafe(html`
     <section class="er-section" data-stage-section="${stage}">
-      <h2 class="er-section-title">
+      <h2 class="er-section-head">
         <span>${stage}</span>
         <span class="ornament">${STAGE_ORNAMENTS[stage]}</span>
         <span class="count">№ ${entries.length}</span>
@@ -609,7 +632,7 @@ function renderShortformMatrix(data: DashboardData, ctx: StudioContext): RawHtml
 
   return unsafe(html`
     <section class="er-section">
-      <h2 class="er-section-title">
+      <h2 class="er-section-head">
         <span>Short form · coverage</span>
         <span class="count">${data.publishedBlogEntries.length} × ${PLATFORMS_ORDER.length}</span>
       </h2>
@@ -657,7 +680,7 @@ function renderApprovedSection(data: DashboardData, ctx: StudioContext): RawHtml
     .join('');
   return unsafe(html`
     <section class="er-section">
-      <h2 class="er-section-title">
+      <h2 class="er-section-head">
         <span>Awaiting press</span>
         <span class="count">№ ${data.approved.length}</span>
       </h2>
@@ -687,7 +710,7 @@ function renderTerminalSection(data: DashboardData, ctx: StudioContext, now: Dat
     .join('');
   return unsafe(html`
     <section class="er-section">
-      <h2 class="er-section-title">
+      <h2 class="er-section-head">
         <span>Recent proofs</span>
         <span class="count">last ${data.terminal.length}</span>
       </h2>

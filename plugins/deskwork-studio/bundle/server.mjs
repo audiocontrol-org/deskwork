@@ -10347,8 +10347,8 @@ var serveStatic = (options = { root: "" }) => {
 };
 
 // src/server.ts
-import { existsSync as existsSync8, realpathSync } from "node:fs";
-import { dirname as dirname2, isAbsolute, resolve as resolve2 } from "node:path";
+import { existsSync as existsSync9, realpathSync } from "node:fs";
+import { dirname as dirname3, isAbsolute, resolve as resolve2 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // ../core/src/config.ts
@@ -11523,9 +11523,9 @@ var VFile = class {
    * @returns {undefined}
    *   Nothing.
    */
-  set dirname(dirname3) {
+  set dirname(dirname4) {
     assertPath(this.basename, "dirname");
-    this.path = default2.join(dirname3 || "", this.basename);
+    this.path = default2.join(dirname4 || "", this.basename);
   }
   /**
    * Get the extname (including dot) (example: `'.js'`).
@@ -23424,7 +23424,8 @@ async function serveScrapbookFile(c, ctx) {
 }
 
 // src/routes/scrapbook-mutations.ts
-import { existsSync as existsSync5 } from "node:fs";
+import { existsSync as existsSync5, mkdirSync as mkdirSync3, renameSync as renameSync2, statSync as statSync3 } from "node:fs";
+import { dirname as dirname2 } from "node:path";
 function checkEnvelope(ctx, body3) {
   const site = body3.site;
   const slug = body3.slug;
@@ -23437,7 +23438,11 @@ function checkEnvelope(ctx, body3) {
   if (!(site in ctx.config.sites)) {
     return { error: `unknown site: ${site}`, status: 404 };
   }
-  return { site, slug };
+  const secretRaw = body3.secret;
+  if (secretRaw !== void 0 && typeof secretRaw !== "boolean") {
+    return { error: "secret must be a boolean when provided", status: 400 };
+  }
+  return { site, slug, secret: secretRaw === true };
 }
 function statusForError(message) {
   if (/already exists/i.test(message)) return 409;
@@ -23481,7 +23486,8 @@ function createScrapbookMutationsRouter(ctx) {
         ctx.config,
         env2.site,
         env2.slug,
-        filename
+        filename,
+        { secret: env2.secret }
       );
       if (!existsSync5(abs)) {
         if (filename.endsWith(".md")) {
@@ -23491,7 +23497,8 @@ function createScrapbookMutationsRouter(ctx) {
             env2.site,
             env2.slug,
             filename,
-            bodyText
+            bodyText,
+            { secret: env2.secret }
           );
         } else {
           item = writeScrapbookUpload(
@@ -23500,7 +23507,8 @@ function createScrapbookMutationsRouter(ctx) {
             env2.site,
             env2.slug,
             filename,
-            Buffer.from(bodyText, "utf-8")
+            Buffer.from(bodyText, "utf-8"),
+            { secret: env2.secret }
           );
         }
       } else {
@@ -23510,7 +23518,8 @@ function createScrapbookMutationsRouter(ctx) {
           env2.site,
           env2.slug,
           filename,
-          bodyText
+          bodyText,
+          { secret: env2.secret }
         );
       }
     } catch (err2) {
@@ -23532,16 +23541,56 @@ function createScrapbookMutationsRouter(ctx) {
     if (typeof newName !== "string" || newName.length === 0) {
       return c.json({ error: "newName is required" }, 400);
     }
+    const toSecretRaw = parsed.value.toSecret;
+    if (toSecretRaw !== void 0 && typeof toSecretRaw !== "boolean") {
+      return c.json({ error: "toSecret must be a boolean when provided" }, 400);
+    }
+    const toSecret = toSecretRaw === void 0 ? env2.secret : toSecretRaw;
     let item;
     try {
-      item = renameScrapbookFile(
-        ctx.projectRoot,
-        ctx.config,
-        env2.site,
-        env2.slug,
-        oldName,
-        newName
-      );
+      if (toSecret === env2.secret) {
+        item = renameScrapbookFile(
+          ctx.projectRoot,
+          ctx.config,
+          env2.site,
+          env2.slug,
+          oldName,
+          newName,
+          { secret: env2.secret }
+        );
+      } else {
+        const srcAbs = scrapbookFilePath(
+          ctx.projectRoot,
+          ctx.config,
+          env2.site,
+          env2.slug,
+          oldName,
+          { secret: env2.secret }
+        );
+        const dstAbs = scrapbookFilePath(
+          ctx.projectRoot,
+          ctx.config,
+          env2.site,
+          env2.slug,
+          newName,
+          { secret: toSecret }
+        );
+        if (!existsSync5(srcAbs)) {
+          return c.json({ error: `file not found: "${oldName}"` }, 404);
+        }
+        if (existsSync5(dstAbs)) {
+          return c.json({ error: `target name already exists: "${newName}"` }, 409);
+        }
+        mkdirSync3(dirname2(dstAbs), { recursive: true });
+        renameSync2(srcAbs, dstAbs);
+        const st = statSync3(dstAbs);
+        item = {
+          name: newName,
+          kind: classify(newName),
+          size: st.size,
+          mtime: st.mtime.toISOString()
+        };
+      }
     } catch (err2) {
       const reason = err2 instanceof Error ? err2.message : String(err2);
       return c.json({ error: reason }, statusForError(reason));
@@ -23563,7 +23612,8 @@ function createScrapbookMutationsRouter(ctx) {
         ctx.config,
         env2.site,
         env2.slug,
-        filename
+        filename,
+        { secret: env2.secret }
       );
     } catch (err2) {
       const reason = err2 instanceof Error ? err2.message : String(err2);
@@ -23592,7 +23642,8 @@ function createScrapbookMutationsRouter(ctx) {
         env2.site,
         env2.slug,
         filename,
-        bodyText
+        bodyText,
+        { secret: env2.secret }
       );
     } catch (err2) {
       const reason = err2 instanceof Error ? err2.message : String(err2);
@@ -23610,6 +23661,8 @@ function createScrapbookMutationsRouter(ctx) {
     const site = form.get("site");
     const slug = form.get("slug");
     const file = form.get("file");
+    const secretField = form.get("secret");
+    const secret = typeof secretField === "string" && secretField === "true";
     if (typeof site !== "string" || site.length === 0) {
       return c.json({ error: "site is required" }, 400);
     }
@@ -23635,7 +23688,8 @@ function createScrapbookMutationsRouter(ctx) {
         site,
         slug,
         filename,
-        buf
+        buf,
+        { secret }
       );
     } catch (err2) {
       const reason = err2 instanceof Error ? err2.message : String(err2);
@@ -23657,8 +23711,19 @@ var STAGES = [
   "Outlining",
   "Drafting",
   "Review",
+  "Paused",
   "Published"
 ];
+var PAUSABLE_STAGES = [
+  "Ideas",
+  "Planned",
+  "Outlining",
+  "Drafting",
+  "Review"
+];
+function isPausable(stage) {
+  return PAUSABLE_STAGES.includes(stage);
+}
 function isStage(value) {
   return STAGES.includes(value);
 }
@@ -23734,6 +23799,10 @@ function parseEntries(lines, stage) {
       if (url) entry.contentUrl = url;
       const filePath = col(cells2, cols, "filepath");
       if (filePath) entry.filePath = filePath;
+      const pausedFrom = col(cells2, cols, "pausedfrom");
+      if (pausedFrom && isStage(pausedFrom) && isPausable(pausedFrom)) {
+        entry.pausedFrom = pausedFrom;
+      }
       const published = col(cells2, cols, "published");
       if (published) entry.datePublished = published;
       const issue = col(cells2, cols, "issue");
@@ -24137,6 +24206,7 @@ var STAGE_ORNAMENTS = {
   Outlining: "\u22B9",
   Drafting: "\u270E",
   Review: "\u203B",
+  Paused: "\u23F8",
   Published: "\u2713"
 };
 var MONTH_NAMES = [
@@ -24265,18 +24335,18 @@ function renderHeader(data, ctx, now) {
   const issueNum = String(data.workflows.length).padStart(2, "0");
   const issueDate = `${now.getDate()} ${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`;
   return unsafe(html6`
-  <header class="er-masthead">
-    <div class="er-masthead-kicker">
+  <header class="er-pagehead er-pagehead--centered">
+    <p class="er-pagehead__kicker">
       Vol. ${volume} &middot; № ${issueNum} &middot; Press-check
-    </div>
-    <h1 class="er-masthead-title">
+    </p>
+    <h1 class="er-pagehead__title">
       Editorial <em>Studio</em>
     </h1>
-    <p class="er-masthead-deck">
+    <p class="er-pagehead__deck">
       Project: <code>${ctx.projectRoot}</code>
-      &nbsp;·&nbsp; <a href="/dev/editorial-help" style="color: var(--er-red-pencil);">the manual</a>
+      &nbsp;·&nbsp; <a class="er-link-marginalia" href="/dev/editorial-help">the manual</a>
     </p>
-    <div class="er-masthead-meta">
+    <p class="er-pagehead__meta">
       <span>${issueDate}</span>
       <span class="sep">·</span>
       <span>${data.calendarEntries.length} on the calendar</span>
@@ -24284,7 +24354,7 @@ function renderHeader(data, ctx, now) {
       <span>${data.activeBySitedSlug.size} in review</span>
       <span class="sep">·</span>
       <span>${data.approved.length} awaiting press</span>
-    </div>
+    </p>
   </header>`);
 }
 function renderFilterStrip(sites) {
@@ -24292,14 +24362,14 @@ function renderFilterStrip(sites) {
     <section class="er-filter" data-filter-strip>
       <span class="er-filter-label">Find</span>
       <input type="search" data-filter-input placeholder="slug, title…" autocomplete="off" />
-      <span class="er-filter-label" style="margin-left: 1rem;">Site</span>
+      <span class="er-filter-label er-filter-label--gap">Site</span>
       <div class="er-chips" role="tablist">
         <button class="er-chip" aria-pressed="true" data-site-chip="all">all</button>
         ${sites.map(
     (s) => unsafe(html6`<button class="er-chip" data-site-chip="${s}">${siteLabel(s).toLowerCase()}</button>`)
   )}
       </div>
-      <span class="er-filter-label" style="margin-left: 1rem;">Stage</span>
+      <span class="er-filter-label er-filter-label--gap">Stage</span>
       <div class="er-chips" role="tablist">
         <button class="er-chip" aria-pressed="true" data-stage-chip="all">all</button>
         ${STAGES.map(
@@ -24314,6 +24384,7 @@ var STAGE_EMPTY_MESSAGES = {
   Outlining: "Nothing in outlining. /editorial-outline <slug> to start one.",
   Drafting: "No posts in drafting.",
   Review: "Nothing in review stage.",
+  Paused: "Nothing paused. /deskwork:pause <slug> sets an entry aside without losing where it was.",
   Published: "No published posts yet."
 };
 function renderRowMeta(ctx, site, entry, stage, hasFile) {
@@ -24329,6 +24400,11 @@ function renderRowMeta(ctx, site, entry, stage, hasFile) {
   }
   if (entry.datePublished && stage === "Published") {
     parts.push(unsafe(html6`<span class="er-calendar-meta">${entry.datePublished}</span>`));
+  }
+  if (stage === "Paused" && entry.pausedFrom) {
+    parts.push(
+      unsafe(html6`<span class="er-calendar-meta"><em>was:</em> ${entry.pausedFrom}</span>`)
+    );
   }
   if (kind !== "blog") {
     parts.push(unsafe(html6`<span class="er-calendar-meta er-calendar-meta-kind">${kind}</span>`));
@@ -24400,6 +24476,15 @@ function renderRowActions(site, entry, stage, hasFile, bodyWritten, wf) {
     buttons.push(html6`<button class="er-btn er-btn-small er-copy-btn" type="button"
       data-copy="/editorial-draft-review --site ${site} ${entry.slug}"
       title="re-review a published post">re-review</button>`);
+  }
+  if (stage === "Paused") {
+    buttons.push(html6`<button class="er-btn er-btn-small er-btn-primary er-copy-btn" type="button"
+      data-copy="/deskwork:resume --site ${site} ${entry.slug}"
+      title="restore to ${entry.pausedFrom ?? "prior stage"}">resume →</button>`);
+  } else if (stage === "Ideas" || stage === "Planned" || stage === "Outlining" || stage === "Drafting" || stage === "Review") {
+    buttons.push(html6`<button class="er-btn er-btn-small er-copy-btn" type="button"
+      data-copy="/deskwork:pause --site ${site} ${entry.slug}"
+      title="set aside without losing the prior stage">pause</button>`);
   }
   if (kind === "blog") {
     buttons.push(html6`<button class="er-btn er-btn-small" type="button" data-action="rename-open"
@@ -24512,7 +24597,7 @@ function renderStageSection(ctx, data, stage, entries, sites) {
   );
   return unsafe(html6`
     <section class="er-section" data-stage-section="${stage}">
-      <h2 class="er-section-title">
+      <h2 class="er-section-head">
         <span>${stage}</span>
         <span class="ornament">${STAGE_ORNAMENTS[stage]}</span>
         <span class="count">№ ${entries.length}</span>
@@ -24546,7 +24631,7 @@ function renderShortformMatrix(data, ctx) {
   }).join("");
   return unsafe(html6`
     <section class="er-section">
-      <h2 class="er-section-title">
+      <h2 class="er-section-head">
         <span>Short form · coverage</span>
         <span class="count">${data.publishedBlogEntries.length} × ${PLATFORMS_ORDER.length}</span>
       </h2>
@@ -24585,7 +24670,7 @@ function renderApprovedSection(data, ctx) {
   }).join("");
   return unsafe(html6`
     <section class="er-section">
-      <h2 class="er-section-title">
+      <h2 class="er-section-head">
         <span>Awaiting press</span>
         <span class="count">№ ${data.approved.length}</span>
       </h2>
@@ -24609,7 +24694,7 @@ function renderTerminalSection(data, ctx, now) {
   }).join("");
   return unsafe(html6`
     <section class="er-section">
-      <h2 class="er-section-title">
+      <h2 class="er-section-head">
         <span>Recent proofs</span>
         <span class="count">last ${data.terminal.length}</span>
       </h2>
@@ -25246,15 +25331,15 @@ function renderShortformPage(ctx, focus = null) {
       </div>` : ordered.map((p2) => renderPlatformSection(p2, byPlatform.get(p2) ?? []).__raw).join("");
   const body3 = html6`
     ${renderEditorialFolio("reviews", "shortform desk")}
-    <header class="er-masthead">
-      <div class="er-masthead-kicker">All sites · short form</div>
-      <h1 class="er-masthead-title">The <em>compositor</em>'s desk</h1>
-      <p class="er-masthead-deck">Social copy, one galley slip per platform.</p>
-      <div class="er-masthead-meta">
+    <header class="er-pagehead er-pagehead--centered">
+      <p class="er-pagehead__kicker">All sites · short form</p>
+      <h1 class="er-pagehead__title">The <em>compositor</em>'s desk</h1>
+      <p class="er-pagehead__deck">Social copy, one galley slip per platform.</p>
+      <p class="er-pagehead__meta">
         <span>${cards.length} in flight</span>
         <span class="sep">·</span>
         <span>${ordered.length} ${ordered.length === 1 ? "platform" : "platforms"}</span>
-      </div>
+      </p>
     </header>
     <main class="er-container" style="padding-top: var(--er-space-4); padding-bottom: var(--er-space-6);">
       ${unsafe(cardsBlock)}
@@ -25485,17 +25570,17 @@ function formatIssueDate(now) {
 function renderCover(ctx, now) {
   const sitesInline = Object.values(ctx.config.sites).map((s) => s.host).join(" \xB7 ");
   return unsafe(html6`
-    <header class="eh-cover">
-      <p class="eh-cover-kicker">
+    <header class="er-pagehead er-pagehead--centered eh-cover">
+      <p class="er-pagehead__kicker eh-cover-kicker">
         Vol. 01 <span class="dot">·</span> Manual <span class="dot">·</span> Internal — for operators
       </p>
-      <h1 class="eh-cover-title">
+      <h1 class="er-pagehead__title eh-cover-title">
         The Compositor's <em>Manual</em>
       </h1>
-      <p class="eh-cover-dek">
+      <p class="er-pagehead__deck eh-cover-dek">
         Everything you need to move a thought from notebook to published dispatch without asking a colleague. The editorial calendar, the review pipelines, the skills that drive them, and the desk where you watch the whole thing happen.
       </p>
-      <p class="eh-imprint">
+      <p class="er-pagehead__imprint eh-imprint">
         <strong>Sites</strong><span>${sitesInline || ctx.projectRoot}</span>
         <span class="sep">§</span>
         <strong>Issued</strong><span>${formatIssueDate(now)}</span>
@@ -25891,9 +25976,11 @@ function renderItemRow(item, index2, opts = {}) {
   const kindLabel2 = item.kind === "other" ? "\xB7" : item.kind.toUpperCase();
   const idPrefix = secret ? "secret-" : "";
   const dataSecret = secret ? ' data-secret="true"' : "";
+  const sectionToggleLabel = secret ? "mark public" : "mark secret";
   const toolbar = withTools ? unsafe(html6`<div class="scrapbook-toolbar" data-toolbar>
         ${editBtn}
         <button type="button" class="scrapbook-tool" data-action="rename">rename</button>
+        <button type="button" class="scrapbook-tool" data-action="toggle-secret">${sectionToggleLabel}</button>
         <button type="button" class="scrapbook-tool scrapbook-tool--delete" data-action="delete">delete</button>
       </div>`) : "";
   return unsafe(html6`
@@ -25993,7 +26080,11 @@ function renderReadingPanel(items) {
           <span class="scrapbook-composer-kind">NEW</span>
           <input type="text" class="scrapbook-composer-filename" data-composer-filename
             placeholder="note-name.md" aria-label="new note filename" />
-          <div class="scrapbook-editor-footer" style="margin: 0;">
+          <div class="scrapbook-editor-footer scrapbook-composer-actions">
+            <label class="scrapbook-secret-toggle" title="save under scrapbook/secret/ — never published">
+              <input type="checkbox" data-composer-secret />
+              <span>secret</span>
+            </label>
             <button type="button" class="scrapbook-tool" data-action="composer-cancel">cancel</button>
             <button type="submit" class="scrapbook-tool scrapbook-tool--primary" data-action="composer-save">save →</button>
           </div>
@@ -26012,6 +26103,11 @@ function renderReadingPanel(items) {
         <span class="scrapbook-drop-label">── drop a file here, or pick one ──</span>
         <input type="file" data-scrapbook-file-input
           accept="image/*,application/json,text/plain,text/markdown,.md,.json,.txt" />
+        <label class="scrapbook-secret-toggle scrapbook-secret-toggle--upload"
+          title="save the upload under scrapbook/secret/ — never published">
+          <input type="checkbox" data-upload-secret />
+          <span>upload as secret</span>
+        </label>
       </div>
     </section>`);
 }
@@ -26034,7 +26130,7 @@ function renderSecretSection(items) {
       </p>
       <ol class="scrapbook-items scrapbook-items--secret">
         ${items.map(
-    (item, i) => renderItemRow(item, i, { secret: true, withTools: false })
+    (item, i) => renderItemRow(item, i, { secret: true, withTools: true })
   )}
       </ol>
     </section>`);
@@ -26051,15 +26147,14 @@ function renderScrapbookPage(ctx, site, path) {
   const body3 = html6`
     ${renderEditorialFolio("content", `scrapbook \xB7 ${site}/${path}`)}
     <main class="scrapbook-page" data-site="${site}" data-slug="${path}" data-scrapbook-root>
-      <header class="scrapbook-header">
-        <p class="scrapbook-kicker">
+      <header class="er-pagehead er-pagehead--compact scrapbook-header">
+        ${renderBreadcrumb(site, path)}
+        <p class="er-pagehead__kicker scrapbook-kicker">
           <span class="scrapbook-kicker-mark" aria-hidden="true">§</span>
           Scrapbook
         </p>
-        <h1 class="scrapbook-title">${path}</h1>
-        ${renderBreadcrumb(site, path)}
+        <h1 class="er-pagehead__title scrapbook-title">${path}</h1>
         <a class="scrapbook-back" href="/dev/editorial-studio">← back to the desk</a>
-        <hr />
       </header>
       <div class="scrapbook-status" data-scrapbook-status hidden></div>
       ${unsafe(publicBlock)}
@@ -26073,7 +26168,8 @@ function renderScrapbookPage(ctx, site, path) {
     cssHrefs: [
       "/static/css/editorial-review.css",
       "/static/css/editorial-nav.css",
-      "/static/css/scrapbook.css"
+      "/static/css/scrapbook.css",
+      "/static/css/blog-figure.css"
     ],
     bodyAttrs: 'data-review-ui="studio"',
     bodyHtml: body3,
@@ -26082,6 +26178,75 @@ function renderScrapbookPage(ctx, site, path) {
 }
 
 // ../core/src/content-tree.ts
+import { existsSync as existsSync7, readdirSync as readdirSync3, readFileSync as readFileSync8, statSync as statSync4 } from "node:fs";
+import { join as join8 } from "node:path";
+var INDEX_BASENAMES = /* @__PURE__ */ new Set([
+  "index.md",
+  "index.mdx",
+  "index.markdown"
+]);
+var README_BASENAMES = /* @__PURE__ */ new Set([
+  "readme.md",
+  "readme.mdx",
+  "readme.markdown"
+]);
+function readTitleFromMarkdown(absPath) {
+  try {
+    const raw3 = readFileSync8(absPath, "utf-8");
+    const parsed = parseFrontmatter(raw3);
+    const t = parsed.data.title;
+    if (typeof t === "string" && t.trim().length > 0) return t.trim();
+  } catch {
+  }
+  return null;
+}
+function defaultFsWalk(projectRoot, config, site) {
+  const root3 = resolveContentDir(projectRoot, config, site);
+  if (!existsSync7(root3)) return [];
+  const out = [];
+  const SKIP2 = /* @__PURE__ */ new Set(["scrapbook", "node_modules", "dist", ".git"]);
+  const visit2 = (dirAbs, slugSoFar) => {
+    let names;
+    try {
+      names = readdirSync3(dirAbs);
+    } catch {
+      return;
+    }
+    let hasIndex = false;
+    let hasReadme = false;
+    let titleSource = null;
+    for (const name of names) {
+      const lower = name.toLowerCase();
+      if (INDEX_BASENAMES.has(lower)) {
+        hasIndex = true;
+        if (titleSource === null) titleSource = join8(dirAbs, name);
+      } else if (README_BASENAMES.has(lower)) {
+        hasReadme = true;
+        if (titleSource === null && !hasIndex) titleSource = join8(dirAbs, name);
+      }
+    }
+    if (slugSoFar !== "") {
+      const title = titleSource ? readTitleFromMarkdown(titleSource) : null;
+      out.push({ slug: slugSoFar, hasIndex, hasReadme, title });
+    }
+    for (const name of names) {
+      if (name.startsWith(".")) continue;
+      if (SKIP2.has(name.toLowerCase())) continue;
+      const childAbs = join8(dirAbs, name);
+      let childStat;
+      try {
+        childStat = statSync4(childAbs);
+      } catch {
+        continue;
+      }
+      if (!childStat.isDirectory()) continue;
+      const childSlug = slugSoFar === "" ? name : `${slugSoFar}/${name}`;
+      visit2(childAbs, childSlug);
+    }
+  };
+  visit2(root3, "");
+  return out;
+}
 function leafOfSlug(slug) {
   const idx = slug.lastIndexOf("/");
   return idx < 0 ? slug : slug.slice(idx + 1);
@@ -26101,7 +26266,7 @@ function rootSegment(slug) {
 function basenameLooksLikeIndex(filePath) {
   const last = filePath.split("/").pop() ?? "";
   const lower = last.toLowerCase();
-  return lower === "index.md" || lower === "index.mdx" || lower === "index.markdown" || lower === "readme.md" || lower === "readme.mdx" || lower === "readme.markdown";
+  return INDEX_BASENAMES.has(lower) || README_BASENAMES.has(lower);
 }
 function entryHasOwnIndex(entry) {
   if (entry.filePath !== void 0 && entry.filePath !== "") {
@@ -26122,6 +26287,10 @@ function buildContentTree(site, entries, config, projectRoot, options = {}) {
       return { items: [], secretItems: [] };
     }
   });
+  const fsWalk = options.fsWalk ?? ((siteArg) => defaultFsWalk(projectRoot, config, siteArg));
+  const fsEntries = fsWalk(site);
+  const fsEntryBySlug = /* @__PURE__ */ new Map();
+  for (const e of fsEntries) fsEntryBySlug.set(e.slug, e);
   const entryBySlug = /* @__PURE__ */ new Map();
   const allSlugs = /* @__PURE__ */ new Set();
   for (const e of entries) {
@@ -26129,23 +26298,38 @@ function buildContentTree(site, entries, config, projectRoot, options = {}) {
     allSlugs.add(e.slug);
     for (const a of ancestorsOf(e.slug)) allSlugs.add(a);
   }
+  for (const e of fsEntries) {
+    if (e.hasReadme || e.hasIndex) {
+      allSlugs.add(e.slug);
+      for (const a of ancestorsOf(e.slug)) allSlugs.add(a);
+    }
+  }
   const sortedSlugs = [...allSlugs].sort();
   const nodeBySlug = /* @__PURE__ */ new Map();
   for (const slug of sortedSlugs) {
     const entry = entryBySlug.get(slug) ?? null;
+    const fsEntry = fsEntryBySlug.get(slug) ?? null;
     const sb = lookup(site, slug);
     const items = [...sb.items, ...sb.secretItems];
     const mostRecent = items.reduce(
       (acc, it) => pickLatestMtime(acc, it.mtime),
       null
     );
+    const title = entry?.title ?? (fsEntry?.title ?? null) ?? leafOfSlug(slug);
+    let hasOwnIndex = false;
+    if (entry !== null) {
+      hasOwnIndex = entryHasOwnIndex(entry);
+    } else if (fsEntry !== null) {
+      hasOwnIndex = fsEntry.hasIndex || fsEntry.hasReadme;
+    }
     const node2 = {
       site,
       slug,
-      title: entry?.title ?? leafOfSlug(slug),
+      title,
       lane: entry?.stage ?? null,
       entry,
-      hasOwnIndex: entry === null ? false : entryHasOwnIndex(entry),
+      hasOwnIndex,
+      hasFsDir: fsEntry !== null,
       scrapbookCount: items.length,
       scrapbookMostRecentMtime: mostRecent,
       children: []
@@ -26186,6 +26370,7 @@ function buildContentTree(site, entries, config, projectRoot, options = {}) {
         lane: null,
         entry: null,
         hasOwnIndex: false,
+        hasFsDir: fsEntryBySlug.has(root3),
         scrapbookCount: items.length,
         scrapbookMostRecentMtime: mostRecent,
         children: []
@@ -26281,8 +26466,8 @@ function flattenForRender(root3) {
 }
 
 // src/pages/content-detail.ts
-import { readFileSync as readFileSync8, existsSync as existsSync7 } from "node:fs";
-import { join as join8 } from "node:path";
+import { readFileSync as readFileSync9, existsSync as existsSync8 } from "node:fs";
+import { join as join9 } from "node:path";
 var PREVIEW_CHAR_BUDGET = 480;
 function renderEmptyDetail() {
   return unsafe(html6`
@@ -26296,8 +26481,8 @@ function renderEmptyDetail() {
 }
 function safeReadFile(absPath) {
   try {
-    if (!existsSync7(absPath)) return null;
-    return readFileSync8(absPath, "utf-8");
+    if (!existsSync8(absPath)) return null;
+    return readFileSync9(absPath, "utf-8");
   } catch {
     return null;
   }
@@ -26334,10 +26519,10 @@ async function renderBodyPreview(body3) {
 }
 function makeInlineTextLoaderForNode(ctx, site, slug) {
   const contentDir = resolveContentDir(ctx.projectRoot, ctx.config, site);
-  const scrapbookDir2 = join8(contentDir, slug, "scrapbook");
+  const scrapbookDir2 = join9(contentDir, slug, "scrapbook");
   return (filename, maxBytes) => {
     try {
-      const buf = readFileSync8(join8(scrapbookDir2, filename));
+      const buf = readFileSync9(join9(scrapbookDir2, filename));
       const slice = buf.subarray(0, Math.min(buf.byteLength, maxBytes));
       return slice.toString("utf-8");
     } catch {
@@ -26369,6 +26554,21 @@ function renderScrapbookList(site, slug, summary, loader) {
     </p>
     <div class="scraplist scraplist--secret">${secretRows}</div>`);
 }
+function findOrganizationalIndex(contentDir, slug) {
+  const candidates = [
+    "index.md",
+    "index.mdx",
+    "index.markdown",
+    "README.md",
+    "README.mdx",
+    "README.markdown"
+  ];
+  for (const name of candidates) {
+    const abs = join9(contentDir, slug, name);
+    if (existsSync8(abs)) return abs;
+  }
+  return null;
+}
 function loadDetailRender(ctx, site, node2) {
   const contentDir = resolveContentDir(ctx.projectRoot, ctx.config, site);
   let frontmatter = {};
@@ -26376,12 +26576,22 @@ function loadDetailRender(ctx, site, node2) {
   let scrapbook = null;
   if (node2.entry !== null) {
     const filePath = node2.entry.filePath ?? `${node2.slug}/index.md`;
-    const abs = join8(contentDir, filePath);
+    const abs = join9(contentDir, filePath);
     const raw3 = safeReadFile(abs);
     if (raw3 !== null) {
       const parsed = parseFrontmatter(raw3);
       frontmatter = parsed.data;
       bodyPreview = parsed.body;
+    }
+  } else if (node2.hasFsDir && node2.hasOwnIndex) {
+    const abs = findOrganizationalIndex(contentDir, node2.slug);
+    if (abs !== null) {
+      const raw3 = safeReadFile(abs);
+      if (raw3 !== null) {
+        const parsed = parseFrontmatter(raw3);
+        frontmatter = parsed.data;
+        bodyPreview = parsed.body;
+      }
     }
   }
   try {
@@ -26538,20 +26748,20 @@ function renderContentTopLevel(ctx) {
   const body3 = html6`
     ${renderEditorialFolio("content", "the shape of the work")}
     <main class="content-page">
-      <header class="page-head">
+      <header class="er-pagehead er-pagehead--split er-pagehead--compact">
         <div>
-          <h1 class="page-head__title">A <em>shape</em> of the work.</h1>
-          <p class="page-head__sub">
+          <h1 class="er-pagehead__title">A <em>shape</em> of the work.</h1>
+          <p class="er-pagehead__deck">
             The pipeline view shows where things are. This shows what's
             there. Browse the corpus by its tree on disk; drill into any
             node to see its content and the scrapbook hanging off it.
           </p>
         </div>
-        <div class="page-head__meta">
-          <b>${counts.sites}</b> SITES<br>
-          <b>${counts.trackedNodes}</b> TRACKED NODES<br>
-          <b>${counts.scrapbookItems}</b> SCRAPBOOK ITEMS
-        </div>
+        <p class="er-pagehead__meta">
+          <span><b>${counts.sites}</b> SITES</span>
+          <span><b>${counts.trackedNodes}</b> TRACKED NODES</span>
+          <span><b>${counts.scrapbookItems}</b> SCRAPBOOK ITEMS</span>
+        </p>
       </header>
       <section class="toplevel">
         ${sites.map((sp, i) => renderSiteCard(sp, i))}
@@ -26563,11 +26773,15 @@ function renderContentTopLevel(ctx) {
       "/static/css/editorial-review.css",
       "/static/css/editorial-nav.css",
       "/static/css/content.css",
-      "/static/css/scrap-row.css"
+      "/static/css/scrap-row.css",
+      "/static/css/blog-figure.css"
     ],
     bodyAttrs: 'data-review-ui="studio"',
     bodyHtml: body3,
-    scriptModules: []
+    // #29: lightbox listener for image thumbnails in detail-panel
+    // scrap rows. Idempotent — safe to load on the top-level page
+    // too (no scrap rows there → no work).
+    scriptModules: ["/static/dist/content-view-client.js"]
   });
 }
 function renderTreeBreadcrumb(site, project, selectedSlug) {
@@ -26706,11 +26920,14 @@ async function renderContentProject(ctx, site, projectSlug, selectedSlug) {
         "/static/css/editorial-review.css",
         "/static/css/editorial-nav.css",
         "/static/css/content.css",
-        "/static/css/scrap-row.css"
+        "/static/css/scrap-row.css",
+        "/static/css/blog-figure.css"
       ],
       bodyAttrs: 'data-review-ui="studio"',
       bodyHtml: body3,
-      scriptModules: []
+      // #29: scrap rows in the detail panel have image thumbnails;
+      // wire up the lightbox.
+      scriptModules: ["/static/dist/content-view-client.js"]
     })
   };
 }
@@ -26861,10 +27078,10 @@ function renderStudioIndex(_ctx) {
   const body3 = html6`
     ${renderEditorialFolio("index", "index of the press")}
     <main class="er-toc-page">
-      <header class="er-toc-head">
-        <div class="er-toc-head__kicker">Index of the <em>Press</em></div>
-        <h1 class="er-toc-head__title">Editorial <em>Studio</em></h1>
-        <p class="er-toc-head__deck">
+      <header class="er-pagehead er-pagehead--centered er-pagehead--toc">
+        <p class="er-pagehead__kicker">Index of the <em>Press</em></p>
+        <h1 class="er-pagehead__title">Editorial <em>Studio</em></h1>
+        <p class="er-pagehead__deck">
           A reference of the dev surfaces — pipeline, review desk, browse, manual.
           Begin where the work is.
         </p>
@@ -27011,13 +27228,13 @@ function usage(error) {
   process.exit(error ? 2 : 0);
 }
 function publicDir() {
-  const here = dirname2(fileURLToPath2(import.meta.url));
+  const here = dirname3(fileURLToPath2(import.meta.url));
   const candidates = [
     resolve2(here, "..", "public"),
     resolve2(here, "..", "..", "..", "plugins", "deskwork-studio", "public")
   ];
   for (const candidate of candidates) {
-    if (existsSync8(candidate)) return candidate;
+    if (existsSync9(candidate)) return candidate;
   }
   throw new Error(
     `deskwork-studio: could not find public/ assets. Tried:

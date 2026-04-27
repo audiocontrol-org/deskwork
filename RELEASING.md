@@ -58,11 +58,13 @@ gh release view v0.2.0
 
 Should print the release with auto-generated notes. The release page on GitHub shows the changelog and links to the tagged commit.
 
-### Pre-commit hook (separate from releases)
+### Pre-push hook (separate from releases)
 
-A pre-commit hook at `.husky/pre-commit` rebuilds the cli and studio bundles whenever staged source under `packages/{core,cli,studio}/src/` changes, then re-stages the rebuilt bundle. This keeps `bundle/cli.mjs` and `bundle/server.mjs` in sync with their source on every commit, so a release tag can never include a stale bundle.
+A pre-push hook at `.husky/pre-push` rebuilds the cli and studio bundles whenever source under `packages/{core,cli,studio}/src/` has changed since the remote tip. If the rebuilt bundle differs from what's committed, the push aborts with a message asking you to commit the regenerated bundle and try again. This keeps `bundle/cli.mjs` and `bundle/server.mjs` in sync with their source on every push, so a release tag can never include a stale bundle.
 
-Contributors get the hook installed automatically when they `npm install` (via husky's `prepare` script). If the hook fails, the commit fails — fix the build, then retry. CI also re-checks bundles on PRs as a safety net for contributors with local hooks disabled.
+Originally a pre-commit hook (issue #4 install-gap fix). Moved to pre-push in v0.6.0 (issue #16) because the commit-level rebuild added perceptible friction to every commit. Pre-push catches the same correctness problem (no stale bundle ever lands on a remote branch) without paying the cost on every local commit. CI is the layered safety net for anyone whose local hook is disabled.
+
+Contributors get the hook installed automatically when they `npm install` (via husky's `prepare` script). If the hook fails, the push fails — fix the build, commit the rebuilt bundle, and push again.
 
 ### What gets released
 
