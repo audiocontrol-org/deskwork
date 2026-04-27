@@ -30,8 +30,11 @@ jobs:
       - name: Install + build (via prepare hooks)
         run: npm install
 
+      # --if-present skips workspaces without a 'test' script. Plugin
+      # shells (plugins/deskwork, plugins/deskwork-studio) ship metadata
+      # + bash wrappers + bundles only — no tests.
       - name: Run all tests
-        run: npm --workspaces test
+        run: npm --workspaces --if-present test
 
       # The committed bundle paths. If `npm install` (which ran prepare
       # → build) produced output that differs from what's checked in,
