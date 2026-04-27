@@ -439,3 +439,40 @@ Design reference: [`mockups/birds-eye-content-view.html`](mockups/birds-eye-cont
 **GitHub tracking:** [#18](https://github.com/audiocontrol-org/deskwork/issues/18) is the implementation issue.
 
 **Ships in:** v0.4.0.
+
+---
+
+### Phase 17: Cross-page editorial nav + studio index at `/dev/`
+
+**Deliverable:** Unified cross-page navigation across all studio surfaces, plus a new entry-point index page at `/dev/`. Both surfaces commit hard to the existing editorial-print design language (Fraunces/Newsreader/JetBrains Mono, paper-and-ink palette, red-pencil marginalia accents) — no new aesthetic.
+
+Surfaced during writingcontrol.org acceptance testing of v0.4.2: the operator hit `/dev/editorial-studio` and asked "where are the links to the other surfaces?" — Phase 16d's `chrome.ts` shipped but was wired only into the bird's-eye content view. Every other page renders its own bespoke header with no cross-page nav. This phase fixes the discoverability gap and adds a proper landing page.
+
+**Design reference:** [`mockups/editorial-nav-and-index.html`](mockups/editorial-nav-and-index.html). Three states: folio strip atop dashboard masthead, folio strip atop content-view header, full studio index.
+
+Tasks:
+- [ ] `packages/studio/src/pages/chrome.ts` — replace `renderEditorialChrome` with `renderEditorialFolio(active: ChromeActiveLink)` matching the mockup's folio strip. Three-column grid: wordmark / nav / spine. Active link gets the red-pencil tick mark via `::before`. Sticky positioning. Existing `ChromeActiveLink` union extended with `'index'`.
+- [ ] `packages/studio/src/pages/index.ts` (NEW) — `renderStudioIndex(ctx: StudioContext)` returning the full TOC page per the mockup's State 3. Four sections (Pipeline / Review desk / Browse / Reference), six entries total. Templated routes (longform reviews, scrapbook) render the slug placeholder in red-pencil italic.
+- [ ] `packages/studio/src/server.ts` — add `app.get('/dev', ...)` and `app.get('/dev/', ...)` routes for the index. Update the existing `app.get('/', ...)` redirect to point at `/dev/` (was `/dev/editorial-studio`).
+- [ ] `plugins/deskwork-studio/public/css/editorial-nav.css` (NEW) or extend `editorial-studio.css` — the folio strip CSS + index TOC CSS, both using existing `--er-*` tokens only. No new variables.
+- [ ] `plugins/deskwork-studio/public/css/content.css` — remove the `.ed-chrome*` rules (replaced by `.er-folio*`). Migration touches only the chrome layer; the Writer's Catalog viewport CSS stays.
+- [ ] Wire `renderEditorialFolio()` into the existing page renderers: `dashboard.ts`, `review.ts`, `shortform.ts`, `help.ts`, `scrapbook.ts`, `content.ts`. Each page renders the folio strip ABOVE its existing bespoke masthead — masthead identity preserved, cross-page nav added. The content-view's `.ed-chrome` is removed in favor of the folio.
+- [ ] `packages/studio/test/index-page.test.ts` (NEW) — integration test for `/dev/` and `/dev` routes: returns 200, includes folio strip, includes all 6 entries with their routes, active link is `Index`.
+- [ ] `packages/studio/test/folio-cross-page.test.ts` (NEW) — for each of the 6 surfaces, assert the rendered HTML includes `er-folio`, has the correct `active` link marked, and contains links to all 5 other surfaces.
+
+**Acceptance Criteria:**
+- [ ] Every studio page renders the folio strip at top with all 5 nav links visible. Active surface marked with the red-pencil tick.
+- [ ] `http://localhost:47321/dev/` renders the studio index TOC; was 404 before.
+- [ ] Visual posture matches the mockup — no third aesthetic introduced; folio + index reuse existing `--er-*` tokens.
+- [ ] `.ed-chrome*` CSS rules removed from `content.css` (the bird's-eye view now uses the folio like every other surface).
+- [ ] All tests green: `npm --workspaces --if-present test`.
+- [ ] Typecheck clean for all 3 packages.
+- [ ] Bundles regenerated and committed.
+
+**Notes:**
+- The dashboard's bespoke `er-masthead` (with "Vol. X · № Y · Press-check" kicker) STAYS. Folio strip sits above it as a separate element. Same for shortform, help, scrapbook — preserve each page's identity.
+- The content-view at `/dev/content` previously used `.ed-chrome` (Writer's Catalog clean strip from Phase 16d). That gets replaced with the editorial-print folio. The `content.css` viewport styles (paper, ink, oxblood marginalia for tree connectors and detail panel) stay — only the chrome layer changes.
+- Folio strip is sticky (per mockup CSS) so cross-page nav stays reachable as the operator scrolls long pages (the dashboard, the help manual).
+- Active-link tick mark uses CSS `::before` with skewed borders — no images, no inline SVG.
+
+**GitHub tracking:** No standalone issue; surfaced during #18 acceptance follow-up. Ships in v0.5.0 (minor bump — new user-visible surface at `/dev/`).
