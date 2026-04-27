@@ -333,26 +333,26 @@ Tasks:
 **Deliverable:** A new `deskwork ingest` subcommand that walks a project's existing markdown/MDX files and populates the editorial calendar at the right stage, layout-agnostic. Closes [#15](https://github.com/audiocontrol-org/deskwork/issues/15).
 
 Tasks:
-- [ ] `packages/core/src/ingest.ts` — discovery primitive. Inputs: a list of paths (file, directory, glob). Outputs: `IngestCandidate[]` with `{ filePath, frontmatter, derivedSlug, derivedState, derivedDate, source: 'frontmatter'|'path'|'mtime'|'today' }`. Recursive directory walking + glob expansion. No mutations.
-- [ ] `packages/core/src/ingest.ts` — slug derivation. `<dir>/index.md` → parent dir name. Jekyll `YYYY-MM-DD-<slug>.md` recognized. Else filename minus extension. Slug field name configurable.
-- [ ] `packages/core/src/ingest.ts` — state derivation. `--state-from frontmatter` (default) reads `state:` field, normalizes to a calendar lane. `--state-from datePublished` infers from date relative to today. Unknown states report ambiguous; require `--state` override.
-- [ ] `packages/core/src/ingest.ts` — date derivation. Tries `datePublished`, then `date`, then file mtime, then today. Records the source.
-- [ ] `packages/core/src/ingest.ts` — idempotency. Filter candidates against the existing calendar; emit `IngestSkip[]` for duplicates with reason. `--force` bypasses after manual reconciliation.
-- [ ] `packages/cli/src/commands/ingest.ts` — dispatcher entry. Argv shape: `[<project-root>] [--site <slug>] [options] <path>...`. Parses flags, calls core, prints plan, applies on `--apply`.
-- [ ] `packages/cli/src/commands/ingest.ts` — dry-run output. Pretty-print the plan: per-file `{ slug, state, date, source-of-each, action: 'add'|'skip' }`. Single line per file. `--json` for machine-readable.
-- [ ] `packages/cli/src/commands/ingest.ts` — apply path. On `--apply`, write calendar rows via `addEntry` (or a new `bulkAddEntries`); also append a journal entry per ingested file (event shape: `'ingest'`, captures source frontmatter snapshot for provenance).
-- [ ] `plugins/deskwork/skills/ingest/SKILL.md` — operator-facing prompt. When to use ingest vs. add. The dry-run-first contract. Layout-agnostic discovery examples (Astro / Hugo / Jekyll / Eleventy / plain). Common flag combinations.
-- [ ] `packages/core/test/ingest.test.ts` — unit coverage for slug derivation, state derivation, date derivation, idempotency, frontmatter field-name overrides, glob expansion.
-- [ ] `packages/cli/test/ingest-integration.test.ts` — end-to-end against tmp project trees: Astro-shaped (`<slug>/index.md`), Hugo-shaped (leaf bundles), Jekyll-shaped (`YYYY-MM-DD-<slug>.md`), flat (`<slug>.md`), mixed states (published / draft / future-dated).
+- [x] `packages/core/src/ingest.ts` — discovery primitive. Inputs: a list of paths (file, directory, glob). Outputs: `IngestCandidate[]` with `{ filePath, frontmatter, derivedSlug, derivedState, derivedDate, source: 'frontmatter'|'path'|'mtime'|'today' }`. Recursive directory walking + glob expansion. No mutations.
+- [x] `packages/core/src/ingest.ts` — slug derivation. `<dir>/index.md` → parent dir name. Jekyll `YYYY-MM-DD-<slug>.md` recognized. Else filename minus extension. Slug field name configurable.
+- [x] `packages/core/src/ingest.ts` — state derivation. `--state-from frontmatter` (default) reads `state:` field, normalizes to a calendar lane. `--state-from datePublished` infers from date relative to today. Unknown states report ambiguous; require `--state` override.
+- [x] `packages/core/src/ingest.ts` — date derivation. Tries `datePublished`, then `date`, then file mtime, then today. Records the source.
+- [x] `packages/core/src/ingest.ts` — idempotency. Filter candidates against the existing calendar; emit `IngestSkip[]` for duplicates with reason. `--force` bypasses after manual reconciliation.
+- [x] `packages/cli/src/commands/ingest.ts` — dispatcher entry. Argv shape: `[<project-root>] [--site <slug>] [options] <path>...`. Parses flags, calls core, prints plan, applies on `--apply`.
+- [x] `packages/cli/src/commands/ingest.ts` — dry-run output. Pretty-print the plan: per-file `{ slug, state, date, source-of-each, action: 'add'|'skip' }`. Single line per file. `--json` for machine-readable.
+- [x] `packages/cli/src/commands/ingest.ts` — apply path. On `--apply`, write calendar rows via `addEntry` (or a new `bulkAddEntries`); also append a journal entry per ingested file (event shape: `'ingest'`, captures source frontmatter snapshot for provenance).
+- [x] `plugins/deskwork/skills/ingest/SKILL.md` — operator-facing prompt. When to use ingest vs. add. The dry-run-first contract. Layout-agnostic discovery examples (Astro / Hugo / Jekyll / Eleventy / plain). Common flag combinations.
+- [x] `packages/core/test/ingest.test.ts` — unit coverage for slug derivation, state derivation, date derivation, idempotency, frontmatter field-name overrides, glob expansion.
+- [x] `packages/cli/test/ingest-integration.test.ts` — end-to-end against tmp project trees: Astro-shaped (`<slug>/index.md`), Hugo-shaped (leaf bundles), Jekyll-shaped (`YYYY-MM-DD-<slug>.md`), flat (`<slug>.md`), mixed states (published / draft / future-dated).
 
 **Acceptance Criteria:**
-- [ ] `deskwork ingest <path>` (no `--apply`) prints a complete plan to stdout and writes nothing to disk; exit 0 even if every file would be skipped (so it composes with shell pipelines).
-- [ ] `deskwork ingest <path> --apply` writes calendar rows for non-skipped candidates and journal entries with `event: 'ingest'`. Re-running the same command produces only "skipped" output (idempotent).
-- [ ] Discovery works against a synthetic Astro tree (`src/content/essays/<slug>/index.md`), Hugo tree (`content/posts/<slug>/index.md`), Jekyll tree (`_posts/2024-01-01-foo.md`), and flat tree (`posts/<slug>.md`) without per-tree configuration — only the path argument differs.
-- [ ] Files in `scrapbook/` are skipped by default. `blogFilenameTemplate` (when set on the site config) is used as a validation hint, not a hard filter — operators ingesting from a different layout than what new content uses still succeed.
-- [ ] Frontmatter with unrecognized `state:` values produces a "state ambiguous" report; the operator can re-run with `--state <known-lane>` to commit.
-- [ ] Slug collision with an existing calendar row reports skipped + reason; `--force` overrides.
-- [ ] writingcontrol.org dogfood: ingesting `src/content/essays/` lands the three known essays in the right lanes (`whats-in-a-name` + `the-deskwork-experiment` → Published with their `datePublished` values; `on-revising-in-the-open` → Drafting with placeholder date).
+- [x] `deskwork ingest <path>` (no `--apply`) prints a complete plan to stdout and writes nothing to disk; exit 0 even if every file would be skipped (so it composes with shell pipelines).
+- [x] `deskwork ingest <path> --apply` writes calendar rows for non-skipped candidates and journal entries with `event: 'ingest'`. Re-running the same command produces only "skipped" output (idempotent).
+- [x] Discovery works against a synthetic Astro tree (`src/content/essays/<slug>/index.md`), Hugo tree (`content/posts/<slug>/index.md`), Jekyll tree (`_posts/2024-01-01-foo.md`), and flat tree (`posts/<slug>.md`) without per-tree configuration — only the path argument differs.
+- [x] Files in `scrapbook/` are skipped by default. `blogFilenameTemplate` (when set on the site config) is used as a validation hint, not a hard filter — operators ingesting from a different layout than what new content uses still succeed.
+- [x] Frontmatter with unrecognized `state:` values produces a "state ambiguous" report; the operator can re-run with `--state <known-lane>` to commit.
+- [x] Slug collision with an existing calendar row reports skipped + reason; `--force` overrides.
+- [x] writingcontrol.org dogfood: ingesting `src/content/essays/` lands the three known essays in the right lanes (`whats-in-a-name` + `the-deskwork-experiment` → Published with their `datePublished` values; `on-revising-in-the-open` → Drafting with placeholder date).
 
 **Notes:**
 - The `state:` frontmatter field is project-specific. Default mapping: `published` → Published, `draft` → Drafting, `outline`/`outlining` → Outlining, `planned` → Planned, `idea`/`ideas` → Ideas. Anything else is ambiguous and requires an explicit `--state` override.
