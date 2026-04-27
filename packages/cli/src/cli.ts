@@ -20,6 +20,7 @@ const SUBCOMMANDS: Record<string, () => Promise<{ run: (argv: string[]) => Promi
   add: () => import('./commands/add.ts'),
   approve: () => import('./commands/approve.ts'),
   draft: () => import('./commands/draft.ts'),
+  ingest: () => import('./commands/ingest.ts'),
   install: () => import('./commands/install.ts'),
   iterate: () => import('./commands/iterate.ts'),
   outline: () => import('./commands/outline.ts'),
@@ -72,6 +73,7 @@ function printUsage(): void {
   out.write('Usage: deskwork <subcommand> [args...]\n\n');
   out.write('Lifecycle:\n');
   out.write('  install         bootstrap deskwork in a project\n');
+  out.write('  ingest          backfill existing markdown into the calendar\n');
   out.write('  add             append an idea to the calendar\n');
   out.write('  plan            move Ideas → Planned with keywords\n');
   out.write('  outline         scaffold + move Planned → Outlining\n');

@@ -738,6 +738,9 @@ function siteConfig(config, site) {
 function resolveCalendarPath(projectRoot, config, site) {
   return join2(projectRoot, siteConfig(config, site).calendarPath);
 }
+function resolveContentDir(projectRoot, config, site) {
+  return join2(projectRoot, siteConfig(config, site).contentDir);
+}
 function resolveBlogFilePath(projectRoot, config, site, slug, filePath) {
   const entry = siteConfig(config, site);
   if (filePath !== void 0 && filePath !== "") {
@@ -814,8 +817,8 @@ __export(add_exports, {
   run: () => run
 });
 async function run(argv2) {
-  const KNOWN_FLAGS = ["site", "type", "content-url", "source", "slug"];
-  const SLUG_RE = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
+  const KNOWN_FLAGS2 = ["site", "type", "content-url", "source", "slug"];
+  const SLUG_RE2 = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
   const { positional, flags } = parse();
   if (positional.length < 2) {
     fail(
@@ -823,7 +826,7 @@ async function run(argv2) {
       2
     );
   }
-  if (flags.slug !== void 0 && !SLUG_RE.test(flags.slug)) {
+  if (flags.slug !== void 0 && !SLUG_RE2.test(flags.slug)) {
     fail(
       `--slug must be one or more /-separated kebab-case segments (got "${flags.slug}")`,
       2
@@ -880,7 +883,7 @@ async function run(argv2) {
   });
   function parse() {
     try {
-      return parseArgs(argv2, KNOWN_FLAGS);
+      return parseArgs(argv2, KNOWN_FLAGS2);
     } catch (err2) {
       fail(err2 instanceof Error ? err2.message : String(err2), 2);
     }
@@ -1257,8 +1260,8 @@ __export(approve_exports, {
 });
 import { existsSync as existsSync2 } from "node:fs";
 async function run2(argv2) {
-  const KNOWN_FLAGS = ["site", "platform", "channel"];
-  const SLUG_RE = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
+  const KNOWN_FLAGS2 = ["site", "platform", "channel"];
+  const SLUG_RE2 = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
   const { positional, flags } = parse();
   if (positional.length < 2) {
     fail(
@@ -1268,8 +1271,8 @@ async function run2(argv2) {
   }
   const [rootArg, slug] = positional;
   const projectRoot = absolutize(rootArg);
-  if (!SLUG_RE.test(slug)) {
-    fail(`invalid slug: ${slug} (must match ${SLUG_RE})`);
+  if (!SLUG_RE2.test(slug)) {
+    fail(`invalid slug: ${slug} (must match ${SLUG_RE2})`);
   }
   if (flags.platform !== void 0 && !isPlatform(flags.platform)) {
     fail(`Invalid --platform "${flags.platform}".`);
@@ -1389,7 +1392,7 @@ async function run2(argv2) {
   }
   function parse() {
     try {
-      return parseArgs(argv2, KNOWN_FLAGS);
+      return parseArgs(argv2, KNOWN_FLAGS2);
     } catch (err2) {
       fail(err2 instanceof Error ? err2.message : String(err2), 2);
     }
@@ -1414,7 +1417,7 @@ __export(draft_exports, {
   run: () => run3
 });
 async function run3(argv2) {
-  const KNOWN_FLAGS = ["site", "issue"];
+  const KNOWN_FLAGS2 = ["site", "issue"];
   const { positional, flags } = parse();
   if (positional.length < 2) {
     fail(
@@ -1462,7 +1465,7 @@ async function run3(argv2) {
   });
   function parse() {
     try {
-      return parseArgs(argv2, KNOWN_FLAGS);
+      return parseArgs(argv2, KNOWN_FLAGS2);
     } catch (err2) {
       fail(err2 instanceof Error ? err2.message : String(err2), 2);
     }
@@ -1476,238 +1479,6 @@ var init_draft = __esm({
     init_calendar_mutations();
     init_types();
     init_paths();
-    init_cli();
-  }
-});
-
-// src/commands/install.ts
-var install_exports = {};
-__export(install_exports, {
-  run: () => run4
-});
-import { readFileSync as readFileSync4, writeFileSync as writeFileSync3, existsSync as existsSync3, mkdirSync as mkdirSync2 } from "node:fs";
-import { dirname, isAbsolute as isAbsolute2, join as join5, resolve as resolve2 } from "node:path";
-async function run4(argv2) {
-  function usage() {
-    console.error(
-      "Usage: deskwork install [<project-root>] <config-file>"
-    );
-    process.exit(2);
-  }
-  let projectRootArg;
-  let configFileArg;
-  if (argv2.length === 1) {
-    projectRootArg = process.cwd();
-    configFileArg = argv2[0];
-  } else if (argv2.length === 2) {
-    [projectRootArg, configFileArg] = argv2;
-  } else {
-    usage();
-  }
-  const projectRoot = isAbsolute2(projectRootArg) ? projectRootArg : resolve2(process.cwd(), projectRootArg);
-  const configFile = isAbsolute2(configFileArg) ? configFileArg : resolve2(process.cwd(), configFileArg);
-  console.log(`Installing into: ${projectRoot}`);
-  if (!existsSync3(projectRoot)) {
-    console.error(`Project root does not exist: ${projectRoot}`);
-    process.exit(1);
-  }
-  if (!existsSync3(configFile)) {
-    console.error(`Config file does not exist: ${configFile}`);
-    process.exit(1);
-  }
-  let rawConfig;
-  try {
-    rawConfig = JSON.parse(readFileSync4(configFile, "utf-8"));
-  } catch (err2) {
-    const reason = err2 instanceof Error ? err2.message : String(err2);
-    console.error(`Config file is not valid JSON: ${reason}`);
-    process.exit(1);
-  }
-  let config;
-  try {
-    config = parseConfig(rawConfig);
-  } catch (err2) {
-    const reason = err2 instanceof Error ? err2.message : String(err2);
-    console.error(reason);
-    process.exit(1);
-  }
-  const writtenConfigPath = configPath(projectRoot);
-  mkdirSync2(dirname(writtenConfigPath), { recursive: true });
-  writeFileSync3(
-    writtenConfigPath,
-    JSON.stringify(config, null, 2) + "\n",
-    "utf-8"
-  );
-  const createdCalendars = [];
-  const preservedCalendars = [];
-  for (const [slug, site] of Object.entries(config.sites)) {
-    const absPath = join5(projectRoot, site.calendarPath);
-    if (existsSync3(absPath)) {
-      preservedCalendars.push(`${slug}: ${site.calendarPath}`);
-      continue;
-    }
-    mkdirSync2(dirname(absPath), { recursive: true });
-    writeFileSync3(absPath, renderEmptyCalendar(), "utf-8");
-    createdCalendars.push(`${slug}: ${site.calendarPath}`);
-  }
-  console.log(`Wrote config: ${writtenConfigPath}`);
-  console.log(`Sites configured: ${Object.keys(config.sites).join(", ")}`);
-  console.log(`Default site: ${config.defaultSite}`);
-  if (createdCalendars.length > 0) {
-    console.log(`Created calendars:`);
-    for (const c of createdCalendars) console.log(`  - ${c}`);
-  }
-  if (preservedCalendars.length > 0) {
-    console.log(`Left existing calendars untouched:`);
-    for (const c of preservedCalendars) console.log(`  - ${c}`);
-  }
-}
-var init_install = __esm({
-  "src/commands/install.ts"() {
-    "use strict";
-    init_config();
-    init_calendar();
-  }
-});
-
-// src/commands/iterate.ts
-var iterate_exports = {};
-__export(iterate_exports, {
-  run: () => run5
-});
-import { existsSync as existsSync4, readFileSync as readFileSync5 } from "node:fs";
-async function run5(argv2) {
-  const KNOWN_FLAGS = ["site", "kind", "dispositions"];
-  const DISPOSITIONS = /* @__PURE__ */ new Set(["addressed", "deferred", "wontfix"]);
-  const { positional, flags } = parse();
-  if (positional.length < 2) {
-    fail(
-      "Usage: deskwork-iterate <project-root> [--site <slug>] [--kind longform|outline] [--dispositions <path>] <slug>",
-      2
-    );
-  }
-  const [rootArg, slug] = positional;
-  const projectRoot = absolutize(rootArg);
-  const kind = flags.kind === "outline" ? "outline" : "longform";
-  if (flags.kind !== void 0 && flags.kind !== "longform" && flags.kind !== "outline") {
-    fail(`Invalid --kind "${flags.kind}". Must be 'longform' or 'outline'.`);
-  }
-  let config;
-  try {
-    config = readConfig(projectRoot);
-  } catch (err2) {
-    fail(err2 instanceof Error ? err2.message : String(err2));
-  }
-  const site = resolveSite(config, flags.site);
-  const file = resolveBlogFilePath(projectRoot, config, site, slug);
-  if (!existsSync4(file)) {
-    fail(`No blog file at ${file}.`);
-  }
-  const diskMarkdown = readFileSync5(file, "utf8");
-  const workflow = readWorkflows(projectRoot, config).find(
-    (w) => w.site === site && w.slug === slug && w.contentKind === kind && w.state !== "applied" && w.state !== "cancelled"
-  );
-  if (!workflow) {
-    fail(
-      `No active ${kind} workflow for ${site}/${slug}. Run /deskwork:review-start <slug> to enqueue one first.`
-    );
-  }
-  if (workflow.state !== "iterating") {
-    fail(
-      `Workflow state is '${workflow.state}', not 'iterating'.
-The studio must click 'Request iteration' to move the workflow to 'iterating' before this helper runs.`
-    );
-  }
-  const versions = readVersions(projectRoot, config, workflow.id);
-  const current = versions.find((v) => v.version === workflow.currentVersion);
-  if (current && current.markdown === diskMarkdown) {
-    fail(
-      `File on disk is identical to workflow v${workflow.currentVersion} \u2014 no revision to snapshot. Write the revision to disk first (the agent does this), then re-run.`
-    );
-  }
-  let dispositions = null;
-  if (flags.dispositions !== void 0) {
-    const path = absolutize(flags.dispositions);
-    if (!existsSync4(path)) {
-      fail(`--dispositions file not found: ${path}`);
-    }
-    let parsed;
-    try {
-      parsed = JSON.parse(readFileSync5(path, "utf8"));
-    } catch (err2) {
-      const reason = err2 instanceof Error ? err2.message : String(err2);
-      fail(`--dispositions: invalid JSON at ${path}: ${reason}`);
-    }
-    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-      fail(`--dispositions: expected JSON object at ${path}`);
-    }
-    dispositions = {};
-    for (const [commentId, raw] of Object.entries(parsed)) {
-      if (typeof raw !== "object" || raw === null) {
-        fail(`--dispositions[${commentId}]: must be an object`);
-      }
-      const d = raw;
-      if (typeof d.disposition !== "string" || !DISPOSITIONS.has(d.disposition)) {
-        fail(
-          `--dispositions[${commentId}].disposition: must be 'addressed' | 'deferred' | 'wontfix'`
-        );
-      }
-      const entry = { disposition: d.disposition };
-      if (typeof d.reason === "string" && d.reason.length > 0) {
-        entry.reason = d.reason;
-      }
-      dispositions[commentId] = entry;
-    }
-  }
-  const newVersion = appendVersion(
-    projectRoot,
-    config,
-    workflow.id,
-    diskMarkdown,
-    "agent"
-  );
-  const addressed = [];
-  if (dispositions) {
-    const workflowComments = new Set(
-      readAnnotations(projectRoot, config, workflow.id).filter((a) => a.type === "comment").map((a) => a.id)
-    );
-    for (const [commentId, entry] of Object.entries(dispositions)) {
-      if (!workflowComments.has(commentId)) continue;
-      const ann = mintAnnotation({
-        type: "address",
-        workflowId: workflow.id,
-        commentId,
-        version: newVersion.version,
-        disposition: entry.disposition,
-        ...entry.reason !== void 0 ? { reason: entry.reason } : {}
-      });
-      appendAnnotation(projectRoot, config, ann);
-      addressed.push(commentId);
-    }
-  }
-  const updated = transitionState(projectRoot, config, workflow.id, "in-review");
-  emit({
-    workflowId: workflow.id,
-    site: updated.site,
-    slug: updated.slug,
-    state: updated.state,
-    version: newVersion.version,
-    addressedComments: addressed
-  });
-  function parse() {
-    try {
-      return parseArgs(argv2, KNOWN_FLAGS);
-    } catch (err2) {
-      fail(err2 instanceof Error ? err2.message : String(err2), 2);
-    }
-  }
-}
-var init_iterate = __esm({
-  "src/commands/iterate.ts"() {
-    "use strict";
-    init_config();
-    init_paths();
-    init_pipeline();
     init_cli();
   }
 });
@@ -5668,10 +5439,10 @@ var require_resolve_block_map = __commonJS({
       let offset = bm.offset;
       let commentEnd = null;
       for (const collItem of bm.items) {
-        const { start, key, sep, value } = collItem;
+        const { start, key, sep: sep4, value } = collItem;
         const keyProps = resolveProps.resolveProps(start, {
           indicator: "explicit-key-ind",
-          next: key ?? sep?.[0],
+          next: key ?? sep4?.[0],
           offset,
           onError,
           parentIndent: bm.indent,
@@ -5685,7 +5456,7 @@ var require_resolve_block_map = __commonJS({
             else if ("indent" in key && key.indent !== bm.indent)
               onError(offset, "BAD_INDENT", startColMsg);
           }
-          if (!keyProps.anchor && !keyProps.tag && !sep) {
+          if (!keyProps.anchor && !keyProps.tag && !sep4) {
             commentEnd = keyProps.end;
             if (keyProps.comment) {
               if (map.comment)
@@ -5709,7 +5480,7 @@ var require_resolve_block_map = __commonJS({
         ctx.atKey = false;
         if (utilMapIncludes.mapIncludes(ctx, map.items, keyNode))
           onError(keyStart, "DUPLICATE_KEY", "Map keys must be unique");
-        const valueProps = resolveProps.resolveProps(sep ?? [], {
+        const valueProps = resolveProps.resolveProps(sep4 ?? [], {
           indicator: "map-value-ind",
           next: value,
           offset: keyNode.range[2],
@@ -5725,7 +5496,7 @@ var require_resolve_block_map = __commonJS({
             if (ctx.options.strict && keyProps.start < valueProps.found.offset - 1024)
               onError(keyNode.range, "KEY_OVER_1024_CHARS", "The : indicator must be at most 1024 chars after the start of an implicit block mapping key");
           }
-          const valueNode = value ? composeNode(ctx, value, valueProps, onError) : composeEmptyNode(ctx, offset, sep, null, valueProps, onError);
+          const valueNode = value ? composeNode(ctx, value, valueProps, onError) : composeEmptyNode(ctx, offset, sep4, null, valueProps, onError);
           if (ctx.schema.compat)
             utilFlowIndentCheck.flowIndentCheck(bm.indent, value, onError);
           offset = valueNode.range[2];
@@ -5816,7 +5587,7 @@ var require_resolve_end = __commonJS({
       let comment = "";
       if (end) {
         let hasSpace = false;
-        let sep = "";
+        let sep4 = "";
         for (const token of end) {
           const { source, type } = token;
           switch (type) {
@@ -5830,13 +5601,13 @@ var require_resolve_end = __commonJS({
               if (!comment)
                 comment = cb;
               else
-                comment += sep + cb;
-              sep = "";
+                comment += sep4 + cb;
+              sep4 = "";
               break;
             }
             case "newline":
               if (comment)
-                sep += source;
+                sep4 += source;
               hasSpace = true;
               break;
             default:
@@ -5879,18 +5650,18 @@ var require_resolve_flow_collection = __commonJS({
       let offset = fc.offset + fc.start.source.length;
       for (let i = 0; i < fc.items.length; ++i) {
         const collItem = fc.items[i];
-        const { start, key, sep, value } = collItem;
+        const { start, key, sep: sep4, value } = collItem;
         const props = resolveProps.resolveProps(start, {
           flow: fcName,
           indicator: "explicit-key-ind",
-          next: key ?? sep?.[0],
+          next: key ?? sep4?.[0],
           offset,
           onError,
           parentIndent: fc.indent,
           startOnNewline: false
         });
         if (!props.found) {
-          if (!props.anchor && !props.tag && !sep && !value) {
+          if (!props.anchor && !props.tag && !sep4 && !value) {
             if (i === 0 && props.comma)
               onError(props.comma, "UNEXPECTED_TOKEN", `Unexpected , in ${fcName}`);
             else if (i < fc.items.length - 1)
@@ -5944,8 +5715,8 @@ var require_resolve_flow_collection = __commonJS({
             }
           }
         }
-        if (!isMap && !sep && !props.found) {
-          const valueNode = value ? composeNode(ctx, value, props, onError) : composeEmptyNode(ctx, props.end, sep, null, props, onError);
+        if (!isMap && !sep4 && !props.found) {
+          const valueNode = value ? composeNode(ctx, value, props, onError) : composeEmptyNode(ctx, props.end, sep4, null, props, onError);
           coll.items.push(valueNode);
           offset = valueNode.range[2];
           if (isBlock(value))
@@ -5957,7 +5728,7 @@ var require_resolve_flow_collection = __commonJS({
           if (isBlock(key))
             onError(keyNode.range, "BLOCK_IN_FLOW", blockMsg);
           ctx.atKey = false;
-          const valueProps = resolveProps.resolveProps(sep ?? [], {
+          const valueProps = resolveProps.resolveProps(sep4 ?? [], {
             flow: fcName,
             indicator: "map-value-ind",
             next: value,
@@ -5968,8 +5739,8 @@ var require_resolve_flow_collection = __commonJS({
           });
           if (valueProps.found) {
             if (!isMap && !props.found && ctx.options.strict) {
-              if (sep)
-                for (const st of sep) {
+              if (sep4)
+                for (const st of sep4) {
                   if (st === valueProps.found)
                     break;
                   if (st.type === "newline") {
@@ -5986,7 +5757,7 @@ var require_resolve_flow_collection = __commonJS({
             else
               onError(valueProps.start, "MISSING_CHAR", `Missing , or : between ${fcName} items`);
           }
-          const valueNode = value ? composeNode(ctx, value, valueProps, onError) : valueProps.found ? composeEmptyNode(ctx, valueProps.end, sep, null, valueProps, onError) : null;
+          const valueNode = value ? composeNode(ctx, value, valueProps, onError) : valueProps.found ? composeEmptyNode(ctx, valueProps.end, sep4, null, valueProps, onError) : null;
           if (valueNode) {
             if (isBlock(value))
               onError(valueNode.range, "BLOCK_IN_FLOW", blockMsg);
@@ -6166,7 +5937,7 @@ var require_resolve_block_scalar = __commonJS({
           chompStart = i + 1;
       }
       let value = "";
-      let sep = "";
+      let sep4 = "";
       let prevMoreIndented = false;
       for (let i = 0; i < contentStart; ++i)
         value += lines[i][0].slice(trimIndent) + "\n";
@@ -6183,24 +5954,24 @@ var require_resolve_block_scalar = __commonJS({
           indent = "";
         }
         if (type === Scalar.Scalar.BLOCK_LITERAL) {
-          value += sep + indent.slice(trimIndent) + content;
-          sep = "\n";
+          value += sep4 + indent.slice(trimIndent) + content;
+          sep4 = "\n";
         } else if (indent.length > trimIndent || content[0] === "	") {
-          if (sep === " ")
-            sep = "\n";
-          else if (!prevMoreIndented && sep === "\n")
-            sep = "\n\n";
-          value += sep + indent.slice(trimIndent) + content;
-          sep = "\n";
+          if (sep4 === " ")
+            sep4 = "\n";
+          else if (!prevMoreIndented && sep4 === "\n")
+            sep4 = "\n\n";
+          value += sep4 + indent.slice(trimIndent) + content;
+          sep4 = "\n";
           prevMoreIndented = true;
         } else if (content === "") {
-          if (sep === "\n")
+          if (sep4 === "\n")
             value += "\n";
           else
-            sep = "\n";
+            sep4 = "\n";
         } else {
-          value += sep + content;
-          sep = " ";
+          value += sep4 + content;
+          sep4 = " ";
           prevMoreIndented = false;
         }
       }
@@ -6382,25 +6153,25 @@ var require_resolve_flow_scalar = __commonJS({
       if (!match)
         return source;
       let res = match[1];
-      let sep = " ";
+      let sep4 = " ";
       let pos = first.lastIndex;
       line.lastIndex = pos;
       while (match = line.exec(source)) {
         if (match[1] === "") {
-          if (sep === "\n")
-            res += sep;
+          if (sep4 === "\n")
+            res += sep4;
           else
-            sep = "\n";
+            sep4 = "\n";
         } else {
-          res += sep + match[1];
-          sep = " ";
+          res += sep4 + match[1];
+          sep4 = " ";
         }
         pos = line.lastIndex;
       }
       const last = /[ \t]*(.*)/sy;
       last.lastIndex = pos;
       match = last.exec(source);
-      return res + sep + (match?.[1] ?? "");
+      return res + sep4 + (match?.[1] ?? "");
     }
     function doubleQuotedValue(source, onError) {
       let res = "";
@@ -7207,14 +6978,14 @@ var require_cst_stringify = __commonJS({
         }
       }
     }
-    function stringifyItem({ start, key, sep, value }) {
+    function stringifyItem({ start, key, sep: sep4, value }) {
       let res = "";
       for (const st of start)
         res += st.source;
       if (key)
         res += stringifyToken(key);
-      if (sep)
-        for (const st of sep)
+      if (sep4)
+        for (const st of sep4)
           res += st.source;
       if (value)
         res += stringifyToken(value);
@@ -8364,18 +8135,18 @@ var require_parser = __commonJS({
         if (this.type === "map-value-ind") {
           const prev = getPrevProps(this.peek(2));
           const start = getFirstKeyStartProps(prev);
-          let sep;
+          let sep4;
           if (scalar.end) {
-            sep = scalar.end;
-            sep.push(this.sourceToken);
+            sep4 = scalar.end;
+            sep4.push(this.sourceToken);
             delete scalar.end;
           } else
-            sep = [this.sourceToken];
+            sep4 = [this.sourceToken];
           const map = {
             type: "block-map",
             offset: scalar.offset,
             indent: scalar.indent,
-            items: [{ start, key: scalar, sep }]
+            items: [{ start, key: scalar, sep: sep4 }]
           };
           this.onKeyLine = true;
           this.stack[this.stack.length - 1] = map;
@@ -8528,15 +8299,15 @@ var require_parser = __commonJS({
                 } else if (isFlowToken(it.key) && !includesToken(it.sep, "newline")) {
                   const start2 = getFirstKeyStartProps(it.start);
                   const key = it.key;
-                  const sep = it.sep;
-                  sep.push(this.sourceToken);
+                  const sep4 = it.sep;
+                  sep4.push(this.sourceToken);
                   delete it.key;
                   delete it.sep;
                   this.stack.push({
                     type: "block-map",
                     offset: this.offset,
                     indent: this.indent,
-                    items: [{ start: start2, key, sep }]
+                    items: [{ start: start2, key, sep: sep4 }]
                   });
                 } else if (start.length > 0) {
                   it.sep = it.sep.concat(start, this.sourceToken);
@@ -8730,13 +8501,13 @@ var require_parser = __commonJS({
             const prev = getPrevProps(parent);
             const start = getFirstKeyStartProps(prev);
             fixFlowSeqItems(fc);
-            const sep = fc.end.splice(1, fc.end.length);
-            sep.push(this.sourceToken);
+            const sep4 = fc.end.splice(1, fc.end.length);
+            sep4.push(this.sourceToken);
             const map = {
               type: "block-map",
               offset: fc.offset,
               indent: fc.indent,
-              items: [{ start, key: fc, sep }]
+              items: [{ start, key: fc, sep: sep4 }]
             };
             this.onKeyLine = true;
             this.stack[this.stack.length - 1] = map;
@@ -9015,7 +8786,30 @@ var require_dist = __commonJS({
 });
 
 // ../core/src/frontmatter.ts
-import { readFileSync as readFileSync6, writeFileSync as writeFileSync4 } from "node:fs";
+import { readFileSync as readFileSync4, writeFileSync as writeFileSync3 } from "node:fs";
+function parseFrontmatter(markdown) {
+  const match = markdown.match(FRONTMATTER_RE);
+  if (!match) {
+    return { data: {}, body: markdown };
+  }
+  const [, yamlContent, body] = match;
+  let data;
+  try {
+    data = (0, import_yaml.parse)(yamlContent);
+  } catch (err2) {
+    const reason = err2 instanceof Error ? err2.message : String(err2);
+    throw new Error(`Invalid YAML frontmatter: ${reason}`);
+  }
+  if (data === null || data === void 0) {
+    return { data: {}, body };
+  }
+  if (typeof data !== "object" || Array.isArray(data)) {
+    throw new Error(
+      `Invalid frontmatter: expected a YAML mapping at the top level, got ${typeof data}.`
+    );
+  }
+  return { data, body };
+}
 function stringifyFrontmatter(data, body) {
   const yaml = (0, import_yaml.stringify)(data, { lineWidth: 0 }).replace(/\n$/, "");
   return `---
@@ -9024,19 +8818,1009 @@ ${yaml}
 ${body}`;
 }
 function writeFrontmatter(path, data, body) {
-  writeFileSync4(path, stringifyFrontmatter(data, body), "utf-8");
+  writeFileSync3(path, stringifyFrontmatter(data, body), "utf-8");
 }
-var import_yaml;
+var import_yaml, FRONTMATTER_RE;
 var init_frontmatter = __esm({
   "../core/src/frontmatter.ts"() {
     "use strict";
     import_yaml = __toESM(require_dist(), 1);
+    FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
+  }
+});
+
+// ../core/src/ingest-paths.ts
+import {
+  existsSync as existsSync3,
+  readdirSync as readdirSync2,
+  statSync
+} from "node:fs";
+import { isAbsolute as isAbsolute2, join as join5, resolve as resolve2, sep } from "node:path";
+function collectMarkdownFiles(paths) {
+  const seen = /* @__PURE__ */ new Map();
+  for (const p of paths) {
+    for (const file of expandPath(p)) {
+      if (!seen.has(file.filePath)) {
+        seen.set(file.filePath, file);
+      }
+    }
+  }
+  return [...seen.values()].sort(
+    (a, b) => a.filePath.localeCompare(b.filePath)
+  );
+}
+function expandPath(input) {
+  const absolute = isAbsolute2(input) ? input : resolve2(process.cwd(), input);
+  if (containsGlob(input)) {
+    return expandGlob(absolute);
+  }
+  if (!existsSync3(absolute)) {
+    throw new Error(`Path does not exist: ${input}`);
+  }
+  const stat = statSync(absolute);
+  if (stat.isFile()) {
+    if (!hasMarkdownExtension(absolute)) {
+      throw new Error(
+        `Path is not a markdown file: ${input} (expected one of ${MARKDOWN_EXTENSIONS.join(", ")})`
+      );
+    }
+    return [{ filePath: absolute, root: dirnameOf(absolute) }];
+  }
+  if (stat.isDirectory()) {
+    return walkDirectory(absolute, absolute);
+  }
+  return [];
+}
+function dirnameOf(filePath) {
+  const idx = filePath.lastIndexOf(sep);
+  if (idx <= 0) return sep;
+  return filePath.slice(0, idx);
+}
+function walkDirectory(dir, root) {
+  const out = [];
+  const entries = readdirSync2(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const child = join5(dir, entry.name);
+    if (entry.isDirectory()) {
+      out.push(...walkDirectory(child, root));
+    } else if (entry.isFile() && hasMarkdownExtension(entry.name)) {
+      out.push({ filePath: child, root });
+    }
+  }
+  return out;
+}
+function containsGlob(input) {
+  return /[*?[]/.test(input);
+}
+function expandGlob(absolutePattern) {
+  const segments = absolutePattern.split(sep);
+  let rootEnd = 0;
+  for (let i = 0; i < segments.length; i++) {
+    if (containsGlob(segments[i])) break;
+    rootEnd = i;
+  }
+  const root = segments.slice(0, rootEnd + 1).join(sep) || sep;
+  const remainder = segments.slice(rootEnd + 1);
+  if (!existsSync3(root)) {
+    return [];
+  }
+  return matchPattern(root, remainder, root);
+}
+function matchPattern(currentDir, remaining, root) {
+  if (remaining.length === 0) {
+    if (statSync(currentDir).isFile() && hasMarkdownExtension(currentDir)) {
+      return [{ filePath: currentDir, root }];
+    }
+    return [];
+  }
+  const [head, ...rest] = remaining;
+  const out = [];
+  let entries;
+  try {
+    entries = readdirSync2(currentDir, { withFileTypes: true });
+  } catch {
+    return out;
+  }
+  if (head === "**") {
+    out.push(...matchPattern(currentDir, rest, root));
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        out.push(
+          ...matchPattern(join5(currentDir, entry.name), remaining, root)
+        );
+      }
+    }
+    return out;
+  }
+  const matcher = globSegmentMatcher(head);
+  for (const entry of entries) {
+    if (!matcher(entry.name)) continue;
+    const child = join5(currentDir, entry.name);
+    if (rest.length === 0) {
+      if (entry.isFile() && hasMarkdownExtension(entry.name)) {
+        out.push({ filePath: child, root });
+      }
+    } else if (entry.isDirectory()) {
+      out.push(...matchPattern(child, rest, root));
+    }
+  }
+  return out;
+}
+function globSegmentMatcher(pattern) {
+  let re = "^";
+  for (let i = 0; i < pattern.length; i++) {
+    const ch = pattern[i];
+    if (ch === "*") re += "[^/]*";
+    else if (ch === "?") re += "[^/]";
+    else if (ch === "[") {
+      const close = pattern.indexOf("]", i);
+      if (close === -1) {
+        re += "\\[";
+      } else {
+        re += pattern.slice(i, close + 1);
+        i = close;
+      }
+    } else if (/[\\^$+().{}|]/.test(ch)) re += `\\${ch}`;
+    else re += ch;
+  }
+  re += "$";
+  const compiled = new RegExp(re);
+  return (name) => compiled.test(name);
+}
+function hasMarkdownExtension(filename) {
+  const lower = filename.toLowerCase();
+  return MARKDOWN_EXTENSIONS.some((ext) => lower.endsWith(ext));
+}
+var MARKDOWN_EXTENSIONS;
+var init_ingest_paths = __esm({
+  "../core/src/ingest-paths.ts"() {
+    "use strict";
+    MARKDOWN_EXTENSIONS = [".md", ".mdx", ".markdown"];
+  }
+});
+
+// ../core/src/ingest-derive.ts
+import { readdirSync as readdirSync3, statSync as statSync2 } from "node:fs";
+import { join as join6, relative, sep as sep2 } from "node:path";
+function deriveSlug(input) {
+  if (input.explicitSlug !== void 0) {
+    return { value: input.explicitSlug, source: "explicit" };
+  }
+  if (input.slugFrom === "frontmatter") {
+    const fmSlug = readStringField(input.frontmatter, input.fieldName);
+    if (fmSlug !== void 0) {
+      return { value: fmSlug, source: "frontmatter" };
+    }
+  }
+  return slugFromPath(input.filePath, input.root);
+}
+function slugFromPath(filePath, root) {
+  const rel = relative(root, filePath);
+  const segments = rel.split(sep2).filter((s) => s.length > 0);
+  if (segments.length === 0) {
+    return { value: "", source: "path", reason: "file path equals root" };
+  }
+  const filename = segments[segments.length - 1];
+  const dot = filename.lastIndexOf(".");
+  const base = dot > 0 ? filename.slice(0, dot) : filename;
+  const baseLower = base.toLowerCase();
+  let leafSegments;
+  let dirSegments;
+  if (baseLower === "index" || baseLower === "readme") {
+    if (segments.length < 2) {
+      const rootSegments = root.split(sep2).filter((s) => s.length > 0);
+      const rootLeaf = rootSegments[rootSegments.length - 1];
+      if (!rootLeaf) {
+        return {
+          value: "",
+          source: "path",
+          reason: `${filename} at the filesystem root has no directory name to derive a slug from`
+        };
+      }
+      leafSegments = [rootLeaf];
+      dirSegments = [];
+    } else {
+      leafSegments = [segments[segments.length - 2]];
+      dirSegments = segments.slice(0, -2);
+    }
+  } else {
+    const jekyll = base.match(JEKYLL_RE);
+    leafSegments = [jekyll ? jekyll[4] : base];
+    dirSegments = segments.slice(0, -1);
+  }
+  const prefix = [];
+  if (directoryIsHierarchicalNode(root)) {
+    const rootSegments = root.split(sep2).filter((s) => s.length > 0);
+    const rootLeaf = rootSegments[rootSegments.length - 1];
+    if (rootLeaf && leafSegments[0] !== rootLeaf) {
+      prefix.push(rootLeaf);
+    }
+  }
+  let cursor = root;
+  for (const dir of dirSegments) {
+    cursor = join6(cursor, dir);
+    if (directoryIsHierarchicalNode(cursor)) {
+      prefix.push(dir);
+    } else {
+      prefix.length = 0;
+    }
+  }
+  return { value: [...prefix, ...leafSegments].join("/"), source: "path" };
+}
+function directoryIsHierarchicalNode(dir) {
+  let entries;
+  try {
+    entries = readdirSync3(dir, { withFileTypes: true });
+  } catch {
+    return false;
+  }
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    const lower = entry.name.toLowerCase();
+    for (const ext of MARKDOWN_EXTENSIONS) {
+      if (lower === `index${ext}` || lower === `readme${ext}`) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+function deriveState(input) {
+  if (input.explicitState !== void 0) {
+    return { value: input.explicitState, source: "explicit" };
+  }
+  if (input.stateFrom === "frontmatter") {
+    const raw = readStringField(input.frontmatter, input.stateField);
+    if (raw === void 0) {
+      return { value: "Ideas", source: "frontmatter" };
+    }
+    const normalized = normalizeStateString(raw);
+    if (normalized === null) {
+      return { value: null, source: "frontmatter", rawValue: raw };
+    }
+    return { value: normalized, source: "frontmatter" };
+  }
+  const dateRaw = readDateField(input.frontmatter, input.dateField);
+  if (dateRaw === void 0) {
+    return { value: "Ideas", source: "frontmatter" };
+  }
+  const today = (input.now ?? /* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  if (dateRaw <= today) {
+    return { value: "Published", source: "frontmatter" };
+  }
+  return { value: "Drafting", source: "frontmatter" };
+}
+function normalizeStateString(raw) {
+  const key = raw.trim().toLowerCase();
+  if (key.length === 0) return null;
+  const direct = STATE_ALIASES[key];
+  if (direct) return direct;
+  const titled = key.charAt(0).toUpperCase() + key.slice(1);
+  if (isStage(titled)) return titled;
+  return null;
+}
+function deriveDate(input) {
+  if (input.explicitDate !== void 0) {
+    return { value: input.explicitDate, source: "explicit" };
+  }
+  const fmDate = readDateField(input.frontmatter, input.dateField);
+  if (fmDate !== void 0) {
+    return { value: fmDate, source: "frontmatter" };
+  }
+  if (input.dateField !== "date") {
+    const generic = readDateField(input.frontmatter, "date");
+    if (generic !== void 0) {
+      return { value: generic, source: "frontmatter" };
+    }
+  }
+  try {
+    const stat = statSync2(input.filePath);
+    return { value: stat.mtime.toISOString().slice(0, 10), source: "mtime" };
+  } catch {
+  }
+  const today = (input.now ?? /* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  return { value: today, source: "today" };
+}
+function deriveTitle(frontmatter, fieldName, slug) {
+  const raw = readStringField(frontmatter, fieldName);
+  if (raw !== void 0 && raw.length > 0) return raw;
+  const leaf = slug.split("/").pop() ?? slug;
+  return leaf.split("-").map((w) => w.length > 0 ? w[0].toUpperCase() + w.slice(1) : w).join(" ");
+}
+function deriveDescription(frontmatter, fieldName) {
+  return readStringField(frontmatter, fieldName) ?? "";
+}
+function readStringField(frontmatter, field) {
+  const value = frontmatter[field];
+  if (typeof value !== "string") return void 0;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : void 0;
+}
+function readDateField(frontmatter, field) {
+  const value = frontmatter[field];
+  if (value === void 0 || value === null) return void 0;
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10);
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (ISO_DATE_RE.test(trimmed)) return trimmed;
+    const parsed = Date.parse(trimmed);
+    if (!Number.isNaN(parsed)) {
+      return new Date(parsed).toISOString().slice(0, 10);
+    }
+  }
+  return void 0;
+}
+var JEKYLL_RE, ISO_DATE_RE, STATE_ALIASES;
+var init_ingest_derive = __esm({
+  "../core/src/ingest-derive.ts"() {
+    "use strict";
+    init_types();
+    init_ingest_paths();
+    JEKYLL_RE = /^(\d{4})-(\d{2})-(\d{2})-(.+)$/;
+    ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+    STATE_ALIASES = {
+      ideas: "Ideas",
+      idea: "Ideas",
+      ideas_lane: "Ideas",
+      planned: "Planned",
+      outlining: "Outlining",
+      outline: "Outlining",
+      drafting: "Drafting",
+      draft: "Drafting",
+      review: "Review",
+      reviewing: "Review",
+      "in-review": "Review",
+      in_review: "Review",
+      published: "Published",
+      publish: "Published"
+    };
+  }
+});
+
+// ../core/src/ingest.ts
+import { isAbsolute as isAbsolute3, relative as relative2, sep as sep3 } from "node:path";
+import { readFileSync as readFileSync5 } from "node:fs";
+function discoverIngestCandidates(paths, options) {
+  if (paths.length === 0) {
+    throw new Error("discoverIngestCandidates: at least one path is required");
+  }
+  if (!options.projectRoot || !isAbsolute3(options.projectRoot)) {
+    throw new Error(
+      `discoverIngestCandidates: projectRoot must be an absolute path (got "${options.projectRoot ?? ""}")`
+    );
+  }
+  const collected = collectMarkdownFiles(paths);
+  if (options.explicitSlug !== void 0 && collected.length !== 1) {
+    throw new Error(
+      `--slug requires exactly one matched file; ${collected.length} matched`
+    );
+  }
+  const candidates = [];
+  const skips = [];
+  const fields = { ...DEFAULT_FIELDS, ...options.fieldNames ?? {} };
+  for (const { filePath, root } of collected) {
+    const relPath = relativeTo(options.projectRoot, filePath);
+    if (isUnderScrapbook(filePath, options.scrapbookRoots)) {
+      skips.push({
+        filePath,
+        relativePath: relPath,
+        reason: "file is under scrapbook/ (skipped by default)"
+      });
+      continue;
+    }
+    let raw;
+    try {
+      raw = readFileSync5(filePath, "utf-8");
+    } catch (err2) {
+      skips.push({
+        filePath,
+        relativePath: relPath,
+        reason: `unreadable: ${err2 instanceof Error ? err2.message : String(err2)}`
+      });
+      continue;
+    }
+    let parsed;
+    try {
+      parsed = parseFrontmatter(raw);
+    } catch (err2) {
+      skips.push({
+        filePath,
+        relativePath: relPath,
+        reason: `frontmatter parse failed: ${err2 instanceof Error ? err2.message : String(err2)}`
+      });
+      continue;
+    }
+    const slug = deriveSlug({
+      filePath,
+      root,
+      frontmatter: parsed.data,
+      fieldName: fields.slug,
+      slugFrom: options.slugFrom ?? "path",
+      ...options.explicitSlug !== void 0 ? { explicitSlug: options.explicitSlug } : {}
+    });
+    if (!slug.value) {
+      skips.push({
+        filePath,
+        relativePath: relPath,
+        reason: slug.reason ?? "could not derive slug"
+      });
+      continue;
+    }
+    if (!SLUG_RE.test(slug.value)) {
+      skips.push({
+        filePath,
+        relativePath: relPath,
+        slug: slug.value,
+        reason: `derived slug "${slug.value}" is not valid kebab-case (must match [a-z0-9][a-z0-9-]* segments separated by '/')`
+      });
+      continue;
+    }
+    if (options.calendar && !options.force && options.calendar.entries.some((e) => e.slug === slug.value)) {
+      skips.push({
+        filePath,
+        relativePath: relPath,
+        slug: slug.value,
+        reason: `calendar already has an entry with slug "${slug.value}" (use --force to override)`
+      });
+      continue;
+    }
+    const state = deriveState({
+      frontmatter: parsed.data,
+      stateField: fields.state,
+      dateField: fields.date,
+      stateFrom: options.stateFrom ?? "frontmatter",
+      ...options.explicitState !== void 0 ? { explicitState: options.explicitState } : {},
+      ...options.now !== void 0 ? { now: options.now } : {}
+    });
+    const date = deriveDate({
+      filePath,
+      frontmatter: parsed.data,
+      dateField: fields.date,
+      ...options.explicitDate !== void 0 ? { explicitDate: options.explicitDate } : {},
+      ...options.now !== void 0 ? { now: options.now } : {}
+    });
+    const title = deriveTitle(parsed.data, fields.title, slug.value);
+    const description = deriveDescription(parsed.data, fields.description);
+    candidates.push({
+      filePath,
+      relativePath: relPath,
+      frontmatter: parsed.data,
+      body: parsed.body,
+      derivedSlug: slug.value,
+      slugSource: slug.source,
+      derivedState: state.value,
+      stateSource: state.source,
+      ...state.rawValue !== void 0 ? { rawState: state.rawValue } : {},
+      derivedDate: date.value,
+      dateSource: date.source,
+      title,
+      description
+    });
+  }
+  return { candidates, skips };
+}
+function candidateToEntry(candidate, stage) {
+  const entry = {
+    slug: candidate.derivedSlug,
+    title: candidate.title,
+    description: candidate.description,
+    stage,
+    targetKeywords: [],
+    source: "manual"
+  };
+  if (stage === "Published") {
+    entry.datePublished = candidate.derivedDate;
+  }
+  return entry;
+}
+function relativeTo(projectRoot, filePath) {
+  const rel = relative2(projectRoot, filePath);
+  return rel.length > 0 ? rel : filePath;
+}
+function isUnderScrapbook(filePath, roots) {
+  if (!roots || roots.length === 0) return false;
+  for (const root of roots) {
+    const r = root.endsWith(sep3) ? root : root + sep3;
+    if (filePath.startsWith(r)) return true;
+  }
+  return false;
+}
+var SLUG_RE, DEFAULT_FIELDS;
+var init_ingest = __esm({
+  "../core/src/ingest.ts"() {
+    "use strict";
+    init_frontmatter();
+    init_ingest_paths();
+    init_ingest_derive();
+    SLUG_RE = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
+    DEFAULT_FIELDS = {
+      title: "title",
+      description: "description",
+      slug: "slug",
+      state: "state",
+      date: "datePublished"
+    };
+  }
+});
+
+// src/commands/ingest.ts
+var ingest_exports = {};
+__export(ingest_exports, {
+  run: () => run4
+});
+import { existsSync as existsSync4, mkdirSync as mkdirSync2 } from "node:fs";
+import { isAbsolute as isAbsolute4, join as join7, resolve as resolve3 } from "node:path";
+import { randomUUID as randomUUID4 } from "node:crypto";
+async function run4(argv2) {
+  const { positional, flags, booleans } = parseInput(argv2);
+  if (positional.length < 2) {
+    fail(
+      "Usage: deskwork ingest <project-root> [--site <slug>] [--apply] [--json] [--force] [--slug-from frontmatter|path] [--state-from frontmatter|datePublished] [--slug <s>] [--state <stage>] [--date YYYY-MM-DD] [--title-field <n>] [--description-field <n>] [--slug-field <n>] [--state-field <n>] [--date-field <n>] <path>...",
+      2
+    );
+  }
+  const [rootArg, ...paths] = positional;
+  const projectRoot = absolutize(rootArg);
+  const slugFrom = parseSlugFrom(flags["slug-from"]);
+  const stateFrom = parseStateFrom(flags["state-from"]);
+  const explicitState = parseExplicitState(flags.state);
+  const explicitDate = parseExplicitDate(flags.date);
+  let config;
+  try {
+    config = readConfig(projectRoot);
+  } catch (err2) {
+    fail(err2 instanceof Error ? err2.message : String(err2));
+  }
+  const site = resolveSite(config, flags.site);
+  const calendarPath = resolveCalendarPath(projectRoot, config, site);
+  const calendar = readCalendar(calendarPath);
+  const absolutePaths = paths.map(
+    (p) => isAbsolute4(p) ? p : resolve3(projectRoot, p)
+  );
+  const contentDir = resolveContentDir(projectRoot, config, site);
+  const scrapbookRoots = [join7(contentDir, "scrapbook")];
+  let discovery;
+  try {
+    discovery = discoverIngestCandidates(absolutePaths, {
+      projectRoot,
+      ...slugFrom !== void 0 ? { slugFrom } : {},
+      ...stateFrom !== void 0 ? { stateFrom } : {},
+      ...flags.slug !== void 0 ? { explicitSlug: flags.slug } : {},
+      ...explicitState !== void 0 ? { explicitState } : {},
+      ...explicitDate !== void 0 ? { explicitDate } : {},
+      fieldNames: buildFieldNames(flags),
+      calendar,
+      ...booleans.has("force") ? { force: true } : {},
+      scrapbookRoots
+    });
+  } catch (err2) {
+    fail(err2 instanceof Error ? err2.message : String(err2), 2);
+  }
+  const ambiguous = [];
+  const actionable = [];
+  for (const c of discovery.candidates) {
+    if (c.derivedState === null) {
+      ambiguous.push({
+        filePath: c.filePath,
+        relativePath: c.relativePath,
+        slug: c.derivedSlug,
+        reason: `state ambiguous (raw frontmatter value: "${c.rawState ?? ""}"); pass --state <stage> to commit`
+      });
+      continue;
+    }
+    actionable.push({ candidate: c, stage: c.derivedState });
+  }
+  const allSkips = [...discovery.skips, ...ambiguous];
+  if (booleans.has("json")) {
+    emitJsonPlan({
+      apply: booleans.has("apply"),
+      site,
+      calendarPath,
+      add: actionable.map((a) => candidatePlanRecord(a.candidate, a.stage)),
+      skip: allSkips
+    });
+  } else {
+    emitTextPlan({
+      apply: booleans.has("apply"),
+      add: actionable,
+      skip: allSkips
+    });
+  }
+  if (!booleans.has("apply")) return;
+  for (const { candidate, stage } of actionable) {
+    const id = randomUUID4();
+    const entry = { id, ...candidateToEntry(candidate, stage) };
+    calendar.entries.push(entry);
+    writeIngestJournalEntry(projectRoot, config, site, candidate, entry);
+  }
+  writeCalendar(calendarPath, calendar);
+}
+function parseInput(argv2) {
+  try {
+    return parseArgs(argv2, KNOWN_FLAGS, BOOLEAN_FLAGS);
+  } catch (err2) {
+    fail(err2 instanceof Error ? err2.message : String(err2), 2);
+  }
+}
+function parseSlugFrom(value) {
+  if (value === void 0) return void 0;
+  if (value !== "frontmatter" && value !== "path") {
+    fail(`--slug-from must be 'frontmatter' or 'path' (got "${value}")`, 2);
+  }
+  return value;
+}
+function parseStateFrom(value) {
+  if (value === void 0) return void 0;
+  if (value !== "frontmatter" && value !== "datePublished") {
+    fail(
+      `--state-from must be 'frontmatter' or 'datePublished' (got "${value}")`,
+      2
+    );
+  }
+  return value;
+}
+function parseExplicitState(value) {
+  if (value === void 0) return void 0;
+  const normalized = value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+  if (!isStage(normalized)) {
+    fail(
+      `--state must be one of Ideas, Planned, Outlining, Drafting, Review, Published (got "${value}")`,
+      2
+    );
+  }
+  return normalized;
+}
+function parseExplicitDate(value) {
+  if (value === void 0) return void 0;
+  if (!DATE_RE.test(value)) {
+    fail(`--date must match YYYY-MM-DD (got "${value}")`, 2);
+  }
+  return value;
+}
+function buildFieldNames(flags) {
+  const out = {};
+  if (flags["title-field"] !== void 0) out.title = flags["title-field"];
+  if (flags["description-field"] !== void 0) out.description = flags["description-field"];
+  if (flags["slug-field"] !== void 0) out.slug = flags["slug-field"];
+  if (flags["state-field"] !== void 0) out.state = flags["state-field"];
+  if (flags["date-field"] !== void 0) out.date = flags["date-field"];
+  return out;
+}
+function candidatePlanRecord(c, stage) {
+  return {
+    action: "add",
+    slug: c.derivedSlug,
+    title: c.title,
+    stage,
+    date: c.derivedDate,
+    filePath: c.filePath,
+    relativePath: c.relativePath,
+    sources: {
+      slug: c.slugSource,
+      state: c.stateSource,
+      date: c.dateSource
+    }
+  };
+}
+function emitJsonPlan(plan) {
+  process.stdout.write(`${JSON.stringify(plan, null, 2)}
+`);
+}
+function emitTextPlan(plan) {
+  const heading = plan.apply ? `Applying: ${plan.add.length} add, ${plan.skip.length} skip` : `Plan: ${plan.add.length} add, ${plan.skip.length} skip (dry-run; pass --apply to commit)`;
+  process.stdout.write(`${heading}
+
+`);
+  for (const { candidate, stage } of plan.add) {
+    const sources = `slug:${candidate.slugSource} state:${candidate.stateSource} date:${candidate.dateSource}`;
+    process.stdout.write(
+      `add  ${pad(candidate.derivedSlug, 36)}  ${pad(stage, 10)}  ${pad(candidate.derivedDate, 12)}  ${sources}
+`
+    );
+  }
+  for (const skip of plan.skip) {
+    const slug = skip.slug ?? "(no slug)";
+    process.stdout.write(`skip ${pad(slug, 36)}  ${skip.reason}
+`);
+  }
+}
+function pad(s, n) {
+  if (s.length >= n) return s;
+  return s + " ".repeat(n - s.length);
+}
+function writeIngestJournalEntry(projectRoot, config, site, candidate, entry) {
+  const journalRoot = join7(
+    projectRoot,
+    config.reviewJournalDir ?? ".deskwork/review-journal",
+    "ingest"
+  );
+  if (!existsSync4(journalRoot)) {
+    mkdirSync2(journalRoot, { recursive: true });
+  }
+  const record = {
+    id: entry.id ?? randomUUID4(),
+    timestamp: (/* @__PURE__ */ new Date()).toISOString(),
+    event: "ingest",
+    slug: entry.slug,
+    entryId: entry.id ?? "",
+    site,
+    stage: entry.stage,
+    sourceFile: candidate.relativePath,
+    frontmatterSnapshot: candidate.frontmatter,
+    derivation: {
+      slug: candidate.slugSource,
+      state: candidate.stateSource,
+      date: candidate.dateSource
+    }
+  };
+  appendJournal(journalRoot, record);
+}
+var KNOWN_FLAGS, BOOLEAN_FLAGS, DATE_RE;
+var init_ingest2 = __esm({
+  "src/commands/ingest.ts"() {
+    "use strict";
+    init_config();
+    init_calendar();
+    init_paths();
+    init_types();
+    init_cli();
+    init_journal();
+    init_ingest();
+    KNOWN_FLAGS = [
+      "site",
+      "slug-from",
+      "state-from",
+      "slug",
+      "state",
+      "date",
+      "title-field",
+      "description-field",
+      "slug-field",
+      "state-field",
+      "date-field"
+    ];
+    BOOLEAN_FLAGS = ["apply", "json", "force"];
+    DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+  }
+});
+
+// src/commands/install.ts
+var install_exports = {};
+__export(install_exports, {
+  run: () => run5
+});
+import { readFileSync as readFileSync6, writeFileSync as writeFileSync4, existsSync as existsSync5, mkdirSync as mkdirSync3 } from "node:fs";
+import { dirname, isAbsolute as isAbsolute5, join as join8, resolve as resolve4 } from "node:path";
+async function run5(argv2) {
+  function usage() {
+    console.error(
+      "Usage: deskwork install [<project-root>] <config-file>"
+    );
+    process.exit(2);
+  }
+  let projectRootArg;
+  let configFileArg;
+  if (argv2.length === 1) {
+    projectRootArg = process.cwd();
+    configFileArg = argv2[0];
+  } else if (argv2.length === 2) {
+    [projectRootArg, configFileArg] = argv2;
+  } else {
+    usage();
+  }
+  const projectRoot = isAbsolute5(projectRootArg) ? projectRootArg : resolve4(process.cwd(), projectRootArg);
+  const configFile = isAbsolute5(configFileArg) ? configFileArg : resolve4(process.cwd(), configFileArg);
+  console.log(`Installing into: ${projectRoot}`);
+  if (!existsSync5(projectRoot)) {
+    console.error(`Project root does not exist: ${projectRoot}`);
+    process.exit(1);
+  }
+  if (!existsSync5(configFile)) {
+    console.error(`Config file does not exist: ${configFile}`);
+    process.exit(1);
+  }
+  let rawConfig;
+  try {
+    rawConfig = JSON.parse(readFileSync6(configFile, "utf-8"));
+  } catch (err2) {
+    const reason = err2 instanceof Error ? err2.message : String(err2);
+    console.error(`Config file is not valid JSON: ${reason}`);
+    process.exit(1);
+  }
+  let config;
+  try {
+    config = parseConfig(rawConfig);
+  } catch (err2) {
+    const reason = err2 instanceof Error ? err2.message : String(err2);
+    console.error(reason);
+    process.exit(1);
+  }
+  const writtenConfigPath = configPath(projectRoot);
+  mkdirSync3(dirname(writtenConfigPath), { recursive: true });
+  writeFileSync4(
+    writtenConfigPath,
+    JSON.stringify(config, null, 2) + "\n",
+    "utf-8"
+  );
+  const createdCalendars = [];
+  const preservedCalendars = [];
+  for (const [slug, site] of Object.entries(config.sites)) {
+    const absPath = join8(projectRoot, site.calendarPath);
+    if (existsSync5(absPath)) {
+      preservedCalendars.push(`${slug}: ${site.calendarPath}`);
+      continue;
+    }
+    mkdirSync3(dirname(absPath), { recursive: true });
+    writeFileSync4(absPath, renderEmptyCalendar(), "utf-8");
+    createdCalendars.push(`${slug}: ${site.calendarPath}`);
+  }
+  console.log(`Wrote config: ${writtenConfigPath}`);
+  console.log(`Sites configured: ${Object.keys(config.sites).join(", ")}`);
+  console.log(`Default site: ${config.defaultSite}`);
+  if (createdCalendars.length > 0) {
+    console.log(`Created calendars:`);
+    for (const c of createdCalendars) console.log(`  - ${c}`);
+  }
+  if (preservedCalendars.length > 0) {
+    console.log(`Left existing calendars untouched:`);
+    for (const c of preservedCalendars) console.log(`  - ${c}`);
+  }
+}
+var init_install = __esm({
+  "src/commands/install.ts"() {
+    "use strict";
+    init_config();
+    init_calendar();
+  }
+});
+
+// src/commands/iterate.ts
+var iterate_exports = {};
+__export(iterate_exports, {
+  run: () => run6
+});
+import { existsSync as existsSync6, readFileSync as readFileSync7 } from "node:fs";
+async function run6(argv2) {
+  const KNOWN_FLAGS2 = ["site", "kind", "dispositions"];
+  const DISPOSITIONS = /* @__PURE__ */ new Set(["addressed", "deferred", "wontfix"]);
+  const { positional, flags } = parse();
+  if (positional.length < 2) {
+    fail(
+      "Usage: deskwork-iterate <project-root> [--site <slug>] [--kind longform|outline] [--dispositions <path>] <slug>",
+      2
+    );
+  }
+  const [rootArg, slug] = positional;
+  const projectRoot = absolutize(rootArg);
+  const kind = flags.kind === "outline" ? "outline" : "longform";
+  if (flags.kind !== void 0 && flags.kind !== "longform" && flags.kind !== "outline") {
+    fail(`Invalid --kind "${flags.kind}". Must be 'longform' or 'outline'.`);
+  }
+  let config;
+  try {
+    config = readConfig(projectRoot);
+  } catch (err2) {
+    fail(err2 instanceof Error ? err2.message : String(err2));
+  }
+  const site = resolveSite(config, flags.site);
+  const file = resolveBlogFilePath(projectRoot, config, site, slug);
+  if (!existsSync6(file)) {
+    fail(`No blog file at ${file}.`);
+  }
+  const diskMarkdown = readFileSync7(file, "utf8");
+  const workflow = readWorkflows(projectRoot, config).find(
+    (w) => w.site === site && w.slug === slug && w.contentKind === kind && w.state !== "applied" && w.state !== "cancelled"
+  );
+  if (!workflow) {
+    fail(
+      `No active ${kind} workflow for ${site}/${slug}. Run /deskwork:review-start <slug> to enqueue one first.`
+    );
+  }
+  if (workflow.state !== "iterating") {
+    fail(
+      `Workflow state is '${workflow.state}', not 'iterating'.
+The studio must click 'Request iteration' to move the workflow to 'iterating' before this helper runs.`
+    );
+  }
+  const versions = readVersions(projectRoot, config, workflow.id);
+  const current = versions.find((v) => v.version === workflow.currentVersion);
+  if (current && current.markdown === diskMarkdown) {
+    fail(
+      `File on disk is identical to workflow v${workflow.currentVersion} \u2014 no revision to snapshot. Write the revision to disk first (the agent does this), then re-run.`
+    );
+  }
+  let dispositions = null;
+  if (flags.dispositions !== void 0) {
+    const path = absolutize(flags.dispositions);
+    if (!existsSync6(path)) {
+      fail(`--dispositions file not found: ${path}`);
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(readFileSync7(path, "utf8"));
+    } catch (err2) {
+      const reason = err2 instanceof Error ? err2.message : String(err2);
+      fail(`--dispositions: invalid JSON at ${path}: ${reason}`);
+    }
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      fail(`--dispositions: expected JSON object at ${path}`);
+    }
+    dispositions = {};
+    for (const [commentId, raw] of Object.entries(parsed)) {
+      if (typeof raw !== "object" || raw === null) {
+        fail(`--dispositions[${commentId}]: must be an object`);
+      }
+      const d = raw;
+      if (typeof d.disposition !== "string" || !DISPOSITIONS.has(d.disposition)) {
+        fail(
+          `--dispositions[${commentId}].disposition: must be 'addressed' | 'deferred' | 'wontfix'`
+        );
+      }
+      const entry = { disposition: d.disposition };
+      if (typeof d.reason === "string" && d.reason.length > 0) {
+        entry.reason = d.reason;
+      }
+      dispositions[commentId] = entry;
+    }
+  }
+  const newVersion = appendVersion(
+    projectRoot,
+    config,
+    workflow.id,
+    diskMarkdown,
+    "agent"
+  );
+  const addressed = [];
+  if (dispositions) {
+    const workflowComments = new Set(
+      readAnnotations(projectRoot, config, workflow.id).filter((a) => a.type === "comment").map((a) => a.id)
+    );
+    for (const [commentId, entry] of Object.entries(dispositions)) {
+      if (!workflowComments.has(commentId)) continue;
+      const ann = mintAnnotation({
+        type: "address",
+        workflowId: workflow.id,
+        commentId,
+        version: newVersion.version,
+        disposition: entry.disposition,
+        ...entry.reason !== void 0 ? { reason: entry.reason } : {}
+      });
+      appendAnnotation(projectRoot, config, ann);
+      addressed.push(commentId);
+    }
+  }
+  const updated = transitionState(projectRoot, config, workflow.id, "in-review");
+  emit({
+    workflowId: workflow.id,
+    site: updated.site,
+    slug: updated.slug,
+    state: updated.state,
+    version: newVersion.version,
+    addressedComments: addressed
+  });
+  function parse() {
+    try {
+      return parseArgs(argv2, KNOWN_FLAGS2);
+    } catch (err2) {
+      fail(err2 instanceof Error ? err2.message : String(err2), 2);
+    }
+  }
+}
+var init_iterate = __esm({
+  "src/commands/iterate.ts"() {
+    "use strict";
+    init_config();
+    init_paths();
+    init_pipeline();
+    init_cli();
   }
 });
 
 // ../core/src/scaffold.ts
-import { existsSync as existsSync5, mkdirSync as mkdirSync3 } from "node:fs";
-import { dirname as dirname2, join as join6, relative } from "node:path";
+import { existsSync as existsSync7, mkdirSync as mkdirSync4 } from "node:fs";
+import { dirname as dirname2, join as join9, relative as relative3 } from "node:path";
 function scaffoldBlogPost(projectRoot, config, site, entry, opts = {}) {
   const slug = resolveSite(config, site);
   const siteCfg = config.sites[slug];
@@ -9054,8 +9838,8 @@ function scaffoldBlogPost(projectRoot, config, site, entry, opts = {}) {
     entry.slug,
     contentRelativePath
   );
-  const relativePath = relative(projectRoot, filePath);
-  if (existsSync5(filePath)) {
+  const relativePath = relative3(projectRoot, filePath);
+  if (existsSync7(filePath)) {
     throw new Error(`Blog post already exists at ${relativePath}`);
   }
   const dateStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
@@ -9069,9 +9853,9 @@ function scaffoldBlogPost(projectRoot, config, site, entry, opts = {}) {
   data.author = author;
   if (siteCfg.blogInitialState) data.state = siteCfg.blogInitialState;
   const body = buildBody(entry.title, siteCfg.blogOutlineSection === true);
-  mkdirSync3(dirname2(filePath), { recursive: true });
+  mkdirSync4(dirname2(filePath), { recursive: true });
   writeFrontmatter(filePath, data, body);
-  const reported = contentRelativePath ?? relative(join6(projectRoot, siteCfg.contentDir), filePath);
+  const reported = contentRelativePath ?? relative3(join9(projectRoot, siteCfg.contentDir), filePath);
   return { filePath, relativePath, contentRelativePath: reported };
 }
 function layoutToContentRelativePath(layout, slug) {
@@ -9112,10 +9896,10 @@ var init_scaffold = __esm({
 // src/commands/outline.ts
 var outline_exports = {};
 __export(outline_exports, {
-  run: () => run6
+  run: () => run7
 });
-async function run6(argv2) {
-  const KNOWN_FLAGS = ["site", "author", "layout"];
+async function run7(argv2) {
+  const KNOWN_FLAGS2 = ["site", "author", "layout"];
   const VALID_LAYOUTS = ["index", "readme", "flat"];
   const { positional, flags } = parse();
   if (positional.length < 2) {
@@ -9180,7 +9964,7 @@ async function run6(argv2) {
   });
   function parse() {
     try {
-      return parseArgs(argv2, KNOWN_FLAGS);
+      return parseArgs(argv2, KNOWN_FLAGS2);
     } catch (err2) {
       fail(err2 instanceof Error ? err2.message : String(err2), 2);
     }
@@ -9202,10 +9986,10 @@ var init_outline = __esm({
 // src/commands/plan.ts
 var plan_exports = {};
 __export(plan_exports, {
-  run: () => run7
+  run: () => run8
 });
-async function run7(argv2) {
-  const KNOWN_FLAGS = ["site", "topics"];
+async function run8(argv2) {
+  const KNOWN_FLAGS2 = ["site", "topics"];
   const { positional, flags } = parse();
   if (positional.length < 2) {
     fail(
@@ -9247,7 +10031,7 @@ async function run7(argv2) {
   });
   function parse() {
     try {
-      return parseArgs(argv2, KNOWN_FLAGS);
+      return parseArgs(argv2, KNOWN_FLAGS2);
     } catch (err2) {
       fail(err2 instanceof Error ? err2.message : String(err2), 2);
     }
@@ -9267,12 +10051,12 @@ var init_plan = __esm({
 // src/commands/publish.ts
 var publish_exports = {};
 __export(publish_exports, {
-  run: () => run8
+  run: () => run9
 });
-import { existsSync as existsSync6 } from "node:fs";
-async function run8(argv2) {
-  const KNOWN_FLAGS = ["site", "date", "content-url"];
-  const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+import { existsSync as existsSync8 } from "node:fs";
+async function run9(argv2) {
+  const KNOWN_FLAGS2 = ["site", "date", "content-url"];
+  const DATE_RE2 = /^\d{4}-\d{2}-\d{2}$/;
   const { positional, flags } = parse();
   if (positional.length < 2) {
     fail(
@@ -9282,7 +10066,7 @@ async function run8(argv2) {
   }
   const [rootArg, slug] = positional;
   const projectRoot = absolutize(rootArg);
-  if (flags.date !== void 0 && !DATE_RE.test(flags.date)) {
+  if (flags.date !== void 0 && !DATE_RE2.test(flags.date)) {
     fail(`Invalid --date "${flags.date}". Must match YYYY-MM-DD.`);
   }
   let config;
@@ -9309,7 +10093,7 @@ async function run8(argv2) {
   let filePath;
   if (hasRepoContent(contentType)) {
     filePath = resolveBlogFilePath(projectRoot, config, site, slug);
-    if (!existsSync6(filePath)) {
+    if (!existsSync8(filePath)) {
       fail(
         `Cannot publish blog post "${slug}": no file at ${filePath}. Write the post before publishing.`
       );
@@ -9338,7 +10122,7 @@ async function run8(argv2) {
   });
   function parse() {
     try {
-      return parseArgs(argv2, KNOWN_FLAGS);
+      return parseArgs(argv2, KNOWN_FLAGS2);
     } catch (err2) {
       fail(err2 instanceof Error ? err2.message : String(err2), 2);
     }
@@ -9359,10 +10143,10 @@ var init_publish = __esm({
 // src/commands/review-cancel.ts
 var review_cancel_exports = {};
 __export(review_cancel_exports, {
-  run: () => run9
+  run: () => run10
 });
-async function run9(argv2) {
-  const KNOWN_FLAGS = ["site", "platform", "channel", "kind"];
+async function run10(argv2) {
+  const KNOWN_FLAGS2 = ["site", "platform", "channel", "kind"];
   const { positional, flags } = parse();
   if (positional.length < 2) {
     fail(
@@ -9426,7 +10210,7 @@ async function run9(argv2) {
   }
   function parse() {
     try {
-      return parseArgs(argv2, KNOWN_FLAGS);
+      return parseArgs(argv2, KNOWN_FLAGS2);
     } catch (err2) {
       fail(err2 instanceof Error ? err2.message : String(err2), 2);
     }
@@ -9447,10 +10231,10 @@ var init_review_cancel = __esm({
 // src/commands/review-help.ts
 var review_help_exports = {};
 __export(review_help_exports, {
-  run: () => run10
+  run: () => run11
 });
-async function run10(argv2) {
-  const KNOWN_FLAGS = ["site"];
+async function run11(argv2) {
+  const KNOWN_FLAGS2 = ["site"];
   const { positional, flags } = parse();
   if (positional.length < 1) {
     fail("Usage: deskwork-review-help <project-root> [--site <slug>]", 2);
@@ -9479,7 +10263,7 @@ async function run10(argv2) {
   });
   function parse() {
     try {
-      return parseArgs(argv2, KNOWN_FLAGS);
+      return parseArgs(argv2, KNOWN_FLAGS2);
     } catch (err2) {
       fail(err2 instanceof Error ? err2.message : String(err2), 2);
     }
@@ -9657,11 +10441,11 @@ var init_report = __esm({
 // src/commands/review-report.ts
 var review_report_exports = {};
 __export(review_report_exports, {
-  run: () => run11
+  run: () => run12
 });
-async function run11(argv2) {
-  const KNOWN_FLAGS = ["site", "format"];
-  const BOOLEAN_FLAGS = ["include-active"];
+async function run12(argv2) {
+  const KNOWN_FLAGS2 = ["site", "format"];
+  const BOOLEAN_FLAGS2 = ["include-active"];
   const { positional, flags, booleans } = parse();
   if (positional.length < 1) {
     fail(
@@ -9691,7 +10475,7 @@ async function run11(argv2) {
   }
   function parse() {
     try {
-      return parseArgs(argv2, KNOWN_FLAGS, BOOLEAN_FLAGS);
+      return parseArgs(argv2, KNOWN_FLAGS2, BOOLEAN_FLAGS2);
     } catch (err2) {
       fail(err2 instanceof Error ? err2.message : String(err2), 2);
     }
@@ -9707,7 +10491,7 @@ var init_review_report = __esm({
 });
 
 // ../core/src/body-state.ts
-import { existsSync as existsSync7, readFileSync as readFileSync7 } from "node:fs";
+import { existsSync as existsSync9, readFileSync as readFileSync8 } from "node:fs";
 function stripOutlineSection(body) {
   const lines = body.split("\n");
   const startIdx = lines.findIndex((line) => /^##[ \t]+Outline\b/.test(line));
@@ -9722,8 +10506,8 @@ function stripOutlineSection(body) {
   return [...lines.slice(0, startIdx), ...lines.slice(endIdx)].join("\n");
 }
 function bodyState(filePath) {
-  if (!existsSync7(filePath)) return "missing";
-  const content = readFileSync7(filePath, "utf8");
+  if (!existsSync9(filePath)) return "missing";
+  const content = readFileSync8(filePath, "utf8");
   const fmMatch = content.match(/^---\n[\s\S]*?\n---\n?/);
   const body = fmMatch ? content.slice(fmMatch[0].length) : content;
   const withoutH1 = body.replace(/^\s*#[^\n]*\n?/, "");
@@ -9745,21 +10529,21 @@ var init_body_state = __esm({
 // src/commands/review-start.ts
 var review_start_exports = {};
 __export(review_start_exports, {
-  run: () => run12
+  run: () => run13
 });
-import { existsSync as existsSync8, readFileSync as readFileSync8, readdirSync as readdirSync2 } from "node:fs";
+import { existsSync as existsSync10, readFileSync as readFileSync9, readdirSync as readdirSync4 } from "node:fs";
 import { dirname as dirname3 } from "node:path";
-async function run12(argv2) {
-  const KNOWN_FLAGS = ["site"];
-  const SLUG_RE = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
+async function run13(argv2) {
+  const KNOWN_FLAGS2 = ["site"];
+  const SLUG_RE2 = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
   const { positional, flags } = parse();
   if (positional.length < 2) {
     fail("Usage: deskwork-review-start <project-root> [--site <slug>] <slug>", 2);
   }
   const [rootArg, slug] = positional;
   const projectRoot = absolutize(rootArg);
-  if (!SLUG_RE.test(slug)) {
-    fail(`invalid slug: ${slug} (must match ${SLUG_RE})`);
+  if (!SLUG_RE2.test(slug)) {
+    fail(`invalid slug: ${slug} (must match ${SLUG_RE2})`);
   }
   let config;
   try {
@@ -9769,7 +10553,7 @@ async function run12(argv2) {
   }
   const site = resolveSite(config, flags.site);
   const file = resolveBlogFilePath(projectRoot, config, site, slug);
-  if (!existsSync8(file)) {
+  if (!existsSync10(file)) {
     const siblings = listSiblingSlugs(file);
     const list = siblings.length > 0 ? siblings.join(", ") : "(none)";
     fail(
@@ -9778,7 +10562,7 @@ Existing slugs on ${site}: ${list}.
 Run /deskwork:outline <slug> (or /deskwork:draft) to scaffold it first.`
     );
   }
-  const initialMarkdown = readFileSync8(file, "utf8");
+  const initialMarkdown = readFileSync9(file, "utf8");
   const body = bodyState(file);
   const before = Date.now();
   const workflow = createWorkflow(projectRoot, config, {
@@ -9812,15 +10596,15 @@ Run /deskwork:outline <slug> (or /deskwork:draft) to scaffold it first.`
   });
   function parse() {
     try {
-      return parseArgs(argv2, KNOWN_FLAGS);
+      return parseArgs(argv2, KNOWN_FLAGS2);
     } catch (err2) {
       fail(err2 instanceof Error ? err2.message : String(err2), 2);
     }
   }
   function listSiblingSlugs(blogFile) {
     const dir = dirname3(blogFile);
-    if (!existsSync8(dir)) return [];
-    return readdirSync2(dir).filter((name) => name.endsWith(".md")).map((name) => name.replace(/\.md$/, ""));
+    if (!existsSync10(dir)) return [];
+    return readdirSync4(dir).filter((name) => name.endsWith(".md")).map((name) => name.replace(/\.md$/, ""));
   }
 }
 var init_review_start = __esm({
@@ -9839,6 +10623,7 @@ var SUBCOMMANDS = {
   add: () => Promise.resolve().then(() => (init_add(), add_exports)),
   approve: () => Promise.resolve().then(() => (init_approve(), approve_exports)),
   draft: () => Promise.resolve().then(() => (init_draft(), draft_exports)),
+  ingest: () => Promise.resolve().then(() => (init_ingest2(), ingest_exports)),
   install: () => Promise.resolve().then(() => (init_install(), install_exports)),
   iterate: () => Promise.resolve().then(() => (init_iterate(), iterate_exports)),
   outline: () => Promise.resolve().then(() => (init_outline(), outline_exports)),
@@ -9879,6 +10664,7 @@ function printUsage() {
   out.write("Usage: deskwork <subcommand> [args...]\n\n");
   out.write("Lifecycle:\n");
   out.write("  install         bootstrap deskwork in a project\n");
+  out.write("  ingest          backfill existing markdown into the calendar\n");
   out.write("  add             append an idea to the calendar\n");
   out.write("  plan            move Ideas \u2192 Planned with keywords\n");
   out.write("  outline         scaffold + move Planned \u2192 Outlining\n");

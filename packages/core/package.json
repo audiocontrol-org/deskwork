@@ -1,6 +1,6 @@
 {
   "name": "@deskwork/core",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "Editorial calendar + review pipeline library — shared by @deskwork/cli and @deskwork/studio",
@@ -21,6 +21,9 @@
     "./cli-args": "./src/cli.ts",
     "./config": "./src/config.ts",
     "./frontmatter": "./src/frontmatter.ts",
+    "./ingest": "./src/ingest.ts",
+    "./ingest-derive": "./src/ingest-derive.ts",
+    "./ingest-paths": "./src/ingest-paths.ts",
     "./journal": "./src/journal.ts",
     "./paths": "./src/paths.ts",
     "./rename-slug": "./src/rename-slug.ts",
