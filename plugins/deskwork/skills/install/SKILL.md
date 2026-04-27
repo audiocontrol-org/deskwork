@@ -62,7 +62,13 @@ Invoke the helper script (available on PATH because it lives under the plugin's 
 deskwork install /tmp/deskwork-install-config.json
 ```
 
-Pass the absolute path to the project root. The script:
+Project root defaults to the current working directory. The agent is already running in the host project's directory inside Claude Code, so the one-arg form is the natural call. The first line of output (`Installing into: <abspath>`) confirms the inferred project root before any disk writes happen — if it's wrong, interrupt the run and re-invoke with an explicit project root:
+
+```
+deskwork install /Users/me/work/my-site /tmp/deskwork-install-config.json
+```
+
+The script:
 
 1. Validates the JSON against the config schema
 2. Writes it to `<project-root>/.deskwork/config.json`

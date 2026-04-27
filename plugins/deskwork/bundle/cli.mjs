@@ -1489,13 +1489,24 @@ import { readFileSync as readFileSync4, writeFileSync as writeFileSync3, existsS
 import { dirname, isAbsolute as isAbsolute2, join as join5, resolve as resolve2 } from "node:path";
 async function run4(argv2) {
   function usage() {
-    console.error("Usage: deskwork-install <project-root> <config-file>");
+    console.error(
+      "Usage: deskwork install [<project-root>] <config-file>"
+    );
     process.exit(2);
   }
-  const [projectRootArg, configFileArg] = argv2;
-  if (!projectRootArg || !configFileArg) usage();
+  let projectRootArg;
+  let configFileArg;
+  if (argv2.length === 1) {
+    projectRootArg = process.cwd();
+    configFileArg = argv2[0];
+  } else if (argv2.length === 2) {
+    [projectRootArg, configFileArg] = argv2;
+  } else {
+    usage();
+  }
   const projectRoot = isAbsolute2(projectRootArg) ? projectRootArg : resolve2(process.cwd(), projectRootArg);
   const configFile = isAbsolute2(configFileArg) ? configFileArg : resolve2(process.cwd(), configFileArg);
+  console.log(`Installing into: ${projectRoot}`);
   if (!existsSync3(projectRoot)) {
     console.error(`Project root does not exist: ${projectRoot}`);
     process.exit(1);
