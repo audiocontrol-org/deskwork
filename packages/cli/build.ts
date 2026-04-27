@@ -1,28 +1,31 @@
 #!/usr/bin/env tsx
 /**
- * esbuild bundler for @deskwork/cli — produces a self-contained CommonJS
+ * esbuild bundler for @deskwork/cli — produces a self-contained ESM
  * bundle the plugin's bash wrapper can run via plain `node` without any
  * `npm install` step or workspace symlink chain.
  *
- * Output: `bundle/cli.cjs` (committed to git; ships with the plugin
- * shell so a fresh `git clone` just works).
+ * Output is written into the plugin tree (`plugins/deskwork/bundle/cli.mjs`)
+ * rather than alongside the source package, so the marketplace install
+ * payload — which only ships `plugins/<name>/` — contains the runnable
+ * bundle. A fresh `git clone` and a marketplace install run the same file.
  *
  * Usage:  npm run build  (or `tsx build.ts` directly)
  */
 
 import { build, type BuildOptions, type BuildResult } from 'esbuild';
-import { stat } from 'node:fs/promises';
+import { mkdir, stat } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ENTRY = resolve(HERE, 'src', 'cli.ts');
-// .mjs (ESM) rather than .cjs because the source uses top-level await for
-// the dynamic-import dispatch in cli.ts. Node decides module type by file
-// extension; the bash wrapper invokes `node bundle/cli.mjs` either way.
-const OUT = resolve(HERE, 'bundle', 'cli.mjs');
+// Bundle lives inside the plugin payload so the marketplace install
+// (which copies plugins/<name>/ only) finds it next to bin/deskwork.
+const PLUGIN_ROOT = resolve(HERE, '..', '..', 'plugins', 'deskwork');
+const OUT = resolve(PLUGIN_ROOT, 'bundle', 'cli.mjs');
 
 async function main(): Promise<void> {
+  await mkdir(dirname(OUT), { recursive: true });
   const opts: BuildOptions = {
     entryPoints: [ENTRY],
     outfile: OUT,

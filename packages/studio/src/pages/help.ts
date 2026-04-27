@@ -24,7 +24,7 @@ import {
   KIND_LABEL,
   SKILLS_SORTED,
   type Skill,
-} from '../../public/src/editorial-skills-catalogue.ts';
+} from '../../../../plugins/deskwork-studio/public/src/editorial-skills-catalogue.ts';
 import type { StudioContext } from '../routes/api.ts';
 import { html, unsafe, type RawHtml } from './html.ts';
 import { layout } from './layout.ts';

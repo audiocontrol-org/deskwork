@@ -14,9 +14,11 @@
  *     prose, not the page chrome).
  *   - Site defaults to `config.defaultSite` rather than the hardcoded
  *     `'editorialcontrol'` upstream used.
- *   - The outline-split helper lives under `public/src/` (it's a
- *     browser module) but it's pure TS, so it can run server-side
- *     for the initial render too.
+ *   - The outline-split helper lives under the plugin tree's `public/src/`
+ *     (it's a browser module) but it's pure TS, so it can run server-side
+ *     for the initial render too. After the marketplace-install fix
+ *     (issue #4), `public/` was relocated from packages/studio/ into
+ *     plugins/deskwork-studio/, hence the long relative import below.
  */
 
 import { handleGetWorkflow } from '@deskwork/core/review/handlers';
@@ -28,7 +30,7 @@ import {
   parseDraftFrontmatter,
   renderMarkdownToHtml,
 } from '@deskwork/core/review/render';
-import { splitOutline } from '../../public/src/outline-split.ts';
+import { splitOutline } from '../../../../plugins/deskwork-studio/public/src/outline-split.ts';
 import type { StudioContext } from '../routes/api.ts';
 import { html, unsafe, type RawHtml } from './html.ts';
 import { layout } from './layout.ts';

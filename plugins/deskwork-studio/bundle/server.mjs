@@ -10347,7 +10347,7 @@ var serveStatic = (options = { root: "" }) => {
 };
 
 // src/server.ts
-import { realpathSync } from "node:fs";
+import { existsSync as existsSync6, realpathSync } from "node:fs";
 import { dirname as dirname2, isAbsolute, resolve as resolve2 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
@@ -24282,7 +24282,7 @@ function renderDashboard(ctx) {
   });
 }
 
-// public/src/outline-split.ts
+// ../../plugins/deskwork-studio/public/src/outline-split.ts
 function splitOutline(md) {
   const lines = md.split("\n");
   const startIdx = lines.findIndex((line) => /^##[ \t]+Outline\b/.test(line));
@@ -24671,7 +24671,7 @@ function renderShortformPage(ctx, focus = null) {
   });
 }
 
-// public/src/editorial-skills-catalogue.ts
+// ../../plugins/deskwork-studio/public/src/editorial-skills-catalogue.ts
 var KIND_LABEL = {
   cognitive: "cognitive",
   mechanical: "mechanical",
@@ -25514,7 +25514,17 @@ function usage(error) {
 }
 function publicDir() {
   const here = dirname2(fileURLToPath2(import.meta.url));
-  return resolve2(here, "..", "public");
+  const candidates = [
+    resolve2(here, "..", "public"),
+    resolve2(here, "..", "..", "..", "plugins", "deskwork-studio", "public")
+  ];
+  for (const candidate of candidates) {
+    if (existsSync6(candidate)) return candidate;
+  }
+  throw new Error(
+    `deskwork-studio: could not find public/ assets. Tried:
+  ${candidates.join("\n  ")}`
+  );
 }
 function createApp(ctx) {
   const app = new Hono2();

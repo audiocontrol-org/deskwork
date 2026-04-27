@@ -5,9 +5,10 @@
 # Resolution order (first match wins):
 #   1. Workspace-linked binary (`node_modules/.bin/deskwork`) — the dev
 #      path; runs source via tsx, supports edits without rebuild.
-#   2. Self-contained ESM bundle at `packages/cli/bundle/cli.mjs` —
-#      shipped in the repo, runs via plain `node` with no `npm install`
-#      step. This is what fresh `git clone` installs use.
+#   2. Self-contained ESM bundle inside the plugin tree at
+#      `bundle/cli.mjs` — committed to git and shipped verbatim by the
+#      Claude Code marketplace install (which copies plugins/<name>/
+#      only). Runs via plain `node`, no `npm install` step required.
 #   3. Loud error.
 #
 # Either way, the operator's experience is the same: `deskwork <sub>`.
@@ -28,16 +29,12 @@ for candidate in "${workspace_candidates[@]}"; do
   fi
 done
 
-# (2) Self-contained bundle — ships in the repo at packages/cli/bundle/.
-bundle_candidates=(
-  "${SCRIPT_DIR}/../../../packages/cli/bundle/cli.mjs"
-  "${SCRIPT_DIR}/../../packages/cli/bundle/cli.mjs"
-)
-for candidate in "${bundle_candidates[@]}"; do
-  if [ -f "$candidate" ]; then
-    exec node "$candidate" "$@"
-  fi
-done
+# (2) Plugin-internal bundle — sits next to bin/ so it ships with the
+# marketplace install payload. Single source of truth.
+bundle="${SCRIPT_DIR}/../bundle/cli.mjs"
+if [ -f "$bundle" ]; then
+  exec node "$bundle" "$@"
+fi
 
 # (3) Nothing found.
 cat >&2 <<EOF
@@ -48,9 +45,8 @@ Looked for workspace bin in:
   ${workspace_candidates[1]}
   ${workspace_candidates[2]}
 
-Looked for bundle in:
-  ${bundle_candidates[0]}
-  ${bundle_candidates[1]}
+Looked for bundle at:
+  ${bundle}
 
 If you cloned the deskwork repo manually, run 'npm install' at the repo
 root to populate node_modules/.bin/, or run 'npm --workspace packages/cli
