@@ -459,10 +459,13 @@ describe('studio pages', () => {
     expect(r.text).toContain('/static/dist/editorial-review-client.js');
   });
 
-  it('GET / redirects to the dashboard', async () => {
+  it('GET / redirects to the studio index', async () => {
+    // Phase 17: index page at /dev/ replaces the prior "redirect to
+    // dashboard" landing. The dashboard moves to /dev/editorial-studio
+    // (one of the index entries).
     const res = await app.fetch(new Request('http://x/'), {});
     expect(res.status).toBe(302);
-    expect(res.headers.get('location')).toBe('/dev/editorial-studio');
+    expect(res.headers.get('location')).toBe('/dev/');
   });
 });
 

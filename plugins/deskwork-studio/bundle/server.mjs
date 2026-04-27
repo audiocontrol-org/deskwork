@@ -24098,6 +24098,32 @@ function escapeForScriptTag(json) {
   return json.replace(/<\/(script|!--)/gi, "<\\/$1");
 }
 
+// src/pages/chrome.ts
+var NAV_LINKS = [
+  { key: "index", href: "/dev/", label: "Index" },
+  { key: "dashboard", href: "/dev/editorial-studio", label: "Dashboard" },
+  { key: "content", href: "/dev/content", label: "Content" },
+  { key: "reviews", href: "/dev/editorial-review-shortform", label: "Reviews" },
+  { key: "manual", href: "/dev/editorial-help", label: "Manual" }
+];
+function renderEditorialFolio(active, spineLabel) {
+  const links = NAV_LINKS.map((link2) => {
+    const cls = link2.key === active ? "active" : "";
+    return html6`<a class="${cls}" href="${link2.href}">${link2.label}</a>`;
+  }).join("");
+  const spine = spineLabel ? html6`<div class="er-folio-spine">${spineLabel}</div>` : '<div class="er-folio-spine" aria-hidden="true"></div>';
+  return unsafe(html6`
+    <header class="er-folio">
+      <div class="er-folio-inner">
+        <div class="er-folio-name">deskwork <em>STUDIO</em></div>
+        <nav class="er-folio-nav" aria-label="Studio sections">
+          ${unsafe(links)}
+        </nav>
+        ${unsafe(spine)}
+      </div>
+    </header>`);
+}
+
 // src/pages/dashboard.ts
 var PLATFORMS_ORDER = [
   "reddit",
@@ -24643,6 +24669,7 @@ function renderDashboard(ctx) {
     return renderStageSection(ctx, data, stage, stageEntries, sites).__raw;
   }).join("\n");
   const body3 = html6`
+  ${renderEditorialFolio("dashboard", "press-check")}
   ${renderHeader(data, ctx, now)}
   <main class="er-container">
     ${renderFilterStrip(sites)}
@@ -24662,6 +24689,7 @@ function renderDashboard(ctx) {
     title: "Editorial Studio \u2014 dev",
     cssHrefs: [
       "/static/css/editorial-review.css",
+      "/static/css/editorial-nav.css",
       "/static/css/editorial-studio.css"
     ],
     bodyAttrs: 'data-review-ui="studio"',
@@ -24888,6 +24916,7 @@ function renderError(slug, site, contentKind, message) {
   const startCmd = contentKind === "outline" ? `/editorial-outline --site ${site} ${slug}` : `/editorial-draft-review --site ${site} ${slug}`;
   const body3 = html6`
     <div data-review-ui="longform">
+      ${renderEditorialFolio("reviews", `longform \xB7 ${slug}`)}
       <div class="er-error">
         <h1>No galley to review.</h1>
         <p><strong>Slug:</strong> <code>${slug}</code></p>
@@ -24899,7 +24928,10 @@ function renderError(slug, site, contentKind, message) {
     </div>`;
   return layout({
     title: `Review \u2014 ${slug} \u2014 error`,
-    cssHrefs: ["/static/css/editorial-review.css"],
+    cssHrefs: [
+      "/static/css/editorial-review.css",
+      "/static/css/editorial-nav.css"
+    ],
     bodyHtml: body3,
     scriptModules: []
   });
@@ -25089,6 +25121,7 @@ async function renderReviewPage(ctx, slug, query) {
   const titleField = stringField(fm.title) ?? `Draft: ${slug}`;
   const body3 = html6`
     <div data-review-ui="longform" class="er-review-shell">
+      ${renderEditorialFolio("reviews", `longform \xB7 ${workflow.slug}`)}
       <div class="er-draft-frame">
         <div id="draft-body" data-draft-body
           title="Double-click to edit · select text to leave a margin note">${unsafe(bodyHtml)}</div>
@@ -25119,6 +25152,7 @@ async function renderReviewPage(ctx, slug, query) {
     title: `${titleField} \u2014 Review`,
     cssHrefs: [
       "/static/css/editorial-review.css",
+      "/static/css/editorial-nav.css",
       "/static/css/blog-figure.css",
       "/static/css/review-viewport.css",
       "/static/css/scrap-row.css"
@@ -25211,6 +25245,7 @@ function renderShortformPage(ctx, focus = null) {
         Start one with <code>/editorial-shortform-draft --site &lt;site&gt; &lt;slug&gt; &lt;platform&gt;</code>
       </div>` : ordered.map((p2) => renderPlatformSection(p2, byPlatform.get(p2) ?? []).__raw).join("");
   const body3 = html6`
+    ${renderEditorialFolio("reviews", "shortform desk")}
     <header class="er-masthead">
       <div class="er-masthead-kicker">All sites · short form</div>
       <h1 class="er-masthead-title">The <em>compositor</em>'s desk</h1>
@@ -25233,6 +25268,7 @@ function renderShortformPage(ctx, focus = null) {
     title: "Short form \u2014 all sites \u2014 dev",
     cssHrefs: [
       "/static/css/editorial-review.css",
+      "/static/css/editorial-nav.css",
       "/static/css/editorial-studio.css"
     ],
     bodyAttrs: 'data-review-ui="shortform"',
@@ -25820,6 +25856,7 @@ function renderColophon() {
 function renderHelpPage(ctx) {
   const now = ctx.now ? ctx.now() : /* @__PURE__ */ new Date();
   const body3 = html6`
+    ${renderEditorialFolio("manual", "compositor's manual")}
     <a class="eh-back" href="/dev/editorial-studio">back to the studio</a>
     <div class="eh-rail" aria-hidden="true"></div>
     <div class="eh-container">
@@ -25837,6 +25874,7 @@ function renderHelpPage(ctx) {
     title: "The Compositor's Manual \u2014 Editorial Calendar \u2014 dev",
     cssHrefs: [
       "/static/css/editorial-review.css",
+      "/static/css/editorial-nav.css",
       "/static/css/editorial-help.css"
     ],
     bodyAttrs: 'data-review-ui="manual"',
@@ -26011,6 +26049,7 @@ function renderScrapbookPage(ctx, site, path) {
   const publicBlock = items.length === 0 ? renderEmpty().__raw : renderReadingPanel(items).__raw + renderIndexSidebar(items, site, path).__raw;
   const secretBlock = secretItems.length > 0 ? renderSecretSection(secretItems).__raw : "";
   const body3 = html6`
+    ${renderEditorialFolio("content", `scrapbook \xB7 ${site}/${path}`)}
     <main class="scrapbook-page" data-site="${site}" data-slug="${path}" data-scrapbook-root>
       <header class="scrapbook-header">
         <p class="scrapbook-kicker">
@@ -26031,7 +26070,12 @@ function renderScrapbookPage(ctx, site, path) {
     </main>`;
   return layout({
     title: `scrapbook \xB7 ${path} \u2014 dev`,
-    cssHrefs: ["/static/css/scrapbook.css"],
+    cssHrefs: [
+      "/static/css/editorial-review.css",
+      "/static/css/editorial-nav.css",
+      "/static/css/scrapbook.css"
+    ],
+    bodyAttrs: 'data-review-ui="studio"',
     bodyHtml: body3,
     scriptModules: ["/static/dist/scrapbook-client.js"]
   });
@@ -26234,34 +26278,6 @@ function flattenForRender(root3) {
   };
   walk(root3, 0, true);
   return out;
-}
-
-// src/pages/chrome.ts
-var NAV_LINKS = [
-  { key: "dashboard", href: "/dev/editorial-studio", label: "Dashboard" },
-  { key: "content", href: "/dev/content", label: "Content" },
-  { key: "reviews", href: "/dev/editorial-review-shortform", label: "Reviews" },
-  { key: "manual", href: "/dev/editorial-help", label: "Manual" }
-];
-function siteSummary(ctx) {
-  const slugs = Object.keys(ctx.config.sites);
-  if (slugs.length === 1) return slugs[0];
-  return `${slugs.length} sites`;
-}
-function renderEditorialChrome(ctx, active) {
-  const links = NAV_LINKS.map(
-    (link2) => html6`<a class="${link2.key === active ? "active" : ""}" href="${link2.href}">${link2.label}</a>`
-  ).join("");
-  return unsafe(html6`
-    <header class="ed-chrome">
-      <div class="ed-chrome__inner">
-        <div class="ed-chrome__brand">deskwork<sup>STUDIO</sup></div>
-        <div class="ed-chrome__site"><b>${siteSummary(ctx)}</b></div>
-        <nav class="ed-chrome__nav" aria-label="Studio sections">
-          ${unsafe(links)}
-        </nav>
-      </div>
-    </header>`);
 }
 
 // src/pages/content-detail.ts
@@ -26520,7 +26536,7 @@ function renderContentTopLevel(ctx) {
   const sites = loadAllSites(ctx);
   const counts = aggregateCounts(sites);
   const body3 = html6`
-    ${renderEditorialChrome(ctx, "content")}
+    ${renderEditorialFolio("content", "the shape of the work")}
     <main class="content-page">
       <header class="page-head">
         <div>
@@ -26543,7 +26559,13 @@ function renderContentTopLevel(ctx) {
     </main>`;
   return layout({
     title: "Content \u2014 deskwork",
-    cssHrefs: ["/static/css/content.css", "/static/css/scrap-row.css"],
+    cssHrefs: [
+      "/static/css/editorial-review.css",
+      "/static/css/editorial-nav.css",
+      "/static/css/content.css",
+      "/static/css/scrap-row.css"
+    ],
+    bodyAttrs: 'data-review-ui="studio"',
     bodyHtml: body3,
     scriptModules: []
   });
@@ -26660,7 +26682,7 @@ async function renderContentProject(ctx, site, projectSlug, selectedSlug) {
   const selectedNode = selectedSlug ? findNode(project, selectedSlug) : null;
   const detailBlock = selectedNode ? await renderNodeDetail(ctx, site, selectedNode) : renderEmptyDetail();
   const body3 = html6`
-    ${renderEditorialChrome(ctx, "content")}
+    ${renderEditorialFolio("content", `drilldown \xB7 ${project.rootSlug}`)}
     <main class="content-page">
       <section class="drilldown">
         <div class="drilldown__tree">
@@ -26680,7 +26702,13 @@ async function renderContentProject(ctx, site, projectSlug, selectedSlug) {
     status: 200,
     html: layout({
       title: `${project.title} \xB7 content \u2014 deskwork`,
-      cssHrefs: ["/static/css/content.css", "/static/css/scrap-row.css"],
+      cssHrefs: [
+        "/static/css/editorial-review.css",
+        "/static/css/editorial-nav.css",
+        "/static/css/content.css",
+        "/static/css/scrap-row.css"
+      ],
+      bodyAttrs: 'data-review-ui="studio"',
       bodyHtml: body3,
       scriptModules: []
     })
@@ -26688,6 +26716,7 @@ async function renderContentProject(ctx, site, projectSlug, selectedSlug) {
 }
 function renderNotFound(message) {
   const body3 = html6`
+    ${renderEditorialFolio("content", "not found")}
     <main class="content-page">
       <section class="content-error">
         <h1>Not found</h1>
@@ -26697,7 +26726,162 @@ function renderNotFound(message) {
     </main>`;
   return layout({
     title: "Not found \u2014 deskwork",
-    cssHrefs: ["/static/css/content.css"],
+    cssHrefs: [
+      "/static/css/editorial-review.css",
+      "/static/css/editorial-nav.css",
+      "/static/css/content.css"
+    ],
+    bodyAttrs: 'data-review-ui="studio"',
+    bodyHtml: body3,
+    scriptModules: []
+  });
+}
+
+// src/pages/index.ts
+var SECTIONS = [
+  {
+    ornament: "\xB6",
+    name: "Pipeline",
+    count: "i. \u2014 1 surface",
+    entries: [
+      {
+        numeral: "I",
+        titleHtml: "Dashboard",
+        titleText: "Dashboard",
+        route: "/dev/editorial-studio",
+        desc: "Press-check. The calendar across all sites; awaiting press; recent proofs; voice-drift signal."
+      }
+    ]
+  },
+  {
+    ornament: "\xB6",
+    name: "Review desk",
+    count: "ii.\u2013iii. \u2014 2 surfaces",
+    entries: [
+      {
+        numeral: "II",
+        titleHtml: "Shortform reviews",
+        titleText: "Shortform reviews",
+        route: "/dev/editorial-review-shortform",
+        desc: "Cross-platform copy desk. Reddit, LinkedIn, YouTube, Instagram \u2014 galley slips, one per platform."
+      },
+      {
+        numeral: "III",
+        titleHtml: "Longform reviews",
+        titleText: "Longform reviews",
+        route: "/dev/editorial-review/<slug>",
+        template: { prefix: "/dev/editorial-review/", placeholder: "<slug>" },
+        desc: "Per-entry margin notes, decisions, iterate flow.",
+        hint: "entry-by-entry",
+        postHint: "Reach via the Dashboard or Content view; each review is opened against a specific slug."
+      }
+    ]
+  },
+  {
+    ornament: "\xB6",
+    name: "Browse",
+    count: "iv.\u2013v. \u2014 2 surfaces",
+    entries: [
+      {
+        numeral: "IV",
+        titleHtml: "Content view",
+        titleText: "Content view",
+        route: "/dev/content",
+        desc: "The shape of the work. A drillable tree of nodes; click any to read its head matter and browse its scrapbook."
+      },
+      {
+        numeral: "V",
+        titleHtml: "Scrapbook",
+        titleText: "Scrapbook",
+        route: "/dev/scrapbook/<site>/<path>",
+        template: { prefix: "/dev/scrapbook/", placeholder: "<site>/<path>" },
+        desc: "Research, receipts, working notes. Addressed by hierarchical path; secret items appear in their own section.",
+        hint: "path-addressed",
+        postHint: "Reach via the Content view's per-node drawer, or address directly."
+      }
+    ]
+  },
+  {
+    ornament: "\xB6",
+    name: "Reference",
+    count: "vi. \u2014 1 surface",
+    entries: [
+      {
+        numeral: "VI",
+        titleHtml: "The Compositor's <em>Manual</em>",
+        titleText: "The Compositor's Manual",
+        route: "/dev/editorial-help",
+        desc: "The workflow, the skill catalogue, the names of the things \u2014 read once, return when the work asks."
+      }
+    ]
+  }
+];
+function renderEntryTitle(entry) {
+  if (entry.template) {
+    return html6`<span class="er-toc-entry__title">${unsafe(entry.titleHtml)}</span>`;
+  }
+  return html6`<a class="er-toc-entry__title" href="${entry.route}">${unsafe(entry.titleHtml)}</a>`;
+}
+function renderEntryRoute(entry) {
+  if (entry.template) {
+    return html6`<span class="er-toc-entry__route is-template">${entry.template.prefix}<em>${entry.template.placeholder}</em></span>`;
+  }
+  return html6`<span class="er-toc-entry__route">${entry.route}</span>`;
+}
+function renderEntryDesc(entry) {
+  const hint = entry.hint ? html6` <span class="er-toc-entry__hint">${entry.hint}</span>` : "";
+  const post = entry.postHint ? html6` <em>${entry.postHint}</em>` : "";
+  return html6`<p class="er-toc-entry__desc">${entry.desc}${unsafe(hint)}${unsafe(post)}</p>`;
+}
+function renderEntry(entry) {
+  return unsafe(html6`
+    <li class="er-toc-entry">
+      <div class="er-toc-entry__row">
+        <span class="er-toc-entry__num">${entry.numeral}</span>
+        ${unsafe(renderEntryTitle(entry))}
+        ${unsafe(renderEntryRoute(entry))}
+      </div>
+      ${unsafe(renderEntryDesc(entry))}
+    </li>`);
+}
+function renderSection(section) {
+  return unsafe(html6`
+    <section class="er-toc-section">
+      <div class="er-toc-section-head">
+        <span class="er-toc-section-head__ornament">${section.ornament}</span>
+        <span class="er-toc-section-head__name">${section.name}</span>
+        <span class="er-toc-section-head__count">${section.count}</span>
+      </div>
+      <ol class="er-toc-list">
+        ${section.entries.map(renderEntry)}
+      </ol>
+    </section>`);
+}
+function renderStudioIndex(_ctx) {
+  const body3 = html6`
+    ${renderEditorialFolio("index", "index of the press")}
+    <main class="er-toc-page">
+      <header class="er-toc-head">
+        <div class="er-toc-head__kicker">Index of the <em>Press</em></div>
+        <h1 class="er-toc-head__title">Editorial <em>Studio</em></h1>
+        <p class="er-toc-head__deck">
+          A reference of the dev surfaces — pipeline, review desk, browse, manual.
+          Begin where the work is.
+        </p>
+      </header>
+      ${SECTIONS.map(renderSection)}
+      <footer class="er-toc-colophon">
+        Pressed in the deskwork studio. Loopback only.<br>
+        <span class="er-toc-colophon__rule"></span>
+      </footer>
+    </main>`;
+  return layout({
+    title: "Editorial Studio \u2014 Index",
+    cssHrefs: [
+      "/static/css/editorial-review.css",
+      "/static/css/editorial-nav.css"
+    ],
+    bodyAttrs: 'data-review-ui="studio"',
     bodyHtml: body3,
     scriptModules: []
   });
@@ -26843,6 +27027,8 @@ function publicDir() {
 function createApp(ctx) {
   const app = new Hono2();
   app.route("/api/dev/editorial-review", createApiRouter(ctx));
+  app.get("/dev", (c) => c.html(renderStudioIndex(ctx)));
+  app.get("/dev/", (c) => c.html(renderStudioIndex(ctx)));
   app.get("/dev/editorial-studio", (c) => c.html(renderDashboard(ctx)));
   app.get("/dev/editorial-help", (c) => c.html(renderHelpPage(ctx)));
   app.get(
@@ -26887,7 +27073,7 @@ function createApp(ctx) {
       rewriteRequestPath: (path) => path.replace(/^\/static/, "")
     })
   );
-  app.get("/", (c) => c.redirect("/dev/editorial-studio"));
+  app.get("/", (c) => c.redirect("/dev/"));
   return app;
 }
 async function main() {

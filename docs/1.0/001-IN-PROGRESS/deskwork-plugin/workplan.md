@@ -451,23 +451,23 @@ Surfaced during writingcontrol.org acceptance testing of v0.4.2: the operator hi
 **Design reference:** [`mockups/editorial-nav-and-index.html`](mockups/editorial-nav-and-index.html). Three states: folio strip atop dashboard masthead, folio strip atop content-view header, full studio index.
 
 Tasks:
-- [ ] `packages/studio/src/pages/chrome.ts` — replace `renderEditorialChrome` with `renderEditorialFolio(active: ChromeActiveLink)` matching the mockup's folio strip. Three-column grid: wordmark / nav / spine. Active link gets the red-pencil tick mark via `::before`. Sticky positioning. Existing `ChromeActiveLink` union extended with `'index'`.
-- [ ] `packages/studio/src/pages/index.ts` (NEW) — `renderStudioIndex(ctx: StudioContext)` returning the full TOC page per the mockup's State 3. Four sections (Pipeline / Review desk / Browse / Reference), six entries total. Templated routes (longform reviews, scrapbook) render the slug placeholder in red-pencil italic.
-- [ ] `packages/studio/src/server.ts` — add `app.get('/dev', ...)` and `app.get('/dev/', ...)` routes for the index. Update the existing `app.get('/', ...)` redirect to point at `/dev/` (was `/dev/editorial-studio`).
-- [ ] `plugins/deskwork-studio/public/css/editorial-nav.css` (NEW) or extend `editorial-studio.css` — the folio strip CSS + index TOC CSS, both using existing `--er-*` tokens only. No new variables.
-- [ ] `plugins/deskwork-studio/public/css/content.css` — remove the `.ed-chrome*` rules (replaced by `.er-folio*`). Migration touches only the chrome layer; the Writer's Catalog viewport CSS stays.
-- [ ] Wire `renderEditorialFolio()` into the existing page renderers: `dashboard.ts`, `review.ts`, `shortform.ts`, `help.ts`, `scrapbook.ts`, `content.ts`. Each page renders the folio strip ABOVE its existing bespoke masthead — masthead identity preserved, cross-page nav added. The content-view's `.ed-chrome` is removed in favor of the folio.
-- [ ] `packages/studio/test/index-page.test.ts` (NEW) — integration test for `/dev/` and `/dev` routes: returns 200, includes folio strip, includes all 6 entries with their routes, active link is `Index`.
-- [ ] `packages/studio/test/folio-cross-page.test.ts` (NEW) — for each of the 6 surfaces, assert the rendered HTML includes `er-folio`, has the correct `active` link marked, and contains links to all 5 other surfaces.
+- [x] `packages/studio/src/pages/chrome.ts` — replace `renderEditorialChrome` with `renderEditorialFolio(active: ChromeActiveLink, spineLabel?: string)` matching the mockup's folio strip. Three-column grid: wordmark / nav / spine. Active link gets the red-pencil tick mark via `::before`. Sticky positioning. Existing `ChromeActiveLink` union extended with `'index'`.
+- [x] `packages/studio/src/pages/index.ts` (NEW) — `renderStudioIndex(ctx: StudioContext)` returning the full TOC page per the mockup's State 3. Four sections (Pipeline / Review desk / Browse / Reference), six entries total. Templated routes (longform reviews, scrapbook) render the slug placeholder in red-pencil italic.
+- [x] `packages/studio/src/server.ts` — add `app.get('/dev', ...)` and `app.get('/dev/', ...)` routes for the index. Update the existing `app.get('/', ...)` redirect to point at `/dev/` (was `/dev/editorial-studio`).
+- [x] `plugins/deskwork-studio/public/css/editorial-nav.css` (NEW) — folio strip CSS + index TOC CSS, scoped under `[data-review-ui]` and using only existing `--er-*` tokens. No new variables.
+- [x] `plugins/deskwork-studio/public/css/content.css` — `.ed-chrome*` rules removed (replaced by `.er-folio*` in editorial-nav.css). Writer's Catalog viewport CSS preserved.
+- [x] Wired `renderEditorialFolio()` into all page renderers: `dashboard.ts`, `review.ts` (longform main + error), `shortform.ts`, `help.ts`, `scrapbook.ts`, `content.ts` (top-level + drilldown + not-found). Each page renders the folio strip ABOVE its existing bespoke masthead. The content-view's `.ed-chrome` is replaced by the folio.
+- [x] `packages/studio/test/index-page.test.ts` (NEW) — integration tests for `/dev/` and `/dev` routes: returns 200, includes folio strip, includes all 6 entries with their routes, active link is `Index`. Plus the root redirect now points at `/dev/`.
+- [x] `packages/studio/test/folio-cross-page.test.ts` (NEW) — for each of the 7 reachable surfaces (index, dashboard, content, shortform, help, scrapbook, longform-error), asserts the rendered HTML includes `er-folio`, the correct `active` link is marked, and all 5 nav links are present.
 
 **Acceptance Criteria:**
-- [ ] Every studio page renders the folio strip at top with all 5 nav links visible. Active surface marked with the red-pencil tick.
-- [ ] `http://localhost:47321/dev/` renders the studio index TOC; was 404 before.
-- [ ] Visual posture matches the mockup — no third aesthetic introduced; folio + index reuse existing `--er-*` tokens.
-- [ ] `.ed-chrome*` CSS rules removed from `content.css` (the bird's-eye view now uses the folio like every other surface).
-- [ ] All tests green: `npm --workspaces --if-present test`.
-- [ ] Typecheck clean for all 3 packages.
-- [ ] Bundles regenerated and committed.
+- [x] Every studio page renders the folio strip at top with all 5 nav links visible. Active surface marked with the red-pencil tick.
+- [x] `http://localhost:47321/dev/` renders the studio index TOC; was 404 before.
+- [x] Visual posture matches the mockup — no third aesthetic introduced; folio + index reuse existing `--er-*` tokens.
+- [x] `.ed-chrome*` CSS rules removed from `content.css` (the bird's-eye view now uses the folio like every other surface).
+- [x] All tests green: `npm --workspaces --if-present test` (core 222, cli 61, studio 131 = 414 total; was 360 → +54).
+- [x] Typecheck clean for all 3 packages.
+- [x] Bundles regenerated and committed.
 
 **Notes:**
 - The dashboard's bespoke `er-masthead` (with "Vol. X · № Y · Press-check" kicker) STAYS. Folio strip sits above it as a separate element. Same for shortform, help, scrapbook — preserve each page's identity.

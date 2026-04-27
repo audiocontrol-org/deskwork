@@ -90,81 +90,11 @@ body::before {
   background-size: 3px 3px;
 }
 
-/* ---------- Editorial chrome ---------- */
-
-.ed-chrome {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  padding: 24px 0 18px;
-  background: linear-gradient(to bottom, var(--paper) 60%, rgba(250, 246, 238, 0));
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-}
-
-.ed-chrome__inner {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: baseline;
-  gap: 32px;
-  border-bottom: 1px solid var(--rule);
-  padding-bottom: 14px;
-}
-
-.ed-chrome__brand {
-  font-family: var(--font-display);
-  font-variation-settings: "opsz" 144, "SOFT" 30, "WONK" 0;
-  font-weight: 500;
-  font-size: 24px;
-  letter-spacing: -0.02em;
-  color: var(--ink);
-}
-
-.ed-chrome__brand sup {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 500;
-  letter-spacing: 0.12em;
-  color: var(--ink-light);
-  margin-left: 8px;
-  vertical-align: top;
-  position: relative;
-  top: 4px;
-}
-
-.ed-chrome__nav {
-  display: flex;
-  gap: 28px;
-  justify-self: end;
-  margin-right: 20px;
-}
-
-.ed-chrome__nav a {
-  font-family: var(--font-body);
-  font-size: 13px;
-  color: var(--ink-mid);
-  text-decoration: none;
-  letter-spacing: 0.005em;
-  padding-bottom: 2px;
-  border-bottom: 1px solid transparent;
-  transition: color 0.18s ease, border-color 0.18s ease;
-}
-
-.ed-chrome__nav a:hover { color: var(--ink); border-bottom-color: var(--rule); }
-
-.ed-chrome__nav a.active {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
-}
-
-.ed-chrome__site {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--ink-light);
-  letter-spacing: 0.04em;
-}
-
-.ed-chrome__site b { font-weight: 500; color: var(--ink-mid); }
+/* ---------- Editorial chrome ----------
+ * Phase 17 removed the bespoke .ed-chrome strip. Cross-page nav now
+ * lives in editorial-nav.css (the .er-folio strip rendered above the
+ * content view's bird's-eye masthead).
+ */
 
 /* ---------- Page head ---------- */
 

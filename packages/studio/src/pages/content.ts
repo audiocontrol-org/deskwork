@@ -19,7 +19,7 @@
  *
  * Helpers:
  *   - `pages/content-detail.ts` — detail panel rendering.
- *   - `pages/chrome.ts` — top-of-page editorial chrome.
+ *   - `pages/chrome.ts` — cross-page editorial folio strip (`renderEditorialFolio`).
  *   - `components/scrapbook-item.ts` — shared scrap-row renderer.
  *   - `@deskwork/core/content-tree` — pure tree assembly.
  */
@@ -41,7 +41,7 @@ import type { Stage } from '@deskwork/core/types';
 import type { StudioContext } from '../routes/api.ts';
 import { html, unsafe, type RawHtml } from './html.ts';
 import { layout } from './layout.ts';
-import { renderEditorialChrome } from './chrome.ts';
+import { renderEditorialFolio } from './chrome.ts';
 import { renderEmptyDetail, renderNodeDetail } from './content-detail.ts';
 import { scrapbookViewerUrl } from '../components/scrapbook-item.ts';
 
@@ -190,7 +190,7 @@ export function renderContentTopLevel(ctx: StudioContext): string {
   const counts = aggregateCounts(sites);
 
   const body = html`
-    ${renderEditorialChrome(ctx, 'content')}
+    ${renderEditorialFolio('content', 'the shape of the work')}
     <main class="content-page">
       <header class="page-head">
         <div>
@@ -214,7 +214,13 @@ export function renderContentTopLevel(ctx: StudioContext): string {
 
   return layout({
     title: 'Content — deskwork',
-    cssHrefs: ['/static/css/content.css', '/static/css/scrap-row.css'],
+    cssHrefs: [
+      '/static/css/editorial-review.css',
+      '/static/css/editorial-nav.css',
+      '/static/css/content.css',
+      '/static/css/scrap-row.css',
+    ],
+    bodyAttrs: 'data-review-ui="studio"',
     bodyHtml: body,
     scriptModules: [],
   });
@@ -376,7 +382,7 @@ export async function renderContentProject(
     : renderEmptyDetail();
 
   const body = html`
-    ${renderEditorialChrome(ctx, 'content')}
+    ${renderEditorialFolio('content', `drilldown · ${project.rootSlug}`)}
     <main class="content-page">
       <section class="drilldown">
         <div class="drilldown__tree">
@@ -397,7 +403,13 @@ export async function renderContentProject(
     status: 200,
     html: layout({
       title: `${project.title} · content — deskwork`,
-      cssHrefs: ['/static/css/content.css', '/static/css/scrap-row.css'],
+      cssHrefs: [
+        '/static/css/editorial-review.css',
+        '/static/css/editorial-nav.css',
+        '/static/css/content.css',
+        '/static/css/scrap-row.css',
+      ],
+      bodyAttrs: 'data-review-ui="studio"',
       bodyHtml: body,
       scriptModules: [],
     }),
@@ -406,6 +418,7 @@ export async function renderContentProject(
 
 function renderNotFound(message: string): string {
   const body = html`
+    ${renderEditorialFolio('content', 'not found')}
     <main class="content-page">
       <section class="content-error">
         <h1>Not found</h1>
@@ -415,7 +428,12 @@ function renderNotFound(message: string): string {
     </main>`;
   return layout({
     title: 'Not found — deskwork',
-    cssHrefs: ['/static/css/content.css'],
+    cssHrefs: [
+      '/static/css/editorial-review.css',
+      '/static/css/editorial-nav.css',
+      '/static/css/content.css',
+    ],
+    bodyAttrs: 'data-review-ui="studio"',
     bodyHtml: body,
     scriptModules: [],
   });
