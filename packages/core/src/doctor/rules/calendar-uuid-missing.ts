@@ -162,6 +162,7 @@ const rule: DoctorRule = {
         finding: plan.finding,
         applied: false,
         message: 'plan is not directly appliable; runner should resolve prompt first',
+        skipReason: 'apply-failed',
       };
     }
     const calendarPath = String(plan.payload.calendarPath ?? '');
@@ -170,6 +171,7 @@ const rule: DoctorRule = {
         finding: plan.finding,
         applied: false,
         message: 'apply payload missing calendarPath',
+        skipReason: 'apply-failed',
       };
     }
     try {
@@ -184,6 +186,7 @@ const rule: DoctorRule = {
         finding: plan.finding,
         applied: false,
         message: `failed to re-write calendar: ${reason}`,
+        skipReason: 'apply-failed',
       };
     }
     // Re-read what's now on disk to update the runner's view of

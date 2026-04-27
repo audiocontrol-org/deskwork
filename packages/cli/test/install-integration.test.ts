@@ -280,6 +280,191 @@ describe('deskwork-install', () => {
     }
   });
 
+  it('schema pre-flight: prints patch instructions on Astro projects with strict schema (Issue #42)', () => {
+    project = newProject();
+    tmpConfigs = newTmpConfigDir();
+    try {
+      // Bare-bones Astro fixture: astro config at root + a strict
+      // content schema with no deskwork field and no passthrough.
+      writeFileSync(
+        join(project, 'astro.config.mjs'),
+        'export default {};\n',
+        'utf-8',
+      );
+      mkdirSync(join(project, 'src/content'), { recursive: true });
+      writeFileSync(
+        join(project, 'src/content/config.ts'),
+        [
+          "import { defineCollection, z } from 'astro:content';",
+          '',
+          'const blog = defineCollection({',
+          "  type: 'content',",
+          '  schema: z.object({',
+          '    title: z.string(),',
+          '  }),',
+          '});',
+          '',
+          'export const collections = { blog };',
+          '',
+        ].join('\n'),
+        'utf-8',
+      );
+      const cfgFile = writeConfigFile(tmpConfigs, {
+        version: 1,
+        sites: {
+          main: {
+            host: 'example.com',
+            contentDir: 'src/content/blog',
+            calendarPath: '.deskwork/calendar.md',
+          },
+        },
+      });
+      const res = run([project, cfgFile]);
+      expect(res.code).toBe(0);
+      expect(res.stdout).toMatch(/Schema pre-flight: UNCERTAIN/);
+      // The patch instructions text is printed inline.
+      expect(res.stdout).toMatch(/deskwork:\s*z\.object/);
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+      rmSync(tmpConfigs, { recursive: true, force: true });
+    }
+  });
+
+  it('schema pre-flight: reports OK when schema declares a `deskwork` field (Issue #42)', () => {
+    project = newProject();
+    tmpConfigs = newTmpConfigDir();
+    try {
+      writeFileSync(
+        join(project, 'astro.config.mjs'),
+        'export default {};\n',
+        'utf-8',
+      );
+      mkdirSync(join(project, 'src/content'), { recursive: true });
+      writeFileSync(
+        join(project, 'src/content/config.ts'),
+        [
+          "import { defineCollection, z } from 'astro:content';",
+          '',
+          'const blog = defineCollection({',
+          '  schema: z.object({',
+          '    deskwork: z.object({ id: z.string().uuid() }).passthrough().optional(),',
+          '    title: z.string(),',
+          '  }),',
+          '});',
+          '',
+        ].join('\n'),
+        'utf-8',
+      );
+      const cfgFile = writeConfigFile(tmpConfigs, {
+        version: 1,
+        sites: {
+          main: {
+            host: 'example.com',
+            contentDir: 'src/content/blog',
+            calendarPath: '.deskwork/calendar.md',
+          },
+        },
+      });
+      const res = run([project, cfgFile]);
+      expect(res.code).toBe(0);
+      expect(res.stdout).toMatch(/Schema pre-flight: OK/);
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+      rmSync(tmpConfigs, { recursive: true, force: true });
+    }
+  });
+
+  it('schema pre-flight: skipped on non-Astro projects (Issue #42)', () => {
+    project = newProject();
+    tmpConfigs = newTmpConfigDir();
+    try {
+      const cfgFile = writeConfigFile(tmpConfigs, {
+        version: 1,
+        sites: {
+          main: {
+            host: 'example.com',
+            contentDir: 'content/blog',
+            calendarPath: '.deskwork/calendar.md',
+          },
+        },
+      });
+      const res = run([project, cfgFile]);
+      expect(res.code).toBe(0);
+      expect(res.stdout).toMatch(/Schema pre-flight: skipped/);
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+      rmSync(tmpConfigs, { recursive: true, force: true });
+    }
+  });
+
+  it('existing-pipeline detection: warns about competing in-house implementations (Issue #45)', () => {
+    project = newProject();
+    tmpConfigs = newTmpConfigDir();
+    try {
+      // Plant signals matching the audiocontrol layout described in #45.
+      mkdirSync(join(project, 'journal/editorial/history'), { recursive: true });
+      mkdirSync(join(project, '.claude/skills/editorial-add'), {
+        recursive: true,
+      });
+      mkdirSync(join(project, '.claude/skills/editorial-plan'), {
+        recursive: true,
+      });
+      mkdirSync(join(project, '.claude/skills/editorial-outline'), {
+        recursive: true,
+      });
+      mkdirSync(join(project, 'scripts/lib/editorial-review'), {
+        recursive: true,
+      });
+
+      const cfgFile = writeConfigFile(tmpConfigs, {
+        version: 1,
+        sites: {
+          main: {
+            host: 'example.com',
+            contentDir: 'content/blog',
+            calendarPath: '.deskwork/calendar.md',
+          },
+        },
+      });
+      const res = run([project, cfgFile]);
+      expect(res.code).toBe(0);
+      expect(res.stdout).toMatch(
+        /Detected existing editorial-pipeline signals/,
+      );
+      expect(res.stdout).toMatch(/journal\/editorial/);
+      expect(res.stdout).toMatch(/editorial-add/);
+      expect(res.stdout).toMatch(/install ALONGSIDE/);
+      expect(res.stdout).toMatch(/Resolve overlap manually/);
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+      rmSync(tmpConfigs, { recursive: true, force: true });
+    }
+  });
+
+  it('existing-pipeline detection: silent on bare projects (Issue #45)', () => {
+    project = newProject();
+    tmpConfigs = newTmpConfigDir();
+    try {
+      const cfgFile = writeConfigFile(tmpConfigs, {
+        version: 1,
+        sites: {
+          main: {
+            host: 'example.com',
+            contentDir: 'content/blog',
+            calendarPath: '.deskwork/calendar.md',
+          },
+        },
+      });
+      const res = run([project, cfgFile]);
+      expect(res.code).toBe(0);
+      // No warning should appear.
+      expect(res.stdout).not.toMatch(/Detected existing editorial-pipeline/);
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+      rmSync(tmpConfigs, { recursive: true, force: true });
+    }
+  });
+
   it('two-arg form: explicit project-root still works', () => {
     // Backward-compat: `deskwork install <project-root> <config-file>`
     // continues to behave as it did before the one-arg shape was added.

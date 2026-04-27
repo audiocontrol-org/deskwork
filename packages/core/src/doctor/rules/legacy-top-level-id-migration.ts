@@ -226,6 +226,7 @@ const rule: DoctorRule = {
         applied: false,
         message:
           'plan is not directly appliable; runner should resolve prompt first',
+        skipReason: 'apply-failed',
       };
     }
     const absPath = String(plan.payload.absolutePath ?? '');
@@ -235,6 +236,7 @@ const rule: DoctorRule = {
         finding: plan.finding,
         applied: false,
         message: 'apply payload missing absolutePath or legacyId',
+        skipReason: 'apply-failed',
       };
     }
     try {
@@ -245,6 +247,7 @@ const rule: DoctorRule = {
         finding: plan.finding,
         applied: false,
         message: `failed to migrate frontmatter id: ${reason}`,
+        skipReason: 'apply-failed',
       };
     }
     return {

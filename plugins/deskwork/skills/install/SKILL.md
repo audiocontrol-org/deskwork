@@ -79,7 +79,30 @@ If the helper exits non-zero, **do not retry blindly** — read the error, corre
 
 ### Step 5 — Note the host content-schema requirement (Astro projects only)
 
-Deskwork binds calendar entries to their content files via `id: <uuid>` written into each markdown's frontmatter. Astro content-collection schemas are strict by default and will reject any unknown frontmatter field — including `id`. After install, before the first `/deskwork:outline` (or `/deskwork:ingest`) writes a file with frontmatter, confirm that each collection's schema permits the `id` field. The plugin's [`README.md`](../../README.md#content-schema-requirement) has the one-line patches (`z.string().uuid().optional()` or `.passthrough()`); the `doctor` skill's `schema-rejected` rule prints the same instructions if a write hits the rejection.
+Deskwork binds calendar entries to their content files via a UUID written under a `deskwork:` mapping in each markdown's frontmatter (i.e. `deskwork.id`). Astro content-collection schemas are strict by default and will reject any unknown frontmatter field — including the `deskwork:` namespace. After install, before the first `/deskwork:outline` (or `/deskwork:ingest`) writes a file with frontmatter, confirm that each collection's schema permits the namespace.
+
+Pick one of these patches and apply it to every Astro collection schema (typically `src/content/config.ts` or `src/content.config.ts`):
+
+**Option 1 — explicit `deskwork` namespace (recommended)**
+
+```ts
+schema: z.object({
+  deskwork: z.object({ id: z.string().uuid() }).passthrough().optional(),
+  // ...your existing fields
+})
+```
+
+**Option 2 — passthrough unknown keys at the top level**
+
+```ts
+schema: z.object({
+  // ...your existing fields
+}).passthrough()
+```
+
+The `doctor` skill's `schema-rejected` rule prints the same instructions if a write hits the rejection.
+
+> **Note:** Top-level `id: z.string().uuid().optional()` is **NOT** what to add — that field belongs to the operator's keyspace. Deskwork no longer claims it (Issue #38, v0.7.2). A top-level `id` schema field is silently a no-op against deskwork's binding because the binding lives under `deskwork:`.
 
 Hugo, Jekyll, Eleventy, and plain-markdown projects don't validate frontmatter against a schema — nothing to do for those.
 

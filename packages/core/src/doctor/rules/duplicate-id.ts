@@ -122,6 +122,7 @@ const rule: DoctorRule = {
         finding: plan.finding,
         applied: false,
         message: 'plan is not directly appliable; runner should resolve prompt first',
+        skipReason: 'apply-failed',
       };
     }
     const canonical = String(plan.payload.canonical ?? '');
@@ -134,6 +135,7 @@ const rule: DoctorRule = {
         finding: plan.finding,
         applied: false,
         message: 'apply payload missing canonical or others',
+        skipReason: 'apply-failed',
       };
     }
     const cleared: string[] = [];
@@ -147,10 +149,15 @@ const rule: DoctorRule = {
       }
     }
     if (failed.length > 0) {
+      const partial = cleared.length > 0;
       return {
         finding: plan.finding,
-        applied: cleared.length > 0,
+        applied: partial,
         message: `cleared id from ${cleared.length} file(s); failed on ${failed.length}: ${failed.map((p) => relative(ctx.projectRoot, p)).join(', ')}`,
+        // When we cleared at least one file but some failed, treat as
+        // partial success — the `apply-failed` skip reason only fires
+        // when nothing landed on disk.
+        ...(partial ? {} : { skipReason: 'apply-failed' as const }),
         details: { canonical, cleared, failed },
       };
     }

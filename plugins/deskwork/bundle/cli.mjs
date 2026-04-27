@@ -9707,7 +9707,8 @@ var init_missing_frontmatter_id = __esm({
           return {
             finding: plan.finding,
             applied: false,
-            message: "plan is not directly appliable; runner should resolve prompt first"
+            message: "plan is not directly appliable; runner should resolve prompt first",
+            skipReason: "apply-failed"
           };
         }
         const absPath = String(plan.payload.absolutePath ?? "");
@@ -9716,7 +9717,8 @@ var init_missing_frontmatter_id = __esm({
           return {
             finding: plan.finding,
             applied: false,
-            message: "apply payload missing absolutePath or entryId"
+            message: "apply payload missing absolutePath or entryId",
+            skipReason: "apply-failed"
           };
         }
         try {
@@ -9726,7 +9728,8 @@ var init_missing_frontmatter_id = __esm({
           return {
             finding: plan.finding,
             applied: false,
-            message: `failed to write frontmatter id: ${reason}`
+            message: `failed to write frontmatter id: ${reason}`,
+            skipReason: "apply-failed"
           };
         }
         return {
@@ -9810,7 +9813,8 @@ var init_orphan_frontmatter_id = __esm({
           return {
             finding: plan.finding,
             applied: false,
-            message: "plan is not directly appliable; runner should resolve prompt first"
+            message: "plan is not directly appliable; runner should resolve prompt first",
+            skipReason: "apply-failed"
           };
         }
         const action = String(plan.payload.action ?? "");
@@ -9818,7 +9822,8 @@ var init_orphan_frontmatter_id = __esm({
           return {
             finding: plan.finding,
             applied: false,
-            message: "left file unchanged per operator choice"
+            message: "left file unchanged per operator choice",
+            skipReason: "no-action-needed"
           };
         }
         if (action === "clear-id") {
@@ -9827,7 +9832,8 @@ var init_orphan_frontmatter_id = __esm({
             return {
               finding: plan.finding,
               applied: false,
-              message: "clear-id apply payload missing absolutePath"
+              message: "clear-id apply payload missing absolutePath",
+              skipReason: "apply-failed"
             };
           }
           try {
@@ -9836,7 +9842,8 @@ var init_orphan_frontmatter_id = __esm({
               return {
                 finding: plan.finding,
                 applied: false,
-                message: `no id field in ${relative3(ctx.projectRoot, absPath)} to clear`
+                message: `no id field in ${relative3(ctx.projectRoot, absPath)} to clear`,
+                skipReason: "no-action-needed"
               };
             }
           } catch (err2) {
@@ -9844,7 +9851,8 @@ var init_orphan_frontmatter_id = __esm({
             return {
               finding: plan.finding,
               applied: false,
-              message: `failed to clear frontmatter id: ${reason}`
+              message: `failed to clear frontmatter id: ${reason}`,
+              skipReason: "apply-failed"
             };
           }
           return {
@@ -9857,7 +9865,8 @@ var init_orphan_frontmatter_id = __esm({
         return {
           finding: plan.finding,
           applied: false,
-          message: `unknown apply action: ${action}`
+          message: `unknown apply action: ${action}`,
+          skipReason: "apply-failed"
         };
       }
     };
@@ -9944,7 +9953,8 @@ var init_duplicate_id = __esm({
           return {
             finding: plan.finding,
             applied: false,
-            message: "plan is not directly appliable; runner should resolve prompt first"
+            message: "plan is not directly appliable; runner should resolve prompt first",
+            skipReason: "apply-failed"
           };
         }
         const canonical = String(plan.payload.canonical ?? "");
@@ -9954,7 +9964,8 @@ var init_duplicate_id = __esm({
           return {
             finding: plan.finding,
             applied: false,
-            message: "apply payload missing canonical or others"
+            message: "apply payload missing canonical or others",
+            skipReason: "apply-failed"
           };
         }
         const cleared = [];
@@ -9968,10 +9979,15 @@ var init_duplicate_id = __esm({
           }
         }
         if (failed.length > 0) {
+          const partial = cleared.length > 0;
           return {
             finding: plan.finding,
-            applied: cleared.length > 0,
+            applied: partial,
             message: `cleared id from ${cleared.length} file(s); failed on ${failed.length}: ${failed.map((p) => relative4(ctx.projectRoot, p)).join(", ")}`,
+            // When we cleared at least one file but some failed, treat as
+            // partial success — the `apply-failed` skip reason only fires
+            // when nothing landed on disk.
+            ...partial ? {} : { skipReason: "apply-failed" },
             details: { canonical, cleared, failed }
           };
         }
@@ -10030,7 +10046,8 @@ var init_slug_collision = __esm({
         return {
           finding: plan.finding,
           applied: false,
-          message: "slug-collision has no automatic repair (operator must rename)"
+          message: "slug-collision has no automatic repair (operator must rename)",
+          skipReason: "editorial-decision"
         };
       }
     };
@@ -10144,7 +10161,8 @@ var init_schema_rejected = __esm({
         return {
           finding: plan.finding,
           applied: false,
-          message: "schema-rejected has no automatic repair \u2014 operator must patch the host content schema"
+          message: "schema-rejected has no automatic repair \u2014 operator must patch the host content schema",
+          skipReason: "schema-rejected"
         };
       }
     };
@@ -10221,7 +10239,8 @@ var init_workflow_stale = __esm({
           return {
             finding: plan.finding,
             applied: false,
-            message: "plan is not directly appliable; runner should resolve prompt first"
+            message: "plan is not directly appliable; runner should resolve prompt first",
+            skipReason: "apply-failed"
           };
         }
         const workflowId = String(plan.payload.workflowId ?? "");
@@ -10229,7 +10248,8 @@ var init_workflow_stale = __esm({
           return {
             finding: plan.finding,
             applied: false,
-            message: "apply payload missing workflowId"
+            message: "apply payload missing workflowId",
+            skipReason: "apply-failed"
           };
         }
         const file = findWorkflowFile(ctx.projectRoot, ctx.config, workflowId);
@@ -10237,7 +10257,8 @@ var init_workflow_stale = __esm({
           return {
             finding: plan.finding,
             applied: false,
-            message: `no pipeline file found for workflow ${workflowId}`
+            message: `no pipeline file found for workflow ${workflowId}`,
+            skipReason: "apply-failed"
           };
         }
         try {
@@ -10247,7 +10268,8 @@ var init_workflow_stale = __esm({
           return {
             finding: plan.finding,
             applied: false,
-            message: `failed to delete ${file}: ${reason}`
+            message: `failed to delete ${file}: ${reason}`,
+            skipReason: "apply-failed"
           };
         }
         return {
@@ -10376,7 +10398,8 @@ var init_calendar_uuid_missing = __esm({
           return {
             finding: plan.finding,
             applied: false,
-            message: "plan is not directly appliable; runner should resolve prompt first"
+            message: "plan is not directly appliable; runner should resolve prompt first",
+            skipReason: "apply-failed"
           };
         }
         const calendarPath = String(plan.payload.calendarPath ?? "");
@@ -10384,7 +10407,8 @@ var init_calendar_uuid_missing = __esm({
           return {
             finding: plan.finding,
             applied: false,
-            message: "apply payload missing calendarPath"
+            message: "apply payload missing calendarPath",
+            skipReason: "apply-failed"
           };
         }
         try {
@@ -10395,7 +10419,8 @@ var init_calendar_uuid_missing = __esm({
           return {
             finding: plan.finding,
             applied: false,
-            message: `failed to re-write calendar: ${reason}`
+            message: `failed to re-write calendar: ${reason}`,
+            skipReason: "apply-failed"
           };
         }
         return {
@@ -10556,7 +10581,8 @@ var init_legacy_top_level_id_migration = __esm({
           return {
             finding: plan.finding,
             applied: false,
-            message: "plan is not directly appliable; runner should resolve prompt first"
+            message: "plan is not directly appliable; runner should resolve prompt first",
+            skipReason: "apply-failed"
           };
         }
         const absPath = String(plan.payload.absolutePath ?? "");
@@ -10565,7 +10591,8 @@ var init_legacy_top_level_id_migration = __esm({
           return {
             finding: plan.finding,
             applied: false,
-            message: "apply payload missing absolutePath or legacyId"
+            message: "apply payload missing absolutePath or legacyId",
+            skipReason: "apply-failed"
           };
         }
         try {
@@ -10575,7 +10602,8 @@ var init_legacy_top_level_id_migration = __esm({
           return {
             finding: plan.finding,
             applied: false,
-            message: `failed to migrate frontmatter id: ${reason}`
+            message: `failed to migrate frontmatter id: ${reason}`,
+            skipReason: "apply-failed"
           };
         }
         return {
@@ -10684,7 +10712,8 @@ async function resolveAndApply(rule9, ctx, plan, interaction) {
     return {
       finding: plan.finding,
       applied: false,
-      message: plan.reason
+      message: plan.reason,
+      skipReason: reportOnlySkipReason(rule9, plan.finding)
     };
   }
   if (plan.kind === "prompt") {
@@ -10693,7 +10722,8 @@ async function resolveAndApply(rule9, ctx, plan, interaction) {
       return {
         finding: plan.finding,
         applied: false,
-        message: "skipped (operator declined or --yes mode encountered ambiguity)"
+        message: "skipped (operator declined or --yes mode encountered ambiguity)",
+        skipReason: "ambiguous"
       };
     }
     const choice = plan.choices.find((c) => c.id === choiceId);
@@ -10701,7 +10731,8 @@ async function resolveAndApply(rule9, ctx, plan, interaction) {
       return {
         finding: plan.finding,
         applied: false,
-        message: `unknown choice id: ${choiceId}`
+        message: `unknown choice id: ${choiceId}`,
+        skipReason: "apply-failed"
       };
     }
     const applyPlan = {
@@ -10717,10 +10748,23 @@ async function resolveAndApply(rule9, ctx, plan, interaction) {
     return {
       finding: plan.finding,
       applied: false,
-      message: "skipped (operator declined)"
+      message: "skipped (operator declined)",
+      skipReason: "operator-declined"
     };
   }
   return rule9.apply(ctx, plan);
+}
+function reportOnlySkipReason(rule9, _finding) {
+  switch (rule9.id) {
+    case "missing-frontmatter-id":
+      return "prerequisite-missing";
+    case "slug-collision":
+      return "editorial-decision";
+    case "schema-rejected":
+      return "schema-rejected";
+    default:
+      return "editorial-decision";
+  }
 }
 var RULES, RULE_BY_ID, yesInteraction;
 var init_runner = __esm({
@@ -10834,8 +10878,13 @@ async function run4(argv2) {
     }
   }
   emitReport(report, { json, repairMode: true });
-  const failedRepairs = report.repairs.filter((r) => !r.applied).length;
-  process.exit(failedRepairs === 0 ? 0 : 1);
+  const realFollowUps = report.repairs.filter(
+    (r) => !r.applied && !isExpectedSkip(r.skipReason)
+  ).length;
+  process.exit(realFollowUps === 0 ? 0 : 1);
+}
+function isExpectedSkip(reason) {
+  return reason === "prerequisite-missing" || reason === "no-action-needed";
 }
 function parseInput(argv2) {
   try {
@@ -10915,6 +10964,7 @@ function serializeRepair(r) {
     site: r.finding.site,
     applied: r.applied,
     message: r.message,
+    ...r.skipReason !== void 0 ? { skipReason: r.skipReason } : {},
     finding: serializeFinding(r.finding),
     ...r.details !== void 0 ? { details: r.details } : {}
   };
@@ -10945,29 +10995,103 @@ function emitText(report, opts) {
     process.stdout.write("\n");
   }
   if (opts.repairMode) {
-    process.stdout.write("Repairs:\n");
-    if (report.repairs.length === 0) {
-      process.stdout.write("  (none)\n");
-      return;
-    }
-    for (const r of report.repairs) {
-      const verdict = r.applied ? "applied" : "skipped";
-      process.stdout.write(`  - [${r.finding.ruleId}] [${verdict}] ${r.message}
-`);
-    }
-    const applied = report.repairs.filter((r) => r.applied).length;
-    const skipped = report.repairs.length - applied;
-    process.stdout.write(
-      `
-Summary: ${applied} applied, ${skipped} skipped/failed
-`
-    );
+    emitRepairsGrouped(report);
     return;
   }
   process.stdout.write(
     `Run \`deskwork doctor --fix=<rule>\` (or \`--fix=all\`) to repair. Add \`--yes\` for non-interactive mode.
 `
   );
+}
+function emitRepairsGrouped(report) {
+  process.stdout.write("Repairs:\n");
+  if (report.repairs.length === 0) {
+    process.stdout.write("  (none)\n");
+    return;
+  }
+  const byRule = groupBy(report.repairs, (r) => r.finding.ruleId);
+  for (const rule9 of RULES) {
+    const repairs = byRule.get(rule9.id);
+    if (!repairs || repairs.length === 0) continue;
+    const applied = repairs.filter((r) => r.applied);
+    const skipped = repairs.filter((r) => !r.applied);
+    const summaryParts = [
+      `${applied.length} applied`,
+      `${skipped.length} skipped`
+    ];
+    if (skipped.length > 0) {
+      const hint = primarySkipHint(skipped);
+      if (hint !== null) summaryParts[1] += ` (${hint})`;
+    }
+    process.stdout.write(`
+  ${rule9.id}: ${summaryParts.join(", ")}
+`);
+    if (applied.length > 0) {
+      process.stdout.write("    applied:\n");
+      for (const r of applied) {
+        process.stdout.write(`      - [${r.finding.site}] ${r.message}
+`);
+      }
+    }
+    if (skipped.length > 0) {
+      const byReason = groupBy(skipped, (r) => r.skipReason ?? "unknown");
+      for (const [reason, items] of byReason) {
+        process.stdout.write(`    skipped (${reason}):
+`);
+        for (const r of items) {
+          process.stdout.write(`      - [${r.finding.site}] ${r.message}
+`);
+        }
+      }
+    }
+  }
+  const totals = aggregateRepairTotals(report.repairs);
+  process.stdout.write("\nSummary:\n");
+  process.stdout.write(`  applied: ${totals.applied}
+`);
+  for (const [reason, count] of totals.skipped) {
+    process.stdout.write(`  skipped (${reason}): ${count}
+`);
+  }
+}
+function aggregateRepairTotals(repairs) {
+  let applied = 0;
+  const counts = /* @__PURE__ */ new Map();
+  for (const r of repairs) {
+    if (r.applied) {
+      applied++;
+      continue;
+    }
+    const key = r.skipReason ?? "unknown";
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return { applied, skipped: Array.from(counts.entries()) };
+}
+function primarySkipHint(skipped) {
+  const reasons = /* @__PURE__ */ new Set();
+  for (const r of skipped) {
+    reasons.add(r.skipReason ?? "unknown");
+  }
+  if (reasons.size !== 1) return null;
+  const [only] = reasons;
+  switch (only) {
+    case "prerequisite-missing":
+      return "no body file yet \u2014 run /deskwork:outline";
+    case "ambiguous":
+      return "ambiguous; re-run interactively to choose";
+    case "editorial-decision":
+      return "operator must decide";
+    case "schema-rejected":
+      return "patch host content schema first";
+    case "operator-declined":
+      return "operator declined";
+    case "apply-failed":
+      return "apply failed";
+    case "no-action-needed":
+      return "no action needed";
+    default:
+      return null;
+  }
 }
 function groupBy(items, key) {
   const out = /* @__PURE__ */ new Map();
@@ -11834,13 +11958,239 @@ var init_ingest2 = __esm({
   }
 });
 
+// src/commands/install-preflight.ts
+import { existsSync as existsSync9, readFileSync as readFileSync13, readdirSync as readdirSync8, statSync as statSync6 } from "node:fs";
+import { join as join13 } from "node:path";
+function isAstroProject(projectRoot) {
+  return ASTRO_CONFIG_NAMES.some(
+    (name) => existsSync9(join13(projectRoot, name))
+  );
+}
+function findContentSchemaFile(projectRoot) {
+  for (const rel of CONTENT_SCHEMA_NAMES) {
+    const abs = join13(projectRoot, rel);
+    if (existsSync9(abs)) return abs;
+  }
+  return null;
+}
+function preflightSchemaForProject(projectRoot) {
+  if (!isAstroProject(projectRoot)) {
+    return {
+      kind: "skipped",
+      reason: "no Astro config detected at project root; non-Astro engines (Hugo / Jekyll / Eleventy / plain markdown) do not validate frontmatter"
+    };
+  }
+  const schemaPath = findContentSchemaFile(projectRoot);
+  if (schemaPath === null) {
+    return {
+      kind: "uncertain",
+      schemaPath: null,
+      reason: "no src/content/config.* or src/content.config.* file found"
+    };
+  }
+  let raw;
+  try {
+    raw = readFileSync13(schemaPath, "utf-8");
+  } catch (err2) {
+    const reason = err2 instanceof Error ? err2.message : String(err2);
+    return {
+      kind: "uncertain",
+      schemaPath,
+      reason: `could not read schema file: ${reason}`
+    };
+  }
+  const explicitNamespace = /\bdeskwork\s*:\s*z\.[a-zA-Z]/u.test(raw);
+  if (explicitNamespace) {
+    return {
+      kind: "compatible",
+      schemaPath,
+      reason: "detected explicit `deskwork:` field in the schema"
+    };
+  }
+  if (/\.passthrough\s*\(/u.test(raw)) {
+    return {
+      kind: "compatible",
+      schemaPath,
+      reason: "detected `.passthrough()` on the schema (accepts unknown keys)"
+    };
+  }
+  return {
+    kind: "uncertain",
+    schemaPath,
+    reason: "no `deskwork:` field declaration and no `.passthrough()` found"
+  };
+}
+function printSchemaPreflight(projectRoot, config) {
+  const outcome = preflightSchemaForProject(projectRoot);
+  const sites = Object.keys(config.sites);
+  if (outcome.kind === "skipped") {
+    console.log(
+      `Schema pre-flight: skipped (${outcome.reason}).`
+    );
+    return;
+  }
+  if (outcome.kind === "compatible") {
+    console.log(
+      `Schema pre-flight: OK (${outcome.reason}).`
+    );
+    console.log(`  schema file: ${outcome.schemaPath}`);
+    if (sites.length > 0) {
+      console.log(
+        `  applies to sites: ${sites.join(", ")}`
+      );
+    }
+    return;
+  }
+  console.log("Schema pre-flight: UNCERTAIN \u2014 patch instructions follow.");
+  console.log(`  reason: ${outcome.reason}`);
+  if (outcome.schemaPath !== null) {
+    console.log(`  inspected: ${outcome.schemaPath}`);
+  }
+  if (sites.length > 0) {
+    console.log(
+      `  configured sites: ${sites.join(", ")}`
+    );
+  }
+  console.log("");
+  console.log(printSchemaPatchInstructions());
+}
+function detectExistingPipeline(projectRoot) {
+  const out = [];
+  if (existsSync9(join13(projectRoot, "journal/editorial"))) {
+    out.push({
+      kind: "journal-tree",
+      relativePath: "journal/editorial/"
+    });
+  }
+  const skillsDir = join13(projectRoot, ".claude/skills");
+  const skillMatches = [];
+  if (existsSync9(skillsDir)) {
+    let entries = [];
+    try {
+      entries = readdirSync8(skillsDir);
+    } catch {
+      entries = [];
+    }
+    for (const name of entries) {
+      if (EDITORIAL_SKILL_NAMES.has(name)) {
+        const abs = join13(skillsDir, name);
+        try {
+          if (statSync6(abs).isDirectory()) {
+            skillMatches.push(name);
+          }
+        } catch {
+        }
+      }
+    }
+  }
+  if (skillMatches.length >= EDITORIAL_SKILL_SIGNAL_THRESHOLD) {
+    for (const name of skillMatches) {
+      out.push({
+        kind: "editorial-skill",
+        relativePath: `.claude/skills/${name}/`
+      });
+    }
+  }
+  const sitesDir = join13(projectRoot, "src/sites");
+  if (existsSync9(sitesDir)) {
+    let siteNames = [];
+    try {
+      siteNames = readdirSync8(sitesDir);
+    } catch {
+      siteNames = [];
+    }
+    for (const site of siteNames) {
+      const pagesDir = join13(sitesDir, site, "pages/dev");
+      if (!existsSync9(pagesDir)) continue;
+      let pageEntries = [];
+      try {
+        pageEntries = readdirSync8(pagesDir);
+      } catch {
+        continue;
+      }
+      for (const page of pageEntries) {
+        if (page.startsWith("editorial-") && page.endsWith(".astro")) {
+          out.push({
+            kind: "editorial-astro-page",
+            relativePath: `src/sites/${site}/pages/dev/${page}`
+          });
+        }
+      }
+    }
+  }
+  for (const candidate of ["scripts/lib/editorial", "scripts/lib/editorial-review"]) {
+    if (existsSync9(join13(projectRoot, candidate))) {
+      out.push({
+        kind: "editorial-script-module",
+        relativePath: `${candidate}/`
+      });
+    }
+  }
+  return out;
+}
+function printExistingPipelineWarning(signals) {
+  if (signals.length === 0) return;
+  console.log("");
+  console.log(
+    "Detected existing editorial-pipeline signals in this project:"
+  );
+  for (const s of signals) {
+    console.log(`  - ${s.relativePath}`);
+  }
+  console.log("");
+  console.log(
+    "Deskwork will install ALONGSIDE the existing implementation, not replace it."
+  );
+  console.log(
+    "Resolve overlap manually before driving both pipelines against the same calendar."
+  );
+  console.log("");
+}
+var ASTRO_CONFIG_NAMES, CONTENT_SCHEMA_NAMES, EDITORIAL_SKILL_NAMES, EDITORIAL_SKILL_SIGNAL_THRESHOLD;
+var init_install_preflight = __esm({
+  "src/commands/install-preflight.ts"() {
+    "use strict";
+    init_doctor();
+    ASTRO_CONFIG_NAMES = [
+      "astro.config.mjs",
+      "astro.config.ts",
+      "astro.config.js",
+      "astro.config.cjs"
+    ];
+    CONTENT_SCHEMA_NAMES = [
+      // Newer Astro convention.
+      "src/content.config.ts",
+      "src/content.config.js",
+      "src/content.config.mjs",
+      // Older Astro convention (used by the original audiocontrol tree).
+      "src/content/config.ts",
+      "src/content/config.js",
+      "src/content/config.mjs"
+    ];
+    EDITORIAL_SKILL_NAMES = /* @__PURE__ */ new Set([
+      "editorial-add",
+      "editorial-plan",
+      "editorial-outline",
+      "editorial-draft",
+      "editorial-publish",
+      "editorial-iterate",
+      "editorial-approve",
+      "editorial-review-cancel",
+      "editorial-review-help",
+      "editorial-review-report",
+      "editorial-distribute"
+    ]);
+    EDITORIAL_SKILL_SIGNAL_THRESHOLD = 3;
+  }
+});
+
 // src/commands/install.ts
 var install_exports = {};
 __export(install_exports, {
   run: () => run7
 });
-import { readFileSync as readFileSync13, writeFileSync as writeFileSync8, existsSync as existsSync9, mkdirSync as mkdirSync4 } from "node:fs";
-import { dirname as dirname3, isAbsolute as isAbsolute5, join as join13, resolve as resolve4 } from "node:path";
+import { readFileSync as readFileSync14, writeFileSync as writeFileSync8, existsSync as existsSync10, mkdirSync as mkdirSync4 } from "node:fs";
+import { dirname as dirname3, isAbsolute as isAbsolute5, join as join14, resolve as resolve4 } from "node:path";
 async function run7(argv2) {
   function usage() {
     console.error(
@@ -11861,17 +12211,17 @@ async function run7(argv2) {
   const projectRoot = isAbsolute5(projectRootArg) ? projectRootArg : resolve4(process.cwd(), projectRootArg);
   const configFile = isAbsolute5(configFileArg) ? configFileArg : resolve4(process.cwd(), configFileArg);
   console.log(`Installing into: ${projectRoot}`);
-  if (!existsSync9(projectRoot)) {
+  if (!existsSync10(projectRoot)) {
     console.error(`Project root does not exist: ${projectRoot}`);
     process.exit(1);
   }
-  if (!existsSync9(configFile)) {
+  if (!existsSync10(configFile)) {
     console.error(`Config file does not exist: ${configFile}`);
     process.exit(1);
   }
   let rawConfig;
   try {
-    rawConfig = JSON.parse(readFileSync13(configFile, "utf-8"));
+    rawConfig = JSON.parse(readFileSync14(configFile, "utf-8"));
   } catch (err2) {
     const reason = err2 instanceof Error ? err2.message : String(err2);
     console.error(`Config file is not valid JSON: ${reason}`);
@@ -11885,6 +12235,8 @@ async function run7(argv2) {
     console.error(reason);
     process.exit(1);
   }
+  const pipelineSignals = detectExistingPipeline(projectRoot);
+  printExistingPipelineWarning(pipelineSignals);
   const writtenConfigPath = configPath(projectRoot);
   mkdirSync4(dirname3(writtenConfigPath), { recursive: true });
   writeFileSync8(
@@ -11895,8 +12247,8 @@ async function run7(argv2) {
   const createdCalendars = [];
   const preservedCalendars = [];
   for (const [slug, site] of Object.entries(config.sites)) {
-    const absPath = join13(projectRoot, site.calendarPath);
-    if (existsSync9(absPath)) {
+    const absPath = join14(projectRoot, site.calendarPath);
+    if (existsSync10(absPath)) {
       preservedCalendars.push(`${slug}: ${site.calendarPath}`);
       continue;
     }
@@ -11915,12 +12267,14 @@ async function run7(argv2) {
     console.log(`Left existing calendars untouched:`);
     for (const c of preservedCalendars) console.log(`  - ${c}`);
   }
+  printSchemaPreflight(projectRoot, config);
 }
 var init_install = __esm({
   "src/commands/install.ts"() {
     "use strict";
     init_config();
     init_calendar();
+    init_install_preflight();
   }
 });
 
@@ -11929,7 +12283,7 @@ var iterate_exports = {};
 __export(iterate_exports, {
   run: () => run8
 });
-import { existsSync as existsSync10, readFileSync as readFileSync14 } from "node:fs";
+import { existsSync as existsSync11, readFileSync as readFileSync15 } from "node:fs";
 async function run8(argv2) {
   const KNOWN_FLAGS3 = ["site", "kind", "platform", "channel", "dispositions"];
   const DISPOSITIONS = /* @__PURE__ */ new Set(["addressed", "deferred", "wontfix"]);
@@ -11990,12 +12344,12 @@ async function run8(argv2) {
   } else {
     file = resolveBlogFilePath(projectRoot, config, site, slug);
   }
-  if (!existsSync10(file)) {
+  if (!existsSync11(file)) {
     fail(
       kind === "shortform" ? `No shortform file at ${file}. Run /deskwork:shortform-start first.` : `No blog file at ${file}.`
     );
   }
-  const diskMarkdown = readFileSync14(file, "utf8");
+  const diskMarkdown = readFileSync15(file, "utf8");
   const workflow = readWorkflows(projectRoot, config).find(
     (w) => w.site === site && w.slug === slug && w.contentKind === kind && (kind !== "shortform" || w.platform === flags.platform) && (kind !== "shortform" || (w.channel ?? null) === (flags.channel ?? null)) && w.state !== "applied" && w.state !== "cancelled"
   );
@@ -12020,12 +12374,12 @@ The studio must click 'Request iteration' to move the workflow to 'iterating' be
   let dispositions = null;
   if (flags.dispositions !== void 0) {
     const path = absolutize(flags.dispositions);
-    if (!existsSync10(path)) {
+    if (!existsSync11(path)) {
       fail(`--dispositions file not found: ${path}`);
     }
     let parsed;
     try {
-      parsed = JSON.parse(readFileSync14(path, "utf8"));
+      parsed = JSON.parse(readFileSync15(path, "utf8"));
     } catch (err2) {
       const reason = err2 instanceof Error ? err2.message : String(err2);
       fail(`--dispositions: invalid JSON at ${path}: ${reason}`);
@@ -12106,8 +12460,8 @@ var init_iterate = __esm({
 });
 
 // ../core/src/scaffold.ts
-import { existsSync as existsSync11, mkdirSync as mkdirSync5 } from "node:fs";
-import { dirname as dirname4, join as join14, relative as relative8 } from "node:path";
+import { existsSync as existsSync12, mkdirSync as mkdirSync5 } from "node:fs";
+import { dirname as dirname4, join as join15, relative as relative8 } from "node:path";
 function scaffoldBlogPost(projectRoot, config, site, entry, opts = {}) {
   const slug = resolveSite(config, site);
   const siteCfg = config.sites[slug];
@@ -12126,7 +12480,7 @@ function scaffoldBlogPost(projectRoot, config, site, entry, opts = {}) {
     contentRelativePath
   );
   const relativePath = relative8(projectRoot, filePath);
-  if (existsSync11(filePath)) {
+  if (existsSync12(filePath)) {
     throw new Error(`Blog post already exists at ${relativePath}`);
   }
   const dateStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
@@ -12148,7 +12502,7 @@ function scaffoldBlogPost(projectRoot, config, site, entry, opts = {}) {
   const body = buildBody(entry.title, siteCfg.blogOutlineSection === true);
   mkdirSync5(dirname4(filePath), { recursive: true });
   writeFrontmatter(filePath, data, body);
-  const reported = contentRelativePath ?? relative8(join14(projectRoot, siteCfg.contentDir), filePath);
+  const reported = contentRelativePath ?? relative8(join15(projectRoot, siteCfg.contentDir), filePath);
   return { filePath, relativePath, contentRelativePath: reported };
 }
 function layoutToContentRelativePath(layout, slug) {
@@ -12406,7 +12760,7 @@ var publish_exports = {};
 __export(publish_exports, {
   run: () => run12
 });
-import { existsSync as existsSync12 } from "node:fs";
+import { existsSync as existsSync13 } from "node:fs";
 async function run12(argv2) {
   const KNOWN_FLAGS3 = ["site", "date", "content-url"];
   const DATE_RE2 = /^\d{4}-\d{2}-\d{2}$/;
@@ -12446,7 +12800,7 @@ async function run12(argv2) {
   let filePath;
   if (hasRepoContent(contentType)) {
     filePath = resolveBlogFilePath(projectRoot, config, site, slug);
-    if (!existsSync12(filePath)) {
+    if (!existsSync13(filePath)) {
       fail(
         `Cannot publish blog post "${slug}": no file at ${filePath}. Write the post before publishing.`
       );
@@ -12906,7 +13260,7 @@ var init_review_report = __esm({
 });
 
 // ../core/src/body-state.ts
-import { existsSync as existsSync13, readFileSync as readFileSync15 } from "node:fs";
+import { existsSync as existsSync14, readFileSync as readFileSync16 } from "node:fs";
 function stripOutlineSection(body) {
   const lines = body.split("\n");
   const startIdx = lines.findIndex((line) => /^##[ \t]+Outline\b/.test(line));
@@ -12921,8 +13275,8 @@ function stripOutlineSection(body) {
   return [...lines.slice(0, startIdx), ...lines.slice(endIdx)].join("\n");
 }
 function bodyState(filePath) {
-  if (!existsSync13(filePath)) return "missing";
-  const content = readFileSync15(filePath, "utf8");
+  if (!existsSync14(filePath)) return "missing";
+  const content = readFileSync16(filePath, "utf8");
   const fmMatch = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
   const body = fmMatch ? content.slice(fmMatch[0].length) : content;
   const withoutH1 = body.replace(/^\s*#[^\n]*\n?/, "");
@@ -12946,7 +13300,7 @@ var review_start_exports = {};
 __export(review_start_exports, {
   run: () => run17
 });
-import { existsSync as existsSync14, readFileSync as readFileSync16, readdirSync as readdirSync8 } from "node:fs";
+import { existsSync as existsSync15, readFileSync as readFileSync17, readdirSync as readdirSync9 } from "node:fs";
 import { dirname as dirname5 } from "node:path";
 async function run17(argv2) {
   const KNOWN_FLAGS3 = ["site"];
@@ -12968,7 +13322,7 @@ async function run17(argv2) {
   }
   const site = resolveSite(config, flags.site);
   const file = resolveBlogFilePath(projectRoot, config, site, slug);
-  if (!existsSync14(file)) {
+  if (!existsSync15(file)) {
     const siblings = listSiblingSlugs(file);
     const list = siblings.length > 0 ? siblings.join(", ") : "(none)";
     fail(
@@ -12977,12 +13331,12 @@ Existing slugs on ${site}: ${list}.
 Run /deskwork:outline <slug> (or /deskwork:draft) to scaffold it first.`
     );
   }
-  const initialMarkdown = readFileSync16(file, "utf8");
+  const initialMarkdown = readFileSync17(file, "utf8");
   const body = bodyState(file);
   let entryId;
   try {
     const calendarPath = resolveCalendarPath(projectRoot, config, site);
-    if (existsSync14(calendarPath)) {
+    if (existsSync15(calendarPath)) {
       const cal = readCalendar(calendarPath);
       entryId = cal.entries.find((e) => e.slug === slug)?.id;
     }
@@ -13029,8 +13383,8 @@ Run /deskwork:outline <slug> (or /deskwork:draft) to scaffold it first.`
   }
   function listSiblingSlugs(blogFile) {
     const dir = dirname5(blogFile);
-    if (!existsSync14(dir)) return [];
-    return readdirSync8(dir).filter((name) => name.endsWith(".md")).map((name) => name.replace(/\.md$/, ""));
+    if (!existsSync15(dir)) return [];
+    return readdirSync9(dir).filter((name) => name.endsWith(".md")).map((name) => name.replace(/\.md$/, ""));
   }
 }
 var init_review_start = __esm({

@@ -29,6 +29,7 @@
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
+import { listenWithAutoIncrement } from './listen.ts';
 import { existsSync, realpathSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -59,6 +60,12 @@ interface CliArgs {
   projectRoot: string;
   port: number;
   /**
+   * True when the operator passed `--port` (or `-p`). When true, the
+   * listener refuses to auto-increment on EADDRINUSE — the operator
+   * asked for a specific port, so failure is surfaced loudly.
+   */
+  portExplicit: boolean;
+  /**
    * Bind address explicitly requested by the operator via --host.
    * `null` means "use the default policy" — bind to loopback AND any
    * detected Tailscale interface (unless `--no-tailscale` was passed,
@@ -75,6 +82,7 @@ const LOOPBACK = '127.0.0.1';
 export function parseCliArgs(argv: string[]): CliArgs {
   let projectRoot = process.cwd();
   let port = DEFAULT_PORT;
+  let portExplicit = false;
   let hostOverride: string | null = null;
   let noTailscale = false;
   for (let i = 0; i < argv.length; i++) {
@@ -89,8 +97,10 @@ export function parseCliArgs(argv: string[]): CliArgs {
       const next = argv[++i];
       if (!next) usage(`${a} requires a value`);
       port = parseInt(next, 10);
+      portExplicit = true;
     } else if (a.startsWith('--port=')) {
       port = parseInt(a.slice('--port='.length), 10);
+      portExplicit = true;
     } else if (a === '--host' || a === '-H') {
       const next = argv[++i];
       if (!next) usage(`${a} requires a value`);
@@ -111,6 +121,7 @@ export function parseCliArgs(argv: string[]): CliArgs {
   return {
     projectRoot: isAbsolute(projectRoot) ? projectRoot : resolve(process.cwd(), projectRoot),
     port,
+    portExplicit,
     hostOverride,
     noTailscale,
   };
@@ -411,9 +422,8 @@ export function createApp(ctx: StudioContext): Hono {
 }
 
 async function main(): Promise<void> {
-  const { projectRoot, port, hostOverride, noTailscale } = parseCliArgs(
-    process.argv.slice(2),
-  );
+  const { projectRoot, port, portExplicit, hostOverride, noTailscale } =
+    parseCliArgs(process.argv.slice(2));
 
   let config;
   try {
@@ -447,27 +457,41 @@ async function main(): Promise<void> {
     bindAddresses = tailscale === null ? [LOOPBACK] : [LOOPBACK, ...tailscale.ipv4];
   }
 
-  // Open a listener per address, in order, blocking briefly between so
-  // the banner stays grouped. Each `serve()` call returns its own
-  // server handle and runs independently — Node keeps the process
-  // alive as long as at least one is active.
+  // Issue #43: bind every address with EADDRINUSE handling.
+  //   - default port: walk forward through a small range on conflict.
+  //   - --port explicit: fail fast with a clear error.
+  let result;
+  try {
+    result = await listenWithAutoIncrement(
+      {
+        fetch: app.fetch,
+        port,
+        addresses: bindAddresses,
+        explicitPort: portExplicit,
+      },
+      serve,
+    );
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    process.stderr.write(`deskwork-studio: ${reason}\n`);
+    process.exit(1);
+  }
+
   const reachableUrls: string[] = [];
   for (const addr of bindAddresses) {
-    serve({ fetch: app.fetch, port, hostname: addr }, () => {
-      reachableUrls.push(`http://${addr === LOOPBACK ? 'localhost' : addr}:${port}/`);
-      // When the last listener attaches, print the consolidated banner.
-      if (reachableUrls.length === bindAddresses.length) {
-        printBanner({
-          urls: reachableUrls,
-          projectRoot,
-          siteSlugs: Object.keys(config.sites),
-          tailscale,
-          port,
-          override: hostOverride,
-        });
-      }
-    });
+    reachableUrls.push(
+      `http://${addr === LOOPBACK ? 'localhost' : addr}:${result.port}/`,
+    );
   }
+  printBanner({
+    urls: reachableUrls,
+    projectRoot,
+    siteSlugs: Object.keys(config.sites),
+    tailscale,
+    port: result.port,
+    override: hostOverride,
+    autoIncrementedFrom: result.autoIncremented ? port : null,
+  });
 }
 
 interface BannerInput {
@@ -477,6 +501,12 @@ interface BannerInput {
   readonly tailscale: TailscaleInfo | null;
   readonly port: number;
   readonly override: string | null;
+  /**
+   * The port the operator originally requested when EADDRINUSE forced
+   * the listener to walk forward. `null` means the chosen port equals
+   * the requested port (no auto-increment happened).
+   */
+  readonly autoIncrementedFrom: number | null;
 }
 
 function printBanner(b: BannerInput): void {
@@ -491,13 +521,20 @@ function printBanner(b: BannerInput): void {
   }
   process.stdout.write(`  project: ${b.projectRoot}\n`);
   process.stdout.write(`  sites:   ${b.siteSlugs.join(', ')}\n`);
+  if (b.autoIncrementedFrom !== null) {
+    // Issue #43: surface the auto-increment so the operator isn't
+    // confused when the URL doesn't match the documented default.
+    process.stdout.write(
+      `  note: port ${b.autoIncrementedFrom} was in use; using ${b.port} instead\n`,
+    );
+  }
   // Loud warning when bound beyond loopback + Tailscale tailnet.
   // Tailscale interfaces (100.64.0.0/10) are considered trusted; an
   // explicit --host other than loopback is not.
   const exposed = b.override !== null && b.override !== LOOPBACK;
   if (exposed) {
     process.stdout.write(
-      `  ⚠ bound to ${b.override}. Studio has no authentication —\n` +
+      `  warning: bound to ${b.override}. Studio has no authentication —\n` +
         '    only run this on a trusted network (Tailscale, VPN, etc.).\n',
     );
   }

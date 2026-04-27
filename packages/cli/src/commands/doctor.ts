@@ -18,9 +18,17 @@
  *   --yes                 Non-interactive repair (skip ambiguous).
  *   --json                Emit JSON instead of human-readable text.
  *
- * Exit codes:
- *   0  Audit clean OR all repairs applied.
- *   1  Findings present (audit) OR some repairs skipped/failed (fix).
+ * Exit codes (Issue #44, Phase 22):
+ *   0  Audit clean. OR --fix succeeded for every applicable finding.
+ *      "Applicable" here means: anything that wasn't skipped because
+ *      a prerequisite outside doctor's scope hasn't happened yet (e.g.
+ *      the body file hasn't been scaffolded, so missing-frontmatter-id
+ *      can't bind).
+ *   1  Findings present (audit-only mode). OR --fix encountered real
+ *      follow-ups: ambiguous cases requiring interactive resolution,
+ *      schema rejections needing the operator to patch the host
+ *      schema, editorial decisions, operator declines, or hard
+ *      apply-failures.
  *   2  Usage / config error.
  */
 
@@ -39,6 +47,7 @@ import {
   type Finding,
   type RepairPlan,
   type RepairResult,
+  type SkipReason,
 } from '@deskwork/core/doctor';
 
 const KNOWN_FLAGS = ['site', 'fix'] as const;
@@ -114,11 +123,35 @@ export async function run(argv: string[]): Promise<void> {
   }
   emitReport(report, { json, repairMode: true });
 
-  // Exit 0 only when every finding had a successful repair OR when
-  // there were zero findings to begin with. Skipped/failed repairs
-  // mean the operator still has work to do.
-  const failedRepairs = report.repairs.filter((r) => !r.applied).length;
-  process.exit(failedRepairs === 0 ? 0 : 1);
+  // Exit-code logic (Issue #44):
+  //   - applied → success.
+  //   - skipped because the prerequisite isn't met (e.g. no body file
+  //     yet for missing-frontmatter-id) → success. The operator's
+  //     next action is `/deskwork:outline`, not "look at doctor."
+  //   - skipped because the operator chose "leave as-is" on an orphan
+  //     prompt → success. The operator made a choice; respect it.
+  //   - everything else (ambiguous, schema-rejected, editorial-
+  //     decision, operator-declined, apply-failed) → exit 1. These
+  //     are real follow-ups doctor can't auto-resolve.
+  const realFollowUps = report.repairs.filter(
+    (r) => !r.applied && !isExpectedSkip(r.skipReason),
+  ).length;
+  process.exit(realFollowUps === 0 ? 0 : 1);
+}
+
+/**
+ * True for skip reasons that indicate the operator's next move is
+ * outside doctor's scope (run a different command, decline a no-op
+ * choice). The exit-code logic treats these as success in `--fix`
+ * mode so CI can run `doctor --fix=all --yes` and trust exit 0
+ * means "we did everything we could."
+ *
+ * `undefined` defaults to "this is a real follow-up" — older rule
+ * implementations that don't set `skipReason` keep the legacy
+ * exit-1-on-skip behavior.
+ */
+function isExpectedSkip(reason: SkipReason | undefined): boolean {
+  return reason === 'prerequisite-missing' || reason === 'no-action-needed';
 }
 
 function parseInput(argv: string[]) {
@@ -219,6 +252,7 @@ function serializeRepair(r: RepairResult): Record<string, unknown> {
     site: r.finding.site,
     applied: r.applied,
     message: r.message,
+    ...(r.skipReason !== undefined ? { skipReason: r.skipReason } : {}),
     finding: serializeFinding(r.finding),
     ...(r.details !== undefined ? { details: r.details } : {}),
   };
@@ -247,20 +281,7 @@ function emitText(report: DoctorReport, opts: EmitOptions): void {
   }
 
   if (opts.repairMode) {
-    process.stdout.write('Repairs:\n');
-    if (report.repairs.length === 0) {
-      process.stdout.write('  (none)\n');
-      return;
-    }
-    for (const r of report.repairs) {
-      const verdict = r.applied ? 'applied' : 'skipped';
-      process.stdout.write(`  - [${r.finding.ruleId}] [${verdict}] ${r.message}\n`);
-    }
-    const applied = report.repairs.filter((r) => r.applied).length;
-    const skipped = report.repairs.length - applied;
-    process.stdout.write(
-      `\nSummary: ${applied} applied, ${skipped} skipped/failed\n`,
-    );
+    emitRepairsGrouped(report);
     return;
   }
 
@@ -268,6 +289,122 @@ function emitText(report: DoctorReport, opts: EmitOptions): void {
     `Run \`deskwork doctor --fix=<rule>\` (or \`--fix=all\`) to repair. ` +
       `Add \`--yes\` for non-interactive mode.\n`,
   );
+}
+
+/**
+ * Issue #44 — repairs grouped by rule with applied/skipped split and
+ * a per-finding indented bullet list. Replaces the older flat per-line
+ * format that was hard to scan when 28 findings landed in one rule.
+ *
+ * Within each rule:
+ *   - one summary line: "<rule>: N applied, M skipped (<reason hint>)"
+ *   - applied bullets, then skipped bullets grouped by reason
+ *
+ * The skip-reason groups surface the prerequisite-missing case (the
+ * common audiocontrol scenario where 16 entries are waiting on
+ * outline) separately from the ambiguous / editorial-decision /
+ * apply-failed cases that need real operator follow-up.
+ */
+function emitRepairsGrouped(report: DoctorReport): void {
+  process.stdout.write('Repairs:\n');
+  if (report.repairs.length === 0) {
+    process.stdout.write('  (none)\n');
+    return;
+  }
+  const byRule = groupBy(report.repairs, (r) => r.finding.ruleId);
+  for (const rule of RULES) {
+    const repairs = byRule.get(rule.id);
+    if (!repairs || repairs.length === 0) continue;
+    const applied = repairs.filter((r) => r.applied);
+    const skipped = repairs.filter((r) => !r.applied);
+    const summaryParts: string[] = [
+      `${applied.length} applied`,
+      `${skipped.length} skipped`,
+    ];
+    if (skipped.length > 0) {
+      const hint = primarySkipHint(skipped);
+      if (hint !== null) summaryParts[1] += ` (${hint})`;
+    }
+    process.stdout.write(`\n  ${rule.id}: ${summaryParts.join(', ')}\n`);
+    if (applied.length > 0) {
+      process.stdout.write('    applied:\n');
+      for (const r of applied) {
+        process.stdout.write(`      - [${r.finding.site}] ${r.message}\n`);
+      }
+    }
+    if (skipped.length > 0) {
+      const byReason = groupBy(skipped, (r) => r.skipReason ?? 'unknown');
+      for (const [reason, items] of byReason) {
+        process.stdout.write(`    skipped (${reason}):\n`);
+        for (const r of items) {
+          process.stdout.write(`      - [${r.finding.site}] ${r.message}\n`);
+        }
+      }
+    }
+  }
+  // Aggregated bottom-of-output summary with the new skip-reason
+  // granularity from Issue #44.
+  const totals = aggregateRepairTotals(report.repairs);
+  process.stdout.write('\nSummary:\n');
+  process.stdout.write(`  applied: ${totals.applied}\n`);
+  for (const [reason, count] of totals.skipped) {
+    process.stdout.write(`  skipped (${reason}): ${count}\n`);
+  }
+}
+
+interface RepairTotals {
+  readonly applied: number;
+  /** Skipped counts keyed by reason, in iteration order. */
+  readonly skipped: ReadonlyArray<readonly [string, number]>;
+}
+
+function aggregateRepairTotals(
+  repairs: ReadonlyArray<RepairResult>,
+): RepairTotals {
+  let applied = 0;
+  const counts = new Map<string, number>();
+  for (const r of repairs) {
+    if (r.applied) {
+      applied++;
+      continue;
+    }
+    const key = r.skipReason ?? 'unknown';
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return { applied, skipped: Array.from(counts.entries()) };
+}
+
+/**
+ * One-line hint for the parenthetical attached to a rule's per-rule
+ * summary line. Returns null when the skip-reason mix is heterogeneous
+ * enough that a single phrase would be misleading; the per-reason
+ * sub-bullets already show the breakdown.
+ */
+function primarySkipHint(skipped: ReadonlyArray<RepairResult>): string | null {
+  const reasons = new Set<string>();
+  for (const r of skipped) {
+    reasons.add(r.skipReason ?? 'unknown');
+  }
+  if (reasons.size !== 1) return null;
+  const [only] = reasons;
+  switch (only) {
+    case 'prerequisite-missing':
+      return 'no body file yet — run /deskwork:outline';
+    case 'ambiguous':
+      return 'ambiguous; re-run interactively to choose';
+    case 'editorial-decision':
+      return 'operator must decide';
+    case 'schema-rejected':
+      return 'patch host content schema first';
+    case 'operator-declined':
+      return 'operator declined';
+    case 'apply-failed':
+      return 'apply failed';
+    case 'no-action-needed':
+      return 'no action needed';
+    default:
+      return null;
+  }
 }
 
 function groupBy<T, K>(items: T[], key: (item: T) => K): Map<K, T[]> {

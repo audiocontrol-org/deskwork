@@ -218,13 +218,17 @@ describe('deskwork doctor — missing-frontmatter-id', () => {
     expect(deskworkIdOf('other/duplicate-title.md')).toBeUndefined();
   });
 
-  it('reports zero candidates explicitly when no matching file exists', () => {
+  it('reports zero candidates explicitly when no matching file exists, exits 0 (Issue #44 — prerequisite-missing is not a real follow-up)', () => {
     run('add', [project, 'Detached Entry']);
     // No file at all under contentDir.
 
     const fix = run('doctor', [project, '--fix=missing-frontmatter-id', '--yes']);
-    expect(fix.code).toBe(1);
+    // Issue #44: prerequisite-missing skips do not warrant exit 1 in
+    // --fix mode — there's nothing for doctor to do until the operator
+    // runs /deskwork:outline. The skip is informational, not blocking.
+    expect(fix.code).toBe(0);
     expect(fix.stdout).toMatch(/no candidate file/);
+    expect(fix.stdout).toMatch(/prerequisite-missing/);
   });
 });
 
@@ -731,5 +735,173 @@ describe('deskwork doctor — flag handling', () => {
     // No findings, so this is just a flag-acceptance test.
     const res = run('doctor', [project, '--fix=all', '--yes']);
     expect(res.code).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue #44 — exit-code matrix for `--fix` mode
+// ---------------------------------------------------------------------------
+
+describe('deskwork doctor — exit-code matrix (Issue #44)', () => {
+  it('audit on findings: exit 1 (unchanged)', () => {
+    run('add', [project, 'Audit Findings']);
+    writeContent(
+      'audit-findings/index.md',
+      '---\ntitle: Audit Findings\n---\n\n# A\n',
+    );
+    const res = run('doctor', [project]);
+    expect(res.code).toBe(1);
+  });
+
+  it('audit on clean tree: exit 0 (unchanged)', () => {
+    const res = run('doctor', [project]);
+    expect(res.code).toBe(0);
+  });
+
+  it('--fix with all-applied: exit 0', () => {
+    run('add', [project, 'All Applied']);
+    writeContent(
+      'all-applied/index.md',
+      '---\ntitle: All Applied\n---\n\n# AA\n',
+    );
+    const res = run('doctor', [
+      project,
+      '--fix=missing-frontmatter-id',
+      '--yes',
+    ]);
+    expect(res.code).toBe(0);
+    expect(res.stdout).toMatch(/applied/);
+  });
+
+  it('--fix with all-skipped-prerequisite: exit 0 (NEW behavior)', () => {
+    // Calendar entry with no body file → prerequisite-missing → exit 0.
+    run('add', [project, 'Skip Pre One']);
+    run('add', [project, 'Skip Pre Two']);
+    const res = run('doctor', [
+      project,
+      '--fix=missing-frontmatter-id',
+      '--yes',
+    ]);
+    expect(res.code).toBe(0);
+    expect(res.stdout).toMatch(/prerequisite-missing/);
+  });
+
+  it('--fix with mixed applied + prerequisite-skipped: exit 0 (NEW behavior)', () => {
+    // One entry has a body file (will be applied); one doesn't (will
+    // be skipped as prerequisite-missing). Mixed run still exits 0.
+    run('add', [project, 'Has Body']);
+    writeContent(
+      'has-body/index.md',
+      '---\ntitle: Has Body\n---\n\n# B\n',
+    );
+    run('add', [project, 'No Body']);
+    const res = run('doctor', [
+      project,
+      '--fix=missing-frontmatter-id',
+      '--yes',
+    ]);
+    expect(res.code).toBe(0);
+    expect(res.stdout).toMatch(/applied/);
+    expect(res.stdout).toMatch(/prerequisite-missing/);
+  });
+
+  it('--fix with ambiguous case: exit 1 (operator must resolve)', () => {
+    // Two candidate files for the same entry → ambiguous → exit 1.
+    run('add', [project, 'Ambiguous Case']);
+    writeContent(
+      'ambiguous-case/index.md',
+      '---\ntitle: Ambiguous Case\n---\n\n# A\n',
+    );
+    writeContent(
+      'other/dup.md',
+      '---\ntitle: Ambiguous Case\n---\n\n# B\n',
+    );
+    const res = run('doctor', [
+      project,
+      '--fix=missing-frontmatter-id',
+      '--yes',
+    ]);
+    expect(res.code).toBe(1);
+    expect(res.stdout).toMatch(/ambiguous/);
+  });
+
+  it('--fix=schema-rejected --yes: exit 0 (passive rule, no findings)', () => {
+    // schema-rejected emits no findings in audit, so there's nothing
+    // to skip — clean exit. The skipReason machinery only triggers on
+    // active findings.
+    const res = run('doctor', [
+      project,
+      '--fix=schema-rejected',
+      '--yes',
+    ]);
+    expect(res.code).toBe(0);
+  });
+
+  it('--fix=slug-collision --yes: exit 1 (editorial-decision)', () => {
+    const calendarPath = join(project, 'docs/calendar.md');
+    const calendar = parseCalendar(readFileSync(calendarPath, 'utf-8'));
+    calendar.entries.push(
+      {
+        id: '99999999-9999-4999-8999-999999999991',
+        slug: 'collide-x',
+        title: 'X',
+        description: '',
+        stage: 'Ideas',
+        targetKeywords: [],
+        source: 'manual',
+      },
+      {
+        id: '99999999-9999-4999-8999-999999999992',
+        slug: 'collide-x',
+        title: 'Y',
+        description: '',
+        stage: 'Ideas',
+        targetKeywords: [],
+        source: 'manual',
+      },
+    );
+    writeCalendar(calendarPath, calendar);
+    const res = run('doctor', [project, '--fix=slug-collision', '--yes']);
+    expect(res.code).toBe(1);
+    expect(res.stdout).toMatch(/editorial-decision/);
+  });
+
+  it('JSON output includes skipReason field (Issue #44)', () => {
+    run('add', [project, 'For Json']);
+    const res = run('doctor', [
+      project,
+      '--fix=missing-frontmatter-id',
+      '--yes',
+      '--json',
+    ]);
+    expect(res.code).toBe(0);
+    const out = res.json as {
+      repairs: Array<{ skipReason?: string; ruleId: string }>;
+    };
+    expect(out.repairs.length).toBeGreaterThan(0);
+    const r = out.repairs.find((x) => x.ruleId === 'missing-frontmatter-id');
+    expect(r).toBeDefined();
+    expect(r?.skipReason).toBe('prerequisite-missing');
+  });
+
+  it('grouped output prints applied/skipped subgroups (Issue #44)', () => {
+    run('add', [project, 'Grouped Applied']);
+    writeContent(
+      'grouped-applied/index.md',
+      '---\ntitle: Grouped Applied\n---\n\n# G\n',
+    );
+    run('add', [project, 'Grouped Skipped']);
+    const res = run('doctor', [
+      project,
+      '--fix=missing-frontmatter-id',
+      '--yes',
+    ]);
+    expect(res.code).toBe(0);
+    // The grouped output format puts the rule name on its own
+    // header line followed by indented `applied:` / `skipped (...):`
+    // bullet lists.
+    expect(res.stdout).toMatch(/missing-frontmatter-id: \d+ applied, \d+ skipped/);
+    expect(res.stdout).toMatch(/applied:/);
+    expect(res.stdout).toMatch(/skipped \(prerequisite-missing\):/);
   });
 });

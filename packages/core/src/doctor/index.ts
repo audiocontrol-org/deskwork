@@ -16,6 +16,7 @@ export type {
   RepairChoice,
   RepairPlan,
   RepairResult,
+  SkipReason,
 } from './types.ts';
 
 export {

@@ -28,6 +28,11 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { parseConfig, configPath } from '@deskwork/core/config';
 import { renderEmptyCalendar } from '@deskwork/core/calendar';
+import {
+  detectExistingPipeline,
+  printExistingPipelineWarning,
+  printSchemaPreflight,
+} from './install-preflight.ts';
 
 export async function run(argv: string[]): Promise<void> {
   function usage(): never {
@@ -95,6 +100,13 @@ export async function run(argv: string[]): Promise<void> {
     process.exit(1);
   }
 
+  // Issue #45: detect competing in-house editorial pipelines BEFORE
+  // writing the config file. The warning is non-blocking; install
+  // still proceeds. The operator gets an honest accounting of what
+  // they're about to be running alongside.
+  const pipelineSignals = detectExistingPipeline(projectRoot);
+  printExistingPipelineWarning(pipelineSignals);
+
   const writtenConfigPath = configPath(projectRoot);
   mkdirSync(dirname(writtenConfigPath), { recursive: true });
   writeFileSync(
@@ -128,4 +140,10 @@ export async function run(argv: string[]): Promise<void> {
     console.log(`Left existing calendars untouched:`);
     for (const c of preservedCalendars) console.log(`  - ${c}`);
   }
+
+  // Issue #42: schema pre-flight. Loud-but-non-blocking probe for the
+  // host's content-collection schema. Skipped on non-Astro projects.
+  // When uncertain, the helper prints inline patch instructions so
+  // the operator sees the requirement before the first deskwork write.
+  printSchemaPreflight(projectRoot, config);
 }

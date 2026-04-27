@@ -79,6 +79,41 @@ export interface RepairChoice {
   payload: Readonly<Record<string, unknown>>;
 }
 
+/**
+ * Reason a `RepairResult` was not applied — the granularity matters for
+ * the exit-code logic in `--fix` mode (Issue #44, Phase 22).
+ *
+ *  - `prerequisite-missing`: the rule could not run because something
+ *    outside doctor's scope hasn't happened yet (e.g. the entry has no
+ *    body file because `outline` hasn't been called). Operator action
+ *    is required, but it's not a doctor failure — `--fix` should still
+ *    exit 0 once every applicable rule has been applied.
+ *  - `ambiguous`: the rule has multiple valid resolutions and refuses
+ *    to pick one without operator input. `--yes` mode skips these; the
+ *    operator has to re-run interactively. `--fix` exits non-zero.
+ *  - `editorial-decision`: the rule has a single resolution path but
+ *    that path requires a human judgment call (e.g. picking which slug
+ *    "owns" a public URL when two collide). `--fix` exits non-zero.
+ *  - `schema-rejected`: the host's content-collection schema refused
+ *    the write. `--fix` exits non-zero — the operator must patch the
+ *    schema before retrying.
+ *  - `operator-declined`: interactive mode and the operator said no.
+ *    `--fix` exits non-zero (the operator chose not to proceed).
+ *  - `apply-failed`: the rule's `apply()` raised on disk. `--fix` exits
+ *    non-zero — a real failure to track down.
+ *  - `no-action-needed`: the rule's plan resolved to a no-op (e.g. the
+ *    operator chose "leave as-is" in an orphan-id prompt). `--fix`
+ *    treats this as a successful skip.
+ */
+export type SkipReason =
+  | 'prerequisite-missing'
+  | 'ambiguous'
+  | 'editorial-decision'
+  | 'schema-rejected'
+  | 'operator-declined'
+  | 'apply-failed'
+  | 'no-action-needed';
+
 /** Outcome of applying a repair plan. */
 export interface RepairResult {
   finding: Finding;
@@ -86,6 +121,14 @@ export interface RepairResult {
   applied: boolean;
   /** Human-readable summary of what happened (or why it was skipped). */
   message: string;
+  /**
+   * When `applied` is false, why. Used by the CLI command to decide
+   * whether the skip is a real follow-up (exit non-zero) or a no-op
+   * waiting on operator action outside doctor's scope (exit zero).
+   * Optional for backward compatibility — older rule implementations
+   * may not set it; the CLI defaults to "treat as a real follow-up".
+   */
+  skipReason?: SkipReason;
   /** Optional rule-defined details — e.g. paths written. */
   details?: Readonly<Record<string, unknown>>;
 }

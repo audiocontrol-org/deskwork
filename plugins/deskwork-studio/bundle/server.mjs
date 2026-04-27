@@ -10346,6 +10346,102 @@ var serveStatic = (options = { root: "" }) => {
   };
 };
 
+// src/listen.ts
+var AUTO_INCREMENT_RANGE = 30;
+function listenOnAddress(serveImpl, fetchFn, port, address) {
+  return new Promise((resolvePromise, rejectPromise) => {
+    let resolved = false;
+    let server;
+    try {
+      server = serveImpl(
+        { fetch: fetchFn, port, hostname: address },
+        () => {
+          if (resolved) return;
+          resolved = true;
+          resolvePromise(server);
+        }
+      );
+    } catch (err2) {
+      rejectPromise(err2);
+      return;
+    }
+    server.on("error", (err2) => {
+      if (resolved) return;
+      resolved = true;
+      try {
+        server.close();
+      } catch {
+      }
+      rejectPromise(err2);
+    });
+  });
+}
+function closeAll(servers) {
+  return Promise.all(
+    servers.map(
+      (s) => new Promise((res) => {
+        try {
+          s.close(() => res());
+        } catch {
+          res();
+        }
+      })
+    )
+  ).then(() => void 0);
+}
+function isAddressInUse(err2) {
+  if (!err2 || typeof err2 !== "object") return false;
+  const code2 = err2.code;
+  return typeof code2 === "string" && code2 === "EADDRINUSE";
+}
+async function attemptPort(serveImpl, fetchFn, port, addresses) {
+  const bound = [];
+  for (const addr of addresses) {
+    try {
+      const s = await listenOnAddress(serveImpl, fetchFn, port, addr);
+      bound.push(s);
+    } catch (err2) {
+      await closeAll(bound);
+      throw err2;
+    }
+  }
+  return bound;
+}
+async function listenWithAutoIncrement(options, serveImpl) {
+  const startPort = options.port;
+  const maxPort = options.explicitPort ? startPort : startPort + AUTO_INCREMENT_RANGE - 1;
+  let lastError = null;
+  for (let p2 = startPort; p2 <= maxPort; p2++) {
+    try {
+      const servers = await attemptPort(
+        serveImpl,
+        options.fetch,
+        p2,
+        options.addresses
+      );
+      return {
+        port: p2,
+        servers,
+        autoIncremented: p2 !== startPort
+      };
+    } catch (err2) {
+      lastError = err2;
+      if (!isAddressInUse(err2)) {
+        throw err2;
+      }
+    }
+  }
+  if (options.explicitPort) {
+    const detail = lastError instanceof Error ? `: ${lastError.message}` : "";
+    throw new Error(
+      `port ${startPort} is in use${detail}. The operator passed --port explicitly, so deskwork-studio refuses to auto-increment. Pass --port <other> or stop the existing process.`
+    );
+  }
+  throw new Error(
+    `no free port found in range ${startPort}..${maxPort}. Pass --port <other> to choose a different starting point, or stop an existing deskwork-studio instance.`
+  );
+}
+
 // src/server.ts
 import { existsSync as existsSync13, realpathSync } from "node:fs";
 import { dirname as dirname5, isAbsolute, resolve as resolve2 } from "node:path";
@@ -27911,6 +28007,7 @@ var LOOPBACK = "127.0.0.1";
 function parseCliArgs(argv) {
   let projectRoot = process.cwd();
   let port = DEFAULT_PORT;
+  let portExplicit = false;
   let hostOverride = null;
   let noTailscale = false;
   for (let i = 0; i < argv.length; i++) {
@@ -27925,8 +28022,10 @@ function parseCliArgs(argv) {
       const next = argv[++i];
       if (!next) usage(`${a} requires a value`);
       port = parseInt(next, 10);
+      portExplicit = true;
     } else if (a.startsWith("--port=")) {
       port = parseInt(a.slice("--port=".length), 10);
+      portExplicit = true;
     } else if (a === "--host" || a === "-H") {
       const next = argv[++i];
       if (!next) usage(`${a} requires a value`);
@@ -27947,6 +28046,7 @@ function parseCliArgs(argv) {
   return {
     projectRoot: isAbsolute(projectRoot) ? projectRoot : resolve2(process.cwd(), projectRoot),
     port,
+    portExplicit,
     hostOverride,
     noTailscale
   };
@@ -28145,9 +28245,7 @@ function createApp(ctx) {
   return app;
 }
 async function main() {
-  const { projectRoot, port, hostOverride, noTailscale } = parseCliArgs(
-    process.argv.slice(2)
-  );
+  const { projectRoot, port, portExplicit, hostOverride, noTailscale } = parseCliArgs(process.argv.slice(2));
   let config;
   try {
     config = readConfig(projectRoot);
@@ -28169,22 +28267,38 @@ async function main() {
     tailscale = detectTailscale();
     bindAddresses = tailscale === null ? [LOOPBACK] : [LOOPBACK, ...tailscale.ipv4];
   }
+  let result;
+  try {
+    result = await listenWithAutoIncrement(
+      {
+        fetch: app.fetch,
+        port,
+        addresses: bindAddresses,
+        explicitPort: portExplicit
+      },
+      serve
+    );
+  } catch (err2) {
+    const reason = err2 instanceof Error ? err2.message : String(err2);
+    process.stderr.write(`deskwork-studio: ${reason}
+`);
+    process.exit(1);
+  }
   const reachableUrls = [];
   for (const addr of bindAddresses) {
-    serve({ fetch: app.fetch, port, hostname: addr }, () => {
-      reachableUrls.push(`http://${addr === LOOPBACK ? "localhost" : addr}:${port}/`);
-      if (reachableUrls.length === bindAddresses.length) {
-        printBanner({
-          urls: reachableUrls,
-          projectRoot,
-          siteSlugs: Object.keys(config.sites),
-          tailscale,
-          port,
-          override: hostOverride
-        });
-      }
-    });
+    reachableUrls.push(
+      `http://${addr === LOOPBACK ? "localhost" : addr}:${result.port}/`
+    );
   }
+  printBanner({
+    urls: reachableUrls,
+    projectRoot,
+    siteSlugs: Object.keys(config.sites),
+    tailscale,
+    port: result.port,
+    override: hostOverride,
+    autoIncrementedFrom: result.autoIncremented ? port : null
+  });
 }
 function printBanner(b) {
   process.stdout.write("deskwork-studio listening on:\n");
@@ -28202,10 +28316,16 @@ function printBanner(b) {
 `);
   process.stdout.write(`  sites:   ${b.siteSlugs.join(", ")}
 `);
+  if (b.autoIncrementedFrom !== null) {
+    process.stdout.write(
+      `  note: port ${b.autoIncrementedFrom} was in use; using ${b.port} instead
+`
+    );
+  }
   const exposed = b.override !== null && b.override !== LOOPBACK;
   if (exposed) {
     process.stdout.write(
-      `  \u26A0 bound to ${b.override}. Studio has no authentication \u2014
+      `  warning: bound to ${b.override}. Studio has no authentication \u2014
     only run this on a trusted network (Tailscale, VPN, etc.).
 `
     );
