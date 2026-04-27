@@ -30,9 +30,11 @@ export interface ScaffoldResult {
   /** Path relative to the project root */
   relativePath: string;
   /**
-   * Path of the file relative to `contentDir` — the value to record on
-   * the calendar entry so subsequent reads can find this file even
-   * when its layout differs from the site's `blogFilenameTemplate`.
+   * Path of the file relative to `contentDir` — reported to the
+   * caller so it can show the operator where the file landed. The
+   * file's connection to the calendar entry is now carried by its
+   * frontmatter `id:` field, not by a path string on the calendar
+   * row (Phase 19a).
    */
   contentRelativePath: string;
 }
@@ -100,7 +102,24 @@ export function scaffoldBlogPost(
 
   const dateStr = new Date().toISOString().slice(0, 10);
 
+  // The `id:` field binds this file to its CalendarEntry refactor-proof.
+  // Phase 19 made entry id (UUID) the canonical internal identifier;
+  // writing it into frontmatter lets the content-index pick this file up
+  // regardless of slug renames or fs relocations. `addEntry` always sets
+  // `entry.id` to a UUID; if it's missing here we have a real bug
+  // upstream — fail loud rather than scaffold an unbindable file.
+  if (!entry.id || entry.id.trim() === '') {
+    throw new Error(
+      'Cannot scaffold entry without id; this is a bug in calendar-mutations or upstream. ' +
+        `Entry slug: "${entry.slug}".`,
+    );
+  }
+
   const data: Record<string, unknown> = {};
+  // `id` first so it's the visually-stable top of the frontmatter
+  // block — operators reading the file see it immediately and won't
+  // mistake it for a host-rendering field.
+  data.id = entry.id;
   if (siteCfg.blogLayout) data.layout = siteCfg.blogLayout;
   data.title = entry.title;
   data.description = entry.description;
@@ -115,10 +134,9 @@ export function scaffoldBlogPost(
   mkdirSync(dirname(filePath), { recursive: true });
   writeFrontmatter(filePath, data, body);
 
-  // Always report the contentDir-relative path. When no explicit layout
-  // was requested we derive it from the resolved file path so the caller
-  // can record `entry.filePath` consistently regardless of which
-  // resolution branch produced filePath.
+  // Always report the contentDir-relative path so the caller can show
+  // the operator where the file landed. When no explicit layout was
+  // requested we derive it from the resolved file path.
   const reported =
     contentRelativePath ??
     relative(join(projectRoot, siteCfg.contentDir), filePath);

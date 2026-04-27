@@ -81,39 +81,36 @@ export function isContentType(value: string): value is ContentType {
 /** A single entry in the editorial calendar. */
 export interface CalendarEntry {
   /**
-   * Stable internal identifier (UUID v4). Persists across slug changes so
-   * workflows, distribution records, and journal entries can join through
-   * it without rewriting history when the public slug is renamed for SEO.
+   * Stable internal identifier (UUID v4) — the canonical join key for
+   * everything inside deskwork (workflows, distribution records,
+   * journal entries, the content index). Persists across slug renames
+   * so SEO-driven slug changes don't rewrite history.
    *
-   * Optional on this interface so pre-id test fixtures compile. At runtime
-   * every parseCalendar / addEntry path sets id to a UUID. Treat missing
-   * on disk as "legacy, not yet migrated" — the parser assigns a fresh
-   * UUID in-memory and the next `writeCalendar` persists it. One save
-   * fully populates a legacy calendar.
+   * Optional on this interface so pre-id test fixtures compile. At
+   * runtime every parseCalendar / addEntry path sets id to a UUID.
+   * Treat missing on disk as "legacy, not yet migrated" — the parser
+   * assigns a fresh UUID in-memory and the next `writeCalendar`
+   * persists it. One save fully populates a legacy calendar.
    */
   id?: string;
   /**
-   * URL-safe identifier — kebab-case segments, optionally separated by
-   * forward slashes for hierarchical content collections. Examples:
+   * The host rendering engine's identifier — typically used to derive
+   * the public URL (e.g. `/blog/<slug>` in Astro). Owned by the host
+   * project, not by deskwork. Deskwork stores it for display and for
+   * the legacy slug-fallback path; deskwork's filesystem placement
+   * decisions go through `id` + the content index, NOT through slug.
+   *
+   * Format remains URL-safe — kebab-case segments, optionally
+   * separated by forward slashes for hierarchical content collections.
+   * Examples:
    *
    *   "scsi-over-wifi-raspberry-pi-bridge"          (flat)
    *   "the-outbound"                                (hierarchical root)
    *   "the-outbound/characters/strivers"            (nested chapter)
    *
-   * Hierarchy is implicit in the slug — there is no explicit parent
-   * pointer. Each segment must match `[a-z0-9][a-z0-9-]*`.
+   * Each segment must match `[a-z0-9][a-z0-9-]*`.
    */
   slug: string;
-  /**
-   * Optional explicit content-file path for this entry, relative to the
-   * site's `contentDir`. Set this when the file's location can't be
-   * derived from the slug + the site's `blogFilenameTemplate` — e.g.
-   * a flat `characters/alice.md` next to `characters/bob.md`, or a
-   * `README.md` instead of `index.md` on a nested editorial-private
-   * node. When unset, deskwork falls back to the template (preserving
-   * the flat-blog default behavior).
-   */
-  filePath?: string;
   /** Human-readable title */
   title: string;
   /** One-line description for SEO / calendar overview */

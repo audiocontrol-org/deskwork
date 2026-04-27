@@ -25,10 +25,13 @@ import {
   listScrapbook,
   readScrapbookFile,
   scrapbookDir,
+  scrapbookDirAtPath,
+  scrapbookDirForEntry,
   scrapbookFilePath,
   slugSegments,
   SECRET_SUBDIR,
 } from '../src/scrapbook.ts';
+import type { ContentIndex } from '../src/content-index.ts';
 import type { DeskworkConfig } from '../src/config.ts';
 
 function makeConfig(): DeskworkConfig {
@@ -302,5 +305,104 @@ describe('classify (existing behavior, unchanged)', () => {
     expect(classify('a.png')).toBe('img');
     expect(classify('a.txt')).toBe('txt');
     expect(classify('a.unknown')).toBe('other');
+  });
+});
+
+describe('scrapbookDirAtPath (Phase 19c)', () => {
+  // Path-addressed sibling of scrapbookDir — used when the studio
+  // already knows the fs path of an organizational/tracked node and
+  // doesn't need to re-derive through the slug regex.
+  let root: string;
+  const cfg = makeConfig();
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'deskwork-sb-at-path-'));
+  });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it('joins contentDir + relPath + scrapbook for flat paths', () => {
+    expect(scrapbookDirAtPath(root, cfg, 'wc', 'flat')).toBe(
+      join(root, 'src/content/projects/flat/scrapbook'),
+    );
+  });
+
+  it('handles hierarchical paths', () => {
+    expect(
+      scrapbookDirAtPath(root, cfg, 'wc', 'projects/the-outbound'),
+    ).toBe(
+      join(root, 'src/content/projects/projects/the-outbound/scrapbook'),
+    );
+  });
+
+  it('rejects path-traversal shapes', () => {
+    expect(() => scrapbookDirAtPath(root, cfg, 'wc', '../escape')).toThrow();
+  });
+});
+
+describe('scrapbookDirForEntry (Phase 19c)', () => {
+  // Resolves the scrapbook from the entry's bound file location (via
+  // content index) so refactoring the directory tree updates the
+  // scrapbook address automatically. Falls back to slug-template for
+  // pre-doctor entries.
+  let root: string;
+  const cfg = makeConfig();
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'deskwork-sb-for-entry-'));
+  });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it('uses the bound file path from the content index', () => {
+    const id = '11111111-2222-4333-8444-555555555555';
+    const abs = join(root, 'src/content/projects/projects/the-outbound/index.md');
+    const idx: ContentIndex = {
+      byId: new Map([[id, abs]]),
+      byPath: new Map([['projects/the-outbound/index.md', id]]),
+      invalid: [],
+    };
+    const dir = scrapbookDirForEntry(
+      root,
+      cfg,
+      'wc',
+      { id, slug: 'the-outbound' },
+      idx,
+    );
+    expect(dir).toBe(
+      join(root, 'src/content/projects/projects/the-outbound/scrapbook'),
+    );
+  });
+
+  it('falls back to slug-template path when no id binding exists', () => {
+    const idx: ContentIndex = {
+      byId: new Map(),
+      byPath: new Map(),
+      invalid: [],
+    };
+    const dir = scrapbookDirForEntry(
+      root,
+      cfg,
+      'wc',
+      { slug: 'my-post' },
+      idx,
+    );
+    // Template defaults to <slug>/index.md → scrapbook lives at
+    // <slug>/scrapbook.
+    expect(dir).toBe(join(root, 'src/content/projects/my-post/scrapbook'));
+  });
+
+  it('builds the index on demand when none is passed', () => {
+    // Real fixture: write a file with frontmatter id, let the helper
+    // walk and resolve.
+    const id = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+    const abs = join(root, 'src/content/projects/projects/the-outbound/index.md');
+    mkdirSync(join(abs, '..'), { recursive: true });
+    writeFileSync(abs, `---\nid: ${id}\ntitle: The Outbound\n---\n`);
+    const dir = scrapbookDirForEntry(root, cfg, 'wc', {
+      id,
+      slug: 'the-outbound',
+    });
+    expect(dir).toBe(
+      join(root, 'src/content/projects/projects/the-outbound/scrapbook'),
+    );
   });
 });

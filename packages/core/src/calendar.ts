@@ -130,8 +130,10 @@ function parseEntries(lines: string[], stage: Stage): CalendarEntry[] {
       const url = col(cells, cols, 'url');
       if (url) entry.contentUrl = url;
 
-      const filePath = col(cells, cols, 'filepath');
-      if (filePath) entry.filePath = filePath;
+      // Legacy calendars may carry a `FilePath` column from the prior
+      // plan; the parser is column-tolerant and ignores it. Phase 19
+      // moves filesystem placement to frontmatter `id:` + the content
+      // index, so the column is no longer load-bearing on disk.
 
       // PausedFrom column round-trips on the Paused section. Other
       // sections that happen to carry the column (legacy hand-edits)
@@ -350,9 +352,6 @@ function renderStageTable(entries: CalendarEntry[], stage: Stage): string {
   const hasUrl = entries.some(
     (e) => e.contentUrl !== undefined && e.contentUrl !== '',
   );
-  const hasFilePath = entries.some(
-    (e) => e.filePath !== undefined && e.filePath !== '',
-  );
   const isPublished = stage === 'Published';
   const isPaused = stage === 'Paused';
 
@@ -360,7 +359,6 @@ function renderStageTable(entries: CalendarEntry[], stage: Stage): string {
   if (hasTopics) headers.push('Topics');
   if (hasType) headers.push('Type');
   if (hasUrl) headers.push('URL');
-  if (hasFilePath) headers.push('FilePath');
   headers.push('Source');
   if (isPaused) headers.push('PausedFrom');
   if (isPublished) headers.push('Published');
@@ -383,7 +381,6 @@ function renderStageTable(entries: CalendarEntry[], stage: Stage): string {
     if (hasTopics) row.push(escapeCell((e.topics ?? []).join(', ')));
     if (hasType) row.push(effectiveContentType(e));
     if (hasUrl) row.push(escapeCell(e.contentUrl ?? ''));
-    if (hasFilePath) row.push(escapeCell(e.filePath ?? ''));
     row.push(e.source);
     if (isPaused) row.push(e.pausedFrom ?? '');
     if (isPublished) row.push(e.datePublished ?? '');

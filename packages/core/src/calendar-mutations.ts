@@ -256,6 +256,24 @@ export function findEntry(
 }
 
 /**
+ * CLI-arg friendly lookup: tries `id` first (stable across slug
+ * renames), falls back to `slug`. Use this anywhere an operator-typed
+ * argument might be either form — e.g. `deskwork doctor --entry <X>`.
+ *
+ * Returns `undefined` when neither match. Empty / whitespace-only
+ * input also returns undefined.
+ */
+export function findEntryBySlugOrId(
+  calendar: EditorialCalendar,
+  slugOrId: string,
+): CalendarEntry | undefined {
+  if (slugOrId === undefined || slugOrId === null) return undefined;
+  const trimmed = slugOrId.trim();
+  if (trimmed === '') return undefined;
+  return findEntryById(calendar, trimmed) ?? findEntry(calendar, trimmed);
+}
+
+/**
  * Append a distribution record for a published post. The referenced entry
  * must exist and be in the Published stage — we don't record shares for
  * posts that haven't shipped yet.

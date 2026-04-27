@@ -19,6 +19,7 @@ v0.4.1 patch — fixes: scrapbook ingest predicate handles nested scrapbook dirs
 
 - **Editorial lifecycle** — Ideas → Planned → Outlining → Drafting → Review → Published, with structured review iteration loops.
 - **Hierarchical content** — slugs accept `/`-separated segments (`the-outbound/characters/strivers`) and every lifecycle skill, calendar surface, and studio page works at any depth. Long-form projects (novels, essay collections, multi-chapter guides) live alongside flat blog posts in the same calendar. Per-entry `--layout {index|readme|flat}` controls the on-disk shape; `directoryIsHierarchicalNode` keeps untracked organizational dirs out of the slug.
+- **Refactor-proof binding** — calendar entries join to their content files via a UUID written into each markdown's frontmatter (`id: <uuid>`), not via a cached path. Renaming or moving a file in the content tree doesn't break the binding; deskwork rediscovers it on the next read by scanning `contentDir` for the matching id. The `deskwork doctor` command audits the binding metadata across calendar, files, and review workflows, and repairs ambiguous cases interactively.
 - **Backfill existing content** — `/deskwork:ingest` walks paths, derives slugs from the on-disk layout, and adds rows to the calendar after a dry-run.
 - **Studio web surface** — local Hono server with dashboard, longform review pane, shortform desk, scrapbook viewer, and bird's-eye content view.
 
@@ -40,7 +41,7 @@ Then bootstrap the host project:
 
 The plugins ship with self-contained ESM bundles (`packages/cli/bundle/cli.mjs`, `packages/studio/bundle/server.mjs`) so a fresh install runs end-to-end with nothing more than the cloned repo and `node` on PATH. Local-development installs (`claude --plugin-dir plugins/deskwork`) use the workspace-linked tsx binary instead — same wrapper, layered resolution.
 
-See each plugin's `README.md` under `plugins/` for configuration and usage.
+See each plugin's `README.md` under `plugins/` for configuration and usage. The `deskwork` plugin README documents the host content-schema requirement (Astro projects must allow the `id` field in frontmatter) and the `doctor` maintenance command.
 
 ### Getting updates
 

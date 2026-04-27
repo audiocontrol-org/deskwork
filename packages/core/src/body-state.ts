@@ -50,7 +50,9 @@ export function bodyState(filePath: string): BodyState {
   if (!existsSync(filePath)) return 'missing';
   const content = readFileSync(filePath, 'utf8');
 
-  const fmMatch = content.match(/^---\n[\s\S]*?\n---\n?/);
+  // `\r?\n` mirrors `frontmatter.ts`'s FRONTMATTER_RE so files saved
+  // with Windows line endings classify the same way as `\n`-only files.
+  const fmMatch = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
   const body = fmMatch ? content.slice(fmMatch[0].length) : content;
 
   const withoutH1 = body.replace(/^\s*#[^\n]*\n?/, '');

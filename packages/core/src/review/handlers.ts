@@ -11,7 +11,15 @@
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import type { DeskworkConfig } from '../config.ts';
-import { resolveBlogFilePath } from '../paths.ts';
+import {
+  findEntryFile,
+  resolveBlogFilePath,
+  resolveCalendarPath,
+} from '../paths.ts';
+import { readCalendar } from '../calendar.ts';
+import { findEntry, findEntryById } from '../calendar-mutations.ts';
+import { buildContentIndex, type ContentIndex } from '../content-index.ts';
+import type { CalendarEntry } from '../types.ts';
 import type { DraftAnnotation, DraftWorkflowState } from './types.ts';
 import {
   appendAnnotation,
@@ -304,12 +312,25 @@ export function handleCreateVersion(
   // SSOT: the markdown file on disk IS the article. Write disk first,
   // then snapshot to the journal. Longform and outline both live on disk;
   // shortform has no separate file (workflow markdown is canonical).
+  //
+  // Resolve via the content index first (so writingcontrol-shaped layouts
+  // where slug != fs path work), with template fallback for legacy
+  // / pre-doctor cases.
   if (workflow.contentKind === 'longform' || workflow.contentKind === 'outline') {
-    const blogFile = resolveBlogFilePath(projectRoot, config, workflow.site, workflow.slug);
-    if (!existsSync(blogFile)) {
+    const blogFile = resolveWorkflowFilePath(
+      projectRoot,
+      config,
+      workflow.site,
+      workflow.slug,
+      {
+        ...(workflow.entryId !== undefined ? { entryId: workflow.entryId } : {}),
+      },
+    );
+    if (blogFile === undefined || !existsSync(blogFile)) {
+      const shown = blogFile ?? '(unresolved)';
       return err(
         500,
-        `cannot save: blog file missing at ${blogFile}. ` +
+        `cannot save: blog file missing at ${shown}. ` +
           `Scaffold the post with /deskwork:outline before saving edits.`,
       );
     }
@@ -359,16 +380,40 @@ export function handleStartLongform(
     return err(400, `invalid slug: ${b.slug}. Must match ${SLUG_RE}`);
   }
 
-  const path = resolveBlogFilePath(projectRoot, config, b.site, b.slug);
-  if (!existsSync(path)) {
-    return err(404, `blog draft not found at ${path}`);
+  // Look the entry up once and reuse for both file resolution and the
+  // entryId stamp. When the caller already supplied an id, prefer the
+  // entry whose id matches (useful for callers passing a sibling-calendar
+  // id intentionally).
+  const callerEntryId =
+    b.entryId !== undefined && b.entryId !== '' ? b.entryId : undefined;
+  const entry = lookupEntry(projectRoot, config, b.site, {
+    ...(callerEntryId !== undefined ? { entryId: callerEntryId } : {}),
+    slug: b.slug,
+  });
+
+  // Resolve entryId — caller's hint wins; otherwise derive from the
+  // calendar entry. Stamping entryId onto every new workflow keeps the
+  // join stable across slug renames.
+  const entryId = callerEntryId ?? entry?.id;
+
+  // Resolve the on-disk markdown file. Index lookup first (so
+  // writingcontrol-shaped non-template paths work), template fallback
+  // for legacy / pre-doctor cases.
+  const path = resolveWorkflowFilePath(projectRoot, config, b.site, b.slug, {
+    ...(entryId !== undefined ? { entryId } : {}),
+    ...(entry !== undefined ? { entry } : {}),
+  });
+  if (path === undefined || !existsSync(path)) {
+    const shown = path ?? '(unresolved)';
+    return err(404, `blog draft not found at ${shown}`);
   }
 
   const markdown = readFileSync(path, 'utf-8');
+
   const before = readWorkflows(projectRoot, config).find((w) => {
     const identityMatch =
-      b.entryId && w.entryId
-        ? w.entryId === b.entryId
+      entryId && w.entryId
+        ? w.entryId === entryId
         : w.site === b.site && w.slug === b.slug;
     return (
       identityMatch &&
@@ -380,12 +425,94 @@ export function handleStartLongform(
   const workflow = createWorkflow(projectRoot, config, {
     site: b.site,
     slug: b.slug,
-    ...(b.entryId !== undefined ? { entryId: b.entryId } : {}),
+    ...(entryId !== undefined && entryId !== '' ? { entryId } : {}),
     contentKind: 'longform',
     initialMarkdown: markdown,
     initialOriginatedBy: 'agent',
   });
   return ok({ workflow, existing: !!before && before.id === workflow.id });
+}
+
+/**
+ * Read a calendar entry by id or slug for a given site, returning
+ * `undefined` when the calendar is missing or the entry can't be found.
+ * The handlers use this to look up the entry *before* deciding how to
+ * resolve its on-disk file.
+ */
+function lookupEntry(
+  projectRoot: string,
+  config: DeskworkConfig,
+  site: string,
+  match: { entryId?: string; slug?: string },
+): CalendarEntry | undefined {
+  try {
+    const calendarPath = resolveCalendarPath(projectRoot, config, site);
+    if (!existsSync(calendarPath)) return undefined;
+    const cal = readCalendar(calendarPath);
+    if (match.entryId !== undefined && match.entryId !== '') {
+      const byId = findEntryById(cal, match.entryId);
+      if (byId !== undefined) return byId;
+    }
+    if (match.slug !== undefined && match.slug !== '') {
+      return findEntry(cal, match.slug);
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Resolve the absolute path of the markdown file backing a workflow.
+ *
+ * Precedence:
+ *   1. **Content index** — when an entry id is known (either passed in
+ *      directly or derived from the workflow's site+slug via the
+ *      calendar), scan the site's `contentDir` for a markdown file
+ *      whose frontmatter `id:` matches. Refactor-proof: the binding
+ *      moves with the file. This is what makes writingcontrol-shaped
+ *      layouts (calendar slug `the-outbound`, file at
+ *      `projects/the-outbound/index.md`) work.
+ *   2. **Slug-template fallback** — when no entry id is available
+ *      (legacy workflow, pre-doctor entry, ad-hoc draft with no calendar
+ *      record), fall back to the site's `blogFilenameTemplate`. This
+ *      preserves audiocontrol-shaped behavior unchanged.
+ *
+ * Returns `undefined` only when both paths come up empty — the caller
+ * decides how to surface the missing binding (404 from the route).
+ */
+function resolveWorkflowFilePath(
+  projectRoot: string,
+  config: DeskworkConfig,
+  site: string,
+  slug: string,
+  hint: { entryId?: string; entry?: CalendarEntry; index?: ContentIndex },
+): string | undefined {
+  let entry = hint.entry;
+  let entryId = hint.entryId;
+  if (entry === undefined && (entryId === undefined || entryId === '')) {
+    entry = lookupEntry(projectRoot, config, site, { slug });
+    entryId = entry?.id;
+  } else if (entry === undefined && entryId !== undefined) {
+    entry = lookupEntry(projectRoot, config, site, { entryId });
+  } else if (entryId === undefined || entryId === '') {
+    entryId = entry?.id;
+  }
+
+  if (entryId !== undefined && entryId !== '') {
+    const idx =
+      hint.index ?? buildContentIndex(projectRoot, config, site);
+    const fromIndex = findEntryFile(
+      projectRoot,
+      config,
+      site,
+      entryId,
+      idx,
+      entry !== undefined ? { slug: entry.slug } : { slug },
+    );
+    if (fromIndex !== undefined) return fromIndex;
+  }
+  return resolveBlogFilePath(projectRoot, config, site, slug);
 }
 
 /**

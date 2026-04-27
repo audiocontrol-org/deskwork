@@ -150,22 +150,23 @@ describe('content view — drilldown', () => {
           slug: 'the-outbound/characters',
           title: 'Characters',
           stage: 'Outlining',
-          filePath: 'the-outbound/characters/README.md',
         }),
         entry({
           slug: 'the-outbound/characters/strivers',
           title: 'Strivers',
           stage: 'Drafting',
           description: 'Those who keep moving.',
-          filePath: 'the-outbound/characters/strivers/README.md',
         }),
       ],
       files: {
+        // Phase 19a removed CalendarEntry.filePath. The detail panel
+        // now reads `<slug>/index.md` for tracked entries. Fixture
+        // uses index.md to exercise the post-19a code path.
         'src/content/projects/the-outbound/index.md':
           '---\ntitle: The Outbound\nstate: drafting\n---\n\n# The Outbound\n\nA novel about a one-way exodus.\n',
-        'src/content/projects/the-outbound/characters/README.md':
+        'src/content/projects/the-outbound/characters/index.md':
           '---\ntitle: Characters\n---\n\n# Characters\n',
-        'src/content/projects/the-outbound/characters/strivers/README.md':
+        'src/content/projects/the-outbound/characters/strivers/index.md':
           '---\ntitle: Strivers\nlogline: They run because nothing has ever stood still.\n---\n\n# Strivers\n\nThe strivers were the ones who kept moving.\n',
         'src/content/projects/the-outbound/characters/strivers/scrapbook/archetypes.md':
           '# archetypes notes\n',
@@ -188,9 +189,12 @@ describe('content view — drilldown', () => {
     expect(r.html).toContain('data-slug="the-outbound"');
     expect(r.html).toContain('data-slug="the-outbound/characters"');
     expect(r.html).toContain('data-slug="the-outbound/characters/strivers"');
-    // Inline review links on every tracked row.
-    expect(r.html).toContain(
-      'href="/dev/editorial-review/the-outbound/characters/strivers?site=wc"',
+    // Inline review links on every tracked row. Phase 19d: tracked
+    // entries now carry stamped UUIDs (writeCalendar assigns ids on
+    // first write), so the canonical URL is id-based. Match the UUID
+    // shape rather than a hard-coded id (parseCalendar mints them).
+    expect(r.html).toMatch(
+      /href="\/dev\/editorial-review\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\?site=wc"/,
     );
     // Inline scrapbook link on the row that has scrapbook items.
     expect(r.html).toContain(

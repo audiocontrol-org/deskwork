@@ -33,6 +33,7 @@ import {
   type ContentProject,
   type FlatNode,
 } from '@deskwork/core/content-tree';
+import type { ContentIndex } from '@deskwork/core/content-index';
 import {
   formatRelativeTime,
 } from '@deskwork/core/scrapbook';
@@ -44,6 +45,13 @@ import { layout } from './layout.ts';
 import { renderEditorialFolio } from './chrome.ts';
 import { renderEmptyDetail, renderNodeDetail } from './content-detail.ts';
 import { scrapbookViewerUrl } from '../components/scrapbook-item.ts';
+
+/**
+ * Per-request index getter — supplied by the route layer (which
+ * pulls memoized indices off the Hono context). Optional: when
+ * omitted, renderers fall back to building the index per call.
+ */
+export type IndexGetter = (site: string) => ContentIndex;
 
 // ---------------------------------------------------------------------------
 // Per-site project loading
@@ -58,14 +66,17 @@ interface SiteProjects {
 function loadProjectsForSite(
   ctx: StudioContext,
   site: string,
+  getIndex?: IndexGetter,
 ): SiteProjects {
   const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
   const cal = readCalendar(calendarPath);
+  const contentIndex = getIndex ? getIndex(site) : undefined;
   const projects = buildContentTree(
     site,
     cal.entries,
     ctx.config,
     ctx.projectRoot,
+    contentIndex !== undefined ? { contentIndex } : {},
   );
   return {
     site,
@@ -74,9 +85,12 @@ function loadProjectsForSite(
   };
 }
 
-function loadAllSites(ctx: StudioContext): SiteProjects[] {
+function loadAllSites(
+  ctx: StudioContext,
+  getIndex?: IndexGetter,
+): SiteProjects[] {
   return Object.keys(ctx.config.sites).map((site) =>
-    loadProjectsForSite(ctx, site),
+    loadProjectsForSite(ctx, site, getIndex),
   );
 }
 
@@ -185,8 +199,11 @@ function renderSiteCard(sp: SiteProjects, index: number): RawHtml {
     </article>`);
 }
 
-export function renderContentTopLevel(ctx: StudioContext): string {
-  const sites = loadAllSites(ctx);
+export function renderContentTopLevel(
+  ctx: StudioContext,
+  getIndex?: IndexGetter,
+): string {
+  const sites = loadAllSites(ctx, getIndex);
   const counts = aggregateCounts(sites);
 
   const body = html`
@@ -237,23 +254,23 @@ export function renderContentTopLevel(ctx: StudioContext): string {
 function renderTreeBreadcrumb(
   site: string,
   project: ContentProject,
-  selectedSlug: string | null,
+  selectedPath: string | null,
 ): RawHtml {
   const links: string[] = [];
   links.push(html`<a href="/dev/content/${site}">${site}</a>`);
-  if (selectedSlug === null) {
+  if (selectedPath === null) {
     links.push(html`<b>${project.rootSlug}</b>`);
   } else {
     const projectHref = `/dev/content/${site}/${encodeURI(project.rootSlug)}`;
     links.push(html`<a href="${projectHref}">${project.rootSlug}</a>`);
-    const segments = selectedSlug.split('/');
+    const segments = selectedPath.split('/');
     for (let i = 1; i < segments.length; i++) {
-      const slug = segments.slice(0, i + 1).join('/');
+      const path = segments.slice(0, i + 1).join('/');
       const isLast = i === segments.length - 1;
       if (isLast) {
         links.push(html`<b>${segments[i]}</b>`);
       } else {
-        const href = `${projectHref}?node=${encodeURIComponent(slug)}`;
+        const href = `${projectHref}?node=${encodeURIComponent(path)}`;
         links.push(html`<a href="${href}">${segments[i]}</a>`);
       }
     }
@@ -275,9 +292,24 @@ function nodeIcon(node: ContentNode): RawHtml {
 }
 
 function nodeFilePathHint(node: ContentNode): string {
-  if (node.entry?.filePath) return `/${node.entry.filePath}`;
-  if (node.entry !== null) return `/${node.slug}/index.md`;
-  return `/${node.slug}/`;
+  // Phase 19c: node.path is the fs-relative path (the structural key).
+  // Tracked entries display the index file shape; organizational
+  // nodes show the directory shape. The host's actual file basename
+  // could differ (README.md, .mdx, etc.) but `/index.md` is the
+  // universal "expected location" hint the operator reads.
+  if (node.entry !== null) return `/${node.path}/index.md`;
+  return `/${node.path}/`;
+}
+
+/**
+ * Last segment of an fs-relative path. Used to detect when a tracked
+ * entry's public-URL slug differs from where it lives on disk —
+ * e.g. an entry whose `path = "projects/the-outbound-novel"` and
+ * `slug = "the-outbound"` (renamed directory, slug unchanged for SEO).
+ */
+function pathLeaf(path: string): string {
+  const idx = path.lastIndexOf('/');
+  return idx < 0 ? path : path.slice(idx + 1);
 }
 
 function renderTreeRowMeta(node: ContentNode): RawHtml {
@@ -293,8 +325,19 @@ function renderTreeRowMeta(node: ContentNode): RawHtml {
 }
 
 function renderTreeRowActions(node: ContentNode, site: string): RawHtml {
-  const reviewHref = `/dev/editorial-review/${encodeURI(node.slug)}?site=${site}`;
-  const scrapHref = scrapbookViewerUrl({ site, path: node.slug });
+  // Phase 19d: when an entry is overlaid, prefer its stable id for
+  // the canonical review URL (refactor-proof — survives slug renames).
+  // Fall back to the entry's slug (or the node's path for organizational
+  // nodes) when no id is stamped — that's the legacy migration shape;
+  // server.ts 302-redirects it to the canonical URL.
+  const reviewKey =
+    node.entry !== null && node.entry.id !== undefined && node.entry.id !== ''
+      ? node.entry.id
+      : (node.slug ?? node.path);
+  const reviewHref = `/dev/editorial-review/${encodeURI(reviewKey)}?site=${site}`;
+  // Scrapbook addressing uses fs path — every node, tracked or not,
+  // has a deterministic on-disk scrapbook location at `<path>/scrapbook/`.
+  const scrapHref = scrapbookViewerUrl({ site, path: node.path });
   const reviewLink =
     node.entry !== null
       ? html`<a class="tree-row__action tree-row__action--review" href="${reviewHref}"
@@ -312,14 +355,17 @@ function renderTreeRow(
   site: string,
   project: ContentProject,
   flat: FlatNode,
-  selectedSlug: string | null,
+  selectedPath: string | null,
 ): RawHtml {
   const { node, depth, isLast } = flat;
-  const isSelected = selectedSlug === node.slug;
+  const isSelected = selectedPath === node.path;
   const isLeaf = node.children.length === 0;
   const lane = laneToken(node.lane);
   const projectHref = `/dev/content/${site}/${encodeURI(project.rootSlug)}`;
-  const nodeHref = `${projectHref}?node=${encodeURIComponent(node.slug)}`;
+  // Phase 19c: structural URLs key on fs path. The selection query
+  // parameter accepts hierarchical paths via `:path{.+}` route syntax
+  // upstream — encodeURIComponent preserves the `/` segments.
+  const nodeHref = `${projectHref}?node=${encodeURIComponent(node.path)}`;
   const classes = [
     'tree-row',
     isLeaf ? 'is-leaf' : 'is-branch',
@@ -329,13 +375,28 @@ function renderTreeRow(
     .filter(Boolean)
     .join(' ');
 
+  // Phase 19d: render a "public URL" hover hint when an overlay entry
+  // exists AND the entry's slug differs from the path's leaf segment.
+  // The slug is the host-rendering engine's identifier (the SEO URL);
+  // showing it explicitly clarifies the relationship between the
+  // structural fs path and the public-facing URL.
+  const publicUrlHint =
+    node.slug !== undefined && node.slug !== pathLeaf(node.path)
+      ? unsafe(html`<span class="tree-row__public-url"
+          title="public URL on the host site">/blog/${node.slug}</span>`)
+      : unsafe('');
+
+  // The HTML attribute name `data-slug` is preserved for backward
+  // compatibility with the client-side selectors; it now carries the
+  // fs path. A future cleanup can rename the attribute to data-path.
   return unsafe(html`
     <a class="${classes}" href="${nodeHref}" style="--depth: ${depth}"
-      data-slug="${node.slug}" aria-current="${isSelected ? 'true' : 'false'}">
+      data-slug="${node.path}" aria-current="${isSelected ? 'true' : 'false'}">
       <div class="tree-row__main">
         ${nodeIcon(node)}
         <span class="tree-row__title">${node.title}</span>
         <span class="tree-row__slug">${nodeFilePathHint(node)}</span>
+        ${publicUrlHint}
       </div>
       <span class="tree-row__lane">
         <span class="lane-dot lane-dot--${lane}"></span>
@@ -349,12 +410,12 @@ function renderTreeRow(
 function renderTree(
   site: string,
   project: ContentProject,
-  selectedSlug: string | null,
+  selectedPath: string | null,
 ): RawHtml {
   const flat = flattenForRender(project.root);
   return unsafe(html`
     <div class="tree" role="tree">
-      ${flat.map((f) => renderTreeRow(site, project, f, selectedSlug))}
+      ${flat.map((f) => renderTreeRow(site, project, f, selectedPath))}
     </div>`);
 }
 
@@ -366,12 +427,13 @@ export async function renderContentProject(
   ctx: StudioContext,
   site: string,
   projectSlug: string,
-  selectedSlug: string | null,
+  selectedPath: string | null,
+  getIndex?: IndexGetter,
 ): Promise<{ status: number; html: string }> {
   if (!(site in ctx.config.sites)) {
     return { status: 404, html: renderNotFound(`unknown site: ${site}`) };
   }
-  const sp = loadProjectsForSite(ctx, site);
+  const sp = loadProjectsForSite(ctx, site, getIndex);
   const project = sp.projects.find((p) => p.rootSlug === projectSlug);
   if (!project) {
     return {
@@ -380,7 +442,7 @@ export async function renderContentProject(
     };
   }
 
-  const selectedNode = selectedSlug ? findNode(project, selectedSlug) : null;
+  const selectedNode = selectedPath ? findNode(project, selectedPath) : null;
   const detailBlock = selectedNode
     ? await renderNodeDetail(ctx, site, selectedNode)
     : renderEmptyDetail();
@@ -390,14 +452,14 @@ export async function renderContentProject(
     <main class="content-page">
       <section class="drilldown">
         <div class="drilldown__tree">
-          ${renderTreeBreadcrumb(site, project, selectedNode?.slug ?? null)}
+          ${renderTreeBreadcrumb(site, project, selectedNode?.path ?? null)}
           <header class="tree-head">
             <h2 class="tree-head__title">${project.title}</h2>
             <span class="tree-head__count">
               ${project.totalNodes} NODES · ${project.maxDepth} LEVELS DEEP
             </span>
           </header>
-          ${renderTree(site, project, selectedNode?.slug ?? null)}
+          ${renderTree(site, project, selectedNode?.path ?? null)}
         </div>
         ${detailBlock}
       </section>

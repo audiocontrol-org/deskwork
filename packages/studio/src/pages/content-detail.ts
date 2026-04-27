@@ -170,10 +170,15 @@ function loadDetailRender(
   let bodyPreview = '';
   let scrapbook: ScrapbookSummary | null = null;
 
-  if (node.entry !== null) {
-    const filePath = node.entry.filePath ?? `${node.slug}/index.md`;
-    const abs = join(contentDir, filePath);
-    const raw = safeReadFile(abs);
+  // Phase 19c: detail-panel file lookup uses the node's fs `path` —
+  // the structural key. Whether the node is a tracked entry or
+  // organizational, the file lookup walks `<contentDir>/<path>/`
+  // for an index/README. (Phase 19d will additionally consult the
+  // per-request content index for tracked entries to handle the case
+  // where the host's template differs from the file's actual path.)
+  const idxFile = findOrganizationalIndex(contentDir, node.path);
+  if (idxFile !== null) {
+    const raw = safeReadFile(idxFile);
     if (raw !== null) {
       const parsed = parseFrontmatter(raw);
       frontmatter = parsed.data as Record<string, unknown>;
@@ -197,7 +202,7 @@ function loadDetailRender(
   }
 
   try {
-    scrapbook = listScrapbook(ctx.projectRoot, ctx.config, site, node.slug);
+    scrapbook = listScrapbook(ctx.projectRoot, ctx.config, site, node.path);
   } catch {
     scrapbook = null;
   }
@@ -212,30 +217,50 @@ export async function renderNodeDetail(
 ): Promise<RawHtml> {
   const detail = loadDetailRender(ctx, site, node);
   const fmCount = Object.keys(detail.frontmatter).length;
-  const reviewHref = `/dev/editorial-review/${encodeURI(node.slug)}?site=${site}`;
-  const scrapHref = scrapbookViewerUrl({ site, path: node.slug });
+  // Phase 19d: prefer the entry's stable id for the canonical review
+  // URL — refactor-proof, survives slug renames. Falls back to the
+  // entry slug (or the node's path) when the entry has no id stamped.
+  const reviewKey =
+    node.entry !== null && node.entry.id !== undefined && node.entry.id !== ''
+      ? node.entry.id
+      : (node.slug ?? node.path);
+  const reviewHref = `/dev/editorial-review/${encodeURI(reviewKey)}?site=${site}`;
+  // Scrapbook viewer addresses by fs path — every node has a
+  // deterministic on-disk scrapbook location at `<path>/scrapbook/`.
+  const scrapHref = scrapbookViewerUrl({ site, path: node.path });
   const scrapDirHint =
     node.scrapbookCount === 0
       ? '0 items · scrapbook empty'
-      : `${node.scrapbookCount} items · /${node.slug}/scrapbook`;
+      : `${node.scrapbookCount} items · /${node.path}/scrapbook`;
   const updatedHint =
     node.scrapbookMostRecentMtime !== null
       ? html`<span class="detail__updated">last touched ${formatRelativeTime(node.scrapbookMostRecentMtime)}</span>`
       : '';
-  const loader = makeInlineTextLoaderForNode(ctx, site, node.slug);
+  const loader = makeInlineTextLoaderForNode(ctx, site, node.path);
   const previewBlock = await renderBodyPreview(detail.bodyPreview);
   const reviewBtn =
     node.entry !== null
       ? html`<a class="btn btn--accent" href="${reviewHref}">Open in Review</a>`
       : '';
+  // Phase 19c: when an entry overlay carries a slug, surface it as
+  // the "public URL" hover hint. The slug is the host-rendering
+  // engine's identifier — operators recognize it as the SEO URL,
+  // distinct from the fs path that drives the tree.
+  const publicUrlHint =
+    node.slug !== undefined && node.slug !== node.path
+      ? html`<span class="detail__public-url" title="public URL on the host site">
+          public URL: /blog/${node.slug}
+        </span>`
+      : '';
 
   return unsafe(html`
-    <div class="detail" data-node-detail data-slug="${node.slug}">
-      <div class="detail__crumb">${node.slug.replaceAll('/', ' · ')}</div>
+    <div class="detail" data-node-detail data-slug="${node.path}">
+      <div class="detail__crumb">${node.path.replaceAll('/', ' · ')}</div>
       <h2 class="detail__title">${node.title}</h2>
       <p class="detail__sub">
         ${node.entry?.description ?? ''}
         ${unsafe(updatedHint)}
+        ${unsafe(publicUrlHint)}
       </p>
 
       <div class="detail__sectionhead">
@@ -254,7 +279,7 @@ export async function renderNodeDetail(
         Scrapbook
         <span class="marg">${scrapDirHint}</span>
       </div>
-      ${renderScrapbookList(site, node.slug, detail.scrapbook, loader)}
+      ${renderScrapbookList(site, node.path, detail.scrapbook, loader)}
 
       <div class="actions">
         ${unsafe(reviewBtn)}

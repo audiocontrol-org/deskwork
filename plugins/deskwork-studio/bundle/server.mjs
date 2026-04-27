@@ -37,97 +37,6 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
-// ../../node_modules/extend/index.js
-var require_extend = __commonJS({
-  "../../node_modules/extend/index.js"(exports, module) {
-    "use strict";
-    var hasOwn = Object.prototype.hasOwnProperty;
-    var toStr = Object.prototype.toString;
-    var defineProperty = Object.defineProperty;
-    var gOPD = Object.getOwnPropertyDescriptor;
-    var isArray = function isArray2(arr) {
-      if (typeof Array.isArray === "function") {
-        return Array.isArray(arr);
-      }
-      return toStr.call(arr) === "[object Array]";
-    };
-    var isPlainObject2 = function isPlainObject3(obj) {
-      if (!obj || toStr.call(obj) !== "[object Object]") {
-        return false;
-      }
-      var hasOwnConstructor = hasOwn.call(obj, "constructor");
-      var hasIsPrototypeOf = obj.constructor && obj.constructor.prototype && hasOwn.call(obj.constructor.prototype, "isPrototypeOf");
-      if (obj.constructor && !hasOwnConstructor && !hasIsPrototypeOf) {
-        return false;
-      }
-      var key2;
-      for (key2 in obj) {
-      }
-      return typeof key2 === "undefined" || hasOwn.call(obj, key2);
-    };
-    var setProperty = function setProperty2(target, options) {
-      if (defineProperty && options.name === "__proto__") {
-        defineProperty(target, options.name, {
-          enumerable: true,
-          configurable: true,
-          value: options.newValue,
-          writable: true
-        });
-      } else {
-        target[options.name] = options.newValue;
-      }
-    };
-    var getProperty = function getProperty2(obj, name) {
-      if (name === "__proto__") {
-        if (!hasOwn.call(obj, name)) {
-          return void 0;
-        } else if (gOPD) {
-          return gOPD(obj, name).value;
-        }
-      }
-      return obj[name];
-    };
-    module.exports = function extend2() {
-      var options, name, src, copy, copyIsArray, clone;
-      var target = arguments[0];
-      var i = 1;
-      var length = arguments.length;
-      var deep = false;
-      if (typeof target === "boolean") {
-        deep = target;
-        target = arguments[1] || {};
-        i = 2;
-      }
-      if (target == null || typeof target !== "object" && typeof target !== "function") {
-        target = {};
-      }
-      for (; i < length; ++i) {
-        options = arguments[i];
-        if (options != null) {
-          for (name in options) {
-            src = getProperty(target, name);
-            copy = getProperty(options, name);
-            if (target !== copy) {
-              if (deep && copy && (isPlainObject2(copy) || (copyIsArray = isArray(copy)))) {
-                if (copyIsArray) {
-                  copyIsArray = false;
-                  clone = src && isArray(src) ? src : [];
-                } else {
-                  clone = src && isPlainObject2(src) ? src : {};
-                }
-                setProperty(target, { name, newValue: extend2(deep, clone, copy) });
-              } else if (typeof copy !== "undefined") {
-                setProperty(target, { name, newValue: copy });
-              }
-            }
-          }
-        }
-      }
-      return target;
-    };
-  }
-});
-
 // ../../node_modules/yaml/dist/nodes/identity.js
 var require_identity = __commonJS({
   "../../node_modules/yaml/dist/nodes/identity.js"(exports) {
@@ -7430,6 +7339,97 @@ var require_dist = __commonJS({
   }
 });
 
+// ../../node_modules/extend/index.js
+var require_extend = __commonJS({
+  "../../node_modules/extend/index.js"(exports, module) {
+    "use strict";
+    var hasOwn = Object.prototype.hasOwnProperty;
+    var toStr = Object.prototype.toString;
+    var defineProperty = Object.defineProperty;
+    var gOPD = Object.getOwnPropertyDescriptor;
+    var isArray = function isArray2(arr) {
+      if (typeof Array.isArray === "function") {
+        return Array.isArray(arr);
+      }
+      return toStr.call(arr) === "[object Array]";
+    };
+    var isPlainObject2 = function isPlainObject3(obj) {
+      if (!obj || toStr.call(obj) !== "[object Object]") {
+        return false;
+      }
+      var hasOwnConstructor = hasOwn.call(obj, "constructor");
+      var hasIsPrototypeOf = obj.constructor && obj.constructor.prototype && hasOwn.call(obj.constructor.prototype, "isPrototypeOf");
+      if (obj.constructor && !hasOwnConstructor && !hasIsPrototypeOf) {
+        return false;
+      }
+      var key2;
+      for (key2 in obj) {
+      }
+      return typeof key2 === "undefined" || hasOwn.call(obj, key2);
+    };
+    var setProperty = function setProperty2(target, options) {
+      if (defineProperty && options.name === "__proto__") {
+        defineProperty(target, options.name, {
+          enumerable: true,
+          configurable: true,
+          value: options.newValue,
+          writable: true
+        });
+      } else {
+        target[options.name] = options.newValue;
+      }
+    };
+    var getProperty = function getProperty2(obj, name) {
+      if (name === "__proto__") {
+        if (!hasOwn.call(obj, name)) {
+          return void 0;
+        } else if (gOPD) {
+          return gOPD(obj, name).value;
+        }
+      }
+      return obj[name];
+    };
+    module.exports = function extend2() {
+      var options, name, src, copy, copyIsArray, clone;
+      var target = arguments[0];
+      var i = 1;
+      var length = arguments.length;
+      var deep = false;
+      if (typeof target === "boolean") {
+        deep = target;
+        target = arguments[1] || {};
+        i = 2;
+      }
+      if (target == null || typeof target !== "object" && typeof target !== "function") {
+        target = {};
+      }
+      for (; i < length; ++i) {
+        options = arguments[i];
+        if (options != null) {
+          for (name in options) {
+            src = getProperty(target, name);
+            copy = getProperty(options, name);
+            if (target !== copy) {
+              if (deep && copy && (isPlainObject2(copy) || (copyIsArray = isArray(copy)))) {
+                if (copyIsArray) {
+                  copyIsArray = false;
+                  clone = src && isArray(src) ? src : [];
+                } else {
+                  clone = src && isPlainObject2(src) ? src : {};
+                }
+                setProperty(target, { name, newValue: extend2(deep, clone, copy) });
+              } else if (typeof copy !== "undefined") {
+                setProperty(target, { name, newValue: copy });
+              }
+            }
+          }
+        }
+      }
+      return target;
+    };
+  }
+});
+
 // ../../node_modules/hono/dist/compose.js
 var compose = (middleware, onError, onNotFound) => {
   return (context, next) => {
@@ -10347,7 +10347,7 @@ var serveStatic = (options = { root: "" }) => {
 };
 
 // src/server.ts
-import { existsSync as existsSync9, realpathSync } from "node:fs";
+import { existsSync as existsSync10, realpathSync } from "node:fs";
 import { dirname as dirname3, isAbsolute, resolve as resolve2 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
@@ -10561,11 +10561,403 @@ function describe(value) {
   return typeof value;
 }
 
-// ../core/src/review/handlers.ts
-import { existsSync as existsSync3, readFileSync as readFileSync3, writeFileSync as writeFileSync2 } from "node:fs";
+// ../core/src/calendar.ts
+import { readFileSync as readFileSync2, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+
+// ../core/src/types.ts
+var STAGES = [
+  "Ideas",
+  "Planned",
+  "Outlining",
+  "Drafting",
+  "Review",
+  "Paused",
+  "Published"
+];
+var PAUSABLE_STAGES = [
+  "Ideas",
+  "Planned",
+  "Outlining",
+  "Drafting",
+  "Review"
+];
+function isPausable(stage) {
+  return PAUSABLE_STAGES.includes(stage);
+}
+function isStage(value) {
+  return STAGES.includes(value);
+}
+var CONTENT_TYPES = ["blog", "youtube", "tool"];
+function isContentType(value) {
+  return CONTENT_TYPES.includes(value);
+}
+function effectiveContentType(entry) {
+  return entry.contentType ?? "blog";
+}
+function hasRepoContent(contentType) {
+  return contentType === "blog";
+}
+var PLATFORMS = ["reddit", "youtube", "linkedin", "instagram"];
+function isPlatform(value) {
+  return PLATFORMS.includes(value);
+}
+
+// ../core/src/calendar.ts
+function parseRow(line) {
+  return line.split("|").slice(1, -1).map((cell) => cell.trim());
+}
+function isSeparator(line) {
+  return /^\|[\s:-]+\|/.test(line);
+}
+function indexColumns(headerLine) {
+  const map = /* @__PURE__ */ new Map();
+  parseRow(headerLine).forEach((name, idx) => {
+    map.set(name.trim().toLowerCase(), idx);
+  });
+  return map;
+}
+function col(cells2, cols, name) {
+  const idx = cols.get(name);
+  if (idx === void 0) return void 0;
+  const value = cells2[idx];
+  if (value === void 0) return void 0;
+  const trimmed = value.trim();
+  return trimmed === "" ? void 0 : trimmed;
+}
+function parseEntries(lines, stage) {
+  const entries = [];
+  let i = 0;
+  while (i < lines.length && !lines[i].startsWith("|")) i++;
+  if (i >= lines.length) return entries;
+  const cols = indexColumns(lines[i]);
+  i++;
+  if (i < lines.length && isSeparator(lines[i])) i++;
+  while (i < lines.length && lines[i].startsWith("|")) {
+    const cells2 = parseRow(lines[i]);
+    const slug = col(cells2, cols, "slug");
+    const title = col(cells2, cols, "title");
+    if (slug && title) {
+      const existingId = col(cells2, cols, "uuid") ?? col(cells2, cols, "id");
+      const entry = {
+        id: existingId ?? randomUUID(),
+        slug,
+        title,
+        description: col(cells2, cols, "description") ?? "",
+        stage,
+        targetKeywords: (col(cells2, cols, "keywords") ?? "").split(",").map((k) => k.trim()).filter(Boolean),
+        source: col(cells2, cols, "source") === "analytics" ? "analytics" : "manual"
+      };
+      const topics = col(cells2, cols, "topics");
+      if (topics) {
+        entry.topics = topics.split(",").map((t) => t.trim()).filter(Boolean);
+      }
+      const typeValue = col(cells2, cols, "type");
+      if (typeValue && isContentType(typeValue)) {
+        entry.contentType = typeValue;
+      }
+      const url = col(cells2, cols, "url");
+      if (url) entry.contentUrl = url;
+      const pausedFrom = col(cells2, cols, "pausedfrom");
+      if (pausedFrom && isStage(pausedFrom) && isPausable(pausedFrom)) {
+        entry.pausedFrom = pausedFrom;
+      }
+      const published = col(cells2, cols, "published");
+      if (published) entry.datePublished = published;
+      const issue = col(cells2, cols, "issue");
+      if (issue) {
+        const match2 = issue.match(/#?(\d+)/);
+        if (match2) entry.issueNumber = parseInt(match2[1], 10);
+      }
+      entries.push(entry);
+    }
+    i++;
+  }
+  return entries;
+}
+function parseDistributions(lines) {
+  const records = [];
+  let i = 0;
+  while (i < lines.length && !lines[i].startsWith("|")) i++;
+  if (i >= lines.length) return records;
+  const cols = indexColumns(lines[i]);
+  i++;
+  if (i < lines.length && isSeparator(lines[i])) i++;
+  while (i < lines.length && lines[i].startsWith("|")) {
+    const cells2 = parseRow(lines[i]);
+    const slug = col(cells2, cols, "slug");
+    const platformValue = col(cells2, cols, "platform");
+    const url = col(cells2, cols, "url");
+    const dateShared = col(cells2, cols, "shared");
+    if (slug && platformValue && url && dateShared && isPlatform(platformValue)) {
+      const entryIdCell = col(cells2, cols, "entryid") ?? col(cells2, cols, "uuid");
+      const rec = {
+        entryId: entryIdCell ?? "",
+        slug,
+        platform: platformValue,
+        url,
+        dateShared
+      };
+      const channel = col(cells2, cols, "channel");
+      if (channel) rec.channel = channel;
+      const notes = col(cells2, cols, "notes");
+      if (notes) rec.notes = notes;
+      records.push(rec);
+    }
+    i++;
+  }
+  return records;
+}
+function parseShortformBlocks(lines) {
+  const blocks = [];
+  let i = 0;
+  while (i < lines.length) {
+    const header = lines[i].match(/^### (.+)$/);
+    if (!header) {
+      i++;
+      continue;
+    }
+    const parts = header[1].split("\xB7").map((s) => s.trim());
+    if (parts.length < 2) {
+      i++;
+      continue;
+    }
+    const [slug, platform, channel] = parts;
+    i++;
+    const bodyLines = [];
+    while (i < lines.length && !lines[i].startsWith("### ")) {
+      bodyLines.push(lines[i]);
+      i++;
+    }
+    const text5 = bodyLines.join("\n").replace(/^\n+|\n+$/g, "");
+    if (text5.length > 0) {
+      const block = { slug, platform, text: text5 };
+      if (channel) block.channel = channel;
+      blocks.push(block);
+    }
+  }
+  return blocks;
+}
+function parseCalendar(markdown) {
+  const entries = [];
+  const distributions = [];
+  const shortformBlocks = [];
+  const lines = markdown.split("\n");
+  let currentSection = null;
+  let sectionLines = [];
+  function flushSection() {
+    if (currentSection && sectionLines.length > 0) {
+      if (currentSection === "Distribution") {
+        distributions.push(...parseDistributions(sectionLines));
+      } else if (currentSection === "Shortform Copy") {
+        shortformBlocks.push(...parseShortformBlocks(sectionLines));
+      } else {
+        entries.push(...parseEntries(sectionLines, currentSection));
+      }
+    }
+    sectionLines = [];
+  }
+  for (const line of lines) {
+    const sectionMatch = line.match(/^## (.+)$/);
+    if (sectionMatch) {
+      flushSection();
+      const name = sectionMatch[1].trim();
+      if (isStage(name)) {
+        currentSection = name;
+      } else if (name === "Distribution") {
+        currentSection = "Distribution";
+      } else if (name === "Shortform Copy") {
+        currentSection = "Shortform Copy";
+      } else {
+        currentSection = null;
+      }
+    } else if (currentSection) {
+      sectionLines.push(line);
+    }
+  }
+  flushSection();
+  for (const b of shortformBlocks) {
+    const rec = distributions.find(
+      (d) => d.slug === b.slug && d.platform === b.platform && (d.channel ?? "").toLowerCase() === (b.channel ?? "").toLowerCase()
+    );
+    if (rec) rec.shortform = b.text;
+  }
+  const entryBySlug = new Map(entries.map((e) => [e.slug, e]));
+  for (const d of distributions) {
+    if (!d.entryId) {
+      const match2 = entryBySlug.get(d.slug);
+      if (match2 && match2.id) d.entryId = match2.id;
+    }
+  }
+  return { entries, distributions };
+}
+function readCalendar(calendarPath) {
+  let raw3;
+  try {
+    raw3 = readFileSync2(calendarPath, "utf-8");
+  } catch (err2) {
+    if (err2 instanceof Error && "code" in err2 && err2.code === "ENOENT") {
+      return { entries: [], distributions: [] };
+    }
+    throw err2;
+  }
+  return parseCalendar(raw3);
+}
 
 // ../core/src/paths.ts
-import { join as join3 } from "node:path";
+import { join as join4 } from "node:path";
+
+// ../core/src/content-index.ts
+import { readdirSync, statSync as statSync2 } from "node:fs";
+import { join as join3, relative } from "node:path";
+
+// ../core/src/frontmatter.ts
+var import_yaml = __toESM(require_dist(), 1);
+import { readFileSync as readFileSync3, writeFileSync as writeFileSync2 } from "node:fs";
+var FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
+function parseFrontmatter(markdown) {
+  const match2 = markdown.match(FRONTMATTER_RE);
+  if (!match2) {
+    return { data: {}, body: markdown };
+  }
+  const [, yamlContent, body3] = match2;
+  let data;
+  try {
+    data = (0, import_yaml.parse)(yamlContent);
+  } catch (err2) {
+    const reason = err2 instanceof Error ? err2.message : String(err2);
+    throw new Error(`Invalid YAML frontmatter: ${reason}`);
+  }
+  if (data === null || data === void 0) {
+    return { data: {}, body: body3 };
+  }
+  if (typeof data !== "object" || Array.isArray(data)) {
+    throw new Error(
+      `Invalid frontmatter: expected a YAML mapping at the top level, got ${typeof data}.`
+    );
+  }
+  return { data, body: body3 };
+}
+function readFrontmatter(path) {
+  return parseFrontmatter(readFileSync3(path, "utf-8"));
+}
+
+// ../core/src/content-index.ts
+var SKIP_DIRS = /* @__PURE__ */ new Set([
+  "scrapbook",
+  "node_modules",
+  "dist",
+  ".git"
+]);
+var MARKDOWN_EXTENSIONS = /* @__PURE__ */ new Set([
+  ".md",
+  ".mdx",
+  ".markdown"
+]);
+var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isUuid(value) {
+  return UUID_RE.test(value);
+}
+function extensionOf(name) {
+  const idx = name.lastIndexOf(".");
+  if (idx < 0) return "";
+  return name.slice(idx).toLowerCase();
+}
+function shouldSkipDir(name) {
+  if (name.startsWith(".")) return true;
+  return SKIP_DIRS.has(name.toLowerCase());
+}
+function collectMarkdownFiles(dir) {
+  const out = [];
+  visit2(dir);
+  out.sort();
+  return out;
+  function visit2(currentDir) {
+    let names;
+    try {
+      names = readdirSync(currentDir);
+    } catch {
+      return;
+    }
+    for (const name of names) {
+      const abs = join3(currentDir, name);
+      let st;
+      try {
+        st = statSync2(abs);
+      } catch {
+        continue;
+      }
+      if (st.isDirectory()) {
+        if (shouldSkipDir(name)) continue;
+        visit2(abs);
+        continue;
+      }
+      if (!st.isFile()) continue;
+      if (MARKDOWN_EXTENSIONS.has(extensionOf(name))) {
+        out.push(abs);
+      }
+    }
+  }
+}
+function readIdFromFrontmatter(absPath) {
+  let parsed;
+  try {
+    parsed = readFrontmatter(absPath);
+  } catch (err2) {
+    const reason = err2 instanceof Error ? err2.message : String(err2);
+    return { kind: "invalid", reason: `unreadable frontmatter: ${reason}` };
+  }
+  const raw3 = parsed.data.id;
+  if (raw3 === void 0) return { kind: "absent" };
+  if (typeof raw3 !== "string") {
+    return {
+      kind: "invalid",
+      reason: `frontmatter id is ${typeof raw3}, expected string`
+    };
+  }
+  const trimmed = raw3.trim();
+  if (trimmed === "") {
+    return {
+      kind: "invalid",
+      reason: "frontmatter id is empty"
+    };
+  }
+  if (!isUuid(trimmed)) {
+    return {
+      kind: "invalid",
+      reason: `frontmatter id "${trimmed}" is not a valid UUID`
+    };
+  }
+  return { kind: "valid", id: trimmed };
+}
+function buildContentIndex(projectRoot, config, site) {
+  const contentDir = resolveContentDir(projectRoot, config, site);
+  const byId = /* @__PURE__ */ new Map();
+  const byPath = /* @__PURE__ */ new Map();
+  const invalid2 = [];
+  let files;
+  try {
+    files = collectMarkdownFiles(contentDir);
+  } catch {
+    return { byId, byPath, invalid: invalid2 };
+  }
+  for (const abs of files) {
+    const lookup = readIdFromFrontmatter(abs);
+    if (lookup.kind === "absent") continue;
+    if (lookup.kind === "invalid") {
+      invalid2.push({ absolutePath: abs, reason: lookup.reason });
+      continue;
+    }
+    const rel = relative(contentDir, abs);
+    if (!byId.has(lookup.id)) {
+      byId.set(lookup.id, abs);
+    }
+    byPath.set(rel, lookup.id);
+  }
+  return { byId, byPath, invalid: invalid2 };
+}
+
+// ../core/src/paths.ts
 function resolveSite(config, site) {
   if (site === null || site === void 0 || site === "") {
     return config.defaultSite;
@@ -10583,38 +10975,66 @@ function siteConfig(config, site) {
   return config.sites[slug];
 }
 function resolveCalendarPath(projectRoot, config, site) {
-  return join3(projectRoot, siteConfig(config, site).calendarPath);
+  return join4(projectRoot, siteConfig(config, site).calendarPath);
 }
 function resolveContentDir(projectRoot, config, site) {
-  return join3(projectRoot, siteConfig(config, site).contentDir);
+  return join4(projectRoot, siteConfig(config, site).contentDir);
 }
 var DEFAULT_BLOG_FILENAME_TEMPLATE = "{slug}/index.md";
 function resolveBlogFilePath(projectRoot, config, site, slug, filePath) {
   const entry = siteConfig(config, site);
   if (filePath !== void 0 && filePath !== "") {
-    return join3(projectRoot, entry.contentDir, filePath);
+    return join4(projectRoot, entry.contentDir, filePath);
   }
   const template = entry.blogFilenameTemplate ?? DEFAULT_BLOG_FILENAME_TEMPLATE;
-  return join3(projectRoot, entry.contentDir, template.replaceAll("{slug}", slug));
+  return join4(projectRoot, entry.contentDir, template.replaceAll("{slug}", slug));
 }
 function resolveBlogPostDir(projectRoot, config, site, slug) {
-  return join3(projectRoot, siteConfig(config, site).contentDir, slug);
+  return join4(projectRoot, siteConfig(config, site).contentDir, slug);
+}
+function findEntryFile(projectRoot, config, site, entryId, index2, legacyEntryForFallback) {
+  if (entryId !== "") {
+    const idx = index2 ?? buildContentIndex(projectRoot, config, resolveSite(config, site));
+    const hit = idx.byId.get(entryId);
+    if (hit !== void 0) return hit;
+  }
+  if (legacyEntryForFallback !== void 0) {
+    return resolveBlogFilePath(
+      projectRoot,
+      config,
+      site,
+      legacyEntryForFallback.slug
+    );
+  }
+  return void 0;
+}
+
+// ../core/src/review/handlers.ts
+import { existsSync as existsSync3, readFileSync as readFileSync5, writeFileSync as writeFileSync4 } from "node:fs";
+
+// ../core/src/calendar-mutations.ts
+function findEntryById(calendar, id) {
+  if (!id) return void 0;
+  return calendar.entries.find((e) => e.id === id);
+}
+function findEntry(calendar, slug) {
+  return calendar.entries.find((e) => e.slug === slug);
 }
 
 // ../core/src/review/pipeline.ts
-import { randomUUID } from "node:crypto";
-import { join as join5 } from "node:path";
+import { randomUUID as randomUUID2 } from "node:crypto";
+import { join as join6 } from "node:path";
 
 // ../core/src/journal.ts
 import {
   existsSync as existsSync2,
   mkdirSync,
-  readFileSync as readFileSync2,
-  readdirSync,
+  readFileSync as readFileSync4,
+  readdirSync as readdirSync2,
   unlinkSync,
-  writeFileSync
+  writeFileSync as writeFileSync3
 } from "node:fs";
-import { join as join4 } from "node:path";
+import { join as join5 } from "node:path";
 function normalizeTimestamp(iso) {
   return iso.replace(/[:.]/g, "-");
 }
@@ -10627,14 +11047,14 @@ function recordFilename(timestamp, id) {
 function findFileById(dir, id) {
   if (!existsSync2(dir)) return null;
   const suffix = `-${id}.json`;
-  for (const name of readdirSync(dir)) {
-    if (name.endsWith(suffix)) return join4(dir, name);
+  for (const name of readdirSync2(dir)) {
+    if (name.endsWith(suffix)) return join5(dir, name);
   }
   return null;
 }
 function readFile(path) {
   try {
-    const text5 = readFileSync2(path, "utf-8");
+    const text5 = readFileSync4(path, "utf-8");
     return JSON.parse(text5);
   } catch {
     return null;
@@ -10644,9 +11064,9 @@ function readJournal(dir, options = {}) {
   if (!existsSync2(dir)) return [];
   const timestampField = options.timestampField ?? "timestamp";
   const records = [];
-  for (const name of readdirSync(dir)) {
+  for (const name of readdirSync2(dir)) {
     if (!name.endsWith(".json")) continue;
-    const record = readFile(join4(dir, name));
+    const record = readFile(join5(dir, name));
     if (record === null) continue;
     records.push(record);
   }
@@ -10666,8 +11086,8 @@ function appendJournal(dir, record, options = {}) {
   if (!id) throw new Error(`appendJournal: record has no \`${idField}\` field`);
   if (!timestamp) throw new Error(`appendJournal: record has no \`${timestampField}\` field`);
   const existing = findFileById(dir, id);
-  const target = existing ?? join4(dir, recordFilename(timestamp, id));
-  writeFileSync(target, JSON.stringify(record, null, 2) + "\n", "utf-8");
+  const target = existing ?? join5(dir, recordFilename(timestamp, id));
+  writeFileSync3(target, JSON.stringify(record, null, 2) + "\n", "utf-8");
 }
 
 // ../core/src/review/journal-mappers.ts
@@ -10712,13 +11132,13 @@ var DEFAULT_JOURNAL_DIR = ".deskwork/review-journal";
 var PIPELINE_SUBDIR = "pipeline";
 var HISTORY_SUBDIR = "history";
 function reviewJournalRoot(projectRoot, config) {
-  return join5(projectRoot, config.reviewJournalDir ?? DEFAULT_JOURNAL_DIR);
+  return join6(projectRoot, config.reviewJournalDir ?? DEFAULT_JOURNAL_DIR);
 }
 function pipelinePath(projectRoot, config) {
-  return join5(reviewJournalRoot(projectRoot, config), PIPELINE_SUBDIR);
+  return join6(reviewJournalRoot(projectRoot, config), PIPELINE_SUBDIR);
 }
 function historyPath(projectRoot, config) {
-  return join5(reviewJournalRoot(projectRoot, config), HISTORY_SUBDIR);
+  return join6(reviewJournalRoot(projectRoot, config), HISTORY_SUBDIR);
 }
 function readWorkflows(projectRoot, config) {
   return readJournal(pipelinePath(projectRoot, config), {
@@ -10760,7 +11180,7 @@ function createWorkflow(projectRoot, config, params) {
   if (existing) return existing;
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const item = {
-    id: randomUUID(),
+    id: randomUUID2(),
     site: params.site,
     slug: params.slug,
     contentKind: params.contentKind,
@@ -10875,7 +11295,7 @@ function readAnnotations(projectRoot, config, workflowId, version) {
 function mintAnnotation(partial) {
   return {
     ...partial,
-    id: randomUUID(),
+    id: randomUUID2(),
     createdAt: (/* @__PURE__ */ new Date()).toISOString()
   };
 }
@@ -11054,14 +11474,23 @@ function handleCreateVersion(projectRoot, config, body3) {
   }
   const diff = lineDiff(before.markdown, d.afterMarkdown);
   if (workflow.contentKind === "longform" || workflow.contentKind === "outline") {
-    const blogFile = resolveBlogFilePath(projectRoot, config, workflow.site, workflow.slug);
-    if (!existsSync3(blogFile)) {
+    const blogFile = resolveWorkflowFilePath(
+      projectRoot,
+      config,
+      workflow.site,
+      workflow.slug,
+      {
+        ...workflow.entryId !== void 0 ? { entryId: workflow.entryId } : {}
+      }
+    );
+    if (blogFile === void 0 || !existsSync3(blogFile)) {
+      const shown = blogFile ?? "(unresolved)";
       return err(
         500,
-        `cannot save: blog file missing at ${blogFile}. Scaffold the post with /deskwork:outline before saving edits.`
+        `cannot save: blog file missing at ${shown}. Scaffold the post with /deskwork:outline before saving edits.`
       );
     }
-    writeFileSync2(blogFile, d.afterMarkdown, "utf-8");
+    writeFileSync4(blogFile, d.afterMarkdown, "utf-8");
   }
   const version = appendVersion(projectRoot, config, d.workflowId, d.afterMarkdown, "operator");
   const annotation = mintAnnotation({
@@ -11087,24 +11516,76 @@ function handleStartLongform(projectRoot, config, body3) {
   if (!SLUG_RE.test(b.slug)) {
     return err(400, `invalid slug: ${b.slug}. Must match ${SLUG_RE}`);
   }
-  const path = resolveBlogFilePath(projectRoot, config, b.site, b.slug);
-  if (!existsSync3(path)) {
-    return err(404, `blog draft not found at ${path}`);
+  const callerEntryId = b.entryId !== void 0 && b.entryId !== "" ? b.entryId : void 0;
+  const entry = lookupEntry(projectRoot, config, b.site, {
+    ...callerEntryId !== void 0 ? { entryId: callerEntryId } : {},
+    slug: b.slug
+  });
+  const entryId = callerEntryId ?? entry?.id;
+  const path = resolveWorkflowFilePath(projectRoot, config, b.site, b.slug, {
+    ...entryId !== void 0 ? { entryId } : {},
+    ...entry !== void 0 ? { entry } : {}
+  });
+  if (path === void 0 || !existsSync3(path)) {
+    const shown = path ?? "(unresolved)";
+    return err(404, `blog draft not found at ${shown}`);
   }
-  const markdown = readFileSync3(path, "utf-8");
+  const markdown = readFileSync5(path, "utf-8");
   const before = readWorkflows(projectRoot, config).find((w) => {
-    const identityMatch = b.entryId && w.entryId ? w.entryId === b.entryId : w.site === b.site && w.slug === b.slug;
+    const identityMatch = entryId && w.entryId ? w.entryId === entryId : w.site === b.site && w.slug === b.slug;
     return identityMatch && w.contentKind === "longform" && w.state !== "applied" && w.state !== "cancelled";
   });
   const workflow = createWorkflow(projectRoot, config, {
     site: b.site,
     slug: b.slug,
-    ...b.entryId !== void 0 ? { entryId: b.entryId } : {},
+    ...entryId !== void 0 && entryId !== "" ? { entryId } : {},
     contentKind: "longform",
     initialMarkdown: markdown,
     initialOriginatedBy: "agent"
   });
   return ok({ workflow, existing: !!before && before.id === workflow.id });
+}
+function lookupEntry(projectRoot, config, site, match2) {
+  try {
+    const calendarPath = resolveCalendarPath(projectRoot, config, site);
+    if (!existsSync3(calendarPath)) return void 0;
+    const cal = readCalendar(calendarPath);
+    if (match2.entryId !== void 0 && match2.entryId !== "") {
+      const byId = findEntryById(cal, match2.entryId);
+      if (byId !== void 0) return byId;
+    }
+    if (match2.slug !== void 0 && match2.slug !== "") {
+      return findEntry(cal, match2.slug);
+    }
+    return void 0;
+  } catch {
+    return void 0;
+  }
+}
+function resolveWorkflowFilePath(projectRoot, config, site, slug, hint) {
+  let entry = hint.entry;
+  let entryId = hint.entryId;
+  if (entry === void 0 && (entryId === void 0 || entryId === "")) {
+    entry = lookupEntry(projectRoot, config, site, { slug });
+    entryId = entry?.id;
+  } else if (entry === void 0 && entryId !== void 0) {
+    entry = lookupEntry(projectRoot, config, site, { entryId });
+  } else if (entryId === void 0 || entryId === "") {
+    entryId = entry?.id;
+  }
+  if (entryId !== void 0 && entryId !== "") {
+    const idx = hint.index ?? buildContentIndex(projectRoot, config, site);
+    const fromIndex = findEntryFile(
+      projectRoot,
+      config,
+      site,
+      entryId,
+      idx,
+      entry !== void 0 ? { slug: entry.slug } : { slug }
+    );
+    if (fromIndex !== void 0) return fromIndex;
+  }
+  return resolveBlogFilePath(projectRoot, config, site, slug);
 }
 function lineDiff(a, b) {
   const aLines = a.split("\n");
@@ -22965,33 +23446,6 @@ function rehypeStringify(options) {
   }
 }
 
-// ../core/src/frontmatter.ts
-var import_yaml = __toESM(require_dist(), 1);
-var FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
-function parseFrontmatter(markdown) {
-  const match2 = markdown.match(FRONTMATTER_RE);
-  if (!match2) {
-    return { data: {}, body: markdown };
-  }
-  const [, yamlContent, body3] = match2;
-  let data;
-  try {
-    data = (0, import_yaml.parse)(yamlContent);
-  } catch (err2) {
-    const reason = err2 instanceof Error ? err2.message : String(err2);
-    throw new Error(`Invalid YAML frontmatter: ${reason}`);
-  }
-  if (data === null || data === void 0) {
-    return { data: {}, body: body3 };
-  }
-  if (typeof data !== "object" || Array.isArray(data)) {
-    throw new Error(
-      `Invalid frontmatter: expected a YAML mapping at the top level, got ${typeof data}.`
-    );
-  }
-  return { data, body: body3 };
-}
-
 // ../core/src/remark-image-figure.mjs
 function findSoloImage(paragraph2) {
   if (!paragraph2.children || paragraph2.children.length === 0) return null;
@@ -23147,14 +23601,14 @@ import { extname as extname2 } from "node:path";
 import {
   existsSync as existsSync4,
   mkdirSync as mkdirSync2,
-  readdirSync as readdirSync2,
-  readFileSync as readFileSync4,
+  readdirSync as readdirSync3,
+  readFileSync as readFileSync6,
   renameSync,
   rmSync,
-  statSync as statSync2,
-  writeFileSync as writeFileSync3
+  statSync as statSync3,
+  writeFileSync as writeFileSync5
 } from "node:fs";
-import { dirname, extname, join as join6, resolve } from "node:path";
+import { dirname, extname, join as join7, resolve } from "node:path";
 var SECRET_SUBDIR = "secret";
 var SLUG_RE2 = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
 var FILENAME_RE = /^[a-zA-Z0-9._-][a-zA-Z0-9._ -]*$/;
@@ -23185,12 +23639,12 @@ function assertFilename(name) {
 function scrapbookDir(projectRoot, config, site, slug) {
   assertSlug(slug);
   const articleDir = resolveBlogPostDir(projectRoot, config, site, slug);
-  return join6(articleDir, "scrapbook");
+  return join7(articleDir, "scrapbook");
 }
 function scrapbookFilePath(projectRoot, config, site, slug, filename, opts = {}) {
   assertFilename(filename);
   const dir = scrapbookDir(projectRoot, config, site, slug);
-  const target = opts.secret ? join6(dir, SECRET_SUBDIR) : dir;
+  const target = opts.secret ? join7(dir, SECRET_SUBDIR) : dir;
   const abs = resolve(target, filename);
   if (!abs.startsWith(dir + "/") && abs !== dir) {
     throw new Error(
@@ -23235,17 +23689,17 @@ function listScrapbook(projectRoot, config, site, slug) {
     return { site, slug, dir, exists: false, items: [], secretItems: [] };
   }
   const items = listFilesInDir(dir);
-  const secretDir = join6(dir, SECRET_SUBDIR);
+  const secretDir = join7(dir, SECRET_SUBDIR);
   const secretItems = existsSync4(secretDir) ? listFilesInDir(secretDir) : [];
   return { site, slug, dir, exists: true, items, secretItems };
 }
 function listFilesInDir(dir) {
   const items = [];
-  for (const e of readdirSync2(dir, { withFileTypes: true })) {
+  for (const e of readdirSync3(dir, { withFileTypes: true })) {
     if (!e.isFile()) continue;
     if (e.name.startsWith(".")) continue;
-    const abs = join6(dir, e.name);
-    const st = statSync2(abs);
+    const abs = join7(dir, e.name);
+    const st = statSync3(abs);
     items.push({
       name: e.name,
       kind: classify(e.name),
@@ -23267,9 +23721,9 @@ function countScrapbook(projectRoot, config, site, slug) {
 function readScrapbookFile(projectRoot, config, site, slug, filename, opts = {}) {
   const abs = scrapbookFilePath(projectRoot, config, site, slug, filename, opts);
   if (!existsSync4(abs)) throw new Error(`not found: ${filename}`);
-  const st = statSync2(abs);
+  const st = statSync3(abs);
   if (!st.isFile()) throw new Error(`not a file: ${filename}`);
-  const content3 = readFileSync4(abs);
+  const content3 = readFileSync6(abs);
   return {
     name: filename,
     kind: classify(filename),
@@ -23287,8 +23741,8 @@ function createScrapbookMarkdown(projectRoot, config, site, slug, filename, body
     throw new Error(`file already exists: "${filename}"`);
   }
   mkdirSync2(dirname(abs), { recursive: true });
-  writeFileSync3(abs, body3, "utf-8");
-  const st = statSync2(abs);
+  writeFileSync5(abs, body3, "utf-8");
+  const st = statSync3(abs);
   return {
     name: filename,
     kind: "md",
@@ -23299,8 +23753,8 @@ function createScrapbookMarkdown(projectRoot, config, site, slug, filename, body
 function saveScrapbookFile(projectRoot, config, site, slug, filename, body3, opts = {}) {
   const abs = scrapbookFilePath(projectRoot, config, site, slug, filename, opts);
   if (!existsSync4(abs)) throw new Error(`file not found: "${filename}"`);
-  writeFileSync3(abs, body3);
-  const st = statSync2(abs);
+  writeFileSync5(abs, body3);
+  const st = statSync3(abs);
   return {
     name: filename,
     kind: classify(filename),
@@ -23316,7 +23770,7 @@ function renameScrapbookFile(projectRoot, config, site, slug, oldName, newName, 
     throw new Error(`target name already exists: "${newName}"`);
   }
   renameSync(oldAbs, newAbs);
-  const st = statSync2(newAbs);
+  const st = statSync3(newAbs);
   return {
     name: newName,
     kind: classify(newName),
@@ -23335,8 +23789,8 @@ function writeScrapbookUpload(projectRoot, config, site, slug, filename, content
     throw new Error(`file already exists: "${filename}" \u2014 rename first`);
   }
   mkdirSync2(dirname(abs), { recursive: true });
-  writeFileSync3(abs, content3);
-  const st = statSync2(abs);
+  writeFileSync5(abs, content3);
+  const st = statSync3(abs);
   return {
     name: filename,
     kind: classify(filename),
@@ -23424,7 +23878,7 @@ async function serveScrapbookFile(c, ctx) {
 }
 
 // src/routes/scrapbook-mutations.ts
-import { existsSync as existsSync5, mkdirSync as mkdirSync3, renameSync as renameSync2, statSync as statSync3 } from "node:fs";
+import { existsSync as existsSync5, mkdirSync as mkdirSync3, renameSync as renameSync2, statSync as statSync4 } from "node:fs";
 import { dirname as dirname2 } from "node:path";
 function checkEnvelope(ctx, body3) {
   const site = body3.site;
@@ -23583,7 +24037,7 @@ function createScrapbookMutationsRouter(ctx) {
         }
         mkdirSync3(dirname2(dstAbs), { recursive: true });
         renameSync2(srcAbs, dstAbs);
-        const st = statSync3(dstAbs);
+        const st = statSync4(dstAbs);
         item = {
           name: newName,
           kind: classify(newName),
@@ -23698,251 +24152,6 @@ function createScrapbookMutationsRouter(ctx) {
     return c.json({ item }, 200);
   });
   return app;
-}
-
-// ../core/src/calendar.ts
-import { readFileSync as readFileSync5, writeFileSync as writeFileSync4 } from "node:fs";
-import { randomUUID as randomUUID2 } from "node:crypto";
-
-// ../core/src/types.ts
-var STAGES = [
-  "Ideas",
-  "Planned",
-  "Outlining",
-  "Drafting",
-  "Review",
-  "Paused",
-  "Published"
-];
-var PAUSABLE_STAGES = [
-  "Ideas",
-  "Planned",
-  "Outlining",
-  "Drafting",
-  "Review"
-];
-function isPausable(stage) {
-  return PAUSABLE_STAGES.includes(stage);
-}
-function isStage(value) {
-  return STAGES.includes(value);
-}
-var CONTENT_TYPES = ["blog", "youtube", "tool"];
-function isContentType(value) {
-  return CONTENT_TYPES.includes(value);
-}
-function effectiveContentType(entry) {
-  return entry.contentType ?? "blog";
-}
-function hasRepoContent(contentType) {
-  return contentType === "blog";
-}
-var PLATFORMS = ["reddit", "youtube", "linkedin", "instagram"];
-function isPlatform(value) {
-  return PLATFORMS.includes(value);
-}
-
-// ../core/src/calendar.ts
-function parseRow(line) {
-  return line.split("|").slice(1, -1).map((cell) => cell.trim());
-}
-function isSeparator(line) {
-  return /^\|[\s:-]+\|/.test(line);
-}
-function indexColumns(headerLine) {
-  const map = /* @__PURE__ */ new Map();
-  parseRow(headerLine).forEach((name, idx) => {
-    map.set(name.trim().toLowerCase(), idx);
-  });
-  return map;
-}
-function col(cells2, cols, name) {
-  const idx = cols.get(name);
-  if (idx === void 0) return void 0;
-  const value = cells2[idx];
-  if (value === void 0) return void 0;
-  const trimmed = value.trim();
-  return trimmed === "" ? void 0 : trimmed;
-}
-function parseEntries(lines, stage) {
-  const entries = [];
-  let i = 0;
-  while (i < lines.length && !lines[i].startsWith("|")) i++;
-  if (i >= lines.length) return entries;
-  const cols = indexColumns(lines[i]);
-  i++;
-  if (i < lines.length && isSeparator(lines[i])) i++;
-  while (i < lines.length && lines[i].startsWith("|")) {
-    const cells2 = parseRow(lines[i]);
-    const slug = col(cells2, cols, "slug");
-    const title = col(cells2, cols, "title");
-    if (slug && title) {
-      const existingId = col(cells2, cols, "uuid") ?? col(cells2, cols, "id");
-      const entry = {
-        id: existingId ?? randomUUID2(),
-        slug,
-        title,
-        description: col(cells2, cols, "description") ?? "",
-        stage,
-        targetKeywords: (col(cells2, cols, "keywords") ?? "").split(",").map((k) => k.trim()).filter(Boolean),
-        source: col(cells2, cols, "source") === "analytics" ? "analytics" : "manual"
-      };
-      const topics = col(cells2, cols, "topics");
-      if (topics) {
-        entry.topics = topics.split(",").map((t) => t.trim()).filter(Boolean);
-      }
-      const typeValue = col(cells2, cols, "type");
-      if (typeValue && isContentType(typeValue)) {
-        entry.contentType = typeValue;
-      }
-      const url = col(cells2, cols, "url");
-      if (url) entry.contentUrl = url;
-      const filePath = col(cells2, cols, "filepath");
-      if (filePath) entry.filePath = filePath;
-      const pausedFrom = col(cells2, cols, "pausedfrom");
-      if (pausedFrom && isStage(pausedFrom) && isPausable(pausedFrom)) {
-        entry.pausedFrom = pausedFrom;
-      }
-      const published = col(cells2, cols, "published");
-      if (published) entry.datePublished = published;
-      const issue = col(cells2, cols, "issue");
-      if (issue) {
-        const match2 = issue.match(/#?(\d+)/);
-        if (match2) entry.issueNumber = parseInt(match2[1], 10);
-      }
-      entries.push(entry);
-    }
-    i++;
-  }
-  return entries;
-}
-function parseDistributions(lines) {
-  const records = [];
-  let i = 0;
-  while (i < lines.length && !lines[i].startsWith("|")) i++;
-  if (i >= lines.length) return records;
-  const cols = indexColumns(lines[i]);
-  i++;
-  if (i < lines.length && isSeparator(lines[i])) i++;
-  while (i < lines.length && lines[i].startsWith("|")) {
-    const cells2 = parseRow(lines[i]);
-    const slug = col(cells2, cols, "slug");
-    const platformValue = col(cells2, cols, "platform");
-    const url = col(cells2, cols, "url");
-    const dateShared = col(cells2, cols, "shared");
-    if (slug && platformValue && url && dateShared && isPlatform(platformValue)) {
-      const entryIdCell = col(cells2, cols, "entryid") ?? col(cells2, cols, "uuid");
-      const rec = {
-        entryId: entryIdCell ?? "",
-        slug,
-        platform: platformValue,
-        url,
-        dateShared
-      };
-      const channel = col(cells2, cols, "channel");
-      if (channel) rec.channel = channel;
-      const notes = col(cells2, cols, "notes");
-      if (notes) rec.notes = notes;
-      records.push(rec);
-    }
-    i++;
-  }
-  return records;
-}
-function parseShortformBlocks(lines) {
-  const blocks = [];
-  let i = 0;
-  while (i < lines.length) {
-    const header = lines[i].match(/^### (.+)$/);
-    if (!header) {
-      i++;
-      continue;
-    }
-    const parts = header[1].split("\xB7").map((s) => s.trim());
-    if (parts.length < 2) {
-      i++;
-      continue;
-    }
-    const [slug, platform, channel] = parts;
-    i++;
-    const bodyLines = [];
-    while (i < lines.length && !lines[i].startsWith("### ")) {
-      bodyLines.push(lines[i]);
-      i++;
-    }
-    const text5 = bodyLines.join("\n").replace(/^\n+|\n+$/g, "");
-    if (text5.length > 0) {
-      const block = { slug, platform, text: text5 };
-      if (channel) block.channel = channel;
-      blocks.push(block);
-    }
-  }
-  return blocks;
-}
-function parseCalendar(markdown) {
-  const entries = [];
-  const distributions = [];
-  const shortformBlocks = [];
-  const lines = markdown.split("\n");
-  let currentSection = null;
-  let sectionLines = [];
-  function flushSection() {
-    if (currentSection && sectionLines.length > 0) {
-      if (currentSection === "Distribution") {
-        distributions.push(...parseDistributions(sectionLines));
-      } else if (currentSection === "Shortform Copy") {
-        shortformBlocks.push(...parseShortformBlocks(sectionLines));
-      } else {
-        entries.push(...parseEntries(sectionLines, currentSection));
-      }
-    }
-    sectionLines = [];
-  }
-  for (const line of lines) {
-    const sectionMatch = line.match(/^## (.+)$/);
-    if (sectionMatch) {
-      flushSection();
-      const name = sectionMatch[1].trim();
-      if (isStage(name)) {
-        currentSection = name;
-      } else if (name === "Distribution") {
-        currentSection = "Distribution";
-      } else if (name === "Shortform Copy") {
-        currentSection = "Shortform Copy";
-      } else {
-        currentSection = null;
-      }
-    } else if (currentSection) {
-      sectionLines.push(line);
-    }
-  }
-  flushSection();
-  for (const b of shortformBlocks) {
-    const rec = distributions.find(
-      (d) => d.slug === b.slug && d.platform === b.platform && (d.channel ?? "").toLowerCase() === (b.channel ?? "").toLowerCase()
-    );
-    if (rec) rec.shortform = b.text;
-  }
-  const entryBySlug = new Map(entries.map((e) => [e.slug, e]));
-  for (const d of distributions) {
-    if (!d.entryId) {
-      const match2 = entryBySlug.get(d.slug);
-      if (match2 && match2.id) d.entryId = match2.id;
-    }
-  }
-  return { entries, distributions };
-}
-function readCalendar(calendarPath) {
-  let raw3;
-  try {
-    raw3 = readFileSync5(calendarPath, "utf-8");
-  } catch (err2) {
-    if (err2 instanceof Error && "code" in err2 && err2.code === "ENOENT") {
-      return { entries: [], distributions: [] };
-    }
-    throw err2;
-  }
-  return parseCalendar(raw3);
 }
 
 // ../core/src/review/report.ts
@@ -24068,7 +24277,7 @@ function buildReport(projectRoot, config, opts = {}) {
 }
 
 // ../core/src/body-state.ts
-import { existsSync as existsSync6, readFileSync as readFileSync6 } from "node:fs";
+import { existsSync as existsSync6, readFileSync as readFileSync7 } from "node:fs";
 var PLACEHOLDER_MARKER = "<!-- Write your post here -->";
 function stripOutlineSection(body3) {
   const lines = body3.split("\n");
@@ -24085,8 +24294,8 @@ function stripOutlineSection(body3) {
 }
 function bodyState(filePath) {
   if (!existsSync6(filePath)) return "missing";
-  const content3 = readFileSync6(filePath, "utf8");
-  const fmMatch = content3.match(/^---\n[\s\S]*?\n---\n?/);
+  const content3 = readFileSync7(filePath, "utf8");
+  const fmMatch = content3.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
   const body3 = fmMatch ? content3.slice(fmMatch[0].length) : content3;
   const withoutH1 = body3.replace(/^\s*#[^\n]*\n?/, "");
   const withoutOutline = stripOutlineSection(withoutH1);
@@ -24232,8 +24441,9 @@ function siteLabel(site) {
 function stateLabel(state) {
   return state.replace("-", " ");
 }
-function covKey(site, slug) {
-  return `${site}::${slug}`;
+function covKey(site, slug, entryId) {
+  const stable = entryId !== void 0 && entryId !== null && entryId !== "" ? entryId : slug;
+  return `${site}::${stable}`;
 }
 function fmtRelTime(iso, now) {
   const t = new Date(iso).getTime();
@@ -24249,16 +24459,17 @@ function workflowLink(w) {
   if (w.contentKind === "shortform") {
     return `/dev/editorial-review-shortform?focus=${w.id}#workflow-${w.id}`;
   }
-  if (w.contentKind === "outline") {
-    return `/dev/editorial-review/${w.slug}?site=${w.site}&kind=outline`;
-  }
-  return `/dev/editorial-review/${w.slug}?site=${w.site}`;
+  const key2 = w.entryId ?? w.slug;
+  const kindBit = w.contentKind === "outline" ? "&kind=outline" : "";
+  return `/dev/editorial-review/${key2}?site=${w.site}${kindBit}`;
 }
 function blogPreviewLink(site, slug, host, entry) {
   if (entry.stage === "Published") return `https://${host}/blog/${slug}/`;
-  return `/dev/editorial-review/${slug}?site=${site}`;
+  const key2 = entry.id ?? slug;
+  return `/dev/editorial-review/${key2}?site=${site}`;
 }
-function loadDashboardData(ctx) {
+function loadDashboardData(ctx, getIndex) {
+  void getIndex;
   const calendarEntries = [];
   const distributions = [];
   const slugsBySite = {};
@@ -24267,16 +24478,20 @@ function loadDashboardData(ctx) {
     slugsBySite[site] = [];
     const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
     const cal = readCalendar(calendarPath);
+    const idBySlug = /* @__PURE__ */ new Map();
     for (const entry of cal.entries) {
       calendarEntries.push({ site, entry });
       slugsBySite[site].push(entry.slug);
+      if (entry.id) idBySlug.set(entry.slug, entry.id);
     }
     for (const d of cal.distributions) {
       const dr = d;
+      const entryId = dr.entryId ?? idBySlug.get(dr.slug) ?? null;
       distributions.push({
         site,
         platform: dr.platform,
         slug: dr.slug,
+        entryId,
         shortform: typeof dr.shortform === "string" && dr.shortform.length > 0
       });
     }
@@ -24288,7 +24503,7 @@ function loadDashboardData(ctx) {
   for (const d of distributions) {
     if (!d.shortform) continue;
     if (!isPlatform2(d.platform)) continue;
-    const key2 = covKey(d.site, d.slug);
+    const key2 = covKey(d.site, d.slug, d.entryId);
     const set = shortformCoverage.get(key2) ?? /* @__PURE__ */ new Set();
     set.add(d.platform);
     shortformCoverage.set(key2, set);
@@ -24301,7 +24516,7 @@ function loadDashboardData(ctx) {
   const activeBySitedSlug = /* @__PURE__ */ new Map();
   for (const w of workflows) {
     if (w.state === "applied" || w.state === "cancelled") continue;
-    const key2 = covKey(w.site, w.slug);
+    const key2 = covKey(w.site, w.slug, w.entryId);
     const list3 = activeBySitedSlug.get(key2) ?? [];
     list3.push(w);
     activeBySitedSlug.set(key2, list3);
@@ -24320,13 +24535,24 @@ function loadDashboardData(ctx) {
     report
   };
 }
-function entryBodyStateOf(ctx, site, entry) {
+function entryBodyStateOf(ctx, site, entry, getIndex) {
   if (!hasRepoContent(effectiveContentType(entry))) return "missing";
-  const path = resolveBlogFilePath(ctx.projectRoot, ctx.config, site, entry.slug);
-  return bodyState(path);
+  if (entry.id !== void 0 && entry.id !== "" && getIndex) {
+    const path = findEntryFile(
+      ctx.projectRoot,
+      ctx.config,
+      site,
+      entry.id,
+      getIndex(site),
+      { slug: entry.slug }
+    );
+    if (path !== void 0) return bodyState(path);
+  }
+  const fallback = resolveBlogFilePath(ctx.projectRoot, ctx.config, site, entry.slug);
+  return bodyState(fallback);
 }
-function findStageWorkflow(data, site, slug, stage) {
-  const list3 = data.activeBySitedSlug.get(covKey(site, slug)) ?? [];
+function findStageWorkflow(data, site, entry, stage) {
+  const list3 = data.activeBySitedSlug.get(covKey(site, entry.slug, entry.id)) ?? [];
   if (stage === "Outlining") return list3.find((w) => w.contentKind === "outline");
   return list3.find((w) => w.contentKind === "longform");
 }
@@ -24492,13 +24718,13 @@ function renderRowActions(site, entry, stage, hasFile, bodyWritten, wf) {
   }
   return unsafe(`<span class="er-calendar-action">${buttons.join("")}</span>`);
 }
-function renderRow(ctx, data, sited, stage, index2) {
+function renderRow(ctx, data, sited, stage, index2, getIndex) {
   const { site, entry } = sited;
   const kind = effectiveContentType(entry);
-  const body3 = entryBodyStateOf(ctx, site, entry);
+  const body3 = entryBodyStateOf(ctx, site, entry, getIndex);
   const hasFile = body3 !== "missing";
   const bodyWritten = body3 === "written";
-  const wf = findStageWorkflow(data, site, entry.slug, stage);
+  const wf = findStageWorkflow(data, site, entry, stage);
   const search2 = [
     entry.slug,
     entry.title,
@@ -24547,7 +24773,7 @@ function renderRow(ctx, data, sited, stage, index2) {
       ${renameForm}
     </div>`);
 }
-function renderStageSection(ctx, data, stage, entries, sites) {
+function renderStageSection(ctx, data, stage, entries, sites, getIndex) {
   const intakeBlock = stage === "Ideas" ? unsafe(html6`
         <div class="er-intake-form" data-intake-form hidden>
           <p class="er-intake-hint">
@@ -24593,7 +24819,7 @@ function renderStageSection(ctx, data, stage, entries, sites) {
   const body3 = entries.length === 0 ? unsafe(html6`<div class="er-empty" style="padding: 1rem 0.25rem; font-size: 0.95rem;">
           ${STAGE_EMPTY_MESSAGES[stage]}
         </div>`) : unsafe(
-    entries.map((e, i) => renderRow(ctx, data, e, stage, i).__raw).join("")
+    entries.map((e, i) => renderRow(ctx, data, e, stage, i, getIndex).__raw).join("")
   );
   return unsafe(html6`
     <section class="er-section" data-stage-section="${stage}">
@@ -24610,7 +24836,7 @@ function renderStageSection(ctx, data, stage, entries, sites) {
 function renderShortformMatrix(data, ctx) {
   if (data.publishedBlogEntries.length === 0) return unsafe("");
   const rows = data.publishedBlogEntries.map(({ site, entry }) => {
-    const covered = data.shortformCoverage.get(covKey(site, entry.slug)) ?? /* @__PURE__ */ new Set();
+    const covered = data.shortformCoverage.get(covKey(site, entry.slug, entry.id)) ?? /* @__PURE__ */ new Set();
     const cells2 = PLATFORMS_ORDER.map((p2) => {
       const has = covered.has(p2);
       const inner = has ? html6`<span class="er-sf-check" title="${p2} copy drafted">✓</span>` : html6`<button class="er-copy-btn er-sf-draft-btn" type="button"
@@ -24741,9 +24967,9 @@ function renderSidebar(data) {
       </section>
     </aside>`);
 }
-function renderDashboard(ctx) {
+function renderDashboard(ctx, getIndex) {
   const sites = Object.keys(ctx.config.sites);
-  const data = loadDashboardData(ctx);
+  const data = loadDashboardData(ctx, getIndex);
   const now = ctx.now ? ctx.now() : /* @__PURE__ */ new Date();
   const stageSections = STAGES.map((stage) => {
     const stageEntries = data.calendarEntries.filter((e) => e.entry.stage === stage).sort((a, b) => {
@@ -24751,7 +24977,7 @@ function renderDashboard(ctx) {
       if (siteCmp !== 0) return siteCmp;
       return a.entry.slug.localeCompare(b.entry.slug);
     });
-    return renderStageSection(ctx, data, stage, stageEntries, sites).__raw;
+    return renderStageSection(ctx, data, stage, stageEntries, sites, getIndex).__raw;
   }).join("\n");
   const body3 = html6`
   ${renderEditorialFolio("dashboard", "press-check")}
@@ -24924,8 +25150,8 @@ function renderEmptyScrapbookRow() {
 }
 
 // src/pages/review.ts
-import { readFileSync as readFileSync7 } from "node:fs";
-import { join as join7 } from "node:path";
+import { readFileSync as readFileSync8 } from "node:fs";
+import { join as join8 } from "node:path";
 function isSuccessBody(body3) {
   if (typeof body3 !== "object" || body3 === null) return false;
   return "workflow" in body3 && "versions" in body3;
@@ -25122,10 +25348,10 @@ function renderOutlineDrawer(outlineHtml) {
 }
 function makeInlineTextLoader(ctx, site, slug) {
   const contentDir = resolveContentDir(ctx.projectRoot, ctx.config, site);
-  const scrapbookDir2 = join7(contentDir, slug, "scrapbook");
+  const scrapbookDir2 = join8(contentDir, slug, "scrapbook");
   return (filename, maxBytes) => {
     try {
-      const buf = readFileSync7(join7(scrapbookDir2, filename));
+      const buf = readFileSync8(join8(scrapbookDir2, filename));
       const slice = buf.subarray(0, Math.min(buf.byteLength, maxBytes));
       return slice.toString("utf-8");
     } catch {
@@ -25178,11 +25404,13 @@ function renderScrapbookDrawer(ctx, site, slug) {
       </div>
     </aside>`);
 }
-async function renderReviewPage(ctx, slug, query) {
+async function renderReviewPage(ctx, lookup, query) {
   const site = pickSite(ctx, query.site);
   const contentKind = pickContentKind(query.kind ?? null);
+  const slug = lookup.slug;
   const fetched = handleGetWorkflow(ctx.projectRoot, ctx.config, {
     id: null,
+    entryId: lookup.kind === "id" ? lookup.entryId : null,
     site,
     slug,
     contentKind,
@@ -26177,9 +26405,9 @@ function renderScrapbookPage(ctx, site, path) {
   });
 }
 
-// ../core/src/content-tree.ts
-import { existsSync as existsSync7, readdirSync as readdirSync3, readFileSync as readFileSync8, statSync as statSync4 } from "node:fs";
-import { join as join8 } from "node:path";
+// ../core/src/content-tree-fs-walk.ts
+import { existsSync as existsSync7, readdirSync as readdirSync4, readFileSync as readFileSync9, statSync as statSync5 } from "node:fs";
+import { join as join9 } from "node:path";
 var INDEX_BASENAMES = /* @__PURE__ */ new Set([
   "index.md",
   "index.mdx",
@@ -26190,9 +26418,14 @@ var README_BASENAMES = /* @__PURE__ */ new Set([
   "readme.mdx",
   "readme.markdown"
 ]);
+var TEMPLATE_INDEX_BASENAMES = [
+  "index.md",
+  "index.mdx",
+  "index.markdown"
+];
 function readTitleFromMarkdown(absPath) {
   try {
-    const raw3 = readFileSync8(absPath, "utf-8");
+    const raw3 = readFileSync9(absPath, "utf-8");
     const parsed = parseFrontmatter(raw3);
     const t = parsed.data.title;
     if (typeof t === "string" && t.trim().length > 0) return t.trim();
@@ -26205,10 +26438,10 @@ function defaultFsWalk(projectRoot, config, site) {
   if (!existsSync7(root3)) return [];
   const out = [];
   const SKIP2 = /* @__PURE__ */ new Set(["scrapbook", "node_modules", "dist", ".git"]);
-  const visit2 = (dirAbs, slugSoFar) => {
+  const visit2 = (dirAbs, pathSoFar) => {
     let names;
     try {
-      names = readdirSync3(dirAbs);
+      names = readdirSync4(dirAbs);
     } catch {
       return;
     }
@@ -26219,143 +26452,210 @@ function defaultFsWalk(projectRoot, config, site) {
       const lower = name.toLowerCase();
       if (INDEX_BASENAMES.has(lower)) {
         hasIndex = true;
-        if (titleSource === null) titleSource = join8(dirAbs, name);
+        if (titleSource === null) titleSource = join9(dirAbs, name);
       } else if (README_BASENAMES.has(lower)) {
         hasReadme = true;
-        if (titleSource === null && !hasIndex) titleSource = join8(dirAbs, name);
+        if (titleSource === null && !hasIndex) titleSource = join9(dirAbs, name);
       }
     }
-    if (slugSoFar !== "") {
+    if (pathSoFar !== "") {
       const title = titleSource ? readTitleFromMarkdown(titleSource) : null;
-      out.push({ slug: slugSoFar, hasIndex, hasReadme, title });
+      out.push({ slug: pathSoFar, hasIndex, hasReadme, title });
     }
     for (const name of names) {
       if (name.startsWith(".")) continue;
       if (SKIP2.has(name.toLowerCase())) continue;
-      const childAbs = join8(dirAbs, name);
+      const childAbs = join9(dirAbs, name);
       let childStat;
       try {
-        childStat = statSync4(childAbs);
+        childStat = statSync5(childAbs);
       } catch {
         continue;
       }
       if (!childStat.isDirectory()) continue;
-      const childSlug = slugSoFar === "" ? name : `${slugSoFar}/${name}`;
-      visit2(childAbs, childSlug);
+      const childPath = pathSoFar === "" ? name : `${pathSoFar}/${name}`;
+      visit2(childAbs, childPath);
     }
   };
   visit2(root3, "");
   return out;
 }
-function leafOfSlug(slug) {
-  const idx = slug.lastIndexOf("/");
-  return idx < 0 ? slug : slug.slice(idx + 1);
+
+// ../core/src/content-tree-helpers.ts
+import { existsSync as existsSync8 } from "node:fs";
+import { join as join10 } from "node:path";
+function leafOfPath(path) {
+  const idx = path.lastIndexOf("/");
+  return idx < 0 ? path : path.slice(idx + 1);
 }
-function ancestorsOf(slug) {
-  const segments = slug.split("/");
+function ancestorsOf(path) {
+  const segments = path.split("/");
   const out = [];
   for (let i = 1; i < segments.length; i++) {
     out.push(segments.slice(0, i).join("/"));
   }
   return out;
 }
-function rootSegment(slug) {
-  const idx = slug.indexOf("/");
-  return idx < 0 ? slug : slug.slice(0, idx);
+function rootSegment(path) {
+  const idx = path.indexOf("/");
+  return idx < 0 ? path : path.slice(0, idx);
 }
-function basenameLooksLikeIndex(filePath) {
-  const last = filePath.split("/").pop() ?? "";
-  const lower = last.toLowerCase();
-  return INDEX_BASENAMES.has(lower) || README_BASENAMES.has(lower);
-}
-function entryHasOwnIndex(entry) {
-  if (entry.filePath !== void 0 && entry.filePath !== "") {
-    return basenameLooksLikeIndex(entry.filePath);
+function entryHasOwnIndex(contentDir, entryPath, fsHasIndex, fsHasReadme, boundFile, hasFsDir) {
+  if (boundFile !== void 0) return true;
+  if (fsHasIndex) return true;
+  if (fsHasReadme) return true;
+  for (const basename of TEMPLATE_INDEX_BASENAMES) {
+    if (existsSync8(join10(contentDir, entryPath, basename))) return true;
   }
-  return true;
+  if (!hasFsDir) return true;
+  return false;
 }
 function pickLatestMtime(a, b) {
   if (a === null) return b;
   if (b === null) return a;
   return a > b ? a : b;
 }
+function stripIndexBasename(relPath) {
+  const segments = relPath.split("/");
+  const last = segments[segments.length - 1].toLowerCase();
+  if (INDEX_BASENAMES.has(last)) {
+    return segments.slice(0, -1).join("/");
+  }
+  const dotIdx = last.lastIndexOf(".");
+  if (dotIdx > 0) {
+    const stripped = segments.slice(0, -1);
+    stripped.push(last.slice(0, dotIdx));
+    return stripped.join("/");
+  }
+  return relPath;
+}
+function findIdBoundPath(entry, index2) {
+  if (typeof entry.id !== "string" || entry.id === "") return null;
+  for (const [path, id] of index2.byPath.entries()) {
+    if (id === entry.id) return stripIndexBasename(path);
+  }
+  return null;
+}
+function idBoundFile(entry, index2) {
+  if (typeof entry.id !== "string" || entry.id === "") return void 0;
+  return index2.byId.get(entry.id);
+}
+
+// ../core/src/content-tree.ts
+var WARNED_LEGACY_FALLBACK = /* @__PURE__ */ new Set();
 function buildContentTree(site, entries, config, projectRoot, options = {}) {
-  const lookup = options.scrapbookLookup ?? ((siteArg, slug) => {
+  const lookup = options.scrapbookLookup ?? ((siteArg, path) => {
     try {
-      return listScrapbook(projectRoot, config, siteArg, slug);
+      return listScrapbook(projectRoot, config, siteArg, path);
     } catch {
       return { items: [], secretItems: [] };
     }
   });
   const fsWalk = options.fsWalk ?? ((siteArg) => defaultFsWalk(projectRoot, config, siteArg));
   const fsEntries = fsWalk(site);
-  const fsEntryBySlug = /* @__PURE__ */ new Map();
-  for (const e of fsEntries) fsEntryBySlug.set(e.slug, e);
-  const entryBySlug = /* @__PURE__ */ new Map();
-  const allSlugs = /* @__PURE__ */ new Set();
-  for (const e of entries) {
-    entryBySlug.set(e.slug, e);
-    allSlugs.add(e.slug);
-    for (const a of ancestorsOf(e.slug)) allSlugs.add(a);
-  }
+  const fsEntryByPath = /* @__PURE__ */ new Map();
+  for (const e of fsEntries) fsEntryByPath.set(e.slug, e);
+  const contentIndex = options.contentIndex ?? buildContentIndex(projectRoot, config, site);
+  const warn = options.warn ?? ((msg) => console.warn(msg));
+  const contentDir = resolveContentDir(projectRoot, config, site);
+  const allPaths = /* @__PURE__ */ new Set();
+  const overlayByPath = /* @__PURE__ */ new Map();
   for (const e of fsEntries) {
     if (e.hasReadme || e.hasIndex) {
-      allSlugs.add(e.slug);
-      for (const a of ancestorsOf(e.slug)) allSlugs.add(a);
+      allPaths.add(e.slug);
+      for (const a of ancestorsOf(e.slug)) allPaths.add(a);
     }
   }
-  const sortedSlugs = [...allSlugs].sort();
-  const nodeBySlug = /* @__PURE__ */ new Map();
-  for (const slug of sortedSlugs) {
-    const entry = entryBySlug.get(slug) ?? null;
-    const fsEntry = fsEntryBySlug.get(slug) ?? null;
-    const sb = lookup(site, slug);
+  for (const entry of entries) {
+    const idBoundPath = findIdBoundPath(entry, contentIndex);
+    if (idBoundPath !== null) {
+      overlayByPath.set(idBoundPath, entry);
+      allPaths.add(idBoundPath);
+      for (const a of ancestorsOf(idBoundPath)) allPaths.add(a);
+      continue;
+    }
+    if (fsEntryByPath.has(entry.slug)) {
+      overlayByPath.set(entry.slug, entry);
+      allPaths.add(entry.slug);
+      for (const a of ancestorsOf(entry.slug)) allPaths.add(a);
+      const dedupKey = `${site}:${entry.id ?? entry.slug}`;
+      if (!WARNED_LEGACY_FALLBACK.has(dedupKey)) {
+        WARNED_LEGACY_FALLBACK.add(dedupKey);
+        warn(
+          `[content-tree] Calendar entry "${entry.slug}" matched fs node by slug (no frontmatter id binding). Run \`deskwork doctor --fix=missing-frontmatter-id\` to make this binding refactor-proof.`
+        );
+      }
+      continue;
+    }
+    allPaths.add(entry.slug);
+    for (const a of ancestorsOf(entry.slug)) allPaths.add(a);
+    overlayByPath.set(entry.slug, entry);
+  }
+  const sortedPaths = [...allPaths].sort();
+  const nodeByPath = /* @__PURE__ */ new Map();
+  for (const path of sortedPaths) {
+    const overlay = overlayByPath.get(path) ?? null;
+    const fsEntry = fsEntryByPath.get(path) ?? null;
+    const sb = lookup(site, path);
     const items = [...sb.items, ...sb.secretItems];
     const mostRecent = items.reduce(
       (acc, it) => pickLatestMtime(acc, it.mtime),
       null
     );
-    const title = entry?.title ?? (fsEntry?.title ?? null) ?? leafOfSlug(slug);
+    const title = overlay?.title ?? (fsEntry?.title ?? null) ?? leafOfPath(path);
     let hasOwnIndex = false;
-    if (entry !== null) {
-      hasOwnIndex = entryHasOwnIndex(entry);
+    if (overlay !== null) {
+      const boundFile = idBoundFile(overlay, contentIndex);
+      hasOwnIndex = entryHasOwnIndex(
+        contentDir,
+        path,
+        fsEntry?.hasIndex ?? false,
+        fsEntry?.hasReadme ?? false,
+        boundFile,
+        fsEntry !== null
+      );
     } else if (fsEntry !== null) {
       hasOwnIndex = fsEntry.hasIndex || fsEntry.hasReadme;
     }
     const node2 = {
       site,
-      slug,
+      path,
       title,
-      lane: entry?.stage ?? null,
-      entry,
+      lane: overlay?.stage ?? null,
+      entry: overlay,
       hasOwnIndex,
       hasFsDir: fsEntry !== null,
       scrapbookCount: items.length,
       scrapbookMostRecentMtime: mostRecent,
       children: []
     };
-    nodeBySlug.set(slug, node2);
+    if (overlay?.slug !== void 0) {
+      node2.slug = overlay.slug;
+    }
+    nodeByPath.set(path, node2);
   }
-  for (const slug of sortedSlugs) {
-    const parts = slug.split("/");
+  for (const path of sortedPaths) {
+    const parts = path.split("/");
     if (parts.length === 1) continue;
-    const parentSlug = parts.slice(0, -1).join("/");
-    const parent = nodeBySlug.get(parentSlug);
-    const node2 = nodeBySlug.get(slug);
+    const parentPath = parts.slice(0, -1).join("/");
+    const parent = nodeByPath.get(parentPath);
+    const node2 = nodeByPath.get(path);
     if (parent && node2) parent.children.push(node2);
   }
   const projectRootBy = /* @__PURE__ */ new Map();
-  for (const slug of sortedSlugs) {
-    if (slug.includes("/")) continue;
-    const node2 = nodeBySlug.get(slug);
+  for (const path of sortedPaths) {
+    if (path.includes("/")) continue;
+    const node2 = nodeByPath.get(path);
     if (!node2) continue;
-    const arr = projectRootBy.get(slug) ?? [];
+    const arr = projectRootBy.get(path) ?? [];
     arr.push(node2);
-    projectRootBy.set(slug, arr);
+    projectRootBy.set(path, arr);
   }
   const knownRoots = new Set(projectRootBy.keys());
   for (const e of entries) {
-    const root3 = rootSegment(e.slug);
+    const idBoundPath = findIdBoundPath(e, contentIndex);
+    const entryPath = idBoundPath ?? e.slug;
+    const root3 = rootSegment(entryPath);
     if (!knownRoots.has(root3)) {
       const sb = lookup(site, root3);
       const items = [...sb.items, ...sb.secretItems];
@@ -26365,22 +26665,22 @@ function buildContentTree(site, entries, config, projectRoot, options = {}) {
       );
       const synth = {
         site,
-        slug: root3,
-        title: leafOfSlug(root3),
+        path: root3,
+        title: leafOfPath(root3),
         lane: null,
         entry: null,
         hasOwnIndex: false,
-        hasFsDir: fsEntryBySlug.has(root3),
+        hasFsDir: fsEntryByPath.has(root3),
         scrapbookCount: items.length,
         scrapbookMostRecentMtime: mostRecent,
         children: []
       };
-      nodeBySlug.set(root3, synth);
-      for (const slug of sortedSlugs) {
-        if (rootSegment(slug) === root3 && slug.includes("/")) {
-          const parentSlug = slug.split("/").slice(0, -1).join("/");
-          if (parentSlug === root3) {
-            const child = nodeBySlug.get(slug);
+      nodeByPath.set(root3, synth);
+      for (const path of sortedPaths) {
+        if (rootSegment(path) === root3 && path.includes("/")) {
+          const parentPath = path.split("/").slice(0, -1).join("/");
+          if (parentPath === root3) {
+            const child = nodeByPath.get(path);
             if (child && !synth.children.includes(child)) {
               synth.children.push(child);
             }
@@ -26388,22 +26688,23 @@ function buildContentTree(site, entries, config, projectRoot, options = {}) {
         }
       }
       projectRootBy.set(root3, [synth]);
+      knownRoots.add(root3);
     }
   }
-  for (const node2 of nodeBySlug.values()) {
-    node2.children.sort((a, b) => a.slug.localeCompare(b.slug));
+  for (const node2 of nodeByPath.values()) {
+    node2.children.sort((a, b) => a.path.localeCompare(b.path));
   }
   const projects = [];
-  for (const [rootSlug, roots] of projectRootBy.entries()) {
+  for (const [rootPath, roots] of projectRootBy.entries()) {
     if (roots.length === 0) continue;
     const root3 = roots[0];
-    const summary = summarizeProject(site, rootSlug, root3);
+    const summary = summarizeProject(site, rootPath, root3);
     projects.push(summary);
   }
   projects.sort((a, b) => a.rootSlug.localeCompare(b.rootSlug));
   return projects;
 }
-function summarizeProject(site, rootSlug, root3) {
+function summarizeProject(site, rootPath, root3) {
   let trackedCount = 0;
   let totalNodes = 0;
   let maxDepth = 0;
@@ -26431,7 +26732,7 @@ function summarizeProject(site, rootSlug, root3) {
   }
   return {
     site,
-    rootSlug,
+    rootSlug: rootPath,
     title: root3.title,
     trackedCount,
     totalNodes,
@@ -26441,13 +26742,13 @@ function summarizeProject(site, rootSlug, root3) {
     root: root3
   };
 }
-function findNode(project, slug) {
-  if (project.root.slug === slug) return project.root;
+function findNode(project, path) {
+  if (project.root.path === path) return project.root;
   const queue = [...project.root.children];
   while (queue.length > 0) {
     const head2 = queue.shift();
     if (!head2) continue;
-    if (head2.slug === slug) return head2;
+    if (head2.path === path) return head2;
     queue.push(...head2.children);
   }
   return null;
@@ -26466,8 +26767,8 @@ function flattenForRender(root3) {
 }
 
 // src/pages/content-detail.ts
-import { readFileSync as readFileSync9, existsSync as existsSync8 } from "node:fs";
-import { join as join9 } from "node:path";
+import { readFileSync as readFileSync10, existsSync as existsSync9 } from "node:fs";
+import { join as join11 } from "node:path";
 var PREVIEW_CHAR_BUDGET = 480;
 function renderEmptyDetail() {
   return unsafe(html6`
@@ -26481,8 +26782,8 @@ function renderEmptyDetail() {
 }
 function safeReadFile(absPath) {
   try {
-    if (!existsSync8(absPath)) return null;
-    return readFileSync9(absPath, "utf-8");
+    if (!existsSync9(absPath)) return null;
+    return readFileSync10(absPath, "utf-8");
   } catch {
     return null;
   }
@@ -26519,10 +26820,10 @@ async function renderBodyPreview(body3) {
 }
 function makeInlineTextLoaderForNode(ctx, site, slug) {
   const contentDir = resolveContentDir(ctx.projectRoot, ctx.config, site);
-  const scrapbookDir2 = join9(contentDir, slug, "scrapbook");
+  const scrapbookDir2 = join11(contentDir, slug, "scrapbook");
   return (filename, maxBytes) => {
     try {
-      const buf = readFileSync9(join9(scrapbookDir2, filename));
+      const buf = readFileSync10(join11(scrapbookDir2, filename));
       const slice = buf.subarray(0, Math.min(buf.byteLength, maxBytes));
       return slice.toString("utf-8");
     } catch {
@@ -26564,8 +26865,8 @@ function findOrganizationalIndex(contentDir, slug) {
     "README.markdown"
   ];
   for (const name of candidates) {
-    const abs = join9(contentDir, slug, name);
-    if (existsSync8(abs)) return abs;
+    const abs = join11(contentDir, slug, name);
+    if (existsSync9(abs)) return abs;
   }
   return null;
 }
@@ -26574,10 +26875,9 @@ function loadDetailRender(ctx, site, node2) {
   let frontmatter = {};
   let bodyPreview = "";
   let scrapbook = null;
-  if (node2.entry !== null) {
-    const filePath = node2.entry.filePath ?? `${node2.slug}/index.md`;
-    const abs = join9(contentDir, filePath);
-    const raw3 = safeReadFile(abs);
+  const idxFile = findOrganizationalIndex(contentDir, node2.path);
+  if (idxFile !== null) {
+    const raw3 = safeReadFile(idxFile);
     if (raw3 !== null) {
       const parsed = parseFrontmatter(raw3);
       frontmatter = parsed.data;
@@ -26595,7 +26895,7 @@ function loadDetailRender(ctx, site, node2) {
     }
   }
   try {
-    scrapbook = listScrapbook(ctx.projectRoot, ctx.config, site, node2.slug);
+    scrapbook = listScrapbook(ctx.projectRoot, ctx.config, site, node2.path);
   } catch {
     scrapbook = null;
   }
@@ -26604,20 +26904,25 @@ function loadDetailRender(ctx, site, node2) {
 async function renderNodeDetail(ctx, site, node2) {
   const detail = loadDetailRender(ctx, site, node2);
   const fmCount = Object.keys(detail.frontmatter).length;
-  const reviewHref = `/dev/editorial-review/${encodeURI(node2.slug)}?site=${site}`;
-  const scrapHref = scrapbookViewerUrl({ site, path: node2.slug });
-  const scrapDirHint = node2.scrapbookCount === 0 ? "0 items \xB7 scrapbook empty" : `${node2.scrapbookCount} items \xB7 /${node2.slug}/scrapbook`;
+  const reviewKey = node2.entry !== null && node2.entry.id !== void 0 && node2.entry.id !== "" ? node2.entry.id : node2.slug ?? node2.path;
+  const reviewHref = `/dev/editorial-review/${encodeURI(reviewKey)}?site=${site}`;
+  const scrapHref = scrapbookViewerUrl({ site, path: node2.path });
+  const scrapDirHint = node2.scrapbookCount === 0 ? "0 items \xB7 scrapbook empty" : `${node2.scrapbookCount} items \xB7 /${node2.path}/scrapbook`;
   const updatedHint = node2.scrapbookMostRecentMtime !== null ? html6`<span class="detail__updated">last touched ${formatRelativeTime(node2.scrapbookMostRecentMtime)}</span>` : "";
-  const loader = makeInlineTextLoaderForNode(ctx, site, node2.slug);
+  const loader = makeInlineTextLoaderForNode(ctx, site, node2.path);
   const previewBlock = await renderBodyPreview(detail.bodyPreview);
   const reviewBtn = node2.entry !== null ? html6`<a class="btn btn--accent" href="${reviewHref}">Open in Review</a>` : "";
+  const publicUrlHint = node2.slug !== void 0 && node2.slug !== node2.path ? html6`<span class="detail__public-url" title="public URL on the host site">
+          public URL: /blog/${node2.slug}
+        </span>` : "";
   return unsafe(html6`
-    <div class="detail" data-node-detail data-slug="${node2.slug}">
-      <div class="detail__crumb">${node2.slug.replaceAll("/", " \xB7 ")}</div>
+    <div class="detail" data-node-detail data-slug="${node2.path}">
+      <div class="detail__crumb">${node2.path.replaceAll("/", " \xB7 ")}</div>
       <h2 class="detail__title">${node2.title}</h2>
       <p class="detail__sub">
         ${node2.entry?.description ?? ""}
         ${unsafe(updatedHint)}
+        ${unsafe(publicUrlHint)}
       </p>
 
       <div class="detail__sectionhead">
@@ -26636,7 +26941,7 @@ async function renderNodeDetail(ctx, site, node2) {
         Scrapbook
         <span class="marg">${scrapDirHint}</span>
       </div>
-      ${renderScrapbookList(site, node2.slug, detail.scrapbook, loader)}
+      ${renderScrapbookList(site, node2.path, detail.scrapbook, loader)}
 
       <div class="actions">
         ${unsafe(reviewBtn)}
@@ -26646,14 +26951,16 @@ async function renderNodeDetail(ctx, site, node2) {
 }
 
 // src/pages/content.ts
-function loadProjectsForSite(ctx, site) {
+function loadProjectsForSite(ctx, site, getIndex) {
   const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
   const cal = readCalendar(calendarPath);
+  const contentIndex = getIndex ? getIndex(site) : void 0;
   const projects = buildContentTree(
     site,
     cal.entries,
     ctx.config,
-    ctx.projectRoot
+    ctx.projectRoot,
+    contentIndex !== void 0 ? { contentIndex } : {}
   );
   return {
     site,
@@ -26661,9 +26968,9 @@ function loadProjectsForSite(ctx, site) {
     projects
   };
 }
-function loadAllSites(ctx) {
+function loadAllSites(ctx, getIndex) {
   return Object.keys(ctx.config.sites).map(
-    (site) => loadProjectsForSite(ctx, site)
+    (site) => loadProjectsForSite(ctx, site, getIndex)
   );
 }
 function aggregateCounts(siteProjects) {
@@ -26742,8 +27049,8 @@ function renderSiteCard(sp, index2) {
       </p>
     </article>`);
 }
-function renderContentTopLevel(ctx) {
-  const sites = loadAllSites(ctx);
+function renderContentTopLevel(ctx, getIndex) {
+  const sites = loadAllSites(ctx, getIndex);
   const counts = aggregateCounts(sites);
   const body3 = html6`
     ${renderEditorialFolio("content", "the shape of the work")}
@@ -26784,22 +27091,22 @@ function renderContentTopLevel(ctx) {
     scriptModules: ["/static/dist/content-view-client.js"]
   });
 }
-function renderTreeBreadcrumb(site, project, selectedSlug) {
+function renderTreeBreadcrumb(site, project, selectedPath) {
   const links = [];
   links.push(html6`<a href="/dev/content/${site}">${site}</a>`);
-  if (selectedSlug === null) {
+  if (selectedPath === null) {
     links.push(html6`<b>${project.rootSlug}</b>`);
   } else {
     const projectHref = `/dev/content/${site}/${encodeURI(project.rootSlug)}`;
     links.push(html6`<a href="${projectHref}">${project.rootSlug}</a>`);
-    const segments = selectedSlug.split("/");
+    const segments = selectedPath.split("/");
     for (let i = 1; i < segments.length; i++) {
-      const slug = segments.slice(0, i + 1).join("/");
+      const path = segments.slice(0, i + 1).join("/");
       const isLast = i === segments.length - 1;
       if (isLast) {
         links.push(html6`<b>${segments[i]}</b>`);
       } else {
-        const href = `${projectHref}?node=${encodeURIComponent(slug)}`;
+        const href = `${projectHref}?node=${encodeURIComponent(path)}`;
         links.push(html6`<a href="${href}">${segments[i]}</a>`);
       }
     }
@@ -26821,9 +27128,12 @@ function nodeIcon(node2) {
   return unsafe(html6`<span class="tree-row__icon" aria-hidden="true">·</span>`);
 }
 function nodeFilePathHint(node2) {
-  if (node2.entry?.filePath) return `/${node2.entry.filePath}`;
-  if (node2.entry !== null) return `/${node2.slug}/index.md`;
-  return `/${node2.slug}/`;
+  if (node2.entry !== null) return `/${node2.path}/index.md`;
+  return `/${node2.path}/`;
+}
+function pathLeaf(path) {
+  const idx = path.lastIndexOf("/");
+  return idx < 0 ? path : path.slice(idx + 1);
 }
 function renderTreeRowMeta(node2) {
   const meta = [];
@@ -26837,34 +27147,38 @@ function renderTreeRowMeta(node2) {
   return unsafe(meta.join(""));
 }
 function renderTreeRowActions(node2, site) {
-  const reviewHref = `/dev/editorial-review/${encodeURI(node2.slug)}?site=${site}`;
-  const scrapHref = scrapbookViewerUrl({ site, path: node2.slug });
+  const reviewKey = node2.entry !== null && node2.entry.id !== void 0 && node2.entry.id !== "" ? node2.entry.id : node2.slug ?? node2.path;
+  const reviewHref = `/dev/editorial-review/${encodeURI(reviewKey)}?site=${site}`;
+  const scrapHref = scrapbookViewerUrl({ site, path: node2.path });
   const reviewLink = node2.entry !== null ? html6`<a class="tree-row__action tree-row__action--review" href="${reviewHref}"
           tabindex="0" aria-label="Open review for ${node2.title}">→ review</a>` : "";
   const scrapLink = node2.scrapbookCount > 0 ? html6`<a class="tree-row__action" href="${scrapHref}"
           tabindex="0" aria-label="Open scrapbook for ${node2.title}">→ scrapbook</a>` : "";
   return unsafe(reviewLink + scrapLink);
 }
-function renderTreeRow(site, project, flat, selectedSlug) {
+function renderTreeRow(site, project, flat, selectedPath) {
   const { node: node2, depth, isLast } = flat;
-  const isSelected = selectedSlug === node2.slug;
+  const isSelected = selectedPath === node2.path;
   const isLeaf = node2.children.length === 0;
   const lane = laneToken(node2.lane);
   const projectHref = `/dev/content/${site}/${encodeURI(project.rootSlug)}`;
-  const nodeHref = `${projectHref}?node=${encodeURIComponent(node2.slug)}`;
+  const nodeHref = `${projectHref}?node=${encodeURIComponent(node2.path)}`;
   const classes = [
     "tree-row",
     isLeaf ? "is-leaf" : "is-branch",
     isLast ? "is-last" : "",
     isSelected ? "is-selected" : ""
   ].filter(Boolean).join(" ");
+  const publicUrlHint = node2.slug !== void 0 && node2.slug !== pathLeaf(node2.path) ? unsafe(html6`<span class="tree-row__public-url"
+          title="public URL on the host site">/blog/${node2.slug}</span>`) : unsafe("");
   return unsafe(html6`
     <a class="${classes}" href="${nodeHref}" style="--depth: ${depth}"
-      data-slug="${node2.slug}" aria-current="${isSelected ? "true" : "false"}">
+      data-slug="${node2.path}" aria-current="${isSelected ? "true" : "false"}">
       <div class="tree-row__main">
         ${nodeIcon(node2)}
         <span class="tree-row__title">${node2.title}</span>
         <span class="tree-row__slug">${nodeFilePathHint(node2)}</span>
+        ${publicUrlHint}
       </div>
       <span class="tree-row__lane">
         <span class="lane-dot lane-dot--${lane}"></span>
@@ -26874,18 +27188,18 @@ function renderTreeRow(site, project, flat, selectedSlug) {
       <span class="tree-row__actions">${renderTreeRowActions(node2, site)}</span>
     </a>`);
 }
-function renderTree(site, project, selectedSlug) {
+function renderTree(site, project, selectedPath) {
   const flat = flattenForRender(project.root);
   return unsafe(html6`
     <div class="tree" role="tree">
-      ${flat.map((f) => renderTreeRow(site, project, f, selectedSlug))}
+      ${flat.map((f) => renderTreeRow(site, project, f, selectedPath))}
     </div>`);
 }
-async function renderContentProject(ctx, site, projectSlug, selectedSlug) {
+async function renderContentProject(ctx, site, projectSlug, selectedPath, getIndex) {
   if (!(site in ctx.config.sites)) {
     return { status: 404, html: renderNotFound(`unknown site: ${site}`) };
   }
-  const sp = loadProjectsForSite(ctx, site);
+  const sp = loadProjectsForSite(ctx, site, getIndex);
   const project = sp.projects.find((p2) => p2.rootSlug === projectSlug);
   if (!project) {
     return {
@@ -26893,21 +27207,21 @@ async function renderContentProject(ctx, site, projectSlug, selectedSlug) {
       html: renderNotFound(`unknown project: ${projectSlug} on ${site}`)
     };
   }
-  const selectedNode = selectedSlug ? findNode(project, selectedSlug) : null;
+  const selectedNode = selectedPath ? findNode(project, selectedPath) : null;
   const detailBlock = selectedNode ? await renderNodeDetail(ctx, site, selectedNode) : renderEmptyDetail();
   const body3 = html6`
     ${renderEditorialFolio("content", `drilldown \xB7 ${project.rootSlug}`)}
     <main class="content-page">
       <section class="drilldown">
         <div class="drilldown__tree">
-          ${renderTreeBreadcrumb(site, project, selectedNode?.slug ?? null)}
+          ${renderTreeBreadcrumb(site, project, selectedNode?.path ?? null)}
           <header class="tree-head">
             <h2 class="tree-head__title">${project.title}</h2>
             <span class="tree-head__count">
               ${project.totalNodes} NODES · ${project.maxDepth} LEVELS DEEP
             </span>
           </header>
-          ${renderTree(site, project, selectedNode?.slug ?? null)}
+          ${renderTree(site, project, selectedNode?.path ?? null)}
         </div>
         ${detailBlock}
       </section>
@@ -27156,6 +27470,35 @@ function detectTailscale() {
   return { ipv4, magicDnsName: detectTailscaleMagicDnsName() };
 }
 
+// src/request-context.ts
+var CONTEXT_KEY = "deskwork:contentIndices";
+function isIndexCache(value) {
+  return value instanceof Map;
+}
+var activeBuilder = buildContentIndex;
+function contentIndexMiddleware() {
+  return async (c, next) => {
+    const cache = /* @__PURE__ */ new Map();
+    c.set(CONTEXT_KEY, cache);
+    await next();
+  };
+}
+function getCache(c) {
+  const raw3 = c.get(CONTEXT_KEY);
+  return isIndexCache(raw3) ? raw3 : null;
+}
+function getRequestContentIndex(c, studioCtx, site) {
+  const cache = getCache(c);
+  if (cache !== null) {
+    const cached = cache.get(site);
+    if (cached !== void 0) return cached;
+    const fresh = activeBuilder(studioCtx.projectRoot, studioCtx.config, site);
+    cache.set(site, fresh);
+    return fresh;
+  }
+  return activeBuilder(studioCtx.projectRoot, studioCtx.config, site);
+}
+
 // src/server.ts
 var DEFAULT_PORT = 47321;
 var LOOPBACK = "127.0.0.1";
@@ -27227,6 +27570,43 @@ function usage(error) {
   out.write("then reach the studio at the magic-DNS hostname (e.g. '<machine>.<tailnet>.ts.net').\n");
   process.exit(error ? 2 : 0);
 }
+function resolveEntryById(ctx, site, id) {
+  if (!(site in ctx.config.sites)) return null;
+  try {
+    const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
+    if (!existsSync10(calendarPath)) return null;
+    const cal = readCalendar(calendarPath);
+    const entry = cal.entries.find((e) => e.id === id);
+    if (!entry || entry.id === void 0) return null;
+    return { kind: "id", entryId: entry.id, slug: entry.slug };
+  } catch {
+    return null;
+  }
+}
+function resolveEntryBySlug(ctx, site, slug) {
+  if (!(site in ctx.config.sites)) return "unknown-site";
+  try {
+    const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
+    if (!existsSync10(calendarPath)) return null;
+    const cal = readCalendar(calendarPath);
+    const entry = cal.entries.find((e) => e.slug === slug);
+    if (!entry) return null;
+    if (entry.id) return { kind: "id", entryId: entry.id, slug: entry.slug };
+    return { kind: "slug", slug: entry.slug };
+  } catch {
+    return null;
+  }
+}
+function buildReviewRedirectUrl(entryId, requestUrl) {
+  let search2 = "";
+  try {
+    const u = new URL(requestUrl);
+    search2 = u.search;
+  } catch {
+    search2 = "";
+  }
+  return `/dev/editorial-review/${entryId}${search2}`;
+}
 function publicDir() {
   const here = dirname3(fileURLToPath2(import.meta.url));
   const candidates = [
@@ -27234,7 +27614,7 @@ function publicDir() {
     resolve2(here, "..", "..", "..", "plugins", "deskwork-studio", "public")
   ];
   for (const candidate of candidates) {
-    if (existsSync9(candidate)) return candidate;
+    if (existsSync10(candidate)) return candidate;
   }
   throw new Error(
     `deskwork-studio: could not find public/ assets. Tried:
@@ -27243,25 +27623,67 @@ function publicDir() {
 }
 function createApp(ctx) {
   const app = new Hono2();
+  app.use("*", contentIndexMiddleware());
   app.route("/api/dev/editorial-review", createApiRouter(ctx));
   app.get("/dev", (c) => c.html(renderStudioIndex(ctx)));
   app.get("/dev/", (c) => c.html(renderStudioIndex(ctx)));
-  app.get("/dev/editorial-studio", (c) => c.html(renderDashboard(ctx)));
+  app.get("/dev/editorial-studio", (c) => {
+    const getIndex = (site) => getRequestContentIndex(c, ctx, site);
+    return c.html(renderDashboard(ctx, getIndex));
+  });
   app.get("/dev/editorial-help", (c) => c.html(renderHelpPage(ctx)));
   app.get(
     "/dev/editorial-review-shortform",
     (c) => c.html(renderShortformPage(ctx, c.req.query("focus") ?? null))
   );
   app.get(
-    "/dev/editorial-review/:slug{.+}",
-    async (c) => c.html(
-      await renderReviewPage(ctx, decodeURIComponent(c.req.param("slug")), {
+    "/dev/editorial-review/:id{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}",
+    async (c) => {
+      const id = c.req.param("id");
+      const siteParam = c.req.query("site") ?? ctx.config.defaultSite;
+      const lookup = resolveEntryById(ctx, siteParam, id);
+      if (lookup === null) {
+        return c.html(
+          await renderReviewPage(
+            ctx,
+            { kind: "id", entryId: id, slug: id },
+            {
+              site: c.req.query("site") ?? null,
+              version: c.req.query("v") ?? null,
+              kind: c.req.query("kind") ?? null
+            }
+          )
+        );
+      }
+      return c.html(
+        await renderReviewPage(ctx, lookup, {
+          site: c.req.query("site") ?? null,
+          version: c.req.query("v") ?? null,
+          kind: c.req.query("kind") ?? null
+        })
+      );
+    }
+  );
+  app.get("/dev/editorial-review/:slug{.+}", async (c) => {
+    const slug = decodeURIComponent(c.req.param("slug"));
+    const siteParam = c.req.query("site") ?? ctx.config.defaultSite;
+    const found = resolveEntryBySlug(ctx, siteParam, slug);
+    if (found === "unknown-site") {
+      return c.notFound();
+    }
+    if (found !== null && found.kind === "id") {
+      const url = buildReviewRedirectUrl(found.entryId, c.req.url);
+      return c.redirect(url, 302);
+    }
+    const lookup = found !== null ? found : { kind: "slug", slug };
+    return c.html(
+      await renderReviewPage(ctx, lookup, {
         site: c.req.query("site") ?? null,
         version: c.req.query("v") ?? null,
         kind: c.req.query("kind") ?? null
       })
-    )
-  );
+    );
+  });
   app.get(
     "/dev/scrapbook/:site/:path{.+}",
     (c) => c.html(
@@ -27274,13 +27696,20 @@ function createApp(ctx) {
   );
   app.get("/api/dev/scrapbook-file", (c) => serveScrapbookFile(c, ctx));
   app.route("/api/dev/scrapbook", createScrapbookMutationsRouter(ctx));
-  app.get("/dev/content", (c) => c.html(renderContentTopLevel(ctx)));
-  app.get("/dev/content/:site", (c) => c.html(renderContentTopLevel(ctx)));
+  app.get("/dev/content", (c) => {
+    const getIndex = (site) => getRequestContentIndex(c, ctx, site);
+    return c.html(renderContentTopLevel(ctx, getIndex));
+  });
+  app.get("/dev/content/:site", (c) => {
+    const getIndex = (site) => getRequestContentIndex(c, ctx, site);
+    return c.html(renderContentTopLevel(ctx, getIndex));
+  });
   app.get("/dev/content/:site/:project{.+}", async (c) => {
     const site = c.req.param("site");
     const project = decodeURIComponent(c.req.param("project"));
     const node2 = c.req.query("node") ?? null;
-    const r = await renderContentProject(ctx, site, project, node2);
+    const getIndex = (s) => getRequestContentIndex(c, ctx, s);
+    const r = await renderContentProject(ctx, site, project, node2, getIndex);
     return c.html(r.html, r.status);
   });
   app.use(

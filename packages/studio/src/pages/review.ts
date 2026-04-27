@@ -56,6 +56,19 @@ interface ReviewQuery {
   kind?: string | null;
 }
 
+/**
+ * How the route resolved the request. Phase 19d added the canonical
+ * id-based URL; the legacy slug URL still resolves to a render via the
+ * 302-redirect path (the redirect target lands here as `kind: 'id'`).
+ *
+ * `kind: 'slug'` is reserved for the legacy fallback when the calendar
+ * entry has no id stamped on it yet — pre-doctor state, not a "fallback"
+ * the project rules forbid but the migration path the plan calls out.
+ */
+export type ReviewLookup =
+  | { kind: 'id'; entryId: string; slug: string }
+  | { kind: 'slug'; slug: string };
+
 function isSuccessBody(
   body: unknown,
 ): body is { workflow: DraftWorkflowItem; versions: DraftVersion[] } {
@@ -396,14 +409,21 @@ function renderScrapbookDrawer(
 
 export async function renderReviewPage(
   ctx: StudioContext,
-  slug: string,
+  lookup: ReviewLookup,
   query: ReviewQuery,
 ): Promise<string> {
   const site = pickSite(ctx, query.site);
   const contentKind = pickContentKind(query.kind ?? null);
 
+  // Phase 19d: id-based join is canonical. The slug branch here is the
+  // legacy migration path for workflows whose entries were created
+  // before frontmatter ids landed — explicitly NOT the kind of "silent
+  // fallback" the project rules prohibit. Doctor surfaces these so an
+  // operator can backfill ids and retire this branch.
+  const slug = lookup.slug;
   const fetched = handleGetWorkflow(ctx.projectRoot, ctx.config, {
     id: null,
+    entryId: lookup.kind === 'id' ? lookup.entryId : null,
     site,
     slug,
     contentKind,

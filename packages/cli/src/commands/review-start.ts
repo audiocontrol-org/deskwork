@@ -17,7 +17,12 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { readConfig } from '@deskwork/core/config';
-import { resolveSite, resolveBlogFilePath } from '@deskwork/core/paths';
+import {
+  resolveSite,
+  resolveBlogFilePath,
+  resolveCalendarPath,
+} from '@deskwork/core/paths';
+import { readCalendar } from '@deskwork/core/calendar';
 import { createWorkflow, readVersions } from '@deskwork/core/review/pipeline';
 import { bodyState } from '@deskwork/core/body-state';
 import { absolutize, emit, fail, parseArgs } from '@deskwork/core/cli-args';
@@ -62,12 +67,27 @@ export async function run(argv: string[]): Promise<void> {
   const initialMarkdown = readFileSync(file, 'utf8');
   const body = bodyState(file);
 
+  // Resolve entryId from the calendar so the workflow records the
+  // stable identity. Surviving slug renames depends on having this id
+  // baked in at workflow creation time.
+  let entryId: string | undefined;
+  try {
+    const calendarPath = resolveCalendarPath(projectRoot, config, site);
+    if (existsSync(calendarPath)) {
+      const cal = readCalendar(calendarPath);
+      entryId = cal.entries.find((e) => e.slug === slug)?.id;
+    }
+  } catch {
+    entryId = undefined;
+  }
+
   // createWorkflow is idempotent. Capture `before` to detect whether a
   // fresh workflow was created vs an existing one matched.
   const before = Date.now();
   const workflow = createWorkflow(projectRoot, config, {
     site,
     slug,
+    ...(entryId !== undefined && entryId !== '' ? { entryId } : {}),
     contentKind: 'longform',
     initialMarkdown,
     initialOriginatedBy: 'agent',

@@ -25,6 +25,29 @@ Pair with the optional [`deskwork-studio`](../deskwork-studio/) plugin for a loc
 
 The install skill explores the project (Astro / Next / Hugo / etc), proposes a config shape, and writes `.deskwork/config.json` plus an empty `editorial-calendar-<site>.md`. Idempotent — safe to re-run.
 
+### Content schema requirement
+
+Deskwork binds calendar entries to their content files via a UUID written into each markdown file's frontmatter (`id: <uuid>`). For Astro projects with a strict content-collection schema, the schema must permit the `id` field. Two equivalent ways to allow it:
+
+```ts
+// option 1: explicit
+schema: z.object({
+  id: z.string().uuid().optional(),
+  title: z.string(),
+  // …
+})
+
+// option 2: passthrough — allows any unknown fields, including `id`
+schema: z.object({
+  title: z.string(),
+  // …
+}).passthrough()
+```
+
+Hugo, Jekyll, Eleventy, and plain-markdown projects don't validate frontmatter against a schema — nothing to configure for those.
+
+If a deskwork write hits a strict-schema rejection, the CLI surfaces a clear error pointing at this section. The `doctor` skill's `schema-rejected` rule prints the same patch instructions on demand (see below).
+
 ### Skills
 
 All skills are under the `/deskwork:` namespace. Slugs accept `/`-separated kebab-case segments — both flat (`scsi-protocol`) and hierarchical (`the-outbound/characters/strivers`).
@@ -43,6 +66,22 @@ All skills are under the `/deskwork:` namespace. Slugs accept `/`-separated keba
 | `review-cancel` | Cancel a review workflow |
 | `review-help` | List open workflows |
 | `review-report` | Voice-drift report across recent terminal workflows |
+| `doctor` | Audit (and optionally repair) binding metadata across the calendar, content tree, and workflow store |
+
+#### `doctor` — keep calendar, files, and workflows in sync
+
+`deskwork doctor` walks every site in `.deskwork/config.json`, joins the calendar against the content tree (via the frontmatter `id:` binding), and reports anything that doesn't line up. It runs in audit-only mode by default (suitable for pre-commit / CI) and engages interactive repair with `--fix=<rule>` or `--fix=all`. Rules cover missing or orphaned frontmatter ids, duplicate ids, slug collisions, host-schema rejections, stale review workflows, and missing calendar UUIDs.
+
+Examples:
+
+```sh
+deskwork doctor                                  # audit-only across every site
+deskwork doctor --site main                      # audit one site
+deskwork doctor --fix=missing-frontmatter-id     # interactive backfill of ids
+deskwork doctor --fix=all --yes                  # non-interactive repair (skips ambiguous prompts)
+```
+
+See [`skills/doctor/SKILL.md`](skills/doctor/SKILL.md) for the full rule-by-rule playbook.
 
 ### Hierarchical content
 
@@ -71,7 +110,13 @@ The content file's location is picked per-entry at outline time via `--layout`:
 | `--layout readme` | `<slug>/README.md` | Editorial-private nested chapters (often paired with content-collection patterns that exclude `README.md`) |
 | `--layout flat` | `<slug>.md` | Many small siblings under one parent (no per-entry dir) |
 
-Each entry's actual file path is recorded in the calendar's `FilePath` column, so subsequent reads find the right file regardless of the site's default `blogFilenameTemplate`.
+Each scaffolded file carries `id: <uuid>` in its frontmatter — that's the binding deskwork uses to find the file again on subsequent reads, regardless of the site's default `blogFilenameTemplate` or any later renames in the content tree.
+
+#### Refactor-proof binding
+
+Calendar entries join to their content files via the UUID in frontmatter, not via a cached path. Renaming or moving a file in the content tree (e.g. `projects/the-outbound/index.md` → `projects/the-outbound-novel/index.md`) doesn't break the binding — deskwork rediscovers the file on the next read by scanning `contentDir` for the matching frontmatter `id`. No relocate command, no calendar edit.
+
+If you ever do hit a stale binding (legacy entry whose file doesn't yet carry an `id:`, file deleted out from under the calendar, or any of the other failure modes), `deskwork doctor` finds it and offers a repair.
 
 #### Each entry stands alone
 
@@ -85,7 +130,7 @@ Adding `the-outbound/characters/strivers` does **not** auto-create entries for `
 
 The studio (`deskwork-studio`) renders hierarchical content at any depth:
 
-- `/dev/editorial-review/<slug>` — review surface, accepts hierarchical slugs (`the-outbound/characters/strivers`)
+- `/dev/editorial-review/<id>` — review surface, canonical id-based URL. Slug-based links (`/dev/editorial-review/the-outbound/characters/strivers`) still resolve and 302-redirect to the canonical id route.
 - `/dev/scrapbook/<site>/<path>` — scrapbook viewer at any path; works for tracked entries AND untracked organizational nodes
 - `/dev/content/<site>/<project>` — bird's-eye tree view (Phase 16) showing the entire content shape with drillable detail panel
 

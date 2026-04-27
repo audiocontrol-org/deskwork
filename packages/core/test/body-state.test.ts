@@ -61,4 +61,14 @@ describe('bodyState', () => {
     writeFileSync(file, `---\ntitle: X\n---\n\n# X\n\n   \n\n`, 'utf-8');
     expect(bodyState(file)).toBe('placeholder');
   });
+
+  it('handles Windows (CRLF) line endings (Phase 19c regex consistency fix)', () => {
+    // The pre-19c regex only matched `\n` between `---` markers, so
+    // a Windows-saved file's frontmatter wouldn't strip and the entire
+    // file (including the YAML preamble) was classified as body. The
+    // 19c fix mirrors `frontmatter.ts`'s `\r?\n` regex.
+    const crlf = `---\r\ntitle: X\r\n---\r\n\r\n# X\r\n\r\nReal prose written on Windows.\r\n`;
+    writeFileSync(file, crlf, 'utf-8');
+    expect(bodyState(file)).toBe('written');
+  });
 });

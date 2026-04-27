@@ -19,6 +19,7 @@
 const SUBCOMMANDS: Record<string, () => Promise<{ run: (argv: string[]) => Promise<void> }>> = {
   add: () => import('./commands/add.ts'),
   approve: () => import('./commands/approve.ts'),
+  doctor: () => import('./commands/doctor.ts'),
   draft: () => import('./commands/draft.ts'),
   ingest: () => import('./commands/ingest.ts'),
   install: () => import('./commands/install.ts'),
@@ -83,6 +84,8 @@ function printUsage(): void {
   out.write('  publish         move to Published\n');
   out.write('  pause           move a non-terminal entry to Paused\n');
   out.write('  resume          restore a Paused entry to its prior stage\n\n');
+  out.write('Maintenance:\n');
+  out.write('  doctor          audit/repair binding metadata\n\n');
   out.write('Review loop:\n');
   out.write('  review-start    enqueue a longform draft for review\n');
   out.write('  iterate         snapshot agent revision; back to in-review\n');

@@ -38,11 +38,25 @@ import {
   type Platform,
   type Stage,
 } from '@deskwork/core/types';
-import { resolveCalendarPath, resolveBlogFilePath } from '@deskwork/core/paths';
+import {
+  resolveCalendarPath,
+  resolveBlogFilePath,
+  findEntryFile,
+} from '@deskwork/core/paths';
+import type { ContentIndex } from '@deskwork/core/content-index';
 import type { StudioContext } from '../routes/api.ts';
 import { html, unsafe, type RawHtml } from './html.ts';
 import { layout } from './layout.ts';
 import { renderEditorialFolio } from './chrome.ts';
+
+/**
+ * Per-request content-index getter. The route layer wires this to the
+ * Hono context's memoized cache so a single dashboard render only
+ * builds the index once per site even though many entries call
+ * `entryBodyStateOf`. When omitted (e.g., a non-route caller), the
+ * dashboard falls back to the slug-template path.
+ */
+export type DashboardIndexGetter = (site: string) => ContentIndex;
 
 interface SitedEntry {
   site: string;
@@ -52,6 +66,12 @@ interface SitedDistribution {
   site: string;
   platform: string;
   slug: string;
+  /**
+   * Stable id of the joined calendar entry. Phase 19d: keys
+   * (site, entryId) when present, falls back to (site, slug) for
+   * pre-id distribution records.
+   */
+  entryId: string | null;
   shortform: boolean;
 }
 
@@ -89,8 +109,26 @@ function stateLabel(state: string): string {
   return state.replace('-', ' ');
 }
 
-function covKey(site: string, slug: string): string {
-  return `${site}::${slug}`;
+/**
+ * Internal correlation key for the dashboard's `Map<key, …>` joins.
+ * Phase 19d: prefer the calendar entry's stable UUID when present,
+ * falling back to the slug for legacy data (workflows / entries
+ * created before frontmatter ids landed). The function is overloaded
+ * via two arities — `covKey(site, slug)` for slug-only callers and
+ * `covKey(site, slug, entryId)` for callers that have access to the
+ * id. The latter form picks `entryId` when it's a non-empty string,
+ * else falls through to `slug`. Display still uses slug as the human
+ * label; this key only correlates internally.
+ *
+ * The "fallback" here is the legacy migration path — not the kind of
+ * silent fallback the project rules forbid. Doctor reports the legacy
+ * cases so operators can backfill ids.
+ */
+function covKey(site: string, slug: string, entryId?: string | null): string {
+  const stable = entryId !== undefined && entryId !== null && entryId !== ''
+    ? entryId
+    : slug;
+  return `${site}::${stable}`;
 }
 
 function fmtRelTime(iso: string, now: Date): string {
@@ -108,15 +146,20 @@ function workflowLink(w: DraftWorkflowItem): string {
   if (w.contentKind === 'shortform') {
     return `/dev/editorial-review-shortform?focus=${w.id}#workflow-${w.id}`;
   }
-  if (w.contentKind === 'outline') {
-    return `/dev/editorial-review/${w.slug}?site=${w.site}&kind=outline`;
-  }
-  return `/dev/editorial-review/${w.slug}?site=${w.site}`;
+  // Phase 19d: prefer the canonical id-based URL when the workflow
+  // carries entryId. The legacy slug URL still works (server.ts will
+  // 302-redirect it), but emitting the canonical form skips the
+  // redirect round trip and makes the UI's outbound links honest.
+  const key = w.entryId ?? w.slug;
+  const kindBit = w.contentKind === 'outline' ? '&kind=outline' : '';
+  return `/dev/editorial-review/${key}?site=${w.site}${kindBit}`;
 }
 
 function blogPreviewLink(site: string, slug: string, host: string, entry: CalendarEntry): string {
   if (entry.stage === 'Published') return `https://${host}/blog/${slug}/`;
-  return `/dev/editorial-review/${slug}?site=${site}`;
+  // Phase 19d: prefer the canonical id-based URL.
+  const key = entry.id ?? slug;
+  return `/dev/editorial-review/${key}?site=${site}`;
 }
 
 interface DashboardData {
@@ -132,7 +175,15 @@ interface DashboardData {
   report: ReviewReport;
 }
 
-function loadDashboardData(ctx: StudioContext): DashboardData {
+function loadDashboardData(
+  ctx: StudioContext,
+  getIndex?: DashboardIndexGetter,
+): DashboardData {
+  // `getIndex` is currently consumed downstream by renderRow →
+  // entryBodyStateOf, not here. Threading it through keeps the call
+  // signature symmetric with renderDashboard and leaves room for
+  // future load-time uses (e.g., joining workflows by entry id).
+  void getIndex;
   const calendarEntries: SitedEntry[] = [];
   const distributions: SitedDistribution[] = [];
   const slugsBySite: Record<string, string[]> = {};
@@ -142,16 +193,23 @@ function loadDashboardData(ctx: StudioContext): DashboardData {
     slugsBySite[site] = [];
     const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
     const cal = readCalendar(calendarPath);
+    // Build a slug → id map up front so distributions can resolve
+    // their entry's stable id even when the DistributionRecord
+    // pre-dates the entryId field.
+    const idBySlug = new Map<string, string>();
     for (const entry of cal.entries) {
       calendarEntries.push({ site, entry });
       slugsBySite[site].push(entry.slug);
+      if (entry.id) idBySlug.set(entry.slug, entry.id);
     }
     for (const d of cal.distributions) {
       const dr: DistributionRecord = d;
+      const entryId = dr.entryId ?? idBySlug.get(dr.slug) ?? null;
       distributions.push({
         site,
         platform: dr.platform,
         slug: dr.slug,
+        entryId,
         shortform: typeof dr.shortform === 'string' && dr.shortform.length > 0,
       });
     }
@@ -168,7 +226,7 @@ function loadDashboardData(ctx: StudioContext): DashboardData {
   for (const d of distributions) {
     if (!d.shortform) continue;
     if (!isPlatform(d.platform)) continue;
-    const key = covKey(d.site, d.slug);
+    const key = covKey(d.site, d.slug, d.entryId);
     const set = shortformCoverage.get(key) ?? new Set<Platform>();
     set.add(d.platform);
     shortformCoverage.set(key, set);
@@ -186,7 +244,7 @@ function loadDashboardData(ctx: StudioContext): DashboardData {
   const activeBySitedSlug = new Map<string, DraftWorkflowItem[]>();
   for (const w of workflows) {
     if (w.state === 'applied' || w.state === 'cancelled') continue;
-    const key = covKey(w.site, w.slug);
+    const key = covKey(w.site, w.slug, w.entryId);
     const list = activeBySitedSlug.get(key) ?? [];
     list.push(w);
     activeBySitedSlug.set(key, list);
@@ -212,19 +270,39 @@ function entryBodyStateOf(
   ctx: StudioContext,
   site: string,
   entry: CalendarEntry,
+  getIndex?: DashboardIndexGetter,
 ): BodyState {
   if (!hasRepoContent(effectiveContentType(entry))) return 'missing';
-  const path = resolveBlogFilePath(ctx.projectRoot, ctx.config, site, entry.slug);
-  return bodyState(path);
+  // When the entry has a stable id AND the route layer wired in a
+  // per-request index getter, use the id-driven content-index lookup
+  // — this matches files whose path doesn't follow the slug template
+  // (e.g., writingcontrol-shape projects where slug `the-outbound`
+  // resolves to `projects/the-outbound/index.md` while the calendar
+  // slug doesn't bake the path). Without an id or getter, fall back
+  // to the slug-template behavior so non-route callers still work.
+  if (entry.id !== undefined && entry.id !== '' && getIndex) {
+    const path = findEntryFile(
+      ctx.projectRoot,
+      ctx.config,
+      site,
+      entry.id,
+      getIndex(site),
+      { slug: entry.slug },
+    );
+    if (path !== undefined) return bodyState(path);
+  }
+  const fallback = resolveBlogFilePath(ctx.projectRoot, ctx.config, site, entry.slug);
+  return bodyState(fallback);
 }
 
 function findStageWorkflow(
   data: DashboardData,
   site: string,
-  slug: string,
+  entry: CalendarEntry,
   stage: Stage,
 ): DraftWorkflowItem | undefined {
-  const list = data.activeBySitedSlug.get(covKey(site, slug)) ?? [];
+  const list =
+    data.activeBySitedSlug.get(covKey(site, entry.slug, entry.id)) ?? [];
   if (stage === 'Outlining') return list.find((w) => w.contentKind === 'outline');
   return list.find((w) => w.contentKind === 'longform');
 }
@@ -436,13 +514,14 @@ function renderRow(
   sited: SitedEntry,
   stage: Stage,
   index: number,
+  getIndex?: DashboardIndexGetter,
 ): RawHtml {
   const { site, entry } = sited;
   const kind = effectiveContentType(entry);
-  const body = entryBodyStateOf(ctx, site, entry);
+  const body = entryBodyStateOf(ctx, site, entry, getIndex);
   const hasFile = body !== 'missing';
   const bodyWritten = body === 'written';
-  const wf = findStageWorkflow(data, site, entry.slug, stage);
+  const wf = findStageWorkflow(data, site, entry, stage);
   const search = [
     entry.slug,
     entry.title,
@@ -530,6 +609,7 @@ function renderStageSection(
   stage: Stage,
   entries: SitedEntry[],
   sites: readonly string[],
+  getIndex?: DashboardIndexGetter,
 ): RawHtml {
   const intakeBlock =
     stage === 'Ideas'
@@ -588,7 +668,7 @@ function renderStageSection(
         </div>`)
       : unsafe(
           entries
-            .map((e, i) => renderRow(ctx, data, e, stage, i).__raw)
+            .map((e, i) => renderRow(ctx, data, e, stage, i, getIndex).__raw)
             .join(''),
         );
 
@@ -608,7 +688,9 @@ function renderStageSection(
 function renderShortformMatrix(data: DashboardData, ctx: StudioContext): RawHtml {
   if (data.publishedBlogEntries.length === 0) return unsafe('');
   const rows = data.publishedBlogEntries.map(({ site, entry }) => {
-    const covered = data.shortformCoverage.get(covKey(site, entry.slug)) ?? new Set<Platform>();
+    const covered =
+      data.shortformCoverage.get(covKey(site, entry.slug, entry.id)) ??
+      new Set<Platform>();
     const cells = PLATFORMS_ORDER.map((p) => {
       const has = covered.has(p);
       const inner = has
@@ -775,9 +857,12 @@ function renderSidebar(data: DashboardData): RawHtml {
 // Entry point
 // ---------------------------------------------------------------------------
 
-export function renderDashboard(ctx: StudioContext): string {
+export function renderDashboard(
+  ctx: StudioContext,
+  getIndex?: DashboardIndexGetter,
+): string {
   const sites = Object.keys(ctx.config.sites);
-  const data = loadDashboardData(ctx);
+  const data = loadDashboardData(ctx, getIndex);
   const now = ctx.now ? ctx.now() : new Date();
 
   const stageSections = STAGES.map((stage) => {
@@ -792,7 +877,7 @@ export function renderDashboard(ctx: StudioContext): string {
         if (siteCmp !== 0) return siteCmp;
         return a.entry.slug.localeCompare(b.entry.slug);
       });
-    return renderStageSection(ctx, data, stage, stageEntries, sites).__raw;
+    return renderStageSection(ctx, data, stage, stageEntries, sites, getIndex).__raw;
   }).join('\n');
 
   const body = html`
