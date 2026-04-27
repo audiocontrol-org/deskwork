@@ -14,5 +14,13 @@
   ],
   "engines": {
     "node": ">=20"
+  },
+  "scripts": {
+    "prepare": "husky",
+    "version:bump": "tsx scripts/bump-version.mjs"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "tsx": "^4.21.0"
   }
 }

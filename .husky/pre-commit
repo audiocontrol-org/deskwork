@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+#
+# pre-commit — keep self-contained ESM bundles in sync with their source.
+#
+# When source under packages/cli/src/ or packages/studio/src/ (or their
+# shared dependency, packages/core/src/) is staged for commit, the
+# committed bundle at packages/<name>/bundle/<entry>.mjs must reflect
+# the new source. This hook rebuilds the affected bundles and re-stages
+# them, so a stale bundle never lands in a commit.
+#
+# - Skipped silently when no source is staged.
+# - Idempotent: rebuilding when bundle was already correct is a no-op.
+# - The build is fast (esbuild ~1s per package); contributors who edit
+#   only docs / tests / READMEs see no overhead.
+
+set -euo pipefail
+
+staged="$(git diff --cached --name-only --diff-filter=ACMR)"
+
+needs_cli=false
+needs_studio=false
+
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  case "$f" in
+    packages/core/src/*) needs_cli=true; needs_studio=true ;;
+    packages/cli/src/*) needs_cli=true ;;
+    packages/studio/src/*) needs_studio=true ;;
+  esac
+done <<< "$staged"
+
+# Studio's build also rebundles the client-side TS in public/dist/, but
+# those bundles are gitignored — only server.mjs is committed. Same
+# build script handles both.
+rebuild_one() {
+  local pkg="$1"
+  local bundle="$2"
+  echo "[deskwork pre-commit] rebuilding ${bundle} (source under packages/${pkg}/src/ staged)"
+  npm --workspace "packages/${pkg}" run build > /dev/null
+  git add "packages/${pkg}/bundle/${bundle}"
+}
+
+if [ "$needs_cli" = true ]; then
+  rebuild_one "cli" "cli.mjs"
+fi
+
+if [ "$needs_studio" = true ]; then
+  rebuild_one "studio" "server.mjs"
+fi
