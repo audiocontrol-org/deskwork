@@ -77,14 +77,21 @@ The script:
 
 If the helper exits non-zero, **do not retry blindly** — read the error, correct the config, and re-run. The script is idempotent: running it again with the same config is safe.
 
-### Step 5 — Report to the user
+### Step 5 — Note the host content-schema requirement (Astro projects only)
+
+Deskwork binds calendar entries to their content files via `id: <uuid>` written into each markdown's frontmatter. Astro content-collection schemas are strict by default and will reject any unknown frontmatter field — including `id`. After install, before the first `/deskwork:outline` (or `/deskwork:ingest`) writes a file with frontmatter, confirm that each collection's schema permits the `id` field. The plugin's [`README.md`](../../README.md#content-schema-requirement) has the one-line patches (`z.string().uuid().optional()` or `.passthrough()`); the `doctor` skill's `schema-rejected` rule prints the same instructions if a write hits the rejection.
+
+Hugo, Jekyll, Eleventy, and plain-markdown projects don't validate frontmatter against a schema — nothing to do for those.
+
+### Step 6 — Report to the user
 
 Tell the user what was configured:
 
 - Path to the written config
 - Each site slug and its calendar path
 - Whether any calendars were preserved (existing files the install did not overwrite)
-- Suggested next step: run `/deskwork:add "<idea title>"` (once Phase 3 ships) to start capturing content
+- Whether the host needs a content-schema patch (Astro), and where to find the patch instructions
+- Suggested next step: run `/deskwork:add "<idea title>"` to start capturing content
 
 ### Safety rules
 

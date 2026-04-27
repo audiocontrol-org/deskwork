@@ -337,7 +337,7 @@ The deskwork calendar markdown is plugin-managed metadata (not site content). Ed
 ### What this is not
 
 - **Not removing slug.** Slug remains the operator-facing CLI argument and the public URL field. It just stops being load-bearing for deskwork's internal joins or fs placement.
-- **Not adding per-collection blog templates.** Operators who need a destination different from the site-level template specify `--path` at scaffold time.
+- **Not adding per-collection blog templates.** Operators with destinations that don't fit any of the three layouts (`index | readme | flat`) scaffold the file by hand and bind via `deskwork doctor --fix=missing-frontmatter-id`. (The plan reference proposed an `outline --path <rel-path>` flag for explicit destination; that did not ship in 19a — see workplan Phase 19a notes. The doctor's three-tier candidate search is the supported path for non-template destinations until demand for the explicit flag emerges.)
 - **Not migrating audiocontrol's calendar.** Audiocontrol's flat layout works perfectly with the existing template fallback. After running `doctor` once, audiocontrol files just gain `id:` in frontmatter — same render, same routes.
 - **Not a full re-architecture of the calendar parser.** Regex-based table parsing is in places (pipe-escape gap, shortform header detection). These are outside the new hot path; they're flagged for a future hardening pass, not addressed in Phase 19.
 

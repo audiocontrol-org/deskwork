@@ -11,7 +11,7 @@ description: Audit and repair binding metadata across the editorial calendar, co
 
 - After an upgrade (Phase 19 introduced the `id:` frontmatter binding; existing projects backfill via doctor).
 - After bulk editing the calendar by hand.
-- After moving or renaming files outside of `deskwork rename-slug`.
+- After moving or renaming content files in the host project (the frontmatter id moves with the file, but doctor will surface anything that drifted).
 - As a pre-commit / CI check: audit-only mode exits non-zero on any finding, so it composes with `--exit-code` workflows.
 
 ### One look at the rules
@@ -86,13 +86,13 @@ Two files claim the same id. Pick the canonical file; doctor clears the id from 
 
 #### `slug-collision`
 
-Two calendar entries share a slug. The host renderer maps URLs by slug, so this produces duplicate or hidden public pages. Doctor refuses to auto-rename; use `deskwork rename-slug` (when the operator decides which entry owns the URL) or hand-edit the calendar.
+Two calendar entries share a slug. The host renderer maps URLs by slug, so this produces duplicate or hidden public pages. Doctor refuses to auto-rename — the operator decides which entry owns the URL and hand-edits the slug column in the calendar markdown.
 
 #### `schema-rejected`
 
 The host's Astro content collection schema rejects the `id` field. The audit doesn't actively probe for this (would require running the host's build). Other code paths surface schema rejection at write time and reference this rule's patch instructions.
 
-The fix is a one-line content-schema patch — see the rule's plan output, or import the helper directly:
+The fix is a one-line content-schema patch — see the plugin README's [Content schema requirement](../../README.md#content-schema-requirement) section for the full prose, or import the helper directly:
 
 ```ts
 import { printSchemaPatchInstructions } from '@deskwork/core/doctor';
@@ -131,6 +131,6 @@ The on-disk calendar has rows with no UUID column populated (typical of legacy c
 
 ### What this is not
 
-- **Not a bulk renamer.** `slug-collision` reports; you decide and use `deskwork rename-slug`.
+- **Not a bulk renamer.** `slug-collision` reports; you decide which entry owns the URL and hand-edit the slug column.
 - **Not a workflow recovery tool.** `workflow-stale` clears stale pipeline records but doesn't recreate workflows that should exist.
 - **Not a content-schema generator.** `schema-rejected` prints patch instructions; you apply them by hand.
