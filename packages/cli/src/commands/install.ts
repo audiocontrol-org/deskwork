@@ -2,14 +2,22 @@
  * deskwork-install — validate a deskwork config, write it to disk, and seed
  * empty calendar files for every configured site.
  *
- * Usage:
- *   deskwork-install <project-root> <config-file>
+ * Usage (one-arg, project-root defaults to cwd):
+ *   deskwork install <config-file>
  *
- * The config-file must contain valid JSON matching the DeskworkConfig schema
- * (see lib/config.ts). On success the script:
+ * Usage (two-arg, explicit project-root):
+ *   deskwork install <project-root> <config-file>
+ *
+ * The agent inside Claude Code is already running in the host project's
+ * working directory, so the one-arg form is the natural call. The
+ * explicit two-arg form is preserved for scripted use (CI bootstrapping
+ * a project from outside, etc.).
+ *
+ * The config-file must contain valid JSON matching the DeskworkConfig
+ * schema (see lib/config.ts). On success the script:
  *   1. Writes the validated config to <project-root>/.deskwork/config.json
- *   2. Creates an empty calendar file at each site's calendarPath, but only
- *      when no file is already there
+ *   2. Creates an empty calendar file at each site's calendarPath, but
+ *      only when no file is already there
  *   3. Prints a summary of what was written and what was left untouched
  *
  * Exits non-zero with an actionable message on any failure. Idempotent:
@@ -23,12 +31,30 @@ import { renderEmptyCalendar } from '@deskwork/core/calendar';
 
 export async function run(argv: string[]): Promise<void> {
   function usage(): never {
-    console.error('Usage: deskwork-install <project-root> <config-file>');
+    console.error(
+      'Usage: deskwork install [<project-root>] <config-file>',
+    );
     process.exit(2);
   }
 
-  const [projectRootArg, configFileArg] = argv;
-  if (!projectRootArg || !configFileArg) usage();
+  // Two argv shapes possible after the cli dispatcher has run:
+  //   [<config-file>]                    → project-root defaults to cwd
+  //   [<project-root>, <config-file>]    → explicit project-root
+  // The dispatcher's pathLike heuristic injects cwd for non-path-like
+  // first args, so `deskwork install bare.json` arrives here as the
+  // two-arg form `[cwd, bare.json]`. The one-arg form below only fires
+  // when the user passed an absolute or relative path as the single
+  // positional (e.g. `deskwork install /tmp/config.json`).
+  let projectRootArg: string;
+  let configFileArg: string;
+  if (argv.length === 1) {
+    projectRootArg = process.cwd();
+    configFileArg = argv[0];
+  } else if (argv.length === 2) {
+    [projectRootArg, configFileArg] = argv;
+  } else {
+    usage();
+  }
 
   const projectRoot = isAbsolute(projectRootArg)
     ? projectRootArg
@@ -36,6 +62,11 @@ export async function run(argv: string[]): Promise<void> {
   const configFile = isAbsolute(configFileArg)
     ? configFileArg
     : resolve(process.cwd(), configFileArg);
+
+  // Heads-up so the operator (or the agent reading the output) can
+  // interrupt before any disk writes if the inferred project-root is
+  // wrong. Prints to stdout so it lands above the success summary.
+  console.log(`Installing into: ${projectRoot}`);
 
   if (!existsSync(projectRoot)) {
     console.error(`Project root does not exist: ${projectRoot}`);

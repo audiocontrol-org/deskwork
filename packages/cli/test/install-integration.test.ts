@@ -30,6 +30,21 @@ function run(args: string[]): { code: number; stdout: string; stderr: string } {
   };
 }
 
+function runFromCwd(
+  cwd: string,
+  args: string[],
+): { code: number; stdout: string; stderr: string } {
+  const r = spawnSync(deskworkBin, ['install', ...args], {
+    encoding: 'utf-8',
+    cwd,
+  });
+  return {
+    code: r.status ?? -1,
+    stdout: r.stdout ?? '',
+    stderr: r.stderr ?? '',
+  };
+}
+
 function writeConfigFile(dir: string, value: unknown): string {
   const path = join(dir, 'config.json');
   writeFileSync(path, JSON.stringify(value), 'utf-8');
@@ -192,9 +207,103 @@ describe('deskwork-install', () => {
     }
   });
 
-  it('exits 2 on missing arguments', () => {
-    const res = run([]);
+  it('exits 2 with a usage message when too many args are passed', () => {
+    // 3+ positional args is an unambiguous usage error. (0 and 1 args
+    // are valid one-arg form post-dispatcher; 2 args is the explicit
+    // two-arg form.)
+    const res = run(['/tmp/a', '/tmp/b', '/tmp/c']);
     expect(res.code).toBe(2);
     expect(res.stderr).toMatch(/Usage/);
+  });
+
+  it('one-arg form: project-root defaults to cwd when only config is passed', () => {
+    // Simulates the natural agent invocation `deskwork install /tmp/cfg.json`
+    // from inside the host project's directory. The dispatcher's pathLike
+    // heuristic does NOT inject cwd because the absolute config path looks
+    // path-like — it's the install command itself that infers project-root
+    // from cwd in that case.
+    project = newProject();
+    tmpConfigs = newTmpConfigDir();
+    try {
+      const cfgFile = writeConfigFile(tmpConfigs, {
+        version: 1,
+        sites: {
+          a: {
+            host: 'a.example',
+            contentDir: 'src/content',
+            calendarPath: 'docs/cal.md',
+          },
+        },
+        defaultSite: 'a',
+      });
+      const res = runFromCwd(project, [cfgFile]);
+      expect(res.code).toBe(0);
+      // Heads-up message confirms inferred root before any writes
+      expect(res.stdout).toMatch(/Installing into:/);
+      // Real project file landed at the cwd-inferred root
+      expect(existsSync(join(project, '.deskwork/config.json'))).toBe(true);
+      expect(existsSync(join(project, 'docs/cal.md'))).toBe(true);
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+      rmSync(tmpConfigs, { recursive: true, force: true });
+    }
+  });
+
+  it('one-arg form: bare config name (non-path-like) routes through dispatcher cwd-injection', () => {
+    // `deskwork install bare-config.json` — first arg isn't path-like, so
+    // the dispatcher injects cwd ahead of it; install then sees the
+    // 2-arg form. End result is identical to the one-arg path-like case
+    // above, just via a different code path.
+    project = newProject();
+    try {
+      writeFileSync(
+        join(project, 'bare-config.json'),
+        JSON.stringify({
+          version: 1,
+          sites: {
+            x: {
+              host: 'x.example',
+              contentDir: 'src',
+              calendarPath: 'cal.md',
+            },
+          },
+          defaultSite: 'x',
+        }),
+        'utf-8',
+      );
+      const res = runFromCwd(project, ['bare-config.json']);
+      expect(res.code).toBe(0);
+      expect(res.stdout).toMatch(/Installing into:/);
+      expect(existsSync(join(project, '.deskwork/config.json'))).toBe(true);
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+
+  it('two-arg form: explicit project-root still works', () => {
+    // Backward-compat: `deskwork install <project-root> <config-file>`
+    // continues to behave as it did before the one-arg shape was added.
+    project = newProject();
+    tmpConfigs = newTmpConfigDir();
+    try {
+      const cfgFile = writeConfigFile(tmpConfigs, {
+        version: 1,
+        sites: {
+          y: {
+            host: 'y.example',
+            contentDir: 'src/content',
+            calendarPath: 'docs/cal-y.md',
+          },
+        },
+        defaultSite: 'y',
+      });
+      const res = run([project, cfgFile]);
+      expect(res.code).toBe(0);
+      expect(res.stdout).toMatch(/Installing into:/);
+      expect(existsSync(join(project, '.deskwork/config.json'))).toBe(true);
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+      rmSync(tmpConfigs, { recursive: true, force: true });
+    }
   });
 });

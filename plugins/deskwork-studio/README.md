@@ -2,7 +2,7 @@
 
 Web studio for the deskwork editorial calendar — a local Hono server exposing a dashboard, longform review surface, shortform review desk, scrapbook viewer, and the compositor's manual.
 
-This is a thin Claude Code plugin shell. The actual server lives in the [@deskwork/studio](../../packages/studio/) npm package; this plugin's `bin/deskwork-studio` wrapper resolves to the workspace-linked binary on dev installs, or falls back to the self-contained bundle at `packages/studio/bundle/server.mjs` (committed to git) for fresh `claude plugin install` users. No `npm install` ceremony required either way.
+This is a thin Claude Code plugin shell. The actual server lives in the [@deskwork/studio](../../packages/studio/) npm package; this plugin's `bin/deskwork-studio` wrapper resolves to the workspace-linked binary on dev installs, or falls back to the self-contained bundle at `plugins/deskwork-studio/bundle/server.mjs` (committed to git) for fresh `claude plugin install` users. No `npm install` ceremony required either way.
 
 ### Install
 
@@ -21,7 +21,22 @@ In a project that has a `.deskwork/config.json` (run `/deskwork:install` first i
 /deskwork-studio:studio
 ```
 
-The skill prompts for an optional project root and port, then launches the server. Default URL: `http://localhost:4321/dev/editorial-studio`.
+The skill prompts for an optional project root, port, and host, then launches the server. Default URL: `http://localhost:47321/dev/editorial-studio`. The default port is `47321` (chosen to avoid the Astro dev server's default `4321` — most projects deskwork manages run an Astro dev server alongside).
+
+### Reaching the studio from another device
+
+By default the studio detects Tailscale on launch and binds to **both** loopback AND the local Tailscale interface(s). Tailscale peers can reach the studio at the magic-DNS hostname (`<machine>.<tailnet>.ts.net`) without any flags. The startup banner lists every reachable URL.
+
+If Tailscale isn't installed or running, the studio binds to loopback only.
+
+Overrides:
+
+| Goal | Flag |
+|---|---|
+| Loopback only (skip Tailscale even if running) | `--no-tailscale` |
+| Bind ONLY to a specific address (LAN/Wi-Fi opt-in) | `--host 0.0.0.0` (or a specific IP) |
+
+The studio has **no authentication** and **no rate-limiting**. Tailscale is treated as a trusted network. `--host` overrides print a loud warning when bound beyond loopback.
 
 ### Routes
 
