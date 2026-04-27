@@ -384,10 +384,10 @@ Tasks are grouped by sub-phase to allow each to land as a separate PR if needed.
 
 #### 16b — Smoke verification against writingcontrol.org
 
-- [ ] Drive `deskwork ingest src/content/projects/the-outbound/` against the actual writingcontrol.org repo (commit `69cb868` or current HEAD).
-- [ ] Verify slugs produced match what the design says: `the-outbound`, `the-outbound/characters`, `the-outbound/characters/strivers`, `the-outbound/settings`, `the-outbound/settings/libertardistan`, `the-outbound/structure`. Pure organizational dirs (those without their own `index.md`) do not produce slugs.
-- [ ] Boot studio against writingcontrol; verify scrapbook viewer at `/dev/scrapbook/writingcontrol/the-outbound/characters/strivers` returns 200 with breadcrumb.
-- [ ] Capture findings in `docs/1.0/001-IN-PROGRESS/deskwork-plugin/implementation-summary.md` under a new "Phase 16 — writingcontrol.org dogfood" section.
+- [x] Drive `deskwork ingest src/content/projects/the-outbound/` against the actual writingcontrol.org repo (commit `69cb868` or current HEAD).
+- [x] Verify slugs produced match what the design says: `the-outbound`, `the-outbound/characters`, `the-outbound/characters/strivers`, `the-outbound/settings`, `the-outbound/settings/libertardistan`, `the-outbound/structure`. Pure organizational dirs (those without their own `index.md`) do not produce slugs.
+- [x] Boot studio against writingcontrol; verify scrapbook viewer at `/dev/scrapbook/writingcontrol/the-outbound/characters/strivers` returns 200 with breadcrumb.
+- [x] Capture findings in `docs/1.0/001-IN-PROGRESS/deskwork-plugin/implementation-summary.md` under a new "Phase 16 — writingcontrol.org dogfood" section.
 
 **Acceptance:** End-to-end ingest + studio works against writingcontrol's actual hierarchical project tree; findings recorded.
 
