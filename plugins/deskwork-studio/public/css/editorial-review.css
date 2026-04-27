@@ -102,7 +102,162 @@ body[data-review-ui="shortform"] {
   line-height: 1.55;
 }
 
-/* ---------- Masthead ---------- */
+/* ---------- Pagehead (CSF-3 cross-surface audit v0.5.0) ----------
+ *
+ * Unified page head used by every studio surface (dashboard,
+ * shortform, content view, studio index, manual, scrapbook viewer).
+ * Replaces six distinct class hierarchies (er-masthead-*, page-head,
+ * er-toc-head, eh-cover-*, scrapbook-header, er-dispatch-*) with a
+ * single family `er-pagehead-*` and four layout modifiers:
+ *
+ *   --centered   — text-aligned center (dashboard, shortform, manual)
+ *   --split      — title/deck on the left, meta on the right (content)
+ *   --compact    — smaller title scale (scrapbook viewer)
+ *   --imprint    — adds the strong/span imprint strip (manual)
+ *
+ * Slots (each optional):
+ *   __kicker     — small mono uppercase tag (Vol. / № / Press-check ...)
+ *   __title      — the display title (h1)
+ *   __deck       — italic display dek under the title
+ *   __meta       — mono uppercase meta strip
+ *   __imprint    — the manual's strong/span imprint pairs
+ *   __crumbs     — breadcrumb (used by scrapbook + content drilldown)
+ *
+ * Per the audit: the existing class names (er-masthead-*,
+ * scrapbook-header, page-head, eh-cover-*, er-toc-head) remain
+ * as styled aliases for back-compat with renders already in flight.
+ */
+
+.er-pagehead {
+  padding: var(--er-space-6) var(--er-space-5) var(--er-space-4);
+  border-bottom: var(--er-rule-double);
+  position: relative;
+  margin: 0 auto;
+}
+
+.er-pagehead--centered { text-align: center; }
+
+.er-pagehead--split {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: var(--er-space-4);
+  text-align: left;
+}
+
+.er-pagehead__kicker {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  margin: 0 0 var(--er-space-2);
+}
+
+.er-pagehead__kicker em {
+  font-style: normal;
+  color: var(--er-red-pencil);
+}
+
+.er-pagehead__title {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 144, "wght" 400, "SOFT" 0;
+  font-size: clamp(3rem, 7vw, 5.5rem);
+  line-height: 0.95;
+  letter-spacing: -0.022em;
+  margin: 0;
+  color: var(--er-ink);
+}
+
+.er-pagehead__title em {
+  font-style: italic;
+  font-variation-settings: "opsz" 144, "wght" 400, "SOFT" 100;
+}
+
+.er-pagehead--compact .er-pagehead__title {
+  font-size: clamp(1.8rem, 3.5vw, 2.6rem);
+}
+
+.er-pagehead__deck {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-variation-settings: "opsz" 48, "wght" 400;
+  font-size: 1.15rem;
+  color: var(--er-ink-soft);
+  margin: var(--er-space-2) 0 var(--er-space-3);
+  max-width: 44rem;
+  line-height: 1.45;
+}
+
+.er-pagehead--centered .er-pagehead__deck {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.er-pagehead__meta {
+  font-family: var(--er-font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  display: inline-flex;
+  gap: var(--er-space-2);
+  align-items: center;
+  margin: 0;
+}
+
+.er-pagehead__meta .sep { color: var(--er-faded-2); }
+
+.er-pagehead--split .er-pagehead__meta {
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  gap: 0.2rem;
+}
+
+.er-pagehead__imprint {
+  font-family: var(--er-font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--er-space-2);
+  margin-top: var(--er-space-3);
+  padding-top: var(--er-space-2);
+  border-top: var(--er-rule-thin);
+  border-bottom: var(--er-rule-thin);
+  padding-bottom: var(--er-space-2);
+}
+
+.er-pagehead__imprint strong {
+  color: var(--er-ink);
+  font-weight: 500;
+  margin-right: 0.4em;
+}
+
+.er-pagehead__imprint .sep { color: var(--er-faded-2); }
+
+.er-pagehead__crumbs {
+  font-family: var(--er-font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+  color: var(--er-faded);
+  margin: 0 0 var(--er-space-1);
+}
+
+.er-pagehead__crumbs a {
+  color: var(--er-ink-soft);
+  text-decoration: none;
+}
+
+.er-pagehead__crumbs a:hover { color: var(--er-red-pencil); }
+.er-pagehead__crumbs .sep { color: var(--er-faded-2); margin: 0 0.4em; }
+.er-pagehead__crumbs b { color: var(--er-ink); font-weight: 500; }
+
+/* ---------- Masthead (legacy alias of er-pagehead--centered) ---------- */
 
 .er-masthead {
   padding: var(--er-space-6) var(--er-space-5) var(--er-space-4);

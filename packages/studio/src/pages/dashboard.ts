@@ -242,18 +242,18 @@ function renderHeader(
   const issueNum = String(data.workflows.length).padStart(2, '0');
   const issueDate = `${now.getDate()} ${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`;
   return unsafe(html`
-  <header class="er-masthead">
-    <div class="er-masthead-kicker">
+  <header class="er-pagehead er-pagehead--centered">
+    <p class="er-pagehead__kicker">
       Vol. ${volume} &middot; № ${issueNum} &middot; Press-check
-    </div>
-    <h1 class="er-masthead-title">
+    </p>
+    <h1 class="er-pagehead__title">
       Editorial <em>Studio</em>
     </h1>
-    <p class="er-masthead-deck">
+    <p class="er-pagehead__deck">
       Project: <code>${ctx.projectRoot}</code>
       &nbsp;·&nbsp; <a class="er-link-marginalia" href="/dev/editorial-help">the manual</a>
     </p>
-    <div class="er-masthead-meta">
+    <p class="er-pagehead__meta">
       <span>${issueDate}</span>
       <span class="sep">·</span>
       <span>${data.calendarEntries.length} on the calendar</span>
@@ -261,7 +261,7 @@ function renderHeader(
       <span>${data.activeBySitedSlug.size} in review</span>
       <span class="sep">·</span>
       <span>${data.approved.length} awaiting press</span>
-    </div>
+    </p>
   </header>`);
 }
 

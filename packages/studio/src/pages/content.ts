@@ -192,20 +192,20 @@ export function renderContentTopLevel(ctx: StudioContext): string {
   const body = html`
     ${renderEditorialFolio('content', 'the shape of the work')}
     <main class="content-page">
-      <header class="page-head">
+      <header class="er-pagehead er-pagehead--split er-pagehead--compact">
         <div>
-          <h1 class="page-head__title">A <em>shape</em> of the work.</h1>
-          <p class="page-head__sub">
+          <h1 class="er-pagehead__title">A <em>shape</em> of the work.</h1>
+          <p class="er-pagehead__deck">
             The pipeline view shows where things are. This shows what's
             there. Browse the corpus by its tree on disk; drill into any
             node to see its content and the scrapbook hanging off it.
           </p>
         </div>
-        <div class="page-head__meta">
-          <b>${counts.sites}</b> SITES<br>
-          <b>${counts.trackedNodes}</b> TRACKED NODES<br>
-          <b>${counts.scrapbookItems}</b> SCRAPBOOK ITEMS
-        </div>
+        <p class="er-pagehead__meta">
+          <span><b>${counts.sites}</b> SITES</span>
+          <span><b>${counts.trackedNodes}</b> TRACKED NODES</span>
+          <span><b>${counts.scrapbookItems}</b> SCRAPBOOK ITEMS</span>
+        </p>
       </header>
       <section class="toplevel">
         ${sites.map((sp, i) => renderSiteCard(sp, i))}

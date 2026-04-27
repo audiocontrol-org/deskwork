@@ -247,15 +247,14 @@ export function renderScrapbookPage(
   const body = html`
     ${renderEditorialFolio('content', `scrapbook · ${site}/${path}`)}
     <main class="scrapbook-page" data-site="${site}" data-slug="${path}" data-scrapbook-root>
-      <header class="scrapbook-header">
-        <p class="scrapbook-kicker">
+      <header class="er-pagehead er-pagehead--compact scrapbook-header">
+        ${renderBreadcrumb(site, path)}
+        <p class="er-pagehead__kicker scrapbook-kicker">
           <span class="scrapbook-kicker-mark" aria-hidden="true">§</span>
           Scrapbook
         </p>
-        <h1 class="scrapbook-title">${path}</h1>
-        ${renderBreadcrumb(site, path)}
+        <h1 class="er-pagehead__title scrapbook-title">${path}</h1>
         <a class="scrapbook-back" href="/dev/editorial-studio">← back to the desk</a>
-        <hr />
       </header>
       <div class="scrapbook-status" data-scrapbook-status hidden></div>
       ${unsafe(publicBlock)}

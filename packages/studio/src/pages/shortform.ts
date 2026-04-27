@@ -135,15 +135,15 @@ export function renderShortformPage(
 
   const body = html`
     ${renderEditorialFolio('reviews', 'shortform desk')}
-    <header class="er-masthead">
-      <div class="er-masthead-kicker">All sites · short form</div>
-      <h1 class="er-masthead-title">The <em>compositor</em>'s desk</h1>
-      <p class="er-masthead-deck">Social copy, one galley slip per platform.</p>
-      <div class="er-masthead-meta">
+    <header class="er-pagehead er-pagehead--centered">
+      <p class="er-pagehead__kicker">All sites · short form</p>
+      <h1 class="er-pagehead__title">The <em>compositor</em>'s desk</h1>
+      <p class="er-pagehead__deck">Social copy, one galley slip per platform.</p>
+      <p class="er-pagehead__meta">
         <span>${cards.length} in flight</span>
         <span class="sep">·</span>
         <span>${ordered.length} ${ordered.length === 1 ? 'platform' : 'platforms'}</span>
-      </div>
+      </p>
     </header>
     <main class="er-container" style="padding-top: var(--er-space-4); padding-bottom: var(--er-space-6);">
       ${unsafe(cardsBlock)}

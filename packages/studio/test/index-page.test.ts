@@ -88,7 +88,9 @@ describe('studio index page', () => {
   it('renders the TOC with the volume head', async () => {
     const r = await getHtml(app, '/dev/');
     expect(r.html).toContain('class="er-toc-page"');
-    expect(r.html).toContain('class="er-toc-head"');
+    // CSF-3 (v0.6.0): the index now uses the unified er-pagehead with
+    // a --toc modifier that adds the pressed-ornament rule treatment.
+    expect(r.html).toMatch(/class="er-pagehead[^"]*er-pagehead--toc/);
     // Title proper.
     expect(r.html).toContain('Editorial');
     expect(r.html).toContain('Studio');

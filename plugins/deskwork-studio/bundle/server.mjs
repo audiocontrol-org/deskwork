@@ -24281,18 +24281,18 @@ function renderHeader(data, ctx, now) {
   const issueNum = String(data.workflows.length).padStart(2, "0");
   const issueDate = `${now.getDate()} ${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`;
   return unsafe(html6`
-  <header class="er-masthead">
-    <div class="er-masthead-kicker">
+  <header class="er-pagehead er-pagehead--centered">
+    <p class="er-pagehead__kicker">
       Vol. ${volume} &middot; № ${issueNum} &middot; Press-check
-    </div>
-    <h1 class="er-masthead-title">
+    </p>
+    <h1 class="er-pagehead__title">
       Editorial <em>Studio</em>
     </h1>
-    <p class="er-masthead-deck">
+    <p class="er-pagehead__deck">
       Project: <code>${ctx.projectRoot}</code>
       &nbsp;·&nbsp; <a class="er-link-marginalia" href="/dev/editorial-help">the manual</a>
     </p>
-    <div class="er-masthead-meta">
+    <p class="er-pagehead__meta">
       <span>${issueDate}</span>
       <span class="sep">·</span>
       <span>${data.calendarEntries.length} on the calendar</span>
@@ -24300,7 +24300,7 @@ function renderHeader(data, ctx, now) {
       <span>${data.activeBySitedSlug.size} in review</span>
       <span class="sep">·</span>
       <span>${data.approved.length} awaiting press</span>
-    </div>
+    </p>
   </header>`);
 }
 function renderFilterStrip(sites) {
@@ -25277,15 +25277,15 @@ function renderShortformPage(ctx, focus = null) {
       </div>` : ordered.map((p2) => renderPlatformSection(p2, byPlatform.get(p2) ?? []).__raw).join("");
   const body3 = html6`
     ${renderEditorialFolio("reviews", "shortform desk")}
-    <header class="er-masthead">
-      <div class="er-masthead-kicker">All sites · short form</div>
-      <h1 class="er-masthead-title">The <em>compositor</em>'s desk</h1>
-      <p class="er-masthead-deck">Social copy, one galley slip per platform.</p>
-      <div class="er-masthead-meta">
+    <header class="er-pagehead er-pagehead--centered">
+      <p class="er-pagehead__kicker">All sites · short form</p>
+      <h1 class="er-pagehead__title">The <em>compositor</em>'s desk</h1>
+      <p class="er-pagehead__deck">Social copy, one galley slip per platform.</p>
+      <p class="er-pagehead__meta">
         <span>${cards.length} in flight</span>
         <span class="sep">·</span>
         <span>${ordered.length} ${ordered.length === 1 ? "platform" : "platforms"}</span>
-      </div>
+      </p>
     </header>
     <main class="er-container" style="padding-top: var(--er-space-4); padding-bottom: var(--er-space-6);">
       ${unsafe(cardsBlock)}
@@ -25516,17 +25516,17 @@ function formatIssueDate(now) {
 function renderCover(ctx, now) {
   const sitesInline = Object.values(ctx.config.sites).map((s) => s.host).join(" \xB7 ");
   return unsafe(html6`
-    <header class="eh-cover">
-      <p class="eh-cover-kicker">
+    <header class="er-pagehead er-pagehead--centered eh-cover">
+      <p class="er-pagehead__kicker eh-cover-kicker">
         Vol. 01 <span class="dot">·</span> Manual <span class="dot">·</span> Internal — for operators
       </p>
-      <h1 class="eh-cover-title">
+      <h1 class="er-pagehead__title eh-cover-title">
         The Compositor's <em>Manual</em>
       </h1>
-      <p class="eh-cover-dek">
+      <p class="er-pagehead__deck eh-cover-dek">
         Everything you need to move a thought from notebook to published dispatch without asking a colleague. The editorial calendar, the review pipelines, the skills that drive them, and the desk where you watch the whole thing happen.
       </p>
-      <p class="eh-imprint">
+      <p class="er-pagehead__imprint eh-imprint">
         <strong>Sites</strong><span>${sitesInline || ctx.projectRoot}</span>
         <span class="sep">§</span>
         <strong>Issued</strong><span>${formatIssueDate(now)}</span>
@@ -26082,15 +26082,14 @@ function renderScrapbookPage(ctx, site, path) {
   const body3 = html6`
     ${renderEditorialFolio("content", `scrapbook \xB7 ${site}/${path}`)}
     <main class="scrapbook-page" data-site="${site}" data-slug="${path}" data-scrapbook-root>
-      <header class="scrapbook-header">
-        <p class="scrapbook-kicker">
+      <header class="er-pagehead er-pagehead--compact scrapbook-header">
+        ${renderBreadcrumb(site, path)}
+        <p class="er-pagehead__kicker scrapbook-kicker">
           <span class="scrapbook-kicker-mark" aria-hidden="true">§</span>
           Scrapbook
         </p>
-        <h1 class="scrapbook-title">${path}</h1>
-        ${renderBreadcrumb(site, path)}
+        <h1 class="er-pagehead__title scrapbook-title">${path}</h1>
         <a class="scrapbook-back" href="/dev/editorial-studio">← back to the desk</a>
-        <hr />
       </header>
       <div class="scrapbook-status" data-scrapbook-status hidden></div>
       ${unsafe(publicBlock)}
@@ -26569,20 +26568,20 @@ function renderContentTopLevel(ctx) {
   const body3 = html6`
     ${renderEditorialFolio("content", "the shape of the work")}
     <main class="content-page">
-      <header class="page-head">
+      <header class="er-pagehead er-pagehead--split er-pagehead--compact">
         <div>
-          <h1 class="page-head__title">A <em>shape</em> of the work.</h1>
-          <p class="page-head__sub">
+          <h1 class="er-pagehead__title">A <em>shape</em> of the work.</h1>
+          <p class="er-pagehead__deck">
             The pipeline view shows where things are. This shows what's
             there. Browse the corpus by its tree on disk; drill into any
             node to see its content and the scrapbook hanging off it.
           </p>
         </div>
-        <div class="page-head__meta">
-          <b>${counts.sites}</b> SITES<br>
-          <b>${counts.trackedNodes}</b> TRACKED NODES<br>
-          <b>${counts.scrapbookItems}</b> SCRAPBOOK ITEMS
-        </div>
+        <p class="er-pagehead__meta">
+          <span><b>${counts.sites}</b> SITES</span>
+          <span><b>${counts.trackedNodes}</b> TRACKED NODES</span>
+          <span><b>${counts.scrapbookItems}</b> SCRAPBOOK ITEMS</span>
+        </p>
       </header>
       <section class="toplevel">
         ${sites.map((sp, i) => renderSiteCard(sp, i))}
@@ -26892,10 +26891,10 @@ function renderStudioIndex(_ctx) {
   const body3 = html6`
     ${renderEditorialFolio("index", "index of the press")}
     <main class="er-toc-page">
-      <header class="er-toc-head">
-        <div class="er-toc-head__kicker">Index of the <em>Press</em></div>
-        <h1 class="er-toc-head__title">Editorial <em>Studio</em></h1>
-        <p class="er-toc-head__deck">
+      <header class="er-pagehead er-pagehead--centered er-pagehead--toc">
+        <p class="er-pagehead__kicker">Index of the <em>Press</em></p>
+        <h1 class="er-pagehead__title">Editorial <em>Studio</em></h1>
+        <p class="er-pagehead__deck">
           A reference of the dev surfaces — pipeline, review desk, browse, manual.
           Begin where the work is.
         </p>
