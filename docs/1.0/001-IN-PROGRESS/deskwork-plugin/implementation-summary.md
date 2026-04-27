@@ -84,17 +84,16 @@ Booted via `node plugins/deskwork-studio/bundle/server.mjs --project-root
    just under `<contentDir>/scrapbook/`. Out of scope for Phase 16
    — file as a follow-up issue.
 
-2. **Review route doesn't accept hierarchical slugs.**
-   `/dev/editorial-review/the-outbound/characters/strivers` returns 404
-   because the route is `app.get('/dev/editorial-review/:slug', ...)`
-   — Hono's `:slug` matches a single segment. The scrapbook route uses
-   `:path{.+}` to capture multi-segment paths; the review route needs
-   the same treatment. Out of scope for Phase 16 — file as a follow-up
-   issue. Phase 16d's bird's-eye content view will produce review
-   links for hierarchical entries, so the fix is a hard prerequisite
-   for the linked-review experience, but reaches beyond Phase 16's
-   scope (touches client-side review code that assumes single-segment
-   slug encoding).
+2. **Review route doesn't accept hierarchical slugs (fixed during Phase 16b).**
+   `/dev/editorial-review/the-outbound/characters/strivers` originally
+   returned 404 because the route was `app.get('/dev/editorial-review/:slug', ...)`
+   — Hono's `:slug` matches a single segment. Folded into Phase 16b
+   as a small prerequisite: changed the route to `:slug{.+}` (matching
+   the scrapbook route's pattern) and decoded the captured value.
+   Client-side code consumes workflow IDs, not slugs in URLs, so no
+   browser-side change was needed. Without this fix the bird's-eye
+   content view's `→ review` affordances on every hierarchical row
+   would have produced 404s.
 
 3. **writingcontrol's config doesn't represent both content roots.**
    `essays/` and `projects/` are siblings under `src/content/`, but

@@ -25613,9 +25613,9 @@ function createApp(ctx) {
     (c) => c.html(renderShortformPage(ctx, c.req.query("focus") ?? null))
   );
   app.get(
-    "/dev/editorial-review/:slug",
+    "/dev/editorial-review/:slug{.+}",
     async (c) => c.html(
-      await renderReviewPage(ctx, c.req.param("slug"), {
+      await renderReviewPage(ctx, decodeURIComponent(c.req.param("slug")), {
         site: c.req.query("site") ?? null,
         version: c.req.query("v") ?? null,
         kind: c.req.query("kind") ?? null
