@@ -32,8 +32,10 @@ jobs:
       - name: Install + build
         run: npm install
 
+      # --if-present skips workspaces without a 'test' script (plugin
+      # shells ship metadata + wrappers + bundles only).
       - name: Run all tests
-        run: npm --workspaces test
+        run: npm --workspaces --if-present test
 
       - name: Verify bundles match the tagged source
         run: |
