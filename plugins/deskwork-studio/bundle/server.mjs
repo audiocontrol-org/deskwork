@@ -10992,9 +10992,34 @@ function resolveBlogFilePath(projectRoot, config, site, slug, filePath) {
 function resolveBlogPostDir(projectRoot, config, site, slug) {
   return join4(projectRoot, siteConfig(config, site).contentDir, slug);
 }
+function findEntryFile(projectRoot, config, site, entryId, index2, legacyEntryForFallback) {
+  if (entryId !== "") {
+    const idx = index2 ?? buildContentIndex(projectRoot, config, resolveSite(config, site));
+    const hit = idx.byId.get(entryId);
+    if (hit !== void 0) return hit;
+  }
+  if (legacyEntryForFallback !== void 0) {
+    return resolveBlogFilePath(
+      projectRoot,
+      config,
+      site,
+      legacyEntryForFallback.slug
+    );
+  }
+  return void 0;
+}
 
 // ../core/src/review/handlers.ts
 import { existsSync as existsSync3, readFileSync as readFileSync5, writeFileSync as writeFileSync4 } from "node:fs";
+
+// ../core/src/calendar-mutations.ts
+function findEntryById(calendar, id) {
+  if (!id) return void 0;
+  return calendar.entries.find((e) => e.id === id);
+}
+function findEntry(calendar, slug) {
+  return calendar.entries.find((e) => e.slug === slug);
+}
 
 // ../core/src/review/pipeline.ts
 import { randomUUID as randomUUID2 } from "node:crypto";
@@ -11449,11 +11474,20 @@ function handleCreateVersion(projectRoot, config, body3) {
   }
   const diff = lineDiff(before.markdown, d.afterMarkdown);
   if (workflow.contentKind === "longform" || workflow.contentKind === "outline") {
-    const blogFile = resolveBlogFilePath(projectRoot, config, workflow.site, workflow.slug);
-    if (!existsSync3(blogFile)) {
+    const blogFile = resolveWorkflowFilePath(
+      projectRoot,
+      config,
+      workflow.site,
+      workflow.slug,
+      {
+        ...workflow.entryId !== void 0 ? { entryId: workflow.entryId } : {}
+      }
+    );
+    if (blogFile === void 0 || !existsSync3(blogFile)) {
+      const shown = blogFile ?? "(unresolved)";
       return err(
         500,
-        `cannot save: blog file missing at ${blogFile}. Scaffold the post with /deskwork:outline before saving edits.`
+        `cannot save: blog file missing at ${shown}. Scaffold the post with /deskwork:outline before saving edits.`
       );
     }
     writeFileSync4(blogFile, d.afterMarkdown, "utf-8");
@@ -11482,15 +11516,21 @@ function handleStartLongform(projectRoot, config, body3) {
   if (!SLUG_RE.test(b.slug)) {
     return err(400, `invalid slug: ${b.slug}. Must match ${SLUG_RE}`);
   }
-  const path = resolveBlogFilePath(projectRoot, config, b.site, b.slug);
-  if (!existsSync3(path)) {
-    return err(404, `blog draft not found at ${path}`);
+  const callerEntryId = b.entryId !== void 0 && b.entryId !== "" ? b.entryId : void 0;
+  const entry = lookupEntry(projectRoot, config, b.site, {
+    ...callerEntryId !== void 0 ? { entryId: callerEntryId } : {},
+    slug: b.slug
+  });
+  const entryId = callerEntryId ?? entry?.id;
+  const path = resolveWorkflowFilePath(projectRoot, config, b.site, b.slug, {
+    ...entryId !== void 0 ? { entryId } : {},
+    ...entry !== void 0 ? { entry } : {}
+  });
+  if (path === void 0 || !existsSync3(path)) {
+    const shown = path ?? "(unresolved)";
+    return err(404, `blog draft not found at ${shown}`);
   }
   const markdown = readFileSync5(path, "utf-8");
-  let entryId = b.entryId;
-  if (entryId === void 0 || entryId === "") {
-    entryId = lookupEntryIdBySlug(projectRoot, config, b.site, b.slug);
-  }
   const before = readWorkflows(projectRoot, config).find((w) => {
     const identityMatch = entryId && w.entryId ? w.entryId === entryId : w.site === b.site && w.slug === b.slug;
     return identityMatch && w.contentKind === "longform" && w.state !== "applied" && w.state !== "cancelled";
@@ -11505,16 +11545,47 @@ function handleStartLongform(projectRoot, config, body3) {
   });
   return ok({ workflow, existing: !!before && before.id === workflow.id });
 }
-function lookupEntryIdBySlug(projectRoot, config, site, slug) {
+function lookupEntry(projectRoot, config, site, match2) {
   try {
     const calendarPath = resolveCalendarPath(projectRoot, config, site);
     if (!existsSync3(calendarPath)) return void 0;
     const cal = readCalendar(calendarPath);
-    const entry = cal.entries.find((e) => e.slug === slug);
-    return entry?.id;
+    if (match2.entryId !== void 0 && match2.entryId !== "") {
+      const byId = findEntryById(cal, match2.entryId);
+      if (byId !== void 0) return byId;
+    }
+    if (match2.slug !== void 0 && match2.slug !== "") {
+      return findEntry(cal, match2.slug);
+    }
+    return void 0;
   } catch {
     return void 0;
   }
+}
+function resolveWorkflowFilePath(projectRoot, config, site, slug, hint) {
+  let entry = hint.entry;
+  let entryId = hint.entryId;
+  if (entry === void 0 && (entryId === void 0 || entryId === "")) {
+    entry = lookupEntry(projectRoot, config, site, { slug });
+    entryId = entry?.id;
+  } else if (entry === void 0 && entryId !== void 0) {
+    entry = lookupEntry(projectRoot, config, site, { entryId });
+  } else if (entryId === void 0 || entryId === "") {
+    entryId = entry?.id;
+  }
+  if (entryId !== void 0 && entryId !== "") {
+    const idx = hint.index ?? buildContentIndex(projectRoot, config, site);
+    const fromIndex = findEntryFile(
+      projectRoot,
+      config,
+      site,
+      entryId,
+      idx,
+      entry !== void 0 ? { slug: entry.slug } : { slug }
+    );
+    if (fromIndex !== void 0) return fromIndex;
+  }
+  return resolveBlogFilePath(projectRoot, config, site, slug);
 }
 function lineDiff(a, b) {
   const aLines = a.split("\n");
@@ -24397,7 +24468,8 @@ function blogPreviewLink(site, slug, host, entry) {
   const key2 = entry.id ?? slug;
   return `/dev/editorial-review/${key2}?site=${site}`;
 }
-function loadDashboardData(ctx) {
+function loadDashboardData(ctx, getIndex) {
+  void getIndex;
   const calendarEntries = [];
   const distributions = [];
   const slugsBySite = {};
@@ -24463,10 +24535,21 @@ function loadDashboardData(ctx) {
     report
   };
 }
-function entryBodyStateOf(ctx, site, entry) {
+function entryBodyStateOf(ctx, site, entry, getIndex) {
   if (!hasRepoContent(effectiveContentType(entry))) return "missing";
-  const path = resolveBlogFilePath(ctx.projectRoot, ctx.config, site, entry.slug);
-  return bodyState(path);
+  if (entry.id !== void 0 && entry.id !== "" && getIndex) {
+    const path = findEntryFile(
+      ctx.projectRoot,
+      ctx.config,
+      site,
+      entry.id,
+      getIndex(site),
+      { slug: entry.slug }
+    );
+    if (path !== void 0) return bodyState(path);
+  }
+  const fallback = resolveBlogFilePath(ctx.projectRoot, ctx.config, site, entry.slug);
+  return bodyState(fallback);
 }
 function findStageWorkflow(data, site, entry, stage) {
   const list3 = data.activeBySitedSlug.get(covKey(site, entry.slug, entry.id)) ?? [];
@@ -24635,10 +24718,10 @@ function renderRowActions(site, entry, stage, hasFile, bodyWritten, wf) {
   }
   return unsafe(`<span class="er-calendar-action">${buttons.join("")}</span>`);
 }
-function renderRow(ctx, data, sited, stage, index2) {
+function renderRow(ctx, data, sited, stage, index2, getIndex) {
   const { site, entry } = sited;
   const kind = effectiveContentType(entry);
-  const body3 = entryBodyStateOf(ctx, site, entry);
+  const body3 = entryBodyStateOf(ctx, site, entry, getIndex);
   const hasFile = body3 !== "missing";
   const bodyWritten = body3 === "written";
   const wf = findStageWorkflow(data, site, entry, stage);
@@ -24690,7 +24773,7 @@ function renderRow(ctx, data, sited, stage, index2) {
       ${renameForm}
     </div>`);
 }
-function renderStageSection(ctx, data, stage, entries, sites) {
+function renderStageSection(ctx, data, stage, entries, sites, getIndex) {
   const intakeBlock = stage === "Ideas" ? unsafe(html6`
         <div class="er-intake-form" data-intake-form hidden>
           <p class="er-intake-hint">
@@ -24736,7 +24819,7 @@ function renderStageSection(ctx, data, stage, entries, sites) {
   const body3 = entries.length === 0 ? unsafe(html6`<div class="er-empty" style="padding: 1rem 0.25rem; font-size: 0.95rem;">
           ${STAGE_EMPTY_MESSAGES[stage]}
         </div>`) : unsafe(
-    entries.map((e, i) => renderRow(ctx, data, e, stage, i).__raw).join("")
+    entries.map((e, i) => renderRow(ctx, data, e, stage, i, getIndex).__raw).join("")
   );
   return unsafe(html6`
     <section class="er-section" data-stage-section="${stage}">
@@ -24884,9 +24967,9 @@ function renderSidebar(data) {
       </section>
     </aside>`);
 }
-function renderDashboard(ctx) {
+function renderDashboard(ctx, getIndex) {
   const sites = Object.keys(ctx.config.sites);
-  const data = loadDashboardData(ctx);
+  const data = loadDashboardData(ctx, getIndex);
   const now = ctx.now ? ctx.now() : /* @__PURE__ */ new Date();
   const stageSections = STAGES.map((stage) => {
     const stageEntries = data.calendarEntries.filter((e) => e.entry.stage === stage).sort((a, b) => {
@@ -24894,7 +24977,7 @@ function renderDashboard(ctx) {
       if (siteCmp !== 0) return siteCmp;
       return a.entry.slug.localeCompare(b.entry.slug);
     });
-    return renderStageSection(ctx, data, stage, stageEntries, sites).__raw;
+    return renderStageSection(ctx, data, stage, stageEntries, sites, getIndex).__raw;
   }).join("\n");
   const body3 = html6`
   ${renderEditorialFolio("dashboard", "press-check")}
@@ -26459,6 +26542,7 @@ function idBoundFile(entry, index2) {
 }
 
 // ../core/src/content-tree.ts
+var WARNED_LEGACY_FALLBACK = /* @__PURE__ */ new Set();
 function buildContentTree(site, entries, config, projectRoot, options = {}) {
   const lookup = options.scrapbookLookup ?? ((siteArg, path) => {
     try {
@@ -26494,9 +26578,13 @@ function buildContentTree(site, entries, config, projectRoot, options = {}) {
       overlayByPath.set(entry.slug, entry);
       allPaths.add(entry.slug);
       for (const a of ancestorsOf(entry.slug)) allPaths.add(a);
-      warn(
-        `[content-tree] Calendar entry "${entry.slug}" matched fs node by slug (no frontmatter id binding). Run \`deskwork doctor --fix=missing-frontmatter-id\` to make this binding refactor-proof.`
-      );
+      const dedupKey = `${site}:${entry.id ?? entry.slug}`;
+      if (!WARNED_LEGACY_FALLBACK.has(dedupKey)) {
+        WARNED_LEGACY_FALLBACK.add(dedupKey);
+        warn(
+          `[content-tree] Calendar entry "${entry.slug}" matched fs node by slug (no frontmatter id binding). Run \`deskwork doctor --fix=missing-frontmatter-id\` to make this binding refactor-proof.`
+        );
+      }
       continue;
     }
     allPaths.add(entry.slug);
@@ -27529,7 +27617,10 @@ function createApp(ctx) {
   app.route("/api/dev/editorial-review", createApiRouter(ctx));
   app.get("/dev", (c) => c.html(renderStudioIndex(ctx)));
   app.get("/dev/", (c) => c.html(renderStudioIndex(ctx)));
-  app.get("/dev/editorial-studio", (c) => c.html(renderDashboard(ctx)));
+  app.get("/dev/editorial-studio", (c) => {
+    const getIndex = (site) => getRequestContentIndex(c, ctx, site);
+    return c.html(renderDashboard(ctx, getIndex));
+  });
   app.get("/dev/editorial-help", (c) => c.html(renderHelpPage(ctx)));
   app.get(
     "/dev/editorial-review-shortform",

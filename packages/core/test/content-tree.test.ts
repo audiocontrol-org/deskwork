@@ -10,8 +10,9 @@
  * overlaid on the node (display attribute, not structural identity).
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
+  __resetLegacyFallbackWarnings,
   buildContentTree,
   findNode,
   flattenForRender,
@@ -545,6 +546,14 @@ describe('buildContentTree — frontmatter id binding (Phase 19c)', () => {
     expect(project.root.lane).toBe('Published');
   });
 
+  // The legacy-fallback warning Set is process-level — reset it before
+  // each scenario in this block so warning-count assertions don't leak
+  // across tests. The reset helper is exported test-only from
+  // content-tree.ts; documented at its definition.
+  beforeEach(() => {
+    __resetLegacyFallbackWarnings();
+  });
+
   // Scenario (c) — pre-doctor legacy fallback. The calendar entry has
   // an id but no file's frontmatter has been bound yet. The fs walk
   // surfaces a directory at the slug-equals-path location. Tree
@@ -616,5 +625,57 @@ describe('buildContentTree — frontmatter id binding (Phase 19c)', () => {
     const ghost = projects.find((p) => p.rootSlug === 'the-outbound');
     expect(ghost?.root.entry?.title).toBe('The Outbound');
     expect(ghost?.root.hasFsDir).toBe(false);
+  });
+
+  // Scenario (e) — the studio polls the dashboard at ~10s intervals,
+  // calling `buildContentTree` on every render. Pre-doctor entries that
+  // legitimately fall through to slug-fallback should warn ONCE per
+  // process, not on every render. (S2 review fix.)
+  it('legacy slug-fallback warning fires once per (site, entry), not per call', () => {
+    const entryId = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+    const entries = [
+      entry({
+        id: entryId,
+        slug: 'recurring-warner',
+        title: 'Recurring Warner',
+        stage: 'Drafting',
+      }),
+    ];
+    const fs: FsWalkEntry[] = [
+      {
+        slug: 'recurring-warner',
+        hasIndex: true,
+        hasReadme: false,
+        title: 'Recurring Warner',
+      },
+    ];
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {
+      /* swallow */
+    });
+    try {
+      // First call — uses default warn (console.warn) so we exercise
+      // the same path the studio takes. Should warn exactly once.
+      buildContentTree('wc', entries, makeConfig(), '/tmp/x', {
+        scrapbookLookup: emptyLookup,
+        fsWalk: () => fs,
+        contentIndex: emptyIndex,
+      });
+      expect(consoleWarn).toHaveBeenCalledTimes(1);
+
+      // Subsequent renders should be silent for the same (site, entry).
+      buildContentTree('wc', entries, makeConfig(), '/tmp/x', {
+        scrapbookLookup: emptyLookup,
+        fsWalk: () => fs,
+        contentIndex: emptyIndex,
+      });
+      buildContentTree('wc', entries, makeConfig(), '/tmp/x', {
+        scrapbookLookup: emptyLookup,
+        fsWalk: () => fs,
+        contentIndex: emptyIndex,
+      });
+      expect(consoleWarn).toHaveBeenCalledTimes(1);
+    } finally {
+      consoleWarn.mockRestore();
+    }
   });
 });

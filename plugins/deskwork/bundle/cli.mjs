@@ -8777,6 +8777,8 @@ var init_handlers = __esm({
     "use strict";
     init_paths();
     init_calendar();
+    init_calendar_mutations();
+    init_content_index();
     init_pipeline();
   }
 });

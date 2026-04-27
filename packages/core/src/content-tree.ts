@@ -80,6 +80,32 @@ export type {
 } from './content-tree-types.ts';
 
 // ---------------------------------------------------------------------------
+// Legacy slug-fallback warning de-duplication
+// ---------------------------------------------------------------------------
+//
+// `buildContentTree` is called on every studio render (the dashboard polls
+// at ~10s intervals). Pre-doctor entries that legitimately fall through to
+// slug-as-path matching would otherwise emit the same warning hundreds of
+// times an hour. Track which (site, entryId|slug) pairs have already
+// warned this process and skip subsequent warnings.
+//
+// The Set lives at module scope on purpose — it intentionally outlives any
+// single request. Tests that need fresh warning behavior should call the
+// `__resetLegacyFallbackWarnings()` helper below in `beforeEach`.
+
+const WARNED_LEGACY_FALLBACK: Set<string> = new Set();
+
+/**
+ * Test-only: clear the legacy slug-fallback warning de-dup set so tests
+ * that exercise warning behavior can do so independently. Not part of the
+ * public API — exposed only because process-level state is awkward to
+ * reset from inside tests without a hook.
+ */
+export function __resetLegacyFallbackWarnings(): void {
+  WARNED_LEGACY_FALLBACK.clear();
+}
+
+// ---------------------------------------------------------------------------
 // Build
 // ---------------------------------------------------------------------------
 
@@ -169,11 +195,18 @@ export function buildContentTree(
       overlayByPath.set(entry.slug, entry);
       allPaths.add(entry.slug);
       for (const a of ancestorsOf(entry.slug)) allPaths.add(a);
-      warn(
-        `[content-tree] Calendar entry "${entry.slug}" matched fs node by slug ` +
-          `(no frontmatter id binding). Run \`deskwork doctor --fix=missing-frontmatter-id\` ` +
-          `to make this binding refactor-proof.`,
-      );
+      // De-dup the warning per process — without this the studio's polled
+      // dashboard re-emits the same warning on every render. Key by
+      // (site, entryId | slug) so a renamed slug warns again.
+      const dedupKey = `${site}:${entry.id ?? entry.slug}`;
+      if (!WARNED_LEGACY_FALLBACK.has(dedupKey)) {
+        WARNED_LEGACY_FALLBACK.add(dedupKey);
+        warn(
+          `[content-tree] Calendar entry "${entry.slug}" matched fs node by slug ` +
+            `(no frontmatter id binding). Run \`deskwork doctor --fix=missing-frontmatter-id\` ` +
+            `to make this binding refactor-proof.`,
+        );
+      }
       continue;
     }
     // Ghost: entry exists but has no fs counterpart at slug-equals-path

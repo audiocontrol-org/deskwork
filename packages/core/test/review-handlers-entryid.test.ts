@@ -16,13 +16,18 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { writeCalendar } from '../src/calendar.ts';
-import { handleStartLongform, handleGetWorkflow } from '../src/review/handlers.ts';
+import {
+  handleCreateVersion,
+  handleStartLongform,
+  handleGetWorkflow,
+} from '../src/review/handlers.ts';
 import { createWorkflow, readWorkflows } from '../src/review/pipeline.ts';
 import type { DeskworkConfig } from '../src/config.ts';
 import type { CalendarEntry, EditorialCalendar } from '../src/types.ts';
@@ -208,5 +213,160 @@ describe('review handlers — entryId propagation (Phase 19d)', () => {
     // And the workflow store contains exactly one item.
     const all = readWorkflows(root, cfg);
     expect(all.filter((w) => w.slug === 'idem')).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 19c S8 — handlers must consult the content index, not just the
+// slug-template. Writingcontrol-shape: calendar slug is the public Astro
+// URL (`the-outbound`), file lives at `projects/the-outbound/index.md`,
+// frontmatter `id:` binds them. Pre-S8 the handlers called
+// `resolveBlogFilePath` directly, which only knows the slug-template
+// path — for writingcontrol that path doesn't exist on disk and the
+// handler 404s. Post-S8 the handler resolves via the content index
+// first, falling back to the template only when no id binding exists.
+// ---------------------------------------------------------------------------
+
+const WC_ENTRY_ID = 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff';
+
+function wcConfig(): DeskworkConfig {
+  return {
+    version: 1,
+    sites: {
+      wc: {
+        host: 'wc.example',
+        contentDir: 'src/content/projects',
+        calendarPath: 'docs/cal-wc.md',
+        // Default `{slug}/index.md` template — for slug `the-outbound`
+        // that resolves to `<contentDir>/the-outbound/index.md`, NOT
+        // `<contentDir>/projects/the-outbound/index.md`.
+      },
+    },
+    defaultSite: 'wc',
+  };
+}
+
+function seedWcCalendar(root: string, cfg: DeskworkConfig, e: CalendarEntry) {
+  const cal: EditorialCalendar = { entries: [e], distributions: [] };
+  const calendarPath = join(root, cfg.sites.wc.calendarPath);
+  mkdirSync(join(root, 'docs'), { recursive: true });
+  writeCalendar(calendarPath, cal);
+}
+
+/**
+ * Seed a writingcontrol-shape blog file: under
+ * `<contentDir>/projects/<slug>/index.md` with frontmatter `id:`
+ * matching the entry's UUID. Slug-template resolution would point to
+ * `<contentDir>/<slug>/index.md` instead — the wrong path.
+ */
+function seedWcBlog(
+  root: string,
+  cfg: DeskworkConfig,
+  slug: string,
+  entryId: string,
+  body: string,
+): string {
+  const file = join(
+    root,
+    cfg.sites.wc.contentDir,
+    'projects',
+    slug,
+    'index.md',
+  );
+  mkdirSync(join(file, '..'), { recursive: true });
+  const content = `---\nid: ${entryId}\ntitle: The Outbound\n---\n\n${body}`;
+  writeFileSync(file, content, 'utf-8');
+  return file;
+}
+
+describe('review handlers — writingcontrol-shape index lookup (Phase 19c S8)', () => {
+  let root: string;
+  let cfg: DeskworkConfig;
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'deskwork-handlers-wc-'));
+    cfg = wcConfig();
+  });
+
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('handleStartLongform resolves the file via the content index when slug != fs path', () => {
+    seedWcCalendar(
+      root,
+      cfg,
+      entry({
+        id: WC_ENTRY_ID,
+        slug: 'the-outbound',
+        title: 'The Outbound',
+      }),
+    );
+    const filePath = seedWcBlog(
+      root,
+      cfg,
+      'the-outbound',
+      WC_ENTRY_ID,
+      'Body of the outbound.\n',
+    );
+
+    const r = handleStartLongform(root, cfg, {
+      site: 'wc',
+      slug: 'the-outbound',
+    });
+    // Pre-S8 this would 404 because resolveBlogFilePath returns
+    // `<contentDir>/the-outbound/index.md` which doesn't exist.
+    expect(r.status).toBe(200);
+    const body = r.body as { workflow: { entryId?: string; slug: string } };
+    expect(body.workflow.slug).toBe('the-outbound');
+    expect(body.workflow.entryId).toBe(WC_ENTRY_ID);
+
+    // Verify the workflow's initial markdown actually came from the
+    // index-bound file (not some other path).
+    const fileContent = readFileSync(filePath, 'utf-8');
+    expect(fileContent).toContain('Body of the outbound.');
+  });
+
+  it('handleCreateVersion writes back to the index-bound file, not the template path', () => {
+    // Seed calendar + blog at writingcontrol path, create the workflow
+    // (with entryId stamped) directly so we control the initial state.
+    seedWcCalendar(
+      root,
+      cfg,
+      entry({
+        id: WC_ENTRY_ID,
+        slug: 'the-outbound',
+        title: 'The Outbound',
+      }),
+    );
+    const filePath = seedWcBlog(
+      root,
+      cfg,
+      'the-outbound',
+      WC_ENTRY_ID,
+      'Initial body.\n',
+    );
+    const initialMarkdown = readFileSync(filePath, 'utf-8');
+    const workflow = createWorkflow(root, cfg, {
+      entryId: WC_ENTRY_ID,
+      site: 'wc',
+      slug: 'the-outbound',
+      contentKind: 'longform',
+      initialMarkdown,
+    });
+
+    // Operator submits an edit. The handler must write to the
+    // frontmatter-bound path, not `<contentDir>/the-outbound/index.md`.
+    const editedMarkdown = `${initialMarkdown}\nA new paragraph from the operator.\n`;
+    const r = handleCreateVersion(root, cfg, {
+      workflowId: workflow.id,
+      beforeVersion: 1,
+      afterMarkdown: editedMarkdown,
+    });
+    expect(r.status).toBe(200);
+
+    // The actual file on disk got the edit.
+    const after = readFileSync(filePath, 'utf-8');
+    expect(after).toBe(editedMarkdown);
   });
 });

@@ -243,7 +243,10 @@ export function createApp(ctx: StudioContext): Hono {
   // Page routes
   app.get('/dev', (c) => c.html(renderStudioIndex(ctx)));
   app.get('/dev/', (c) => c.html(renderStudioIndex(ctx)));
-  app.get('/dev/editorial-studio', (c) => c.html(renderDashboard(ctx)));
+  app.get('/dev/editorial-studio', (c) => {
+    const getIndex = (site: string) => getRequestContentIndex(c, ctx, site);
+    return c.html(renderDashboard(ctx, getIndex));
+  });
   app.get('/dev/editorial-help', (c) => c.html(renderHelpPage(ctx)));
   app.get('/dev/editorial-review-shortform', (c) =>
     c.html(renderShortformPage(ctx, c.req.query('focus') ?? null)),

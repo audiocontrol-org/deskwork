@@ -38,11 +38,25 @@ import {
   type Platform,
   type Stage,
 } from '@deskwork/core/types';
-import { resolveCalendarPath, resolveBlogFilePath } from '@deskwork/core/paths';
+import {
+  resolveCalendarPath,
+  resolveBlogFilePath,
+  findEntryFile,
+} from '@deskwork/core/paths';
+import type { ContentIndex } from '@deskwork/core/content-index';
 import type { StudioContext } from '../routes/api.ts';
 import { html, unsafe, type RawHtml } from './html.ts';
 import { layout } from './layout.ts';
 import { renderEditorialFolio } from './chrome.ts';
+
+/**
+ * Per-request content-index getter. The route layer wires this to the
+ * Hono context's memoized cache so a single dashboard render only
+ * builds the index once per site even though many entries call
+ * `entryBodyStateOf`. When omitted (e.g., a non-route caller), the
+ * dashboard falls back to the slug-template path.
+ */
+export type DashboardIndexGetter = (site: string) => ContentIndex;
 
 interface SitedEntry {
   site: string;
@@ -161,7 +175,15 @@ interface DashboardData {
   report: ReviewReport;
 }
 
-function loadDashboardData(ctx: StudioContext): DashboardData {
+function loadDashboardData(
+  ctx: StudioContext,
+  getIndex?: DashboardIndexGetter,
+): DashboardData {
+  // `getIndex` is currently consumed downstream by renderRow →
+  // entryBodyStateOf, not here. Threading it through keeps the call
+  // signature symmetric with renderDashboard and leaves room for
+  // future load-time uses (e.g., joining workflows by entry id).
+  void getIndex;
   const calendarEntries: SitedEntry[] = [];
   const distributions: SitedDistribution[] = [];
   const slugsBySite: Record<string, string[]> = {};
@@ -248,10 +270,29 @@ function entryBodyStateOf(
   ctx: StudioContext,
   site: string,
   entry: CalendarEntry,
+  getIndex?: DashboardIndexGetter,
 ): BodyState {
   if (!hasRepoContent(effectiveContentType(entry))) return 'missing';
-  const path = resolveBlogFilePath(ctx.projectRoot, ctx.config, site, entry.slug);
-  return bodyState(path);
+  // When the entry has a stable id AND the route layer wired in a
+  // per-request index getter, use the id-driven content-index lookup
+  // — this matches files whose path doesn't follow the slug template
+  // (e.g., writingcontrol-shape projects where slug `the-outbound`
+  // resolves to `projects/the-outbound/index.md` while the calendar
+  // slug doesn't bake the path). Without an id or getter, fall back
+  // to the slug-template behavior so non-route callers still work.
+  if (entry.id !== undefined && entry.id !== '' && getIndex) {
+    const path = findEntryFile(
+      ctx.projectRoot,
+      ctx.config,
+      site,
+      entry.id,
+      getIndex(site),
+      { slug: entry.slug },
+    );
+    if (path !== undefined) return bodyState(path);
+  }
+  const fallback = resolveBlogFilePath(ctx.projectRoot, ctx.config, site, entry.slug);
+  return bodyState(fallback);
 }
 
 function findStageWorkflow(
@@ -473,10 +514,11 @@ function renderRow(
   sited: SitedEntry,
   stage: Stage,
   index: number,
+  getIndex?: DashboardIndexGetter,
 ): RawHtml {
   const { site, entry } = sited;
   const kind = effectiveContentType(entry);
-  const body = entryBodyStateOf(ctx, site, entry);
+  const body = entryBodyStateOf(ctx, site, entry, getIndex);
   const hasFile = body !== 'missing';
   const bodyWritten = body === 'written';
   const wf = findStageWorkflow(data, site, entry, stage);
@@ -567,6 +609,7 @@ function renderStageSection(
   stage: Stage,
   entries: SitedEntry[],
   sites: readonly string[],
+  getIndex?: DashboardIndexGetter,
 ): RawHtml {
   const intakeBlock =
     stage === 'Ideas'
@@ -625,7 +668,7 @@ function renderStageSection(
         </div>`)
       : unsafe(
           entries
-            .map((e, i) => renderRow(ctx, data, e, stage, i).__raw)
+            .map((e, i) => renderRow(ctx, data, e, stage, i, getIndex).__raw)
             .join(''),
         );
 
@@ -814,9 +857,12 @@ function renderSidebar(data: DashboardData): RawHtml {
 // Entry point
 // ---------------------------------------------------------------------------
 
-export function renderDashboard(ctx: StudioContext): string {
+export function renderDashboard(
+  ctx: StudioContext,
+  getIndex?: DashboardIndexGetter,
+): string {
   const sites = Object.keys(ctx.config.sites);
-  const data = loadDashboardData(ctx);
+  const data = loadDashboardData(ctx, getIndex);
   const now = ctx.now ? ctx.now() : new Date();
 
   const stageSections = STAGES.map((stage) => {
@@ -831,7 +877,7 @@ export function renderDashboard(ctx: StudioContext): string {
         if (siteCmp !== 0) return siteCmp;
         return a.entry.slug.localeCompare(b.entry.slug);
       });
-    return renderStageSection(ctx, data, stage, stageEntries, sites).__raw;
+    return renderStageSection(ctx, data, stage, stageEntries, sites, getIndex).__raw;
   }).join('\n');
 
   const body = html`
