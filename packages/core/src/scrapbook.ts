@@ -315,6 +315,25 @@ export function listScrapbook(
   slug: string,
 ): ScrapbookSummary {
   const dir = scrapbookDir(projectRoot, config, site, slug);
+  return listScrapbookAtDir(site, slug, dir);
+}
+
+/**
+ * List a scrapbook by absolute directory path. Used by callers that
+ * have already resolved the on-disk path via `scrapbookDirForEntry`
+ * (id-driven) or `scrapbookDirAtPath` (fs-path-driven) and don't want
+ * to re-derive through the slug template. The `slug` parameter is only
+ * used to populate the returned summary's identifier field — it does
+ * not influence path resolution.
+ *
+ * Internal primitive shared by `listScrapbook` (slug-based) and
+ * `listScrapbookForEntry` (id-driven).
+ */
+export function listScrapbookAtDir(
+  site: string,
+  slug: string,
+  dir: string,
+): ScrapbookSummary {
   if (!existsSync(dir)) {
     return { site, slug, dir, exists: false, items: [], secretItems: [] };
   }
@@ -322,6 +341,34 @@ export function listScrapbook(
   const secretDir = join(dir, SECRET_SUBDIR);
   const secretItems = existsSync(secretDir) ? listFilesInDir(secretDir) : [];
   return { site, slug, dir, exists: true, items, secretItems };
+}
+
+/**
+ * List scrapbook items for a tracked calendar entry. Resolves the
+ * scrapbook directory via the content index when available (id binding),
+ * falling back to slug-based addressing for entries that haven't been
+ * bound to frontmatter yet (pre-doctor state).
+ *
+ * Mirrors the shape of `countScrapbookForEntry`. Used by the studio
+ * review-page drawer + content-detail panel so writingcontrol-shape
+ * entries (where the file path diverges from the slug template) list
+ * items at the correct on-disk location.
+ *
+ * @param entry Calendar entry — `id` preferred; `slug` is both the
+ *              legacy fallback and the disambiguator the underlying
+ *              resolver uses when the index is incomplete.
+ * @param index Optional pre-built per-request index. When omitted, the
+ *              resolver builds one on demand.
+ */
+export function listScrapbookForEntry(
+  projectRoot: string,
+  config: DeskworkConfig,
+  site: string,
+  entry: { id?: string; slug: string },
+  index?: ContentIndex,
+): ScrapbookSummary {
+  const dir = scrapbookDirForEntry(projectRoot, config, site, entry, index);
+  return listScrapbookAtDir(site, entry.slug, dir);
 }
 
 /** Internal helper — list files (not subdirs/dotfiles) at a given path. */

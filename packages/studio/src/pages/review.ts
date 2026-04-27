@@ -30,22 +30,28 @@ import {
   parseDraftFrontmatter,
   renderMarkdownToHtml,
 } from '@deskwork/core/review/render';
-import { listScrapbook, type ScrapbookItem } from '@deskwork/core/scrapbook';
+import { readCalendar } from '@deskwork/core/calendar';
+import { findEntry, findEntryById } from '@deskwork/core/calendar-mutations';
+import type { CalendarEntry } from '@deskwork/core/types';
+import type { ContentIndex } from '@deskwork/core/content-index';
 import { splitOutline } from '../../../../plugins/deskwork-studio/public/src/outline-split.ts';
 import type { StudioContext } from '../routes/api.ts';
 import { html, unsafe, type RawHtml } from './html.ts';
 import { layout } from './layout.ts';
 import { renderEditorialFolio } from './chrome.ts';
 import { escapeHtml } from './html.ts';
-import {
-  renderEmptyScrapbookRow,
-  renderReadOnlyScrapbookRow,
-  scrapbookViewerUrl,
-  type InlineTextLoader,
-} from '../components/scrapbook-item.ts';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { resolveContentDir } from '@deskwork/core/paths';
+import { renderScrapbookDrawer } from './review-scrapbook-drawer.ts';
+import { existsSync } from 'node:fs';
+import { resolveCalendarPath } from '@deskwork/core/paths';
+
+/**
+ * Per-request content-index getter. The route layer wires this to the
+ * Hono context's memoized cache so a single review render only builds
+ * the index once per site even though both the inline-text loader and
+ * the scrapbook drawer ask for it. When omitted, callers fall back to
+ * slug-template path resolution.
+ */
+export type ReviewIndexGetter = (site: string) => ContentIndex;
 
 interface ReviewQuery {
   /** ?site=<slug> override; null falls back to config.defaultSite. */
@@ -313,104 +319,40 @@ function renderOutlineDrawer(outlineHtml: string): RawHtml {
 }
 
 /**
- * Build an inline-text loader for the shared scrapbook-item renderer.
- * Reads at most `maxBytes` from the file at `<contentDir>/<slug>/scrapbook/<name>`
- * and returns the bytes decoded as UTF-8. Returns null when the file
- * isn't readable as text — the renderer falls back to a download link.
+ * Resolve the calendar entry that backs this review surface. Callers
+ * have either an `entryId` (id-canonical route) or a slug (legacy
+ * route) to work with. Returns `null` when no calendar entry matches —
+ * ad-hoc workflows + pre-doctor entries fall through to the slug-
+ * template legacy path elsewhere.
+ *
+ * Failures (calendar absent, parse error) are swallowed to null so a
+ * transient calendar issue never blocks the review render.
  */
-function makeInlineTextLoader(
+function lookupReviewEntry(
   ctx: StudioContext,
   site: string,
-  slug: string,
-): InlineTextLoader {
-  const contentDir = resolveContentDir(ctx.projectRoot, ctx.config, site);
-  const scrapbookDir = join(contentDir, slug, 'scrapbook');
-  return (filename, maxBytes) => {
-    try {
-      const buf = readFileSync(join(scrapbookDir, filename));
-      const slice = buf.subarray(0, Math.min(buf.byteLength, maxBytes));
-      return slice.toString('utf-8');
-    } catch {
-      return null;
+  lookup: ReviewLookup,
+): CalendarEntry | null {
+  try {
+    const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
+    if (!existsSync(calendarPath)) return null;
+    const cal = readCalendar(calendarPath);
+    if (lookup.kind === 'id') {
+      const byId = findEntryById(cal, lookup.entryId);
+      if (byId !== undefined) return byId;
     }
-  };
-}
-
-function renderScrapbookDrawerItems(
-  site: string,
-  slug: string,
-  items: readonly ScrapbookItem[],
-  loader: InlineTextLoader,
-): RawHtml {
-  if (items.length === 0) {
-    return renderEmptyScrapbookRow();
+    const bySlug = findEntry(cal, lookup.slug);
+    return bySlug ?? null;
+  } catch {
+    return null;
   }
-  const rows = items.map((item) =>
-    renderReadOnlyScrapbookRow(
-      { site, path: slug },
-      item,
-      { inlinePreviewLoader: loader },
-    ),
-  );
-  return unsafe(rows.map((r) => r.__raw).join(''));
-}
-
-/**
- * Scrapbook drawer for the review surface — shows the IMMEDIATE node's
- * scrapbook (no ancestors) per Phase 16c. Always visible: an empty
- * scrapbook still renders the section so the operator sees the
- * affordance for this node.
- */
-function renderScrapbookDrawer(
-  ctx: StudioContext,
-  site: string,
-  slug: string,
-): RawHtml {
-  const summary = (() => {
-    try {
-      return listScrapbook(ctx.projectRoot, ctx.config, site, slug);
-    } catch {
-      // listScrapbook validates the slug; an invalid slug shouldn't
-      // tank the whole review page. Treat as empty drawer + log via
-      // the unobtrusive empty state.
-      return null;
-    }
-  })();
-
-  const items = summary?.items ?? [];
-  const secretItems = summary?.secretItems ?? [];
-  const total = items.length + secretItems.length;
-  const loader = makeInlineTextLoader(ctx, site, slug);
-
-  return unsafe(html`
-    <aside class="er-scrapbook-drawer" data-scrapbook-drawer aria-label="Scrapbook for this entry">
-      <header class="er-scrapbook-drawer-head">
-        <span class="er-scrapbook-drawer-kicker">§ Scrapbook</span>
-        <span class="er-scrapbook-drawer-count">${total} ${total === 1 ? 'item' : 'items'}</span>
-        <a class="er-scrapbook-drawer-open" href="${scrapbookViewerUrl({ site, path: slug })}"
-          title="Open the standalone scrapbook viewer">open ↗</a>
-      </header>
-      <div class="er-scrapbook-drawer-body">
-        ${renderScrapbookDrawerItems(site, slug, items, loader)}
-        ${
-          secretItems.length > 0
-            ? unsafe(html`
-                <div class="er-scrapbook-drawer-secret">
-                  <p class="er-scrapbook-drawer-secret-head">
-                    <span aria-hidden="true">⚿</span> secret · ${secretItems.length}
-                  </p>
-                  ${renderScrapbookDrawerItems(site, slug, secretItems, loader)}
-                </div>`)
-            : ''
-        }
-      </div>
-    </aside>`);
 }
 
 export async function renderReviewPage(
   ctx: StudioContext,
   lookup: ReviewLookup,
   query: ReviewQuery,
+  getIndex?: ReviewIndexGetter,
 ): Promise<string> {
   const site = pickSite(ctx, query.site);
   const contentKind = pickContentKind(query.kind ?? null);
@@ -453,6 +395,13 @@ export async function renderReviewPage(
 
   const titleField = stringField(fm.title) ?? `Draft: ${slug}`;
 
+  // Phase 19c+: look up the calendar entry so the scrapbook drawer +
+  // inline-text loader can resolve the on-disk scrapbook directory via
+  // the content index when a frontmatter-id binding exists. Falls back
+  // to slug-template addressing when no entry / no id is present.
+  const reviewEntry = lookupReviewEntry(ctx, site, lookup);
+  const reviewIndex = getIndex ? getIndex(site) : undefined;
+
   const body = html`
     <div data-review-ui="longform" class="er-review-shell">
       ${renderEditorialFolio('reviews', `longform · ${workflow.slug}`)}
@@ -477,7 +426,7 @@ export async function renderReviewPage(
       ${renderMarginalia()}
       <button class="er-pencil-btn" data-add-comment-btn hidden type="button">Mark</button>
       ${renderOutlineDrawer(outlineHtml)}
-      ${renderScrapbookDrawer(ctx, site, workflow.slug)}
+      ${renderScrapbookDrawer(ctx, site, reviewEntry, workflow.slug, reviewIndex)}
       <div class="er-toast" data-toast hidden></div>
       ${renderShortcutsOverlay()}
       <div class="er-poll-indicator" data-poll>auto-refresh · 8s</div>
