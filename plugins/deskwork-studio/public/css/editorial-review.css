@@ -49,6 +49,14 @@
   --er-rule-med: 1px solid var(--er-ink);
   --er-rule-heavy: 3px solid var(--er-ink);
   --er-rule-double: 2px double var(--er-ink);
+
+  /* CSF-7 (cross-surface audit v0.5.0): shared container widths.
+   * `wide` is the studio-default (78rem ≈ 1248px) used by the dashboard,
+   * shortform, content view, and folio strip. `narrow` is the studio
+   * index TOC (56rem). Every consumer pulls from these tokens — no
+   * raw `78rem` / `56rem` / `1280px` sprinkled through the stylesheets. */
+  --er-container-wide: 78rem;
+  --er-container-narrow: 56rem;
 }
 
 /* ---------- Scoped reset + page chrome ---------- */
@@ -156,7 +164,7 @@ body[data-review-ui="shortform"] {
 /* ---------- Layout primitives ---------- */
 
 .er-container {
-  max-width: 78rem;
+  max-width: var(--er-container-wide);
   margin: 0 auto;
   padding: 0 var(--er-space-4);
 }

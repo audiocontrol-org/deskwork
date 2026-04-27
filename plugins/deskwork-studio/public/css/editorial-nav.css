@@ -34,7 +34,7 @@
 }
 
 [data-review-ui] .er-folio-inner {
-  max-width: 78rem;
+  max-width: var(--er-container-wide);
   margin: 0 auto;
   padding: var(--er-space-1) var(--er-space-4);
   display: grid;
@@ -159,7 +159,7 @@
    ============================================================ */
 
 [data-review-ui] .er-toc-page {
-  max-width: 56rem;
+  max-width: var(--er-container-narrow);
   margin: 0 auto;
   padding: var(--er-space-6) var(--er-space-4) var(--er-space-6);
 }

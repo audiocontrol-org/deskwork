@@ -13,8 +13,9 @@
   grid-template-columns: minmax(0, 1fr) minmax(14rem, 18rem);
   gap: clamp(2rem, 4vw, 4.5rem);
   align-items: start;
-  max-width: 78rem;
-  padding: 3rem clamp(1.5rem, 4vw, 3rem) 5rem;
+  /* CSF-7: shared container width with the rest of the studio. */
+  max-width: var(--er-container-wide);
+  padding: var(--er-space-5) clamp(1.5rem, 4vw, 3rem) var(--er-space-6);
   margin: 0 auto;
   color: hsl(var(--foreground));
 }

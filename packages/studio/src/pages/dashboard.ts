@@ -251,7 +251,7 @@ function renderHeader(
     </h1>
     <p class="er-masthead-deck">
       Project: <code>${ctx.projectRoot}</code>
-      &nbsp;·&nbsp; <a href="/dev/editorial-help" style="color: var(--er-red-pencil);">the manual</a>
+      &nbsp;·&nbsp; <a class="er-link-marginalia" href="/dev/editorial-help">the manual</a>
     </p>
     <div class="er-masthead-meta">
       <span>${issueDate}</span>
@@ -270,7 +270,7 @@ function renderFilterStrip(sites: readonly string[]): RawHtml {
     <section class="er-filter" data-filter-strip>
       <span class="er-filter-label">Find</span>
       <input type="search" data-filter-input placeholder="slug, title…" autocomplete="off" />
-      <span class="er-filter-label" style="margin-left: 1rem;">Site</span>
+      <span class="er-filter-label er-filter-label--gap">Site</span>
       <div class="er-chips" role="tablist">
         <button class="er-chip" aria-pressed="true" data-site-chip="all">all</button>
         ${sites.map(
@@ -278,7 +278,7 @@ function renderFilterStrip(sites: readonly string[]): RawHtml {
             unsafe(html`<button class="er-chip" data-site-chip="${s}">${siteLabel(s).toLowerCase()}</button>`),
         )}
       </div>
-      <span class="er-filter-label" style="margin-left: 1rem;">Stage</span>
+      <span class="er-filter-label er-filter-label--gap">Stage</span>
       <div class="er-chips" role="tablist">
         <button class="er-chip" aria-pressed="true" data-stage-chip="all">all</button>
         ${STAGES.map(
