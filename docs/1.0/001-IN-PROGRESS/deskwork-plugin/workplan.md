@@ -495,6 +495,7 @@ Tasks:
 - [ ] **[#28](https://github.com/audiocontrol-org/deskwork/issues/28)** — Standalone scrapbook viewer client UI exposes `secret/` toggle. Server endpoints (v0.4.1) support secret/, client doesn't.
 - [ ] **[#29](https://github.com/audiocontrol-org/deskwork/issues/29)** — Lightbox component for scrapbook image preview. Currently full-window navigation; should be in-context.
 - [ ] **[#30](https://github.com/audiocontrol-org/deskwork/issues/30)** — Cache content-tree assembly (CONDITIONAL — only act when perf is observed as a problem).
+- [ ] **[#31](https://github.com/audiocontrol-org/deskwork/issues/31)** — Cross-surface design audit (chrome + content layout consistency). Run `/frontend-design` against all 7 studio surfaces; produce audit report + unification mockup. Implementation follows in a separate issue if the operator approves.
 
 #### Group B — Original workplan items still unchecked
 
