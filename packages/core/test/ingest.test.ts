@@ -474,6 +474,49 @@ describe('discoverIngestCandidates — discovery', () => {
     expect(r.skips[0].reason).toMatch(/scrapbook/);
   });
 
+  it('skips files under nested scrapbook dirs at any depth (#20)', () => {
+    // Two scrapbook dirs at different depths in a hierarchical tree,
+    // both containing a same-named markdown file. Without the path-
+    // segment-aware predicate, the deeper scrapbook leaks through and
+    // produces a duplicate calendar row. Both must be skipped.
+    write('content/the-outbound/index.md', '---\ntitle: outbound\n---\n');
+    write('content/the-outbound/scrapbook/archetypes.md', '---\ntitle: a\n---\n');
+    write('content/the-outbound/characters/index.md', '---\ntitle: chars\n---\n');
+    write(
+      'content/the-outbound/characters/scrapbook/archetypes.md',
+      '---\ntitle: a\n---\n',
+    );
+    const r = discoverIngestCandidates(
+      [join(project, 'content')],
+      // Note: scrapbookRoots intentionally NOT supplied — the predicate
+      // must match by path segment alone. The CLI still threads
+      // `<contentDir>/scrapbook` for backward compat but the deeper
+      // `<...>/characters/scrapbook/` was never on that list.
+      baseOpts(),
+    );
+    const slugs = r.candidates.map((c) => c.derivedSlug).sort();
+    // Only the two real content nodes ingest — neither archetypes.md.
+    expect(slugs).toEqual([
+      'the-outbound',
+      'the-outbound/characters',
+    ]);
+    expect(r.skips.filter((s) => /scrapbook/.test(s.reason))).toHaveLength(2);
+  });
+
+  it('does not false-positive on directory names containing "scrapbook"', () => {
+    // A directory literally named `scrapbookery/` is NOT a scrapbook
+    // dir — only an exact segment match of `scrapbook` should skip.
+    write('content/scrapbookery/post.md', '---\ntitle: p\n---\n');
+    const r = discoverIngestCandidates(
+      [join(project, 'content')],
+      baseOpts(),
+    );
+    // Whatever slug derivation produces, the file must NOT be filtered
+    // out as a scrapbook entry — the predicate is what's under test.
+    expect(r.candidates).toHaveLength(1);
+    expect(r.skips.filter((s) => /scrapbook/.test(s.reason))).toHaveLength(0);
+  });
+
   it('handles a malformed-frontmatter file as a skip, not a throw', () => {
     write('bad.md', '---\nthis is: not: parseable: YAML:\n---\nbody');
     write('good.md', '---\ntitle: Good\n---\nbody');

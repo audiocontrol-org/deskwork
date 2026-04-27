@@ -9320,6 +9320,8 @@ function relativeTo(projectRoot, filePath) {
   return rel.length > 0 ? rel : filePath;
 }
 function isUnderScrapbook(filePath, roots) {
+  const segments = filePath.split(sep3);
+  if (segments.includes("scrapbook")) return true;
   if (!roots || roots.length === 0) return false;
   for (const root of roots) {
     const r = root.endsWith(sep3) ? root : root + sep3;

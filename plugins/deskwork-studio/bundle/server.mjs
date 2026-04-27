@@ -10347,7 +10347,7 @@ var serveStatic = (options = { root: "" }) => {
 };
 
 // src/server.ts
-import { existsSync as existsSync7, realpathSync } from "node:fs";
+import { existsSync as existsSync8, realpathSync } from "node:fs";
 import { dirname as dirname2, isAbsolute, resolve as resolve2 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
@@ -23278,6 +23278,72 @@ function readScrapbookFile(projectRoot, config, site, slug, filename, opts = {})
     content: content3
   };
 }
+function createScrapbookMarkdown(projectRoot, config, site, slug, filename, body3, opts = {}) {
+  if (!filename.endsWith(".md")) {
+    throw new Error(`create endpoint only accepts .md files: "${filename}"`);
+  }
+  const abs = scrapbookFilePath(projectRoot, config, site, slug, filename, opts);
+  if (existsSync4(abs)) {
+    throw new Error(`file already exists: "${filename}"`);
+  }
+  mkdirSync2(dirname(abs), { recursive: true });
+  writeFileSync3(abs, body3, "utf-8");
+  const st = statSync2(abs);
+  return {
+    name: filename,
+    kind: "md",
+    size: st.size,
+    mtime: st.mtime.toISOString()
+  };
+}
+function saveScrapbookFile(projectRoot, config, site, slug, filename, body3, opts = {}) {
+  const abs = scrapbookFilePath(projectRoot, config, site, slug, filename, opts);
+  if (!existsSync4(abs)) throw new Error(`file not found: "${filename}"`);
+  writeFileSync3(abs, body3);
+  const st = statSync2(abs);
+  return {
+    name: filename,
+    kind: classify(filename),
+    size: st.size,
+    mtime: st.mtime.toISOString()
+  };
+}
+function renameScrapbookFile(projectRoot, config, site, slug, oldName, newName, opts = {}) {
+  const oldAbs = scrapbookFilePath(projectRoot, config, site, slug, oldName, opts);
+  const newAbs = scrapbookFilePath(projectRoot, config, site, slug, newName, opts);
+  if (!existsSync4(oldAbs)) throw new Error(`file not found: "${oldName}"`);
+  if (existsSync4(newAbs) && oldAbs !== newAbs) {
+    throw new Error(`target name already exists: "${newName}"`);
+  }
+  renameSync(oldAbs, newAbs);
+  const st = statSync2(newAbs);
+  return {
+    name: newName,
+    kind: classify(newName),
+    size: st.size,
+    mtime: st.mtime.toISOString()
+  };
+}
+function deleteScrapbookFile(projectRoot, config, site, slug, filename, opts = {}) {
+  const abs = scrapbookFilePath(projectRoot, config, site, slug, filename, opts);
+  if (!existsSync4(abs)) throw new Error(`file not found: "${filename}"`);
+  rmSync(abs);
+}
+function writeScrapbookUpload(projectRoot, config, site, slug, filename, content3, opts = {}) {
+  const abs = scrapbookFilePath(projectRoot, config, site, slug, filename, opts);
+  if (existsSync4(abs)) {
+    throw new Error(`file already exists: "${filename}" \u2014 rename first`);
+  }
+  mkdirSync2(dirname(abs), { recursive: true });
+  writeFileSync3(abs, content3);
+  const st = statSync2(abs);
+  return {
+    name: filename,
+    kind: classify(filename),
+    size: st.size,
+    mtime: st.mtime.toISOString()
+  };
+}
 function formatRelativeTime(iso, now = /* @__PURE__ */ new Date()) {
   const then = new Date(iso).getTime();
   const diff = now.getTime() - then;
@@ -23355,6 +23421,229 @@ async function serveScrapbookFile(c, ctx) {
     "Content-Length": String(result.size),
     "Cache-Control": "private, max-age=10"
   });
+}
+
+// src/routes/scrapbook-mutations.ts
+import { existsSync as existsSync5 } from "node:fs";
+function checkEnvelope(ctx, body3) {
+  const site = body3.site;
+  const slug = body3.slug;
+  if (typeof site !== "string" || site.length === 0) {
+    return { error: "site is required", status: 400 };
+  }
+  if (typeof slug !== "string" || slug.length === 0) {
+    return { error: "slug is required", status: 400 };
+  }
+  if (!(site in ctx.config.sites)) {
+    return { error: `unknown site: ${site}`, status: 404 };
+  }
+  return { site, slug };
+}
+function statusForError(message) {
+  if (/already exists/i.test(message)) return 409;
+  if (/not found/i.test(message)) return 404;
+  return 400;
+}
+function isJsonObject(v) {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+async function readJson(c) {
+  let raw3;
+  try {
+    raw3 = await c.req.json();
+  } catch {
+    return { ok: false, status: 400, error: "invalid JSON body" };
+  }
+  if (!isJsonObject(raw3)) {
+    return { ok: false, status: 400, error: "body must be a JSON object" };
+  }
+  return { ok: true, value: raw3 };
+}
+function createScrapbookMutationsRouter(ctx) {
+  const app = new Hono2();
+  app.post("/save", async (c) => {
+    const parsed = await readJson(c);
+    if (!parsed.ok) return c.json({ error: parsed.error }, parsed.status);
+    const env2 = checkEnvelope(ctx, parsed.value);
+    if ("error" in env2) return c.json({ error: env2.error }, env2.status);
+    const filename = parsed.value.filename;
+    const bodyText = parsed.value.body;
+    if (typeof filename !== "string" || filename.length === 0) {
+      return c.json({ error: "filename is required" }, 400);
+    }
+    if (typeof bodyText !== "string") {
+      return c.json({ error: "body must be a string" }, 400);
+    }
+    let item;
+    try {
+      const abs = scrapbookFilePath(
+        ctx.projectRoot,
+        ctx.config,
+        env2.site,
+        env2.slug,
+        filename
+      );
+      if (!existsSync5(abs)) {
+        if (filename.endsWith(".md")) {
+          item = createScrapbookMarkdown(
+            ctx.projectRoot,
+            ctx.config,
+            env2.site,
+            env2.slug,
+            filename,
+            bodyText
+          );
+        } else {
+          item = writeScrapbookUpload(
+            ctx.projectRoot,
+            ctx.config,
+            env2.site,
+            env2.slug,
+            filename,
+            Buffer.from(bodyText, "utf-8")
+          );
+        }
+      } else {
+        item = saveScrapbookFile(
+          ctx.projectRoot,
+          ctx.config,
+          env2.site,
+          env2.slug,
+          filename,
+          bodyText
+        );
+      }
+    } catch (err2) {
+      const reason = err2 instanceof Error ? err2.message : String(err2);
+      return c.json({ error: reason }, statusForError(reason));
+    }
+    return c.json({ item }, 200);
+  });
+  app.post("/rename", async (c) => {
+    const parsed = await readJson(c);
+    if (!parsed.ok) return c.json({ error: parsed.error }, parsed.status);
+    const env2 = checkEnvelope(ctx, parsed.value);
+    if ("error" in env2) return c.json({ error: env2.error }, env2.status);
+    const oldName = parsed.value.oldName;
+    const newName = parsed.value.newName;
+    if (typeof oldName !== "string" || oldName.length === 0) {
+      return c.json({ error: "oldName is required" }, 400);
+    }
+    if (typeof newName !== "string" || newName.length === 0) {
+      return c.json({ error: "newName is required" }, 400);
+    }
+    let item;
+    try {
+      item = renameScrapbookFile(
+        ctx.projectRoot,
+        ctx.config,
+        env2.site,
+        env2.slug,
+        oldName,
+        newName
+      );
+    } catch (err2) {
+      const reason = err2 instanceof Error ? err2.message : String(err2);
+      return c.json({ error: reason }, statusForError(reason));
+    }
+    return c.json({ item }, 200);
+  });
+  app.post("/delete", async (c) => {
+    const parsed = await readJson(c);
+    if (!parsed.ok) return c.json({ error: parsed.error }, parsed.status);
+    const env2 = checkEnvelope(ctx, parsed.value);
+    if ("error" in env2) return c.json({ error: env2.error }, env2.status);
+    const filename = parsed.value.filename;
+    if (typeof filename !== "string" || filename.length === 0) {
+      return c.json({ error: "filename is required" }, 400);
+    }
+    try {
+      deleteScrapbookFile(
+        ctx.projectRoot,
+        ctx.config,
+        env2.site,
+        env2.slug,
+        filename
+      );
+    } catch (err2) {
+      const reason = err2 instanceof Error ? err2.message : String(err2);
+      return c.json({ error: reason }, statusForError(reason));
+    }
+    return c.json({ ok: true }, 200);
+  });
+  app.post("/create", async (c) => {
+    const parsed = await readJson(c);
+    if (!parsed.ok) return c.json({ error: parsed.error }, parsed.status);
+    const env2 = checkEnvelope(ctx, parsed.value);
+    if ("error" in env2) return c.json({ error: env2.error }, env2.status);
+    const filename = parsed.value.filename;
+    const bodyText = parsed.value.body ?? "";
+    if (typeof filename !== "string" || filename.length === 0) {
+      return c.json({ error: "filename is required" }, 400);
+    }
+    if (typeof bodyText !== "string") {
+      return c.json({ error: "body must be a string" }, 400);
+    }
+    let item;
+    try {
+      item = createScrapbookMarkdown(
+        ctx.projectRoot,
+        ctx.config,
+        env2.site,
+        env2.slug,
+        filename,
+        bodyText
+      );
+    } catch (err2) {
+      const reason = err2 instanceof Error ? err2.message : String(err2);
+      return c.json({ error: reason }, statusForError(reason));
+    }
+    return c.json({ item }, 200);
+  });
+  app.post("/upload", async (c) => {
+    let form;
+    try {
+      form = await c.req.formData();
+    } catch {
+      return c.json({ error: "invalid multipart body" }, 400);
+    }
+    const site = form.get("site");
+    const slug = form.get("slug");
+    const file = form.get("file");
+    if (typeof site !== "string" || site.length === 0) {
+      return c.json({ error: "site is required" }, 400);
+    }
+    if (typeof slug !== "string" || slug.length === 0) {
+      return c.json({ error: "slug is required" }, 400);
+    }
+    if (!(site in ctx.config.sites)) {
+      return c.json({ error: `unknown site: ${site}` }, 404);
+    }
+    if (!(file instanceof File)) {
+      return c.json({ error: "file is required (multipart)" }, 400);
+    }
+    const filename = file.name;
+    if (typeof filename !== "string" || filename.length === 0) {
+      return c.json({ error: "uploaded file has no name" }, 400);
+    }
+    let item;
+    try {
+      const buf = Buffer.from(await file.arrayBuffer());
+      item = writeScrapbookUpload(
+        ctx.projectRoot,
+        ctx.config,
+        site,
+        slug,
+        filename,
+        buf
+      );
+    } catch (err2) {
+      const reason = err2 instanceof Error ? err2.message : String(err2);
+      return c.json({ error: reason }, statusForError(reason));
+    }
+    return c.json({ item }, 200);
+  });
+  return app;
 }
 
 // ../core/src/calendar.ts
@@ -23710,7 +23999,7 @@ function buildReport(projectRoot, config, opts = {}) {
 }
 
 // ../core/src/body-state.ts
-import { existsSync as existsSync5, readFileSync as readFileSync6 } from "node:fs";
+import { existsSync as existsSync6, readFileSync as readFileSync6 } from "node:fs";
 var PLACEHOLDER_MARKER = "<!-- Write your post here -->";
 function stripOutlineSection(body3) {
   const lines = body3.split("\n");
@@ -23726,7 +24015,7 @@ function stripOutlineSection(body3) {
   return [...lines.slice(0, startIdx), ...lines.slice(endIdx)].join("\n");
 }
 function bodyState(filePath) {
-  if (!existsSync5(filePath)) return "missing";
+  if (!existsSync6(filePath)) return "missing";
   const content3 = readFileSync6(filePath, "utf8");
   const fmMatch = content3.match(/^---\n[\s\S]*?\n---\n?/);
   const body3 = fmMatch ? content3.slice(fmMatch[0].length) : content3;
@@ -25976,7 +26265,7 @@ function renderEditorialChrome(ctx, active) {
 }
 
 // src/pages/content-detail.ts
-import { readFileSync as readFileSync8, existsSync as existsSync6 } from "node:fs";
+import { readFileSync as readFileSync8, existsSync as existsSync7 } from "node:fs";
 import { join as join8 } from "node:path";
 var PREVIEW_CHAR_BUDGET = 480;
 function renderEmptyDetail() {
@@ -25991,7 +26280,7 @@ function renderEmptyDetail() {
 }
 function safeReadFile(absPath) {
   try {
-    if (!existsSync6(absPath)) return null;
+    if (!existsSync7(absPath)) return null;
     return readFileSync8(absPath, "utf-8");
   } catch {
     return null;
@@ -26544,7 +26833,7 @@ function publicDir() {
     resolve2(here, "..", "..", "..", "plugins", "deskwork-studio", "public")
   ];
   for (const candidate of candidates) {
-    if (existsSync7(candidate)) return candidate;
+    if (existsSync8(candidate)) return candidate;
   }
   throw new Error(
     `deskwork-studio: could not find public/ assets. Tried:
@@ -26581,6 +26870,7 @@ function createApp(ctx) {
     )
   );
   app.get("/api/dev/scrapbook-file", (c) => serveScrapbookFile(c, ctx));
+  app.route("/api/dev/scrapbook", createScrapbookMutationsRouter(ctx));
   app.get("/dev/content", (c) => c.html(renderContentTopLevel(ctx)));
   app.get("/dev/content/:site", (c) => c.html(renderContentTopLevel(ctx)));
   app.get("/dev/content/:site/:project{.+}", async (c) => {

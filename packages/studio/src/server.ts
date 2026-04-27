@@ -35,6 +35,7 @@ import { fileURLToPath } from 'node:url';
 import { readConfig } from '@deskwork/core/config';
 import { createApiRouter, type StudioContext } from './routes/api.ts';
 import { serveScrapbookFile } from './routes/scrapbook-file.ts';
+import { createScrapbookMutationsRouter } from './routes/scrapbook-mutations.ts';
 import { renderDashboard } from './pages/dashboard.ts';
 import { renderReviewPage } from './pages/review.ts';
 import { renderShortformPage } from './pages/shortform.ts';
@@ -194,9 +195,18 @@ export function createApp(ctx: StudioContext): Hono {
   // Read-only binary endpoint for scrapbook files. Used by the
   // shared scrapbook-item renderer (`components/scrapbook-item.ts`)
   // to source image thumbnails, PDF iframes, and download fallbacks.
-  // Distinct from the (not-yet-ported) full scrapbook CRUD API — the
-  // bird's-eye and review-drawer surfaces are read-only.
+  // The standalone scrapbook viewer also uses this for previews; its
+  // mutation endpoints (save/rename/delete/create/upload) hang off
+  // `/api/dev/scrapbook/*` below.
   app.get('/api/dev/scrapbook-file', (c) => serveScrapbookFile(c, ctx));
+
+  // Mutation endpoints for the standalone scrapbook viewer. The
+  // client (`plugins/deskwork-studio/public/src/scrapbook-client.ts`)
+  // POSTs to /save, /rename, /delete, /create, /upload. All path
+  // resolution + traversal protection is delegated to
+  // `@deskwork/core/scrapbook` helpers — see issue #21 for the
+  // full contract.
+  app.route('/api/dev/scrapbook', createScrapbookMutationsRouter(ctx));
 
   // Bird's-eye content view (Phase 16d). Three routes:
   //   GET /dev/content                     — top-level (sites + projects)
