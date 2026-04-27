@@ -9072,7 +9072,7 @@ function deriveState(input) {
   if (input.stateFrom === "frontmatter") {
     const raw = readStringField(input.frontmatter, input.stateField);
     if (raw === void 0) {
-      return { value: "Ideas", source: "frontmatter" };
+      return { value: "Ideas", source: "default" };
     }
     const normalized = normalizeStateString(raw);
     if (normalized === null) {
@@ -9082,7 +9082,7 @@ function deriveState(input) {
   }
   const dateRaw = readDateField(input.frontmatter, input.dateField);
   if (dateRaw === void 0) {
-    return { value: "Ideas", source: "frontmatter" };
+    return { value: "Ideas", source: "default" };
   }
   const today = (input.now ?? /* @__PURE__ */ new Date()).toISOString().slice(0, 10);
   if (dateRaw <= today) {
@@ -9180,7 +9180,7 @@ var init_ingest_derive = __esm({
 });
 
 // ../core/src/ingest.ts
-import { isAbsolute as isAbsolute3, relative as relative2, sep as sep3 } from "node:path";
+import { basename, isAbsolute as isAbsolute3, relative as relative2, sep as sep3 } from "node:path";
 import { readFileSync as readFileSync5 } from "node:fs";
 function discoverIngestCandidates(paths, options) {
   if (paths.length === 0) {
@@ -9229,6 +9229,14 @@ function discoverIngestCandidates(paths, options) {
         filePath,
         relativePath: relPath,
         reason: `frontmatter parse failed: ${err2 instanceof Error ? err2.message : String(err2)}`
+      });
+      continue;
+    }
+    if (isReadmeBasename(filePath) && Object.keys(parsed.data).length === 0) {
+      skips.push({
+        filePath,
+        relativePath: relPath,
+        reason: "README.md without frontmatter (organizational, not pipeline)"
       });
       continue;
     }
@@ -9314,6 +9322,10 @@ function candidateToEntry(candidate, stage) {
     entry.datePublished = candidate.derivedDate;
   }
   return entry;
+}
+function isReadmeBasename(filePath) {
+  const lower = basename(filePath).toLowerCase();
+  return lower === "readme.md" || lower === "readme.mdx" || lower === "readme.markdown";
 }
 function relativeTo(projectRoot, filePath) {
   const rel = relative2(projectRoot, filePath);
