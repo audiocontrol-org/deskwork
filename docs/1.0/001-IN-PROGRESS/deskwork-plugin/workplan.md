@@ -660,3 +660,57 @@ Tasks are grouped by sub-phase. Sub-phases are sequential (19a → 19b → 19c �
 - The `filePath` field on `CalendarEntry` was added in the prior plan but never populated by any real calendar. Removing it is a no-op for existing data.
 - Calendar table parser hardening (escape-pipe round-trip, AST-based parsing) is OUT OF SCOPE for Phase 19 — out of the new hot path. Flag in DEVELOPMENT-NOTES.
 - Performance: per-request content-index scan is fine for the current scale (writingcontrol ~10 files, audiocontrol ~30). For sites with thousands of files, switch to a watched in-memory index with fs-event invalidation. Not needed at present scale.
+
+---
+
+### Phase 20: Move outline content out of user-supplied markdown into the scrapbook
+
+**Deliverable:** The `outline` skill no longer writes a `## Outline` section into the user's body markdown. The outline content lives in `<contentDir>/<slug>/scrapbook/outline.md` instead — a deskwork-managed location that doesn't intrude on the operator's content document. A new doctor rule migrates legacy entries whose body markdown still has an embedded `## Outline` section.
+
+**Why this phase exists:** The same principle that drove Phase 19's `deskwork:` namespace fix (#38) applies here. Deskwork must intrude as little as possible on user-owned documents. Today's `## Outline` body section assumes deskwork controls how the host renderer treats H2 headings — an assumption that doesn't hold for a plugin distributed across arbitrary Astro / Hugo / Eleventy / Jekyll / plain markdown projects. Move the outline to where deskwork owns the territory.
+
+**Plan reference:** PRD section "Extension: minimize intrusion into user-supplied content (move outline out of body markdown)".
+
+#### 20a — Core: scaffold outline to scrapbook, remove body section
+
+- [ ] `packages/core/src/scaffold.ts`: drop the `## Outline` body section. The body now contains H1 + body placeholder only. `siteCfg.blogOutlineSection` becomes obsolete — keep the field on the config schema for one release with a deprecation warning, then remove in a later cleanup.
+- [ ] `packages/core/src/scaffold.ts` (or a new module): `scaffoldOutlineFile(projectRoot, config, site, entry)` writes `<contentDir>/<slug>/scrapbook/outline.md` with frontmatter (`deskwork.id` matching the entry; title; minimal metadata) + structured placeholder (H1, a few H2 placeholder sections).
+- [ ] `packages/cli/src/commands/outline.ts`: scaffolding now writes the outline scrapbook file in addition to (or in some flows: instead of) the body file. For new entries, both files get scaffolded; for entries whose body file already exists, only the outline scrapbook file gets scaffolded.
+- [ ] Tests: scaffolded outline file has the expected frontmatter shape + placeholder; body markdown does NOT contain a `## Outline` section after scaffolding.
+
+#### 20b — Doctor migration rule: `legacy-embedded-outline-migration`
+
+- [ ] `packages/core/src/doctor/rules/legacy-embedded-outline-migration.ts`: new rule. Audit detects entries whose body markdown contains a top-level `## Outline` section. Plan: move the section's contents into `<contentDir>/<slug>/scrapbook/outline.md`, then remove the section from the body. Apply: round-trip-preserving body markdown rewrite (the same yaml-Document approach extended to markdown — or a string-level rewrite that finds the `## Outline` ... next-H2 boundary).
+- [ ] Conflict handling: if `scrapbook/outline.md` already exists, the apply path skips with a clear message ("outline already exists at scrapbook/outline.md; review and merge by hand") rather than overwriting. Operator runs the migration after manually reconciling.
+- [ ] Idempotent: a body that no longer has an `## Outline` section produces no finding. Auto-safe under `--fix=all --yes` only when the target scrapbook outline file doesn't already exist.
+- [ ] Register in `packages/core/src/doctor/runner.ts` so it runs as part of the default rule set.
+- [ ] Tests: 4-6 fixtures covering audit, fix, conflict-skip-when-target-exists, idempotency, body-without-outline (no finding), edge cases (multiple H2s, body-with-only-H1, missing body file).
+
+#### 20c — Studio: read outline from scrapbook
+
+- [ ] Audit any studio surface that today reads the body's `## Outline` section. Likely candidates: review.ts, content-detail.ts. Each surface that currently reads the embedded outline switches to reading `<contentDir>/<slug>/scrapbook/outline.md` (use `scrapbookDirForEntry` + a known filename).
+- [ ] No new UI surface — the operator browses the outline via the existing scrapbook viewer (`/dev/scrapbook/<site>/<path>` opens the file directly), and the editorial review surface can render an "Outline" panel inline by reading the same file when present.
+- [ ] If the surface today renders both an outline preview and a body preview (review page), keep both; just point the outline preview at the scrapbook file.
+- [ ] Tests: 1-2 integration tests covering the post-migration surfaces.
+
+#### 20d — Docs
+
+- [ ] `plugins/deskwork/skills/outline/SKILL.md`: rewrite the prose. The skill scaffolds the outline in the scrapbook (not in the body). The operator's outline work happens in `<contentDir>/<slug>/scrapbook/outline.md`. The skill description (frontmatter) updated to reflect the new behavior.
+- [ ] `plugins/deskwork/README.md`: any place that describes the outline lifecycle or the body markdown shape — update to reflect the new contract (no embedded outline section).
+- [ ] `plugins/deskwork/skills/doctor/SKILL.md`: add the new `legacy-embedded-outline-migration` rule to the rules table + a one-paragraph playbook entry.
+- [ ] `plugins/deskwork/skills/draft/SKILL.md`: any prose that says "remove the outline section" or similar — update to reflect that drafting starts from a body without an embedded outline.
+- [ ] `RELEASING.md` or migration notes: document the migration path for operators upgrading from a pre-Phase-20 install (run `deskwork doctor --fix=legacy-embedded-outline-migration`).
+
+**Acceptance:**
+- New entries scaffolded post-Phase-20 have body markdown free of `## Outline` sections; their outline content lives in `scrapbook/outline.md`.
+- Legacy entries with embedded `## Outline` sections are detected by `deskwork doctor` and migrated cleanly via `--fix=legacy-embedded-outline-migration`.
+- Audiocontrol's existing entries (which use `blogOutlineSection: true` in v0.5.x → v0.7.x) continue to render correctly post-migration; the embedded section moves to the scrapbook outline file without content loss.
+- Studio surfaces that previously rendered the embedded outline now render the scrapbook outline file when present.
+- All workspace tests pass; typecheck clean for all 3 packages; both plugins validate.
+
+**Notes:**
+- The `blogOutlineSection` config field is deprecated but kept for one release. Operators upgrading don't need to change their site config; a future cleanup phase removes it.
+- Out of scope: moving the entire scrapbook to a deskwork-owned sandbox (e.g., `.deskwork/scrapbook/<site>/<slug>/`). The PRD records this as a possibility worth considering after Phase 20 ships and we observe operator friction; it is **not** action for this phase.
+- The migration's body-rewrite path uses a markdown-aware approach (find `## Outline` ... next H2 or EOF). If the body has unusual heading nesting (`## Outline` inside a code fence, for example), the rule errs on the side of skipping with a report rather than risking content loss. Document this in the rule's source.
+
+**GitHub tracking:** [#40](https://github.com/audiocontrol-org/deskwork/issues/40)

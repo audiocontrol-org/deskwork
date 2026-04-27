@@ -342,3 +342,44 @@ The deskwork calendar markdown is plugin-managed metadata (not site content). Ed
 - **Not a full re-architecture of the calendar parser.** Regex-based table parsing is in places (pipe-escape gap, shortform header detection). These are outside the new hot path; they're flagged for a future hardening pass, not addressed in Phase 19.
 
 **Plan reference.** Approved plan: `/Users/orion/.claude/plans/i-would-like-to-wiggly-hennessy.md` (rewritten during this `/feature-extend` invocation; supersedes the prior slug-as-path plan that was never implemented at the level the new design requires).
+
+---
+
+## Extension: minimize intrusion into user-supplied content (move outline out of body markdown)
+
+Added as Phase 20. Triggered by the same principle that produced Phase 19's `deskwork:` namespace fix (issue [#38](https://github.com/audiocontrol-org/deskwork/issues/38)) — deskwork must intrude as little as possible on user-owned documents.
+
+### Why now
+
+Today the `outline` skill scaffolds an `## Outline` section directly into the user's body markdown (`scaffold.ts:166-168` controlled by site config `blogOutlineSection: true`). That works fine when deskwork controls the downstream rendering engine, but for a plugin distributed for arbitrary host projects the assumption breaks:
+
+- Every host renderer treats the body markdown differently. Some strip H2 sections by name, some don't. Some auto-generate TOCs from headings. The `## Outline` heading might appear in the published page; in others it might break formatting; in others it might be ignored. Deskwork has no way to predict, and the operator shouldn't have to debug whose heading-rendering rules apply.
+- Even when the operator removes the `## Outline` section before publishing, the workflow forces them to do so manually — a step that has nothing to do with editorial work and everything to do with deskwork's lifecycle artifact leaking into their content document.
+- The Phase 19 namespace principle applies here too: the body markdown belongs to the host renderer + the operator. Deskwork can read it, scaffold the initial frontmatter (including the `deskwork.id` namespace), and step out. Anything beyond that — outline shape, lifecycle annotations, draft notes — needs to live where deskwork owns the territory.
+
+### Solution
+
+Move the outline content out of the user's body markdown into the entry's scrapbook directory. The natural location: `<contentDir>/<slug>/scrapbook/outline.md`. The scrapbook is already a deskwork-managed sibling directory excluded from the host's content collection pattern; placing outline content there keeps the operator's body markdown free of deskwork artifacts.
+
+Behavior changes:
+
+- `deskwork outline <slug>` no longer adds a `## Outline` section to the body markdown. Instead, it scaffolds `<contentDir>/<slug>/scrapbook/outline.md` with a structured placeholder (frontmatter + H2 sub-headings the operator fills in).
+- The body markdown is scaffolded with frontmatter (including `deskwork.id`) + H1 + body placeholder only. No deskwork-managed body sections.
+- The lifecycle stage transition (Planned → Outlining) is unchanged. The operator's outline work just happens in a different file.
+- The studio surfaces (any UI that today reads the body's `## Outline` section) read from the scrapbook outline file instead. The operator browses the outline via the existing scrapbook viewer at `/dev/scrapbook/<site>/<path>` — no new UI surface needed.
+- `deskwork draft` (Outlining → Drafting) is unchanged in semantics; in practice the body draft no longer needs to "remove the outline section" since there isn't one.
+
+Migration: a new doctor rule (`legacy-embedded-outline-migration`) detects entries whose body markdown contains a `## Outline` section and offers to move the content into `scrapbook/outline.md`. Idempotent. Auto-safe under `--fix=all --yes` when the target scrapbook outline file doesn't already exist.
+
+### Note (deferred — possibility, not action)
+
+The same principle suggests considering whether the **scrapbook itself** (today at `<contentDir>/<slug>/scrapbook/`) is too intrusive. It lives inside the user's content tree, just outside the renderer's collection pattern. An alternative would be moving scrapbook content to a deskwork-owned sandbox like `.deskwork/scrapbook/<site>/<slug>/` — completely out of the user's source tree.
+
+This is **not** Phase 20 scope. Flagging as a possibility to consider after Phase 20 ships and we see how operators react. The trade-off: a deskwork-sandboxed scrapbook is cleaner from the "intrude as little as possible" perspective, but it loses the proximity benefit (operator's research notes co-located with the content they're researching for) and would require a migration story for any project that's already using the in-content-tree scrapbook layout. Worth measuring against actual operator friction before deciding.
+
+### What this is not
+
+- **Not removing the scrapbook capability.** Scrapbook stays. This phase only moves the outline content into the scrapbook.
+- **Not changing the outline lifecycle stage.** Planned → Outlining → Drafting flow is preserved.
+- **Not introducing a new content type for outlines.** The outline file is just a markdown file in scrapbook; deskwork's lifecycle treats it as ambient (doesn't track its state in the calendar; the body markdown is still the canonical thing the calendar entry binds to).
+- **Not migrating the scrapbook to a deskwork-owned sandbox.** Out of scope for Phase 20; recorded as a possibility for future consideration above.
