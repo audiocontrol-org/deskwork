@@ -570,21 +570,26 @@ Tasks are grouped by sub-phase. Sub-phases are sequential (19a → 19b → 19c �
 
 #### 19b — `deskwork doctor` validate + repair
 
-- [ ] `packages/cli/src/commands/doctor.ts` (NEW): subcommand entry. Parses `--fix=<rule>`, `--fix=all`, `--yes` flags. Default = audit-only.
-- [ ] Audit-only mode walks the calendar + content index + workflow store and reports findings grouped by rule. Exit 0 if clean; exit 1 if any findings (suitable for pre-commit / CI).
-- [ ] Rule checkers (each with its own validator function in `packages/core/src/doctor/rules/`):
-  - `missing-frontmatter-id` — calendar entry exists, no file under contentDir has matching frontmatter id.
-  - `orphan-frontmatter-id` — file has `id: X`, no calendar entry with id X.
-  - `duplicate-id` — two or more files share the same frontmatter id.
-  - `slug-collision` — two calendar entries share the same slug.
-  - `schema-rejected` — host's content schema rejects `id` field on write (caught at write attempt; doctor surfaces the schema-patch instructions).
-  - `workflow-stale` — workflow record keys by old slug or has no `entryId`.
-  - `calendar-uuid-missing` — pre-UUID calendar entry parsed; UUID assigned in-memory but never persisted.
-- [ ] Repair engine (`--fix=<rule>` or `--fix=all`): each rule has a repair action. Interactive prompts per finding; `--yes` non-interactive variant skips ambiguous cases and reports them.
-- [ ] `packages/cli/test/doctor.test.ts` (NEW): one fixture per rule. Audit reports findings without mutation; `--fix` produces the expected repair on a fixture calendar + content tree; not-at-template-path case for `missing-frontmatter-id`; schema-rejection surfaces the exact patch instruction.
-- [ ] `plugins/deskwork/skills/doctor/SKILL.md` (NEW): one-arg-at-a-time prompting (which rule to check / fix; whether to apply). Plain-English explanation of each rule.
+- [x] `packages/cli/src/commands/doctor.ts` (NEW, 281 lines): subcommand entry. Parses `--fix=<rule|all>`, `--yes`, `--json`, `--site` flags. Default = audit-only.
+- [x] Audit-only mode walks the calendar + content index + workflow store. Exit 0 if clean, 1 if findings, 2 on usage/config error.
+- [x] All 7 rule checkers implemented under `packages/core/src/doctor/rules/` (full audit + plan + apply for each, no stubs):
+  - `missing-frontmatter-id` — 3-tier candidate search (slug-template path → title match → basename match); writes `id:` into frontmatter on apply.
+  - `orphan-frontmatter-id` — interactive: leave-as-is or clear-id.
+  - `duplicate-id` — interactive: pick canonical; clears id from non-canonical files.
+  - `slug-collision` — report-only (editorial decision).
+  - `schema-rejected` — passive audit (always empty); exposes `printSchemaPatchInstructions()` helper for other rules to surface when they hit a schema rejection at write-time.
+  - `workflow-stale` — joins on entryId (when present) with slug fallback; delete-stale-pipeline-file repair preserves the journal history.
+  - `calendar-uuid-missing` — re-reads calendar bytes, finds rows with empty UUID cells, rewrites calendar to flush in-memory ids to disk.
+- [x] Repair engine (`runRepair` in `packages/core/src/doctor/runner.ts`): per-rule plan/apply orchestration. `--yes` mode auto-applies single-candidate / unambiguous plans; skips ambiguous prompts cleanly and reports.
+- [x] `packages/cli/test/doctor.test.ts` (NEW, 21 tests): one fixture per rule covering audit + repair + post-repair re-audit; ambiguous-skip negative test for `missing-frontmatter-id` with multiple candidates.
+- [x] `plugins/deskwork/skills/doctor/SKILL.md` (NEW): operator-facing prose with examples, rule explanations, host content-schema requirement.
 
-**Acceptance:** `deskwork doctor` (no flags) on a healthy fixture exits 0 with a clean report. Each rule, with a fixture that violates it, is correctly diagnosed in audit mode and correctly repaired in fix mode.
+**Acceptance:** ✅ Healthy fixture audit exits 0; each rule's violation fixture diagnoses in audit and repairs in fix mode (where the rule has a real repair). 21 new cli tests; all 480 tests pass; typecheck clean across all 3 packages; `claude plugin validate` passes.
+
+**Notes:**
+- Public surface exported via `@deskwork/core/doctor`; new subpath export added to `packages/core/package.json`.
+- `--json` mode produces machine-readable output composable with `jq` (operator script use).
+- `yesInteraction` semantics: `pickChoice` skips ambiguous prompts; `confirmApply` is always `true`. Single-candidate / unambiguous plans auto-apply; multi-candidate / editorial-decision plans skip with a clear "needs interactive operator" message.
 
 #### 19c — Path encoding rewire + content-tree inversion
 

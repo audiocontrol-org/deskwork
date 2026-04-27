@@ -37,6 +37,7 @@
     "./scrapbook": "./src/scrapbook.ts",
     "./content-tree": "./src/content-tree.ts",
     "./content-index": "./src/content-index.ts",
+    "./doctor": "./src/doctor/index.ts",
     "./types": "./src/types.ts"
   },
   "scripts": {

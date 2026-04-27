@@ -23,3 +23,4 @@ export * as renameSlug from './rename-slug.ts';
 export * as review from './review/index.ts';
 export * as contentTree from './content-tree.ts';
 export * from './content-index.ts';
+export * as doctor from './doctor/index.ts';
