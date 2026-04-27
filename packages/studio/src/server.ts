@@ -35,6 +35,7 @@ import { fileURLToPath } from 'node:url';
 import { readConfig } from '@deskwork/core/config';
 import { readCalendar } from '@deskwork/core/calendar';
 import { resolveCalendarPath } from '@deskwork/core/paths';
+import { readWorkflow } from '@deskwork/core/review/pipeline';
 import { createApiRouter, type StudioContext } from './routes/api.ts';
 import { serveScrapbookFile } from './routes/scrapbook-file.ts';
 import { createScrapbookMutationsRouter } from './routes/scrapbook-mutations.ts';
@@ -249,43 +250,57 @@ export function createApp(ctx: StudioContext): Hono {
   });
   app.get('/dev/editorial-help', (c) => c.html(renderHelpPage(ctx)));
   app.get('/dev/editorial-review-shortform', (c) =>
-    c.html(renderShortformPage(ctx, c.req.query('focus') ?? null)),
+    c.html(renderShortformPage(ctx)),
   );
   // Phase 19d: id-based canonical review URL. Strict UUID-shape regex
   // matched FIRST so it wins over the legacy `:slug{.+}` route below.
   // Hono evaluates routes in registration order; first match wins.
+  //
+  // Phase 21c added a workflow-id branch: the dashboard's shortform
+  // matrix (and any other surface that knows a workflow id) deep-links
+  // straight to a workflow record. We try workflow-id resolution first
+  // because workflow journals are smaller than the calendar; entry-id
+  // is the existing canonical longform/outline path and stays the
+  // fallback when the id doesn't match a workflow.
   app.get(
     '/dev/editorial-review/:id{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}',
     async (c) => {
       const id = c.req.param('id');
       const siteParam = c.req.query('site') ?? ctx.config.defaultSite;
-      const lookup = resolveEntryById(ctx, siteParam, id);
       const getIndex = (s: string) => getRequestContentIndex(c, ctx, s);
+      const reviewQuery = {
+        site: c.req.query('site') ?? null,
+        version: c.req.query('v') ?? null,
+        kind: c.req.query('kind') ?? null,
+      };
+
+      // 1. Workflow-id branch — phase 21c.
+      const wf = readWorkflow(ctx.projectRoot, ctx.config, id);
+      if (wf !== null) {
+        return c.html(
+          await renderReviewPage(
+            ctx,
+            { kind: 'workflow', workflowId: id },
+            reviewQuery,
+            getIndex,
+          ),
+        );
+      }
+
+      // 2. Entry-id branch — the legacy canonical longform/outline URL.
+      const lookup = resolveEntryById(ctx, siteParam, id);
       if (lookup === null) {
         return c.html(
           await renderReviewPage(
             ctx,
             { kind: 'id', entryId: id, slug: id },
-            {
-              site: c.req.query('site') ?? null,
-              version: c.req.query('v') ?? null,
-              kind: c.req.query('kind') ?? null,
-            },
+            reviewQuery,
             getIndex,
           ),
         );
       }
       return c.html(
-        await renderReviewPage(
-          ctx,
-          lookup,
-          {
-            site: c.req.query('site') ?? null,
-            version: c.req.query('v') ?? null,
-            kind: c.req.query('kind') ?? null,
-          },
-          getIndex,
-        ),
+        await renderReviewPage(ctx, lookup, reviewQuery, getIndex),
       );
     },
   );

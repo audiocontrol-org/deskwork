@@ -10348,7 +10348,7 @@ var serveStatic = (options = { root: "" }) => {
 
 // src/server.ts
 import { existsSync as existsSync13, realpathSync } from "node:fs";
-import { dirname as dirname4, isAbsolute, resolve as resolve2 } from "node:path";
+import { dirname as dirname5, isAbsolute, resolve as resolve2 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // ../core/src/config.ts
@@ -10838,8 +10838,22 @@ function parseFrontmatter(markdown) {
   }
   return { data: toFrontmatterData(data), body: body3 };
 }
+function stringifyFrontmatter(data, body3) {
+  const doc = buildDocument(data);
+  return `---
+${doc.toString({ lineWidth: 0 }).replace(/\n$/, "")}
+---
+${body3}`;
+}
 function readFrontmatter(path) {
   return parseFrontmatter(readFileSync3(path, "utf-8"));
+}
+function writeFrontmatter(path, data, body3) {
+  writeFileSync2(path, stringifyFrontmatter(data, body3), "utf-8");
+}
+function buildDocument(data) {
+  const initialYaml = (0, import_yaml.stringify)(data, { lineWidth: 0 });
+  return (0, import_yaml.parseDocument)(initialYaml);
 }
 function toFrontmatterData(value) {
   const out = {};
@@ -11047,9 +11061,6 @@ function resolveShortformFilePath(projectRoot, config, site, entry, platform, ch
   const filename = channel !== void 0 && channel !== "" ? `${platform}-${channel}.md` : `${platform}.md`;
   return join4(entryDir, "scrapbook", "shortform", filename);
 }
-
-// ../core/src/review/handlers.ts
-import { existsSync as existsSync5, writeFileSync as writeFileSync4 } from "node:fs";
 
 // ../core/src/review/pipeline.ts
 import { randomUUID as randomUUID2 } from "node:crypto";
@@ -11330,8 +11341,12 @@ function mintAnnotation(partial) {
   };
 }
 
+// ../core/src/review/handlers.ts
+import { existsSync as existsSync5, writeFileSync as writeFileSync4 } from "node:fs";
+
 // ../core/src/review/start-handlers.ts
 import { existsSync as existsSync4, mkdirSync as mkdirSync2, readFileSync as readFileSync5 } from "node:fs";
+import { dirname as dirname2 } from "node:path";
 
 // ../core/src/review/workflow-paths.ts
 import { existsSync as existsSync3 } from "node:fs";
@@ -11462,6 +11477,99 @@ function handleStartLongform(projectRoot, config, body3) {
     initialOriginatedBy: "agent"
   });
   return ok({ workflow, existing: !!before && before.id === workflow.id });
+}
+function handleStartShortform(projectRoot, config, body3) {
+  if (!body3 || typeof body3 !== "object") return err(400, "expected JSON object body");
+  const b = body3;
+  if (!b.site) return err(400, "site is required");
+  if (!(b.site in config.sites)) {
+    const known = Object.keys(config.sites).join(", ");
+    return err(400, `unknown site: ${b.site}. Configured: ${known}`);
+  }
+  if (!b.slug || typeof b.slug !== "string") return err(400, "slug is required");
+  if (!SLUG_RE.test(b.slug)) {
+    return err(400, `invalid slug: ${b.slug}. Must match ${SLUG_RE}`);
+  }
+  if (!b.platform) return err(400, "platform is required");
+  if (!isPlatform(b.platform)) {
+    return err(400, `invalid platform: ${String(b.platform)}`);
+  }
+  const channel = b.channel !== void 0 && b.channel !== "" ? b.channel : void 0;
+  const callerEntryId = b.entryId !== void 0 && b.entryId !== "" ? b.entryId : void 0;
+  const entry = lookupEntry(projectRoot, config, b.site, {
+    ...callerEntryId !== void 0 ? { entryId: callerEntryId } : {},
+    slug: b.slug
+  });
+  if (!entry) {
+    return err(404, `no calendar entry for site=${b.site} slug=${b.slug}`);
+  }
+  const entryId = callerEntryId ?? entry.id;
+  let filePath;
+  try {
+    filePath = resolveShortformWorkflowFilePath(
+      projectRoot,
+      config,
+      b.site,
+      b.slug,
+      b.platform,
+      channel,
+      {
+        ...entryId !== void 0 ? { entryId } : {},
+        entry
+      }
+    );
+  } catch (e) {
+    return err(400, e instanceof Error ? e.message : String(e));
+  }
+  if (filePath === void 0) {
+    const fallback = resolveLongformFilePath(
+      projectRoot,
+      config,
+      b.site,
+      b.slug,
+      { ...entryId !== void 0 ? { entryId } : {}, entry }
+    );
+    const entryDir = dirname2(fallback);
+    const filename = channel !== void 0 ? `${b.platform}-${channel}.md` : `${b.platform}.md`;
+    filePath = `${entryDir}/scrapbook/shortform/${filename}`;
+  }
+  let markdown;
+  if (existsSync4(filePath)) {
+    markdown = readFileSync5(filePath, "utf-8");
+  } else {
+    mkdirSync2(dirname2(filePath), { recursive: true });
+    const initialBody = b.initialMarkdown ?? "";
+    const deskworkMeta = {
+      platform: b.platform
+    };
+    if (channel !== void 0) deskworkMeta.channel = channel;
+    if (entryId !== void 0 && entryId !== "") deskworkMeta.id = entryId;
+    const fmData = {
+      title: entry.title,
+      deskwork: deskworkMeta
+    };
+    writeFrontmatter(filePath, fmData, initialBody);
+    markdown = initialBody;
+  }
+  const before = readWorkflows(projectRoot, config).find((w) => {
+    const identityMatch = entryId && w.entryId ? w.entryId === entryId : w.site === b.site && w.slug === b.slug;
+    return identityMatch && w.contentKind === "shortform" && (w.platform ?? null) === (b.platform ?? null) && (w.channel ?? null) === (channel ?? null) && w.state !== "applied" && w.state !== "cancelled";
+  });
+  const workflow = createWorkflow(projectRoot, config, {
+    site: b.site,
+    slug: b.slug,
+    ...entryId !== void 0 && entryId !== "" ? { entryId } : {},
+    contentKind: "shortform",
+    platform: b.platform,
+    ...channel !== void 0 ? { channel } : {},
+    initialMarkdown: markdown,
+    initialOriginatedBy: "agent"
+  });
+  return ok({
+    workflow,
+    existing: !!before && before.id === workflow.id,
+    filePath
+  });
 }
 function workflowFilePath(projectRoot, config, workflow) {
   if (workflow.contentKind === "shortform") {
@@ -12097,9 +12205,9 @@ var VFile = class {
    * @returns {undefined}
    *   Nothing.
    */
-  set dirname(dirname5) {
+  set dirname(dirname6) {
     assertPath(this.basename, "dirname");
-    this.path = default2.join(dirname5 || "", this.basename);
+    this.path = default2.join(dirname6 || "", this.basename);
   }
   /**
    * Get the extname (including dot) (example: `'.js'`).
@@ -23602,6 +23710,23 @@ async function renderMarkdownToHtml(markdown) {
 }
 
 // src/routes/api.ts
+function extractWorkflowId(body3) {
+  if (typeof body3 !== "object" || body3 === null) return null;
+  const workflow = Reflect.get(body3, "workflow");
+  if (typeof workflow !== "object" || workflow === null) return null;
+  const id = Reflect.get(workflow, "id");
+  return typeof id === "string" && id.length > 0 ? id : null;
+}
+function withReviewUrl(body3, workflowId) {
+  const out = {};
+  if (typeof body3 === "object" && body3 !== null) {
+    for (const [k, v] of Object.entries(body3)) {
+      out[k] = v;
+    }
+  }
+  out.reviewUrl = `/dev/editorial-review/${workflowId}`;
+  return out;
+}
 function createApiRouter(ctx) {
   const app = new Hono2();
   app.post("/annotate", async (c) => {
@@ -23662,6 +23787,21 @@ function createApiRouter(ctx) {
     const r = handleStartLongform(ctx.projectRoot, ctx.config, body3);
     return c.json(r.body, r.status);
   });
+  app.post("/start-shortform", async (c) => {
+    let body3;
+    try {
+      body3 = await c.req.json();
+    } catch {
+      return c.json({ error: "invalid JSON body" }, 400);
+    }
+    const r = handleStartShortform(ctx.projectRoot, ctx.config, body3);
+    const workflowId = extractWorkflowId(r.body);
+    if (r.status === 200 && workflowId !== null) {
+      const augmented = withReviewUrl(r.body, workflowId);
+      return c.json(augmented, 200);
+    }
+    return c.json(r.body, r.status);
+  });
   app.post("/render", async (c) => {
     let body3;
     try {
@@ -23701,7 +23841,7 @@ import {
   statSync as statSync3,
   writeFileSync as writeFileSync5
 } from "node:fs";
-import { dirname as dirname2, extname, join as join7, resolve } from "node:path";
+import { dirname as dirname3, extname, join as join7, resolve } from "node:path";
 var SECRET_SUBDIR = "secret";
 var SLUG_RE2 = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
 var FILENAME_RE = /^[a-zA-Z0-9._-][a-zA-Z0-9._ -]*$/;
@@ -23755,7 +23895,7 @@ function scrapbookDirForEntry(projectRoot, config, site, entry, index2) {
       `Cannot resolve scrapbook dir: entry has no id binding and no template fallback (slug="${entry.slug}")`
     );
   }
-  return join7(dirname2(file), "scrapbook");
+  return join7(dirname3(file), "scrapbook");
 }
 function scrapbookFilePath(projectRoot, config, site, slug, filename, opts = {}) {
   assertFilename(filename);
@@ -23878,7 +24018,7 @@ function createScrapbookMarkdown(projectRoot, config, site, slug, filename, body
   if (existsSync6(abs)) {
     throw new Error(`file already exists: "${filename}"`);
   }
-  mkdirSync3(dirname2(abs), { recursive: true });
+  mkdirSync3(dirname3(abs), { recursive: true });
   writeFileSync5(abs, body3, "utf-8");
   const st = statSync3(abs);
   return {
@@ -23926,7 +24066,7 @@ function writeScrapbookUpload(projectRoot, config, site, slug, filename, content
   if (existsSync6(abs)) {
     throw new Error(`file already exists: "${filename}" \u2014 rename first`);
   }
-  mkdirSync3(dirname2(abs), { recursive: true });
+  mkdirSync3(dirname3(abs), { recursive: true });
   writeFileSync5(abs, content3);
   const st = statSync3(abs);
   return {
@@ -24017,7 +24157,7 @@ async function serveScrapbookFile(c, ctx) {
 
 // src/routes/scrapbook-mutations.ts
 import { existsSync as existsSync7, mkdirSync as mkdirSync4, renameSync as renameSync2, statSync as statSync4 } from "node:fs";
-import { dirname as dirname3 } from "node:path";
+import { dirname as dirname4 } from "node:path";
 function checkEnvelope(ctx, body3) {
   const site = body3.site;
   const slug = body3.slug;
@@ -24173,7 +24313,7 @@ function createScrapbookMutationsRouter(ctx) {
         if (existsSync7(dstAbs)) {
           return c.json({ error: `target name already exists: "${newName}"` }, 409);
         }
-        mkdirSync4(dirname3(dstAbs), { recursive: true });
+        mkdirSync4(dirname4(dstAbs), { recursive: true });
         renameSync2(srcAbs, dstAbs);
         const st = statSync4(dstAbs);
         item = {
@@ -24595,7 +24735,7 @@ function fmtRelTime(iso, now) {
 }
 function workflowLink(w) {
   if (w.contentKind === "shortform") {
-    return `/dev/editorial-review-shortform?focus=${w.id}#workflow-${w.id}`;
+    return `/dev/editorial-review/${w.id}`;
   }
   const key2 = w.entryId ?? w.slug;
   const kindBit = w.contentKind === "outline" ? "&kind=outline" : "";
@@ -24644,6 +24784,15 @@ function loadDashboardData(ctx, getIndex) {
     const key2 = covKey(d.site, d.slug, d.entryId);
     const set = shortformCoverage.get(key2) ?? /* @__PURE__ */ new Set();
     set.add(d.platform);
+    shortformCoverage.set(key2, set);
+  }
+  for (const w of workflows) {
+    if (w.contentKind !== "shortform") continue;
+    if (w.state === "applied" || w.state === "cancelled") continue;
+    if (!w.platform || !isPlatform2(w.platform)) continue;
+    const key2 = covKey(w.site, w.slug, w.entryId);
+    const set = shortformCoverage.get(key2) ?? /* @__PURE__ */ new Set();
+    set.add(w.platform);
     shortformCoverage.set(key2, set);
   }
   const publishedBlogEntries = calendarEntries.filter(
@@ -24977,15 +25126,40 @@ function renderStageSection(ctx, data, stage, entries, sites, getIndex) {
       ${body3}
     </section>`);
 }
+function indexShortformWorkflows(data) {
+  const out = /* @__PURE__ */ new Map();
+  for (const w of data.workflows) {
+    if (w.contentKind !== "shortform") continue;
+    if (w.state === "applied" || w.state === "cancelled") continue;
+    if (!w.platform) continue;
+    const key2 = `${covKey(w.site, w.slug, w.entryId)}::${w.platform}`;
+    out.set(key2, w);
+  }
+  return out;
+}
 function renderShortformMatrix(data, ctx) {
   if (data.publishedBlogEntries.length === 0) return unsafe("");
+  const wfIndex = indexShortformWorkflows(data);
   const rows = data.publishedBlogEntries.map(({ site, entry }) => {
     const covered = data.shortformCoverage.get(covKey(site, entry.slug, entry.id)) ?? /* @__PURE__ */ new Set();
     const cells2 = PLATFORMS_ORDER.map((p2) => {
       const has = covered.has(p2);
-      const inner = has ? html6`<span class="er-sf-check" title="${p2} copy drafted">✓</span>` : html6`<button class="er-copy-btn er-sf-draft-btn" type="button"
-            data-copy="/editorial-shortform-draft --site ${site} ${entry.slug} ${p2}"
-            title="copy /editorial-shortform-draft for ${p2}">draft</button>`;
+      const wfKey = `${covKey(site, entry.slug, entry.id)}::${p2}`;
+      const wf = wfIndex.get(wfKey);
+      let inner;
+      if (has && wf) {
+        inner = html6`<a class="er-sf-link" href="/dev/editorial-review/${wf.id}"
+          title="${p2} workflow · open in review">✓</a>`;
+      } else if (has) {
+        inner = html6`<span class="er-sf-check" title="${p2} copy drafted">✓</span>`;
+      } else {
+        inner = html6`<button class="er-sf-start-btn" type="button"
+          data-action="start-shortform"
+          data-site="${site}"
+          data-slug="${entry.slug}"
+          data-platform="${p2}"
+          title="Start a ${p2} shortform draft for ${entry.slug}">start</button>`;
+      }
       const cls = has ? "er-sf-cell er-sf-cell-covered" : "er-sf-cell er-sf-cell-empty";
       return html6`<td class="${cls}">${unsafe(inner)}</td>`;
     }).join("");
@@ -25100,11 +25274,10 @@ function renderSidebar(data) {
         <div class="er-slip-header">Short form</div>
         <h3 class="er-slip-title">Social copy</h3>
         <p style="font-size: 0.85rem; margin: 0 0 var(--er-space-1); color: var(--er-ink-soft);">
-          Agent-drafted. Run in Claude Code:
+          Click <em>start</em> in the coverage matrix above to begin a
+          shortform draft. Edit, iterate, and approve in the unified
+          review surface.
         </p>
-        <code style="display: block; font-size: 0.72rem; padding: var(--er-space-1) var(--er-space-2); word-break: break-all; background: var(--er-paper-2);">
-          /editorial-shortform-draft --site &lt;site&gt; &lt;slug&gt; &lt;platform&gt; [channel]
-        </code>
         <p style="margin-top: var(--er-space-2);">
           <a href="/dev/editorial-review-shortform">Go to the shortform desk →</a>
         </p>
@@ -25384,7 +25557,9 @@ function errorFromBody(body3) {
   return "unknown error";
 }
 function pickContentKind(rawKind) {
-  return rawKind === "outline" ? "outline" : "longform";
+  if (rawKind === "outline") return "outline";
+  if (rawKind === "shortform") return "shortform";
+  return "longform";
 }
 function pickSite(ctx, raw3) {
   if (raw3 && raw3 in ctx.config.sites) return raw3;
@@ -25396,7 +25571,7 @@ function stringField(v) {
 async function prepareRender(markdown, contentKind) {
   const parsed = parseDraftFrontmatter(markdown);
   const fm = parsed.frontmatter;
-  const split = contentKind === "outline" ? { body: parsed.body, outline: "", present: false, startLine: -1, endLine: -1 } : splitOutline(parsed.body);
+  const split = contentKind !== "longform" ? { body: parsed.body, outline: "", present: false, startLine: -1, endLine: -1 } : splitOutline(parsed.body);
   const bodyHtml = await renderMarkdownToHtml(split.body);
   const description = stringField(fm.description);
   const dekHtml = description ? `<p class="er-dispatch-dek">${escapeHtml(description)}</p>` : "";
@@ -25410,9 +25585,9 @@ function stateLabel2(state) {
 }
 function renderVersionsStrip(versions2, site, contentKind, current) {
   if (versions2.length <= 1) return unsafe("");
+  const kindBit = contentKind === "outline" ? "&kind=outline" : contentKind === "shortform" ? "&kind=shortform" : "";
   const links = versions2.map((v) => {
     const isActive = v.version === current.version;
-    const kindBit = contentKind === "outline" ? "&kind=outline" : "";
     const href = `?site=${site}${kindBit}&v=${v.version}`;
     return html6`<a href="${href}" class="${isActive ? "active" : ""}">v${v.version}</a>`;
   }).join("");
@@ -25444,7 +25619,7 @@ function renderControlsRight(workflow) {
   return unsafe(`<span class="er-strip-right">${buttons.join("")}</span>`);
 }
 function renderError(slug, site, contentKind, message) {
-  const startCmd = contentKind === "outline" ? `/editorial-outline --site ${site} ${slug}` : `/editorial-draft-review --site ${site} ${slug}`;
+  const startCmd = contentKind === "outline" ? `/editorial-outline --site ${site} ${slug}` : contentKind === "shortform" ? `/deskwork:shortform-start --site ${site} ${slug} <platform>` : `/editorial-draft-review --site ${site} ${slug}`;
   const body3 = html6`
     <div data-review-ui="longform">
       ${renderEditorialFolio("reviews", `longform \xB7 ${slug}`)}
@@ -25566,7 +25741,7 @@ function renderOutlineDrawer(outlineHtml) {
       </footer>
     </aside>`);
 }
-function lookupReviewEntry(ctx, site, lookup) {
+function lookupReviewEntry(ctx, site, lookup, fallbackSlug) {
   try {
     const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
     if (!existsSync9(calendarPath)) return null;
@@ -25575,33 +25750,55 @@ function lookupReviewEntry(ctx, site, lookup) {
       const byId = findEntryById(cal, lookup.entryId);
       if (byId !== void 0) return byId;
     }
-    const bySlug = findEntry(cal, lookup.slug);
+    const slug = lookup.kind === "workflow" ? fallbackSlug : lookup.slug;
+    const bySlug = findEntry(cal, slug);
     return bySlug ?? null;
   } catch {
     return null;
   }
 }
 async function renderReviewPage(ctx, lookup, query, getIndex) {
-  const site = pickSite(ctx, query.site);
-  const contentKind = pickContentKind(query.kind ?? null);
-  const slug = lookup.slug;
-  const fetched = handleGetWorkflow(ctx.projectRoot, ctx.config, {
+  const queryKind = pickContentKind(query.kind ?? null);
+  const fetched = lookup.kind === "workflow" ? handleGetWorkflow(ctx.projectRoot, ctx.config, {
+    id: lookup.workflowId,
+    entryId: null,
+    site: null,
+    slug: null,
+    contentKind: null,
+    platform: null,
+    channel: null
+  }) : handleGetWorkflow(ctx.projectRoot, ctx.config, {
     id: null,
     entryId: lookup.kind === "id" ? lookup.entryId : null,
-    site,
-    slug,
-    contentKind,
+    site: pickSite(ctx, query.site),
+    slug: lookup.slug,
+    contentKind: queryKind,
     platform: null,
     channel: null
   });
+  const lookupSlug = lookup.kind === "workflow" ? lookup.workflowId : lookup.slug;
+  let resolvedSite = pickSite(ctx, query.site);
   if (fetched.status !== 200 || !isSuccessBody(fetched.body)) {
-    return renderError(slug, site, contentKind, errorFromBody(fetched.body));
+    return renderError(
+      lookupSlug,
+      resolvedSite,
+      queryKind,
+      errorFromBody(fetched.body)
+    );
   }
   const { workflow, versions: versions2 } = fetched.body;
+  const contentKind = lookup.kind === "workflow" ? workflow.contentKind : queryKind;
+  if (lookup.kind === "workflow") resolvedSite = workflow.site;
+  const slug = workflow.slug;
   const requested = query.version ? parseInt(query.version, 10) : workflow.currentVersion;
   const currentVersion = versions2.find((v) => v.version === requested) ?? versions2[versions2.length - 1];
   if (!currentVersion) {
-    return renderError(slug, site, contentKind, "no current version on this workflow");
+    return renderError(
+      slug,
+      resolvedSite,
+      contentKind,
+      "no current version on this workflow"
+    );
   }
   const { fm, bodyHtml, outlineHtml } = await prepareRender(
     currentVersion.markdown,
@@ -25609,11 +25806,20 @@ async function renderReviewPage(ctx, lookup, query, getIndex) {
   );
   const draftState = { workflow, currentVersion, versions: versions2 };
   const titleField = stringField(fm.title) ?? `Draft: ${slug}`;
-  const reviewEntry = lookupReviewEntry(ctx, site, lookup);
-  const reviewIndex = getIndex ? getIndex(site) : void 0;
+  const reviewEntry = lookupReviewEntry(ctx, resolvedSite, lookup, slug);
+  const reviewIndex = getIndex ? getIndex(resolvedSite) : void 0;
+  const isShortform = contentKind === "shortform";
+  const shortformMeta = isShortform ? unsafe(html6`
+      <div class="er-shortform-meta">
+        <span class="er-platform">${workflow.platform ?? "other"}</span>
+        ${workflow.channel ? unsafe(html6`<span class="er-channel">${workflow.channel}</span>`) : ""}
+      </div>`) : unsafe("");
+  const reviewUiAttr = isShortform ? "shortform" : "longform";
+  const folioSpine = isShortform ? `shortform \xB7 ${workflow.platform ?? "?"}${workflow.channel ? ` \xB7 ${workflow.channel}` : ""} \xB7 ${slug}` : `longform \xB7 ${slug}`;
   const body3 = html6`
-    <div data-review-ui="longform" class="er-review-shell">
-      ${renderEditorialFolio("reviews", `longform \xB7 ${workflow.slug}`)}
+    <div data-review-ui="${reviewUiAttr}" class="er-review-shell">
+      ${renderEditorialFolio("reviews", folioSpine)}
+      ${shortformMeta}
       <div class="er-draft-frame">
         <div id="draft-body" data-draft-body
           title="Double-click to edit · select text to leave a margin note">${unsafe(bodyHtml)}</div>
@@ -25623,7 +25829,7 @@ async function renderReviewPage(ctx, lookup, query, getIndex) {
         <a class="er-strip-back" href="/dev/editorial-studio" title="Back to the editorial studio">← studio</a>
         <span class="er-strip-galley">Galley <em>№ ${currentVersion.version}</em></span>
         <span class="er-strip-slug">${workflow.site} / ${workflow.slug}</span>
-        ${renderVersionsStrip(versions2, site, contentKind, currentVersion)}
+        ${renderVersionsStrip(versions2, resolvedSite, contentKind, currentVersion)}
         <span class="er-strip-center">
           <span class="er-stamp er-stamp-big er-stamp-${workflow.state}" data-state-label>
             ${stateLabel2(workflow.state)}
@@ -25634,8 +25840,8 @@ async function renderReviewPage(ctx, lookup, query, getIndex) {
       </div>
       ${renderMarginalia()}
       <button class="er-pencil-btn" data-add-comment-btn hidden type="button">Mark</button>
-      ${renderOutlineDrawer(outlineHtml)}
-      ${renderScrapbookDrawer(ctx, site, reviewEntry, workflow.slug, reviewIndex)}
+      ${isShortform ? unsafe("") : renderOutlineDrawer(outlineHtml)}
+      ${isShortform ? unsafe("") : renderScrapbookDrawer(ctx, resolvedSite, reviewEntry, workflow.slug, reviewIndex)}
       <div class="er-toast" data-toast hidden></div>
       ${renderShortcutsOverlay()}
       <div class="er-poll-indicator" data-poll>auto-refresh · 8s</div>
@@ -25660,27 +25866,20 @@ var PLATFORM_ORDER = ["reddit", "linkedin", "youtube", "instagram"];
 function siteLabel2(site) {
   return site.slice(0, 2).toUpperCase();
 }
-function loadCards(ctx) {
+function loadOpenShortform(ctx) {
   const open = [];
   for (const w of listOpen(ctx.projectRoot, ctx.config)) {
     if (w.contentKind === "shortform") open.push(w);
   }
-  const cards = open.map((w) => {
-    const versions2 = readVersions(ctx.projectRoot, ctx.config, w.id);
-    const currentVersion = versions2.find((v) => v.version === w.currentVersion) ?? null;
-    return { workflow: w, currentVersion };
-  });
-  cards.sort(
-    (a, b) => b.workflow.updatedAt.localeCompare(a.workflow.updatedAt)
-  );
-  return cards;
+  open.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return open;
 }
-function groupByPlatform(cards) {
+function groupByPlatform(workflows) {
   const byPlatform = /* @__PURE__ */ new Map();
-  for (const card of cards) {
-    const key2 = card.workflow.platform ?? "other";
+  for (const w of workflows) {
+    const key2 = w.platform ?? "other";
     const list3 = byPlatform.get(key2) ?? [];
-    list3.push(card);
+    list3.push(w);
     byPlatform.set(key2, list3);
   }
   const ordered = [
@@ -25691,59 +25890,69 @@ function groupByPlatform(cards) {
   ];
   return { byPlatform, ordered };
 }
-function renderCard(card) {
-  const { workflow: w, currentVersion } = card;
-  const channelMarkup = w.channel ? unsafe(html6`<span class="channel">${w.channel}</span>`) : "";
+function fmtRelTime2(iso, now) {
+  const t = new Date(iso).getTime();
+  const s = Math.max(0, Math.floor((now.getTime() - t) / 1e3));
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 48) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+function renderRow2(w, now) {
+  const channelMarkup = w.channel ? unsafe(html6`<span class="channel">${w.channel}</span>`) : unsafe("");
+  const reviewUrl = `/dev/editorial-review/${w.id}`;
   return unsafe(html6`
-    <article id="workflow-${w.id}" class="er-galley"
-      data-platform="${w.platform ?? "other"}"
+    <a class="er-row er-shortform-row"
+      href="${reviewUrl}"
       data-workflow-id="${w.id}"
-      data-before-version="${w.currentVersion}"
+      data-platform="${w.platform ?? "other"}"
       data-state="${w.state}"
       data-site="${w.site}">
-      <span class="er-galley-accent"></span>
-      <header class="er-galley-head">
-        <span class="er-row-site er-row-site--${w.site}" title="${w.site}">${siteLabel2(w.site)}</span>
-        <h3>${w.slug}</h3>
-        ${channelMarkup}
-        <span class="er-stamp er-stamp-${w.state}">${w.state.replace("-", " ")}</span>
-        <span class="version">v${w.currentVersion}</span>
-      </header>
-      <textarea data-text>${currentVersion?.markdown ?? ""}</textarea>
-      <div class="er-galley-actions">
-        <button type="button" class="er-btn er-btn-primary" data-action="save">Save as new version</button>
-        <button type="button" class="er-btn er-btn-approve" data-action="approve">Approve</button>
-        <button type="button" class="er-btn" data-action="iterate">Iterate</button>
-        <button type="button" class="er-btn er-btn-reject" data-action="reject">Reject</button>
-        <span style="font-family: var(--er-font-mono); font-size: 0.7rem; color: var(--er-faded); margin-left: auto;" data-hint></span>
-      </div>
-    </article>`);
+      <span class="er-row-num">→</span>
+      <span class="er-row-site er-row-site--${w.site}" title="${w.site}">${siteLabel2(w.site)}</span>
+      <span class="er-row-slug">${w.slug}</span>
+      ${channelMarkup}
+      <span class="er-stamp er-stamp-${w.state}">${w.state.replace("-", " ")}</span>
+      <span class="er-row-ts">v${w.currentVersion} · ${fmtRelTime2(w.updatedAt, now)}</span>
+      <span class="er-row-hint">Open in review →</span>
+    </a>`);
 }
-function renderPlatformSection(platform, cards) {
+function renderPlatformSection(platform, workflows, now) {
+  const rows = workflows.map((w) => renderRow2(w, now).__raw).join("");
   return unsafe(html6`
     <section class="er-platform-section">
       <div class="er-platform-header">
         <h2>${platform}</h2>
-        <span class="er-platform-count">№ ${String(cards.length).padStart(2, "0")}</span>
+        <span class="er-platform-count">№ ${String(workflows.length).padStart(2, "0")}</span>
       </div>
-      ${cards.map(renderCard)}
+      ${unsafe(rows)}
     </section>`);
 }
-function renderShortformPage(ctx, focus = null) {
-  const cards = loadCards(ctx);
-  const { byPlatform, ordered } = groupByPlatform(cards);
-  const cardsBlock = cards.length === 0 ? html6`<div class="er-empty" style="margin-top: var(--er-space-5);">
-        No short-form galleys on the desk.<br />
-        Start one with <code>/editorial-shortform-draft --site &lt;site&gt; &lt;slug&gt; &lt;platform&gt;</code>
-      </div>` : ordered.map((p2) => renderPlatformSection(p2, byPlatform.get(p2) ?? []).__raw).join("");
+function renderEmptyState() {
+  const platformList = PLATFORM_ORDER.join(", ");
+  return unsafe(html6`
+    <div class="er-empty" style="margin-top: var(--er-space-5);">
+      No short-form galleys on the desk.<br />
+      Supported platforms: <em>${platformList}</em>.<br />
+      Start a new shortform draft from the dashboard's
+      <a href="/dev/editorial-studio">coverage matrix</a>.
+    </div>`);
+}
+function renderShortformPage(ctx) {
+  const workflows = loadOpenShortform(ctx);
+  const { byPlatform, ordered } = groupByPlatform(workflows);
+  const now = ctx.now ? ctx.now() : /* @__PURE__ */ new Date();
+  const cardsBlock = workflows.length === 0 ? renderEmptyState().__raw : ordered.map((p2) => renderPlatformSection(p2, byPlatform.get(p2) ?? [], now).__raw).join("");
   const body3 = html6`
     ${renderEditorialFolio("reviews", "shortform desk")}
     <header class="er-pagehead er-pagehead--centered">
       <p class="er-pagehead__kicker">All sites · short form</p>
       <h1 class="er-pagehead__title">The <em>compositor</em>'s desk</h1>
-      <p class="er-pagehead__deck">Social copy, one galley slip per platform.</p>
+      <p class="er-pagehead__deck">Open shortform galleys — click any row to open the unified review surface.</p>
       <p class="er-pagehead__meta">
-        <span>${cards.length} in flight</span>
+        <span>${workflows.length} in flight</span>
         <span class="sep">·</span>
         <span>${ordered.length} ${ordered.length === 1 ? "platform" : "platforms"}</span>
       </p>
@@ -25754,8 +25963,7 @@ function renderShortformPage(ctx, focus = null) {
         <a href="/dev/editorial-studio">← back to the studio</a>
       </p>
     </main>
-    <div class="er-toast" id="toast" hidden></div>
-    <div class="er-poll-indicator" data-poll>auto-refresh · 10s</div>`;
+    <div class="er-toast" id="toast" hidden></div>`;
   return layout({
     title: "Short form \u2014 all sites \u2014 dev",
     cssHrefs: [
@@ -25765,7 +25973,7 @@ function renderShortformPage(ctx, focus = null) {
     ],
     bodyAttrs: 'data-review-ui="shortform"',
     bodyHtml: body3,
-    embeddedJson: focus ? [{ id: "", attr: "data-shortform-focus", data: focus }] : [],
+    embeddedJson: [],
     scriptModules: ["/static/dist/editorial-studio-client.js"]
   });
 }
@@ -27806,7 +28014,7 @@ function buildReviewRedirectUrl(entryId, requestUrl) {
   return `/dev/editorial-review/${entryId}${search2}`;
 }
 function publicDir() {
-  const here = dirname4(fileURLToPath2(import.meta.url));
+  const here = dirname5(fileURLToPath2(import.meta.url));
   const candidates = [
     resolve2(here, "..", "public"),
     resolve2(here, "..", "..", "..", "plugins", "deskwork-studio", "public")
@@ -27832,40 +28040,43 @@ function createApp(ctx) {
   app.get("/dev/editorial-help", (c) => c.html(renderHelpPage(ctx)));
   app.get(
     "/dev/editorial-review-shortform",
-    (c) => c.html(renderShortformPage(ctx, c.req.query("focus") ?? null))
+    (c) => c.html(renderShortformPage(ctx))
   );
   app.get(
     "/dev/editorial-review/:id{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}",
     async (c) => {
       const id = c.req.param("id");
       const siteParam = c.req.query("site") ?? ctx.config.defaultSite;
-      const lookup = resolveEntryById(ctx, siteParam, id);
       const getIndex = (s) => getRequestContentIndex(c, ctx, s);
+      const reviewQuery = {
+        site: c.req.query("site") ?? null,
+        version: c.req.query("v") ?? null,
+        kind: c.req.query("kind") ?? null
+      };
+      const wf = readWorkflow(ctx.projectRoot, ctx.config, id);
+      if (wf !== null) {
+        return c.html(
+          await renderReviewPage(
+            ctx,
+            { kind: "workflow", workflowId: id },
+            reviewQuery,
+            getIndex
+          )
+        );
+      }
+      const lookup = resolveEntryById(ctx, siteParam, id);
       if (lookup === null) {
         return c.html(
           await renderReviewPage(
             ctx,
             { kind: "id", entryId: id, slug: id },
-            {
-              site: c.req.query("site") ?? null,
-              version: c.req.query("v") ?? null,
-              kind: c.req.query("kind") ?? null
-            },
+            reviewQuery,
             getIndex
           )
         );
       }
       return c.html(
-        await renderReviewPage(
-          ctx,
-          lookup,
-          {
-            site: c.req.query("site") ?? null,
-            version: c.req.query("v") ?? null,
-            kind: c.req.query("kind") ?? null
-          },
-          getIndex
-        )
+        await renderReviewPage(ctx, lookup, reviewQuery, getIndex)
       );
     }
   );

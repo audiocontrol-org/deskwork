@@ -144,7 +144,11 @@ function fmtRelTime(iso: string, now: Date): string {
 
 function workflowLink(w: DraftWorkflowItem): string {
   if (w.contentKind === 'shortform') {
-    return `/dev/editorial-review-shortform?focus=${w.id}#workflow-${w.id}`;
+    // Phase 21c: shortform now renders inside the unified review
+    // surface. Workflow-id deep-links land on the right workflow
+    // without first resolving an entry id — the route handler
+    // recognises a workflow id and dispatches accordingly.
+    return `/dev/editorial-review/${w.id}`;
   }
   // Phase 19d: prefer the canonical id-based URL when the workflow
   // carries entryId. The legacy slug URL still works (server.ts will
@@ -229,6 +233,19 @@ function loadDashboardData(
     const key = covKey(d.site, d.slug, d.entryId);
     const set = shortformCoverage.get(key) ?? new Set<Platform>();
     set.add(d.platform);
+    shortformCoverage.set(key, set);
+  }
+  // Phase 21c — shortform workflows count as coverage too. Distributions
+  // come from the calendar (an `editorial-publish` side-effect), so a
+  // freshly-started shortform draft (no published-yet distribution
+  // record) wouldn't show in the matrix without this branch.
+  for (const w of workflows) {
+    if (w.contentKind !== 'shortform') continue;
+    if (w.state === 'applied' || w.state === 'cancelled') continue;
+    if (!w.platform || !isPlatform(w.platform)) continue;
+    const key = covKey(w.site, w.slug, w.entryId);
+    const set = shortformCoverage.get(key) ?? new Set<Platform>();
+    set.add(w.platform);
     shortformCoverage.set(key, set);
   }
 
@@ -702,19 +719,58 @@ function renderStageSection(
     </section>`);
 }
 
+/**
+ * Shortform workflow lookup keyed by (site, entryId|slug, platform).
+ * Built once per dashboard render so the coverage matrix can render
+ * each covered cell as a direct link to the workflow's review surface
+ * — phase 21c replaces the prior "✓" sigil + copy-CLI-command flow.
+ */
+function indexShortformWorkflows(
+  data: DashboardData,
+): Map<string, DraftWorkflowItem> {
+  const out = new Map<string, DraftWorkflowItem>();
+  for (const w of data.workflows) {
+    if (w.contentKind !== 'shortform') continue;
+    if (w.state === 'applied' || w.state === 'cancelled') continue;
+    if (!w.platform) continue;
+    const key = `${covKey(w.site, w.slug, w.entryId)}::${w.platform}`;
+    out.set(key, w);
+  }
+  return out;
+}
+
 function renderShortformMatrix(data: DashboardData, ctx: StudioContext): RawHtml {
   if (data.publishedBlogEntries.length === 0) return unsafe('');
+  const wfIndex = indexShortformWorkflows(data);
   const rows = data.publishedBlogEntries.map(({ site, entry }) => {
     const covered =
       data.shortformCoverage.get(covKey(site, entry.slug, entry.id)) ??
       new Set<Platform>();
     const cells = PLATFORMS_ORDER.map((p) => {
       const has = covered.has(p);
-      const inner = has
-        ? html`<span class="er-sf-check" title="${p} copy drafted">✓</span>`
-        : html`<button class="er-copy-btn er-sf-draft-btn" type="button"
-            data-copy="/editorial-shortform-draft --site ${site} ${entry.slug} ${p}"
-            title="copy /editorial-shortform-draft for ${p}">draft</button>`;
+      const wfKey = `${covKey(site, entry.slug, entry.id)}::${p}`;
+      const wf = wfIndex.get(wfKey);
+      // A covered cell with a live workflow → link straight into the
+      // unified review surface. A covered cell without a workflow
+      // (distribution recorded outside the studio's pipeline — legacy
+      // data) keeps the static "✓" so the matrix doesn't lie about
+      // what's clickable. Empty cells render a real start button that
+      // POSTs to /api/dev/editorial-review/start-shortform and
+      // navigates to the new workflow's review URL.
+      let inner: string;
+      if (has && wf) {
+        inner = html`<a class="er-sf-link" href="/dev/editorial-review/${wf.id}"
+          title="${p} workflow · open in review">✓</a>`;
+      } else if (has) {
+        inner = html`<span class="er-sf-check" title="${p} copy drafted">✓</span>`;
+      } else {
+        inner = html`<button class="er-sf-start-btn" type="button"
+          data-action="start-shortform"
+          data-site="${site}"
+          data-slug="${entry.slug}"
+          data-platform="${p}"
+          title="Start a ${p} shortform draft for ${entry.slug}">start</button>`;
+      }
       const cls = has ? 'er-sf-cell er-sf-cell-covered' : 'er-sf-cell er-sf-cell-empty';
       return html`<td class="${cls}">${unsafe(inner)}</td>`;
     }).join('');
@@ -858,11 +914,10 @@ function renderSidebar(data: DashboardData): RawHtml {
         <div class="er-slip-header">Short form</div>
         <h3 class="er-slip-title">Social copy</h3>
         <p style="font-size: 0.85rem; margin: 0 0 var(--er-space-1); color: var(--er-ink-soft);">
-          Agent-drafted. Run in Claude Code:
+          Click <em>start</em> in the coverage matrix above to begin a
+          shortform draft. Edit, iterate, and approve in the unified
+          review surface.
         </p>
-        <code style="display: block; font-size: 0.72rem; padding: var(--er-space-1) var(--er-space-2); word-break: break-all; background: var(--er-paper-2);">
-          /editorial-shortform-draft --site &lt;site&gt; &lt;slug&gt; &lt;platform&gt; [channel]
-        </code>
         <p style="margin-top: var(--er-space-2);">
           <a href="/dev/editorial-review-shortform">Go to the shortform desk →</a>
         </p>
