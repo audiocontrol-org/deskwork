@@ -31,6 +31,27 @@ The plugins ship with self-contained ESM bundles (`packages/cli/bundle/cli.mjs`,
 
 See each plugin's `README.md` under `plugins/` for configuration and usage.
 
+### Getting updates
+
+deskwork tracks the default branch of `audiocontrol-org/deskwork`. To pull the latest:
+
+```
+/plugin marketplace update deskwork
+/reload-plugins
+```
+
+By default, third-party marketplaces don't auto-update — run those two commands when you want to refresh. To toggle auto-update, use `/plugin` and look for the **Marketplaces** tab.
+
+### Pinning to a stable release
+
+Tagged releases (e.g. `v0.1.0`) give a stable point-in-time ref. Pin to one at install time:
+
+```
+/plugin marketplace add audiocontrol-org/deskwork#v0.1.0
+```
+
+Releases are listed at <https://github.com/audiocontrol-org/deskwork/releases>. The release procedure is documented in [`RELEASING.md`](./RELEASING.md) for contributors.
+
 ### Repository layout
 
 ```
