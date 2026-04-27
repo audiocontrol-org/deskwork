@@ -375,10 +375,10 @@ Tasks are grouped by sub-phase to allow each to land as a separate PR if needed.
 
 #### 16a — Documentation (close perception gap)
 
-- [ ] Add a "Hierarchical content" section to `plugins/deskwork/README.md` showing: hierarchical slugs (`<project>/<chapter>`), per-entry on-disk shape (`<slug>/index.md`, `<slug>/README.md`, flat `<slug>.md`), and the `outline --layout {index|readme|flat}` flag.
-- [ ] Add a "Hierarchical layouts" example block to `plugins/deskwork/skills/ingest/SKILL.md` using the `the-outbound/characters/strivers` shape — show the actual command, the actual slugs produced, and the `directoryIsHierarchicalNode` rule (ancestors prefix the slug only when they have their own `index.md`/`README.md`).
-- [ ] Add a "Hierarchical content" line to the root `README.md` "Features" / "Capabilities" section so prospective adopters see it before installing.
-- [ ] Add `docs/1.0/001-IN-PROGRESS/deskwork-plugin/mockups/birds-eye-content-view.html` reference to the feature README.
+- [x] Add a "Hierarchical content" section to `plugins/deskwork/README.md` showing: hierarchical slugs (`<project>/<chapter>`), per-entry on-disk shape (`<slug>/index.md`, `<slug>/README.md`, flat `<slug>.md`), and the `outline --layout {index|readme|flat}` flag.
+- [x] Add a "Hierarchical layouts" example block to `plugins/deskwork/skills/ingest/SKILL.md` using the `the-outbound/characters/strivers` shape — show the actual command, the actual slugs produced, and the `directoryIsHierarchicalNode` rule (ancestors prefix the slug only when they have their own `index.md`/`README.md`).
+- [x] Add a "Hierarchical content" line to the root `README.md` "Features" / "Capabilities" section so prospective adopters see it before installing.
+- [x] Add `docs/1.0/001-IN-PROGRESS/deskwork-plugin/mockups/birds-eye-content-view.html` reference to the feature README.
 
 **Acceptance:** The writingcontrol team — or anyone reading the docs cold — can answer "does deskwork support hierarchical content?" with "yes" within 60 seconds, and find the working example without source-diving.
 

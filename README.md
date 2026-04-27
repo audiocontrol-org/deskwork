@@ -7,9 +7,16 @@ Open-source plugins for [Claude Code](https://claude.com/claude-code). Flagship 
 | Name | Status | Purpose |
 |---|---|---|
 | `deskwork` | Shipping (v0) | Editorial calendar lifecycle: capture, plan, outline, draft, review, publish |
-| `deskwork-studio` | Shipping (v0) | Optional local Hono web surface — dashboard, review pane, scrapbook, manual |
+| `deskwork-studio` | Shipping (v0) | Optional local Hono web surface — dashboard, review pane, scrapbook, content view, manual |
 | `feature-image` | Planned | Feature image generation for blog posts and pages |
 | `analytics` | Planned | Content performance analytics |
+
+### Capabilities
+
+- **Editorial lifecycle** — Ideas → Planned → Outlining → Drafting → Review → Published, with structured review iteration loops.
+- **Hierarchical content** — slugs accept `/`-separated segments (`the-outbound/characters/strivers`) and every lifecycle skill, calendar surface, and studio page works at any depth. Long-form projects (novels, essay collections, multi-chapter guides) live alongside flat blog posts in the same calendar. Per-entry `--layout {index|readme|flat}` controls the on-disk shape; `directoryIsHierarchicalNode` keeps untracked organizational dirs out of the slug.
+- **Backfill existing content** — `/deskwork:ingest` walks paths, derives slugs from the on-disk layout, and adds rows to the calendar after a dry-run.
+- **Studio web surface** — local Hono server with dashboard, longform review pane, shortform desk, scrapbook viewer, and bird's-eye content view.
 
 ### Installation
 
