@@ -3,11 +3,12 @@
  * @deskwork/studio — local web server for the editorial review surface.
  *
  * Usage:
- *   deskwork-studio [--project-root <path>] [--port <n>]
+ *   deskwork-studio [--project-root <path>] [--port <n>] [--host <addr>]
  *
  * Defaults:
  *   --project-root  process.cwd()
- *   --port          4321
+ *   --port          47321  (avoids the Astro dev server's default 4321)
+ *   --host          127.0.0.1 (loopback only — see security note in main())
  *
  * The server reads .deskwork/config.json from the project root, then
  * exposes:
@@ -38,15 +39,30 @@ import { renderReviewPage } from './pages/review.ts';
 import { renderShortformPage } from './pages/shortform.ts';
 import { renderHelpPage } from './pages/help.ts';
 import { renderScrapbookPage } from './pages/scrapbook.ts';
+import { detectTailscale, type TailscaleInfo } from './tailscale.ts';
 
 interface CliArgs {
   projectRoot: string;
   port: number;
+  /**
+   * Bind address explicitly requested by the operator via --host.
+   * `null` means "use the default policy" — bind to loopback AND any
+   * detected Tailscale interface (unless `--no-tailscale` was passed,
+   * in which case loopback only).
+   */
+  hostOverride: string | null;
+  /** When true, skip Tailscale auto-detection even if it's running. */
+  noTailscale: boolean;
 }
 
-function parseCliArgs(argv: string[]): CliArgs {
+const DEFAULT_PORT = 47321;
+const LOOPBACK = '127.0.0.1';
+
+export function parseCliArgs(argv: string[]): CliArgs {
   let projectRoot = process.cwd();
-  let port = 4321;
+  let port = DEFAULT_PORT;
+  let hostOverride: string | null = null;
+  let noTailscale = false;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--project-root' || a === '-r') {
@@ -61,6 +77,14 @@ function parseCliArgs(argv: string[]): CliArgs {
       port = parseInt(next, 10);
     } else if (a.startsWith('--port=')) {
       port = parseInt(a.slice('--port='.length), 10);
+    } else if (a === '--host' || a === '-H') {
+      const next = argv[++i];
+      if (!next) usage(`${a} requires a value`);
+      hostOverride = next;
+    } else if (a.startsWith('--host=')) {
+      hostOverride = a.slice('--host='.length);
+    } else if (a === '--no-tailscale') {
+      noTailscale = true;
     } else if (a === '--help' || a === '-h') {
       usage(null);
     } else {
@@ -73,19 +97,31 @@ function parseCliArgs(argv: string[]): CliArgs {
   return {
     projectRoot: isAbsolute(projectRoot) ? projectRoot : resolve(process.cwd(), projectRoot),
     port,
+    hostOverride,
+    noTailscale,
   };
 }
 
 function usage(error: string | null): never {
   const out = error ? process.stderr : process.stdout;
   if (error) out.write(`error: ${error}\n\n`);
-  out.write('Usage: deskwork-studio [--project-root <path>] [--port <n>]\n');
+  out.write('Usage: deskwork-studio [--project-root <path>] [--port <n>] [--host <addr>] [--no-tailscale]\n');
   out.write('\n');
   out.write('Options:\n');
   out.write('  -r, --project-root <path>   project root containing .deskwork/config.json\n');
   out.write('                              (default: cwd)\n');
-  out.write('  -p, --port <n>              listen on this port (default: 4321)\n');
+  out.write(`  -p, --port <n>              listen on this port (default: ${DEFAULT_PORT})\n`);
+  out.write('  -H, --host <addr>           bind address. When set, the studio binds ONLY to\n');
+  out.write('                              this address — overrides Tailscale auto-detection.\n');
+  out.write('                              Use 0.0.0.0 to expose on every interface (LAN +\n');
+  out.write('                              Tailscale + Wi-Fi). Studio has no auth; only do this\n');
+  out.write('                              on trusted networks.\n');
+  out.write('      --no-tailscale          skip Tailscale auto-detection (loopback only)\n');
   out.write('  -h, --help                  show this message\n');
+  out.write('\n');
+  out.write('Default networking policy: bind to 127.0.0.1 (loopback) AND, if Tailscale is\n');
+  out.write('running on this machine, the local Tailscale interface(s). Tailscale peers can\n');
+  out.write("then reach the studio at the magic-DNS hostname (e.g. '<machine>.<tailnet>.ts.net').\n");
   process.exit(error ? 2 : 0);
 }
 
@@ -161,7 +197,9 @@ export function createApp(ctx: StudioContext): Hono {
 }
 
 async function main(): Promise<void> {
-  const { projectRoot, port } = parseCliArgs(process.argv.slice(2));
+  const { projectRoot, port, hostOverride, noTailscale } = parseCliArgs(
+    process.argv.slice(2),
+  );
 
   let config;
   try {
@@ -175,15 +213,80 @@ async function main(): Promise<void> {
   const ctx: StudioContext = { projectRoot, config };
   const app = createApp(ctx);
 
-  // Bind to loopback only. The studio is dev-only — no auth, no review of
-  // mutation handlers against a hostile caller. Binding 0.0.0.0 (Hono's
-  // default) would expose the project tree and review APIs to anyone on the
-  // local network.
-  serve({ fetch: app.fetch, port, hostname: '127.0.0.1' }, (info) => {
-    process.stdout.write(`deskwork-studio listening on http://localhost:${info.port}/\n`);
-    process.stdout.write(`  project: ${projectRoot}\n`);
-    process.stdout.write(`  sites:   ${Object.keys(config.sites).join(', ')}\n`);
-  });
+  // Networking policy:
+  //   --host <addr>          → bind ONLY to that address (operator override)
+  //   --no-tailscale         → loopback only
+  //   default                → loopback + auto-detected Tailscale (if running)
+  //
+  // The studio is dev-only with no auth. Loopback is always safe.
+  // Tailscale's tailnet is treated as a trusted network — peers on the
+  // same tailnet are usually devices the operator owns. LAN/Wi-Fi
+  // exposure stays opt-in via `--host 0.0.0.0`.
+  let tailscale: TailscaleInfo | null = null;
+  let bindAddresses: string[];
+  if (hostOverride !== null) {
+    bindAddresses = [hostOverride];
+  } else if (noTailscale) {
+    bindAddresses = [LOOPBACK];
+  } else {
+    tailscale = detectTailscale();
+    bindAddresses = tailscale === null ? [LOOPBACK] : [LOOPBACK, ...tailscale.ipv4];
+  }
+
+  // Open a listener per address, in order, blocking briefly between so
+  // the banner stays grouped. Each `serve()` call returns its own
+  // server handle and runs independently — Node keeps the process
+  // alive as long as at least one is active.
+  const reachableUrls: string[] = [];
+  for (const addr of bindAddresses) {
+    serve({ fetch: app.fetch, port, hostname: addr }, () => {
+      reachableUrls.push(`http://${addr === LOOPBACK ? 'localhost' : addr}:${port}/`);
+      // When the last listener attaches, print the consolidated banner.
+      if (reachableUrls.length === bindAddresses.length) {
+        printBanner({
+          urls: reachableUrls,
+          projectRoot,
+          siteSlugs: Object.keys(config.sites),
+          tailscale,
+          port,
+          override: hostOverride,
+        });
+      }
+    });
+  }
+}
+
+interface BannerInput {
+  readonly urls: readonly string[];
+  readonly projectRoot: string;
+  readonly siteSlugs: readonly string[];
+  readonly tailscale: TailscaleInfo | null;
+  readonly port: number;
+  readonly override: string | null;
+}
+
+function printBanner(b: BannerInput): void {
+  process.stdout.write('deskwork-studio listening on:\n');
+  for (const url of b.urls) {
+    process.stdout.write(`  ${url}\n`);
+  }
+  if (b.tailscale && b.tailscale.magicDnsName) {
+    process.stdout.write(
+      `  http://${b.tailscale.magicDnsName}:${b.port}/    (Tailscale magic-DNS)\n`,
+    );
+  }
+  process.stdout.write(`  project: ${b.projectRoot}\n`);
+  process.stdout.write(`  sites:   ${b.siteSlugs.join(', ')}\n`);
+  // Loud warning when bound beyond loopback + Tailscale tailnet.
+  // Tailscale interfaces (100.64.0.0/10) are considered trusted; an
+  // explicit --host other than loopback is not.
+  const exposed = b.override !== null && b.override !== LOOPBACK;
+  if (exposed) {
+    process.stdout.write(
+      `  ⚠ bound to ${b.override}. Studio has no authentication —\n` +
+        '    only run this on a trusted network (Tailscale, VPN, etc.).\n',
+    );
+  }
 }
 
 // Only run when invoked directly, not when imported from tests. Resolve

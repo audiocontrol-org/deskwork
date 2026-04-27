@@ -25466,10 +25466,66 @@ function renderScrapbookPage(ctx, site, path) {
   });
 }
 
+// src/tailscale.ts
+import { spawnSync } from "node:child_process";
+import { networkInterfaces } from "node:os";
+function isTailscaleIPv4(addr) {
+  const parts = addr.split(".");
+  if (parts.length !== 4) return false;
+  const a = Number(parts[0]);
+  const b = Number(parts[1]);
+  if (a !== 100) return false;
+  if (!Number.isFinite(b)) return false;
+  return b >= 64 && b <= 127;
+}
+function detectTailscaleIPv4Addresses() {
+  const interfaces = networkInterfaces();
+  const found = [];
+  for (const addrs of Object.values(interfaces)) {
+    if (!addrs) continue;
+    for (const a of addrs) {
+      if (a.family !== "IPv4") continue;
+      if (a.internal) continue;
+      if (isTailscaleIPv4(a.address)) {
+        found.push(a.address);
+      }
+    }
+  }
+  return found.sort();
+}
+function detectTailscaleMagicDnsName() {
+  const result = spawnSync("tailscale", ["status", "--json"], {
+    encoding: "utf-8",
+    timeout: 1500
+  });
+  if (result.error || result.status !== 0 || !result.stdout) return null;
+  let parsed;
+  try {
+    parsed = JSON.parse(result.stdout);
+  } catch {
+    return null;
+  }
+  if (!parsed || typeof parsed !== "object") return null;
+  const self2 = parsed.Self;
+  if (!self2 || typeof self2 !== "object") return null;
+  const dnsName = self2.DNSName;
+  if (typeof dnsName !== "string" || dnsName.length === 0) return null;
+  return dnsName.endsWith(".") ? dnsName.slice(0, -1) : dnsName;
+}
+function detectTailscale() {
+  const ipv4 = detectTailscaleIPv4Addresses();
+  if (ipv4.length === 0) return null;
+  return { ipv4, magicDnsName: detectTailscaleMagicDnsName() };
+}
+
 // src/server.ts
+var DEFAULT_PORT = 47321;
+var LOOPBACK = "127.0.0.1";
 function parseCliArgs(argv) {
   let projectRoot = process.cwd();
-  let port = 4321;
+  let port = DEFAULT_PORT;
+  let hostOverride = null;
+  let noTailscale = false;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--project-root" || a === "-r") {
@@ -25484,6 +25540,14 @@ function parseCliArgs(argv) {
       port = parseInt(next, 10);
     } else if (a.startsWith("--port=")) {
       port = parseInt(a.slice("--port=".length), 10);
+    } else if (a === "--host" || a === "-H") {
+      const next = argv[++i];
+      if (!next) usage(`${a} requires a value`);
+      hostOverride = next;
+    } else if (a.startsWith("--host=")) {
+      hostOverride = a.slice("--host=".length);
+    } else if (a === "--no-tailscale") {
+      noTailscale = true;
     } else if (a === "--help" || a === "-h") {
       usage(null);
     } else {
@@ -25495,7 +25559,9 @@ function parseCliArgs(argv) {
   }
   return {
     projectRoot: isAbsolute(projectRoot) ? projectRoot : resolve2(process.cwd(), projectRoot),
-    port
+    port,
+    hostOverride,
+    noTailscale
   };
 }
 function usage(error) {
@@ -25503,13 +25569,24 @@ function usage(error) {
   if (error) out.write(`error: ${error}
 
 `);
-  out.write("Usage: deskwork-studio [--project-root <path>] [--port <n>]\n");
+  out.write("Usage: deskwork-studio [--project-root <path>] [--port <n>] [--host <addr>] [--no-tailscale]\n");
   out.write("\n");
   out.write("Options:\n");
   out.write("  -r, --project-root <path>   project root containing .deskwork/config.json\n");
   out.write("                              (default: cwd)\n");
-  out.write("  -p, --port <n>              listen on this port (default: 4321)\n");
+  out.write(`  -p, --port <n>              listen on this port (default: ${DEFAULT_PORT})
+`);
+  out.write("  -H, --host <addr>           bind address. When set, the studio binds ONLY to\n");
+  out.write("                              this address \u2014 overrides Tailscale auto-detection.\n");
+  out.write("                              Use 0.0.0.0 to expose on every interface (LAN +\n");
+  out.write("                              Tailscale + Wi-Fi). Studio has no auth; only do this\n");
+  out.write("                              on trusted networks.\n");
+  out.write("      --no-tailscale          skip Tailscale auto-detection (loopback only)\n");
   out.write("  -h, --help                  show this message\n");
+  out.write("\n");
+  out.write("Default networking policy: bind to 127.0.0.1 (loopback) AND, if Tailscale is\n");
+  out.write("running on this machine, the local Tailscale interface(s). Tailscale peers can\n");
+  out.write("then reach the studio at the magic-DNS hostname (e.g. '<machine>.<tailnet>.ts.net').\n");
   process.exit(error ? 2 : 0);
 }
 function publicDir() {
@@ -25566,7 +25643,9 @@ function createApp(ctx) {
   return app;
 }
 async function main() {
-  const { projectRoot, port } = parseCliArgs(process.argv.slice(2));
+  const { projectRoot, port, hostOverride, noTailscale } = parseCliArgs(
+    process.argv.slice(2)
+  );
   let config;
   try {
     config = readConfig(projectRoot);
@@ -25578,18 +25657,62 @@ async function main() {
   }
   const ctx = { projectRoot, config };
   const app = createApp(ctx);
-  serve({ fetch: app.fetch, port, hostname: "127.0.0.1" }, (info) => {
-    process.stdout.write(`deskwork-studio listening on http://localhost:${info.port}/
+  let tailscale = null;
+  let bindAddresses;
+  if (hostOverride !== null) {
+    bindAddresses = [hostOverride];
+  } else if (noTailscale) {
+    bindAddresses = [LOOPBACK];
+  } else {
+    tailscale = detectTailscale();
+    bindAddresses = tailscale === null ? [LOOPBACK] : [LOOPBACK, ...tailscale.ipv4];
+  }
+  const reachableUrls = [];
+  for (const addr of bindAddresses) {
+    serve({ fetch: app.fetch, port, hostname: addr }, () => {
+      reachableUrls.push(`http://${addr === LOOPBACK ? "localhost" : addr}:${port}/`);
+      if (reachableUrls.length === bindAddresses.length) {
+        printBanner({
+          urls: reachableUrls,
+          projectRoot,
+          siteSlugs: Object.keys(config.sites),
+          tailscale,
+          port,
+          override: hostOverride
+        });
+      }
+    });
+  }
+}
+function printBanner(b) {
+  process.stdout.write("deskwork-studio listening on:\n");
+  for (const url of b.urls) {
+    process.stdout.write(`  ${url}
 `);
-    process.stdout.write(`  project: ${projectRoot}
+  }
+  if (b.tailscale && b.tailscale.magicDnsName) {
+    process.stdout.write(
+      `  http://${b.tailscale.magicDnsName}:${b.port}/    (Tailscale magic-DNS)
+`
+    );
+  }
+  process.stdout.write(`  project: ${b.projectRoot}
 `);
-    process.stdout.write(`  sites:   ${Object.keys(config.sites).join(", ")}
+  process.stdout.write(`  sites:   ${b.siteSlugs.join(", ")}
 `);
-  });
+  const exposed = b.override !== null && b.override !== LOOPBACK;
+  if (exposed) {
+    process.stdout.write(
+      `  \u26A0 bound to ${b.override}. Studio has no authentication \u2014
+    only run this on a trusted network (Tailscale, VPN, etc.).
+`
+    );
+  }
 }
 if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath2(import.meta.url)) {
   await main();
 }
 export {
-  createApp
+  createApp,
+  parseCliArgs
 };
