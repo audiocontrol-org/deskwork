@@ -68,6 +68,7 @@ const STAGE_ORNAMENTS: Record<Stage, string> = {
   Outlining: '⊹',
   Drafting: '✎',
   Review: '※',
+  Paused: '⏸',
   Published: '✓',
 };
 
@@ -294,6 +295,7 @@ const STAGE_EMPTY_MESSAGES: Record<Stage, string> = {
   Outlining: 'Nothing in outlining. /editorial-outline <slug> to start one.',
   Drafting: 'No posts in drafting.',
   Review: 'Nothing in review stage.',
+  Paused: 'Nothing paused. /deskwork:pause <slug> sets an entry aside without losing where it was.',
   Published: 'No published posts yet.',
 };
 
@@ -316,6 +318,11 @@ function renderRowMeta(
   }
   if (entry.datePublished && stage === 'Published') {
     parts.push(unsafe(html`<span class="er-calendar-meta">${entry.datePublished}</span>`));
+  }
+  if (stage === 'Paused' && entry.pausedFrom) {
+    parts.push(
+      unsafe(html`<span class="er-calendar-meta"><em>was:</em> ${entry.pausedFrom}</span>`),
+    );
   }
   if (kind !== 'blog') {
     parts.push(unsafe(html`<span class="er-calendar-meta er-calendar-meta-kind">${kind}</span>`));
@@ -399,6 +406,22 @@ function renderRowActions(
     buttons.push(html`<button class="er-btn er-btn-small er-copy-btn" type="button"
       data-copy="/editorial-draft-review --site ${site} ${entry.slug}"
       title="re-review a published post">re-review</button>`);
+  }
+  // #27 — Paused gets a "resume" copy; pausable stages get a "pause" copy.
+  if (stage === 'Paused') {
+    buttons.push(html`<button class="er-btn er-btn-small er-btn-primary er-copy-btn" type="button"
+      data-copy="/deskwork:resume --site ${site} ${entry.slug}"
+      title="restore to ${entry.pausedFrom ?? 'prior stage'}">resume →</button>`);
+  } else if (
+    stage === 'Ideas' ||
+    stage === 'Planned' ||
+    stage === 'Outlining' ||
+    stage === 'Drafting' ||
+    stage === 'Review'
+  ) {
+    buttons.push(html`<button class="er-btn er-btn-small er-copy-btn" type="button"
+      data-copy="/deskwork:pause --site ${site} ${entry.slug}"
+      title="set aside without losing the prior stage">pause</button>`);
   }
   if (kind === 'blog') {
     buttons.push(html`<button class="er-btn er-btn-small" type="button" data-action="rename-open"

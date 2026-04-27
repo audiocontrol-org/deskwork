@@ -23657,8 +23657,19 @@ var STAGES = [
   "Outlining",
   "Drafting",
   "Review",
+  "Paused",
   "Published"
 ];
+var PAUSABLE_STAGES = [
+  "Ideas",
+  "Planned",
+  "Outlining",
+  "Drafting",
+  "Review"
+];
+function isPausable(stage) {
+  return PAUSABLE_STAGES.includes(stage);
+}
 function isStage(value) {
   return STAGES.includes(value);
 }
@@ -23734,6 +23745,10 @@ function parseEntries(lines, stage) {
       if (url) entry.contentUrl = url;
       const filePath = col(cells2, cols, "filepath");
       if (filePath) entry.filePath = filePath;
+      const pausedFrom = col(cells2, cols, "pausedfrom");
+      if (pausedFrom && isStage(pausedFrom) && isPausable(pausedFrom)) {
+        entry.pausedFrom = pausedFrom;
+      }
       const published = col(cells2, cols, "published");
       if (published) entry.datePublished = published;
       const issue = col(cells2, cols, "issue");
@@ -24137,6 +24152,7 @@ var STAGE_ORNAMENTS = {
   Outlining: "\u22B9",
   Drafting: "\u270E",
   Review: "\u203B",
+  Paused: "\u23F8",
   Published: "\u2713"
 };
 var MONTH_NAMES = [
@@ -24314,6 +24330,7 @@ var STAGE_EMPTY_MESSAGES = {
   Outlining: "Nothing in outlining. /editorial-outline <slug> to start one.",
   Drafting: "No posts in drafting.",
   Review: "Nothing in review stage.",
+  Paused: "Nothing paused. /deskwork:pause <slug> sets an entry aside without losing where it was.",
   Published: "No published posts yet."
 };
 function renderRowMeta(ctx, site, entry, stage, hasFile) {
@@ -24329,6 +24346,11 @@ function renderRowMeta(ctx, site, entry, stage, hasFile) {
   }
   if (entry.datePublished && stage === "Published") {
     parts.push(unsafe(html6`<span class="er-calendar-meta">${entry.datePublished}</span>`));
+  }
+  if (stage === "Paused" && entry.pausedFrom) {
+    parts.push(
+      unsafe(html6`<span class="er-calendar-meta"><em>was:</em> ${entry.pausedFrom}</span>`)
+    );
   }
   if (kind !== "blog") {
     parts.push(unsafe(html6`<span class="er-calendar-meta er-calendar-meta-kind">${kind}</span>`));
@@ -24400,6 +24422,15 @@ function renderRowActions(site, entry, stage, hasFile, bodyWritten, wf) {
     buttons.push(html6`<button class="er-btn er-btn-small er-copy-btn" type="button"
       data-copy="/editorial-draft-review --site ${site} ${entry.slug}"
       title="re-review a published post">re-review</button>`);
+  }
+  if (stage === "Paused") {
+    buttons.push(html6`<button class="er-btn er-btn-small er-btn-primary er-copy-btn" type="button"
+      data-copy="/deskwork:resume --site ${site} ${entry.slug}"
+      title="restore to ${entry.pausedFrom ?? "prior stage"}">resume →</button>`);
+  } else if (stage === "Ideas" || stage === "Planned" || stage === "Outlining" || stage === "Drafting" || stage === "Review") {
+    buttons.push(html6`<button class="er-btn er-btn-small er-copy-btn" type="button"
+      data-copy="/deskwork:pause --site ${site} ${entry.slug}"
+      title="set aside without losing the prior stage">pause</button>`);
   }
   if (kind === "blog") {
     buttons.push(html6`<button class="er-btn er-btn-small" type="button" data-action="rename-open"

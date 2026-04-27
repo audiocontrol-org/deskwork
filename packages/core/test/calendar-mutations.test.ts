@@ -5,11 +5,14 @@ import {
   outlineEntry,
   draftEntry,
   publishEntry,
+  pauseEntry,
+  unpauseEntry,
   findEntry,
   addDistribution,
   slugify,
 } from '../src/calendar-mutations.ts';
-import type { EditorialCalendar } from '../src/types.ts';
+import { parseCalendar, renderCalendar } from '../src/calendar.ts';
+import { PAUSABLE_STAGES, type EditorialCalendar } from '../src/types.ts';
 
 function emptyCalendar(): EditorialCalendar {
   return { entries: [], distributions: [] };
@@ -150,6 +153,113 @@ describe('publishEntry', () => {
     expect(() => publishEntry(emptyCalendar(), 'missing')).toThrow(
       /No calendar entry found/,
     );
+  });
+});
+
+describe('pauseEntry / unpauseEntry (#27)', () => {
+  it('pauses from each non-terminal stage and resumes back to it', () => {
+    for (const targetStage of PAUSABLE_STAGES) {
+      const cal = emptyCalendar();
+      addEntry(cal, `Pause Me from ${targetStage}`);
+      const e = findEntry(cal, slugify(`Pause Me from ${targetStage}`))!;
+      e.stage = targetStage;
+
+      const paused = pauseEntry(cal, e.slug);
+      expect(paused.stage).toBe('Paused');
+      expect(paused.pausedFrom).toBe(targetStage);
+
+      const resumed = unpauseEntry(cal, e.slug);
+      expect(resumed.stage).toBe(targetStage);
+      expect(resumed.pausedFrom).toBeUndefined();
+    }
+  });
+
+  it('refuses to pause an already-Paused entry', () => {
+    const cal = emptyCalendar();
+    addEntry(cal, 'Already Paused');
+    pauseEntry(cal, 'already-paused');
+    expect(() => pauseEntry(cal, 'already-paused')).toThrow(/already Paused/);
+  });
+
+  it('refuses to pause a Published entry', () => {
+    const cal = emptyCalendar();
+    addEntry(cal, 'Shipped');
+    publishEntry(cal, 'shipped');
+    expect(() => pauseEntry(cal, 'shipped')).toThrow(/non-terminal stages/);
+  });
+
+  it('refuses to resume a non-Paused entry', () => {
+    const cal = emptyCalendar();
+    addEntry(cal, 'Idle');
+    expect(() => unpauseEntry(cal, 'idle')).toThrow(/only Paused/);
+  });
+
+  it('throws on unknown slug for both pause and resume', () => {
+    expect(() => pauseEntry(emptyCalendar(), 'missing')).toThrow(/No calendar entry/);
+    expect(() => unpauseEntry(emptyCalendar(), 'missing')).toThrow(/No calendar entry/);
+  });
+
+  it('refuses to resume when pausedFrom is missing (corrupt state)', () => {
+    const cal = emptyCalendar();
+    addEntry(cal, 'Hand Edit');
+    const e = findEntry(cal, 'hand-edit')!;
+    e.stage = 'Paused';
+    // pausedFrom intentionally absent — simulates a manually-edited
+    // calendar where the operator typed `Paused` without going
+    // through the mutation.
+    expect(() => unpauseEntry(cal, 'hand-edit')).toThrow(
+      /no pausedFrom/,
+    );
+  });
+
+  it('round-trips Paused + pausedFrom through parseCalendar / renderCalendar', () => {
+    const cal = emptyCalendar();
+    addEntry(cal, 'Drift Mid-Outline');
+    planEntry(cal, 'drift-mid-outline', ['x']);
+    outlineEntry(cal, 'drift-mid-outline');
+    pauseEntry(cal, 'drift-mid-outline');
+    const md = renderCalendar(cal);
+    expect(md).toContain('## Paused');
+    expect(md).toMatch(/PausedFrom/);
+    expect(md).toMatch(/Outlining/);
+
+    const parsed = parseCalendar(md);
+    const restored = parsed.entries.find((e) => e.slug === 'drift-mid-outline');
+    expect(restored?.stage).toBe('Paused');
+    expect(restored?.pausedFrom).toBe('Outlining');
+  });
+
+  it('parses legacy calendars (no Paused section) without breaking', () => {
+    const md = [
+      '# Editorial Calendar',
+      '',
+      '## Ideas',
+      '',
+      '*No entries.*',
+      '',
+      '## Planned',
+      '',
+      '*No entries.*',
+      '',
+      '## Outlining',
+      '',
+      '*No entries.*',
+      '',
+      '## Drafting',
+      '',
+      '*No entries.*',
+      '',
+      '## Review',
+      '',
+      '*No entries.*',
+      '',
+      '## Published',
+      '',
+      '*No entries.*',
+      '',
+    ].join('\n');
+    const cal = parseCalendar(md);
+    expect(cal.entries).toEqual([]);
   });
 });
 

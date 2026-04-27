@@ -15,6 +15,15 @@
  * Real editorial teams outline first; skipping this step wastes
  * iteration cycles on structural problems a 30-second outline
  * review would have caught.
+ *
+ * `Paused` is a non-linear holding stage. An entry pauses out of any
+ * non-terminal stage (Ideas / Planned / Outlining / Drafting / Review)
+ * and resumes back to wherever it came from. The pause origin lives on
+ * the entry itself (`pausedFrom`) so resume restores the right place
+ * without the operator having to remember. `Paused` is always rendered
+ * AFTER `Review` and BEFORE `Published` in fixed lifecycle views — it
+ * sits visually adjacent to the terminal state without itself being
+ * terminal. Added in v0.6.0 (issue #27).
  */
 export const STAGES = [
   'Ideas',
@@ -22,10 +31,31 @@ export const STAGES = [
   'Outlining',
   'Drafting',
   'Review',
+  'Paused',
   'Published',
 ] as const;
 
 export type Stage = (typeof STAGES)[number];
+
+/**
+ * Stages an entry can pause out of (and resume back to). Excludes
+ * `Paused` itself (can't double-pause) and `Published` (terminal —
+ * a published entry is already shipped, pausing would be lying).
+ */
+export const PAUSABLE_STAGES = [
+  'Ideas',
+  'Planned',
+  'Outlining',
+  'Drafting',
+  'Review',
+] as const satisfies readonly Stage[];
+
+export type PausableStage = (typeof PAUSABLE_STAGES)[number];
+
+/** True if a stage can be paused out of. */
+export function isPausable(stage: Stage): stage is PausableStage {
+  return (PAUSABLE_STAGES as readonly Stage[]).includes(stage);
+}
 
 /** True if a value is a recognized stage name. */
 export function isStage(value: string): value is Stage {
@@ -113,6 +143,14 @@ export interface CalendarEntry {
   issueNumber?: number;
   /** How this entry was sourced */
   source: 'manual' | 'analytics';
+  /**
+   * When `stage === 'Paused'`, the stage the entry was in immediately
+   * before pausing — `unpauseEntry` reads this to restore the entry
+   * to its prior lifecycle position. Never set for non-Paused entries
+   * (writeCalendar emits an empty cell for them so the column doesn't
+   * shout at non-paused rows).
+   */
+  pausedFrom?: PausableStage;
 }
 
 /**
