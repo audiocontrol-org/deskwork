@@ -24543,7 +24543,7 @@ function renderStageSection(ctx, data, stage, entries, sites) {
   );
   return unsafe(html6`
     <section class="er-section" data-stage-section="${stage}">
-      <h2 class="er-section-title">
+      <h2 class="er-section-head">
         <span>${stage}</span>
         <span class="ornament">${STAGE_ORNAMENTS[stage]}</span>
         <span class="count">№ ${entries.length}</span>
@@ -24577,7 +24577,7 @@ function renderShortformMatrix(data, ctx) {
   }).join("");
   return unsafe(html6`
     <section class="er-section">
-      <h2 class="er-section-title">
+      <h2 class="er-section-head">
         <span>Short form · coverage</span>
         <span class="count">${data.publishedBlogEntries.length} × ${PLATFORMS_ORDER.length}</span>
       </h2>
@@ -24616,7 +24616,7 @@ function renderApprovedSection(data, ctx) {
   }).join("");
   return unsafe(html6`
     <section class="er-section">
-      <h2 class="er-section-title">
+      <h2 class="er-section-head">
         <span>Awaiting press</span>
         <span class="count">№ ${data.approved.length}</span>
       </h2>
@@ -24640,7 +24640,7 @@ function renderTerminalSection(data, ctx, now) {
   }).join("");
   return unsafe(html6`
     <section class="er-section">
-      <h2 class="er-section-title">
+      <h2 class="er-section-head">
         <span>Recent proofs</span>
         <span class="count">last ${data.terminal.length}</span>
       </h2>

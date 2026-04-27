@@ -227,6 +227,15 @@
   line-height: 1.45;
 }
 
+/* CSF-9 (cross-surface audit v0.5.0): the studio index's er-toc-list
+ * and the manual's eh-toc are conceptually the same component (TOC
+ * with leader dots and right-aligned page numbers / route paths).
+ * They differ in markup (cross-page list vs in-page anchor list) and
+ * in visual pitch (display title scale here vs body-copy scale in the
+ * manual), but both consume the same --er-* tokens. Future work can
+ * consolidate the markup if the visual pitch difference disappears.
+ * For now, both surfaces document the shared semantics here. */
+
 /* Sections — small caps with red-pencil ornament */
 [data-review-ui] .er-toc-section {
   margin-bottom: var(--er-space-5);

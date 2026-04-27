@@ -179,6 +179,15 @@ body[data-review-ui="shortform"] {
   .er-layout { grid-template-columns: 1fr; gap: var(--er-space-4); }
 }
 
+/* CSF-4 (cross-surface audit v0.5.0): unified section-head component.
+ * `er-section-head` is the canonical class; `er-section-title` is its
+ * legacy name and remains as an alias so longform-review surfaces
+ * (which still emit `er-section-title`) keep their styling. New
+ * surfaces should use `er-section-head` directly. The studio index's
+ * `er-toc-section-head` and the manual's `eh-section-head` keep their
+ * surface-specific class names but share this same shape (header with
+ * an ornament, a title, and a right-aligned count/sig). */
+.er-section-head,
 .er-section-title {
   font-family: var(--er-font-display);
   font-variation-settings: "opsz" 48, "wght" 500;
@@ -190,11 +199,13 @@ body[data-review-ui="shortform"] {
   gap: var(--er-space-2);
 }
 
+.er-section-head .ornament,
 .er-section-title .ornament {
   color: var(--er-red-pencil);
   font-size: 0.9em;
 }
 
+.er-section-head .count,
 .er-section-title .count {
   font-family: var(--er-font-mono);
   font-size: 0.7rem;
@@ -209,6 +220,7 @@ body[data-review-ui="shortform"] {
 /* Stage-level action button — sits at the right edge of the
  * section title, a small nudge off the count. Currently used by
  * the Ideas stage for the "intake new idea" toggle. */
+.er-section-head .er-section-action,
 .er-section-title .er-section-action {
   margin-left: var(--er-space-2);
   align-self: center;
