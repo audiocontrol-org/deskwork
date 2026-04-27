@@ -6,6 +6,8 @@
 export * from './types.ts';
 export * from './pipeline.ts';
 export * from './handlers.ts';
+export * from './start-handlers.ts';
+export * from './workflow-paths.ts';
 export * from './report.ts';
 export * from './render.ts';
 export { envelopeFor, unwrap, synthesizeHistoryId } from './journal-mappers.ts';

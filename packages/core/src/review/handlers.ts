@@ -9,22 +9,12 @@
  * (which honors the site's blogFilenameTemplate config).
  */
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import type { DeskworkConfig } from '../config.ts';
-import {
-  findEntryFile,
-  resolveBlogFilePath,
-  resolveCalendarPath,
-} from '../paths.ts';
-import { readCalendar } from '../calendar.ts';
-import { findEntry, findEntryById } from '../calendar-mutations.ts';
-import { buildContentIndex, type ContentIndex } from '../content-index.ts';
-import type { CalendarEntry } from '../types.ts';
 import type { DraftAnnotation, DraftWorkflowState } from './types.ts';
 import {
   appendAnnotation,
   appendVersion,
-  createWorkflow,
   mintAnnotation,
   readAnnotations,
   readVersions,
@@ -32,19 +22,11 @@ import {
   readWorkflows,
   transitionState,
 } from './pipeline.ts';
+import { workflowFilePath } from './start-handlers.ts';
+import { err, ok, type HandlerResult } from './result.ts';
 
-export interface HandlerResult {
-  status: number;
-  body: unknown;
-}
-
-function err(status: number, message: string): HandlerResult {
-  return { status, body: { error: message } };
-}
-
-function ok(body: unknown): HandlerResult {
-  return { status: 200, body };
-}
+export type { HandlerResult } from './result.ts';
+export { handleStartLongform, handleStartShortform } from './start-handlers.ts';
 
 // Distribute Omit over the union so `Extract` on the `type` discriminant
 // still works. Plain `Omit<Union, K>` collapses the union into a single
@@ -310,32 +292,31 @@ export function handleCreateVersion(
   const diff = lineDiff(before.markdown, d.afterMarkdown);
 
   // SSOT: the markdown file on disk IS the article. Write disk first,
-  // then snapshot to the journal. Longform and outline both live on disk;
-  // shortform has no separate file (workflow markdown is canonical).
+  // then snapshot to the journal. All content kinds (longform, outline,
+  // shortform) are disk-backed — Phase 21a removed the shortform special
+  // case so the studio's save/iterate/approve handlers see one shape.
   //
   // Resolve via the content index first (so writingcontrol-shaped layouts
   // where slug != fs path work), with template fallback for legacy
-  // / pre-doctor cases.
-  if (workflow.contentKind === 'longform' || workflow.contentKind === 'outline') {
-    const blogFile = resolveWorkflowFilePath(
-      projectRoot,
-      config,
-      workflow.site,
-      workflow.slug,
-      {
-        ...(workflow.entryId !== undefined ? { entryId: workflow.entryId } : {}),
-      },
-    );
-    if (blogFile === undefined || !existsSync(blogFile)) {
-      const shown = blogFile ?? '(unresolved)';
+  // / pre-doctor cases. For shortform, the path goes through
+  // resolveShortformFilePath (entry-dir + scrapbook/shortform/<…>.md).
+  const targetFile = workflowFilePath(projectRoot, config, workflow);
+  if (targetFile === undefined || !existsSync(targetFile)) {
+    const shown = targetFile ?? '(unresolved)';
+    if (workflow.contentKind === 'shortform') {
       return err(
         500,
-        `cannot save: blog file missing at ${shown}. ` +
-          `Scaffold the post with /deskwork:outline before saving edits.`,
+        `cannot save: shortform file missing at ${shown}. ` +
+          `Run /deskwork:shortform-start to scaffold the file before saving edits.`,
       );
     }
-    writeFileSync(blogFile, d.afterMarkdown, 'utf-8');
+    return err(
+      500,
+      `cannot save: blog file missing at ${shown}. ` +
+        `Scaffold the post with /deskwork:outline before saving edits.`,
+    );
   }
+  writeFileSync(targetFile, d.afterMarkdown, 'utf-8');
 
   const version = appendVersion(projectRoot, config, d.workflowId, d.afterMarkdown, 'operator');
   const annotation = mintAnnotation({
@@ -347,172 +328,6 @@ export function handleCreateVersion(
   });
   appendAnnotation(projectRoot, config, annotation);
   return ok({ version, annotation });
-}
-
-interface StartLongformBody {
-  site: string;
-  slug: string;
-  /** Optional stable id of the calendar entry — stamped onto the workflow. */
-  entryId?: string;
-}
-
-const SLUG_RE = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
-
-/**
- * Enqueue a longform draft review from the studio dashboard. Reads the
- * blog post markdown from disk (honoring blogFilenameTemplate) and calls
- * createWorkflow. Idempotent on (entryId | (site, slug), 'longform').
- */
-export function handleStartLongform(
-  projectRoot: string,
-  config: DeskworkConfig,
-  body: unknown,
-): HandlerResult {
-  if (!body || typeof body !== 'object') return err(400, 'expected JSON object body');
-  const b = body as Partial<StartLongformBody>;
-  if (!b.site) return err(400, 'site is required');
-  if (!(b.site in config.sites)) {
-    const known = Object.keys(config.sites).join(', ');
-    return err(400, `unknown site: ${b.site}. Configured: ${known}`);
-  }
-  if (!b.slug || typeof b.slug !== 'string') return err(400, 'slug is required');
-  if (!SLUG_RE.test(b.slug)) {
-    return err(400, `invalid slug: ${b.slug}. Must match ${SLUG_RE}`);
-  }
-
-  // Look the entry up once and reuse for both file resolution and the
-  // entryId stamp. When the caller already supplied an id, prefer the
-  // entry whose id matches (useful for callers passing a sibling-calendar
-  // id intentionally).
-  const callerEntryId =
-    b.entryId !== undefined && b.entryId !== '' ? b.entryId : undefined;
-  const entry = lookupEntry(projectRoot, config, b.site, {
-    ...(callerEntryId !== undefined ? { entryId: callerEntryId } : {}),
-    slug: b.slug,
-  });
-
-  // Resolve entryId — caller's hint wins; otherwise derive from the
-  // calendar entry. Stamping entryId onto every new workflow keeps the
-  // join stable across slug renames.
-  const entryId = callerEntryId ?? entry?.id;
-
-  // Resolve the on-disk markdown file. Index lookup first (so
-  // writingcontrol-shaped non-template paths work), template fallback
-  // for legacy / pre-doctor cases.
-  const path = resolveWorkflowFilePath(projectRoot, config, b.site, b.slug, {
-    ...(entryId !== undefined ? { entryId } : {}),
-    ...(entry !== undefined ? { entry } : {}),
-  });
-  if (path === undefined || !existsSync(path)) {
-    const shown = path ?? '(unresolved)';
-    return err(404, `blog draft not found at ${shown}`);
-  }
-
-  const markdown = readFileSync(path, 'utf-8');
-
-  const before = readWorkflows(projectRoot, config).find((w) => {
-    const identityMatch =
-      entryId && w.entryId
-        ? w.entryId === entryId
-        : w.site === b.site && w.slug === b.slug;
-    return (
-      identityMatch &&
-      w.contentKind === 'longform' &&
-      w.state !== 'applied' &&
-      w.state !== 'cancelled'
-    );
-  });
-  const workflow = createWorkflow(projectRoot, config, {
-    site: b.site,
-    slug: b.slug,
-    ...(entryId !== undefined && entryId !== '' ? { entryId } : {}),
-    contentKind: 'longform',
-    initialMarkdown: markdown,
-    initialOriginatedBy: 'agent',
-  });
-  return ok({ workflow, existing: !!before && before.id === workflow.id });
-}
-
-/**
- * Read a calendar entry by id or slug for a given site, returning
- * `undefined` when the calendar is missing or the entry can't be found.
- * The handlers use this to look up the entry *before* deciding how to
- * resolve its on-disk file.
- */
-function lookupEntry(
-  projectRoot: string,
-  config: DeskworkConfig,
-  site: string,
-  match: { entryId?: string; slug?: string },
-): CalendarEntry | undefined {
-  try {
-    const calendarPath = resolveCalendarPath(projectRoot, config, site);
-    if (!existsSync(calendarPath)) return undefined;
-    const cal = readCalendar(calendarPath);
-    if (match.entryId !== undefined && match.entryId !== '') {
-      const byId = findEntryById(cal, match.entryId);
-      if (byId !== undefined) return byId;
-    }
-    if (match.slug !== undefined && match.slug !== '') {
-      return findEntry(cal, match.slug);
-    }
-    return undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-/**
- * Resolve the absolute path of the markdown file backing a workflow.
- *
- * Precedence:
- *   1. **Content index** — when an entry id is known (either passed in
- *      directly or derived from the workflow's site+slug via the
- *      calendar), scan the site's `contentDir` for a markdown file
- *      whose frontmatter `id:` matches. Refactor-proof: the binding
- *      moves with the file. This is what makes writingcontrol-shaped
- *      layouts (calendar slug `the-outbound`, file at
- *      `projects/the-outbound/index.md`) work.
- *   2. **Slug-template fallback** — when no entry id is available
- *      (legacy workflow, pre-doctor entry, ad-hoc draft with no calendar
- *      record), fall back to the site's `blogFilenameTemplate`. This
- *      preserves audiocontrol-shaped behavior unchanged.
- *
- * Returns `undefined` only when both paths come up empty — the caller
- * decides how to surface the missing binding (404 from the route).
- */
-function resolveWorkflowFilePath(
-  projectRoot: string,
-  config: DeskworkConfig,
-  site: string,
-  slug: string,
-  hint: { entryId?: string; entry?: CalendarEntry; index?: ContentIndex },
-): string | undefined {
-  let entry = hint.entry;
-  let entryId = hint.entryId;
-  if (entry === undefined && (entryId === undefined || entryId === '')) {
-    entry = lookupEntry(projectRoot, config, site, { slug });
-    entryId = entry?.id;
-  } else if (entry === undefined && entryId !== undefined) {
-    entry = lookupEntry(projectRoot, config, site, { entryId });
-  } else if (entryId === undefined || entryId === '') {
-    entryId = entry?.id;
-  }
-
-  if (entryId !== undefined && entryId !== '') {
-    const idx =
-      hint.index ?? buildContentIndex(projectRoot, config, site);
-    const fromIndex = findEntryFile(
-      projectRoot,
-      config,
-      site,
-      entryId,
-      idx,
-      entry !== undefined ? { slug: entry.slug } : { slug },
-    );
-    if (fromIndex !== undefined) return fromIndex;
-  }
-  return resolveBlogFilePath(projectRoot, config, site, slug);
 }
 
 /**

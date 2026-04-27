@@ -10347,8 +10347,8 @@ var serveStatic = (options = { root: "" }) => {
 };
 
 // src/server.ts
-import { existsSync as existsSync11, realpathSync } from "node:fs";
-import { dirname as dirname3, isAbsolute, resolve as resolve2 } from "node:path";
+import { existsSync as existsSync13, realpathSync } from "node:fs";
+import { dirname as dirname4, isAbsolute, resolve as resolve2 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // ../core/src/config.ts
@@ -10689,13 +10689,13 @@ function parseDistributions(lines) {
     const platformValue = col(cells2, cols, "platform");
     const url = col(cells2, cols, "url");
     const dateShared = col(cells2, cols, "shared");
-    if (slug && platformValue && url && dateShared && isPlatform(platformValue)) {
+    if (slug && platformValue && dateShared && isPlatform(platformValue)) {
       const entryIdCell = col(cells2, cols, "entryid") ?? col(cells2, cols, "uuid");
       const rec = {
         entryId: entryIdCell ?? "",
         slug,
         platform: platformValue,
-        url,
+        url: url ?? "",
         dateShared
       };
       const channel = col(cells2, cols, "channel");
@@ -10805,7 +10805,7 @@ function readCalendar(calendarPath) {
 }
 
 // ../core/src/paths.ts
-import { join as join4 } from "node:path";
+import { dirname, join as join4 } from "node:path";
 
 // ../core/src/content-index.ts
 import { readdirSync, statSync as statSync2 } from "node:fs";
@@ -11025,18 +11025,31 @@ function findEntryFile(projectRoot, config, site, entryId, index2, legacyEntryFo
   }
   return void 0;
 }
+var CHANNEL_RE = /^[a-z0-9][a-z0-9-]*$/;
+function resolveShortformFilePath(projectRoot, config, site, entry, platform, channel, index2) {
+  if (channel !== void 0 && channel !== "") {
+    if (!CHANNEL_RE.test(channel)) {
+      throw new Error(
+        `Invalid shortform channel "${channel}": must match ${CHANNEL_RE} (kebab-case, same shape as a slug segment).`
+      );
+    }
+  }
+  const entryFile = findEntryFile(
+    projectRoot,
+    config,
+    site,
+    entry.id ?? "",
+    index2,
+    { slug: entry.slug }
+  );
+  if (entryFile === void 0) return void 0;
+  const entryDir = dirname(entryFile);
+  const filename = channel !== void 0 && channel !== "" ? `${platform}-${channel}.md` : `${platform}.md`;
+  return join4(entryDir, "scrapbook", "shortform", filename);
+}
 
 // ../core/src/review/handlers.ts
-import { existsSync as existsSync3, readFileSync as readFileSync5, writeFileSync as writeFileSync4 } from "node:fs";
-
-// ../core/src/calendar-mutations.ts
-function findEntryById(calendar, id) {
-  if (!id) return void 0;
-  return calendar.entries.find((e) => e.id === id);
-}
-function findEntry(calendar, slug) {
-  return calendar.entries.find((e) => e.slug === slug);
-}
+import { existsSync as existsSync5, writeFileSync as writeFileSync4 } from "node:fs";
 
 // ../core/src/review/pipeline.ts
 import { randomUUID as randomUUID2 } from "node:crypto";
@@ -11317,13 +11330,164 @@ function mintAnnotation(partial) {
   };
 }
 
-// ../core/src/review/handlers.ts
+// ../core/src/review/start-handlers.ts
+import { existsSync as existsSync4, mkdirSync as mkdirSync2, readFileSync as readFileSync5 } from "node:fs";
+
+// ../core/src/review/workflow-paths.ts
+import { existsSync as existsSync3 } from "node:fs";
+
+// ../core/src/calendar-mutations.ts
+function findEntryById(calendar, id) {
+  if (!id) return void 0;
+  return calendar.entries.find((e) => e.id === id);
+}
+function findEntry(calendar, slug) {
+  return calendar.entries.find((e) => e.slug === slug);
+}
+
+// ../core/src/review/workflow-paths.ts
+function lookupEntry(projectRoot, config, site, match2) {
+  try {
+    const calendarPath = resolveCalendarPath(projectRoot, config, site);
+    if (!existsSync3(calendarPath)) return void 0;
+    const cal = readCalendar(calendarPath);
+    if (match2.entryId !== void 0 && match2.entryId !== "") {
+      const byId = findEntryById(cal, match2.entryId);
+      if (byId !== void 0) return byId;
+    }
+    if (match2.slug !== void 0 && match2.slug !== "") {
+      return findEntry(cal, match2.slug);
+    }
+    return void 0;
+  } catch {
+    return void 0;
+  }
+}
+function resolveLongformFilePath(projectRoot, config, site, slug, hint) {
+  let entry = hint.entry;
+  let entryId = hint.entryId;
+  if (entry === void 0 && (entryId === void 0 || entryId === "")) {
+    entry = lookupEntry(projectRoot, config, site, { slug });
+    entryId = entry?.id;
+  } else if (entry === void 0 && entryId !== void 0) {
+    entry = lookupEntry(projectRoot, config, site, { entryId });
+  } else if (entryId === void 0 || entryId === "") {
+    entryId = entry?.id;
+  }
+  if (entryId !== void 0 && entryId !== "") {
+    const idx = hint.index ?? buildContentIndex(projectRoot, config, site);
+    const fromIndex = findEntryFile(
+      projectRoot,
+      config,
+      site,
+      entryId,
+      idx,
+      entry !== void 0 ? { slug: entry.slug } : { slug }
+    );
+    if (fromIndex !== void 0) return fromIndex;
+  }
+  return resolveBlogFilePath(projectRoot, config, site, slug);
+}
+function resolveShortformWorkflowFilePath(projectRoot, config, site, slug, platform, channel, hint) {
+  let entry = hint.entry;
+  let entryId = hint.entryId;
+  if (entry === void 0 && (entryId === void 0 || entryId === "")) {
+    entry = lookupEntry(projectRoot, config, site, { slug });
+    entryId = entry?.id;
+  } else if (entry === void 0 && entryId !== void 0) {
+    entry = lookupEntry(projectRoot, config, site, { entryId });
+  } else if (entryId === void 0 || entryId === "") {
+    entryId = entry?.id;
+  }
+  return resolveShortformFilePath(
+    projectRoot,
+    config,
+    site,
+    {
+      ...entryId !== void 0 && entryId !== "" ? { id: entryId } : {},
+      slug: entry?.slug ?? slug
+    },
+    platform,
+    channel,
+    hint.index
+  );
+}
+
+// ../core/src/review/result.ts
 function err(status, message) {
   return { status, body: { error: message } };
 }
 function ok(body3) {
   return { status: 200, body: body3 };
 }
+
+// ../core/src/review/start-handlers.ts
+var SLUG_RE = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
+function handleStartLongform(projectRoot, config, body3) {
+  if (!body3 || typeof body3 !== "object") return err(400, "expected JSON object body");
+  const b = body3;
+  if (!b.site) return err(400, "site is required");
+  if (!(b.site in config.sites)) {
+    const known = Object.keys(config.sites).join(", ");
+    return err(400, `unknown site: ${b.site}. Configured: ${known}`);
+  }
+  if (!b.slug || typeof b.slug !== "string") return err(400, "slug is required");
+  if (!SLUG_RE.test(b.slug)) {
+    return err(400, `invalid slug: ${b.slug}. Must match ${SLUG_RE}`);
+  }
+  const callerEntryId = b.entryId !== void 0 && b.entryId !== "" ? b.entryId : void 0;
+  const entry = lookupEntry(projectRoot, config, b.site, {
+    ...callerEntryId !== void 0 ? { entryId: callerEntryId } : {},
+    slug: b.slug
+  });
+  const entryId = callerEntryId ?? entry?.id;
+  const path = resolveLongformFilePath(projectRoot, config, b.site, b.slug, {
+    ...entryId !== void 0 ? { entryId } : {},
+    ...entry !== void 0 ? { entry } : {}
+  });
+  if (!existsSync4(path)) {
+    return err(404, `blog draft not found at ${path}`);
+  }
+  const markdown = readFileSync5(path, "utf-8");
+  const before = readWorkflows(projectRoot, config).find((w) => {
+    const identityMatch = entryId && w.entryId ? w.entryId === entryId : w.site === b.site && w.slug === b.slug;
+    return identityMatch && w.contentKind === "longform" && w.state !== "applied" && w.state !== "cancelled";
+  });
+  const workflow = createWorkflow(projectRoot, config, {
+    site: b.site,
+    slug: b.slug,
+    ...entryId !== void 0 && entryId !== "" ? { entryId } : {},
+    contentKind: "longform",
+    initialMarkdown: markdown,
+    initialOriginatedBy: "agent"
+  });
+  return ok({ workflow, existing: !!before && before.id === workflow.id });
+}
+function workflowFilePath(projectRoot, config, workflow) {
+  if (workflow.contentKind === "shortform") {
+    if (workflow.platform === void 0) {
+      throw new Error(
+        `shortform workflow ${JSON.stringify(workflow)} has no platform`
+      );
+    }
+    return resolveShortformWorkflowFilePath(
+      projectRoot,
+      config,
+      workflow.site,
+      workflow.slug,
+      workflow.platform,
+      workflow.channel,
+      {
+        ...workflow.entryId !== void 0 ? { entryId: workflow.entryId } : {}
+      }
+    );
+  }
+  return resolveLongformFilePath(projectRoot, config, workflow.site, workflow.slug, {
+    ...workflow.entryId !== void 0 ? { entryId: workflow.entryId } : {}
+  });
+}
+
+// ../core/src/review/handlers.ts
 function handleAnnotate(projectRoot, config, body3) {
   if (!body3 || typeof body3 !== "object") return err(400, "expected JSON object body");
   const draft = body3;
@@ -11490,25 +11654,21 @@ function handleCreateVersion(projectRoot, config, body3) {
     return err(400, "afterMarkdown is identical to beforeVersion \u2014 no edit to record");
   }
   const diff = lineDiff(before.markdown, d.afterMarkdown);
-  if (workflow.contentKind === "longform" || workflow.contentKind === "outline") {
-    const blogFile = resolveWorkflowFilePath(
-      projectRoot,
-      config,
-      workflow.site,
-      workflow.slug,
-      {
-        ...workflow.entryId !== void 0 ? { entryId: workflow.entryId } : {}
-      }
-    );
-    if (blogFile === void 0 || !existsSync3(blogFile)) {
-      const shown = blogFile ?? "(unresolved)";
+  const targetFile = workflowFilePath(projectRoot, config, workflow);
+  if (targetFile === void 0 || !existsSync5(targetFile)) {
+    const shown = targetFile ?? "(unresolved)";
+    if (workflow.contentKind === "shortform") {
       return err(
         500,
-        `cannot save: blog file missing at ${shown}. Scaffold the post with /deskwork:outline before saving edits.`
+        `cannot save: shortform file missing at ${shown}. Run /deskwork:shortform-start to scaffold the file before saving edits.`
       );
     }
-    writeFileSync4(blogFile, d.afterMarkdown, "utf-8");
+    return err(
+      500,
+      `cannot save: blog file missing at ${shown}. Scaffold the post with /deskwork:outline before saving edits.`
+    );
   }
+  writeFileSync4(targetFile, d.afterMarkdown, "utf-8");
   const version = appendVersion(projectRoot, config, d.workflowId, d.afterMarkdown, "operator");
   const annotation = mintAnnotation({
     type: "edit",
@@ -11519,90 +11679,6 @@ function handleCreateVersion(projectRoot, config, body3) {
   });
   appendAnnotation(projectRoot, config, annotation);
   return ok({ version, annotation });
-}
-var SLUG_RE = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
-function handleStartLongform(projectRoot, config, body3) {
-  if (!body3 || typeof body3 !== "object") return err(400, "expected JSON object body");
-  const b = body3;
-  if (!b.site) return err(400, "site is required");
-  if (!(b.site in config.sites)) {
-    const known = Object.keys(config.sites).join(", ");
-    return err(400, `unknown site: ${b.site}. Configured: ${known}`);
-  }
-  if (!b.slug || typeof b.slug !== "string") return err(400, "slug is required");
-  if (!SLUG_RE.test(b.slug)) {
-    return err(400, `invalid slug: ${b.slug}. Must match ${SLUG_RE}`);
-  }
-  const callerEntryId = b.entryId !== void 0 && b.entryId !== "" ? b.entryId : void 0;
-  const entry = lookupEntry(projectRoot, config, b.site, {
-    ...callerEntryId !== void 0 ? { entryId: callerEntryId } : {},
-    slug: b.slug
-  });
-  const entryId = callerEntryId ?? entry?.id;
-  const path = resolveWorkflowFilePath(projectRoot, config, b.site, b.slug, {
-    ...entryId !== void 0 ? { entryId } : {},
-    ...entry !== void 0 ? { entry } : {}
-  });
-  if (path === void 0 || !existsSync3(path)) {
-    const shown = path ?? "(unresolved)";
-    return err(404, `blog draft not found at ${shown}`);
-  }
-  const markdown = readFileSync5(path, "utf-8");
-  const before = readWorkflows(projectRoot, config).find((w) => {
-    const identityMatch = entryId && w.entryId ? w.entryId === entryId : w.site === b.site && w.slug === b.slug;
-    return identityMatch && w.contentKind === "longform" && w.state !== "applied" && w.state !== "cancelled";
-  });
-  const workflow = createWorkflow(projectRoot, config, {
-    site: b.site,
-    slug: b.slug,
-    ...entryId !== void 0 && entryId !== "" ? { entryId } : {},
-    contentKind: "longform",
-    initialMarkdown: markdown,
-    initialOriginatedBy: "agent"
-  });
-  return ok({ workflow, existing: !!before && before.id === workflow.id });
-}
-function lookupEntry(projectRoot, config, site, match2) {
-  try {
-    const calendarPath = resolveCalendarPath(projectRoot, config, site);
-    if (!existsSync3(calendarPath)) return void 0;
-    const cal = readCalendar(calendarPath);
-    if (match2.entryId !== void 0 && match2.entryId !== "") {
-      const byId = findEntryById(cal, match2.entryId);
-      if (byId !== void 0) return byId;
-    }
-    if (match2.slug !== void 0 && match2.slug !== "") {
-      return findEntry(cal, match2.slug);
-    }
-    return void 0;
-  } catch {
-    return void 0;
-  }
-}
-function resolveWorkflowFilePath(projectRoot, config, site, slug, hint) {
-  let entry = hint.entry;
-  let entryId = hint.entryId;
-  if (entry === void 0 && (entryId === void 0 || entryId === "")) {
-    entry = lookupEntry(projectRoot, config, site, { slug });
-    entryId = entry?.id;
-  } else if (entry === void 0 && entryId !== void 0) {
-    entry = lookupEntry(projectRoot, config, site, { entryId });
-  } else if (entryId === void 0 || entryId === "") {
-    entryId = entry?.id;
-  }
-  if (entryId !== void 0 && entryId !== "") {
-    const idx = hint.index ?? buildContentIndex(projectRoot, config, site);
-    const fromIndex = findEntryFile(
-      projectRoot,
-      config,
-      site,
-      entryId,
-      idx,
-      entry !== void 0 ? { slug: entry.slug } : { slug }
-    );
-    if (fromIndex !== void 0) return fromIndex;
-  }
-  return resolveBlogFilePath(projectRoot, config, site, slug);
 }
 function lineDiff(a, b) {
   const aLines = a.split("\n");
@@ -12021,9 +12097,9 @@ var VFile = class {
    * @returns {undefined}
    *   Nothing.
    */
-  set dirname(dirname4) {
+  set dirname(dirname5) {
     assertPath(this.basename, "dirname");
-    this.path = default2.join(dirname4 || "", this.basename);
+    this.path = default2.join(dirname5 || "", this.basename);
   }
   /**
    * Get the extname (including dot) (example: `'.js'`).
@@ -23616,8 +23692,8 @@ import { extname as extname2 } from "node:path";
 
 // ../core/src/scrapbook.ts
 import {
-  existsSync as existsSync4,
-  mkdirSync as mkdirSync2,
+  existsSync as existsSync6,
+  mkdirSync as mkdirSync3,
   readdirSync as readdirSync3,
   readFileSync as readFileSync6,
   renameSync,
@@ -23625,7 +23701,7 @@ import {
   statSync as statSync3,
   writeFileSync as writeFileSync5
 } from "node:fs";
-import { dirname, extname, join as join7, resolve } from "node:path";
+import { dirname as dirname2, extname, join as join7, resolve } from "node:path";
 var SECRET_SUBDIR = "secret";
 var SLUG_RE2 = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
 var FILENAME_RE = /^[a-zA-Z0-9._-][a-zA-Z0-9._ -]*$/;
@@ -23679,7 +23755,7 @@ function scrapbookDirForEntry(projectRoot, config, site, entry, index2) {
       `Cannot resolve scrapbook dir: entry has no id binding and no template fallback (slug="${entry.slug}")`
     );
   }
-  return join7(dirname(file), "scrapbook");
+  return join7(dirname2(file), "scrapbook");
 }
 function scrapbookFilePath(projectRoot, config, site, slug, filename, opts = {}) {
   assertFilename(filename);
@@ -23728,12 +23804,12 @@ function listScrapbook(projectRoot, config, site, slug) {
   return listScrapbookAtDir(site, slug, dir);
 }
 function listScrapbookAtDir(site, slug, dir) {
-  if (!existsSync4(dir)) {
+  if (!existsSync6(dir)) {
     return { site, slug, dir, exists: false, items: [], secretItems: [] };
   }
   const items = listFilesInDir(dir);
   const secretDir = join7(dir, SECRET_SUBDIR);
-  const secretItems = existsSync4(secretDir) ? listFilesInDir(secretDir) : [];
+  const secretItems = existsSync6(secretDir) ? listFilesInDir(secretDir) : [];
   return { site, slug, dir, exists: true, items, secretItems };
 }
 function listFilesInDir(dir) {
@@ -23755,10 +23831,10 @@ function listFilesInDir(dir) {
 }
 function countScrapbookAtDir(dir) {
   try {
-    if (!existsSync4(dir)) return 0;
+    if (!existsSync6(dir)) return 0;
     const top = listFilesInDir(dir);
     const secretDir = join7(dir, SECRET_SUBDIR);
-    const secret = existsSync4(secretDir) ? listFilesInDir(secretDir) : [];
+    const secret = existsSync6(secretDir) ? listFilesInDir(secretDir) : [];
     return top.length + secret.length;
   } catch {
     return 0;
@@ -23782,7 +23858,7 @@ function countScrapbookForEntry(projectRoot, config, site, entry, index2) {
 }
 function readScrapbookFile(projectRoot, config, site, slug, filename, opts = {}) {
   const abs = scrapbookFilePath(projectRoot, config, site, slug, filename, opts);
-  if (!existsSync4(abs)) throw new Error(`not found: ${filename}`);
+  if (!existsSync6(abs)) throw new Error(`not found: ${filename}`);
   const st = statSync3(abs);
   if (!st.isFile()) throw new Error(`not a file: ${filename}`);
   const content3 = readFileSync6(abs);
@@ -23799,10 +23875,10 @@ function createScrapbookMarkdown(projectRoot, config, site, slug, filename, body
     throw new Error(`create endpoint only accepts .md files: "${filename}"`);
   }
   const abs = scrapbookFilePath(projectRoot, config, site, slug, filename, opts);
-  if (existsSync4(abs)) {
+  if (existsSync6(abs)) {
     throw new Error(`file already exists: "${filename}"`);
   }
-  mkdirSync2(dirname(abs), { recursive: true });
+  mkdirSync3(dirname2(abs), { recursive: true });
   writeFileSync5(abs, body3, "utf-8");
   const st = statSync3(abs);
   return {
@@ -23814,7 +23890,7 @@ function createScrapbookMarkdown(projectRoot, config, site, slug, filename, body
 }
 function saveScrapbookFile(projectRoot, config, site, slug, filename, body3, opts = {}) {
   const abs = scrapbookFilePath(projectRoot, config, site, slug, filename, opts);
-  if (!existsSync4(abs)) throw new Error(`file not found: "${filename}"`);
+  if (!existsSync6(abs)) throw new Error(`file not found: "${filename}"`);
   writeFileSync5(abs, body3);
   const st = statSync3(abs);
   return {
@@ -23827,8 +23903,8 @@ function saveScrapbookFile(projectRoot, config, site, slug, filename, body3, opt
 function renameScrapbookFile(projectRoot, config, site, slug, oldName, newName, opts = {}) {
   const oldAbs = scrapbookFilePath(projectRoot, config, site, slug, oldName, opts);
   const newAbs = scrapbookFilePath(projectRoot, config, site, slug, newName, opts);
-  if (!existsSync4(oldAbs)) throw new Error(`file not found: "${oldName}"`);
-  if (existsSync4(newAbs) && oldAbs !== newAbs) {
+  if (!existsSync6(oldAbs)) throw new Error(`file not found: "${oldName}"`);
+  if (existsSync6(newAbs) && oldAbs !== newAbs) {
     throw new Error(`target name already exists: "${newName}"`);
   }
   renameSync(oldAbs, newAbs);
@@ -23842,15 +23918,15 @@ function renameScrapbookFile(projectRoot, config, site, slug, oldName, newName, 
 }
 function deleteScrapbookFile(projectRoot, config, site, slug, filename, opts = {}) {
   const abs = scrapbookFilePath(projectRoot, config, site, slug, filename, opts);
-  if (!existsSync4(abs)) throw new Error(`file not found: "${filename}"`);
+  if (!existsSync6(abs)) throw new Error(`file not found: "${filename}"`);
   rmSync(abs);
 }
 function writeScrapbookUpload(projectRoot, config, site, slug, filename, content3, opts = {}) {
   const abs = scrapbookFilePath(projectRoot, config, site, slug, filename, opts);
-  if (existsSync4(abs)) {
+  if (existsSync6(abs)) {
     throw new Error(`file already exists: "${filename}" \u2014 rename first`);
   }
-  mkdirSync2(dirname(abs), { recursive: true });
+  mkdirSync3(dirname2(abs), { recursive: true });
   writeFileSync5(abs, content3);
   const st = statSync3(abs);
   return {
@@ -23940,8 +24016,8 @@ async function serveScrapbookFile(c, ctx) {
 }
 
 // src/routes/scrapbook-mutations.ts
-import { existsSync as existsSync5, mkdirSync as mkdirSync3, renameSync as renameSync2, statSync as statSync4 } from "node:fs";
-import { dirname as dirname2 } from "node:path";
+import { existsSync as existsSync7, mkdirSync as mkdirSync4, renameSync as renameSync2, statSync as statSync4 } from "node:fs";
+import { dirname as dirname3 } from "node:path";
 function checkEnvelope(ctx, body3) {
   const site = body3.site;
   const slug = body3.slug;
@@ -24005,7 +24081,7 @@ function createScrapbookMutationsRouter(ctx) {
         filename,
         { secret: env2.secret }
       );
-      if (!existsSync5(abs)) {
+      if (!existsSync7(abs)) {
         if (filename.endsWith(".md")) {
           item = createScrapbookMarkdown(
             ctx.projectRoot,
@@ -24091,13 +24167,13 @@ function createScrapbookMutationsRouter(ctx) {
           newName,
           { secret: toSecret }
         );
-        if (!existsSync5(srcAbs)) {
+        if (!existsSync7(srcAbs)) {
           return c.json({ error: `file not found: "${oldName}"` }, 404);
         }
-        if (existsSync5(dstAbs)) {
+        if (existsSync7(dstAbs)) {
           return c.json({ error: `target name already exists: "${newName}"` }, 409);
         }
-        mkdirSync3(dirname2(dstAbs), { recursive: true });
+        mkdirSync4(dirname3(dstAbs), { recursive: true });
         renameSync2(srcAbs, dstAbs);
         const st = statSync4(dstAbs);
         item = {
@@ -24339,7 +24415,7 @@ function buildReport(projectRoot, config, opts = {}) {
 }
 
 // ../core/src/body-state.ts
-import { existsSync as existsSync6, readFileSync as readFileSync7 } from "node:fs";
+import { existsSync as existsSync8, readFileSync as readFileSync7 } from "node:fs";
 var PLACEHOLDER_MARKER = "<!-- Write your post here -->";
 function stripOutlineSection(body3) {
   const lines = body3.split("\n");
@@ -24355,7 +24431,7 @@ function stripOutlineSection(body3) {
   return [...lines.slice(0, startIdx), ...lines.slice(endIdx)].join("\n");
 }
 function bodyState(filePath) {
-  if (!existsSync6(filePath)) return "missing";
+  if (!existsSync8(filePath)) return "missing";
   const content3 = readFileSync7(filePath, "utf8");
   const fmMatch = content3.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
   const body3 = fmMatch ? content3.slice(fmMatch[0].length) : content3;
@@ -25295,7 +25371,7 @@ function renderScrapbookDrawer(ctx, site, entry, slug, index2) {
 }
 
 // src/pages/review.ts
-import { existsSync as existsSync7 } from "node:fs";
+import { existsSync as existsSync9 } from "node:fs";
 function isSuccessBody(body3) {
   if (typeof body3 !== "object" || body3 === null) return false;
   return "workflow" in body3 && "versions" in body3;
@@ -25493,7 +25569,7 @@ function renderOutlineDrawer(outlineHtml) {
 function lookupReviewEntry(ctx, site, lookup) {
   try {
     const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
-    if (!existsSync7(calendarPath)) return null;
+    if (!existsSync9(calendarPath)) return null;
     const cal = readCalendar(calendarPath);
     if (lookup.kind === "id") {
       const byId = findEntryById(cal, lookup.entryId);
@@ -26509,7 +26585,7 @@ function renderScrapbookPage(ctx, site, path) {
 }
 
 // ../core/src/content-tree-fs-walk.ts
-import { existsSync as existsSync8, readdirSync as readdirSync4, readFileSync as readFileSync9, statSync as statSync5 } from "node:fs";
+import { existsSync as existsSync10, readdirSync as readdirSync4, readFileSync as readFileSync9, statSync as statSync5 } from "node:fs";
 import { join as join9 } from "node:path";
 var INDEX_BASENAMES = /* @__PURE__ */ new Set([
   "index.md",
@@ -26538,7 +26614,7 @@ function readTitleFromMarkdown(absPath) {
 }
 function defaultFsWalk(projectRoot, config, site) {
   const root3 = resolveContentDir(projectRoot, config, site);
-  if (!existsSync8(root3)) return [];
+  if (!existsSync10(root3)) return [];
   const out = [];
   const SKIP2 = /* @__PURE__ */ new Set(["scrapbook", "node_modules", "dist", ".git"]);
   const visit2 = (dirAbs, pathSoFar) => {
@@ -26585,7 +26661,7 @@ function defaultFsWalk(projectRoot, config, site) {
 }
 
 // ../core/src/content-tree-helpers.ts
-import { existsSync as existsSync9 } from "node:fs";
+import { existsSync as existsSync11 } from "node:fs";
 import { join as join10 } from "node:path";
 function leafOfPath(path) {
   const idx = path.lastIndexOf("/");
@@ -26608,7 +26684,7 @@ function entryHasOwnIndex(contentDir, entryPath, fsHasIndex, fsHasReadme, boundF
   if (fsHasIndex) return true;
   if (fsHasReadme) return true;
   for (const basename of TEMPLATE_INDEX_BASENAMES) {
-    if (existsSync9(join10(contentDir, entryPath, basename))) return true;
+    if (existsSync11(join10(contentDir, entryPath, basename))) return true;
   }
   if (!hasFsDir) return true;
   return false;
@@ -26870,7 +26946,7 @@ function flattenForRender(root3) {
 }
 
 // src/pages/content-detail.ts
-import { readFileSync as readFileSync10, existsSync as existsSync10 } from "node:fs";
+import { readFileSync as readFileSync10, existsSync as existsSync12 } from "node:fs";
 import { join as join11 } from "node:path";
 var PREVIEW_CHAR_BUDGET = 480;
 function renderEmptyDetail() {
@@ -26885,7 +26961,7 @@ function renderEmptyDetail() {
 }
 function safeReadFile(absPath) {
   try {
-    if (!existsSync10(absPath)) return null;
+    if (!existsSync12(absPath)) return null;
     return readFileSync10(absPath, "utf-8");
   } catch {
     return null;
@@ -26986,7 +27062,7 @@ function findOrganizationalIndex(contentDir, slug) {
   ];
   for (const name of candidates) {
     const abs = join11(contentDir, slug, name);
-    if (existsSync10(abs)) return abs;
+    if (existsSync12(abs)) return abs;
   }
   return null;
 }
@@ -27696,7 +27772,7 @@ function resolveEntryById(ctx, site, id) {
   if (!(site in ctx.config.sites)) return null;
   try {
     const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
-    if (!existsSync11(calendarPath)) return null;
+    if (!existsSync13(calendarPath)) return null;
     const cal = readCalendar(calendarPath);
     const entry = cal.entries.find((e) => e.id === id);
     if (!entry || entry.id === void 0) return null;
@@ -27709,7 +27785,7 @@ function resolveEntryBySlug(ctx, site, slug) {
   if (!(site in ctx.config.sites)) return "unknown-site";
   try {
     const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
-    if (!existsSync11(calendarPath)) return null;
+    if (!existsSync13(calendarPath)) return null;
     const cal = readCalendar(calendarPath);
     const entry = cal.entries.find((e) => e.slug === slug);
     if (!entry) return null;
@@ -27730,13 +27806,13 @@ function buildReviewRedirectUrl(entryId, requestUrl) {
   return `/dev/editorial-review/${entryId}${search2}`;
 }
 function publicDir() {
-  const here = dirname3(fileURLToPath2(import.meta.url));
+  const here = dirname4(fileURLToPath2(import.meta.url));
   const candidates = [
     resolve2(here, "..", "public"),
     resolve2(here, "..", "..", "..", "plugins", "deskwork-studio", "public")
   ];
   for (const candidate of candidates) {
-    if (existsSync11(candidate)) return candidate;
+    if (existsSync13(candidate)) return candidate;
   }
   throw new Error(
     `deskwork-studio: could not find public/ assets. Tried:

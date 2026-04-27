@@ -13,6 +13,7 @@ import {
   type ContentType,
   type DistributionRecord,
   type EditorialCalendar,
+  type Platform,
 } from './types.ts';
 
 /** Convert a title to a URL-safe slug. */
@@ -282,6 +283,12 @@ export function findEntryBySlugOrId(
  * (legacy callers). On success, stamps entryId onto the record so
  * downstream joins use the stable identity even if the slug later
  * changes.
+ *
+ * Phase 21a: `record.url` may be an empty string at creation time. The
+ * shortform flow `addDistribution`s a placeholder record (URL gets filled
+ * in by `updateDistributionUrl` once the operator has posted to the
+ * platform). The DistributionRecord.url type stays `string` — there is
+ * no runtime non-empty check, so the existing surface is unchanged.
  */
 export function addDistribution(
   calendar: EditorialCalendar,
@@ -304,4 +311,95 @@ export function addDistribution(
   record.slug = entry.slug;
   calendar.distributions.push(record);
   return record;
+}
+
+/**
+ * Set / update the URL on a distribution record. Used after the operator
+ * has manually posted a shortform to the platform and obtained the share
+ * URL.
+ *
+ * Match precedence: `entryId` (stable) → `(slug, platform, channel?)`
+ * (legacy fallback). When no record exists yet the helper creates one via
+ * `addDistribution` so the URL becomes the first thing recorded for that
+ * distribution.
+ *
+ * Channel comparison is case-insensitive (matches the existing approve
+ * helper's behavior). Pass `channel: undefined` to match a record that
+ * has no channel set.
+ *
+ * Only fields explicitly supplied are written — leaving `notes`
+ * undefined preserves any existing note. `dateShared` defaults to today
+ * (UTC) when omitted, both for new records and as the explicit set when
+ * updating an existing one.
+ *
+ * @returns the updated DistributionRecord (always present after this call).
+ */
+export function updateDistributionUrl(
+  calendar: EditorialCalendar,
+  match: { entryId?: string; slug?: string; platform: Platform; channel?: string },
+  url: string,
+  dateShared?: string,
+  notes?: string,
+): DistributionRecord {
+  if (!match.platform) {
+    throw new Error('updateDistributionUrl: platform is required');
+  }
+  if (
+    (match.entryId === undefined || match.entryId === '') &&
+    (match.slug === undefined || match.slug === '')
+  ) {
+    throw new Error('updateDistributionUrl: entryId or slug is required');
+  }
+
+  const channelKey = match.channel?.toLowerCase();
+  const channelMatches = (recChannel: string | undefined): boolean => {
+    if (channelKey === undefined) return !recChannel;
+    return (recChannel?.toLowerCase() ?? '') === channelKey;
+  };
+
+  // Match by entryId first (stable across slug renames) then by
+  // (slug, platform, channel?) as the legacy fallback.
+  const existing = calendar.distributions.find((d) => {
+    if (d.platform !== match.platform) return false;
+    if (!channelMatches(d.channel)) return false;
+    if (match.entryId !== undefined && match.entryId !== '' && d.entryId === match.entryId) {
+      return true;
+    }
+    if (match.slug !== undefined && match.slug !== '' && d.slug === match.slug) {
+      return true;
+    }
+    return false;
+  });
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  if (existing) {
+    existing.url = url;
+    existing.dateShared = dateShared ?? existing.dateShared ?? today;
+    if (notes !== undefined) {
+      existing.notes = notes;
+    }
+    return existing;
+  }
+
+  // No record yet — fall through to addDistribution so the entry's
+  // Published-stage invariant is enforced and entryId/slug get stamped
+  // from the calendar entry.
+  const slug = match.slug ?? '';
+  const record: DistributionRecord = {
+    slug,
+    platform: match.platform,
+    url,
+    dateShared: dateShared ?? today,
+  };
+  if (match.entryId !== undefined && match.entryId !== '') {
+    record.entryId = match.entryId;
+  }
+  if (match.channel !== undefined && match.channel !== '') {
+    record.channel = match.channel;
+  }
+  if (notes !== undefined) {
+    record.notes = notes;
+  }
+  return addDistribution(calendar, record);
 }

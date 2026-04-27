@@ -391,13 +391,13 @@ function parseDistributions(lines) {
     const platformValue = col(cells, cols, "platform");
     const url = col(cells, cols, "url");
     const dateShared = col(cells, cols, "shared");
-    if (slug && platformValue && url && dateShared && isPlatform(platformValue)) {
+    if (slug && platformValue && dateShared && isPlatform(platformValue)) {
       const entryIdCell = col(cells, cols, "entryid") ?? col(cells, cols, "uuid");
       const rec = {
         entryId: entryIdCell ?? "",
         slug,
         platform: platformValue,
-        url,
+        url: url ?? "",
         dateShared
       };
       const channel = col(cells, cols, "channel");
@@ -8364,7 +8364,7 @@ var init_content_index = __esm({
 });
 
 // ../core/src/paths.ts
-import { join as join3 } from "node:path";
+import { dirname, join as join3 } from "node:path";
 function resolveSite(config, site) {
   if (site === null || site === void 0 || site === "") {
     return config.defaultSite;
@@ -8395,12 +8395,50 @@ function resolveBlogFilePath(projectRoot, config, site, slug, filePath) {
   const template = entry.blogFilenameTemplate ?? DEFAULT_BLOG_FILENAME_TEMPLATE;
   return join3(projectRoot, entry.contentDir, template.replaceAll("{slug}", slug));
 }
-var DEFAULT_BLOG_FILENAME_TEMPLATE;
+function findEntryFile(projectRoot, config, site, entryId, index, legacyEntryForFallback) {
+  if (entryId !== "") {
+    const idx = index ?? buildContentIndex(projectRoot, config, resolveSite(config, site));
+    const hit = idx.byId.get(entryId);
+    if (hit !== void 0) return hit;
+  }
+  if (legacyEntryForFallback !== void 0) {
+    return resolveBlogFilePath(
+      projectRoot,
+      config,
+      site,
+      legacyEntryForFallback.slug
+    );
+  }
+  return void 0;
+}
+function resolveShortformFilePath(projectRoot, config, site, entry, platform, channel, index) {
+  if (channel !== void 0 && channel !== "") {
+    if (!CHANNEL_RE.test(channel)) {
+      throw new Error(
+        `Invalid shortform channel "${channel}": must match ${CHANNEL_RE} (kebab-case, same shape as a slug segment).`
+      );
+    }
+  }
+  const entryFile = findEntryFile(
+    projectRoot,
+    config,
+    site,
+    entry.id ?? "",
+    index,
+    { slug: entry.slug }
+  );
+  if (entryFile === void 0) return void 0;
+  const entryDir = dirname(entryFile);
+  const filename = channel !== void 0 && channel !== "" ? `${platform}-${channel}.md` : `${platform}.md`;
+  return join3(entryDir, "scrapbook", "shortform", filename);
+}
+var DEFAULT_BLOG_FILENAME_TEMPLATE, CHANNEL_RE;
 var init_paths = __esm({
   "../core/src/paths.ts"() {
     "use strict";
     init_content_index();
     DEFAULT_BLOG_FILENAME_TEMPLATE = "{slug}/index.md";
+    CHANNEL_RE = /^[a-z0-9][a-z0-9-]*$/;
   }
 });
 
@@ -8851,13 +8889,43 @@ var init_pipeline = __esm({
   }
 });
 
-// ../core/src/review/handlers.ts
+// ../core/src/review/workflow-paths.ts
+var init_workflow_paths = __esm({
+  "../core/src/review/workflow-paths.ts"() {
+    "use strict";
+    init_content_index();
+    init_paths();
+    init_calendar();
+    init_calendar_mutations();
+  }
+});
+
+// ../core/src/review/result.ts
 function err(status, message) {
   return { status, body: { error: message } };
 }
 function ok(body) {
   return { status: 200, body };
 }
+var init_result = __esm({
+  "../core/src/review/result.ts"() {
+    "use strict";
+  }
+});
+
+// ../core/src/review/start-handlers.ts
+var init_start_handlers = __esm({
+  "../core/src/review/start-handlers.ts"() {
+    "use strict";
+    init_types();
+    init_frontmatter();
+    init_pipeline();
+    init_workflow_paths();
+    init_result();
+  }
+});
+
+// ../core/src/review/handlers.ts
 function handleGetWorkflow(projectRoot, config, query) {
   if (query.id) {
     const workflow = readWorkflow(projectRoot, config, query.id);
@@ -8895,11 +8963,10 @@ function handleGetWorkflow(projectRoot, config, query) {
 var init_handlers = __esm({
   "../core/src/review/handlers.ts"() {
     "use strict";
-    init_paths();
-    init_calendar();
-    init_calendar_mutations();
-    init_content_index();
     init_pipeline();
+    init_start_handlers();
+    init_result();
+    init_start_handlers();
   }
 });
 
@@ -8908,7 +8975,7 @@ var approve_exports = {};
 __export(approve_exports, {
   run: () => run2
 });
-import { existsSync as existsSync2 } from "node:fs";
+import { existsSync as existsSync2, readFileSync as readFileSync5 } from "node:fs";
 async function run2(argv2) {
   const KNOWN_FLAGS3 = ["site", "platform", "channel"];
   const SLUG_RE2 = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
@@ -8984,12 +9051,25 @@ async function run2(argv2) {
       filePath: blogFile
     });
   }
-  function applyShortform(workflow2, versions2, approvedVersion2) {
+  function applyShortform(workflow2, _versions, approvedVersion2) {
     if (!flags.platform) fail("--platform is required for shortform workflows");
-    const approvedMarkdown = versions2.find((v) => v.version === approvedVersion2)?.markdown;
-    if (approvedMarkdown === void 0) {
-      fail(`Approved v${approvedVersion2} not found in history.`);
+    if (!isPlatform(flags.platform)) fail(`Invalid --platform "${flags.platform}".`);
+    const filePath = resolveShortformFilePath(
+      projectRoot,
+      config,
+      site,
+      { slug },
+      flags.platform,
+      flags.channel
+    );
+    if (filePath === void 0 || !existsSync2(filePath)) {
+      const shown = filePath ?? "(unresolved)";
+      fail(
+        `Shortform file missing at ${shown}. The file is the SSOT \u2014 re-run /deskwork:shortform-start if needed.`
+      );
     }
+    const fileSrc = readFileSync5(filePath, "utf-8");
+    const approvedMarkdown = parseFrontmatter(fileSrc).body.replace(/^\n+/, "");
     const calendarPath = resolveCalendarPath(projectRoot, config, site);
     const cal = readCalendar(calendarPath);
     const channelLower = flags.channel?.toLowerCase();
@@ -9019,7 +9099,8 @@ async function run2(argv2) {
       version: approvedVersion2,
       platform: flags.platform,
       channel: flags.channel,
-      calendarPath
+      calendarPath,
+      filePath
     });
   }
   function latestApprove(annotations2) {
@@ -9054,6 +9135,7 @@ var init_approve = __esm({
     init_config();
     init_paths();
     init_calendar();
+    init_frontmatter();
     init_handlers();
     init_pipeline();
     init_types();
@@ -9064,7 +9146,7 @@ var init_approve = __esm({
 // ../core/src/doctor/rules/missing-frontmatter-id.ts
 import { existsSync as existsSync3, readdirSync as readdirSync3, statSync as statSync2 } from "node:fs";
 import { basename, extname, join as join6, relative as relative2 } from "node:path";
-import { readFileSync as readFileSync5, writeFileSync as writeFileSync4 } from "node:fs";
+import { readFileSync as readFileSync6, writeFileSync as writeFileSync4 } from "node:fs";
 function shouldSkipDir2(name) {
   if (name.startsWith(".")) return true;
   return SKIP_DIRS2.has(name.toLowerCase());
@@ -9161,7 +9243,7 @@ function findCandidatesForEntry(projectRoot, config, site, entry) {
   return candidates;
 }
 function bindFrontmatterId(absPath, entryId) {
-  const raw = readFileSync5(absPath, "utf-8");
+  const raw = readFileSync6(absPath, "utf-8");
   const updated = updateFrontmatter(raw, { deskwork: { id: entryId } });
   if (updated === raw) return;
   writeFileSync4(absPath, updated, "utf-8");
@@ -9293,10 +9375,10 @@ var init_missing_frontmatter_id = __esm({
 });
 
 // ../core/src/doctor/rules/orphan-frontmatter-id.ts
-import { readFileSync as readFileSync6, writeFileSync as writeFileSync5 } from "node:fs";
+import { readFileSync as readFileSync7, writeFileSync as writeFileSync5 } from "node:fs";
 import { relative as relative3 } from "node:path";
 function clearFrontmatterId(absPath) {
-  const raw = readFileSync6(absPath, "utf-8");
+  const raw = readFileSync7(absPath, "utf-8");
   const { data } = parseFrontmatter(raw);
   const block = data.deskwork;
   if (block === void 0 || block === null) return false;
@@ -9417,10 +9499,10 @@ var init_orphan_frontmatter_id = __esm({
 });
 
 // ../core/src/doctor/rules/duplicate-id.ts
-import { readFileSync as readFileSync7, writeFileSync as writeFileSync6 } from "node:fs";
+import { readFileSync as readFileSync8, writeFileSync as writeFileSync6 } from "node:fs";
 import { join as join7, relative as relative4 } from "node:path";
 function clearFrontmatterId2(absPath) {
-  const raw = readFileSync7(absPath, "utf-8");
+  const raw = readFileSync8(absPath, "utf-8");
   const { data } = parseFrontmatter(raw);
   const block = data.deskwork;
   if (block === void 0 || block === null) return false;
@@ -9814,7 +9896,7 @@ var init_workflow_stale = __esm({
 });
 
 // ../core/src/doctor/rules/calendar-uuid-missing.ts
-import { readFileSync as readFileSync8, existsSync as existsSync4 } from "node:fs";
+import { readFileSync as readFileSync9, existsSync as existsSync4 } from "node:fs";
 function scanRowsMissingUuid(markdown) {
   const lines = markdown.split("\n");
   const rows = [];
@@ -9887,7 +9969,7 @@ var init_calendar_uuid_missing = __esm({
         if (!existsSync4(calendarPath)) return [];
         let raw;
         try {
-          raw = readFileSync8(calendarPath, "utf-8");
+          raw = readFileSync9(calendarPath, "utf-8");
         } catch {
           return [];
         }
@@ -9962,7 +10044,7 @@ var init_calendar_uuid_missing = __esm({
 });
 
 // ../core/src/doctor/rules/legacy-top-level-id-migration.ts
-import { readFileSync as readFileSync9, readdirSync as readdirSync5, statSync as statSync3, writeFileSync as writeFileSync7 } from "node:fs";
+import { readFileSync as readFileSync10, readdirSync as readdirSync5, statSync as statSync3, writeFileSync as writeFileSync7 } from "node:fs";
 import { extname as extname2, join as join9, relative as relative5 } from "node:path";
 function shouldSkipDir3(name) {
   if (name.startsWith(".")) return true;
@@ -10003,7 +10085,7 @@ function collectMarkdownFiles3(dir) {
 function classify(absPath, calendarIds) {
   let parsed;
   try {
-    parsed = parseFrontmatter(readFileSync9(absPath, "utf-8"));
+    parsed = parseFrontmatter(readFileSync10(absPath, "utf-8"));
   } catch {
     return null;
   }
@@ -10024,7 +10106,7 @@ function classify(absPath, calendarIds) {
   return { absolutePath: absPath, legacyId: trimmed };
 }
 function migrateLegacyTopLevelId(absPath, legacyId) {
-  const raw = readFileSync9(absPath, "utf-8");
+  const raw = readFileSync10(absPath, "utf-8");
   const withDeskwork = updateFrontmatter(raw, { deskwork: { id: legacyId } });
   const withoutTopLevel = removeFrontmatterPaths(withDeskwork, [["id"]]);
   if (withoutTopLevel === raw) return;
@@ -10966,7 +11048,7 @@ var init_ingest_derive = __esm({
 
 // ../core/src/ingest.ts
 import { basename as basename2, isAbsolute as isAbsolute3, relative as relative7, sep as sep3 } from "node:path";
-import { readFileSync as readFileSync10 } from "node:fs";
+import { readFileSync as readFileSync11 } from "node:fs";
 function discoverIngestCandidates(paths, options) {
   if (paths.length === 0) {
     throw new Error("discoverIngestCandidates: at least one path is required");
@@ -10997,7 +11079,7 @@ function discoverIngestCandidates(paths, options) {
     }
     let raw;
     try {
-      raw = readFileSync10(filePath, "utf-8");
+      raw = readFileSync11(filePath, "utf-8");
     } catch (err2) {
       skips.push({
         filePath,
@@ -11390,8 +11472,8 @@ var install_exports = {};
 __export(install_exports, {
   run: () => run6
 });
-import { readFileSync as readFileSync11, writeFileSync as writeFileSync8, existsSync as existsSync7, mkdirSync as mkdirSync3 } from "node:fs";
-import { dirname, isAbsolute as isAbsolute5, join as join13, resolve as resolve4 } from "node:path";
+import { readFileSync as readFileSync12, writeFileSync as writeFileSync8, existsSync as existsSync7, mkdirSync as mkdirSync3 } from "node:fs";
+import { dirname as dirname2, isAbsolute as isAbsolute5, join as join13, resolve as resolve4 } from "node:path";
 async function run6(argv2) {
   function usage() {
     console.error(
@@ -11422,7 +11504,7 @@ async function run6(argv2) {
   }
   let rawConfig;
   try {
-    rawConfig = JSON.parse(readFileSync11(configFile, "utf-8"));
+    rawConfig = JSON.parse(readFileSync12(configFile, "utf-8"));
   } catch (err2) {
     const reason = err2 instanceof Error ? err2.message : String(err2);
     console.error(`Config file is not valid JSON: ${reason}`);
@@ -11437,7 +11519,7 @@ async function run6(argv2) {
     process.exit(1);
   }
   const writtenConfigPath = configPath(projectRoot);
-  mkdirSync3(dirname(writtenConfigPath), { recursive: true });
+  mkdirSync3(dirname2(writtenConfigPath), { recursive: true });
   writeFileSync8(
     writtenConfigPath,
     JSON.stringify(config, null, 2) + "\n",
@@ -11451,7 +11533,7 @@ async function run6(argv2) {
       preservedCalendars.push(`${slug}: ${site.calendarPath}`);
       continue;
     }
-    mkdirSync3(dirname(absPath), { recursive: true });
+    mkdirSync3(dirname2(absPath), { recursive: true });
     writeFileSync8(absPath, renderEmptyCalendar(), "utf-8");
     createdCalendars.push(`${slug}: ${site.calendarPath}`);
   }
@@ -11480,22 +11562,39 @@ var iterate_exports = {};
 __export(iterate_exports, {
   run: () => run7
 });
-import { existsSync as existsSync8, readFileSync as readFileSync12 } from "node:fs";
+import { existsSync as existsSync8, readFileSync as readFileSync13 } from "node:fs";
 async function run7(argv2) {
-  const KNOWN_FLAGS3 = ["site", "kind", "dispositions"];
+  const KNOWN_FLAGS3 = ["site", "kind", "platform", "channel", "dispositions"];
   const DISPOSITIONS = /* @__PURE__ */ new Set(["addressed", "deferred", "wontfix"]);
+  const VALID_KINDS = ["longform", "outline", "shortform"];
   const { positional, flags } = parse();
   if (positional.length < 2) {
     fail(
-      "Usage: deskwork-iterate <project-root> [--site <slug>] [--kind longform|outline] [--dispositions <path>] <slug>",
+      "Usage: deskwork-iterate <project-root> [--site <slug>] [--kind longform|outline|shortform] [--platform <p>] [--channel <c>] [--dispositions <path>] <slug>",
       2
     );
   }
   const [rootArg, slug] = positional;
   const projectRoot = absolutize(rootArg);
-  const kind = flags.kind === "outline" ? "outline" : "longform";
-  if (flags.kind !== void 0 && flags.kind !== "longform" && flags.kind !== "outline") {
-    fail(`Invalid --kind "${flags.kind}". Must be 'longform' or 'outline'.`);
+  if (flags.kind !== void 0 && !VALID_KINDS.includes(flags.kind)) {
+    fail(
+      `Invalid --kind "${flags.kind}". Must be 'longform', 'outline', or 'shortform'.`
+    );
+  }
+  const kind = (() => {
+    if (flags.kind === "shortform") return "shortform";
+    if (flags.kind === "outline") return "outline";
+    return "longform";
+  })();
+  if (kind === "shortform") {
+    if (flags.platform === void 0) {
+      fail("--platform is required when --kind=shortform.");
+    }
+    if (!isPlatform(flags.platform)) {
+      fail(`Invalid --platform "${flags.platform}".`);
+    }
+  } else if (flags.platform !== void 0 || flags.channel !== void 0) {
+    fail("--platform / --channel are only valid with --kind=shortform.");
   }
   let config;
   try {
@@ -11504,13 +11603,34 @@ async function run7(argv2) {
     fail(err2 instanceof Error ? err2.message : String(err2));
   }
   const site = resolveSite(config, flags.site);
-  const file = resolveBlogFilePath(projectRoot, config, site, slug);
-  if (!existsSync8(file)) {
-    fail(`No blog file at ${file}.`);
+  let file;
+  if (kind === "shortform" && flags.platform !== void 0 && isPlatform(flags.platform)) {
+    const channel = flags.channel;
+    const resolved = resolveShortformFilePath(
+      projectRoot,
+      config,
+      site,
+      { slug },
+      flags.platform,
+      channel
+    );
+    if (resolved === void 0) {
+      fail(
+        `Cannot resolve shortform file for site=${site} slug=${slug} platform=${flags.platform}. Run /deskwork:shortform-start to scaffold it first.`
+      );
+    }
+    file = resolved;
+  } else {
+    file = resolveBlogFilePath(projectRoot, config, site, slug);
   }
-  const diskMarkdown = readFileSync12(file, "utf8");
+  if (!existsSync8(file)) {
+    fail(
+      kind === "shortform" ? `No shortform file at ${file}. Run /deskwork:shortform-start first.` : `No blog file at ${file}.`
+    );
+  }
+  const diskMarkdown = readFileSync13(file, "utf8");
   const workflow = readWorkflows(projectRoot, config).find(
-    (w) => w.site === site && w.slug === slug && w.contentKind === kind && w.state !== "applied" && w.state !== "cancelled"
+    (w) => w.site === site && w.slug === slug && w.contentKind === kind && (kind !== "shortform" || w.platform === flags.platform) && (kind !== "shortform" || (w.channel ?? null) === (flags.channel ?? null)) && w.state !== "applied" && w.state !== "cancelled"
   );
   if (!workflow) {
     fail(
@@ -11538,7 +11658,7 @@ The studio must click 'Request iteration' to move the workflow to 'iterating' be
     }
     let parsed;
     try {
-      parsed = JSON.parse(readFileSync12(path, "utf8"));
+      parsed = JSON.parse(readFileSync13(path, "utf8"));
     } catch (err2) {
       const reason = err2 instanceof Error ? err2.message : String(err2);
       fail(`--dispositions: invalid JSON at ${path}: ${reason}`);
@@ -11613,13 +11733,14 @@ var init_iterate = __esm({
     init_config();
     init_paths();
     init_pipeline();
+    init_types();
     init_cli();
   }
 });
 
 // ../core/src/scaffold.ts
 import { existsSync as existsSync9, mkdirSync as mkdirSync4 } from "node:fs";
-import { dirname as dirname2, join as join14, relative as relative8 } from "node:path";
+import { dirname as dirname3, join as join14, relative as relative8 } from "node:path";
 function scaffoldBlogPost(projectRoot, config, site, entry, opts = {}) {
   const slug = resolveSite(config, site);
   const siteCfg = config.sites[slug];
@@ -11658,7 +11779,7 @@ function scaffoldBlogPost(projectRoot, config, site, entry, opts = {}) {
   data.author = author;
   if (siteCfg.blogInitialState) data.state = siteCfg.blogInitialState;
   const body = buildBody(entry.title, siteCfg.blogOutlineSection === true);
-  mkdirSync4(dirname2(filePath), { recursive: true });
+  mkdirSync4(dirname3(filePath), { recursive: true });
   writeFrontmatter(filePath, data, body);
   const reported = contentRelativePath ?? relative8(join14(projectRoot, siteCfg.contentDir), filePath);
   return { filePath, relativePath, contentRelativePath: reported };
@@ -12418,7 +12539,7 @@ var init_review_report = __esm({
 });
 
 // ../core/src/body-state.ts
-import { existsSync as existsSync11, readFileSync as readFileSync13 } from "node:fs";
+import { existsSync as existsSync11, readFileSync as readFileSync14 } from "node:fs";
 function stripOutlineSection(body) {
   const lines = body.split("\n");
   const startIdx = lines.findIndex((line) => /^##[ \t]+Outline\b/.test(line));
@@ -12434,7 +12555,7 @@ function stripOutlineSection(body) {
 }
 function bodyState(filePath) {
   if (!existsSync11(filePath)) return "missing";
-  const content = readFileSync13(filePath, "utf8");
+  const content = readFileSync14(filePath, "utf8");
   const fmMatch = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
   const body = fmMatch ? content.slice(fmMatch[0].length) : content;
   const withoutH1 = body.replace(/^\s*#[^\n]*\n?/, "");
@@ -12458,8 +12579,8 @@ var review_start_exports = {};
 __export(review_start_exports, {
   run: () => run16
 });
-import { existsSync as existsSync12, readFileSync as readFileSync14, readdirSync as readdirSync8 } from "node:fs";
-import { dirname as dirname3 } from "node:path";
+import { existsSync as existsSync12, readFileSync as readFileSync15, readdirSync as readdirSync8 } from "node:fs";
+import { dirname as dirname4 } from "node:path";
 async function run16(argv2) {
   const KNOWN_FLAGS3 = ["site"];
   const SLUG_RE2 = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
@@ -12489,7 +12610,7 @@ Existing slugs on ${site}: ${list}.
 Run /deskwork:outline <slug> (or /deskwork:draft) to scaffold it first.`
     );
   }
-  const initialMarkdown = readFileSync14(file, "utf8");
+  const initialMarkdown = readFileSync15(file, "utf8");
   const body = bodyState(file);
   let entryId;
   try {
@@ -12540,7 +12661,7 @@ Run /deskwork:outline <slug> (or /deskwork:draft) to scaffold it first.`
     }
   }
   function listSiblingSlugs(blogFile) {
-    const dir = dirname3(blogFile);
+    const dir = dirname4(blogFile);
     if (!existsSync12(dir)) return [];
     return readdirSync8(dir).filter((name) => name.endsWith(".md")).map((name) => name.replace(/\.md$/, ""));
   }
