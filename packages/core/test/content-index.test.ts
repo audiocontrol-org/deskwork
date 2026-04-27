@@ -33,22 +33,54 @@ function makeConfig(): DeskworkConfig {
   };
 }
 
+/**
+ * Write a markdown fixture under `<root>/src/content/projects/<rel>`.
+ *
+ * Issue #38: deskwork's binding key lives at `deskwork.id` (a nested
+ * mapping). Test fixtures pass `id` as the canonical knob; the helper
+ * renders it as a `deskwork:` block in the generated YAML so the
+ * content index actually picks it up. Pass `topLevelId` when you need
+ * to test legacy v0.7.0/v0.7.1 shapes that put `id:` at the top level.
+ */
+interface FixtureFrontmatter {
+  /** Value to write under `deskwork.id` (the canonical binding). */
+  id?: string;
+  /** Value to write at the top level — legacy / operator's keyspace. */
+  topLevelId?: string;
+  title?: string;
+  /** Other arbitrary keys to render verbatim. */
+  extra?: Record<string, string>;
+}
+
 function writeMd(
   root: string,
   rel: string,
-  data: Record<string, string> | null,
+  data: FixtureFrontmatter | null,
   body: string,
 ): string {
   const abs = join(root, 'src/content/projects', rel);
   mkdirSync(join(abs, '..'), { recursive: true });
   if (data === null) {
     writeFileSync(abs, body);
-  } else {
-    const yaml = Object.entries(data)
-      .map(([k, v]) => `${k}: ${v}`)
-      .join('\n');
-    writeFileSync(abs, `---\n${yaml}\n---\n${body}`);
+    return abs;
   }
+  const lines: string[] = [];
+  if (data.id !== undefined) {
+    lines.push('deskwork:');
+    lines.push(`  id: ${data.id}`);
+  }
+  if (data.topLevelId !== undefined) {
+    lines.push(`id: ${data.topLevelId}`);
+  }
+  if (data.title !== undefined) {
+    lines.push(`title: ${data.title}`);
+  }
+  if (data.extra) {
+    for (const [k, v] of Object.entries(data.extra)) {
+      lines.push(`${k}: ${v}`);
+    }
+  }
+  writeFileSync(abs, `---\n${lines.join('\n')}\n---\n${body}`);
   return abs;
 }
 
@@ -85,9 +117,9 @@ describe('buildContentIndex', () => {
     writeMd(root, 'a/index.md', { id: id1, title: 'A' }, '\n# A\n');
     writeMd(root, 'b/index.md', { id: id2, title: 'B' }, '\n# B\n');
     writeMd(root, 'c/index.md', { id: id3, title: 'C' }, '\n# C\n');
-    // Pre-bind file: no `id:` at all. Should NOT appear in invalid.
+    // Pre-bind file: no `deskwork.id:` at all. Should NOT appear in invalid.
     writeMd(root, 'd/index.md', { title: 'D' }, '\n# D\n');
-    // Malformed id — present but not a UUID.
+    // Malformed id — namespaced block present but the id isn't a UUID.
     writeMd(root, 'e/index.md', { id: 'not-a-uuid', title: 'E' }, '\n# E\n');
 
     const idx = buildContentIndex(root, cfg, 'wc');
@@ -223,5 +255,58 @@ describe('buildContentIndex', () => {
     const idx = buildContentIndex(root, cfg, 'wc');
     expect(idx.byId.size).toBe(0);
     expect(idx.invalid).toHaveLength(1);
+  });
+
+  // Issue #38 — namespacing
+  describe('Issue #38: deskwork-namespaced id reads', () => {
+    it('indexes files with `deskwork.id` populated', () => {
+      const id = '99999999-9999-4999-8999-999999999999';
+      writeMd(root, 'a/index.md', { id, title: 'A' }, '\n# A\n');
+      const idx = buildContentIndex(root, cfg, 'wc');
+      expect(idx.byId.get(id)).toBe(
+        join(root, 'src/content/projects/a/index.md'),
+      );
+      expect(idx.invalid).toEqual([]);
+    });
+
+    it('does NOT index files with only a top-level `id:` (legacy state)', () => {
+      const id = '88888888-8888-4888-8888-888888888888';
+      writeMd(root, 'a/index.md', { topLevelId: id, title: 'A' }, '\n# A\n');
+      const idx = buildContentIndex(root, cfg, 'wc');
+      // Top-level id belongs to the operator's keyspace post-#38; the
+      // legacy-top-level-id-migration doctor rule surfaces these files
+      // for migration. The index treats them as pre-bind.
+      expect(idx.byId.size).toBe(0);
+      expect(idx.invalid).toEqual([]);
+    });
+
+    it('treats malformed `deskwork.id` (non-UUID string) as invalid', () => {
+      writeMd(
+        root,
+        'a/index.md',
+        { id: 'not-a-uuid', title: 'A' },
+        '\n# A\n',
+      );
+      const idx = buildContentIndex(root, cfg, 'wc');
+      expect(idx.byId.size).toBe(0);
+      expect(idx.invalid).toHaveLength(1);
+      expect(idx.invalid[0].reason).toMatch(/UUID/);
+    });
+
+    it('prefers `deskwork.id` even when a top-level `id:` is also present', () => {
+      const namespaced = '11111111-2222-4333-8444-555555555555';
+      const topLevel = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+      writeMd(
+        root,
+        'a/index.md',
+        { id: namespaced, topLevelId: topLevel, title: 'A' },
+        '\n# A\n',
+      );
+      const idx = buildContentIndex(root, cfg, 'wc');
+      expect(idx.byId.get(namespaced)).toBe(
+        join(root, 'src/content/projects/a/index.md'),
+      );
+      expect(idx.byId.has(topLevel)).toBe(false);
+    });
   });
 });

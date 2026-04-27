@@ -101,7 +101,8 @@ function seedFixture(root: string, cfg: DeskworkConfig): void {
     join(fileDir, 'index.md'),
     [
       '---',
-      `id: ${WC_ENTRY_ID}`,
+      'deskwork:',
+      `  id: ${WC_ENTRY_ID}`,
       'title: The Outbound',
       '---',
       '',

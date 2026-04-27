@@ -27,22 +27,24 @@ The install skill explores the project (Astro / Next / Hugo / etc), proposes a c
 
 ### Content schema requirement
 
-Deskwork binds calendar entries to their content files via a UUID written into each markdown file's frontmatter (`id: <uuid>`). For Astro projects with a strict content-collection schema, the schema must permit the `id` field. Two equivalent ways to allow it:
+Deskwork binds calendar entries to their content files via a UUID written into each markdown file's frontmatter under a `deskwork:` namespace (`deskwork.id: <uuid>`). The namespace keeps deskwork's binding metadata out of the operator's top-level keyspace — the top-level `id:` field belongs to you, not deskwork. For Astro projects with a strict content-collection schema, the schema must permit the `deskwork` namespace. Two equivalent ways to allow it:
 
 ```ts
-// option 1: explicit
+// option 1: explicit deskwork namespace
 schema: z.object({
-  id: z.string().uuid().optional(),
+  deskwork: z.object({ id: z.string().uuid() }).passthrough().optional(),
   title: z.string(),
   // …
 })
 
-// option 2: passthrough — allows any unknown fields, including `id`
+// option 2: top-level passthrough — allows any unknown fields, including the entire deskwork namespace
 schema: z.object({
   title: z.string(),
   // …
 }).passthrough()
 ```
+
+Top-level `id:` is NOT what to add — that's the keyspace deskwork no longer claims (Issue #38, v0.7.2). If you previously ran `deskwork doctor` against v0.7.0 / v0.7.1 and it wrote top-level `id:` fields, the `legacy-top-level-id-migration` doctor rule migrates those to the namespaced form on the next run.
 
 Hugo, Jekyll, Eleventy, and plain-markdown projects don't validate frontmatter against a schema — nothing to configure for those.
 
@@ -110,13 +112,13 @@ The content file's location is picked per-entry at outline time via `--layout`:
 | `--layout readme` | `<slug>/README.md` | Editorial-private nested chapters (often paired with content-collection patterns that exclude `README.md`) |
 | `--layout flat` | `<slug>.md` | Many small siblings under one parent (no per-entry dir) |
 
-Each scaffolded file carries `id: <uuid>` in its frontmatter — that's the binding deskwork uses to find the file again on subsequent reads, regardless of the site's default `blogFilenameTemplate` or any later renames in the content tree.
+Each scaffolded file carries a `deskwork:` mapping in its frontmatter (`deskwork.id: <uuid>`) — that's the binding deskwork uses to find the file again on subsequent reads, regardless of the site's default `blogFilenameTemplate` or any later renames in the content tree.
 
 #### Refactor-proof binding
 
-Calendar entries join to their content files via the UUID in frontmatter, not via a cached path. Renaming or moving a file in the content tree (e.g. `projects/the-outbound/index.md` → `projects/the-outbound-novel/index.md`) doesn't break the binding — deskwork rediscovers the file on the next read by scanning `contentDir` for the matching frontmatter `id`. No relocate command, no calendar edit.
+Calendar entries join to their content files via the UUID in frontmatter (`deskwork.id`), not via a cached path. Renaming or moving a file in the content tree (e.g. `projects/the-outbound/index.md` → `projects/the-outbound-novel/index.md`) doesn't break the binding — deskwork rediscovers the file on the next read by scanning `contentDir` for the matching frontmatter `deskwork.id`. No relocate command, no calendar edit.
 
-If you ever do hit a stale binding (legacy entry whose file doesn't yet carry an `id:`, file deleted out from under the calendar, or any of the other failure modes), `deskwork doctor` finds it and offers a repair.
+If you ever do hit a stale binding (legacy entry whose file doesn't yet carry a `deskwork.id:`, file deleted out from under the calendar, or any of the other failure modes), `deskwork doctor` finds it and offers a repair.
 
 #### Each entry stands alone
 

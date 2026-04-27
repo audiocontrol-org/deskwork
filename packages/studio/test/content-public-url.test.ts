@@ -91,7 +91,7 @@ describe('content tree — public-URL hover hint (Phase 19d)', () => {
     mkdirSync(fileDir, { recursive: true });
     writeFileSync(
       join(fileDir, 'index.md'),
-      `---\nid: ${KNOWN_ID}\ntitle: The Outbound\n---\n\n# The Outbound\n\nBody.\n`,
+      `---\ndeskwork:\n  id: ${KNOWN_ID}\ntitle: The Outbound\n---\n\n# The Outbound\n\nBody.\n`,
       'utf-8',
     );
 
@@ -129,7 +129,7 @@ describe('content tree — public-URL hover hint (Phase 19d)', () => {
     mkdirSync(fileDir, { recursive: true });
     writeFileSync(
       join(fileDir, 'index.md'),
-      `---\nid: ${KNOWN_ID}\ntitle: Flat Post\n---\n\n# Flat\n\nBody.\n`,
+      `---\ndeskwork:\n  id: ${KNOWN_ID}\ntitle: Flat Post\n---\n\n# Flat\n\nBody.\n`,
       'utf-8',
     );
 

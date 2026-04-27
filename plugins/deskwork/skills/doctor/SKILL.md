@@ -5,11 +5,11 @@ description: Audit and repair binding metadata across the editorial calendar, co
 
 ## Doctor — keep calendar, files, and workflows in sync
 
-`deskwork doctor` is the maintenance command. It walks every site in the project's `.deskwork/config.json`, joins the calendar against the content tree (via frontmatter `id:`), and reports anything that doesn't line up. By default it changes nothing — you read the report, decide what to fix, and run again with `--fix`.
+`deskwork doctor` is the maintenance command. It walks every site in the project's `.deskwork/config.json`, joins the calendar against the content tree (via frontmatter `deskwork.id:`), and reports anything that doesn't line up. By default it changes nothing — you read the report, decide what to fix, and run again with `--fix`.
 
 ### When to run
 
-- After an upgrade (Phase 19 introduced the `id:` frontmatter binding; existing projects backfill via doctor).
+- After an upgrade (Phase 19 introduced the frontmatter binding; v0.7.2 moved it under a `deskwork:` namespace; existing projects backfill / migrate via doctor).
 - After bulk editing the calendar by hand.
 - After moving or renaming content files in the host project (the frontmatter id moves with the file, but doctor will surface anything that drifted).
 - As a pre-commit / CI check: audit-only mode exits non-zero on any finding, so it composes with `--exit-code` workflows.
@@ -18,13 +18,14 @@ description: Audit and repair binding metadata across the editorial calendar, co
 
 | Rule | What it catches |
 |---|---|
-| `missing-frontmatter-id` | Calendar entry exists, no file claims that id via frontmatter. |
-| `orphan-frontmatter-id` | File has `id:`, no calendar entry with that id. |
-| `duplicate-id` | Two or more files share the same `id`. |
-| `slug-collision` | Two calendar entries share the same slug (URL conflict). |
-| `schema-rejected` | Host's content schema refuses the `id` field — surfaces patch instructions. |
-| `workflow-stale` | A draft workflow points at a non-existent calendar entry. |
 | `calendar-uuid-missing` | A calendar row on disk has no UUID column populated. |
+| `legacy-top-level-id-migration` | A file's binding lives at top-level `id:` (v0.7.0 / v0.7.1 shape) and should be migrated to `deskwork.id`. |
+| `missing-frontmatter-id` | Calendar entry exists, no file claims that id via `deskwork.id`. |
+| `orphan-frontmatter-id` | File has `deskwork.id`, no calendar entry with that id. |
+| `duplicate-id` | Two or more files share the same `deskwork.id`. |
+| `slug-collision` | Two calendar entries share the same slug (URL conflict). |
+| `workflow-stale` | A draft workflow points at a non-existent calendar entry. |
+| `schema-rejected` | Host's content schema refuses the `deskwork` namespace — surfaces patch instructions. |
 
 ### Step 1 — audit
 
@@ -61,15 +62,31 @@ Doctor never auto-applies destructive choices — clearing an orphan id, picking
 
 ### Rule-by-rule playbook
 
+#### `legacy-top-level-id-migration`
+
+Files written by `deskwork doctor` under v0.7.0 / v0.7.1 may have their binding at the top-level `id:` field. v0.7.2 moved the canonical location to `deskwork.id` (a nested mapping) so deskwork doesn't claim the operator's global keyspace. This rule detects files where:
+
+1. Top-level `id:` is a UUID matching a calendar entry, AND
+2. `deskwork.id` is NOT present.
+
+Repair moves the value from top-level to `deskwork.id` and removes the top-level field. The rewrite is round-trip-preserving — every other byte in the frontmatter (quoting styles, comments, blank lines, key order) stays intact. Idempotent: a second run on a migrated file finds nothing to do. Safe under `--fix=all --yes`.
+
+```sh
+# Migrate after upgrading from v0.7.0 / v0.7.1:
+deskwork doctor --fix=legacy-top-level-id-migration
+# Or part of a full pass:
+deskwork doctor --fix=all --yes
+```
+
 #### `missing-frontmatter-id`
 
-Most common after first install (the calendar has rows but the files don't yet carry `id:`). Doctor searches for candidate files in three widening passes:
+Most common after first install (the calendar has rows but the files don't yet carry `deskwork.id:`). Doctor searches for candidate files in three widening passes:
 
 1. The file at the slug-template path (e.g. `<contentDir>/<slug>/index.md`).
 2. Any file whose frontmatter `title` matches the calendar entry's title.
 3. Any file whose basename matches the slug.
 
-Exactly one candidate → write `id: <entry.id>` into the file and exit. Multiple candidates → prompt. Zero candidates → report and skip (no file to bind to).
+Exactly one candidate → write `deskwork.id: <entry.id>` into the file and exit. Multiple candidates → prompt. Zero candidates → report and skip (no file to bind to).
 
 ```sh
 # Backfill ids for the active site:
@@ -78,11 +95,11 @@ deskwork doctor --fix=missing-frontmatter-id --site main
 
 #### `orphan-frontmatter-id`
 
-A file has an `id:` that no calendar entry claims. Three plausible intents (add a calendar row, clear the id, leave it alone) — there's no safe automatic action, so the rule prompts. With `--yes` it skips and reports.
+A file has a `deskwork.id` that no calendar entry claims. Three plausible intents (add a calendar row, clear the id, leave it alone) — there's no safe automatic action, so the rule prompts. With `--yes` it skips and reports.
 
 #### `duplicate-id`
 
-Two files claim the same id. Pick the canonical file; doctor clears the id from the others. With `--yes` doctor skips and reports — picking which file is editorial.
+Two files claim the same `deskwork.id`. Pick the canonical file; doctor clears the id from the others. With `--yes` doctor skips and reports — picking which file is editorial.
 
 #### `slug-collision`
 
@@ -90,7 +107,7 @@ Two calendar entries share a slug. The host renderer maps URLs by slug, so this 
 
 #### `schema-rejected`
 
-The host's Astro content collection schema rejects the `id` field. The audit doesn't actively probe for this (would require running the host's build). Other code paths surface schema rejection at write time and reference this rule's patch instructions.
+The host's Astro content collection schema rejects the `deskwork:` namespace block. The audit doesn't actively probe for this (would require running the host's build). Other code paths surface schema rejection at write time and reference this rule's patch instructions.
 
 The fix is a one-line content-schema patch — see the plugin README's [Content schema requirement](../../README.md#content-schema-requirement) section for the full prose, or import the helper directly:
 
@@ -101,8 +118,10 @@ console.log(printSchemaPatchInstructions());
 
 Two options the helper documents:
 
-1. Add `id: z.string().uuid().optional()` to the collection schema.
-2. Add `.passthrough()` to allow unknown fields through.
+1. Add `deskwork: z.object({ id: z.string().uuid() }).passthrough().optional()` to the collection schema.
+2. Add top-level `.passthrough()` to allow the entire `deskwork:` namespace through.
+
+Top-level `id:` is NOT what to add — that's the keyspace deskwork no longer claims.
 
 Hugo / Jekyll / Eleventy / plain markdown projects: not applicable, those engines don't validate frontmatter against a schema.
 

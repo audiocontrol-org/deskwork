@@ -13,7 +13,7 @@
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { parseFrontmatter, stringifyFrontmatter } from '../../frontmatter.ts';
+import { parseFrontmatter, removeFrontmatterPaths } from '../../frontmatter.ts';
 import { resolveContentDir } from '../../paths.ts';
 import type {
   DoctorContext,
@@ -25,13 +25,24 @@ import type {
 
 const RULE_ID = 'duplicate-id';
 
+/**
+ * Clear the `deskwork.id` field from a markdown file. Returns true when
+ * the field was present and cleared. Issue #38: scoped to the
+ * namespaced key — top-level `id:` belongs to the operator and is left
+ * alone.
+ */
 function clearFrontmatterId(absPath: string): boolean {
   const raw = readFileSync(absPath, 'utf-8');
-  const { data, body } = parseFrontmatter(raw);
-  if (!('id' in data)) return false;
-  const next: Record<string, unknown> = { ...data };
-  delete next.id;
-  writeFileSync(absPath, stringifyFrontmatter(next, body), 'utf-8');
+  const { data } = parseFrontmatter(raw);
+  const block = data.deskwork;
+  if (block === undefined || block === null) return false;
+  if (typeof block !== 'object' || Array.isArray(block)) return false;
+  const blockObj = block as Record<string, unknown>;
+  if (!('id' in blockObj)) return false;
+
+  const updated = removeFrontmatterPaths(raw, [['deskwork', 'id']]);
+  if (updated === raw) return false;
+  writeFileSync(absPath, updated, 'utf-8');
   return true;
 }
 

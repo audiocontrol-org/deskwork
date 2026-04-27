@@ -109,6 +109,20 @@ function frontmatterOf(rel: string): Record<string, unknown> {
   return parseFrontmatter(raw).data;
 }
 
+/**
+ * Read the canonical deskwork-namespaced id from a fixture file's
+ * frontmatter (Issue #38). Returns undefined when the file has no
+ * deskwork block or the id field within is missing.
+ */
+function deskworkIdOf(rel: string): string | undefined {
+  const data = frontmatterOf(rel);
+  const block = data.deskwork;
+  if (block === undefined || block === null) return undefined;
+  if (typeof block !== 'object' || Array.isArray(block)) return undefined;
+  const id = (block as Record<string, unknown>).id;
+  return typeof id === 'string' ? id : undefined;
+}
+
 const ID_A = '11111111-1111-4111-8111-111111111111';
 const ID_B = '22222222-2222-4222-8222-222222222222';
 const ID_C = '33333333-3333-4333-8333-333333333333';
@@ -166,13 +180,15 @@ describe('deskwork doctor — missing-frontmatter-id', () => {
     expect(fix.code).toBe(0);
     expect(fix.stdout).toMatch(/applied/);
 
-    // File now carries the calendar's id.
+    // File now carries the calendar's id under `deskwork.id` (Issue #38).
     const cal = readCalendarFile();
     const entry = cal.entries.find((e) => e.slug === 'single-candidate');
     expect(entry).toBeDefined();
     if (!entry) return;
-    const fm = frontmatterOf('single-candidate/index.md');
-    expect(fm.id).toBe(entry.id);
+    expect(deskworkIdOf('single-candidate/index.md')).toBe(entry.id);
+    // Top-level `id:` MUST NOT have been written — that keyspace is
+    // the operator's, not deskwork's.
+    expect(frontmatterOf('single-candidate/index.md').id).toBeUndefined();
 
     // Re-audit: no findings.
     const reaudit = run('doctor', [project]);
@@ -197,11 +213,9 @@ describe('deskwork doctor — missing-frontmatter-id', () => {
     expect(fix.code).toBe(1);
     expect(fix.stdout).toMatch(/skipped/i);
 
-    // Neither file got an id written.
-    const fmA = frontmatterOf('ambiguous/index.md');
-    const fmB = frontmatterOf('other/duplicate-title.md');
-    expect(fmA.id).toBeUndefined();
-    expect(fmB.id).toBeUndefined();
+    // Neither file got a deskwork.id written.
+    expect(deskworkIdOf('ambiguous/index.md')).toBeUndefined();
+    expect(deskworkIdOf('other/duplicate-title.md')).toBeUndefined();
   });
 
   it('reports zero candidates explicitly when no matching file exists', () => {
@@ -220,9 +234,10 @@ describe('deskwork doctor — missing-frontmatter-id', () => {
 
 describe('deskwork doctor — orphan-frontmatter-id', () => {
   it('reports a file whose id has no calendar match', () => {
+    // Issue #38: deskwork's binding lives at deskwork.id, not top-level.
     writeContent(
       'orphan/index.md',
-      `---\nid: ${ID_A}\ntitle: Orphan\n---\n\n# Orphan\n`,
+      `---\ndeskwork:\n  id: ${ID_A}\ntitle: Orphan\n---\n\n# Orphan\n`,
     );
 
     const audit = run('doctor', [project]);
@@ -233,7 +248,7 @@ describe('deskwork doctor — orphan-frontmatter-id', () => {
   it('--fix --yes leaves orphans alone (safe default)', () => {
     writeContent(
       'orphan/index.md',
-      `---\nid: ${ID_A}\ntitle: Orphan\n---\n\n# Orphan\n`,
+      `---\ndeskwork:\n  id: ${ID_A}\ntitle: Orphan\n---\n\n# Orphan\n`,
     );
 
     const fix = run('doctor', [project, '--fix=orphan-frontmatter-id', '--yes']);
@@ -243,8 +258,7 @@ describe('deskwork doctor — orphan-frontmatter-id', () => {
     expect(fix.stdout).toMatch(/skipped/i);
 
     // Frontmatter unchanged.
-    const fm = frontmatterOf('orphan/index.md');
-    expect(fm.id).toBe(ID_A);
+    expect(deskworkIdOf('orphan/index.md')).toBe(ID_A);
   });
 });
 
@@ -254,13 +268,14 @@ describe('deskwork doctor — orphan-frontmatter-id', () => {
 
 describe('deskwork doctor — duplicate-id', () => {
   it('reports two files sharing the same frontmatter id', () => {
+    // Issue #38: deskwork-namespaced binding.
     writeContent(
       'a/index.md',
-      `---\nid: ${ID_A}\ntitle: First\n---\n\n# A\n`,
+      `---\ndeskwork:\n  id: ${ID_A}\ntitle: First\n---\n\n# A\n`,
     );
     writeContent(
       'b/index.md',
-      `---\nid: ${ID_A}\ntitle: Second\n---\n\n# B\n`,
+      `---\ndeskwork:\n  id: ${ID_A}\ntitle: Second\n---\n\n# B\n`,
     );
 
     const audit = run('doctor', [project]);
@@ -271,11 +286,11 @@ describe('deskwork doctor — duplicate-id', () => {
   it('--fix --yes skips duplicates (operator must pick the canonical file)', () => {
     writeContent(
       'a/index.md',
-      `---\nid: ${ID_A}\ntitle: First\n---\n\n# A\n`,
+      `---\ndeskwork:\n  id: ${ID_A}\ntitle: First\n---\n\n# A\n`,
     );
     writeContent(
       'b/index.md',
-      `---\nid: ${ID_A}\ntitle: Second\n---\n\n# B\n`,
+      `---\ndeskwork:\n  id: ${ID_A}\ntitle: Second\n---\n\n# B\n`,
     );
 
     const fix = run('doctor', [project, '--fix=duplicate-id', '--yes']);
@@ -283,8 +298,8 @@ describe('deskwork doctor — duplicate-id', () => {
     expect(fix.stdout).toMatch(/skipped/i);
 
     // Both files still have the id.
-    expect(frontmatterOf('a/index.md').id).toBe(ID_A);
-    expect(frontmatterOf('b/index.md').id).toBe(ID_A);
+    expect(deskworkIdOf('a/index.md')).toBe(ID_A);
+    expect(deskworkIdOf('b/index.md')).toBe(ID_A);
   });
 });
 
@@ -552,6 +567,139 @@ describe('deskwork doctor — calendar-uuid-missing', () => {
       (f) => f.ruleId === 'calendar-uuid-missing',
     );
     expect(uuidFindings).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// legacy-top-level-id-migration (Issue #38)
+// ---------------------------------------------------------------------------
+
+describe('deskwork doctor — legacy-top-level-id-migration', () => {
+  it('reports a file whose top-level id is a calendar UUID and has no deskwork.id', () => {
+    // Add a calendar entry, then create a file with the legacy v0.7.0/v0.7.1
+    // shape: top-level `id:` matching the calendar UUID, no deskwork block.
+    run('add', [project, 'Legacy Post']);
+    const cal = readCalendarFile();
+    const entry = cal.entries.find((e) => e.slug === 'legacy-post');
+    expect(entry).toBeDefined();
+    if (!entry) return;
+    writeContent(
+      'legacy-post/index.md',
+      `---\nid: ${entry.id}\ntitle: Legacy Post\n---\n\n# Legacy\n`,
+    );
+
+    const audit = run('doctor', [project]);
+    expect(audit.code).toBe(1);
+    expect(audit.stdout).toMatch(/legacy-top-level-id-migration/);
+  });
+
+  it('--fix --yes migrates the id to deskwork.id and removes the top-level field', () => {
+    run('add', [project, 'Migrate Me']);
+    const cal = readCalendarFile();
+    const entry = cal.entries.find((e) => e.slug === 'migrate-me');
+    expect(entry).toBeDefined();
+    if (!entry) return;
+    writeContent(
+      'migrate-me/index.md',
+      `---\nid: ${entry.id}\ntitle: Migrate Me\ndatePublished: "2020-10-01"\n---\n\n# M\n`,
+    );
+
+    const fix = run('doctor', [
+      project,
+      '--fix=legacy-top-level-id-migration',
+      '--yes',
+    ]);
+    expect(fix.code).toBe(0);
+    expect(fix.stdout).toMatch(/applied/);
+
+    // Top-level `id:` is gone; `deskwork.id` is populated with the same UUID.
+    const fm = frontmatterOf('migrate-me/index.md');
+    expect(fm.id).toBeUndefined();
+    expect(deskworkIdOf('migrate-me/index.md')).toBe(entry.id);
+
+    // Round-trip preservation: the unrelated double-quoted ISO date is
+    // still double-quoted on disk after the migration write.
+    const raw = readFileSync(
+      join(project, 'src/content', 'migrate-me/index.md'),
+      'utf-8',
+    );
+    expect(raw).toContain('datePublished: "2020-10-01"');
+  });
+
+  it('is idempotent — second run finds nothing to migrate', () => {
+    run('add', [project, 'Already Migrated']);
+    const cal = readCalendarFile();
+    const entry = cal.entries.find((e) => e.slug === 'already-migrated');
+    expect(entry).toBeDefined();
+    if (!entry) return;
+    writeContent(
+      'already-migrated/index.md',
+      `---\nid: ${entry.id}\ntitle: Already\n---\n\n# A\n`,
+    );
+
+    // First migration.
+    run('doctor', [project, '--fix=legacy-top-level-id-migration', '--yes']);
+    // Second run on the post-migration state.
+    const second = run('doctor', [
+      project,
+      '--fix=legacy-top-level-id-migration',
+      '--yes',
+      '--json',
+    ]);
+    const out = second.json as {
+      findings: Array<{ ruleId: string }>;
+      repairs: unknown[];
+    };
+    const migrationFindings = out.findings.filter(
+      (f) => f.ruleId === 'legacy-top-level-id-migration',
+    );
+    expect(migrationFindings).toEqual([]);
+    expect(out.repairs).toEqual([]);
+  });
+
+  it('leaves alone files whose top-level `id:` is not a calendar UUID', () => {
+    // Operator's keyspace — not deskwork's. We must not migrate or
+    // touch this.
+    writeContent(
+      'operator-id/index.md',
+      `---\nid: not-a-uuid\ntitle: Operator's id\n---\n\n# Op\n`,
+    );
+
+    const fix = run('doctor', [
+      project,
+      '--fix=legacy-top-level-id-migration',
+      '--yes',
+      '--json',
+    ]);
+    const out = fix.json as { findings: Array<{ ruleId: string }> };
+    const migrationFindings = out.findings.filter(
+      (f) => f.ruleId === 'legacy-top-level-id-migration',
+    );
+    expect(migrationFindings).toEqual([]);
+
+    // File untouched.
+    const fm = frontmatterOf('operator-id/index.md');
+    expect(fm.id).toBe('not-a-uuid');
+  });
+
+  it('--fix=all migrates legacy ids in the same run', () => {
+    // Verify the rule is in the all-set (acceptance criterion).
+    run('add', [project, 'All Mode']);
+    const cal = readCalendarFile();
+    const entry = cal.entries.find((e) => e.slug === 'all-mode');
+    expect(entry).toBeDefined();
+    if (!entry) return;
+    writeContent(
+      'all-mode/index.md',
+      `---\nid: ${entry.id}\ntitle: All Mode\n---\n\n# A\n`,
+    );
+
+    const fix = run('doctor', [project, '--fix=all', '--yes']);
+    // The repair pipeline applies. After the run, the file should
+    // carry deskwork.id and no top-level id.
+    expect(fix.stdout).toMatch(/applied/);
+    expect(deskworkIdOf('all-mode/index.md')).toBe(entry.id);
+    expect(frontmatterOf('all-mode/index.md').id).toBeUndefined();
   });
 });
 

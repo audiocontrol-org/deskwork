@@ -102,12 +102,15 @@ export function scaffoldBlogPost(
 
   const dateStr = new Date().toISOString().slice(0, 10);
 
-  // The `id:` field binds this file to its CalendarEntry refactor-proof.
-  // Phase 19 made entry id (UUID) the canonical internal identifier;
-  // writing it into frontmatter lets the content-index pick this file up
-  // regardless of slug renames or fs relocations. `addEntry` always sets
-  // `entry.id` to a UUID; if it's missing here we have a real bug
-  // upstream — fail loud rather than scaffold an unbindable file.
+  // The `deskwork.id` field binds this file to its CalendarEntry
+  // refactor-proof. Phase 19 made entry id (UUID) the canonical internal
+  // identifier; writing it into frontmatter lets the content-index pick
+  // this file up regardless of slug renames or fs relocations. The id
+  // lives under a `deskwork:` namespace (Issue #38) so deskwork doesn't
+  // claim the global top-level `id:` keyspace — operators may use that
+  // freely. `addEntry` always sets `entry.id` to a UUID; if it's missing
+  // here we have a real bug upstream — fail loud rather than scaffold an
+  // unbindable file.
   if (!entry.id || entry.id.trim() === '') {
     throw new Error(
       'Cannot scaffold entry without id; this is a bug in calendar-mutations or upstream. ' +
@@ -116,10 +119,10 @@ export function scaffoldBlogPost(
   }
 
   const data: Record<string, unknown> = {};
-  // `id` first so it's the visually-stable top of the frontmatter
-  // block — operators reading the file see it immediately and won't
-  // mistake it for a host-rendering field.
-  data.id = entry.id;
+  // `deskwork` block first so it's the visually-stable top of the
+  // frontmatter — operators reading the file see the namespaced
+  // binding immediately and won't mistake it for a host-rendering field.
+  data.deskwork = { id: entry.id };
   if (siteCfg.blogLayout) data.layout = siteCfg.blogLayout;
   data.title = entry.title;
   data.description = entry.description;

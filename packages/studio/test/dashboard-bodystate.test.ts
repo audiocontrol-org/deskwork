@@ -121,7 +121,8 @@ describe('studio dashboard — body-state via content index', () => {
       filePath,
       [
         '---',
-        `id: ${WC_ENTRY_ID}`,
+        'deskwork:',
+        `  id: ${WC_ENTRY_ID}`,
         'title: The Outbound',
         '---',
         '',
@@ -179,7 +180,8 @@ describe('studio dashboard — body-state via content index', () => {
       filePath,
       [
         '---',
-        `id: ${WC_ENTRY_ID}`,
+        'deskwork:',
+        `  id: ${WC_ENTRY_ID}`,
         'title: The Outbound',
         '---',
         '',

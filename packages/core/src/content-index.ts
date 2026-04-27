@@ -2,19 +2,25 @@
  * Content index — `{uuid → absolute path}` and `{relative path → uuid}`.
  *
  * Walks `<contentDir>/` for a configured site, parses every markdown file's
- * YAML frontmatter, and records the file's `id:` field when present and
- * shaped like a UUID. The result drives id-based file lookups (Phase 19c)
+ * YAML frontmatter, and records the file's `deskwork.id:` field when present
+ * and shaped like a UUID. The result drives id-based file lookups (Phase 19c)
  * and `deskwork doctor`'s validation rules (Phase 19b).
+ *
+ * Namespace (Issue #38): the binding key lives under a `deskwork:`
+ * namespace in frontmatter (`deskwork.id`), NOT at the top level. Older
+ * v0.7.0/v0.7.1 files with a top-level `id:` are NOT picked up here —
+ * the `legacy-top-level-id-migration` doctor rule surfaces and migrates
+ * those.
  *
  * Design notes:
  * - Pure function: each call walks fresh. Callers that want memoization
  *   wrap (the studio memoizes per HTTP request; doctor memoizes per run).
  *   Building the index here means not maintaining a stale-cache invariant.
- * - Files with no `id:` are simply omitted — that's the legitimate
- *   pre-bind state. `doctor` reports them via the calendar/index join,
- *   not by treating "no id" as an error here.
- * - Files with a malformed `id:` go into `invalid` so `doctor` can
- *   surface them; they don't pollute `byId` / `byPath`.
+ * - Files with no `deskwork.id:` are simply omitted — that's the
+ *   legitimate pre-bind state. `doctor` reports them via the calendar
+ *   join, not by treating "no id" as an error here.
+ * - Files with a malformed `deskwork.id:` go into `invalid` so `doctor`
+ *   can surface them; they don't pollute `byId` / `byPath`.
  * - On duplicate ids across files, the first encountered (in sorted
  *   directory walk order) wins `byId`; the second is silently dropped
  *   from `byId` but its path still appears in `byPath`. The
@@ -168,25 +174,38 @@ function readIdFromFrontmatter(absPath: string): IdLookup {
     const reason = err instanceof Error ? err.message : String(err);
     return { kind: 'invalid', reason: `unreadable frontmatter: ${reason}` };
   }
-  const raw = parsed.data.id;
+  // Issue #38: read `deskwork.id` only — top-level `id:` belongs to the
+  // operator, not to deskwork. Files with only a top-level id are
+  // surfaced separately by the legacy-top-level-id-migration doctor rule.
+  const deskworkBlock = parsed.data.deskwork;
+  if (deskworkBlock === undefined || deskworkBlock === null) {
+    return { kind: 'absent' };
+  }
+  if (typeof deskworkBlock !== 'object' || Array.isArray(deskworkBlock)) {
+    return {
+      kind: 'invalid',
+      reason: `frontmatter deskwork is ${typeof deskworkBlock}, expected mapping`,
+    };
+  }
+  const raw = (deskworkBlock as Record<string, unknown>).id;
   if (raw === undefined) return { kind: 'absent' };
   if (typeof raw !== 'string') {
     return {
       kind: 'invalid',
-      reason: `frontmatter id is ${typeof raw}, expected string`,
+      reason: `frontmatter deskwork.id is ${typeof raw}, expected string`,
     };
   }
   const trimmed = raw.trim();
   if (trimmed === '') {
     return {
       kind: 'invalid',
-      reason: 'frontmatter id is empty',
+      reason: 'frontmatter deskwork.id is empty',
     };
   }
   if (!isUuid(trimmed)) {
     return {
       kind: 'invalid',
-      reason: `frontmatter id "${trimmed}" is not a valid UUID`,
+      reason: `frontmatter deskwork.id "${trimmed}" is not a valid UUID`,
     };
   }
   return { kind: 'valid', id: trimmed };

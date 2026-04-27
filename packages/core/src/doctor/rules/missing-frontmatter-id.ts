@@ -117,12 +117,14 @@ export function findCandidatesForEntry(
   function consider(abs: string, reason: CandidateFile['matchReason']): void {
     if (!existsSync(abs)) return;
     if (seen.has(abs)) return;
-    // Skip files whose frontmatter already has an id (they belong to
-    // another entry or are duplicates — out of this rule's scope).
+    // Skip files whose frontmatter already has a deskwork.id (they
+    // belong to another entry or are duplicates — out of this rule's
+    // scope). Top-level `id:` is the operator's keyspace per Issue #38
+    // and doesn't disqualify a file as a candidate.
     try {
       const parsed = readFrontmatter(abs);
-      const existingId = parsed.data.id;
-      if (typeof existingId === 'string' && existingId.trim() !== '') {
+      const existingId = readDeskworkId(parsed.data);
+      if (existingId !== undefined) {
         return;
       }
     } catch {
@@ -167,14 +169,32 @@ export function findCandidatesForEntry(
 }
 
 /**
- * Write `id: <entryId>` into the markdown file's frontmatter. Idempotent
- * when the file already carries the same id (no-op write avoided).
+ * Write `deskwork.id: <entryId>` into the markdown file's frontmatter.
+ * Idempotent when the file already carries the same id (no-op write
+ * avoided). Issue #38: writes under the `deskwork:` namespace, not the
+ * global top-level `id:`.
  */
 export function bindFrontmatterId(absPath: string, entryId: string): void {
   const raw = readFileSync(absPath, 'utf-8');
-  const updated = updateFrontmatter(raw, { id: entryId });
+  const updated = updateFrontmatter(raw, { deskwork: { id: entryId } });
   if (updated === raw) return;
   writeFileSync(absPath, updated, 'utf-8');
+}
+
+/**
+ * Read `deskwork.id` from frontmatter data. Returns `undefined` when
+ * either the `deskwork` block or the nested `id` is missing or
+ * malformed. Used by candidate filters and the migration rule to keep
+ * the namespaced-key reads consistent across rules.
+ */
+function readDeskworkId(data: Record<string, unknown>): string | undefined {
+  const block = data.deskwork;
+  if (block === undefined || block === null) return undefined;
+  if (typeof block !== 'object' || Array.isArray(block)) return undefined;
+  const id = (block as Record<string, unknown>).id;
+  if (typeof id !== 'string') return undefined;
+  const trimmed = id.trim();
+  return trimmed === '' ? undefined : trimmed;
 }
 
 const rule: DoctorRule = {
