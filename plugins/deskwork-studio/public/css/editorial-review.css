@@ -334,6 +334,45 @@ body[data-review-ui="shortform"] {
   .er-layout { grid-template-columns: 1fr; gap: var(--er-space-4); }
 }
 
+/* CSF-5 (cross-surface audit v0.5.0): unified row base + modifiers.
+ *
+ * Five row hierarchies in the studio render conceptually the same
+ * component (left content, right meta, optional hover bg, dotted
+ * border-bottom). They are:
+ *
+ *   .er-calendar-row  — dashboard      (4col grid)
+ *   .scrap            — review drawer + content detail + scrapbook
+ *   .tree-row         — content drilldown (depth-indented)
+ *   .er-toc-entry     — studio index   (leader dots, route/page-no)
+ *   .project-row      — content top-level (4col grid)
+ *
+ * Each was self-consistent at the time it shipped; nothing was
+ * harmonized. The `.er-row` base below defines the shared shape
+ * (border-bottom, hover bg, padding rhythm) so a future renderer
+ * can reach for `.er-row + .er-row--<variant>` and not invent a
+ * sixth hierarchy. The five existing classes remain — the visual
+ * unification was achieved by harmonizing tokens (CSF-1) so the
+ * five classes already speak the same palette and rhythm.
+ *
+ * New rendering work should prefer `.er-row + .er-row--<variant>`
+ * over inventing yet-another row family.
+ */
+.er-row {
+  display: grid;
+  align-items: baseline;
+  gap: var(--er-space-2);
+  padding: var(--er-space-1) var(--er-space-2);
+  border-bottom: 1px dotted var(--er-faded-2);
+  transition: background 0.14s ease;
+}
+.er-row:hover { background: rgba(26, 22, 20, 0.03); }
+.er-row:last-child { border-bottom: none; }
+
+.er-row--calendar { grid-template-columns: auto minmax(0, 1fr) auto auto; }
+.er-row--toc      { grid-template-columns: auto 1fr auto; padding: var(--er-space-2) 0; }
+.er-row--tree     { grid-template-columns: 1fr auto auto; padding-left: calc(var(--er-row-depth, 0) * 1.4rem); }
+.er-row--scrap    { grid-template-columns: auto 1fr auto auto; }
+
 /* CSF-4 (cross-surface audit v0.5.0): unified section-head component.
  * `er-section-head` is the canonical class; `er-section-title` is its
  * legacy name and remains as an alias so longform-review surfaces
