@@ -17,7 +17,7 @@
   },
   "scripts": {
     "prepare": "husky",
-    "version:bump": "tsx scripts/bump-version.mjs"
+    "version:bump": "tsx scripts/bump-version.ts"
   },
   "devDependencies": {
     "husky": "^9.1.7",
