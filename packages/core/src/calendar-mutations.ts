@@ -31,9 +31,15 @@ export function addEntry(
     source?: CalendarEntry['source'];
     contentType?: ContentType;
     contentUrl?: string;
+    /**
+     * Explicit slug override. Use this to capture hierarchical entries
+     * (e.g. "the-outbound/characters/strivers") whose slug shouldn't be
+     * derived from the title. When omitted, the slug is `slugify(title)`.
+     */
+    slug?: string;
   },
 ): CalendarEntry {
-  const slug = slugify(title);
+  const slug = opts?.slug ?? slugify(title);
 
   const existing = calendar.entries.find((e) => e.slug === slug);
   if (existing) {

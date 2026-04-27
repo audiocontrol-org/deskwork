@@ -17,6 +17,17 @@ The user provides a title and optionally a description. Examples:
 
 If the project has multiple sites, confirm which one the idea belongs to. The `--site <slug>` flag is accepted; default is the project's `defaultSite`.
 
+### Hierarchical entries (slug overrides)
+
+For projects with hierarchical content (e.g. a fiction project with chapters/sub-pieces), the slug is normally derived from the title. Use `--slug <path>` to specify the full hierarchical path explicitly. The path is one or more `/`-separated kebab-case segments.
+
+```
+/deskwork:add --slug the-outbound/characters/strivers "Strivers" "A character study"
+/deskwork:add --slug the-outbound/structure "Structure"
+```
+
+Each hierarchical entry stands alone — adding `the-outbound/characters/strivers` does NOT auto-create entries for `the-outbound` or `the-outbound/characters`. Promote intermediate directories to tracked entries explicitly when (and only when) the operator wants them tracked through the lifecycle.
+
 ### Content type
 
 Before writing, ask the user for the **content type** unless obvious from context. One of:
@@ -36,7 +47,7 @@ For `youtube` and `tool` entries, capture the URL now if the content is already 
 
 ```
 deskwork add [--site <slug>] [--type blog|youtube|tool] \
-                [--content-url URL] <title> [description]
+                [--content-url URL] [--slug <path>] <title> [description]
 ```
 
 The helper writes the calendar atomically and prints a JSON result with the generated slug.

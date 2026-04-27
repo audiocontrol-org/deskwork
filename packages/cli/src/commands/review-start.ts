@@ -24,7 +24,7 @@ import { absolutize, emit, fail, parseArgs } from '@deskwork/core/cli-args';
 
 export async function run(argv: string[]): Promise<void> {
   const KNOWN_FLAGS = ['site'] as const;
-  const SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
+  const SLUG_RE = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
 
   const { positional, flags } = parse();
 

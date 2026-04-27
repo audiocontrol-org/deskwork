@@ -354,6 +354,7 @@ export async function renderReviewPage(
     cssHrefs: [
       '/static/css/editorial-review.css',
       '/static/css/blog-figure.css',
+      '/static/css/review-viewport.css',
     ],
     bodyHtml: body,
     embeddedJson: [{ id: 'draft-state', data: draftState }],

@@ -270,6 +270,74 @@ describe('studio pages', () => {
     expect(r.text).toContain('awaiting');
   });
 
+  it('GET /dev/editorial-studio indents hierarchical entries by slug depth', async () => {
+    // Seed a calendar with a parent + nested child + deeper grandchild.
+    // The dashboard's display sort should cluster them and the rows
+    // should carry data-depth + the --er-row-depth CSS variable.
+    const calPath = join(root, 'docs/cal-a.md');
+    mkdirSync(dirname(calPath), { recursive: true });
+    const calMd = `# Editorial Calendar
+
+## Ideas
+
+| UUID | Slug | Title | Description | Keywords | Source |
+|------|------|-------|-------------|----------|--------|
+| 11111111-1111-4111-8111-111111111111 | the-outbound | Project | Hub | | manual |
+| 22222222-2222-4222-8222-222222222222 | the-outbound/characters | Characters | Group | | manual |
+| 33333333-3333-4333-8333-333333333333 | the-outbound/characters/strivers | Strivers | Subgroup | | manual |
+
+## Planned
+
+*No entries.*
+
+## Outlining
+
+*No entries.*
+
+## Drafting
+
+*No entries.*
+
+## Review
+
+*No entries.*
+
+## Published
+
+*No entries.*
+`;
+    writeFileSync(calPath, calMd, 'utf-8');
+
+    const r = await getText(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+
+    // Top-level entry: no data-depth attribute on its wrap.
+    expect(r.text).toMatch(
+      /<div class="er-calendar-row-wrap" [^>]*data-search="[^"]*the-outbound[^/][^"]*"(?![^>]*data-depth)/,
+    );
+    // depth-1 entry has data-depth="1" + the CSS var
+    expect(r.text).toContain('data-depth="1"');
+    expect(r.text).toContain('--er-row-depth: 1');
+    // depth-2 entry
+    expect(r.text).toContain('data-depth="2"');
+    expect(r.text).toContain('--er-row-depth: 2');
+    // Leaf segment styling — only the leaf is bold, ancestors muted
+    expect(r.text).toContain('er-row-slug-leaf');
+    expect(r.text).toContain('er-row-slug-ancestors');
+
+    // Entries are clustered: the-outbound row appears before
+    // the-outbound/characters which appears before
+    // the-outbound/characters/strivers.
+    const idxParent = r.text.indexOf('data-slug="the-outbound"');
+    const idxChild = r.text.indexOf('data-slug="the-outbound/characters"');
+    const idxGrand = r.text.indexOf(
+      'data-slug="the-outbound/characters/strivers"',
+    );
+    expect(idxParent).toBeGreaterThan(0);
+    expect(idxChild).toBeGreaterThan(idxParent);
+    expect(idxGrand).toBeGreaterThan(idxChild);
+  });
+
   it('GET /dev/editorial-review-shortform renders', async () => {
     const r = await getText(app, '/dev/editorial-review-shortform');
     expect(r.status).toBe(200);
@@ -316,6 +384,57 @@ describe('studio pages', () => {
     // and confusing errors for the operator).
     const r = await getText(app, '/dev/scrapbook/unknown-site/some-slug');
     expect(r.status).toBe(500);
+  });
+
+  it('GET /dev/scrapbook/:site/<deep-path> renders a hierarchical scrapbook', async () => {
+    const dir = join(
+      root,
+      'src/sites/a/content/blog/the-outbound/characters/strivers/scrapbook',
+    );
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'archetypes.md'), '# notes', 'utf-8');
+    const r = await getText(
+      app,
+      '/dev/scrapbook/a/the-outbound/characters/strivers',
+    );
+    expect(r.status).toBe(200);
+    expect(r.text).toContain('archetypes.md');
+    // Breadcrumb shows each path segment as a link, with the leaf
+    // rendered as the current span.
+    expect(r.text).toContain('scrapbook-breadcrumb');
+    expect(r.text).toContain('href="/dev/scrapbook/a/the-outbound"');
+    expect(r.text).toContain('href="/dev/scrapbook/a/the-outbound/characters"');
+    expect(r.text).toContain('scrapbook-breadcrumb-current');
+  });
+
+  it('GET /dev/scrapbook/:site/<path> exposes secret items in a separate section', async () => {
+    const sb = join(
+      root,
+      'src/sites/a/content/blog/the-outbound/scrapbook',
+    );
+    const secret = join(sb, 'secret');
+    mkdirSync(secret, { recursive: true });
+    writeFileSync(join(sb, 'public-note.md'), '#', 'utf-8');
+    writeFileSync(join(secret, 'draft-thoughts.md'), '#', 'utf-8');
+    const r = await getText(app, '/dev/scrapbook/a/the-outbound');
+    expect(r.status).toBe(200);
+    expect(r.text).toContain('public-note.md');
+    expect(r.text).toContain('scrapbook-secret');
+    expect(r.text).toContain('draft-thoughts.md');
+    // Public-section item should NOT carry data-secret; secret-section
+    // item should.
+    expect(r.text).toMatch(
+      /data-filename="draft-thoughts.md"[^>]*data-secret="true"/,
+    );
+  });
+
+  it('GET /dev/scrapbook/:site/<path> hides secret section when no secret items', async () => {
+    const sb = join(root, 'src/sites/a/content/blog/clean/scrapbook');
+    mkdirSync(sb, { recursive: true });
+    writeFileSync(join(sb, 'note.md'), '#', 'utf-8');
+    const r = await getText(app, '/dev/scrapbook/a/clean');
+    expect(r.status).toBe(200);
+    expect(r.text).not.toContain('scrapbook-secret');
   });
 
   it('GET /dev/editorial-review/:slug returns an error page for unknown slug', async () => {

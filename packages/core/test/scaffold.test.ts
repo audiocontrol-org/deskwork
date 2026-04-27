@@ -77,7 +77,7 @@ describe('scaffoldBlogPost', () => {
         makeConfig(),
         'audiocontrol',
         makeEntry(),
-        'Override Author',
+        { authorOverride: 'Override Author' },
       );
       const body = readFileSync(result.filePath, 'utf-8');
       expect(body).toContain('author: Override Author');
@@ -203,12 +203,81 @@ describe('scaffoldBlogPost', () => {
         config,
         'audiocontrol',
         makeEntry(),
-        'Explicit',
+        { authorOverride: 'Explicit' },
       );
       expect(existsSync(result.filePath)).toBe(true);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  describe('layout option', () => {
+    it("layout='index' (explicit) writes <slug>/index.md and reports the contentDir-relative path", () => {
+      const root = mkdtempSync(join(tmpdir(), 'deskwork-scaffold-layout-'));
+      try {
+        const entry = makeEntry({ slug: 'characters/strivers' });
+        const result = scaffoldBlogPost(root, makeConfig(), 'audiocontrol', entry, {
+          layout: 'index',
+        });
+        expect(result.relativePath).toBe(
+          'src/sites/audiocontrol/pages/blog/characters/strivers/index.md',
+        );
+        expect(result.contentRelativePath).toBe('characters/strivers/index.md');
+        expect(existsSync(result.filePath)).toBe(true);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    it("layout='readme' writes <slug>/README.md", () => {
+      const root = mkdtempSync(join(tmpdir(), 'deskwork-scaffold-readme-'));
+      try {
+        const entry = makeEntry({ slug: 'the-outbound/characters/strivers' });
+        const result = scaffoldBlogPost(root, makeConfig(), 'audiocontrol', entry, {
+          layout: 'readme',
+        });
+        expect(result.contentRelativePath).toBe(
+          'the-outbound/characters/strivers/README.md',
+        );
+        expect(result.relativePath.endsWith('/README.md')).toBe(true);
+        expect(existsSync(result.filePath)).toBe(true);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    it("layout='flat' writes <slug>.md as a sibling under the parent dir", () => {
+      const root = mkdtempSync(join(tmpdir(), 'deskwork-scaffold-flat-'));
+      try {
+        const entry = makeEntry({ slug: 'the-outbound/characters/alice' });
+        const result = scaffoldBlogPost(root, makeConfig(), 'audiocontrol', entry, {
+          layout: 'flat',
+        });
+        expect(result.contentRelativePath).toBe(
+          'the-outbound/characters/alice.md',
+        );
+        // The file lives at .../characters/alice.md — no own dir
+        expect(result.filePath.endsWith('/the-outbound/characters/alice.md')).toBe(true);
+        expect(existsSync(result.filePath)).toBe(true);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    it('without layout, falls back to the site template (legacy behavior)', () => {
+      const root = mkdtempSync(join(tmpdir(), 'deskwork-scaffold-default-'));
+      try {
+        const result = scaffoldBlogPost(
+          root,
+          makeConfig(),
+          'audiocontrol',
+          makeEntry({ slug: 'flat-piece' }),
+        );
+        expect(result.contentRelativePath).toBe('flat-piece/index.md');
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
   });
 
   it('throws for an unknown site', () => {

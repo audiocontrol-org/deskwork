@@ -117,9 +117,17 @@ export function createApp(ctx: StudioContext): Hono {
       }),
     ),
   );
-  app.get('/dev/scrapbook/:site/:slug', (c) =>
+  // Wildcard path — `:site` is a single segment, the trailing path
+  // captures arbitrarily-deep hierarchical addresses (e.g.
+  // `the-outbound/characters/strivers`). Hono's `:path{.+}` regex
+  // matcher swallows everything after the site segment.
+  app.get('/dev/scrapbook/:site/:path{.+}', (c) =>
     c.html(
-      renderScrapbookPage(ctx, c.req.param('site'), c.req.param('slug')),
+      renderScrapbookPage(
+        ctx,
+        c.req.param('site'),
+        decodeURIComponent(c.req.param('path')),
+      ),
     ),
   );
 

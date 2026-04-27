@@ -19,7 +19,11 @@
 import { readConfig } from '@deskwork/core/config';
 import { readCalendar, writeCalendar } from '@deskwork/core/calendar';
 import { outlineEntry, findEntry } from '@deskwork/core/calendar-mutations';
-import { scaffoldBlogPost, type ScaffoldResult } from '@deskwork/core/scaffold';
+import {
+  scaffoldBlogPost,
+  type ScaffoldLayout,
+  type ScaffoldResult,
+} from '@deskwork/core/scaffold';
 import {
   effectiveContentType,
   hasRepoContent,
@@ -28,16 +32,28 @@ import { resolveSite, resolveCalendarPath } from '@deskwork/core/paths';
 import { absolutize, emit, fail, parseArgs } from '@deskwork/core/cli-args';
 
 export async function run(argv: string[]): Promise<void> {
-  const KNOWN_FLAGS = ['site', 'author'] as const;
+  const KNOWN_FLAGS = ['site', 'author', 'layout'] as const;
+  const VALID_LAYOUTS: readonly ScaffoldLayout[] = ['index', 'readme', 'flat'];
 
   const { positional, flags } = parse();
 
   if (positional.length < 2) {
     fail(
-      'Usage: deskwork-outline <project-root> [--site <slug>] [--author "Name"] <slug>',
+      'Usage: deskwork-outline <project-root> [--site <slug>] [--author "Name"] ' +
+        '[--layout index|readme|flat] <slug>',
       2,
     );
   }
+  if (
+    flags.layout !== undefined &&
+    !(VALID_LAYOUTS as readonly string[]).includes(flags.layout)
+  ) {
+    fail(
+      `--layout must be one of ${VALID_LAYOUTS.join(', ')} (got "${flags.layout}")`,
+      2,
+    );
+  }
+  const layout = flags.layout as ScaffoldLayout | undefined;
 
   const [rootArg, slug] = positional;
   const projectRoot = absolutize(rootArg);
@@ -71,17 +87,21 @@ export async function run(argv: string[]): Promise<void> {
   const contentType = effectiveContentType(existing);
   let scaffolded: ScaffoldResult | null = null;
   if (hasRepoContent(contentType)) {
+    const opts: Parameters<typeof scaffoldBlogPost>[4] = {};
+    if (flags.author !== undefined) opts.authorOverride = flags.author;
+    if (layout !== undefined) opts.layout = layout;
     try {
-      scaffolded = scaffoldBlogPost(
-        projectRoot,
-        config,
-        site,
-        existing,
-        flags.author,
-      );
+      scaffolded = scaffoldBlogPost(projectRoot, config, site, existing, opts);
     } catch (err) {
       fail(err instanceof Error ? err.message : String(err));
     }
+  }
+
+  // Record the file path on the entry when the scaffolder produced one
+  // that diverges from the site's default template — gives subsequent
+  // reads (review, publish) the explicit path to look at.
+  if (scaffolded && layout !== undefined) {
+    existing.filePath = scaffolded.contentRelativePath;
   }
 
   const updated = outlineEntry(calendar, slug);

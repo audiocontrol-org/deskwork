@@ -216,6 +216,143 @@ describe('renderCalendar', () => {
   });
 });
 
+describe('hierarchical slugs', () => {
+  it('parses entries with slash-separated slugs', () => {
+    const md = `# Editorial Calendar
+
+## Ideas
+
+| UUID | Slug | Title | Description | Keywords | Source |
+|------|------|-------|-------------|----------|--------|
+| 33333333-3333-4333-8333-333333333333 | the-outbound | The Outbound | Project hub | | manual |
+| 44444444-4444-4444-8444-444444444444 | the-outbound/characters/strivers | Strivers | Sub-piece | | manual |
+
+## Planned
+
+*No entries.*
+
+## Outlining
+
+*No entries.*
+
+## Drafting
+
+*No entries.*
+
+## Review
+
+*No entries.*
+
+## Published
+
+*No entries.*
+`;
+    const cal = parseCalendar(md);
+    expect(cal.entries).toHaveLength(2);
+    expect(cal.entries[0].slug).toBe('the-outbound');
+    expect(cal.entries[1].slug).toBe('the-outbound/characters/strivers');
+  });
+
+  it('round-trips slashes in slug cells', () => {
+    const cal: EditorialCalendar = {
+      entries: [
+        {
+          id: '55555555-5555-4555-8555-555555555555',
+          slug: 'the-outbound/characters/strivers',
+          title: 'Strivers',
+          description: 'sub-piece',
+          stage: 'Ideas',
+          targetKeywords: [],
+          source: 'manual',
+        },
+      ],
+      distributions: [],
+    };
+    const out = renderCalendar(cal);
+    expect(out).toContain('the-outbound/characters/strivers');
+    const parsed = parseCalendar(out);
+    expect(parsed).toEqual(cal);
+  });
+});
+
+describe('FilePath column', () => {
+  it('renders FilePath column only when at least one entry has it', () => {
+    const cal: EditorialCalendar = {
+      entries: [
+        {
+          id: '66666666-6666-4666-8666-666666666666',
+          slug: 'plain',
+          title: 'Plain',
+          description: '',
+          stage: 'Ideas',
+          targetKeywords: [],
+          source: 'manual',
+        },
+      ],
+      distributions: [],
+    };
+    expect(renderCalendar(cal)).not.toContain('FilePath');
+    cal.entries[0].filePath = 'characters/alice.md';
+    const withPath = renderCalendar(cal);
+    expect(withPath).toContain('FilePath');
+    expect(withPath).toContain('characters/alice.md');
+  });
+
+  it('round-trips filePath values', () => {
+    const cal: EditorialCalendar = {
+      entries: [
+        {
+          id: '77777777-7777-4777-8777-777777777777',
+          slug: 'characters/alice',
+          title: 'Alice',
+          description: 'a character',
+          stage: 'Drafting',
+          targetKeywords: [],
+          source: 'manual',
+          filePath: 'characters/alice.md',
+        },
+      ],
+      distributions: [],
+    };
+    const parsed = parseCalendar(renderCalendar(cal));
+    expect(parsed).toEqual(cal);
+  });
+
+  it('legacy calendars without FilePath column read unchanged', () => {
+    const md = `# Editorial Calendar
+
+## Ideas
+
+| UUID | Slug | Title | Description | Keywords | Source |
+|------|------|-------|-------------|----------|--------|
+| 88888888-8888-4888-8888-888888888888 | legacy | Legacy entry | desc | | manual |
+
+## Planned
+
+*No entries.*
+
+## Outlining
+
+*No entries.*
+
+## Drafting
+
+*No entries.*
+
+## Review
+
+*No entries.*
+
+## Published
+
+*No entries.*
+`;
+    const cal = parseCalendar(md);
+    expect(cal.entries).toHaveLength(1);
+    expect(cal.entries[0].filePath).toBeUndefined();
+  });
+});
+
 describe('round-trip', () => {
   it('round-trips a calendar with all optional columns and distributions', () => {
     // Entries in canonical render order: Ideas, then Planned, ..., then Published.

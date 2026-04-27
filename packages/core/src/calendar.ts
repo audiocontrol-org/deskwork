@@ -129,6 +129,9 @@ function parseEntries(lines: string[], stage: Stage): CalendarEntry[] {
       const url = col(cells, cols, 'url');
       if (url) entry.contentUrl = url;
 
+      const filePath = col(cells, cols, 'filepath');
+      if (filePath) entry.filePath = filePath;
+
       const published = col(cells, cols, 'published');
       if (published) entry.datePublished = published;
 
@@ -338,12 +341,16 @@ function renderStageTable(entries: CalendarEntry[], stage: Stage): string {
   const hasUrl = entries.some(
     (e) => e.contentUrl !== undefined && e.contentUrl !== '',
   );
+  const hasFilePath = entries.some(
+    (e) => e.filePath !== undefined && e.filePath !== '',
+  );
   const isPublished = stage === 'Published';
 
   const headers: string[] = ['UUID', 'Slug', 'Title', 'Description', 'Keywords'];
   if (hasTopics) headers.push('Topics');
   if (hasType) headers.push('Type');
   if (hasUrl) headers.push('URL');
+  if (hasFilePath) headers.push('FilePath');
   headers.push('Source');
   if (isPublished) headers.push('Published');
   if (hasIssue || isPublished) headers.push('Issue');
@@ -365,6 +372,7 @@ function renderStageTable(entries: CalendarEntry[], stage: Stage): string {
     if (hasTopics) row.push(escapeCell((e.topics ?? []).join(', ')));
     if (hasType) row.push(effectiveContentType(e));
     if (hasUrl) row.push(escapeCell(e.contentUrl ?? ''));
+    if (hasFilePath) row.push(escapeCell(e.filePath ?? ''));
     row.push(e.source);
     if (isPublished) row.push(e.datePublished ?? '');
     if (hasIssue || isPublished) row.push(e.issueNumber ? `#${e.issueNumber}` : '');
