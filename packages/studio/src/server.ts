@@ -45,6 +45,7 @@ import {
   renderContentTopLevel,
   renderContentProject,
 } from './pages/content.ts';
+import { renderStudioIndex } from './pages/index.ts';
 import { detectTailscale, type TailscaleInfo } from './tailscale.ts';
 
 interface CliArgs {
@@ -159,6 +160,8 @@ export function createApp(ctx: StudioContext): Hono {
   app.route('/api/dev/editorial-review', createApiRouter(ctx));
 
   // Page routes
+  app.get('/dev', (c) => c.html(renderStudioIndex(ctx)));
+  app.get('/dev/', (c) => c.html(renderStudioIndex(ctx)));
   app.get('/dev/editorial-studio', (c) => c.html(renderDashboard(ctx)));
   app.get('/dev/editorial-help', (c) => c.html(renderHelpPage(ctx)));
   app.get('/dev/editorial-review-shortform', (c) =>
@@ -232,8 +235,8 @@ export function createApp(ctx: StudioContext): Hono {
     }),
   );
 
-  // Convenience root redirect to the dashboard.
-  app.get('/', (c) => c.redirect('/dev/editorial-studio'));
+  // Convenience root redirect to the studio index.
+  app.get('/', (c) => c.redirect('/dev/'));
 
   return app;
 }

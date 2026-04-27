@@ -35,6 +35,7 @@ import { splitOutline } from '../../../../plugins/deskwork-studio/public/src/out
 import type { StudioContext } from '../routes/api.ts';
 import { html, unsafe, type RawHtml } from './html.ts';
 import { layout } from './layout.ts';
+import { renderEditorialFolio } from './chrome.ts';
 import { escapeHtml } from './html.ts';
 import {
   renderEmptyScrapbookRow,
@@ -174,6 +175,7 @@ function renderError(slug: string, site: string, contentKind: 'longform' | 'outl
     : `/editorial-draft-review --site ${site} ${slug}`;
   const body = html`
     <div data-review-ui="longform">
+      ${renderEditorialFolio('reviews', `longform · ${slug}`)}
       <div class="er-error">
         <h1>No galley to review.</h1>
         <p><strong>Slug:</strong> <code>${slug}</code></p>
@@ -185,7 +187,10 @@ function renderError(slug: string, site: string, contentKind: 'longform' | 'outl
     </div>`;
   return layout({
     title: `Review — ${slug} — error`,
-    cssHrefs: ['/static/css/editorial-review.css'],
+    cssHrefs: [
+      '/static/css/editorial-review.css',
+      '/static/css/editorial-nav.css',
+    ],
     bodyHtml: body,
     scriptModules: [],
   });
@@ -430,6 +435,7 @@ export async function renderReviewPage(
 
   const body = html`
     <div data-review-ui="longform" class="er-review-shell">
+      ${renderEditorialFolio('reviews', `longform · ${workflow.slug}`)}
       <div class="er-draft-frame">
         <div id="draft-body" data-draft-body
           title="Double-click to edit · select text to leave a margin note">${unsafe(bodyHtml)}</div>
@@ -461,6 +467,7 @@ export async function renderReviewPage(
     title: `${titleField} — Review`,
     cssHrefs: [
       '/static/css/editorial-review.css',
+      '/static/css/editorial-nav.css',
       '/static/css/blog-figure.css',
       '/static/css/review-viewport.css',
       '/static/css/scrap-row.css',

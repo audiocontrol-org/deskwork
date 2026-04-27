@@ -42,6 +42,7 @@ import { resolveCalendarPath, resolveBlogFilePath } from '@deskwork/core/paths';
 import type { StudioContext } from '../routes/api.ts';
 import { html, unsafe, type RawHtml } from './html.ts';
 import { layout } from './layout.ts';
+import { renderEditorialFolio } from './chrome.ts';
 
 interface SitedEntry {
   site: string;
@@ -772,6 +773,7 @@ export function renderDashboard(ctx: StudioContext): string {
   }).join('\n');
 
   const body = html`
+  ${renderEditorialFolio('dashboard', 'press-check')}
   ${renderHeader(data, ctx, now)}
   <main class="er-container">
     ${renderFilterStrip(sites)}
@@ -792,6 +794,7 @@ export function renderDashboard(ctx: StudioContext): string {
     title: 'Editorial Studio — dev',
     cssHrefs: [
       '/static/css/editorial-review.css',
+      '/static/css/editorial-nav.css',
       '/static/css/editorial-studio.css',
     ],
     bodyAttrs: 'data-review-ui="studio"',

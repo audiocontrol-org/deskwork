@@ -28,6 +28,7 @@ import {
 import type { StudioContext } from '../routes/api.ts';
 import { html, unsafe, type RawHtml } from './html.ts';
 import { layout } from './layout.ts';
+import { renderEditorialFolio } from './chrome.ts';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -428,6 +429,7 @@ function renderColophon(): RawHtml {
 export function renderHelpPage(ctx: StudioContext): string {
   const now = ctx.now ? ctx.now() : new Date();
   const body = html`
+    ${renderEditorialFolio('manual', "compositor's manual")}
     <a class="eh-back" href="/dev/editorial-studio">back to the studio</a>
     <div class="eh-rail" aria-hidden="true"></div>
     <div class="eh-container">
@@ -445,6 +447,7 @@ export function renderHelpPage(ctx: StudioContext): string {
     title: "The Compositor's Manual — Editorial Calendar — dev",
     cssHrefs: [
       '/static/css/editorial-review.css',
+      '/static/css/editorial-nav.css',
       '/static/css/editorial-help.css',
     ],
     bodyAttrs: 'data-review-ui="manual"',

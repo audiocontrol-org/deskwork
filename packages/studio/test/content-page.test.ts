@@ -113,7 +113,8 @@ describe('content view — top level', () => {
     app = createApp({ projectRoot: root, config: cfg });
     const r = await getHtml(app, '/dev/content');
     expect(r.status).toBe(200);
-    expect(r.html).toContain('class="ed-chrome"');
+    // Phase 17: chrome was replaced by the er-folio cross-page strip.
+    expect(r.html).toContain('class="er-folio"');
     expect(r.html).toContain('href="/dev/content"');
     expect(r.html).toContain('site-card__name">wc</h2>');
     expect(r.html).toContain('whats-in-a-name');

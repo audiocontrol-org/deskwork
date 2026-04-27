@@ -22,6 +22,7 @@ import type {
 import type { StudioContext } from '../routes/api.ts';
 import { html, unsafe, type RawHtml } from './html.ts';
 import { layout } from './layout.ts';
+import { renderEditorialFolio } from './chrome.ts';
 
 const PLATFORM_ORDER = ['reddit', 'linkedin', 'youtube', 'instagram'] as const;
 
@@ -133,6 +134,7 @@ export function renderShortformPage(
         .join('');
 
   const body = html`
+    ${renderEditorialFolio('reviews', 'shortform desk')}
     <header class="er-masthead">
       <div class="er-masthead-kicker">All sites · short form</div>
       <h1 class="er-masthead-title">The <em>compositor</em>'s desk</h1>
@@ -156,6 +158,7 @@ export function renderShortformPage(
     title: 'Short form — all sites — dev',
     cssHrefs: [
       '/static/css/editorial-review.css',
+      '/static/css/editorial-nav.css',
       '/static/css/editorial-studio.css',
     ],
     bodyAttrs: 'data-review-ui="shortform"',

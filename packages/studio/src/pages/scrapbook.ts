@@ -26,6 +26,7 @@ import {
 import type { StudioContext } from '../routes/api.ts';
 import { html, unsafe, type RawHtml } from './html.ts';
 import { layout } from './layout.ts';
+import { renderEditorialFolio } from './chrome.ts';
 
 interface RenderItemRowOptions {
   /** Mark the row visually as belonging to the secret section. */
@@ -244,6 +245,7 @@ export function renderScrapbookPage(
   const secretBlock = secretItems.length > 0 ? renderSecretSection(secretItems).__raw : '';
 
   const body = html`
+    ${renderEditorialFolio('content', `scrapbook · ${site}/${path}`)}
     <main class="scrapbook-page" data-site="${site}" data-slug="${path}" data-scrapbook-root>
       <header class="scrapbook-header">
         <p class="scrapbook-kicker">
@@ -265,7 +267,12 @@ export function renderScrapbookPage(
 
   return layout({
     title: `scrapbook · ${path} — dev`,
-    cssHrefs: ['/static/css/scrapbook.css'],
+    cssHrefs: [
+      '/static/css/editorial-review.css',
+      '/static/css/editorial-nav.css',
+      '/static/css/scrapbook.css',
+    ],
+    bodyAttrs: 'data-review-ui="studio"',
     bodyHtml: body,
     scriptModules: ['/static/dist/scrapbook-client.js'],
   });

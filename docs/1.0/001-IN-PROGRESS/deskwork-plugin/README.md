@@ -23,6 +23,7 @@ Extract the editorial calendar skills from audiocontrol.org into an open-source 
 | 14 | Versioning, release process, and build correctness | Complete (v0.1.0, v0.2.0 released) |
 | 15 | `deskwork ingest` — backfill existing content into calendar | Complete ([#15](https://github.com/audiocontrol-org/deskwork/issues/15), [PR #17](https://github.com/audiocontrol-org/deskwork/pull/17)) |
 | 16 | Hierarchical content gaps + scrapbook-in-review + bird's-eye content view | Complete ([#18](https://github.com/audiocontrol-org/deskwork/issues/18); design mockup at [`mockups/birds-eye-content-view.html`](mockups/birds-eye-content-view.html)) |
+| 17 | Cross-page editorial nav + studio index at `/dev/` | Complete (v0.5.0; design mockup at [`mockups/editorial-nav-and-index.html`](mockups/editorial-nav-and-index.html)) |
 
 ### Key Links
 
