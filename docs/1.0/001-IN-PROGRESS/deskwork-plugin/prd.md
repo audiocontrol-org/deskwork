@@ -164,3 +164,31 @@ Documented for future decision; **not being implemented in v0.1**.
 The pillar question is captured here for the record; the architectural decision is deferred. v0.1 implementation continues with the npm-package distribution model (Phases 7-12). A future phase will revisit, propose a concrete design, and migrate.
 
 **Trigger to revisit:** the first time a deskwork user (the project author or anyone else) reports difficulty fixing a rough edge in the plugin from within their project.
+
+---
+
+## Extension: versioning, release process, and build correctness
+
+Added mid-implementation as Phase 14. Formalizes the operator-facing version + update story now that the plugin is shipping (PRs #1, #2, #3 merged) and consumers will start tracking it.
+
+### Why now
+
+PR #3 made fresh installs work end-to-end via committed bundles. That introduced a new hazard: every source change must be paired with a bundle rebuild before commit, or the bundle on `main` drifts from the source. With manual rebuild, the failure mode is silent — a contributor edits `cli.ts`, commits, pushes, and downstream consumers run a stale bundle that lacks the change. We need automation that makes stale bundles structurally impossible to land.
+
+Separately, Claude Code's plugin marketplace tracks the default branch by default. Without tagged releases, every operator who runs `/plugin marketplace update deskwork` gets whatever's at the bleeding edge. That's fine for early dogfood, but the moment an operator wants to pin to a known-good state — for stability, for reproducibility, for rolling back a regression — they need a stable ref. Tagged releases give them one.
+
+### Scope
+
+Three workstreams that share infrastructure (the `npm run build` invocation):
+
+1. **Pre-commit bundle correctness.** Husky-managed git hook that detects staged source under `packages/{cli,studio}/src/` and rebuilds + re-stages the affected bundle, or fails loudly if rebuild produces a different output than what's staged. Local-side enforcement.
+2. **Server-side enforcement.** GitHub Actions workflow on PR that runs the full test suite and verifies bundles aren't stale (rebuilds in CI, diffs against committed). Safety net for contributors without husky.
+3. **Formal release procedure.** Version-bump script that updates every manifest atomically (`marketplace.json`, both `plugin.json` files, all workspace `package.json` files); a `RELEASING.md` documenting the procedure; a GitHub Actions workflow that creates a GitHub release with auto-generated changelog when a `v*` tag is pushed.
+
+### What this is not
+
+- **Not npm publishing.** Bundles already close the install gap (see Phase 7-12 + the bundle work in `46dccbd`). npm is still optional and remains so.
+- **Not semantic-version enforcement.** The plugin doesn't have a stable public API yet; `0.x.y` numbering is informational. We bump on judgment, not semver.
+- **Not a migration path for breaking changes.** When we eventually break a calendar format or config schema, that's a separate concern handled by the calendar parser's own backward-compat (which already does UUID backfill and column-presence detection).
+
+**Plan reference.** Approved during the `/feature-extend` invocation that produced Phase 14.

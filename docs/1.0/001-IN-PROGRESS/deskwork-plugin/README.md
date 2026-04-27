@@ -20,6 +20,7 @@ Extract the editorial calendar skills from audiocontrol.org into an open-source 
 | 11 | Add deskwork-studio plugin shell + marketplace entry | Complete |
 | 12 | End-to-end dogfood (CLI + studio) against sandbox | Complete |
 | 13 | Hierarchical content + scrapbook secret subdir | Complete |
+| 14 | Versioning, release process, and build correctness | Not started |
 
 ### Key Links
 

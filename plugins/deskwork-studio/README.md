@@ -34,3 +34,7 @@ The skill prompts for an optional project root and port, then launches the serve
 | `/dev/scrapbook/<site>/<path>` | Scrapbook viewer; `<path>` may be any depth (e.g. `the-outbound/characters/strivers`); secret items appear in a separate section with a `private` badge |
 
 The studio is **dev-only** — no auth, localhost binding only.
+
+### Updates + pinning
+
+Tracks the default branch of `audiocontrol-org/deskwork`. Update with `/plugin marketplace update deskwork && /reload-plugins`. Pin to a tagged release via `/plugin marketplace add audiocontrol-org/deskwork#v0.1.0`. Full story in the [root README](../../README.md#getting-updates).

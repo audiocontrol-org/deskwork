@@ -294,3 +294,34 @@ Tasks:
 **Notes:**
 - `addEntry` does NOT auto-create ancestor entries when a deep leaf is added — each entry stands alone. The operator promotes intermediate directories to tracked entries explicitly when they want them tracked through the lifecycle.
 - The host project's content-collection patterns determine which on-disk shapes ship publicly; deskwork's job is to honor whatever the operator picks per-entry, not to enforce a public/private distinction at the file-naming layer.
+
+---
+
+### Phase 14: Versioning, release process, and build correctness
+
+**Deliverable:** Stale-bundle commits become structurally impossible (pre-commit hook + CI safety net), formal release procedure produces tagged GitHub releases, and operators have a documented update + pinning story.
+
+Tasks:
+- [ ] Add `husky` as a workspace devDep with `prepare` hook so contributors get the git hooks installed automatically on `npm install`.
+- [ ] Add `.husky/pre-commit` that detects staged files under `packages/{cli,studio}/src/` and runs `npm --workspace packages/<name> run build`, then re-stages the rebuilt bundle. If the bundle output diverges from what's staged, fail loudly with the diff path.
+- [ ] Add `scripts/bump-version.mjs` (tsx runner) that takes a version arg and updates atomically: root `package.json`, every workspace `package.json`, `.claude-plugin/marketplace.json` (top-level + per-plugin entries), `plugins/deskwork/.claude-plugin/plugin.json`, `plugins/deskwork-studio/.claude-plugin/plugin.json`.
+- [ ] Add `.github/workflows/check.yml` — on PR: install + run all tests + verify bundles match `npm run build` output (rebuild + `git diff --exit-code packages/*/bundle/`).
+- [ ] Add `.github/workflows/release.yml` — on `v*` tag push: install, build, run tests, then `gh release create` with auto-generated notes from commits since the previous tag.
+- [ ] Add `RELEASING.md` at the repo root documenting the manual release flow: `npm run version <semver>` → review diff → commit → `git tag v<semver>` → push tag → workflow creates the release.
+- [ ] Bump every manifest from `0.0.1` to `0.1.0` via the new script.
+- [ ] Tag `v0.1.0` at the resulting commit and push; verify the release workflow produces a GitHub release.
+- [ ] Update root `README.md` with: (a) explicit operator update instructions (`/plugin marketplace update deskwork && /reload-plugins`), (b) pinning instructions (`/plugin marketplace add audiocontrol-org/deskwork#v0.1.0`), (c) link to `RELEASING.md` for contributors.
+- [ ] Update `plugins/deskwork/README.md` and `plugins/deskwork-studio/README.md` with a brief "Updates" section pointing at the root README.
+
+**Acceptance Criteria:**
+- [ ] Staging a source change under `packages/cli/src/` without rebuilding bundles either rebuilds + re-stages automatically (pre-commit), or the commit fails with a clear path-pointer.
+- [ ] `gh release view v0.1.0` returns a published release with auto-generated notes covering commits since the project began (or since `v0.0.x`, if any).
+- [ ] CI workflow on a PR with stale bundles fails with the bundle path called out in the failure log.
+- [ ] All workspace manifests + plugin manifests + marketplace manifest report version `0.1.0`; running `npm run version 0.1.1` correctly bumps every one.
+- [ ] README has a top-level "Getting updates" subsection that an operator can find by skimming.
+
+**Notes:**
+- Husky's pre-commit cost: ~1 second when no source changed, ~5 seconds when bundles need rebuilding (esbuild is fast). Acceptable.
+- The CI workflow doubles as a regression gate — it runs the full test suite on every PR. If we add more packages later, the workflow's `npm --workspaces test` line scales without changes.
+- Release notes are auto-generated from commit messages between tags. We've been writing meaningful commit messages all along; that pays off here. No special prefix convention required.
+- Version bump is intentionally manual — the script writes, you review the diff and decide whether to commit. No "auto-publish on every merge" semantics.

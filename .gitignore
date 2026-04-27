@@ -28,6 +28,8 @@ yarn-error.log*
 ## Claude Code local
 .claude/settings.local.json
 .claude/worktrees/
+## Agent memory belongs in ~/.claude/projects/, never committed
+/memory/
 
 ## Local dogfood sandbox — a clone of audiocontrol.org used to drive the
 ## editorial-calendar lifecycle end-to-end against a real-shaped project

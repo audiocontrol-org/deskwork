@@ -74,6 +74,10 @@ The wrapper tries, in order:
 
 Fresh `claude plugin install` users hit path 2 — nothing extra to do. Local-dev installs hit path 1.
 
+### Updates + pinning
+
+Tracks the default branch of `audiocontrol-org/deskwork`. To pull the latest, run `/plugin marketplace update deskwork && /reload-plugins`. To pin to a stable release, install the marketplace with a tag: `/plugin marketplace add audiocontrol-org/deskwork#v0.1.0`. See the [root README](../../README.md#getting-updates) for the full update story.
+
 ### License
 
 GPL-3.0-or-later. See the monorepo `LICENSE`.
