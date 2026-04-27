@@ -11,7 +11,8 @@
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import type { DeskworkConfig } from '../config.ts';
-import { resolveBlogFilePath } from '../paths.ts';
+import { resolveBlogFilePath, resolveCalendarPath } from '../paths.ts';
+import { readCalendar } from '../calendar.ts';
 import type { DraftAnnotation, DraftWorkflowState } from './types.ts';
 import {
   appendAnnotation,
@@ -365,10 +366,21 @@ export function handleStartLongform(
   }
 
   const markdown = readFileSync(path, 'utf-8');
+
+  // Resolve entryId from the calendar when the caller didn't supply one.
+  // This is NOT the kind of "fallback" the project rules forbid — it's
+  // an explicit derivation from authoritative state (the calendar).
+  // Stamping entryId onto every new workflow keeps the join stable
+  // across slug renames.
+  let entryId = b.entryId;
+  if (entryId === undefined || entryId === '') {
+    entryId = lookupEntryIdBySlug(projectRoot, config, b.site, b.slug);
+  }
+
   const before = readWorkflows(projectRoot, config).find((w) => {
     const identityMatch =
-      b.entryId && w.entryId
-        ? w.entryId === b.entryId
+      entryId && w.entryId
+        ? w.entryId === entryId
         : w.site === b.site && w.slug === b.slug;
     return (
       identityMatch &&
@@ -380,12 +392,36 @@ export function handleStartLongform(
   const workflow = createWorkflow(projectRoot, config, {
     site: b.site,
     slug: b.slug,
-    ...(b.entryId !== undefined ? { entryId: b.entryId } : {}),
+    ...(entryId !== undefined && entryId !== '' ? { entryId } : {}),
     contentKind: 'longform',
     initialMarkdown: markdown,
     initialOriginatedBy: 'agent',
   });
   return ok({ workflow, existing: !!before && before.id === workflow.id });
+}
+
+/**
+ * Look up a calendar entry's stable UUID by `(site, slug)`. Returns
+ * `undefined` when the entry isn't in the calendar (e.g. workflow
+ * created from a stray draft file with no calendar record) or when the
+ * calendar can't be read (missing file). The caller treats `undefined`
+ * as "no id available — workflow stays slug-keyed."
+ */
+function lookupEntryIdBySlug(
+  projectRoot: string,
+  config: DeskworkConfig,
+  site: string,
+  slug: string,
+): string | undefined {
+  try {
+    const calendarPath = resolveCalendarPath(projectRoot, config, site);
+    if (!existsSync(calendarPath)) return undefined;
+    const cal = readCalendar(calendarPath);
+    const entry = cal.entries.find((e) => e.slug === slug);
+    return entry?.id;
+  } catch {
+    return undefined;
+  }
 }
 
 /**

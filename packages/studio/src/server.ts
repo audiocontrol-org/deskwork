@@ -33,11 +33,13 @@ import { existsSync, realpathSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readConfig } from '@deskwork/core/config';
+import { readCalendar } from '@deskwork/core/calendar';
+import { resolveCalendarPath } from '@deskwork/core/paths';
 import { createApiRouter, type StudioContext } from './routes/api.ts';
 import { serveScrapbookFile } from './routes/scrapbook-file.ts';
 import { createScrapbookMutationsRouter } from './routes/scrapbook-mutations.ts';
 import { renderDashboard } from './pages/dashboard.ts';
-import { renderReviewPage } from './pages/review.ts';
+import { renderReviewPage, type ReviewLookup } from './pages/review.ts';
 import { renderShortformPage } from './pages/shortform.ts';
 import { renderHelpPage } from './pages/help.ts';
 import { renderScrapbookPage } from './pages/scrapbook.ts';
@@ -47,6 +49,10 @@ import {
 } from './pages/content.ts';
 import { renderStudioIndex } from './pages/index.ts';
 import { detectTailscale, type TailscaleInfo } from './tailscale.ts';
+import {
+  contentIndexMiddleware,
+  getRequestContentIndex,
+} from './request-context.ts';
 
 interface CliArgs {
   projectRoot: string;
@@ -132,6 +138,75 @@ function usage(error: string | null): never {
   process.exit(error ? 2 : 0);
 }
 
+/**
+ * Resolve a UUID `id` against the calendar for `site` and return a
+ * `ReviewLookup` carrying both the id and the entry's display slug.
+ * Returns null when the id doesn't match any calendar entry — the
+ * caller then renders a "no galley to review" error page.
+ */
+function resolveEntryById(
+  ctx: StudioContext,
+  site: string,
+  id: string,
+): ReviewLookup | null {
+  if (!(site in ctx.config.sites)) return null;
+  try {
+    const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
+    if (!existsSync(calendarPath)) return null;
+    const cal = readCalendar(calendarPath);
+    const entry = cal.entries.find((e) => e.id === id);
+    if (!entry || entry.id === undefined) return null;
+    return { kind: 'id', entryId: entry.id, slug: entry.slug };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve a slug to either:
+ *   - `{ kind: 'id', entryId, slug }` when the entry has a stable id
+ *     stamped — caller 302-redirects to the canonical id URL.
+ *   - `{ kind: 'slug', slug }` when the entry exists but has no id
+ *     (pre-doctor migration state) — caller renders directly.
+ *   - `null` when no entry matches the slug — caller renders 404.
+ *   - `'unknown-site'` when the site param isn't configured.
+ */
+function resolveEntryBySlug(
+  ctx: StudioContext,
+  site: string,
+  slug: string,
+): ReviewLookup | null | 'unknown-site' {
+  if (!(site in ctx.config.sites)) return 'unknown-site';
+  try {
+    const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
+    if (!existsSync(calendarPath)) return null;
+    const cal = readCalendar(calendarPath);
+    const entry = cal.entries.find((e) => e.slug === slug);
+    if (!entry) return null;
+    if (entry.id) return { kind: 'id', entryId: entry.id, slug: entry.slug };
+    return { kind: 'slug', slug: entry.slug };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Build the canonical id-based redirect URL while preserving the
+ * original request's query string (site, version, kind, etc.). The
+ * input URL is the absolute request URL (Hono's `c.req.url`); we
+ * extract just the search portion and graft it onto the new path.
+ */
+function buildReviewRedirectUrl(entryId: string, requestUrl: string): string {
+  let search = '';
+  try {
+    const u = new URL(requestUrl);
+    search = u.search;
+  } catch {
+    search = '';
+  }
+  return `/dev/editorial-review/${entryId}${search}`;
+}
+
 function publicDir(): string {
   // Two runtime layouts share this resolver:
   //   - Bundle: plugins/deskwork-studio/bundle/server.mjs → ../public
@@ -156,6 +231,12 @@ function publicDir(): string {
 export function createApp(ctx: StudioContext): Hono {
   const app = new Hono();
 
+  // Per-request content-index memoization. Mounted before page routes
+  // so every renderer in a single request shares one index per site.
+  // The middleware just attaches an empty cache; renderers populate it
+  // lazily via `getRequestContentIndex(c, ctx, site)`.
+  app.use('*', contentIndexMiddleware());
+
   // API routes
   app.route('/api/dev/editorial-review', createApiRouter(ctx));
 
@@ -167,20 +248,70 @@ export function createApp(ctx: StudioContext): Hono {
   app.get('/dev/editorial-review-shortform', (c) =>
     c.html(renderShortformPage(ctx, c.req.query('focus') ?? null)),
   );
-  // `:slug{.+}` captures hierarchical slugs (`/`-separated kebab-case
-  // segments) — anything from a flat `scsi-protocol` to a deeply nested
-  // `the-outbound/characters/strivers`. Without the regex matcher, Hono
-  // treats `:slug` as a single-segment match and returns 404 for any
-  // slug containing `/`.
-  app.get('/dev/editorial-review/:slug{.+}', async (c) =>
-    c.html(
-      await renderReviewPage(ctx, decodeURIComponent(c.req.param('slug')), {
+  // Phase 19d: id-based canonical review URL. Strict UUID-shape regex
+  // matched FIRST so it wins over the legacy `:slug{.+}` route below.
+  // Hono evaluates routes in registration order; first match wins.
+  app.get(
+    '/dev/editorial-review/:id{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}',
+    async (c) => {
+      const id = c.req.param('id');
+      const siteParam = c.req.query('site') ?? ctx.config.defaultSite;
+      const lookup = resolveEntryById(ctx, siteParam, id);
+      if (lookup === null) {
+        return c.html(
+          await renderReviewPage(
+            ctx,
+            { kind: 'id', entryId: id, slug: id },
+            {
+              site: c.req.query('site') ?? null,
+              version: c.req.query('v') ?? null,
+              kind: c.req.query('kind') ?? null,
+            },
+          ),
+        );
+      }
+      return c.html(
+        await renderReviewPage(ctx, lookup, {
+          site: c.req.query('site') ?? null,
+          version: c.req.query('v') ?? null,
+          kind: c.req.query('kind') ?? null,
+        }),
+      );
+    },
+  );
+  // Legacy slug route. `:slug{.+}` captures hierarchical slugs
+  // (`/`-separated kebab-case segments). Resolution order:
+  //   1. Calendar entry exists with id → 302-redirect to canonical id URL.
+  //   2. Calendar entry exists without id (pre-doctor) → render via
+  //      legacy slug-keyed workflow join (no redirect).
+  //   3. No calendar entry → fall through to slug-keyed render anyway:
+  //      a workflow may exist independently (test fixtures, ad-hoc
+  //      drafts not on the calendar). The renderer's renderError path
+  //      handles "no workflow either" with a 200 explainer page.
+  // Only reachable when the path doesn't match the UUID route above.
+  app.get('/dev/editorial-review/:slug{.+}', async (c) => {
+    const slug = decodeURIComponent(c.req.param('slug'));
+    const siteParam = c.req.query('site') ?? ctx.config.defaultSite;
+    const found = resolveEntryBySlug(ctx, siteParam, slug);
+    if (found === 'unknown-site') {
+      return c.notFound();
+    }
+    if (found !== null && found.kind === 'id') {
+      const url = buildReviewRedirectUrl(found.entryId, c.req.url);
+      return c.redirect(url, 302);
+    }
+    // `found === null` (no calendar entry) OR `kind: 'slug'` (entry
+    // present, no id). Both render through the slug-keyed legacy path.
+    const lookup: ReviewLookup =
+      found !== null ? found : { kind: 'slug', slug };
+    return c.html(
+      await renderReviewPage(ctx, lookup, {
         site: c.req.query('site') ?? null,
         version: c.req.query('v') ?? null,
         kind: c.req.query('kind') ?? null,
       }),
-    ),
-  );
+    );
+  });
   // Wildcard path — `:site` is a single segment, the trailing path
   // captures arbitrarily-deep hierarchical addresses (e.g.
   // `the-outbound/characters/strivers`). Hono's `:path{.+}` regex
@@ -216,13 +347,20 @@ export function createApp(ctx: StudioContext): Hono {
   //   GET /dev/content/:site               — same shape filtered to one site
   //   GET /dev/content/:site/:project{.+}  — drilldown for one project
   // The `?node=<slug>` query param toggles the detail panel.
-  app.get('/dev/content', (c) => c.html(renderContentTopLevel(ctx)));
-  app.get('/dev/content/:site', (c) => c.html(renderContentTopLevel(ctx)));
+  app.get('/dev/content', (c) => {
+    const getIndex = (site: string) => getRequestContentIndex(c, ctx, site);
+    return c.html(renderContentTopLevel(ctx, getIndex));
+  });
+  app.get('/dev/content/:site', (c) => {
+    const getIndex = (site: string) => getRequestContentIndex(c, ctx, site);
+    return c.html(renderContentTopLevel(ctx, getIndex));
+  });
   app.get('/dev/content/:site/:project{.+}', async (c) => {
     const site = c.req.param('site');
     const project = decodeURIComponent(c.req.param('project'));
     const node = c.req.query('node') ?? null;
-    const r = await renderContentProject(ctx, site, project, node);
+    const getIndex = (s: string) => getRequestContentIndex(c, ctx, s);
+    const r = await renderContentProject(ctx, site, project, node, getIndex);
     return c.html(r.html, r.status as never);
   });
 

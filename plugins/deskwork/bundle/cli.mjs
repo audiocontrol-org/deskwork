@@ -8776,6 +8776,7 @@ var init_handlers = __esm({
   "../core/src/review/handlers.ts"() {
     "use strict";
     init_paths();
+    init_calendar();
     init_pipeline();
   }
 });
@@ -12159,10 +12160,21 @@ Run /deskwork:outline <slug> (or /deskwork:draft) to scaffold it first.`
   }
   const initialMarkdown = readFileSync13(file, "utf8");
   const body = bodyState(file);
+  let entryId;
+  try {
+    const calendarPath = resolveCalendarPath(projectRoot, config, site);
+    if (existsSync12(calendarPath)) {
+      const cal = readCalendar(calendarPath);
+      entryId = cal.entries.find((e) => e.slug === slug)?.id;
+    }
+  } catch {
+    entryId = void 0;
+  }
   const before = Date.now();
   const workflow = createWorkflow(projectRoot, config, {
     site,
     slug,
+    ...entryId !== void 0 && entryId !== "" ? { entryId } : {},
     contentKind: "longform",
     initialMarkdown,
     initialOriginatedBy: "agent"
@@ -12207,6 +12219,7 @@ var init_review_start = __esm({
     "use strict";
     init_config();
     init_paths();
+    init_calendar();
     init_pipeline();
     init_body_state();
     init_cli();

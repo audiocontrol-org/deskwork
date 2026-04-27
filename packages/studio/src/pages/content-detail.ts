@@ -202,10 +202,13 @@ export async function renderNodeDetail(
 ): Promise<RawHtml> {
   const detail = loadDetailRender(ctx, site, node);
   const fmCount = Object.keys(detail.frontmatter).length;
-  // Review URL: prefer the entry's slug (host-owned public URL) for
-  // tracked nodes, else fall back to the path. Phase 19d will swap
-  // this for an id-based URL.
-  const reviewKey = node.slug ?? node.path;
+  // Phase 19d: prefer the entry's stable id for the canonical review
+  // URL — refactor-proof, survives slug renames. Falls back to the
+  // entry slug (or the node's path) when the entry has no id stamped.
+  const reviewKey =
+    node.entry !== null && node.entry.id !== undefined && node.entry.id !== ''
+      ? node.entry.id
+      : (node.slug ?? node.path);
   const reviewHref = `/dev/editorial-review/${encodeURI(reviewKey)}?site=${site}`;
   // Scrapbook viewer addresses by fs path — every node has a
   // deterministic on-disk scrapbook location at `<path>/scrapbook/`.

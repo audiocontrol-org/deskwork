@@ -33,6 +33,7 @@ import {
   type ContentProject,
   type FlatNode,
 } from '@deskwork/core/content-tree';
+import type { ContentIndex } from '@deskwork/core/content-index';
 import {
   formatRelativeTime,
 } from '@deskwork/core/scrapbook';
@@ -44,6 +45,13 @@ import { layout } from './layout.ts';
 import { renderEditorialFolio } from './chrome.ts';
 import { renderEmptyDetail, renderNodeDetail } from './content-detail.ts';
 import { scrapbookViewerUrl } from '../components/scrapbook-item.ts';
+
+/**
+ * Per-request index getter — supplied by the route layer (which
+ * pulls memoized indices off the Hono context). Optional: when
+ * omitted, renderers fall back to building the index per call.
+ */
+export type IndexGetter = (site: string) => ContentIndex;
 
 // ---------------------------------------------------------------------------
 // Per-site project loading
@@ -58,14 +66,17 @@ interface SiteProjects {
 function loadProjectsForSite(
   ctx: StudioContext,
   site: string,
+  getIndex?: IndexGetter,
 ): SiteProjects {
   const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
   const cal = readCalendar(calendarPath);
+  const contentIndex = getIndex ? getIndex(site) : undefined;
   const projects = buildContentTree(
     site,
     cal.entries,
     ctx.config,
     ctx.projectRoot,
+    contentIndex !== undefined ? { contentIndex } : {},
   );
   return {
     site,
@@ -74,9 +85,12 @@ function loadProjectsForSite(
   };
 }
 
-function loadAllSites(ctx: StudioContext): SiteProjects[] {
+function loadAllSites(
+  ctx: StudioContext,
+  getIndex?: IndexGetter,
+): SiteProjects[] {
   return Object.keys(ctx.config.sites).map((site) =>
-    loadProjectsForSite(ctx, site),
+    loadProjectsForSite(ctx, site, getIndex),
   );
 }
 
@@ -185,8 +199,11 @@ function renderSiteCard(sp: SiteProjects, index: number): RawHtml {
     </article>`);
 }
 
-export function renderContentTopLevel(ctx: StudioContext): string {
-  const sites = loadAllSites(ctx);
+export function renderContentTopLevel(
+  ctx: StudioContext,
+  getIndex?: IndexGetter,
+): string {
+  const sites = loadAllSites(ctx, getIndex);
   const counts = aggregateCounts(sites);
 
   const body = html`
@@ -284,6 +301,17 @@ function nodeFilePathHint(node: ContentNode): string {
   return `/${node.path}/`;
 }
 
+/**
+ * Last segment of an fs-relative path. Used to detect when a tracked
+ * entry's public-URL slug differs from where it lives on disk —
+ * e.g. an entry whose `path = "projects/the-outbound-novel"` and
+ * `slug = "the-outbound"` (renamed directory, slug unchanged for SEO).
+ */
+function pathLeaf(path: string): string {
+  const idx = path.lastIndexOf('/');
+  return idx < 0 ? path : path.slice(idx + 1);
+}
+
 function renderTreeRowMeta(node: ContentNode): RawHtml {
   const meta: string[] = [];
   if (node.scrapbookCount > 0) {
@@ -297,11 +325,15 @@ function renderTreeRowMeta(node: ContentNode): RawHtml {
 }
 
 function renderTreeRowActions(node: ContentNode, site: string): RawHtml {
-  // Review URLs still address by slug today (Phase 19d will switch to
-  // id-based routes); when an entry is overlaid, prefer its slug. For
-  // organizational nodes, fall back to the path (which equals the
-  // slug for flat layouts).
-  const reviewKey = node.slug ?? node.path;
+  // Phase 19d: when an entry is overlaid, prefer its stable id for
+  // the canonical review URL (refactor-proof — survives slug renames).
+  // Fall back to the entry's slug (or the node's path for organizational
+  // nodes) when no id is stamped — that's the legacy migration shape;
+  // server.ts 302-redirects it to the canonical URL.
+  const reviewKey =
+    node.entry !== null && node.entry.id !== undefined && node.entry.id !== ''
+      ? node.entry.id
+      : (node.slug ?? node.path);
   const reviewHref = `/dev/editorial-review/${encodeURI(reviewKey)}?site=${site}`;
   // Scrapbook addressing uses fs path — every node, tracked or not,
   // has a deterministic on-disk scrapbook location at `<path>/scrapbook/`.
@@ -343,6 +375,17 @@ function renderTreeRow(
     .filter(Boolean)
     .join(' ');
 
+  // Phase 19d: render a "public URL" hover hint when an overlay entry
+  // exists AND the entry's slug differs from the path's leaf segment.
+  // The slug is the host-rendering engine's identifier (the SEO URL);
+  // showing it explicitly clarifies the relationship between the
+  // structural fs path and the public-facing URL.
+  const publicUrlHint =
+    node.slug !== undefined && node.slug !== pathLeaf(node.path)
+      ? unsafe(html`<span class="tree-row__public-url"
+          title="public URL on the host site">/blog/${node.slug}</span>`)
+      : unsafe('');
+
   // The HTML attribute name `data-slug` is preserved for backward
   // compatibility with the client-side selectors; it now carries the
   // fs path. A future cleanup can rename the attribute to data-path.
@@ -353,6 +396,7 @@ function renderTreeRow(
         ${nodeIcon(node)}
         <span class="tree-row__title">${node.title}</span>
         <span class="tree-row__slug">${nodeFilePathHint(node)}</span>
+        ${publicUrlHint}
       </div>
       <span class="tree-row__lane">
         <span class="lane-dot lane-dot--${lane}"></span>
@@ -384,11 +428,12 @@ export async function renderContentProject(
   site: string,
   projectSlug: string,
   selectedPath: string | null,
+  getIndex?: IndexGetter,
 ): Promise<{ status: number; html: string }> {
   if (!(site in ctx.config.sites)) {
     return { status: 404, html: renderNotFound(`unknown site: ${site}`) };
   }
-  const sp = loadProjectsForSite(ctx, site);
+  const sp = loadProjectsForSite(ctx, site, getIndex);
   const project = sp.projects.find((p) => p.rootSlug === projectSlug);
   if (!project) {
     return {

@@ -10561,8 +10561,248 @@ function describe(value) {
   return typeof value;
 }
 
-// ../core/src/review/handlers.ts
-import { existsSync as existsSync3, readFileSync as readFileSync4, writeFileSync as writeFileSync3 } from "node:fs";
+// ../core/src/calendar.ts
+import { readFileSync as readFileSync2, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+
+// ../core/src/types.ts
+var STAGES = [
+  "Ideas",
+  "Planned",
+  "Outlining",
+  "Drafting",
+  "Review",
+  "Paused",
+  "Published"
+];
+var PAUSABLE_STAGES = [
+  "Ideas",
+  "Planned",
+  "Outlining",
+  "Drafting",
+  "Review"
+];
+function isPausable(stage) {
+  return PAUSABLE_STAGES.includes(stage);
+}
+function isStage(value) {
+  return STAGES.includes(value);
+}
+var CONTENT_TYPES = ["blog", "youtube", "tool"];
+function isContentType(value) {
+  return CONTENT_TYPES.includes(value);
+}
+function effectiveContentType(entry) {
+  return entry.contentType ?? "blog";
+}
+function hasRepoContent(contentType) {
+  return contentType === "blog";
+}
+var PLATFORMS = ["reddit", "youtube", "linkedin", "instagram"];
+function isPlatform(value) {
+  return PLATFORMS.includes(value);
+}
+
+// ../core/src/calendar.ts
+function parseRow(line) {
+  return line.split("|").slice(1, -1).map((cell) => cell.trim());
+}
+function isSeparator(line) {
+  return /^\|[\s:-]+\|/.test(line);
+}
+function indexColumns(headerLine) {
+  const map = /* @__PURE__ */ new Map();
+  parseRow(headerLine).forEach((name, idx) => {
+    map.set(name.trim().toLowerCase(), idx);
+  });
+  return map;
+}
+function col(cells2, cols, name) {
+  const idx = cols.get(name);
+  if (idx === void 0) return void 0;
+  const value = cells2[idx];
+  if (value === void 0) return void 0;
+  const trimmed = value.trim();
+  return trimmed === "" ? void 0 : trimmed;
+}
+function parseEntries(lines, stage) {
+  const entries = [];
+  let i = 0;
+  while (i < lines.length && !lines[i].startsWith("|")) i++;
+  if (i >= lines.length) return entries;
+  const cols = indexColumns(lines[i]);
+  i++;
+  if (i < lines.length && isSeparator(lines[i])) i++;
+  while (i < lines.length && lines[i].startsWith("|")) {
+    const cells2 = parseRow(lines[i]);
+    const slug = col(cells2, cols, "slug");
+    const title = col(cells2, cols, "title");
+    if (slug && title) {
+      const existingId = col(cells2, cols, "uuid") ?? col(cells2, cols, "id");
+      const entry = {
+        id: existingId ?? randomUUID(),
+        slug,
+        title,
+        description: col(cells2, cols, "description") ?? "",
+        stage,
+        targetKeywords: (col(cells2, cols, "keywords") ?? "").split(",").map((k) => k.trim()).filter(Boolean),
+        source: col(cells2, cols, "source") === "analytics" ? "analytics" : "manual"
+      };
+      const topics = col(cells2, cols, "topics");
+      if (topics) {
+        entry.topics = topics.split(",").map((t) => t.trim()).filter(Boolean);
+      }
+      const typeValue = col(cells2, cols, "type");
+      if (typeValue && isContentType(typeValue)) {
+        entry.contentType = typeValue;
+      }
+      const url = col(cells2, cols, "url");
+      if (url) entry.contentUrl = url;
+      const pausedFrom = col(cells2, cols, "pausedfrom");
+      if (pausedFrom && isStage(pausedFrom) && isPausable(pausedFrom)) {
+        entry.pausedFrom = pausedFrom;
+      }
+      const published = col(cells2, cols, "published");
+      if (published) entry.datePublished = published;
+      const issue = col(cells2, cols, "issue");
+      if (issue) {
+        const match2 = issue.match(/#?(\d+)/);
+        if (match2) entry.issueNumber = parseInt(match2[1], 10);
+      }
+      entries.push(entry);
+    }
+    i++;
+  }
+  return entries;
+}
+function parseDistributions(lines) {
+  const records = [];
+  let i = 0;
+  while (i < lines.length && !lines[i].startsWith("|")) i++;
+  if (i >= lines.length) return records;
+  const cols = indexColumns(lines[i]);
+  i++;
+  if (i < lines.length && isSeparator(lines[i])) i++;
+  while (i < lines.length && lines[i].startsWith("|")) {
+    const cells2 = parseRow(lines[i]);
+    const slug = col(cells2, cols, "slug");
+    const platformValue = col(cells2, cols, "platform");
+    const url = col(cells2, cols, "url");
+    const dateShared = col(cells2, cols, "shared");
+    if (slug && platformValue && url && dateShared && isPlatform(platformValue)) {
+      const entryIdCell = col(cells2, cols, "entryid") ?? col(cells2, cols, "uuid");
+      const rec = {
+        entryId: entryIdCell ?? "",
+        slug,
+        platform: platformValue,
+        url,
+        dateShared
+      };
+      const channel = col(cells2, cols, "channel");
+      if (channel) rec.channel = channel;
+      const notes = col(cells2, cols, "notes");
+      if (notes) rec.notes = notes;
+      records.push(rec);
+    }
+    i++;
+  }
+  return records;
+}
+function parseShortformBlocks(lines) {
+  const blocks = [];
+  let i = 0;
+  while (i < lines.length) {
+    const header = lines[i].match(/^### (.+)$/);
+    if (!header) {
+      i++;
+      continue;
+    }
+    const parts = header[1].split("\xB7").map((s) => s.trim());
+    if (parts.length < 2) {
+      i++;
+      continue;
+    }
+    const [slug, platform, channel] = parts;
+    i++;
+    const bodyLines = [];
+    while (i < lines.length && !lines[i].startsWith("### ")) {
+      bodyLines.push(lines[i]);
+      i++;
+    }
+    const text5 = bodyLines.join("\n").replace(/^\n+|\n+$/g, "");
+    if (text5.length > 0) {
+      const block = { slug, platform, text: text5 };
+      if (channel) block.channel = channel;
+      blocks.push(block);
+    }
+  }
+  return blocks;
+}
+function parseCalendar(markdown) {
+  const entries = [];
+  const distributions = [];
+  const shortformBlocks = [];
+  const lines = markdown.split("\n");
+  let currentSection = null;
+  let sectionLines = [];
+  function flushSection() {
+    if (currentSection && sectionLines.length > 0) {
+      if (currentSection === "Distribution") {
+        distributions.push(...parseDistributions(sectionLines));
+      } else if (currentSection === "Shortform Copy") {
+        shortformBlocks.push(...parseShortformBlocks(sectionLines));
+      } else {
+        entries.push(...parseEntries(sectionLines, currentSection));
+      }
+    }
+    sectionLines = [];
+  }
+  for (const line of lines) {
+    const sectionMatch = line.match(/^## (.+)$/);
+    if (sectionMatch) {
+      flushSection();
+      const name = sectionMatch[1].trim();
+      if (isStage(name)) {
+        currentSection = name;
+      } else if (name === "Distribution") {
+        currentSection = "Distribution";
+      } else if (name === "Shortform Copy") {
+        currentSection = "Shortform Copy";
+      } else {
+        currentSection = null;
+      }
+    } else if (currentSection) {
+      sectionLines.push(line);
+    }
+  }
+  flushSection();
+  for (const b of shortformBlocks) {
+    const rec = distributions.find(
+      (d) => d.slug === b.slug && d.platform === b.platform && (d.channel ?? "").toLowerCase() === (b.channel ?? "").toLowerCase()
+    );
+    if (rec) rec.shortform = b.text;
+  }
+  const entryBySlug = new Map(entries.map((e) => [e.slug, e]));
+  for (const d of distributions) {
+    if (!d.entryId) {
+      const match2 = entryBySlug.get(d.slug);
+      if (match2 && match2.id) d.entryId = match2.id;
+    }
+  }
+  return { entries, distributions };
+}
+function readCalendar(calendarPath) {
+  let raw3;
+  try {
+    raw3 = readFileSync2(calendarPath, "utf-8");
+  } catch (err2) {
+    if (err2 instanceof Error && "code" in err2 && err2.code === "ENOENT") {
+      return { entries: [], distributions: [] };
+    }
+    throw err2;
+  }
+  return parseCalendar(raw3);
+}
 
 // ../core/src/paths.ts
 import { join as join4 } from "node:path";
@@ -10573,7 +10813,7 @@ import { join as join3, relative } from "node:path";
 
 // ../core/src/frontmatter.ts
 var import_yaml = __toESM(require_dist(), 1);
-import { readFileSync as readFileSync2, writeFileSync } from "node:fs";
+import { readFileSync as readFileSync3, writeFileSync as writeFileSync2 } from "node:fs";
 var FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
 function parseFrontmatter(markdown) {
   const match2 = markdown.match(FRONTMATTER_RE);
@@ -10599,7 +10839,7 @@ function parseFrontmatter(markdown) {
   return { data, body: body3 };
 }
 function readFrontmatter(path) {
-  return parseFrontmatter(readFileSync2(path, "utf-8"));
+  return parseFrontmatter(readFileSync3(path, "utf-8"));
 }
 
 // ../core/src/content-index.ts
@@ -10753,18 +10993,21 @@ function resolveBlogPostDir(projectRoot, config, site, slug) {
   return join4(projectRoot, siteConfig(config, site).contentDir, slug);
 }
 
+// ../core/src/review/handlers.ts
+import { existsSync as existsSync3, readFileSync as readFileSync5, writeFileSync as writeFileSync4 } from "node:fs";
+
 // ../core/src/review/pipeline.ts
-import { randomUUID } from "node:crypto";
+import { randomUUID as randomUUID2 } from "node:crypto";
 import { join as join6 } from "node:path";
 
 // ../core/src/journal.ts
 import {
   existsSync as existsSync2,
   mkdirSync,
-  readFileSync as readFileSync3,
+  readFileSync as readFileSync4,
   readdirSync as readdirSync2,
   unlinkSync,
-  writeFileSync as writeFileSync2
+  writeFileSync as writeFileSync3
 } from "node:fs";
 import { join as join5 } from "node:path";
 function normalizeTimestamp(iso) {
@@ -10786,7 +11029,7 @@ function findFileById(dir, id) {
 }
 function readFile(path) {
   try {
-    const text5 = readFileSync3(path, "utf-8");
+    const text5 = readFileSync4(path, "utf-8");
     return JSON.parse(text5);
   } catch {
     return null;
@@ -10819,7 +11062,7 @@ function appendJournal(dir, record, options = {}) {
   if (!timestamp) throw new Error(`appendJournal: record has no \`${timestampField}\` field`);
   const existing = findFileById(dir, id);
   const target = existing ?? join5(dir, recordFilename(timestamp, id));
-  writeFileSync2(target, JSON.stringify(record, null, 2) + "\n", "utf-8");
+  writeFileSync3(target, JSON.stringify(record, null, 2) + "\n", "utf-8");
 }
 
 // ../core/src/review/journal-mappers.ts
@@ -10912,7 +11155,7 @@ function createWorkflow(projectRoot, config, params) {
   if (existing) return existing;
   const now = (/* @__PURE__ */ new Date()).toISOString();
   const item = {
-    id: randomUUID(),
+    id: randomUUID2(),
     site: params.site,
     slug: params.slug,
     contentKind: params.contentKind,
@@ -11027,7 +11270,7 @@ function readAnnotations(projectRoot, config, workflowId, version) {
 function mintAnnotation(partial) {
   return {
     ...partial,
-    id: randomUUID(),
+    id: randomUUID2(),
     createdAt: (/* @__PURE__ */ new Date()).toISOString()
   };
 }
@@ -11213,7 +11456,7 @@ function handleCreateVersion(projectRoot, config, body3) {
         `cannot save: blog file missing at ${blogFile}. Scaffold the post with /deskwork:outline before saving edits.`
       );
     }
-    writeFileSync3(blogFile, d.afterMarkdown, "utf-8");
+    writeFileSync4(blogFile, d.afterMarkdown, "utf-8");
   }
   const version = appendVersion(projectRoot, config, d.workflowId, d.afterMarkdown, "operator");
   const annotation = mintAnnotation({
@@ -11243,20 +11486,35 @@ function handleStartLongform(projectRoot, config, body3) {
   if (!existsSync3(path)) {
     return err(404, `blog draft not found at ${path}`);
   }
-  const markdown = readFileSync4(path, "utf-8");
+  const markdown = readFileSync5(path, "utf-8");
+  let entryId = b.entryId;
+  if (entryId === void 0 || entryId === "") {
+    entryId = lookupEntryIdBySlug(projectRoot, config, b.site, b.slug);
+  }
   const before = readWorkflows(projectRoot, config).find((w) => {
-    const identityMatch = b.entryId && w.entryId ? w.entryId === b.entryId : w.site === b.site && w.slug === b.slug;
+    const identityMatch = entryId && w.entryId ? w.entryId === entryId : w.site === b.site && w.slug === b.slug;
     return identityMatch && w.contentKind === "longform" && w.state !== "applied" && w.state !== "cancelled";
   });
   const workflow = createWorkflow(projectRoot, config, {
     site: b.site,
     slug: b.slug,
-    ...b.entryId !== void 0 ? { entryId: b.entryId } : {},
+    ...entryId !== void 0 && entryId !== "" ? { entryId } : {},
     contentKind: "longform",
     initialMarkdown: markdown,
     initialOriginatedBy: "agent"
   });
   return ok({ workflow, existing: !!before && before.id === workflow.id });
+}
+function lookupEntryIdBySlug(projectRoot, config, site, slug) {
+  try {
+    const calendarPath = resolveCalendarPath(projectRoot, config, site);
+    if (!existsSync3(calendarPath)) return void 0;
+    const cal = readCalendar(calendarPath);
+    const entry = cal.entries.find((e) => e.slug === slug);
+    return entry?.id;
+  } catch {
+    return void 0;
+  }
 }
 function lineDiff(a, b) {
   const aLines = a.split("\n");
@@ -23273,11 +23531,11 @@ import {
   existsSync as existsSync4,
   mkdirSync as mkdirSync2,
   readdirSync as readdirSync3,
-  readFileSync as readFileSync5,
+  readFileSync as readFileSync6,
   renameSync,
   rmSync,
   statSync as statSync3,
-  writeFileSync as writeFileSync4
+  writeFileSync as writeFileSync5
 } from "node:fs";
 import { dirname, extname, join as join7, resolve } from "node:path";
 var SECRET_SUBDIR = "secret";
@@ -23394,7 +23652,7 @@ function readScrapbookFile(projectRoot, config, site, slug, filename, opts = {})
   if (!existsSync4(abs)) throw new Error(`not found: ${filename}`);
   const st = statSync3(abs);
   if (!st.isFile()) throw new Error(`not a file: ${filename}`);
-  const content3 = readFileSync5(abs);
+  const content3 = readFileSync6(abs);
   return {
     name: filename,
     kind: classify(filename),
@@ -23412,7 +23670,7 @@ function createScrapbookMarkdown(projectRoot, config, site, slug, filename, body
     throw new Error(`file already exists: "${filename}"`);
   }
   mkdirSync2(dirname(abs), { recursive: true });
-  writeFileSync4(abs, body3, "utf-8");
+  writeFileSync5(abs, body3, "utf-8");
   const st = statSync3(abs);
   return {
     name: filename,
@@ -23424,7 +23682,7 @@ function createScrapbookMarkdown(projectRoot, config, site, slug, filename, body
 function saveScrapbookFile(projectRoot, config, site, slug, filename, body3, opts = {}) {
   const abs = scrapbookFilePath(projectRoot, config, site, slug, filename, opts);
   if (!existsSync4(abs)) throw new Error(`file not found: "${filename}"`);
-  writeFileSync4(abs, body3);
+  writeFileSync5(abs, body3);
   const st = statSync3(abs);
   return {
     name: filename,
@@ -23460,7 +23718,7 @@ function writeScrapbookUpload(projectRoot, config, site, slug, filename, content
     throw new Error(`file already exists: "${filename}" \u2014 rename first`);
   }
   mkdirSync2(dirname(abs), { recursive: true });
-  writeFileSync4(abs, content3);
+  writeFileSync5(abs, content3);
   const st = statSync3(abs);
   return {
     name: filename,
@@ -23825,249 +24083,6 @@ function createScrapbookMutationsRouter(ctx) {
   return app;
 }
 
-// ../core/src/calendar.ts
-import { readFileSync as readFileSync6, writeFileSync as writeFileSync5 } from "node:fs";
-import { randomUUID as randomUUID2 } from "node:crypto";
-
-// ../core/src/types.ts
-var STAGES = [
-  "Ideas",
-  "Planned",
-  "Outlining",
-  "Drafting",
-  "Review",
-  "Paused",
-  "Published"
-];
-var PAUSABLE_STAGES = [
-  "Ideas",
-  "Planned",
-  "Outlining",
-  "Drafting",
-  "Review"
-];
-function isPausable(stage) {
-  return PAUSABLE_STAGES.includes(stage);
-}
-function isStage(value) {
-  return STAGES.includes(value);
-}
-var CONTENT_TYPES = ["blog", "youtube", "tool"];
-function isContentType(value) {
-  return CONTENT_TYPES.includes(value);
-}
-function effectiveContentType(entry) {
-  return entry.contentType ?? "blog";
-}
-function hasRepoContent(contentType) {
-  return contentType === "blog";
-}
-var PLATFORMS = ["reddit", "youtube", "linkedin", "instagram"];
-function isPlatform(value) {
-  return PLATFORMS.includes(value);
-}
-
-// ../core/src/calendar.ts
-function parseRow(line) {
-  return line.split("|").slice(1, -1).map((cell) => cell.trim());
-}
-function isSeparator(line) {
-  return /^\|[\s:-]+\|/.test(line);
-}
-function indexColumns(headerLine) {
-  const map = /* @__PURE__ */ new Map();
-  parseRow(headerLine).forEach((name, idx) => {
-    map.set(name.trim().toLowerCase(), idx);
-  });
-  return map;
-}
-function col(cells2, cols, name) {
-  const idx = cols.get(name);
-  if (idx === void 0) return void 0;
-  const value = cells2[idx];
-  if (value === void 0) return void 0;
-  const trimmed = value.trim();
-  return trimmed === "" ? void 0 : trimmed;
-}
-function parseEntries(lines, stage) {
-  const entries = [];
-  let i = 0;
-  while (i < lines.length && !lines[i].startsWith("|")) i++;
-  if (i >= lines.length) return entries;
-  const cols = indexColumns(lines[i]);
-  i++;
-  if (i < lines.length && isSeparator(lines[i])) i++;
-  while (i < lines.length && lines[i].startsWith("|")) {
-    const cells2 = parseRow(lines[i]);
-    const slug = col(cells2, cols, "slug");
-    const title = col(cells2, cols, "title");
-    if (slug && title) {
-      const existingId = col(cells2, cols, "uuid") ?? col(cells2, cols, "id");
-      const entry = {
-        id: existingId ?? randomUUID2(),
-        slug,
-        title,
-        description: col(cells2, cols, "description") ?? "",
-        stage,
-        targetKeywords: (col(cells2, cols, "keywords") ?? "").split(",").map((k) => k.trim()).filter(Boolean),
-        source: col(cells2, cols, "source") === "analytics" ? "analytics" : "manual"
-      };
-      const topics = col(cells2, cols, "topics");
-      if (topics) {
-        entry.topics = topics.split(",").map((t) => t.trim()).filter(Boolean);
-      }
-      const typeValue = col(cells2, cols, "type");
-      if (typeValue && isContentType(typeValue)) {
-        entry.contentType = typeValue;
-      }
-      const url = col(cells2, cols, "url");
-      if (url) entry.contentUrl = url;
-      const pausedFrom = col(cells2, cols, "pausedfrom");
-      if (pausedFrom && isStage(pausedFrom) && isPausable(pausedFrom)) {
-        entry.pausedFrom = pausedFrom;
-      }
-      const published = col(cells2, cols, "published");
-      if (published) entry.datePublished = published;
-      const issue = col(cells2, cols, "issue");
-      if (issue) {
-        const match2 = issue.match(/#?(\d+)/);
-        if (match2) entry.issueNumber = parseInt(match2[1], 10);
-      }
-      entries.push(entry);
-    }
-    i++;
-  }
-  return entries;
-}
-function parseDistributions(lines) {
-  const records = [];
-  let i = 0;
-  while (i < lines.length && !lines[i].startsWith("|")) i++;
-  if (i >= lines.length) return records;
-  const cols = indexColumns(lines[i]);
-  i++;
-  if (i < lines.length && isSeparator(lines[i])) i++;
-  while (i < lines.length && lines[i].startsWith("|")) {
-    const cells2 = parseRow(lines[i]);
-    const slug = col(cells2, cols, "slug");
-    const platformValue = col(cells2, cols, "platform");
-    const url = col(cells2, cols, "url");
-    const dateShared = col(cells2, cols, "shared");
-    if (slug && platformValue && url && dateShared && isPlatform(platformValue)) {
-      const entryIdCell = col(cells2, cols, "entryid") ?? col(cells2, cols, "uuid");
-      const rec = {
-        entryId: entryIdCell ?? "",
-        slug,
-        platform: platformValue,
-        url,
-        dateShared
-      };
-      const channel = col(cells2, cols, "channel");
-      if (channel) rec.channel = channel;
-      const notes = col(cells2, cols, "notes");
-      if (notes) rec.notes = notes;
-      records.push(rec);
-    }
-    i++;
-  }
-  return records;
-}
-function parseShortformBlocks(lines) {
-  const blocks = [];
-  let i = 0;
-  while (i < lines.length) {
-    const header = lines[i].match(/^### (.+)$/);
-    if (!header) {
-      i++;
-      continue;
-    }
-    const parts = header[1].split("\xB7").map((s) => s.trim());
-    if (parts.length < 2) {
-      i++;
-      continue;
-    }
-    const [slug, platform, channel] = parts;
-    i++;
-    const bodyLines = [];
-    while (i < lines.length && !lines[i].startsWith("### ")) {
-      bodyLines.push(lines[i]);
-      i++;
-    }
-    const text5 = bodyLines.join("\n").replace(/^\n+|\n+$/g, "");
-    if (text5.length > 0) {
-      const block = { slug, platform, text: text5 };
-      if (channel) block.channel = channel;
-      blocks.push(block);
-    }
-  }
-  return blocks;
-}
-function parseCalendar(markdown) {
-  const entries = [];
-  const distributions = [];
-  const shortformBlocks = [];
-  const lines = markdown.split("\n");
-  let currentSection = null;
-  let sectionLines = [];
-  function flushSection() {
-    if (currentSection && sectionLines.length > 0) {
-      if (currentSection === "Distribution") {
-        distributions.push(...parseDistributions(sectionLines));
-      } else if (currentSection === "Shortform Copy") {
-        shortformBlocks.push(...parseShortformBlocks(sectionLines));
-      } else {
-        entries.push(...parseEntries(sectionLines, currentSection));
-      }
-    }
-    sectionLines = [];
-  }
-  for (const line of lines) {
-    const sectionMatch = line.match(/^## (.+)$/);
-    if (sectionMatch) {
-      flushSection();
-      const name = sectionMatch[1].trim();
-      if (isStage(name)) {
-        currentSection = name;
-      } else if (name === "Distribution") {
-        currentSection = "Distribution";
-      } else if (name === "Shortform Copy") {
-        currentSection = "Shortform Copy";
-      } else {
-        currentSection = null;
-      }
-    } else if (currentSection) {
-      sectionLines.push(line);
-    }
-  }
-  flushSection();
-  for (const b of shortformBlocks) {
-    const rec = distributions.find(
-      (d) => d.slug === b.slug && d.platform === b.platform && (d.channel ?? "").toLowerCase() === (b.channel ?? "").toLowerCase()
-    );
-    if (rec) rec.shortform = b.text;
-  }
-  const entryBySlug = new Map(entries.map((e) => [e.slug, e]));
-  for (const d of distributions) {
-    if (!d.entryId) {
-      const match2 = entryBySlug.get(d.slug);
-      if (match2 && match2.id) d.entryId = match2.id;
-    }
-  }
-  return { entries, distributions };
-}
-function readCalendar(calendarPath) {
-  let raw3;
-  try {
-    raw3 = readFileSync6(calendarPath, "utf-8");
-  } catch (err2) {
-    if (err2 instanceof Error && "code" in err2 && err2.code === "ENOENT") {
-      return { entries: [], distributions: [] };
-    }
-    throw err2;
-  }
-  return parseCalendar(raw3);
-}
-
 // ../core/src/review/report.ts
 var CATEGORY_KEYS = [
   "voice-drift",
@@ -24355,8 +24370,9 @@ function siteLabel(site) {
 function stateLabel(state) {
   return state.replace("-", " ");
 }
-function covKey(site, slug) {
-  return `${site}::${slug}`;
+function covKey(site, slug, entryId) {
+  const stable = entryId !== void 0 && entryId !== null && entryId !== "" ? entryId : slug;
+  return `${site}::${stable}`;
 }
 function fmtRelTime(iso, now) {
   const t = new Date(iso).getTime();
@@ -24372,14 +24388,14 @@ function workflowLink(w) {
   if (w.contentKind === "shortform") {
     return `/dev/editorial-review-shortform?focus=${w.id}#workflow-${w.id}`;
   }
-  if (w.contentKind === "outline") {
-    return `/dev/editorial-review/${w.slug}?site=${w.site}&kind=outline`;
-  }
-  return `/dev/editorial-review/${w.slug}?site=${w.site}`;
+  const key2 = w.entryId ?? w.slug;
+  const kindBit = w.contentKind === "outline" ? "&kind=outline" : "";
+  return `/dev/editorial-review/${key2}?site=${w.site}${kindBit}`;
 }
 function blogPreviewLink(site, slug, host, entry) {
   if (entry.stage === "Published") return `https://${host}/blog/${slug}/`;
-  return `/dev/editorial-review/${slug}?site=${site}`;
+  const key2 = entry.id ?? slug;
+  return `/dev/editorial-review/${key2}?site=${site}`;
 }
 function loadDashboardData(ctx) {
   const calendarEntries = [];
@@ -24390,16 +24406,20 @@ function loadDashboardData(ctx) {
     slugsBySite[site] = [];
     const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
     const cal = readCalendar(calendarPath);
+    const idBySlug = /* @__PURE__ */ new Map();
     for (const entry of cal.entries) {
       calendarEntries.push({ site, entry });
       slugsBySite[site].push(entry.slug);
+      if (entry.id) idBySlug.set(entry.slug, entry.id);
     }
     for (const d of cal.distributions) {
       const dr = d;
+      const entryId = dr.entryId ?? idBySlug.get(dr.slug) ?? null;
       distributions.push({
         site,
         platform: dr.platform,
         slug: dr.slug,
+        entryId,
         shortform: typeof dr.shortform === "string" && dr.shortform.length > 0
       });
     }
@@ -24411,7 +24431,7 @@ function loadDashboardData(ctx) {
   for (const d of distributions) {
     if (!d.shortform) continue;
     if (!isPlatform2(d.platform)) continue;
-    const key2 = covKey(d.site, d.slug);
+    const key2 = covKey(d.site, d.slug, d.entryId);
     const set = shortformCoverage.get(key2) ?? /* @__PURE__ */ new Set();
     set.add(d.platform);
     shortformCoverage.set(key2, set);
@@ -24424,7 +24444,7 @@ function loadDashboardData(ctx) {
   const activeBySitedSlug = /* @__PURE__ */ new Map();
   for (const w of workflows) {
     if (w.state === "applied" || w.state === "cancelled") continue;
-    const key2 = covKey(w.site, w.slug);
+    const key2 = covKey(w.site, w.slug, w.entryId);
     const list3 = activeBySitedSlug.get(key2) ?? [];
     list3.push(w);
     activeBySitedSlug.set(key2, list3);
@@ -24448,8 +24468,8 @@ function entryBodyStateOf(ctx, site, entry) {
   const path = resolveBlogFilePath(ctx.projectRoot, ctx.config, site, entry.slug);
   return bodyState(path);
 }
-function findStageWorkflow(data, site, slug, stage) {
-  const list3 = data.activeBySitedSlug.get(covKey(site, slug)) ?? [];
+function findStageWorkflow(data, site, entry, stage) {
+  const list3 = data.activeBySitedSlug.get(covKey(site, entry.slug, entry.id)) ?? [];
   if (stage === "Outlining") return list3.find((w) => w.contentKind === "outline");
   return list3.find((w) => w.contentKind === "longform");
 }
@@ -24621,7 +24641,7 @@ function renderRow(ctx, data, sited, stage, index2) {
   const body3 = entryBodyStateOf(ctx, site, entry);
   const hasFile = body3 !== "missing";
   const bodyWritten = body3 === "written";
-  const wf = findStageWorkflow(data, site, entry.slug, stage);
+  const wf = findStageWorkflow(data, site, entry, stage);
   const search2 = [
     entry.slug,
     entry.title,
@@ -24733,7 +24753,7 @@ function renderStageSection(ctx, data, stage, entries, sites) {
 function renderShortformMatrix(data, ctx) {
   if (data.publishedBlogEntries.length === 0) return unsafe("");
   const rows = data.publishedBlogEntries.map(({ site, entry }) => {
-    const covered = data.shortformCoverage.get(covKey(site, entry.slug)) ?? /* @__PURE__ */ new Set();
+    const covered = data.shortformCoverage.get(covKey(site, entry.slug, entry.id)) ?? /* @__PURE__ */ new Set();
     const cells2 = PLATFORMS_ORDER.map((p2) => {
       const has = covered.has(p2);
       const inner = has ? html6`<span class="er-sf-check" title="${p2} copy drafted">✓</span>` : html6`<button class="er-copy-btn er-sf-draft-btn" type="button"
@@ -25301,11 +25321,13 @@ function renderScrapbookDrawer(ctx, site, slug) {
       </div>
     </aside>`);
 }
-async function renderReviewPage(ctx, slug, query) {
+async function renderReviewPage(ctx, lookup, query) {
   const site = pickSite(ctx, query.site);
   const contentKind = pickContentKind(query.kind ?? null);
+  const slug = lookup.slug;
   const fetched = handleGetWorkflow(ctx.projectRoot, ctx.config, {
     id: null,
+    entryId: lookup.kind === "id" ? lookup.entryId : null,
     site,
     slug,
     contentKind,
@@ -26784,7 +26806,7 @@ function loadDetailRender(ctx, site, node2) {
 async function renderNodeDetail(ctx, site, node2) {
   const detail = loadDetailRender(ctx, site, node2);
   const fmCount = Object.keys(detail.frontmatter).length;
-  const reviewKey = node2.slug ?? node2.path;
+  const reviewKey = node2.entry !== null && node2.entry.id !== void 0 && node2.entry.id !== "" ? node2.entry.id : node2.slug ?? node2.path;
   const reviewHref = `/dev/editorial-review/${encodeURI(reviewKey)}?site=${site}`;
   const scrapHref = scrapbookViewerUrl({ site, path: node2.path });
   const scrapDirHint = node2.scrapbookCount === 0 ? "0 items \xB7 scrapbook empty" : `${node2.scrapbookCount} items \xB7 /${node2.path}/scrapbook`;
@@ -26831,14 +26853,16 @@ async function renderNodeDetail(ctx, site, node2) {
 }
 
 // src/pages/content.ts
-function loadProjectsForSite(ctx, site) {
+function loadProjectsForSite(ctx, site, getIndex) {
   const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
   const cal = readCalendar(calendarPath);
+  const contentIndex = getIndex ? getIndex(site) : void 0;
   const projects = buildContentTree(
     site,
     cal.entries,
     ctx.config,
-    ctx.projectRoot
+    ctx.projectRoot,
+    contentIndex !== void 0 ? { contentIndex } : {}
   );
   return {
     site,
@@ -26846,9 +26870,9 @@ function loadProjectsForSite(ctx, site) {
     projects
   };
 }
-function loadAllSites(ctx) {
+function loadAllSites(ctx, getIndex) {
   return Object.keys(ctx.config.sites).map(
-    (site) => loadProjectsForSite(ctx, site)
+    (site) => loadProjectsForSite(ctx, site, getIndex)
   );
 }
 function aggregateCounts(siteProjects) {
@@ -26927,8 +26951,8 @@ function renderSiteCard(sp, index2) {
       </p>
     </article>`);
 }
-function renderContentTopLevel(ctx) {
-  const sites = loadAllSites(ctx);
+function renderContentTopLevel(ctx, getIndex) {
+  const sites = loadAllSites(ctx, getIndex);
   const counts = aggregateCounts(sites);
   const body3 = html6`
     ${renderEditorialFolio("content", "the shape of the work")}
@@ -27009,6 +27033,10 @@ function nodeFilePathHint(node2) {
   if (node2.entry !== null) return `/${node2.path}/index.md`;
   return `/${node2.path}/`;
 }
+function pathLeaf(path) {
+  const idx = path.lastIndexOf("/");
+  return idx < 0 ? path : path.slice(idx + 1);
+}
 function renderTreeRowMeta(node2) {
   const meta = [];
   if (node2.scrapbookCount > 0) {
@@ -27021,7 +27049,7 @@ function renderTreeRowMeta(node2) {
   return unsafe(meta.join(""));
 }
 function renderTreeRowActions(node2, site) {
-  const reviewKey = node2.slug ?? node2.path;
+  const reviewKey = node2.entry !== null && node2.entry.id !== void 0 && node2.entry.id !== "" ? node2.entry.id : node2.slug ?? node2.path;
   const reviewHref = `/dev/editorial-review/${encodeURI(reviewKey)}?site=${site}`;
   const scrapHref = scrapbookViewerUrl({ site, path: node2.path });
   const reviewLink = node2.entry !== null ? html6`<a class="tree-row__action tree-row__action--review" href="${reviewHref}"
@@ -27043,6 +27071,8 @@ function renderTreeRow(site, project, flat, selectedPath) {
     isLast ? "is-last" : "",
     isSelected ? "is-selected" : ""
   ].filter(Boolean).join(" ");
+  const publicUrlHint = node2.slug !== void 0 && node2.slug !== pathLeaf(node2.path) ? unsafe(html6`<span class="tree-row__public-url"
+          title="public URL on the host site">/blog/${node2.slug}</span>`) : unsafe("");
   return unsafe(html6`
     <a class="${classes}" href="${nodeHref}" style="--depth: ${depth}"
       data-slug="${node2.path}" aria-current="${isSelected ? "true" : "false"}">
@@ -27050,6 +27080,7 @@ function renderTreeRow(site, project, flat, selectedPath) {
         ${nodeIcon(node2)}
         <span class="tree-row__title">${node2.title}</span>
         <span class="tree-row__slug">${nodeFilePathHint(node2)}</span>
+        ${publicUrlHint}
       </div>
       <span class="tree-row__lane">
         <span class="lane-dot lane-dot--${lane}"></span>
@@ -27066,11 +27097,11 @@ function renderTree(site, project, selectedPath) {
       ${flat.map((f) => renderTreeRow(site, project, f, selectedPath))}
     </div>`);
 }
-async function renderContentProject(ctx, site, projectSlug, selectedPath) {
+async function renderContentProject(ctx, site, projectSlug, selectedPath, getIndex) {
   if (!(site in ctx.config.sites)) {
     return { status: 404, html: renderNotFound(`unknown site: ${site}`) };
   }
-  const sp = loadProjectsForSite(ctx, site);
+  const sp = loadProjectsForSite(ctx, site, getIndex);
   const project = sp.projects.find((p2) => p2.rootSlug === projectSlug);
   if (!project) {
     return {
@@ -27341,6 +27372,35 @@ function detectTailscale() {
   return { ipv4, magicDnsName: detectTailscaleMagicDnsName() };
 }
 
+// src/request-context.ts
+var CONTEXT_KEY = "deskwork:contentIndices";
+function isIndexCache(value) {
+  return value instanceof Map;
+}
+var activeBuilder = buildContentIndex;
+function contentIndexMiddleware() {
+  return async (c, next) => {
+    const cache = /* @__PURE__ */ new Map();
+    c.set(CONTEXT_KEY, cache);
+    await next();
+  };
+}
+function getCache(c) {
+  const raw3 = c.get(CONTEXT_KEY);
+  return isIndexCache(raw3) ? raw3 : null;
+}
+function getRequestContentIndex(c, studioCtx, site) {
+  const cache = getCache(c);
+  if (cache !== null) {
+    const cached = cache.get(site);
+    if (cached !== void 0) return cached;
+    const fresh = activeBuilder(studioCtx.projectRoot, studioCtx.config, site);
+    cache.set(site, fresh);
+    return fresh;
+  }
+  return activeBuilder(studioCtx.projectRoot, studioCtx.config, site);
+}
+
 // src/server.ts
 var DEFAULT_PORT = 47321;
 var LOOPBACK = "127.0.0.1";
@@ -27412,6 +27472,43 @@ function usage(error) {
   out.write("then reach the studio at the magic-DNS hostname (e.g. '<machine>.<tailnet>.ts.net').\n");
   process.exit(error ? 2 : 0);
 }
+function resolveEntryById(ctx, site, id) {
+  if (!(site in ctx.config.sites)) return null;
+  try {
+    const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
+    if (!existsSync10(calendarPath)) return null;
+    const cal = readCalendar(calendarPath);
+    const entry = cal.entries.find((e) => e.id === id);
+    if (!entry || entry.id === void 0) return null;
+    return { kind: "id", entryId: entry.id, slug: entry.slug };
+  } catch {
+    return null;
+  }
+}
+function resolveEntryBySlug(ctx, site, slug) {
+  if (!(site in ctx.config.sites)) return "unknown-site";
+  try {
+    const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
+    if (!existsSync10(calendarPath)) return null;
+    const cal = readCalendar(calendarPath);
+    const entry = cal.entries.find((e) => e.slug === slug);
+    if (!entry) return null;
+    if (entry.id) return { kind: "id", entryId: entry.id, slug: entry.slug };
+    return { kind: "slug", slug: entry.slug };
+  } catch {
+    return null;
+  }
+}
+function buildReviewRedirectUrl(entryId, requestUrl) {
+  let search2 = "";
+  try {
+    const u = new URL(requestUrl);
+    search2 = u.search;
+  } catch {
+    search2 = "";
+  }
+  return `/dev/editorial-review/${entryId}${search2}`;
+}
 function publicDir() {
   const here = dirname3(fileURLToPath2(import.meta.url));
   const candidates = [
@@ -27428,6 +27525,7 @@ function publicDir() {
 }
 function createApp(ctx) {
   const app = new Hono2();
+  app.use("*", contentIndexMiddleware());
   app.route("/api/dev/editorial-review", createApiRouter(ctx));
   app.get("/dev", (c) => c.html(renderStudioIndex(ctx)));
   app.get("/dev/", (c) => c.html(renderStudioIndex(ctx)));
@@ -27438,15 +27536,53 @@ function createApp(ctx) {
     (c) => c.html(renderShortformPage(ctx, c.req.query("focus") ?? null))
   );
   app.get(
-    "/dev/editorial-review/:slug{.+}",
-    async (c) => c.html(
-      await renderReviewPage(ctx, decodeURIComponent(c.req.param("slug")), {
+    "/dev/editorial-review/:id{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}",
+    async (c) => {
+      const id = c.req.param("id");
+      const siteParam = c.req.query("site") ?? ctx.config.defaultSite;
+      const lookup = resolveEntryById(ctx, siteParam, id);
+      if (lookup === null) {
+        return c.html(
+          await renderReviewPage(
+            ctx,
+            { kind: "id", entryId: id, slug: id },
+            {
+              site: c.req.query("site") ?? null,
+              version: c.req.query("v") ?? null,
+              kind: c.req.query("kind") ?? null
+            }
+          )
+        );
+      }
+      return c.html(
+        await renderReviewPage(ctx, lookup, {
+          site: c.req.query("site") ?? null,
+          version: c.req.query("v") ?? null,
+          kind: c.req.query("kind") ?? null
+        })
+      );
+    }
+  );
+  app.get("/dev/editorial-review/:slug{.+}", async (c) => {
+    const slug = decodeURIComponent(c.req.param("slug"));
+    const siteParam = c.req.query("site") ?? ctx.config.defaultSite;
+    const found = resolveEntryBySlug(ctx, siteParam, slug);
+    if (found === "unknown-site") {
+      return c.notFound();
+    }
+    if (found !== null && found.kind === "id") {
+      const url = buildReviewRedirectUrl(found.entryId, c.req.url);
+      return c.redirect(url, 302);
+    }
+    const lookup = found !== null ? found : { kind: "slug", slug };
+    return c.html(
+      await renderReviewPage(ctx, lookup, {
         site: c.req.query("site") ?? null,
         version: c.req.query("v") ?? null,
         kind: c.req.query("kind") ?? null
       })
-    )
-  );
+    );
+  });
   app.get(
     "/dev/scrapbook/:site/:path{.+}",
     (c) => c.html(
@@ -27459,13 +27595,20 @@ function createApp(ctx) {
   );
   app.get("/api/dev/scrapbook-file", (c) => serveScrapbookFile(c, ctx));
   app.route("/api/dev/scrapbook", createScrapbookMutationsRouter(ctx));
-  app.get("/dev/content", (c) => c.html(renderContentTopLevel(ctx)));
-  app.get("/dev/content/:site", (c) => c.html(renderContentTopLevel(ctx)));
+  app.get("/dev/content", (c) => {
+    const getIndex = (site) => getRequestContentIndex(c, ctx, site);
+    return c.html(renderContentTopLevel(ctx, getIndex));
+  });
+  app.get("/dev/content/:site", (c) => {
+    const getIndex = (site) => getRequestContentIndex(c, ctx, site);
+    return c.html(renderContentTopLevel(ctx, getIndex));
+  });
   app.get("/dev/content/:site/:project{.+}", async (c) => {
     const site = c.req.param("site");
     const project = decodeURIComponent(c.req.param("project"));
     const node2 = c.req.query("node") ?? null;
-    const r = await renderContentProject(ctx, site, project, node2);
+    const getIndex = (s) => getRequestContentIndex(c, ctx, s);
+    const r = await renderContentProject(ctx, site, project, node2, getIndex);
     return c.html(r.html, r.status);
   });
   app.use(

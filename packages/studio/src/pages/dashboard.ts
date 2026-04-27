@@ -52,6 +52,12 @@ interface SitedDistribution {
   site: string;
   platform: string;
   slug: string;
+  /**
+   * Stable id of the joined calendar entry. Phase 19d: keys
+   * (site, entryId) when present, falls back to (site, slug) for
+   * pre-id distribution records.
+   */
+  entryId: string | null;
   shortform: boolean;
 }
 
@@ -89,8 +95,26 @@ function stateLabel(state: string): string {
   return state.replace('-', ' ');
 }
 
-function covKey(site: string, slug: string): string {
-  return `${site}::${slug}`;
+/**
+ * Internal correlation key for the dashboard's `Map<key, …>` joins.
+ * Phase 19d: prefer the calendar entry's stable UUID when present,
+ * falling back to the slug for legacy data (workflows / entries
+ * created before frontmatter ids landed). The function is overloaded
+ * via two arities — `covKey(site, slug)` for slug-only callers and
+ * `covKey(site, slug, entryId)` for callers that have access to the
+ * id. The latter form picks `entryId` when it's a non-empty string,
+ * else falls through to `slug`. Display still uses slug as the human
+ * label; this key only correlates internally.
+ *
+ * The "fallback" here is the legacy migration path — not the kind of
+ * silent fallback the project rules forbid. Doctor reports the legacy
+ * cases so operators can backfill ids.
+ */
+function covKey(site: string, slug: string, entryId?: string | null): string {
+  const stable = entryId !== undefined && entryId !== null && entryId !== ''
+    ? entryId
+    : slug;
+  return `${site}::${stable}`;
 }
 
 function fmtRelTime(iso: string, now: Date): string {
@@ -108,15 +132,20 @@ function workflowLink(w: DraftWorkflowItem): string {
   if (w.contentKind === 'shortform') {
     return `/dev/editorial-review-shortform?focus=${w.id}#workflow-${w.id}`;
   }
-  if (w.contentKind === 'outline') {
-    return `/dev/editorial-review/${w.slug}?site=${w.site}&kind=outline`;
-  }
-  return `/dev/editorial-review/${w.slug}?site=${w.site}`;
+  // Phase 19d: prefer the canonical id-based URL when the workflow
+  // carries entryId. The legacy slug URL still works (server.ts will
+  // 302-redirect it), but emitting the canonical form skips the
+  // redirect round trip and makes the UI's outbound links honest.
+  const key = w.entryId ?? w.slug;
+  const kindBit = w.contentKind === 'outline' ? '&kind=outline' : '';
+  return `/dev/editorial-review/${key}?site=${w.site}${kindBit}`;
 }
 
 function blogPreviewLink(site: string, slug: string, host: string, entry: CalendarEntry): string {
   if (entry.stage === 'Published') return `https://${host}/blog/${slug}/`;
-  return `/dev/editorial-review/${slug}?site=${site}`;
+  // Phase 19d: prefer the canonical id-based URL.
+  const key = entry.id ?? slug;
+  return `/dev/editorial-review/${key}?site=${site}`;
 }
 
 interface DashboardData {
@@ -142,16 +171,23 @@ function loadDashboardData(ctx: StudioContext): DashboardData {
     slugsBySite[site] = [];
     const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
     const cal = readCalendar(calendarPath);
+    // Build a slug → id map up front so distributions can resolve
+    // their entry's stable id even when the DistributionRecord
+    // pre-dates the entryId field.
+    const idBySlug = new Map<string, string>();
     for (const entry of cal.entries) {
       calendarEntries.push({ site, entry });
       slugsBySite[site].push(entry.slug);
+      if (entry.id) idBySlug.set(entry.slug, entry.id);
     }
     for (const d of cal.distributions) {
       const dr: DistributionRecord = d;
+      const entryId = dr.entryId ?? idBySlug.get(dr.slug) ?? null;
       distributions.push({
         site,
         platform: dr.platform,
         slug: dr.slug,
+        entryId,
         shortform: typeof dr.shortform === 'string' && dr.shortform.length > 0,
       });
     }
@@ -168,7 +204,7 @@ function loadDashboardData(ctx: StudioContext): DashboardData {
   for (const d of distributions) {
     if (!d.shortform) continue;
     if (!isPlatform(d.platform)) continue;
-    const key = covKey(d.site, d.slug);
+    const key = covKey(d.site, d.slug, d.entryId);
     const set = shortformCoverage.get(key) ?? new Set<Platform>();
     set.add(d.platform);
     shortformCoverage.set(key, set);
@@ -186,7 +222,7 @@ function loadDashboardData(ctx: StudioContext): DashboardData {
   const activeBySitedSlug = new Map<string, DraftWorkflowItem[]>();
   for (const w of workflows) {
     if (w.state === 'applied' || w.state === 'cancelled') continue;
-    const key = covKey(w.site, w.slug);
+    const key = covKey(w.site, w.slug, w.entryId);
     const list = activeBySitedSlug.get(key) ?? [];
     list.push(w);
     activeBySitedSlug.set(key, list);
@@ -221,10 +257,11 @@ function entryBodyStateOf(
 function findStageWorkflow(
   data: DashboardData,
   site: string,
-  slug: string,
+  entry: CalendarEntry,
   stage: Stage,
 ): DraftWorkflowItem | undefined {
-  const list = data.activeBySitedSlug.get(covKey(site, slug)) ?? [];
+  const list =
+    data.activeBySitedSlug.get(covKey(site, entry.slug, entry.id)) ?? [];
   if (stage === 'Outlining') return list.find((w) => w.contentKind === 'outline');
   return list.find((w) => w.contentKind === 'longform');
 }
@@ -442,7 +479,7 @@ function renderRow(
   const body = entryBodyStateOf(ctx, site, entry);
   const hasFile = body !== 'missing';
   const bodyWritten = body === 'written';
-  const wf = findStageWorkflow(data, site, entry.slug, stage);
+  const wf = findStageWorkflow(data, site, entry, stage);
   const search = [
     entry.slug,
     entry.title,
@@ -608,7 +645,9 @@ function renderStageSection(
 function renderShortformMatrix(data: DashboardData, ctx: StudioContext): RawHtml {
   if (data.publishedBlogEntries.length === 0) return unsafe('');
   const rows = data.publishedBlogEntries.map(({ site, entry }) => {
-    const covered = data.shortformCoverage.get(covKey(site, entry.slug)) ?? new Set<Platform>();
+    const covered =
+      data.shortformCoverage.get(covKey(site, entry.slug, entry.id)) ??
+      new Set<Platform>();
     const cells = PLATFORMS_ORDER.map((p) => {
       const has = covered.has(p);
       const inner = has
