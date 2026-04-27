@@ -21,6 +21,7 @@ import slugCollision from './rules/slug-collision.ts';
 import schemaRejected from './rules/schema-rejected.ts';
 import workflowStale from './rules/workflow-stale.ts';
 import calendarUuidMissing from './rules/calendar-uuid-missing.ts';
+import legacyTopLevelIdMigration from './rules/legacy-top-level-id-migration.ts';
 import type {
   DoctorContext,
   DoctorInteraction,
@@ -36,9 +37,16 @@ import type {
  * detect calendar-uuid-missing first (to flush UUIDs), then run the
  * frontmatter-id rules (which depend on UUIDs being persisted on
  * disk to be useful in long-lived data).
+ *
+ * `legacy-top-level-id-migration` (Issue #38) runs BEFORE
+ * `missing-frontmatter-id` so that v0.7.0/v0.7.1-shaped files migrate
+ * to the namespaced form first; on the same run, the
+ * missing-frontmatter-id rule then sees the migrated files as bound
+ * (via `deskwork.id`) and doesn't re-report them.
  */
 export const RULES: ReadonlyArray<DoctorRule> = [
   calendarUuidMissing,
+  legacyTopLevelIdMigration,
   missingFrontmatterId,
   orphanFrontmatterId,
   duplicateId,

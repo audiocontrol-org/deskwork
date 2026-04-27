@@ -778,9 +778,9 @@ var require_identity = __commonJS({
     var NODE_TYPE = Symbol.for("yaml.node.type");
     var isAlias = (node) => !!node && typeof node === "object" && node[NODE_TYPE] === ALIAS;
     var isDocument = (node) => !!node && typeof node === "object" && node[NODE_TYPE] === DOC;
-    var isMap = (node) => !!node && typeof node === "object" && node[NODE_TYPE] === MAP;
+    var isMap2 = (node) => !!node && typeof node === "object" && node[NODE_TYPE] === MAP;
     var isPair = (node) => !!node && typeof node === "object" && node[NODE_TYPE] === PAIR;
-    var isScalar = (node) => !!node && typeof node === "object" && node[NODE_TYPE] === SCALAR;
+    var isScalar2 = (node) => !!node && typeof node === "object" && node[NODE_TYPE] === SCALAR;
     var isSeq = (node) => !!node && typeof node === "object" && node[NODE_TYPE] === SEQ;
     function isCollection(node) {
       if (node && typeof node === "object")
@@ -802,7 +802,7 @@ var require_identity = __commonJS({
         }
       return false;
     }
-    var hasAnchor = (node) => (isScalar(node) || isCollection(node)) && !!node.anchor;
+    var hasAnchor = (node) => (isScalar2(node) || isCollection(node)) && !!node.anchor;
     exports.ALIAS = ALIAS;
     exports.DOC = DOC;
     exports.MAP = MAP;
@@ -814,10 +814,10 @@ var require_identity = __commonJS({
     exports.isAlias = isAlias;
     exports.isCollection = isCollection;
     exports.isDocument = isDocument;
-    exports.isMap = isMap;
+    exports.isMap = isMap2;
     exports.isNode = isNode;
     exports.isPair = isPair;
-    exports.isScalar = isScalar;
+    exports.isScalar = isScalar2;
     exports.isSeq = isSeq;
   }
 });
@@ -1464,7 +1464,7 @@ var require_Scalar = __commonJS({
     var Node = require_Node();
     var toJS = require_toJS();
     var isScalarValue = (value) => !value || typeof value !== "function" && typeof value !== "object";
-    var Scalar = class extends Node.NodeBase {
+    var Scalar2 = class extends Node.NodeBase {
       constructor(value) {
         super(identity.SCALAR);
         this.value = value;
@@ -1476,12 +1476,12 @@ var require_Scalar = __commonJS({
         return String(this.value);
       }
     };
-    Scalar.BLOCK_FOLDED = "BLOCK_FOLDED";
-    Scalar.BLOCK_LITERAL = "BLOCK_LITERAL";
-    Scalar.PLAIN = "PLAIN";
-    Scalar.QUOTE_DOUBLE = "QUOTE_DOUBLE";
-    Scalar.QUOTE_SINGLE = "QUOTE_SINGLE";
-    exports.Scalar = Scalar;
+    Scalar2.BLOCK_FOLDED = "BLOCK_FOLDED";
+    Scalar2.BLOCK_LITERAL = "BLOCK_LITERAL";
+    Scalar2.PLAIN = "PLAIN";
+    Scalar2.QUOTE_DOUBLE = "QUOTE_DOUBLE";
+    Scalar2.QUOTE_SINGLE = "QUOTE_SINGLE";
+    exports.Scalar = Scalar2;
     exports.isScalarValue = isScalarValue;
   }
 });
@@ -1492,7 +1492,7 @@ var require_createNode = __commonJS({
     "use strict";
     var Alias = require_Alias();
     var identity = require_identity();
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     var defaultTagPrefix = "tag:yaml.org,2002:";
     function findTagObject(value, tagName, tags) {
       if (tagName) {
@@ -1537,7 +1537,7 @@ var require_createNode = __commonJS({
           value = value.toJSON();
         }
         if (!value || typeof value !== "object") {
-          const node2 = new Scalar.Scalar(value);
+          const node2 = new Scalar2.Scalar(value);
           if (ref)
             ref.node = node2;
           return node2;
@@ -1548,7 +1548,7 @@ var require_createNode = __commonJS({
         onTagObj(tagObj);
         delete ctx.onTagObj;
       }
-      const node = tagObj?.createNode ? tagObj.createNode(ctx.schema, value, ctx) : typeof tagObj?.nodeClass?.from === "function" ? tagObj.nodeClass.from(ctx.schema, value, ctx) : new Scalar.Scalar(value);
+      const node = tagObj?.createNode ? tagObj.createNode(ctx.schema, value, ctx) : typeof tagObj?.nodeClass?.from === "function" ? tagObj.nodeClass.from(ctx.schema, value, ctx) : new Scalar2.Scalar(value);
       if (tagName)
         node.tag = tagName;
       else if (!tagObj.default)
@@ -1861,7 +1861,7 @@ ${indent}${text.slice(fold + 1, end2)}`;
 var require_stringifyString = __commonJS({
   "../../node_modules/yaml/dist/stringify/stringifyString.js"(exports) {
     "use strict";
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     var foldFlowLines = require_foldFlowLines();
     var getFoldOptions = (ctx, isBlock) => ({
       indentAtStart: isBlock ? ctx.indent.length : ctx.indentAtStart,
@@ -2004,7 +2004,7 @@ ${indent}`) + "'";
         return quotedString(value, ctx);
       }
       const indent = ctx.indent || (ctx.forceBlockIndent || containsDocumentMarker(value) ? "  " : "");
-      const literal = blockQuote === "literal" ? true : blockQuote === "folded" || type === Scalar.Scalar.BLOCK_FOLDED ? false : type === Scalar.Scalar.BLOCK_LITERAL ? true : !lineLengthOverLimit(value, lineWidth, indent.length);
+      const literal = blockQuote === "literal" ? true : blockQuote === "folded" || type === Scalar2.Scalar.BLOCK_FOLDED ? false : type === Scalar2.Scalar.BLOCK_LITERAL ? true : !lineLengthOverLimit(value, lineWidth, indent.length);
       if (!value)
         return literal ? "|\n" : ">\n";
       let chomp;
@@ -2059,7 +2059,7 @@ ${indent}`) + "'";
         const foldedValue = value.replace(/\n+/g, "\n$&").replace(/(?:^|\n)([\t ].*)(?:([\n\t ]*)\n(?![\n\t ]))?/g, "$1$2").replace(/\n+/g, `$&${indent}`);
         let literalFallback = false;
         const foldOptions = getFoldOptions(ctx, true);
-        if (blockQuote !== "folded" && type !== Scalar.Scalar.BLOCK_FOLDED) {
+        if (blockQuote !== "folded" && type !== Scalar2.Scalar.BLOCK_FOLDED) {
           foldOptions.onOverflow = () => {
             literalFallback = true;
           };
@@ -2082,7 +2082,7 @@ ${indent}${start}${value}${end}`;
       if (/^[\n\t ,[\]{}#&*!|>'"%@`]|^[?-]$|^[?-][ \t]|[\n:][ \t]|[ \t]\n|[\n\t ]#|[\n\t :]$/.test(value)) {
         return implicitKey || inFlow || !value.includes("\n") ? quotedString(value, ctx) : blockString(item, ctx, onComment, onChompKeep);
       }
-      if (!implicitKey && !inFlow && type !== Scalar.Scalar.PLAIN && value.includes("\n")) {
+      if (!implicitKey && !inFlow && type !== Scalar2.Scalar.PLAIN && value.includes("\n")) {
         return blockString(item, ctx, onComment, onChompKeep);
       }
       if (containsDocumentMarker(value)) {
@@ -2107,20 +2107,20 @@ ${indent}`);
       const { implicitKey, inFlow } = ctx;
       const ss = typeof item.value === "string" ? item : Object.assign({}, item, { value: String(item.value) });
       let { type } = item;
-      if (type !== Scalar.Scalar.QUOTE_DOUBLE) {
+      if (type !== Scalar2.Scalar.QUOTE_DOUBLE) {
         if (/[\x00-\x08\x0b-\x1f\x7f-\x9f\u{D800}-\u{DFFF}]/u.test(ss.value))
-          type = Scalar.Scalar.QUOTE_DOUBLE;
+          type = Scalar2.Scalar.QUOTE_DOUBLE;
       }
       const _stringify = (_type) => {
         switch (_type) {
-          case Scalar.Scalar.BLOCK_FOLDED:
-          case Scalar.Scalar.BLOCK_LITERAL:
+          case Scalar2.Scalar.BLOCK_FOLDED:
+          case Scalar2.Scalar.BLOCK_LITERAL:
             return implicitKey || inFlow ? quotedString(ss.value, ctx) : blockString(ss, ctx, onComment, onChompKeep);
-          case Scalar.Scalar.QUOTE_DOUBLE:
+          case Scalar2.Scalar.QUOTE_DOUBLE:
             return doubleQuotedString(ss.value, ctx);
-          case Scalar.Scalar.QUOTE_SINGLE:
+          case Scalar2.Scalar.QUOTE_SINGLE:
             return singleQuotedString(ss.value, ctx);
-          case Scalar.Scalar.PLAIN:
+          case Scalar2.Scalar.PLAIN:
             return plainString(ss, ctx, onComment, onChompKeep);
           default:
             return null;
@@ -2269,7 +2269,7 @@ var require_stringifyPair = __commonJS({
   "../../node_modules/yaml/dist/stringify/stringifyPair.js"(exports) {
     "use strict";
     var identity = require_identity();
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     var stringify = require_stringify();
     var stringifyComment = require_stringifyComment();
     function stringifyPair({ key, value }, ctx, onComment, onChompKeep) {
@@ -2284,7 +2284,7 @@ var require_stringifyPair = __commonJS({
           throw new Error(msg);
         }
       }
-      let explicitKey = !simpleKeys && (!key || keyComment && value == null && !ctx.inFlow || identity.isCollection(key) || (identity.isScalar(key) ? key.type === Scalar.Scalar.BLOCK_FOLDED || key.type === Scalar.Scalar.BLOCK_LITERAL : typeof key === "object"));
+      let explicitKey = !simpleKeys && (!key || keyComment && value == null && !ctx.inFlow || identity.isCollection(key) || (identity.isScalar(key) ? key.type === Scalar2.Scalar.BLOCK_FOLDED || key.type === Scalar2.Scalar.BLOCK_LITERAL : typeof key === "object"));
       ctx = Object.assign({}, ctx, {
         allNullValues: false,
         implicitKey: !explicitKey && (simpleKeys || !allNullValues),
@@ -2424,19 +2424,19 @@ var require_merge = __commonJS({
   "../../node_modules/yaml/dist/schema/yaml-1.1/merge.js"(exports) {
     "use strict";
     var identity = require_identity();
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     var MERGE_KEY = "<<";
     var merge = {
       identify: (value) => value === MERGE_KEY || typeof value === "symbol" && value.description === MERGE_KEY,
       default: "key",
       tag: "tag:yaml.org,2002:merge",
       test: /^<<$/,
-      resolve: () => Object.assign(new Scalar.Scalar(Symbol(MERGE_KEY)), {
+      resolve: () => Object.assign(new Scalar2.Scalar(Symbol(MERGE_KEY)), {
         addToJSMap: addMergeToJSMap
       }),
       stringify: () => MERGE_KEY
     };
-    var isMergeKey = (ctx, key) => (merge.identify(key) || identity.isScalar(key) && (!key.type || key.type === Scalar.Scalar.PLAIN) && merge.identify(key.value)) && ctx?.doc.schema.tags.some((tag) => tag.tag === merge.tag && tag.default);
+    var isMergeKey = (ctx, key) => (merge.identify(key) || identity.isScalar(key) && (!key.type || key.type === Scalar2.Scalar.PLAIN) && merge.identify(key.value)) && ctx?.doc.schema.tags.some((tag) => tag.tag === merge.tag && tag.default);
     function addMergeToJSMap(ctx, map, value) {
       value = ctx && identity.isAlias(value) ? value.resolve(ctx.doc) : value;
       if (identity.isSeq(value))
@@ -2740,7 +2740,7 @@ var require_YAMLMap = __commonJS({
     var Collection = require_Collection();
     var identity = require_identity();
     var Pair = require_Pair();
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     function findPair(items, key) {
       const k = identity.isScalar(key) ? key.value : key;
       for (const it of items) {
@@ -2753,7 +2753,7 @@ var require_YAMLMap = __commonJS({
       }
       return void 0;
     }
-    var YAMLMap = class extends Collection.Collection {
+    var YAMLMap2 = class extends Collection.Collection {
       static get tagName() {
         return "tag:yaml.org,2002:map";
       }
@@ -2807,7 +2807,7 @@ var require_YAMLMap = __commonJS({
         if (prev) {
           if (!overwrite)
             throw new Error(`Key ${_pair.key} already set`);
-          if (identity.isScalar(prev.value) && Scalar.isScalarValue(_pair.value))
+          if (identity.isScalar(prev.value) && Scalar2.isScalarValue(_pair.value))
             prev.value.value = _pair.value;
           else
             prev.value = _pair.value;
@@ -2870,7 +2870,7 @@ var require_YAMLMap = __commonJS({
         });
       }
     };
-    exports.YAMLMap = YAMLMap;
+    exports.YAMLMap = YAMLMap2;
     exports.findPair = findPair;
   }
 });
@@ -2880,18 +2880,18 @@ var require_map = __commonJS({
   "../../node_modules/yaml/dist/schema/common/map.js"(exports) {
     "use strict";
     var identity = require_identity();
-    var YAMLMap = require_YAMLMap();
+    var YAMLMap2 = require_YAMLMap();
     var map = {
       collection: "map",
       default: true,
-      nodeClass: YAMLMap.YAMLMap,
+      nodeClass: YAMLMap2.YAMLMap,
       tag: "tag:yaml.org,2002:map",
       resolve(map2, onError) {
         if (!identity.isMap(map2))
           onError("Expected a mapping for this tag");
         return map2;
       },
-      createNode: (schema, obj, ctx) => YAMLMap.YAMLMap.from(schema, obj, ctx)
+      createNode: (schema, obj, ctx) => YAMLMap2.YAMLMap.from(schema, obj, ctx)
     };
     exports.map = map;
   }
@@ -2905,7 +2905,7 @@ var require_YAMLSeq = __commonJS({
     var stringifyCollection = require_stringifyCollection();
     var Collection = require_Collection();
     var identity = require_identity();
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     var toJS = require_toJS();
     var YAMLSeq = class extends Collection.Collection {
       static get tagName() {
@@ -2962,7 +2962,7 @@ var require_YAMLSeq = __commonJS({
         if (typeof idx !== "number")
           throw new Error(`Expected a valid index, not ${key}.`);
         const prev = this.items[idx];
-        if (identity.isScalar(prev) && Scalar.isScalarValue(value))
+        if (identity.isScalar(prev) && Scalar2.isScalarValue(value))
           prev.value = value;
         else
           this.items[idx] = value;
@@ -3058,14 +3058,14 @@ var require_string = __commonJS({
 var require_null = __commonJS({
   "../../node_modules/yaml/dist/schema/common/null.js"(exports) {
     "use strict";
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     var nullTag = {
       identify: (value) => value == null,
-      createNode: () => new Scalar.Scalar(null),
+      createNode: () => new Scalar2.Scalar(null),
       default: true,
       tag: "tag:yaml.org,2002:null",
       test: /^(?:~|[Nn]ull|NULL)?$/,
-      resolve: () => new Scalar.Scalar(null),
+      resolve: () => new Scalar2.Scalar(null),
       stringify: ({ source }, ctx) => typeof source === "string" && nullTag.test.test(source) ? source : ctx.options.nullStr
     };
     exports.nullTag = nullTag;
@@ -3076,13 +3076,13 @@ var require_null = __commonJS({
 var require_bool = __commonJS({
   "../../node_modules/yaml/dist/schema/core/bool.js"(exports) {
     "use strict";
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     var boolTag = {
       identify: (value) => typeof value === "boolean",
       default: true,
       tag: "tag:yaml.org,2002:bool",
       test: /^(?:[Tt]rue|TRUE|[Ff]alse|FALSE)$/,
-      resolve: (str) => new Scalar.Scalar(str[0] === "t" || str[0] === "T"),
+      resolve: (str) => new Scalar2.Scalar(str[0] === "t" || str[0] === "T"),
       stringify({ source, value }, ctx) {
         if (source && boolTag.test.test(source)) {
           const sv = source[0] === "t" || source[0] === "T";
@@ -3127,7 +3127,7 @@ var require_stringifyNumber = __commonJS({
 var require_float = __commonJS({
   "../../node_modules/yaml/dist/schema/core/float.js"(exports) {
     "use strict";
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     var stringifyNumber = require_stringifyNumber();
     var floatNaN = {
       identify: (value) => typeof value === "number",
@@ -3155,7 +3155,7 @@ var require_float = __commonJS({
       tag: "tag:yaml.org,2002:float",
       test: /^[-+]?(?:\.[0-9]+|[0-9]+\.[0-9]*)$/,
       resolve(str) {
-        const node = new Scalar.Scalar(parseFloat(str));
+        const node = new Scalar2.Scalar(parseFloat(str));
         const dot = str.indexOf(".");
         if (dot !== -1 && str[str.length - 1] === "0")
           node.minFractionDigits = str.length - dot - 1;
@@ -3246,7 +3246,7 @@ var require_schema = __commonJS({
 var require_schema2 = __commonJS({
   "../../node_modules/yaml/dist/schema/json/schema.js"(exports) {
     "use strict";
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     var map = require_map();
     var seq = require_seq();
     function intIdentify(value) {
@@ -3263,7 +3263,7 @@ var require_schema2 = __commonJS({
       },
       {
         identify: (value) => value == null,
-        createNode: () => new Scalar.Scalar(null),
+        createNode: () => new Scalar2.Scalar(null),
         default: true,
         tag: "tag:yaml.org,2002:null",
         test: /^null$/,
@@ -3314,7 +3314,7 @@ var require_binary = __commonJS({
   "../../node_modules/yaml/dist/schema/yaml-1.1/binary.js"(exports) {
     "use strict";
     var node_buffer = __require("buffer");
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     var stringifyString = require_stringifyString();
     var binary = {
       identify: (value) => value instanceof Uint8Array,
@@ -3358,15 +3358,15 @@ var require_binary = __commonJS({
         } else {
           throw new Error("This environment does not support writing binary tags; either Buffer or btoa is required");
         }
-        type ?? (type = Scalar.Scalar.BLOCK_LITERAL);
-        if (type !== Scalar.Scalar.QUOTE_DOUBLE) {
+        type ?? (type = Scalar2.Scalar.BLOCK_LITERAL);
+        if (type !== Scalar2.Scalar.QUOTE_DOUBLE) {
           const lineWidth = Math.max(ctx.options.lineWidth - ctx.indent.length, ctx.options.minContentWidth);
           const n = Math.ceil(str.length / lineWidth);
           const lines = new Array(n);
           for (let i = 0, o = 0; i < n; ++i, o += lineWidth) {
             lines[i] = str.substr(o, lineWidth);
           }
-          str = lines.join(type === Scalar.Scalar.BLOCK_LITERAL ? "\n" : " ");
+          str = lines.join(type === Scalar2.Scalar.BLOCK_LITERAL ? "\n" : " ");
         }
         return stringifyString.stringifyString({ comment, type, value: str }, ctx, onComment, onChompKeep);
       }
@@ -3381,7 +3381,7 @@ var require_pairs = __commonJS({
     "use strict";
     var identity = require_identity();
     var Pair = require_Pair();
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     var YAMLSeq = require_YAMLSeq();
     function resolvePairs(seq, onError) {
       if (identity.isSeq(seq)) {
@@ -3392,7 +3392,7 @@ var require_pairs = __commonJS({
           else if (identity.isMap(item)) {
             if (item.items.length > 1)
               onError("Each pair must have its own sequence indicator");
-            const pair = item.items[0] || new Pair.Pair(new Scalar.Scalar(null));
+            const pair = item.items[0] || new Pair.Pair(new Scalar2.Scalar(null));
             if (item.commentBefore)
               pair.key.commentBefore = pair.key.commentBefore ? `${item.commentBefore}
 ${pair.key.commentBefore}` : item.commentBefore;
@@ -3459,17 +3459,17 @@ var require_omap = __commonJS({
     "use strict";
     var identity = require_identity();
     var toJS = require_toJS();
-    var YAMLMap = require_YAMLMap();
+    var YAMLMap2 = require_YAMLMap();
     var YAMLSeq = require_YAMLSeq();
     var pairs = require_pairs();
     var YAMLOMap = class _YAMLOMap extends YAMLSeq.YAMLSeq {
       constructor() {
         super();
-        this.add = YAMLMap.YAMLMap.prototype.add.bind(this);
-        this.delete = YAMLMap.YAMLMap.prototype.delete.bind(this);
-        this.get = YAMLMap.YAMLMap.prototype.get.bind(this);
-        this.has = YAMLMap.YAMLMap.prototype.has.bind(this);
-        this.set = YAMLMap.YAMLMap.prototype.set.bind(this);
+        this.add = YAMLMap2.YAMLMap.prototype.add.bind(this);
+        this.delete = YAMLMap2.YAMLMap.prototype.delete.bind(this);
+        this.get = YAMLMap2.YAMLMap.prototype.get.bind(this);
+        this.has = YAMLMap2.YAMLMap.prototype.has.bind(this);
+        this.set = YAMLMap2.YAMLMap.prototype.set.bind(this);
         this.tag = _YAMLOMap.tag;
       }
       /**
@@ -3535,7 +3535,7 @@ var require_omap = __commonJS({
 var require_bool2 = __commonJS({
   "../../node_modules/yaml/dist/schema/yaml-1.1/bool.js"(exports) {
     "use strict";
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     function boolStringify({ value, source }, ctx) {
       const boolObj = value ? trueTag : falseTag;
       if (source && boolObj.test.test(source))
@@ -3547,7 +3547,7 @@ var require_bool2 = __commonJS({
       default: true,
       tag: "tag:yaml.org,2002:bool",
       test: /^(?:Y|y|[Yy]es|YES|[Tt]rue|TRUE|[Oo]n|ON)$/,
-      resolve: () => new Scalar.Scalar(true),
+      resolve: () => new Scalar2.Scalar(true),
       stringify: boolStringify
     };
     var falseTag = {
@@ -3555,7 +3555,7 @@ var require_bool2 = __commonJS({
       default: true,
       tag: "tag:yaml.org,2002:bool",
       test: /^(?:N|n|[Nn]o|NO|[Ff]alse|FALSE|[Oo]ff|OFF)$/,
-      resolve: () => new Scalar.Scalar(false),
+      resolve: () => new Scalar2.Scalar(false),
       stringify: boolStringify
     };
     exports.falseTag = falseTag;
@@ -3567,7 +3567,7 @@ var require_bool2 = __commonJS({
 var require_float2 = __commonJS({
   "../../node_modules/yaml/dist/schema/yaml-1.1/float.js"(exports) {
     "use strict";
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     var stringifyNumber = require_stringifyNumber();
     var floatNaN = {
       identify: (value) => typeof value === "number",
@@ -3595,7 +3595,7 @@ var require_float2 = __commonJS({
       tag: "tag:yaml.org,2002:float",
       test: /^[-+]?(?:[0-9][0-9_]*)?\.[0-9_]*$/,
       resolve(str) {
-        const node = new Scalar.Scalar(parseFloat(str.replace(/_/g, "")));
+        const node = new Scalar2.Scalar(parseFloat(str.replace(/_/g, "")));
         const dot = str.indexOf(".");
         if (dot !== -1) {
           const f = str.substring(dot + 1).replace(/_/g, "");
@@ -3697,8 +3697,8 @@ var require_set = __commonJS({
     "use strict";
     var identity = require_identity();
     var Pair = require_Pair();
-    var YAMLMap = require_YAMLMap();
-    var YAMLSet = class _YAMLSet extends YAMLMap.YAMLMap {
+    var YAMLMap2 = require_YAMLMap();
+    var YAMLSet = class _YAMLSet extends YAMLMap2.YAMLMap {
       constructor(schema) {
         super(schema);
         this.tag = _YAMLSet.tag;
@@ -3711,7 +3711,7 @@ var require_set = __commonJS({
           pair = new Pair.Pair(key.key, null);
         else
           pair = new Pair.Pair(key, null);
-        const prev = YAMLMap.findPair(this.items, pair.key);
+        const prev = YAMLMap2.findPair(this.items, pair.key);
         if (!prev)
           this.items.push(pair);
       }
@@ -3720,13 +3720,13 @@ var require_set = __commonJS({
        * Otherwise, returns the value of that Pair's key.
        */
       get(key, keepPair) {
-        const pair = YAMLMap.findPair(this.items, key);
+        const pair = YAMLMap2.findPair(this.items, key);
         return !keepPair && identity.isPair(pair) ? identity.isScalar(pair.key) ? pair.key.value : pair.key : pair;
       }
       set(key, value) {
         if (typeof value !== "boolean")
           throw new Error(`Expected boolean value for set(key, value) in a YAML set, not ${typeof value}`);
-        const prev = YAMLMap.findPair(this.items, key);
+        const prev = YAMLMap2.findPair(this.items, key);
         if (prev && !value) {
           this.items.splice(this.items.indexOf(prev), 1);
         } else if (!prev && value) {
@@ -4707,14 +4707,14 @@ var require_resolve_block_map = __commonJS({
   "../../node_modules/yaml/dist/compose/resolve-block-map.js"(exports) {
     "use strict";
     var Pair = require_Pair();
-    var YAMLMap = require_YAMLMap();
+    var YAMLMap2 = require_YAMLMap();
     var resolveProps = require_resolve_props();
     var utilContainsNewline = require_util_contains_newline();
     var utilFlowIndentCheck = require_util_flow_indent_check();
     var utilMapIncludes = require_util_map_includes();
     var startColMsg = "All mapping items must start at the same column";
     function resolveBlockMap({ composeNode, composeEmptyNode }, ctx, bm, onError, tag) {
-      const NodeClass = tag?.nodeClass ?? YAMLMap.YAMLMap;
+      const NodeClass = tag?.nodeClass ?? YAMLMap2.YAMLMap;
       const map = new NodeClass(ctx.schema);
       if (ctx.atRoot)
         ctx.atRoot = false;
@@ -4910,7 +4910,7 @@ var require_resolve_flow_collection = __commonJS({
     "use strict";
     var identity = require_identity();
     var Pair = require_Pair();
-    var YAMLMap = require_YAMLMap();
+    var YAMLMap2 = require_YAMLMap();
     var YAMLSeq = require_YAMLSeq();
     var resolveEnd = require_resolve_end();
     var resolveProps = require_resolve_props();
@@ -4919,9 +4919,9 @@ var require_resolve_flow_collection = __commonJS({
     var blockMsg = "Block collections are not allowed within flow collections";
     var isBlock = (token) => token && (token.type === "block-map" || token.type === "block-seq");
     function resolveFlowCollection({ composeNode, composeEmptyNode }, ctx, fc, onError, tag) {
-      const isMap = fc.start.source === "{";
-      const fcName = isMap ? "flow map" : "flow sequence";
-      const NodeClass = tag?.nodeClass ?? (isMap ? YAMLMap.YAMLMap : YAMLSeq.YAMLSeq);
+      const isMap2 = fc.start.source === "{";
+      const fcName = isMap2 ? "flow map" : "flow sequence";
+      const NodeClass = tag?.nodeClass ?? (isMap2 ? YAMLMap2.YAMLMap : YAMLSeq.YAMLSeq);
       const coll = new NodeClass(ctx.schema);
       coll.flow = true;
       const atRoot = ctx.atRoot;
@@ -4957,7 +4957,7 @@ var require_resolve_flow_collection = __commonJS({
             offset = props.end;
             continue;
           }
-          if (!isMap && ctx.options.strict && utilContainsNewline.containsNewline(key))
+          if (!isMap2 && ctx.options.strict && utilContainsNewline.containsNewline(key))
             onError(
               key,
               // checked by containsNewline()
@@ -4997,7 +4997,7 @@ var require_resolve_flow_collection = __commonJS({
             }
           }
         }
-        if (!isMap && !sep4 && !props.found) {
+        if (!isMap2 && !sep4 && !props.found) {
           const valueNode = value ? composeNode(ctx, value, props, onError) : composeEmptyNode(ctx, props.end, sep4, null, props, onError);
           coll.items.push(valueNode);
           offset = valueNode.range[2];
@@ -5020,7 +5020,7 @@ var require_resolve_flow_collection = __commonJS({
             startOnNewline: false
           });
           if (valueProps.found) {
-            if (!isMap && !props.found && ctx.options.strict) {
+            if (!isMap2 && !props.found && ctx.options.strict) {
               if (sep4)
                 for (const st of sep4) {
                   if (st === valueProps.found)
@@ -5052,13 +5052,13 @@ var require_resolve_flow_collection = __commonJS({
           const pair = new Pair.Pair(keyNode, valueNode);
           if (ctx.options.keepSourceTokens)
             pair.srcToken = collItem;
-          if (isMap) {
+          if (isMap2) {
             const map = coll;
             if (utilMapIncludes.mapIncludes(ctx, map.items, keyNode))
               onError(keyStart, "DUPLICATE_KEY", "Map keys must be unique");
             map.items.push(pair);
           } else {
-            const map = new YAMLMap.YAMLMap(ctx.schema);
+            const map = new YAMLMap2.YAMLMap(ctx.schema);
             map.flow = true;
             map.items.push(pair);
             const endRange = (valueNode ?? keyNode).range;
@@ -5068,7 +5068,7 @@ var require_resolve_flow_collection = __commonJS({
           offset = valueNode ? valueNode.range[2] : valueProps.end;
         }
       }
-      const expectedEnd = isMap ? "}" : "]";
+      const expectedEnd = isMap2 ? "}" : "]";
       const [ce, ...ee] = fc.end;
       let cePos = offset;
       if (ce?.source === expectedEnd)
@@ -5103,8 +5103,8 @@ var require_compose_collection = __commonJS({
   "../../node_modules/yaml/dist/compose/compose-collection.js"(exports) {
     "use strict";
     var identity = require_identity();
-    var Scalar = require_Scalar();
-    var YAMLMap = require_YAMLMap();
+    var Scalar2 = require_Scalar();
+    var YAMLMap2 = require_YAMLMap();
     var YAMLSeq = require_YAMLSeq();
     var resolveBlockMap = require_resolve_block_map();
     var resolveBlockSeq = require_resolve_block_seq();
@@ -5132,7 +5132,7 @@ var require_compose_collection = __commonJS({
         }
       }
       const expType = token.type === "block-map" ? "map" : token.type === "block-seq" ? "seq" : token.start.source === "{" ? "map" : "seq";
-      if (!tagToken || !tagName || tagName === "!" || tagName === YAMLMap.YAMLMap.tagName && expType === "map" || tagName === YAMLSeq.YAMLSeq.tagName && expType === "seq") {
+      if (!tagToken || !tagName || tagName === "!" || tagName === YAMLMap2.YAMLMap.tagName && expType === "map" || tagName === YAMLSeq.YAMLSeq.tagName && expType === "seq") {
         return resolveCollection(CN, ctx, token, onError, tagName);
       }
       let tag = ctx.schema.tags.find((t) => t.tag === tagName && t.collection === expType);
@@ -5152,7 +5152,7 @@ var require_compose_collection = __commonJS({
       }
       const coll = resolveCollection(CN, ctx, token, onError, tagName, tag);
       const res = tag.resolve?.(coll, (msg) => onError(tagToken, "TAG_RESOLVE_FAILED", msg), ctx.options) ?? coll;
-      const node = identity.isNode(res) ? res : new Scalar.Scalar(res);
+      const node = identity.isNode(res) ? res : new Scalar2.Scalar(res);
       node.range = coll.range;
       node.tag = tagName;
       if (tag?.format)
@@ -5167,13 +5167,13 @@ var require_compose_collection = __commonJS({
 var require_resolve_block_scalar = __commonJS({
   "../../node_modules/yaml/dist/compose/resolve-block-scalar.js"(exports) {
     "use strict";
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     function resolveBlockScalar(ctx, scalar, onError) {
       const start = scalar.offset;
       const header = parseBlockScalarHeader(scalar, ctx.options.strict, onError);
       if (!header)
         return { value: "", type: null, comment: "", range: [start, start, start] };
-      const type = header.mode === ">" ? Scalar.Scalar.BLOCK_FOLDED : Scalar.Scalar.BLOCK_LITERAL;
+      const type = header.mode === ">" ? Scalar2.Scalar.BLOCK_FOLDED : Scalar2.Scalar.BLOCK_LITERAL;
       const lines = scalar.source ? splitLines(scalar.source) : [];
       let chompStart = lines.length;
       for (let i = lines.length - 1; i >= 0; --i) {
@@ -5235,7 +5235,7 @@ var require_resolve_block_scalar = __commonJS({
           onError(offset - content.length - (crlf ? 2 : 1), "BAD_INDENT", message);
           indent = "";
         }
-        if (type === Scalar.Scalar.BLOCK_LITERAL) {
+        if (type === Scalar2.Scalar.BLOCK_LITERAL) {
           value += sep4 + indent.slice(trimIndent) + content;
           sep4 = "\n";
         } else if (indent.length > trimIndent || content[0] === "	") {
@@ -5350,7 +5350,7 @@ var require_resolve_block_scalar = __commonJS({
 var require_resolve_flow_scalar = __commonJS({
   "../../node_modules/yaml/dist/compose/resolve-flow-scalar.js"(exports) {
     "use strict";
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     var resolveEnd = require_resolve_end();
     function resolveFlowScalar(scalar, strict, onError) {
       const { offset, type, source, end } = scalar;
@@ -5359,15 +5359,15 @@ var require_resolve_flow_scalar = __commonJS({
       const _onError = (rel, code, msg) => onError(offset + rel, code, msg);
       switch (type) {
         case "scalar":
-          _type = Scalar.Scalar.PLAIN;
+          _type = Scalar2.Scalar.PLAIN;
           value = plainValue(source, _onError);
           break;
         case "single-quoted-scalar":
-          _type = Scalar.Scalar.QUOTE_SINGLE;
+          _type = Scalar2.Scalar.QUOTE_SINGLE;
           value = singleQuotedValue(source, _onError);
           break;
         case "double-quoted-scalar":
-          _type = Scalar.Scalar.QUOTE_DOUBLE;
+          _type = Scalar2.Scalar.QUOTE_DOUBLE;
           value = doubleQuotedValue(source, _onError);
           break;
         /* istanbul ignore next should not happen */
@@ -5570,7 +5570,7 @@ var require_compose_scalar = __commonJS({
   "../../node_modules/yaml/dist/compose/compose-scalar.js"(exports) {
     "use strict";
     var identity = require_identity();
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     var resolveBlockScalar = require_resolve_block_scalar();
     var resolveFlowScalar = require_resolve_flow_scalar();
     function composeScalar(ctx, token, tagToken, onError) {
@@ -5588,11 +5588,11 @@ var require_compose_scalar = __commonJS({
       let scalar;
       try {
         const res = tag.resolve(value, (msg) => onError(tagToken ?? token, "TAG_RESOLVE_FAILED", msg), ctx.options);
-        scalar = identity.isScalar(res) ? res : new Scalar.Scalar(res);
+        scalar = identity.isScalar(res) ? res : new Scalar2.Scalar(res);
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
         onError(tagToken ?? token, "TAG_RESOLVE_FAILED", msg);
-        scalar = new Scalar.Scalar(value);
+        scalar = new Scalar2.Scalar(value);
       }
       scalar.range = range;
       scalar.source = value;
@@ -6351,7 +6351,7 @@ var require_cst = __commonJS({
     var FLOW_END = "";
     var SCALAR = "";
     var isCollection = (token) => !!token && "items" in token;
-    var isScalar = (token) => !!token && (token.type === "scalar" || token.type === "single-quoted-scalar" || token.type === "double-quoted-scalar" || token.type === "block-scalar");
+    var isScalar2 = (token) => !!token && (token.type === "scalar" || token.type === "single-quoted-scalar" || token.type === "double-quoted-scalar" || token.type === "block-scalar");
     function prettyToken(token) {
       switch (token) {
         case BOM:
@@ -6435,7 +6435,7 @@ var require_cst = __commonJS({
     exports.FLOW_END = FLOW_END;
     exports.SCALAR = SCALAR;
     exports.isCollection = isCollection;
-    exports.isScalar = isScalar;
+    exports.isScalar = isScalar2;
     exports.prettyToken = prettyToken;
     exports.tokenType = tokenType;
   }
@@ -7948,7 +7948,7 @@ var require_public_api = __commonJS({
         return docs;
       return Object.assign([], { empty: true }, composer$1.streamInfo());
     }
-    function parseDocument(source, options = {}) {
+    function parseDocument2(source, options = {}) {
       const { lineCounter: lineCounter2, prettyErrors } = parseOptions(options);
       const parser$1 = new parser.Parser(lineCounter2?.addNewLine);
       const composer$1 = new composer.Composer(options);
@@ -7974,7 +7974,7 @@ var require_public_api = __commonJS({
       } else if (options === void 0 && reviver && typeof reviver === "object") {
         options = reviver;
       }
-      const doc = parseDocument(src, options);
+      const doc = parseDocument2(src, options);
       if (!doc)
         return null;
       doc.warnings.forEach((warning) => log.warn(doc.options.logLevel, warning));
@@ -8010,7 +8010,7 @@ var require_public_api = __commonJS({
     }
     exports.parse = parse;
     exports.parseAllDocuments = parseAllDocuments;
-    exports.parseDocument = parseDocument;
+    exports.parseDocument = parseDocument2;
     exports.stringify = stringify;
   }
 });
@@ -8026,8 +8026,8 @@ var require_dist = __commonJS({
     var Alias = require_Alias();
     var identity = require_identity();
     var Pair = require_Pair();
-    var Scalar = require_Scalar();
-    var YAMLMap = require_YAMLMap();
+    var Scalar2 = require_Scalar();
+    var YAMLMap2 = require_YAMLMap();
     var YAMLSeq = require_YAMLSeq();
     var cst = require_cst();
     var lexer = require_lexer();
@@ -8051,8 +8051,8 @@ var require_dist = __commonJS({
     exports.isScalar = identity.isScalar;
     exports.isSeq = identity.isSeq;
     exports.Pair = Pair.Pair;
-    exports.Scalar = Scalar.Scalar;
-    exports.YAMLMap = YAMLMap.YAMLMap;
+    exports.Scalar = Scalar2.Scalar;
+    exports.YAMLMap = YAMLMap2.YAMLMap;
     exports.YAMLSeq = YAMLSeq.YAMLSeq;
     exports.CST = cst;
     exports.Lexer = lexer.Lexer;
@@ -8090,24 +8090,134 @@ function parseFrontmatter(markdown) {
       `Invalid frontmatter: expected a YAML mapping at the top level, got ${typeof data}.`
     );
   }
-  return { data, body };
+  return { data: toFrontmatterData(data), body };
 }
 function stringifyFrontmatter(data, body) {
-  const yaml = (0, import_yaml.stringify)(data, { lineWidth: 0 }).replace(/\n$/, "");
+  const doc = buildDocument(data);
   return `---
-${yaml}
+${doc.toString({ lineWidth: 0 }).replace(/\n$/, "")}
 ---
 ${body}`;
 }
 function updateFrontmatter(markdown, patch) {
-  const { data, body } = parseFrontmatter(markdown);
-  return stringifyFrontmatter({ ...data, ...patch }, body);
+  const match = markdown.match(FRONTMATTER_RE);
+  if (!match) {
+    return stringifyFrontmatter(patch, markdown);
+  }
+  const [, yamlContent, body] = match;
+  const doc = (0, import_yaml.parseDocument)(yamlContent, { keepSourceTokens: false });
+  if (doc.errors.length > 0) {
+    const first = doc.errors[0];
+    throw new Error(`Invalid YAML frontmatter: ${first.message}`);
+  }
+  applyPatchToDocument(doc, patch);
+  const yamlOut = doc.toString({ lineWidth: 0 }).replace(/\n$/, "");
+  return `---
+${yamlOut}
+---
+${body}`;
+}
+function removeFrontmatterPaths(markdown, paths, options = {}) {
+  const match = markdown.match(FRONTMATTER_RE);
+  if (!match) return markdown;
+  const [, yamlContent, body] = match;
+  const doc = (0, import_yaml.parseDocument)(yamlContent);
+  if (doc.errors.length > 0) {
+    const first = doc.errors[0];
+    throw new Error(`Invalid YAML frontmatter: ${first.message}`);
+  }
+  const prune = options.pruneEmptyParents ?? true;
+  let mutated = false;
+  for (const path of paths) {
+    if (path.length === 0) continue;
+    if (!doc.hasIn(path)) continue;
+    doc.deleteIn(path);
+    mutated = true;
+    if (prune && path.length > 1) {
+      for (let depth = path.length - 1; depth >= 1; depth--) {
+        const parentPath = path.slice(0, depth);
+        const parent = doc.getIn(parentPath, true);
+        if ((0, import_yaml.isMap)(parent) && parent.items.length === 0) {
+          doc.deleteIn(parentPath);
+        } else {
+          break;
+        }
+      }
+    }
+  }
+  if (!mutated) return markdown;
+  const yamlOut = doc.toString({ lineWidth: 0 }).replace(/\n$/, "");
+  return `---
+${yamlOut}
+---
+${body}`;
 }
 function readFrontmatter(path) {
   return parseFrontmatter(readFileSync3(path, "utf-8"));
 }
 function writeFrontmatter(path, data, body) {
   writeFileSync2(path, stringifyFrontmatter(data, body), "utf-8");
+}
+function applyPatchToDocument(doc, patch) {
+  if (doc.contents !== null && !(0, import_yaml.isMap)(doc.contents)) {
+    throw new Error(
+      "Cannot patch frontmatter: top-level YAML node is not a mapping."
+    );
+  }
+  for (const [key, value] of Object.entries(patch)) {
+    if (isPlainObject(value)) {
+      mergeNestedObject(doc, [key], value);
+      continue;
+    }
+    if ((0, import_yaml.isMap)(doc.contents)) {
+      setScalarPreservingStyle(doc.contents, key, value);
+    } else {
+      doc.set(key, value);
+    }
+  }
+}
+function setScalarPreservingStyle(map, key, value) {
+  const existing = map.get(key, true);
+  if ((0, import_yaml.isScalar)(existing)) {
+    const next = new import_yaml.Scalar(value);
+    if (existing.type !== void 0) next.type = existing.type;
+    map.set(key, next);
+    return;
+  }
+  map.set(key, value);
+}
+function mergeNestedObject(doc, path, value) {
+  for (let depth = 1; depth <= path.length; depth++) {
+    const prefix = path.slice(0, depth);
+    if (!doc.hasIn(prefix)) {
+      doc.setIn(prefix, new import_yaml.YAMLMap(doc.schema));
+    }
+  }
+  for (const [k, v] of Object.entries(value)) {
+    const fullPath = [...path, k];
+    if (isPlainObject(v)) {
+      mergeNestedObject(doc, fullPath, v);
+      continue;
+    }
+    doc.setIn(fullPath, v);
+  }
+}
+function isPlainObject(value) {
+  if (value === null || typeof value !== "object") return false;
+  if (Array.isArray(value)) return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+function buildDocument(data) {
+  const initialYaml = (0, import_yaml.stringify)(data, { lineWidth: 0 });
+  return (0, import_yaml.parseDocument)(initialYaml);
+}
+function toFrontmatterData(value) {
+  const out = {};
+  for (const k of Object.keys(value)) {
+    out[k] = value[k];
+  }
+  return out;
 }
 var import_yaml, FRONTMATTER_RE;
 var init_frontmatter = __esm({
@@ -8173,25 +8283,35 @@ function readIdFromFrontmatter(absPath) {
     const reason = err2 instanceof Error ? err2.message : String(err2);
     return { kind: "invalid", reason: `unreadable frontmatter: ${reason}` };
   }
-  const raw = parsed.data.id;
+  const deskworkBlock = parsed.data.deskwork;
+  if (deskworkBlock === void 0 || deskworkBlock === null) {
+    return { kind: "absent" };
+  }
+  if (typeof deskworkBlock !== "object" || Array.isArray(deskworkBlock)) {
+    return {
+      kind: "invalid",
+      reason: `frontmatter deskwork is ${typeof deskworkBlock}, expected mapping`
+    };
+  }
+  const raw = deskworkBlock.id;
   if (raw === void 0) return { kind: "absent" };
   if (typeof raw !== "string") {
     return {
       kind: "invalid",
-      reason: `frontmatter id is ${typeof raw}, expected string`
+      reason: `frontmatter deskwork.id is ${typeof raw}, expected string`
     };
   }
   const trimmed = raw.trim();
   if (trimmed === "") {
     return {
       kind: "invalid",
-      reason: "frontmatter id is empty"
+      reason: "frontmatter deskwork.id is empty"
     };
   }
   if (!isUuid(trimmed)) {
     return {
       kind: "invalid",
-      reason: `frontmatter id "${trimmed}" is not a valid UUID`
+      reason: `frontmatter deskwork.id "${trimmed}" is not a valid UUID`
     };
   }
   return { kind: "valid", id: trimmed };
@@ -9002,8 +9122,8 @@ function findCandidatesForEntry(projectRoot, config, site, entry) {
     if (seen.has(abs)) return;
     try {
       const parsed = readFrontmatter(abs);
-      const existingId = parsed.data.id;
-      if (typeof existingId === "string" && existingId.trim() !== "") {
+      const existingId = readDeskworkId(parsed.data);
+      if (existingId !== void 0) {
         return;
       }
     } catch {
@@ -9042,9 +9162,18 @@ function findCandidatesForEntry(projectRoot, config, site, entry) {
 }
 function bindFrontmatterId(absPath, entryId) {
   const raw = readFileSync5(absPath, "utf-8");
-  const updated = updateFrontmatter(raw, { id: entryId });
+  const updated = updateFrontmatter(raw, { deskwork: { id: entryId } });
   if (updated === raw) return;
   writeFileSync4(absPath, updated, "utf-8");
+}
+function readDeskworkId(data) {
+  const block = data.deskwork;
+  if (block === void 0 || block === null) return void 0;
+  if (typeof block !== "object" || Array.isArray(block)) return void 0;
+  const id = block.id;
+  if (typeof id !== "string") return void 0;
+  const trimmed = id.trim();
+  return trimmed === "" ? void 0 : trimmed;
 }
 var RULE_ID, MARKDOWN_EXTENSIONS2, SKIP_DIRS2, rule, missing_frontmatter_id_default;
 var init_missing_frontmatter_id = __esm({
@@ -9168,12 +9297,15 @@ import { readFileSync as readFileSync6, writeFileSync as writeFileSync5 } from "
 import { relative as relative3 } from "node:path";
 function clearFrontmatterId(absPath) {
   const raw = readFileSync6(absPath, "utf-8");
-  const { data, body } = parseFrontmatter(raw);
-  if (!("id" in data)) return false;
-  const next = { ...data };
-  delete next.id;
-  const rendered = stringifyFrontmatter(next, body);
-  writeFileSync5(absPath, rendered, "utf-8");
+  const { data } = parseFrontmatter(raw);
+  const block = data.deskwork;
+  if (block === void 0 || block === null) return false;
+  if (typeof block !== "object" || Array.isArray(block)) return false;
+  const blockObj = block;
+  if (!("id" in blockObj)) return false;
+  const updated = removeFrontmatterPaths(raw, [["deskwork", "id"]]);
+  if (updated === raw) return false;
+  writeFileSync5(absPath, updated, "utf-8");
   return true;
 }
 var RULE_ID2, rule2, orphan_frontmatter_id_default;
@@ -9289,11 +9421,15 @@ import { readFileSync as readFileSync7, writeFileSync as writeFileSync6 } from "
 import { join as join7, relative as relative4 } from "node:path";
 function clearFrontmatterId2(absPath) {
   const raw = readFileSync7(absPath, "utf-8");
-  const { data, body } = parseFrontmatter(raw);
-  if (!("id" in data)) return false;
-  const next = { ...data };
-  delete next.id;
-  writeFileSync6(absPath, stringifyFrontmatter(next, body), "utf-8");
+  const { data } = parseFrontmatter(raw);
+  const block = data.deskwork;
+  if (block === void 0 || block === null) return false;
+  if (typeof block !== "object" || Array.isArray(block)) return false;
+  const blockObj = block;
+  if (!("id" in blockObj)) return false;
+  const updated = removeFrontmatterPaths(raw, [["deskwork", "id"]]);
+  if (updated === raw) return false;
+  writeFileSync6(absPath, updated, "utf-8");
   return true;
 }
 function findDuplicateGroups(ctx) {
@@ -9466,17 +9602,21 @@ var TEMPLATE;
 var init_schema_patch = __esm({
   "../core/src/doctor/schema-patch.ts"() {
     "use strict";
-    TEMPLATE = `# Host content schema must permit \`id\` in frontmatter
+    TEMPLATE = `# Host content schema must permit the \`deskwork\` namespace in frontmatter
 
-Deskwork binds calendar entries to markdown files via a frontmatter \`id:\`
-field (UUID v4). For Astro projects with strict content collection
-schemas, this means the site's \`src/content/config.ts\` must allow
-\`id\` to pass through.
+Deskwork binds calendar entries to markdown files via a UUID written
+under a \`deskwork:\` mapping in frontmatter (\`deskwork.id\`, UUID v4).
+For Astro projects with strict content collection schemas, this means
+the site's \`src/content/config.ts\` must allow the namespace to pass
+through.
+
+Note: top-level \`id:\` is NOT what to add \u2014 that field belongs to the
+operator's keyspace. Deskwork no longer claims it.
 
 Pick one of the following patches and apply it to your collection
 schema. Re-run the failing command after the patch.
 
-## Option 1 \u2014 explicit \`id\` field (recommended)
+## Option 1 \u2014 explicit \`deskwork\` namespace (recommended)
 
 \`\`\`ts
 import { defineCollection, z } from 'astro:content';
@@ -9484,7 +9624,7 @@ import { defineCollection, z } from 'astro:content';
 const blog = defineCollection({
   type: 'content',
   schema: z.object({
-    id: z.string().uuid().optional(),
+    deskwork: z.object({ id: z.string().uuid() }).passthrough().optional(),
     title: z.string(),
     description: z.string().optional(),
     // ...your existing fields
@@ -9494,10 +9634,14 @@ const blog = defineCollection({
 export const collections = { blog };
 \`\`\`
 
-The field is optional so legacy files without \`id\` keep validating;
-deskwork sets it on every new scaffold and via \`deskwork doctor --fix=missing-frontmatter-id\`.
+The \`deskwork\` block is optional so legacy files without it keep
+validating; deskwork sets it on every new scaffold and via
+\`deskwork doctor --fix=missing-frontmatter-id\` /
+\`--fix=legacy-top-level-id-migration\`. The inner \`.passthrough()\`
+leaves room for additional deskwork-scoped fields without forcing a
+schema change every release.
 
-## Option 2 \u2014 passthrough unknown keys
+## Option 2 \u2014 passthrough unknown keys at the top level
 
 \`\`\`ts
 const blog = defineCollection({
@@ -9509,13 +9653,16 @@ const blog = defineCollection({
 });
 \`\`\`
 
-Less precise but a smaller diff. Use this when the schema is wide and
-you don't want to enumerate every deskwork-internal field.
+Less precise but a smaller diff. Top-level \`.passthrough()\` accepts
+any extra keys \u2014 including the entire \`deskwork:\` namespace \u2014 without
+complaint. Use this when the schema is wide and you don't want to
+enumerate every deskwork-internal field.
 
 ## Hugo / Jekyll / Eleventy / plain markdown
 
-These engines don't validate frontmatter against a schema; \`id\`
-already passes through untouched. No patch needed.
+These engines don't validate frontmatter against a schema; the
+\`deskwork:\` mapping already passes through untouched. No patch
+needed.
 
 After patching, re-run the original deskwork command. The
 \`schema-rejected\` rule's findings will clear on the next
@@ -9814,6 +9961,186 @@ var init_calendar_uuid_missing = __esm({
   }
 });
 
+// ../core/src/doctor/rules/legacy-top-level-id-migration.ts
+import { readFileSync as readFileSync9, readdirSync as readdirSync5, statSync as statSync3, writeFileSync as writeFileSync7 } from "node:fs";
+import { extname as extname2, join as join9, relative as relative5 } from "node:path";
+function shouldSkipDir3(name) {
+  if (name.startsWith(".")) return true;
+  return SKIP_DIRS3.has(name.toLowerCase());
+}
+function collectMarkdownFiles3(dir) {
+  const out = [];
+  visit(dir);
+  out.sort();
+  return out;
+  function visit(currentDir) {
+    let names;
+    try {
+      names = readdirSync5(currentDir);
+    } catch {
+      return;
+    }
+    for (const name of names) {
+      const abs = join9(currentDir, name);
+      let st;
+      try {
+        st = statSync3(abs);
+      } catch {
+        continue;
+      }
+      if (st.isDirectory()) {
+        if (shouldSkipDir3(name)) continue;
+        visit(abs);
+        continue;
+      }
+      if (!st.isFile()) continue;
+      if (MARKDOWN_EXTENSIONS3.has(extname2(name).toLowerCase())) {
+        out.push(abs);
+      }
+    }
+  }
+}
+function classify(absPath, calendarIds) {
+  let parsed;
+  try {
+    parsed = parseFrontmatter(readFileSync9(absPath, "utf-8"));
+  } catch {
+    return null;
+  }
+  const topLevelId = parsed.data.id;
+  if (typeof topLevelId !== "string") return null;
+  const trimmed = topLevelId.trim();
+  if (trimmed === "" || !UUID_RE2.test(trimmed)) return null;
+  if (!calendarIds.has(trimmed)) return null;
+  const block = parsed.data.deskwork;
+  if (block !== void 0 && block !== null) {
+    if (typeof block === "object" && !Array.isArray(block)) {
+      const nestedId = block.id;
+      if (typeof nestedId === "string" && nestedId.trim() !== "") {
+        return null;
+      }
+    }
+  }
+  return { absolutePath: absPath, legacyId: trimmed };
+}
+function migrateLegacyTopLevelId(absPath, legacyId) {
+  const raw = readFileSync9(absPath, "utf-8");
+  const withDeskwork = updateFrontmatter(raw, { deskwork: { id: legacyId } });
+  const withoutTopLevel = removeFrontmatterPaths(withDeskwork, [["id"]]);
+  if (withoutTopLevel === raw) return;
+  writeFileSync7(absPath, withoutTopLevel, "utf-8");
+}
+var RULE_ID8, MARKDOWN_EXTENSIONS3, SKIP_DIRS3, UUID_RE2, rule8, legacy_top_level_id_migration_default;
+var init_legacy_top_level_id_migration = __esm({
+  "../core/src/doctor/rules/legacy-top-level-id-migration.ts"() {
+    "use strict";
+    init_paths();
+    init_frontmatter();
+    RULE_ID8 = "legacy-top-level-id-migration";
+    MARKDOWN_EXTENSIONS3 = /* @__PURE__ */ new Set([
+      ".md",
+      ".mdx",
+      ".markdown"
+    ]);
+    SKIP_DIRS3 = /* @__PURE__ */ new Set([
+      "scrapbook",
+      "node_modules",
+      "dist",
+      ".git"
+    ]);
+    UUID_RE2 = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    rule8 = {
+      id: RULE_ID8,
+      label: "Frontmatter id at top level should be under `deskwork:` namespace",
+      async audit(ctx) {
+        const contentDir = resolveContentDir(
+          ctx.projectRoot,
+          ctx.config,
+          ctx.site
+        );
+        const calendarIds = /* @__PURE__ */ new Set();
+        for (const e of ctx.calendar.entries) {
+          if (e.id) calendarIds.add(e.id);
+        }
+        let files;
+        try {
+          files = collectMarkdownFiles3(contentDir);
+        } catch {
+          return [];
+        }
+        const findings = [];
+        for (const abs of files) {
+          const hit = classify(abs, calendarIds);
+          if (hit === null) continue;
+          findings.push({
+            ruleId: RULE_ID8,
+            site: ctx.site,
+            severity: "warning",
+            message: `File ${relative5(ctx.projectRoot, abs)} has a top-level \`id:\` that should be migrated under \`deskwork.id\``,
+            details: {
+              absolutePath: abs,
+              legacyId: hit.legacyId
+            }
+          });
+        }
+        return findings;
+      },
+      async plan(_ctx, finding) {
+        const absPath = String(finding.details.absolutePath ?? "");
+        const legacyId = String(finding.details.legacyId ?? "");
+        if (!absPath || !legacyId) {
+          return {
+            kind: "report-only",
+            finding,
+            reason: "finding missing absolutePath or legacyId \u2014 re-run audit"
+          };
+        }
+        return {
+          kind: "apply",
+          finding,
+          summary: `move top-level id ${legacyId} to deskwork.id in ${absPath}`,
+          payload: { absolutePath: absPath, legacyId }
+        };
+      },
+      async apply(ctx, plan) {
+        if (plan.kind !== "apply") {
+          return {
+            finding: plan.finding,
+            applied: false,
+            message: "plan is not directly appliable; runner should resolve prompt first"
+          };
+        }
+        const absPath = String(plan.payload.absolutePath ?? "");
+        const legacyId = String(plan.payload.legacyId ?? "");
+        if (!absPath || !legacyId) {
+          return {
+            finding: plan.finding,
+            applied: false,
+            message: "apply payload missing absolutePath or legacyId"
+          };
+        }
+        try {
+          migrateLegacyTopLevelId(absPath, legacyId);
+        } catch (err2) {
+          const reason = err2 instanceof Error ? err2.message : String(err2);
+          return {
+            finding: plan.finding,
+            applied: false,
+            message: `failed to migrate frontmatter id: ${reason}`
+          };
+        }
+        return {
+          finding: plan.finding,
+          applied: true,
+          message: `migrated id ${legacyId} from top-level to deskwork.id in ` + relative5(ctx.projectRoot, absPath),
+          details: { absolutePath: absPath, legacyId }
+        };
+      }
+    };
+    legacy_top_level_id_migration_default = rule8;
+  }
+});
+
 // ../core/src/doctor/runner.ts
 function parseFixArgument(arg) {
   const trimmed = arg.trim();
@@ -9861,13 +10188,13 @@ function selectRules(ruleIds) {
   if (ruleIds === void 0) return [...RULES];
   const out = [];
   for (const id of ruleIds) {
-    const rule8 = RULE_BY_ID.get(id);
-    if (!rule8) {
+    const rule9 = RULE_BY_ID.get(id);
+    if (!rule9) {
       throw new Error(
         `Unknown doctor rule: "${id}". Known: ${RULES.map((r) => r.id).join(", ")}, all`
       );
     }
-    out.push(rule8);
+    out.push(rule9);
   }
   return out;
 }
@@ -9877,8 +10204,8 @@ async function runAudit(opts, interaction) {
   const findings = [];
   for (const site of sites) {
     const ctx = buildContext(opts, site, interaction);
-    for (const rule8 of rules) {
-      const out = await rule8.audit(ctx);
+    for (const rule9 of rules) {
+      const out = await rule9.audit(ctx);
       findings.push(...out);
     }
   }
@@ -9891,19 +10218,19 @@ async function runRepair(opts, interaction) {
   const repairs = [];
   for (const site of sites) {
     const ctx = buildContext(opts, site, interaction);
-    for (const rule8 of rules) {
-      const ruleFindings = await rule8.audit(ctx);
+    for (const rule9 of rules) {
+      const ruleFindings = await rule9.audit(ctx);
       findings.push(...ruleFindings);
       for (const finding of ruleFindings) {
-        const plan = await rule8.plan(ctx, finding);
-        const result = await resolveAndApply(rule8, ctx, plan, interaction);
+        const plan = await rule9.plan(ctx, finding);
+        const result = await resolveAndApply(rule9, ctx, plan, interaction);
         repairs.push(result);
       }
     }
   }
   return { findings, repairs, sites };
 }
-async function resolveAndApply(rule8, ctx, plan, interaction) {
+async function resolveAndApply(rule9, ctx, plan, interaction) {
   if (plan.kind === "report-only") {
     return {
       finding: plan.finding,
@@ -9934,7 +10261,7 @@ async function resolveAndApply(rule8, ctx, plan, interaction) {
       summary: choice.label,
       payload: choice.payload
     };
-    return rule8.apply(ctx, applyPlan);
+    return rule9.apply(ctx, applyPlan);
   }
   const ok2 = await interaction.confirmApply(plan);
   if (!ok2) {
@@ -9944,7 +10271,7 @@ async function resolveAndApply(rule8, ctx, plan, interaction) {
       message: "skipped (operator declined)"
     };
   }
-  return rule8.apply(ctx, plan);
+  return rule9.apply(ctx, plan);
 }
 var RULES, RULE_BY_ID, yesInteraction;
 var init_runner = __esm({
@@ -9961,8 +10288,10 @@ var init_runner = __esm({
     init_schema_rejected();
     init_workflow_stale();
     init_calendar_uuid_missing();
+    init_legacy_top_level_id_migration();
     RULES = [
       calendar_uuid_missing_default,
+      legacy_top_level_id_migration_default,
       missing_frontmatter_id_default,
       orphan_frontmatter_id_default,
       duplicate_id_default,
@@ -10155,10 +10484,10 @@ function emitText(report, opts) {
 
 `
   );
-  for (const rule8 of RULES) {
-    const findings = byRule.get(rule8.id);
+  for (const rule9 of RULES) {
+    const findings = byRule.get(rule9.id);
     if (!findings || findings.length === 0) continue;
-    process.stdout.write(`[${rule8.id}] ${rule8.label} (${findings.length})
+    process.stdout.write(`[${rule9.id}] ${rule9.label} (${findings.length})
 `);
     for (const f of findings) {
       process.stdout.write(`  - [${f.site}] ${f.message}
@@ -10288,11 +10617,11 @@ var init_draft = __esm({
 // ../core/src/ingest-paths.ts
 import {
   existsSync as existsSync5,
-  readdirSync as readdirSync5,
-  statSync as statSync3
+  readdirSync as readdirSync6,
+  statSync as statSync4
 } from "node:fs";
-import { isAbsolute as isAbsolute2, join as join9, resolve as resolve2, sep } from "node:path";
-function collectMarkdownFiles3(paths) {
+import { isAbsolute as isAbsolute2, join as join10, resolve as resolve2, sep } from "node:path";
+function collectMarkdownFiles4(paths) {
   const seen = /* @__PURE__ */ new Map();
   for (const p of paths) {
     for (const file of expandPath(p)) {
@@ -10313,11 +10642,11 @@ function expandPath(input) {
   if (!existsSync5(absolute)) {
     throw new Error(`Path does not exist: ${input}`);
   }
-  const stat = statSync3(absolute);
+  const stat = statSync4(absolute);
   if (stat.isFile()) {
     if (!hasMarkdownExtension(absolute)) {
       throw new Error(
-        `Path is not a markdown file: ${input} (expected one of ${MARKDOWN_EXTENSIONS3.join(", ")})`
+        `Path is not a markdown file: ${input} (expected one of ${MARKDOWN_EXTENSIONS4.join(", ")})`
       );
     }
     return [{ filePath: absolute, root: dirnameOf(absolute) }];
@@ -10334,9 +10663,9 @@ function dirnameOf(filePath) {
 }
 function walkDirectory(dir, root) {
   const out = [];
-  const entries = readdirSync5(dir, { withFileTypes: true });
+  const entries = readdirSync6(dir, { withFileTypes: true });
   for (const entry of entries) {
-    const child = join9(dir, entry.name);
+    const child = join10(dir, entry.name);
     if (entry.isDirectory()) {
       out.push(...walkDirectory(child, root));
     } else if (entry.isFile() && hasMarkdownExtension(entry.name)) {
@@ -10364,7 +10693,7 @@ function expandGlob(absolutePattern) {
 }
 function matchPattern(currentDir, remaining, root) {
   if (remaining.length === 0) {
-    if (statSync3(currentDir).isFile() && hasMarkdownExtension(currentDir)) {
+    if (statSync4(currentDir).isFile() && hasMarkdownExtension(currentDir)) {
       return [{ filePath: currentDir, root }];
     }
     return [];
@@ -10373,7 +10702,7 @@ function matchPattern(currentDir, remaining, root) {
   const out = [];
   let entries;
   try {
-    entries = readdirSync5(currentDir, { withFileTypes: true });
+    entries = readdirSync6(currentDir, { withFileTypes: true });
   } catch {
     return out;
   }
@@ -10382,7 +10711,7 @@ function matchPattern(currentDir, remaining, root) {
     for (const entry of entries) {
       if (entry.isDirectory()) {
         out.push(
-          ...matchPattern(join9(currentDir, entry.name), remaining, root)
+          ...matchPattern(join10(currentDir, entry.name), remaining, root)
         );
       }
     }
@@ -10391,7 +10720,7 @@ function matchPattern(currentDir, remaining, root) {
   const matcher = globSegmentMatcher(head);
   for (const entry of entries) {
     if (!matcher(entry.name)) continue;
-    const child = join9(currentDir, entry.name);
+    const child = join10(currentDir, entry.name);
     if (rest.length === 0) {
       if (entry.isFile() && hasMarkdownExtension(entry.name)) {
         out.push({ filePath: child, root });
@@ -10425,19 +10754,19 @@ function globSegmentMatcher(pattern) {
 }
 function hasMarkdownExtension(filename) {
   const lower = filename.toLowerCase();
-  return MARKDOWN_EXTENSIONS3.some((ext) => lower.endsWith(ext));
+  return MARKDOWN_EXTENSIONS4.some((ext) => lower.endsWith(ext));
 }
-var MARKDOWN_EXTENSIONS3;
+var MARKDOWN_EXTENSIONS4;
 var init_ingest_paths = __esm({
   "../core/src/ingest-paths.ts"() {
     "use strict";
-    MARKDOWN_EXTENSIONS3 = [".md", ".mdx", ".markdown"];
+    MARKDOWN_EXTENSIONS4 = [".md", ".mdx", ".markdown"];
   }
 });
 
 // ../core/src/ingest-derive.ts
-import { readdirSync as readdirSync6, statSync as statSync4 } from "node:fs";
-import { join as join10, relative as relative5, sep as sep2 } from "node:path";
+import { readdirSync as readdirSync7, statSync as statSync5 } from "node:fs";
+import { join as join11, relative as relative6, sep as sep2 } from "node:path";
 function deriveSlug(input) {
   if (input.explicitSlug !== void 0) {
     return { value: input.explicitSlug, source: "explicit" };
@@ -10451,7 +10780,7 @@ function deriveSlug(input) {
   return slugFromPath(input.filePath, input.root);
 }
 function slugFromPath(filePath, root) {
-  const rel = relative5(root, filePath);
+  const rel = relative6(root, filePath);
   const segments = rel.split(sep2).filter((s) => s.length > 0);
   if (segments.length === 0) {
     return { value: "", source: "path", reason: "file path equals root" };
@@ -10494,7 +10823,7 @@ function slugFromPath(filePath, root) {
   }
   let cursor = root;
   for (const dir of dirSegments) {
-    cursor = join10(cursor, dir);
+    cursor = join11(cursor, dir);
     if (directoryIsHierarchicalNode(cursor)) {
       prefix.push(dir);
     } else {
@@ -10506,14 +10835,14 @@ function slugFromPath(filePath, root) {
 function directoryIsHierarchicalNode(dir) {
   let entries;
   try {
-    entries = readdirSync6(dir, { withFileTypes: true });
+    entries = readdirSync7(dir, { withFileTypes: true });
   } catch {
     return false;
   }
   for (const entry of entries) {
     if (!entry.isFile()) continue;
     const lower = entry.name.toLowerCase();
-    for (const ext of MARKDOWN_EXTENSIONS3) {
+    for (const ext of MARKDOWN_EXTENSIONS4) {
       if (lower === `index${ext}` || lower === `readme${ext}`) {
         return true;
       }
@@ -10570,7 +10899,7 @@ function deriveDate(input) {
     }
   }
   try {
-    const stat = statSync4(input.filePath);
+    const stat = statSync5(input.filePath);
     return { value: stat.mtime.toISOString().slice(0, 10), source: "mtime" };
   } catch {
   }
@@ -10636,8 +10965,8 @@ var init_ingest_derive = __esm({
 });
 
 // ../core/src/ingest.ts
-import { basename as basename2, isAbsolute as isAbsolute3, relative as relative6, sep as sep3 } from "node:path";
-import { readFileSync as readFileSync9 } from "node:fs";
+import { basename as basename2, isAbsolute as isAbsolute3, relative as relative7, sep as sep3 } from "node:path";
+import { readFileSync as readFileSync10 } from "node:fs";
 function discoverIngestCandidates(paths, options) {
   if (paths.length === 0) {
     throw new Error("discoverIngestCandidates: at least one path is required");
@@ -10647,7 +10976,7 @@ function discoverIngestCandidates(paths, options) {
       `discoverIngestCandidates: projectRoot must be an absolute path (got "${options.projectRoot ?? ""}")`
     );
   }
-  const collected = collectMarkdownFiles3(paths);
+  const collected = collectMarkdownFiles4(paths);
   if (options.explicitSlug !== void 0 && collected.length !== 1) {
     throw new Error(
       `--slug requires exactly one matched file; ${collected.length} matched`
@@ -10668,7 +10997,7 @@ function discoverIngestCandidates(paths, options) {
     }
     let raw;
     try {
-      raw = readFileSync9(filePath, "utf-8");
+      raw = readFileSync10(filePath, "utf-8");
     } catch (err2) {
       skips.push({
         filePath,
@@ -10784,7 +11113,7 @@ function isReadmeBasename(filePath) {
   return lower === "readme.md" || lower === "readme.mdx" || lower === "readme.markdown";
 }
 function relativeTo(projectRoot, filePath) {
-  const rel = relative6(projectRoot, filePath);
+  const rel = relative7(projectRoot, filePath);
   return rel.length > 0 ? rel : filePath;
 }
 function isUnderScrapbook(filePath, roots) {
@@ -10821,7 +11150,7 @@ __export(ingest_exports, {
   run: () => run5
 });
 import { existsSync as existsSync6, mkdirSync as mkdirSync2 } from "node:fs";
-import { isAbsolute as isAbsolute4, join as join11, resolve as resolve3 } from "node:path";
+import { isAbsolute as isAbsolute4, join as join12, resolve as resolve3 } from "node:path";
 import { randomUUID as randomUUID4 } from "node:crypto";
 async function run5(argv2) {
   const { positional, flags, booleans } = parseInput2(argv2);
@@ -10850,7 +11179,7 @@ async function run5(argv2) {
     (p) => isAbsolute4(p) ? p : resolve3(projectRoot, p)
   );
   const contentDir = resolveContentDir(projectRoot, config, site);
-  const scrapbookRoots = [join11(contentDir, "scrapbook")];
+  const scrapbookRoots = [join12(contentDir, "scrapbook")];
   let discovery;
   try {
     discovery = discoverIngestCandidates(absolutePaths, {
@@ -11001,7 +11330,7 @@ function pad(s, n) {
   return s + " ".repeat(n - s.length);
 }
 function writeIngestJournalEntry(projectRoot, config, site, candidate, entry) {
-  const journalRoot = join11(
+  const journalRoot = join12(
     projectRoot,
     config.reviewJournalDir ?? ".deskwork/review-journal",
     "ingest"
@@ -11061,8 +11390,8 @@ var install_exports = {};
 __export(install_exports, {
   run: () => run6
 });
-import { readFileSync as readFileSync10, writeFileSync as writeFileSync7, existsSync as existsSync7, mkdirSync as mkdirSync3 } from "node:fs";
-import { dirname, isAbsolute as isAbsolute5, join as join12, resolve as resolve4 } from "node:path";
+import { readFileSync as readFileSync11, writeFileSync as writeFileSync8, existsSync as existsSync7, mkdirSync as mkdirSync3 } from "node:fs";
+import { dirname, isAbsolute as isAbsolute5, join as join13, resolve as resolve4 } from "node:path";
 async function run6(argv2) {
   function usage() {
     console.error(
@@ -11093,7 +11422,7 @@ async function run6(argv2) {
   }
   let rawConfig;
   try {
-    rawConfig = JSON.parse(readFileSync10(configFile, "utf-8"));
+    rawConfig = JSON.parse(readFileSync11(configFile, "utf-8"));
   } catch (err2) {
     const reason = err2 instanceof Error ? err2.message : String(err2);
     console.error(`Config file is not valid JSON: ${reason}`);
@@ -11109,7 +11438,7 @@ async function run6(argv2) {
   }
   const writtenConfigPath = configPath(projectRoot);
   mkdirSync3(dirname(writtenConfigPath), { recursive: true });
-  writeFileSync7(
+  writeFileSync8(
     writtenConfigPath,
     JSON.stringify(config, null, 2) + "\n",
     "utf-8"
@@ -11117,13 +11446,13 @@ async function run6(argv2) {
   const createdCalendars = [];
   const preservedCalendars = [];
   for (const [slug, site] of Object.entries(config.sites)) {
-    const absPath = join12(projectRoot, site.calendarPath);
+    const absPath = join13(projectRoot, site.calendarPath);
     if (existsSync7(absPath)) {
       preservedCalendars.push(`${slug}: ${site.calendarPath}`);
       continue;
     }
     mkdirSync3(dirname(absPath), { recursive: true });
-    writeFileSync7(absPath, renderEmptyCalendar(), "utf-8");
+    writeFileSync8(absPath, renderEmptyCalendar(), "utf-8");
     createdCalendars.push(`${slug}: ${site.calendarPath}`);
   }
   console.log(`Wrote config: ${writtenConfigPath}`);
@@ -11151,7 +11480,7 @@ var iterate_exports = {};
 __export(iterate_exports, {
   run: () => run7
 });
-import { existsSync as existsSync8, readFileSync as readFileSync11 } from "node:fs";
+import { existsSync as existsSync8, readFileSync as readFileSync12 } from "node:fs";
 async function run7(argv2) {
   const KNOWN_FLAGS3 = ["site", "kind", "dispositions"];
   const DISPOSITIONS = /* @__PURE__ */ new Set(["addressed", "deferred", "wontfix"]);
@@ -11179,7 +11508,7 @@ async function run7(argv2) {
   if (!existsSync8(file)) {
     fail(`No blog file at ${file}.`);
   }
-  const diskMarkdown = readFileSync11(file, "utf8");
+  const diskMarkdown = readFileSync12(file, "utf8");
   const workflow = readWorkflows(projectRoot, config).find(
     (w) => w.site === site && w.slug === slug && w.contentKind === kind && w.state !== "applied" && w.state !== "cancelled"
   );
@@ -11209,7 +11538,7 @@ The studio must click 'Request iteration' to move the workflow to 'iterating' be
     }
     let parsed;
     try {
-      parsed = JSON.parse(readFileSync11(path, "utf8"));
+      parsed = JSON.parse(readFileSync12(path, "utf8"));
     } catch (err2) {
       const reason = err2 instanceof Error ? err2.message : String(err2);
       fail(`--dispositions: invalid JSON at ${path}: ${reason}`);
@@ -11290,7 +11619,7 @@ var init_iterate = __esm({
 
 // ../core/src/scaffold.ts
 import { existsSync as existsSync9, mkdirSync as mkdirSync4 } from "node:fs";
-import { dirname as dirname2, join as join13, relative as relative7 } from "node:path";
+import { dirname as dirname2, join as join14, relative as relative8 } from "node:path";
 function scaffoldBlogPost(projectRoot, config, site, entry, opts = {}) {
   const slug = resolveSite(config, site);
   const siteCfg = config.sites[slug];
@@ -11308,7 +11637,7 @@ function scaffoldBlogPost(projectRoot, config, site, entry, opts = {}) {
     entry.slug,
     contentRelativePath
   );
-  const relativePath = relative7(projectRoot, filePath);
+  const relativePath = relative8(projectRoot, filePath);
   if (existsSync9(filePath)) {
     throw new Error(`Blog post already exists at ${relativePath}`);
   }
@@ -11319,7 +11648,7 @@ function scaffoldBlogPost(projectRoot, config, site, entry, opts = {}) {
     );
   }
   const data = {};
-  data.id = entry.id;
+  data.deskwork = { id: entry.id };
   if (siteCfg.blogLayout) data.layout = siteCfg.blogLayout;
   data.title = entry.title;
   data.description = entry.description;
@@ -11331,7 +11660,7 @@ function scaffoldBlogPost(projectRoot, config, site, entry, opts = {}) {
   const body = buildBody(entry.title, siteCfg.blogOutlineSection === true);
   mkdirSync4(dirname2(filePath), { recursive: true });
   writeFrontmatter(filePath, data, body);
-  const reported = contentRelativePath ?? relative7(join13(projectRoot, siteCfg.contentDir), filePath);
+  const reported = contentRelativePath ?? relative8(join14(projectRoot, siteCfg.contentDir), filePath);
   return { filePath, relativePath, contentRelativePath: reported };
 }
 function layoutToContentRelativePath(layout, slug) {
@@ -12089,7 +12418,7 @@ var init_review_report = __esm({
 });
 
 // ../core/src/body-state.ts
-import { existsSync as existsSync11, readFileSync as readFileSync12 } from "node:fs";
+import { existsSync as existsSync11, readFileSync as readFileSync13 } from "node:fs";
 function stripOutlineSection(body) {
   const lines = body.split("\n");
   const startIdx = lines.findIndex((line) => /^##[ \t]+Outline\b/.test(line));
@@ -12105,7 +12434,7 @@ function stripOutlineSection(body) {
 }
 function bodyState(filePath) {
   if (!existsSync11(filePath)) return "missing";
-  const content = readFileSync12(filePath, "utf8");
+  const content = readFileSync13(filePath, "utf8");
   const fmMatch = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
   const body = fmMatch ? content.slice(fmMatch[0].length) : content;
   const withoutH1 = body.replace(/^\s*#[^\n]*\n?/, "");
@@ -12129,7 +12458,7 @@ var review_start_exports = {};
 __export(review_start_exports, {
   run: () => run16
 });
-import { existsSync as existsSync12, readFileSync as readFileSync13, readdirSync as readdirSync7 } from "node:fs";
+import { existsSync as existsSync12, readFileSync as readFileSync14, readdirSync as readdirSync8 } from "node:fs";
 import { dirname as dirname3 } from "node:path";
 async function run16(argv2) {
   const KNOWN_FLAGS3 = ["site"];
@@ -12160,7 +12489,7 @@ Existing slugs on ${site}: ${list}.
 Run /deskwork:outline <slug> (or /deskwork:draft) to scaffold it first.`
     );
   }
-  const initialMarkdown = readFileSync13(file, "utf8");
+  const initialMarkdown = readFileSync14(file, "utf8");
   const body = bodyState(file);
   let entryId;
   try {
@@ -12213,7 +12542,7 @@ Run /deskwork:outline <slug> (or /deskwork:draft) to scaffold it first.`
   function listSiblingSlugs(blogFile) {
     const dir = dirname3(blogFile);
     if (!existsSync12(dir)) return [];
-    return readdirSync7(dir).filter((name) => name.endsWith(".md")).map((name) => name.replace(/\.md$/, ""));
+    return readdirSync8(dir).filter((name) => name.endsWith(".md")).map((name) => name.replace(/\.md$/, ""));
   }
 }
 var init_review_start = __esm({

@@ -397,7 +397,7 @@ describe('scrapbookDirForEntry (Phase 19c)', () => {
     const id = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
     const abs = join(root, 'src/content/projects/projects/the-outbound/index.md');
     mkdirSync(join(abs, '..'), { recursive: true });
-    writeFileSync(abs, `---\nid: ${id}\ntitle: The Outbound\n---\n`);
+    writeFileSync(abs, `---\ndeskwork:\n  id: ${id}\ntitle: The Outbound\n---\n`);
     const dir = scrapbookDirForEntry(root, cfg, 'wc', {
       id,
       slug: 'the-outbound',
@@ -437,7 +437,7 @@ describe('countScrapbookForEntry (issue #34)', () => {
     );
     const secret = join(sb, SECRET_SUBDIR);
     mkdirSync(secret, { recursive: true });
-    writeFileSync(fileAbs, `---\nid: ${id}\ntitle: The Outbound\n---\n`);
+    writeFileSync(fileAbs, `---\ndeskwork:\n  id: ${id}\ntitle: The Outbound\n---\n`);
     writeFileSync(join(sb, 'README.md'), '# notes');
     writeFileSync(join(sb, 'reference.json'), '{}');
     writeFileSync(join(secret, 'draft.md'), '# secret');

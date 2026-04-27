@@ -274,7 +274,7 @@ function seedWcBlog(
     'index.md',
   );
   mkdirSync(join(file, '..'), { recursive: true });
-  const content = `---\nid: ${entryId}\ntitle: The Outbound\n---\n\n${body}`;
+  const content = `---\ndeskwork:\n  id: ${entryId}\ntitle: The Outbound\n---\n\n${body}`;
   writeFileSync(file, content, 'utf-8');
   return file;
 }

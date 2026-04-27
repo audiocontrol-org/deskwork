@@ -196,7 +196,7 @@ describe('findEntryFile (Phase 19c)', () => {
     mkdirSync(join(abs, '..'), { recursive: true });
     writeFileSync(
       abs,
-      `---\nid: ${id}\ntitle: The Outbound\n---\n\n# The Outbound\n`,
+      `---\ndeskwork:\n  id: ${id}\ntitle: The Outbound\n---\n\n# The Outbound\n`,
     );
     expect(findEntryFile(root, cfg, 'wc', id)).toBe(abs);
   });

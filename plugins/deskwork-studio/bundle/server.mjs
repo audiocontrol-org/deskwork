@@ -50,9 +50,9 @@ var require_identity = __commonJS({
     var NODE_TYPE = /* @__PURE__ */ Symbol.for("yaml.node.type");
     var isAlias = (node2) => !!node2 && typeof node2 === "object" && node2[NODE_TYPE] === ALIAS;
     var isDocument = (node2) => !!node2 && typeof node2 === "object" && node2[NODE_TYPE] === DOC;
-    var isMap = (node2) => !!node2 && typeof node2 === "object" && node2[NODE_TYPE] === MAP2;
+    var isMap2 = (node2) => !!node2 && typeof node2 === "object" && node2[NODE_TYPE] === MAP2;
     var isPair = (node2) => !!node2 && typeof node2 === "object" && node2[NODE_TYPE] === PAIR;
-    var isScalar = (node2) => !!node2 && typeof node2 === "object" && node2[NODE_TYPE] === SCALAR;
+    var isScalar2 = (node2) => !!node2 && typeof node2 === "object" && node2[NODE_TYPE] === SCALAR;
     var isSeq = (node2) => !!node2 && typeof node2 === "object" && node2[NODE_TYPE] === SEQ;
     function isCollection(node2) {
       if (node2 && typeof node2 === "object")
@@ -74,7 +74,7 @@ var require_identity = __commonJS({
         }
       return false;
     }
-    var hasAnchor = (node2) => (isScalar(node2) || isCollection(node2)) && !!node2.anchor;
+    var hasAnchor = (node2) => (isScalar2(node2) || isCollection(node2)) && !!node2.anchor;
     exports.ALIAS = ALIAS;
     exports.DOC = DOC;
     exports.MAP = MAP2;
@@ -86,10 +86,10 @@ var require_identity = __commonJS({
     exports.isAlias = isAlias;
     exports.isCollection = isCollection;
     exports.isDocument = isDocument;
-    exports.isMap = isMap;
+    exports.isMap = isMap2;
     exports.isNode = isNode;
     exports.isPair = isPair;
-    exports.isScalar = isScalar;
+    exports.isScalar = isScalar2;
     exports.isSeq = isSeq;
   }
 });
@@ -736,7 +736,7 @@ var require_Scalar = __commonJS({
     var Node3 = require_Node();
     var toJS = require_toJS();
     var isScalarValue = (value) => !value || typeof value !== "function" && typeof value !== "object";
-    var Scalar = class extends Node3.NodeBase {
+    var Scalar2 = class extends Node3.NodeBase {
       constructor(value) {
         super(identity.SCALAR);
         this.value = value;
@@ -748,12 +748,12 @@ var require_Scalar = __commonJS({
         return String(this.value);
       }
     };
-    Scalar.BLOCK_FOLDED = "BLOCK_FOLDED";
-    Scalar.BLOCK_LITERAL = "BLOCK_LITERAL";
-    Scalar.PLAIN = "PLAIN";
-    Scalar.QUOTE_DOUBLE = "QUOTE_DOUBLE";
-    Scalar.QUOTE_SINGLE = "QUOTE_SINGLE";
-    exports.Scalar = Scalar;
+    Scalar2.BLOCK_FOLDED = "BLOCK_FOLDED";
+    Scalar2.BLOCK_LITERAL = "BLOCK_LITERAL";
+    Scalar2.PLAIN = "PLAIN";
+    Scalar2.QUOTE_DOUBLE = "QUOTE_DOUBLE";
+    Scalar2.QUOTE_SINGLE = "QUOTE_SINGLE";
+    exports.Scalar = Scalar2;
     exports.isScalarValue = isScalarValue;
   }
 });
@@ -764,7 +764,7 @@ var require_createNode = __commonJS({
     "use strict";
     var Alias = require_Alias();
     var identity = require_identity();
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     var defaultTagPrefix = "tag:yaml.org,2002:";
     function findTagObject(value, tagName, tags) {
       if (tagName) {
@@ -809,7 +809,7 @@ var require_createNode = __commonJS({
           value = value.toJSON();
         }
         if (!value || typeof value !== "object") {
-          const node3 = new Scalar.Scalar(value);
+          const node3 = new Scalar2.Scalar(value);
           if (ref)
             ref.node = node3;
           return node3;
@@ -820,7 +820,7 @@ var require_createNode = __commonJS({
         onTagObj(tagObj);
         delete ctx.onTagObj;
       }
-      const node2 = tagObj?.createNode ? tagObj.createNode(ctx.schema, value, ctx) : typeof tagObj?.nodeClass?.from === "function" ? tagObj.nodeClass.from(ctx.schema, value, ctx) : new Scalar.Scalar(value);
+      const node2 = tagObj?.createNode ? tagObj.createNode(ctx.schema, value, ctx) : typeof tagObj?.nodeClass?.from === "function" ? tagObj.nodeClass.from(ctx.schema, value, ctx) : new Scalar2.Scalar(value);
       if (tagName)
         node2.tag = tagName;
       else if (!tagObj.default)
@@ -1133,7 +1133,7 @@ ${indent}${text5.slice(fold + 1, end2)}`;
 var require_stringifyString = __commonJS({
   "../../node_modules/yaml/dist/stringify/stringifyString.js"(exports) {
     "use strict";
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     var foldFlowLines = require_foldFlowLines();
     var getFoldOptions = (ctx, isBlock) => ({
       indentAtStart: isBlock ? ctx.indent.length : ctx.indentAtStart,
@@ -1276,7 +1276,7 @@ ${indent}`) + "'";
         return quotedString(value, ctx);
       }
       const indent = ctx.indent || (ctx.forceBlockIndent || containsDocumentMarker(value) ? "  " : "");
-      const literal = blockQuote2 === "literal" ? true : blockQuote2 === "folded" || type === Scalar.Scalar.BLOCK_FOLDED ? false : type === Scalar.Scalar.BLOCK_LITERAL ? true : !lineLengthOverLimit(value, lineWidth, indent.length);
+      const literal = blockQuote2 === "literal" ? true : blockQuote2 === "folded" || type === Scalar2.Scalar.BLOCK_FOLDED ? false : type === Scalar2.Scalar.BLOCK_LITERAL ? true : !lineLengthOverLimit(value, lineWidth, indent.length);
       if (!value)
         return literal ? "|\n" : ">\n";
       let chomp;
@@ -1331,7 +1331,7 @@ ${indent}`) + "'";
         const foldedValue = value.replace(/\n+/g, "\n$&").replace(/(?:^|\n)([\t ].*)(?:([\n\t ]*)\n(?![\n\t ]))?/g, "$1$2").replace(/\n+/g, `$&${indent}`);
         let literalFallback = false;
         const foldOptions = getFoldOptions(ctx, true);
-        if (blockQuote2 !== "folded" && type !== Scalar.Scalar.BLOCK_FOLDED) {
+        if (blockQuote2 !== "folded" && type !== Scalar2.Scalar.BLOCK_FOLDED) {
           foldOptions.onOverflow = () => {
             literalFallback = true;
           };
@@ -1354,7 +1354,7 @@ ${indent}${start}${value}${end}`;
       if (/^[\n\t ,[\]{}#&*!|>'"%@`]|^[?-]$|^[?-][ \t]|[\n:][ \t]|[ \t]\n|[\n\t ]#|[\n\t :]$/.test(value)) {
         return implicitKey || inFlow || !value.includes("\n") ? quotedString(value, ctx) : blockString(item, ctx, onComment, onChompKeep);
       }
-      if (!implicitKey && !inFlow && type !== Scalar.Scalar.PLAIN && value.includes("\n")) {
+      if (!implicitKey && !inFlow && type !== Scalar2.Scalar.PLAIN && value.includes("\n")) {
         return blockString(item, ctx, onComment, onChompKeep);
       }
       if (containsDocumentMarker(value)) {
@@ -1379,20 +1379,20 @@ ${indent}`);
       const { implicitKey, inFlow } = ctx;
       const ss = typeof item.value === "string" ? item : Object.assign({}, item, { value: String(item.value) });
       let { type } = item;
-      if (type !== Scalar.Scalar.QUOTE_DOUBLE) {
+      if (type !== Scalar2.Scalar.QUOTE_DOUBLE) {
         if (/[\x00-\x08\x0b-\x1f\x7f-\x9f\u{D800}-\u{DFFF}]/u.test(ss.value))
-          type = Scalar.Scalar.QUOTE_DOUBLE;
+          type = Scalar2.Scalar.QUOTE_DOUBLE;
       }
       const _stringify = (_type) => {
         switch (_type) {
-          case Scalar.Scalar.BLOCK_FOLDED:
-          case Scalar.Scalar.BLOCK_LITERAL:
+          case Scalar2.Scalar.BLOCK_FOLDED:
+          case Scalar2.Scalar.BLOCK_LITERAL:
             return implicitKey || inFlow ? quotedString(ss.value, ctx) : blockString(ss, ctx, onComment, onChompKeep);
-          case Scalar.Scalar.QUOTE_DOUBLE:
+          case Scalar2.Scalar.QUOTE_DOUBLE:
             return doubleQuotedString(ss.value, ctx);
-          case Scalar.Scalar.QUOTE_SINGLE:
+          case Scalar2.Scalar.QUOTE_SINGLE:
             return singleQuotedString(ss.value, ctx);
-          case Scalar.Scalar.PLAIN:
+          case Scalar2.Scalar.PLAIN:
             return plainString(ss, ctx, onComment, onChompKeep);
           default:
             return null;
@@ -1541,7 +1541,7 @@ var require_stringifyPair = __commonJS({
   "../../node_modules/yaml/dist/stringify/stringifyPair.js"(exports) {
     "use strict";
     var identity = require_identity();
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     var stringify3 = require_stringify();
     var stringifyComment = require_stringifyComment();
     function stringifyPair({ key: key2, value }, ctx, onComment, onChompKeep) {
@@ -1556,7 +1556,7 @@ var require_stringifyPair = __commonJS({
           throw new Error(msg);
         }
       }
-      let explicitKey = !simpleKeys && (!key2 || keyComment && value == null && !ctx.inFlow || identity.isCollection(key2) || (identity.isScalar(key2) ? key2.type === Scalar.Scalar.BLOCK_FOLDED || key2.type === Scalar.Scalar.BLOCK_LITERAL : typeof key2 === "object"));
+      let explicitKey = !simpleKeys && (!key2 || keyComment && value == null && !ctx.inFlow || identity.isCollection(key2) || (identity.isScalar(key2) ? key2.type === Scalar2.Scalar.BLOCK_FOLDED || key2.type === Scalar2.Scalar.BLOCK_LITERAL : typeof key2 === "object"));
       ctx = Object.assign({}, ctx, {
         allNullValues: false,
         implicitKey: !explicitKey && (simpleKeys || !allNullValues),
@@ -1696,19 +1696,19 @@ var require_merge = __commonJS({
   "../../node_modules/yaml/dist/schema/yaml-1.1/merge.js"(exports) {
     "use strict";
     var identity = require_identity();
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     var MERGE_KEY = "<<";
     var merge2 = {
       identify: (value) => value === MERGE_KEY || typeof value === "symbol" && value.description === MERGE_KEY,
       default: "key",
       tag: "tag:yaml.org,2002:merge",
       test: /^<<$/,
-      resolve: () => Object.assign(new Scalar.Scalar(Symbol(MERGE_KEY)), {
+      resolve: () => Object.assign(new Scalar2.Scalar(Symbol(MERGE_KEY)), {
         addToJSMap: addMergeToJSMap
       }),
       stringify: () => MERGE_KEY
     };
-    var isMergeKey = (ctx, key2) => (merge2.identify(key2) || identity.isScalar(key2) && (!key2.type || key2.type === Scalar.Scalar.PLAIN) && merge2.identify(key2.value)) && ctx?.doc.schema.tags.some((tag) => tag.tag === merge2.tag && tag.default);
+    var isMergeKey = (ctx, key2) => (merge2.identify(key2) || identity.isScalar(key2) && (!key2.type || key2.type === Scalar2.Scalar.PLAIN) && merge2.identify(key2.value)) && ctx?.doc.schema.tags.some((tag) => tag.tag === merge2.tag && tag.default);
     function addMergeToJSMap(ctx, map, value) {
       value = ctx && identity.isAlias(value) ? value.resolve(ctx.doc) : value;
       if (identity.isSeq(value))
@@ -2012,7 +2012,7 @@ var require_YAMLMap = __commonJS({
     var Collection = require_Collection();
     var identity = require_identity();
     var Pair = require_Pair();
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     function findPair(items, key2) {
       const k = identity.isScalar(key2) ? key2.value : key2;
       for (const it of items) {
@@ -2025,7 +2025,7 @@ var require_YAMLMap = __commonJS({
       }
       return void 0;
     }
-    var YAMLMap = class extends Collection.Collection {
+    var YAMLMap2 = class extends Collection.Collection {
       static get tagName() {
         return "tag:yaml.org,2002:map";
       }
@@ -2079,7 +2079,7 @@ var require_YAMLMap = __commonJS({
         if (prev) {
           if (!overwrite)
             throw new Error(`Key ${_pair.key} already set`);
-          if (identity.isScalar(prev.value) && Scalar.isScalarValue(_pair.value))
+          if (identity.isScalar(prev.value) && Scalar2.isScalarValue(_pair.value))
             prev.value.value = _pair.value;
           else
             prev.value = _pair.value;
@@ -2142,7 +2142,7 @@ var require_YAMLMap = __commonJS({
         });
       }
     };
-    exports.YAMLMap = YAMLMap;
+    exports.YAMLMap = YAMLMap2;
     exports.findPair = findPair;
   }
 });
@@ -2152,18 +2152,18 @@ var require_map = __commonJS({
   "../../node_modules/yaml/dist/schema/common/map.js"(exports) {
     "use strict";
     var identity = require_identity();
-    var YAMLMap = require_YAMLMap();
+    var YAMLMap2 = require_YAMLMap();
     var map = {
       collection: "map",
       default: true,
-      nodeClass: YAMLMap.YAMLMap,
+      nodeClass: YAMLMap2.YAMLMap,
       tag: "tag:yaml.org,2002:map",
       resolve(map2, onError) {
         if (!identity.isMap(map2))
           onError("Expected a mapping for this tag");
         return map2;
       },
-      createNode: (schema, obj, ctx) => YAMLMap.YAMLMap.from(schema, obj, ctx)
+      createNode: (schema, obj, ctx) => YAMLMap2.YAMLMap.from(schema, obj, ctx)
     };
     exports.map = map;
   }
@@ -2177,7 +2177,7 @@ var require_YAMLSeq = __commonJS({
     var stringifyCollection = require_stringifyCollection();
     var Collection = require_Collection();
     var identity = require_identity();
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     var toJS = require_toJS();
     var YAMLSeq = class extends Collection.Collection {
       static get tagName() {
@@ -2234,7 +2234,7 @@ var require_YAMLSeq = __commonJS({
         if (typeof idx !== "number")
           throw new Error(`Expected a valid index, not ${key2}.`);
         const prev = this.items[idx];
-        if (identity.isScalar(prev) && Scalar.isScalarValue(value))
+        if (identity.isScalar(prev) && Scalar2.isScalarValue(value))
           prev.value = value;
         else
           this.items[idx] = value;
@@ -2330,14 +2330,14 @@ var require_string = __commonJS({
 var require_null = __commonJS({
   "../../node_modules/yaml/dist/schema/common/null.js"(exports) {
     "use strict";
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     var nullTag = {
       identify: (value) => value == null,
-      createNode: () => new Scalar.Scalar(null),
+      createNode: () => new Scalar2.Scalar(null),
       default: true,
       tag: "tag:yaml.org,2002:null",
       test: /^(?:~|[Nn]ull|NULL)?$/,
-      resolve: () => new Scalar.Scalar(null),
+      resolve: () => new Scalar2.Scalar(null),
       stringify: ({ source }, ctx) => typeof source === "string" && nullTag.test.test(source) ? source : ctx.options.nullStr
     };
     exports.nullTag = nullTag;
@@ -2348,13 +2348,13 @@ var require_null = __commonJS({
 var require_bool = __commonJS({
   "../../node_modules/yaml/dist/schema/core/bool.js"(exports) {
     "use strict";
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     var boolTag = {
       identify: (value) => typeof value === "boolean",
       default: true,
       tag: "tag:yaml.org,2002:bool",
       test: /^(?:[Tt]rue|TRUE|[Ff]alse|FALSE)$/,
-      resolve: (str) => new Scalar.Scalar(str[0] === "t" || str[0] === "T"),
+      resolve: (str) => new Scalar2.Scalar(str[0] === "t" || str[0] === "T"),
       stringify({ source, value }, ctx) {
         if (source && boolTag.test.test(source)) {
           const sv = source[0] === "t" || source[0] === "T";
@@ -2399,7 +2399,7 @@ var require_stringifyNumber = __commonJS({
 var require_float = __commonJS({
   "../../node_modules/yaml/dist/schema/core/float.js"(exports) {
     "use strict";
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     var stringifyNumber = require_stringifyNumber();
     var floatNaN = {
       identify: (value) => typeof value === "number",
@@ -2427,7 +2427,7 @@ var require_float = __commonJS({
       tag: "tag:yaml.org,2002:float",
       test: /^[-+]?(?:\.[0-9]+|[0-9]+\.[0-9]*)$/,
       resolve(str) {
-        const node2 = new Scalar.Scalar(parseFloat(str));
+        const node2 = new Scalar2.Scalar(parseFloat(str));
         const dot = str.indexOf(".");
         if (dot !== -1 && str[str.length - 1] === "0")
           node2.minFractionDigits = str.length - dot - 1;
@@ -2518,7 +2518,7 @@ var require_schema = __commonJS({
 var require_schema2 = __commonJS({
   "../../node_modules/yaml/dist/schema/json/schema.js"(exports) {
     "use strict";
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     var map = require_map();
     var seq = require_seq();
     function intIdentify(value) {
@@ -2535,7 +2535,7 @@ var require_schema2 = __commonJS({
       },
       {
         identify: (value) => value == null,
-        createNode: () => new Scalar.Scalar(null),
+        createNode: () => new Scalar2.Scalar(null),
         default: true,
         tag: "tag:yaml.org,2002:null",
         test: /^null$/,
@@ -2586,7 +2586,7 @@ var require_binary = __commonJS({
   "../../node_modules/yaml/dist/schema/yaml-1.1/binary.js"(exports) {
     "use strict";
     var node_buffer = __require("buffer");
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     var stringifyString = require_stringifyString();
     var binary = {
       identify: (value) => value instanceof Uint8Array,
@@ -2630,15 +2630,15 @@ var require_binary = __commonJS({
         } else {
           throw new Error("This environment does not support writing binary tags; either Buffer or btoa is required");
         }
-        type ?? (type = Scalar.Scalar.BLOCK_LITERAL);
-        if (type !== Scalar.Scalar.QUOTE_DOUBLE) {
+        type ?? (type = Scalar2.Scalar.BLOCK_LITERAL);
+        if (type !== Scalar2.Scalar.QUOTE_DOUBLE) {
           const lineWidth = Math.max(ctx.options.lineWidth - ctx.indent.length, ctx.options.minContentWidth);
           const n = Math.ceil(str.length / lineWidth);
           const lines = new Array(n);
           for (let i = 0, o = 0; i < n; ++i, o += lineWidth) {
             lines[i] = str.substr(o, lineWidth);
           }
-          str = lines.join(type === Scalar.Scalar.BLOCK_LITERAL ? "\n" : " ");
+          str = lines.join(type === Scalar2.Scalar.BLOCK_LITERAL ? "\n" : " ");
         }
         return stringifyString.stringifyString({ comment: comment2, type, value: str }, ctx, onComment, onChompKeep);
       }
@@ -2653,7 +2653,7 @@ var require_pairs = __commonJS({
     "use strict";
     var identity = require_identity();
     var Pair = require_Pair();
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     var YAMLSeq = require_YAMLSeq();
     function resolvePairs(seq, onError) {
       if (identity.isSeq(seq)) {
@@ -2664,7 +2664,7 @@ var require_pairs = __commonJS({
           else if (identity.isMap(item)) {
             if (item.items.length > 1)
               onError("Each pair must have its own sequence indicator");
-            const pair = item.items[0] || new Pair.Pair(new Scalar.Scalar(null));
+            const pair = item.items[0] || new Pair.Pair(new Scalar2.Scalar(null));
             if (item.commentBefore)
               pair.key.commentBefore = pair.key.commentBefore ? `${item.commentBefore}
 ${pair.key.commentBefore}` : item.commentBefore;
@@ -2731,17 +2731,17 @@ var require_omap = __commonJS({
     "use strict";
     var identity = require_identity();
     var toJS = require_toJS();
-    var YAMLMap = require_YAMLMap();
+    var YAMLMap2 = require_YAMLMap();
     var YAMLSeq = require_YAMLSeq();
     var pairs = require_pairs();
     var YAMLOMap = class _YAMLOMap extends YAMLSeq.YAMLSeq {
       constructor() {
         super();
-        this.add = YAMLMap.YAMLMap.prototype.add.bind(this);
-        this.delete = YAMLMap.YAMLMap.prototype.delete.bind(this);
-        this.get = YAMLMap.YAMLMap.prototype.get.bind(this);
-        this.has = YAMLMap.YAMLMap.prototype.has.bind(this);
-        this.set = YAMLMap.YAMLMap.prototype.set.bind(this);
+        this.add = YAMLMap2.YAMLMap.prototype.add.bind(this);
+        this.delete = YAMLMap2.YAMLMap.prototype.delete.bind(this);
+        this.get = YAMLMap2.YAMLMap.prototype.get.bind(this);
+        this.has = YAMLMap2.YAMLMap.prototype.has.bind(this);
+        this.set = YAMLMap2.YAMLMap.prototype.set.bind(this);
         this.tag = _YAMLOMap.tag;
       }
       /**
@@ -2807,7 +2807,7 @@ var require_omap = __commonJS({
 var require_bool2 = __commonJS({
   "../../node_modules/yaml/dist/schema/yaml-1.1/bool.js"(exports) {
     "use strict";
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     function boolStringify({ value, source }, ctx) {
       const boolObj = value ? trueTag : falseTag;
       if (source && boolObj.test.test(source))
@@ -2819,7 +2819,7 @@ var require_bool2 = __commonJS({
       default: true,
       tag: "tag:yaml.org,2002:bool",
       test: /^(?:Y|y|[Yy]es|YES|[Tt]rue|TRUE|[Oo]n|ON)$/,
-      resolve: () => new Scalar.Scalar(true),
+      resolve: () => new Scalar2.Scalar(true),
       stringify: boolStringify
     };
     var falseTag = {
@@ -2827,7 +2827,7 @@ var require_bool2 = __commonJS({
       default: true,
       tag: "tag:yaml.org,2002:bool",
       test: /^(?:N|n|[Nn]o|NO|[Ff]alse|FALSE|[Oo]ff|OFF)$/,
-      resolve: () => new Scalar.Scalar(false),
+      resolve: () => new Scalar2.Scalar(false),
       stringify: boolStringify
     };
     exports.falseTag = falseTag;
@@ -2839,7 +2839,7 @@ var require_bool2 = __commonJS({
 var require_float2 = __commonJS({
   "../../node_modules/yaml/dist/schema/yaml-1.1/float.js"(exports) {
     "use strict";
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     var stringifyNumber = require_stringifyNumber();
     var floatNaN = {
       identify: (value) => typeof value === "number",
@@ -2867,7 +2867,7 @@ var require_float2 = __commonJS({
       tag: "tag:yaml.org,2002:float",
       test: /^[-+]?(?:[0-9][0-9_]*)?\.[0-9_]*$/,
       resolve(str) {
-        const node2 = new Scalar.Scalar(parseFloat(str.replace(/_/g, "")));
+        const node2 = new Scalar2.Scalar(parseFloat(str.replace(/_/g, "")));
         const dot = str.indexOf(".");
         if (dot !== -1) {
           const f = str.substring(dot + 1).replace(/_/g, "");
@@ -2969,8 +2969,8 @@ var require_set = __commonJS({
     "use strict";
     var identity = require_identity();
     var Pair = require_Pair();
-    var YAMLMap = require_YAMLMap();
-    var YAMLSet = class _YAMLSet extends YAMLMap.YAMLMap {
+    var YAMLMap2 = require_YAMLMap();
+    var YAMLSet = class _YAMLSet extends YAMLMap2.YAMLMap {
       constructor(schema) {
         super(schema);
         this.tag = _YAMLSet.tag;
@@ -2983,7 +2983,7 @@ var require_set = __commonJS({
           pair = new Pair.Pair(key2.key, null);
         else
           pair = new Pair.Pair(key2, null);
-        const prev = YAMLMap.findPair(this.items, pair.key);
+        const prev = YAMLMap2.findPair(this.items, pair.key);
         if (!prev)
           this.items.push(pair);
       }
@@ -2992,13 +2992,13 @@ var require_set = __commonJS({
        * Otherwise, returns the value of that Pair's key.
        */
       get(key2, keepPair) {
-        const pair = YAMLMap.findPair(this.items, key2);
+        const pair = YAMLMap2.findPair(this.items, key2);
         return !keepPair && identity.isPair(pair) ? identity.isScalar(pair.key) ? pair.key.value : pair.key : pair;
       }
       set(key2, value) {
         if (typeof value !== "boolean")
           throw new Error(`Expected boolean value for set(key, value) in a YAML set, not ${typeof value}`);
-        const prev = YAMLMap.findPair(this.items, key2);
+        const prev = YAMLMap2.findPair(this.items, key2);
         if (prev && !value) {
           this.items.splice(this.items.indexOf(prev), 1);
         } else if (!prev && value) {
@@ -3979,14 +3979,14 @@ var require_resolve_block_map = __commonJS({
   "../../node_modules/yaml/dist/compose/resolve-block-map.js"(exports) {
     "use strict";
     var Pair = require_Pair();
-    var YAMLMap = require_YAMLMap();
+    var YAMLMap2 = require_YAMLMap();
     var resolveProps = require_resolve_props();
     var utilContainsNewline = require_util_contains_newline();
     var utilFlowIndentCheck = require_util_flow_indent_check();
     var utilMapIncludes = require_util_map_includes();
     var startColMsg = "All mapping items must start at the same column";
     function resolveBlockMap({ composeNode, composeEmptyNode }, ctx, bm, onError, tag) {
-      const NodeClass = tag?.nodeClass ?? YAMLMap.YAMLMap;
+      const NodeClass = tag?.nodeClass ?? YAMLMap2.YAMLMap;
       const map = new NodeClass(ctx.schema);
       if (ctx.atRoot)
         ctx.atRoot = false;
@@ -4182,7 +4182,7 @@ var require_resolve_flow_collection = __commonJS({
     "use strict";
     var identity = require_identity();
     var Pair = require_Pair();
-    var YAMLMap = require_YAMLMap();
+    var YAMLMap2 = require_YAMLMap();
     var YAMLSeq = require_YAMLSeq();
     var resolveEnd = require_resolve_end();
     var resolveProps = require_resolve_props();
@@ -4191,9 +4191,9 @@ var require_resolve_flow_collection = __commonJS({
     var blockMsg = "Block collections are not allowed within flow collections";
     var isBlock = (token) => token && (token.type === "block-map" || token.type === "block-seq");
     function resolveFlowCollection({ composeNode, composeEmptyNode }, ctx, fc, onError, tag) {
-      const isMap = fc.start.source === "{";
-      const fcName = isMap ? "flow map" : "flow sequence";
-      const NodeClass = tag?.nodeClass ?? (isMap ? YAMLMap.YAMLMap : YAMLSeq.YAMLSeq);
+      const isMap2 = fc.start.source === "{";
+      const fcName = isMap2 ? "flow map" : "flow sequence";
+      const NodeClass = tag?.nodeClass ?? (isMap2 ? YAMLMap2.YAMLMap : YAMLSeq.YAMLSeq);
       const coll = new NodeClass(ctx.schema);
       coll.flow = true;
       const atRoot = ctx.atRoot;
@@ -4229,7 +4229,7 @@ var require_resolve_flow_collection = __commonJS({
             offset = props.end;
             continue;
           }
-          if (!isMap && ctx.options.strict && utilContainsNewline.containsNewline(key2))
+          if (!isMap2 && ctx.options.strict && utilContainsNewline.containsNewline(key2))
             onError(
               key2,
               // checked by containsNewline()
@@ -4269,7 +4269,7 @@ var require_resolve_flow_collection = __commonJS({
             }
           }
         }
-        if (!isMap && !sep && !props.found) {
+        if (!isMap2 && !sep && !props.found) {
           const valueNode = value ? composeNode(ctx, value, props, onError) : composeEmptyNode(ctx, props.end, sep, null, props, onError);
           coll.items.push(valueNode);
           offset = valueNode.range[2];
@@ -4292,7 +4292,7 @@ var require_resolve_flow_collection = __commonJS({
             startOnNewline: false
           });
           if (valueProps.found) {
-            if (!isMap && !props.found && ctx.options.strict) {
+            if (!isMap2 && !props.found && ctx.options.strict) {
               if (sep)
                 for (const st of sep) {
                   if (st === valueProps.found)
@@ -4324,13 +4324,13 @@ var require_resolve_flow_collection = __commonJS({
           const pair = new Pair.Pair(keyNode, valueNode);
           if (ctx.options.keepSourceTokens)
             pair.srcToken = collItem;
-          if (isMap) {
+          if (isMap2) {
             const map = coll;
             if (utilMapIncludes.mapIncludes(ctx, map.items, keyNode))
               onError(keyStart, "DUPLICATE_KEY", "Map keys must be unique");
             map.items.push(pair);
           } else {
-            const map = new YAMLMap.YAMLMap(ctx.schema);
+            const map = new YAMLMap2.YAMLMap(ctx.schema);
             map.flow = true;
             map.items.push(pair);
             const endRange = (valueNode ?? keyNode).range;
@@ -4340,7 +4340,7 @@ var require_resolve_flow_collection = __commonJS({
           offset = valueNode ? valueNode.range[2] : valueProps.end;
         }
       }
-      const expectedEnd = isMap ? "}" : "]";
+      const expectedEnd = isMap2 ? "}" : "]";
       const [ce, ...ee] = fc.end;
       let cePos = offset;
       if (ce?.source === expectedEnd)
@@ -4375,8 +4375,8 @@ var require_compose_collection = __commonJS({
   "../../node_modules/yaml/dist/compose/compose-collection.js"(exports) {
     "use strict";
     var identity = require_identity();
-    var Scalar = require_Scalar();
-    var YAMLMap = require_YAMLMap();
+    var Scalar2 = require_Scalar();
+    var YAMLMap2 = require_YAMLMap();
     var YAMLSeq = require_YAMLSeq();
     var resolveBlockMap = require_resolve_block_map();
     var resolveBlockSeq = require_resolve_block_seq();
@@ -4404,7 +4404,7 @@ var require_compose_collection = __commonJS({
         }
       }
       const expType = token.type === "block-map" ? "map" : token.type === "block-seq" ? "seq" : token.start.source === "{" ? "map" : "seq";
-      if (!tagToken || !tagName || tagName === "!" || tagName === YAMLMap.YAMLMap.tagName && expType === "map" || tagName === YAMLSeq.YAMLSeq.tagName && expType === "seq") {
+      if (!tagToken || !tagName || tagName === "!" || tagName === YAMLMap2.YAMLMap.tagName && expType === "map" || tagName === YAMLSeq.YAMLSeq.tagName && expType === "seq") {
         return resolveCollection(CN, ctx, token, onError, tagName);
       }
       let tag = ctx.schema.tags.find((t) => t.tag === tagName && t.collection === expType);
@@ -4424,7 +4424,7 @@ var require_compose_collection = __commonJS({
       }
       const coll = resolveCollection(CN, ctx, token, onError, tagName, tag);
       const res = tag.resolve?.(coll, (msg) => onError(tagToken, "TAG_RESOLVE_FAILED", msg), ctx.options) ?? coll;
-      const node2 = identity.isNode(res) ? res : new Scalar.Scalar(res);
+      const node2 = identity.isNode(res) ? res : new Scalar2.Scalar(res);
       node2.range = coll.range;
       node2.tag = tagName;
       if (tag?.format)
@@ -4439,13 +4439,13 @@ var require_compose_collection = __commonJS({
 var require_resolve_block_scalar = __commonJS({
   "../../node_modules/yaml/dist/compose/resolve-block-scalar.js"(exports) {
     "use strict";
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     function resolveBlockScalar(ctx, scalar, onError) {
       const start = scalar.offset;
       const header = parseBlockScalarHeader(scalar, ctx.options.strict, onError);
       if (!header)
         return { value: "", type: null, comment: "", range: [start, start, start] };
-      const type = header.mode === ">" ? Scalar.Scalar.BLOCK_FOLDED : Scalar.Scalar.BLOCK_LITERAL;
+      const type = header.mode === ">" ? Scalar2.Scalar.BLOCK_FOLDED : Scalar2.Scalar.BLOCK_LITERAL;
       const lines = scalar.source ? splitLines(scalar.source) : [];
       let chompStart = lines.length;
       for (let i = lines.length - 1; i >= 0; --i) {
@@ -4507,7 +4507,7 @@ var require_resolve_block_scalar = __commonJS({
           onError(offset - content3.length - (crlf ? 2 : 1), "BAD_INDENT", message);
           indent = "";
         }
-        if (type === Scalar.Scalar.BLOCK_LITERAL) {
+        if (type === Scalar2.Scalar.BLOCK_LITERAL) {
           value += sep + indent.slice(trimIndent) + content3;
           sep = "\n";
         } else if (indent.length > trimIndent || content3[0] === "	") {
@@ -4622,7 +4622,7 @@ var require_resolve_block_scalar = __commonJS({
 var require_resolve_flow_scalar = __commonJS({
   "../../node_modules/yaml/dist/compose/resolve-flow-scalar.js"(exports) {
     "use strict";
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     var resolveEnd = require_resolve_end();
     function resolveFlowScalar(scalar, strict, onError) {
       const { offset, type, source, end } = scalar;
@@ -4631,15 +4631,15 @@ var require_resolve_flow_scalar = __commonJS({
       const _onError = (rel, code2, msg) => onError(offset + rel, code2, msg);
       switch (type) {
         case "scalar":
-          _type = Scalar.Scalar.PLAIN;
+          _type = Scalar2.Scalar.PLAIN;
           value = plainValue(source, _onError);
           break;
         case "single-quoted-scalar":
-          _type = Scalar.Scalar.QUOTE_SINGLE;
+          _type = Scalar2.Scalar.QUOTE_SINGLE;
           value = singleQuotedValue(source, _onError);
           break;
         case "double-quoted-scalar":
-          _type = Scalar.Scalar.QUOTE_DOUBLE;
+          _type = Scalar2.Scalar.QUOTE_DOUBLE;
           value = doubleQuotedValue(source, _onError);
           break;
         /* istanbul ignore next should not happen */
@@ -4842,7 +4842,7 @@ var require_compose_scalar = __commonJS({
   "../../node_modules/yaml/dist/compose/compose-scalar.js"(exports) {
     "use strict";
     var identity = require_identity();
-    var Scalar = require_Scalar();
+    var Scalar2 = require_Scalar();
     var resolveBlockScalar = require_resolve_block_scalar();
     var resolveFlowScalar = require_resolve_flow_scalar();
     function composeScalar(ctx, token, tagToken, onError) {
@@ -4860,11 +4860,11 @@ var require_compose_scalar = __commonJS({
       let scalar;
       try {
         const res = tag.resolve(value, (msg) => onError(tagToken ?? token, "TAG_RESOLVE_FAILED", msg), ctx.options);
-        scalar = identity.isScalar(res) ? res : new Scalar.Scalar(res);
+        scalar = identity.isScalar(res) ? res : new Scalar2.Scalar(res);
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
         onError(tagToken ?? token, "TAG_RESOLVE_FAILED", msg);
-        scalar = new Scalar.Scalar(value);
+        scalar = new Scalar2.Scalar(value);
       }
       scalar.range = range;
       scalar.source = value;
@@ -5623,7 +5623,7 @@ var require_cst = __commonJS({
     var FLOW_END = "";
     var SCALAR = "";
     var isCollection = (token) => !!token && "items" in token;
-    var isScalar = (token) => !!token && (token.type === "scalar" || token.type === "single-quoted-scalar" || token.type === "double-quoted-scalar" || token.type === "block-scalar");
+    var isScalar2 = (token) => !!token && (token.type === "scalar" || token.type === "single-quoted-scalar" || token.type === "double-quoted-scalar" || token.type === "block-scalar");
     function prettyToken(token) {
       switch (token) {
         case BOM:
@@ -5707,7 +5707,7 @@ var require_cst = __commonJS({
     exports.FLOW_END = FLOW_END;
     exports.SCALAR = SCALAR;
     exports.isCollection = isCollection;
-    exports.isScalar = isScalar;
+    exports.isScalar = isScalar2;
     exports.prettyToken = prettyToken;
     exports.tokenType = tokenType;
   }
@@ -7220,7 +7220,7 @@ var require_public_api = __commonJS({
         return docs;
       return Object.assign([], { empty: true }, composer$1.streamInfo());
     }
-    function parseDocument(source, options = {}) {
+    function parseDocument2(source, options = {}) {
       const { lineCounter: lineCounter2, prettyErrors } = parseOptions(options);
       const parser$1 = new parser.Parser(lineCounter2?.addNewLine);
       const composer$1 = new composer.Composer(options);
@@ -7246,7 +7246,7 @@ var require_public_api = __commonJS({
       } else if (options === void 0 && reviver && typeof reviver === "object") {
         options = reviver;
       }
-      const doc = parseDocument(src, options);
+      const doc = parseDocument2(src, options);
       if (!doc)
         return null;
       doc.warnings.forEach((warning) => log.warn(doc.options.logLevel, warning));
@@ -7282,7 +7282,7 @@ var require_public_api = __commonJS({
     }
     exports.parse = parse2;
     exports.parseAllDocuments = parseAllDocuments;
-    exports.parseDocument = parseDocument;
+    exports.parseDocument = parseDocument2;
     exports.stringify = stringify3;
   }
 });
@@ -7298,8 +7298,8 @@ var require_dist = __commonJS({
     var Alias = require_Alias();
     var identity = require_identity();
     var Pair = require_Pair();
-    var Scalar = require_Scalar();
-    var YAMLMap = require_YAMLMap();
+    var Scalar2 = require_Scalar();
+    var YAMLMap2 = require_YAMLMap();
     var YAMLSeq = require_YAMLSeq();
     var cst = require_cst();
     var lexer = require_lexer();
@@ -7323,8 +7323,8 @@ var require_dist = __commonJS({
     exports.isScalar = identity.isScalar;
     exports.isSeq = identity.isSeq;
     exports.Pair = Pair.Pair;
-    exports.Scalar = Scalar.Scalar;
-    exports.YAMLMap = YAMLMap.YAMLMap;
+    exports.Scalar = Scalar2.Scalar;
+    exports.YAMLMap = YAMLMap2.YAMLMap;
     exports.YAMLSeq = YAMLSeq.YAMLSeq;
     exports.CST = cst;
     exports.Lexer = lexer.Lexer;
@@ -10836,10 +10836,17 @@ function parseFrontmatter(markdown) {
       `Invalid frontmatter: expected a YAML mapping at the top level, got ${typeof data}.`
     );
   }
-  return { data, body: body3 };
+  return { data: toFrontmatterData(data), body: body3 };
 }
 function readFrontmatter(path) {
   return parseFrontmatter(readFileSync3(path, "utf-8"));
+}
+function toFrontmatterData(value) {
+  const out = {};
+  for (const k of Object.keys(value)) {
+    out[k] = value[k];
+  }
+  return out;
 }
 
 // ../core/src/content-index.ts
@@ -10907,25 +10914,35 @@ function readIdFromFrontmatter(absPath) {
     const reason = err2 instanceof Error ? err2.message : String(err2);
     return { kind: "invalid", reason: `unreadable frontmatter: ${reason}` };
   }
-  const raw3 = parsed.data.id;
+  const deskworkBlock = parsed.data.deskwork;
+  if (deskworkBlock === void 0 || deskworkBlock === null) {
+    return { kind: "absent" };
+  }
+  if (typeof deskworkBlock !== "object" || Array.isArray(deskworkBlock)) {
+    return {
+      kind: "invalid",
+      reason: `frontmatter deskwork is ${typeof deskworkBlock}, expected mapping`
+    };
+  }
+  const raw3 = deskworkBlock.id;
   if (raw3 === void 0) return { kind: "absent" };
   if (typeof raw3 !== "string") {
     return {
       kind: "invalid",
-      reason: `frontmatter id is ${typeof raw3}, expected string`
+      reason: `frontmatter deskwork.id is ${typeof raw3}, expected string`
     };
   }
   const trimmed = raw3.trim();
   if (trimmed === "") {
     return {
       kind: "invalid",
-      reason: "frontmatter id is empty"
+      reason: "frontmatter deskwork.id is empty"
     };
   }
   if (!isUuid(trimmed)) {
     return {
       kind: "invalid",
-      reason: `frontmatter id "${trimmed}" is not a valid UUID`
+      reason: `frontmatter deskwork.id "${trimmed}" is not a valid UUID`
     };
   }
   return { kind: "valid", id: trimmed };

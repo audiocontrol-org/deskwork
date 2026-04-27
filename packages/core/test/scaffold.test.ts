@@ -295,8 +295,8 @@ describe('scaffoldBlogPost', () => {
     }
   });
 
-  describe('frontmatter id binding (Phase 19a)', () => {
-    it("writes the entry's id into the scaffolded file's frontmatter", () => {
+  describe('frontmatter id binding (Phase 19a, Issue #38 namespacing)', () => {
+    it("writes the entry's id under `deskwork.id` in the scaffolded file's frontmatter", () => {
       const root = mkdtempSync(join(tmpdir(), 'deskwork-scaffold-id-'));
       try {
         const result = scaffoldBlogPost(
@@ -306,20 +306,24 @@ describe('scaffoldBlogPost', () => {
           makeEntry(),
         );
         const body = readFileSync(result.filePath, 'utf-8');
-        // `id` is emitted as the first frontmatter field — verify both
-        // its presence AND its position so operators reading the file
-        // see the binding key immediately.
+        // The id lives under a `deskwork:` namespace block (Issue #38).
+        // It's emitted as the first frontmatter field so operators
+        // reading the file see the namespaced binding immediately.
+        expect(body).toContain('deskwork:');
         expect(body).toContain(`id: ${FIXED_ID}`);
-        const idIdx = body.indexOf(`id: ${FIXED_ID}`);
+        // No top-level `id:` — that keyspace belongs to the operator.
+        expect(body).not.toMatch(/^id: /m);
+
+        const deskworkIdx = body.indexOf('deskwork:');
         const titleIdx = body.indexOf('title: My First Post');
-        expect(idIdx).toBeGreaterThan(-1);
-        expect(titleIdx).toBeGreaterThan(idIdx);
+        expect(deskworkIdx).toBeGreaterThan(-1);
+        expect(titleIdx).toBeGreaterThan(deskworkIdx);
       } finally {
         rmSync(root, { recursive: true, force: true });
       }
     });
 
-    it('round-trips: readFrontmatter on the scaffolded file recovers entry.id', () => {
+    it('round-trips: readFrontmatter on the scaffolded file recovers entry.id under deskwork.id', () => {
       const root = mkdtempSync(join(tmpdir(), 'deskwork-scaffold-rt-'));
       try {
         const entry = makeEntry({
@@ -332,7 +336,14 @@ describe('scaffoldBlogPost', () => {
           entry,
         );
         const parsed = readFrontmatter(result.filePath);
-        expect(parsed.data.id).toBe(entry.id);
+        const block = parsed.data.deskwork;
+        expect(block).toBeDefined();
+        expect(typeof block).toBe('object');
+        if (block && typeof block === 'object' && !Array.isArray(block)) {
+          expect((block as Record<string, unknown>).id).toBe(entry.id);
+        }
+        // Top-level `id:` must be absent — Issue #38.
+        expect(parsed.data.id).toBeUndefined();
       } finally {
         rmSync(root, { recursive: true, force: true });
       }

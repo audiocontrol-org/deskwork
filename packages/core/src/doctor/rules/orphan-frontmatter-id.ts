@@ -15,7 +15,7 @@
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { relative } from 'node:path';
-import { parseFrontmatter, stringifyFrontmatter } from '../../frontmatter.ts';
+import { parseFrontmatter, removeFrontmatterPaths } from '../../frontmatter.ts';
 import type {
   DoctorContext,
   DoctorRule,
@@ -26,14 +26,28 @@ import type {
 
 const RULE_ID = 'orphan-frontmatter-id';
 
+/**
+ * Clear the `deskwork.id` field from a markdown file's frontmatter.
+ * Returns true when the field was present and cleared; false when there
+ * was nothing to clear. Issue #38: scoped to the namespaced key — top-
+ * level `id:` belongs to the operator and is left alone.
+ *
+ * Uses the round-trip-preserving emitter so untouched keys keep their
+ * exact bytes (quoting, comments, ordering). Empty `deskwork:` blocks
+ * are pruned via `removeFrontmatterPaths`.
+ */
 function clearFrontmatterId(absPath: string): boolean {
   const raw = readFileSync(absPath, 'utf-8');
-  const { data, body } = parseFrontmatter(raw);
-  if (!('id' in data)) return false;
-  const next: Record<string, unknown> = { ...data };
-  delete next.id;
-  const rendered = stringifyFrontmatter(next, body);
-  writeFileSync(absPath, rendered, 'utf-8');
+  const { data } = parseFrontmatter(raw);
+  const block = data.deskwork;
+  if (block === undefined || block === null) return false;
+  if (typeof block !== 'object' || Array.isArray(block)) return false;
+  const blockObj = block as Record<string, unknown>;
+  if (!('id' in blockObj)) return false;
+
+  const updated = removeFrontmatterPaths(raw, [['deskwork', 'id']]);
+  if (updated === raw) return false;
+  writeFileSync(absPath, updated, 'utf-8');
   return true;
 }
 
