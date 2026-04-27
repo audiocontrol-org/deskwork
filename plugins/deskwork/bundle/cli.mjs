@@ -765,700 +765,6 @@ var init_calendar_mutations = __esm({
   }
 });
 
-// ../core/src/paths.ts
-import { join as join2 } from "node:path";
-function resolveSite(config, site) {
-  if (site === null || site === void 0 || site === "") {
-    return config.defaultSite;
-  }
-  if (!(site in config.sites)) {
-    const known = Object.keys(config.sites).join(", ");
-    throw new Error(
-      `Unknown site "${site}". Configured sites: ${known}. Default when omitted: ${config.defaultSite}.`
-    );
-  }
-  return site;
-}
-function siteConfig(config, site) {
-  const slug = resolveSite(config, site);
-  return config.sites[slug];
-}
-function resolveCalendarPath(projectRoot, config, site) {
-  return join2(projectRoot, siteConfig(config, site).calendarPath);
-}
-function resolveContentDir(projectRoot, config, site) {
-  return join2(projectRoot, siteConfig(config, site).contentDir);
-}
-function resolveBlogFilePath(projectRoot, config, site, slug, filePath) {
-  const entry = siteConfig(config, site);
-  if (filePath !== void 0 && filePath !== "") {
-    return join2(projectRoot, entry.contentDir, filePath);
-  }
-  const template = entry.blogFilenameTemplate ?? DEFAULT_BLOG_FILENAME_TEMPLATE;
-  return join2(projectRoot, entry.contentDir, template.replaceAll("{slug}", slug));
-}
-var DEFAULT_BLOG_FILENAME_TEMPLATE;
-var init_paths = __esm({
-  "../core/src/paths.ts"() {
-    "use strict";
-    DEFAULT_BLOG_FILENAME_TEMPLATE = "{slug}/index.md";
-  }
-});
-
-// ../core/src/cli.ts
-import { isAbsolute, resolve } from "node:path";
-function parseArgs(argv2, known, booleanFlags = []) {
-  const positional = [];
-  const flags = {};
-  const booleans = /* @__PURE__ */ new Set();
-  const knownSet = new Set(known);
-  const boolSet = new Set(booleanFlags);
-  for (let i = 0; i < argv2.length; i++) {
-    const a = argv2[i];
-    if (!a.startsWith("--")) {
-      positional.push(a);
-      continue;
-    }
-    const eq = a.indexOf("=");
-    const name = eq >= 0 ? a.slice(2, eq) : a.slice(2);
-    if (boolSet.has(name)) {
-      booleans.add(name);
-      continue;
-    }
-    if (!knownSet.has(name)) {
-      throw new Error(`Unknown flag: --${name}`);
-    }
-    if (eq >= 0) {
-      flags[name] = a.slice(eq + 1);
-    } else {
-      const next = argv2[i + 1];
-      if (next === void 0 || next.startsWith("--")) {
-        throw new Error(`Flag --${name} requires a value`);
-      }
-      flags[name] = next;
-      i++;
-    }
-  }
-  return { positional, flags, booleans };
-}
-function absolutize(pathArg) {
-  return isAbsolute(pathArg) ? pathArg : resolve(process.cwd(), pathArg);
-}
-function fail(message, code = 1) {
-  process.stderr.write(`${message}
-`);
-  process.exit(code);
-}
-function emit(result) {
-  process.stdout.write(`${JSON.stringify(result, null, 2)}
-`);
-}
-var init_cli = __esm({
-  "../core/src/cli.ts"() {
-    "use strict";
-  }
-});
-
-// src/commands/add.ts
-var add_exports = {};
-__export(add_exports, {
-  run: () => run
-});
-async function run(argv2) {
-  const KNOWN_FLAGS3 = ["site", "type", "content-url", "source", "slug"];
-  const SLUG_RE2 = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
-  const { positional, flags } = parse();
-  if (positional.length < 2) {
-    fail(
-      "Usage: deskwork-add <project-root> [--site <slug>] [--type blog|youtube|tool] [--content-url URL] [--source manual|analytics] [--slug <path>] <title> [description]",
-      2
-    );
-  }
-  if (flags.slug !== void 0 && !SLUG_RE2.test(flags.slug)) {
-    fail(
-      `--slug must be one or more /-separated kebab-case segments (got "${flags.slug}")`,
-      2
-    );
-  }
-  const [rootArg, title, ...rest] = positional;
-  const description = rest.join(" ").trim();
-  const projectRoot = absolutize(rootArg);
-  let config;
-  try {
-    config = readConfig(projectRoot);
-  } catch (err2) {
-    fail(err2 instanceof Error ? err2.message : String(err2));
-  }
-  const site = resolveSite(config, flags.site);
-  const calendarPath = resolveCalendarPath(projectRoot, config, site);
-  let contentType;
-  if (flags.type !== void 0) {
-    if (!isContentType(flags.type)) {
-      fail(`Invalid --type "${flags.type}". Must be one of: blog, youtube, tool.`);
-    }
-    contentType = flags.type;
-  }
-  let source = "manual";
-  if (flags.source !== void 0) {
-    if (flags.source !== "manual" && flags.source !== "analytics") {
-      fail(`Invalid --source "${flags.source}". Must be "manual" or "analytics".`);
-    }
-    source = flags.source;
-  }
-  const calendar = readCalendar(calendarPath);
-  let entry;
-  try {
-    entry = addEntry(calendar, title, {
-      description,
-      source,
-      ...contentType !== void 0 ? { contentType } : {},
-      ...flags["content-url"] !== void 0 ? { contentUrl: flags["content-url"] } : {},
-      ...flags.slug !== void 0 ? { slug: flags.slug } : {}
-    });
-  } catch (err2) {
-    fail(err2 instanceof Error ? err2.message : String(err2));
-  }
-  writeCalendar(calendarPath, calendar);
-  emit({
-    slug: entry.slug,
-    title: entry.title,
-    stage: entry.stage,
-    description: entry.description,
-    site,
-    calendarPath,
-    contentType: entry.contentType,
-    contentUrl: entry.contentUrl
-  });
-  function parse() {
-    try {
-      return parseArgs(argv2, KNOWN_FLAGS3);
-    } catch (err2) {
-      fail(err2 instanceof Error ? err2.message : String(err2), 2);
-    }
-  }
-}
-var init_add = __esm({
-  "src/commands/add.ts"() {
-    "use strict";
-    init_config();
-    init_calendar();
-    init_calendar_mutations();
-    init_paths();
-    init_types();
-    init_cli();
-  }
-});
-
-// ../core/src/journal.ts
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync as readFileSync3,
-  readdirSync,
-  unlinkSync,
-  writeFileSync as writeFileSync2
-} from "node:fs";
-import { join as join3 } from "node:path";
-function normalizeTimestamp(iso) {
-  return iso.replace(/[:.]/g, "-");
-}
-function ensureDir(dir) {
-  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-}
-function recordFilename(timestamp, id) {
-  return `${normalizeTimestamp(timestamp)}-${id}.json`;
-}
-function findFileById(dir, id) {
-  if (!existsSync(dir)) return null;
-  const suffix = `-${id}.json`;
-  for (const name of readdirSync(dir)) {
-    if (name.endsWith(suffix)) return join3(dir, name);
-  }
-  return null;
-}
-function readFile(path) {
-  try {
-    const text = readFileSync3(path, "utf-8");
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
-}
-function readJournal(dir, options = {}) {
-  if (!existsSync(dir)) return [];
-  const timestampField = options.timestampField ?? "timestamp";
-  const records = [];
-  for (const name of readdirSync(dir)) {
-    if (!name.endsWith(".json")) continue;
-    const record = readFile(join3(dir, name));
-    if (record === null) continue;
-    records.push(record);
-  }
-  records.sort((a, b) => {
-    const aKey = String(a[timestampField] ?? "");
-    const bKey = String(b[timestampField] ?? "");
-    return aKey.localeCompare(bKey);
-  });
-  return records;
-}
-function appendJournal(dir, record, options = {}) {
-  ensureDir(dir);
-  const idField = options.idField ?? "id";
-  const timestampField = options.timestampField ?? "timestamp";
-  const id = String(record[idField] ?? "");
-  const timestamp = String(record[timestampField] ?? "");
-  if (!id) throw new Error(`appendJournal: record has no \`${idField}\` field`);
-  if (!timestamp) throw new Error(`appendJournal: record has no \`${timestampField}\` field`);
-  const existing = findFileById(dir, id);
-  const target = existing ?? join3(dir, recordFilename(timestamp, id));
-  writeFileSync2(target, JSON.stringify(record, null, 2) + "\n", "utf-8");
-}
-var init_journal = __esm({
-  "../core/src/journal.ts"() {
-    "use strict";
-  }
-});
-
-// ../core/src/review/journal-mappers.ts
-function synthesizeHistoryId(entry) {
-  switch (entry.kind) {
-    case "workflow-created":
-      return `created-${entry.workflow.id}`;
-    case "workflow-state":
-      return `state-${entry.workflowId}-${normalizeTimestamp(entry.at)}`;
-    case "version":
-      return `version-${entry.workflowId}-v${entry.version.version}`;
-    case "annotation":
-      return entry.annotation.id;
-  }
-}
-function envelopeFor(entry) {
-  return {
-    id: synthesizeHistoryId(entry),
-    timestamp: entry.at,
-    entry
-  };
-}
-function unwrap(env) {
-  return env.entry;
-}
-var init_journal_mappers = __esm({
-  "../core/src/review/journal-mappers.ts"() {
-    "use strict";
-    init_journal();
-  }
-});
-
-// ../core/src/review/types.ts
-function isValidTransition(from, to) {
-  return VALID_TRANSITIONS[from].includes(to);
-}
-var VALID_TRANSITIONS;
-var init_types2 = __esm({
-  "../core/src/review/types.ts"() {
-    "use strict";
-    VALID_TRANSITIONS = {
-      open: ["in-review", "cancelled"],
-      "in-review": ["iterating", "approved", "cancelled"],
-      iterating: ["in-review", "cancelled"],
-      approved: ["applied", "cancelled"],
-      applied: [],
-      cancelled: []
-    };
-  }
-});
-
-// ../core/src/review/pipeline.ts
-import { randomUUID as randomUUID3 } from "node:crypto";
-import { join as join4 } from "node:path";
-function reviewJournalRoot(projectRoot, config) {
-  return join4(projectRoot, config.reviewJournalDir ?? DEFAULT_JOURNAL_DIR);
-}
-function pipelinePath(projectRoot, config) {
-  return join4(reviewJournalRoot(projectRoot, config), PIPELINE_SUBDIR);
-}
-function historyPath(projectRoot, config) {
-  return join4(reviewJournalRoot(projectRoot, config), HISTORY_SUBDIR);
-}
-function readWorkflows(projectRoot, config) {
-  return readJournal(pipelinePath(projectRoot, config), {
-    timestampField: "createdAt"
-  });
-}
-function readHistory(projectRoot, config) {
-  const envelopes = readJournal(
-    historyPath(projectRoot, config)
-  );
-  return envelopes.map(unwrap);
-}
-function readWorkflow(projectRoot, config, id) {
-  return readWorkflows(projectRoot, config).find((w) => w.id === id) ?? null;
-}
-function writeWorkflow(projectRoot, config, workflow) {
-  appendJournal(pipelinePath(projectRoot, config), workflow, {
-    idField: "id",
-    timestampField: "createdAt"
-  });
-}
-function writeHistory(projectRoot, config, entry) {
-  appendJournal(historyPath(projectRoot, config), envelopeFor(entry), {
-    idField: "id",
-    timestampField: "timestamp"
-  });
-}
-function matchesKey(w, k) {
-  const idMatch = k.entryId && w.entryId ? w.entryId === k.entryId : w.site === k.site && w.slug === k.slug;
-  return idMatch && w.contentKind === k.contentKind && (w.platform ?? null) === (k.platform ?? null) && (w.channel ?? null) === (k.channel ?? null);
-}
-function findOpenByKey(projectRoot, config, params) {
-  return readWorkflows(projectRoot, config).find(
-    (w) => matchesKey(w, params) && w.state !== "applied" && w.state !== "cancelled"
-  ) ?? null;
-}
-function createWorkflow(projectRoot, config, params) {
-  const existing = findOpenByKey(projectRoot, config, params);
-  if (existing) return existing;
-  const now = (/* @__PURE__ */ new Date()).toISOString();
-  const item = {
-    id: randomUUID3(),
-    site: params.site,
-    slug: params.slug,
-    contentKind: params.contentKind,
-    state: "open",
-    currentVersion: 1,
-    createdAt: now,
-    updatedAt: now
-  };
-  if (params.entryId !== void 0) item.entryId = params.entryId;
-  if (params.platform !== void 0) item.platform = params.platform;
-  if (params.channel !== void 0) item.channel = params.channel;
-  writeWorkflow(projectRoot, config, item);
-  writeHistory(projectRoot, config, {
-    kind: "workflow-created",
-    at: now,
-    workflow: item
-  });
-  const v1 = {
-    version: 1,
-    markdown: params.initialMarkdown,
-    createdAt: now,
-    originatedBy: params.initialOriginatedBy ?? "agent"
-  };
-  writeHistory(projectRoot, config, {
-    kind: "version",
-    at: now,
-    workflowId: item.id,
-    version: v1
-  });
-  return item;
-}
-function listOpen(projectRoot, config, site) {
-  return readWorkflows(projectRoot, config).filter(
-    (w) => w.state !== "applied" && w.state !== "cancelled" && (!site || w.site === site)
-  );
-}
-function transitionState(projectRoot, config, workflowId, to) {
-  const current = readWorkflow(projectRoot, config, workflowId);
-  if (!current) throw new Error(`Unknown workflow: ${workflowId}`);
-  if (!isValidTransition(current.state, to)) {
-    throw new Error(
-      `Invalid transition for workflow ${workflowId}: ${current.state} \u2192 ${to}`
-    );
-  }
-  const now = (/* @__PURE__ */ new Date()).toISOString();
-  const updated = { ...current, state: to, updatedAt: now };
-  writeWorkflow(projectRoot, config, updated);
-  writeHistory(projectRoot, config, {
-    kind: "workflow-state",
-    at: now,
-    workflowId,
-    from: current.state,
-    to
-  });
-  return updated;
-}
-function appendVersion(projectRoot, config, workflowId, markdown, originatedBy) {
-  const current = readWorkflow(projectRoot, config, workflowId);
-  if (!current) throw new Error(`Unknown workflow: ${workflowId}`);
-  const now = (/* @__PURE__ */ new Date()).toISOString();
-  const version = {
-    version: current.currentVersion + 1,
-    markdown,
-    createdAt: now,
-    originatedBy
-  };
-  writeHistory(projectRoot, config, {
-    kind: "version",
-    at: now,
-    workflowId,
-    version
-  });
-  const updated = {
-    ...current,
-    currentVersion: version.version,
-    updatedAt: now
-  };
-  writeWorkflow(projectRoot, config, updated);
-  return version;
-}
-function appendAnnotation(projectRoot, config, annotation) {
-  writeHistory(projectRoot, config, {
-    kind: "annotation",
-    at: annotation.createdAt,
-    annotation
-  });
-}
-function readVersions(projectRoot, config, workflowId) {
-  const versions = [];
-  for (const entry of readHistory(projectRoot, config)) {
-    if (entry.kind === "version" && entry.workflowId === workflowId) {
-      versions.push(entry.version);
-    }
-  }
-  return versions.sort((a, b) => a.version - b.version);
-}
-function readAnnotations(projectRoot, config, workflowId, version) {
-  const anns = [];
-  for (const entry of readHistory(projectRoot, config)) {
-    if (entry.kind !== "annotation") continue;
-    const a = entry.annotation;
-    if (a.workflowId !== workflowId) continue;
-    if (version === void 0) {
-      anns.push(a);
-      continue;
-    }
-    const matchesVersion = a.type === "comment" && a.version === version || a.type === "approve" && a.version === version || a.type === "reject" && a.version === version || a.type === "edit" && a.beforeVersion === version;
-    if (matchesVersion) anns.push(a);
-  }
-  return anns;
-}
-function mintAnnotation(partial) {
-  return {
-    ...partial,
-    id: randomUUID3(),
-    createdAt: (/* @__PURE__ */ new Date()).toISOString()
-  };
-}
-var DEFAULT_JOURNAL_DIR, PIPELINE_SUBDIR, HISTORY_SUBDIR;
-var init_pipeline = __esm({
-  "../core/src/review/pipeline.ts"() {
-    "use strict";
-    init_journal();
-    init_journal_mappers();
-    init_types2();
-    DEFAULT_JOURNAL_DIR = ".deskwork/review-journal";
-    PIPELINE_SUBDIR = "pipeline";
-    HISTORY_SUBDIR = "history";
-  }
-});
-
-// ../core/src/review/handlers.ts
-function err(status, message) {
-  return { status, body: { error: message } };
-}
-function ok(body) {
-  return { status: 200, body };
-}
-function handleGetWorkflow(projectRoot, config, query) {
-  if (query.id) {
-    const workflow = readWorkflow(projectRoot, config, query.id);
-    if (!workflow) return err(404, `unknown workflow id: ${query.id}`);
-    return ok({
-      workflow,
-      versions: readVersions(projectRoot, config, workflow.id)
-    });
-  }
-  if (!query.entryId && (!query.site || !query.slug)) {
-    return err(400, "either id, entryId, or (site & slug) query params are required");
-  }
-  if (query.site && !(query.site in config.sites)) {
-    const known = Object.keys(config.sites).join(", ");
-    return err(400, `unknown site: ${query.site}. Configured: ${known}`);
-  }
-  const contentKind = query.contentKind ?? "longform";
-  const candidates = readWorkflows(projectRoot, config).filter((w) => {
-    const identityMatch = query.entryId && w.entryId ? w.entryId === query.entryId : query.site && query.slug ? w.site === query.site && w.slug === query.slug : false;
-    return identityMatch && w.contentKind === contentKind && (w.platform ?? null) === (query.platform ?? null) && (w.channel ?? null) === (query.channel ?? null);
-  });
-  if (candidates.length === 0) {
-    const key = query.entryId ? `entryId=${query.entryId}` : `${query.site ?? "?"}/${query.slug ?? "?"}`;
-    return err(404, `no workflow for ${key} (${contentKind})`);
-  }
-  const isTerminal = (s) => s === "applied" || s === "cancelled";
-  const match = [...candidates].sort((a, b) => {
-    const aTerm = isTerminal(a.state) ? 1 : 0;
-    const bTerm = isTerminal(b.state) ? 1 : 0;
-    if (aTerm !== bTerm) return aTerm - bTerm;
-    return b.createdAt.localeCompare(a.createdAt);
-  })[0];
-  return ok({ workflow: match, versions: readVersions(projectRoot, config, match.id) });
-}
-var init_handlers = __esm({
-  "../core/src/review/handlers.ts"() {
-    "use strict";
-    init_paths();
-    init_pipeline();
-  }
-});
-
-// src/commands/approve.ts
-var approve_exports = {};
-__export(approve_exports, {
-  run: () => run2
-});
-import { existsSync as existsSync2 } from "node:fs";
-async function run2(argv2) {
-  const KNOWN_FLAGS3 = ["site", "platform", "channel"];
-  const SLUG_RE2 = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
-  const { positional, flags } = parse();
-  if (positional.length < 2) {
-    fail(
-      "Usage: deskwork-approve <project-root> [--site <slug>] <slug> [--platform <p>] [--channel <c>]",
-      2
-    );
-  }
-  const [rootArg, slug] = positional;
-  const projectRoot = absolutize(rootArg);
-  if (!SLUG_RE2.test(slug)) {
-    fail(`invalid slug: ${slug} (must match ${SLUG_RE2})`);
-  }
-  if (flags.platform !== void 0 && !isPlatform(flags.platform)) {
-    fail(`Invalid --platform "${flags.platform}".`);
-  }
-  let config;
-  try {
-    config = readConfig(projectRoot);
-  } catch (err2) {
-    fail(err2 instanceof Error ? err2.message : String(err2));
-  }
-  const site = resolveSite(config, flags.site);
-  const contentKind = flags.platform ? "shortform" : "longform";
-  const fetched = handleGetWorkflow(projectRoot, config, {
-    id: null,
-    site,
-    slug,
-    contentKind,
-    platform: flags.platform ?? null,
-    channel: flags.channel ?? null
-  });
-  if (fetched.status !== 200 || !isSuccessBody(fetched.body)) {
-    fail(
-      `no ${contentKind} workflow for ${site}/${slug}: ${errorMessage(fetched.body)}`
-    );
-  }
-  const workflow = fetched.body.workflow;
-  const versions = fetched.body.versions;
-  if (workflow.state !== "approved") {
-    fail(
-      `Workflow state is '${workflow.state}', not 'approved'. Click Approve in the review UI first (that records which version was approved).`
-    );
-  }
-  const annotations = readAnnotations(projectRoot, config, workflow.id);
-  const approveAnn = latestApprove(annotations);
-  const approvedVersion = approveAnn?.version ?? workflow.currentVersion;
-  if (contentKind === "longform") {
-    applyLongform(workflow, approvedVersion);
-  } else {
-    applyShortform(workflow, versions, approvedVersion);
-  }
-  function applyLongform(workflow2, approvedVersion2) {
-    if (approvedVersion2 !== workflow2.currentVersion) {
-      fail(
-        `Approved v${approvedVersion2}, but workflow is at v${workflow2.currentVersion}. Disk has moved on since the approve click \u2014 re-click Approve on v${workflow2.currentVersion} or iterate back.`
-      );
-    }
-    const blogFile = resolveBlogFilePath(projectRoot, config, site, slug);
-    if (!existsSync2(blogFile)) {
-      fail(`Blog file missing at ${blogFile}. Nothing to approve against.`);
-    }
-    transitionState(projectRoot, config, workflow2.id, "applied");
-    emit({
-      workflowId: workflow2.id,
-      site,
-      slug,
-      contentKind: "longform",
-      state: "applied",
-      version: approvedVersion2,
-      filePath: blogFile
-    });
-  }
-  function applyShortform(workflow2, versions2, approvedVersion2) {
-    if (!flags.platform) fail("--platform is required for shortform workflows");
-    const approvedMarkdown = versions2.find((v) => v.version === approvedVersion2)?.markdown;
-    if (approvedMarkdown === void 0) {
-      fail(`Approved v${approvedVersion2} not found in history.`);
-    }
-    const calendarPath = resolveCalendarPath(projectRoot, config, site);
-    const cal = readCalendar(calendarPath);
-    const channelLower = flags.channel?.toLowerCase();
-    const match = cal.distributions.find((d) => {
-      if (d.slug !== slug) return false;
-      if (d.platform !== flags.platform) return false;
-      if (channelLower !== void 0) {
-        return (d.channel?.toLowerCase() ?? "") === channelLower;
-      }
-      return !d.channel;
-    });
-    if (!match) {
-      const channelBit = flags.channel ? ` \xB7 channel=${flags.channel}` : "";
-      fail(
-        `No distribution record for (slug=${slug}, platform=${flags.platform}${channelBit}). Create it with /deskwork:distribute first.`
-      );
-    }
-    match.shortform = approvedMarkdown;
-    writeCalendar(calendarPath, cal);
-    transitionState(projectRoot, config, workflow2.id, "applied");
-    emit({
-      workflowId: workflow2.id,
-      site,
-      slug,
-      contentKind: "shortform",
-      state: "applied",
-      version: approvedVersion2,
-      platform: flags.platform,
-      channel: flags.channel,
-      calendarPath
-    });
-  }
-  function latestApprove(annotations2) {
-    const approves = annotations2.filter(
-      (a) => a.type === "approve"
-    );
-    if (approves.length === 0) return void 0;
-    return approves.reduce((a, b) => a.createdAt > b.createdAt ? a : b);
-  }
-  function isSuccessBody(body) {
-    if (typeof body !== "object" || body === null) return false;
-    return "workflow" in body && "versions" in body;
-  }
-  function errorMessage(body) {
-    if (typeof body === "object" && body !== null) {
-      const value = Reflect.get(body, "error");
-      if (typeof value === "string") return value;
-    }
-    return "unknown error";
-  }
-  function parse() {
-    try {
-      return parseArgs(argv2, KNOWN_FLAGS3);
-    } catch (err2) {
-      fail(err2 instanceof Error ? err2.message : String(err2), 2);
-    }
-  }
-}
-var init_approve = __esm({
-  "src/commands/approve.ts"() {
-    "use strict";
-    init_config();
-    init_paths();
-    init_calendar();
-    init_handlers();
-    init_pipeline();
-    init_types();
-    init_cli();
-  }
-});
-
 // ../../node_modules/yaml/dist/nodes/identity.js
 var require_identity = __commonJS({
   "../../node_modules/yaml/dist/nodes/identity.js"(exports) {
@@ -8762,7 +8068,7 @@ var require_dist = __commonJS({
 });
 
 // ../core/src/frontmatter.ts
-import { readFileSync as readFileSync4, writeFileSync as writeFileSync3 } from "node:fs";
+import { readFileSync as readFileSync3, writeFileSync as writeFileSync2 } from "node:fs";
 function parseFrontmatter(markdown) {
   const match = markdown.match(FRONTMATTER_RE);
   if (!match) {
@@ -8798,10 +8104,10 @@ function updateFrontmatter(markdown, patch) {
   return stringifyFrontmatter({ ...data, ...patch }, body);
 }
 function readFrontmatter(path) {
-  return parseFrontmatter(readFileSync4(path, "utf-8"));
+  return parseFrontmatter(readFileSync3(path, "utf-8"));
 }
 function writeFrontmatter(path, data, body) {
-  writeFileSync3(path, stringifyFrontmatter(data, body), "utf-8");
+  writeFileSync2(path, stringifyFrontmatter(data, body), "utf-8");
 }
 var import_yaml, FRONTMATTER_RE;
 var init_frontmatter = __esm({
@@ -8813,8 +8119,8 @@ var init_frontmatter = __esm({
 });
 
 // ../core/src/content-index.ts
-import { readdirSync as readdirSync2, statSync } from "node:fs";
-import { join as join5, relative } from "node:path";
+import { readdirSync, statSync } from "node:fs";
+import { join as join2, relative } from "node:path";
 function isUuid(value) {
   return UUID_RE.test(value);
 }
@@ -8835,12 +8141,12 @@ function collectMarkdownFiles(dir) {
   function visit(currentDir) {
     let names;
     try {
-      names = readdirSync2(currentDir);
+      names = readdirSync(currentDir);
     } catch {
       return;
     }
     for (const name of names) {
-      const abs = join5(currentDir, name);
+      const abs = join2(currentDir, name);
       let st;
       try {
         st = statSync(abs);
@@ -8934,6 +8240,701 @@ var init_content_index = __esm({
       ".markdown"
     ]);
     UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  }
+});
+
+// ../core/src/paths.ts
+import { join as join3 } from "node:path";
+function resolveSite(config, site) {
+  if (site === null || site === void 0 || site === "") {
+    return config.defaultSite;
+  }
+  if (!(site in config.sites)) {
+    const known = Object.keys(config.sites).join(", ");
+    throw new Error(
+      `Unknown site "${site}". Configured sites: ${known}. Default when omitted: ${config.defaultSite}.`
+    );
+  }
+  return site;
+}
+function siteConfig(config, site) {
+  const slug = resolveSite(config, site);
+  return config.sites[slug];
+}
+function resolveCalendarPath(projectRoot, config, site) {
+  return join3(projectRoot, siteConfig(config, site).calendarPath);
+}
+function resolveContentDir(projectRoot, config, site) {
+  return join3(projectRoot, siteConfig(config, site).contentDir);
+}
+function resolveBlogFilePath(projectRoot, config, site, slug, filePath) {
+  const entry = siteConfig(config, site);
+  if (filePath !== void 0 && filePath !== "") {
+    return join3(projectRoot, entry.contentDir, filePath);
+  }
+  const template = entry.blogFilenameTemplate ?? DEFAULT_BLOG_FILENAME_TEMPLATE;
+  return join3(projectRoot, entry.contentDir, template.replaceAll("{slug}", slug));
+}
+var DEFAULT_BLOG_FILENAME_TEMPLATE;
+var init_paths = __esm({
+  "../core/src/paths.ts"() {
+    "use strict";
+    init_content_index();
+    DEFAULT_BLOG_FILENAME_TEMPLATE = "{slug}/index.md";
+  }
+});
+
+// ../core/src/cli.ts
+import { isAbsolute, resolve } from "node:path";
+function parseArgs(argv2, known, booleanFlags = []) {
+  const positional = [];
+  const flags = {};
+  const booleans = /* @__PURE__ */ new Set();
+  const knownSet = new Set(known);
+  const boolSet = new Set(booleanFlags);
+  for (let i = 0; i < argv2.length; i++) {
+    const a = argv2[i];
+    if (!a.startsWith("--")) {
+      positional.push(a);
+      continue;
+    }
+    const eq = a.indexOf("=");
+    const name = eq >= 0 ? a.slice(2, eq) : a.slice(2);
+    if (boolSet.has(name)) {
+      booleans.add(name);
+      continue;
+    }
+    if (!knownSet.has(name)) {
+      throw new Error(`Unknown flag: --${name}`);
+    }
+    if (eq >= 0) {
+      flags[name] = a.slice(eq + 1);
+    } else {
+      const next = argv2[i + 1];
+      if (next === void 0 || next.startsWith("--")) {
+        throw new Error(`Flag --${name} requires a value`);
+      }
+      flags[name] = next;
+      i++;
+    }
+  }
+  return { positional, flags, booleans };
+}
+function absolutize(pathArg) {
+  return isAbsolute(pathArg) ? pathArg : resolve(process.cwd(), pathArg);
+}
+function fail(message, code = 1) {
+  process.stderr.write(`${message}
+`);
+  process.exit(code);
+}
+function emit(result) {
+  process.stdout.write(`${JSON.stringify(result, null, 2)}
+`);
+}
+var init_cli = __esm({
+  "../core/src/cli.ts"() {
+    "use strict";
+  }
+});
+
+// src/commands/add.ts
+var add_exports = {};
+__export(add_exports, {
+  run: () => run
+});
+async function run(argv2) {
+  const KNOWN_FLAGS3 = ["site", "type", "content-url", "source", "slug"];
+  const SLUG_RE2 = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
+  const { positional, flags } = parse();
+  if (positional.length < 2) {
+    fail(
+      "Usage: deskwork-add <project-root> [--site <slug>] [--type blog|youtube|tool] [--content-url URL] [--source manual|analytics] [--slug <path>] <title> [description]",
+      2
+    );
+  }
+  if (flags.slug !== void 0 && !SLUG_RE2.test(flags.slug)) {
+    fail(
+      `--slug must be one or more /-separated kebab-case segments (got "${flags.slug}")`,
+      2
+    );
+  }
+  const [rootArg, title, ...rest] = positional;
+  const description = rest.join(" ").trim();
+  const projectRoot = absolutize(rootArg);
+  let config;
+  try {
+    config = readConfig(projectRoot);
+  } catch (err2) {
+    fail(err2 instanceof Error ? err2.message : String(err2));
+  }
+  const site = resolveSite(config, flags.site);
+  const calendarPath = resolveCalendarPath(projectRoot, config, site);
+  let contentType;
+  if (flags.type !== void 0) {
+    if (!isContentType(flags.type)) {
+      fail(`Invalid --type "${flags.type}". Must be one of: blog, youtube, tool.`);
+    }
+    contentType = flags.type;
+  }
+  let source = "manual";
+  if (flags.source !== void 0) {
+    if (flags.source !== "manual" && flags.source !== "analytics") {
+      fail(`Invalid --source "${flags.source}". Must be "manual" or "analytics".`);
+    }
+    source = flags.source;
+  }
+  const calendar = readCalendar(calendarPath);
+  let entry;
+  try {
+    entry = addEntry(calendar, title, {
+      description,
+      source,
+      ...contentType !== void 0 ? { contentType } : {},
+      ...flags["content-url"] !== void 0 ? { contentUrl: flags["content-url"] } : {},
+      ...flags.slug !== void 0 ? { slug: flags.slug } : {}
+    });
+  } catch (err2) {
+    fail(err2 instanceof Error ? err2.message : String(err2));
+  }
+  writeCalendar(calendarPath, calendar);
+  emit({
+    slug: entry.slug,
+    title: entry.title,
+    stage: entry.stage,
+    description: entry.description,
+    site,
+    calendarPath,
+    contentType: entry.contentType,
+    contentUrl: entry.contentUrl
+  });
+  function parse() {
+    try {
+      return parseArgs(argv2, KNOWN_FLAGS3);
+    } catch (err2) {
+      fail(err2 instanceof Error ? err2.message : String(err2), 2);
+    }
+  }
+}
+var init_add = __esm({
+  "src/commands/add.ts"() {
+    "use strict";
+    init_config();
+    init_calendar();
+    init_calendar_mutations();
+    init_paths();
+    init_types();
+    init_cli();
+  }
+});
+
+// ../core/src/journal.ts
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync as readFileSync4,
+  readdirSync as readdirSync2,
+  unlinkSync,
+  writeFileSync as writeFileSync3
+} from "node:fs";
+import { join as join4 } from "node:path";
+function normalizeTimestamp(iso) {
+  return iso.replace(/[:.]/g, "-");
+}
+function ensureDir(dir) {
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+}
+function recordFilename(timestamp, id) {
+  return `${normalizeTimestamp(timestamp)}-${id}.json`;
+}
+function findFileById(dir, id) {
+  if (!existsSync(dir)) return null;
+  const suffix = `-${id}.json`;
+  for (const name of readdirSync2(dir)) {
+    if (name.endsWith(suffix)) return join4(dir, name);
+  }
+  return null;
+}
+function readFile(path) {
+  try {
+    const text = readFileSync4(path, "utf-8");
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+function readJournal(dir, options = {}) {
+  if (!existsSync(dir)) return [];
+  const timestampField = options.timestampField ?? "timestamp";
+  const records = [];
+  for (const name of readdirSync2(dir)) {
+    if (!name.endsWith(".json")) continue;
+    const record = readFile(join4(dir, name));
+    if (record === null) continue;
+    records.push(record);
+  }
+  records.sort((a, b) => {
+    const aKey = String(a[timestampField] ?? "");
+    const bKey = String(b[timestampField] ?? "");
+    return aKey.localeCompare(bKey);
+  });
+  return records;
+}
+function appendJournal(dir, record, options = {}) {
+  ensureDir(dir);
+  const idField = options.idField ?? "id";
+  const timestampField = options.timestampField ?? "timestamp";
+  const id = String(record[idField] ?? "");
+  const timestamp = String(record[timestampField] ?? "");
+  if (!id) throw new Error(`appendJournal: record has no \`${idField}\` field`);
+  if (!timestamp) throw new Error(`appendJournal: record has no \`${timestampField}\` field`);
+  const existing = findFileById(dir, id);
+  const target = existing ?? join4(dir, recordFilename(timestamp, id));
+  writeFileSync3(target, JSON.stringify(record, null, 2) + "\n", "utf-8");
+}
+var init_journal = __esm({
+  "../core/src/journal.ts"() {
+    "use strict";
+  }
+});
+
+// ../core/src/review/journal-mappers.ts
+function synthesizeHistoryId(entry) {
+  switch (entry.kind) {
+    case "workflow-created":
+      return `created-${entry.workflow.id}`;
+    case "workflow-state":
+      return `state-${entry.workflowId}-${normalizeTimestamp(entry.at)}`;
+    case "version":
+      return `version-${entry.workflowId}-v${entry.version.version}`;
+    case "annotation":
+      return entry.annotation.id;
+  }
+}
+function envelopeFor(entry) {
+  return {
+    id: synthesizeHistoryId(entry),
+    timestamp: entry.at,
+    entry
+  };
+}
+function unwrap(env) {
+  return env.entry;
+}
+var init_journal_mappers = __esm({
+  "../core/src/review/journal-mappers.ts"() {
+    "use strict";
+    init_journal();
+  }
+});
+
+// ../core/src/review/types.ts
+function isValidTransition(from, to) {
+  return VALID_TRANSITIONS[from].includes(to);
+}
+var VALID_TRANSITIONS;
+var init_types2 = __esm({
+  "../core/src/review/types.ts"() {
+    "use strict";
+    VALID_TRANSITIONS = {
+      open: ["in-review", "cancelled"],
+      "in-review": ["iterating", "approved", "cancelled"],
+      iterating: ["in-review", "cancelled"],
+      approved: ["applied", "cancelled"],
+      applied: [],
+      cancelled: []
+    };
+  }
+});
+
+// ../core/src/review/pipeline.ts
+import { randomUUID as randomUUID3 } from "node:crypto";
+import { join as join5 } from "node:path";
+function reviewJournalRoot(projectRoot, config) {
+  return join5(projectRoot, config.reviewJournalDir ?? DEFAULT_JOURNAL_DIR);
+}
+function pipelinePath(projectRoot, config) {
+  return join5(reviewJournalRoot(projectRoot, config), PIPELINE_SUBDIR);
+}
+function historyPath(projectRoot, config) {
+  return join5(reviewJournalRoot(projectRoot, config), HISTORY_SUBDIR);
+}
+function readWorkflows(projectRoot, config) {
+  return readJournal(pipelinePath(projectRoot, config), {
+    timestampField: "createdAt"
+  });
+}
+function readHistory(projectRoot, config) {
+  const envelopes = readJournal(
+    historyPath(projectRoot, config)
+  );
+  return envelopes.map(unwrap);
+}
+function readWorkflow(projectRoot, config, id) {
+  return readWorkflows(projectRoot, config).find((w) => w.id === id) ?? null;
+}
+function writeWorkflow(projectRoot, config, workflow) {
+  appendJournal(pipelinePath(projectRoot, config), workflow, {
+    idField: "id",
+    timestampField: "createdAt"
+  });
+}
+function writeHistory(projectRoot, config, entry) {
+  appendJournal(historyPath(projectRoot, config), envelopeFor(entry), {
+    idField: "id",
+    timestampField: "timestamp"
+  });
+}
+function matchesKey(w, k) {
+  const idMatch = k.entryId && w.entryId ? w.entryId === k.entryId : w.site === k.site && w.slug === k.slug;
+  return idMatch && w.contentKind === k.contentKind && (w.platform ?? null) === (k.platform ?? null) && (w.channel ?? null) === (k.channel ?? null);
+}
+function findOpenByKey(projectRoot, config, params) {
+  return readWorkflows(projectRoot, config).find(
+    (w) => matchesKey(w, params) && w.state !== "applied" && w.state !== "cancelled"
+  ) ?? null;
+}
+function createWorkflow(projectRoot, config, params) {
+  const existing = findOpenByKey(projectRoot, config, params);
+  if (existing) return existing;
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const item = {
+    id: randomUUID3(),
+    site: params.site,
+    slug: params.slug,
+    contentKind: params.contentKind,
+    state: "open",
+    currentVersion: 1,
+    createdAt: now,
+    updatedAt: now
+  };
+  if (params.entryId !== void 0) item.entryId = params.entryId;
+  if (params.platform !== void 0) item.platform = params.platform;
+  if (params.channel !== void 0) item.channel = params.channel;
+  writeWorkflow(projectRoot, config, item);
+  writeHistory(projectRoot, config, {
+    kind: "workflow-created",
+    at: now,
+    workflow: item
+  });
+  const v1 = {
+    version: 1,
+    markdown: params.initialMarkdown,
+    createdAt: now,
+    originatedBy: params.initialOriginatedBy ?? "agent"
+  };
+  writeHistory(projectRoot, config, {
+    kind: "version",
+    at: now,
+    workflowId: item.id,
+    version: v1
+  });
+  return item;
+}
+function listOpen(projectRoot, config, site) {
+  return readWorkflows(projectRoot, config).filter(
+    (w) => w.state !== "applied" && w.state !== "cancelled" && (!site || w.site === site)
+  );
+}
+function transitionState(projectRoot, config, workflowId, to) {
+  const current = readWorkflow(projectRoot, config, workflowId);
+  if (!current) throw new Error(`Unknown workflow: ${workflowId}`);
+  if (!isValidTransition(current.state, to)) {
+    throw new Error(
+      `Invalid transition for workflow ${workflowId}: ${current.state} \u2192 ${to}`
+    );
+  }
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const updated = { ...current, state: to, updatedAt: now };
+  writeWorkflow(projectRoot, config, updated);
+  writeHistory(projectRoot, config, {
+    kind: "workflow-state",
+    at: now,
+    workflowId,
+    from: current.state,
+    to
+  });
+  return updated;
+}
+function appendVersion(projectRoot, config, workflowId, markdown, originatedBy) {
+  const current = readWorkflow(projectRoot, config, workflowId);
+  if (!current) throw new Error(`Unknown workflow: ${workflowId}`);
+  const now = (/* @__PURE__ */ new Date()).toISOString();
+  const version = {
+    version: current.currentVersion + 1,
+    markdown,
+    createdAt: now,
+    originatedBy
+  };
+  writeHistory(projectRoot, config, {
+    kind: "version",
+    at: now,
+    workflowId,
+    version
+  });
+  const updated = {
+    ...current,
+    currentVersion: version.version,
+    updatedAt: now
+  };
+  writeWorkflow(projectRoot, config, updated);
+  return version;
+}
+function appendAnnotation(projectRoot, config, annotation) {
+  writeHistory(projectRoot, config, {
+    kind: "annotation",
+    at: annotation.createdAt,
+    annotation
+  });
+}
+function readVersions(projectRoot, config, workflowId) {
+  const versions = [];
+  for (const entry of readHistory(projectRoot, config)) {
+    if (entry.kind === "version" && entry.workflowId === workflowId) {
+      versions.push(entry.version);
+    }
+  }
+  return versions.sort((a, b) => a.version - b.version);
+}
+function readAnnotations(projectRoot, config, workflowId, version) {
+  const anns = [];
+  for (const entry of readHistory(projectRoot, config)) {
+    if (entry.kind !== "annotation") continue;
+    const a = entry.annotation;
+    if (a.workflowId !== workflowId) continue;
+    if (version === void 0) {
+      anns.push(a);
+      continue;
+    }
+    const matchesVersion = a.type === "comment" && a.version === version || a.type === "approve" && a.version === version || a.type === "reject" && a.version === version || a.type === "edit" && a.beforeVersion === version;
+    if (matchesVersion) anns.push(a);
+  }
+  return anns;
+}
+function mintAnnotation(partial) {
+  return {
+    ...partial,
+    id: randomUUID3(),
+    createdAt: (/* @__PURE__ */ new Date()).toISOString()
+  };
+}
+var DEFAULT_JOURNAL_DIR, PIPELINE_SUBDIR, HISTORY_SUBDIR;
+var init_pipeline = __esm({
+  "../core/src/review/pipeline.ts"() {
+    "use strict";
+    init_journal();
+    init_journal_mappers();
+    init_types2();
+    DEFAULT_JOURNAL_DIR = ".deskwork/review-journal";
+    PIPELINE_SUBDIR = "pipeline";
+    HISTORY_SUBDIR = "history";
+  }
+});
+
+// ../core/src/review/handlers.ts
+function err(status, message) {
+  return { status, body: { error: message } };
+}
+function ok(body) {
+  return { status: 200, body };
+}
+function handleGetWorkflow(projectRoot, config, query) {
+  if (query.id) {
+    const workflow = readWorkflow(projectRoot, config, query.id);
+    if (!workflow) return err(404, `unknown workflow id: ${query.id}`);
+    return ok({
+      workflow,
+      versions: readVersions(projectRoot, config, workflow.id)
+    });
+  }
+  if (!query.entryId && (!query.site || !query.slug)) {
+    return err(400, "either id, entryId, or (site & slug) query params are required");
+  }
+  if (query.site && !(query.site in config.sites)) {
+    const known = Object.keys(config.sites).join(", ");
+    return err(400, `unknown site: ${query.site}. Configured: ${known}`);
+  }
+  const contentKind = query.contentKind ?? "longform";
+  const candidates = readWorkflows(projectRoot, config).filter((w) => {
+    const identityMatch = query.entryId && w.entryId ? w.entryId === query.entryId : query.site && query.slug ? w.site === query.site && w.slug === query.slug : false;
+    return identityMatch && w.contentKind === contentKind && (w.platform ?? null) === (query.platform ?? null) && (w.channel ?? null) === (query.channel ?? null);
+  });
+  if (candidates.length === 0) {
+    const key = query.entryId ? `entryId=${query.entryId}` : `${query.site ?? "?"}/${query.slug ?? "?"}`;
+    return err(404, `no workflow for ${key} (${contentKind})`);
+  }
+  const isTerminal = (s) => s === "applied" || s === "cancelled";
+  const match = [...candidates].sort((a, b) => {
+    const aTerm = isTerminal(a.state) ? 1 : 0;
+    const bTerm = isTerminal(b.state) ? 1 : 0;
+    if (aTerm !== bTerm) return aTerm - bTerm;
+    return b.createdAt.localeCompare(a.createdAt);
+  })[0];
+  return ok({ workflow: match, versions: readVersions(projectRoot, config, match.id) });
+}
+var init_handlers = __esm({
+  "../core/src/review/handlers.ts"() {
+    "use strict";
+    init_paths();
+    init_pipeline();
+  }
+});
+
+// src/commands/approve.ts
+var approve_exports = {};
+__export(approve_exports, {
+  run: () => run2
+});
+import { existsSync as existsSync2 } from "node:fs";
+async function run2(argv2) {
+  const KNOWN_FLAGS3 = ["site", "platform", "channel"];
+  const SLUG_RE2 = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
+  const { positional, flags } = parse();
+  if (positional.length < 2) {
+    fail(
+      "Usage: deskwork-approve <project-root> [--site <slug>] <slug> [--platform <p>] [--channel <c>]",
+      2
+    );
+  }
+  const [rootArg, slug] = positional;
+  const projectRoot = absolutize(rootArg);
+  if (!SLUG_RE2.test(slug)) {
+    fail(`invalid slug: ${slug} (must match ${SLUG_RE2})`);
+  }
+  if (flags.platform !== void 0 && !isPlatform(flags.platform)) {
+    fail(`Invalid --platform "${flags.platform}".`);
+  }
+  let config;
+  try {
+    config = readConfig(projectRoot);
+  } catch (err2) {
+    fail(err2 instanceof Error ? err2.message : String(err2));
+  }
+  const site = resolveSite(config, flags.site);
+  const contentKind = flags.platform ? "shortform" : "longform";
+  const fetched = handleGetWorkflow(projectRoot, config, {
+    id: null,
+    site,
+    slug,
+    contentKind,
+    platform: flags.platform ?? null,
+    channel: flags.channel ?? null
+  });
+  if (fetched.status !== 200 || !isSuccessBody(fetched.body)) {
+    fail(
+      `no ${contentKind} workflow for ${site}/${slug}: ${errorMessage(fetched.body)}`
+    );
+  }
+  const workflow = fetched.body.workflow;
+  const versions = fetched.body.versions;
+  if (workflow.state !== "approved") {
+    fail(
+      `Workflow state is '${workflow.state}', not 'approved'. Click Approve in the review UI first (that records which version was approved).`
+    );
+  }
+  const annotations = readAnnotations(projectRoot, config, workflow.id);
+  const approveAnn = latestApprove(annotations);
+  const approvedVersion = approveAnn?.version ?? workflow.currentVersion;
+  if (contentKind === "longform") {
+    applyLongform(workflow, approvedVersion);
+  } else {
+    applyShortform(workflow, versions, approvedVersion);
+  }
+  function applyLongform(workflow2, approvedVersion2) {
+    if (approvedVersion2 !== workflow2.currentVersion) {
+      fail(
+        `Approved v${approvedVersion2}, but workflow is at v${workflow2.currentVersion}. Disk has moved on since the approve click \u2014 re-click Approve on v${workflow2.currentVersion} or iterate back.`
+      );
+    }
+    const blogFile = resolveBlogFilePath(projectRoot, config, site, slug);
+    if (!existsSync2(blogFile)) {
+      fail(`Blog file missing at ${blogFile}. Nothing to approve against.`);
+    }
+    transitionState(projectRoot, config, workflow2.id, "applied");
+    emit({
+      workflowId: workflow2.id,
+      site,
+      slug,
+      contentKind: "longform",
+      state: "applied",
+      version: approvedVersion2,
+      filePath: blogFile
+    });
+  }
+  function applyShortform(workflow2, versions2, approvedVersion2) {
+    if (!flags.platform) fail("--platform is required for shortform workflows");
+    const approvedMarkdown = versions2.find((v) => v.version === approvedVersion2)?.markdown;
+    if (approvedMarkdown === void 0) {
+      fail(`Approved v${approvedVersion2} not found in history.`);
+    }
+    const calendarPath = resolveCalendarPath(projectRoot, config, site);
+    const cal = readCalendar(calendarPath);
+    const channelLower = flags.channel?.toLowerCase();
+    const match = cal.distributions.find((d) => {
+      if (d.slug !== slug) return false;
+      if (d.platform !== flags.platform) return false;
+      if (channelLower !== void 0) {
+        return (d.channel?.toLowerCase() ?? "") === channelLower;
+      }
+      return !d.channel;
+    });
+    if (!match) {
+      const channelBit = flags.channel ? ` \xB7 channel=${flags.channel}` : "";
+      fail(
+        `No distribution record for (slug=${slug}, platform=${flags.platform}${channelBit}). Create it with /deskwork:distribute first.`
+      );
+    }
+    match.shortform = approvedMarkdown;
+    writeCalendar(calendarPath, cal);
+    transitionState(projectRoot, config, workflow2.id, "applied");
+    emit({
+      workflowId: workflow2.id,
+      site,
+      slug,
+      contentKind: "shortform",
+      state: "applied",
+      version: approvedVersion2,
+      platform: flags.platform,
+      channel: flags.channel,
+      calendarPath
+    });
+  }
+  function latestApprove(annotations2) {
+    const approves = annotations2.filter(
+      (a) => a.type === "approve"
+    );
+    if (approves.length === 0) return void 0;
+    return approves.reduce((a, b) => a.createdAt > b.createdAt ? a : b);
+  }
+  function isSuccessBody(body) {
+    if (typeof body !== "object" || body === null) return false;
+    return "workflow" in body && "versions" in body;
+  }
+  function errorMessage(body) {
+    if (typeof body === "object" && body !== null) {
+      const value = Reflect.get(body, "error");
+      if (typeof value === "string") return value;
+    }
+    return "unknown error";
+  }
+  function parse() {
+    try {
+      return parseArgs(argv2, KNOWN_FLAGS3);
+    } catch (err2) {
+      fail(err2 instanceof Error ? err2.message : String(err2), 2);
+    }
+  }
+}
+var init_approve = __esm({
+  "src/commands/approve.ts"() {
+    "use strict";
+    init_config();
+    init_paths();
+    init_calendar();
+    init_handlers();
+    init_pipeline();
+    init_types();
+    init_cli();
   }
 });
 
@@ -12102,7 +12103,7 @@ function stripOutlineSection(body) {
 function bodyState(filePath) {
   if (!existsSync11(filePath)) return "missing";
   const content = readFileSync12(filePath, "utf8");
-  const fmMatch = content.match(/^---\n[\s\S]*?\n---\n?/);
+  const fmMatch = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
   const body = fmMatch ? content.slice(fmMatch[0].length) : content;
   const withoutH1 = body.replace(/^\s*#[^\n]*\n?/, "");
   const withoutOutline = stripOutlineSection(withoutH1);

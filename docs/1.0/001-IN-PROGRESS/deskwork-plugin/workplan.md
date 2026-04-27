@@ -593,13 +593,21 @@ Tasks are grouped by sub-phase. Sub-phases are sequential (19a → 19b → 19c �
 
 #### 19c — Path encoding rewire + content-tree inversion
 
-- [ ] `packages/core/src/paths.ts`: new `findEntryFile(projectRoot, config, site, entryId, index?)` — looks up the file by id via the content index. `resolveBlogFilePath` becomes a thin wrapper with template-fallback for legacy entries (entries whose file doesn't yet have `id` in frontmatter).
-- [ ] `packages/core/src/scrapbook.ts`: new `scrapbookDirForEntry(projectRoot, config, site, entryId, index?)` — derives `<dirname(file)>/scrapbook/` from the content index. The path-addressed `scrapbookDirAtPath` (already present) stays for direct path lookups.
-- [ ] `packages/core/src/content-tree.ts` (**epicenter**): `ContentNode.slug` → `ContentNode.path`. Tree assembly: walk fs (already does this), for each fs node parse frontmatter, look up the calendar entry by id, overlay state. Calendar entries whose file lacks an id (pre-doctor) fall back to today's slug-based join with a one-time warning per entry.
-- [ ] `packages/core/test/content-tree.test.ts` (extend): the writingcontrol scenario — calendar entry id=X with file at `projects/the-outbound/index.md` (frontmatter `id: X`) overlays onto fs node `projects/the-outbound`. No ghost root. The audiocontrol-shape scenario (flat fs, frontmatter id present) renders identically to today's tree.
-- [ ] `packages/core/src/body-state.ts:53`: opportunistic regex consistency fix — bring its frontmatter regex in line with `frontmatter.ts` (`\r?\n` for Windows files).
+- [x] `packages/core/src/paths.ts`: added `findEntryFile(projectRoot, config, site, entryId, index?, legacyEntryForFallback?)` with documented precedence (index → template). `resolveBlogFilePath` signature unchanged; behavior preserved for legacy callers.
+- [x] `packages/core/src/scrapbook.ts`: added `scrapbookDirForEntry(projectRoot, config, site, entry, index?)`. Path-addressed `scrapbookDirAtPath` (already present) stays.
+- [x] `packages/core/src/content-tree.ts` (**inverted**): `ContentNode.slug` → `ContentNode.path` (structural). New optional `ContentNode.slug` for display, populated only when an entry overlays the node. Tree assembly: walks fs, builds content index, overlays calendar entries via `index.byPath`. Pre-doctor entries fall back to slug-as-path matching with a one-time warning per such entry.
+- [x] Module split: `content-tree.ts` (408 lines, was 579) + `content-tree-types.ts` (161) + `content-tree-helpers.ts` (135) + `content-tree-fs-walk.ts` (137). Public re-exports preserved at `content-tree.ts`.
+- [x] `packages/core/test/content-tree.test.ts`: 4 new Phase 19c scenarios — writingcontrol post-doctor (entry overlays at `projects/the-outbound`, no ghost), audiocontrol post-doctor, legacy slug-fallback with warning, ghost-when-neither-binding-nor-slug-match.
+- [x] `packages/core/test/paths.test.ts`: 4 new tests for `findEntryFile` precedence (index hit, index miss with template fallback, no fallback, missing entry).
+- [x] `packages/core/test/scrapbook.test.ts`: 6 new tests covering `scrapbookDirAtPath` and `scrapbookDirForEntry`.
+- [x] `packages/core/src/body-state.ts`: regex now `\r?\n` to match `frontmatter.ts` (CRLF support). Test added.
+- [x] `packages/studio/src/pages/content.ts` + `content-detail.ts`: `node.slug` → `node.path` for structural identity; review URL uses `node.slug ?? node.path` (slug-when-tracked); scrapbook URLs always use path. New "public URL: /blog/<slug>" hover hint when overlay entry's slug differs from path.
 
-**Acceptance:** writingcontrol scenario test passes (entry → fs node binding via frontmatter id); audiocontrol scenario unchanged; legacy slug-fallback path still works for entries pre-doctor.
+**Acceptance:** ✅ writingcontrol scenario test passes (entry → fs node binding via frontmatter id; no ghost). Audiocontrol scenario renders identically to pre-Phase-19c. Legacy slug-fallback still works for pre-doctor entries. Tests 480 → 495 (+15: 4 content-tree, 4 paths, 6 scrapbook, 1 body-state). Typecheck clean for all 3 packages.
+
+**Notes:**
+- The studio's `:project{.+}` and `?node=<value>` route shapes already accept fs paths (no server.ts changes required for 19c). Phase 19d will add id-based review routes.
+- Ghost-case warning: when neither id-binding nor slug-as-path matches, the entry remains a ghost root silently. Surfacing this with a second warning shape is a one-line addition for a future hardening pass.
 
 #### 19d — Studio id-routing + workflow id-keying
 

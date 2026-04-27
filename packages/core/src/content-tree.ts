@@ -1,294 +1,83 @@
 /**
- * Bird's-eye content-tree builder (Phase 16d, inverted in v0.6.0 / #24).
+ * Bird's-eye content-tree builder (Phase 16d, fs-inverted in v0.6.0 / #24,
+ * fs-keyed in Phase 19c / #33).
  *
  * Derives a tree-of-nodes representation from the host project's
  * filesystem, with the editorial calendar overlaid as a state layer.
  *
  *   - The **filesystem walk** is the primary structure source. Every
- *     directory under `<contentDir>/` becomes a node. Directories that
- *     contain a `README.md` (or `index.md`) are surfaced as
- *     organizational nodes when no calendar entry covers their slug.
+ *     directory under `<contentDir>/` becomes a node, keyed by its
+ *     fs-relative path (e.g. `projects/the-outbound`).
  *   - The **calendar** is the state overlay. A calendar entry whose
- *     slug matches a fs node sets the node's lane (its lifecycle
- *     stage) and its display title. A calendar entry whose slug has
- *     no fs counterpart still appears (the calendar is authoritative
- *     for "this entry exists"); it just doesn't get a README excerpt.
+ *     `id` matches an fs node's frontmatter `id:` (via the content
+ *     index) sets the node's lane (its lifecycle stage), display
+ *     title, AND the `slug` display attribute (the entry's
+ *     host-rendering-engine slug, used by the studio for the
+ *     "public URL: /blog/<slug>" hover hint).
  *
  * Read-only — never mutates the calendar or the filesystem. Callers
  * cache the result for the lifetime of a single request unless the
  * caller knows the underlying data has changed.
  *
- * Inversion rationale (#24): the studio's bird's-eye view should
- * surface organizational README nodes (e.g.
- * `the-outbound/characters/README.md` with no calendar entry) so the
- * operator sees the structure of the work — not just the calendar's
- * subset of it. Until v0.6.0 the calendar was primary and fs was an
- * ancestor-fill mechanism; that meant orgnizational READMEs were
- * invisible. Inverted: fs walks first; calendar overlays state.
+ * Inversion rationale (#33): pre-19c the tree keyed nodes by **slug**.
+ * This worked for audiocontrol's flat layout where slug == fs path,
+ * but broke for writingcontrol where slug `the-outbound` (the
+ * Astro-derived public URL) is unrelated to the file's path
+ * (`projects/the-outbound/index.md`). The ghost-root bug came from
+ * union-by-slug producing a calendar-only tree at slug
+ * `the-outbound` plus a separate untracked tree under `projects/`
+ * that never merged.
+ *
+ * Now: tree placement is filesystem-driven. Each fs node carries the
+ * relative path (e.g. `projects/the-outbound`). Calendar entries
+ * overlay state onto fs nodes by matching the entry's `id` against
+ * the file's frontmatter `id:` via `buildContentIndex`. Slug stops
+ * being load-bearing structurally and becomes a display attribute.
+ *
+ * Legacy slug-fallback (intentional, for pre-doctor entries): when a
+ * calendar entry's id isn't found in the content index (its file
+ * hasn't been bound to frontmatter yet), the assembly looks for an
+ * fs node whose path equals the entry's slug. If found → overlay
+ * with a one-time warning hinting at `deskwork doctor`. If not found
+ * → place the entry as a ghost node (preserving today's behavior
+ * for entries with neither id-binding nor a path-shaped slug).
+ * This is NOT a "fallback for missing functionality" in the project
+ * rule's sense — it's a deliberate transitional path that the doctor
+ * command resolves operator-side.
  */
 
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
 import type { CalendarEntry, Stage } from './types.ts';
 import type { DeskworkConfig } from './config.ts';
+import { buildContentIndex } from './content-index.ts';
 import { listScrapbook } from './scrapbook.ts';
 import { resolveContentDir } from './paths.ts';
-import { parseFrontmatter } from './frontmatter.ts';
+import { defaultFsWalk, type FsWalkEntry } from './content-tree-fs-walk.ts';
+import {
+  ancestorsOf,
+  entryHasOwnIndex,
+  findIdBoundPath,
+  idBoundFile,
+  leafOfPath,
+  pickLatestMtime,
+  rootSegment,
+} from './content-tree-helpers.ts';
+import type {
+  BuildOptions,
+  ContentNode,
+  ContentProject,
+  FlatNode,
+} from './content-tree-types.ts';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-/** A node in the content tree. */
-export interface ContentNode {
-  /** Site slug — passed through from the input. */
-  site: string;
-  /**
-   * Hierarchical slug (`/`-separated). Either a tracked entry's slug
-   * or a filesystem-discovered directory path under contentDir.
-   */
-  slug: string;
-  /** Display title. Resolution order: calendar entry title → README/index frontmatter title → leaf slug segment. */
-  title: string;
-  /**
-   * Lifecycle stage when the node corresponds to a tracked calendar
-   * entry. `null` for organizational nodes (filesystem-only — no
-   * calendar entry).
-   */
-  lane: Stage | null;
-  /**
-   * Underlying calendar entry, when present. `null` for organizational
-   * filesystem nodes. Distinguishes "tracked / has lane" from
-   * "structural only / no lane".
-   */
-  entry: CalendarEntry | null;
-  /**
-   * True when the node has its own `index.md` / `README.md` on disk.
-   * Used by the UI to pick branch / leaf icons and (for organizational
-   * nodes) to decide whether the detail panel can show a README excerpt.
-   */
-  hasOwnIndex: boolean;
-  /**
-   * True when the node was discovered by the filesystem walk
-   * (independent of whether it has a calendar entry). Pure-calendar
-   * nodes (entry exists, no fs directory) report false here. Used by
-   * the studio detail panel to decide whether organizational README
-   * content is fetchable.
-   */
-  hasFsDir: boolean;
-  /** Items at `<contentDir>/<slug>/scrapbook/` (public + secret). */
-  scrapbookCount: number;
-  /**
-   * Most recent mtime across the node's scrapbook items (ISO8601), or
-   * `null` when the scrapbook is empty / absent.
-   */
-  scrapbookMostRecentMtime: string | null;
-  /** Direct children — already sorted in slug order. */
-  children: ContentNode[];
-}
-
-/**
- * Project-level tree summary returned by `buildContentTree`. Operators
- * use this both for the per-project drilldown and for the top-level
- * site cards (counts + lanes derive from the same shape).
- */
-export interface ContentProject {
-  site: string;
-  /** First slug segment — the project root (e.g. `the-outbound`). */
-  rootSlug: string;
-  /**
-   * Display name for the project. When a tracked entry exists at the
-   * root slug, its `title` is used; otherwise the README frontmatter
-   * title or the rootSlug verbatim.
-   */
-  title: string;
-  /** Total tracked entries beneath this project (recursive). */
-  trackedCount: number;
-  /** Total tree nodes including organizational nodes (recursive). */
-  totalNodes: number;
-  /** Maximum depth (1 = single root node, 2 = root + leaves, …). */
-  maxDepth: number;
-  /** Sum of scrapbookCount across every node beneath this project. */
-  scrapbookCount: number;
-  /**
-   * Predominant lane across tracked nodes — the most-frequent stage,
-   * tie-broken by the lane order (`STAGES`). `null` when the project
-   * has no tracked entries.
-   */
-  predominantLane: Stage | null;
-  /** The project root node (its descendants live in `.children`). */
-  root: ContentNode;
-}
-
-/**
- * One row of the filesystem walk: a directory found under contentDir,
- * plus the on-disk markers (README / index) used to decide whether
- * it's a candidate organizational node.
- */
-export interface FsWalkEntry {
-  /** Slug-style relative path from contentDir (e.g. `the-outbound/characters`). */
-  slug: string;
-  /** True when the directory has an `index.md` / `index.mdx` file. */
-  hasIndex: boolean;
-  /**
-   * True when the directory has a `README.md` / `README.mdx` file.
-   * Used to surface organizational nodes that aren't part of the
-   * calendar's tracked set.
-   */
-  hasReadme: boolean;
-  /** Title from the README/index frontmatter `title` field, when present. */
-  title: string | null;
-}
-
-export interface BuildOptions {
-  /**
-   * Override scrapbook lookups — useful for tests that don't want to
-   * depend on the real filesystem layout. Defaults to `listScrapbook`
-   * from `@deskwork/core/scrapbook`.
-   */
-  scrapbookLookup?: (
-    site: string,
-    slug: string,
-  ) => { items: { mtime: string }[]; secretItems: { mtime: string }[] };
-  /**
-   * Override the filesystem walk — used by tests to inject a synthetic
-   * directory shape without writing to disk. Defaults to
-   * `defaultFsWalk` (recursive walk under `resolveContentDir`).
-   */
-  fsWalk?: (site: string) => readonly FsWalkEntry[];
-}
-
-// ---------------------------------------------------------------------------
-// Filesystem walk
-// ---------------------------------------------------------------------------
-
-/** Match the index/README basenames the studio recognizes as a node marker. */
-const INDEX_BASENAMES = new Set([
-  'index.md', 'index.mdx', 'index.markdown',
-]);
-const README_BASENAMES = new Set([
-  'readme.md', 'readme.mdx', 'readme.markdown',
-]);
-
-function readTitleFromMarkdown(absPath: string): string | null {
-  try {
-    const raw = readFileSync(absPath, 'utf-8');
-    const parsed = parseFrontmatter(raw);
-    const t = parsed.data.title;
-    if (typeof t === 'string' && t.trim().length > 0) return t.trim();
-  } catch {
-    // Unreadable / unparseable — fall through.
-  }
-  return null;
-}
-
-/**
- * Default filesystem walk — recursively scan a site's contentDir for
- * directories. Returns one `FsWalkEntry` per directory beneath
- * contentDir (not contentDir itself). Skips dotfiles and the
- * conventional non-content names (`scrapbook`, `node_modules`, etc.).
- *
- * Per-directory the walk records whether an `index.md` / `README.md`
- * is present and (when present) reads the frontmatter `title`.
- */
-export function defaultFsWalk(
-  projectRoot: string,
-  config: DeskworkConfig,
-  site: string,
-): FsWalkEntry[] {
-  const root = resolveContentDir(projectRoot, config, site);
-  if (!existsSync(root)) return [];
-  const out: FsWalkEntry[] = [];
-  const SKIP = new Set(['scrapbook', 'node_modules', 'dist', '.git']);
-
-  const visit = (dirAbs: string, slugSoFar: string): void => {
-    let names: string[];
-    try {
-      names = readdirSync(dirAbs);
-    } catch {
-      return;
-    }
-    let hasIndex = false;
-    let hasReadme = false;
-    let titleSource: string | null = null;
-    for (const name of names) {
-      const lower = name.toLowerCase();
-      if (INDEX_BASENAMES.has(lower)) {
-        hasIndex = true;
-        if (titleSource === null) titleSource = join(dirAbs, name);
-      } else if (README_BASENAMES.has(lower)) {
-        hasReadme = true;
-        // Prefer index.md as the title source when both exist; only
-        // fall back to README when there is no index.
-        if (titleSource === null && !hasIndex) titleSource = join(dirAbs, name);
-      }
-    }
-    if (slugSoFar !== '') {
-      const title = titleSource ? readTitleFromMarkdown(titleSource) : null;
-      out.push({ slug: slugSoFar, hasIndex, hasReadme, title });
-    }
-    for (const name of names) {
-      if (name.startsWith('.')) continue;
-      if (SKIP.has(name.toLowerCase())) continue;
-      const childAbs = join(dirAbs, name);
-      let childStat;
-      try {
-        childStat = statSync(childAbs);
-      } catch {
-        continue;
-      }
-      if (!childStat.isDirectory()) continue;
-      const childSlug = slugSoFar === '' ? name : `${slugSoFar}/${name}`;
-      visit(childAbs, childSlug);
-    }
-  };
-
-  visit(root, '');
-  return out;
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function leafOfSlug(slug: string): string {
-  const idx = slug.lastIndexOf('/');
-  return idx < 0 ? slug : slug.slice(idx + 1);
-}
-
-function ancestorsOf(slug: string): string[] {
-  const segments = slug.split('/');
-  const out: string[] = [];
-  for (let i = 1; i < segments.length; i++) {
-    out.push(segments.slice(0, i).join('/'));
-  }
-  return out;
-}
-
-function rootSegment(slug: string): string {
-  const idx = slug.indexOf('/');
-  return idx < 0 ? slug : slug.slice(0, idx);
-}
-
-function entryHasOwnIndex(_entry: CalendarEntry): boolean {
-  // Phase 19a dropped `CalendarEntry.filePath`; path-encoding now lives
-  // in frontmatter `id:` resolved via the content index. Without an
-  // explicit per-entry path override on the calendar row, the tree
-  // assumes the host's default template (`<slug>/index.md`) — Phase
-  // 19c will rewire this to consult the content index for the file's
-  // real basename and decide hasOwnIndex from there.
-  return true;
-}
-
-/** Return the most-recent ISO mtime across two values, or null when both are null. */
-function pickLatestMtime(
-  a: string | null,
-  b: string | null,
-): string | null {
-  if (a === null) return b;
-  if (b === null) return a;
-  return a > b ? a : b;
-}
+// Re-export the fs-walk + types so external callers (tests, studio) keep
+// importing from `content-tree.ts` as today — the split is internal.
+export { defaultFsWalk } from './content-tree-fs-walk.ts';
+export type { FsWalkEntry } from './content-tree-fs-walk.ts';
+export type {
+  BuildOptions,
+  ContentNode,
+  ContentProject,
+  FlatNode,
+} from './content-tree-types.ts';
 
 // ---------------------------------------------------------------------------
 // Build
@@ -298,13 +87,22 @@ function pickLatestMtime(
  * Build the content-tree projects for one site. Pure data — no HTML,
  * no path-style decisions.
  *
- * Tree assembly is filesystem-primary (per #24): the walk returns every
- * directory under contentDir; the calendar entries layer state (lane,
- * title) on top. Slugs that exist in the calendar but have no fs
- * counterpart are still surfaced (the calendar is authoritative for
- * "this entry exists"); they render as nodes with `hasFsDir: false`.
- * Slugs that exist in the fs walk but have no calendar entry render
- * as organizational nodes (`entry: null`, `lane: null`).
+ * Tree assembly (Phase 19c):
+ *   1. Walk the fs (`fsWalk`) to enumerate every directory under
+ *      contentDir. Each fs entry contributes a candidate node keyed by
+ *      its fs-relative path.
+ *   2. Build the content index (`buildContentIndex`) to map
+ *      `relPath → entryId` based on frontmatter `id:`.
+ *   3. For each fs node with a markdown index/README, look up the
+ *      bound entry id via `index.byPath`, then resolve the calendar
+ *      entry by id. If found → overlay state (lane, title from entry,
+ *      slug as a display attribute).
+ *   4. For calendar entries whose id is NOT in the index (their file
+ *      isn't bound to frontmatter yet — pre-doctor state), do
+ *      legacy slug fallback: look for an fs node whose path equals
+ *      the entry's slug. If found → overlay with a one-time warning.
+ *      If not found → place as a ghost node (today's behavior,
+ *      preserved for backward compat).
  */
 export function buildContentTree(
   site: string,
@@ -315,9 +113,9 @@ export function buildContentTree(
 ): ContentProject[] {
   const lookup =
     options.scrapbookLookup ??
-    ((siteArg, slug) => {
+    ((siteArg, path) => {
       try {
-        return listScrapbook(projectRoot, config, siteArg, slug);
+        return listScrapbook(projectRoot, config, siteArg, path);
       } catch {
         return { items: [], secretItems: [] };
       }
@@ -326,41 +124,74 @@ export function buildContentTree(
   const fsWalk =
     options.fsWalk ?? ((siteArg) => defaultFsWalk(projectRoot, config, siteArg));
   const fsEntries = fsWalk(site);
-  const fsEntryBySlug = new Map<string, FsWalkEntry>();
-  for (const e of fsEntries) fsEntryBySlug.set(e.slug, e);
+  const fsEntryByPath = new Map<string, FsWalkEntry>();
+  for (const e of fsEntries) fsEntryByPath.set(e.slug, e);
 
-  // Two passes:
-  //   1. Index calendar entries by slug; assemble the union of slugs
-  //      that need nodes (calendar slugs ∪ ancestors ∪ fs slugs).
-  //   2. Build the tree from the union, sourcing each node's title
-  //      and lane from the right authority (calendar wins when both
-  //      sources have data).
-  const entryBySlug = new Map<string, CalendarEntry>();
-  const allSlugs = new Set<string>();
+  const contentIndex =
+    options.contentIndex ?? buildContentIndex(projectRoot, config, site);
+  const warn = options.warn ?? ((msg) => console.warn(msg));
+  const contentDir = resolveContentDir(projectRoot, config, site);
 
-  // Calendar contributes its slugs and their ancestors.
-  for (const e of entries) {
-    entryBySlug.set(e.slug, e);
-    allSlugs.add(e.slug);
-    for (const a of ancestorsOf(e.slug)) allSlugs.add(a);
-  }
-  // Filesystem contributes any directory that has a README.md or
-  // index.md (these are the candidates for organizational nodes), plus
-  // the ancestors of those directories so the tree assembles.
+  // ---- Phase 1: assemble the union of paths that need nodes ----
+  // Calendar entries contribute through TWO routes:
+  //   (a) id-based binding: index.byPath[relPath] === entry.id binds
+  //       the entry to that fs path. The path becomes the node key.
+  //   (b) legacy slug fallback: when (a) doesn't fire, treat the
+  //       entry's slug as a candidate path. If the fs walk includes
+  //       it, overlay there with a warning. Otherwise it's a ghost.
+  const allPaths = new Set<string>();
+  // Track which calendar entries bind to which paths. The path is
+  // either the fs-bound path (id-driven) or the entry's slug (legacy
+  // fallback / ghost).
+  const overlayByPath = new Map<string, CalendarEntry>();
+
+  // Filesystem-derived paths first — every walked dir contributes its
+  // own path AND its ancestors so the tree wires up cleanly.
   for (const e of fsEntries) {
     if (e.hasReadme || e.hasIndex) {
-      allSlugs.add(e.slug);
-      for (const a of ancestorsOf(e.slug)) allSlugs.add(a);
+      allPaths.add(e.slug);
+      for (const a of ancestorsOf(e.slug)) allPaths.add(a);
     }
   }
 
-  const sortedSlugs = [...allSlugs].sort();
-  const nodeBySlug = new Map<string, ContentNode>();
+  // Determine each entry's binding target (id-based, slug-fallback, ghost).
+  for (const entry of entries) {
+    const idBoundPath = findIdBoundPath(entry, contentIndex);
+    if (idBoundPath !== null) {
+      overlayByPath.set(idBoundPath, entry);
+      allPaths.add(idBoundPath);
+      for (const a of ancestorsOf(idBoundPath)) allPaths.add(a);
+      continue;
+    }
+    // Legacy slug-fallback: if the slug looks like an fs path AND
+    // matches a walked dir, overlay there. Otherwise ghost.
+    if (fsEntryByPath.has(entry.slug)) {
+      overlayByPath.set(entry.slug, entry);
+      allPaths.add(entry.slug);
+      for (const a of ancestorsOf(entry.slug)) allPaths.add(a);
+      warn(
+        `[content-tree] Calendar entry "${entry.slug}" matched fs node by slug ` +
+          `(no frontmatter id binding). Run \`deskwork doctor --fix=missing-frontmatter-id\` ` +
+          `to make this binding refactor-proof.`,
+      );
+      continue;
+    }
+    // Ghost: entry exists but has no fs counterpart at slug-equals-path
+    // and no id binding. Surface it (the calendar is authoritative for
+    // "this entry exists") so the operator sees it in the tree.
+    allPaths.add(entry.slug);
+    for (const a of ancestorsOf(entry.slug)) allPaths.add(a);
+    overlayByPath.set(entry.slug, entry);
+  }
 
-  for (const slug of sortedSlugs) {
-    const entry = entryBySlug.get(slug) ?? null;
-    const fsEntry = fsEntryBySlug.get(slug) ?? null;
-    const sb = lookup(site, slug);
+  // ---- Phase 2: build nodes for every path in the union ----
+  const sortedPaths = [...allPaths].sort();
+  const nodeByPath = new Map<string, ContentNode>();
+
+  for (const path of sortedPaths) {
+    const overlay = overlayByPath.get(path) ?? null;
+    const fsEntry = fsEntryByPath.get(path) ?? null;
+    const sb = lookup(site, path);
     const items = [...sb.items, ...sb.secretItems];
     const mostRecent = items.reduce<string | null>(
       (acc, it) => pickLatestMtime(acc, it.mtime),
@@ -369,67 +200,77 @@ export function buildContentTree(
 
     // Title resolution: calendar wins, then fs frontmatter, then leaf.
     const title =
-      entry?.title ??
+      overlay?.title ??
       (fsEntry?.title ?? null) ??
-      leafOfSlug(slug);
+      leafOfPath(path);
 
-    // hasOwnIndex resolution: calendar entry implies the host template
-    // (currently always `<slug>/index.md`); else fs walk's hasIndex ||
-    // hasReadme. Phase 19c will route this through the content index
-    // once entries bind to files via frontmatter id.
+    // hasOwnIndex resolution.
     let hasOwnIndex = false;
-    if (entry !== null) {
-      hasOwnIndex = entryHasOwnIndex(entry);
+    if (overlay !== null) {
+      const boundFile = idBoundFile(overlay, contentIndex);
+      hasOwnIndex = entryHasOwnIndex(
+        contentDir,
+        path,
+        fsEntry?.hasIndex ?? false,
+        fsEntry?.hasReadme ?? false,
+        boundFile,
+        fsEntry !== null,
+      );
     } else if (fsEntry !== null) {
       hasOwnIndex = fsEntry.hasIndex || fsEntry.hasReadme;
     }
 
     const node: ContentNode = {
       site,
-      slug,
+      path,
       title,
-      lane: entry?.stage ?? null,
-      entry,
+      lane: overlay?.stage ?? null,
+      entry: overlay,
       hasOwnIndex,
       hasFsDir: fsEntry !== null,
       scrapbookCount: items.length,
       scrapbookMostRecentMtime: mostRecent,
       children: [],
     };
-    nodeBySlug.set(slug, node);
+    if (overlay?.slug !== undefined) {
+      // Slug only set when an entry overlays — used by the studio for
+      // the "public URL" hover hint. Honoring exactOptionalPropertyTypes:
+      // omit the field entirely rather than assigning undefined.
+      node.slug = overlay.slug;
+    }
+    nodeByPath.set(path, node);
   }
 
-  // Wire up parent → child links by slug shape.
-  for (const slug of sortedSlugs) {
-    const parts = slug.split('/');
+  // Wire up parent → child links by path shape.
+  for (const path of sortedPaths) {
+    const parts = path.split('/');
     if (parts.length === 1) continue;
-    const parentSlug = parts.slice(0, -1).join('/');
-    const parent = nodeBySlug.get(parentSlug);
-    const node = nodeBySlug.get(slug);
+    const parentPath = parts.slice(0, -1).join('/');
+    const parent = nodeByPath.get(parentPath);
+    const node = nodeByPath.get(path);
     if (parent && node) parent.children.push(node);
   }
 
-  // Group root-level slugs by project (their first segment) so the
-  // top-level view can present per-project rollups.
+  // Group root-level paths by project (their first segment).
   const projectRootBy: Map<string, ContentNode[]> = new Map();
-  for (const slug of sortedSlugs) {
-    if (slug.includes('/')) continue;
-    const node = nodeBySlug.get(slug);
+  for (const path of sortedPaths) {
+    if (path.includes('/')) continue;
+    const node = nodeByPath.get(path);
     if (!node) continue;
-    const arr = projectRootBy.get(slug) ?? [];
+    const arr = projectRootBy.get(path) ?? [];
     arr.push(node);
-    projectRootBy.set(slug, arr);
+    projectRootBy.set(path, arr);
   }
 
-  // Some calendars have entries at slugs like `the-outbound/characters/strivers`
-  // with NO root-level entry — so the project root is implicit. For
-  // those cases, surface a synthetic project rooted at the first
-  // segment.
+  // Calendars with entries at deep paths and no top-level fs node
+  // need a synthetic project root at the first path segment.
   const knownRoots = new Set(projectRootBy.keys());
   for (const e of entries) {
-    const root = rootSegment(e.slug);
+    // Compute the path the entry resolves to (id-bound or slug).
+    const idBoundPath = findIdBoundPath(e, contentIndex);
+    const entryPath = idBoundPath ?? e.slug;
+    const root = rootSegment(entryPath);
     if (!knownRoots.has(root)) {
-      // Build a synthetic root node with an empty scrapbook lookup.
       const sb = lookup(site, root);
       const items = [...sb.items, ...sb.secretItems];
       const mostRecent = items.reduce<string | null>(
@@ -438,26 +279,24 @@ export function buildContentTree(
       );
       const synth: ContentNode = {
         site,
-        slug: root,
-        title: leafOfSlug(root),
+        path: root,
+        title: leafOfPath(root),
         lane: null,
         entry: null,
         hasOwnIndex: false,
-        hasFsDir: fsEntryBySlug.has(root),
+        hasFsDir: fsEntryByPath.has(root),
         scrapbookCount: items.length,
         scrapbookMostRecentMtime: mostRecent,
         children: [],
       };
-      nodeBySlug.set(root, synth);
+      nodeByPath.set(root, synth);
       // Re-attach orphans whose direct parent was a missing
-      // intermediate slug we hadn't generated; in the pre-loop pass
-      // we already ensured every ancestor slug is in nodeBySlug, so
-      // this only matters for the synthetic-root rooting.
-      for (const slug of sortedSlugs) {
-        if (rootSegment(slug) === root && slug.includes('/')) {
-          const parentSlug = slug.split('/').slice(0, -1).join('/');
-          if (parentSlug === root) {
-            const child = nodeBySlug.get(slug);
+      // intermediate path we hadn't generated.
+      for (const path of sortedPaths) {
+        if (rootSegment(path) === root && path.includes('/')) {
+          const parentPath = path.split('/').slice(0, -1).join('/');
+          if (parentPath === root) {
+            const child = nodeByPath.get(path);
             if (child && !synth.children.includes(child)) {
               synth.children.push(child);
             }
@@ -465,20 +304,21 @@ export function buildContentTree(
         }
       }
       projectRootBy.set(root, [synth]);
+      knownRoots.add(root);
     }
   }
 
   // Sort children deterministically.
-  for (const node of nodeBySlug.values()) {
-    node.children.sort((a, b) => a.slug.localeCompare(b.slug));
+  for (const node of nodeByPath.values()) {
+    node.children.sort((a, b) => a.path.localeCompare(b.path));
   }
 
   // Fold each project root into a ContentProject summary.
   const projects: ContentProject[] = [];
-  for (const [rootSlug, roots] of projectRootBy.entries()) {
+  for (const [rootPath, roots] of projectRootBy.entries()) {
     if (roots.length === 0) continue;
-    const root = roots[0]; // Only one root per slug; defensive shape only.
-    const summary = summarizeProject(site, rootSlug, root);
+    const root = roots[0];
+    const summary = summarizeProject(site, rootPath, root);
     projects.push(summary);
   }
   projects.sort((a, b) => a.rootSlug.localeCompare(b.rootSlug));
@@ -487,7 +327,7 @@ export function buildContentTree(
 
 function summarizeProject(
   site: string,
-  rootSlug: string,
+  rootPath: string,
   root: ContentNode,
 ): ContentProject {
   let trackedCount = 0;
@@ -520,7 +360,7 @@ function summarizeProject(
 
   return {
     site,
-    rootSlug,
+    rootSlug: rootPath,
     title: root.title,
     trackedCount,
     totalNodes,
@@ -532,36 +372,28 @@ function summarizeProject(
 }
 
 /**
- * Helper: find the node with the given slug under a project tree, or
+ * Helper: find the node with the given path under a project tree, or
  * return null. Used by the studio's node-detail panel.
  */
 export function findNode(
   project: ContentProject,
-  slug: string,
+  path: string,
 ): ContentNode | null {
-  if (project.root.slug === slug) return project.root;
+  if (project.root.path === path) return project.root;
   const queue: ContentNode[] = [...project.root.children];
   while (queue.length > 0) {
     const head = queue.shift();
     if (!head) continue;
-    if (head.slug === slug) return head;
+    if (head.path === path) return head;
     queue.push(...head.children);
   }
   return null;
 }
 
 /**
- * Flatten the tree into a depth-first ordered list of `(node, depth, isLast)`
- * triples for rendering. `depth` starts at 0 for the project root.
- * `isLast` is true when the node is the last child of its parent —
- * the UI uses it to truncate the tree connector lines.
+ * Flatten the tree into a depth-first ordered list. See `FlatNode` in
+ * `content-tree-types.ts` for the row shape.
  */
-export interface FlatNode {
-  node: ContentNode;
-  depth: number;
-  isLast: boolean;
-}
-
 export function flattenForRender(root: ContentNode): FlatNode[] {
   const out: FlatNode[] = [];
   const walk = (node: ContentNode, depth: number, isLast: boolean) => {

@@ -37,97 +37,6 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   mod
 ));
 
-// ../../node_modules/extend/index.js
-var require_extend = __commonJS({
-  "../../node_modules/extend/index.js"(exports, module) {
-    "use strict";
-    var hasOwn = Object.prototype.hasOwnProperty;
-    var toStr = Object.prototype.toString;
-    var defineProperty = Object.defineProperty;
-    var gOPD = Object.getOwnPropertyDescriptor;
-    var isArray = function isArray2(arr) {
-      if (typeof Array.isArray === "function") {
-        return Array.isArray(arr);
-      }
-      return toStr.call(arr) === "[object Array]";
-    };
-    var isPlainObject2 = function isPlainObject3(obj) {
-      if (!obj || toStr.call(obj) !== "[object Object]") {
-        return false;
-      }
-      var hasOwnConstructor = hasOwn.call(obj, "constructor");
-      var hasIsPrototypeOf = obj.constructor && obj.constructor.prototype && hasOwn.call(obj.constructor.prototype, "isPrototypeOf");
-      if (obj.constructor && !hasOwnConstructor && !hasIsPrototypeOf) {
-        return false;
-      }
-      var key2;
-      for (key2 in obj) {
-      }
-      return typeof key2 === "undefined" || hasOwn.call(obj, key2);
-    };
-    var setProperty = function setProperty2(target, options) {
-      if (defineProperty && options.name === "__proto__") {
-        defineProperty(target, options.name, {
-          enumerable: true,
-          configurable: true,
-          value: options.newValue,
-          writable: true
-        });
-      } else {
-        target[options.name] = options.newValue;
-      }
-    };
-    var getProperty = function getProperty2(obj, name) {
-      if (name === "__proto__") {
-        if (!hasOwn.call(obj, name)) {
-          return void 0;
-        } else if (gOPD) {
-          return gOPD(obj, name).value;
-        }
-      }
-      return obj[name];
-    };
-    module.exports = function extend2() {
-      var options, name, src, copy, copyIsArray, clone;
-      var target = arguments[0];
-      var i = 1;
-      var length = arguments.length;
-      var deep = false;
-      if (typeof target === "boolean") {
-        deep = target;
-        target = arguments[1] || {};
-        i = 2;
-      }
-      if (target == null || typeof target !== "object" && typeof target !== "function") {
-        target = {};
-      }
-      for (; i < length; ++i) {
-        options = arguments[i];
-        if (options != null) {
-          for (name in options) {
-            src = getProperty(target, name);
-            copy = getProperty(options, name);
-            if (target !== copy) {
-              if (deep && copy && (isPlainObject2(copy) || (copyIsArray = isArray(copy)))) {
-                if (copyIsArray) {
-                  copyIsArray = false;
-                  clone = src && isArray(src) ? src : [];
-                } else {
-                  clone = src && isPlainObject2(src) ? src : {};
-                }
-                setProperty(target, { name, newValue: extend2(deep, clone, copy) });
-              } else if (typeof copy !== "undefined") {
-                setProperty(target, { name, newValue: copy });
-              }
-            }
-          }
-        }
-      }
-      return target;
-    };
-  }
-});
-
 // ../../node_modules/yaml/dist/nodes/identity.js
 var require_identity = __commonJS({
   "../../node_modules/yaml/dist/nodes/identity.js"(exports) {
@@ -7430,6 +7339,97 @@ var require_dist = __commonJS({
   }
 });
 
+// ../../node_modules/extend/index.js
+var require_extend = __commonJS({
+  "../../node_modules/extend/index.js"(exports, module) {
+    "use strict";
+    var hasOwn = Object.prototype.hasOwnProperty;
+    var toStr = Object.prototype.toString;
+    var defineProperty = Object.defineProperty;
+    var gOPD = Object.getOwnPropertyDescriptor;
+    var isArray = function isArray2(arr) {
+      if (typeof Array.isArray === "function") {
+        return Array.isArray(arr);
+      }
+      return toStr.call(arr) === "[object Array]";
+    };
+    var isPlainObject2 = function isPlainObject3(obj) {
+      if (!obj || toStr.call(obj) !== "[object Object]") {
+        return false;
+      }
+      var hasOwnConstructor = hasOwn.call(obj, "constructor");
+      var hasIsPrototypeOf = obj.constructor && obj.constructor.prototype && hasOwn.call(obj.constructor.prototype, "isPrototypeOf");
+      if (obj.constructor && !hasOwnConstructor && !hasIsPrototypeOf) {
+        return false;
+      }
+      var key2;
+      for (key2 in obj) {
+      }
+      return typeof key2 === "undefined" || hasOwn.call(obj, key2);
+    };
+    var setProperty = function setProperty2(target, options) {
+      if (defineProperty && options.name === "__proto__") {
+        defineProperty(target, options.name, {
+          enumerable: true,
+          configurable: true,
+          value: options.newValue,
+          writable: true
+        });
+      } else {
+        target[options.name] = options.newValue;
+      }
+    };
+    var getProperty = function getProperty2(obj, name) {
+      if (name === "__proto__") {
+        if (!hasOwn.call(obj, name)) {
+          return void 0;
+        } else if (gOPD) {
+          return gOPD(obj, name).value;
+        }
+      }
+      return obj[name];
+    };
+    module.exports = function extend2() {
+      var options, name, src, copy, copyIsArray, clone;
+      var target = arguments[0];
+      var i = 1;
+      var length = arguments.length;
+      var deep = false;
+      if (typeof target === "boolean") {
+        deep = target;
+        target = arguments[1] || {};
+        i = 2;
+      }
+      if (target == null || typeof target !== "object" && typeof target !== "function") {
+        target = {};
+      }
+      for (; i < length; ++i) {
+        options = arguments[i];
+        if (options != null) {
+          for (name in options) {
+            src = getProperty(target, name);
+            copy = getProperty(options, name);
+            if (target !== copy) {
+              if (deep && copy && (isPlainObject2(copy) || (copyIsArray = isArray(copy)))) {
+                if (copyIsArray) {
+                  copyIsArray = false;
+                  clone = src && isArray(src) ? src : [];
+                } else {
+                  clone = src && isPlainObject2(src) ? src : {};
+                }
+                setProperty(target, { name, newValue: extend2(deep, clone, copy) });
+              } else if (typeof copy !== "undefined") {
+                setProperty(target, { name, newValue: copy });
+              }
+            }
+          }
+        }
+      }
+      return target;
+    };
+  }
+});
+
 // ../../node_modules/hono/dist/compose.js
 var compose = (middleware, onError, onNotFound) => {
   return (context, next) => {
@@ -10347,7 +10347,7 @@ var serveStatic = (options = { root: "" }) => {
 };
 
 // src/server.ts
-import { existsSync as existsSync9, realpathSync } from "node:fs";
+import { existsSync as existsSync10, realpathSync } from "node:fs";
 import { dirname as dirname3, isAbsolute, resolve as resolve2 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
@@ -10562,10 +10562,162 @@ function describe(value) {
 }
 
 // ../core/src/review/handlers.ts
-import { existsSync as existsSync3, readFileSync as readFileSync3, writeFileSync as writeFileSync2 } from "node:fs";
+import { existsSync as existsSync3, readFileSync as readFileSync4, writeFileSync as writeFileSync3 } from "node:fs";
 
 // ../core/src/paths.ts
-import { join as join3 } from "node:path";
+import { join as join4 } from "node:path";
+
+// ../core/src/content-index.ts
+import { readdirSync, statSync as statSync2 } from "node:fs";
+import { join as join3, relative } from "node:path";
+
+// ../core/src/frontmatter.ts
+var import_yaml = __toESM(require_dist(), 1);
+import { readFileSync as readFileSync2, writeFileSync } from "node:fs";
+var FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
+function parseFrontmatter(markdown) {
+  const match2 = markdown.match(FRONTMATTER_RE);
+  if (!match2) {
+    return { data: {}, body: markdown };
+  }
+  const [, yamlContent, body3] = match2;
+  let data;
+  try {
+    data = (0, import_yaml.parse)(yamlContent);
+  } catch (err2) {
+    const reason = err2 instanceof Error ? err2.message : String(err2);
+    throw new Error(`Invalid YAML frontmatter: ${reason}`);
+  }
+  if (data === null || data === void 0) {
+    return { data: {}, body: body3 };
+  }
+  if (typeof data !== "object" || Array.isArray(data)) {
+    throw new Error(
+      `Invalid frontmatter: expected a YAML mapping at the top level, got ${typeof data}.`
+    );
+  }
+  return { data, body: body3 };
+}
+function readFrontmatter(path) {
+  return parseFrontmatter(readFileSync2(path, "utf-8"));
+}
+
+// ../core/src/content-index.ts
+var SKIP_DIRS = /* @__PURE__ */ new Set([
+  "scrapbook",
+  "node_modules",
+  "dist",
+  ".git"
+]);
+var MARKDOWN_EXTENSIONS = /* @__PURE__ */ new Set([
+  ".md",
+  ".mdx",
+  ".markdown"
+]);
+var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isUuid(value) {
+  return UUID_RE.test(value);
+}
+function extensionOf(name) {
+  const idx = name.lastIndexOf(".");
+  if (idx < 0) return "";
+  return name.slice(idx).toLowerCase();
+}
+function shouldSkipDir(name) {
+  if (name.startsWith(".")) return true;
+  return SKIP_DIRS.has(name.toLowerCase());
+}
+function collectMarkdownFiles(dir) {
+  const out = [];
+  visit2(dir);
+  out.sort();
+  return out;
+  function visit2(currentDir) {
+    let names;
+    try {
+      names = readdirSync(currentDir);
+    } catch {
+      return;
+    }
+    for (const name of names) {
+      const abs = join3(currentDir, name);
+      let st;
+      try {
+        st = statSync2(abs);
+      } catch {
+        continue;
+      }
+      if (st.isDirectory()) {
+        if (shouldSkipDir(name)) continue;
+        visit2(abs);
+        continue;
+      }
+      if (!st.isFile()) continue;
+      if (MARKDOWN_EXTENSIONS.has(extensionOf(name))) {
+        out.push(abs);
+      }
+    }
+  }
+}
+function readIdFromFrontmatter(absPath) {
+  let parsed;
+  try {
+    parsed = readFrontmatter(absPath);
+  } catch (err2) {
+    const reason = err2 instanceof Error ? err2.message : String(err2);
+    return { kind: "invalid", reason: `unreadable frontmatter: ${reason}` };
+  }
+  const raw3 = parsed.data.id;
+  if (raw3 === void 0) return { kind: "absent" };
+  if (typeof raw3 !== "string") {
+    return {
+      kind: "invalid",
+      reason: `frontmatter id is ${typeof raw3}, expected string`
+    };
+  }
+  const trimmed = raw3.trim();
+  if (trimmed === "") {
+    return {
+      kind: "invalid",
+      reason: "frontmatter id is empty"
+    };
+  }
+  if (!isUuid(trimmed)) {
+    return {
+      kind: "invalid",
+      reason: `frontmatter id "${trimmed}" is not a valid UUID`
+    };
+  }
+  return { kind: "valid", id: trimmed };
+}
+function buildContentIndex(projectRoot, config, site) {
+  const contentDir = resolveContentDir(projectRoot, config, site);
+  const byId = /* @__PURE__ */ new Map();
+  const byPath = /* @__PURE__ */ new Map();
+  const invalid2 = [];
+  let files;
+  try {
+    files = collectMarkdownFiles(contentDir);
+  } catch {
+    return { byId, byPath, invalid: invalid2 };
+  }
+  for (const abs of files) {
+    const lookup = readIdFromFrontmatter(abs);
+    if (lookup.kind === "absent") continue;
+    if (lookup.kind === "invalid") {
+      invalid2.push({ absolutePath: abs, reason: lookup.reason });
+      continue;
+    }
+    const rel = relative(contentDir, abs);
+    if (!byId.has(lookup.id)) {
+      byId.set(lookup.id, abs);
+    }
+    byPath.set(rel, lookup.id);
+  }
+  return { byId, byPath, invalid: invalid2 };
+}
+
+// ../core/src/paths.ts
 function resolveSite(config, site) {
   if (site === null || site === void 0 || site === "") {
     return config.defaultSite;
@@ -10583,38 +10735,38 @@ function siteConfig(config, site) {
   return config.sites[slug];
 }
 function resolveCalendarPath(projectRoot, config, site) {
-  return join3(projectRoot, siteConfig(config, site).calendarPath);
+  return join4(projectRoot, siteConfig(config, site).calendarPath);
 }
 function resolveContentDir(projectRoot, config, site) {
-  return join3(projectRoot, siteConfig(config, site).contentDir);
+  return join4(projectRoot, siteConfig(config, site).contentDir);
 }
 var DEFAULT_BLOG_FILENAME_TEMPLATE = "{slug}/index.md";
 function resolveBlogFilePath(projectRoot, config, site, slug, filePath) {
   const entry = siteConfig(config, site);
   if (filePath !== void 0 && filePath !== "") {
-    return join3(projectRoot, entry.contentDir, filePath);
+    return join4(projectRoot, entry.contentDir, filePath);
   }
   const template = entry.blogFilenameTemplate ?? DEFAULT_BLOG_FILENAME_TEMPLATE;
-  return join3(projectRoot, entry.contentDir, template.replaceAll("{slug}", slug));
+  return join4(projectRoot, entry.contentDir, template.replaceAll("{slug}", slug));
 }
 function resolveBlogPostDir(projectRoot, config, site, slug) {
-  return join3(projectRoot, siteConfig(config, site).contentDir, slug);
+  return join4(projectRoot, siteConfig(config, site).contentDir, slug);
 }
 
 // ../core/src/review/pipeline.ts
 import { randomUUID } from "node:crypto";
-import { join as join5 } from "node:path";
+import { join as join6 } from "node:path";
 
 // ../core/src/journal.ts
 import {
   existsSync as existsSync2,
   mkdirSync,
-  readFileSync as readFileSync2,
-  readdirSync,
+  readFileSync as readFileSync3,
+  readdirSync as readdirSync2,
   unlinkSync,
-  writeFileSync
+  writeFileSync as writeFileSync2
 } from "node:fs";
-import { join as join4 } from "node:path";
+import { join as join5 } from "node:path";
 function normalizeTimestamp(iso) {
   return iso.replace(/[:.]/g, "-");
 }
@@ -10627,14 +10779,14 @@ function recordFilename(timestamp, id) {
 function findFileById(dir, id) {
   if (!existsSync2(dir)) return null;
   const suffix = `-${id}.json`;
-  for (const name of readdirSync(dir)) {
-    if (name.endsWith(suffix)) return join4(dir, name);
+  for (const name of readdirSync2(dir)) {
+    if (name.endsWith(suffix)) return join5(dir, name);
   }
   return null;
 }
 function readFile(path) {
   try {
-    const text5 = readFileSync2(path, "utf-8");
+    const text5 = readFileSync3(path, "utf-8");
     return JSON.parse(text5);
   } catch {
     return null;
@@ -10644,9 +10796,9 @@ function readJournal(dir, options = {}) {
   if (!existsSync2(dir)) return [];
   const timestampField = options.timestampField ?? "timestamp";
   const records = [];
-  for (const name of readdirSync(dir)) {
+  for (const name of readdirSync2(dir)) {
     if (!name.endsWith(".json")) continue;
-    const record = readFile(join4(dir, name));
+    const record = readFile(join5(dir, name));
     if (record === null) continue;
     records.push(record);
   }
@@ -10666,8 +10818,8 @@ function appendJournal(dir, record, options = {}) {
   if (!id) throw new Error(`appendJournal: record has no \`${idField}\` field`);
   if (!timestamp) throw new Error(`appendJournal: record has no \`${timestampField}\` field`);
   const existing = findFileById(dir, id);
-  const target = existing ?? join4(dir, recordFilename(timestamp, id));
-  writeFileSync(target, JSON.stringify(record, null, 2) + "\n", "utf-8");
+  const target = existing ?? join5(dir, recordFilename(timestamp, id));
+  writeFileSync2(target, JSON.stringify(record, null, 2) + "\n", "utf-8");
 }
 
 // ../core/src/review/journal-mappers.ts
@@ -10712,13 +10864,13 @@ var DEFAULT_JOURNAL_DIR = ".deskwork/review-journal";
 var PIPELINE_SUBDIR = "pipeline";
 var HISTORY_SUBDIR = "history";
 function reviewJournalRoot(projectRoot, config) {
-  return join5(projectRoot, config.reviewJournalDir ?? DEFAULT_JOURNAL_DIR);
+  return join6(projectRoot, config.reviewJournalDir ?? DEFAULT_JOURNAL_DIR);
 }
 function pipelinePath(projectRoot, config) {
-  return join5(reviewJournalRoot(projectRoot, config), PIPELINE_SUBDIR);
+  return join6(reviewJournalRoot(projectRoot, config), PIPELINE_SUBDIR);
 }
 function historyPath(projectRoot, config) {
-  return join5(reviewJournalRoot(projectRoot, config), HISTORY_SUBDIR);
+  return join6(reviewJournalRoot(projectRoot, config), HISTORY_SUBDIR);
 }
 function readWorkflows(projectRoot, config) {
   return readJournal(pipelinePath(projectRoot, config), {
@@ -11061,7 +11213,7 @@ function handleCreateVersion(projectRoot, config, body3) {
         `cannot save: blog file missing at ${blogFile}. Scaffold the post with /deskwork:outline before saving edits.`
       );
     }
-    writeFileSync2(blogFile, d.afterMarkdown, "utf-8");
+    writeFileSync3(blogFile, d.afterMarkdown, "utf-8");
   }
   const version = appendVersion(projectRoot, config, d.workflowId, d.afterMarkdown, "operator");
   const annotation = mintAnnotation({
@@ -11091,7 +11243,7 @@ function handleStartLongform(projectRoot, config, body3) {
   if (!existsSync3(path)) {
     return err(404, `blog draft not found at ${path}`);
   }
-  const markdown = readFileSync3(path, "utf-8");
+  const markdown = readFileSync4(path, "utf-8");
   const before = readWorkflows(projectRoot, config).find((w) => {
     const identityMatch = b.entryId && w.entryId ? w.entryId === b.entryId : w.site === b.site && w.slug === b.slug;
     return identityMatch && w.contentKind === "longform" && w.state !== "applied" && w.state !== "cancelled";
@@ -22965,33 +23117,6 @@ function rehypeStringify(options) {
   }
 }
 
-// ../core/src/frontmatter.ts
-var import_yaml = __toESM(require_dist(), 1);
-var FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/;
-function parseFrontmatter(markdown) {
-  const match2 = markdown.match(FRONTMATTER_RE);
-  if (!match2) {
-    return { data: {}, body: markdown };
-  }
-  const [, yamlContent, body3] = match2;
-  let data;
-  try {
-    data = (0, import_yaml.parse)(yamlContent);
-  } catch (err2) {
-    const reason = err2 instanceof Error ? err2.message : String(err2);
-    throw new Error(`Invalid YAML frontmatter: ${reason}`);
-  }
-  if (data === null || data === void 0) {
-    return { data: {}, body: body3 };
-  }
-  if (typeof data !== "object" || Array.isArray(data)) {
-    throw new Error(
-      `Invalid frontmatter: expected a YAML mapping at the top level, got ${typeof data}.`
-    );
-  }
-  return { data, body: body3 };
-}
-
 // ../core/src/remark-image-figure.mjs
 function findSoloImage(paragraph2) {
   if (!paragraph2.children || paragraph2.children.length === 0) return null;
@@ -23147,14 +23272,14 @@ import { extname as extname2 } from "node:path";
 import {
   existsSync as existsSync4,
   mkdirSync as mkdirSync2,
-  readdirSync as readdirSync2,
-  readFileSync as readFileSync4,
+  readdirSync as readdirSync3,
+  readFileSync as readFileSync5,
   renameSync,
   rmSync,
-  statSync as statSync2,
-  writeFileSync as writeFileSync3
+  statSync as statSync3,
+  writeFileSync as writeFileSync4
 } from "node:fs";
-import { dirname, extname, join as join6, resolve } from "node:path";
+import { dirname, extname, join as join7, resolve } from "node:path";
 var SECRET_SUBDIR = "secret";
 var SLUG_RE2 = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
 var FILENAME_RE = /^[a-zA-Z0-9._-][a-zA-Z0-9._ -]*$/;
@@ -23185,12 +23310,12 @@ function assertFilename(name) {
 function scrapbookDir(projectRoot, config, site, slug) {
   assertSlug(slug);
   const articleDir = resolveBlogPostDir(projectRoot, config, site, slug);
-  return join6(articleDir, "scrapbook");
+  return join7(articleDir, "scrapbook");
 }
 function scrapbookFilePath(projectRoot, config, site, slug, filename, opts = {}) {
   assertFilename(filename);
   const dir = scrapbookDir(projectRoot, config, site, slug);
-  const target = opts.secret ? join6(dir, SECRET_SUBDIR) : dir;
+  const target = opts.secret ? join7(dir, SECRET_SUBDIR) : dir;
   const abs = resolve(target, filename);
   if (!abs.startsWith(dir + "/") && abs !== dir) {
     throw new Error(
@@ -23235,17 +23360,17 @@ function listScrapbook(projectRoot, config, site, slug) {
     return { site, slug, dir, exists: false, items: [], secretItems: [] };
   }
   const items = listFilesInDir(dir);
-  const secretDir = join6(dir, SECRET_SUBDIR);
+  const secretDir = join7(dir, SECRET_SUBDIR);
   const secretItems = existsSync4(secretDir) ? listFilesInDir(secretDir) : [];
   return { site, slug, dir, exists: true, items, secretItems };
 }
 function listFilesInDir(dir) {
   const items = [];
-  for (const e of readdirSync2(dir, { withFileTypes: true })) {
+  for (const e of readdirSync3(dir, { withFileTypes: true })) {
     if (!e.isFile()) continue;
     if (e.name.startsWith(".")) continue;
-    const abs = join6(dir, e.name);
-    const st = statSync2(abs);
+    const abs = join7(dir, e.name);
+    const st = statSync3(abs);
     items.push({
       name: e.name,
       kind: classify(e.name),
@@ -23267,9 +23392,9 @@ function countScrapbook(projectRoot, config, site, slug) {
 function readScrapbookFile(projectRoot, config, site, slug, filename, opts = {}) {
   const abs = scrapbookFilePath(projectRoot, config, site, slug, filename, opts);
   if (!existsSync4(abs)) throw new Error(`not found: ${filename}`);
-  const st = statSync2(abs);
+  const st = statSync3(abs);
   if (!st.isFile()) throw new Error(`not a file: ${filename}`);
-  const content3 = readFileSync4(abs);
+  const content3 = readFileSync5(abs);
   return {
     name: filename,
     kind: classify(filename),
@@ -23287,8 +23412,8 @@ function createScrapbookMarkdown(projectRoot, config, site, slug, filename, body
     throw new Error(`file already exists: "${filename}"`);
   }
   mkdirSync2(dirname(abs), { recursive: true });
-  writeFileSync3(abs, body3, "utf-8");
-  const st = statSync2(abs);
+  writeFileSync4(abs, body3, "utf-8");
+  const st = statSync3(abs);
   return {
     name: filename,
     kind: "md",
@@ -23299,8 +23424,8 @@ function createScrapbookMarkdown(projectRoot, config, site, slug, filename, body
 function saveScrapbookFile(projectRoot, config, site, slug, filename, body3, opts = {}) {
   const abs = scrapbookFilePath(projectRoot, config, site, slug, filename, opts);
   if (!existsSync4(abs)) throw new Error(`file not found: "${filename}"`);
-  writeFileSync3(abs, body3);
-  const st = statSync2(abs);
+  writeFileSync4(abs, body3);
+  const st = statSync3(abs);
   return {
     name: filename,
     kind: classify(filename),
@@ -23316,7 +23441,7 @@ function renameScrapbookFile(projectRoot, config, site, slug, oldName, newName, 
     throw new Error(`target name already exists: "${newName}"`);
   }
   renameSync(oldAbs, newAbs);
-  const st = statSync2(newAbs);
+  const st = statSync3(newAbs);
   return {
     name: newName,
     kind: classify(newName),
@@ -23335,8 +23460,8 @@ function writeScrapbookUpload(projectRoot, config, site, slug, filename, content
     throw new Error(`file already exists: "${filename}" \u2014 rename first`);
   }
   mkdirSync2(dirname(abs), { recursive: true });
-  writeFileSync3(abs, content3);
-  const st = statSync2(abs);
+  writeFileSync4(abs, content3);
+  const st = statSync3(abs);
   return {
     name: filename,
     kind: classify(filename),
@@ -23424,7 +23549,7 @@ async function serveScrapbookFile(c, ctx) {
 }
 
 // src/routes/scrapbook-mutations.ts
-import { existsSync as existsSync5, mkdirSync as mkdirSync3, renameSync as renameSync2, statSync as statSync3 } from "node:fs";
+import { existsSync as existsSync5, mkdirSync as mkdirSync3, renameSync as renameSync2, statSync as statSync4 } from "node:fs";
 import { dirname as dirname2 } from "node:path";
 function checkEnvelope(ctx, body3) {
   const site = body3.site;
@@ -23583,7 +23708,7 @@ function createScrapbookMutationsRouter(ctx) {
         }
         mkdirSync3(dirname2(dstAbs), { recursive: true });
         renameSync2(srcAbs, dstAbs);
-        const st = statSync3(dstAbs);
+        const st = statSync4(dstAbs);
         item = {
           name: newName,
           kind: classify(newName),
@@ -23701,7 +23826,7 @@ function createScrapbookMutationsRouter(ctx) {
 }
 
 // ../core/src/calendar.ts
-import { readFileSync as readFileSync5, writeFileSync as writeFileSync4 } from "node:fs";
+import { readFileSync as readFileSync6, writeFileSync as writeFileSync5 } from "node:fs";
 import { randomUUID as randomUUID2 } from "node:crypto";
 
 // ../core/src/types.ts
@@ -23933,7 +24058,7 @@ function parseCalendar(markdown) {
 function readCalendar(calendarPath) {
   let raw3;
   try {
-    raw3 = readFileSync5(calendarPath, "utf-8");
+    raw3 = readFileSync6(calendarPath, "utf-8");
   } catch (err2) {
     if (err2 instanceof Error && "code" in err2 && err2.code === "ENOENT") {
       return { entries: [], distributions: [] };
@@ -24066,7 +24191,7 @@ function buildReport(projectRoot, config, opts = {}) {
 }
 
 // ../core/src/body-state.ts
-import { existsSync as existsSync6, readFileSync as readFileSync6 } from "node:fs";
+import { existsSync as existsSync6, readFileSync as readFileSync7 } from "node:fs";
 var PLACEHOLDER_MARKER = "<!-- Write your post here -->";
 function stripOutlineSection(body3) {
   const lines = body3.split("\n");
@@ -24083,8 +24208,8 @@ function stripOutlineSection(body3) {
 }
 function bodyState(filePath) {
   if (!existsSync6(filePath)) return "missing";
-  const content3 = readFileSync6(filePath, "utf8");
-  const fmMatch = content3.match(/^---\n[\s\S]*?\n---\n?/);
+  const content3 = readFileSync7(filePath, "utf8");
+  const fmMatch = content3.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
   const body3 = fmMatch ? content3.slice(fmMatch[0].length) : content3;
   const withoutH1 = body3.replace(/^\s*#[^\n]*\n?/, "");
   const withoutOutline = stripOutlineSection(withoutH1);
@@ -24922,8 +25047,8 @@ function renderEmptyScrapbookRow() {
 }
 
 // src/pages/review.ts
-import { readFileSync as readFileSync7 } from "node:fs";
-import { join as join7 } from "node:path";
+import { readFileSync as readFileSync8 } from "node:fs";
+import { join as join8 } from "node:path";
 function isSuccessBody(body3) {
   if (typeof body3 !== "object" || body3 === null) return false;
   return "workflow" in body3 && "versions" in body3;
@@ -25120,10 +25245,10 @@ function renderOutlineDrawer(outlineHtml) {
 }
 function makeInlineTextLoader(ctx, site, slug) {
   const contentDir = resolveContentDir(ctx.projectRoot, ctx.config, site);
-  const scrapbookDir2 = join7(contentDir, slug, "scrapbook");
+  const scrapbookDir2 = join8(contentDir, slug, "scrapbook");
   return (filename, maxBytes) => {
     try {
-      const buf = readFileSync7(join7(scrapbookDir2, filename));
+      const buf = readFileSync8(join8(scrapbookDir2, filename));
       const slice = buf.subarray(0, Math.min(buf.byteLength, maxBytes));
       return slice.toString("utf-8");
     } catch {
@@ -26175,9 +26300,9 @@ function renderScrapbookPage(ctx, site, path) {
   });
 }
 
-// ../core/src/content-tree.ts
-import { existsSync as existsSync7, readdirSync as readdirSync3, readFileSync as readFileSync8, statSync as statSync4 } from "node:fs";
-import { join as join8 } from "node:path";
+// ../core/src/content-tree-fs-walk.ts
+import { existsSync as existsSync7, readdirSync as readdirSync4, readFileSync as readFileSync9, statSync as statSync5 } from "node:fs";
+import { join as join9 } from "node:path";
 var INDEX_BASENAMES = /* @__PURE__ */ new Set([
   "index.md",
   "index.mdx",
@@ -26188,9 +26313,14 @@ var README_BASENAMES = /* @__PURE__ */ new Set([
   "readme.mdx",
   "readme.markdown"
 ]);
+var TEMPLATE_INDEX_BASENAMES = [
+  "index.md",
+  "index.mdx",
+  "index.markdown"
+];
 function readTitleFromMarkdown(absPath) {
   try {
-    const raw3 = readFileSync8(absPath, "utf-8");
+    const raw3 = readFileSync9(absPath, "utf-8");
     const parsed = parseFrontmatter(raw3);
     const t = parsed.data.title;
     if (typeof t === "string" && t.trim().length > 0) return t.trim();
@@ -26203,10 +26333,10 @@ function defaultFsWalk(projectRoot, config, site) {
   if (!existsSync7(root3)) return [];
   const out = [];
   const SKIP2 = /* @__PURE__ */ new Set(["scrapbook", "node_modules", "dist", ".git"]);
-  const visit2 = (dirAbs, slugSoFar) => {
+  const visit2 = (dirAbs, pathSoFar) => {
     let names;
     try {
-      names = readdirSync3(dirAbs);
+      names = readdirSync4(dirAbs);
     } catch {
       return;
     }
@@ -26217,135 +26347,205 @@ function defaultFsWalk(projectRoot, config, site) {
       const lower = name.toLowerCase();
       if (INDEX_BASENAMES.has(lower)) {
         hasIndex = true;
-        if (titleSource === null) titleSource = join8(dirAbs, name);
+        if (titleSource === null) titleSource = join9(dirAbs, name);
       } else if (README_BASENAMES.has(lower)) {
         hasReadme = true;
-        if (titleSource === null && !hasIndex) titleSource = join8(dirAbs, name);
+        if (titleSource === null && !hasIndex) titleSource = join9(dirAbs, name);
       }
     }
-    if (slugSoFar !== "") {
+    if (pathSoFar !== "") {
       const title = titleSource ? readTitleFromMarkdown(titleSource) : null;
-      out.push({ slug: slugSoFar, hasIndex, hasReadme, title });
+      out.push({ slug: pathSoFar, hasIndex, hasReadme, title });
     }
     for (const name of names) {
       if (name.startsWith(".")) continue;
       if (SKIP2.has(name.toLowerCase())) continue;
-      const childAbs = join8(dirAbs, name);
+      const childAbs = join9(dirAbs, name);
       let childStat;
       try {
-        childStat = statSync4(childAbs);
+        childStat = statSync5(childAbs);
       } catch {
         continue;
       }
       if (!childStat.isDirectory()) continue;
-      const childSlug = slugSoFar === "" ? name : `${slugSoFar}/${name}`;
-      visit2(childAbs, childSlug);
+      const childPath = pathSoFar === "" ? name : `${pathSoFar}/${name}`;
+      visit2(childAbs, childPath);
     }
   };
   visit2(root3, "");
   return out;
 }
-function leafOfSlug(slug) {
-  const idx = slug.lastIndexOf("/");
-  return idx < 0 ? slug : slug.slice(idx + 1);
+
+// ../core/src/content-tree-helpers.ts
+import { existsSync as existsSync8 } from "node:fs";
+import { join as join10 } from "node:path";
+function leafOfPath(path) {
+  const idx = path.lastIndexOf("/");
+  return idx < 0 ? path : path.slice(idx + 1);
 }
-function ancestorsOf(slug) {
-  const segments = slug.split("/");
+function ancestorsOf(path) {
+  const segments = path.split("/");
   const out = [];
   for (let i = 1; i < segments.length; i++) {
     out.push(segments.slice(0, i).join("/"));
   }
   return out;
 }
-function rootSegment(slug) {
-  const idx = slug.indexOf("/");
-  return idx < 0 ? slug : slug.slice(0, idx);
+function rootSegment(path) {
+  const idx = path.indexOf("/");
+  return idx < 0 ? path : path.slice(0, idx);
 }
-function entryHasOwnIndex(_entry) {
-  return true;
+function entryHasOwnIndex(contentDir, entryPath, fsHasIndex, fsHasReadme, boundFile, hasFsDir) {
+  if (boundFile !== void 0) return true;
+  if (fsHasIndex) return true;
+  if (fsHasReadme) return true;
+  for (const basename of TEMPLATE_INDEX_BASENAMES) {
+    if (existsSync8(join10(contentDir, entryPath, basename))) return true;
+  }
+  if (!hasFsDir) return true;
+  return false;
 }
 function pickLatestMtime(a, b) {
   if (a === null) return b;
   if (b === null) return a;
   return a > b ? a : b;
 }
+function stripIndexBasename(relPath) {
+  const segments = relPath.split("/");
+  const last = segments[segments.length - 1].toLowerCase();
+  if (INDEX_BASENAMES.has(last)) {
+    return segments.slice(0, -1).join("/");
+  }
+  const dotIdx = last.lastIndexOf(".");
+  if (dotIdx > 0) {
+    const stripped = segments.slice(0, -1);
+    stripped.push(last.slice(0, dotIdx));
+    return stripped.join("/");
+  }
+  return relPath;
+}
+function findIdBoundPath(entry, index2) {
+  if (typeof entry.id !== "string" || entry.id === "") return null;
+  for (const [path, id] of index2.byPath.entries()) {
+    if (id === entry.id) return stripIndexBasename(path);
+  }
+  return null;
+}
+function idBoundFile(entry, index2) {
+  if (typeof entry.id !== "string" || entry.id === "") return void 0;
+  return index2.byId.get(entry.id);
+}
+
+// ../core/src/content-tree.ts
 function buildContentTree(site, entries, config, projectRoot, options = {}) {
-  const lookup = options.scrapbookLookup ?? ((siteArg, slug) => {
+  const lookup = options.scrapbookLookup ?? ((siteArg, path) => {
     try {
-      return listScrapbook(projectRoot, config, siteArg, slug);
+      return listScrapbook(projectRoot, config, siteArg, path);
     } catch {
       return { items: [], secretItems: [] };
     }
   });
   const fsWalk = options.fsWalk ?? ((siteArg) => defaultFsWalk(projectRoot, config, siteArg));
   const fsEntries = fsWalk(site);
-  const fsEntryBySlug = /* @__PURE__ */ new Map();
-  for (const e of fsEntries) fsEntryBySlug.set(e.slug, e);
-  const entryBySlug = /* @__PURE__ */ new Map();
-  const allSlugs = /* @__PURE__ */ new Set();
-  for (const e of entries) {
-    entryBySlug.set(e.slug, e);
-    allSlugs.add(e.slug);
-    for (const a of ancestorsOf(e.slug)) allSlugs.add(a);
-  }
+  const fsEntryByPath = /* @__PURE__ */ new Map();
+  for (const e of fsEntries) fsEntryByPath.set(e.slug, e);
+  const contentIndex = options.contentIndex ?? buildContentIndex(projectRoot, config, site);
+  const warn = options.warn ?? ((msg) => console.warn(msg));
+  const contentDir = resolveContentDir(projectRoot, config, site);
+  const allPaths = /* @__PURE__ */ new Set();
+  const overlayByPath = /* @__PURE__ */ new Map();
   for (const e of fsEntries) {
     if (e.hasReadme || e.hasIndex) {
-      allSlugs.add(e.slug);
-      for (const a of ancestorsOf(e.slug)) allSlugs.add(a);
+      allPaths.add(e.slug);
+      for (const a of ancestorsOf(e.slug)) allPaths.add(a);
     }
   }
-  const sortedSlugs = [...allSlugs].sort();
-  const nodeBySlug = /* @__PURE__ */ new Map();
-  for (const slug of sortedSlugs) {
-    const entry = entryBySlug.get(slug) ?? null;
-    const fsEntry = fsEntryBySlug.get(slug) ?? null;
-    const sb = lookup(site, slug);
+  for (const entry of entries) {
+    const idBoundPath = findIdBoundPath(entry, contentIndex);
+    if (idBoundPath !== null) {
+      overlayByPath.set(idBoundPath, entry);
+      allPaths.add(idBoundPath);
+      for (const a of ancestorsOf(idBoundPath)) allPaths.add(a);
+      continue;
+    }
+    if (fsEntryByPath.has(entry.slug)) {
+      overlayByPath.set(entry.slug, entry);
+      allPaths.add(entry.slug);
+      for (const a of ancestorsOf(entry.slug)) allPaths.add(a);
+      warn(
+        `[content-tree] Calendar entry "${entry.slug}" matched fs node by slug (no frontmatter id binding). Run \`deskwork doctor --fix=missing-frontmatter-id\` to make this binding refactor-proof.`
+      );
+      continue;
+    }
+    allPaths.add(entry.slug);
+    for (const a of ancestorsOf(entry.slug)) allPaths.add(a);
+    overlayByPath.set(entry.slug, entry);
+  }
+  const sortedPaths = [...allPaths].sort();
+  const nodeByPath = /* @__PURE__ */ new Map();
+  for (const path of sortedPaths) {
+    const overlay = overlayByPath.get(path) ?? null;
+    const fsEntry = fsEntryByPath.get(path) ?? null;
+    const sb = lookup(site, path);
     const items = [...sb.items, ...sb.secretItems];
     const mostRecent = items.reduce(
       (acc, it) => pickLatestMtime(acc, it.mtime),
       null
     );
-    const title = entry?.title ?? (fsEntry?.title ?? null) ?? leafOfSlug(slug);
+    const title = overlay?.title ?? (fsEntry?.title ?? null) ?? leafOfPath(path);
     let hasOwnIndex = false;
-    if (entry !== null) {
-      hasOwnIndex = entryHasOwnIndex(entry);
+    if (overlay !== null) {
+      const boundFile = idBoundFile(overlay, contentIndex);
+      hasOwnIndex = entryHasOwnIndex(
+        contentDir,
+        path,
+        fsEntry?.hasIndex ?? false,
+        fsEntry?.hasReadme ?? false,
+        boundFile,
+        fsEntry !== null
+      );
     } else if (fsEntry !== null) {
       hasOwnIndex = fsEntry.hasIndex || fsEntry.hasReadme;
     }
     const node2 = {
       site,
-      slug,
+      path,
       title,
-      lane: entry?.stage ?? null,
-      entry,
+      lane: overlay?.stage ?? null,
+      entry: overlay,
       hasOwnIndex,
       hasFsDir: fsEntry !== null,
       scrapbookCount: items.length,
       scrapbookMostRecentMtime: mostRecent,
       children: []
     };
-    nodeBySlug.set(slug, node2);
+    if (overlay?.slug !== void 0) {
+      node2.slug = overlay.slug;
+    }
+    nodeByPath.set(path, node2);
   }
-  for (const slug of sortedSlugs) {
-    const parts = slug.split("/");
+  for (const path of sortedPaths) {
+    const parts = path.split("/");
     if (parts.length === 1) continue;
-    const parentSlug = parts.slice(0, -1).join("/");
-    const parent = nodeBySlug.get(parentSlug);
-    const node2 = nodeBySlug.get(slug);
+    const parentPath = parts.slice(0, -1).join("/");
+    const parent = nodeByPath.get(parentPath);
+    const node2 = nodeByPath.get(path);
     if (parent && node2) parent.children.push(node2);
   }
   const projectRootBy = /* @__PURE__ */ new Map();
-  for (const slug of sortedSlugs) {
-    if (slug.includes("/")) continue;
-    const node2 = nodeBySlug.get(slug);
+  for (const path of sortedPaths) {
+    if (path.includes("/")) continue;
+    const node2 = nodeByPath.get(path);
     if (!node2) continue;
-    const arr = projectRootBy.get(slug) ?? [];
+    const arr = projectRootBy.get(path) ?? [];
     arr.push(node2);
-    projectRootBy.set(slug, arr);
+    projectRootBy.set(path, arr);
   }
   const knownRoots = new Set(projectRootBy.keys());
   for (const e of entries) {
-    const root3 = rootSegment(e.slug);
+    const idBoundPath = findIdBoundPath(e, contentIndex);
+    const entryPath = idBoundPath ?? e.slug;
+    const root3 = rootSegment(entryPath);
     if (!knownRoots.has(root3)) {
       const sb = lookup(site, root3);
       const items = [...sb.items, ...sb.secretItems];
@@ -26355,22 +26555,22 @@ function buildContentTree(site, entries, config, projectRoot, options = {}) {
       );
       const synth = {
         site,
-        slug: root3,
-        title: leafOfSlug(root3),
+        path: root3,
+        title: leafOfPath(root3),
         lane: null,
         entry: null,
         hasOwnIndex: false,
-        hasFsDir: fsEntryBySlug.has(root3),
+        hasFsDir: fsEntryByPath.has(root3),
         scrapbookCount: items.length,
         scrapbookMostRecentMtime: mostRecent,
         children: []
       };
-      nodeBySlug.set(root3, synth);
-      for (const slug of sortedSlugs) {
-        if (rootSegment(slug) === root3 && slug.includes("/")) {
-          const parentSlug = slug.split("/").slice(0, -1).join("/");
-          if (parentSlug === root3) {
-            const child = nodeBySlug.get(slug);
+      nodeByPath.set(root3, synth);
+      for (const path of sortedPaths) {
+        if (rootSegment(path) === root3 && path.includes("/")) {
+          const parentPath = path.split("/").slice(0, -1).join("/");
+          if (parentPath === root3) {
+            const child = nodeByPath.get(path);
             if (child && !synth.children.includes(child)) {
               synth.children.push(child);
             }
@@ -26378,22 +26578,23 @@ function buildContentTree(site, entries, config, projectRoot, options = {}) {
         }
       }
       projectRootBy.set(root3, [synth]);
+      knownRoots.add(root3);
     }
   }
-  for (const node2 of nodeBySlug.values()) {
-    node2.children.sort((a, b) => a.slug.localeCompare(b.slug));
+  for (const node2 of nodeByPath.values()) {
+    node2.children.sort((a, b) => a.path.localeCompare(b.path));
   }
   const projects = [];
-  for (const [rootSlug, roots] of projectRootBy.entries()) {
+  for (const [rootPath, roots] of projectRootBy.entries()) {
     if (roots.length === 0) continue;
     const root3 = roots[0];
-    const summary = summarizeProject(site, rootSlug, root3);
+    const summary = summarizeProject(site, rootPath, root3);
     projects.push(summary);
   }
   projects.sort((a, b) => a.rootSlug.localeCompare(b.rootSlug));
   return projects;
 }
-function summarizeProject(site, rootSlug, root3) {
+function summarizeProject(site, rootPath, root3) {
   let trackedCount = 0;
   let totalNodes = 0;
   let maxDepth = 0;
@@ -26421,7 +26622,7 @@ function summarizeProject(site, rootSlug, root3) {
   }
   return {
     site,
-    rootSlug,
+    rootSlug: rootPath,
     title: root3.title,
     trackedCount,
     totalNodes,
@@ -26431,13 +26632,13 @@ function summarizeProject(site, rootSlug, root3) {
     root: root3
   };
 }
-function findNode(project, slug) {
-  if (project.root.slug === slug) return project.root;
+function findNode(project, path) {
+  if (project.root.path === path) return project.root;
   const queue = [...project.root.children];
   while (queue.length > 0) {
     const head2 = queue.shift();
     if (!head2) continue;
-    if (head2.slug === slug) return head2;
+    if (head2.path === path) return head2;
     queue.push(...head2.children);
   }
   return null;
@@ -26456,8 +26657,8 @@ function flattenForRender(root3) {
 }
 
 // src/pages/content-detail.ts
-import { readFileSync as readFileSync9, existsSync as existsSync8 } from "node:fs";
-import { join as join9 } from "node:path";
+import { readFileSync as readFileSync10, existsSync as existsSync9 } from "node:fs";
+import { join as join11 } from "node:path";
 var PREVIEW_CHAR_BUDGET = 480;
 function renderEmptyDetail() {
   return unsafe(html6`
@@ -26471,8 +26672,8 @@ function renderEmptyDetail() {
 }
 function safeReadFile(absPath) {
   try {
-    if (!existsSync8(absPath)) return null;
-    return readFileSync9(absPath, "utf-8");
+    if (!existsSync9(absPath)) return null;
+    return readFileSync10(absPath, "utf-8");
   } catch {
     return null;
   }
@@ -26509,10 +26710,10 @@ async function renderBodyPreview(body3) {
 }
 function makeInlineTextLoaderForNode(ctx, site, slug) {
   const contentDir = resolveContentDir(ctx.projectRoot, ctx.config, site);
-  const scrapbookDir2 = join9(contentDir, slug, "scrapbook");
+  const scrapbookDir2 = join11(contentDir, slug, "scrapbook");
   return (filename, maxBytes) => {
     try {
-      const buf = readFileSync9(join9(scrapbookDir2, filename));
+      const buf = readFileSync10(join11(scrapbookDir2, filename));
       const slice = buf.subarray(0, Math.min(buf.byteLength, maxBytes));
       return slice.toString("utf-8");
     } catch {
@@ -26554,8 +26755,8 @@ function findOrganizationalIndex(contentDir, slug) {
     "README.markdown"
   ];
   for (const name of candidates) {
-    const abs = join9(contentDir, slug, name);
-    if (existsSync8(abs)) return abs;
+    const abs = join11(contentDir, slug, name);
+    if (existsSync9(abs)) return abs;
   }
   return null;
 }
@@ -26564,28 +26765,17 @@ function loadDetailRender(ctx, site, node2) {
   let frontmatter = {};
   let bodyPreview = "";
   let scrapbook = null;
-  if (node2.entry !== null) {
-    const filePath = `${node2.slug}/index.md`;
-    const abs = join9(contentDir, filePath);
-    const raw3 = safeReadFile(abs);
+  const idxFile = findOrganizationalIndex(contentDir, node2.path);
+  if (idxFile !== null) {
+    const raw3 = safeReadFile(idxFile);
     if (raw3 !== null) {
       const parsed = parseFrontmatter(raw3);
       frontmatter = parsed.data;
       bodyPreview = parsed.body;
     }
-  } else if (node2.hasFsDir && node2.hasOwnIndex) {
-    const abs = findOrganizationalIndex(contentDir, node2.slug);
-    if (abs !== null) {
-      const raw3 = safeReadFile(abs);
-      if (raw3 !== null) {
-        const parsed = parseFrontmatter(raw3);
-        frontmatter = parsed.data;
-        bodyPreview = parsed.body;
-      }
-    }
   }
   try {
-    scrapbook = listScrapbook(ctx.projectRoot, ctx.config, site, node2.slug);
+    scrapbook = listScrapbook(ctx.projectRoot, ctx.config, site, node2.path);
   } catch {
     scrapbook = null;
   }
@@ -26594,20 +26784,25 @@ function loadDetailRender(ctx, site, node2) {
 async function renderNodeDetail(ctx, site, node2) {
   const detail = loadDetailRender(ctx, site, node2);
   const fmCount = Object.keys(detail.frontmatter).length;
-  const reviewHref = `/dev/editorial-review/${encodeURI(node2.slug)}?site=${site}`;
-  const scrapHref = scrapbookViewerUrl({ site, path: node2.slug });
-  const scrapDirHint = node2.scrapbookCount === 0 ? "0 items \xB7 scrapbook empty" : `${node2.scrapbookCount} items \xB7 /${node2.slug}/scrapbook`;
+  const reviewKey = node2.slug ?? node2.path;
+  const reviewHref = `/dev/editorial-review/${encodeURI(reviewKey)}?site=${site}`;
+  const scrapHref = scrapbookViewerUrl({ site, path: node2.path });
+  const scrapDirHint = node2.scrapbookCount === 0 ? "0 items \xB7 scrapbook empty" : `${node2.scrapbookCount} items \xB7 /${node2.path}/scrapbook`;
   const updatedHint = node2.scrapbookMostRecentMtime !== null ? html6`<span class="detail__updated">last touched ${formatRelativeTime(node2.scrapbookMostRecentMtime)}</span>` : "";
-  const loader = makeInlineTextLoaderForNode(ctx, site, node2.slug);
+  const loader = makeInlineTextLoaderForNode(ctx, site, node2.path);
   const previewBlock = await renderBodyPreview(detail.bodyPreview);
   const reviewBtn = node2.entry !== null ? html6`<a class="btn btn--accent" href="${reviewHref}">Open in Review</a>` : "";
+  const publicUrlHint = node2.slug !== void 0 && node2.slug !== node2.path ? html6`<span class="detail__public-url" title="public URL on the host site">
+          public URL: /blog/${node2.slug}
+        </span>` : "";
   return unsafe(html6`
-    <div class="detail" data-node-detail data-slug="${node2.slug}">
-      <div class="detail__crumb">${node2.slug.replaceAll("/", " \xB7 ")}</div>
+    <div class="detail" data-node-detail data-slug="${node2.path}">
+      <div class="detail__crumb">${node2.path.replaceAll("/", " \xB7 ")}</div>
       <h2 class="detail__title">${node2.title}</h2>
       <p class="detail__sub">
         ${node2.entry?.description ?? ""}
         ${unsafe(updatedHint)}
+        ${unsafe(publicUrlHint)}
       </p>
 
       <div class="detail__sectionhead">
@@ -26626,7 +26821,7 @@ async function renderNodeDetail(ctx, site, node2) {
         Scrapbook
         <span class="marg">${scrapDirHint}</span>
       </div>
-      ${renderScrapbookList(site, node2.slug, detail.scrapbook, loader)}
+      ${renderScrapbookList(site, node2.path, detail.scrapbook, loader)}
 
       <div class="actions">
         ${unsafe(reviewBtn)}
@@ -26774,22 +26969,22 @@ function renderContentTopLevel(ctx) {
     scriptModules: ["/static/dist/content-view-client.js"]
   });
 }
-function renderTreeBreadcrumb(site, project, selectedSlug) {
+function renderTreeBreadcrumb(site, project, selectedPath) {
   const links = [];
   links.push(html6`<a href="/dev/content/${site}">${site}</a>`);
-  if (selectedSlug === null) {
+  if (selectedPath === null) {
     links.push(html6`<b>${project.rootSlug}</b>`);
   } else {
     const projectHref = `/dev/content/${site}/${encodeURI(project.rootSlug)}`;
     links.push(html6`<a href="${projectHref}">${project.rootSlug}</a>`);
-    const segments = selectedSlug.split("/");
+    const segments = selectedPath.split("/");
     for (let i = 1; i < segments.length; i++) {
-      const slug = segments.slice(0, i + 1).join("/");
+      const path = segments.slice(0, i + 1).join("/");
       const isLast = i === segments.length - 1;
       if (isLast) {
         links.push(html6`<b>${segments[i]}</b>`);
       } else {
-        const href = `${projectHref}?node=${encodeURIComponent(slug)}`;
+        const href = `${projectHref}?node=${encodeURIComponent(path)}`;
         links.push(html6`<a href="${href}">${segments[i]}</a>`);
       }
     }
@@ -26811,8 +27006,8 @@ function nodeIcon(node2) {
   return unsafe(html6`<span class="tree-row__icon" aria-hidden="true">·</span>`);
 }
 function nodeFilePathHint(node2) {
-  if (node2.entry !== null) return `/${node2.slug}/index.md`;
-  return `/${node2.slug}/`;
+  if (node2.entry !== null) return `/${node2.path}/index.md`;
+  return `/${node2.path}/`;
 }
 function renderTreeRowMeta(node2) {
   const meta = [];
@@ -26826,21 +27021,22 @@ function renderTreeRowMeta(node2) {
   return unsafe(meta.join(""));
 }
 function renderTreeRowActions(node2, site) {
-  const reviewHref = `/dev/editorial-review/${encodeURI(node2.slug)}?site=${site}`;
-  const scrapHref = scrapbookViewerUrl({ site, path: node2.slug });
+  const reviewKey = node2.slug ?? node2.path;
+  const reviewHref = `/dev/editorial-review/${encodeURI(reviewKey)}?site=${site}`;
+  const scrapHref = scrapbookViewerUrl({ site, path: node2.path });
   const reviewLink = node2.entry !== null ? html6`<a class="tree-row__action tree-row__action--review" href="${reviewHref}"
           tabindex="0" aria-label="Open review for ${node2.title}">→ review</a>` : "";
   const scrapLink = node2.scrapbookCount > 0 ? html6`<a class="tree-row__action" href="${scrapHref}"
           tabindex="0" aria-label="Open scrapbook for ${node2.title}">→ scrapbook</a>` : "";
   return unsafe(reviewLink + scrapLink);
 }
-function renderTreeRow(site, project, flat, selectedSlug) {
+function renderTreeRow(site, project, flat, selectedPath) {
   const { node: node2, depth, isLast } = flat;
-  const isSelected = selectedSlug === node2.slug;
+  const isSelected = selectedPath === node2.path;
   const isLeaf = node2.children.length === 0;
   const lane = laneToken(node2.lane);
   const projectHref = `/dev/content/${site}/${encodeURI(project.rootSlug)}`;
-  const nodeHref = `${projectHref}?node=${encodeURIComponent(node2.slug)}`;
+  const nodeHref = `${projectHref}?node=${encodeURIComponent(node2.path)}`;
   const classes = [
     "tree-row",
     isLeaf ? "is-leaf" : "is-branch",
@@ -26849,7 +27045,7 @@ function renderTreeRow(site, project, flat, selectedSlug) {
   ].filter(Boolean).join(" ");
   return unsafe(html6`
     <a class="${classes}" href="${nodeHref}" style="--depth: ${depth}"
-      data-slug="${node2.slug}" aria-current="${isSelected ? "true" : "false"}">
+      data-slug="${node2.path}" aria-current="${isSelected ? "true" : "false"}">
       <div class="tree-row__main">
         ${nodeIcon(node2)}
         <span class="tree-row__title">${node2.title}</span>
@@ -26863,14 +27059,14 @@ function renderTreeRow(site, project, flat, selectedSlug) {
       <span class="tree-row__actions">${renderTreeRowActions(node2, site)}</span>
     </a>`);
 }
-function renderTree(site, project, selectedSlug) {
+function renderTree(site, project, selectedPath) {
   const flat = flattenForRender(project.root);
   return unsafe(html6`
     <div class="tree" role="tree">
-      ${flat.map((f) => renderTreeRow(site, project, f, selectedSlug))}
+      ${flat.map((f) => renderTreeRow(site, project, f, selectedPath))}
     </div>`);
 }
-async function renderContentProject(ctx, site, projectSlug, selectedSlug) {
+async function renderContentProject(ctx, site, projectSlug, selectedPath) {
   if (!(site in ctx.config.sites)) {
     return { status: 404, html: renderNotFound(`unknown site: ${site}`) };
   }
@@ -26882,21 +27078,21 @@ async function renderContentProject(ctx, site, projectSlug, selectedSlug) {
       html: renderNotFound(`unknown project: ${projectSlug} on ${site}`)
     };
   }
-  const selectedNode = selectedSlug ? findNode(project, selectedSlug) : null;
+  const selectedNode = selectedPath ? findNode(project, selectedPath) : null;
   const detailBlock = selectedNode ? await renderNodeDetail(ctx, site, selectedNode) : renderEmptyDetail();
   const body3 = html6`
     ${renderEditorialFolio("content", `drilldown \xB7 ${project.rootSlug}`)}
     <main class="content-page">
       <section class="drilldown">
         <div class="drilldown__tree">
-          ${renderTreeBreadcrumb(site, project, selectedNode?.slug ?? null)}
+          ${renderTreeBreadcrumb(site, project, selectedNode?.path ?? null)}
           <header class="tree-head">
             <h2 class="tree-head__title">${project.title}</h2>
             <span class="tree-head__count">
               ${project.totalNodes} NODES · ${project.maxDepth} LEVELS DEEP
             </span>
           </header>
-          ${renderTree(site, project, selectedNode?.slug ?? null)}
+          ${renderTree(site, project, selectedNode?.path ?? null)}
         </div>
         ${detailBlock}
       </section>
@@ -27223,7 +27419,7 @@ function publicDir() {
     resolve2(here, "..", "..", "..", "plugins", "deskwork-studio", "public")
   ];
   for (const candidate of candidates) {
-    if (existsSync9(candidate)) return candidate;
+    if (existsSync10(candidate)) return candidate;
   }
   throw new Error(
     `deskwork-studio: could not find public/ assets. Tried:

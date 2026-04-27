@@ -237,23 +237,23 @@ export function renderContentTopLevel(ctx: StudioContext): string {
 function renderTreeBreadcrumb(
   site: string,
   project: ContentProject,
-  selectedSlug: string | null,
+  selectedPath: string | null,
 ): RawHtml {
   const links: string[] = [];
   links.push(html`<a href="/dev/content/${site}">${site}</a>`);
-  if (selectedSlug === null) {
+  if (selectedPath === null) {
     links.push(html`<b>${project.rootSlug}</b>`);
   } else {
     const projectHref = `/dev/content/${site}/${encodeURI(project.rootSlug)}`;
     links.push(html`<a href="${projectHref}">${project.rootSlug}</a>`);
-    const segments = selectedSlug.split('/');
+    const segments = selectedPath.split('/');
     for (let i = 1; i < segments.length; i++) {
-      const slug = segments.slice(0, i + 1).join('/');
+      const path = segments.slice(0, i + 1).join('/');
       const isLast = i === segments.length - 1;
       if (isLast) {
         links.push(html`<b>${segments[i]}</b>`);
       } else {
-        const href = `${projectHref}?node=${encodeURIComponent(slug)}`;
+        const href = `${projectHref}?node=${encodeURIComponent(path)}`;
         links.push(html`<a href="${href}">${segments[i]}</a>`);
       }
     }
@@ -275,12 +275,13 @@ function nodeIcon(node: ContentNode): RawHtml {
 }
 
 function nodeFilePathHint(node: ContentNode): string {
-  // Phase 19a removed CalendarEntry.filePath. Until Phase 19c wires
-  // the studio through the content index, fall back to the host
-  // template (`<slug>/index.md`) for tracked entries and the
-  // directory shape for organizational nodes.
-  if (node.entry !== null) return `/${node.slug}/index.md`;
-  return `/${node.slug}/`;
+  // Phase 19c: node.path is the fs-relative path (the structural key).
+  // Tracked entries display the index file shape; organizational
+  // nodes show the directory shape. The host's actual file basename
+  // could differ (README.md, .mdx, etc.) but `/index.md` is the
+  // universal "expected location" hint the operator reads.
+  if (node.entry !== null) return `/${node.path}/index.md`;
+  return `/${node.path}/`;
 }
 
 function renderTreeRowMeta(node: ContentNode): RawHtml {
@@ -296,8 +297,15 @@ function renderTreeRowMeta(node: ContentNode): RawHtml {
 }
 
 function renderTreeRowActions(node: ContentNode, site: string): RawHtml {
-  const reviewHref = `/dev/editorial-review/${encodeURI(node.slug)}?site=${site}`;
-  const scrapHref = scrapbookViewerUrl({ site, path: node.slug });
+  // Review URLs still address by slug today (Phase 19d will switch to
+  // id-based routes); when an entry is overlaid, prefer its slug. For
+  // organizational nodes, fall back to the path (which equals the
+  // slug for flat layouts).
+  const reviewKey = node.slug ?? node.path;
+  const reviewHref = `/dev/editorial-review/${encodeURI(reviewKey)}?site=${site}`;
+  // Scrapbook addressing uses fs path — every node, tracked or not,
+  // has a deterministic on-disk scrapbook location at `<path>/scrapbook/`.
+  const scrapHref = scrapbookViewerUrl({ site, path: node.path });
   const reviewLink =
     node.entry !== null
       ? html`<a class="tree-row__action tree-row__action--review" href="${reviewHref}"
@@ -315,14 +323,17 @@ function renderTreeRow(
   site: string,
   project: ContentProject,
   flat: FlatNode,
-  selectedSlug: string | null,
+  selectedPath: string | null,
 ): RawHtml {
   const { node, depth, isLast } = flat;
-  const isSelected = selectedSlug === node.slug;
+  const isSelected = selectedPath === node.path;
   const isLeaf = node.children.length === 0;
   const lane = laneToken(node.lane);
   const projectHref = `/dev/content/${site}/${encodeURI(project.rootSlug)}`;
-  const nodeHref = `${projectHref}?node=${encodeURIComponent(node.slug)}`;
+  // Phase 19c: structural URLs key on fs path. The selection query
+  // parameter accepts hierarchical paths via `:path{.+}` route syntax
+  // upstream — encodeURIComponent preserves the `/` segments.
+  const nodeHref = `${projectHref}?node=${encodeURIComponent(node.path)}`;
   const classes = [
     'tree-row',
     isLeaf ? 'is-leaf' : 'is-branch',
@@ -332,9 +343,12 @@ function renderTreeRow(
     .filter(Boolean)
     .join(' ');
 
+  // The HTML attribute name `data-slug` is preserved for backward
+  // compatibility with the client-side selectors; it now carries the
+  // fs path. A future cleanup can rename the attribute to data-path.
   return unsafe(html`
     <a class="${classes}" href="${nodeHref}" style="--depth: ${depth}"
-      data-slug="${node.slug}" aria-current="${isSelected ? 'true' : 'false'}">
+      data-slug="${node.path}" aria-current="${isSelected ? 'true' : 'false'}">
       <div class="tree-row__main">
         ${nodeIcon(node)}
         <span class="tree-row__title">${node.title}</span>
@@ -352,12 +366,12 @@ function renderTreeRow(
 function renderTree(
   site: string,
   project: ContentProject,
-  selectedSlug: string | null,
+  selectedPath: string | null,
 ): RawHtml {
   const flat = flattenForRender(project.root);
   return unsafe(html`
     <div class="tree" role="tree">
-      ${flat.map((f) => renderTreeRow(site, project, f, selectedSlug))}
+      ${flat.map((f) => renderTreeRow(site, project, f, selectedPath))}
     </div>`);
 }
 
@@ -369,7 +383,7 @@ export async function renderContentProject(
   ctx: StudioContext,
   site: string,
   projectSlug: string,
-  selectedSlug: string | null,
+  selectedPath: string | null,
 ): Promise<{ status: number; html: string }> {
   if (!(site in ctx.config.sites)) {
     return { status: 404, html: renderNotFound(`unknown site: ${site}`) };
@@ -383,7 +397,7 @@ export async function renderContentProject(
     };
   }
 
-  const selectedNode = selectedSlug ? findNode(project, selectedSlug) : null;
+  const selectedNode = selectedPath ? findNode(project, selectedPath) : null;
   const detailBlock = selectedNode
     ? await renderNodeDetail(ctx, site, selectedNode)
     : renderEmptyDetail();
@@ -393,14 +407,14 @@ export async function renderContentProject(
     <main class="content-page">
       <section class="drilldown">
         <div class="drilldown__tree">
-          ${renderTreeBreadcrumb(site, project, selectedNode?.slug ?? null)}
+          ${renderTreeBreadcrumb(site, project, selectedNode?.path ?? null)}
           <header class="tree-head">
             <h2 class="tree-head__title">${project.title}</h2>
             <span class="tree-head__count">
               ${project.totalNodes} NODES · ${project.maxDepth} LEVELS DEEP
             </span>
           </header>
-          ${renderTree(site, project, selectedNode?.slug ?? null)}
+          ${renderTree(site, project, selectedNode?.path ?? null)}
         </div>
         ${detailBlock}
       </section>
