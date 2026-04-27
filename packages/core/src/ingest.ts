@@ -30,7 +30,7 @@
  *     is a separate concern (PRD extension).
  */
 
-import { isAbsolute, relative, sep } from 'node:path';
+import { basename, isAbsolute, relative, sep } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { parseFrontmatter, type FrontmatterData } from './frontmatter.ts';
 import type { CalendarEntry, EditorialCalendar, Stage } from './types.ts';
@@ -258,6 +258,23 @@ export function discoverIngestCandidates(
       continue;
     }
 
+    // README.md (case-insensitive) without frontmatter is treated as
+    // organizational content describing a folder's purpose — NOT a
+    // calendar entry. See #23. README.md WITH frontmatter is still
+    // ingested (Phase 13's `--layout readme` produces these).
+    if (
+      isReadmeBasename(filePath) &&
+      Object.keys(parsed.data).length === 0
+    ) {
+      skips.push({
+        filePath,
+        relativePath: relPath,
+        reason:
+          'README.md without frontmatter (organizational, not pipeline)',
+      });
+      continue;
+    }
+
     const slug = deriveSlug({
       filePath,
       root,
@@ -371,6 +388,20 @@ export function candidateToEntry(
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * True when the file's basename is `README.<ext>` (case-insensitive)
+ * for any of our supported markdown extensions. The frontmatter check
+ * lives at the call site — this helper is purely about the filename.
+ */
+function isReadmeBasename(filePath: string): boolean {
+  const lower = basename(filePath).toLowerCase();
+  return (
+    lower === 'readme.md' ||
+    lower === 'readme.mdx' ||
+    lower === 'readme.markdown'
+  );
+}
 
 function relativeTo(projectRoot: string, filePath: string): string {
   const rel = relative(projectRoot, filePath);

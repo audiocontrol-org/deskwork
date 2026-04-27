@@ -6,10 +6,12 @@ Open-source plugins for [Claude Code](https://claude.com/claude-code). Flagship 
 
 | Name | Status | Purpose |
 |---|---|---|
-| `deskwork` | Shipping (v0.4.1) | Editorial calendar lifecycle: capture, plan, outline, draft, review, publish |
-| `deskwork-studio` | Shipping (v0.4.1) | Optional local Hono web surface — dashboard, review pane, scrapbook, content view, manual |
+| `deskwork` | Shipping (v0.4.2) | Editorial calendar lifecycle: capture, plan, outline, draft, review, publish |
+| `deskwork-studio` | Shipping (v0.4.2) | Optional local Hono web surface — dashboard, review pane, scrapbook, content view, manual |
 | `feature-image` | Planned | Feature image generation for blog posts and pages |
 | `analytics` | Planned | Content performance analytics |
+
+v0.4.2 patch — fixes: `deskwork ingest` skips `README.md` files without frontmatter (organizational, not pipeline content); provenance labels say `default` instead of `frontmatter` when a derived value came from a fallback rather than the file (#23).
 
 v0.4.1 patch — fixes: scrapbook ingest predicate handles nested scrapbook dirs (#20); standalone scrapbook viewer save/rename/delete/create/upload endpoints now exist (#21).
 

@@ -273,6 +273,30 @@ describe('discoverIngestCandidates — state derivation', () => {
     write('p.md', '---\ntitle: P\n---\n');
     const r = discoverIngestCandidates([join(project, 'p.md')], baseOpts());
     expect(r.candidates[0].derivedState).toBe('Ideas');
+    // The value did not come from the file; provenance must reflect
+    // that (#23). Was previously labeled 'frontmatter' (a lie).
+    expect(r.candidates[0].stateSource).toBe('default');
+  });
+
+  it('labels state source as `default` when --state-from datePublished has no datePublished', () => {
+    // No datePublished + stateFrom datePublished → defaults to Ideas.
+    // The audit trail must say `default`, not `frontmatter` (#23).
+    write('p.md', '---\ntitle: P\n---\n');
+    const r = discoverIngestCandidates(
+      [join(project, 'p.md')],
+      baseOpts({ stateFrom: 'datePublished' }),
+    );
+    expect(r.candidates[0].derivedState).toBe('Ideas');
+    expect(r.candidates[0].stateSource).toBe('default');
+  });
+
+  it('keeps state source as `frontmatter` when frontmatter has a real `state:` field', () => {
+    // Regression: only the fallback path should be `default`. Files
+    // that actually carry a state field still report `frontmatter`.
+    write('p.md', '---\ntitle: P\nstate: drafting\n---\n');
+    const r = discoverIngestCandidates([join(project, 'p.md')], baseOpts());
+    expect(r.candidates[0].derivedState).toBe('Drafting');
+    expect(r.candidates[0].stateSource).toBe('frontmatter');
   });
 
   it('--state-from datePublished + past date → Published', () => {
@@ -581,6 +605,137 @@ describe('discoverIngestCandidates — title and description', () => {
       baseOpts({ fieldNames: { title: 'heading' } }),
     );
     expect(r.candidates[0].title).toBe('Heading As Title');
+  });
+});
+
+describe('discoverIngestCandidates — README.md without frontmatter (#23)', () => {
+  it('skips README.md with no frontmatter as organizational, not pipeline', () => {
+    write(
+      'src/content/projects/the-outbound/characters/README.md',
+      'Just a folder description.\nNo frontmatter at all.\n',
+    );
+    const r = discoverIngestCandidates(
+      [join(project, 'src/content/projects/the-outbound/characters/README.md')],
+      baseOpts(),
+    );
+    expect(r.candidates).toEqual([]);
+    expect(r.skips).toHaveLength(1);
+    expect(r.skips[0].reason).toBe(
+      'README.md without frontmatter (organizational, not pipeline)',
+    );
+  });
+
+  it('still ingests README.md WITH frontmatter (Phase 13 --layout readme)', () => {
+    write(
+      'content/posts/hello/README.md',
+      '---\ntitle: Hello\nstate: drafting\n---\n\nbody',
+    );
+    const r = discoverIngestCandidates(
+      [join(project, 'content/posts/hello/README.md')],
+      baseOpts(),
+    );
+    expect(r.skips).toEqual([]);
+    expect(r.candidates).toHaveLength(1);
+    expect(r.candidates[0].derivedSlug).toBe('hello');
+    expect(r.candidates[0].derivedState).toBe('Drafting');
+  });
+
+  it('still ingests index.md with no frontmatter (default-to-Ideas, unchanged)', () => {
+    // The README rule is README-specific. index.md keeps its existing
+    // behavior — it ingests, defaulting state to Ideas. Provenance now
+    // labels that default honestly.
+    write('content/posts/hello/index.md', 'no frontmatter here\n');
+    const r = discoverIngestCandidates(
+      [join(project, 'content/posts/hello/index.md')],
+      baseOpts(),
+    );
+    expect(r.skips).toEqual([]);
+    expect(r.candidates).toHaveLength(1);
+    expect(r.candidates[0].derivedSlug).toBe('hello');
+    expect(r.candidates[0].derivedState).toBe('Ideas');
+    expect(r.candidates[0].stateSource).toBe('default');
+  });
+
+  it('treats README detection as case-insensitive across .md extensions', () => {
+    // `Readme.md`, `readme.md`, `README.MD`, `README.mdx`, `README.markdown`
+    // are all README-shaped — none ingest when frontmatter is absent.
+    // We layer them under different parent dirs to keep slug-derivation
+    // collisions from confounding the assertion.
+    write('a/Readme.md', 'plain prose\n');
+    write('b/readme.md', 'plain prose\n');
+    write('c/README.MD', 'plain prose\n');
+    write('d/README.mdx', 'plain prose\n');
+    write('e/README.markdown', 'plain prose\n');
+    const r = discoverIngestCandidates([join(project)], baseOpts());
+    expect(r.candidates).toEqual([]);
+    expect(r.skips).toHaveLength(5);
+    for (const skip of r.skips) {
+      expect(skip.reason).toBe(
+        'README.md without frontmatter (organizational, not pipeline)',
+      );
+    }
+  });
+
+  it('regression: writingcontrol.org `the-outbound` shape produces 2 entries, not 7 (#23)', () => {
+    // Mirrors the operator's repro from issue #23. Pre-fix this
+    // produced 7 calendar entries (2 real + 5 README organizational
+    // nodes that polluted Ideas). Post-fix, only the index.md files
+    // ingest — the READMEs are correctly skipped.
+    write(
+      'src/content/projects/the-outbound/index.md',
+      '---\ntitle: The Outbound\nstate: published\ndatePublished: 2026-04-26\n---\nbody',
+    );
+    write(
+      'src/content/projects/the-outbound/characters/README.md',
+      'Folder describing characters.\n',
+    );
+    write(
+      'src/content/projects/the-outbound/characters/strivers/README.md',
+      'Strivers folder.\n',
+    );
+    write(
+      'src/content/projects/the-outbound/settings/README.md',
+      'Settings folder.\n',
+    );
+    write(
+      'src/content/projects/the-outbound/settings/libertardistan/README.md',
+      'Libertardistan folder.\n',
+    );
+    write(
+      'src/content/projects/the-outbound/structure/README.md',
+      'Structure folder.\n',
+    );
+    // A neighbor `field-notes` index.md to match the operator's plan
+    // output (Published, with frontmatter date).
+    write(
+      'src/content/projects/field-notes/index.md',
+      '---\ntitle: Field Notes\nstate: published\ndatePublished: 2026-04-10\n---\nbody',
+    );
+    const r = discoverIngestCandidates(
+      [join(project, 'src/content/projects')],
+      baseOpts(),
+    );
+    const slugs = r.candidates.map((c) => c.derivedSlug).sort();
+    expect(slugs).toEqual(['field-notes', 'the-outbound']);
+    // Every README skip should carry the organizational-rationale
+    // reason — exactly 5 of them (one per folder README).
+    const readmeSkips = r.skips.filter((s) =>
+      /README\.md without frontmatter/.test(s.reason),
+    );
+    expect(readmeSkips).toHaveLength(5);
+  });
+
+  it('does not skip a README.md that has frontmatter even if frontmatter is sparse', () => {
+    // Sparse but non-empty frontmatter (a single `title:` field) is
+    // still a deliberate signal from the operator that this README is
+    // a content node — keep ingesting it.
+    write('content/posts/sparse/README.md', '---\ntitle: Sparse\n---\n');
+    const r = discoverIngestCandidates(
+      [join(project, 'content/posts/sparse/README.md')],
+      baseOpts(),
+    );
+    expect(r.candidates).toHaveLength(1);
+    expect(r.candidates[0].derivedSlug).toBe('sparse');
   });
 });
 

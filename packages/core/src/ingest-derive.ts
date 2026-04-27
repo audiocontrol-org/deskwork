@@ -15,12 +15,22 @@ import { isStage, type Stage } from './types.ts';
 import type { FrontmatterData } from './frontmatter.ts';
 import { MARKDOWN_EXTENSIONS } from './ingest-paths.ts';
 
+/**
+ * Where a derived value came from. `'frontmatter'` is reserved for
+ * values that actually appear in the file's frontmatter — when a field
+ * is absent and we substitute a hardcoded fallback (e.g. defaulting
+ * state to `Ideas` when the frontmatter has no `state:` key), the
+ * source is `'default'`. The dry-run plan surfaces this so the
+ * operator can tell at a glance whether a row reflects the file or
+ * was filled in by the ingest layer.
+ */
 export type DerivationSource =
   | 'frontmatter'
   | 'path'
   | 'mtime'
   | 'today'
-  | 'explicit';
+  | 'explicit'
+  | 'default';
 
 export interface SlugDerivation {
   value: string;
@@ -235,8 +245,10 @@ export function deriveState(input: StateDeriveInput): StateDerivation {
   if (input.stateFrom === 'frontmatter') {
     const raw = readStringField(input.frontmatter, input.stateField);
     if (raw === undefined) {
-      // No state field — default to Ideas as the safest lane.
-      return { value: 'Ideas', source: 'frontmatter' };
+      // No state field — default to Ideas as the safest lane. The
+      // value did NOT come from the file; mark the source as
+      // `'default'` so the audit trail doesn't lie (#23).
+      return { value: 'Ideas', source: 'default' };
     }
     const normalized = normalizeStateString(raw);
     if (normalized === null) {
@@ -248,7 +260,9 @@ export function deriveState(input: StateDeriveInput): StateDerivation {
   // stateFrom === 'datePublished'
   const dateRaw = readDateField(input.frontmatter, input.dateField);
   if (dateRaw === undefined) {
-    return { value: 'Ideas', source: 'frontmatter' };
+    // No datePublished — same Ideas fallback as above; same provenance
+    // honesty applies (#23).
+    return { value: 'Ideas', source: 'default' };
   }
   const today = (input.now ?? new Date()).toISOString().slice(0, 10);
   if (dateRaw <= today) {
