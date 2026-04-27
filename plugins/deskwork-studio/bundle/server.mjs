@@ -10347,7 +10347,7 @@ var serveStatic = (options = { root: "" }) => {
 };
 
 // src/server.ts
-import { existsSync as existsSync6, realpathSync } from "node:fs";
+import { existsSync as existsSync7, realpathSync } from "node:fs";
 import { dirname as dirname2, isAbsolute, resolve as resolve2 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
@@ -25748,6 +25748,672 @@ function renderScrapbookPage(ctx, site, path) {
   });
 }
 
+// ../core/src/content-tree.ts
+function leafOfSlug(slug) {
+  const idx = slug.lastIndexOf("/");
+  return idx < 0 ? slug : slug.slice(idx + 1);
+}
+function ancestorsOf(slug) {
+  const segments = slug.split("/");
+  const out = [];
+  for (let i = 1; i < segments.length; i++) {
+    out.push(segments.slice(0, i).join("/"));
+  }
+  return out;
+}
+function rootSegment(slug) {
+  const idx = slug.indexOf("/");
+  return idx < 0 ? slug : slug.slice(0, idx);
+}
+function basenameLooksLikeIndex(filePath) {
+  const last = filePath.split("/").pop() ?? "";
+  const lower = last.toLowerCase();
+  return lower === "index.md" || lower === "index.mdx" || lower === "index.markdown" || lower === "readme.md" || lower === "readme.mdx" || lower === "readme.markdown";
+}
+function entryHasOwnIndex(entry) {
+  if (entry.filePath !== void 0 && entry.filePath !== "") {
+    return basenameLooksLikeIndex(entry.filePath);
+  }
+  return true;
+}
+function pickLatestMtime(a, b) {
+  if (a === null) return b;
+  if (b === null) return a;
+  return a > b ? a : b;
+}
+function buildContentTree(site, entries, config, projectRoot, options = {}) {
+  const lookup = options.scrapbookLookup ?? ((siteArg, slug) => {
+    try {
+      return listScrapbook(projectRoot, config, siteArg, slug);
+    } catch {
+      return { items: [], secretItems: [] };
+    }
+  });
+  const entryBySlug = /* @__PURE__ */ new Map();
+  const allSlugs = /* @__PURE__ */ new Set();
+  for (const e of entries) {
+    entryBySlug.set(e.slug, e);
+    allSlugs.add(e.slug);
+    for (const a of ancestorsOf(e.slug)) allSlugs.add(a);
+  }
+  const sortedSlugs = [...allSlugs].sort();
+  const nodeBySlug = /* @__PURE__ */ new Map();
+  for (const slug of sortedSlugs) {
+    const entry = entryBySlug.get(slug) ?? null;
+    const sb = lookup(site, slug);
+    const items = [...sb.items, ...sb.secretItems];
+    const mostRecent = items.reduce(
+      (acc, it) => pickLatestMtime(acc, it.mtime),
+      null
+    );
+    const node2 = {
+      site,
+      slug,
+      title: entry?.title ?? leafOfSlug(slug),
+      lane: entry?.stage ?? null,
+      entry,
+      hasOwnIndex: entry === null ? false : entryHasOwnIndex(entry),
+      scrapbookCount: items.length,
+      scrapbookMostRecentMtime: mostRecent,
+      children: []
+    };
+    nodeBySlug.set(slug, node2);
+  }
+  for (const slug of sortedSlugs) {
+    const parts = slug.split("/");
+    if (parts.length === 1) continue;
+    const parentSlug = parts.slice(0, -1).join("/");
+    const parent = nodeBySlug.get(parentSlug);
+    const node2 = nodeBySlug.get(slug);
+    if (parent && node2) parent.children.push(node2);
+  }
+  const projectRootBy = /* @__PURE__ */ new Map();
+  for (const slug of sortedSlugs) {
+    if (slug.includes("/")) continue;
+    const node2 = nodeBySlug.get(slug);
+    if (!node2) continue;
+    const arr = projectRootBy.get(slug) ?? [];
+    arr.push(node2);
+    projectRootBy.set(slug, arr);
+  }
+  const knownRoots = new Set(projectRootBy.keys());
+  for (const e of entries) {
+    const root3 = rootSegment(e.slug);
+    if (!knownRoots.has(root3)) {
+      const sb = lookup(site, root3);
+      const items = [...sb.items, ...sb.secretItems];
+      const mostRecent = items.reduce(
+        (acc, it) => pickLatestMtime(acc, it.mtime),
+        null
+      );
+      const synth = {
+        site,
+        slug: root3,
+        title: leafOfSlug(root3),
+        lane: null,
+        entry: null,
+        hasOwnIndex: false,
+        scrapbookCount: items.length,
+        scrapbookMostRecentMtime: mostRecent,
+        children: []
+      };
+      nodeBySlug.set(root3, synth);
+      for (const slug of sortedSlugs) {
+        if (rootSegment(slug) === root3 && slug.includes("/")) {
+          const parentSlug = slug.split("/").slice(0, -1).join("/");
+          if (parentSlug === root3) {
+            const child = nodeBySlug.get(slug);
+            if (child && !synth.children.includes(child)) {
+              synth.children.push(child);
+            }
+          }
+        }
+      }
+      projectRootBy.set(root3, [synth]);
+    }
+  }
+  for (const node2 of nodeBySlug.values()) {
+    node2.children.sort((a, b) => a.slug.localeCompare(b.slug));
+  }
+  const projects = [];
+  for (const [rootSlug, roots] of projectRootBy.entries()) {
+    if (roots.length === 0) continue;
+    const root3 = roots[0];
+    const summary = summarizeProject(site, rootSlug, root3);
+    projects.push(summary);
+  }
+  projects.sort((a, b) => a.rootSlug.localeCompare(b.rootSlug));
+  return projects;
+}
+function summarizeProject(site, rootSlug, root3) {
+  let trackedCount = 0;
+  let totalNodes = 0;
+  let maxDepth = 0;
+  let scrapbookCount = 0;
+  const laneCounts = /* @__PURE__ */ new Map();
+  const visit2 = (node2, depth) => {
+    totalNodes += 1;
+    maxDepth = Math.max(maxDepth, depth);
+    scrapbookCount += node2.scrapbookCount;
+    if (node2.entry !== null) {
+      trackedCount += 1;
+      const stage = node2.entry.stage;
+      laneCounts.set(stage, (laneCounts.get(stage) ?? 0) + 1);
+    }
+    for (const c of node2.children) visit2(c, depth + 1);
+  };
+  visit2(root3, 1);
+  let predominantLane = null;
+  let bestCount = 0;
+  for (const [stage, count] of laneCounts.entries()) {
+    if (count > bestCount) {
+      predominantLane = stage;
+      bestCount = count;
+    }
+  }
+  return {
+    site,
+    rootSlug,
+    title: root3.title,
+    trackedCount,
+    totalNodes,
+    maxDepth,
+    scrapbookCount,
+    predominantLane,
+    root: root3
+  };
+}
+function findNode(project, slug) {
+  if (project.root.slug === slug) return project.root;
+  const queue = [...project.root.children];
+  while (queue.length > 0) {
+    const head2 = queue.shift();
+    if (!head2) continue;
+    if (head2.slug === slug) return head2;
+    queue.push(...head2.children);
+  }
+  return null;
+}
+function flattenForRender(root3) {
+  const out = [];
+  const walk = (node2, depth, isLast) => {
+    out.push({ node: node2, depth, isLast });
+    const last = node2.children.length - 1;
+    for (let i = 0; i < node2.children.length; i++) {
+      walk(node2.children[i], depth + 1, i === last);
+    }
+  };
+  walk(root3, 0, true);
+  return out;
+}
+
+// src/pages/chrome.ts
+var NAV_LINKS = [
+  { key: "dashboard", href: "/dev/editorial-studio", label: "Dashboard" },
+  { key: "content", href: "/dev/content", label: "Content" },
+  { key: "reviews", href: "/dev/editorial-review-shortform", label: "Reviews" },
+  { key: "manual", href: "/dev/editorial-help", label: "Manual" }
+];
+function siteSummary(ctx) {
+  const slugs = Object.keys(ctx.config.sites);
+  if (slugs.length === 1) return slugs[0];
+  return `${slugs.length} sites`;
+}
+function renderEditorialChrome(ctx, active) {
+  const links = NAV_LINKS.map(
+    (link2) => html6`<a class="${link2.key === active ? "active" : ""}" href="${link2.href}">${link2.label}</a>`
+  ).join("");
+  return unsafe(html6`
+    <header class="ed-chrome">
+      <div class="ed-chrome__inner">
+        <div class="ed-chrome__brand">deskwork<sup>STUDIO</sup></div>
+        <div class="ed-chrome__site"><b>${siteSummary(ctx)}</b></div>
+        <nav class="ed-chrome__nav" aria-label="Studio sections">
+          ${unsafe(links)}
+        </nav>
+      </div>
+    </header>`);
+}
+
+// src/pages/content-detail.ts
+import { readFileSync as readFileSync8, existsSync as existsSync6 } from "node:fs";
+import { join as join8 } from "node:path";
+var PREVIEW_CHAR_BUDGET = 480;
+function renderEmptyDetail() {
+  return unsafe(html6`
+    <div class="detail detail--empty" data-detail-empty>
+      <div class="ornament" aria-hidden="true">· · ·</div>
+      <p class="text">
+        Select a node to read its head matter, preview its body, and
+        browse its scrapbook.
+      </p>
+    </div>`);
+}
+function safeReadFile(absPath) {
+  try {
+    if (!existsSync6(absPath)) return null;
+    return readFileSync8(absPath, "utf-8");
+  } catch {
+    return null;
+  }
+}
+function fmField(value) {
+  if (value === null || value === void 0) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) return value.map(fmField).join(", ");
+  return JSON.stringify(value);
+}
+function renderFrontmatter(fm) {
+  const keys2 = Object.keys(fm);
+  if (keys2.length === 0) {
+    return unsafe(html6`<p class="frontmatter-empty">No frontmatter detected.</p>`);
+  }
+  const rows = keys2.map(
+    (k) => html6`<dt>${k}</dt><dd>${fmField(fm[k])}</dd>`
+  );
+  return unsafe(html6`
+    <dl class="frontmatter">
+      ${unsafe(rows.join(""))}
+    </dl>`);
+}
+async function renderBodyPreview(body3) {
+  if (body3.trim().length === 0) {
+    return unsafe(html6`<p class="preview-empty">No body content yet.</p>`);
+  }
+  const slice = body3.length > PREVIEW_CHAR_BUDGET * 2 ? `${body3.slice(0, PREVIEW_CHAR_BUDGET * 2)}
+
+\u2026` : body3;
+  const rendered = await renderMarkdownToHtml(slice);
+  return unsafe(html6`<div class="preview">${unsafe(rendered)}</div>`);
+}
+function makeInlineTextLoaderForNode(ctx, site, slug) {
+  const contentDir = resolveContentDir(ctx.projectRoot, ctx.config, site);
+  const scrapbookDir2 = join8(contentDir, slug, "scrapbook");
+  return (filename, maxBytes) => {
+    try {
+      const buf = readFileSync8(join8(scrapbookDir2, filename));
+      const slice = buf.subarray(0, Math.min(buf.byteLength, maxBytes));
+      return slice.toString("utf-8");
+    } catch {
+      return null;
+    }
+  };
+}
+function renderScrapbookList(site, slug, summary, loader) {
+  if (!summary || summary.items.length === 0 && summary.secretItems.length === 0) {
+    return renderEmptyScrapbookRow();
+  }
+  const itemRows = summary.items.map(
+    (item) => renderReadOnlyScrapbookRow({ site, path: slug }, item, {
+      inlinePreviewLoader: loader
+    })
+  );
+  const secretRows = summary.secretItems.map(
+    (item) => renderReadOnlyScrapbookRow({ site, path: slug }, item, {
+      inlinePreviewLoader: loader
+    })
+  );
+  if (secretRows.length === 0) {
+    return unsafe(html6`<div class="scraplist">${itemRows}</div>`);
+  }
+  return unsafe(html6`
+    <div class="scraplist">${itemRows}</div>
+    <p class="scraplist-secret-head">
+      <span aria-hidden="true">⚿</span> secret · ${summary.secretItems.length}
+    </p>
+    <div class="scraplist scraplist--secret">${secretRows}</div>`);
+}
+function loadDetailRender(ctx, site, node2) {
+  const contentDir = resolveContentDir(ctx.projectRoot, ctx.config, site);
+  let frontmatter = {};
+  let bodyPreview = "";
+  let scrapbook = null;
+  if (node2.entry !== null) {
+    const filePath = node2.entry.filePath ?? `${node2.slug}/index.md`;
+    const abs = join8(contentDir, filePath);
+    const raw3 = safeReadFile(abs);
+    if (raw3 !== null) {
+      const parsed = parseFrontmatter(raw3);
+      frontmatter = parsed.data;
+      bodyPreview = parsed.body;
+    }
+  }
+  try {
+    scrapbook = listScrapbook(ctx.projectRoot, ctx.config, site, node2.slug);
+  } catch {
+    scrapbook = null;
+  }
+  return { frontmatter, bodyPreview, scrapbook };
+}
+async function renderNodeDetail(ctx, site, node2) {
+  const detail = loadDetailRender(ctx, site, node2);
+  const fmCount = Object.keys(detail.frontmatter).length;
+  const reviewHref = `/dev/editorial-review/${encodeURI(node2.slug)}?site=${site}`;
+  const scrapHref = scrapbookViewerUrl({ site, path: node2.slug });
+  const scrapDirHint = node2.scrapbookCount === 0 ? "0 items \xB7 scrapbook empty" : `${node2.scrapbookCount} items \xB7 /${node2.slug}/scrapbook`;
+  const updatedHint = node2.scrapbookMostRecentMtime !== null ? html6`<span class="detail__updated">last touched ${formatRelativeTime(node2.scrapbookMostRecentMtime)}</span>` : "";
+  const loader = makeInlineTextLoaderForNode(ctx, site, node2.slug);
+  const previewBlock = await renderBodyPreview(detail.bodyPreview);
+  const reviewBtn = node2.entry !== null ? html6`<a class="btn btn--accent" href="${reviewHref}">Open in Review</a>` : "";
+  return unsafe(html6`
+    <div class="detail" data-node-detail data-slug="${node2.slug}">
+      <div class="detail__crumb">${node2.slug.replaceAll("/", " \xB7 ")}</div>
+      <h2 class="detail__title">${node2.title}</h2>
+      <p class="detail__sub">
+        ${node2.entry?.description ?? ""}
+        ${unsafe(updatedHint)}
+      </p>
+
+      <div class="detail__sectionhead">
+        Frontmatter
+        <span class="marg">${fmCount} ${fmCount === 1 ? "field" : "fields"} · raw</span>
+      </div>
+      ${renderFrontmatter(detail.frontmatter)}
+
+      <div class="detail__sectionhead">
+        Preview
+        <span class="marg">first paragraphs · markdown rendered</span>
+      </div>
+      ${previewBlock}
+
+      <div class="detail__sectionhead">
+        Scrapbook
+        <span class="marg">${scrapDirHint}</span>
+      </div>
+      ${renderScrapbookList(site, node2.slug, detail.scrapbook, loader)}
+
+      <div class="actions">
+        ${unsafe(reviewBtn)}
+        <a class="btn" href="${scrapHref}">Open Scrapbook</a>
+      </div>
+    </div>`);
+}
+
+// src/pages/content.ts
+function loadProjectsForSite(ctx, site) {
+  const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
+  const cal = readCalendar(calendarPath);
+  const projects = buildContentTree(
+    site,
+    cal.entries,
+    ctx.config,
+    ctx.projectRoot
+  );
+  return {
+    site,
+    host: ctx.config.sites[site].host,
+    projects
+  };
+}
+function loadAllSites(ctx) {
+  return Object.keys(ctx.config.sites).map(
+    (site) => loadProjectsForSite(ctx, site)
+  );
+}
+function aggregateCounts(siteProjects) {
+  let trackedNodes = 0;
+  let scrapbookItems = 0;
+  for (const sp of siteProjects) {
+    for (const project of sp.projects) {
+      trackedNodes += project.trackedCount;
+      scrapbookItems += project.scrapbookCount;
+    }
+  }
+  return { sites: siteProjects.length, trackedNodes, scrapbookItems };
+}
+function laneToken(stage) {
+  return stage ? stage.toLowerCase() : "unknown";
+}
+function laneLabel(stage) {
+  return stage ? `mostly ${stage.toLowerCase()}` : "untracked";
+}
+function projectFormHint(project) {
+  if (project.totalNodes === 1) return "flat entry";
+  if (project.maxDepth >= 3) return `nested \xB7 ${project.totalNodes} nodes`;
+  return `collection \xB7 ${project.totalNodes} nodes`;
+}
+function renderProjectRow(site, project, index2) {
+  const num = String(index2 + 1).padStart(2, "0");
+  const lane = laneToken(project.predominantLane);
+  const href = `/dev/content/${site}/${encodeURI(project.rootSlug)}`;
+  return unsafe(html6`
+    <a class="project-row" href="${href}">
+      <span class="project-row__num">${num}</span>
+      <span class="project-row__name">
+        ${project.title}
+        <em>${projectFormHint(project)}</em>
+      </span>
+      <span class="project-row__nodes">${project.totalNodes} nodes</span>
+      <span class="project-row__lane">
+        <span class="lane-dot lane-dot--${lane}"></span>
+        ${laneLabel(project.predominantLane)}
+      </span>
+    </a>`);
+}
+function siteTag(index2) {
+  return index2 === 0 ? "Site \xB7 primary" : "Site \xB7 auxiliary";
+}
+function renderSiteCard(sp, index2) {
+  const totalNodes = sp.projects.reduce((acc, p2) => acc + p2.totalNodes, 0);
+  const trackedNodes = sp.projects.reduce(
+    (acc, p2) => acc + p2.trackedCount,
+    0
+  );
+  const scrapbookItems = sp.projects.reduce(
+    (acc, p2) => acc + p2.scrapbookCount,
+    0
+  );
+  return unsafe(html6`
+    <article class="site-card">
+      <div class="site-card__tag">${siteTag(index2)}</div>
+      <h2 class="site-card__name">${sp.site}</h2>
+      <div class="site-card__host">${sp.host}</div>
+      <div class="site-card__counts">
+        <b>${sp.projects.length}</b> root entries ·
+        <b>${totalNodes}</b> total nodes ·
+        <b>${scrapbookItems}</b> scrapbook items
+      </div>
+      <div class="site-card__projects">
+        ${sp.projects.map((p2, i) => renderProjectRow(sp.site, p2, i))}
+      </div>
+      ${sp.projects.length === 0 ? unsafe(html6`
+              <p class="site-card__empty">No tracked content yet — run
+                <code>/deskwork:add</code> or
+                <code>/deskwork:ingest</code>.
+              </p>`) : ""}
+      <p class="site-card__rollup">
+        ${trackedNodes} tracked · ${totalNodes - trackedNodes} synthetic
+      </p>
+    </article>`);
+}
+function renderContentTopLevel(ctx) {
+  const sites = loadAllSites(ctx);
+  const counts = aggregateCounts(sites);
+  const body3 = html6`
+    ${renderEditorialChrome(ctx, "content")}
+    <main class="content-page">
+      <header class="page-head">
+        <div>
+          <h1 class="page-head__title">A <em>shape</em> of the work.</h1>
+          <p class="page-head__sub">
+            The pipeline view shows where things are. This shows what's
+            there. Browse the corpus by its tree on disk; drill into any
+            node to see its content and the scrapbook hanging off it.
+          </p>
+        </div>
+        <div class="page-head__meta">
+          <b>${counts.sites}</b> SITES<br>
+          <b>${counts.trackedNodes}</b> TRACKED NODES<br>
+          <b>${counts.scrapbookItems}</b> SCRAPBOOK ITEMS
+        </div>
+      </header>
+      <section class="toplevel">
+        ${sites.map((sp, i) => renderSiteCard(sp, i))}
+      </section>
+    </main>`;
+  return layout({
+    title: "Content \u2014 deskwork",
+    cssHrefs: ["/static/css/content.css", "/static/css/scrap-row.css"],
+    bodyHtml: body3,
+    scriptModules: []
+  });
+}
+function renderTreeBreadcrumb(site, project, selectedSlug) {
+  const links = [];
+  links.push(html6`<a href="/dev/content/${site}">${site}</a>`);
+  if (selectedSlug === null) {
+    links.push(html6`<b>${project.rootSlug}</b>`);
+  } else {
+    const projectHref = `/dev/content/${site}/${encodeURI(project.rootSlug)}`;
+    links.push(html6`<a href="${projectHref}">${project.rootSlug}</a>`);
+    const segments = selectedSlug.split("/");
+    for (let i = 1; i < segments.length; i++) {
+      const slug = segments.slice(0, i + 1).join("/");
+      const isLast = i === segments.length - 1;
+      if (isLast) {
+        links.push(html6`<b>${segments[i]}</b>`);
+      } else {
+        const href = `${projectHref}?node=${encodeURIComponent(slug)}`;
+        links.push(html6`<a href="${href}">${segments[i]}</a>`);
+      }
+    }
+  }
+  const sep = html6`<span class="breadcrumb__sep" aria-hidden="true">›</span>`;
+  return unsafe(html6`
+    <nav class="breadcrumb" aria-label="content tree breadcrumb">
+      ${unsafe(links.join(`
+${sep}
+`))}
+    </nav>`);
+}
+function nodeIcon(node2) {
+  if (node2.children.length > 0 || node2.lane === null) {
+    return unsafe(
+      html6`<span class="tree-row__icon is-branch" aria-hidden="true">◐</span>`
+    );
+  }
+  return unsafe(html6`<span class="tree-row__icon" aria-hidden="true">·</span>`);
+}
+function nodeFilePathHint(node2) {
+  if (node2.entry?.filePath) return `/${node2.entry.filePath}`;
+  if (node2.entry !== null) return `/${node2.slug}/index.md`;
+  return `/${node2.slug}/`;
+}
+function renderTreeRowMeta(node2) {
+  const meta = [];
+  if (node2.scrapbookCount > 0) {
+    const word = node2.scrapbookCount === 1 ? "note" : "notes";
+    meta.push(html6`<span class="scrap-count">${node2.scrapbookCount} ${word}</span>`);
+  }
+  if (node2.scrapbookMostRecentMtime !== null) {
+    meta.push(html6`<span class="mtime">${formatRelativeTime(node2.scrapbookMostRecentMtime)}</span>`);
+  }
+  return unsafe(meta.join(""));
+}
+function renderTreeRowActions(node2, site) {
+  const reviewHref = `/dev/editorial-review/${encodeURI(node2.slug)}?site=${site}`;
+  const scrapHref = scrapbookViewerUrl({ site, path: node2.slug });
+  const reviewLink = node2.entry !== null ? html6`<a class="tree-row__action tree-row__action--review" href="${reviewHref}"
+          tabindex="0" aria-label="Open review for ${node2.title}">→ review</a>` : "";
+  const scrapLink = node2.scrapbookCount > 0 ? html6`<a class="tree-row__action" href="${scrapHref}"
+          tabindex="0" aria-label="Open scrapbook for ${node2.title}">→ scrapbook</a>` : "";
+  return unsafe(reviewLink + scrapLink);
+}
+function renderTreeRow(site, project, flat, selectedSlug) {
+  const { node: node2, depth, isLast } = flat;
+  const isSelected = selectedSlug === node2.slug;
+  const isLeaf = node2.children.length === 0;
+  const lane = laneToken(node2.lane);
+  const projectHref = `/dev/content/${site}/${encodeURI(project.rootSlug)}`;
+  const nodeHref = `${projectHref}?node=${encodeURIComponent(node2.slug)}`;
+  const classes = [
+    "tree-row",
+    isLeaf ? "is-leaf" : "is-branch",
+    isLast ? "is-last" : "",
+    isSelected ? "is-selected" : ""
+  ].filter(Boolean).join(" ");
+  return unsafe(html6`
+    <a class="${classes}" href="${nodeHref}" style="--depth: ${depth}"
+      data-slug="${node2.slug}" aria-current="${isSelected ? "true" : "false"}">
+      <div class="tree-row__main">
+        ${nodeIcon(node2)}
+        <span class="tree-row__title">${node2.title}</span>
+        <span class="tree-row__slug">${nodeFilePathHint(node2)}</span>
+      </div>
+      <span class="tree-row__lane">
+        <span class="lane-dot lane-dot--${lane}"></span>
+        ${node2.lane ? node2.lane.toLowerCase() : "untracked"}
+      </span>
+      <span class="tree-row__meta">${renderTreeRowMeta(node2)}</span>
+      <span class="tree-row__actions">${renderTreeRowActions(node2, site)}</span>
+    </a>`);
+}
+function renderTree(site, project, selectedSlug) {
+  const flat = flattenForRender(project.root);
+  return unsafe(html6`
+    <div class="tree" role="tree">
+      ${flat.map((f) => renderTreeRow(site, project, f, selectedSlug))}
+    </div>`);
+}
+async function renderContentProject(ctx, site, projectSlug, selectedSlug) {
+  if (!(site in ctx.config.sites)) {
+    return { status: 404, html: renderNotFound(`unknown site: ${site}`) };
+  }
+  const sp = loadProjectsForSite(ctx, site);
+  const project = sp.projects.find((p2) => p2.rootSlug === projectSlug);
+  if (!project) {
+    return {
+      status: 404,
+      html: renderNotFound(`unknown project: ${projectSlug} on ${site}`)
+    };
+  }
+  const selectedNode = selectedSlug ? findNode(project, selectedSlug) : null;
+  const detailBlock = selectedNode ? await renderNodeDetail(ctx, site, selectedNode) : renderEmptyDetail();
+  const body3 = html6`
+    ${renderEditorialChrome(ctx, "content")}
+    <main class="content-page">
+      <section class="drilldown">
+        <div class="drilldown__tree">
+          ${renderTreeBreadcrumb(site, project, selectedNode?.slug ?? null)}
+          <header class="tree-head">
+            <h2 class="tree-head__title">${project.title}</h2>
+            <span class="tree-head__count">
+              ${project.totalNodes} NODES · ${project.maxDepth} LEVELS DEEP
+            </span>
+          </header>
+          ${renderTree(site, project, selectedNode?.slug ?? null)}
+        </div>
+        ${detailBlock}
+      </section>
+    </main>`;
+  return {
+    status: 200,
+    html: layout({
+      title: `${project.title} \xB7 content \u2014 deskwork`,
+      cssHrefs: ["/static/css/content.css", "/static/css/scrap-row.css"],
+      bodyHtml: body3,
+      scriptModules: []
+    })
+  };
+}
+function renderNotFound(message) {
+  const body3 = html6`
+    <main class="content-page">
+      <section class="content-error">
+        <h1>Not found</h1>
+        <p>${message}</p>
+        <p><a href="/dev/content">← back to the content view</a></p>
+      </section>
+    </main>`;
+  return layout({
+    title: "Not found \u2014 deskwork",
+    cssHrefs: ["/static/css/content.css"],
+    bodyHtml: body3,
+    scriptModules: []
+  });
+}
+
 // src/tailscale.ts
 import { spawnSync } from "node:child_process";
 import { networkInterfaces } from "node:os";
@@ -25878,7 +26544,7 @@ function publicDir() {
     resolve2(here, "..", "..", "..", "plugins", "deskwork-studio", "public")
   ];
   for (const candidate of candidates) {
-    if (existsSync6(candidate)) return candidate;
+    if (existsSync7(candidate)) return candidate;
   }
   throw new Error(
     `deskwork-studio: could not find public/ assets. Tried:
@@ -25915,6 +26581,15 @@ function createApp(ctx) {
     )
   );
   app.get("/api/dev/scrapbook-file", (c) => serveScrapbookFile(c, ctx));
+  app.get("/dev/content", (c) => c.html(renderContentTopLevel(ctx)));
+  app.get("/dev/content/:site", (c) => c.html(renderContentTopLevel(ctx)));
+  app.get("/dev/content/:site/:project{.+}", async (c) => {
+    const site = c.req.param("site");
+    const project = decodeURIComponent(c.req.param("project"));
+    const node2 = c.req.query("node") ?? null;
+    const r = await renderContentProject(ctx, site, project, node2);
+    return c.html(r.html, r.status);
+  });
   app.use(
     "/static/*",
     serveStatic({

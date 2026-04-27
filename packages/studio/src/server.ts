@@ -40,6 +40,10 @@ import { renderReviewPage } from './pages/review.ts';
 import { renderShortformPage } from './pages/shortform.ts';
 import { renderHelpPage } from './pages/help.ts';
 import { renderScrapbookPage } from './pages/scrapbook.ts';
+import {
+  renderContentTopLevel,
+  renderContentProject,
+} from './pages/content.ts';
 import { detectTailscale, type TailscaleInfo } from './tailscale.ts';
 
 interface CliArgs {
@@ -193,6 +197,21 @@ export function createApp(ctx: StudioContext): Hono {
   // Distinct from the (not-yet-ported) full scrapbook CRUD API — the
   // bird's-eye and review-drawer surfaces are read-only.
   app.get('/api/dev/scrapbook-file', (c) => serveScrapbookFile(c, ctx));
+
+  // Bird's-eye content view (Phase 16d). Three routes:
+  //   GET /dev/content                     — top-level (sites + projects)
+  //   GET /dev/content/:site               — same shape filtered to one site
+  //   GET /dev/content/:site/:project{.+}  — drilldown for one project
+  // The `?node=<slug>` query param toggles the detail panel.
+  app.get('/dev/content', (c) => c.html(renderContentTopLevel(ctx)));
+  app.get('/dev/content/:site', (c) => c.html(renderContentTopLevel(ctx)));
+  app.get('/dev/content/:site/:project{.+}', async (c) => {
+    const site = c.req.param('site');
+    const project = decodeURIComponent(c.req.param('project'));
+    const node = c.req.query('node') ?? null;
+    const r = await renderContentProject(ctx, site, project, node);
+    return c.html(r.html, r.status as never);
+  });
 
   // Static assets — UI client JS, CSS, etc.
   app.use(

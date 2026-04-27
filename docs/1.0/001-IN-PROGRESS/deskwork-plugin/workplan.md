@@ -406,18 +406,18 @@ Tasks are grouped by sub-phase to allow each to land as a separate PR if needed.
 
 Design reference: [`mockups/birds-eye-content-view.html`](mockups/birds-eye-content-view.html). Three states (top-level, drilldown, drilldown-with-detail) — implementation should match the typographic and spatial language of the mockup, not the literal HTML.
 
-- [ ] `packages/studio/src/pages/content.ts` (NEW) — three render functions: `renderContentTopLevel`, `renderContentProject(site, project)`, `renderContentNodeDetail(site, slug)`. Each returns a fully-rendered HTML string per the existing studio convention.
-- [ ] `packages/core/src/content-tree.ts` (NEW) — derives a tree representation from the calendar's flat entry list plus filesystem walks for directories that aren't tracked entries but have content beneath them. Returns `ContentNode[]` with `{ site, slug, title, lane, hasOwnIndex, scrapbookCount, scrapbookMostRecentMtime, children: ContentNode[] }`.
-- [ ] `packages/studio/public/content.css` (NEW) — extracted from the mockup: paper/ink palette, Fraunces + Newsreader + JetBrains Mono via Google Fonts (or local copies if Google Fonts is unavailable in dev), tree connectors, detail-panel layout. Loaded only on `/dev/content/*` routes.
-- [ ] `packages/studio/src/server.ts` — add three routes:
+- [x] `packages/studio/src/pages/content.ts` (NEW) — three render functions: `renderContentTopLevel`, `renderContentProject(site, project)`, `renderContentNodeDetail(site, slug)`. Each returns a fully-rendered HTML string per the existing studio convention.
+- [x] `packages/core/src/content-tree.ts` (NEW) — derives a tree representation from the calendar's flat entry list plus filesystem walks for directories that aren't tracked entries but have content beneath them. Returns `ContentNode[]` with `{ site, slug, title, lane, hasOwnIndex, scrapbookCount, scrapbookMostRecentMtime, children: ContentNode[] }`.
+- [x] `packages/studio/public/content.css` (NEW) — extracted from the mockup: paper/ink palette, Fraunces + Newsreader + JetBrains Mono via Google Fonts (or local copies if Google Fonts is unavailable in dev), tree connectors, detail-panel layout. Loaded only on `/dev/content/*` routes.
+- [x] `packages/studio/src/server.ts` — add three routes:
   - `GET /dev/content` → top-level (lists sites + their root projects)
   - `GET /dev/content/:site` → project list for a site (when site has multiple)
   - `GET /dev/content/:site/:project` → drilldown view (`project` accepts `/`-separated slugs)
   - `GET /dev/content/:site/:project?node=<slug>` → drilldown with node detail (or use a separate endpoint that returns just the panel HTML — operator's choice)
-- [ ] Top-nav in editorial chrome — add a "Content" link alongside "Dashboard" / "Reviews" / "Manual" so the new surface is reachable.
-- [ ] **Inline review links** — every tree row that corresponds to a tracked calendar entry must expose a direct affordance to `/dev/editorial-review/<slug>`. Suggested treatment: a small marginalia-style action on the right edge of the row (e.g. `→ review`) that's quiet at rest and stronger on row-hover. Pure organizational directories (no tracked entry) get no review link — the affordance is only present where review makes sense. The detail panel's "Open in Review" button stays as the primary affordance for the selected node; the row-level link is the secondary affordance for fast scanning.
-- [ ] **Inline scrapbook link** — same treatment for nodes whose scrapbook count > 0: a quiet `→ scrapbook` action that jumps to `/dev/scrapbook/<site>/<path>`. Hidden when scrapbook is empty. Both inline links should be reachable by keyboard (focusable with Tab, activatable with Enter) without requiring hover.
-- [ ] Tests:
+- [x] Top-nav in editorial chrome — add a "Content" link alongside "Dashboard" / "Reviews" / "Manual" so the new surface is reachable.
+- [x] **Inline review links** — every tree row that corresponds to a tracked calendar entry must expose a direct affordance to `/dev/editorial-review/<slug>`. Suggested treatment: a small marginalia-style action on the right edge of the row (e.g. `→ review`) that's quiet at rest and stronger on row-hover. Pure organizational directories (no tracked entry) get no review link — the affordance is only present where review makes sense. The detail panel's "Open in Review" button stays as the primary affordance for the selected node; the row-level link is the secondary affordance for fast scanning.
+- [x] **Inline scrapbook link** — same treatment for nodes whose scrapbook count > 0: a quiet `→ scrapbook` action that jumps to `/dev/scrapbook/<site>/<path>`. Hidden when scrapbook is empty. Both inline links should be reachable by keyboard (focusable with Tab, activatable with Enter) without requiring hover.
+- [x] Tests:
   - `packages/core/test/content-tree.test.ts` — unit coverage for tree assembly: flat calendar with hierarchical slugs, mixed (some entries hierarchical + some flat), pure organizational dirs that aren't entries but contain entries beneath, scrapbook count aggregation.
   - `packages/studio/test/content-page.test.ts` — integration: top-level returns 200 with site cards; drilldown returns 200 with tree; node-selected state includes detail panel; routes return 404 for unknown sites/projects.
 
