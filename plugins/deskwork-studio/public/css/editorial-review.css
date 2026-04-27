@@ -4,9 +4,22 @@
  * Metaphor: a press-check desk. Galley proofs under a pool of light.
  * Red pencil. Rubber stamps. Marginalia. A pot of ink, not a dashboard.
  *
- * Scoped via [data-review-ui="studio"|"longform"|"shortform"] on an
- * ancestor element so the longform route (which mounts inside the
+ * Scoped via [data-review-ui="studio"|"longform"|"shortform"|"manual"]
+ * on an ancestor element so the longform route (which mounts inside the
  * production BlogLayout) doesn't leak chrome styles into the site.
+ *
+ * CSF-10 (cross-surface audit v0.5.0) — architectural exception:
+ * the longform review route mounts INSIDE the production BlogLayout
+ * (see review.ts), which means the editorial-print masthead pattern
+ * cannot apply there unmodified. The review surface uses its own
+ * `er-dispatch-*` family (defined in review-viewport.css) that
+ * coexists with the host site's chrome rather than replacing it.
+ * This is by design — the longform review is the only studio surface
+ * where the chrome is shared with the published site, so margin notes
+ * and the prose render in the same visual context. Other surfaces
+ * (dashboard, content view, scrapbook viewer, manual, shortform,
+ * studio index) own their full body and use the unified
+ * `er-pagehead-*` family.
  */
 
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..900,0..100;1,9..144,300..900,0..100&family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&family=JetBrains+Mono:wght@400;500;600&display=swap');
