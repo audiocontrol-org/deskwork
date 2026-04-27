@@ -23641,6 +23641,24 @@ function scrapbookDir(projectRoot, config, site, slug) {
   const articleDir = resolveBlogPostDir(projectRoot, config, site, slug);
   return join7(articleDir, "scrapbook");
 }
+function scrapbookDirForEntry(projectRoot, config, site, entry, index2) {
+  const entryId = entry.id ?? "";
+  const file = findEntryFile(
+    projectRoot,
+    config,
+    site,
+    entryId,
+    index2,
+    // Legacy fallback ON — we want a usable path even for pre-doctor entries.
+    { slug: entry.slug }
+  );
+  if (file === void 0) {
+    throw new Error(
+      `Cannot resolve scrapbook dir: entry has no id binding and no template fallback (slug="${entry.slug}")`
+    );
+  }
+  return join7(dirname(file), "scrapbook");
+}
 function scrapbookFilePath(projectRoot, config, site, slug, filename, opts = {}) {
   assertFilename(filename);
   const dir = scrapbookDir(projectRoot, config, site, slug);
@@ -23710,10 +23728,29 @@ function listFilesInDir(dir) {
   items.sort((a, b) => b.mtime.localeCompare(a.mtime));
   return items;
 }
+function countScrapbookAtDir(dir) {
+  try {
+    if (!existsSync4(dir)) return 0;
+    const top = listFilesInDir(dir);
+    const secretDir = join7(dir, SECRET_SUBDIR);
+    const secret = existsSync4(secretDir) ? listFilesInDir(secretDir) : [];
+    return top.length + secret.length;
+  } catch {
+    return 0;
+  }
+}
 function countScrapbook(projectRoot, config, site, slug) {
   try {
-    const summary = listScrapbook(projectRoot, config, site, slug);
-    return summary.items.length + summary.secretItems.length;
+    const dir = scrapbookDir(projectRoot, config, site, slug);
+    return countScrapbookAtDir(dir);
+  } catch {
+    return 0;
+  }
+}
+function countScrapbookForEntry(projectRoot, config, site, entry, index2) {
+  try {
+    const dir = scrapbookDirForEntry(projectRoot, config, site, entry, index2);
+    return countScrapbookAtDir(dir);
   } catch {
     return 0;
   }
@@ -24613,7 +24650,7 @@ var STAGE_EMPTY_MESSAGES = {
   Paused: "Nothing paused. /deskwork:pause <slug> sets an entry aside without losing where it was.",
   Published: "No published posts yet."
 };
-function renderRowMeta(ctx, site, entry, stage, hasFile) {
+function renderRowMeta(ctx, site, entry, stage, hasFile, getIndex) {
   const kind = effectiveContentType(entry);
   const parts = [];
   if (entry.targetKeywords && entry.targetKeywords.length > 0 && stage === "Planned") {
@@ -24636,7 +24673,13 @@ function renderRowMeta(ctx, site, entry, stage, hasFile) {
     parts.push(unsafe(html6`<span class="er-calendar-meta er-calendar-meta-kind">${kind}</span>`));
   }
   if (kind === "blog" && hasFile) {
-    const n = countScrapbook(ctx.projectRoot, ctx.config, site, entry.slug);
+    const n = entry.id !== void 0 && entry.id !== "" && getIndex ? countScrapbookForEntry(
+      ctx.projectRoot,
+      ctx.config,
+      site,
+      entry,
+      getIndex(site)
+    ) : countScrapbook(ctx.projectRoot, ctx.config, site, entry.slug);
     if (n > 0) {
       const label = n === 1 ? "scrapbook item" : "scrapbook items";
       parts.push(
@@ -24765,7 +24808,7 @@ function renderRow(ctx, data, sited, stage, index2, getIndex) {
           <span class="er-row-site er-row-site--${site}" title="${host}">${siteLabel(site)}</span>
           <span class="er-row-slug">${depth > 0 ? slugCellWithHierarchy : slugCell}</span>
           <span class="er-calendar-title">${entry.title}</span>
-          ${renderRowMeta(ctx, site, entry, stage, hasFile)}
+          ${renderRowMeta(ctx, site, entry, stage, hasFile, getIndex)}
         </div>
         <span class="er-calendar-status">${fileDot}${stamp}</span>
         ${renderRowActions(site, entry, stage, hasFile, bodyWritten, wf)}
@@ -26884,7 +26927,7 @@ function loadDetailRender(ctx, site, node2) {
       bodyPreview = parsed.body;
     }
   } else if (node2.hasFsDir && node2.hasOwnIndex) {
-    const abs = findOrganizationalIndex(contentDir, node2.slug);
+    const abs = findOrganizationalIndex(contentDir, node2.path);
     if (abs !== null) {
       const raw3 = safeReadFile(abs);
       if (raw3 !== null) {

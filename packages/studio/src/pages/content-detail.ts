@@ -190,7 +190,7 @@ function loadDetailRender(
     // for the detail panel so the operator sees the structural prose
     // (e.g. "These are the characters in The Outbound") even though
     // nothing about this node ships through the lifecycle pipeline.
-    const abs = findOrganizationalIndex(contentDir, node.slug);
+    const abs = findOrganizationalIndex(contentDir, node.path);
     if (abs !== null) {
       const raw = safeReadFile(abs);
       if (raw !== null) {

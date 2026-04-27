@@ -146,4 +146,70 @@ describe('studio dashboard — body-state via content index', () => {
     expect(r.html).not.toMatch(/er-file-missing/);
     expect(r.html).toMatch(/er-file-written/);
   });
+
+  it('counts scrapbook items at the index-resolved directory (issue #34)', async () => {
+    // Same writingcontrol-shape fixture as above. The scrapbook chip
+    // count is rendered inside the entry's row meta — it MUST resolve
+    // the on-disk directory via the content index, not the slug
+    // template, or the chip stays hidden (count is 0).
+    const cal: EditorialCalendar = {
+      entries: [
+        entry({
+          id: WC_ENTRY_ID,
+          slug: 'the-outbound',
+          title: 'The Outbound',
+          stage: 'Drafting',
+        }),
+      ],
+      distributions: [],
+    };
+    writeCalendar(join(root, cfg.sites.wc.calendarPath), cal);
+
+    // File at the writingcontrol-shape path (NOT the slug-template
+    // path). Frontmatter `id:` binds it to the calendar entry.
+    const fileDir = join(
+      root,
+      cfg.sites.wc.contentDir,
+      'projects',
+      'the-outbound',
+    );
+    const filePath = join(fileDir, 'index.md');
+    mkdirSync(fileDir, { recursive: true });
+    writeFileSync(
+      filePath,
+      [
+        '---',
+        `id: ${WC_ENTRY_ID}`,
+        'title: The Outbound',
+        '---',
+        '',
+        '# The Outbound',
+        '',
+        'A novel about a one-way exodus across a slow continent.',
+        '',
+      ].join('\n'),
+      'utf-8',
+    );
+
+    // Scrapbook items live next to the file — at
+    // <contentDir>/projects/the-outbound/scrapbook/, NOT at
+    // <contentDir>/the-outbound/scrapbook/ (which is what the slug
+    // template would resolve to and which doesn't exist).
+    const sbDir = join(fileDir, 'scrapbook');
+    mkdirSync(sbDir, { recursive: true });
+    writeFileSync(join(sbDir, 'README.md'), '# notes');
+    writeFileSync(join(sbDir, 'reference.json'), '{}');
+
+    app = createApp({ projectRoot: root, config: cfg });
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+
+    // Pre-fix: the chip would be missing (count was 0 → render
+    // suppressed). Post-fix: the chip renders with count=2 and links
+    // to /dev/scrapbook/wc/the-outbound.
+    expect(r.html).toMatch(
+      /er-calendar-meta-scrapbook-count[^>]*>\s*2\s*</,
+    );
+    expect(r.html).toMatch(/href="\/dev\/scrapbook\/wc\/the-outbound"/);
+  });
 });

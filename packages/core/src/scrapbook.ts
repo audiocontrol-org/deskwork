@@ -344,9 +344,36 @@ function listFilesInDir(dir: string): ScrapbookItem[] {
 }
 
 /**
+ * Count items inside an absolute scrapbook directory — files at the top
+ * level plus files inside the `secret/` subdirectory. Returns 0 if the
+ * directory doesn't exist; tolerates fs errors so a transient permission
+ * issue or race never crashes the dashboard render. Internal primitive
+ * shared by `countScrapbook` (slug-based) and `countScrapbookForEntry`
+ * (id-driven).
+ */
+function countScrapbookAtDir(dir: string): number {
+  try {
+    if (!existsSync(dir)) return 0;
+    const top = listFilesInDir(dir);
+    const secretDir = join(dir, SECRET_SUBDIR);
+    const secret = existsSync(secretDir) ? listFilesInDir(secretDir) : [];
+    return top.length + secret.length;
+  } catch {
+    return 0;
+  }
+}
+
+/**
  * Total item count (public + secret). Used by the studio chip for the
  * badge — operators want a single "has scrapbook content" signal that
  * counts everything attached to this entry.
+ *
+ * Slug-based addressing: resolves `<contentDir>/<slug>/scrapbook/`. For
+ * entries whose on-disk path doesn't match the slug template (e.g.
+ * writingcontrol-shape projects where slug `the-outbound` lives at
+ * `projects/the-outbound/index.md`), use `countScrapbookForEntry`
+ * instead — it derives the path from the bound file via the content
+ * index.
  */
 export function countScrapbook(
   projectRoot: string,
@@ -355,8 +382,40 @@ export function countScrapbook(
   slug: string,
 ): number {
   try {
-    const summary = listScrapbook(projectRoot, config, site, slug);
-    return summary.items.length + summary.secretItems.length;
+    const dir = scrapbookDir(projectRoot, config, site, slug);
+    return countScrapbookAtDir(dir);
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Count scrapbook items for a tracked calendar entry. Resolves the
+ * scrapbook directory via the content index when available (id binding),
+ * falling back to slug-based addressing for entries that haven't been
+ * bound to frontmatter yet (pre-doctor state).
+ *
+ * Mirrors the shape of `scrapbookDirForEntry` — same resolver, same
+ * legacy-slug fallback. Used by the studio dashboard chip so writing-
+ * control-shape entries (where the file path diverges from the slug
+ * template) report the correct count.
+ *
+ * @param entry Calendar entry — `id` preferred (Phase 19+); `slug` is
+ *              both the legacy fallback and the disambiguator the
+ *              underlying resolver uses when the index is incomplete.
+ * @param index Optional pre-built per-request index. When omitted, the
+ *              resolver builds one on demand.
+ */
+export function countScrapbookForEntry(
+  projectRoot: string,
+  config: DeskworkConfig,
+  site: string,
+  entry: { id?: string; slug: string },
+  index?: ContentIndex,
+): number {
+  try {
+    const dir = scrapbookDirForEntry(projectRoot, config, site, entry, index);
+    return countScrapbookAtDir(dir);
   } catch {
     return 0;
   }
