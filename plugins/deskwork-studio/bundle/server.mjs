@@ -10347,7 +10347,7 @@ var serveStatic = (options = { root: "" }) => {
 };
 
 // src/server.ts
-import { existsSync as existsSync10, realpathSync } from "node:fs";
+import { existsSync as existsSync11, realpathSync } from "node:fs";
 import { dirname as dirname3, isAbsolute, resolve as resolve2 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
@@ -23641,6 +23641,29 @@ function scrapbookDir(projectRoot, config, site, slug) {
   const articleDir = resolveBlogPostDir(projectRoot, config, site, slug);
   return join7(articleDir, "scrapbook");
 }
+function scrapbookDirAtPath(projectRoot, config, site, relPath) {
+  assertSlug(relPath);
+  const articleDir = join7(resolveContentDir(projectRoot, config, site), relPath);
+  return join7(articleDir, "scrapbook");
+}
+function scrapbookDirForEntry(projectRoot, config, site, entry, index2) {
+  const entryId = entry.id ?? "";
+  const file = findEntryFile(
+    projectRoot,
+    config,
+    site,
+    entryId,
+    index2,
+    // Legacy fallback ON — we want a usable path even for pre-doctor entries.
+    { slug: entry.slug }
+  );
+  if (file === void 0) {
+    throw new Error(
+      `Cannot resolve scrapbook dir: entry has no id binding and no template fallback (slug="${entry.slug}")`
+    );
+  }
+  return join7(dirname(file), "scrapbook");
+}
 function scrapbookFilePath(projectRoot, config, site, slug, filename, opts = {}) {
   assertFilename(filename);
   const dir = scrapbookDir(projectRoot, config, site, slug);
@@ -23685,6 +23708,9 @@ function classify(filename) {
 }
 function listScrapbook(projectRoot, config, site, slug) {
   const dir = scrapbookDir(projectRoot, config, site, slug);
+  return listScrapbookAtDir(site, slug, dir);
+}
+function listScrapbookAtDir(site, slug, dir) {
   if (!existsSync4(dir)) {
     return { site, slug, dir, exists: false, items: [], secretItems: [] };
   }
@@ -23710,10 +23736,29 @@ function listFilesInDir(dir) {
   items.sort((a, b) => b.mtime.localeCompare(a.mtime));
   return items;
 }
+function countScrapbookAtDir(dir) {
+  try {
+    if (!existsSync4(dir)) return 0;
+    const top = listFilesInDir(dir);
+    const secretDir = join7(dir, SECRET_SUBDIR);
+    const secret = existsSync4(secretDir) ? listFilesInDir(secretDir) : [];
+    return top.length + secret.length;
+  } catch {
+    return 0;
+  }
+}
 function countScrapbook(projectRoot, config, site, slug) {
   try {
-    const summary = listScrapbook(projectRoot, config, site, slug);
-    return summary.items.length + summary.secretItems.length;
+    const dir = scrapbookDir(projectRoot, config, site, slug);
+    return countScrapbookAtDir(dir);
+  } catch {
+    return 0;
+  }
+}
+function countScrapbookForEntry(projectRoot, config, site, entry, index2) {
+  try {
+    const dir = scrapbookDirForEntry(projectRoot, config, site, entry, index2);
+    return countScrapbookAtDir(dir);
   } catch {
     return 0;
   }
@@ -24613,7 +24658,7 @@ var STAGE_EMPTY_MESSAGES = {
   Paused: "Nothing paused. /deskwork:pause <slug> sets an entry aside without losing where it was.",
   Published: "No published posts yet."
 };
-function renderRowMeta(ctx, site, entry, stage, hasFile) {
+function renderRowMeta(ctx, site, entry, stage, hasFile, getIndex) {
   const kind = effectiveContentType(entry);
   const parts = [];
   if (entry.targetKeywords && entry.targetKeywords.length > 0 && stage === "Planned") {
@@ -24636,7 +24681,13 @@ function renderRowMeta(ctx, site, entry, stage, hasFile) {
     parts.push(unsafe(html6`<span class="er-calendar-meta er-calendar-meta-kind">${kind}</span>`));
   }
   if (kind === "blog" && hasFile) {
-    const n = countScrapbook(ctx.projectRoot, ctx.config, site, entry.slug);
+    const n = entry.id !== void 0 && entry.id !== "" && getIndex ? countScrapbookForEntry(
+      ctx.projectRoot,
+      ctx.config,
+      site,
+      entry,
+      getIndex(site)
+    ) : countScrapbook(ctx.projectRoot, ctx.config, site, entry.slug);
     if (n > 0) {
       const label = n === 1 ? "scrapbook item" : "scrapbook items";
       parts.push(
@@ -24765,7 +24816,7 @@ function renderRow(ctx, data, sited, stage, index2, getIndex) {
           <span class="er-row-site er-row-site--${site}" title="${host}">${siteLabel(site)}</span>
           <span class="er-row-slug">${depth > 0 ? slugCellWithHierarchy : slugCell}</span>
           <span class="er-calendar-title">${entry.title}</span>
-          ${renderRowMeta(ctx, site, entry, stage, hasFile)}
+          ${renderRowMeta(ctx, site, entry, stage, hasFile, getIndex)}
         </div>
         <span class="er-calendar-status">${fileDot}${stamp}</span>
         ${renderRowActions(site, entry, stage, hasFile, bodyWritten, wf)}
@@ -25035,6 +25086,10 @@ function splitOutline(md) {
   return { outline, body: body3, present: true, startLine: startIdx, endLine: endIdx };
 }
 
+// src/pages/review-scrapbook-drawer.ts
+import { readFileSync as readFileSync8 } from "node:fs";
+import { join as join8 } from "node:path";
+
 // src/components/scrapbook-item.ts
 var DEFAULT_PREVIEW_BYTES = 800;
 var TEXT_PREVIEW_LINES = 8;
@@ -25149,9 +25204,81 @@ function renderEmptyScrapbookRow() {
     </div>`);
 }
 
+// src/pages/review-scrapbook-drawer.ts
+function makeInlineTextLoader(ctx, site, entry, slug, index2) {
+  const scrapbookDir2 = entry ? scrapbookDirForEntry(ctx.projectRoot, ctx.config, site, entry, index2) : join8(
+    resolveContentDir(ctx.projectRoot, ctx.config, site),
+    slug,
+    "scrapbook"
+  );
+  return (filename, maxBytes) => {
+    try {
+      const buf = readFileSync8(join8(scrapbookDir2, filename));
+      const slice = buf.subarray(0, Math.min(buf.byteLength, maxBytes));
+      return slice.toString("utf-8");
+    } catch {
+      return null;
+    }
+  };
+}
+function renderScrapbookDrawerItems(site, slug, items, loader) {
+  if (items.length === 0) {
+    return renderEmptyScrapbookRow();
+  }
+  const rows = items.map(
+    (item) => renderReadOnlyScrapbookRow(
+      { site, path: slug },
+      item,
+      { inlinePreviewLoader: loader }
+    )
+  );
+  return unsafe(rows.map((r) => r.__raw).join(""));
+}
+function renderScrapbookDrawer(ctx, site, entry, slug, index2) {
+  const summary = (() => {
+    try {
+      if (entry !== null && entry.id !== void 0 && entry.id !== "") {
+        const scrapbookDir2 = scrapbookDirForEntry(
+          ctx.projectRoot,
+          ctx.config,
+          site,
+          entry,
+          index2
+        );
+        return listScrapbookAtDir(site, entry.slug, scrapbookDir2);
+      }
+      return listScrapbook(ctx.projectRoot, ctx.config, site, slug);
+    } catch {
+      return null;
+    }
+  })();
+  const items = summary?.items ?? [];
+  const secretItems = summary?.secretItems ?? [];
+  const total = items.length + secretItems.length;
+  const loader = makeInlineTextLoader(ctx, site, entry, slug, index2);
+  return unsafe(html6`
+    <aside class="er-scrapbook-drawer" data-scrapbook-drawer aria-label="Scrapbook for this entry">
+      <header class="er-scrapbook-drawer-head">
+        <span class="er-scrapbook-drawer-kicker">§ Scrapbook</span>
+        <span class="er-scrapbook-drawer-count">${total} ${total === 1 ? "item" : "items"}</span>
+        <a class="er-scrapbook-drawer-open" href="${scrapbookViewerUrl({ site, path: slug })}"
+          title="Open the standalone scrapbook viewer">open ↗</a>
+      </header>
+      <div class="er-scrapbook-drawer-body">
+        ${renderScrapbookDrawerItems(site, slug, items, loader)}
+        ${secretItems.length > 0 ? unsafe(html6`
+                <div class="er-scrapbook-drawer-secret">
+                  <p class="er-scrapbook-drawer-secret-head">
+                    <span aria-hidden="true">⚿</span> secret · ${secretItems.length}
+                  </p>
+                  ${renderScrapbookDrawerItems(site, slug, secretItems, loader)}
+                </div>`) : ""}
+      </div>
+    </aside>`);
+}
+
 // src/pages/review.ts
-import { readFileSync as readFileSync8 } from "node:fs";
-import { join as join8 } from "node:path";
+import { existsSync as existsSync7 } from "node:fs";
 function isSuccessBody(body3) {
   if (typeof body3 !== "object" || body3 === null) return false;
   return "workflow" in body3 && "versions" in body3;
@@ -25346,65 +25473,22 @@ function renderOutlineDrawer(outlineHtml) {
       </footer>
     </aside>`);
 }
-function makeInlineTextLoader(ctx, site, slug) {
-  const contentDir = resolveContentDir(ctx.projectRoot, ctx.config, site);
-  const scrapbookDir2 = join8(contentDir, slug, "scrapbook");
-  return (filename, maxBytes) => {
-    try {
-      const buf = readFileSync8(join8(scrapbookDir2, filename));
-      const slice = buf.subarray(0, Math.min(buf.byteLength, maxBytes));
-      return slice.toString("utf-8");
-    } catch {
-      return null;
+function lookupReviewEntry(ctx, site, lookup) {
+  try {
+    const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
+    if (!existsSync7(calendarPath)) return null;
+    const cal = readCalendar(calendarPath);
+    if (lookup.kind === "id") {
+      const byId = findEntryById(cal, lookup.entryId);
+      if (byId !== void 0) return byId;
     }
-  };
-}
-function renderScrapbookDrawerItems(site, slug, items, loader) {
-  if (items.length === 0) {
-    return renderEmptyScrapbookRow();
+    const bySlug = findEntry(cal, lookup.slug);
+    return bySlug ?? null;
+  } catch {
+    return null;
   }
-  const rows = items.map(
-    (item) => renderReadOnlyScrapbookRow(
-      { site, path: slug },
-      item,
-      { inlinePreviewLoader: loader }
-    )
-  );
-  return unsafe(rows.map((r) => r.__raw).join(""));
 }
-function renderScrapbookDrawer(ctx, site, slug) {
-  const summary = (() => {
-    try {
-      return listScrapbook(ctx.projectRoot, ctx.config, site, slug);
-    } catch {
-      return null;
-    }
-  })();
-  const items = summary?.items ?? [];
-  const secretItems = summary?.secretItems ?? [];
-  const total = items.length + secretItems.length;
-  const loader = makeInlineTextLoader(ctx, site, slug);
-  return unsafe(html6`
-    <aside class="er-scrapbook-drawer" data-scrapbook-drawer aria-label="Scrapbook for this entry">
-      <header class="er-scrapbook-drawer-head">
-        <span class="er-scrapbook-drawer-kicker">§ Scrapbook</span>
-        <span class="er-scrapbook-drawer-count">${total} ${total === 1 ? "item" : "items"}</span>
-        <a class="er-scrapbook-drawer-open" href="${scrapbookViewerUrl({ site, path: slug })}"
-          title="Open the standalone scrapbook viewer">open ↗</a>
-      </header>
-      <div class="er-scrapbook-drawer-body">
-        ${renderScrapbookDrawerItems(site, slug, items, loader)}
-        ${secretItems.length > 0 ? unsafe(html6`
-                <div class="er-scrapbook-drawer-secret">
-                  <p class="er-scrapbook-drawer-secret-head">
-                    <span aria-hidden="true">⚿</span> secret · ${secretItems.length}
-                  </p>
-                  ${renderScrapbookDrawerItems(site, slug, secretItems, loader)}
-                </div>`) : ""}
-      </div>
-    </aside>`);
-}
-async function renderReviewPage(ctx, lookup, query) {
+async function renderReviewPage(ctx, lookup, query, getIndex) {
   const site = pickSite(ctx, query.site);
   const contentKind = pickContentKind(query.kind ?? null);
   const slug = lookup.slug;
@@ -25432,6 +25516,8 @@ async function renderReviewPage(ctx, lookup, query) {
   );
   const draftState = { workflow, currentVersion, versions: versions2 };
   const titleField = stringField(fm.title) ?? `Draft: ${slug}`;
+  const reviewEntry = lookupReviewEntry(ctx, site, lookup);
+  const reviewIndex = getIndex ? getIndex(site) : void 0;
   const body3 = html6`
     <div data-review-ui="longform" class="er-review-shell">
       ${renderEditorialFolio("reviews", `longform \xB7 ${workflow.slug}`)}
@@ -25456,7 +25542,7 @@ async function renderReviewPage(ctx, lookup, query) {
       ${renderMarginalia()}
       <button class="er-pencil-btn" data-add-comment-btn hidden type="button">Mark</button>
       ${renderOutlineDrawer(outlineHtml)}
-      ${renderScrapbookDrawer(ctx, site, workflow.slug)}
+      ${renderScrapbookDrawer(ctx, site, reviewEntry, workflow.slug, reviewIndex)}
       <div class="er-toast" data-toast hidden></div>
       ${renderShortcutsOverlay()}
       <div class="er-poll-indicator" data-poll>auto-refresh · 8s</div>
@@ -26406,7 +26492,7 @@ function renderScrapbookPage(ctx, site, path) {
 }
 
 // ../core/src/content-tree-fs-walk.ts
-import { existsSync as existsSync7, readdirSync as readdirSync4, readFileSync as readFileSync9, statSync as statSync5 } from "node:fs";
+import { existsSync as existsSync8, readdirSync as readdirSync4, readFileSync as readFileSync9, statSync as statSync5 } from "node:fs";
 import { join as join9 } from "node:path";
 var INDEX_BASENAMES = /* @__PURE__ */ new Set([
   "index.md",
@@ -26435,7 +26521,7 @@ function readTitleFromMarkdown(absPath) {
 }
 function defaultFsWalk(projectRoot, config, site) {
   const root3 = resolveContentDir(projectRoot, config, site);
-  if (!existsSync7(root3)) return [];
+  if (!existsSync8(root3)) return [];
   const out = [];
   const SKIP2 = /* @__PURE__ */ new Set(["scrapbook", "node_modules", "dist", ".git"]);
   const visit2 = (dirAbs, pathSoFar) => {
@@ -26482,7 +26568,7 @@ function defaultFsWalk(projectRoot, config, site) {
 }
 
 // ../core/src/content-tree-helpers.ts
-import { existsSync as existsSync8 } from "node:fs";
+import { existsSync as existsSync9 } from "node:fs";
 import { join as join10 } from "node:path";
 function leafOfPath(path) {
   const idx = path.lastIndexOf("/");
@@ -26505,7 +26591,7 @@ function entryHasOwnIndex(contentDir, entryPath, fsHasIndex, fsHasReadme, boundF
   if (fsHasIndex) return true;
   if (fsHasReadme) return true;
   for (const basename of TEMPLATE_INDEX_BASENAMES) {
-    if (existsSync8(join10(contentDir, entryPath, basename))) return true;
+    if (existsSync9(join10(contentDir, entryPath, basename))) return true;
   }
   if (!hasFsDir) return true;
   return false;
@@ -26767,7 +26853,7 @@ function flattenForRender(root3) {
 }
 
 // src/pages/content-detail.ts
-import { readFileSync as readFileSync10, existsSync as existsSync9 } from "node:fs";
+import { readFileSync as readFileSync10, existsSync as existsSync10 } from "node:fs";
 import { join as join11 } from "node:path";
 var PREVIEW_CHAR_BUDGET = 480;
 function renderEmptyDetail() {
@@ -26782,7 +26868,7 @@ function renderEmptyDetail() {
 }
 function safeReadFile(absPath) {
   try {
-    if (!existsSync9(absPath)) return null;
+    if (!existsSync10(absPath)) return null;
     return readFileSync10(absPath, "utf-8");
   } catch {
     return null;
@@ -26818,9 +26904,26 @@ async function renderBodyPreview(body3) {
   const rendered = await renderMarkdownToHtml(slice);
   return unsafe(html6`<div class="preview">${unsafe(rendered)}</div>`);
 }
-function makeInlineTextLoaderForNode(ctx, site, slug) {
-  const contentDir = resolveContentDir(ctx.projectRoot, ctx.config, site);
-  const scrapbookDir2 = join11(contentDir, slug, "scrapbook");
+function resolveNodeScrapbookDir(ctx, site, node2, index2) {
+  if (node2.entry !== null && node2.entry.id !== void 0 && node2.entry.id !== "") {
+    return scrapbookDirForEntry(
+      ctx.projectRoot,
+      ctx.config,
+      site,
+      node2.entry,
+      index2
+    );
+  }
+  return scrapbookDirAtPath(ctx.projectRoot, ctx.config, site, node2.path);
+}
+function makeInlineTextLoaderForNode(ctx, site, node2, index2) {
+  let scrapbookDir2;
+  try {
+    scrapbookDir2 = resolveNodeScrapbookDir(ctx, site, node2, index2);
+  } catch {
+    const contentDir = resolveContentDir(ctx.projectRoot, ctx.config, site);
+    scrapbookDir2 = join11(contentDir, node2.path, "scrapbook");
+  }
   return (filename, maxBytes) => {
     try {
       const buf = readFileSync10(join11(scrapbookDir2, filename));
@@ -26866,11 +26969,11 @@ function findOrganizationalIndex(contentDir, slug) {
   ];
   for (const name of candidates) {
     const abs = join11(contentDir, slug, name);
-    if (existsSync9(abs)) return abs;
+    if (existsSync10(abs)) return abs;
   }
   return null;
 }
-function loadDetailRender(ctx, site, node2) {
+function loadDetailRender(ctx, site, node2, index2) {
   const contentDir = resolveContentDir(ctx.projectRoot, ctx.config, site);
   let frontmatter = {};
   let bodyPreview = "";
@@ -26884,7 +26987,7 @@ function loadDetailRender(ctx, site, node2) {
       bodyPreview = parsed.body;
     }
   } else if (node2.hasFsDir && node2.hasOwnIndex) {
-    const abs = findOrganizationalIndex(contentDir, node2.slug);
+    const abs = findOrganizationalIndex(contentDir, node2.path);
     if (abs !== null) {
       const raw3 = safeReadFile(abs);
       if (raw3 !== null) {
@@ -26895,21 +26998,22 @@ function loadDetailRender(ctx, site, node2) {
     }
   }
   try {
-    scrapbook = listScrapbook(ctx.projectRoot, ctx.config, site, node2.path);
+    const scrapDir = resolveNodeScrapbookDir(ctx, site, node2, index2);
+    scrapbook = listScrapbookAtDir(site, node2.path, scrapDir);
   } catch {
     scrapbook = null;
   }
   return { frontmatter, bodyPreview, scrapbook };
 }
-async function renderNodeDetail(ctx, site, node2) {
-  const detail = loadDetailRender(ctx, site, node2);
+async function renderNodeDetail(ctx, site, node2, index2) {
+  const detail = loadDetailRender(ctx, site, node2, index2);
   const fmCount = Object.keys(detail.frontmatter).length;
   const reviewKey = node2.entry !== null && node2.entry.id !== void 0 && node2.entry.id !== "" ? node2.entry.id : node2.slug ?? node2.path;
   const reviewHref = `/dev/editorial-review/${encodeURI(reviewKey)}?site=${site}`;
   const scrapHref = scrapbookViewerUrl({ site, path: node2.path });
   const scrapDirHint = node2.scrapbookCount === 0 ? "0 items \xB7 scrapbook empty" : `${node2.scrapbookCount} items \xB7 /${node2.path}/scrapbook`;
   const updatedHint = node2.scrapbookMostRecentMtime !== null ? html6`<span class="detail__updated">last touched ${formatRelativeTime(node2.scrapbookMostRecentMtime)}</span>` : "";
-  const loader = makeInlineTextLoaderForNode(ctx, site, node2.path);
+  const loader = makeInlineTextLoaderForNode(ctx, site, node2, index2);
   const previewBlock = await renderBodyPreview(detail.bodyPreview);
   const reviewBtn = node2.entry !== null ? html6`<a class="btn btn--accent" href="${reviewHref}">Open in Review</a>` : "";
   const publicUrlHint = node2.slug !== void 0 && node2.slug !== node2.path ? html6`<span class="detail__public-url" title="public URL on the host site">
@@ -27208,7 +27312,8 @@ async function renderContentProject(ctx, site, projectSlug, selectedPath, getInd
     };
   }
   const selectedNode = selectedPath ? findNode(project, selectedPath) : null;
-  const detailBlock = selectedNode ? await renderNodeDetail(ctx, site, selectedNode) : renderEmptyDetail();
+  const detailIndex = getIndex ? getIndex(site) : void 0;
+  const detailBlock = selectedNode ? await renderNodeDetail(ctx, site, selectedNode, detailIndex) : renderEmptyDetail();
   const body3 = html6`
     ${renderEditorialFolio("content", `drilldown \xB7 ${project.rootSlug}`)}
     <main class="content-page">
@@ -27574,7 +27679,7 @@ function resolveEntryById(ctx, site, id) {
   if (!(site in ctx.config.sites)) return null;
   try {
     const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
-    if (!existsSync10(calendarPath)) return null;
+    if (!existsSync11(calendarPath)) return null;
     const cal = readCalendar(calendarPath);
     const entry = cal.entries.find((e) => e.id === id);
     if (!entry || entry.id === void 0) return null;
@@ -27587,7 +27692,7 @@ function resolveEntryBySlug(ctx, site, slug) {
   if (!(site in ctx.config.sites)) return "unknown-site";
   try {
     const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
-    if (!existsSync10(calendarPath)) return null;
+    if (!existsSync11(calendarPath)) return null;
     const cal = readCalendar(calendarPath);
     const entry = cal.entries.find((e) => e.slug === slug);
     if (!entry) return null;
@@ -27614,7 +27719,7 @@ function publicDir() {
     resolve2(here, "..", "..", "..", "plugins", "deskwork-studio", "public")
   ];
   for (const candidate of candidates) {
-    if (existsSync10(candidate)) return candidate;
+    if (existsSync11(candidate)) return candidate;
   }
   throw new Error(
     `deskwork-studio: could not find public/ assets. Tried:
@@ -27642,6 +27747,7 @@ function createApp(ctx) {
       const id = c.req.param("id");
       const siteParam = c.req.query("site") ?? ctx.config.defaultSite;
       const lookup = resolveEntryById(ctx, siteParam, id);
+      const getIndex = (s) => getRequestContentIndex(c, ctx, s);
       if (lookup === null) {
         return c.html(
           await renderReviewPage(
@@ -27651,16 +27757,22 @@ function createApp(ctx) {
               site: c.req.query("site") ?? null,
               version: c.req.query("v") ?? null,
               kind: c.req.query("kind") ?? null
-            }
+            },
+            getIndex
           )
         );
       }
       return c.html(
-        await renderReviewPage(ctx, lookup, {
-          site: c.req.query("site") ?? null,
-          version: c.req.query("v") ?? null,
-          kind: c.req.query("kind") ?? null
-        })
+        await renderReviewPage(
+          ctx,
+          lookup,
+          {
+            site: c.req.query("site") ?? null,
+            version: c.req.query("v") ?? null,
+            kind: c.req.query("kind") ?? null
+          },
+          getIndex
+        )
       );
     }
   );
@@ -27676,12 +27788,18 @@ function createApp(ctx) {
       return c.redirect(url, 302);
     }
     const lookup = found !== null ? found : { kind: "slug", slug };
+    const getIndex = (s) => getRequestContentIndex(c, ctx, s);
     return c.html(
-      await renderReviewPage(ctx, lookup, {
-        site: c.req.query("site") ?? null,
-        version: c.req.query("v") ?? null,
-        kind: c.req.query("kind") ?? null
-      })
+      await renderReviewPage(
+        ctx,
+        lookup,
+        {
+          site: c.req.query("site") ?? null,
+          version: c.req.query("v") ?? null,
+          kind: c.req.query("kind") ?? null
+        },
+        getIndex
+      )
     );
   });
   app.get(

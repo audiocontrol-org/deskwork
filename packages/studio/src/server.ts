@@ -260,6 +260,7 @@ export function createApp(ctx: StudioContext): Hono {
       const id = c.req.param('id');
       const siteParam = c.req.query('site') ?? ctx.config.defaultSite;
       const lookup = resolveEntryById(ctx, siteParam, id);
+      const getIndex = (s: string) => getRequestContentIndex(c, ctx, s);
       if (lookup === null) {
         return c.html(
           await renderReviewPage(
@@ -270,15 +271,21 @@ export function createApp(ctx: StudioContext): Hono {
               version: c.req.query('v') ?? null,
               kind: c.req.query('kind') ?? null,
             },
+            getIndex,
           ),
         );
       }
       return c.html(
-        await renderReviewPage(ctx, lookup, {
-          site: c.req.query('site') ?? null,
-          version: c.req.query('v') ?? null,
-          kind: c.req.query('kind') ?? null,
-        }),
+        await renderReviewPage(
+          ctx,
+          lookup,
+          {
+            site: c.req.query('site') ?? null,
+            version: c.req.query('v') ?? null,
+            kind: c.req.query('kind') ?? null,
+          },
+          getIndex,
+        ),
       );
     },
   );
@@ -307,12 +314,18 @@ export function createApp(ctx: StudioContext): Hono {
     // present, no id). Both render through the slug-keyed legacy path.
     const lookup: ReviewLookup =
       found !== null ? found : { kind: 'slug', slug };
+    const getIndex = (s: string) => getRequestContentIndex(c, ctx, s);
     return c.html(
-      await renderReviewPage(ctx, lookup, {
-        site: c.req.query('site') ?? null,
-        version: c.req.query('v') ?? null,
-        kind: c.req.query('kind') ?? null,
-      }),
+      await renderReviewPage(
+        ctx,
+        lookup,
+        {
+          site: c.req.query('site') ?? null,
+          version: c.req.query('v') ?? null,
+          kind: c.req.query('kind') ?? null,
+        },
+        getIndex,
+      ),
     );
   });
   // Wildcard path — `:site` is a single segment, the trailing path

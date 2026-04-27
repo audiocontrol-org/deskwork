@@ -27,7 +27,7 @@ import {
 import { readWorkflows } from '@deskwork/core/review/pipeline';
 import type { DraftWorkflowItem } from '@deskwork/core/review/types';
 import { bodyState, type BodyState } from '@deskwork/core/body-state';
-import { countScrapbook } from '@deskwork/core/scrapbook';
+import { countScrapbook, countScrapbookForEntry } from '@deskwork/core/scrapbook';
 import {
   PLATFORMS,
   STAGES,
@@ -383,6 +383,7 @@ function renderRowMeta(
   entry: CalendarEntry,
   stage: Stage,
   hasFile: boolean,
+  getIndex?: DashboardIndexGetter,
 ): RawHtml {
   const kind = effectiveContentType(entry);
   const parts: RawHtml[] = [];
@@ -406,7 +407,23 @@ function renderRowMeta(
     parts.push(unsafe(html`<span class="er-calendar-meta er-calendar-meta-kind">${kind}</span>`));
   }
   if (kind === 'blog' && hasFile) {
-    const n = countScrapbook(ctx.projectRoot, ctx.config, site, entry.slug);
+    // Phase 19c+: prefer the id-driven content-index lookup so entries
+    // whose on-disk path doesn't match the slug template (e.g.
+    // writingcontrol-shape projects) report the correct count. When the
+    // entry has no id binding OR no per-request index getter is wired,
+    // fall through to the slug-template path. The fallback is the
+    // legacy migration path, not a silent default — doctor reports the
+    // unbound cases so operators can backfill ids.
+    const n =
+      entry.id !== undefined && entry.id !== '' && getIndex
+        ? countScrapbookForEntry(
+            ctx.projectRoot,
+            ctx.config,
+            site,
+            entry,
+            getIndex(site),
+          )
+        : countScrapbook(ctx.projectRoot, ctx.config, site, entry.slug);
     if (n > 0) {
       const label = n === 1 ? 'scrapbook item' : 'scrapbook items';
       parts.push(
@@ -594,7 +611,7 @@ function renderRow(
           <span class="er-row-site er-row-site--${site}" title="${host}">${siteLabel(site)}</span>
           <span class="er-row-slug">${depth > 0 ? slugCellWithHierarchy : slugCell}</span>
           <span class="er-calendar-title">${entry.title}</span>
-          ${renderRowMeta(ctx, site, entry, stage, hasFile)}
+          ${renderRowMeta(ctx, site, entry, stage, hasFile, getIndex)}
         </div>
         <span class="er-calendar-status">${fileDot}${stamp}</span>
         ${renderRowActions(site, entry, stage, hasFile, bodyWritten, wf)}

@@ -10,12 +10,15 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   formatRelativeTime,
-  listScrapbook,
+  listScrapbookAtDir,
+  scrapbookDirAtPath,
+  scrapbookDirForEntry,
   type ScrapbookSummary,
 } from '@deskwork/core/scrapbook';
 import {
   resolveContentDir,
 } from '@deskwork/core/paths';
+import type { ContentIndex } from '@deskwork/core/content-index';
 import { parseFrontmatter } from '@deskwork/core/frontmatter';
 import { renderMarkdownToHtml } from '@deskwork/core/review/render';
 import type { StudioContext } from '../routes/api.ts';
@@ -84,13 +87,65 @@ async function renderBodyPreview(body: string): Promise<RawHtml> {
   return unsafe(html`<div class="preview">${unsafe(rendered)}</div>`);
 }
 
+/**
+ * Resolve the on-disk scrapbook directory for a content tree node.
+ *
+ * Precedence — the index-driven path is preferred so writingcontrol-
+ * shape entries (slug != fs path) read scrapbook items from the actual
+ * file location:
+ *
+ *   1. The node carries a calendar entry with a stable `id` AND a
+ *      per-request content index is wired → resolve via
+ *      `scrapbookDirForEntry`.
+ *   2. Otherwise → resolve via `scrapbookDirAtPath` against the node's
+ *      fs-derived `path`. Works for both organizational nodes (no
+ *      entry) and pre-doctor entries (no id binding yet) since
+ *      `node.path` is always the structural key already validated by
+ *      the content-tree builder.
+ *
+ * The shared scrapbook directory lookup avoids duplicating the
+ * fall-through logic between the inline-text loader and the scrapbook
+ * listing in `loadDetailRender`.
+ */
+function resolveNodeScrapbookDir(
+  ctx: StudioContext,
+  site: string,
+  node: ContentNode,
+  index?: ContentIndex,
+): string {
+  if (node.entry !== null && node.entry.id !== undefined && node.entry.id !== '') {
+    return scrapbookDirForEntry(
+      ctx.projectRoot,
+      ctx.config,
+      site,
+      node.entry,
+      index,
+    );
+  }
+  // node.path is always a valid kebab-case path (the content-tree
+  // builder enforces this); scrapbookDirAtPath accepts that shape.
+  // Used directly because the path is already filesystem-derived —
+  // bypassing the slug template that wouldn't resolve correctly for
+  // hierarchical / relocated entries.
+  return scrapbookDirAtPath(ctx.projectRoot, ctx.config, site, node.path);
+}
+
 function makeInlineTextLoaderForNode(
   ctx: StudioContext,
   site: string,
-  slug: string,
+  node: ContentNode,
+  index?: ContentIndex,
 ): InlineTextLoader {
-  const contentDir = resolveContentDir(ctx.projectRoot, ctx.config, site);
-  const scrapbookDir = join(contentDir, slug, 'scrapbook');
+  let scrapbookDir: string;
+  try {
+    scrapbookDir = resolveNodeScrapbookDir(ctx, site, node, index);
+  } catch {
+    // Defensive: a malformed path or unresolvable entry shouldn't blow
+    // up the detail panel. Fall back to the legacy slug-template
+    // computation — the loader will just return null for every read.
+    const contentDir = resolveContentDir(ctx.projectRoot, ctx.config, site);
+    scrapbookDir = join(contentDir, node.path, 'scrapbook');
+  }
   return (filename, maxBytes) => {
     try {
       const buf = readFileSync(join(scrapbookDir, filename));
@@ -164,6 +219,7 @@ function loadDetailRender(
   ctx: StudioContext,
   site: string,
   node: ContentNode,
+  index?: ContentIndex,
 ): DetailRender {
   const contentDir = resolveContentDir(ctx.projectRoot, ctx.config, site);
   let frontmatter: Record<string, unknown> = {};
@@ -190,7 +246,7 @@ function loadDetailRender(
     // for the detail panel so the operator sees the structural prose
     // (e.g. "These are the characters in The Outbound") even though
     // nothing about this node ships through the lifecycle pipeline.
-    const abs = findOrganizationalIndex(contentDir, node.slug);
+    const abs = findOrganizationalIndex(contentDir, node.path);
     if (abs !== null) {
       const raw = safeReadFile(abs);
       if (raw !== null) {
@@ -202,7 +258,13 @@ function loadDetailRender(
   }
 
   try {
-    scrapbook = listScrapbook(ctx.projectRoot, ctx.config, site, node.path);
+    // Phase 19c+: the scrapbook listing prefers the index-driven dir
+    // for tracked entries (id binding) and falls back to the path-
+    // driven dir for organizational nodes. `scrapbookDirAtPath` is the
+    // right primitive here because `node.path` is already filesystem-
+    // derived — no slug template to substitute.
+    const scrapDir = resolveNodeScrapbookDir(ctx, site, node, index);
+    scrapbook = listScrapbookAtDir(site, node.path, scrapDir);
   } catch {
     scrapbook = null;
   }
@@ -214,8 +276,9 @@ export async function renderNodeDetail(
   ctx: StudioContext,
   site: string,
   node: ContentNode,
+  index?: ContentIndex,
 ): Promise<RawHtml> {
-  const detail = loadDetailRender(ctx, site, node);
+  const detail = loadDetailRender(ctx, site, node, index);
   const fmCount = Object.keys(detail.frontmatter).length;
   // Phase 19d: prefer the entry's stable id for the canonical review
   // URL — refactor-proof, survives slug renames. Falls back to the
@@ -236,7 +299,7 @@ export async function renderNodeDetail(
     node.scrapbookMostRecentMtime !== null
       ? html`<span class="detail__updated">last touched ${formatRelativeTime(node.scrapbookMostRecentMtime)}</span>`
       : '';
-  const loader = makeInlineTextLoaderForNode(ctx, site, node.path);
+  const loader = makeInlineTextLoaderForNode(ctx, site, node, index);
   const previewBlock = await renderBodyPreview(detail.bodyPreview);
   const reviewBtn =
     node.entry !== null

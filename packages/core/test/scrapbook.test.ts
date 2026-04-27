@@ -20,6 +20,7 @@ import {
   assertSlug,
   classify,
   countScrapbook,
+  countScrapbookForEntry,
   createScrapbookMarkdown,
   isNestedSlug,
   listScrapbook,
@@ -404,5 +405,99 @@ describe('scrapbookDirForEntry (Phase 19c)', () => {
     expect(dir).toBe(
       join(root, 'src/content/projects/projects/the-outbound/scrapbook'),
     );
+  });
+});
+
+describe('countScrapbookForEntry (issue #34)', () => {
+  // The slug-template path is wrong for writingcontrol-shape entries
+  // whose file lives at <contentDir>/projects/<slug>/index.md (extra
+  // `projects/` segment, slug doesn't bake the path). The entry-aware
+  // counter walks the content index first so the chip reflects the
+  // actual on-disk scrapbook directory.
+  let root: string;
+  const cfg = makeConfig();
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'deskwork-sb-count-for-entry-'));
+  });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it('counts items at the index-resolved directory (id-bound entry)', () => {
+    // Calendar slug `the-outbound` but file lives at
+    // <contentDir>/projects/the-outbound/index.md. Scrapbook items
+    // sit next to the file under projects/the-outbound/scrapbook/.
+    const id = '11111111-2222-4333-8444-555555555555';
+    const fileAbs = join(
+      root,
+      'src/content/projects/projects/the-outbound/index.md',
+    );
+    const sb = join(
+      root,
+      'src/content/projects/projects/the-outbound/scrapbook',
+    );
+    const secret = join(sb, SECRET_SUBDIR);
+    mkdirSync(secret, { recursive: true });
+    writeFileSync(fileAbs, `---\nid: ${id}\ntitle: The Outbound\n---\n`);
+    writeFileSync(join(sb, 'README.md'), '# notes');
+    writeFileSync(join(sb, 'reference.json'), '{}');
+    writeFileSync(join(secret, 'draft.md'), '# secret');
+
+    const idx: ContentIndex = {
+      byId: new Map([[id, fileAbs]]),
+      byPath: new Map([['projects/the-outbound/index.md', id]]),
+      invalid: [],
+    };
+
+    const n = countScrapbookForEntry(
+      root,
+      cfg,
+      'wc',
+      { id, slug: 'the-outbound' },
+      idx,
+    );
+    expect(n).toBe(3);
+    // Sanity check — the slug-only counter looks at the wrong path
+    // and returns 0. This is the bug being fixed.
+    expect(countScrapbook(root, cfg, 'wc', 'the-outbound')).toBe(0);
+  });
+
+  it('falls back to slug-template path for entries without an id binding', () => {
+    // Pre-doctor entry (no id). The slug-template path is the only
+    // signal we have; the helper should mirror countScrapbook's
+    // behavior in that case.
+    const sb = join(root, 'src/content/projects/legacy/scrapbook');
+    mkdirSync(sb, { recursive: true });
+    writeFileSync(join(sb, 'a.md'), '#');
+    writeFileSync(join(sb, 'b.md'), '#');
+
+    const idx: ContentIndex = {
+      byId: new Map(),
+      byPath: new Map(),
+      invalid: [],
+    };
+    const n = countScrapbookForEntry(
+      root,
+      cfg,
+      'wc',
+      { slug: 'legacy' },
+      idx,
+    );
+    expect(n).toBe(2);
+  });
+
+  it('returns 0 when the resolved directory does not exist', () => {
+    const idx: ContentIndex = {
+      byId: new Map(),
+      byPath: new Map(),
+      invalid: [],
+    };
+    const n = countScrapbookForEntry(
+      root,
+      cfg,
+      'wc',
+      { slug: 'no-such-thing' },
+      idx,
+    );
+    expect(n).toBe(0);
   });
 });

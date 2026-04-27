@@ -443,8 +443,13 @@ export async function renderContentProject(
   }
 
   const selectedNode = selectedPath ? findNode(project, selectedPath) : null;
+  // Phase 19c+: hand the per-request content index to the detail
+  // panel. The panel uses it for id-driven scrapbook lookups so
+  // writingcontrol-shape entries find their items at the actual file
+  // location. Falls through to slug/path resolution for unbound nodes.
+  const detailIndex = getIndex ? getIndex(site) : undefined;
   const detailBlock = selectedNode
-    ? await renderNodeDetail(ctx, site, selectedNode)
+    ? await renderNodeDetail(ctx, site, selectedNode, detailIndex)
     : renderEmptyDetail();
 
   const body = html`
