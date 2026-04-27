@@ -17,6 +17,15 @@ interface Ctx {
   statusEl: HTMLElement | null;
 }
 
+/**
+ * Read whether a scrapbook item lives in the secret/ section.
+ * Items rendered server-side carry `data-secret="true"` when they
+ * came from `<scrapbook>/secret/`.
+ */
+function itemIsSecret(item: HTMLLIElement): boolean {
+  return item.dataset.secret === 'true';
+}
+
 const SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
 const FILENAME_RE = /^[a-zA-Z0-9._-][a-zA-Z0-9._ -]*$/;
 
@@ -71,8 +80,48 @@ function wireItem(ctx: Ctx, item: HTMLLIElement): void {
       case 'delete':
         enterDeleteConfirm(ctx, item);
         break;
+      case 'toggle-secret':
+        // #28: cross-section move. Preserve the filename; just flip
+        // which directory the file lives in. The server route
+        // handles the rename across sections atomically.
+        void toggleSecret(ctx, item);
+        break;
     }
   });
+}
+
+/**
+ * Move a scrapbook item between `scrapbook/` and `scrapbook/secret/`.
+ * The page reloads on success so the item lands in the right section
+ * with the right counts and section headers (#28).
+ */
+async function toggleSecret(ctx: Ctx, item: HTMLLIElement): Promise<void> {
+  const filename = item.dataset.filename;
+  if (!filename) return;
+  const fromSecret = itemIsSecret(item);
+  const toSecret = !fromSecret;
+  try {
+    const res = await fetch('/api/dev/scrapbook/rename', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        site: ctx.site,
+        slug: ctx.slug,
+        oldName: filename,
+        newName: filename,
+        secret: fromSecret,
+        toSecret,
+      }),
+    });
+    if (!res.ok) {
+      throw new Error((await res.json() as { error?: string }).error ?? 'move failed');
+    }
+    flashInfo(ctx, toSecret ? `marked secret: ${filename}` : `marked public: ${filename}`);
+    // Page reload — section headers / counts update server-side.
+    window.location.reload();
+  } catch (e) {
+    flashError(ctx, `move failed: ${msg(e)}`);
+  }
 }
 
 function toggleItem(ctx: Ctx, item: HTMLLIElement): void {
@@ -130,8 +179,10 @@ function restoreOpenStates(ctx: Ctx): void {
   });
 }
 
-function openKey(site: string, slug: string, filename: string): string {
-  return `scrapbook:${site}:${slug}:${filename}`;
+function openKey(site: string, slug: string, filename: string, secret = false): string {
+  return secret
+    ? `scrapbook:${site}:${slug}:secret:${filename}`
+    : `scrapbook:${site}:${slug}:${filename}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -350,9 +401,12 @@ async function enterEditMode(ctx: Ctx, item: HTMLLIElement): Promise<void> {
 
   // Fetch raw content via the read-only binary endpoint. Decode as
   // text — the edit-mode path is only reached for markdown items.
+  // The `secret=1` query lets the read endpoint pull from
+  // `scrapbook/secret/` when the item is a secret one (#28).
   let raw = '';
   try {
-    const res = await fetch(`/api/dev/scrapbook-file?site=${encodeURIComponent(ctx.site)}&path=${encodeURIComponent(ctx.slug)}&name=${encodeURIComponent(filename)}`);
+    const secretQ = itemIsSecret(item) ? '&secret=1' : '';
+    const res = await fetch(`/api/dev/scrapbook-file?site=${encodeURIComponent(ctx.site)}&path=${encodeURIComponent(ctx.slug)}&name=${encodeURIComponent(filename)}${secretQ}`);
     if (!res.ok) throw new Error(await res.text());
     raw = await res.text();
   } catch (e) { flashError(ctx, `read failed: ${msg(e)}`); return; }
@@ -390,7 +444,13 @@ async function enterEditMode(ctx: Ctx, item: HTMLLIElement): Promise<void> {
       const res = await fetch('/api/dev/scrapbook/save', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ site: ctx.site, slug: ctx.slug, filename, body: ta.value }),
+        body: JSON.stringify({
+          site: ctx.site,
+          slug: ctx.slug,
+          filename,
+          body: ta.value,
+          secret: itemIsSecret(item),
+        }),
       });
       if (!res.ok) throw new Error((await res.json() as { error?: string }).error ?? 'save failed');
       const { item: updated } = (await res.json()) as { item: { mtime: string; size: number } };
@@ -459,7 +519,13 @@ function enterRenameMode(ctx: Ctx, item: HTMLLIElement): void {
       const res = await fetch('/api/dev/scrapbook/rename', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ site: ctx.site, slug: ctx.slug, oldName, newName }),
+        body: JSON.stringify({
+          site: ctx.site,
+          slug: ctx.slug,
+          oldName,
+          newName,
+          secret: itemIsSecret(item),
+        }),
       });
       if (!res.ok) throw new Error((await res.json() as { error?: string }).error ?? 'rename failed');
       item.dataset.filename = newName;
@@ -518,7 +584,12 @@ function enterDeleteConfirm(ctx: Ctx, item: HTMLLIElement): void {
       const res = await fetch('/api/dev/scrapbook/delete', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ site: ctx.site, slug: ctx.slug, filename: item.dataset.filename }),
+        body: JSON.stringify({
+          site: ctx.site,
+          slug: ctx.slug,
+          filename: item.dataset.filename,
+          secret: itemIsSecret(item),
+        }),
       });
       if (!res.ok) throw new Error((await res.json() as { error?: string }).error ?? 'delete failed');
       // Slide out
@@ -566,14 +637,22 @@ function wireComposer(ctx: Ctx): void {
     }
     if (!filename.endsWith('.md')) filename += '.md';
     if (!FILENAME_RE.test(filename)) { flashError(ctx, `invalid filename: ${filename}`); return; }
+    const secret = ctx.root
+      .querySelector<HTMLInputElement>('[data-composer-secret]')?.checked === true;
     try {
       const res = await fetch('/api/dev/scrapbook/create', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ site: ctx.site, slug: ctx.slug, filename, body: bodyInput!.value }),
+        body: JSON.stringify({
+          site: ctx.site,
+          slug: ctx.slug,
+          filename,
+          body: bodyInput!.value,
+          secret,
+        }),
       });
       if (!res.ok) throw new Error((await res.json() as { error?: string }).error ?? 'create failed');
-      flashInfo(ctx, `created ${filename}`);
+      flashInfo(ctx, secret ? `created secret/${filename}` : `created ${filename}`);
       hideComposer(ctx);
       // Simplest refresh — reload the page so the new slip appears
       // in sorted position with the right seq numbers.
@@ -697,13 +776,16 @@ function wireOverlay(ctx: Ctx): void {
 
 async function uploadFile(ctx: Ctx, file: File): Promise<void> {
   try {
+    const secret = ctx.root
+      .querySelector<HTMLInputElement>('[data-upload-secret]')?.checked === true;
     const fd = new FormData();
     fd.append('site', ctx.site);
     fd.append('slug', ctx.slug);
     fd.append('file', file);
+    if (secret) fd.append('secret', 'true');
     const res = await fetch('/api/dev/scrapbook/upload', { method: 'POST', body: fd });
     if (!res.ok) throw new Error((await res.json() as { error?: string }).error ?? 'upload failed');
-    flashInfo(ctx, `uploaded ${file.name}`);
+    flashInfo(ctx, secret ? `uploaded to secret: ${file.name}` : `uploaded ${file.name}`);
     window.location.reload();
   } catch (e) { flashError(ctx, `upload failed: ${msg(e)}`); }
 }

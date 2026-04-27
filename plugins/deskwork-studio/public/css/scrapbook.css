@@ -693,6 +693,40 @@
   gap: 0.75rem;
 }
 
+/* ---- Secret toggle (#28) ---- */
+
+.scrapbook-secret-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  cursor: pointer;
+  user-select: none;
+}
+.scrapbook-secret-toggle input[type="checkbox"] {
+  margin: 0;
+  accent-color: var(--er-red-pencil);
+  cursor: pointer;
+}
+.scrapbook-secret-toggle:hover {
+  color: var(--er-red-pencil);
+}
+.scrapbook-secret-toggle--upload {
+  display: inline-flex;
+  margin-top: var(--er-space-1);
+}
+
+.scrapbook-composer-actions {
+  display: flex;
+  gap: var(--er-space-2);
+  align-items: center;
+  justify-content: flex-end;
+}
+
 /* ---- Status strip (banner at top for errors / confirmations) ---- */
 
 .scrapbook-status {

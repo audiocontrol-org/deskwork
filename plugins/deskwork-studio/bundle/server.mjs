@@ -10348,7 +10348,7 @@ var serveStatic = (options = { root: "" }) => {
 
 // src/server.ts
 import { existsSync as existsSync9, realpathSync } from "node:fs";
-import { dirname as dirname2, isAbsolute, resolve as resolve2 } from "node:path";
+import { dirname as dirname3, isAbsolute, resolve as resolve2 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // ../core/src/config.ts
@@ -11523,9 +11523,9 @@ var VFile = class {
    * @returns {undefined}
    *   Nothing.
    */
-  set dirname(dirname3) {
+  set dirname(dirname4) {
     assertPath(this.basename, "dirname");
-    this.path = default2.join(dirname3 || "", this.basename);
+    this.path = default2.join(dirname4 || "", this.basename);
   }
   /**
    * Get the extname (including dot) (example: `'.js'`).
@@ -23424,7 +23424,8 @@ async function serveScrapbookFile(c, ctx) {
 }
 
 // src/routes/scrapbook-mutations.ts
-import { existsSync as existsSync5 } from "node:fs";
+import { existsSync as existsSync5, mkdirSync as mkdirSync3, renameSync as renameSync2, statSync as statSync3 } from "node:fs";
+import { dirname as dirname2 } from "node:path";
 function checkEnvelope(ctx, body3) {
   const site = body3.site;
   const slug = body3.slug;
@@ -23437,7 +23438,11 @@ function checkEnvelope(ctx, body3) {
   if (!(site in ctx.config.sites)) {
     return { error: `unknown site: ${site}`, status: 404 };
   }
-  return { site, slug };
+  const secretRaw = body3.secret;
+  if (secretRaw !== void 0 && typeof secretRaw !== "boolean") {
+    return { error: "secret must be a boolean when provided", status: 400 };
+  }
+  return { site, slug, secret: secretRaw === true };
 }
 function statusForError(message) {
   if (/already exists/i.test(message)) return 409;
@@ -23481,7 +23486,8 @@ function createScrapbookMutationsRouter(ctx) {
         ctx.config,
         env2.site,
         env2.slug,
-        filename
+        filename,
+        { secret: env2.secret }
       );
       if (!existsSync5(abs)) {
         if (filename.endsWith(".md")) {
@@ -23491,7 +23497,8 @@ function createScrapbookMutationsRouter(ctx) {
             env2.site,
             env2.slug,
             filename,
-            bodyText
+            bodyText,
+            { secret: env2.secret }
           );
         } else {
           item = writeScrapbookUpload(
@@ -23500,7 +23507,8 @@ function createScrapbookMutationsRouter(ctx) {
             env2.site,
             env2.slug,
             filename,
-            Buffer.from(bodyText, "utf-8")
+            Buffer.from(bodyText, "utf-8"),
+            { secret: env2.secret }
           );
         }
       } else {
@@ -23510,7 +23518,8 @@ function createScrapbookMutationsRouter(ctx) {
           env2.site,
           env2.slug,
           filename,
-          bodyText
+          bodyText,
+          { secret: env2.secret }
         );
       }
     } catch (err2) {
@@ -23532,16 +23541,56 @@ function createScrapbookMutationsRouter(ctx) {
     if (typeof newName !== "string" || newName.length === 0) {
       return c.json({ error: "newName is required" }, 400);
     }
+    const toSecretRaw = parsed.value.toSecret;
+    if (toSecretRaw !== void 0 && typeof toSecretRaw !== "boolean") {
+      return c.json({ error: "toSecret must be a boolean when provided" }, 400);
+    }
+    const toSecret = toSecretRaw === void 0 ? env2.secret : toSecretRaw;
     let item;
     try {
-      item = renameScrapbookFile(
-        ctx.projectRoot,
-        ctx.config,
-        env2.site,
-        env2.slug,
-        oldName,
-        newName
-      );
+      if (toSecret === env2.secret) {
+        item = renameScrapbookFile(
+          ctx.projectRoot,
+          ctx.config,
+          env2.site,
+          env2.slug,
+          oldName,
+          newName,
+          { secret: env2.secret }
+        );
+      } else {
+        const srcAbs = scrapbookFilePath(
+          ctx.projectRoot,
+          ctx.config,
+          env2.site,
+          env2.slug,
+          oldName,
+          { secret: env2.secret }
+        );
+        const dstAbs = scrapbookFilePath(
+          ctx.projectRoot,
+          ctx.config,
+          env2.site,
+          env2.slug,
+          newName,
+          { secret: toSecret }
+        );
+        if (!existsSync5(srcAbs)) {
+          return c.json({ error: `file not found: "${oldName}"` }, 404);
+        }
+        if (existsSync5(dstAbs)) {
+          return c.json({ error: `target name already exists: "${newName}"` }, 409);
+        }
+        mkdirSync3(dirname2(dstAbs), { recursive: true });
+        renameSync2(srcAbs, dstAbs);
+        const st = statSync3(dstAbs);
+        item = {
+          name: newName,
+          kind: classify(newName),
+          size: st.size,
+          mtime: st.mtime.toISOString()
+        };
+      }
     } catch (err2) {
       const reason = err2 instanceof Error ? err2.message : String(err2);
       return c.json({ error: reason }, statusForError(reason));
@@ -23563,7 +23612,8 @@ function createScrapbookMutationsRouter(ctx) {
         ctx.config,
         env2.site,
         env2.slug,
-        filename
+        filename,
+        { secret: env2.secret }
       );
     } catch (err2) {
       const reason = err2 instanceof Error ? err2.message : String(err2);
@@ -23592,7 +23642,8 @@ function createScrapbookMutationsRouter(ctx) {
         env2.site,
         env2.slug,
         filename,
-        bodyText
+        bodyText,
+        { secret: env2.secret }
       );
     } catch (err2) {
       const reason = err2 instanceof Error ? err2.message : String(err2);
@@ -23610,6 +23661,8 @@ function createScrapbookMutationsRouter(ctx) {
     const site = form.get("site");
     const slug = form.get("slug");
     const file = form.get("file");
+    const secretField = form.get("secret");
+    const secret = typeof secretField === "string" && secretField === "true";
     if (typeof site !== "string" || site.length === 0) {
       return c.json({ error: "site is required" }, 400);
     }
@@ -23635,7 +23688,8 @@ function createScrapbookMutationsRouter(ctx) {
         site,
         slug,
         filename,
-        buf
+        buf,
+        { secret }
       );
     } catch (err2) {
       const reason = err2 instanceof Error ? err2.message : String(err2);
@@ -25922,9 +25976,11 @@ function renderItemRow(item, index2, opts = {}) {
   const kindLabel2 = item.kind === "other" ? "\xB7" : item.kind.toUpperCase();
   const idPrefix = secret ? "secret-" : "";
   const dataSecret = secret ? ' data-secret="true"' : "";
+  const sectionToggleLabel = secret ? "mark public" : "mark secret";
   const toolbar = withTools ? unsafe(html6`<div class="scrapbook-toolbar" data-toolbar>
         ${editBtn}
         <button type="button" class="scrapbook-tool" data-action="rename">rename</button>
+        <button type="button" class="scrapbook-tool" data-action="toggle-secret">${sectionToggleLabel}</button>
         <button type="button" class="scrapbook-tool scrapbook-tool--delete" data-action="delete">delete</button>
       </div>`) : "";
   return unsafe(html6`
@@ -26024,7 +26080,11 @@ function renderReadingPanel(items) {
           <span class="scrapbook-composer-kind">NEW</span>
           <input type="text" class="scrapbook-composer-filename" data-composer-filename
             placeholder="note-name.md" aria-label="new note filename" />
-          <div class="scrapbook-editor-footer" style="margin: 0;">
+          <div class="scrapbook-editor-footer scrapbook-composer-actions">
+            <label class="scrapbook-secret-toggle" title="save under scrapbook/secret/ — never published">
+              <input type="checkbox" data-composer-secret />
+              <span>secret</span>
+            </label>
             <button type="button" class="scrapbook-tool" data-action="composer-cancel">cancel</button>
             <button type="submit" class="scrapbook-tool scrapbook-tool--primary" data-action="composer-save">save →</button>
           </div>
@@ -26043,6 +26103,11 @@ function renderReadingPanel(items) {
         <span class="scrapbook-drop-label">── drop a file here, or pick one ──</span>
         <input type="file" data-scrapbook-file-input
           accept="image/*,application/json,text/plain,text/markdown,.md,.json,.txt" />
+        <label class="scrapbook-secret-toggle scrapbook-secret-toggle--upload"
+          title="save the upload under scrapbook/secret/ — never published">
+          <input type="checkbox" data-upload-secret />
+          <span>upload as secret</span>
+        </label>
       </div>
     </section>`);
 }
@@ -26065,7 +26130,7 @@ function renderSecretSection(items) {
       </p>
       <ol class="scrapbook-items scrapbook-items--secret">
         ${items.map(
-    (item, i) => renderItemRow(item, i, { secret: true, withTools: false })
+    (item, i) => renderItemRow(item, i, { secret: true, withTools: true })
   )}
       </ol>
     </section>`);
@@ -26112,7 +26177,7 @@ function renderScrapbookPage(ctx, site, path) {
 }
 
 // ../core/src/content-tree.ts
-import { existsSync as existsSync7, readdirSync as readdirSync3, readFileSync as readFileSync8, statSync as statSync3 } from "node:fs";
+import { existsSync as existsSync7, readdirSync as readdirSync3, readFileSync as readFileSync8, statSync as statSync4 } from "node:fs";
 import { join as join8 } from "node:path";
 var INDEX_BASENAMES = /* @__PURE__ */ new Set([
   "index.md",
@@ -26169,7 +26234,7 @@ function defaultFsWalk(projectRoot, config, site) {
       const childAbs = join8(dirAbs, name);
       let childStat;
       try {
-        childStat = statSync3(childAbs);
+        childStat = statSync4(childAbs);
       } catch {
         continue;
       }
@@ -27155,7 +27220,7 @@ function usage(error) {
   process.exit(error ? 2 : 0);
 }
 function publicDir() {
-  const here = dirname2(fileURLToPath2(import.meta.url));
+  const here = dirname3(fileURLToPath2(import.meta.url));
   const candidates = [
     resolve2(here, "..", "public"),
     resolve2(here, "..", "..", "..", "plugins", "deskwork-studio", "public")

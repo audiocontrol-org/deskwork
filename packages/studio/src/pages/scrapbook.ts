@@ -31,7 +31,14 @@ import { renderEditorialFolio } from './chrome.ts';
 interface RenderItemRowOptions {
   /** Mark the row visually as belonging to the secret section. */
   secret?: boolean;
-  /** When true, render disclosure controls + toolbar. False for secret rows in the v1 read-only secret surface. */
+  /**
+   * When true, render disclosure controls + toolbar. Both public AND
+   * secret rows now ship the toolbar (#28); the per-section tools
+   * include a "Mark secret" / "Mark public" toggle that the client
+   * resolves into a cross-section rename. Pre-#28 secret rows were
+   * read-only — that decision is reversed here so operators have full
+   * CRUD over secret/ items from the standalone viewer.
+   */
   withTools?: boolean;
 }
 
@@ -49,10 +56,14 @@ function renderItemRow(
   const kindLabel = item.kind === 'other' ? '·' : item.kind.toUpperCase();
   const idPrefix = secret ? 'secret-' : '';
   const dataSecret = secret ? ' data-secret="true"' : '';
+  // The "mark secret/public" toggle is the cross-section rename
+  // affordance. The button label flips with the source section.
+  const sectionToggleLabel = secret ? 'mark public' : 'mark secret';
   const toolbar = withTools
     ? unsafe(html`<div class="scrapbook-toolbar" data-toolbar>
         ${editBtn}
         <button type="button" class="scrapbook-tool" data-action="rename">rename</button>
+        <button type="button" class="scrapbook-tool" data-action="toggle-secret">${sectionToggleLabel}</button>
         <button type="button" class="scrapbook-tool scrapbook-tool--delete" data-action="delete">delete</button>
       </div>`)
     : '';
@@ -167,7 +178,11 @@ function renderReadingPanel(items: readonly ScrapbookItem[]): RawHtml {
           <span class="scrapbook-composer-kind">NEW</span>
           <input type="text" class="scrapbook-composer-filename" data-composer-filename
             placeholder="note-name.md" aria-label="new note filename" />
-          <div class="scrapbook-editor-footer" style="margin: 0;">
+          <div class="scrapbook-editor-footer scrapbook-composer-actions">
+            <label class="scrapbook-secret-toggle" title="save under scrapbook/secret/ — never published">
+              <input type="checkbox" data-composer-secret />
+              <span>secret</span>
+            </label>
             <button type="button" class="scrapbook-tool" data-action="composer-cancel">cancel</button>
             <button type="submit" class="scrapbook-tool scrapbook-tool--primary" data-action="composer-save">save →</button>
           </div>
@@ -186,6 +201,11 @@ function renderReadingPanel(items: readonly ScrapbookItem[]): RawHtml {
         <span class="scrapbook-drop-label">── drop a file here, or pick one ──</span>
         <input type="file" data-scrapbook-file-input
           accept="image/*,application/json,text/plain,text/markdown,.md,.json,.txt" />
+        <label class="scrapbook-secret-toggle scrapbook-secret-toggle--upload"
+          title="save the upload under scrapbook/secret/ — never published">
+          <input type="checkbox" data-upload-secret />
+          <span>upload as secret</span>
+        </label>
       </div>
     </section>`);
 }
@@ -216,7 +236,7 @@ function renderSecretSection(items: readonly ScrapbookItem[]): RawHtml {
       </p>
       <ol class="scrapbook-items scrapbook-items--secret">
         ${items.map((item, i) =>
-          renderItemRow(item, i, { secret: true, withTools: false }),
+          renderItemRow(item, i, { secret: true, withTools: true }),
         )}
       </ol>
     </section>`);

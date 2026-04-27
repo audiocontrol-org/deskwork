@@ -400,6 +400,177 @@ describe('scrapbook mutation API (#21)', () => {
   });
 
   // -------------------------------------------------------------------
+  // Secret-flag (#28)
+  // -------------------------------------------------------------------
+
+  describe('secret flag', () => {
+    function secretDirFor(slug: string): string {
+      return join(scrapbookDirFor(slug), 'secret');
+    }
+
+    it('create with secret:true writes under scrapbook/secret/', async () => {
+      const slug = 'sec-create';
+      const r = await postJson(app, '/api/dev/scrapbook/create', {
+        site: 'wc',
+        slug,
+        filename: 'note.md',
+        body: 'hush',
+        secret: true,
+      });
+      expect(r.status).toBe(200);
+      expect(existsSync(join(secretDirFor(slug), 'note.md'))).toBe(true);
+      expect(existsSync(join(scrapbookDirFor(slug), 'note.md'))).toBe(false);
+    });
+
+    it('save with secret:true writes under scrapbook/secret/', async () => {
+      const slug = 'sec-save';
+      mkdirSync(secretDirFor(slug), { recursive: true });
+      writeFileSync(join(secretDirFor(slug), 'a.md'), 'old');
+      const r = await postJson(app, '/api/dev/scrapbook/save', {
+        site: 'wc',
+        slug,
+        filename: 'a.md',
+        body: 'new',
+        secret: true,
+      });
+      expect(r.status).toBe(200);
+      expect(
+        readFileSync(join(secretDirFor(slug), 'a.md'), 'utf-8'),
+      ).toBe('new');
+    });
+
+    it('delete with secret:true unlinks under scrapbook/secret/', async () => {
+      const slug = 'sec-delete';
+      mkdirSync(secretDirFor(slug), { recursive: true });
+      writeFileSync(join(secretDirFor(slug), 'gone.md'), 'x');
+      const r = await postJson(app, '/api/dev/scrapbook/delete', {
+        site: 'wc',
+        slug,
+        filename: 'gone.md',
+        secret: true,
+      });
+      expect(r.status).toBe(200);
+      expect(existsSync(join(secretDirFor(slug), 'gone.md'))).toBe(false);
+    });
+
+    it('rejects non-boolean secret with 400', async () => {
+      const r = await postJson(app, '/api/dev/scrapbook/create', {
+        site: 'wc',
+        slug: 'p',
+        filename: 'a.md',
+        body: 'x',
+        secret: 'true',
+      });
+      expect(r.status).toBe(400);
+    });
+  });
+
+  // -------------------------------------------------------------------
+  // Cross-section rename (#28: public ↔ secret)
+  // -------------------------------------------------------------------
+
+  describe('cross-section rename', () => {
+    function secretDirFor(slug: string): string {
+      return join(scrapbookDirFor(slug), 'secret');
+    }
+
+    it('moves a public file into scrapbook/secret/ when toSecret:true', async () => {
+      const slug = 'cross1';
+      seedScrapbookFile(slug, 'plan.md', '# plan\n');
+      const r = await postJson(app, '/api/dev/scrapbook/rename', {
+        site: 'wc',
+        slug,
+        oldName: 'plan.md',
+        newName: 'plan.md',
+        secret: false,
+        toSecret: true,
+      });
+      expect(r.status).toBe(200);
+      expect(existsSync(join(scrapbookDirFor(slug), 'plan.md'))).toBe(false);
+      expect(existsSync(join(secretDirFor(slug), 'plan.md'))).toBe(true);
+    });
+
+    it('moves a secret file out to public when toSecret:false', async () => {
+      const slug = 'cross2';
+      mkdirSync(secretDirFor(slug), { recursive: true });
+      writeFileSync(join(secretDirFor(slug), 'note.md'), '# n\n');
+      const r = await postJson(app, '/api/dev/scrapbook/rename', {
+        site: 'wc',
+        slug,
+        oldName: 'note.md',
+        newName: 'note.md',
+        secret: true,
+        toSecret: false,
+      });
+      expect(r.status).toBe(200);
+      expect(existsSync(join(secretDirFor(slug), 'note.md'))).toBe(false);
+      expect(existsSync(join(scrapbookDirFor(slug), 'note.md'))).toBe(true);
+    });
+
+    it('renames AND moves cross-section in one call', async () => {
+      const slug = 'cross3';
+      seedScrapbookFile(slug, 'old.md', '# o\n');
+      const r = await postJson(app, '/api/dev/scrapbook/rename', {
+        site: 'wc',
+        slug,
+        oldName: 'old.md',
+        newName: 'new.md',
+        secret: false,
+        toSecret: true,
+      });
+      expect(r.status).toBe(200);
+      expect(existsSync(join(scrapbookDirFor(slug), 'old.md'))).toBe(false);
+      expect(existsSync(join(secretDirFor(slug), 'new.md'))).toBe(true);
+    });
+
+    it('returns 409 when the destination already has the target name', async () => {
+      const slug = 'cross4';
+      seedScrapbookFile(slug, 'a.md', 'A');
+      mkdirSync(secretDirFor(slug), { recursive: true });
+      writeFileSync(join(secretDirFor(slug), 'a.md'), 'B');
+      const r = await postJson(app, '/api/dev/scrapbook/rename', {
+        site: 'wc',
+        slug,
+        oldName: 'a.md',
+        newName: 'a.md',
+        secret: false,
+        toSecret: true,
+      });
+      expect(r.status).toBe(409);
+      // Both files still in place.
+      expect(existsSync(join(scrapbookDirFor(slug), 'a.md'))).toBe(true);
+      expect(existsSync(join(secretDirFor(slug), 'a.md'))).toBe(true);
+    });
+
+    it('returns 404 when the source file is missing in the source section', async () => {
+      const slug = 'cross5';
+      mkdirSync(scrapbookDirFor(slug), { recursive: true });
+      const r = await postJson(app, '/api/dev/scrapbook/rename', {
+        site: 'wc',
+        slug,
+        oldName: 'gone.md',
+        newName: 'gone.md',
+        secret: false,
+        toSecret: true,
+      });
+      expect(r.status).toBe(404);
+    });
+
+    it('rejects non-boolean toSecret with 400', async () => {
+      const slug = 'cross6';
+      seedScrapbookFile(slug, 'a.md', 'A');
+      const r = await postJson(app, '/api/dev/scrapbook/rename', {
+        site: 'wc',
+        slug,
+        oldName: 'a.md',
+        newName: 'b.md',
+        toSecret: 'true',
+      });
+      expect(r.status).toBe(400);
+    });
+  });
+
+  // -------------------------------------------------------------------
   // Hierarchical slugs (Phase 13 path-addressed scrapbooks)
   // -------------------------------------------------------------------
 

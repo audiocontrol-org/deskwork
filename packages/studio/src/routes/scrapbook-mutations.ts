@@ -31,6 +31,7 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
+  classify,
   createScrapbookMarkdown,
   deleteScrapbookFile,
   renameScrapbookFile,
@@ -38,7 +39,8 @@ import {
   writeScrapbookUpload,
   type ScrapbookItem,
 } from '@deskwork/core/scrapbook';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync, renameSync, statSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { scrapbookFilePath } from '@deskwork/core/scrapbook';
 import type { StudioContext } from './api.ts';
 
@@ -49,13 +51,19 @@ import type { StudioContext } from './api.ts';
 interface ParsedPayload {
   site: string;
   slug: string;
+  /**
+   * When true, the operation targets `<scrapbook>/secret/<filename>`
+   * instead of the public scrapbook root. Defaults to false.
+   * Surfaced by the standalone viewer's secret-toggle UI (#28).
+   */
+  secret: boolean;
 }
 
 /**
- * Validate the common `{ site, slug }` envelope. Returns a typed object
- * or a 400/404 Response that the caller propagates directly. The site
- * existence check is here so every mutation 404s on unknown sites the
- * same way the read endpoint does.
+ * Validate the common `{ site, slug, secret? }` envelope. Returns a
+ * typed object or a 400/404 Response that the caller propagates
+ * directly. The site existence check is here so every mutation 404s
+ * on unknown sites the same way the read endpoint does.
  */
 function checkEnvelope(
   ctx: StudioContext,
@@ -72,7 +80,11 @@ function checkEnvelope(
   if (!(site in ctx.config.sites)) {
     return { error: `unknown site: ${site}`, status: 404 };
   }
-  return { site, slug };
+  const secretRaw = body.secret;
+  if (secretRaw !== undefined && typeof secretRaw !== 'boolean') {
+    return { error: 'secret must be a boolean when provided', status: 400 };
+  }
+  return { site, slug, secret: secretRaw === true };
 }
 
 /**
@@ -152,6 +164,7 @@ export function createScrapbookMutationsRouter(ctx: StudioContext): Hono {
         env.site,
         env.slug,
         filename,
+        { secret: env.secret },
       );
       if (!existsSync(abs)) {
         // Only `.md` files can be created by the create helper, but
@@ -165,6 +178,7 @@ export function createScrapbookMutationsRouter(ctx: StudioContext): Hono {
             env.slug,
             filename,
             bodyText,
+            { secret: env.secret },
           );
         } else {
           item = writeScrapbookUpload(
@@ -174,6 +188,7 @@ export function createScrapbookMutationsRouter(ctx: StudioContext): Hono {
             env.slug,
             filename,
             Buffer.from(bodyText, 'utf-8'),
+            { secret: env.secret },
           );
         }
       } else {
@@ -184,6 +199,7 @@ export function createScrapbookMutationsRouter(ctx: StudioContext): Hono {
           env.slug,
           filename,
           bodyText,
+          { secret: env.secret },
         );
       }
     } catch (err) {
@@ -194,9 +210,19 @@ export function createScrapbookMutationsRouter(ctx: StudioContext): Hono {
   });
 
   // POST /api/dev/scrapbook/rename
-  // Body: { site, slug, oldName, newName }
-  // Behavior: rename oldName -> newName in the same scrapbook dir.
-  // 409 if newName already exists.
+  // Body: { site, slug, oldName, newName, secret?, toSecret? }
+  //
+  // Two modes:
+  //   - In-place rename: secret = source location (defaults to false);
+  //     toSecret omitted (or equal to secret). The file is renamed
+  //     inside the same section.
+  //   - Cross-section move (#28): secret = source, toSecret = target
+  //     section. When secret !== toSecret, the file is moved between
+  //     `scrapbook/` and `scrapbook/secret/`. The studio's UI exposes
+  //     this as "Mark secret" / "Mark public".
+  //
+  // 409 if the target newName already exists (in the destination
+  // section). 404 if oldName is missing in the source section.
   app.post('/rename', async (c) => {
     const parsed = await readJson(c);
     if (!parsed.ok) return c.json({ error: parsed.error }, parsed.status);
@@ -211,17 +237,64 @@ export function createScrapbookMutationsRouter(ctx: StudioContext): Hono {
     if (typeof newName !== 'string' || newName.length === 0) {
       return c.json({ error: 'newName is required' }, 400);
     }
+    const toSecretRaw = parsed.value.toSecret;
+    if (toSecretRaw !== undefined && typeof toSecretRaw !== 'boolean') {
+      return c.json({ error: 'toSecret must be a boolean when provided' }, 400);
+    }
+    const toSecret = toSecretRaw === undefined ? env.secret : toSecretRaw;
 
     let item: ScrapbookItem;
     try {
-      item = renameScrapbookFile(
-        ctx.projectRoot,
-        ctx.config,
-        env.site,
-        env.slug,
-        oldName,
-        newName,
-      );
+      if (toSecret === env.secret) {
+        item = renameScrapbookFile(
+          ctx.projectRoot,
+          ctx.config,
+          env.site,
+          env.slug,
+          oldName,
+          newName,
+          { secret: env.secret },
+        );
+      } else {
+        // Cross-section move. Use the path-resolver to compute the
+        // source and destination absolute paths under the right
+        // sub-roots (and let the resolver enforce traversal guards).
+        // Then physically rename across the two paths.
+        const srcAbs = scrapbookFilePath(
+          ctx.projectRoot,
+          ctx.config,
+          env.site,
+          env.slug,
+          oldName,
+          { secret: env.secret },
+        );
+        const dstAbs = scrapbookFilePath(
+          ctx.projectRoot,
+          ctx.config,
+          env.site,
+          env.slug,
+          newName,
+          { secret: toSecret },
+        );
+        if (!existsSync(srcAbs)) {
+          return c.json({ error: `file not found: "${oldName}"` }, 404);
+        }
+        if (existsSync(dstAbs)) {
+          return c.json({ error: `target name already exists: "${newName}"` }, 409);
+        }
+        // Ensure the destination directory exists (creates `secret/`
+        // when promoting public → secret for the first time).
+        mkdirSync(dirname(dstAbs), { recursive: true });
+        renameSync(srcAbs, dstAbs);
+        const st = statSync(dstAbs);
+        // Build the response item the same shape the helper uses.
+        item = {
+          name: newName,
+          kind: classify(newName),
+          size: st.size,
+          mtime: st.mtime.toISOString(),
+        };
+      }
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       return c.json({ error: reason }, statusForError(reason));
@@ -250,6 +323,7 @@ export function createScrapbookMutationsRouter(ctx: StudioContext): Hono {
         env.site,
         env.slug,
         filename,
+        { secret: env.secret },
       );
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
@@ -285,6 +359,7 @@ export function createScrapbookMutationsRouter(ctx: StudioContext): Hono {
         env.slug,
         filename,
         bodyText,
+        { secret: env.secret },
       );
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
@@ -294,10 +369,12 @@ export function createScrapbookMutationsRouter(ctx: StudioContext): Hono {
   });
 
   // POST /api/dev/scrapbook/upload
-  // Multipart body: { site, slug, file }
+  // Multipart body: { site, slug, file, secret? }
   // Behavior: save the uploaded file (binary-safe) at
-  // <contentDir>/<slug>/scrapbook/<file.name>. 409 if it already
-  // exists — operator must rename or delete first.
+  // <contentDir>/<slug>/scrapbook/<file.name>, or under
+  // `scrapbook/secret/` when the `secret` form field is the literal
+  // string "true". 409 if it already exists — operator must rename
+  // or delete first.
   app.post('/upload', async (c) => {
     let form: FormData;
     try {
@@ -308,6 +385,9 @@ export function createScrapbookMutationsRouter(ctx: StudioContext): Hono {
     const site = form.get('site');
     const slug = form.get('slug');
     const file = form.get('file');
+    const secretField = form.get('secret');
+    const secret =
+      typeof secretField === 'string' && secretField === 'true';
     if (typeof site !== 'string' || site.length === 0) {
       return c.json({ error: 'site is required' }, 400);
     }
@@ -335,6 +415,7 @@ export function createScrapbookMutationsRouter(ctx: StudioContext): Hono {
         slug,
         filename,
         buf,
+        { secret },
       );
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
