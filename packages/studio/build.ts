@@ -5,31 +5,41 @@
  * Two output sets, both produced by `tsx build.ts`:
  *
  *   1. **Browser-target client modules.** Every TypeScript entry under
- *      `public/src/` becomes a matching `<name>.js` in `public/dist/`.
- *      ESM, sourcemap'd, served through the studio's `/static/*` mount.
+ *      `plugins/deskwork-studio/public/src/` becomes a matching
+ *      `<name>.js` in `plugins/deskwork-studio/public/dist/`. ESM,
+ *      sourcemap'd, served through the studio's `/static/*` mount.
  *      Pages pull in only what they need.
  *
- *   2. **Self-contained Node-target server bundle** at `bundle/server.cjs`.
- *      The plugin shell's bash wrapper runs this via plain `node` when no
- *      workspace-linked binary is available — i.e. fresh `git clone`
- *      installs work without an `npm install` step. Inlines every
- *      workspace dependency (Hono, @hono/node-server, @deskwork/core);
- *      Node built-ins remain external.
+ *   2. **Self-contained Node-target server bundle** at
+ *      `plugins/deskwork-studio/bundle/server.mjs`. The plugin shell's
+ *      bash wrapper runs this via plain `node` when no workspace-linked
+ *      binary is available — both fresh `git clone` and Claude Code
+ *      marketplace installs run this file. Inlines every workspace
+ *      dependency (Hono, @hono/node-server, @deskwork/core); Node
+ *      built-ins remain external.
+ *
+ * All build outputs land inside the plugin tree so the marketplace
+ * install (which only ships `plugins/<name>/`) carries everything the
+ * runtime needs — bundle, client modules, CSS, source `public/src/`.
  */
 
 import { build, type BuildOptions, type BuildResult } from 'esbuild';
-import { readdir, stat } from 'node:fs/promises';
+import { mkdir, readdir, stat } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const SRC_DIR = resolve(HERE, 'public', 'src');
-const OUT_DIR = resolve(HERE, 'public', 'dist');
+// Plugin tree houses all build outputs (and the public/ source assets,
+// since git mv'd from packages/studio/public/ during the marketplace
+// install fix). The plugin payload is the single distribution unit.
+const PLUGIN_ROOT = resolve(HERE, '..', '..', 'plugins', 'deskwork-studio');
+const SRC_DIR = resolve(PLUGIN_ROOT, 'public', 'src');
+const OUT_DIR = resolve(PLUGIN_ROOT, 'public', 'dist');
 const SERVER_ENTRY = resolve(HERE, 'src', 'server.ts');
 // .mjs (ESM) rather than .cjs because the source uses top-level await
 // for the symlinked-bin entrypoint detection. Node infers ESM/CJS from
 // the extension; the wrapper invokes `node bundle/server.mjs` either way.
-const SERVER_OUT = resolve(HERE, 'bundle', 'server.mjs');
+const SERVER_OUT = resolve(PLUGIN_ROOT, 'bundle', 'server.mjs');
 
 interface BundleSummary {
   readonly entry: string;
@@ -76,6 +86,7 @@ async function bundleOne(entryPoint: string): Promise<BundleSummary> {
 }
 
 async function bundleServer(): Promise<BundleSummary> {
+  await mkdir(dirname(SERVER_OUT), { recursive: true });
   const opts: BuildOptions = {
     entryPoints: [SERVER_ENTRY],
     outfile: SERVER_OUT,
