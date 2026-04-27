@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+#
+# pre-push — keep the runnable bundles in sync with their source.
+#
+# Per the install-gap fix shipped in 956cd2d (issue #4), the committed
+# bundles live inside the plugin tree (so marketplace installs find
+# them after Claude copies plugins/<name>/ into its plugin cache):
+#
+#   plugins/deskwork/bundle/cli.mjs           cli build output
+#   plugins/deskwork-studio/bundle/server.mjs studio build output
+#
+# Originally lived in pre-commit (issue #4 install-gap fix). Moved to
+# pre-push (issue #16) because the commit-level rebuild added 1-5s of
+# friction to every commit, even when only docs/tests changed. Pre-push
+# catches the same correctness problem (no stale bundle ever lands on a
+# remote branch) without paying the cost on every local commit. CI is
+# the layered safety net for anyone whose local hook is disabled.
+#
+# Operates on the diff between the about-to-be-pushed range and the
+# remote tip. When the local repo has no remote yet (rare; first push),
+# we fall back to comparing against HEAD~1 so a brand new branch with a
+# single commit still triggers a rebuild for staged source changes.
+# Skipped silently when no relevant source has changed since the
+# remote.
+
+set -euo pipefail
+
+# git supplies the about-to-be-pushed range on stdin as
+#   <local-ref> <local-sha> <remote-ref> <remote-sha>
+# We collect every (remote-sha..local-sha) range that has source under
+# packages/{core,cli,studio}/src/ to decide which bundle(s) to rebuild.
+
+ZERO="0000000000000000000000000000000000000000"
+
+needs_cli=false
+needs_studio=false
+
+range_changes() {
+  local from="$1"
+  local to="$2"
+  if [ "$from" = "$ZERO" ]; then
+    # New branch with no remote tracking — fall back to the parent of
+    # the tip so we examine just this branch's recent commits.
+    git log --name-only --pretty=format: "$to" -1 2>/dev/null || true
+  elif [ "$to" = "$ZERO" ]; then
+    # Branch deletion — nothing to rebuild.
+    return 0
+  else
+    git diff --name-only "$from..$to" 2>/dev/null || true
+  fi
+}
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -z "${local_sha:-}" ] && continue
+  changes="$(range_changes "$remote_sha" "$local_sha")"
+  while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    case "$f" in
+      # Core changes invalidate BOTH bundles (both inline @deskwork/core).
+      packages/core/src/*) needs_cli=true; needs_studio=true ;;
+      packages/cli/src/*) needs_cli=true ;;
+      packages/studio/src/*) needs_studio=true ;;
+    esac
+  done <<< "$changes"
+done
+
+rebuild_one() {
+  local pkg="$1"
+  local plugin_name="$2"
+  local bundle="$3"
+  local out_path="plugins/${plugin_name}/bundle/${bundle}"
+  echo "[deskwork pre-push] rebuilding ${out_path} (source under packages/${pkg}/src/ changed since remote)"
+  npm --workspace "packages/${pkg}" run build > /dev/null
+  if ! git diff --quiet -- "${out_path}"; then
+    echo "[deskwork pre-push] ${out_path} is out of date relative to source. Commit the rebuilt bundle and push again."
+    git --no-pager diff --stat -- "${out_path}"
+    exit 1
+  fi
+}
+
+if [ "$needs_cli" = true ]; then
+  rebuild_one "cli" "deskwork" "cli.mjs"
+fi
+
+if [ "$needs_studio" = true ]; then
+  rebuild_one "studio" "deskwork-studio" "server.mjs"
+fi
