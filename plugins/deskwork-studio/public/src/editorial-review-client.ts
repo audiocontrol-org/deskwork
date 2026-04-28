@@ -899,7 +899,7 @@ export function initEditorialReview(): void {
     if (previewDebounce !== null) window.clearTimeout(previewDebounce);
     previewDebounce = window.setTimeout(async () => {
       try {
-        const { splitOutline } = await import('./outline-split.ts');
+        const { splitOutline } = await import('@deskwork/core/outline-split');
         const bodyOnly = stripFrontmatter(md);
         const isOutlineKind = state.workflow.contentKind === 'outline';
         const bodyForPreview = isOutlineKind
@@ -1005,7 +1005,7 @@ export function initEditorialReview(): void {
     // Load both splitOutline AND joinOutline up front so the onChange
     // handler can rebuild the full document synchronously on every
     // keystroke — no race with a pending dynamic import.
-    const outlineMod = await import('./outline-split.ts');
+    const outlineMod = await import('@deskwork/core/outline-split');
     joinOutlineFn = outlineMod.joinOutline;
     const sourceMarkdown = state.currentVersion.markdown;
     // Outline-stage workflows: the outline IS the article. Don't

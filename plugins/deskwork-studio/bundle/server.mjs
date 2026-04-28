@@ -25429,7 +25429,7 @@ function renderDashboard(ctx, getIndex) {
   });
 }
 
-// ../../plugins/deskwork-studio/public/src/outline-split.ts
+// ../core/src/outline-split.ts
 function splitOutline(md) {
   const lines = md.split("\n");
   const startIdx = lines.findIndex((line) => /^##[ \t]+Outline\b/.test(line));
@@ -26074,7 +26074,7 @@ function renderShortformPage(ctx) {
   });
 }
 
-// ../../plugins/deskwork-studio/public/src/editorial-skills-catalogue.ts
+// src/lib/editorial-skills-catalogue.ts
 var KIND_LABEL = {
   cognitive: "cognitive",
   mechanical: "mechanical",
