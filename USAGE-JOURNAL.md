@@ -141,3 +141,15 @@ Each cycle has ~3 round-trips' worth of latency. With working margin notes the c
 **B. The pre-push hook works** — caught a stale `bundle/cli.mjs` after a schema change to core (cli imports core; bundle was rebuilt by the hook). Confirms a positive signal.
 
 **C. The marketplace's per-plugin tarball boundary** forces the bundle/server.mjs + bundle/cli.mjs pattern. Source-shipping (Phase 1+4 of the in-flight plan) needs to address how `@deskwork/core` reaches per-plugin tarballs — symlink with possible release-time materialization.
+
+#### 14. Iterate button copies a stale slash-command name
+
+**friction.** After v0.8.3 unblocked the studio's interaction layer (margin notes, buttons), operator clicked **Iterate**. The button copied `/editorial-iterate --site deskwork-internal source-shipped-deskwork-plan` to the clipboard. Pasted into Claude Code: *"Unknown command: /editorial-iterate"*.
+
+**diagnosis.** The deskwork plugin's lifecycle skills are namespaced under `/deskwork:*` (so `/deskwork:iterate`). The studio's button-handler code in `plugins/deskwork-studio/public/src/editorial-review-client.ts` emits the legacy `/editorial-*` names (lines ~1481, 1482, 1504, 1505). Fix is a one-file source change.
+
+**also.** The catalogue at `packages/studio/src/lib/editorial-skills-catalogue.ts` and the manual page at `packages/studio/src/pages/help.ts` are riddled with the same legacy names AND describe a slightly older lifecycle shape (e.g., `editorial-draft` was scaffold-and-advance; current is `outline` scaffolds, `draft` advances). That's a bigger documentation-refresh task — separate scope.
+
+**insight.** The minimum fix for this iteration is the button-handler clipboard texts only (4 strings + 2 hint messages). Ship as v0.8.4. The catalogue + manual-page refresh follows. **Pattern to watch**: every place the studio emits a slash-command for the operator to paste into Claude Code is a coupling point with the plugin's skill namespace. Future skill renames will need to sweep these emit points (and `git grep '/editorial-'` would have surfaced them all in one pass).
+
+**operator quote**: *"This is what was pasted into my clipboard when I clicked the iterate button: ❯ Unknown command: /editorial-iterate"*

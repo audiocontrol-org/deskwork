@@ -26392,8 +26392,8 @@ Unsaved edits will be lost. Continue?`
     const site = state.workflow.site;
     const slug = state.workflow.slug;
     const kind = state.workflow.contentKind;
-    const approveCmd = kind === "outline" ? `/editorial-outline-approve --site ${site} ${slug}` : `/editorial-approve --site ${site} ${slug}`;
-    const approveHint = kind === "outline" ? `Approved outline v${versionNum}. Next: /editorial-outline-approve advances the calendar Outlining \u2192 Drafting.` : `Approved v${versionNum}. Next: /editorial-approve writes the file and marks the workflow applied.`;
+    const approveCmd = `/deskwork:approve --site ${site} ${slug}`;
+    const approveHint = kind === "outline" ? `Approved outline v${versionNum}. Next: ${approveCmd} finalizes the workflow.` : `Approved v${versionNum}. Next: ${approveCmd} writes the file and marks the workflow applied.`;
     await copyAndToast(approveCmd, approveHint);
     setTimeout(() => window.location.reload(), 2400);
   });
@@ -26412,7 +26412,7 @@ Unsaved edits will be lost. Continue?`
     const site = state.workflow.site;
     const slug = state.workflow.slug;
     const kind = state.workflow.contentKind;
-    const iterateCmd = kind === "outline" ? `/editorial-iterate --kind outline --site ${site} ${slug}` : `/editorial-iterate --site ${site} ${slug}`;
+    const iterateCmd = kind === "outline" ? `/deskwork:iterate --kind outline --site ${site} ${slug}` : `/deskwork:iterate --site ${site} ${slug}`;
     await copyAndToast(
       iterateCmd,
       `Iterating on v${versionNum}. Next: ${iterateCmd} revises against your comments and appends v${versionNum + 1}.`

@@ -1469,21 +1469,23 @@ export function initEditorialReview(): void {
     await postApproveAnnotation();
     const ok = await postDecision('approved');
     if (!ok) { approveBtn.disabled = false; return; }
-    // Approve writes to disk + transitions to applied; both are done
-    // by /editorial-approve (longform/shortform) or
-    // /editorial-outline-approve (outline) in Claude Code, not by
-    // the studio click. Build the command that matches the workflow.
+    // Approve writes to disk + transitions to applied via
+    // /deskwork:approve in Claude Code, not by the studio click. Build
+    // the command that matches the workflow.
+    //
+    // TODO: outline-approve semantics. Legacy code emitted
+    // /editorial-outline-approve, but no such skill exists in the
+    // current /deskwork:* namespace. /deskwork:approve doesn't accept
+    // --kind. Outline approval may want to map to /deskwork:draft
+    // (advances Outlining → Drafting) — to be confirmed.
     const site = state.workflow.site;
     const slug = state.workflow.slug;
     const kind = state.workflow.contentKind;
-    const approveCmd =
-      kind === 'outline'
-        ? `/editorial-outline-approve --site ${site} ${slug}`
-        : `/editorial-approve --site ${site} ${slug}`;
+    const approveCmd = `/deskwork:approve --site ${site} ${slug}`;
     const approveHint =
       kind === 'outline'
-        ? `Approved outline v${versionNum}. Next: /editorial-outline-approve advances the calendar Outlining → Drafting.`
-        : `Approved v${versionNum}. Next: /editorial-approve writes the file and marks the workflow applied.`;
+        ? `Approved outline v${versionNum}. Next: ${approveCmd} finalizes the workflow.`
+        : `Approved v${versionNum}. Next: ${approveCmd} writes the file and marks the workflow applied.`;
     await copyAndToast(approveCmd, approveHint);
     setTimeout(() => window.location.reload(), 2400);
   });
@@ -1497,12 +1499,14 @@ export function initEditorialReview(): void {
     const site = state.workflow.site;
     const slug = state.workflow.slug;
     const kind = state.workflow.contentKind;
-    // /editorial-iterate defaults to --kind longform; outline
-    // workflows need the flag so the helper picks the right workflow.
+    // /deskwork:iterate defaults to --kind longform; outline and
+    // shortform workflows pass the flag so the helper picks the right
+    // workflow. Shortform additionally needs --platform / --channel,
+    // but the studio's shortform desk emits those via a different path.
     const iterateCmd =
       kind === 'outline'
-        ? `/editorial-iterate --kind outline --site ${site} ${slug}`
-        : `/editorial-iterate --site ${site} ${slug}`;
+        ? `/deskwork:iterate --kind outline --site ${site} ${slug}`
+        : `/deskwork:iterate --site ${site} ${slug}`;
     await copyAndToast(
       iterateCmd,
       `Iterating on v${versionNum}. Next: ${iterateCmd} revises against your comments and appends v${versionNum + 1}.`,
