@@ -25697,6 +25697,16 @@ function renderVersionsStrip(versions2, site, contentKind, current) {
   }).join("");
   return unsafe(html6`<span class="er-strip-versions">${unsafe(links)}</span>`);
 }
+function pendingSkillCmd(workflow) {
+  const { site, slug, contentKind, state } = workflow;
+  if (state === "iterating") {
+    return contentKind === "outline" ? `/deskwork:iterate --kind outline --site ${site} ${slug}` : `/deskwork:iterate --site ${site} ${slug}`;
+  }
+  if (state === "approved") {
+    return `/deskwork:approve --site ${site} ${slug}`;
+  }
+  return "";
+}
 function renderControlsRight(workflow) {
   const isActive = workflow.state === "open" || workflow.state === "in-review";
   const isApproved = workflow.state === "approved";
@@ -25710,20 +25720,24 @@ function renderControlsRight(workflow) {
     buttons.push(html6`<button class="er-btn er-btn-small er-btn-reject" data-action="reject" type="button">Reject</button>`);
   }
   if (isApproved) {
-    buttons.push(html6`<button class="er-btn er-btn-small" disabled title="Run /editorial-approve in Claude Code" type="button">Apply</button>`);
+    const applyCmd = pendingSkillCmd(workflow);
+    buttons.push(html6`<span class="er-pending-state">awaiting apply…</span>`);
+    buttons.push(html6`<button class="er-btn er-btn-small" data-action="copy-cmd" data-cmd="${applyCmd}" title="Copy ${applyCmd} to clipboard" type="button">copy <code>/deskwork:approve</code></button>`);
     buttons.push(html6`<button class="er-btn er-btn-small er-btn-reject" data-action="reject" type="button">Reject</button>`);
   }
   if (isIterating) {
-    buttons.push(html6`<span style="font-family: var(--er-font-display); font-style: italic; color: var(--er-stamp-purple);">agent iterating…</span>`);
+    const iterateCmd = pendingSkillCmd(workflow);
+    buttons.push(html6`<span class="er-pending-state">agent iterating…</span>`);
+    buttons.push(html6`<button class="er-btn er-btn-small" data-action="copy-cmd" data-cmd="${iterateCmd}" title="Copy ${iterateCmd} to clipboard" type="button">copy <code>/deskwork:iterate</code></button>`);
   }
   if (isTerminal) {
-    buttons.push(html6`<span style="font-family: var(--er-font-display); font-style: italic; color: var(--er-faded);">filed (${workflow.state})</span>`);
+    buttons.push(html6`<span class="er-pending-state er-pending-state--filed">filed (${workflow.state})</span>`);
   }
   buttons.push(html6`<button class="er-btn er-btn-small" data-action="shortcuts" type="button" aria-label="Show keyboard shortcuts" title="Keyboard shortcuts">?</button>`);
   return unsafe(`<span class="er-strip-right">${buttons.join("")}</span>`);
 }
 function renderError(slug, site, contentKind, message) {
-  const startCmd = contentKind === "outline" ? `/editorial-outline --site ${site} ${slug}` : contentKind === "shortform" ? `/deskwork:shortform-start --site ${site} ${slug} <platform>` : `/editorial-draft-review --site ${site} ${slug}`;
+  const startCmd = contentKind === "outline" ? `/deskwork:outline --site ${site} ${slug}` : contentKind === "shortform" ? `/deskwork:shortform-start --site ${site} ${slug} <platform>` : `/deskwork:review-start --site ${site} ${slug}`;
   const body3 = html6`
     <div data-review-ui="longform">
       ${renderEditorialFolio("reviews", `longform \xB7 ${slug}`)}

@@ -1529,6 +1529,20 @@ export function initEditorialReview(): void {
     }
   });
 
+  // ---- Re-copy pending skill command ----
+  // Surfaced when the workflow is in `iterating` or `approved` and the
+  // operator's first clipboard paste failed (e.g., the v0.8.4 case where
+  // the legacy /editorial-iterate name shipped). The button carries the
+  // command in a data-cmd attribute; clicking it re-runs the same
+  // copyAndToast we use for the primary buttons.
+  document.querySelectorAll<HTMLButtonElement>('[data-action="copy-cmd"]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const cmd = btn.getAttribute('data-cmd') ?? '';
+      if (!cmd) return;
+      await copyAndToast(cmd, `Copied: ${cmd}`);
+    });
+  });
+
   // ---- Keyboard shortcuts ----
 
   const shortcutsOverlay = qn<HTMLElement>('[data-shortcuts-overlay]');

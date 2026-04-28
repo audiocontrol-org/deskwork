@@ -179,6 +179,27 @@ function renderVersionsStrip(
   return unsafe(html`<span class="er-strip-versions">${unsafe(links)}</span>`);
 }
 
+/**
+ * Build the slash command that the operator pastes into Claude Code to
+ * advance the workflow from its current pending state. Mirrors the
+ * client-side button-handler logic so server-rendered "copy again"
+ * affordances stay consistent.
+ */
+function pendingSkillCmd(workflow: DraftWorkflowItem): string {
+  const { site, slug, contentKind, state } = workflow;
+  if (state === 'iterating') {
+    return contentKind === 'outline'
+      ? `/deskwork:iterate --kind outline --site ${site} ${slug}`
+      : `/deskwork:iterate --site ${site} ${slug}`;
+  }
+  if (state === 'approved') {
+    // Outline-approve semantics still TBD (see editorial-review-client.ts);
+    // for now both kinds emit the same /deskwork:approve.
+    return `/deskwork:approve --site ${site} ${slug}`;
+  }
+  return '';
+}
+
 function renderControlsRight(workflow: DraftWorkflowItem): RawHtml {
   const isActive = workflow.state === 'open' || workflow.state === 'in-review';
   const isApproved = workflow.state === 'approved';
@@ -192,14 +213,18 @@ function renderControlsRight(workflow: DraftWorkflowItem): RawHtml {
     buttons.push(html`<button class="er-btn er-btn-small er-btn-reject" data-action="reject" type="button">Reject</button>`);
   }
   if (isApproved) {
-    buttons.push(html`<button class="er-btn er-btn-small" disabled title="Run /editorial-approve in Claude Code" type="button">Apply</button>`);
+    const applyCmd = pendingSkillCmd(workflow);
+    buttons.push(html`<span class="er-pending-state">awaiting apply…</span>`);
+    buttons.push(html`<button class="er-btn er-btn-small" data-action="copy-cmd" data-cmd="${applyCmd}" title="Copy ${applyCmd} to clipboard" type="button">copy <code>/deskwork:approve</code></button>`);
     buttons.push(html`<button class="er-btn er-btn-small er-btn-reject" data-action="reject" type="button">Reject</button>`);
   }
   if (isIterating) {
-    buttons.push(html`<span style="font-family: var(--er-font-display); font-style: italic; color: var(--er-stamp-purple);">agent iterating…</span>`);
+    const iterateCmd = pendingSkillCmd(workflow);
+    buttons.push(html`<span class="er-pending-state">agent iterating…</span>`);
+    buttons.push(html`<button class="er-btn er-btn-small" data-action="copy-cmd" data-cmd="${iterateCmd}" title="Copy ${iterateCmd} to clipboard" type="button">copy <code>/deskwork:iterate</code></button>`);
   }
   if (isTerminal) {
-    buttons.push(html`<span style="font-family: var(--er-font-display); font-style: italic; color: var(--er-faded);">filed (${workflow.state})</span>`);
+    buttons.push(html`<span class="er-pending-state er-pending-state--filed">filed (${workflow.state})</span>`);
   }
   buttons.push(html`<button class="er-btn er-btn-small" data-action="shortcuts" type="button" aria-label="Show keyboard shortcuts" title="Keyboard shortcuts">?</button>`);
   return unsafe(`<span class="er-strip-right">${buttons.join('')}</span>`);
@@ -213,10 +238,10 @@ function renderError(
 ): string {
   const startCmd =
     contentKind === 'outline'
-      ? `/editorial-outline --site ${site} ${slug}`
+      ? `/deskwork:outline --site ${site} ${slug}`
       : contentKind === 'shortform'
         ? `/deskwork:shortform-start --site ${site} ${slug} <platform>`
-        : `/editorial-draft-review --site ${site} ${slug}`;
+        : `/deskwork:review-start --site ${site} ${slug}`;
   const body = html`
     <div data-review-ui="longform">
       ${renderEditorialFolio('reviews', `longform · ${slug}`)}

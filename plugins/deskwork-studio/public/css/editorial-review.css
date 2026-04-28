@@ -1088,7 +1088,31 @@ body:has([data-review-ui="longform"]) .site-footer {
 @media (max-width: 900px) {
   .er-strip-hint { display: none; }
 }
-.er-strip-right { margin-left: auto; display: flex; gap: var(--er-space-1); flex-wrap: wrap; }
+.er-strip-right { margin-left: auto; display: flex; gap: var(--er-space-1); flex-wrap: wrap; align-items: center; }
+
+/*
+ * Pending-state label rendered inline with the action buttons when a
+ * workflow has been transitioned by the studio but the matching
+ * /deskwork:* skill hasn't been invoked yet (states `iterating` and
+ * `approved`). Lives next to a "copy /deskwork:..." button so the
+ * operator can re-copy the command if the first paste failed.
+ */
+.er-pending-state {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  color: var(--er-stamp-purple);
+  font-size: 0.85rem;
+  padding: 0 0.3em 0 0.1em;
+  letter-spacing: 0.01em;
+}
+.er-pending-state--filed { color: var(--er-faded); }
+.er-strip-right .er-btn-small[data-action="copy-cmd"] code {
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 0.85em;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 0 0.3em;
+  border-radius: 2px;
+}
 
 .er-strip-versions {
   display: inline-flex;

@@ -26431,6 +26431,13 @@ Unsaved edits will be lost. Continue?`
       rejectBtn.disabled = false;
     }
   });
+  document.querySelectorAll('[data-action="copy-cmd"]').forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const cmd2 = btn.getAttribute("data-cmd") ?? "";
+      if (!cmd2) return;
+      await copyAndToast(cmd2, `Copied: ${cmd2}`);
+    });
+  });
   const shortcutsOverlay = qn("[data-shortcuts-overlay]");
   const shortcutsBackdrop = qn("[data-shortcuts-backdrop]");
   const shortcutsBtn = qn('[data-action="shortcuts"]');
