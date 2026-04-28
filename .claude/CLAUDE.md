@@ -1,6 +1,25 @@
 ## deskwork
 
-Open-source Claude Code plugins distributed as a monorepo under the `deskwork` name (after its flagship plugin). Each plugin is self-contained under `plugins/<name>/`. The root `.claude-plugin/marketplace.json` wires plugins together as a marketplace that can be installed via `claude plugin install --marketplace https://github.com/audiocontrol-org/deskwork <plugin>`.
+Open-source Claude Code plugins distributed as a monorepo under the `deskwork` name (after its flagship plugin). Each plugin is self-contained under `plugins/<name>/`. The root `.claude-plugin/marketplace.json` wires plugins together as a marketplace.
+
+For acquisition and install, follow each plugin's own README (e.g. `plugins/deskwork/README.md`) — that's the canonical adopter-facing install path. Do not duplicate install commands here; doc-drift between this file and the plugin README is exactly the failure mode we want to avoid.
+
+## Core Principles
+
+### Deskwork manages **collections of markdown content**, not websites
+
+The unit deskwork operates on is a **content collection**: a tree of markdown files plus their supporting media (images, video, etc.), organized hierarchically and bound together by frontmatter UUIDs. *"Website"* is one possible downstream consumer of a collection — an Astro/Next/Hugo/Eleventy renderer reads the collection and produces a static site — but the collection model exists independently of any renderer. Other consumers: internal documentation, books, manuscripts, knowledge bases, engineering plans, tool documentation. The calendar lifecycle, review pipeline, frontmatter binding, and doctor rules all work on a collection regardless of whether anything renders it.
+
+Public-facing terminology is **collection**. Implementation talks about a tree of markdown + media. The legacy term *"site"* in current configs and code is being migrated.
+
+**Implications for design:**
+- The config schema treats `host` as optional metadata that only matters when a collection is published as a website. A collection without a host is fully valid.
+- The install skill detects content collections (directories of markdown organized hierarchically), with renderer detection (Astro/Next/Hugo/Eleventy) being a secondary attribute that conditionally informs schema-patch advice — not a required signal.
+- Studio surfaces don't assume a `host`. Per-collection dashboards work for any collection; per-website URL formatting only fires when a host is present.
+- Frontmatter binding (`deskwork.id` UUID) is collection-native and renderer-independent — already correct, no migration needed.
+- Doctor rules operate on the collection's content tree; rules that today reference renderer-specific schemas (Astro `z.object` rejection) become conditional on the collection having a configured renderer.
+
+This principle is foundational. If a design choice or piece of code couples deskwork's behavior to *"there must be a website here,"* that coupling is the bug.
 
 ## Plugins
 

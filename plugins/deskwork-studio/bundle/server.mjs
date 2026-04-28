@@ -10458,9 +10458,10 @@ var ALLOWED_TOP_LEVEL_KEYS = /* @__PURE__ */ new Set([
   "author",
   "reviewJournalDir"
 ]);
-var REQUIRED_SITE_KEYS = ["host", "contentDir", "calendarPath"];
+var REQUIRED_SITE_KEYS = ["contentDir", "calendarPath"];
 var ALLOWED_SITE_KEYS = /* @__PURE__ */ new Set([
   ...REQUIRED_SITE_KEYS,
+  "host",
   "channelsPath",
   "blogLayout",
   "blogFilenameTemplate",
@@ -10553,10 +10554,17 @@ function parseSiteConfig(slug, value) {
     }
   }
   const site = {
-    host: obj.host,
     contentDir: obj.contentDir,
     calendarPath: obj.calendarPath
   };
+  if (obj.host !== void 0) {
+    if (typeof obj.host !== "string" || obj.host.length === 0) {
+      throw new Error(
+        `Invalid deskwork config: site "${slug}" has invalid "host" (must be a non-empty string when set).`
+      );
+    }
+    site.host = obj.host;
+  }
   if (obj.channelsPath !== void 0) {
     if (typeof obj.channelsPath !== "string" || obj.channelsPath.length === 0) {
       throw new Error(
@@ -27531,7 +27539,7 @@ function renderSiteCard(sp, index2) {
     <article class="site-card">
       <div class="site-card__tag">${siteTag(index2)}</div>
       <h2 class="site-card__name">${sp.site}</h2>
-      <div class="site-card__host">${sp.host}</div>
+      <div class="site-card__host">${sp.host ?? "(no host configured)"}</div>
       <div class="site-card__counts">
         <b>${sp.projects.length}</b> root entries ·
         <b>${totalNodes}</b> total nodes ·

@@ -105,6 +105,39 @@ describe('parseConfig', () => {
     ).toThrow(/calendarPath/);
   });
 
+  it('accepts a non-website collection (no host)', () => {
+    const cfg = parseConfig({
+      version: 1,
+      sites: {
+        'deskwork-internal': {
+          contentDir: 'docs/internal',
+          calendarPath: '.deskwork/calendar-internal.md',
+        },
+      },
+    });
+    expect(cfg.sites['deskwork-internal'].host).toBeUndefined();
+    expect(cfg.sites['deskwork-internal'].contentDir).toBe('docs/internal');
+    expect(cfg.defaultSite).toBe('deskwork-internal');
+  });
+
+  it('rejects host that is empty when explicitly set', () => {
+    expect(() =>
+      parseConfig({
+        version: 1,
+        sites: { main: { ...stubSite(), host: '' } },
+      }),
+    ).toThrow(/host/);
+  });
+
+  it('rejects host that is not a string when explicitly set', () => {
+    expect(() =>
+      parseConfig({
+        version: 1,
+        sites: { main: { ...stubSite(), host: 42 } },
+      }),
+    ).toThrow(/host/);
+  });
+
   it('rejects non-object input', () => {
     expect(() => parseConfig('string')).toThrow();
     expect(() => parseConfig(null)).toThrow();
