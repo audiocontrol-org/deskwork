@@ -64,4 +64,9 @@ Tasks:
 ### Step 6: Report and Hand Off
 - Summary of what was defined
 - Path to the definition file
-- Next step: run `/feature-setup <slug>`
+- Next step: run `/feature-setup <slug>` — this will create the docs files (PRD with `deskwork.id` frontmatter, workplan, README), register the PRD with deskwork's review pipeline, and report the studio review URL.
+- Canonical sequence going forward (per `.claude/CLAUDE.md` "Feature Lifecycle"):
+  1. `/feature-setup <slug>` — creates files + registers PRD with deskwork
+  2. Operator iterates the PRD via the studio (margin notes → `/deskwork:iterate` → approval) until the workflow is `applied`
+  3. `/feature-issues` — files GitHub issues from the (now-stable) workplan
+  4. `/feature-implement` — begins implementation. Refuses to start if the PRD's deskwork workflow is not `applied`.

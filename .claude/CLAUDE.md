@@ -61,6 +61,23 @@ Feature documentation lives in `docs/1.0/<status>/<slug>/`:
 
 Each feature directory contains: `prd.md`, `workplan.md`, `README.md`, and optionally `implementation-summary.md`.
 
+### Feature Lifecycle (canonical workflow)
+
+Every feature flows through this sequence. Skipping steps is the failure mode that motivates the gates.
+
+1. **`/feature-define <name>`** — interview the operator to define problem, scope, approach, task breakdown. Writes `/tmp/feature-definition-<slug>.md`. Does NOT create infrastructure.
+2. **`/feature-setup <slug>`** — creates branch + worktree + `docs/1.0/001-IN-PROGRESS/<slug>/{prd.md, workplan.md, README.md}`. The PRD is created with a `deskwork.id` UUID in frontmatter and registered with deskwork via `deskwork ingest` + `deskwork review-start`. Reports the studio review URL.
+3. **Operator iterates the PRD via deskwork.** Open the studio review URL, leave margin notes on the PRD, request iteration. Agent runs `/deskwork:iterate` to address comments and snapshot v(n+1). Repeat until the operator clicks Approve and the workflow state becomes `applied`. **The PRD is the document under review; the workplan is implementation tracking that follows from it.**
+4. **`/feature-issues`** — files GitHub issues from the (now-stable) workplan. Only run after the PRD is `applied`.
+5. **`/feature-implement`** — begins implementation. Strict gate: refuses to start if the PRD's deskwork workflow is not `applied`. The gate prevents the "started before the operator finished thinking" failure mode.
+6. **`/feature-extend <slug>`** (mid-implementation) — appends new phases to the PRD + workplan. The PRD-edit step always re-iterates via deskwork (operator clicks Iterate → agent runs `/deskwork:iterate`). Issues for new phases are filed only after re-approval.
+7. **`/feature-review`** / `/feature-ship`** — code review + PR.
+8. **`/feature-complete`** — moves docs to `003-COMPLETE/`, closes issues. Runs on the feature branch BEFORE merge.
+
+The deskwork iteration step (3) is **always required for new features and PRD extensions** — no `--skip-review` flag, no warning-with-override. If the gate is too strict in practice, relax later with explicit operator approval.
+
+For documents that are NOT features (blog posts, internal write-ups, external essays), use the deskwork lifecycle skills directly (`/deskwork:add` → `/deskwork:plan` → `/deskwork:outline` → `/deskwork:draft` → `/deskwork:review-start`). The feature skills are specifically for project-tracked work.
+
 ### Before Committing — Review Checklist
 
 - [ ] Workplan updated with completed acceptance criteria?

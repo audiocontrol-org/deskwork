@@ -4,6 +4,74 @@ Session journal for `deskwork`. Each entry records what was tried, what worked, 
 
 ---
 
+## 2026-04-28 (cont'd): Dogfood arc — non-website collection support, packaging hotfixes, deskwork-baked feature lifecycle (v0.8.2 → v0.8.5, four releases + skill amendments)
+
+### Feature: deskwork-plugin
+### Worktree: deskwork-plugin
+
+**Goal:** Use deskwork to author, review, and iterate the architectural plan for source-shipping the plugins. The session opened with `/frontend-design` evaluating the LinkedIn shortform review surface (which surfaced the v0.6.0–v0.8.1 packaging bug); spent the rest in a recursive dogfood arc — using the broken plugin to produce a plan for fixing the broken plugin, fixing each surface as the dogfood revealed it.
+
+**Accomplished:**
+
+- **v0.8.2 — host-becomes-optional**. Schema in `packages/core/src/config.ts` accepts collections without a `host` field. `resolveSiteHost` returns `string | undefined`. Studio surfaces handle absent host (`?? site` fallback). Install skill rewritten to detect content collections without assuming a website renderer. New "Core Principles" section in `.claude/CLAUDE.md`: deskwork manages collections of markdown content, not websites. PR [#52](https://github.com/audiocontrol-org/deskwork/pull/52) → main.
+- **v0.8.3 — proximate packaging fix** for the v0.6.0–v0.8.2 client-JS-404 bug. `.gitignore` exception for `plugins/deskwork-studio/public/dist/`. Release-workflow verification extended to cover `public/dist/` + presence checks for each required client bundle. Eight committed `*.js` + `*.js.map` files (~3 MB) ship in the marketplace tarball going forward, until Phase 23 retires the bundle-trap entirely.
+- **v0.8.4 — studio buttons emit `/deskwork:*`** skill names instead of legacy `/editorial-*`. Iterate / Approve buttons in `editorial-review-client.ts` rebuilt; renderError startCmd + Apply button title cleaned up. Catalogue + help-page (`packages/studio/src/lib/editorial-skills-catalogue.ts`, `pages/help.ts`) deferred to a separate documentation-refresh commit (legacy names + lifecycle-shape drift).
+- **v0.8.5 — re-copy affordance** for stuck `iterating` / `approved` workflows. Operator clicked Iterate, the v0.8.4 bundle on disk emitted the wrong slash command, paste failed, workflow was stuck in `iterating` with no recovery path. New server-rendered `[data-action="copy-cmd"][data-cmd]` button + generic client handler. Pending state labels rendered with `.er-pending-state` class instead of inline-styled spans.
+- **Dogfood arc — full deskwork lifecycle exercised end-to-end on this monorepo.** Bootstrapped `.deskwork/config.json` for a non-website collection (`deskwork-internal`). Authored, iterated (one operator margin note: *"Why do we need a default collection?"*), and approved the architectural plan at `docs/source-shipped-deskwork-plan/index.md` (workflow `4180c05e-c6a3-4b3d-8fc1-2100492c3f38`, applied at v2). UX audit of the studio review surface captured at `docs/source-shipped-deskwork-plan/scrapbook/ux-audit-2026-04-28.md`.
+- **Hand-transformed the approved plan into feature-docs** (Phase 23 + 24 in the deskwork-plugin feature). Issues [#55](https://github.com/audiocontrol-org/deskwork/issues/55) (Phase 23: source-shipped re-architecture) and [#56](https://github.com/audiocontrol-org/deskwork/issues/56) (Phase 24: content collections) filed.
+- **Baked the deskwork iteration step into the feature lifecycle.** `/feature-setup` now adds `deskwork.id` to PRD + runs `deskwork ingest` + `deskwork review-start`. `/feature-extend` always re-iterates via deskwork after PRD edits; issues filed only after approval. `/feature-implement` has a strict gate (refuses if PRD's deskwork workflow isn't `applied`). `.claude/CLAUDE.md` gained a "Feature Lifecycle" section laying out the 8-step canonical sequence.
+- **Memory → rules migration.** Eight durable agent-discipline lessons moved out of worktree-keyed `~/.claude/projects/.../memory/` (which doesn't survive worktree switches) into git-tracked `.claude/rules/agent-discipline.md`. Six themes: read-docs-before-quoting-commands, operator-owns-scope, packaging-IS-UX, use-the-plugin-via-public-channel-only, namespace-keys-in-user-docs, project-workflow-conventions.
+- **USAGE-JOURNAL.md** established at the repo root as a new top-level project document distinct from DEVELOPMENT-NOTES.md (user-research-facing vs. contributor-facing). `/session-end` skill amended with the journal-population ritual.
+- **Filed [#54](https://github.com/audiocontrol-org/deskwork/issues/54)** — agent-reply margin notes UX enhancement (capsule responses paired to operator comments). Surfaced when operator noted the iteration loop is one-directional.
+
+**Tests:** stayed green throughout (309 core + 186 studio + 132 cli = 627 total). No new tests added this session — the work was packaging + skill amendments + documentation, not source-code features.
+
+**Didn't Work:**
+
+- Initial install attempt was about to bypass the public path (skills already loaded, agent forgot to check `extraKnownMarketplaces` in `settings.local.json`). Operator's Socratic correction surfaced the privileged-path interference; removed before re-attempting.
+- Quoted `claude plugin install --marketplace ...` from memory (matched stale `.claude/CLAUDE.md` syntax). Plugin README documents `/plugin marketplace add` + `/plugin install` slash commands. Fixed `.claude/CLAUDE.md` to point at the README rather than duplicate.
+- `/plugin install deskwork-studio@deskwork` initially failed with *"Plugin not found"* — diagnosed as the privileged-path interference, not a marketplace-registration issue.
+- Wrote install config to `/tmp/deskwork-install-config.json` without first reading; Write failed silently; `deskwork install` ran against a stale config from a prior session and registered the wrong sites. Recovered by removing the wrong artifacts and re-running.
+- v0.8.2 release didn't ship any iteration on the install skill content because plugin version didn't bump in the cache layer (only marketplace metadata). Required v0.8.3 with version bump for the new skill text to land.
+
+**Course Corrections:**
+
+- [PROCESS] Operator: *"We're actually looking for all blockers to adoption and usage. Packaging IS UX."* Don't paper over install bugs by injecting bundles to evaluate the "intended" surface. Saved as agent-discipline rule.
+- [DOCUMENTATION] Operator: *"Why didn't you look at the plugin's acquisition instructions?"* Read the plugin's README before quoting install commands. The plugin documents itself; bypassing the README to invent syntax is the fabrication failure mode.
+- [PROCESS] Operator: *"No fair using it in ways that other, non-privileged users can't."* Use the plugin only through the publicly-advertised channel. Removed `extraKnownMarketplaces` from `settings.local.json`.
+- [PROCESS] Operator: *"If it's not PUBLIC, it doesn't exist."* Strengthened the public-channel rule — uncommitted edits, unpushed branches, draft PRs don't count as documentation. Pushing is the final mile of "fixed."
+- [DOCUMENTATION] Operator: *"What's the point of saving things in memory when they are lost the moment we move to a different worktree or dev environment?"* Migrated agent-discipline lessons from worktree-keyed auto-memory to git-tracked rules.
+- [COMPLEXITY] Operator: *"Why are you running deskwork approve at all?"* Don't reach for runtime to discover documented behavior; read the source. Caught a near-instance of state-mutating-command-as-arg-discovery.
+- [PROCESS] Operator: *"We don't want to put 'feature' shaped things into deskwork. Deskwork is about tracking, ideation, creation, and editing documents — documents of any flavor."* Different abstractions. Plans are documents; features are project state. Don't collapse.
+- [PROCESS] Operator: *"We should bake the deskwork review/edit/iterate cycle in /feature-extend and /feature-define skills."* Done — strict gate on `/feature-implement`, always-iterate on `/feature-extend`, PRD-only review (workplan is tracking).
+
+**Quantitative:**
+- Messages: ~80 user messages
+- Commits: 9 feature commits + 4 release commits = 13 total
+- Releases: 4 (v0.8.2 → v0.8.3 → v0.8.4 → v0.8.5)
+- PRs: 1 ([#52](https://github.com/audiocontrol-org/deskwork/pull/52) for v0.8.2)
+- Issues filed this session: 3 ([#54](https://github.com/audiocontrol-org/deskwork/issues/54), [#55](https://github.com/audiocontrol-org/deskwork/issues/55), [#56](https://github.com/audiocontrol-org/deskwork/issues/56))
+- Course corrections: 8 (3 [PROCESS] x 2 batches, 2 [DOCUMENTATION], 1 [COMPLEXITY])
+- Skill amendments: 5 (`/feature-define`, `/feature-extend`, `/feature-setup`, `/feature-implement`, `/session-end`)
+- `.claude/rules/` files added: 1 (`agent-discipline.md` — 6 sections, 8 distinct rules)
+- New top-level project documents: 1 (`USAGE-JOURNAL.md`)
+- Rule strengthenings during the session: 1 (the public-channel rule got "if it's not PUBLIC, it doesn't exist" added to it mid-session)
+
+**Insights:**
+
+- **Recursive dogfooding works.** Used the broken deskwork plugin to author + iterate a plan for fixing the broken deskwork plugin. Each broken surface surfaced exactly when we needed to use it; each fix unblocked the next iteration. The arc was: review surface broken → ship packaging fix → use working studio → button copies wrong command → ship slash-name fix → workflow gets stuck → ship re-copy affordance → iterate the plan → approve. Four releases driven by the dogfood, each one a real friction the operator would have hit.
+- **Plans are documents; features are project state.** The deskwork pipeline (Ideas → Planned → Outlining → Drafting → Review → Published) is for documents that need editorial work. The feature-docs layout (`docs/1.0/<status>/<slug>/{prd.md, workplan.md, README.md}`) is for tracking implementation against an approved document. Different abstractions; don't collapse them. But: PRD edits route through deskwork (because the PRD is a document), and implementation gates on PRD approval (because the document IS the contract).
+- **The PRD is what's reviewed; the workplan is implementation tracking.** Operator's framing: *"PRD is more important than the workplan; I don't really care about the workplan as long as we get the PRD right."* That's the editorial framing — review the why, take the how on faith once the why is settled. Bakes cleanly into `/feature-setup` (only the PRD gets `deskwork.id` and a review workflow).
+- **Strict gates over warnings.** Operator's framing: *"Strict, for now. We can relax later if it's too strict."* The `/feature-implement` gate is a hard refusal — no `--force` flag. Same shape as the no-bypass-pre-commit-hooks rule, the no-CI-test-infrastructure rule, the use-only-public-channel rule. Constraints first, escape hatches later only if the constraint actually hurts.
+- **Public-channel discipline forces real packaging.** Each fix had to ship through `/plugin marketplace update` + `/plugin install`. The reinstall cycle has 8 distinct steps; ~5 minutes per source-fix iteration. Slow, but honest — every adopter would have the same experience. The Phase 23 source-shipped re-architecture is partly motivated by this friction (npm install + tsx is faster than version-bump + tarball-rebuild + cache-replace per micro-iteration).
+- **Auto-memory is the wrong home for project rules.** The memory directory is keyed to the worktree path; it doesn't survive worktree switches. Lessons that should apply across all worktrees of a project belong in `.claude/rules/` (git-tracked). Lessons about agent behavior on THIS specific project go in `.claude/rules/agent-discipline.md`. Worktree-specific notes are still fine in memory.
+
+**Next session:**
+
+Phase 23 (source-shipped re-architecture) implementation. The plan is approved; the issues are filed; the gate at `/feature-implement` will accept it (workflow `4180c05e-...` is `applied`). Phase 0's verification spike (~30 min, marketplace symlink dereferencing) is the natural starting move — its outcome determines Phase 2's vendor mechanism. After Phase 23 ships (probably as v0.9.0 along with Phase 24), reconsider whether the catalogue + help-page documentation refresh (deferred during this session) wants to be its own phase or rides as part of Phase 24's documentation pass.
+
+---
+
 ## 2026-04-28: Phase 19 → 20 → 21 → 22 + #49 (v0.7.0 → v0.8.1, five releases)
 
 ### Feature: deskwork-plugin

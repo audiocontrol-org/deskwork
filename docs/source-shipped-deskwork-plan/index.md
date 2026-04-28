@@ -47,7 +47,13 @@ This expands the v0.9.0 scope. The reframe coordinates with the source-shipped r
 
 **Reframe-specific changes** (in addition to Phases 0–9 above, which still all apply):
 
-- **Schema rename**: `sites` → `collections` in `.deskwork/config.json`, `defaultSite` → `defaultCollection`, internally `Site` type → `Collection` type. Per-collection field `host` becomes optional. A `legacy-sites-key-migration` doctor rule handles existing operators (writingcontrol, editorialcontrol, audiocontrol) — accept both shapes for the v0.9.0 release with a deprecation warning, then drop legacy in a future cleanup.
+- **Schema rename**: `sites` → `collections` in `.deskwork/config.json`, internally `Site` type → `Collection` type. Per-collection field `host` becomes optional. A `legacy-sites-key-migration` doctor rule handles existing operators (writingcontrol, editorialcontrol, audiocontrol) — accept both shapes for the v0.9.0 release with a deprecation warning, then drop legacy in a future cleanup.
+
+- **Open question — does `defaultSite` survive the reframe?** Today's schema requires `defaultSite` when more than one site is configured (single-site projects auto-infer). The field's purpose is purely a UX convenience — it lets the operator omit `--site` from CLI commands. Three live options for Phase 10 to weigh:
+  - **(a) Rename to `defaultCollection`** for consistency with the rest of the rename. Lowest friction, preserves existing behavior verbatim.
+  - **(b) Eliminate the concept** for multi-collection projects. The "default" framing carries a hierarchy assumption (one collection is primary) that doesn't fit a content-tree model where every collection is co-equal. Multi-collection operators always pass `--collection`. Single-collection projects keep the auto-infer path. Honest, terser config, more typing.
+  - **(c) Rename to a less hierarchy-flavored term** (e.g., `pinned`, `cwd`). Keeps the convenience without the "primary" connotation.
+  - The `legacy-sites-key-migration` doctor rule must handle whichever path Phase 10 picks. Existing adopters' configs migrate cleanly regardless.
 - **Install skill rewrite**: Step 1 detection looks for content collections (directories of markdown organized hierarchically), not websites. Renderer detection (Astro / Next / Hugo / Eleventy) is a *secondary* attribute that conditionally drives the schema-patch advice in Step 5. Step 2 proposes a collection-shaped config; the `host` question is conditional on the operator confirming a website renderer.
 - **Studio surfaces** drop the assumption that `host` is non-empty. Per-collection dashboards work for any collection. Per-website URL formatting (the `?site=<slug>` query param, "Open in production" links, etc.) only fires when a host is configured. Rename `?site=` → `?collection=` URL parameter; add a 302 from the legacy `?site=` param for one release.
 - **Calendar filename convention**: `editorial-calendar-<slug>.md` works either way, but document that "slug" refers to the collection slug, not a website slug.
@@ -63,8 +69,8 @@ This expands the v0.9.0 scope. The reframe coordinates with the source-shipped r
 
 - New zod schemas in `packages/core/src/config.ts` for `Collection` (with optional `host`) alongside legacy `Site` (deprecated, for migration only).
 - Config loader accepts both shapes for one release; reads under `collections` first, falls back to `sites` with a one-time deprecation warning.
-- New doctor rule `legacy-sites-key-migration`: detects `.deskwork/config.json` using the `sites` shape, rewrites to `collections`. Also handles `defaultSite` → `defaultCollection`.
-- Tests cover both shapes loading correctly + the migration rule + the default-collection inference for single-collection configs.
+- New doctor rule `legacy-sites-key-migration`: detects `.deskwork/config.json` using the `sites` shape, rewrites to `collections`. Treatment of `defaultSite` is decided in this phase per the open question framed above (rename / eliminate / re-term); the migration rule executes whichever path is chosen.
+- Tests cover both shapes loading correctly + the migration rule + the single-collection auto-infer path (unchanged regardless of the default-collection decision).
 
 ### Phase 11 — Install skill + CLI rewrite for collection model
 

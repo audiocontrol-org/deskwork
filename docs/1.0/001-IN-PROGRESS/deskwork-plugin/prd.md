@@ -410,3 +410,26 @@ The operator can now author a LinkedIn / Reddit / YouTube / Instagram post for a
 
 - Not auto-posting to LinkedIn / Reddit. The operator posts manually; deskwork records the URL.
 - Not Phase 20. The outline-as-scrapbook + sandbox migration remains queued; Phase 20's eventual migration rule will subsume the shortform-file relocation.
+
+## Extension: source-shipped plugins + content-collections reframe (Phase 23 + 24)
+
+Bundled v0.9.0 covers two coordinated architectural shifts surfaced during the dogfood session that authored this very plan (2026-04-28). The architectural document is `docs/source-shipped-deskwork-plan/index.md` (deskwork workflow `4180c05e-c6a3-4b3d-8fc1-2100492c3f38`, applied at v2). This PRD section is the project-state summary; the plan file is the source-of-truth for the design reasoning.
+
+### Phase 23 — Source-shipped re-architecture
+
+Retire `bundle/server.mjs` + `bundle/cli.mjs` + `public/dist/` as committed compiled artifacts. Plugin tarball ships source; first invocation runs `npm install --omit=dev` once; tsx runs the source. `@deskwork/core` reaches per-plugin tarballs via a symlinked `vendor/core` (Phase 0 verifies whether the marketplace install dereferences symlinks; Path A = pure symlink, Path B = release-time materialization). Customization seam: defaults inside the plugin, operator overrides under `<projectRoot>/.deskwork/`. Local smoke test reproduces the marketplace install path to catch packaging drift.
+
+**Why this lands now.** A UX evaluation early-session revealed the v0.6.0–v0.8.2 packaging defect (`.gitignore: dist/` excluded the studio's client bundles from every release). Proximate fix (gitignore exception + dist-presence verification) shipped in v0.8.3. The full retire-the-bundles re-architecture is the long-term answer the plan describes.
+
+### Phase 24 — Content collections (not websites)
+
+Schema rename `sites` → `collections`. Per-collection `host` becomes optional (already in v0.8.2). Install skill detects content collections without assuming a website renderer. Studio surfaces stop assuming `host` is present. `?site=` URL params migrate to `?collection=`. Documentation pass: every operator-facing "site" reference becomes "collection." Doctor migration rule handles existing adopter configs in both shapes for one release. Open question deferred to implementation: should `defaultSite` rename to `defaultCollection`, eliminate, or re-term (see plan v2 for the framing).
+
+**Why this lands now.** Surfaced when `/deskwork:install` was invoked against this monorepo (a non-website tool repo, no Astro/Next/Hugo signals). The schema rejected it. Proximate fix (host-becomes-optional) shipped in v0.8.2; the full reframe — collection vocabulary throughout, install skill detecting non-website projects, studio not assuming host — is what Phase 24 delivers.
+
+### What this is not
+
+- Not an npm-publish migration for `@deskwork/core`. The vendor-via-symlink approach keeps the marketplace tarball self-contained without registry coordination.
+- Not the full elimination of compiled artifacts on disk. The on-startup esbuild produces client bundles into a runtime cache (`<install>/.runtime-cache/`); they're not committed but are still files on disk. The committed-bundles trap is what retires.
+- Not the agent-reply margin notes work ([#54](https://github.com/audiocontrol-org/deskwork/issues/54)). That's a downstream UX enhancement surfaced during the iteration session; tracked separately.
+

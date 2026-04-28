@@ -153,3 +153,61 @@ Each cycle has ~3 round-trips' worth of latency. With working margin notes the c
 **insight.** The minimum fix for this iteration is the button-handler clipboard texts only (4 strings + 2 hint messages). Ship as v0.8.4. The catalogue + manual-page refresh follows. **Pattern to watch**: every place the studio emits a slash-command for the operator to paste into Claude Code is a coupling point with the plugin's skill namespace. Future skill renames will need to sweep these emit points (and `git grep '/editorial-'` would have surfaced them all in one pass).
 
 **operator quote**: *"This is what was pasted into my clipboard when I clicked the iterate button: ❯ Unknown command: /editorial-iterate"*
+
+#### 15. Workflow stuck in `iterating` with no recovery path
+
+**friction.** After v0.8.4 was supposed to fix the slash-command name, operator's first paste of the Iterate-button output still hit `/editorial-iterate` because the running studio process was still bound to the v0.8.3 cache. The workflow state transitioned to `iterating` on the click; the paste failed; the action buttons disappeared from the strip; no way to re-trigger the clipboard copy.
+
+**fix.** v0.8.5 — server-rendered `[data-action="copy-cmd"][data-cmd]` button paired with the `iterating` and `approved` state labels. Generic client-side handler runs `copyAndToast` on click. The pending command is built server-side via a new `pendingSkillCmd()` helper that mirrors the client-side button-handler logic for consistency.
+
+**insight.** The studio transitions workflow state on button click, then expects the operator to run the corresponding slash command in Claude Code. If anything between click and successful slash-command invocation fails (clipboard issue, paste-into-wrong-window, slash-command rejected, agent crashed mid-iterate), the workflow is stranded with no in-studio recovery. v0.8.5's re-copy button is the minimum fix; the pattern of "client clicks transition state, operator must complete the loop in Claude Code" is brittle by design and worth revisiting (could be its own enhancement issue: in-studio retry/cancel for stuck states).
+
+**operator quote**: *"There should be an affordance that tells me a) it's already waiting for the iteration skill invocation and; b) offers a way to load the skill invocation magic words into my clipboard again."*
+
+#### 16. Margin note → iteration round-trip worked end-to-end
+
+**fix.** First completed iteration through the deskwork pipeline post-v0.8.5. Operator left one margin note: *"Why do we need a default collection?"* anchored on `defaultSite → defaultCollection`. Agent read the comment from the workflow journal (`.deskwork/review-journal/history/`), rewrote the plan to surface three candidate treatments (rename / eliminate / re-term), ran `deskwork iterate --dispositions <path>` with the comment marked `addressed`. v2 snapshotted, workflow back in `in-review`, operator reloaded and saw v2.
+
+**insight.** This is the workflow finally working. End-to-end latency: ~3 minutes per round (operator types comment → agent reads + rewrites + iterates → operator reloads). For a long doc with 12 comments, that's an afternoon; for a 1-comment round it felt fast. The disposition-with-reason mechanism (writing a `dispositions.json` for the iterate helper) records *why* the agent took the action it did, but that reasoning lives in JSON not in the studio sidebar — leads directly to the next item.
+
+#### 17. Operator surfaced the agent-reply gap
+
+**friction.** *"There's currently no way for the agent to make a further comment on a margin note to engage in a comment about the issue. The agent MUST make a change to the document in order to move the iteration forward, when often, further clarification/discussion may be needed."*
+
+**fix.** Filed as enhancement [#54](https://github.com/audiocontrol-org/deskwork/issues/54) — capsule agent replies paired to operator comments, rendered inline in the studio sidebar with disposition badges. Constraint: short capsules, not essays; long discussion still goes in chat. Implementation sketch: extend the existing `--dispositions <path>` mechanism on `deskwork iterate` to accept reply text; render in the sidebar via a new `agentReplies` field on the comment record.
+
+**operator quote**: *"That conversation can certainly happen in the agent chat interface, but then we lose the UX comfort of the review surface where the user [peruses] multiple requests for clarification at a time. Of course, we don't want to write essays in the margin notes, but we might want to write capsule summaries of in-chat discussions about multiple margin note entries that the user can comfortably peruse on a device better suited to review."*
+
+**insight.** The iteration loop today is one-directional (operator → agent → document change). Real editorial review is conversational. Each margin note is a question more often than an instruction; the operator wants a reply they can peruse without scrolling chat history. The fix doesn't require multi-turn threading initially — a single agent capsule per operator comment, rendered with the existing disposition badge, would cover most cases.
+
+#### 18. Plans-as-documents vs features-as-project-state — the distinction matters
+
+**friction.** Asked the operator a leading question: should the feature-doc layout become the deskwork content collection? Reading: collapse them, one model. Operator's answer: no. *"We don't want to put 'feature' shaped things into deskwork. Deskwork is about tracking, ideation, creation, and editing documents — documents of any flavor."*
+
+**insight.** Deskwork's job is editing; the feature-docs layout is project state. The PRD is a *document* that *describes* a feature; the feature itself (with its phases, GitHub issues, branch state, implementation tracking) is something else. Same content, different abstractions. Don't collapse.
+
+The clean integration: PRD flows through deskwork's review/iterate/approve cycle (because it's a document); implementation gates on the workflow being `applied` (because the document IS the contract). The workplan is implementation tracking, not subject to deskwork review (operator's framing: *"I don't really care about the workplan as long as we get the PRD right"*). This led to baking the deskwork iteration step into `/feature-setup`, `/feature-extend`, and `/feature-implement` — strict gate, no override, PRD-only review.
+
+#### 19. The recursive-dogfood pattern shipped four real releases
+
+**insight.** Used the broken deskwork plugin to author and iterate the architectural plan for fixing the broken deskwork plugin. Each broken surface surfaced exactly when we needed to use it; each fix unblocked the next iteration. The arc:
+
+| Step | Surfaced | Shipped |
+|---|---|---|
+| 1 | LinkedIn shortform review surface has dead JS | (problem identified — v0.8.1) |
+| 2 | Schema rejects non-website project for the dogfood install | v0.8.2 — host-becomes-optional |
+| 3 | After v0.8.2 install, studio JS still 404s in marketplace install | v0.8.3 — gitignore exception, dist files commit |
+| 4 | After v0.8.3 unblocks JS, Iterate button copies stale slash-command | v0.8.4 — `/editorial-*` → `/deskwork:*` |
+| 5 | Stale-bundle paste left workflow in `iterating` with no recovery | v0.8.5 — re-copy affordance |
+| 6 | Studio works end-to-end; iterate the plan; approve v2 | (no new release — used existing v0.8.5) |
+| 7 | Plans aren't features; bake deskwork into `/feature-*` skills | (skill amendments — landed in this session) |
+
+Five releases earlier in the same calendar day (v0.7.0 → v0.8.1, prior session). Four more in this session (v0.8.2 → v0.8.5). Nine releases on 2026-04-28 — most driven by dogfood discoveries, none planned in advance. The pattern: reach for the tool, hit a broken edge, fix the edge, retry, hit the next broken edge. Public-channel discipline forces every fix through release-and-reinstall, which is slow per-iteration but honest about what an adopter would experience.
+
+### Cross-cutting observations (continued from initial entry)
+
+**D. Public-channel reinstall cycle is the bottleneck.** ~5 minutes per source-fix iteration: edit → commit → bump version → tag → push → release-workflow runs (~2 min) → operator runs marketplace update + install + reload → restart studio. Multiplied across 4 iteration loops in this session, that's ~20 minutes of pure ceremony. Phase 23's source-shipped architecture would compress this to "edit + npm-install + tsx restart" — much tighter feedback loop, while still honest about what the adopter sees (because the adopter ALSO runs source via tsx after their first npm install).
+
+**E. The studio's port auto-increment worked silently and well.** Multi-process testing across this session left a cluster of studios on 47321/47322/47323/47324. Phase 22c's auto-increment + boot-banner-prints-the-actual-port worked exactly as designed; never had to figure out which studio was on which port from external context.
+
+**F. Marketplace cache vs install cache.** Two separate things. `/plugin marketplace update` refreshes the marketplace clone at `~/.claude/plugins/marketplaces/deskwork/`. `/plugin install` replaces the install cache at `~/.claude/plugins/cache/deskwork/<plugin>/<version>/` ONLY if the version differs. Doc/skill changes pushed without a version bump don't propagate. Hit this twice; required v0.8.3 + v0.8.4 to actually be discrete version bumps. Worth documenting more visibly in `RELEASING.md`.
