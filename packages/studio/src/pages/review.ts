@@ -34,7 +34,7 @@ import { readCalendar } from '@deskwork/core/calendar';
 import { findEntry, findEntryById } from '@deskwork/core/calendar-mutations';
 import type { CalendarEntry } from '@deskwork/core/types';
 import type { ContentIndex } from '@deskwork/core/content-index';
-import { splitOutline } from '../../../../plugins/deskwork-studio/public/src/outline-split.ts';
+import { splitOutline } from '@deskwork/core/outline-split';
 import type { StudioContext } from '../routes/api.ts';
 import { html, unsafe, type RawHtml } from './html.ts';
 import { layout } from './layout.ts';

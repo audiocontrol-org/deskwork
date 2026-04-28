@@ -1,6 +1,6 @@
 {
   "name": "@deskwork/core",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "private": true,
   "type": "module",
   "description": "Editorial calendar + review pipeline library — shared by @deskwork/cli and @deskwork/studio",
@@ -38,6 +38,7 @@
     "./scrapbook": "./src/scrapbook.ts",
     "./content-tree": "./src/content-tree.ts",
     "./content-index": "./src/content-index.ts",
+    "./outline-split": "./src/outline-split.ts",
     "./doctor": "./src/doctor/index.ts",
     "./types": "./src/types.ts"
   },
