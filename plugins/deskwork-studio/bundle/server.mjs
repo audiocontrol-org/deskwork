@@ -10346,9 +10346,105 @@ var serveStatic = (options = { root: "" }) => {
   };
 };
 
+// src/listen.ts
+var AUTO_INCREMENT_RANGE = 30;
+function listenOnAddress(serveImpl, fetchFn, port, address) {
+  return new Promise((resolvePromise, rejectPromise) => {
+    let resolved = false;
+    let server;
+    try {
+      server = serveImpl(
+        { fetch: fetchFn, port, hostname: address },
+        () => {
+          if (resolved) return;
+          resolved = true;
+          resolvePromise(server);
+        }
+      );
+    } catch (err2) {
+      rejectPromise(err2);
+      return;
+    }
+    server.on("error", (err2) => {
+      if (resolved) return;
+      resolved = true;
+      try {
+        server.close();
+      } catch {
+      }
+      rejectPromise(err2);
+    });
+  });
+}
+function closeAll(servers) {
+  return Promise.all(
+    servers.map(
+      (s) => new Promise((res) => {
+        try {
+          s.close(() => res());
+        } catch {
+          res();
+        }
+      })
+    )
+  ).then(() => void 0);
+}
+function isAddressInUse(err2) {
+  if (!err2 || typeof err2 !== "object") return false;
+  const code2 = err2.code;
+  return typeof code2 === "string" && code2 === "EADDRINUSE";
+}
+async function attemptPort(serveImpl, fetchFn, port, addresses) {
+  const bound = [];
+  for (const addr of addresses) {
+    try {
+      const s = await listenOnAddress(serveImpl, fetchFn, port, addr);
+      bound.push(s);
+    } catch (err2) {
+      await closeAll(bound);
+      throw err2;
+    }
+  }
+  return bound;
+}
+async function listenWithAutoIncrement(options, serveImpl) {
+  const startPort = options.port;
+  const maxPort = options.explicitPort ? startPort : startPort + AUTO_INCREMENT_RANGE - 1;
+  let lastError = null;
+  for (let p2 = startPort; p2 <= maxPort; p2++) {
+    try {
+      const servers = await attemptPort(
+        serveImpl,
+        options.fetch,
+        p2,
+        options.addresses
+      );
+      return {
+        port: p2,
+        servers,
+        autoIncremented: p2 !== startPort
+      };
+    } catch (err2) {
+      lastError = err2;
+      if (!isAddressInUse(err2)) {
+        throw err2;
+      }
+    }
+  }
+  if (options.explicitPort) {
+    const detail = lastError instanceof Error ? `: ${lastError.message}` : "";
+    throw new Error(
+      `port ${startPort} is in use${detail}. The operator passed --port explicitly, so deskwork-studio refuses to auto-increment. Pass --port <other> or stop the existing process.`
+    );
+  }
+  throw new Error(
+    `no free port found in range ${startPort}..${maxPort}. Pass --port <other> to choose a different starting point, or stop an existing deskwork-studio instance.`
+  );
+}
+
 // src/server.ts
-import { existsSync as existsSync11, realpathSync } from "node:fs";
-import { dirname as dirname3, isAbsolute, resolve as resolve2 } from "node:path";
+import { existsSync as existsSync13, realpathSync } from "node:fs";
+import { dirname as dirname5, isAbsolute, resolve as resolve2 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // ../core/src/config.ts
@@ -10689,13 +10785,13 @@ function parseDistributions(lines) {
     const platformValue = col(cells2, cols, "platform");
     const url = col(cells2, cols, "url");
     const dateShared = col(cells2, cols, "shared");
-    if (slug && platformValue && url && dateShared && isPlatform(platformValue)) {
+    if (slug && platformValue && dateShared && isPlatform(platformValue)) {
       const entryIdCell = col(cells2, cols, "entryid") ?? col(cells2, cols, "uuid");
       const rec = {
         entryId: entryIdCell ?? "",
         slug,
         platform: platformValue,
-        url,
+        url: url ?? "",
         dateShared
       };
       const channel = col(cells2, cols, "channel");
@@ -10805,7 +10901,7 @@ function readCalendar(calendarPath) {
 }
 
 // ../core/src/paths.ts
-import { join as join4 } from "node:path";
+import { dirname, join as join4 } from "node:path";
 
 // ../core/src/content-index.ts
 import { readdirSync, statSync as statSync2 } from "node:fs";
@@ -10838,8 +10934,22 @@ function parseFrontmatter(markdown) {
   }
   return { data: toFrontmatterData(data), body: body3 };
 }
+function stringifyFrontmatter(data, body3) {
+  const doc = buildDocument(data);
+  return `---
+${doc.toString({ lineWidth: 0 }).replace(/\n$/, "")}
+---
+${body3}`;
+}
 function readFrontmatter(path) {
   return parseFrontmatter(readFileSync3(path, "utf-8"));
+}
+function writeFrontmatter(path, data, body3) {
+  writeFileSync2(path, stringifyFrontmatter(data, body3), "utf-8");
+}
+function buildDocument(data) {
+  const initialYaml = (0, import_yaml.stringify)(data, { lineWidth: 0 });
+  return (0, import_yaml.parseDocument)(initialYaml);
 }
 function toFrontmatterData(value) {
   const out = {};
@@ -11025,17 +11135,27 @@ function findEntryFile(projectRoot, config, site, entryId, index2, legacyEntryFo
   }
   return void 0;
 }
-
-// ../core/src/review/handlers.ts
-import { existsSync as existsSync3, readFileSync as readFileSync5, writeFileSync as writeFileSync4 } from "node:fs";
-
-// ../core/src/calendar-mutations.ts
-function findEntryById(calendar, id) {
-  if (!id) return void 0;
-  return calendar.entries.find((e) => e.id === id);
-}
-function findEntry(calendar, slug) {
-  return calendar.entries.find((e) => e.slug === slug);
+var CHANNEL_RE = /^[a-z0-9][a-z0-9-]*$/;
+function resolveShortformFilePath(projectRoot, config, site, entry, platform, channel, index2) {
+  if (channel !== void 0 && channel !== "") {
+    if (!CHANNEL_RE.test(channel)) {
+      throw new Error(
+        `Invalid shortform channel "${channel}": must match ${CHANNEL_RE} (kebab-case, same shape as a slug segment).`
+      );
+    }
+  }
+  const entryFile = findEntryFile(
+    projectRoot,
+    config,
+    site,
+    entry.id ?? "",
+    index2,
+    { slug: entry.slug }
+  );
+  if (entryFile === void 0) return void 0;
+  const entryDir = dirname(entryFile);
+  const filename = channel !== void 0 && channel !== "" ? `${platform}-${channel}.md` : `${platform}.md`;
+  return join4(entryDir, "scrapbook", "shortform", filename);
 }
 
 // ../core/src/review/pipeline.ts
@@ -11318,12 +11438,260 @@ function mintAnnotation(partial) {
 }
 
 // ../core/src/review/handlers.ts
+import { existsSync as existsSync5, writeFileSync as writeFileSync4 } from "node:fs";
+
+// ../core/src/review/start-handlers.ts
+import { existsSync as existsSync4, mkdirSync as mkdirSync2, readFileSync as readFileSync5 } from "node:fs";
+import { dirname as dirname2 } from "node:path";
+
+// ../core/src/review/workflow-paths.ts
+import { existsSync as existsSync3 } from "node:fs";
+
+// ../core/src/calendar-mutations.ts
+function findEntryById(calendar, id) {
+  if (!id) return void 0;
+  return calendar.entries.find((e) => e.id === id);
+}
+function findEntry(calendar, slug) {
+  return calendar.entries.find((e) => e.slug === slug);
+}
+
+// ../core/src/review/workflow-paths.ts
+function lookupEntry(projectRoot, config, site, match2) {
+  try {
+    const calendarPath = resolveCalendarPath(projectRoot, config, site);
+    if (!existsSync3(calendarPath)) return void 0;
+    const cal = readCalendar(calendarPath);
+    if (match2.entryId !== void 0 && match2.entryId !== "") {
+      const byId = findEntryById(cal, match2.entryId);
+      if (byId !== void 0) return byId;
+    }
+    if (match2.slug !== void 0 && match2.slug !== "") {
+      return findEntry(cal, match2.slug);
+    }
+    return void 0;
+  } catch {
+    return void 0;
+  }
+}
+function resolveLongformFilePath(projectRoot, config, site, slug, hint) {
+  let entry = hint.entry;
+  let entryId = hint.entryId;
+  if (entry === void 0 && (entryId === void 0 || entryId === "")) {
+    entry = lookupEntry(projectRoot, config, site, { slug });
+    entryId = entry?.id;
+  } else if (entry === void 0 && entryId !== void 0) {
+    entry = lookupEntry(projectRoot, config, site, { entryId });
+  } else if (entryId === void 0 || entryId === "") {
+    entryId = entry?.id;
+  }
+  if (entryId !== void 0 && entryId !== "") {
+    const idx = hint.index ?? buildContentIndex(projectRoot, config, site);
+    const fromIndex = findEntryFile(
+      projectRoot,
+      config,
+      site,
+      entryId,
+      idx,
+      entry !== void 0 ? { slug: entry.slug } : { slug }
+    );
+    if (fromIndex !== void 0) return fromIndex;
+  }
+  return resolveBlogFilePath(projectRoot, config, site, slug);
+}
+function resolveShortformWorkflowFilePath(projectRoot, config, site, slug, platform, channel, hint) {
+  let entry = hint.entry;
+  let entryId = hint.entryId;
+  if (entry === void 0 && (entryId === void 0 || entryId === "")) {
+    entry = lookupEntry(projectRoot, config, site, { slug });
+    entryId = entry?.id;
+  } else if (entry === void 0 && entryId !== void 0) {
+    entry = lookupEntry(projectRoot, config, site, { entryId });
+  } else if (entryId === void 0 || entryId === "") {
+    entryId = entry?.id;
+  }
+  return resolveShortformFilePath(
+    projectRoot,
+    config,
+    site,
+    {
+      ...entryId !== void 0 && entryId !== "" ? { id: entryId } : {},
+      slug: entry?.slug ?? slug
+    },
+    platform,
+    channel,
+    hint.index
+  );
+}
+
+// ../core/src/review/result.ts
 function err(status, message) {
   return { status, body: { error: message } };
 }
 function ok(body3) {
   return { status: 200, body: body3 };
 }
+
+// ../core/src/review/start-handlers.ts
+var SLUG_RE = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
+function handleStartLongform(projectRoot, config, body3) {
+  if (!body3 || typeof body3 !== "object") return err(400, "expected JSON object body");
+  const b = body3;
+  if (!b.site) return err(400, "site is required");
+  if (!(b.site in config.sites)) {
+    const known = Object.keys(config.sites).join(", ");
+    return err(400, `unknown site: ${b.site}. Configured: ${known}`);
+  }
+  if (!b.slug || typeof b.slug !== "string") return err(400, "slug is required");
+  if (!SLUG_RE.test(b.slug)) {
+    return err(400, `invalid slug: ${b.slug}. Must match ${SLUG_RE}`);
+  }
+  const callerEntryId = b.entryId !== void 0 && b.entryId !== "" ? b.entryId : void 0;
+  const entry = lookupEntry(projectRoot, config, b.site, {
+    ...callerEntryId !== void 0 ? { entryId: callerEntryId } : {},
+    slug: b.slug
+  });
+  const entryId = callerEntryId ?? entry?.id;
+  const path = resolveLongformFilePath(projectRoot, config, b.site, b.slug, {
+    ...entryId !== void 0 ? { entryId } : {},
+    ...entry !== void 0 ? { entry } : {}
+  });
+  if (!existsSync4(path)) {
+    return err(404, `blog draft not found at ${path}`);
+  }
+  const markdown = readFileSync5(path, "utf-8");
+  const before = readWorkflows(projectRoot, config).find((w) => {
+    const identityMatch = entryId && w.entryId ? w.entryId === entryId : w.site === b.site && w.slug === b.slug;
+    return identityMatch && w.contentKind === "longform" && w.state !== "applied" && w.state !== "cancelled";
+  });
+  const workflow = createWorkflow(projectRoot, config, {
+    site: b.site,
+    slug: b.slug,
+    ...entryId !== void 0 && entryId !== "" ? { entryId } : {},
+    contentKind: "longform",
+    initialMarkdown: markdown,
+    initialOriginatedBy: "agent"
+  });
+  return ok({ workflow, existing: !!before && before.id === workflow.id });
+}
+function handleStartShortform(projectRoot, config, body3) {
+  if (!body3 || typeof body3 !== "object") return err(400, "expected JSON object body");
+  const b = body3;
+  if (!b.site) return err(400, "site is required");
+  if (!(b.site in config.sites)) {
+    const known = Object.keys(config.sites).join(", ");
+    return err(400, `unknown site: ${b.site}. Configured: ${known}`);
+  }
+  if (!b.slug || typeof b.slug !== "string") return err(400, "slug is required");
+  if (!SLUG_RE.test(b.slug)) {
+    return err(400, `invalid slug: ${b.slug}. Must match ${SLUG_RE}`);
+  }
+  if (!b.platform) return err(400, "platform is required");
+  if (!isPlatform(b.platform)) {
+    return err(400, `invalid platform: ${String(b.platform)}`);
+  }
+  const channel = b.channel !== void 0 && b.channel !== "" ? b.channel : void 0;
+  const callerEntryId = b.entryId !== void 0 && b.entryId !== "" ? b.entryId : void 0;
+  const entry = lookupEntry(projectRoot, config, b.site, {
+    ...callerEntryId !== void 0 ? { entryId: callerEntryId } : {},
+    slug: b.slug
+  });
+  if (!entry) {
+    return err(404, `no calendar entry for site=${b.site} slug=${b.slug}`);
+  }
+  const entryId = callerEntryId ?? entry.id;
+  let filePath;
+  try {
+    filePath = resolveShortformWorkflowFilePath(
+      projectRoot,
+      config,
+      b.site,
+      b.slug,
+      b.platform,
+      channel,
+      {
+        ...entryId !== void 0 ? { entryId } : {},
+        entry
+      }
+    );
+  } catch (e) {
+    return err(400, e instanceof Error ? e.message : String(e));
+  }
+  if (filePath === void 0) {
+    const fallback = resolveLongformFilePath(
+      projectRoot,
+      config,
+      b.site,
+      b.slug,
+      { ...entryId !== void 0 ? { entryId } : {}, entry }
+    );
+    const entryDir = dirname2(fallback);
+    const filename = channel !== void 0 ? `${b.platform}-${channel}.md` : `${b.platform}.md`;
+    filePath = `${entryDir}/scrapbook/shortform/${filename}`;
+  }
+  let markdown;
+  if (existsSync4(filePath)) {
+    markdown = readFileSync5(filePath, "utf-8");
+  } else {
+    mkdirSync2(dirname2(filePath), { recursive: true });
+    const initialBody = b.initialMarkdown ?? "";
+    const deskworkMeta = {
+      platform: b.platform
+    };
+    if (channel !== void 0) deskworkMeta.channel = channel;
+    if (entryId !== void 0 && entryId !== "") deskworkMeta.id = entryId;
+    const fmData = {
+      title: entry.title,
+      deskwork: deskworkMeta
+    };
+    writeFrontmatter(filePath, fmData, initialBody);
+    markdown = initialBody;
+  }
+  const before = readWorkflows(projectRoot, config).find((w) => {
+    const identityMatch = entryId && w.entryId ? w.entryId === entryId : w.site === b.site && w.slug === b.slug;
+    return identityMatch && w.contentKind === "shortform" && (w.platform ?? null) === (b.platform ?? null) && (w.channel ?? null) === (channel ?? null) && w.state !== "applied" && w.state !== "cancelled";
+  });
+  const workflow = createWorkflow(projectRoot, config, {
+    site: b.site,
+    slug: b.slug,
+    ...entryId !== void 0 && entryId !== "" ? { entryId } : {},
+    contentKind: "shortform",
+    platform: b.platform,
+    ...channel !== void 0 ? { channel } : {},
+    initialMarkdown: markdown,
+    initialOriginatedBy: "agent"
+  });
+  return ok({
+    workflow,
+    existing: !!before && before.id === workflow.id,
+    filePath
+  });
+}
+function workflowFilePath(projectRoot, config, workflow) {
+  if (workflow.contentKind === "shortform") {
+    if (workflow.platform === void 0) {
+      throw new Error(
+        `shortform workflow ${JSON.stringify(workflow)} has no platform`
+      );
+    }
+    return resolveShortformWorkflowFilePath(
+      projectRoot,
+      config,
+      workflow.site,
+      workflow.slug,
+      workflow.platform,
+      workflow.channel,
+      {
+        ...workflow.entryId !== void 0 ? { entryId: workflow.entryId } : {}
+      }
+    );
+  }
+  return resolveLongformFilePath(projectRoot, config, workflow.site, workflow.slug, {
+    ...workflow.entryId !== void 0 ? { entryId: workflow.entryId } : {}
+  });
+}
+
+// ../core/src/review/handlers.ts
 function handleAnnotate(projectRoot, config, body3) {
   if (!body3 || typeof body3 !== "object") return err(400, "expected JSON object body");
   const draft = body3;
@@ -11490,25 +11858,21 @@ function handleCreateVersion(projectRoot, config, body3) {
     return err(400, "afterMarkdown is identical to beforeVersion \u2014 no edit to record");
   }
   const diff = lineDiff(before.markdown, d.afterMarkdown);
-  if (workflow.contentKind === "longform" || workflow.contentKind === "outline") {
-    const blogFile = resolveWorkflowFilePath(
-      projectRoot,
-      config,
-      workflow.site,
-      workflow.slug,
-      {
-        ...workflow.entryId !== void 0 ? { entryId: workflow.entryId } : {}
-      }
-    );
-    if (blogFile === void 0 || !existsSync3(blogFile)) {
-      const shown = blogFile ?? "(unresolved)";
+  const targetFile = workflowFilePath(projectRoot, config, workflow);
+  if (targetFile === void 0 || !existsSync5(targetFile)) {
+    const shown = targetFile ?? "(unresolved)";
+    if (workflow.contentKind === "shortform") {
       return err(
         500,
-        `cannot save: blog file missing at ${shown}. Scaffold the post with /deskwork:outline before saving edits.`
+        `cannot save: shortform file missing at ${shown}. Run /deskwork:shortform-start to scaffold the file before saving edits.`
       );
     }
-    writeFileSync4(blogFile, d.afterMarkdown, "utf-8");
+    return err(
+      500,
+      `cannot save: blog file missing at ${shown}. Scaffold the post with /deskwork:outline before saving edits.`
+    );
   }
+  writeFileSync4(targetFile, d.afterMarkdown, "utf-8");
   const version = appendVersion(projectRoot, config, d.workflowId, d.afterMarkdown, "operator");
   const annotation = mintAnnotation({
     type: "edit",
@@ -11519,90 +11883,6 @@ function handleCreateVersion(projectRoot, config, body3) {
   });
   appendAnnotation(projectRoot, config, annotation);
   return ok({ version, annotation });
-}
-var SLUG_RE = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
-function handleStartLongform(projectRoot, config, body3) {
-  if (!body3 || typeof body3 !== "object") return err(400, "expected JSON object body");
-  const b = body3;
-  if (!b.site) return err(400, "site is required");
-  if (!(b.site in config.sites)) {
-    const known = Object.keys(config.sites).join(", ");
-    return err(400, `unknown site: ${b.site}. Configured: ${known}`);
-  }
-  if (!b.slug || typeof b.slug !== "string") return err(400, "slug is required");
-  if (!SLUG_RE.test(b.slug)) {
-    return err(400, `invalid slug: ${b.slug}. Must match ${SLUG_RE}`);
-  }
-  const callerEntryId = b.entryId !== void 0 && b.entryId !== "" ? b.entryId : void 0;
-  const entry = lookupEntry(projectRoot, config, b.site, {
-    ...callerEntryId !== void 0 ? { entryId: callerEntryId } : {},
-    slug: b.slug
-  });
-  const entryId = callerEntryId ?? entry?.id;
-  const path = resolveWorkflowFilePath(projectRoot, config, b.site, b.slug, {
-    ...entryId !== void 0 ? { entryId } : {},
-    ...entry !== void 0 ? { entry } : {}
-  });
-  if (path === void 0 || !existsSync3(path)) {
-    const shown = path ?? "(unresolved)";
-    return err(404, `blog draft not found at ${shown}`);
-  }
-  const markdown = readFileSync5(path, "utf-8");
-  const before = readWorkflows(projectRoot, config).find((w) => {
-    const identityMatch = entryId && w.entryId ? w.entryId === entryId : w.site === b.site && w.slug === b.slug;
-    return identityMatch && w.contentKind === "longform" && w.state !== "applied" && w.state !== "cancelled";
-  });
-  const workflow = createWorkflow(projectRoot, config, {
-    site: b.site,
-    slug: b.slug,
-    ...entryId !== void 0 && entryId !== "" ? { entryId } : {},
-    contentKind: "longform",
-    initialMarkdown: markdown,
-    initialOriginatedBy: "agent"
-  });
-  return ok({ workflow, existing: !!before && before.id === workflow.id });
-}
-function lookupEntry(projectRoot, config, site, match2) {
-  try {
-    const calendarPath = resolveCalendarPath(projectRoot, config, site);
-    if (!existsSync3(calendarPath)) return void 0;
-    const cal = readCalendar(calendarPath);
-    if (match2.entryId !== void 0 && match2.entryId !== "") {
-      const byId = findEntryById(cal, match2.entryId);
-      if (byId !== void 0) return byId;
-    }
-    if (match2.slug !== void 0 && match2.slug !== "") {
-      return findEntry(cal, match2.slug);
-    }
-    return void 0;
-  } catch {
-    return void 0;
-  }
-}
-function resolveWorkflowFilePath(projectRoot, config, site, slug, hint) {
-  let entry = hint.entry;
-  let entryId = hint.entryId;
-  if (entry === void 0 && (entryId === void 0 || entryId === "")) {
-    entry = lookupEntry(projectRoot, config, site, { slug });
-    entryId = entry?.id;
-  } else if (entry === void 0 && entryId !== void 0) {
-    entry = lookupEntry(projectRoot, config, site, { entryId });
-  } else if (entryId === void 0 || entryId === "") {
-    entryId = entry?.id;
-  }
-  if (entryId !== void 0 && entryId !== "") {
-    const idx = hint.index ?? buildContentIndex(projectRoot, config, site);
-    const fromIndex = findEntryFile(
-      projectRoot,
-      config,
-      site,
-      entryId,
-      idx,
-      entry !== void 0 ? { slug: entry.slug } : { slug }
-    );
-    if (fromIndex !== void 0) return fromIndex;
-  }
-  return resolveBlogFilePath(projectRoot, config, site, slug);
 }
 function lineDiff(a, b) {
   const aLines = a.split("\n");
@@ -12021,9 +12301,9 @@ var VFile = class {
    * @returns {undefined}
    *   Nothing.
    */
-  set dirname(dirname4) {
+  set dirname(dirname6) {
     assertPath(this.basename, "dirname");
-    this.path = default2.join(dirname4 || "", this.basename);
+    this.path = default2.join(dirname6 || "", this.basename);
   }
   /**
    * Get the extname (including dot) (example: `'.js'`).
@@ -23526,6 +23806,23 @@ async function renderMarkdownToHtml(markdown) {
 }
 
 // src/routes/api.ts
+function extractWorkflowId(body3) {
+  if (typeof body3 !== "object" || body3 === null) return null;
+  const workflow = Reflect.get(body3, "workflow");
+  if (typeof workflow !== "object" || workflow === null) return null;
+  const id = Reflect.get(workflow, "id");
+  return typeof id === "string" && id.length > 0 ? id : null;
+}
+function withReviewUrl(body3, workflowId) {
+  const out = {};
+  if (typeof body3 === "object" && body3 !== null) {
+    for (const [k, v] of Object.entries(body3)) {
+      out[k] = v;
+    }
+  }
+  out.reviewUrl = `/dev/editorial-review/${workflowId}`;
+  return out;
+}
 function createApiRouter(ctx) {
   const app = new Hono2();
   app.post("/annotate", async (c) => {
@@ -23586,6 +23883,21 @@ function createApiRouter(ctx) {
     const r = handleStartLongform(ctx.projectRoot, ctx.config, body3);
     return c.json(r.body, r.status);
   });
+  app.post("/start-shortform", async (c) => {
+    let body3;
+    try {
+      body3 = await c.req.json();
+    } catch {
+      return c.json({ error: "invalid JSON body" }, 400);
+    }
+    const r = handleStartShortform(ctx.projectRoot, ctx.config, body3);
+    const workflowId = extractWorkflowId(r.body);
+    if (r.status === 200 && workflowId !== null) {
+      const augmented = withReviewUrl(r.body, workflowId);
+      return c.json(augmented, 200);
+    }
+    return c.json(r.body, r.status);
+  });
   app.post("/render", async (c) => {
     let body3;
     try {
@@ -23616,8 +23928,8 @@ import { extname as extname2 } from "node:path";
 
 // ../core/src/scrapbook.ts
 import {
-  existsSync as existsSync4,
-  mkdirSync as mkdirSync2,
+  existsSync as existsSync6,
+  mkdirSync as mkdirSync3,
   readdirSync as readdirSync3,
   readFileSync as readFileSync6,
   renameSync,
@@ -23625,7 +23937,7 @@ import {
   statSync as statSync3,
   writeFileSync as writeFileSync5
 } from "node:fs";
-import { dirname, extname, join as join7, resolve } from "node:path";
+import { dirname as dirname3, extname, join as join7, resolve } from "node:path";
 var SECRET_SUBDIR = "secret";
 var SLUG_RE2 = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
 var FILENAME_RE = /^[a-zA-Z0-9._-][a-zA-Z0-9._ -]*$/;
@@ -23679,7 +23991,7 @@ function scrapbookDirForEntry(projectRoot, config, site, entry, index2) {
       `Cannot resolve scrapbook dir: entry has no id binding and no template fallback (slug="${entry.slug}")`
     );
   }
-  return join7(dirname(file), "scrapbook");
+  return join7(dirname3(file), "scrapbook");
 }
 function scrapbookFilePath(projectRoot, config, site, slug, filename, opts = {}) {
   assertFilename(filename);
@@ -23728,12 +24040,12 @@ function listScrapbook(projectRoot, config, site, slug) {
   return listScrapbookAtDir(site, slug, dir);
 }
 function listScrapbookAtDir(site, slug, dir) {
-  if (!existsSync4(dir)) {
+  if (!existsSync6(dir)) {
     return { site, slug, dir, exists: false, items: [], secretItems: [] };
   }
   const items = listFilesInDir(dir);
   const secretDir = join7(dir, SECRET_SUBDIR);
-  const secretItems = existsSync4(secretDir) ? listFilesInDir(secretDir) : [];
+  const secretItems = existsSync6(secretDir) ? listFilesInDir(secretDir) : [];
   return { site, slug, dir, exists: true, items, secretItems };
 }
 function listFilesInDir(dir) {
@@ -23755,10 +24067,10 @@ function listFilesInDir(dir) {
 }
 function countScrapbookAtDir(dir) {
   try {
-    if (!existsSync4(dir)) return 0;
+    if (!existsSync6(dir)) return 0;
     const top = listFilesInDir(dir);
     const secretDir = join7(dir, SECRET_SUBDIR);
-    const secret = existsSync4(secretDir) ? listFilesInDir(secretDir) : [];
+    const secret = existsSync6(secretDir) ? listFilesInDir(secretDir) : [];
     return top.length + secret.length;
   } catch {
     return 0;
@@ -23782,7 +24094,7 @@ function countScrapbookForEntry(projectRoot, config, site, entry, index2) {
 }
 function readScrapbookFile(projectRoot, config, site, slug, filename, opts = {}) {
   const abs = scrapbookFilePath(projectRoot, config, site, slug, filename, opts);
-  if (!existsSync4(abs)) throw new Error(`not found: ${filename}`);
+  if (!existsSync6(abs)) throw new Error(`not found: ${filename}`);
   const st = statSync3(abs);
   if (!st.isFile()) throw new Error(`not a file: ${filename}`);
   const content3 = readFileSync6(abs);
@@ -23799,10 +24111,10 @@ function createScrapbookMarkdown(projectRoot, config, site, slug, filename, body
     throw new Error(`create endpoint only accepts .md files: "${filename}"`);
   }
   const abs = scrapbookFilePath(projectRoot, config, site, slug, filename, opts);
-  if (existsSync4(abs)) {
+  if (existsSync6(abs)) {
     throw new Error(`file already exists: "${filename}"`);
   }
-  mkdirSync2(dirname(abs), { recursive: true });
+  mkdirSync3(dirname3(abs), { recursive: true });
   writeFileSync5(abs, body3, "utf-8");
   const st = statSync3(abs);
   return {
@@ -23814,7 +24126,7 @@ function createScrapbookMarkdown(projectRoot, config, site, slug, filename, body
 }
 function saveScrapbookFile(projectRoot, config, site, slug, filename, body3, opts = {}) {
   const abs = scrapbookFilePath(projectRoot, config, site, slug, filename, opts);
-  if (!existsSync4(abs)) throw new Error(`file not found: "${filename}"`);
+  if (!existsSync6(abs)) throw new Error(`file not found: "${filename}"`);
   writeFileSync5(abs, body3);
   const st = statSync3(abs);
   return {
@@ -23827,8 +24139,8 @@ function saveScrapbookFile(projectRoot, config, site, slug, filename, body3, opt
 function renameScrapbookFile(projectRoot, config, site, slug, oldName, newName, opts = {}) {
   const oldAbs = scrapbookFilePath(projectRoot, config, site, slug, oldName, opts);
   const newAbs = scrapbookFilePath(projectRoot, config, site, slug, newName, opts);
-  if (!existsSync4(oldAbs)) throw new Error(`file not found: "${oldName}"`);
-  if (existsSync4(newAbs) && oldAbs !== newAbs) {
+  if (!existsSync6(oldAbs)) throw new Error(`file not found: "${oldName}"`);
+  if (existsSync6(newAbs) && oldAbs !== newAbs) {
     throw new Error(`target name already exists: "${newName}"`);
   }
   renameSync(oldAbs, newAbs);
@@ -23842,15 +24154,15 @@ function renameScrapbookFile(projectRoot, config, site, slug, oldName, newName, 
 }
 function deleteScrapbookFile(projectRoot, config, site, slug, filename, opts = {}) {
   const abs = scrapbookFilePath(projectRoot, config, site, slug, filename, opts);
-  if (!existsSync4(abs)) throw new Error(`file not found: "${filename}"`);
+  if (!existsSync6(abs)) throw new Error(`file not found: "${filename}"`);
   rmSync(abs);
 }
 function writeScrapbookUpload(projectRoot, config, site, slug, filename, content3, opts = {}) {
   const abs = scrapbookFilePath(projectRoot, config, site, slug, filename, opts);
-  if (existsSync4(abs)) {
+  if (existsSync6(abs)) {
     throw new Error(`file already exists: "${filename}" \u2014 rename first`);
   }
-  mkdirSync2(dirname(abs), { recursive: true });
+  mkdirSync3(dirname3(abs), { recursive: true });
   writeFileSync5(abs, content3);
   const st = statSync3(abs);
   return {
@@ -23940,8 +24252,8 @@ async function serveScrapbookFile(c, ctx) {
 }
 
 // src/routes/scrapbook-mutations.ts
-import { existsSync as existsSync5, mkdirSync as mkdirSync3, renameSync as renameSync2, statSync as statSync4 } from "node:fs";
-import { dirname as dirname2 } from "node:path";
+import { existsSync as existsSync7, mkdirSync as mkdirSync4, renameSync as renameSync2, statSync as statSync4 } from "node:fs";
+import { dirname as dirname4 } from "node:path";
 function checkEnvelope(ctx, body3) {
   const site = body3.site;
   const slug = body3.slug;
@@ -24005,7 +24317,7 @@ function createScrapbookMutationsRouter(ctx) {
         filename,
         { secret: env2.secret }
       );
-      if (!existsSync5(abs)) {
+      if (!existsSync7(abs)) {
         if (filename.endsWith(".md")) {
           item = createScrapbookMarkdown(
             ctx.projectRoot,
@@ -24091,13 +24403,13 @@ function createScrapbookMutationsRouter(ctx) {
           newName,
           { secret: toSecret }
         );
-        if (!existsSync5(srcAbs)) {
+        if (!existsSync7(srcAbs)) {
           return c.json({ error: `file not found: "${oldName}"` }, 404);
         }
-        if (existsSync5(dstAbs)) {
+        if (existsSync7(dstAbs)) {
           return c.json({ error: `target name already exists: "${newName}"` }, 409);
         }
-        mkdirSync3(dirname2(dstAbs), { recursive: true });
+        mkdirSync4(dirname4(dstAbs), { recursive: true });
         renameSync2(srcAbs, dstAbs);
         const st = statSync4(dstAbs);
         item = {
@@ -24339,7 +24651,7 @@ function buildReport(projectRoot, config, opts = {}) {
 }
 
 // ../core/src/body-state.ts
-import { existsSync as existsSync6, readFileSync as readFileSync7 } from "node:fs";
+import { existsSync as existsSync8, readFileSync as readFileSync7 } from "node:fs";
 var PLACEHOLDER_MARKER = "<!-- Write your post here -->";
 function stripOutlineSection(body3) {
   const lines = body3.split("\n");
@@ -24355,7 +24667,7 @@ function stripOutlineSection(body3) {
   return [...lines.slice(0, startIdx), ...lines.slice(endIdx)].join("\n");
 }
 function bodyState(filePath) {
-  if (!existsSync6(filePath)) return "missing";
+  if (!existsSync8(filePath)) return "missing";
   const content3 = readFileSync7(filePath, "utf8");
   const fmMatch = content3.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
   const body3 = fmMatch ? content3.slice(fmMatch[0].length) : content3;
@@ -24519,7 +24831,7 @@ function fmtRelTime(iso, now) {
 }
 function workflowLink(w) {
   if (w.contentKind === "shortform") {
-    return `/dev/editorial-review-shortform?focus=${w.id}#workflow-${w.id}`;
+    return `/dev/editorial-review/${w.id}`;
   }
   const key2 = w.entryId ?? w.slug;
   const kindBit = w.contentKind === "outline" ? "&kind=outline" : "";
@@ -24568,6 +24880,15 @@ function loadDashboardData(ctx, getIndex) {
     const key2 = covKey(d.site, d.slug, d.entryId);
     const set = shortformCoverage.get(key2) ?? /* @__PURE__ */ new Set();
     set.add(d.platform);
+    shortformCoverage.set(key2, set);
+  }
+  for (const w of workflows) {
+    if (w.contentKind !== "shortform") continue;
+    if (w.state === "applied" || w.state === "cancelled") continue;
+    if (!w.platform || !isPlatform2(w.platform)) continue;
+    const key2 = covKey(w.site, w.slug, w.entryId);
+    const set = shortformCoverage.get(key2) ?? /* @__PURE__ */ new Set();
+    set.add(w.platform);
     shortformCoverage.set(key2, set);
   }
   const publishedBlogEntries = calendarEntries.filter(
@@ -24901,15 +25222,40 @@ function renderStageSection(ctx, data, stage, entries, sites, getIndex) {
       ${body3}
     </section>`);
 }
+function indexShortformWorkflows(data) {
+  const out = /* @__PURE__ */ new Map();
+  for (const w of data.workflows) {
+    if (w.contentKind !== "shortform") continue;
+    if (w.state === "applied" || w.state === "cancelled") continue;
+    if (!w.platform) continue;
+    const key2 = `${covKey(w.site, w.slug, w.entryId)}::${w.platform}`;
+    out.set(key2, w);
+  }
+  return out;
+}
 function renderShortformMatrix(data, ctx) {
   if (data.publishedBlogEntries.length === 0) return unsafe("");
+  const wfIndex = indexShortformWorkflows(data);
   const rows = data.publishedBlogEntries.map(({ site, entry }) => {
     const covered = data.shortformCoverage.get(covKey(site, entry.slug, entry.id)) ?? /* @__PURE__ */ new Set();
     const cells2 = PLATFORMS_ORDER.map((p2) => {
       const has = covered.has(p2);
-      const inner = has ? html6`<span class="er-sf-check" title="${p2} copy drafted">✓</span>` : html6`<button class="er-copy-btn er-sf-draft-btn" type="button"
-            data-copy="/editorial-shortform-draft --site ${site} ${entry.slug} ${p2}"
-            title="copy /editorial-shortform-draft for ${p2}">draft</button>`;
+      const wfKey = `${covKey(site, entry.slug, entry.id)}::${p2}`;
+      const wf = wfIndex.get(wfKey);
+      let inner;
+      if (has && wf) {
+        inner = html6`<a class="er-sf-link" href="/dev/editorial-review/${wf.id}"
+          title="${p2} workflow · open in review">✓</a>`;
+      } else if (has) {
+        inner = html6`<span class="er-sf-check" title="${p2} copy drafted">✓</span>`;
+      } else {
+        inner = html6`<button class="er-sf-start-btn" type="button"
+          data-action="start-shortform"
+          data-site="${site}"
+          data-slug="${entry.slug}"
+          data-platform="${p2}"
+          title="Start a ${p2} shortform draft for ${entry.slug}">start</button>`;
+      }
       const cls = has ? "er-sf-cell er-sf-cell-covered" : "er-sf-cell er-sf-cell-empty";
       return html6`<td class="${cls}">${unsafe(inner)}</td>`;
     }).join("");
@@ -25024,11 +25370,10 @@ function renderSidebar(data) {
         <div class="er-slip-header">Short form</div>
         <h3 class="er-slip-title">Social copy</h3>
         <p style="font-size: 0.85rem; margin: 0 0 var(--er-space-1); color: var(--er-ink-soft);">
-          Agent-drafted. Run in Claude Code:
+          Click <em>start</em> in the coverage matrix above to begin a
+          shortform draft. Edit, iterate, and approve in the unified
+          review surface.
         </p>
-        <code style="display: block; font-size: 0.72rem; padding: var(--er-space-1) var(--er-space-2); word-break: break-all; background: var(--er-paper-2);">
-          /editorial-shortform-draft --site &lt;site&gt; &lt;slug&gt; &lt;platform&gt; [channel]
-        </code>
         <p style="margin-top: var(--er-space-2);">
           <a href="/dev/editorial-review-shortform">Go to the shortform desk →</a>
         </p>
@@ -25295,7 +25640,7 @@ function renderScrapbookDrawer(ctx, site, entry, slug, index2) {
 }
 
 // src/pages/review.ts
-import { existsSync as existsSync7 } from "node:fs";
+import { existsSync as existsSync9 } from "node:fs";
 function isSuccessBody(body3) {
   if (typeof body3 !== "object" || body3 === null) return false;
   return "workflow" in body3 && "versions" in body3;
@@ -25308,7 +25653,9 @@ function errorFromBody(body3) {
   return "unknown error";
 }
 function pickContentKind(rawKind) {
-  return rawKind === "outline" ? "outline" : "longform";
+  if (rawKind === "outline") return "outline";
+  if (rawKind === "shortform") return "shortform";
+  return "longform";
 }
 function pickSite(ctx, raw3) {
   if (raw3 && raw3 in ctx.config.sites) return raw3;
@@ -25320,7 +25667,7 @@ function stringField(v) {
 async function prepareRender(markdown, contentKind) {
   const parsed = parseDraftFrontmatter(markdown);
   const fm = parsed.frontmatter;
-  const split = contentKind === "outline" ? { body: parsed.body, outline: "", present: false, startLine: -1, endLine: -1 } : splitOutline(parsed.body);
+  const split = contentKind !== "longform" ? { body: parsed.body, outline: "", present: false, startLine: -1, endLine: -1 } : splitOutline(parsed.body);
   const bodyHtml = await renderMarkdownToHtml(split.body);
   const description = stringField(fm.description);
   const dekHtml = description ? `<p class="er-dispatch-dek">${escapeHtml(description)}</p>` : "";
@@ -25334,9 +25681,9 @@ function stateLabel2(state) {
 }
 function renderVersionsStrip(versions2, site, contentKind, current) {
   if (versions2.length <= 1) return unsafe("");
+  const kindBit = contentKind === "outline" ? "&kind=outline" : contentKind === "shortform" ? "&kind=shortform" : "";
   const links = versions2.map((v) => {
     const isActive = v.version === current.version;
-    const kindBit = contentKind === "outline" ? "&kind=outline" : "";
     const href = `?site=${site}${kindBit}&v=${v.version}`;
     return html6`<a href="${href}" class="${isActive ? "active" : ""}">v${v.version}</a>`;
   }).join("");
@@ -25368,7 +25715,7 @@ function renderControlsRight(workflow) {
   return unsafe(`<span class="er-strip-right">${buttons.join("")}</span>`);
 }
 function renderError(slug, site, contentKind, message) {
-  const startCmd = contentKind === "outline" ? `/editorial-outline --site ${site} ${slug}` : `/editorial-draft-review --site ${site} ${slug}`;
+  const startCmd = contentKind === "outline" ? `/editorial-outline --site ${site} ${slug}` : contentKind === "shortform" ? `/deskwork:shortform-start --site ${site} ${slug} <platform>` : `/editorial-draft-review --site ${site} ${slug}`;
   const body3 = html6`
     <div data-review-ui="longform">
       ${renderEditorialFolio("reviews", `longform \xB7 ${slug}`)}
@@ -25490,42 +25837,64 @@ function renderOutlineDrawer(outlineHtml) {
       </footer>
     </aside>`);
 }
-function lookupReviewEntry(ctx, site, lookup) {
+function lookupReviewEntry(ctx, site, lookup, fallbackSlug) {
   try {
     const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
-    if (!existsSync7(calendarPath)) return null;
+    if (!existsSync9(calendarPath)) return null;
     const cal = readCalendar(calendarPath);
     if (lookup.kind === "id") {
       const byId = findEntryById(cal, lookup.entryId);
       if (byId !== void 0) return byId;
     }
-    const bySlug = findEntry(cal, lookup.slug);
+    const slug = lookup.kind === "workflow" ? fallbackSlug : lookup.slug;
+    const bySlug = findEntry(cal, slug);
     return bySlug ?? null;
   } catch {
     return null;
   }
 }
 async function renderReviewPage(ctx, lookup, query, getIndex) {
-  const site = pickSite(ctx, query.site);
-  const contentKind = pickContentKind(query.kind ?? null);
-  const slug = lookup.slug;
-  const fetched = handleGetWorkflow(ctx.projectRoot, ctx.config, {
+  const queryKind = pickContentKind(query.kind ?? null);
+  const fetched = lookup.kind === "workflow" ? handleGetWorkflow(ctx.projectRoot, ctx.config, {
+    id: lookup.workflowId,
+    entryId: null,
+    site: null,
+    slug: null,
+    contentKind: null,
+    platform: null,
+    channel: null
+  }) : handleGetWorkflow(ctx.projectRoot, ctx.config, {
     id: null,
     entryId: lookup.kind === "id" ? lookup.entryId : null,
-    site,
-    slug,
-    contentKind,
+    site: pickSite(ctx, query.site),
+    slug: lookup.slug,
+    contentKind: queryKind,
     platform: null,
     channel: null
   });
+  const lookupSlug = lookup.kind === "workflow" ? lookup.workflowId : lookup.slug;
+  let resolvedSite = pickSite(ctx, query.site);
   if (fetched.status !== 200 || !isSuccessBody(fetched.body)) {
-    return renderError(slug, site, contentKind, errorFromBody(fetched.body));
+    return renderError(
+      lookupSlug,
+      resolvedSite,
+      queryKind,
+      errorFromBody(fetched.body)
+    );
   }
   const { workflow, versions: versions2 } = fetched.body;
+  const contentKind = lookup.kind === "workflow" ? workflow.contentKind : queryKind;
+  if (lookup.kind === "workflow") resolvedSite = workflow.site;
+  const slug = workflow.slug;
   const requested = query.version ? parseInt(query.version, 10) : workflow.currentVersion;
   const currentVersion = versions2.find((v) => v.version === requested) ?? versions2[versions2.length - 1];
   if (!currentVersion) {
-    return renderError(slug, site, contentKind, "no current version on this workflow");
+    return renderError(
+      slug,
+      resolvedSite,
+      contentKind,
+      "no current version on this workflow"
+    );
   }
   const { fm, bodyHtml, outlineHtml } = await prepareRender(
     currentVersion.markdown,
@@ -25533,11 +25902,20 @@ async function renderReviewPage(ctx, lookup, query, getIndex) {
   );
   const draftState = { workflow, currentVersion, versions: versions2 };
   const titleField = stringField(fm.title) ?? `Draft: ${slug}`;
-  const reviewEntry = lookupReviewEntry(ctx, site, lookup);
-  const reviewIndex = getIndex ? getIndex(site) : void 0;
+  const reviewEntry = lookupReviewEntry(ctx, resolvedSite, lookup, slug);
+  const reviewIndex = getIndex ? getIndex(resolvedSite) : void 0;
+  const isShortform = contentKind === "shortform";
+  const shortformMeta = isShortform ? unsafe(html6`
+      <div class="er-shortform-meta">
+        <span class="er-platform">${workflow.platform ?? "other"}</span>
+        ${workflow.channel ? unsafe(html6`<span class="er-channel">${workflow.channel}</span>`) : ""}
+      </div>`) : unsafe("");
+  const reviewUiAttr = isShortform ? "shortform" : "longform";
+  const folioSpine = isShortform ? `shortform \xB7 ${workflow.platform ?? "?"}${workflow.channel ? ` \xB7 ${workflow.channel}` : ""} \xB7 ${slug}` : `longform \xB7 ${slug}`;
   const body3 = html6`
-    <div data-review-ui="longform" class="er-review-shell">
-      ${renderEditorialFolio("reviews", `longform \xB7 ${workflow.slug}`)}
+    <div data-review-ui="${reviewUiAttr}" class="er-review-shell">
+      ${renderEditorialFolio("reviews", folioSpine)}
+      ${shortformMeta}
       <div class="er-draft-frame">
         <div id="draft-body" data-draft-body
           title="Double-click to edit · select text to leave a margin note">${unsafe(bodyHtml)}</div>
@@ -25547,7 +25925,7 @@ async function renderReviewPage(ctx, lookup, query, getIndex) {
         <a class="er-strip-back" href="/dev/editorial-studio" title="Back to the editorial studio">← studio</a>
         <span class="er-strip-galley">Galley <em>№ ${currentVersion.version}</em></span>
         <span class="er-strip-slug">${workflow.site} / ${workflow.slug}</span>
-        ${renderVersionsStrip(versions2, site, contentKind, currentVersion)}
+        ${renderVersionsStrip(versions2, resolvedSite, contentKind, currentVersion)}
         <span class="er-strip-center">
           <span class="er-stamp er-stamp-big er-stamp-${workflow.state}" data-state-label>
             ${stateLabel2(workflow.state)}
@@ -25558,8 +25936,8 @@ async function renderReviewPage(ctx, lookup, query, getIndex) {
       </div>
       ${renderMarginalia()}
       <button class="er-pencil-btn" data-add-comment-btn hidden type="button">Mark</button>
-      ${renderOutlineDrawer(outlineHtml)}
-      ${renderScrapbookDrawer(ctx, site, reviewEntry, workflow.slug, reviewIndex)}
+      ${isShortform ? unsafe("") : renderOutlineDrawer(outlineHtml)}
+      ${isShortform ? unsafe("") : renderScrapbookDrawer(ctx, resolvedSite, reviewEntry, workflow.slug, reviewIndex)}
       <div class="er-toast" data-toast hidden></div>
       ${renderShortcutsOverlay()}
       <div class="er-poll-indicator" data-poll>auto-refresh · 8s</div>
@@ -25584,27 +25962,20 @@ var PLATFORM_ORDER = ["reddit", "linkedin", "youtube", "instagram"];
 function siteLabel2(site) {
   return site.slice(0, 2).toUpperCase();
 }
-function loadCards(ctx) {
+function loadOpenShortform(ctx) {
   const open = [];
   for (const w of listOpen(ctx.projectRoot, ctx.config)) {
     if (w.contentKind === "shortform") open.push(w);
   }
-  const cards = open.map((w) => {
-    const versions2 = readVersions(ctx.projectRoot, ctx.config, w.id);
-    const currentVersion = versions2.find((v) => v.version === w.currentVersion) ?? null;
-    return { workflow: w, currentVersion };
-  });
-  cards.sort(
-    (a, b) => b.workflow.updatedAt.localeCompare(a.workflow.updatedAt)
-  );
-  return cards;
+  open.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return open;
 }
-function groupByPlatform(cards) {
+function groupByPlatform(workflows) {
   const byPlatform = /* @__PURE__ */ new Map();
-  for (const card of cards) {
-    const key2 = card.workflow.platform ?? "other";
+  for (const w of workflows) {
+    const key2 = w.platform ?? "other";
     const list3 = byPlatform.get(key2) ?? [];
-    list3.push(card);
+    list3.push(w);
     byPlatform.set(key2, list3);
   }
   const ordered = [
@@ -25615,59 +25986,69 @@ function groupByPlatform(cards) {
   ];
   return { byPlatform, ordered };
 }
-function renderCard(card) {
-  const { workflow: w, currentVersion } = card;
-  const channelMarkup = w.channel ? unsafe(html6`<span class="channel">${w.channel}</span>`) : "";
+function fmtRelTime2(iso, now) {
+  const t = new Date(iso).getTime();
+  const s = Math.max(0, Math.floor((now.getTime() - t) / 1e3));
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 48) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+function renderRow2(w, now) {
+  const channelMarkup = w.channel ? unsafe(html6`<span class="channel">${w.channel}</span>`) : unsafe("");
+  const reviewUrl = `/dev/editorial-review/${w.id}`;
   return unsafe(html6`
-    <article id="workflow-${w.id}" class="er-galley"
-      data-platform="${w.platform ?? "other"}"
+    <a class="er-row er-shortform-row"
+      href="${reviewUrl}"
       data-workflow-id="${w.id}"
-      data-before-version="${w.currentVersion}"
+      data-platform="${w.platform ?? "other"}"
       data-state="${w.state}"
       data-site="${w.site}">
-      <span class="er-galley-accent"></span>
-      <header class="er-galley-head">
-        <span class="er-row-site er-row-site--${w.site}" title="${w.site}">${siteLabel2(w.site)}</span>
-        <h3>${w.slug}</h3>
-        ${channelMarkup}
-        <span class="er-stamp er-stamp-${w.state}">${w.state.replace("-", " ")}</span>
-        <span class="version">v${w.currentVersion}</span>
-      </header>
-      <textarea data-text>${currentVersion?.markdown ?? ""}</textarea>
-      <div class="er-galley-actions">
-        <button type="button" class="er-btn er-btn-primary" data-action="save">Save as new version</button>
-        <button type="button" class="er-btn er-btn-approve" data-action="approve">Approve</button>
-        <button type="button" class="er-btn" data-action="iterate">Iterate</button>
-        <button type="button" class="er-btn er-btn-reject" data-action="reject">Reject</button>
-        <span style="font-family: var(--er-font-mono); font-size: 0.7rem; color: var(--er-faded); margin-left: auto;" data-hint></span>
-      </div>
-    </article>`);
+      <span class="er-row-num">→</span>
+      <span class="er-row-site er-row-site--${w.site}" title="${w.site}">${siteLabel2(w.site)}</span>
+      <span class="er-row-slug">${w.slug}</span>
+      ${channelMarkup}
+      <span class="er-stamp er-stamp-${w.state}">${w.state.replace("-", " ")}</span>
+      <span class="er-row-ts">v${w.currentVersion} · ${fmtRelTime2(w.updatedAt, now)}</span>
+      <span class="er-row-hint">Open in review →</span>
+    </a>`);
 }
-function renderPlatformSection(platform, cards) {
+function renderPlatformSection(platform, workflows, now) {
+  const rows = workflows.map((w) => renderRow2(w, now).__raw).join("");
   return unsafe(html6`
     <section class="er-platform-section">
       <div class="er-platform-header">
         <h2>${platform}</h2>
-        <span class="er-platform-count">№ ${String(cards.length).padStart(2, "0")}</span>
+        <span class="er-platform-count">№ ${String(workflows.length).padStart(2, "0")}</span>
       </div>
-      ${cards.map(renderCard)}
+      ${unsafe(rows)}
     </section>`);
 }
-function renderShortformPage(ctx, focus = null) {
-  const cards = loadCards(ctx);
-  const { byPlatform, ordered } = groupByPlatform(cards);
-  const cardsBlock = cards.length === 0 ? html6`<div class="er-empty" style="margin-top: var(--er-space-5);">
-        No short-form galleys on the desk.<br />
-        Start one with <code>/editorial-shortform-draft --site &lt;site&gt; &lt;slug&gt; &lt;platform&gt;</code>
-      </div>` : ordered.map((p2) => renderPlatformSection(p2, byPlatform.get(p2) ?? []).__raw).join("");
+function renderEmptyState() {
+  const platformList = PLATFORM_ORDER.join(", ");
+  return unsafe(html6`
+    <div class="er-empty" style="margin-top: var(--er-space-5);">
+      No short-form galleys on the desk.<br />
+      Supported platforms: <em>${platformList}</em>.<br />
+      Start a new shortform draft from the dashboard's
+      <a href="/dev/editorial-studio">coverage matrix</a>.
+    </div>`);
+}
+function renderShortformPage(ctx) {
+  const workflows = loadOpenShortform(ctx);
+  const { byPlatform, ordered } = groupByPlatform(workflows);
+  const now = ctx.now ? ctx.now() : /* @__PURE__ */ new Date();
+  const cardsBlock = workflows.length === 0 ? renderEmptyState().__raw : ordered.map((p2) => renderPlatformSection(p2, byPlatform.get(p2) ?? [], now).__raw).join("");
   const body3 = html6`
     ${renderEditorialFolio("reviews", "shortform desk")}
     <header class="er-pagehead er-pagehead--centered">
       <p class="er-pagehead__kicker">All sites · short form</p>
       <h1 class="er-pagehead__title">The <em>compositor</em>'s desk</h1>
-      <p class="er-pagehead__deck">Social copy, one galley slip per platform.</p>
+      <p class="er-pagehead__deck">Open shortform galleys — click any row to open the unified review surface.</p>
       <p class="er-pagehead__meta">
-        <span>${cards.length} in flight</span>
+        <span>${workflows.length} in flight</span>
         <span class="sep">·</span>
         <span>${ordered.length} ${ordered.length === 1 ? "platform" : "platforms"}</span>
       </p>
@@ -25678,8 +26059,7 @@ function renderShortformPage(ctx, focus = null) {
         <a href="/dev/editorial-studio">← back to the studio</a>
       </p>
     </main>
-    <div class="er-toast" id="toast" hidden></div>
-    <div class="er-poll-indicator" data-poll>auto-refresh · 10s</div>`;
+    <div class="er-toast" id="toast" hidden></div>`;
   return layout({
     title: "Short form \u2014 all sites \u2014 dev",
     cssHrefs: [
@@ -25689,7 +26069,7 @@ function renderShortformPage(ctx, focus = null) {
     ],
     bodyAttrs: 'data-review-ui="shortform"',
     bodyHtml: body3,
-    embeddedJson: focus ? [{ id: "", attr: "data-shortform-focus", data: focus }] : [],
+    embeddedJson: [],
     scriptModules: ["/static/dist/editorial-studio-client.js"]
   });
 }
@@ -26509,7 +26889,7 @@ function renderScrapbookPage(ctx, site, path) {
 }
 
 // ../core/src/content-tree-fs-walk.ts
-import { existsSync as existsSync8, readdirSync as readdirSync4, readFileSync as readFileSync9, statSync as statSync5 } from "node:fs";
+import { existsSync as existsSync10, readdirSync as readdirSync4, readFileSync as readFileSync9, statSync as statSync5 } from "node:fs";
 import { join as join9 } from "node:path";
 var INDEX_BASENAMES = /* @__PURE__ */ new Set([
   "index.md",
@@ -26538,7 +26918,7 @@ function readTitleFromMarkdown(absPath) {
 }
 function defaultFsWalk(projectRoot, config, site) {
   const root3 = resolveContentDir(projectRoot, config, site);
-  if (!existsSync8(root3)) return [];
+  if (!existsSync10(root3)) return [];
   const out = [];
   const SKIP2 = /* @__PURE__ */ new Set(["scrapbook", "node_modules", "dist", ".git"]);
   const visit2 = (dirAbs, pathSoFar) => {
@@ -26585,7 +26965,7 @@ function defaultFsWalk(projectRoot, config, site) {
 }
 
 // ../core/src/content-tree-helpers.ts
-import { existsSync as existsSync9 } from "node:fs";
+import { existsSync as existsSync11 } from "node:fs";
 import { join as join10 } from "node:path";
 function leafOfPath(path) {
   const idx = path.lastIndexOf("/");
@@ -26608,7 +26988,7 @@ function entryHasOwnIndex(contentDir, entryPath, fsHasIndex, fsHasReadme, boundF
   if (fsHasIndex) return true;
   if (fsHasReadme) return true;
   for (const basename of TEMPLATE_INDEX_BASENAMES) {
-    if (existsSync9(join10(contentDir, entryPath, basename))) return true;
+    if (existsSync11(join10(contentDir, entryPath, basename))) return true;
   }
   if (!hasFsDir) return true;
   return false;
@@ -26870,7 +27250,7 @@ function flattenForRender(root3) {
 }
 
 // src/pages/content-detail.ts
-import { readFileSync as readFileSync10, existsSync as existsSync10 } from "node:fs";
+import { readFileSync as readFileSync10, existsSync as existsSync12 } from "node:fs";
 import { join as join11 } from "node:path";
 var PREVIEW_CHAR_BUDGET = 480;
 function renderEmptyDetail() {
@@ -26885,7 +27265,7 @@ function renderEmptyDetail() {
 }
 function safeReadFile(absPath) {
   try {
-    if (!existsSync10(absPath)) return null;
+    if (!existsSync12(absPath)) return null;
     return readFileSync10(absPath, "utf-8");
   } catch {
     return null;
@@ -26986,7 +27366,7 @@ function findOrganizationalIndex(contentDir, slug) {
   ];
   for (const name of candidates) {
     const abs = join11(contentDir, slug, name);
-    if (existsSync10(abs)) return abs;
+    if (existsSync12(abs)) return abs;
   }
   return null;
 }
@@ -27627,6 +28007,7 @@ var LOOPBACK = "127.0.0.1";
 function parseCliArgs(argv) {
   let projectRoot = process.cwd();
   let port = DEFAULT_PORT;
+  let portExplicit = false;
   let hostOverride = null;
   let noTailscale = false;
   for (let i = 0; i < argv.length; i++) {
@@ -27641,8 +28022,10 @@ function parseCliArgs(argv) {
       const next = argv[++i];
       if (!next) usage(`${a} requires a value`);
       port = parseInt(next, 10);
+      portExplicit = true;
     } else if (a.startsWith("--port=")) {
       port = parseInt(a.slice("--port=".length), 10);
+      portExplicit = true;
     } else if (a === "--host" || a === "-H") {
       const next = argv[++i];
       if (!next) usage(`${a} requires a value`);
@@ -27663,6 +28046,7 @@ function parseCliArgs(argv) {
   return {
     projectRoot: isAbsolute(projectRoot) ? projectRoot : resolve2(process.cwd(), projectRoot),
     port,
+    portExplicit,
     hostOverride,
     noTailscale
   };
@@ -27696,7 +28080,7 @@ function resolveEntryById(ctx, site, id) {
   if (!(site in ctx.config.sites)) return null;
   try {
     const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
-    if (!existsSync11(calendarPath)) return null;
+    if (!existsSync13(calendarPath)) return null;
     const cal = readCalendar(calendarPath);
     const entry = cal.entries.find((e) => e.id === id);
     if (!entry || entry.id === void 0) return null;
@@ -27709,7 +28093,7 @@ function resolveEntryBySlug(ctx, site, slug) {
   if (!(site in ctx.config.sites)) return "unknown-site";
   try {
     const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
-    if (!existsSync11(calendarPath)) return null;
+    if (!existsSync13(calendarPath)) return null;
     const cal = readCalendar(calendarPath);
     const entry = cal.entries.find((e) => e.slug === slug);
     if (!entry) return null;
@@ -27730,13 +28114,13 @@ function buildReviewRedirectUrl(entryId, requestUrl) {
   return `/dev/editorial-review/${entryId}${search2}`;
 }
 function publicDir() {
-  const here = dirname3(fileURLToPath2(import.meta.url));
+  const here = dirname5(fileURLToPath2(import.meta.url));
   const candidates = [
     resolve2(here, "..", "public"),
     resolve2(here, "..", "..", "..", "plugins", "deskwork-studio", "public")
   ];
   for (const candidate of candidates) {
-    if (existsSync11(candidate)) return candidate;
+    if (existsSync13(candidate)) return candidate;
   }
   throw new Error(
     `deskwork-studio: could not find public/ assets. Tried:
@@ -27756,40 +28140,43 @@ function createApp(ctx) {
   app.get("/dev/editorial-help", (c) => c.html(renderHelpPage(ctx)));
   app.get(
     "/dev/editorial-review-shortform",
-    (c) => c.html(renderShortformPage(ctx, c.req.query("focus") ?? null))
+    (c) => c.html(renderShortformPage(ctx))
   );
   app.get(
     "/dev/editorial-review/:id{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}",
     async (c) => {
       const id = c.req.param("id");
       const siteParam = c.req.query("site") ?? ctx.config.defaultSite;
-      const lookup = resolveEntryById(ctx, siteParam, id);
       const getIndex = (s) => getRequestContentIndex(c, ctx, s);
+      const reviewQuery = {
+        site: c.req.query("site") ?? null,
+        version: c.req.query("v") ?? null,
+        kind: c.req.query("kind") ?? null
+      };
+      const wf = readWorkflow(ctx.projectRoot, ctx.config, id);
+      if (wf !== null) {
+        return c.html(
+          await renderReviewPage(
+            ctx,
+            { kind: "workflow", workflowId: id },
+            reviewQuery,
+            getIndex
+          )
+        );
+      }
+      const lookup = resolveEntryById(ctx, siteParam, id);
       if (lookup === null) {
         return c.html(
           await renderReviewPage(
             ctx,
             { kind: "id", entryId: id, slug: id },
-            {
-              site: c.req.query("site") ?? null,
-              version: c.req.query("v") ?? null,
-              kind: c.req.query("kind") ?? null
-            },
+            reviewQuery,
             getIndex
           )
         );
       }
       return c.html(
-        await renderReviewPage(
-          ctx,
-          lookup,
-          {
-            site: c.req.query("site") ?? null,
-            version: c.req.query("v") ?? null,
-            kind: c.req.query("kind") ?? null
-          },
-          getIndex
-        )
+        await renderReviewPage(ctx, lookup, reviewQuery, getIndex)
       );
     }
   );
@@ -27858,9 +28245,7 @@ function createApp(ctx) {
   return app;
 }
 async function main() {
-  const { projectRoot, port, hostOverride, noTailscale } = parseCliArgs(
-    process.argv.slice(2)
-  );
+  const { projectRoot, port, portExplicit, hostOverride, noTailscale } = parseCliArgs(process.argv.slice(2));
   let config;
   try {
     config = readConfig(projectRoot);
@@ -27882,22 +28267,38 @@ async function main() {
     tailscale = detectTailscale();
     bindAddresses = tailscale === null ? [LOOPBACK] : [LOOPBACK, ...tailscale.ipv4];
   }
+  let result;
+  try {
+    result = await listenWithAutoIncrement(
+      {
+        fetch: app.fetch,
+        port,
+        addresses: bindAddresses,
+        explicitPort: portExplicit
+      },
+      serve
+    );
+  } catch (err2) {
+    const reason = err2 instanceof Error ? err2.message : String(err2);
+    process.stderr.write(`deskwork-studio: ${reason}
+`);
+    process.exit(1);
+  }
   const reachableUrls = [];
   for (const addr of bindAddresses) {
-    serve({ fetch: app.fetch, port, hostname: addr }, () => {
-      reachableUrls.push(`http://${addr === LOOPBACK ? "localhost" : addr}:${port}/`);
-      if (reachableUrls.length === bindAddresses.length) {
-        printBanner({
-          urls: reachableUrls,
-          projectRoot,
-          siteSlugs: Object.keys(config.sites),
-          tailscale,
-          port,
-          override: hostOverride
-        });
-      }
-    });
+    reachableUrls.push(
+      `http://${addr === LOOPBACK ? "localhost" : addr}:${result.port}/`
+    );
   }
+  printBanner({
+    urls: reachableUrls,
+    projectRoot,
+    siteSlugs: Object.keys(config.sites),
+    tailscale,
+    port: result.port,
+    override: hostOverride,
+    autoIncrementedFrom: result.autoIncremented ? port : null
+  });
 }
 function printBanner(b) {
   process.stdout.write("deskwork-studio listening on:\n");
@@ -27915,10 +28316,16 @@ function printBanner(b) {
 `);
   process.stdout.write(`  sites:   ${b.siteSlugs.join(", ")}
 `);
+  if (b.autoIncrementedFrom !== null) {
+    process.stdout.write(
+      `  note: port ${b.autoIncrementedFrom} was in use; using ${b.port} instead
+`
+    );
+  }
   const exposed = b.override !== null && b.override !== LOOPBACK;
   if (exposed) {
     process.stdout.write(
-      `  \u26A0 bound to ${b.override}. Studio has no authentication \u2014
+      `  warning: bound to ${b.override}. Studio has no authentication \u2014
     only run this on a trusted network (Tailscale, VPN, etc.).
 `
     );

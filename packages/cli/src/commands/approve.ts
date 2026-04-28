@@ -15,10 +15,16 @@
  *   deskwork-approve <project-root> [--site <slug>] <slug> --platform <p> [--channel <c>]
  */
 
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { readConfig } from '@deskwork/core/config';
-import { resolveSite, resolveBlogFilePath, resolveCalendarPath } from '@deskwork/core/paths';
+import {
+  resolveSite,
+  resolveBlogFilePath,
+  resolveCalendarPath,
+  resolveShortformFilePath,
+} from '@deskwork/core/paths';
 import { readCalendar, writeCalendar } from '@deskwork/core/calendar';
+import { parseFrontmatter } from '@deskwork/core/frontmatter';
 import {
   handleGetWorkflow,
 } from '@deskwork/core/review/handlers';
@@ -134,15 +140,34 @@ export async function run(argv: string[]): Promise<void> {
 
   function applyShortform(
     workflow: DraftWorkflowItem,
-    versions: DraftVersion[],
+    _versions: DraftVersion[],
     approvedVersion: number,
   ): void {
     if (!flags.platform) fail('--platform is required for shortform workflows');
+    if (!isPlatform(flags.platform)) fail(`Invalid --platform "${flags.platform}".`);
 
-    const approvedMarkdown = versions.find((v) => v.version === approvedVersion)?.markdown;
-    if (approvedMarkdown === undefined) {
-      fail(`Approved v${approvedVersion} not found in history.`);
+    // Phase 21a: shortform is now disk-backed. Read the on-disk file as
+    // the SSOT — the journal version is just the latest snapshot, but
+    // every save writes to disk first. Strip the frontmatter so the
+    // calendar's `## Shortform Copy` section captures the body only.
+    const filePath = resolveShortformFilePath(
+      projectRoot,
+      config,
+      site,
+      { slug },
+      flags.platform,
+      flags.channel,
+    );
+    if (filePath === undefined || !existsSync(filePath)) {
+      const shown = filePath ?? '(unresolved)';
+      fail(
+        `Shortform file missing at ${shown}. ` +
+          `The file is the SSOT — re-run /deskwork:shortform-start if needed.`,
+      );
     }
+
+    const fileSrc = readFileSync(filePath, 'utf-8');
+    const approvedMarkdown = parseFrontmatter(fileSrc).body.replace(/^\n+/, '');
 
     const calendarPath = resolveCalendarPath(projectRoot, config, site);
     const cal = readCalendar(calendarPath);
@@ -179,6 +204,7 @@ export async function run(argv: string[]): Promise<void> {
       platform: flags.platform,
       channel: flags.channel,
       calendarPath,
+      filePath,
     });
   }
 

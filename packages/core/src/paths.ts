@@ -25,10 +25,11 @@
  * access to a calendar entry should prefer `findEntryFile`.
  */
 
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import type { DeskworkConfig, SiteConfig } from './config.ts';
 import type { ContentIndex } from './content-index.ts';
 import { buildContentIndex } from './content-index.ts';
+import type { Platform } from './types.ts';
 
 /**
  * Resolve a user-supplied site argument to a configured site slug.
@@ -210,4 +211,81 @@ export function findEntryFile(
     );
   }
   return undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 21a — shortform file resolution
+// ---------------------------------------------------------------------------
+
+/**
+ * Channel must be a kebab-case token. Same shape as a slug segment so the
+ * filename remains URL-safe and matches the rest of deskwork's vocabulary.
+ */
+const CHANNEL_RE = /^[a-z0-9][a-z0-9-]*$/;
+
+/**
+ * Resolve the markdown file path for a shortform draft.
+ *
+ *   <contentDir>/<entry-dir>/scrapbook/shortform/<platform>[-<channel>].md
+ *
+ * Platform is the lowercase Platform value. Channel (if present) is appended
+ * as `-<channel>`. Channel must validate against the kebab-case regex —
+ * deskwork stores channels as kebab-case strings throughout.
+ *
+ * The entry directory is resolved through `findEntryFile` (id-driven,
+ * refactor-proof) with slug-template fallback for legacy entries created
+ * pre-doctor. The slug-template fallback is intentional migration logic so
+ * pre-bind entries keep working.
+ *
+ * Forward-compatibility: every reference to the shortform file location
+ * goes through this function. Phase 20 (sandbox migration) redirects this
+ * single function; everything downstream (handlers, CLI, studio) works
+ * unchanged.
+ *
+ * @param projectRoot Absolute path to the deskwork project root.
+ * @param config Loaded deskwork config.
+ * @param site Site slug (or null/undefined for the default site).
+ * @param entry Calendar entry — `id` preferred, `slug` used both as the
+ *              legacy fallback and to identify the entry directory.
+ * @param platform Which distribution platform.
+ * @param channel Optional sub-channel (e.g. `synthdiy` for r/synthdiy).
+ *                Must be kebab-case.
+ * @param index Optional pre-built content index (per-request memoization).
+ * @returns absolute file path, or undefined when neither the index nor the
+ *          slug-template fallback resolves the entry's directory.
+ */
+export function resolveShortformFilePath(
+  projectRoot: string,
+  config: DeskworkConfig,
+  site: string,
+  entry: { id?: string; slug: string },
+  platform: Platform,
+  channel?: string,
+  index?: ContentIndex,
+): string | undefined {
+  if (channel !== undefined && channel !== '') {
+    if (!CHANNEL_RE.test(channel)) {
+      throw new Error(
+        `Invalid shortform channel "${channel}": must match ${CHANNEL_RE} ` +
+          `(kebab-case, same shape as a slug segment).`,
+      );
+    }
+  }
+
+  const entryFile = findEntryFile(
+    projectRoot,
+    config,
+    site,
+    entry.id ?? '',
+    index,
+    { slug: entry.slug },
+  );
+  if (entryFile === undefined) return undefined;
+
+  const entryDir = dirname(entryFile);
+  const filename =
+    channel !== undefined && channel !== ''
+      ? `${platform}-${channel}.md`
+      : `${platform}.md`;
+  return join(entryDir, 'scrapbook', 'shortform', filename);
 }

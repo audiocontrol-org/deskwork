@@ -1,10 +1,10 @@
 /**
- * deskwork-iterate — snapshot the agent's revised blog file as a new
+ * deskwork-iterate — snapshot the agent's revised content file as a new
  * workflow version and transition back to in-review.
  *
- * Call this AFTER the agent has rewritten the blog markdown on disk
- * based on operator comments. The helper does the mechanical
- * persist-and-transition step:
+ * Call this AFTER the agent has rewritten the markdown on disk based on
+ * operator comments. The helper does the mechanical persist-and-transition
+ * step:
  *
  *   1. Read the workflow (must be in state `iterating`).
  *   2. If disk differs from the workflow's current version, append a
@@ -14,8 +14,16 @@
  *      (one per commentId) that the studio sidebar renders as badges.
  *   4. Transition the workflow back to in-review.
  *
+ * Phase 21a: `--kind shortform` is accepted alongside longform/outline.
+ * The mutation is kind-agnostic — it reads the workflow's on-disk file
+ * (longform: `<contentDir>/<slug>.md`; shortform:
+ * `<contentDir>/<slug>/scrapbook/shortform/<platform>[-<channel>].md`)
+ * and snapshots its body as the new version.
+ *
  * Usage:
- *   deskwork-iterate <project-root> [--site <slug>] [--kind longform|outline]
+ *   deskwork-iterate <project-root> [--site <slug>]
+ *                    [--kind longform|outline|shortform]
+ *                    [--platform <p>] [--channel <c>]
  *                    [--dispositions <path>] <slug>
  *
  * The dispositions file (optional) is a JSON object mapping commentId to
@@ -24,7 +32,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { readConfig } from '@deskwork/core/config';
-import { resolveSite, resolveBlogFilePath } from '@deskwork/core/paths';
+import { resolveSite, resolveBlogFilePath, resolveShortformFilePath } from '@deskwork/core/paths';
 import {
   appendAnnotation,
   appendVersion,
@@ -34,11 +42,14 @@ import {
   readWorkflows,
   transitionState,
 } from '@deskwork/core/review/pipeline';
+import { isPlatform } from '@deskwork/core/types';
 import { absolutize, emit, fail, parseArgs } from '@deskwork/core/cli-args';
 
 export async function run(argv: string[]): Promise<void> {
-  const KNOWN_FLAGS = ['site', 'kind', 'dispositions'] as const;
+  const KNOWN_FLAGS = ['site', 'kind', 'platform', 'channel', 'dispositions'] as const;
   const DISPOSITIONS = new Set(['addressed', 'deferred', 'wontfix'] as const);
+  const VALID_KINDS = ['longform', 'outline', 'shortform'] as const;
+  type Kind = (typeof VALID_KINDS)[number];
   type Disposition = 'addressed' | 'deferred' | 'wontfix';
 
   interface DispositionEntry {
@@ -51,7 +62,8 @@ export async function run(argv: string[]): Promise<void> {
   if (positional.length < 2) {
     fail(
       'Usage: deskwork-iterate <project-root> [--site <slug>] ' +
-        '[--kind longform|outline] [--dispositions <path>] <slug>',
+        '[--kind longform|outline|shortform] [--platform <p>] [--channel <c>] ' +
+        '[--dispositions <path>] <slug>',
       2,
     );
   }
@@ -59,10 +71,29 @@ export async function run(argv: string[]): Promise<void> {
   const [rootArg, slug] = positional;
   const projectRoot = absolutize(rootArg);
 
-  const kind: 'longform' | 'outline' =
-    flags.kind === 'outline' ? 'outline' : 'longform';
-  if (flags.kind !== undefined && flags.kind !== 'longform' && flags.kind !== 'outline') {
-    fail(`Invalid --kind "${flags.kind}". Must be 'longform' or 'outline'.`);
+  if (
+    flags.kind !== undefined &&
+    !(VALID_KINDS as readonly string[]).includes(flags.kind)
+  ) {
+    fail(
+      `Invalid --kind "${flags.kind}". Must be 'longform', 'outline', or 'shortform'.`,
+    );
+  }
+  const kind: Kind = ((): Kind => {
+    if (flags.kind === 'shortform') return 'shortform';
+    if (flags.kind === 'outline') return 'outline';
+    return 'longform';
+  })();
+
+  if (kind === 'shortform') {
+    if (flags.platform === undefined) {
+      fail('--platform is required when --kind=shortform.');
+    }
+    if (!isPlatform(flags.platform)) {
+      fail(`Invalid --platform "${flags.platform}".`);
+    }
+  } else if (flags.platform !== undefined || flags.channel !== undefined) {
+    fail('--platform / --channel are only valid with --kind=shortform.');
   }
 
   let config;
@@ -73,10 +104,35 @@ export async function run(argv: string[]): Promise<void> {
   }
 
   const site = resolveSite(config, flags.site);
-  const file = resolveBlogFilePath(projectRoot, config, site, slug);
+
+  let file: string;
+  if (kind === 'shortform' && flags.platform !== undefined && isPlatform(flags.platform)) {
+    const channel = flags.channel;
+    const resolved = resolveShortformFilePath(
+      projectRoot,
+      config,
+      site,
+      { slug },
+      flags.platform,
+      channel,
+    );
+    if (resolved === undefined) {
+      fail(
+        `Cannot resolve shortform file for site=${site} slug=${slug} platform=${flags.platform}. ` +
+          `Run /deskwork:shortform-start to scaffold it first.`,
+      );
+    }
+    file = resolved;
+  } else {
+    file = resolveBlogFilePath(projectRoot, config, site, slug);
+  }
 
   if (!existsSync(file)) {
-    fail(`No blog file at ${file}.`);
+    fail(
+      kind === 'shortform'
+        ? `No shortform file at ${file}. Run /deskwork:shortform-start first.`
+        : `No blog file at ${file}.`,
+    );
   }
 
   const diskMarkdown = readFileSync(file, 'utf8');
@@ -86,6 +142,8 @@ export async function run(argv: string[]): Promise<void> {
       w.site === site &&
       w.slug === slug &&
       w.contentKind === kind &&
+      (kind !== 'shortform' || w.platform === flags.platform) &&
+      (kind !== 'shortform' || (w.channel ?? null) === (flags.channel ?? null)) &&
       w.state !== 'applied' &&
       w.state !== 'cancelled',
   );

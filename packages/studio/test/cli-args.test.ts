@@ -14,10 +14,29 @@ describe('parseCliArgs', () => {
   it('default port is 47321 (avoids Astro 4321 collision), no host override, tailscale enabled', () => {
     const args = parseCliArgs([]);
     expect(args.port).toBe(47321);
+    expect(args.portExplicit).toBe(false);
     expect(args.hostOverride).toBeNull();
     expect(args.noTailscale).toBe(false);
     // projectRoot defaults to process.cwd(); just assert it's absolute
     expect(args.projectRoot.startsWith('/')).toBe(true);
+  });
+
+  it('--port marks portExplicit true (Issue #43)', () => {
+    const args = parseCliArgs(['--port', '47322']);
+    expect(args.port).toBe(47322);
+    expect(args.portExplicit).toBe(true);
+  });
+
+  it('--port=N marks portExplicit true (Issue #43)', () => {
+    const args = parseCliArgs(['--port=8080']);
+    expect(args.port).toBe(8080);
+    expect(args.portExplicit).toBe(true);
+  });
+
+  it('-p marks portExplicit true (Issue #43)', () => {
+    const args = parseCliArgs(['-p', '9999']);
+    expect(args.port).toBe(9999);
+    expect(args.portExplicit).toBe(true);
   });
 
   it('--host explicit override sets hostOverride', () => {

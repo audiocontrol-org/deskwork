@@ -12,7 +12,7 @@ description: Audit and repair binding metadata across the editorial calendar, co
 - After an upgrade (Phase 19 introduced the frontmatter binding; v0.7.2 moved it under a `deskwork:` namespace; existing projects backfill / migrate via doctor).
 - After bulk editing the calendar by hand.
 - After moving or renaming content files in the host project (the frontmatter id moves with the file, but doctor will surface anything that drifted).
-- As a pre-commit / CI check: audit-only mode exits non-zero on any finding, so it composes with `--exit-code` workflows.
+- As a pre-commit / CI check: audit-only mode exits non-zero on any finding, so it composes with `--exit-code` workflows. `--fix` mode exits 0 when every applicable finding was applied or skipped because a prerequisite outside doctor's scope hasn't happened yet (e.g. `missing-frontmatter-id` on entries without a body file — run `/deskwork:outline` to scaffold). It exits 1 only on real follow-ups: ambiguity needing interactive resolution, schema rejections, editorial decisions, or apply failures.
 
 ### One look at the rules
 

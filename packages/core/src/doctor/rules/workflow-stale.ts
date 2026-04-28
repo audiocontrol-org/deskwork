@@ -110,6 +110,7 @@ const rule: DoctorRule = {
         finding: plan.finding,
         applied: false,
         message: 'plan is not directly appliable; runner should resolve prompt first',
+        skipReason: 'apply-failed',
       };
     }
     const workflowId = String(plan.payload.workflowId ?? '');
@@ -118,6 +119,7 @@ const rule: DoctorRule = {
         finding: plan.finding,
         applied: false,
         message: 'apply payload missing workflowId',
+        skipReason: 'apply-failed',
       };
     }
     const file = findWorkflowFile(ctx.projectRoot, ctx.config, workflowId);
@@ -126,6 +128,7 @@ const rule: DoctorRule = {
         finding: plan.finding,
         applied: false,
         message: `no pipeline file found for workflow ${workflowId}`,
+        skipReason: 'apply-failed',
       };
     }
     try {
@@ -136,6 +139,7 @@ const rule: DoctorRule = {
         finding: plan.finding,
         applied: false,
         message: `failed to delete ${file}: ${reason}`,
+        skipReason: 'apply-failed',
       };
     }
     return {

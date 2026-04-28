@@ -281,6 +281,7 @@ const rule: DoctorRule = {
         finding: plan.finding,
         applied: false,
         message: 'plan is not directly appliable; runner should resolve prompt first',
+        skipReason: 'apply-failed',
       };
     }
     const absPath = String(plan.payload.absolutePath ?? '');
@@ -290,6 +291,7 @@ const rule: DoctorRule = {
         finding: plan.finding,
         applied: false,
         message: 'apply payload missing absolutePath or entryId',
+        skipReason: 'apply-failed',
       };
     }
     try {
@@ -300,6 +302,7 @@ const rule: DoctorRule = {
         finding: plan.finding,
         applied: false,
         message: `failed to write frontmatter id: ${reason}`,
+        skipReason: 'apply-failed',
       };
     }
     return {

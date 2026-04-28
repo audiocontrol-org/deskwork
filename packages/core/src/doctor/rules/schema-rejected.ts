@@ -50,6 +50,7 @@ const rule: DoctorRule = {
       applied: false,
       message:
         'schema-rejected has no automatic repair — operator must patch the host content schema',
+      skipReason: 'schema-rejected',
     };
   },
 };

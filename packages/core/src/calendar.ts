@@ -177,7 +177,11 @@ function parseDistributions(lines: string[]): DistributionRecord[] {
     const url = col(cells, cols, 'url');
     const dateShared = col(cells, cols, 'shared');
 
-    if (slug && platformValue && url && dateShared && isPlatform(platformValue)) {
+    // Phase 21a: URL may be empty at creation time (a placeholder
+    // distribution record awaiting the operator's posted URL via
+    // updateDistributionUrl). Parser accepts empty URL; only slug,
+    // platform, and dateShared are required for round-trip.
+    if (slug && platformValue && dateShared && isPlatform(platformValue)) {
       // entryId may be missing on legacy rows. Left empty here and
       // backfilled in parseCalendar once entries are parsed and a
       // slug → entry lookup table is available.
@@ -186,7 +190,7 @@ function parseDistributions(lines: string[]): DistributionRecord[] {
         entryId: entryIdCell ?? '',
         slug,
         platform: platformValue,
-        url,
+        url: url ?? '',
         dateShared,
       };
       const channel = col(cells, cols, 'channel');

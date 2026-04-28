@@ -1,6 +1,6 @@
 ---
 name: studio
-description: Launch the deskwork web studio — a local dev server (default port 47321, loopback only) exposing the editorial dashboard, longform review surface, scrapbook viewer, and the compositor's manual. Reads .deskwork/config.json from the current project. Use when the operator wants a browser surface for the editorial workflow rather than driving everything through CLI subcommands.
+description: Launch the deskwork web studio — a local dev server (default port 47321, loopback only) exposing the editorial dashboard, unified review surface (longform + shortform), scrapbook viewer, and the compositor's manual. Reads .deskwork/config.json from the current project. Use when the operator wants a browser surface for the editorial workflow rather than driving everything through CLI subcommands.
 ---
 
 ## Studio
@@ -14,6 +14,13 @@ The studio reads `.deskwork/config.json` relative to a project root. Defaults to
 ### Step 2 — Port (default 47321)
 
 The default is `47321`. This is intentionally *not* `4321` — Astro's dev server defaults to `4321`, and most projects deskwork manages run an Astro dev server alongside the studio. Override with `--port <n>` if needed.
+
+If the chosen port is already in use, the studio's behavior depends on whether `--port` was explicitly passed:
+
+- **No explicit `--port`** — auto-increments through the range `47321`…`47350` and prints `Started on http://localhost:<port>` when it finds a free port.
+- **Explicit `--port <n>`** — fails fast with a clear error including the address conflict and a `--port <other>` suggestion. Auto-increment is suppressed because the operator asked for a specific port on purpose.
+
+If the auto-increment range is exhausted, the studio fails with a clear error listing the range it tried.
 
 ### Step 3 — Host policy (Tailscale-aware default)
 
@@ -85,8 +92,8 @@ deskwork-studio listening on:
   http://0.0.0.0:47321/
   project: /absolute/path/to/project
   sites:   writingcontrol
-  ⚠ bound to 0.0.0.0. Studio has no authentication —
-    only run this on a trusted network (Tailscale, VPN, etc.).
+  bound to 0.0.0.0. Studio has no authentication —
+  only run this on a trusted network (Tailscale, VPN, etc.).
 ```
 
 Press Ctrl-C to stop.
@@ -96,11 +103,11 @@ Press Ctrl-C to stop.
 | Path | Surface |
 |---|---|
 | `/` | Redirects to `/dev/editorial-studio` |
-| `/dev/editorial-studio` | Dashboard — calendar across all sites, awaiting press, recent proofs, voice-drift signal |
-| `/dev/editorial-review/<slug>` | Longform review (margin notes, editor, decision controls) for an active workflow |
-| `/dev/editorial-review-shortform` | Shortform review desk (Reddit, LinkedIn, YouTube, Instagram) |
+| `/dev/editorial-studio` | Dashboard — calendar across all sites, awaiting press, recent proofs, voice-drift signal, shortform coverage matrix |
+| `/dev/editorial-review/<id>` | **Unified review surface** for longform and shortform workflows (margin notes, editor, decision controls). For shortform workflows, a small platform/channel header renders above the same editor used for longform. Slug-based legacy URLs 302-redirect here. |
+| `/dev/editorial-review-shortform` | Shortform desk **index** — one row per `(slug, platform, channel?)` tuple. Cells with an active workflow link to `/dev/editorial-review/<id>`; empty cells expose a compose button that POSTs to `/api/dev/editorial-review/start-shortform` and redirects to the new review URL. There is no per-platform editor on this index page itself — editing always happens on the unified review surface. |
 | `/dev/editorial-help` | The compositor's manual — reference for the editorial workflow and skill catalogue |
-| `/dev/scrapbook/<site>/<path>` | Scrapbook viewer for research artifacts (path may be hierarchical, e.g. `the-outbound/characters/strivers`) |
+| `/dev/scrapbook/<site>/<path>` | Scrapbook viewer for research artifacts. The path segment supports hierarchical paths (slashes are accepted by the route's `:path{.+}` glob), e.g. `the-outbound/characters/strivers` resolves to that nested node's scrapbook. |
 
 ### Step 6 — Report to the operator
 
@@ -115,3 +122,4 @@ After launch, tell them:
 
 - The studio is **dev-only**. There is no auth, no rate-limiting, and no review of mutation handlers against a hostile caller. Default loopback bind keeps that posture safe; `--host` is opt-in for trusted overlay networks.
 - All mutations from the studio go through the same `@deskwork/core` handlers the CLI uses, so calendar/journal state stays consistent regardless of which surface the operator drives.
+- Shortform composition reuses the longform review surface — same DOM contract, same Save / Iterate / Approve / Reject controls. There is no parallel composer to maintain.

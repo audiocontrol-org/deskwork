@@ -18,8 +18,40 @@ import {
   handleCreateVersion,
   handleStartLongform,
 } from '@deskwork/core/review/handlers';
+import { handleStartShortform } from '@deskwork/core/review/start-handlers';
 import { renderMarkdownToHtml } from '@deskwork/core/review/render';
 import type { DeskworkConfig } from '@deskwork/core/config';
+
+/**
+ * Narrow a `HandlerResult.body` (typed as `unknown`) to extract the
+ * workflow id. Returns null when the shape doesn't match — phase 21c's
+ * start-shortform route uses this to decide whether to augment the
+ * response with a reviewUrl. Avoids `as`-casts on the body.
+ */
+function extractWorkflowId(body: unknown): string | null {
+  if (typeof body !== 'object' || body === null) return null;
+  const workflow = Reflect.get(body, 'workflow');
+  if (typeof workflow !== 'object' || workflow === null) return null;
+  const id = Reflect.get(workflow, 'id');
+  return typeof id === 'string' && id.length > 0 ? id : null;
+}
+
+/**
+ * Build a fresh response object that preserves every field from the
+ * original handler body and adds `reviewUrl`. Iterates own keys via
+ * `Object.entries` so the result is a plain `Record<string, unknown>`
+ * rather than carrying the input's unknown-typed shape.
+ */
+function withReviewUrl(body: unknown, workflowId: string): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (typeof body === 'object' && body !== null) {
+    for (const [k, v] of Object.entries(body)) {
+      out[k] = v;
+    }
+  }
+  out.reviewUrl = `/dev/editorial-review/${workflowId}`;
+  return out;
+}
 
 export interface StudioContext {
   projectRoot: string;
@@ -103,6 +135,30 @@ export function createApiRouter(ctx: StudioContext): Hono {
       return c.json({ error: 'invalid JSON body' }, 400);
     }
     const r = handleStartLongform(ctx.projectRoot, ctx.config, body);
+    return c.json(r.body, r.status as never);
+  });
+
+  // POST /api/dev/editorial-review/start-shortform
+  //
+  // Phase 21c: Mirrors start-longform but for shortform workflows.
+  // Augments the handler's success body with a `reviewUrl` so the
+  // dashboard's matrix-cell start button can fetch + redirect in one
+  // round-trip. The handler scaffolds the disk file (frontmatter +
+  // initial body) when missing and is idempotent on
+  // (entryId|site+slug, contentKind, platform, channel).
+  app.post('/start-shortform', async (c) => {
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'invalid JSON body' }, 400);
+    }
+    const r = handleStartShortform(ctx.projectRoot, ctx.config, body);
+    const workflowId = extractWorkflowId(r.body);
+    if (r.status === 200 && workflowId !== null) {
+      const augmented = withReviewUrl(r.body, workflowId);
+      return c.json(augmented, 200);
+    }
     return c.json(r.body, r.status as never);
   });
 

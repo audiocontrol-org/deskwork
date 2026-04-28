@@ -15,7 +15,7 @@ For local development against the workspace, point Claude Code at this plugin di
 claude --plugin-dir plugins/deskwork
 ```
 
-Pair with the optional [`deskwork-studio`](../deskwork-studio/) plugin for a local Hono web surface (dashboard, longform review pane, shortform desk, scrapbook viewer, manual).
+Pair with the optional [`deskwork-studio`](../deskwork-studio/) plugin for a local Hono web surface (dashboard, unified review pane for longform + shortform, scrapbook viewer, manual).
 
 ### Bootstrap a project
 
@@ -63,8 +63,10 @@ All skills are under the `/deskwork:` namespace. Slugs accept `/`-separated keba
 | `draft` | Move Outlining → Drafting |
 | `publish` | Move to Published |
 | `review-start` | Open a longform review workflow |
-| `iterate` | Snapshot agent revision; back to in-review |
-| `approve` | Finalize an approved review |
+| `shortform-start` | Open a shortform review workflow (LinkedIn / Reddit / YouTube / Instagram); scaffolds the scrapbook markdown file and reports the studio review URL |
+| `iterate` | Snapshot agent revision; back to in-review. Accepts `--kind longform\|outline\|shortform` |
+| `approve` | Finalize an approved review (longform: file is already correct; shortform: writes the scrapbook body into the calendar's distribution record) |
+| `distribute` | After posting a shortform manually, record the URL on the calendar's distribution record so the dashboard matrix shows the cell as covered |
 | `review-cancel` | Cancel a review workflow |
 | `review-help` | List open workflows |
 | `review-report` | Voice-drift report across recent terminal workflows |
@@ -84,6 +86,86 @@ deskwork doctor --fix=all --yes                  # non-interactive repair (skips
 ```
 
 See [`skills/doctor/SKILL.md`](skills/doctor/SKILL.md) for the full rule-by-rule playbook.
+
+### Shortform / cross-platform posts
+
+Deskwork supports composing shortform posts (LinkedIn, Reddit, YouTube, Instagram) for any tracked calendar entry. Shortform reuses the **same edit/review surface as longform** — there's no parallel composer. Each shortform draft is a real markdown file under the entry's scrapbook; the studio's unified review surface renders a small platform/channel header above the same editor used for longform.
+
+#### File-location convention
+
+```
+<contentDir>/<slug>/scrapbook/shortform/
+  linkedin.md                 (platform-only)
+  reddit-rprogramming.md      (platform + channel; channel kebab-cased into filename)
+  youtube.md
+```
+
+Frontmatter on each file binds the file to its workflow:
+
+```yaml
+---
+deskwork:
+  id: <workflow-uuid>
+  platform: linkedin
+  channel: rprogramming    # optional
+---
+
+The shortform copy goes here.
+```
+
+Until Phase 20's deskwork content sandbox lands ([#40](https://github.com/audiocontrol-org/deskwork/issues/40)), shortform files live inside the host's content tree under `scrapbook/`. When Phase 20 ships, both outline and shortform files migrate into the sandbox in a single doctor pass; the file location is centralized through `resolveShortformFilePath` so callers (CLI, studio, skills) stay unchanged.
+
+#### Lifecycle
+
+```
+1. Pick a Published longform entry.
+2. /deskwork:shortform-start <slug> --platform linkedin
+   → scaffolds <contentDir>/<slug>/scrapbook/shortform/linkedin.md (if missing)
+   → creates a review workflow (contentKind: shortform)
+   → reports the studio review URL: /dev/editorial-review/<id>
+3. Open the studio URL. Edit the copy in the textarea.
+   Click Save / Iterate / Approve through the unified review surface
+   (the same one longform uses).
+4. Manually post to LinkedIn (or Reddit / YouTube / Instagram). Copy the URL.
+5. /deskwork:distribute <slug> --platform linkedin --url <posted-url>
+   → records the URL on the calendar's DistributionRecord
+6. Dashboard matrix shows the (slug, platform) cell as covered with a link
+   to the share.
+```
+
+The `approve` step writes the body content from the scrapbook file into the calendar's `DistributionRecord.shortform` field, preserving cross-tool readability of the calendar's `## Shortform Copy` section. The file on disk is the source of truth; the calendar mirror is for downstream tools that read the calendar markdown directly.
+
+#### End-to-end smoke
+
+After a fresh install, an operator can verify the full LinkedIn workflow with these steps:
+
+```sh
+# Pick a Published entry, e.g. the-deskwork-experiment
+/deskwork:shortform-start the-deskwork-experiment --platform linkedin
+# -> Reports the studio review URL: http://localhost:47321/dev/editorial-review/<uuid>
+
+# Open the URL in a browser. Edit the textarea. Click "Save as new version".
+# Click "Approve" once happy. (Or "Iterate" / "Reject" as needed.)
+
+# Verify the file:
+cat src/content/blog/the-deskwork-experiment/scrapbook/shortform/linkedin.md
+# Frontmatter: deskwork: { id, platform: linkedin }; body: the approved copy.
+
+# Verify the calendar:
+grep -A 5 "## Shortform Copy" docs/editorial-calendar-audiocontrol.md
+# Expect: ### the-deskwork-experiment · linkedin block with the same body content.
+
+# Post to LinkedIn manually. Get the URL.
+
+/deskwork:distribute the-deskwork-experiment --platform linkedin \
+  --url https://linkedin.com/...
+
+# Verify the dashboard matrix:
+# http://localhost:47321/dev/editorial-studio
+# The (the-deskwork-experiment, linkedin) cell now shows the URL or a covered indicator.
+```
+
+The same shape works for Reddit (`--platform reddit --channel <subreddit>`), YouTube (`--platform youtube`), and Instagram (`--platform instagram`). Reddit's `--channel` value is the kebab-cased subreddit (e.g. `rprogramming` for `r/programming`).
 
 ### Hierarchical content
 
@@ -132,13 +214,16 @@ Adding `the-outbound/characters/strivers` does **not** auto-create entries for `
 
 The studio (`deskwork-studio`) renders hierarchical content at any depth:
 
-- `/dev/editorial-review/<id>` — review surface, canonical id-based URL. Slug-based links (`/dev/editorial-review/the-outbound/characters/strivers`) still resolve and 302-redirect to the canonical id route.
-- `/dev/scrapbook/<site>/<path>` — scrapbook viewer at any path; works for tracked entries AND untracked organizational nodes
-- `/dev/content/<site>/<project>` — bird's-eye tree view (Phase 16) showing the entire content shape with drillable detail panel
+- `/dev/editorial-review/<id>` — unified review surface for both longform and shortform workflows; canonical id-based URL. Slug-based links (`/dev/editorial-review/the-outbound/characters/strivers`) still resolve and 302-redirect to the canonical id route.
+- `/dev/editorial-review-shortform` — shortform desk **index**: lists every (slug, platform, channel?) tuple the calendar surfaces, with links to the unified review URL above for in-flight workflows and a "compose" button that starts a new workflow for empty cells.
+- `/dev/scrapbook/<site>/<path>` — scrapbook viewer at any path; works for tracked entries AND untracked organizational nodes.
+- `/dev/content/<site>/<project>` — bird's-eye tree view (Phase 16) showing the entire content shape with drillable detail panel.
 
 ### Scrapbooks
 
 Every node in a content tree can host its own scrapbook at `<contentDir>/<path>/scrapbook/`. Items at the top level are public (committed alongside the article); items inside `scrapbook/secret/` are editorially private — the studio surfaces them in a separate section, and host content-collection patterns shouldn't pick them up.
+
+The shortform composition flow (above) uses a sibling subdirectory `scrapbook/shortform/` for per-platform copy files. This convention keeps shortform drafts in the operator's content tree (close to the longform article they're promoting) until Phase 20 introduces the deskwork content sandbox.
 
 ### Configuration
 

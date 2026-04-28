@@ -74,6 +74,7 @@ const rule: DoctorRule = {
       finding: plan.finding,
       applied: false,
       message: 'slug-collision has no automatic repair (operator must rename)',
+      skipReason: 'editorial-decision',
     };
   },
 };

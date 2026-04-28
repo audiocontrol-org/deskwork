@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
   findEntryFile,
+  resolveShortformFilePath,
   resolveSite,
   resolveCalendarPath,
   resolveChannelsPath,
@@ -199,5 +200,127 @@ describe('findEntryFile (Phase 19c)', () => {
       `---\ndeskwork:\n  id: ${id}\ntitle: The Outbound\n---\n\n# The Outbound\n`,
     );
     expect(findEntryFile(root, cfg, 'wc', id)).toBe(abs);
+  });
+});
+
+describe('resolveShortformFilePath (Phase 21a)', () => {
+  let root: string;
+  const cfg: DeskworkConfig = {
+    version: 1,
+    sites: {
+      wc: {
+        host: 'wc.example',
+        contentDir: 'src/content/blog',
+        calendarPath: 'docs/cal.md',
+      },
+    },
+    defaultSite: 'wc',
+  };
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'deskwork-shortform-path-'));
+  });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it('returns <entry-dir>/scrapbook/shortform/<platform>.md when no channel', () => {
+    const id = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+    const entryFile = join(root, 'src/content/blog/my-post/index.md');
+    mkdirSync(join(entryFile, '..'), { recursive: true });
+    writeFileSync(
+      entryFile,
+      `---\ndeskwork:\n  id: ${id}\ntitle: My Post\n---\n\n# My Post\n`,
+    );
+
+    const out = resolveShortformFilePath(
+      root,
+      cfg,
+      'wc',
+      { id, slug: 'my-post' },
+      'linkedin',
+    );
+    expect(out).toBe(
+      join(root, 'src/content/blog/my-post/scrapbook/shortform/linkedin.md'),
+    );
+  });
+
+  it('appends -<channel> when channel is passed', () => {
+    const id = 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff';
+    const entryFile = join(root, 'src/content/blog/my-post/index.md');
+    mkdirSync(join(entryFile, '..'), { recursive: true });
+    writeFileSync(
+      entryFile,
+      `---\ndeskwork:\n  id: ${id}\ntitle: My Post\n---\n\n# Body\n`,
+    );
+
+    const out = resolveShortformFilePath(
+      root,
+      cfg,
+      'wc',
+      { id, slug: 'my-post' },
+      'reddit',
+      'rprogramming',
+    );
+    expect(out).toBe(
+      join(
+        root,
+        'src/content/blog/my-post/scrapbook/shortform/reddit-rprogramming.md',
+      ),
+    );
+  });
+
+  it('uses slug-template fallback when no id binding (legacy / pre-doctor)', () => {
+    // No file laid down; the slug-template fallback path under findEntryFile
+    // assumes the entry's body would land at <slug>/index.md. resolveShortformFilePath
+    // returns the derived shortform path even though the body doesn't yet exist.
+    const out = resolveShortformFilePath(
+      root,
+      cfg,
+      'wc',
+      { slug: 'planned-but-no-scaffold' },
+      'youtube',
+    );
+    expect(out).toBe(
+      join(
+        root,
+        'src/content/blog/planned-but-no-scaffold/scrapbook/shortform/youtube.md',
+      ),
+    );
+  });
+
+  it('throws on a channel with invalid characters', () => {
+    expect(() =>
+      resolveShortformFilePath(
+        root,
+        cfg,
+        'wc',
+        { slug: 'my-post' },
+        'reddit',
+        'rProgramming',
+      ),
+    ).toThrow(/Invalid shortform channel/);
+    expect(() =>
+      resolveShortformFilePath(
+        root,
+        cfg,
+        'wc',
+        { slug: 'my-post' },
+        'reddit',
+        'r/programming',
+      ),
+    ).toThrow(/Invalid shortform channel/);
+  });
+
+  it('treats empty channel as undefined and resolves to bare platform.md', () => {
+    const out = resolveShortformFilePath(
+      root,
+      cfg,
+      'wc',
+      { slug: 'p' },
+      'instagram',
+      '',
+    );
+    expect(out).toBe(
+      join(root, 'src/content/blog/p/scrapbook/shortform/instagram.md'),
+    );
   });
 });

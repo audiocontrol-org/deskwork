@@ -628,11 +628,74 @@ function initRenameForms(): void {
   });
 }
 
+/**
+ * Start a shortform draft for the (site, slug, platform) cell the
+ * operator clicked in the coverage matrix. POSTs to
+ * /api/dev/editorial-review/start-shortform — the handler scaffolds
+ * the on-disk file and creates the workflow (idempotent on the
+ * tuple). On success we navigate to the workflow's review URL so the
+ * operator lands directly on the unified review surface.
+ *
+ * Phase 21c: replaces the prior copy-CLI-command flow that required
+ * the operator to paste `/editorial-shortform-draft …` into Claude
+ * Code. The new flow is point-and-click — no terminal round trip.
+ */
+function initStartShortformButtons(): void {
+  document
+    .querySelectorAll<HTMLButtonElement>('[data-action="start-shortform"]')
+    .forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const site = btn.dataset.site;
+        const slug = btn.dataset.slug;
+        const platform = btn.dataset.platform;
+        if (!site || !slug || !platform) {
+          showToast('Start button missing site/slug/platform', true);
+          return;
+        }
+        btn.disabled = true;
+        const originalText = btn.textContent;
+        btn.textContent = 'starting…';
+        try {
+          const result = await postJson(
+            '/api/dev/editorial-review/start-shortform',
+            { site, slug, platform },
+          );
+          if (!result.ok) {
+            showToast(
+              bodyError(result.body, `Start failed: ${result.status}`),
+              true,
+            );
+            btn.disabled = false;
+            btn.textContent = originalText;
+            return;
+          }
+          const reviewUrl =
+            typeof result.body === 'object' && result.body !== null
+              ? Reflect.get(result.body, 'reviewUrl')
+              : undefined;
+          if (typeof reviewUrl !== 'string' || reviewUrl.length === 0) {
+            showToast('Start succeeded but no reviewUrl returned', true);
+            btn.disabled = false;
+            btn.textContent = originalText;
+            return;
+          }
+          window.location.href = reviewUrl;
+        } catch (e) {
+          const message = e instanceof Error ? e.message : String(e);
+          showToast(`Network error: ${message}`, true);
+          btn.disabled = false;
+          btn.textContent = originalText;
+        }
+      });
+    });
+}
+
 function init(): void {
   initCopyButtons();
   initScaffoldButtons();
   initPublishButtons();
   initEnqueueReviewButtons();
+  initStartShortformButtons();
   initFilter();
   initKeyboardShortcuts();
   initPolling();

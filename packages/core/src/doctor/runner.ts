@@ -204,10 +204,16 @@ async function resolveAndApply(
   interaction: DoctorInteraction,
 ): Promise<RepairResult> {
   if (plan.kind === 'report-only') {
+    // `report-only` is the rule's signal that the finding can't be
+    // auto-repaired in this run. The granularity (prerequisite vs
+    // editorial-decision vs schema-rejected) is rule-specific; the
+    // rule sets `skipReason` via the report-only finding's details
+    // — see `reportOnlySkipReason()` below.
     return {
       finding: plan.finding,
       applied: false,
       message: plan.reason,
+      skipReason: reportOnlySkipReason(rule, plan.finding),
     };
   }
   if (plan.kind === 'prompt') {
@@ -217,6 +223,7 @@ async function resolveAndApply(
         finding: plan.finding,
         applied: false,
         message: 'skipped (operator declined or --yes mode encountered ambiguity)',
+        skipReason: 'ambiguous',
       };
     }
     const choice = plan.choices.find((c) => c.id === choiceId);
@@ -225,6 +232,7 @@ async function resolveAndApply(
         finding: plan.finding,
         applied: false,
         message: `unknown choice id: ${choiceId}`,
+        skipReason: 'apply-failed',
       };
     }
     const applyPlan: RepairPlan = {
@@ -242,9 +250,43 @@ async function resolveAndApply(
       finding: plan.finding,
       applied: false,
       message: 'skipped (operator declined)',
+      skipReason: 'operator-declined',
     };
   }
   return rule.apply(ctx, plan);
+}
+
+/**
+ * Map a rule's `report-only` plan to a `SkipReason`. The mapping is by
+ * rule id because the existing rules don't carry an explicit skip-
+ * reason field on their `report-only` plans — adding one to every
+ * rule would be churn for a 1:1 relationship that's already implicit
+ * in the rule's purpose.
+ */
+function reportOnlySkipReason(
+  rule: DoctorRule,
+  _finding: import('./types.ts').Finding,
+):
+  | 'prerequisite-missing'
+  | 'editorial-decision'
+  | 'schema-rejected'
+  | 'no-action-needed' {
+  switch (rule.id) {
+    case 'missing-frontmatter-id':
+      // Always "no candidate file found" — the operator hasn't
+      // scaffolded the body file yet (run /deskwork:outline).
+      return 'prerequisite-missing';
+    case 'slug-collision':
+      // Editorial: which slug "owns" the public URL.
+      return 'editorial-decision';
+    case 'schema-rejected':
+      // Patch instructions only; nothing to apply automatically.
+      return 'schema-rejected';
+    default:
+      // Conservative fallback — treat unfamiliar rules as needing
+      // operator follow-up.
+      return 'editorial-decision';
+  }
 }
 
 /**

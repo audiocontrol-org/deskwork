@@ -102,6 +102,7 @@ const rule: DoctorRule = {
         finding: plan.finding,
         applied: false,
         message: 'plan is not directly appliable; runner should resolve prompt first',
+        skipReason: 'apply-failed',
       };
     }
     const action = String(plan.payload.action ?? '');
@@ -110,6 +111,7 @@ const rule: DoctorRule = {
         finding: plan.finding,
         applied: false,
         message: 'left file unchanged per operator choice',
+        skipReason: 'no-action-needed',
       };
     }
     if (action === 'clear-id') {
@@ -119,6 +121,7 @@ const rule: DoctorRule = {
           finding: plan.finding,
           applied: false,
           message: 'clear-id apply payload missing absolutePath',
+          skipReason: 'apply-failed',
         };
       }
       try {
@@ -128,6 +131,7 @@ const rule: DoctorRule = {
             finding: plan.finding,
             applied: false,
             message: `no id field in ${relative(ctx.projectRoot, absPath)} to clear`,
+            skipReason: 'no-action-needed',
           };
         }
       } catch (err) {
@@ -136,6 +140,7 @@ const rule: DoctorRule = {
           finding: plan.finding,
           applied: false,
           message: `failed to clear frontmatter id: ${reason}`,
+          skipReason: 'apply-failed',
         };
       }
       return {
@@ -149,6 +154,7 @@ const rule: DoctorRule = {
       finding: plan.finding,
       applied: false,
       message: `unknown apply action: ${action}`,
+      skipReason: 'apply-failed',
     };
   },
 };
