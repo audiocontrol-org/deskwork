@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "sites": {
+    "deskwork-internal": {
+      "contentDir": "docs",
+      "calendarPath": ".deskwork/calendar.md"
+    }
+  },
+  "defaultSite": "deskwork-internal",
+  "author": "Orion Letizi"
+}
