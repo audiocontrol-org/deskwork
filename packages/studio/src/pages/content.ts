@@ -59,7 +59,8 @@ export type IndexGetter = (site: string) => ContentIndex;
 
 interface SiteProjects {
   site: string;
-  host: string;
+  /** Host is undefined for collections that aren't published as a website. */
+  host: string | undefined;
   projects: ContentProject[];
 }
 
@@ -175,7 +176,7 @@ function renderSiteCard(sp: SiteProjects, index: number): RawHtml {
     <article class="site-card">
       <div class="site-card__tag">${siteTag(index)}</div>
       <h2 class="site-card__name">${sp.site}</h2>
-      <div class="site-card__host">${sp.host}</div>
+      <div class="site-card__host">${sp.host ?? '(no host configured)'}</div>
       <div class="site-card__counts">
         <b>${sp.projects.length}</b> root entries ·
         <b>${totalNodes}</b> total nodes ·

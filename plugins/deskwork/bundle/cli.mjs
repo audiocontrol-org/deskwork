@@ -128,10 +128,17 @@ function parseSiteConfig(slug, value) {
     }
   }
   const site = {
-    host: obj.host,
     contentDir: obj.contentDir,
     calendarPath: obj.calendarPath
   };
+  if (obj.host !== void 0) {
+    if (typeof obj.host !== "string" || obj.host.length === 0) {
+      throw new Error(
+        `Invalid deskwork config: site "${slug}" has invalid "host" (must be a non-empty string when set).`
+      );
+    }
+    site.host = obj.host;
+  }
   if (obj.channelsPath !== void 0) {
     if (typeof obj.channelsPath !== "string" || obj.channelsPath.length === 0) {
       throw new Error(
@@ -243,9 +250,10 @@ var init_config = __esm({
       "author",
       "reviewJournalDir"
     ]);
-    REQUIRED_SITE_KEYS = ["host", "contentDir", "calendarPath"];
+    REQUIRED_SITE_KEYS = ["contentDir", "calendarPath"];
     ALLOWED_SITE_KEYS = /* @__PURE__ */ new Set([
       ...REQUIRED_SITE_KEYS,
+      "host",
       "channelsPath",
       "blogLayout",
       "blogFilenameTemplate",

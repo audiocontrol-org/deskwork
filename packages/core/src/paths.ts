@@ -90,20 +90,38 @@ export function resolveContentDir(
   return join(projectRoot, siteConfig(config, site).contentDir);
 }
 
-/** Bare public hostname for the site (no protocol). */
+/**
+ * Bare public hostname for the site (no protocol). Returns `undefined` for
+ * collections that aren't published as a website (no `host` configured).
+ * Callers needing a non-undefined value for display should fall back to the
+ * site slug; callers needing a real URL should throw if undefined.
+ */
 export function resolveSiteHost(
   config: DeskworkConfig,
   site?: string | null,
-): string {
+): string | undefined {
   return siteConfig(config, site).host;
 }
 
-/** Canonical public base URL for the site, with trailing slash. */
+/**
+ * Canonical public base URL for the site, with trailing slash. Throws when
+ * the collection has no `host` configured (i.e. is not published as a
+ * website) — callers that need a URL must guarantee the collection is a
+ * website-rendered one before calling.
+ */
 export function resolveSiteBaseUrl(
   config: DeskworkConfig,
   site?: string | null,
 ): string {
-  return `https://${resolveSiteHost(config, site)}/`;
+  const host = resolveSiteHost(config, site);
+  if (host === undefined) {
+    const slug = site ?? config.defaultSite;
+    throw new Error(
+      `Cannot resolve a base URL for collection "${slug}": no "host" is configured. ` +
+        `Add a "host" field to .deskwork/config.json if this collection is published as a website.`,
+    );
+  }
+  return `https://${host}/`;
 }
 
 const DEFAULT_BLOG_FILENAME_TEMPLATE = '{slug}/index.md';
