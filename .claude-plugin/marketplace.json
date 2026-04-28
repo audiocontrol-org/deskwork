@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Open-source Claude Code plugins — editorial calendar, feature images, analytics",
-    "version": "0.8.2",
+    "version": "0.8.3",
     "pluginRoot": "./plugins"
   },
   "plugins": [
@@ -14,13 +14,13 @@
       "name": "deskwork",
       "source": "./plugins/deskwork",
       "description": "Editorial calendar lifecycle: capture, plan, draft, publish, distribute",
-      "version": "0.8.2"
+      "version": "0.8.3"
     },
     {
       "name": "deskwork-studio",
       "source": "./plugins/deskwork-studio",
       "description": "Web studio for deskwork — dashboard, longform review, scrapbook, manual. Optional companion to the deskwork plugin",
-      "version": "0.8.2"
+      "version": "0.8.3"
     }
   ]
 }
