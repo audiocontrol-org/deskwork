@@ -39,10 +39,28 @@ jobs:
 
       - name: Verify bundles match the tagged source
         run: |
-          if ! git diff --exit-code -- plugins/deskwork/bundle/ plugins/deskwork-studio/bundle/; then
-            echo "::error::Tagged commit ships stale bundles. Bump the tag, rebuild, and re-tag."
+          if ! git diff --exit-code -- plugins/deskwork/bundle/ plugins/deskwork-studio/bundle/ plugins/deskwork-studio/public/dist/; then
+            echo "::error::Tagged commit ships stale bundles or dist. Bump the tag, rebuild, and re-tag."
             exit 1
           fi
+          # Also assert the studio's client bundles are present in the tag —
+          # they MUST ship in the marketplace tarball or the studio's
+          # interaction layer 404s for every adopter (the v0.6.0–v0.8.2
+          # packaging bug). See `.gitignore` for the load-bearing exception.
+          required_dist=(
+            plugins/deskwork-studio/public/dist/editorial-review-client.js
+            plugins/deskwork-studio/public/dist/editorial-review-editor.js
+            plugins/deskwork-studio/public/dist/editorial-studio-client.js
+            plugins/deskwork-studio/public/dist/scrapbook-client.js
+            plugins/deskwork-studio/public/dist/content-view-client.js
+            plugins/deskwork-studio/public/dist/lightbox.js
+          )
+          for f in "${required_dist[@]}"; do
+            if [ ! -f "$f" ]; then
+              echo "::error::Required client bundle missing from tag: $f"
+              exit 1
+            fi
+          done
 
       - name: Create GitHub release
         env:

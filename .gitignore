@@ -9,6 +9,16 @@ dist/
 build/
 *.tsbuildinfo
 
+## Studio client bundles MUST ship in the marketplace tarball; the blanket
+## `dist/` rule above would silently exclude them, which is exactly the
+## v0.6.0–v0.8.2 packaging bug that motivated this exception. Temporary
+## measure until the source-shipped re-architecture (Phase 1+4 of
+## docs/source-shipped-deskwork-plan/) retires the dist/ directory in
+## favor of runtime esbuild. The release workflow's bundle-verification
+## step covers this path explicitly to catch any drift.
+!plugins/deskwork-studio/public/dist/
+!plugins/deskwork-studio/public/dist/**
+
 ## Runtime / local state
 .env
 .env.*
