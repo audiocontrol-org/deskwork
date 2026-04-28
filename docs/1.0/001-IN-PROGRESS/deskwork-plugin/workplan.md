@@ -714,3 +714,131 @@ Tasks are grouped by sub-phase. Sub-phases are sequential (19a → 19b → 19c �
 - The migration's body-rewrite path uses a markdown-aware approach (find `## Outline` ... next H2 or EOF). If the body has unusual heading nesting (`## Outline` inside a code fence, for example), the rule errs on the side of skipping with a report rather than risking content loss. Document this in the rule's source.
 
 **GitHub tracking:** [#40](https://github.com/audiocontrol-org/deskwork/issues/40)
+---
+
+### Phase 21: End-to-end shortform composition through the unified review surface
+
+**Deliverable:** The operator can author a LinkedIn / Reddit / YouTube / Instagram post for any tracked calendar entry without leaving Claude Code or hand-editing files. Shortform reuses the **same edit/review surface as longform** — there is no parallel composer. Each shortform draft is a real markdown file under the entry's scrapbook (`<contentDir>/<slug>/scrapbook/shortform/<platform>[-<channel>].md`); the studio renders a small platform/channel header above the same editor used for longform. After approval, a new `/deskwork:distribute` skill records the URL of the manually-posted share onto the calendar's `DistributionRecord`, flipping the dashboard matrix cell to "covered".
+
+**Why this phase exists:** Pre-21, three load-bearing pieces were missing: there was no way to *start* a shortform workflow (no `handleStartShortform`, no API route, no CLI command, no skill); the studio's shortform desk rendered an editor textarea with action buttons that had no client-side handlers; and after approval, no way to record the URL the operator posted to. Storage was inline in workflow journal versions, not on disk — a parallel SSOT model that diverged from longform's "file is truth" contract. Phase 21 unifies the model: shortform copy lives in real markdown files (one per `(slug, platform, channel?)` triple), the longform review pipeline drives both kinds, and the studio's shortform desk becomes a pure index page.
+
+**Plan reference:** `~/.claude/plans/i-would-like-to-wiggly-hennessy.md` section "Phase 21: shortform end-to-end through the longform review surface".
+
+**GitHub tracking:** [#47](https://github.com/audiocontrol-org/deskwork/issues/47)
+
+#### 21a — Core: shortform file model + handlers
+
+- [x] `packages/core/src/paths.ts`: new `resolveShortformFilePath(projectRoot, config, site, entry, platform, channel?)` returning `<contentDir>/<slug>/scrapbook/shortform/<platform>[-<channel>].md`. Composes with `findEntryFile` for entry-dir resolution; the scrapbook subpath is appended.
+- [x] `packages/core/src/review/handlers.ts`: new `handleStartShortform(input: { site, slug, platform, channel?, initialMarkdown? })`. Resolves entry; computes file path; creates the file with frontmatter + body when missing; creates workflow with `contentKind: 'shortform'`, populated `platform` + `channel`, `entryId` from the calendar entry; v1 mirrors file content. Idempotent — resuming an existing workflow returns it unchanged.
+- [x] Removed the shortform special-case in `handleCreateVersion` (was at lines 309-313, "shortform has no separate file"). All kinds now write disk first, then version-bump. The file-resolution helper is shared between longform and shortform start paths.
+- [x] `packages/core/src/calendar-mutations.ts`: new `updateDistributionUrl(calendar, entryId | slug, platform, channel?, url, dateShared?)`. Sets URL + `dateShared` on an existing `DistributionRecord` or creates one if `addDistribution` already ran without a URL. `addDistribution`'s required-`url` constraint relaxed — empty URL legal at creation, filled in by `updateDistributionUrl`.
+- [x] `packages/cli/src/commands/iterate.ts`: accepts `--kind shortform` in addition to longform/outline. The mutation is kind-agnostic; validation relaxed.
+- [x] `packages/cli/src/commands/approve.ts`: shortform approve path reads the **file content** (not the workflow inline version) when writing to the distribution record. File is now the source.
+- [x] Tests: `packages/core/test/review-handlers-shortform.test.ts` — handleStartShortform creates file + workflow; handleCreateVersion for shortform writes disk; iterate accepts shortform; approve reads file content.
+
+**Acceptance:** Core tests green; handlers symmetric across content kinds; the special-case branch in `handleCreateVersion` is gone.
+
+#### 21b — CLI + skills: `shortform-start` and `distribute`
+
+- [x] `packages/cli/src/commands/shortform-start.ts` (NEW): subcommand `deskwork shortform-start [<project-root>] [--site <slug>] --platform <p> [--channel <c>] [--initial-markdown <text>] <slug>`. Calls `handleStartShortform`; prints workflow id + studio review URL path (`/dev/editorial-review/<id>`).
+- [x] `packages/cli/src/commands/distribute.ts` (NEW): subcommand `deskwork distribute [<project-root>] [--site <slug>] --platform <p> [--channel <c>] --url <posted-url> [--date <YYYY-MM-DD>] [--notes <text>] <slug>`. Calls `updateDistributionUrl`.
+- [x] `packages/cli/src/cli.ts`: registers `shortform-start` and `distribute`.
+- [x] `plugins/deskwork/skills/shortform-start/SKILL.md` (NEW): operator-facing prose. One-arg-at-a-time prompting (slug → platform → optional channel → optional initial draft). Reports the studio URL on success.
+- [x] `plugins/deskwork/skills/distribute/SKILL.md` (NEW): operator-facing prose for recording the URL after posting.
+- [x] Tests: `packages/cli/test/shortform-start.test.ts` and `packages/cli/test/distribute.test.ts` — integration coverage.
+
+**Acceptance:** CLI tests green; both skills load via `claude --plugin-dir plugins/deskwork`; one-arg-at-a-time prompting works against the live skill loader.
+
+#### 21c — Studio: API route + page refactors + dashboard matrix
+
+- [x] `packages/studio/src/routes/api.ts`: new `POST /api/dev/editorial-review/start-shortform` route. Body: `{ site, slug, platform, channel?, initialMarkdown? }`. Calls `handleStartShortform`. Response: `{ workflowId, reviewUrl }`.
+- [x] `packages/studio/src/pages/shortform.ts`: refactored from compose-stub to **pure index page**. No textareas, no orphan action buttons. Each row links to `/dev/editorial-review/<workflow-id>` (the unified review surface). Empty cells (no workflow yet for a `(slug, platform, channel?)` triple) get a "compose" button that POSTs to `/api/dev/editorial-review/start-shortform` and redirects to the new review URL.
+- [x] `packages/studio/src/pages/review.ts`: extended to handle `contentKind: 'shortform'`. Small platform/channel header renders above the markdown editor. Existing editor + save/iterate/approve/reject buttons work for any contentKind unchanged.
+- [x] `packages/studio/src/pages/dashboard.ts`: `renderShortformMatrix` updated. Cells become real links — covered cells link to the workflow's `/dev/editorial-review/<id>`; uncovered cells get a button that POSTs to `start-shortform` and redirects. Dropped the copy-CLI-command affordance.
+- [x] `packages/studio/public/dist/editorial-review-client.ts`: existing client's `data-action="save-version"`, `"approve"`, `"iterate"`, `"reject"` selectors verified to match the unified review surface DOM contract for both kinds.
+- [x] Removed any shortform-specific client bundle (`shortform-client.ts`) — the unification means no shortform-specific client code.
+- [x] Tests: `packages/studio/test/shortform-routing.test.ts` — start-shortform route → 200 + workflow id; review URL renders shortform workflow with platform/channel header; dashboard matrix link goes to review URL; existing-coverage cell renders correctly.
+
+**Acceptance:** Studio tests green; the studio's shortform desk renders as an index page with no orphan UI; the unified review surface drives both content kinds.
+
+#### 21d — Skill prose, README, end-to-end smoke
+
+- [x] `plugins/deskwork/skills/approve/SKILL.md`: prose updated — shortform approve reads from the on-disk scrapbook file and writes the body content into the calendar's `DistributionRecord.shortform` field. Pre-21a inline-version language removed.
+- [x] `plugins/deskwork/skills/iterate/SKILL.md`: prose updated — `--kind shortform` accepted; revised markdown is written back to the same scrapbook file the workflow reads from. Examples added showing `--kind shortform --platform <p>`.
+- [x] `plugins/deskwork/README.md`: new "Shortform / cross-platform posts" section. File-location convention documented. The "until Phase 20 sandbox lands, lives in scrapbook" caveat noted with link to [#40](https://github.com/audiocontrol-org/deskwork/issues/40). Skills table updated with `shortform-start` and `distribute` rows. End-to-end smoke subsection added.
+- [x] `plugins/deskwork-studio/skills/studio/SKILL.md`: routes table updated — the shortform desk at `/dev/editorial-review-shortform` is now an index page; per-workflow editing happens at `/dev/editorial-review/:id` (same URL shape as longform). Scrapbook hierarchical-path support called out.
+- [x] Root `README.md`: capabilities section gained a "Cross-platform shortform composition" bullet linking to the plugin README's shortform section.
+- [x] End-to-end smoke instructions documented in the plugin README's shortform section (lifted from the plan file's Verification block).
+
+**Acceptance:** All operator-facing docs consistent with the as-shipped behavior; no stale references to the pre-21 textarea + dead-button shortform desk; the LinkedIn end-to-end smoke is documented step-by-step in the plugin README.
+
+---
+
+**Phase 21 Acceptance (overall):** Operator can run `/deskwork:shortform-start <slug> --platform linkedin`, edit/approve through the unified studio review surface, post manually to LinkedIn, then run `/deskwork:distribute <slug> --platform linkedin --url <posted-url>` and see the dashboard matrix flip the cell to covered. The same flow works for Reddit (with `--channel`), YouTube, and Instagram. No parallel composer; no inline-version SSOT path; no stale docs.
+
+**Notes:**
+
+- The shortform file location is centralized through `resolveShortformFilePath`. Phase 20's sandbox migration will redirect that one function; everything downstream (handlers, CLI, studio, skills) stays unchanged. Forward-compatible by design.
+- The pre-21 inline-version-as-SSOT path is gone. `handleCreateVersion`'s shortform special-case ("shortform has no separate file") was deleted in 21a — both kinds are now disk-backed.
+- `addDistribution`'s required-`url` constraint was relaxed; an empty URL is legal at record creation and gets filled in by `updateDistributionUrl` (called from the `distribute` skill).
+- The shortform desk at `/dev/editorial-review-shortform` is now read-only (an index of `(slug, platform, channel?)` tuples). The compose buttons POST to the API and redirect to the unified review URL. There is no textarea on the index page itself.
+
+---
+
+### Phase 22: Install / studio / doctor polish (issues #41–#46)
+
+**Deliverable:** Six independent fixes filed during writingcontrol.org acceptance. Bundled with Phase 21 in the same PR per the operator's amortized-release-ceremony preference. Each issue has its own commit so review is granular.
+
+**GitHub tracking:** [#41](https://github.com/audiocontrol-org/deskwork/issues/41), [#42](https://github.com/audiocontrol-org/deskwork/issues/42), [#43](https://github.com/audiocontrol-org/deskwork/issues/43), [#44](https://github.com/audiocontrol-org/deskwork/issues/44), [#45](https://github.com/audiocontrol-org/deskwork/issues/45), [#46](https://github.com/audiocontrol-org/deskwork/issues/46).
+
+#### 22a — Doc fixes ([#41](https://github.com/audiocontrol-org/deskwork/issues/41), [#46](https://github.com/audiocontrol-org/deskwork/issues/46))
+
+- [x] **#41**: `/deskwork:install` Step 5 prose updated to recommend `deskwork: z.object({ id: z.string().uuid() }).passthrough().optional()` (or top-level `.passthrough()`) instead of the obsolete top-level `id: z.string().uuid().optional()`. v0.7.2 writes `deskwork: { id: ... }`, not top-level. Cross-checked against `printSchemaPatchInstructions()` in `packages/core/src/doctor/schema-patch.ts` — install skill prose now matches the doctor's prose.
+- [x] **#46**: Verified `/dev/scrapbook/<site>/<path>` route accepts hierarchical paths (the Hono `:path{.+}` glob accepts slashes). No code change needed — verification only. Studio SKILL.md prose now explicitly notes hierarchical-path support.
+
+**Acceptance:** Install skill prose and doctor's `printSchemaPatchInstructions` agree on the recommended schema patch shape. Studio SKILL.md prose explicitly mentions hierarchical-path support for the scrapbook viewer.
+
+#### 22b — Install pre-flight + existing-pipeline detection ([#42](https://github.com/audiocontrol-org/deskwork/issues/42), [#45](https://github.com/audiocontrol-org/deskwork/issues/45))
+
+- [x] **#42 (pre-flight schema check)**: After `.deskwork/config.json` is written, the install command attempts a non-destructive schema-compatibility probe per Astro site. Approach: parse the host's `src/content/config.ts` text for the configured collection's schema; look for `id`-related field declarations or a top-level `.passthrough()`. Static check is best-effort — when uncertain or fails, install prints the schema-patch instructions inline at install time. Hugo / Jekyll / Eleventy / plain-markdown sites: skipped (no schema validation).
+- [x] **#45 (existing-pipeline detection)**: heuristic walk for signals of a competing in-house editorial implementation:
+  - `journal/editorial/` directory present
+  - `.claude/skills/editorial-*` skills (matching the same vocabulary deskwork uses)
+  - `src/sites/*/pages/dev/editorial-*.astro` Astro pages
+  - `scripts/lib/editorial/` or similar TypeScript modules
+  When detected, install prints a warning before `.deskwork/config.json` is written. Doesn't block — operator decides.
+
+**Acceptance:** Fresh install against a known-good Astro project succeeds without surfacing the schema-patch instructions. Install against an Astro project with a strict schema lacking `id` allowance prints the patch instructions inline. Install against a project with an existing editorial pipeline (e.g., audiocontrol's `journal/editorial/`) prints the existing-pipeline warning.
+
+#### 22c — Studio EADDRINUSE handling ([#43](https://github.com/audiocontrol-org/deskwork/issues/43))
+
+- [x] `packages/studio/src/server.ts`: catches `EADDRINUSE` from the underlying Node server. Two-tier behavior:
+  1. **No explicit `--port`**: auto-increments through `47321`…`47350` and prints `Started on http://localhost:<port>` clearly.
+  2. **Explicit `--port`**: fails fast with a clear error including the address conflict and a `--port <other>` suggestion.
+- [x] If auto-increment range is exhausted, fails with a clear error listing the range tried.
+- [x] Tests: `packages/studio/test/` — simulates EADDRINUSE and confirms the auto-increment path; clear-error path exercised by stubbing the listen.
+- [x] `plugins/deskwork-studio/skills/studio/SKILL.md`: Step 2 prose updated to document the two-tier behavior.
+
+**Acceptance:** With another process listening on 47321, default `deskwork-studio` invocation succeeds on 47322 (or the next free port). With `--port 47321` explicitly, the studio fails fast with a clear suggestion.
+
+#### 22d — Doctor exit-code + output verbosity + skip-reason granularity ([#44](https://github.com/audiocontrol-org/deskwork/issues/44))
+
+- [x] `packages/cli/src/commands/doctor.ts`:
+  1. **Exit code semantics**: `--fix` mode exits 0 when "all applicable findings were applied or skipped because the prerequisite isn't met yet" (e.g., `missing-frontmatter-id` for entries with no scaffolded file — there's nothing for doctor to do until the operator runs outline). Exit 1 only for actual failures: schema rejection, permission errors, ambiguity-without-`--yes`. Audit-only mode keeps exit 1 on any finding (the existing behavior is correct for CI).
+  2. **Output verbosity**: report grouped by rule. Within each rule, summary first ("12 applied, 16 skipped: no scaffold yet"); individual findings as a subsequent compact section.
+  3. **Skip-reason granularity**: each `RepairResult` carries a `skipReason: 'no-candidate' | 'ambiguous' | 'schema-rejected' | 'editorial-decision' | …`. Summary distinguishes "skipped (waiting on operator action)" from "skipped (could not auto-fix)" — the former isn't an exit-1 condition.
+- [x] Tests: `packages/cli/test/doctor.test.ts` extended with exit-code matrix coverage for the new semantics.
+
+**Acceptance:** `deskwork doctor --fix=all --yes` against a calendar with mostly "no scaffold yet" entries exits 0 (operator action expected, not a failure). `deskwork doctor` (audit-only) against the same calendar still exits 1 (any finding triggers exit 1 in audit mode for CI). Output grouped by rule with summary + collapsible per-finding detail.
+
+---
+
+**Phase 22 Acceptance (overall):** All six issues closed. Install / studio / doctor surfaces cleaner under the failure modes the operator hit during writingcontrol acceptance. No regressions in the existing happy paths (install / studio launch / doctor audit-only).
+
+**Notes:**
+
+- Phase 21 and Phase 22 ship in a single PR. v0.8.0 minor bump (new shortform capability is the headline; polish fixes are the supporting cast).
+- The two phases are independent on the implementation side — the test suites don't share fixtures and the surfaces don't overlap. Bundling is purely release-ceremony amortization.
+- 22b's pre-flight schema check is best-effort. Static parsing of TypeScript source is fragile by nature; the check is "warn when uncertain", not "block when invalid". The doctor's `schema-rejected` rule remains the runtime safety net.
+- 22c's auto-increment range (47321–47350) is hardcoded; tightening or making configurable is left for a future hardening pass. 30 ports is well beyond any realistic concurrent-studio scenario.
+- 22d's `skipReason` enum is defined in `@deskwork/core/doctor` types so external consumers (CI tools, scripts) can pattern-match without parsing prose output.

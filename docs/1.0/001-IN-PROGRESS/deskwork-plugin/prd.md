@@ -383,3 +383,30 @@ This is **not** Phase 20 scope. Flagging as a possibility to consider after Phas
 - **Not changing the outline lifecycle stage.** Planned → Outlining → Drafting flow is preserved.
 - **Not introducing a new content type for outlines.** The outline file is just a markdown file in scrapbook; deskwork's lifecycle treats it as ambient (doesn't track its state in the calendar; the body markdown is still the canonical thing the calendar entry binds to).
 - **Not migrating the scrapbook to a deskwork-owned sandbox.** Out of scope for Phase 20; recorded as a possibility for future consideration above.
+
+---
+
+## Extension: end-to-end shortform composition (Phase 21) + install/studio/doctor polish (Phase 22)
+
+Added as Phase 21 + Phase 22, bundled into one PR per the operator's amortized-release-ceremony preference. Shipped as v0.8.0.
+
+### Phase 21 — shortform end-to-end through the unified review surface
+
+The operator can now author a LinkedIn / Reddit / YouTube / Instagram post for any tracked calendar entry without leaving Claude Code or hand-editing files.
+
+**Architecture principle (operator clarification):** shortform reuses the **same edit/review surface as longform**. No parallel composer. The unified review surface at `/dev/editorial-review/:id` renders any `contentKind`, with a small platform/channel header above the existing markdown editor for shortform.
+
+**Storage:** shortform copy lives in real markdown files at `<contentDir>/<slug>/scrapbook/shortform/<platform>[-<channel>].md` (one per `(slug, platform, channel?)` triple). File is the SSOT — same contract as longform. Until Phase 20 ships the deskwork content sandbox, files live in the scrapbook; Phase 20's eventual migration rule will move both outline and shortform files into the sandbox in one pass.
+
+**New surfaces:** `handleStartShortform` + `resolveShortformFilePath`; `deskwork shortform-start` and `deskwork distribute` CLI subcommands; matching skills; `POST /api/dev/editorial-review/start-shortform` studio route; refactored `/dev/editorial-review-shortform` to a pure index page; dashboard coverage matrix cells become real links / start buttons; `updateDistributionUrl` calendar mutation.
+
+**Operator flow:** `/deskwork:shortform-start <slug> --platform linkedin` → open the studio URL → edit/iterate/approve in the unified review surface → manually post → `/deskwork:distribute <slug> --platform linkedin --url <posted-url>` → dashboard matrix shows the cell as covered.
+
+### Phase 22 — six polish issues from writingcontrol acceptance
+
+#41 install schema-patch instructions updated to the v0.7.2 namespaced shape; #42 install pre-flight Astro schema probe (loud, non-blocking); #43 studio EADDRINUSE auto-increment with explicit-`--port` opt-out; #44 doctor exit-code semantics + grouped output + per-finding `skipReason`; #45 install heuristic detection of existing in-house editorial implementations; #46 scrapbook hierarchical-path docs verified (no code change).
+
+### What this is not
+
+- Not auto-posting to LinkedIn / Reddit. The operator posts manually; deskwork records the URL.
+- Not Phase 20. The outline-as-scrapbook + sandbox migration remains queued; Phase 20's eventual migration rule will subsume the shortform-file relocation.
