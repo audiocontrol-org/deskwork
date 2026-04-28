@@ -4,6 +4,82 @@ Session journal for `deskwork`. Each entry records what was tried, what worked, 
 
 ---
 
+## 2026-04-28: Phase 19 → 20 → 21 → 22 + #49 (v0.7.0 → v0.8.1, five releases)
+
+### Feature: deskwork-plugin
+### Worktree: deskwork-plugin
+
+**Goal:** Continuation of last session's v0.6.0. Headline: "I want to write a LinkedIn post through the plugin and studio." Plus: re-architect identity + path-encoding so deskwork stops conflating slug with both, address a pile of writingcontrol/editorialcontrol bug reports, and ship outline content out of user markdown (this last one stayed planned, not implemented).
+
+**Accomplished:**
+
+- **v0.7.0 (Phase 19)**: separate identity (UUID via `entry.id`) and path-encoding (frontmatter `id:` via on-disk scan) from the host-rendering-engine-owned slug. New `deskwork doctor` validate/repair CLI subcommand with 7 rules (`missing-frontmatter-id`, `orphan-frontmatter-id`, `duplicate-id`, `slug-collision`, `schema-rejected`, `workflow-stale`, `calendar-uuid-missing`). Studio review URLs now id-canonical; legacy slug routes 302-redirect. `ContentNode.slug` renamed to `.path`; slug becomes optional display attribute. New `content-index.ts` module scans contentDir per-request and binds entry → file via frontmatter id (refactor-proof). [PR #35]
+
+- **v0.7.1**: review-handler `handleStartLongform` / `handleCreateVersion` rewired through `findEntryFile` (was bypassing the content index for non-template paths); dashboard body-state column rewired the same way; review-surface scrapbook paths (inline-text loader + drawer + content-detail panel) rewired through `scrapbookDirForEntry`. Pre-existing typecheck error in `content-detail.ts:193` fixed (organizational node passed `node.slug` to `findOrganizationalIndex`; corrected to `node.path`). Slug-fallback warning in `content-tree.ts` now dedups per-process via a Set (was emitting on every render). [PR #36]
+
+- **v0.7.2**: doctor frontmatter rewrite preserves string-scalar quoting via `yaml`'s `parseDocument` round-trip mode (was stripping ISO date quotes and breaking Astro `z.string()` schemas — issue #37 from writingcontrol). Binding id moved from top-level `id:` to a `deskwork.id` namespaced object (issue #38 — operator's principle correction: anything we embed in user-supplied documents must be deskwork-namespaced; never claim global keys). New `legacy-top-level-id-migration` doctor rule for files written by v0.7.0/v0.7.1 doctor runs. [PR #39]
+
+- **v0.8.0 (Phase 21 + 22)**: end-to-end shortform composition. Operator can now write a LinkedIn (or Reddit / YouTube / Instagram) post through the plugin + studio without leaving Claude Code. Architecture principle from operator clarification: shortform reuses the **same edit/review surface as longform** — no parallel composer. Each shortform draft is a markdown file at `<contentDir>/<slug>/scrapbook/shortform/<platform>[-<channel>].md`; file is the SSOT same as longform. `handleStartShortform` mirrors `handleStartLongform`; `handleCreateVersion`'s shortform special case removed. `iterate --kind shortform` accepted. `approve --platform` reads from the file (was reading inline workflow version). New `shortform-start` and `distribute` CLI subcommands + skills. Studio: `POST /api/dev/editorial-review/start-shortform`; refactored `/dev/editorial-review-shortform` to a pure index page (no textareas, no dead buttons); review.ts extends to render shortform with platform/channel header above the existing markdown editor; dashboard matrix cells become real interactions (covered cells anchor to workflow review URL; empty cells are start-shortform buttons that POST + redirect). Bundled with Phase 22 polish: install schema-doc fix (#41), install pre-flight Astro schema probe (#42), install existing-pipeline detection (#45), studio EADDRINUSE auto-increment (#43), doctor exit-code semantics + grouped output + per-finding `skipReason` (#44), scrapbook hierarchical-path docs verified accurate (#46). [PR #48]
+
+- **v0.8.1**: dev-source boot fix (#49 from editorialcontrol). Cross-package relative `.ts` imports from `packages/studio/src/pages/{review,help}.ts` into `plugins/deskwork-studio/public/src/` failed at runtime through `tsx` + Node 22 ESM (named exports not resolved through that path shape); bundled marketplace path was unaffected. `outline-split.ts` promoted to `@deskwork/core/outline-split` (used by both server and browser). `editorial-skills-catalogue.ts` collocated under `packages/studio/src/lib/` (server-only; was bundled-but-never-loaded as a client entry). Stale bundle output deleted. [PR #50]
+
+- **Skill amendments**: `/feature-ship` SKILL.md amended (commit 52795af) to stop at PR creation rather than auto-merging. The operator owns the merge gate; the prior auto-merge behavior bypassed the human review checkpoint between PR open and merge.
+
+- **Phase 20 (#40)** added to the workplan as queued. Move outline content out of user body markdown into a deskwork-managed location (the outline `## Outline` section was getting injected into operator content; same intrude-as-little-as-possible principle as Phase 19's namespace fix). Not implemented this session; operator decided to ship v0.8.0 first.
+
+**Tests:** 539 → 627 (+88) across the arc. End state: 135 cli + 306 core + 186 studio.
+
+**Didn't Work:**
+
+- Initial attempt to fix #49 by dropping the `.ts` extension on the cross-package import — TypeScript's node16 moduleResolution requires explicit `.ts`. Had to take scope (move the file).
+
+- Phase 22 agent's "out of scope but worth flagging" note about the dev-source boot bug. I read it, didn't fix it, didn't file an issue. The editorialcontrol team hit it. Filed as #49 after the fact. Memory entry saved (`feedback_operator_owns_scope.md`) so this pattern doesn't recur.
+
+- The first PR (#35) auto-merged via the original `/feature-ship` skill before I could ask the operator about a follow-up issue (#34) the code-review agent flagged. The operator's question — "is there a reason we didn't fix it?" — was the correct check. Skill amended, memory aligned with `feedback_dont_unilaterally_defer.md`.
+
+**Course Corrections:**
+
+- [DOCUMENTATION] Operator: "Any frontmatter you embed in user-supplied documents must have deskwork-namespaced keys. We can't assume that the global keyspace is unused." Saved as `feedback_namespace_keys_in_user_docs.md`. Drove the v0.7.2 namespace migration.
+
+- [PROCESS] Operator: "Why did you merge the pr? Is that part of the feature-ship skill?" The skill DID auto-merge, which I followed. Operator clarified the skill's design was wrong — amended `/feature-ship` to stop at PR creation. The merge gate now belongs to the operator.
+
+- [PROCESS] Operator: "Is there a reason we didn't fix it?" — referring to #34 (dashboard scrapbook chip count for hierarchical entries). Code-review agent flagged it, I filed-and-shipped instead of fixing in scope. Operator's read: same unilateral-defer pattern as the prior session. Fixed in v0.7.1 in the same branch.
+
+- [PROCESS] Editorialcontrol issue #49: agent flagged this exact bug as "out of scope" during Phase 22 implementation. I noted it without filing. Operator: "I'm the only one who should determine whether something is in or out of scope." Saved as `feedback_operator_owns_scope.md`.
+
+- [COMPLEXITY] Operator: "There's a bug from editorialcontrol. Why didn't our testing catch this before shipping?" My answer (we test in-process via `app.fetch`, never the actual binary boot path) was honest; offered three test-coverage options. Operator: "CI testing is brutally slow. I do *NOT* want to do testing in CI." Saved as `feedback_no_ci_test_infrastructure.md`. Did the local smoke test instead — `tsx packages/studio/src/server.ts` against the .audiocontrol.org sandbox — which caught a second cross-package import bug (in help.ts) on the first run.
+
+- [COMPLEXITY] Operator: "I want to make sure you don't duplicate code to implement the shortform review surface. It should use the *same* edit/review surface as the longform articles." This was a critical scope correction during Phase 21 planning — without it, the easy implementation would have duplicated the longform editor surface in shortform.ts. Reusing the unified review surface is what made Phase 21 a clean ~3-sub-phase implementation instead of a parallel-implementation maze. Also: "If we need to create markdown files for the shortform content (we probably should), we can put them in the scrapbook until we have a true deskwork content sandbox to play with from Phase 20" — gave a clear forward path that doesn't block on Phase 20.
+
+**Quantitative:**
+- Messages: ~50 user messages
+- Commits: 30 feature commits (across 5 release commits)
+- Releases: 5 (v0.7.0 → v0.7.1 → v0.7.2 → v0.8.0 → v0.8.1)
+- PRs: 5 (#35, #36, #39, #48, #50)
+- Issues filed this session: 14 (#33, #37, #38, #40, #41–#46, #47, #49 plus the existing-issue updates)
+- Issues closed this session: 12+
+- Tests: 539 → 627 (+88)
+- Memory entries written: 4 (`feedback_namespace_keys_in_user_docs.md`, `feedback_operator_owns_scope.md`, `feedback_no_ci_test_infrastructure.md`; plus the existing `feedback_dont_unilaterally_defer.md` was reinforced multiple times)
+- Course corrections: 5 ([DOCUMENTATION], 2x [PROCESS], 2x [COMPLEXITY])
+- Skill amendments: 1 (`/feature-ship` — operator owns merge)
+- Approximate file count changed: 80+ across all 5 PRs
+
+**Insights:**
+
+- **The "minimize intrusion" principle is recursive.** Phase 19's namespace fix (don't claim top-level `id:`) led directly to the Phase 20 framing (don't claim `## Outline` body sections). Both are surface-level expressions of the same underlying contract: the operator owns the user-supplied document; deskwork lives in deskwork-managed adjacent locations. The principle extends to: scrapbook directory placement (currently inside `<contentDir>/`, possibly should move to `.deskwork/`), and any future deskwork artifact that wants to live near content. Worth carrying forward as the load-bearing architectural rule.
+
+- **File-is-SSOT is the right default for any content type.** Phase 21's instinct was that shortform might be different (live in the workflow journal). Operator pushed back; making shortform a real markdown file made Phase 21 dramatically simpler — same review pipeline, same client bundle, same DOM contract. Resist any future "but this content type is special" carve-out.
+
+- **Local smoke testing catches what unit tests miss.** The dev-source boot bug (#49) was invisible to vitest because vitest runs the server in-process via `app.fetch`. Booting the binary via `tsx` immediately surfaced it. The operator's "no CI testing" rule reframes this: smoke testing is local-only, optional, fast, and exists to catch this exact class of bug. Add a `scripts/smoke.sh` or similar at some point.
+
+- **Agent dispatch reports are not safe disposal points.** When a sub-agent says "out of scope but worth flagging," I have to act on that. Either fix it in scope, or file an issue immediately. The pattern of reading the flag and moving on has now bitten twice (#34 and #49). Saved as `feedback_operator_owns_scope.md`. Future agent prompts should ask agents to file issues directly instead of just flagging — closing the loop at the dispatch layer.
+
+- **Bundling related work pays off.** v0.8.0 carried Phase 21 + Phase 22 together — one PR, one merge, one tag, one release-workflow run. v0.7.0 → v0.7.2 was three separate releases for what should have been one. The amortized-ceremony preference (consistent feedback across multiple sessions) is correct: ceremony is overhead; reduce it by bundling.
+
+**Next session:**
+
+Phase 20 (outline-as-scrapbook + sandbox migration) is the natural follow-up — same minimize-intrusion principle, plus subsumes the shortform-file relocation. Or operator verification of v0.8.0 against writingcontrol/editorialcontrol (#33 still pending). Or Phase 18 Group B/C deferrals (operator decisions). Operator's call.
+
 ## 2026-04-27: Session arc — v0.2.0 → v0.6.0 (seven releases) + process corrections
 
 ### Feature: deskwork-plugin
