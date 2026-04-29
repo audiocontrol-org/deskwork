@@ -11,5 +11,10 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "dependencies": {
+    "@deskwork/core": "file:./vendor/core",
+    "tsx": "^4.21.0",
+    "yaml": "^2.8.0"
   }
 }

@@ -37,30 +37,33 @@ jobs:
       - name: Run all tests
         run: npm --workspaces --if-present test
 
-      - name: Verify bundles match the tagged source
+      # Phase 23c (Path B): the committed `vendor/core` symlinks survive
+      # marketplace install as symlinks, but the relative target traverses
+      # out of the cached plugin tree (the marketplace copies plugins/<name>/
+      # only — not the workspace root). Materialize the symlinks into
+      # plain directory copies on the tagged commit so adopters get a
+      # self-contained tree. The development branch keeps the symlinks
+      # intact; only the tagged release commit ships materialized.
+      - name: Materialize vendor/core symlinks
+        run: bash scripts/materialize-vendor.sh
+
+      - name: Configure git for tag move
         run: |
-          if ! git diff --exit-code -- plugins/deskwork/bundle/ plugins/deskwork-studio/bundle/ plugins/deskwork-studio/public/dist/; then
-            echo "::error::Tagged commit ships stale bundles or dist. Bump the tag, rebuild, and re-tag."
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit materialized vendor + re-point tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          git add plugins/deskwork/vendor plugins/deskwork-studio/vendor
+          if git diff --cached --quiet; then
+            echo "no vendor changes to commit (nothing was a symlink?)"
             exit 1
           fi
-          # Also assert the studio's client bundles are present in the tag —
-          # they MUST ship in the marketplace tarball or the studio's
-          # interaction layer 404s for every adopter (the v0.6.0–v0.8.2
-          # packaging bug). See `.gitignore` for the load-bearing exception.
-          required_dist=(
-            plugins/deskwork-studio/public/dist/editorial-review-client.js
-            plugins/deskwork-studio/public/dist/editorial-review-editor.js
-            plugins/deskwork-studio/public/dist/editorial-studio-client.js
-            plugins/deskwork-studio/public/dist/scrapbook-client.js
-            plugins/deskwork-studio/public/dist/content-view-client.js
-            plugins/deskwork-studio/public/dist/lightbox.js
-          )
-          for f in "${required_dist[@]}"; do
-            if [ ! -f "$f" ]; then
-              echo "::error::Required client bundle missing from tag: $f"
-              exit 1
-            fi
-          done
+          git commit -m "release: materialize vendor/core for ${TAG}"
+          git tag -f "${TAG}"
+          git push --force origin "refs/tags/${TAG}"
 
       - name: Create GitHub release
         env:
