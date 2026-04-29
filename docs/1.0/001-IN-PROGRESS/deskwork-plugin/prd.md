@@ -1,3 +1,9 @@
+---
+deskwork:
+  id: 9845c268-670f-4793-b986-0433e9ef4fb9
+title: "PRD: deskwork-plugin"
+---
+
 ## PRD: deskwork-plugin
 
 ### Problem Statement
