@@ -1058,13 +1058,21 @@ Tasks are grouped by sub-phase. Sub-phases are sequential (19a → 19b → 19c �
 
 #### 26b — Package shape audit + dist build
 
-- [ ] `exports` field declared per package (explicit subpath exports for what consumers need).
-- [ ] `files` whitelist: `dist/`, `package.json`, `README.md`. Excludes tests, fixtures, source maps unless wanted.
-- [ ] `tsconfig.build.json` per package: `outDir: "dist"`, `declaration: true`, `declarationMap: true`.
-- [ ] `npm run build` script per package; `npm run build --workspaces` at root.
-- [ ] `npm pack` smoke verifies tarball contents per package (no test fixtures, no node_modules).
+- [x] `exports` field declared per package (explicit subpath exports for what consumers need).
+- [x] `files` whitelist: `dist/`, `package.json`, `README.md`. Excludes tests, fixtures, source maps unless wanted.
+- [x] `tsconfig.build.json` per package: `outDir: "dist"`, `declaration: true`, `declarationMap: true`.
+- [x] `npm run build` script per package; `npm run build --workspaces` at root.
+- [x] `npm pack` smoke verifies tarball contents per package (no test fixtures, no node_modules).
 
-**Acceptance:** All three packages produce tarballs with the expected file set. `npm pack --workspace @deskwork/<pkg>` produces a tarball that, after extraction, has only the whitelisted files.
+**Acceptance:** All three packages produce tarballs with the expected file set. `npm pack --workspace @deskwork/<pkg>` produces a tarball that, after extraction, has only the whitelisted files. Met by 26b commits.
+
+**Notes:**
+- Build uses `rewriteRelativeImportExtensions: true` so source imports written with `.ts` extensions emit as `.js` references in dist.
+- Source shebangs in `packages/cli/src/cli.ts` and `packages/studio/src/server.ts` switched from `tsx` to `node` so the published bin entries (which point at `dist/`) execute under node directly. Dev workflow now requires `npm run build` before invoking the bin shim — published-correct shape supersedes the previous tsx-against-source dev path.
+- Root workspaces array reordered so build runs in dependency order (`packages/core` before `packages/cli` and `packages/studio`).
+- Studio/cli dropped `prepare` for build; `prepack` is the build hook (avoids the install-time race where dependent packages' prepare ran before core had built).
+- `customize` command refactored to anchor on `<pkg>/package.json` resolution instead of subpath exports. The previous `@deskwork/studio/server.ts` and `@deskwork/studio/pages/*` exports were removed; they were operator-tooling-only anchors that pointed at source. Customize still walks `src/<...>` from the package root, which works in workspace dev but will need follow-up once `src/` is stripped from npm-published tarballs.
+- `@deskwork/core` ships three `.mjs` remark plugins; the build script copies them from `src/*.mjs` to `dist/` since `tsc` does not compile `.mjs` sources.
 
 #### Manual reservation publish (operator action between 26b and 26c)
 
@@ -1072,16 +1080,6 @@ Tasks are grouped by sub-phase. Sub-phases are sequential (19a → 19b → 19c �
 - [ ] Operator configures Trusted Publishers per package on npm UI (Org=`audiocontrol-org`, Repo=`deskwork`, Workflow=`release.yml`). Required setup for any future CI publishing in 26-CI.
 
 **Acceptance:** `npm view @deskwork/core`, `npm view @deskwork/cli`, `npm view @deskwork/studio` all return the placeholder version. Trusted publishers configured per package (visible in npm UI Settings → Trusted publishing).
-
-#### 26b — Package shape audit + dist build
-
-- [ ] `exports` field declared per package (explicit subpath exports).
-- [ ] `files` whitelist: `dist/`, `package.json`, `README.md`. Excludes tests, fixtures, source maps unless wanted.
-- [ ] `tsconfig.build.json` per package: `outDir: "dist"`, `declaration: true`, `declarationMap: true`.
-- [ ] `npm run build` script per package; `npm run build --workspaces` at root.
-- [ ] `npm pack` smoke verifies tarball contents per package.
-
-**Acceptance:** All three packages produce tarballs with the expected file set. Consumers can `import { foo } from "@deskwork/core"` and import declared subpaths.
 
 #### 26c — Plugin bin shim rewrite
 
