@@ -1,0 +1,46 @@
+{
+  "name": "@deskwork/studio",
+  "version": "0.9.3",
+  "private": true,
+  "type": "module",
+  "description": "Editorial review studio — local web UI for the deskwork plugin",
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/audiocontrol-org/deskwork.git",
+    "directory": "packages/studio"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "deskwork-studio": "./src/server.ts"
+  },
+  "exports": {
+    "./server.ts": "./src/server.ts",
+    "./pages/*": "./src/pages/*"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@deskwork/core": "*",
+    "@hono/node-server": "^1.13.7",
+    "hono": "^4.6.0"
+  },
+  "devDependencies": {
+    "@codemirror/commands": "^6.10.3",
+    "@codemirror/lang-markdown": "^6.5.0",
+    "@codemirror/language": "^6.12.3",
+    "@codemirror/state": "^6.6.0",
+    "@codemirror/view": "^6.41.1",
+    "@lezer/highlight": "^1.2.3",
+    "@types/node": "^22.10.0",
+    "esbuild": "^0.28.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.2"
+  }
+}
