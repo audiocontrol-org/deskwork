@@ -1,6 +1,6 @@
 {
   "name": "@deskwork/studio",
-  "version": "0.8.6",
+  "version": "0.8.7",
   "private": true,
   "type": "module",
   "description": "Editorial review studio — local web UI for the deskwork plugin",
