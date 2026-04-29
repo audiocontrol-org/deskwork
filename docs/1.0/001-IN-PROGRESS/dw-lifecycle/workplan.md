@@ -1713,7 +1713,7 @@ git commit -m "feat(dw-lifecycle/bin): journal append helper"
 - Create: `plugins/dw-lifecycle/src/subcommands/journal-append.ts`
 - Modify: `plugins/dw-lifecycle/src/cli.ts`
 
-- [ ] **Step 1: Implement subcommand**
+- [x] **Step 1: Implement subcommand**
 
 ```typescript
 // src/subcommands/journal-append.ts
@@ -1744,7 +1744,7 @@ export async function journalAppend(args: string[]): Promise<void> {
 }
 ```
 
-- [ ] **Step 2: Wire into cli.ts**
+- [x] **Step 2: Wire into cli.ts**
 
 ```typescript
 import { journalAppend } from './subcommands/journal-append.js';
@@ -1757,7 +1757,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
 };
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/src/subcommands/journal-append.ts plugins/dw-lifecycle/src/cli.ts
