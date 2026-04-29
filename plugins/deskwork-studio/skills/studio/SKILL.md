@@ -1,6 +1,6 @@
 ---
 name: studio
-description: Launch the deskwork web studio — a local dev server (default port 47321, loopback only) exposing the editorial dashboard, unified review surface (longform + shortform), scrapbook viewer, and the compositor's manual. Reads .deskwork/config.json from the current project. Use when the operator wants a browser surface for the editorial workflow rather than driving everything through CLI subcommands.
+description: Launch the deskwork web studio — a local dev server (default port 47321; binds to loopback plus the local Tailscale interface when one is detected, so peers on the same tailnet can reach it via magic-DNS) exposing the editorial dashboard, unified review surface (longform + shortform), scrapbook viewer, and the compositor's manual. Reads .deskwork/config.json from the current project. Use when the operator wants a browser surface for the editorial workflow rather than driving everything through CLI subcommands.
 ---
 
 ## Studio
