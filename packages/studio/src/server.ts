@@ -40,6 +40,7 @@ import { readWorkflow } from '@deskwork/core/review/pipeline';
 import { createApiRouter, type StudioContext } from './routes/api.ts';
 import { serveScrapbookFile } from './routes/scrapbook-file.ts';
 import { createScrapbookMutationsRouter } from './routes/scrapbook-mutations.ts';
+import { buildClientAssets } from './build-client-assets.ts';
 import { renderDashboard } from './pages/dashboard.ts';
 import { renderReviewPage, type ReviewLookup } from './pages/review.ts';
 import { renderShortformPage } from './pages/shortform.ts';
@@ -219,25 +220,54 @@ function buildReviewRedirectUrl(entryId: string, requestUrl: string): string {
   return `/dev/editorial-review/${entryId}${search}`;
 }
 
-function publicDir(): string {
-  // Two runtime layouts share this resolver:
-  //   - Bundle: plugins/deskwork-studio/bundle/server.mjs → ../public
-  //   - Source: packages/studio/src/server.ts → repo-relative
-  //     plugins/deskwork-studio/public (the assets moved into the
-  //     plugin tree so marketplace install ships them).
-  // Both candidates resolve to the same absolute path on a real
-  // checkout; the dev fallback only matters when running source via tsx.
+/**
+ * Resolve the plugin tree root (`plugins/deskwork-studio/`) at runtime.
+ *
+ * Two runtime layouts:
+ *   - Bundle: `plugins/deskwork-studio/bundle/server.mjs` → plugin root
+ *     is `<HERE>/..`.
+ *   - Source: `packages/studio/src/server.ts` → plugin root is
+ *     `<HERE>/../../../plugins/deskwork-studio`.
+ *
+ * The bundle candidate is checked first because that's the marketplace
+ * install path; the source candidate only fires under workspace dev.
+ */
+function pluginRoot(): string {
   const here = dirname(fileURLToPath(import.meta.url));
   const candidates = [
-    resolve(here, '..', 'public'),
-    resolve(here, '..', '..', '..', 'plugins', 'deskwork-studio', 'public'),
+    resolve(here, '..'),
+    resolve(here, '..', '..', '..', 'plugins', 'deskwork-studio'),
   ];
   for (const candidate of candidates) {
-    if (existsSync(candidate)) return candidate;
+    // Use the plugin's marker file (public/src exists in both layouts)
+    // to avoid grabbing an unrelated parent dir.
+    if (existsSync(resolve(candidate, 'public', 'src'))) return candidate;
   }
   throw new Error(
-    `deskwork-studio: could not find public/ assets. Tried:\n  ${candidates.join('\n  ')}`,
+    `deskwork-studio: could not find plugin root. Tried:\n  ${candidates.join('\n  ')}`,
   );
+}
+
+function publicDir(): string {
+  // CSS, source modules, and any other static assets live under
+  // `<pluginRoot>/public/`. Compiled client JS does NOT live here in
+  // the runtime-built path (Phase 23e) — see clientAssetsDir().
+  const root = resolve(pluginRoot(), 'public');
+  if (!existsSync(root)) {
+    throw new Error(
+      `deskwork-studio: could not find public/ assets at ${root}`,
+    );
+  }
+  return root;
+}
+
+/**
+ * Path to runtime-built client modules
+ * (`<pluginRoot>/.runtime-cache/dist/`). Phase 23e builds into this dir
+ * during boot; the `/static/dist/*` mount serves from it.
+ */
+function clientAssetsDir(): string {
+  return resolve(pluginRoot(), '.runtime-cache', 'dist');
 }
 
 export function createApp(ctx: StudioContext): Hono {
@@ -407,6 +437,20 @@ export function createApp(ctx: StudioContext): Hono {
   });
 
   // Static assets — UI client JS, CSS, etc.
+  //
+  // Phase 23e: client modules are esbuild-built at server boot into
+  // <pluginRoot>/.runtime-cache/dist/. The more-specific `/static/dist/*`
+  // mount is registered FIRST so it wins over the catchall below for JS
+  // requests; CSS and other files stay served from `public/`. URL surface
+  // is unchanged — page renderers still emit /static/dist/<name>.js and
+  // /static/css/<file>.css.
+  app.use(
+    '/static/dist/*',
+    serveStatic({
+      root: clientAssetsDir(),
+      rewriteRequestPath: (path) => path.replace(/^\/static\/dist/, ''),
+    }),
+  );
   app.use(
     '/static/*',
     serveStatic({
@@ -431,6 +475,23 @@ async function main(): Promise<void> {
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     process.stderr.write(`Could not load config: ${reason}\n`);
+    process.exit(1);
+  }
+
+  // Phase 23e: build client modules from source into the runtime cache
+  // BEFORE wiring routes (the `/static/dist/*` mount records its root
+  // at registration time and warns when the path doesn't exist yet).
+  // Failures abort startup — serving stale or missing JS would silently
+  // break the UI.
+  try {
+    const summary = await buildClientAssets({ pluginRoot: pluginRoot() });
+    process.stdout.write(
+      `deskwork-studio: built ${summary.entriesBuilt} client assets ` +
+        `(${summary.entriesCached} cached) -> ${summary.outDir}\n`,
+    );
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    process.stderr.write(`deskwork-studio: client asset build failed: ${reason}\n`);
     process.exit(1);
   }
 

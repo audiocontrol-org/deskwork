@@ -7430,6 +7430,2507 @@ var require_extend = __commonJS({
   }
 });
 
+// node_modules/esbuild/lib/main.js
+var require_main = __commonJS({
+  "node_modules/esbuild/lib/main.js"(exports, module) {
+    "use strict";
+    var __defProp2 = Object.defineProperty;
+    var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
+    var __getOwnPropNames2 = Object.getOwnPropertyNames;
+    var __hasOwnProp2 = Object.prototype.hasOwnProperty;
+    var __export2 = (target, all3) => {
+      for (var name in all3)
+        __defProp2(target, name, { get: all3[name], enumerable: true });
+    };
+    var __copyProps2 = (to, from, except, desc) => {
+      if (from && typeof from === "object" || typeof from === "function") {
+        for (let key2 of __getOwnPropNames2(from))
+          if (!__hasOwnProp2.call(to, key2) && key2 !== except)
+            __defProp2(to, key2, { get: () => from[key2], enumerable: !(desc = __getOwnPropDesc2(from, key2)) || desc.enumerable });
+      }
+      return to;
+    };
+    var __toCommonJS = (mod) => __copyProps2(__defProp2({}, "__esModule", { value: true }), mod);
+    var node_exports = {};
+    __export2(node_exports, {
+      analyzeMetafile: () => analyzeMetafile,
+      analyzeMetafileSync: () => analyzeMetafileSync,
+      build: () => build2,
+      buildSync: () => buildSync,
+      context: () => context,
+      default: () => node_default,
+      formatMessages: () => formatMessages,
+      formatMessagesSync: () => formatMessagesSync,
+      initialize: () => initialize,
+      stop: () => stop,
+      transform: () => transform,
+      transformSync: () => transformSync,
+      version: () => version
+    });
+    module.exports = __toCommonJS(node_exports);
+    function encodePacket(packet) {
+      let visit2 = (value) => {
+        if (value === null) {
+          bb.write8(0);
+        } else if (typeof value === "boolean") {
+          bb.write8(1);
+          bb.write8(+value);
+        } else if (typeof value === "number") {
+          bb.write8(2);
+          bb.write32(value | 0);
+        } else if (typeof value === "string") {
+          bb.write8(3);
+          bb.write(encodeUTF8(value));
+        } else if (value instanceof Uint8Array) {
+          bb.write8(4);
+          bb.write(value);
+        } else if (value instanceof Array) {
+          bb.write8(5);
+          bb.write32(value.length);
+          for (let item of value) {
+            visit2(item);
+          }
+        } else {
+          let keys2 = Object.keys(value);
+          bb.write8(6);
+          bb.write32(keys2.length);
+          for (let key2 of keys2) {
+            bb.write(encodeUTF8(key2));
+            visit2(value[key2]);
+          }
+        }
+      };
+      let bb = new ByteBuffer();
+      bb.write32(0);
+      bb.write32(packet.id << 1 | +!packet.isRequest);
+      visit2(packet.value);
+      writeUInt32LE(bb.buf, bb.len - 4, 0);
+      return bb.buf.subarray(0, bb.len);
+    }
+    function decodePacket(bytes) {
+      let visit2 = () => {
+        switch (bb.read8()) {
+          case 0:
+            return null;
+          case 1:
+            return !!bb.read8();
+          case 2:
+            return bb.read32();
+          case 3:
+            return decodeUTF8(bb.read());
+          case 4:
+            return bb.read();
+          case 5: {
+            let count = bb.read32();
+            let value2 = [];
+            for (let i = 0; i < count; i++) {
+              value2.push(visit2());
+            }
+            return value2;
+          }
+          case 6: {
+            let count = bb.read32();
+            let value2 = {};
+            for (let i = 0; i < count; i++) {
+              value2[decodeUTF8(bb.read())] = visit2();
+            }
+            return value2;
+          }
+          default:
+            throw new Error("Invalid packet");
+        }
+      };
+      let bb = new ByteBuffer(bytes);
+      let id = bb.read32();
+      let isRequest = (id & 1) === 0;
+      id >>>= 1;
+      let value = visit2();
+      if (bb.ptr !== bytes.length) {
+        throw new Error("Invalid packet");
+      }
+      return { id, isRequest, value };
+    }
+    var ByteBuffer = class {
+      constructor(buf = new Uint8Array(1024)) {
+        this.buf = buf;
+        this.len = 0;
+        this.ptr = 0;
+      }
+      _write(delta) {
+        if (this.len + delta > this.buf.length) {
+          let clone = new Uint8Array((this.len + delta) * 2);
+          clone.set(this.buf);
+          this.buf = clone;
+        }
+        this.len += delta;
+        return this.len - delta;
+      }
+      write8(value) {
+        let offset = this._write(1);
+        this.buf[offset] = value;
+      }
+      write32(value) {
+        let offset = this._write(4);
+        writeUInt32LE(this.buf, value, offset);
+      }
+      write(bytes) {
+        let offset = this._write(4 + bytes.length);
+        writeUInt32LE(this.buf, bytes.length, offset);
+        this.buf.set(bytes, offset + 4);
+      }
+      _read(delta) {
+        if (this.ptr + delta > this.buf.length) {
+          throw new Error("Invalid packet");
+        }
+        this.ptr += delta;
+        return this.ptr - delta;
+      }
+      read8() {
+        return this.buf[this._read(1)];
+      }
+      read32() {
+        return readUInt32LE(this.buf, this._read(4));
+      }
+      read() {
+        let length = this.read32();
+        let bytes = new Uint8Array(length);
+        let ptr = this._read(bytes.length);
+        bytes.set(this.buf.subarray(ptr, ptr + length));
+        return bytes;
+      }
+    };
+    var encodeUTF8;
+    var decodeUTF8;
+    var encodeInvariant;
+    if (typeof TextEncoder !== "undefined" && typeof TextDecoder !== "undefined") {
+      let encoder = new TextEncoder();
+      let decoder = new TextDecoder();
+      encodeUTF8 = (text5) => encoder.encode(text5);
+      decodeUTF8 = (bytes) => decoder.decode(bytes);
+      encodeInvariant = 'new TextEncoder().encode("")';
+    } else if (typeof Buffer !== "undefined") {
+      encodeUTF8 = (text5) => Buffer.from(text5);
+      decodeUTF8 = (bytes) => {
+        let { buffer, byteOffset, byteLength } = bytes;
+        return Buffer.from(buffer, byteOffset, byteLength).toString();
+      };
+      encodeInvariant = 'Buffer.from("")';
+    } else {
+      throw new Error("No UTF-8 codec found");
+    }
+    if (!(encodeUTF8("") instanceof Uint8Array))
+      throw new Error(`Invariant violation: "${encodeInvariant} instanceof Uint8Array" is incorrectly false
+
+This indicates that your JavaScript environment is broken. You cannot use
+esbuild in this environment because esbuild relies on this invariant. This
+is not a problem with esbuild. You need to fix your environment instead.
+`);
+    function readUInt32LE(buffer, offset) {
+      return (buffer[offset++] | buffer[offset++] << 8 | buffer[offset++] << 16 | buffer[offset++] << 24) >>> 0;
+    }
+    function writeUInt32LE(buffer, value, offset) {
+      buffer[offset++] = value;
+      buffer[offset++] = value >> 8;
+      buffer[offset++] = value >> 16;
+      buffer[offset++] = value >> 24;
+    }
+    var fromCharCode = String.fromCharCode;
+    function throwSyntaxError(bytes, index2, message) {
+      const c = bytes[index2];
+      let line = 1;
+      let column = 0;
+      for (let i = 0; i < index2; i++) {
+        if (bytes[i] === 10) {
+          line++;
+          column = 0;
+        } else {
+          column++;
+        }
+      }
+      throw new SyntaxError(
+        message ? message : index2 === bytes.length ? "Unexpected end of input while parsing JSON" : c >= 32 && c <= 126 ? `Unexpected character ${fromCharCode(c)} in JSON at position ${index2} (line ${line}, column ${column})` : `Unexpected byte 0x${c.toString(16)} in JSON at position ${index2} (line ${line}, column ${column})`
+      );
+    }
+    function JSON_parse(bytes) {
+      if (!(bytes instanceof Uint8Array)) {
+        throw new Error(`JSON input must be a Uint8Array`);
+      }
+      const propertyStack = [];
+      const objectStack = [];
+      const stateStack = [];
+      const length = bytes.length;
+      let property = null;
+      let state = 0;
+      let object;
+      let i = 0;
+      while (i < length) {
+        let c = bytes[i++];
+        if (c <= 32) {
+          continue;
+        }
+        let value;
+        if (state === 2 && property === null && c !== 34 && c !== 125) {
+          throwSyntaxError(bytes, --i);
+        }
+        switch (c) {
+          // True
+          case 116: {
+            if (bytes[i++] !== 114 || bytes[i++] !== 117 || bytes[i++] !== 101) {
+              throwSyntaxError(bytes, --i);
+            }
+            value = true;
+            break;
+          }
+          // False
+          case 102: {
+            if (bytes[i++] !== 97 || bytes[i++] !== 108 || bytes[i++] !== 115 || bytes[i++] !== 101) {
+              throwSyntaxError(bytes, --i);
+            }
+            value = false;
+            break;
+          }
+          // Null
+          case 110: {
+            if (bytes[i++] !== 117 || bytes[i++] !== 108 || bytes[i++] !== 108) {
+              throwSyntaxError(bytes, --i);
+            }
+            value = null;
+            break;
+          }
+          // Number begin
+          case 45:
+          case 46:
+          case 48:
+          case 49:
+          case 50:
+          case 51:
+          case 52:
+          case 53:
+          case 54:
+          case 55:
+          case 56:
+          case 57: {
+            let index2 = i;
+            value = fromCharCode(c);
+            c = bytes[i];
+            while (true) {
+              switch (c) {
+                case 43:
+                case 45:
+                case 46:
+                case 48:
+                case 49:
+                case 50:
+                case 51:
+                case 52:
+                case 53:
+                case 54:
+                case 55:
+                case 56:
+                case 57:
+                case 101:
+                case 69: {
+                  value += fromCharCode(c);
+                  c = bytes[++i];
+                  continue;
+                }
+              }
+              break;
+            }
+            value = +value;
+            if (isNaN(value)) {
+              throwSyntaxError(bytes, --index2, "Invalid number");
+            }
+            break;
+          }
+          // String begin
+          case 34: {
+            value = "";
+            while (true) {
+              if (i >= length) {
+                throwSyntaxError(bytes, length);
+              }
+              c = bytes[i++];
+              if (c === 34) {
+                break;
+              } else if (c === 92) {
+                switch (bytes[i++]) {
+                  // Normal escape sequence
+                  case 34:
+                    value += '"';
+                    break;
+                  case 47:
+                    value += "/";
+                    break;
+                  case 92:
+                    value += "\\";
+                    break;
+                  case 98:
+                    value += "\b";
+                    break;
+                  case 102:
+                    value += "\f";
+                    break;
+                  case 110:
+                    value += "\n";
+                    break;
+                  case 114:
+                    value += "\r";
+                    break;
+                  case 116:
+                    value += "	";
+                    break;
+                  // Unicode escape sequence
+                  case 117: {
+                    let code2 = 0;
+                    for (let j = 0; j < 4; j++) {
+                      c = bytes[i++];
+                      code2 <<= 4;
+                      if (c >= 48 && c <= 57) code2 |= c - 48;
+                      else if (c >= 97 && c <= 102) code2 |= c + (10 - 97);
+                      else if (c >= 65 && c <= 70) code2 |= c + (10 - 65);
+                      else throwSyntaxError(bytes, --i);
+                    }
+                    value += fromCharCode(code2);
+                    break;
+                  }
+                  // Invalid escape sequence
+                  default:
+                    throwSyntaxError(bytes, --i);
+                    break;
+                }
+              } else if (c <= 127) {
+                value += fromCharCode(c);
+              } else if ((c & 224) === 192) {
+                value += fromCharCode((c & 31) << 6 | bytes[i++] & 63);
+              } else if ((c & 240) === 224) {
+                value += fromCharCode((c & 15) << 12 | (bytes[i++] & 63) << 6 | bytes[i++] & 63);
+              } else if ((c & 248) == 240) {
+                let codePoint = (c & 7) << 18 | (bytes[i++] & 63) << 12 | (bytes[i++] & 63) << 6 | bytes[i++] & 63;
+                if (codePoint > 65535) {
+                  codePoint -= 65536;
+                  value += fromCharCode(codePoint >> 10 & 1023 | 55296);
+                  codePoint = 56320 | codePoint & 1023;
+                }
+                value += fromCharCode(codePoint);
+              }
+            }
+            value[0];
+            break;
+          }
+          // Array begin
+          case 91: {
+            value = [];
+            propertyStack.push(property);
+            objectStack.push(object);
+            stateStack.push(state);
+            property = null;
+            object = value;
+            state = 1;
+            continue;
+          }
+          // Object begin
+          case 123: {
+            value = {};
+            propertyStack.push(property);
+            objectStack.push(object);
+            stateStack.push(state);
+            property = null;
+            object = value;
+            state = 2;
+            continue;
+          }
+          // Array end
+          case 93: {
+            if (state !== 1) {
+              throwSyntaxError(bytes, --i);
+            }
+            value = object;
+            property = propertyStack.pop();
+            object = objectStack.pop();
+            state = stateStack.pop();
+            break;
+          }
+          // Object end
+          case 125: {
+            if (state !== 2) {
+              throwSyntaxError(bytes, --i);
+            }
+            value = object;
+            property = propertyStack.pop();
+            object = objectStack.pop();
+            state = stateStack.pop();
+            break;
+          }
+          default: {
+            throwSyntaxError(bytes, --i);
+          }
+        }
+        c = bytes[i];
+        while (c <= 32) {
+          c = bytes[++i];
+        }
+        switch (state) {
+          case 0: {
+            if (i === length) {
+              return value;
+            }
+            break;
+          }
+          case 1: {
+            object.push(value);
+            if (c === 44) {
+              i++;
+              continue;
+            }
+            if (c === 93) {
+              continue;
+            }
+            break;
+          }
+          case 2: {
+            if (property === null) {
+              property = value;
+              if (c === 58) {
+                i++;
+                continue;
+              }
+            } else {
+              object[property] = value;
+              property = null;
+              if (c === 44) {
+                i++;
+                continue;
+              }
+              if (c === 125) {
+                continue;
+              }
+            }
+            break;
+          }
+        }
+        break;
+      }
+      throwSyntaxError(bytes, i);
+    }
+    var quote = JSON.stringify;
+    var buildLogLevelDefault = "warning";
+    var transformLogLevelDefault = "silent";
+    function validateAndJoinStringArray(values, what) {
+      const toJoin = [];
+      for (const value of values) {
+        validateStringValue(value, what);
+        if (value.indexOf(",") >= 0) throw new Error(`Invalid ${what}: ${value}`);
+        toJoin.push(value);
+      }
+      return toJoin.join(",");
+    }
+    var canBeAnything = () => null;
+    var mustBeBoolean = (value) => typeof value === "boolean" ? null : "a boolean";
+    var mustBeString = (value) => typeof value === "string" ? null : "a string";
+    var mustBeRegExp = (value) => value instanceof RegExp ? null : "a RegExp object";
+    var mustBeInteger = (value) => typeof value === "number" && value === (value | 0) ? null : "an integer";
+    var mustBeValidPortNumber = (value) => typeof value === "number" && value === (value | 0) && value >= 0 && value <= 65535 ? null : "a valid port number";
+    var mustBeFunction = (value) => typeof value === "function" ? null : "a function";
+    var mustBeArray = (value) => Array.isArray(value) ? null : "an array";
+    var mustBeArrayOfStrings = (value) => Array.isArray(value) && value.every((x) => typeof x === "string") ? null : "an array of strings";
+    var mustBeObject = (value) => typeof value === "object" && value !== null && !Array.isArray(value) ? null : "an object";
+    var mustBeEntryPoints = (value) => typeof value === "object" && value !== null ? null : "an array or an object";
+    var mustBeWebAssemblyModule = (value) => value instanceof WebAssembly.Module ? null : "a WebAssembly.Module";
+    var mustBeObjectOrNull = (value) => typeof value === "object" && !Array.isArray(value) ? null : "an object or null";
+    var mustBeStringOrBoolean = (value) => typeof value === "string" || typeof value === "boolean" ? null : "a string or a boolean";
+    var mustBeStringOrObject = (value) => typeof value === "string" || typeof value === "object" && value !== null && !Array.isArray(value) ? null : "a string or an object";
+    var mustBeStringOrArrayOfStrings = (value) => typeof value === "string" || Array.isArray(value) && value.every((x) => typeof x === "string") ? null : "a string or an array of strings";
+    var mustBeStringOrUint8Array = (value) => typeof value === "string" || value instanceof Uint8Array ? null : "a string or a Uint8Array";
+    var mustBeStringOrURL = (value) => typeof value === "string" || value instanceof URL ? null : "a string or a URL";
+    function getFlag(object, keys2, key2, mustBeFn) {
+      let value = object[key2];
+      keys2[key2 + ""] = true;
+      if (value === void 0) return void 0;
+      let mustBe = mustBeFn(value);
+      if (mustBe !== null) throw new Error(`${quote(key2)} must be ${mustBe}`);
+      return value;
+    }
+    function checkForInvalidFlags(object, keys2, where) {
+      for (let key2 in object) {
+        if (!(key2 in keys2)) {
+          throw new Error(`Invalid option ${where}: ${quote(key2)}`);
+        }
+      }
+    }
+    function validateInitializeOptions(options) {
+      let keys2 = /* @__PURE__ */ Object.create(null);
+      let wasmURL = getFlag(options, keys2, "wasmURL", mustBeStringOrURL);
+      let wasmModule = getFlag(options, keys2, "wasmModule", mustBeWebAssemblyModule);
+      let worker = getFlag(options, keys2, "worker", mustBeBoolean);
+      checkForInvalidFlags(options, keys2, "in initialize() call");
+      return {
+        wasmURL,
+        wasmModule,
+        worker
+      };
+    }
+    function validateMangleCache(mangleCache) {
+      let validated;
+      if (mangleCache !== void 0) {
+        validated = /* @__PURE__ */ Object.create(null);
+        for (let key2 in mangleCache) {
+          let value = mangleCache[key2];
+          if (typeof value === "string" || value === false) {
+            validated[key2] = value;
+          } else {
+            throw new Error(`Expected ${quote(key2)} in mangle cache to map to either a string or false`);
+          }
+        }
+      }
+      return validated;
+    }
+    function pushLogFlags(flags, options, keys2, isTTY2, logLevelDefault) {
+      let color2 = getFlag(options, keys2, "color", mustBeBoolean);
+      let logLevel = getFlag(options, keys2, "logLevel", mustBeString);
+      let logLimit = getFlag(options, keys2, "logLimit", mustBeInteger);
+      if (color2 !== void 0) flags.push(`--color=${color2}`);
+      else if (isTTY2) flags.push(`--color=true`);
+      flags.push(`--log-level=${logLevel || logLevelDefault}`);
+      flags.push(`--log-limit=${logLimit || 0}`);
+    }
+    function validateStringValue(value, what, key2) {
+      if (typeof value !== "string") {
+        throw new Error(`Expected value for ${what}${key2 !== void 0 ? " " + quote(key2) : ""} to be a string, got ${typeof value} instead`);
+      }
+      return value;
+    }
+    function pushCommonFlags(flags, options, keys2) {
+      let legalComments = getFlag(options, keys2, "legalComments", mustBeString);
+      let sourceRoot = getFlag(options, keys2, "sourceRoot", mustBeString);
+      let sourcesContent = getFlag(options, keys2, "sourcesContent", mustBeBoolean);
+      let target = getFlag(options, keys2, "target", mustBeStringOrArrayOfStrings);
+      let format = getFlag(options, keys2, "format", mustBeString);
+      let globalName = getFlag(options, keys2, "globalName", mustBeString);
+      let mangleProps = getFlag(options, keys2, "mangleProps", mustBeRegExp);
+      let reserveProps = getFlag(options, keys2, "reserveProps", mustBeRegExp);
+      let mangleQuoted = getFlag(options, keys2, "mangleQuoted", mustBeBoolean);
+      let minify = getFlag(options, keys2, "minify", mustBeBoolean);
+      let minifySyntax = getFlag(options, keys2, "minifySyntax", mustBeBoolean);
+      let minifyWhitespace = getFlag(options, keys2, "minifyWhitespace", mustBeBoolean);
+      let minifyIdentifiers = getFlag(options, keys2, "minifyIdentifiers", mustBeBoolean);
+      let lineLimit = getFlag(options, keys2, "lineLimit", mustBeInteger);
+      let drop = getFlag(options, keys2, "drop", mustBeArrayOfStrings);
+      let dropLabels = getFlag(options, keys2, "dropLabels", mustBeArrayOfStrings);
+      let charset = getFlag(options, keys2, "charset", mustBeString);
+      let treeShaking = getFlag(options, keys2, "treeShaking", mustBeBoolean);
+      let ignoreAnnotations = getFlag(options, keys2, "ignoreAnnotations", mustBeBoolean);
+      let jsx = getFlag(options, keys2, "jsx", mustBeString);
+      let jsxFactory = getFlag(options, keys2, "jsxFactory", mustBeString);
+      let jsxFragment = getFlag(options, keys2, "jsxFragment", mustBeString);
+      let jsxImportSource = getFlag(options, keys2, "jsxImportSource", mustBeString);
+      let jsxDev = getFlag(options, keys2, "jsxDev", mustBeBoolean);
+      let jsxSideEffects = getFlag(options, keys2, "jsxSideEffects", mustBeBoolean);
+      let define = getFlag(options, keys2, "define", mustBeObject);
+      let logOverride = getFlag(options, keys2, "logOverride", mustBeObject);
+      let supported = getFlag(options, keys2, "supported", mustBeObject);
+      let pure = getFlag(options, keys2, "pure", mustBeArrayOfStrings);
+      let keepNames = getFlag(options, keys2, "keepNames", mustBeBoolean);
+      let platform = getFlag(options, keys2, "platform", mustBeString);
+      let tsconfigRaw = getFlag(options, keys2, "tsconfigRaw", mustBeStringOrObject);
+      let absPaths = getFlag(options, keys2, "absPaths", mustBeArrayOfStrings);
+      if (legalComments) flags.push(`--legal-comments=${legalComments}`);
+      if (sourceRoot !== void 0) flags.push(`--source-root=${sourceRoot}`);
+      if (sourcesContent !== void 0) flags.push(`--sources-content=${sourcesContent}`);
+      if (target) flags.push(`--target=${validateAndJoinStringArray(Array.isArray(target) ? target : [target], "target")}`);
+      if (format) flags.push(`--format=${format}`);
+      if (globalName) flags.push(`--global-name=${globalName}`);
+      if (platform) flags.push(`--platform=${platform}`);
+      if (tsconfigRaw) flags.push(`--tsconfig-raw=${typeof tsconfigRaw === "string" ? tsconfigRaw : JSON.stringify(tsconfigRaw)}`);
+      if (minify) flags.push("--minify");
+      if (minifySyntax) flags.push("--minify-syntax");
+      if (minifyWhitespace) flags.push("--minify-whitespace");
+      if (minifyIdentifiers) flags.push("--minify-identifiers");
+      if (lineLimit) flags.push(`--line-limit=${lineLimit}`);
+      if (charset) flags.push(`--charset=${charset}`);
+      if (treeShaking !== void 0) flags.push(`--tree-shaking=${treeShaking}`);
+      if (ignoreAnnotations) flags.push(`--ignore-annotations`);
+      if (drop) for (let what of drop) flags.push(`--drop:${validateStringValue(what, "drop")}`);
+      if (dropLabels) flags.push(`--drop-labels=${validateAndJoinStringArray(dropLabels, "drop label")}`);
+      if (absPaths) flags.push(`--abs-paths=${validateAndJoinStringArray(absPaths, "abs paths")}`);
+      if (mangleProps) flags.push(`--mangle-props=${jsRegExpToGoRegExp(mangleProps)}`);
+      if (reserveProps) flags.push(`--reserve-props=${jsRegExpToGoRegExp(reserveProps)}`);
+      if (mangleQuoted !== void 0) flags.push(`--mangle-quoted=${mangleQuoted}`);
+      if (jsx) flags.push(`--jsx=${jsx}`);
+      if (jsxFactory) flags.push(`--jsx-factory=${jsxFactory}`);
+      if (jsxFragment) flags.push(`--jsx-fragment=${jsxFragment}`);
+      if (jsxImportSource) flags.push(`--jsx-import-source=${jsxImportSource}`);
+      if (jsxDev) flags.push(`--jsx-dev`);
+      if (jsxSideEffects) flags.push(`--jsx-side-effects`);
+      if (define) {
+        for (let key2 in define) {
+          if (key2.indexOf("=") >= 0) throw new Error(`Invalid define: ${key2}`);
+          flags.push(`--define:${key2}=${validateStringValue(define[key2], "define", key2)}`);
+        }
+      }
+      if (logOverride) {
+        for (let key2 in logOverride) {
+          if (key2.indexOf("=") >= 0) throw new Error(`Invalid log override: ${key2}`);
+          flags.push(`--log-override:${key2}=${validateStringValue(logOverride[key2], "log override", key2)}`);
+        }
+      }
+      if (supported) {
+        for (let key2 in supported) {
+          if (key2.indexOf("=") >= 0) throw new Error(`Invalid supported: ${key2}`);
+          const value = supported[key2];
+          if (typeof value !== "boolean") throw new Error(`Expected value for supported ${quote(key2)} to be a boolean, got ${typeof value} instead`);
+          flags.push(`--supported:${key2}=${value}`);
+        }
+      }
+      if (pure) for (let fn of pure) flags.push(`--pure:${validateStringValue(fn, "pure")}`);
+      if (keepNames) flags.push(`--keep-names`);
+    }
+    function flagsForBuildOptions(callName, options, isTTY2, logLevelDefault, writeDefault) {
+      var _a2;
+      let flags = [];
+      let entries = [];
+      let keys2 = /* @__PURE__ */ Object.create(null);
+      let stdinContents = null;
+      let stdinResolveDir = null;
+      pushLogFlags(flags, options, keys2, isTTY2, logLevelDefault);
+      pushCommonFlags(flags, options, keys2);
+      let sourcemap = getFlag(options, keys2, "sourcemap", mustBeStringOrBoolean);
+      let bundle = getFlag(options, keys2, "bundle", mustBeBoolean);
+      let splitting = getFlag(options, keys2, "splitting", mustBeBoolean);
+      let preserveSymlinks = getFlag(options, keys2, "preserveSymlinks", mustBeBoolean);
+      let metafile = getFlag(options, keys2, "metafile", mustBeBoolean);
+      let outfile = getFlag(options, keys2, "outfile", mustBeString);
+      let outdir = getFlag(options, keys2, "outdir", mustBeString);
+      let outbase = getFlag(options, keys2, "outbase", mustBeString);
+      let tsconfig = getFlag(options, keys2, "tsconfig", mustBeString);
+      let resolveExtensions = getFlag(options, keys2, "resolveExtensions", mustBeArrayOfStrings);
+      let nodePathsInput = getFlag(options, keys2, "nodePaths", mustBeArrayOfStrings);
+      let mainFields = getFlag(options, keys2, "mainFields", mustBeArrayOfStrings);
+      let conditions = getFlag(options, keys2, "conditions", mustBeArrayOfStrings);
+      let external = getFlag(options, keys2, "external", mustBeArrayOfStrings);
+      let packages = getFlag(options, keys2, "packages", mustBeString);
+      let alias = getFlag(options, keys2, "alias", mustBeObject);
+      let loader = getFlag(options, keys2, "loader", mustBeObject);
+      let outExtension = getFlag(options, keys2, "outExtension", mustBeObject);
+      let publicPath = getFlag(options, keys2, "publicPath", mustBeString);
+      let entryNames = getFlag(options, keys2, "entryNames", mustBeString);
+      let chunkNames = getFlag(options, keys2, "chunkNames", mustBeString);
+      let assetNames = getFlag(options, keys2, "assetNames", mustBeString);
+      let inject = getFlag(options, keys2, "inject", mustBeArrayOfStrings);
+      let banner = getFlag(options, keys2, "banner", mustBeObject);
+      let footer2 = getFlag(options, keys2, "footer", mustBeObject);
+      let entryPoints = getFlag(options, keys2, "entryPoints", mustBeEntryPoints);
+      let absWorkingDir = getFlag(options, keys2, "absWorkingDir", mustBeString);
+      let stdin = getFlag(options, keys2, "stdin", mustBeObject);
+      let write = (_a2 = getFlag(options, keys2, "write", mustBeBoolean)) != null ? _a2 : writeDefault;
+      let allowOverwrite = getFlag(options, keys2, "allowOverwrite", mustBeBoolean);
+      let mangleCache = getFlag(options, keys2, "mangleCache", mustBeObject);
+      keys2.plugins = true;
+      checkForInvalidFlags(options, keys2, `in ${callName}() call`);
+      if (sourcemap) flags.push(`--sourcemap${sourcemap === true ? "" : `=${sourcemap}`}`);
+      if (bundle) flags.push("--bundle");
+      if (allowOverwrite) flags.push("--allow-overwrite");
+      if (splitting) flags.push("--splitting");
+      if (preserveSymlinks) flags.push("--preserve-symlinks");
+      if (metafile) flags.push(`--metafile`);
+      if (outfile) flags.push(`--outfile=${outfile}`);
+      if (outdir) flags.push(`--outdir=${outdir}`);
+      if (outbase) flags.push(`--outbase=${outbase}`);
+      if (tsconfig) flags.push(`--tsconfig=${tsconfig}`);
+      if (packages) flags.push(`--packages=${packages}`);
+      if (resolveExtensions) flags.push(`--resolve-extensions=${validateAndJoinStringArray(resolveExtensions, "resolve extension")}`);
+      if (publicPath) flags.push(`--public-path=${publicPath}`);
+      if (entryNames) flags.push(`--entry-names=${entryNames}`);
+      if (chunkNames) flags.push(`--chunk-names=${chunkNames}`);
+      if (assetNames) flags.push(`--asset-names=${assetNames}`);
+      if (mainFields) flags.push(`--main-fields=${validateAndJoinStringArray(mainFields, "main field")}`);
+      if (conditions) flags.push(`--conditions=${validateAndJoinStringArray(conditions, "condition")}`);
+      if (external) for (let name of external) flags.push(`--external:${validateStringValue(name, "external")}`);
+      if (alias) {
+        for (let old in alias) {
+          if (old.indexOf("=") >= 0) throw new Error(`Invalid package name in alias: ${old}`);
+          flags.push(`--alias:${old}=${validateStringValue(alias[old], "alias", old)}`);
+        }
+      }
+      if (banner) {
+        for (let type in banner) {
+          if (type.indexOf("=") >= 0) throw new Error(`Invalid banner file type: ${type}`);
+          flags.push(`--banner:${type}=${validateStringValue(banner[type], "banner", type)}`);
+        }
+      }
+      if (footer2) {
+        for (let type in footer2) {
+          if (type.indexOf("=") >= 0) throw new Error(`Invalid footer file type: ${type}`);
+          flags.push(`--footer:${type}=${validateStringValue(footer2[type], "footer", type)}`);
+        }
+      }
+      if (inject) for (let path3 of inject) flags.push(`--inject:${validateStringValue(path3, "inject")}`);
+      if (loader) {
+        for (let ext in loader) {
+          if (ext.indexOf("=") >= 0) throw new Error(`Invalid loader extension: ${ext}`);
+          flags.push(`--loader:${ext}=${validateStringValue(loader[ext], "loader", ext)}`);
+        }
+      }
+      if (outExtension) {
+        for (let ext in outExtension) {
+          if (ext.indexOf("=") >= 0) throw new Error(`Invalid out extension: ${ext}`);
+          flags.push(`--out-extension:${ext}=${validateStringValue(outExtension[ext], "out extension", ext)}`);
+        }
+      }
+      if (entryPoints) {
+        if (Array.isArray(entryPoints)) {
+          for (let i = 0, n = entryPoints.length; i < n; i++) {
+            let entryPoint = entryPoints[i];
+            if (typeof entryPoint === "object" && entryPoint !== null) {
+              let entryPointKeys = /* @__PURE__ */ Object.create(null);
+              let input = getFlag(entryPoint, entryPointKeys, "in", mustBeString);
+              let output = getFlag(entryPoint, entryPointKeys, "out", mustBeString);
+              checkForInvalidFlags(entryPoint, entryPointKeys, "in entry point at index " + i);
+              if (input === void 0) throw new Error('Missing property "in" for entry point at index ' + i);
+              if (output === void 0) throw new Error('Missing property "out" for entry point at index ' + i);
+              entries.push([output, input]);
+            } else {
+              entries.push(["", validateStringValue(entryPoint, "entry point at index " + i)]);
+            }
+          }
+        } else {
+          for (let key2 in entryPoints) {
+            entries.push([key2, validateStringValue(entryPoints[key2], "entry point", key2)]);
+          }
+        }
+      }
+      if (stdin) {
+        let stdinKeys = /* @__PURE__ */ Object.create(null);
+        let contents = getFlag(stdin, stdinKeys, "contents", mustBeStringOrUint8Array);
+        let resolveDir = getFlag(stdin, stdinKeys, "resolveDir", mustBeString);
+        let sourcefile = getFlag(stdin, stdinKeys, "sourcefile", mustBeString);
+        let loader2 = getFlag(stdin, stdinKeys, "loader", mustBeString);
+        checkForInvalidFlags(stdin, stdinKeys, 'in "stdin" object');
+        if (sourcefile) flags.push(`--sourcefile=${sourcefile}`);
+        if (loader2) flags.push(`--loader=${loader2}`);
+        if (resolveDir) stdinResolveDir = resolveDir;
+        if (typeof contents === "string") stdinContents = encodeUTF8(contents);
+        else if (contents instanceof Uint8Array) stdinContents = contents;
+      }
+      let nodePaths = [];
+      if (nodePathsInput) {
+        for (let value of nodePathsInput) {
+          value += "";
+          nodePaths.push(value);
+        }
+      }
+      return {
+        entries,
+        flags,
+        write,
+        stdinContents,
+        stdinResolveDir,
+        absWorkingDir,
+        nodePaths,
+        mangleCache: validateMangleCache(mangleCache)
+      };
+    }
+    function flagsForTransformOptions(callName, options, isTTY2, logLevelDefault) {
+      let flags = [];
+      let keys2 = /* @__PURE__ */ Object.create(null);
+      pushLogFlags(flags, options, keys2, isTTY2, logLevelDefault);
+      pushCommonFlags(flags, options, keys2);
+      let sourcemap = getFlag(options, keys2, "sourcemap", mustBeStringOrBoolean);
+      let sourcefile = getFlag(options, keys2, "sourcefile", mustBeString);
+      let loader = getFlag(options, keys2, "loader", mustBeString);
+      let banner = getFlag(options, keys2, "banner", mustBeString);
+      let footer2 = getFlag(options, keys2, "footer", mustBeString);
+      let mangleCache = getFlag(options, keys2, "mangleCache", mustBeObject);
+      checkForInvalidFlags(options, keys2, `in ${callName}() call`);
+      if (sourcemap) flags.push(`--sourcemap=${sourcemap === true ? "external" : sourcemap}`);
+      if (sourcefile) flags.push(`--sourcefile=${sourcefile}`);
+      if (loader) flags.push(`--loader=${loader}`);
+      if (banner) flags.push(`--banner=${banner}`);
+      if (footer2) flags.push(`--footer=${footer2}`);
+      return {
+        flags,
+        mangleCache: validateMangleCache(mangleCache)
+      };
+    }
+    function createChannel(streamIn) {
+      const requestCallbacksByKey = {};
+      const closeData = { didClose: false, reason: "" };
+      let responseCallbacks = {};
+      let nextRequestID = 0;
+      let nextBuildKey = 0;
+      let stdout = new Uint8Array(16 * 1024);
+      let stdoutUsed = 0;
+      let readFromStdout = (chunk) => {
+        let limit = stdoutUsed + chunk.length;
+        if (limit > stdout.length) {
+          let swap = new Uint8Array(limit * 2);
+          swap.set(stdout);
+          stdout = swap;
+        }
+        stdout.set(chunk, stdoutUsed);
+        stdoutUsed += chunk.length;
+        let offset = 0;
+        while (offset + 4 <= stdoutUsed) {
+          let length = readUInt32LE(stdout, offset);
+          if (offset + 4 + length > stdoutUsed) {
+            break;
+          }
+          offset += 4;
+          handleIncomingPacket(stdout.subarray(offset, offset + length));
+          offset += length;
+        }
+        if (offset > 0) {
+          stdout.copyWithin(0, offset, stdoutUsed);
+          stdoutUsed -= offset;
+        }
+      };
+      let afterClose = (error) => {
+        closeData.didClose = true;
+        if (error) closeData.reason = ": " + (error.message || error);
+        const text5 = "The service was stopped" + closeData.reason;
+        for (let id in responseCallbacks) {
+          responseCallbacks[id](text5, null);
+        }
+        responseCallbacks = {};
+      };
+      let sendRequest = (refs, value, callback) => {
+        if (closeData.didClose) return callback("The service is no longer running" + closeData.reason, null);
+        let id = nextRequestID++;
+        responseCallbacks[id] = (error, response) => {
+          try {
+            callback(error, response);
+          } finally {
+            if (refs) refs.unref();
+          }
+        };
+        if (refs) refs.ref();
+        streamIn.writeToStdin(encodePacket({ id, isRequest: true, value }));
+      };
+      let sendResponse = (id, value) => {
+        if (closeData.didClose) throw new Error("The service is no longer running" + closeData.reason);
+        streamIn.writeToStdin(encodePacket({ id, isRequest: false, value }));
+      };
+      let handleRequest = async (id, request) => {
+        try {
+          if (request.command === "ping") {
+            sendResponse(id, {});
+            return;
+          }
+          if (typeof request.key === "number") {
+            const requestCallbacks = requestCallbacksByKey[request.key];
+            if (!requestCallbacks) {
+              return;
+            }
+            const callback = requestCallbacks[request.command];
+            if (callback) {
+              await callback(id, request);
+              return;
+            }
+          }
+          throw new Error(`Invalid command: ` + request.command);
+        } catch (e) {
+          const errors = [extractErrorMessageV8(e, streamIn, null, void 0, "")];
+          try {
+            sendResponse(id, { errors });
+          } catch {
+          }
+        }
+      };
+      let isFirstPacket = true;
+      let handleIncomingPacket = (bytes) => {
+        if (isFirstPacket) {
+          isFirstPacket = false;
+          let binaryVersion = String.fromCharCode(...bytes);
+          if (binaryVersion !== "0.28.0") {
+            throw new Error(`Cannot start service: Host version "${"0.28.0"}" does not match binary version ${quote(binaryVersion)}`);
+          }
+          return;
+        }
+        let packet = decodePacket(bytes);
+        if (packet.isRequest) {
+          handleRequest(packet.id, packet.value);
+        } else {
+          let callback = responseCallbacks[packet.id];
+          delete responseCallbacks[packet.id];
+          if (packet.value.error) callback(packet.value.error, {});
+          else callback(null, packet.value);
+        }
+      };
+      let buildOrContext = ({ callName, refs, options, isTTY: isTTY2, defaultWD: defaultWD2, callback }) => {
+        let refCount = 0;
+        const buildKey = nextBuildKey++;
+        const requestCallbacks = {};
+        const buildRefs = {
+          ref() {
+            if (++refCount === 1) {
+              if (refs) refs.ref();
+            }
+          },
+          unref() {
+            if (--refCount === 0) {
+              delete requestCallbacksByKey[buildKey];
+              if (refs) refs.unref();
+            }
+          }
+        };
+        requestCallbacksByKey[buildKey] = requestCallbacks;
+        buildRefs.ref();
+        buildOrContextImpl(
+          callName,
+          buildKey,
+          sendRequest,
+          sendResponse,
+          buildRefs,
+          streamIn,
+          requestCallbacks,
+          options,
+          isTTY2,
+          defaultWD2,
+          (err2, res) => {
+            try {
+              callback(err2, res);
+            } finally {
+              buildRefs.unref();
+            }
+          }
+        );
+      };
+      let transform2 = ({ callName, refs, input, options, isTTY: isTTY2, fs: fs3, callback }) => {
+        const details = createObjectStash();
+        let start = (inputPath) => {
+          try {
+            if (typeof input !== "string" && !(input instanceof Uint8Array))
+              throw new Error('The input to "transform" must be a string or a Uint8Array');
+            let {
+              flags,
+              mangleCache
+            } = flagsForTransformOptions(callName, options, isTTY2, transformLogLevelDefault);
+            let request = {
+              command: "transform",
+              flags,
+              inputFS: inputPath !== null,
+              input: inputPath !== null ? encodeUTF8(inputPath) : typeof input === "string" ? encodeUTF8(input) : input
+            };
+            if (mangleCache) request.mangleCache = mangleCache;
+            sendRequest(refs, request, (error, response) => {
+              if (error) return callback(new Error(error), null);
+              let errors = replaceDetailsInMessages(response.errors, details);
+              let warnings = replaceDetailsInMessages(response.warnings, details);
+              let outstanding = 1;
+              let next = () => {
+                if (--outstanding === 0) {
+                  let result = {
+                    warnings,
+                    code: response.code,
+                    map: response.map,
+                    mangleCache: void 0,
+                    legalComments: void 0
+                  };
+                  if ("legalComments" in response) result.legalComments = response == null ? void 0 : response.legalComments;
+                  if (response.mangleCache) result.mangleCache = response == null ? void 0 : response.mangleCache;
+                  callback(null, result);
+                }
+              };
+              if (errors.length > 0) return callback(failureErrorWithLog("Transform failed", errors, warnings), null);
+              if (response.codeFS) {
+                outstanding++;
+                fs3.readFile(response.code, (err2, contents) => {
+                  if (err2 !== null) {
+                    callback(err2, null);
+                  } else {
+                    response.code = contents;
+                    next();
+                  }
+                });
+              }
+              if (response.mapFS) {
+                outstanding++;
+                fs3.readFile(response.map, (err2, contents) => {
+                  if (err2 !== null) {
+                    callback(err2, null);
+                  } else {
+                    response.map = contents;
+                    next();
+                  }
+                });
+              }
+              next();
+            });
+          } catch (e) {
+            let flags = [];
+            try {
+              pushLogFlags(flags, options, {}, isTTY2, transformLogLevelDefault);
+            } catch {
+            }
+            const error = extractErrorMessageV8(e, streamIn, details, void 0, "");
+            sendRequest(refs, { command: "error", flags, error }, () => {
+              error.detail = details.load(error.detail);
+              callback(failureErrorWithLog("Transform failed", [error], []), null);
+            });
+          }
+        };
+        if ((typeof input === "string" || input instanceof Uint8Array) && input.length > 1024 * 1024) {
+          let next = start;
+          start = () => fs3.writeFile(input, next);
+        }
+        start(null);
+      };
+      let formatMessages2 = ({ callName, refs, messages, options, callback }) => {
+        if (!options) throw new Error(`Missing second argument in ${callName}() call`);
+        let keys2 = {};
+        let kind = getFlag(options, keys2, "kind", mustBeString);
+        let color2 = getFlag(options, keys2, "color", mustBeBoolean);
+        let terminalWidth = getFlag(options, keys2, "terminalWidth", mustBeInteger);
+        checkForInvalidFlags(options, keys2, `in ${callName}() call`);
+        if (kind === void 0) throw new Error(`Missing "kind" in ${callName}() call`);
+        if (kind !== "error" && kind !== "warning") throw new Error(`Expected "kind" to be "error" or "warning" in ${callName}() call`);
+        let request = {
+          command: "format-msgs",
+          messages: sanitizeMessages(messages, "messages", null, "", terminalWidth),
+          isWarning: kind === "warning"
+        };
+        if (color2 !== void 0) request.color = color2;
+        if (terminalWidth !== void 0) request.terminalWidth = terminalWidth;
+        sendRequest(refs, request, (error, response) => {
+          if (error) return callback(new Error(error), null);
+          callback(null, response.messages);
+        });
+      };
+      let analyzeMetafile2 = ({ callName, refs, metafile, options, callback }) => {
+        if (options === void 0) options = {};
+        let keys2 = {};
+        let color2 = getFlag(options, keys2, "color", mustBeBoolean);
+        let verbose = getFlag(options, keys2, "verbose", mustBeBoolean);
+        checkForInvalidFlags(options, keys2, `in ${callName}() call`);
+        let request = {
+          command: "analyze-metafile",
+          metafile
+        };
+        if (color2 !== void 0) request.color = color2;
+        if (verbose !== void 0) request.verbose = verbose;
+        sendRequest(refs, request, (error, response) => {
+          if (error) return callback(new Error(error), null);
+          callback(null, response.result);
+        });
+      };
+      return {
+        readFromStdout,
+        afterClose,
+        service: {
+          buildOrContext,
+          transform: transform2,
+          formatMessages: formatMessages2,
+          analyzeMetafile: analyzeMetafile2
+        }
+      };
+    }
+    function buildOrContextImpl(callName, buildKey, sendRequest, sendResponse, refs, streamIn, requestCallbacks, options, isTTY2, defaultWD2, callback) {
+      const details = createObjectStash();
+      const isContext = callName === "context";
+      const handleError = (e, pluginName) => {
+        const flags = [];
+        try {
+          pushLogFlags(flags, options, {}, isTTY2, buildLogLevelDefault);
+        } catch {
+        }
+        const message = extractErrorMessageV8(e, streamIn, details, void 0, pluginName);
+        sendRequest(refs, { command: "error", flags, error: message }, () => {
+          message.detail = details.load(message.detail);
+          callback(failureErrorWithLog(isContext ? "Context failed" : "Build failed", [message], []), null);
+        });
+      };
+      let plugins;
+      if (typeof options === "object") {
+        const value = options.plugins;
+        if (value !== void 0) {
+          if (!Array.isArray(value)) return handleError(new Error(`"plugins" must be an array`), "");
+          plugins = value;
+        }
+      }
+      if (plugins && plugins.length > 0) {
+        if (streamIn.isSync) return handleError(new Error("Cannot use plugins in synchronous API calls"), "");
+        handlePlugins(
+          buildKey,
+          sendRequest,
+          sendResponse,
+          refs,
+          streamIn,
+          requestCallbacks,
+          options,
+          plugins,
+          details
+        ).then(
+          (result) => {
+            if (!result.ok) return handleError(result.error, result.pluginName);
+            try {
+              buildOrContextContinue(result.requestPlugins, result.runOnEndCallbacks, result.scheduleOnDisposeCallbacks);
+            } catch (e) {
+              handleError(e, "");
+            }
+          },
+          (e) => handleError(e, "")
+        );
+        return;
+      }
+      try {
+        buildOrContextContinue(null, (result, done) => done([], []), () => {
+        });
+      } catch (e) {
+        handleError(e, "");
+      }
+      function buildOrContextContinue(requestPlugins, runOnEndCallbacks, scheduleOnDisposeCallbacks) {
+        const writeDefault = streamIn.hasFS;
+        const {
+          entries,
+          flags,
+          write,
+          stdinContents,
+          stdinResolveDir,
+          absWorkingDir,
+          nodePaths,
+          mangleCache
+        } = flagsForBuildOptions(callName, options, isTTY2, buildLogLevelDefault, writeDefault);
+        if (write && !streamIn.hasFS) throw new Error(`The "write" option is unavailable in this environment`);
+        const request = {
+          command: "build",
+          key: buildKey,
+          entries,
+          flags,
+          write,
+          stdinContents,
+          stdinResolveDir,
+          absWorkingDir: absWorkingDir || defaultWD2,
+          nodePaths,
+          context: isContext
+        };
+        if (requestPlugins) request.plugins = requestPlugins;
+        if (mangleCache) request.mangleCache = mangleCache;
+        const buildResponseToResult = (response, callback2) => {
+          const result = {
+            errors: replaceDetailsInMessages(response.errors, details),
+            warnings: replaceDetailsInMessages(response.warnings, details),
+            outputFiles: void 0,
+            metafile: void 0,
+            mangleCache: void 0
+          };
+          const originalErrors = result.errors.slice();
+          const originalWarnings = result.warnings.slice();
+          if (response.outputFiles) result.outputFiles = response.outputFiles.map(convertOutputFiles);
+          if (response.metafile && response.metafile.length) result.metafile = parseJSON(response.metafile);
+          if (response.mangleCache) result.mangleCache = response.mangleCache;
+          if (response.writeToStdout !== void 0) console.log(decodeUTF8(response.writeToStdout).replace(/\n$/, ""));
+          runOnEndCallbacks(result, (onEndErrors, onEndWarnings) => {
+            if (originalErrors.length > 0 || onEndErrors.length > 0) {
+              const error = failureErrorWithLog("Build failed", originalErrors.concat(onEndErrors), originalWarnings.concat(onEndWarnings));
+              return callback2(error, null, onEndErrors, onEndWarnings);
+            }
+            callback2(null, result, onEndErrors, onEndWarnings);
+          });
+        };
+        let latestResultPromise;
+        let provideLatestResult;
+        if (isContext)
+          requestCallbacks["on-end"] = (id, request2) => new Promise((resolve4) => {
+            buildResponseToResult(request2, (err2, result, onEndErrors, onEndWarnings) => {
+              const response = {
+                errors: onEndErrors,
+                warnings: onEndWarnings
+              };
+              if (provideLatestResult) provideLatestResult(err2, result);
+              latestResultPromise = void 0;
+              provideLatestResult = void 0;
+              sendResponse(id, response);
+              resolve4();
+            });
+          });
+        sendRequest(refs, request, (error, response) => {
+          if (error) return callback(new Error(error), null);
+          if (!isContext) {
+            return buildResponseToResult(response, (err2, res) => {
+              scheduleOnDisposeCallbacks();
+              return callback(err2, res);
+            });
+          }
+          if (response.errors.length > 0) {
+            return callback(failureErrorWithLog("Context failed", response.errors, response.warnings), null);
+          }
+          let didDispose = false;
+          const result = {
+            rebuild: () => {
+              if (!latestResultPromise) latestResultPromise = new Promise((resolve4, reject) => {
+                let settlePromise;
+                provideLatestResult = (err2, result2) => {
+                  if (!settlePromise) settlePromise = () => err2 ? reject(err2) : resolve4(result2);
+                };
+                const triggerAnotherBuild = () => {
+                  const request2 = {
+                    command: "rebuild",
+                    key: buildKey
+                  };
+                  sendRequest(refs, request2, (error2, response2) => {
+                    if (error2) {
+                      reject(new Error(error2));
+                    } else if (settlePromise) {
+                      settlePromise();
+                    } else {
+                      triggerAnotherBuild();
+                    }
+                  });
+                };
+                triggerAnotherBuild();
+              });
+              return latestResultPromise;
+            },
+            watch: (options2 = {}) => new Promise((resolve4, reject) => {
+              if (!streamIn.hasFS) throw new Error(`Cannot use the "watch" API in this environment`);
+              const keys2 = {};
+              const delay = getFlag(options2, keys2, "delay", mustBeInteger);
+              checkForInvalidFlags(options2, keys2, `in watch() call`);
+              const request2 = {
+                command: "watch",
+                key: buildKey
+              };
+              if (delay) request2.delay = delay;
+              sendRequest(refs, request2, (error2) => {
+                if (error2) reject(new Error(error2));
+                else resolve4(void 0);
+              });
+            }),
+            serve: (options2 = {}) => new Promise((resolve4, reject) => {
+              if (!streamIn.hasFS) throw new Error(`Cannot use the "serve" API in this environment`);
+              const keys2 = {};
+              const port = getFlag(options2, keys2, "port", mustBeValidPortNumber);
+              const host = getFlag(options2, keys2, "host", mustBeString);
+              const servedir = getFlag(options2, keys2, "servedir", mustBeString);
+              const keyfile = getFlag(options2, keys2, "keyfile", mustBeString);
+              const certfile = getFlag(options2, keys2, "certfile", mustBeString);
+              const fallback = getFlag(options2, keys2, "fallback", mustBeString);
+              const cors = getFlag(options2, keys2, "cors", mustBeObject);
+              const onRequest = getFlag(options2, keys2, "onRequest", mustBeFunction);
+              checkForInvalidFlags(options2, keys2, `in serve() call`);
+              const request2 = {
+                command: "serve",
+                key: buildKey,
+                onRequest: !!onRequest
+              };
+              if (port !== void 0) request2.port = port;
+              if (host !== void 0) request2.host = host;
+              if (servedir !== void 0) request2.servedir = servedir;
+              if (keyfile !== void 0) request2.keyfile = keyfile;
+              if (certfile !== void 0) request2.certfile = certfile;
+              if (fallback !== void 0) request2.fallback = fallback;
+              if (cors) {
+                const corsKeys = {};
+                const origin = getFlag(cors, corsKeys, "origin", mustBeStringOrArrayOfStrings);
+                checkForInvalidFlags(cors, corsKeys, `on "cors" object`);
+                if (Array.isArray(origin)) request2.corsOrigin = origin;
+                else if (origin !== void 0) request2.corsOrigin = [origin];
+              }
+              sendRequest(refs, request2, (error2, response2) => {
+                if (error2) return reject(new Error(error2));
+                if (onRequest) {
+                  requestCallbacks["serve-request"] = (id, request3) => {
+                    onRequest(request3.args);
+                    sendResponse(id, {});
+                  };
+                }
+                resolve4(response2);
+              });
+            }),
+            cancel: () => new Promise((resolve4) => {
+              if (didDispose) return resolve4();
+              const request2 = {
+                command: "cancel",
+                key: buildKey
+              };
+              sendRequest(refs, request2, () => {
+                resolve4();
+              });
+            }),
+            dispose: () => new Promise((resolve4) => {
+              if (didDispose) return resolve4();
+              didDispose = true;
+              const request2 = {
+                command: "dispose",
+                key: buildKey
+              };
+              sendRequest(refs, request2, () => {
+                resolve4();
+                scheduleOnDisposeCallbacks();
+                refs.unref();
+              });
+            })
+          };
+          refs.ref();
+          callback(null, result);
+        });
+      }
+    }
+    var handlePlugins = async (buildKey, sendRequest, sendResponse, refs, streamIn, requestCallbacks, initialOptions, plugins, details) => {
+      let onStartCallbacks = [];
+      let onEndCallbacks = [];
+      let onResolveCallbacks = {};
+      let onLoadCallbacks = {};
+      let onDisposeCallbacks = [];
+      let nextCallbackID = 0;
+      let i = 0;
+      let requestPlugins = [];
+      let isSetupDone = false;
+      plugins = [...plugins];
+      for (let item of plugins) {
+        let keys2 = {};
+        if (typeof item !== "object") throw new Error(`Plugin at index ${i} must be an object`);
+        const name = getFlag(item, keys2, "name", mustBeString);
+        if (typeof name !== "string" || name === "") throw new Error(`Plugin at index ${i} is missing a name`);
+        try {
+          let setup = getFlag(item, keys2, "setup", mustBeFunction);
+          if (typeof setup !== "function") throw new Error(`Plugin is missing a setup function`);
+          checkForInvalidFlags(item, keys2, `on plugin ${quote(name)}`);
+          let plugin = {
+            name,
+            onStart: false,
+            onEnd: false,
+            onResolve: [],
+            onLoad: []
+          };
+          i++;
+          let resolve4 = (path3, options = {}) => {
+            if (!isSetupDone) throw new Error('Cannot call "resolve" before plugin setup has completed');
+            if (typeof path3 !== "string") throw new Error(`The path to resolve must be a string`);
+            let keys22 = /* @__PURE__ */ Object.create(null);
+            let pluginName = getFlag(options, keys22, "pluginName", mustBeString);
+            let importer = getFlag(options, keys22, "importer", mustBeString);
+            let namespace = getFlag(options, keys22, "namespace", mustBeString);
+            let resolveDir = getFlag(options, keys22, "resolveDir", mustBeString);
+            let kind = getFlag(options, keys22, "kind", mustBeString);
+            let pluginData = getFlag(options, keys22, "pluginData", canBeAnything);
+            let importAttributes = getFlag(options, keys22, "with", mustBeObject);
+            checkForInvalidFlags(options, keys22, "in resolve() call");
+            return new Promise((resolve22, reject) => {
+              const request = {
+                command: "resolve",
+                path: path3,
+                key: buildKey,
+                pluginName: name
+              };
+              if (pluginName != null) request.pluginName = pluginName;
+              if (importer != null) request.importer = importer;
+              if (namespace != null) request.namespace = namespace;
+              if (resolveDir != null) request.resolveDir = resolveDir;
+              if (kind != null) request.kind = kind;
+              else throw new Error(`Must specify "kind" when calling "resolve"`);
+              if (pluginData != null) request.pluginData = details.store(pluginData);
+              if (importAttributes != null) request.with = sanitizeStringMap(importAttributes, "with");
+              sendRequest(refs, request, (error, response) => {
+                if (error !== null) reject(new Error(error));
+                else resolve22({
+                  errors: replaceDetailsInMessages(response.errors, details),
+                  warnings: replaceDetailsInMessages(response.warnings, details),
+                  path: response.path,
+                  external: response.external,
+                  sideEffects: response.sideEffects,
+                  namespace: response.namespace,
+                  suffix: response.suffix,
+                  pluginData: details.load(response.pluginData)
+                });
+              });
+            });
+          };
+          let promise = setup({
+            initialOptions,
+            resolve: resolve4,
+            onStart(callback) {
+              let registeredText = `This error came from the "onStart" callback registered here:`;
+              let registeredNote = extractCallerV8(new Error(registeredText), streamIn, "onStart");
+              onStartCallbacks.push({ name, callback, note: registeredNote });
+              plugin.onStart = true;
+            },
+            onEnd(callback) {
+              let registeredText = `This error came from the "onEnd" callback registered here:`;
+              let registeredNote = extractCallerV8(new Error(registeredText), streamIn, "onEnd");
+              onEndCallbacks.push({ name, callback, note: registeredNote });
+              plugin.onEnd = true;
+            },
+            onResolve(options, callback) {
+              let registeredText = `This error came from the "onResolve" callback registered here:`;
+              let registeredNote = extractCallerV8(new Error(registeredText), streamIn, "onResolve");
+              let keys22 = {};
+              let filter = getFlag(options, keys22, "filter", mustBeRegExp);
+              let namespace = getFlag(options, keys22, "namespace", mustBeString);
+              checkForInvalidFlags(options, keys22, `in onResolve() call for plugin ${quote(name)}`);
+              if (filter == null) throw new Error(`onResolve() call is missing a filter`);
+              let id = nextCallbackID++;
+              onResolveCallbacks[id] = { name, callback, note: registeredNote };
+              plugin.onResolve.push({ id, filter: jsRegExpToGoRegExp(filter), namespace: namespace || "" });
+            },
+            onLoad(options, callback) {
+              let registeredText = `This error came from the "onLoad" callback registered here:`;
+              let registeredNote = extractCallerV8(new Error(registeredText), streamIn, "onLoad");
+              let keys22 = {};
+              let filter = getFlag(options, keys22, "filter", mustBeRegExp);
+              let namespace = getFlag(options, keys22, "namespace", mustBeString);
+              checkForInvalidFlags(options, keys22, `in onLoad() call for plugin ${quote(name)}`);
+              if (filter == null) throw new Error(`onLoad() call is missing a filter`);
+              let id = nextCallbackID++;
+              onLoadCallbacks[id] = { name, callback, note: registeredNote };
+              plugin.onLoad.push({ id, filter: jsRegExpToGoRegExp(filter), namespace: namespace || "" });
+            },
+            onDispose(callback) {
+              onDisposeCallbacks.push(callback);
+            },
+            esbuild: streamIn.esbuild
+          });
+          if (promise) await promise;
+          requestPlugins.push(plugin);
+        } catch (e) {
+          return { ok: false, error: e, pluginName: name };
+        }
+      }
+      requestCallbacks["on-start"] = async (id, request) => {
+        details.clear();
+        let response = { errors: [], warnings: [] };
+        await Promise.all(onStartCallbacks.map(async ({ name, callback, note }) => {
+          try {
+            let result = await callback();
+            if (result != null) {
+              if (typeof result !== "object") throw new Error(`Expected onStart() callback in plugin ${quote(name)} to return an object`);
+              let keys2 = {};
+              let errors = getFlag(result, keys2, "errors", mustBeArray);
+              let warnings = getFlag(result, keys2, "warnings", mustBeArray);
+              checkForInvalidFlags(result, keys2, `from onStart() callback in plugin ${quote(name)}`);
+              if (errors != null) response.errors.push(...sanitizeMessages(errors, "errors", details, name, void 0));
+              if (warnings != null) response.warnings.push(...sanitizeMessages(warnings, "warnings", details, name, void 0));
+            }
+          } catch (e) {
+            response.errors.push(extractErrorMessageV8(e, streamIn, details, note && note(), name));
+          }
+        }));
+        sendResponse(id, response);
+      };
+      requestCallbacks["on-resolve"] = async (id, request) => {
+        let response = {}, name = "", callback, note;
+        for (let id2 of request.ids) {
+          try {
+            ({ name, callback, note } = onResolveCallbacks[id2]);
+            let result = await callback({
+              path: request.path,
+              importer: request.importer,
+              namespace: request.namespace,
+              resolveDir: request.resolveDir,
+              kind: request.kind,
+              pluginData: details.load(request.pluginData),
+              with: request.with
+            });
+            if (result != null) {
+              if (typeof result !== "object") throw new Error(`Expected onResolve() callback in plugin ${quote(name)} to return an object`);
+              let keys2 = {};
+              let pluginName = getFlag(result, keys2, "pluginName", mustBeString);
+              let path3 = getFlag(result, keys2, "path", mustBeString);
+              let namespace = getFlag(result, keys2, "namespace", mustBeString);
+              let suffix = getFlag(result, keys2, "suffix", mustBeString);
+              let external = getFlag(result, keys2, "external", mustBeBoolean);
+              let sideEffects = getFlag(result, keys2, "sideEffects", mustBeBoolean);
+              let pluginData = getFlag(result, keys2, "pluginData", canBeAnything);
+              let errors = getFlag(result, keys2, "errors", mustBeArray);
+              let warnings = getFlag(result, keys2, "warnings", mustBeArray);
+              let watchFiles = getFlag(result, keys2, "watchFiles", mustBeArrayOfStrings);
+              let watchDirs = getFlag(result, keys2, "watchDirs", mustBeArrayOfStrings);
+              checkForInvalidFlags(result, keys2, `from onResolve() callback in plugin ${quote(name)}`);
+              response.id = id2;
+              if (pluginName != null) response.pluginName = pluginName;
+              if (path3 != null) response.path = path3;
+              if (namespace != null) response.namespace = namespace;
+              if (suffix != null) response.suffix = suffix;
+              if (external != null) response.external = external;
+              if (sideEffects != null) response.sideEffects = sideEffects;
+              if (pluginData != null) response.pluginData = details.store(pluginData);
+              if (errors != null) response.errors = sanitizeMessages(errors, "errors", details, name, void 0);
+              if (warnings != null) response.warnings = sanitizeMessages(warnings, "warnings", details, name, void 0);
+              if (watchFiles != null) response.watchFiles = sanitizeStringArray(watchFiles, "watchFiles");
+              if (watchDirs != null) response.watchDirs = sanitizeStringArray(watchDirs, "watchDirs");
+              break;
+            }
+          } catch (e) {
+            response = { id: id2, errors: [extractErrorMessageV8(e, streamIn, details, note && note(), name)] };
+            break;
+          }
+        }
+        sendResponse(id, response);
+      };
+      requestCallbacks["on-load"] = async (id, request) => {
+        let response = {}, name = "", callback, note;
+        for (let id2 of request.ids) {
+          try {
+            ({ name, callback, note } = onLoadCallbacks[id2]);
+            let result = await callback({
+              path: request.path,
+              namespace: request.namespace,
+              suffix: request.suffix,
+              pluginData: details.load(request.pluginData),
+              with: request.with
+            });
+            if (result != null) {
+              if (typeof result !== "object") throw new Error(`Expected onLoad() callback in plugin ${quote(name)} to return an object`);
+              let keys2 = {};
+              let pluginName = getFlag(result, keys2, "pluginName", mustBeString);
+              let contents = getFlag(result, keys2, "contents", mustBeStringOrUint8Array);
+              let resolveDir = getFlag(result, keys2, "resolveDir", mustBeString);
+              let pluginData = getFlag(result, keys2, "pluginData", canBeAnything);
+              let loader = getFlag(result, keys2, "loader", mustBeString);
+              let errors = getFlag(result, keys2, "errors", mustBeArray);
+              let warnings = getFlag(result, keys2, "warnings", mustBeArray);
+              let watchFiles = getFlag(result, keys2, "watchFiles", mustBeArrayOfStrings);
+              let watchDirs = getFlag(result, keys2, "watchDirs", mustBeArrayOfStrings);
+              checkForInvalidFlags(result, keys2, `from onLoad() callback in plugin ${quote(name)}`);
+              response.id = id2;
+              if (pluginName != null) response.pluginName = pluginName;
+              if (contents instanceof Uint8Array) response.contents = contents;
+              else if (contents != null) response.contents = encodeUTF8(contents);
+              if (resolveDir != null) response.resolveDir = resolveDir;
+              if (pluginData != null) response.pluginData = details.store(pluginData);
+              if (loader != null) response.loader = loader;
+              if (errors != null) response.errors = sanitizeMessages(errors, "errors", details, name, void 0);
+              if (warnings != null) response.warnings = sanitizeMessages(warnings, "warnings", details, name, void 0);
+              if (watchFiles != null) response.watchFiles = sanitizeStringArray(watchFiles, "watchFiles");
+              if (watchDirs != null) response.watchDirs = sanitizeStringArray(watchDirs, "watchDirs");
+              break;
+            }
+          } catch (e) {
+            response = { id: id2, errors: [extractErrorMessageV8(e, streamIn, details, note && note(), name)] };
+            break;
+          }
+        }
+        sendResponse(id, response);
+      };
+      let runOnEndCallbacks = (result, done) => done([], []);
+      if (onEndCallbacks.length > 0) {
+        runOnEndCallbacks = (result, done) => {
+          (async () => {
+            const onEndErrors = [];
+            const onEndWarnings = [];
+            for (const { name, callback, note } of onEndCallbacks) {
+              let newErrors;
+              let newWarnings;
+              try {
+                const value = await callback(result);
+                if (value != null) {
+                  if (typeof value !== "object") throw new Error(`Expected onEnd() callback in plugin ${quote(name)} to return an object`);
+                  let keys2 = {};
+                  let errors = getFlag(value, keys2, "errors", mustBeArray);
+                  let warnings = getFlag(value, keys2, "warnings", mustBeArray);
+                  checkForInvalidFlags(value, keys2, `from onEnd() callback in plugin ${quote(name)}`);
+                  if (errors != null) newErrors = sanitizeMessages(errors, "errors", details, name, void 0);
+                  if (warnings != null) newWarnings = sanitizeMessages(warnings, "warnings", details, name, void 0);
+                }
+              } catch (e) {
+                newErrors = [extractErrorMessageV8(e, streamIn, details, note && note(), name)];
+              }
+              if (newErrors) {
+                onEndErrors.push(...newErrors);
+                try {
+                  result.errors.push(...newErrors);
+                } catch {
+                }
+              }
+              if (newWarnings) {
+                onEndWarnings.push(...newWarnings);
+                try {
+                  result.warnings.push(...newWarnings);
+                } catch {
+                }
+              }
+            }
+            done(onEndErrors, onEndWarnings);
+          })();
+        };
+      }
+      let scheduleOnDisposeCallbacks = () => {
+        for (const cb of onDisposeCallbacks) {
+          setTimeout(() => cb(), 0);
+        }
+      };
+      isSetupDone = true;
+      return {
+        ok: true,
+        requestPlugins,
+        runOnEndCallbacks,
+        scheduleOnDisposeCallbacks
+      };
+    };
+    function createObjectStash() {
+      const map = /* @__PURE__ */ new Map();
+      let nextID = 0;
+      return {
+        clear() {
+          map.clear();
+        },
+        load(id) {
+          return map.get(id);
+        },
+        store(value) {
+          if (value === void 0) return -1;
+          const id = nextID++;
+          map.set(id, value);
+          return id;
+        }
+      };
+    }
+    function extractCallerV8(e, streamIn, ident) {
+      let note;
+      let tried = false;
+      return () => {
+        if (tried) return note;
+        tried = true;
+        try {
+          let lines = (e.stack + "").split("\n");
+          lines.splice(1, 1);
+          let location = parseStackLinesV8(streamIn, lines, ident);
+          if (location) {
+            note = { text: e.message, location };
+            return note;
+          }
+        } catch {
+        }
+      };
+    }
+    function extractErrorMessageV8(e, streamIn, stash, note, pluginName) {
+      let text5 = "Internal error";
+      let location = null;
+      try {
+        text5 = (e && e.message || e) + "";
+      } catch {
+      }
+      try {
+        location = parseStackLinesV8(streamIn, (e.stack + "").split("\n"), "");
+      } catch {
+      }
+      return { id: "", pluginName, text: text5, location, notes: note ? [note] : [], detail: stash ? stash.store(e) : -1 };
+    }
+    function parseStackLinesV8(streamIn, lines, ident) {
+      let at = "    at ";
+      if (streamIn.readFileSync && !lines[0].startsWith(at) && lines[1].startsWith(at)) {
+        for (let i = 1; i < lines.length; i++) {
+          let line = lines[i];
+          if (!line.startsWith(at)) continue;
+          line = line.slice(at.length);
+          while (true) {
+            let match2 = /^(?:new |async )?\S+ \((.*)\)$/.exec(line);
+            if (match2) {
+              line = match2[1];
+              continue;
+            }
+            match2 = /^eval at \S+ \((.*)\)(?:, \S+:\d+:\d+)?$/.exec(line);
+            if (match2) {
+              line = match2[1];
+              continue;
+            }
+            match2 = /^(\S+):(\d+):(\d+)$/.exec(line);
+            if (match2) {
+              let contents;
+              try {
+                contents = streamIn.readFileSync(match2[1], "utf8");
+              } catch {
+                break;
+              }
+              let lineText = contents.split(/\r\n|\r|\n|\u2028|\u2029/)[+match2[2] - 1] || "";
+              let column = +match2[3] - 1;
+              let length = lineText.slice(column, column + ident.length) === ident ? ident.length : 0;
+              return {
+                file: match2[1],
+                namespace: "file",
+                line: +match2[2],
+                column: encodeUTF8(lineText.slice(0, column)).length,
+                length: encodeUTF8(lineText.slice(column, column + length)).length,
+                lineText: lineText + "\n" + lines.slice(1).join("\n"),
+                suggestion: ""
+              };
+            }
+            break;
+          }
+        }
+      }
+      return null;
+    }
+    function failureErrorWithLog(text5, errors, warnings) {
+      let limit = 5;
+      text5 += errors.length < 1 ? "" : ` with ${errors.length} error${errors.length < 2 ? "" : "s"}:` + errors.slice(0, limit + 1).map((e, i) => {
+        if (i === limit) return "\n...";
+        if (!e.location) return `
+error: ${e.text}`;
+        let { file, line, column } = e.location;
+        let pluginText = e.pluginName ? `[plugin: ${e.pluginName}] ` : "";
+        return `
+${file}:${line}:${column}: ERROR: ${pluginText}${e.text}`;
+      }).join("");
+      let error = new Error(text5);
+      for (const [key2, value] of [["errors", errors], ["warnings", warnings]]) {
+        Object.defineProperty(error, key2, {
+          configurable: true,
+          enumerable: true,
+          get: () => value,
+          set: (value2) => Object.defineProperty(error, key2, {
+            configurable: true,
+            enumerable: true,
+            value: value2
+          })
+        });
+      }
+      return error;
+    }
+    function replaceDetailsInMessages(messages, stash) {
+      for (const message of messages) {
+        message.detail = stash.load(message.detail);
+      }
+      return messages;
+    }
+    function sanitizeLocation(location, where, terminalWidth) {
+      if (location == null) return null;
+      let keys2 = {};
+      let file = getFlag(location, keys2, "file", mustBeString);
+      let namespace = getFlag(location, keys2, "namespace", mustBeString);
+      let line = getFlag(location, keys2, "line", mustBeInteger);
+      let column = getFlag(location, keys2, "column", mustBeInteger);
+      let length = getFlag(location, keys2, "length", mustBeInteger);
+      let lineText = getFlag(location, keys2, "lineText", mustBeString);
+      let suggestion = getFlag(location, keys2, "suggestion", mustBeString);
+      checkForInvalidFlags(location, keys2, where);
+      if (lineText) {
+        const relevantASCII = lineText.slice(
+          0,
+          (column && column > 0 ? column : 0) + (length && length > 0 ? length : 0) + (terminalWidth && terminalWidth > 0 ? terminalWidth : 80)
+        );
+        if (!/[\x7F-\uFFFF]/.test(relevantASCII) && !/\n/.test(lineText)) {
+          lineText = relevantASCII;
+        }
+      }
+      return {
+        file: file || "",
+        namespace: namespace || "",
+        line: line || 0,
+        column: column || 0,
+        length: length || 0,
+        lineText: lineText || "",
+        suggestion: suggestion || ""
+      };
+    }
+    function sanitizeMessages(messages, property, stash, fallbackPluginName, terminalWidth) {
+      let messagesClone = [];
+      let index2 = 0;
+      for (const message of messages) {
+        let keys2 = {};
+        let id = getFlag(message, keys2, "id", mustBeString);
+        let pluginName = getFlag(message, keys2, "pluginName", mustBeString);
+        let text5 = getFlag(message, keys2, "text", mustBeString);
+        let location = getFlag(message, keys2, "location", mustBeObjectOrNull);
+        let notes = getFlag(message, keys2, "notes", mustBeArray);
+        let detail = getFlag(message, keys2, "detail", canBeAnything);
+        let where = `in element ${index2} of "${property}"`;
+        checkForInvalidFlags(message, keys2, where);
+        let notesClone = [];
+        if (notes) {
+          for (const note of notes) {
+            let noteKeys = {};
+            let noteText = getFlag(note, noteKeys, "text", mustBeString);
+            let noteLocation = getFlag(note, noteKeys, "location", mustBeObjectOrNull);
+            checkForInvalidFlags(note, noteKeys, where);
+            notesClone.push({
+              text: noteText || "",
+              location: sanitizeLocation(noteLocation, where, terminalWidth)
+            });
+          }
+        }
+        messagesClone.push({
+          id: id || "",
+          pluginName: pluginName || fallbackPluginName,
+          text: text5 || "",
+          location: sanitizeLocation(location, where, terminalWidth),
+          notes: notesClone,
+          detail: stash ? stash.store(detail) : -1
+        });
+        index2++;
+      }
+      return messagesClone;
+    }
+    function sanitizeStringArray(values, property) {
+      const result = [];
+      for (const value of values) {
+        if (typeof value !== "string") throw new Error(`${quote(property)} must be an array of strings`);
+        result.push(value);
+      }
+      return result;
+    }
+    function sanitizeStringMap(map, property) {
+      const result = /* @__PURE__ */ Object.create(null);
+      for (const key2 in map) {
+        const value = map[key2];
+        if (typeof value !== "string") throw new Error(`key ${quote(key2)} in object ${quote(property)} must be a string`);
+        result[key2] = value;
+      }
+      return result;
+    }
+    function convertOutputFiles({ path: path3, contents, hash }) {
+      let text5 = null;
+      return {
+        path: path3,
+        contents,
+        hash,
+        get text() {
+          const binary = this.contents;
+          if (text5 === null || binary !== contents) {
+            contents = binary;
+            text5 = decodeUTF8(binary);
+          }
+          return text5;
+        }
+      };
+    }
+    function jsRegExpToGoRegExp(regexp) {
+      let result = regexp.source;
+      if (regexp.flags) result = `(?${regexp.flags})${result}`;
+      return result;
+    }
+    function parseJSON(bytes) {
+      let text5;
+      try {
+        text5 = decodeUTF8(bytes);
+      } catch {
+        return JSON_parse(bytes);
+      }
+      return JSON.parse(text5);
+    }
+    var fs = __require("fs");
+    var os = __require("os");
+    var path = __require("path");
+    var ESBUILD_BINARY_PATH = process.env.ESBUILD_BINARY_PATH || ESBUILD_BINARY_PATH;
+    var isValidBinaryPath = (x) => !!x && x !== "/usr/bin/esbuild";
+    var packageDarwin_arm64 = "@esbuild/darwin-arm64";
+    var packageDarwin_x64 = "@esbuild/darwin-x64";
+    var knownWindowsPackages = {
+      "win32 arm64 LE": "@esbuild/win32-arm64",
+      "win32 ia32 LE": "@esbuild/win32-ia32",
+      "win32 x64 LE": "@esbuild/win32-x64"
+    };
+    var knownUnixlikePackages = {
+      "aix ppc64 BE": "@esbuild/aix-ppc64",
+      "android arm64 LE": "@esbuild/android-arm64",
+      "darwin arm64 LE": "@esbuild/darwin-arm64",
+      "darwin x64 LE": "@esbuild/darwin-x64",
+      "freebsd arm64 LE": "@esbuild/freebsd-arm64",
+      "freebsd x64 LE": "@esbuild/freebsd-x64",
+      "linux arm LE": "@esbuild/linux-arm",
+      "linux arm64 LE": "@esbuild/linux-arm64",
+      "linux ia32 LE": "@esbuild/linux-ia32",
+      "linux mips64el LE": "@esbuild/linux-mips64el",
+      "linux ppc64 LE": "@esbuild/linux-ppc64",
+      "linux riscv64 LE": "@esbuild/linux-riscv64",
+      "linux s390x BE": "@esbuild/linux-s390x",
+      "linux x64 LE": "@esbuild/linux-x64",
+      "linux loong64 LE": "@esbuild/linux-loong64",
+      "netbsd arm64 LE": "@esbuild/netbsd-arm64",
+      "netbsd x64 LE": "@esbuild/netbsd-x64",
+      "openbsd arm64 LE": "@esbuild/openbsd-arm64",
+      "openbsd x64 LE": "@esbuild/openbsd-x64",
+      "sunos x64 LE": "@esbuild/sunos-x64"
+    };
+    var knownWebAssemblyFallbackPackages = {
+      "android arm LE": "@esbuild/android-arm",
+      "android x64 LE": "@esbuild/android-x64",
+      "openharmony arm64 LE": "@esbuild/openharmony-arm64"
+    };
+    function pkgAndSubpathForCurrentPlatform() {
+      let pkg;
+      let subpath;
+      let isWASM = false;
+      let platformKey = `${process.platform} ${os.arch()} ${os.endianness()}`;
+      if (platformKey in knownWindowsPackages) {
+        pkg = knownWindowsPackages[platformKey];
+        subpath = "esbuild.exe";
+      } else if (platformKey in knownUnixlikePackages) {
+        pkg = knownUnixlikePackages[platformKey];
+        subpath = "bin/esbuild";
+      } else if (platformKey in knownWebAssemblyFallbackPackages) {
+        pkg = knownWebAssemblyFallbackPackages[platformKey];
+        subpath = "bin/esbuild";
+        isWASM = true;
+      } else {
+        throw new Error(`Unsupported platform: ${platformKey}`);
+      }
+      return { pkg, subpath, isWASM };
+    }
+    function pkgForSomeOtherPlatform() {
+      const libMainJS = __require.resolve("esbuild");
+      const nodeModulesDirectory = path.dirname(path.dirname(path.dirname(libMainJS)));
+      if (path.basename(nodeModulesDirectory) === "node_modules") {
+        for (const unixKey in knownUnixlikePackages) {
+          try {
+            const pkg = knownUnixlikePackages[unixKey];
+            if (fs.existsSync(path.join(nodeModulesDirectory, pkg))) return pkg;
+          } catch {
+          }
+        }
+        for (const windowsKey in knownWindowsPackages) {
+          try {
+            const pkg = knownWindowsPackages[windowsKey];
+            if (fs.existsSync(path.join(nodeModulesDirectory, pkg))) return pkg;
+          } catch {
+          }
+        }
+      }
+      return null;
+    }
+    function downloadedBinPath(pkg, subpath) {
+      const esbuildLibDir = path.dirname(__require.resolve("esbuild"));
+      return path.join(esbuildLibDir, `downloaded-${pkg.replace("/", "-")}-${path.basename(subpath)}`);
+    }
+    function generateBinPath() {
+      if (isValidBinaryPath(ESBUILD_BINARY_PATH)) {
+        if (!fs.existsSync(ESBUILD_BINARY_PATH)) {
+          console.warn(`[esbuild] Ignoring bad configuration: ESBUILD_BINARY_PATH=${ESBUILD_BINARY_PATH}`);
+        } else {
+          return { binPath: ESBUILD_BINARY_PATH, isWASM: false };
+        }
+      }
+      const { pkg, subpath, isWASM } = pkgAndSubpathForCurrentPlatform();
+      let binPath;
+      try {
+        binPath = __require.resolve(`${pkg}/${subpath}`);
+      } catch (e) {
+        binPath = downloadedBinPath(pkg, subpath);
+        if (!fs.existsSync(binPath)) {
+          try {
+            __require.resolve(pkg);
+          } catch {
+            const otherPkg = pkgForSomeOtherPlatform();
+            if (otherPkg) {
+              let suggestions = `
+Specifically the "${otherPkg}" package is present but this platform
+needs the "${pkg}" package instead. People often get into this
+situation by installing esbuild on Windows or macOS and copying "node_modules"
+into a Docker image that runs Linux, or by copying "node_modules" between
+Windows and WSL environments.
+
+If you are installing with npm, you can try not copying the "node_modules"
+directory when you copy the files over, and running "npm ci" or "npm install"
+on the destination platform after the copy. Or you could consider using yarn
+instead of npm which has built-in support for installing a package on multiple
+platforms simultaneously.
+
+If you are installing with yarn, you can try listing both this platform and the
+other platform in your ".yarnrc.yml" file using the "supportedArchitectures"
+feature: https://yarnpkg.com/configuration/yarnrc/#supportedArchitectures
+Keep in mind that this means multiple copies of esbuild will be present.
+`;
+              if (pkg === packageDarwin_x64 && otherPkg === packageDarwin_arm64 || pkg === packageDarwin_arm64 && otherPkg === packageDarwin_x64) {
+                suggestions = `
+Specifically the "${otherPkg}" package is present but this platform
+needs the "${pkg}" package instead. People often get into this
+situation by installing esbuild with npm running inside of Rosetta 2 and then
+trying to use it with node running outside of Rosetta 2, or vice versa (Rosetta
+2 is Apple's on-the-fly x86_64-to-arm64 translation service).
+
+If you are installing with npm, you can try ensuring that both npm and node are
+not running under Rosetta 2 and then reinstalling esbuild. This likely involves
+changing how you installed npm and/or node. For example, installing node with
+the universal installer here should work: https://nodejs.org/en/download/. Or
+you could consider using yarn instead of npm which has built-in support for
+installing a package on multiple platforms simultaneously.
+
+If you are installing with yarn, you can try listing both "arm64" and "x64"
+in your ".yarnrc.yml" file using the "supportedArchitectures" feature:
+https://yarnpkg.com/configuration/yarnrc/#supportedArchitectures
+Keep in mind that this means multiple copies of esbuild will be present.
+`;
+              }
+              throw new Error(`
+You installed esbuild for another platform than the one you're currently using.
+This won't work because esbuild is written with native code and needs to
+install a platform-specific binary executable.
+${suggestions}
+Another alternative is to use the "esbuild-wasm" package instead, which works
+the same way on all platforms. But it comes with a heavy performance cost and
+can sometimes be 10x slower than the "esbuild" package, so you may also not
+want to do that.
+`);
+            }
+            throw new Error(`The package "${pkg}" could not be found, and is needed by esbuild.
+
+If you are installing esbuild with npm, make sure that you don't specify the
+"--no-optional" or "--omit=optional" flags. The "optionalDependencies" feature
+of "package.json" is used by esbuild to install the correct binary executable
+for your current platform.`);
+          }
+          throw e;
+        }
+      }
+      if (/\.zip\//.test(binPath)) {
+        let pnpapi;
+        try {
+          pnpapi = __require("pnpapi");
+        } catch (e) {
+        }
+        if (pnpapi) {
+          const root3 = pnpapi.getPackageInformation(pnpapi.topLevel).packageLocation;
+          const binTargetPath = path.join(
+            root3,
+            "node_modules",
+            ".cache",
+            "esbuild",
+            `pnpapi-${pkg.replace("/", "-")}-${"0.28.0"}-${path.basename(subpath)}`
+          );
+          if (!fs.existsSync(binTargetPath)) {
+            fs.mkdirSync(path.dirname(binTargetPath), { recursive: true });
+            fs.copyFileSync(binPath, binTargetPath);
+            fs.chmodSync(binTargetPath, 493);
+          }
+          return { binPath: binTargetPath, isWASM };
+        }
+      }
+      return { binPath, isWASM };
+    }
+    var child_process = __require("child_process");
+    var crypto2 = __require("crypto");
+    var path2 = __require("path");
+    var fs2 = __require("fs");
+    var os2 = __require("os");
+    var tty = __require("tty");
+    var worker_threads;
+    if (process.env.ESBUILD_WORKER_THREADS !== "0") {
+      try {
+        worker_threads = __require("worker_threads");
+      } catch {
+      }
+      let [major, minor] = process.versions.node.split(".");
+      if (
+        // <v12.17.0 does not work
+        +major < 12 || +major === 12 && +minor < 17 || +major === 13 && +minor < 13
+      ) {
+        worker_threads = void 0;
+      }
+    }
+    var _a;
+    var isInternalWorkerThread = ((_a = worker_threads == null ? void 0 : worker_threads.workerData) == null ? void 0 : _a.esbuildVersion) === "0.28.0";
+    var esbuildCommandAndArgs = () => {
+      if ((!ESBUILD_BINARY_PATH || false) && (path2.basename(__filename) !== "main.js" || path2.basename(__dirname) !== "lib")) {
+        throw new Error(
+          `The esbuild JavaScript API cannot be bundled. Please mark the "esbuild" package as external so it's not included in the bundle.
+
+More information: The file containing the code for esbuild's JavaScript API (${__filename}) does not appear to be inside the esbuild package on the file system, which usually means that the esbuild package was bundled into another file. This is problematic because the API needs to run a binary executable inside the esbuild package which is located using a relative path from the API code to the executable. If the esbuild package is bundled, the relative path will be incorrect and the executable won't be found.`
+        );
+      }
+      if (false) {
+        return ["node", [path2.join(__dirname, "..", "bin", "esbuild")]];
+      } else {
+        const { binPath, isWASM } = generateBinPath();
+        if (isWASM) {
+          return ["node", [binPath]];
+        } else {
+          return [binPath, []];
+        }
+      }
+    };
+    var isTTY = () => tty.isatty(2);
+    var fsSync = {
+      readFile(tempFile, callback) {
+        try {
+          let contents = fs2.readFileSync(tempFile, "utf8");
+          try {
+            fs2.unlinkSync(tempFile);
+          } catch {
+          }
+          callback(null, contents);
+        } catch (err2) {
+          callback(err2, null);
+        }
+      },
+      writeFile(contents, callback) {
+        try {
+          let tempFile = randomFileName();
+          fs2.writeFileSync(tempFile, contents);
+          callback(tempFile);
+        } catch {
+          callback(null);
+        }
+      }
+    };
+    var fsAsync = {
+      readFile(tempFile, callback) {
+        try {
+          fs2.readFile(tempFile, "utf8", (err2, contents) => {
+            try {
+              fs2.unlink(tempFile, () => callback(err2, contents));
+            } catch {
+              callback(err2, contents);
+            }
+          });
+        } catch (err2) {
+          callback(err2, null);
+        }
+      },
+      writeFile(contents, callback) {
+        try {
+          let tempFile = randomFileName();
+          fs2.writeFile(tempFile, contents, (err2) => err2 !== null ? callback(null) : callback(tempFile));
+        } catch {
+          callback(null);
+        }
+      }
+    };
+    var version = "0.28.0";
+    var build2 = (options) => ensureServiceIsRunning().build(options);
+    var context = (buildOptions) => ensureServiceIsRunning().context(buildOptions);
+    var transform = (input, options) => ensureServiceIsRunning().transform(input, options);
+    var formatMessages = (messages, options) => ensureServiceIsRunning().formatMessages(messages, options);
+    var analyzeMetafile = (messages, options) => ensureServiceIsRunning().analyzeMetafile(messages, options);
+    var buildSync = (options) => {
+      if (worker_threads && !isInternalWorkerThread) {
+        if (!workerThreadService) workerThreadService = startWorkerThreadService(worker_threads);
+        return workerThreadService.buildSync(options);
+      }
+      let result;
+      runServiceSync((service) => service.buildOrContext({
+        callName: "buildSync",
+        refs: null,
+        options,
+        isTTY: isTTY(),
+        defaultWD,
+        callback: (err2, res) => {
+          if (err2) throw err2;
+          result = res;
+        }
+      }));
+      return result;
+    };
+    var transformSync = (input, options) => {
+      if (worker_threads && !isInternalWorkerThread) {
+        if (!workerThreadService) workerThreadService = startWorkerThreadService(worker_threads);
+        return workerThreadService.transformSync(input, options);
+      }
+      let result;
+      runServiceSync((service) => service.transform({
+        callName: "transformSync",
+        refs: null,
+        input,
+        options: options || {},
+        isTTY: isTTY(),
+        fs: fsSync,
+        callback: (err2, res) => {
+          if (err2) throw err2;
+          result = res;
+        }
+      }));
+      return result;
+    };
+    var formatMessagesSync = (messages, options) => {
+      if (worker_threads && !isInternalWorkerThread) {
+        if (!workerThreadService) workerThreadService = startWorkerThreadService(worker_threads);
+        return workerThreadService.formatMessagesSync(messages, options);
+      }
+      let result;
+      runServiceSync((service) => service.formatMessages({
+        callName: "formatMessagesSync",
+        refs: null,
+        messages,
+        options,
+        callback: (err2, res) => {
+          if (err2) throw err2;
+          result = res;
+        }
+      }));
+      return result;
+    };
+    var analyzeMetafileSync = (metafile, options) => {
+      if (worker_threads && !isInternalWorkerThread) {
+        if (!workerThreadService) workerThreadService = startWorkerThreadService(worker_threads);
+        return workerThreadService.analyzeMetafileSync(metafile, options);
+      }
+      let result;
+      runServiceSync((service) => service.analyzeMetafile({
+        callName: "analyzeMetafileSync",
+        refs: null,
+        metafile: typeof metafile === "string" ? metafile : JSON.stringify(metafile),
+        options,
+        callback: (err2, res) => {
+          if (err2) throw err2;
+          result = res;
+        }
+      }));
+      return result;
+    };
+    var stop = () => {
+      if (stopService) stopService();
+      if (workerThreadService) workerThreadService.stop();
+      return Promise.resolve();
+    };
+    var initializeWasCalled = false;
+    var initialize = (options) => {
+      options = validateInitializeOptions(options || {});
+      if (options.wasmURL) throw new Error(`The "wasmURL" option only works in the browser`);
+      if (options.wasmModule) throw new Error(`The "wasmModule" option only works in the browser`);
+      if (options.worker) throw new Error(`The "worker" option only works in the browser`);
+      if (initializeWasCalled) throw new Error('Cannot call "initialize" more than once');
+      ensureServiceIsRunning();
+      initializeWasCalled = true;
+      return Promise.resolve();
+    };
+    var defaultWD = process.cwd();
+    var longLivedService;
+    var stopService;
+    var ensureServiceIsRunning = () => {
+      if (longLivedService) return longLivedService;
+      let [command, args] = esbuildCommandAndArgs();
+      let child = child_process.spawn(command, args.concat(`--service=${"0.28.0"}`, "--ping"), {
+        windowsHide: true,
+        stdio: ["pipe", "pipe", "inherit"],
+        cwd: defaultWD
+      });
+      let { readFromStdout, afterClose, service } = createChannel({
+        writeToStdin(bytes) {
+          child.stdin.write(bytes, (err2) => {
+            if (err2) afterClose(err2);
+          });
+        },
+        readFileSync: fs2.readFileSync,
+        isSync: false,
+        hasFS: true,
+        esbuild: node_exports
+      });
+      child.stdin.on("error", afterClose);
+      child.on("error", afterClose);
+      const stdin = child.stdin;
+      const stdout = child.stdout;
+      stdout.on("data", readFromStdout);
+      stdout.on("end", afterClose);
+      stopService = () => {
+        stdin.destroy();
+        stdout.destroy();
+        child.kill();
+        initializeWasCalled = false;
+        longLivedService = void 0;
+        stopService = void 0;
+      };
+      let refCount = 0;
+      child.unref();
+      if (stdin.unref) {
+        stdin.unref();
+      }
+      if (stdout.unref) {
+        stdout.unref();
+      }
+      const refs = {
+        ref() {
+          if (++refCount === 1) child.ref();
+        },
+        unref() {
+          if (--refCount === 0) child.unref();
+        }
+      };
+      longLivedService = {
+        build: (options) => new Promise((resolve4, reject) => {
+          service.buildOrContext({
+            callName: "build",
+            refs,
+            options,
+            isTTY: isTTY(),
+            defaultWD,
+            callback: (err2, res) => err2 ? reject(err2) : resolve4(res)
+          });
+        }),
+        context: (options) => new Promise((resolve4, reject) => service.buildOrContext({
+          callName: "context",
+          refs,
+          options,
+          isTTY: isTTY(),
+          defaultWD,
+          callback: (err2, res) => err2 ? reject(err2) : resolve4(res)
+        })),
+        transform: (input, options) => new Promise((resolve4, reject) => service.transform({
+          callName: "transform",
+          refs,
+          input,
+          options: options || {},
+          isTTY: isTTY(),
+          fs: fsAsync,
+          callback: (err2, res) => err2 ? reject(err2) : resolve4(res)
+        })),
+        formatMessages: (messages, options) => new Promise((resolve4, reject) => service.formatMessages({
+          callName: "formatMessages",
+          refs,
+          messages,
+          options,
+          callback: (err2, res) => err2 ? reject(err2) : resolve4(res)
+        })),
+        analyzeMetafile: (metafile, options) => new Promise((resolve4, reject) => service.analyzeMetafile({
+          callName: "analyzeMetafile",
+          refs,
+          metafile: typeof metafile === "string" ? metafile : JSON.stringify(metafile),
+          options,
+          callback: (err2, res) => err2 ? reject(err2) : resolve4(res)
+        }))
+      };
+      return longLivedService;
+    };
+    var runServiceSync = (callback) => {
+      let [command, args] = esbuildCommandAndArgs();
+      let stdin = new Uint8Array();
+      let { readFromStdout, afterClose, service } = createChannel({
+        writeToStdin(bytes) {
+          if (stdin.length !== 0) throw new Error("Must run at most one command");
+          stdin = bytes;
+        },
+        isSync: true,
+        hasFS: true,
+        esbuild: node_exports
+      });
+      callback(service);
+      let stdout = child_process.execFileSync(command, args.concat(`--service=${"0.28.0"}`), {
+        cwd: defaultWD,
+        windowsHide: true,
+        input: stdin,
+        // We don't know how large the output could be. If it's too large, the
+        // command will fail with ENOBUFS. Reserve 16mb for now since that feels
+        // like it should be enough. Also allow overriding this with an environment
+        // variable.
+        maxBuffer: +process.env.ESBUILD_MAX_BUFFER || 16 * 1024 * 1024
+      });
+      readFromStdout(stdout);
+      afterClose(null);
+    };
+    var randomFileName = () => {
+      return path2.join(os2.tmpdir(), `esbuild-${crypto2.randomBytes(32).toString("hex")}`);
+    };
+    var workerThreadService = null;
+    var startWorkerThreadService = (worker_threads2) => {
+      let { port1: mainPort, port2: workerPort } = new worker_threads2.MessageChannel();
+      let worker = new worker_threads2.Worker(__filename, {
+        workerData: { workerPort, defaultWD, esbuildVersion: "0.28.0" },
+        transferList: [workerPort],
+        // From node's documentation: https://nodejs.org/api/worker_threads.html
+        //
+        //   Take care when launching worker threads from preload scripts (scripts loaded
+        //   and run using the `-r` command line flag). Unless the `execArgv` option is
+        //   explicitly set, new Worker threads automatically inherit the command line flags
+        //   from the running process and will preload the same preload scripts as the main
+        //   thread. If the preload script unconditionally launches a worker thread, every
+        //   thread spawned will spawn another until the application crashes.
+        //
+        execArgv: []
+      });
+      let nextID = 0;
+      let fakeBuildError = (text5) => {
+        let error = new Error(`Build failed with 1 error:
+error: ${text5}`);
+        let errors = [{ id: "", pluginName: "", text: text5, location: null, notes: [], detail: void 0 }];
+        error.errors = errors;
+        error.warnings = [];
+        return error;
+      };
+      let validateBuildSyncOptions = (options) => {
+        if (!options) return;
+        let plugins = options.plugins;
+        if (plugins && plugins.length > 0) throw fakeBuildError(`Cannot use plugins in synchronous API calls`);
+      };
+      let applyProperties = (object, properties) => {
+        for (let key2 in properties) {
+          object[key2] = properties[key2];
+        }
+      };
+      let runCallSync = (command, args) => {
+        let id = nextID++;
+        let sharedBuffer = new SharedArrayBuffer(8);
+        let sharedBufferView = new Int32Array(sharedBuffer);
+        let msg = { sharedBuffer, id, command, args };
+        worker.postMessage(msg);
+        let status = Atomics.wait(sharedBufferView, 0, 0);
+        if (status !== "ok" && status !== "not-equal") throw new Error("Internal error: Atomics.wait() failed: " + status);
+        let { message: { id: id2, resolve: resolve4, reject, properties } } = worker_threads2.receiveMessageOnPort(mainPort);
+        if (id !== id2) throw new Error(`Internal error: Expected id ${id} but got id ${id2}`);
+        if (reject) {
+          applyProperties(reject, properties);
+          throw reject;
+        }
+        return resolve4;
+      };
+      worker.unref();
+      return {
+        buildSync(options) {
+          validateBuildSyncOptions(options);
+          return runCallSync("build", [options]);
+        },
+        transformSync(input, options) {
+          return runCallSync("transform", [input, options]);
+        },
+        formatMessagesSync(messages, options) {
+          return runCallSync("formatMessages", [messages, options]);
+        },
+        analyzeMetafileSync(metafile, options) {
+          return runCallSync("analyzeMetafile", [metafile, options]);
+        },
+        stop() {
+          worker.terminate();
+          workerThreadService = null;
+        }
+      };
+    };
+    var startSyncServiceWorker = () => {
+      let workerPort = worker_threads.workerData.workerPort;
+      let parentPort = worker_threads.parentPort;
+      let extractProperties = (object) => {
+        let properties = {};
+        if (object && typeof object === "object") {
+          for (let key2 in object) {
+            properties[key2] = object[key2];
+          }
+        }
+        return properties;
+      };
+      try {
+        let service = ensureServiceIsRunning();
+        defaultWD = worker_threads.workerData.defaultWD;
+        parentPort.on("message", (msg) => {
+          (async () => {
+            let { sharedBuffer, id, command, args } = msg;
+            let sharedBufferView = new Int32Array(sharedBuffer);
+            try {
+              switch (command) {
+                case "build":
+                  workerPort.postMessage({ id, resolve: await service.build(args[0]) });
+                  break;
+                case "transform":
+                  workerPort.postMessage({ id, resolve: await service.transform(args[0], args[1]) });
+                  break;
+                case "formatMessages":
+                  workerPort.postMessage({ id, resolve: await service.formatMessages(args[0], args[1]) });
+                  break;
+                case "analyzeMetafile":
+                  workerPort.postMessage({ id, resolve: await service.analyzeMetafile(args[0], args[1]) });
+                  break;
+                default:
+                  throw new Error(`Invalid command: ${command}`);
+              }
+            } catch (reject) {
+              workerPort.postMessage({ id, reject, properties: extractProperties(reject) });
+            }
+            Atomics.add(sharedBufferView, 0, 1);
+            Atomics.notify(sharedBufferView, 0, Infinity);
+          })();
+        });
+      } catch (reject) {
+        parentPort.on("message", (msg) => {
+          let { sharedBuffer, id } = msg;
+          let sharedBufferView = new Int32Array(sharedBuffer);
+          workerPort.postMessage({ id, reject, properties: extractProperties(reject) });
+          Atomics.add(sharedBufferView, 0, 1);
+          Atomics.notify(sharedBufferView, 0, Infinity);
+        });
+      }
+    };
+    if (isInternalWorkerThread) {
+      startSyncServiceWorker();
+    }
+    var node_default = node_exports;
+  }
+});
+
 // ../../node_modules/hono/dist/compose.js
 var compose = (middleware, onError, onNotFound) => {
   return (context, next) => {
@@ -9977,7 +12478,7 @@ var responseViaResponseObject = async (res, outgoing, options = {}) => {
         });
         if (!chunk) {
           if (i === 1) {
-            await new Promise((resolve3) => setTimeout(resolve3));
+            await new Promise((resolve4) => setTimeout(resolve4));
             maxReadCount = 3;
             continue;
           }
@@ -10444,7 +12945,7 @@ async function listenWithAutoIncrement(options, serveImpl) {
 
 // src/server.ts
 import { existsSync as existsSync13, realpathSync } from "node:fs";
-import { dirname as dirname5, isAbsolute, resolve as resolve2 } from "node:path";
+import { dirname as dirname5, isAbsolute, resolve as resolve3 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // ../core/src/config.ts
@@ -12915,7 +15416,7 @@ var Processor = class _Processor extends CallableInstance {
     assertParser("process", this.parser || this.Parser);
     assertCompiler("process", this.compiler || this.Compiler);
     return done ? executor(void 0, done) : new Promise(executor);
-    function executor(resolve3, reject) {
+    function executor(resolve4, reject) {
       const realFile = vfile(file);
       const parseTree = (
         /** @type {HeadTree extends undefined ? Node : HeadTree} */
@@ -12946,8 +15447,8 @@ var Processor = class _Processor extends CallableInstance {
       function realDone(error, file2) {
         if (error || !file2) {
           reject(error);
-        } else if (resolve3) {
-          resolve3(file2);
+        } else if (resolve4) {
+          resolve4(file2);
         } else {
           ok2(done, "`done` is defined if `resolve` is not");
           done(void 0, file2);
@@ -13049,7 +15550,7 @@ var Processor = class _Processor extends CallableInstance {
       file = void 0;
     }
     return done ? executor(void 0, done) : new Promise(executor);
-    function executor(resolve3, reject) {
+    function executor(resolve4, reject) {
       ok2(
         typeof file !== "function",
         "`file` can\u2019t be a `done` anymore, we checked"
@@ -13063,8 +15564,8 @@ var Processor = class _Processor extends CallableInstance {
         );
         if (error) {
           reject(error);
-        } else if (resolve3) {
-          resolve3(resultingTree);
+        } else if (resolve4) {
+          resolve4(resultingTree);
         } else {
           ok2(done, "`done` is defined if `resolve` is not");
           done(void 0, resultingTree, file2);
@@ -15931,10 +18432,10 @@ function resolveAll(constructs2, events, context) {
   const called = [];
   let index2 = -1;
   while (++index2 < constructs2.length) {
-    const resolve3 = constructs2[index2].resolveAll;
-    if (resolve3 && !called.includes(resolve3)) {
-      events = resolve3(events, context);
-      called.push(resolve3);
+    const resolve4 = constructs2[index2].resolveAll;
+    if (resolve4 && !called.includes(resolve4)) {
+      events = resolve4(events, context);
+      called.push(resolve4);
     }
   }
   return events;
@@ -24541,6 +27042,153 @@ function createScrapbookMutationsRouter(ctx) {
   return app;
 }
 
+// src/build-client-assets.ts
+var import_esbuild = __toESM(require_main(), 1);
+import { mkdir, readdir, stat } from "node:fs/promises";
+import { join as join8, resolve as resolve2 } from "node:path";
+var CACHE_DIR_NAME = ".runtime-cache";
+var CACHE_OUT_SUBDIR = "dist";
+async function buildClientAssets(opts) {
+  const srcDir = resolve2(opts.pluginRoot, "public", "src");
+  const outDir = resolve2(opts.pluginRoot, CACHE_DIR_NAME, CACHE_OUT_SUBDIR);
+  const entries = await findEntries(srcDir);
+  if (entries.length === 0) {
+    throw new Error(
+      `deskwork-studio: no .ts entries found in ${srcDir}; cannot build client assets`
+    );
+  }
+  await mkdir(outDir, { recursive: true });
+  let entriesBuilt = 0;
+  let entriesCached = 0;
+  let totalBytes = 0;
+  for (const entryPath of entries) {
+    const decision = await decideEntry(entryPath, srcDir, outDir);
+    if (decision.rebuild) {
+      const bytes = await rebuildEntry(decision);
+      totalBytes += bytes;
+      entriesBuilt += 1;
+    } else {
+      const cachedStat = await stat(decision.outFile);
+      totalBytes += cachedStat.size;
+      entriesCached += 1;
+    }
+  }
+  return { entriesBuilt, entriesCached, totalBytes, outDir };
+}
+async function findEntries(dir) {
+  let names;
+  try {
+    names = await readdir(dir);
+  } catch (err2) {
+    const reason = err2 instanceof Error ? err2.message : String(err2);
+    throw new Error(
+      `deskwork-studio: cannot read client source dir ${dir}: ${reason}`
+    );
+  }
+  const entries = [];
+  for (const name of names) {
+    if (!name.endsWith(".ts")) continue;
+    const full = join8(dir, name);
+    const info = await stat(full);
+    if (info.isFile()) entries.push(full);
+  }
+  entries.sort();
+  return entries;
+}
+async function decideEntry(entryPath, srcDir, outDir) {
+  const baseName = entryPath.slice(srcDir.length + 1).replace(/\.ts$/, ".js");
+  const outFile = join8(outDir, baseName);
+  const cachedMtime = await safeMtime(outFile);
+  if (cachedMtime === null) {
+    return { entryPath, outFile, baseName, rebuild: true };
+  }
+  const entryMtime = await safeMtime(entryPath);
+  if (entryMtime === null) {
+    throw new Error(
+      `deskwork-studio: client entry vanished between readdir and stat: ${entryPath}`
+    );
+  }
+  if (entryMtime > cachedMtime) {
+    return { entryPath, outFile, baseName, rebuild: true };
+  }
+  const metaPath = `${outFile}.meta.json`;
+  const metaMtime = await safeMtime(metaPath);
+  if (metaMtime === null) {
+    return { entryPath, outFile, baseName, rebuild: true };
+  }
+  const importPaths = await readMetafileInputs(metaPath, entryPath);
+  for (const imp of importPaths) {
+    const impMtime = await safeMtime(imp);
+    if (impMtime === null) continue;
+    if (impMtime > cachedMtime) {
+      return { entryPath, outFile, baseName, rebuild: true };
+    }
+  }
+  return { entryPath, outFile, baseName, rebuild: false };
+}
+async function rebuildEntry(decision) {
+  const opts = {
+    entryPoints: [decision.entryPath],
+    outfile: decision.outFile,
+    bundle: true,
+    format: "esm",
+    target: "es2022",
+    minify: false,
+    sourcemap: "linked",
+    logLevel: "warning",
+    metafile: true
+  };
+  const result = await (0, import_esbuild.build)(opts);
+  if (result.errors.length > 0) {
+    throw new Error(
+      `deskwork-studio: esbuild reported ${result.errors.length} errors building ${decision.entryPath}`
+    );
+  }
+  if (!result.metafile) {
+    throw new Error(
+      `deskwork-studio: esbuild did not return a metafile for ${decision.entryPath}; cache check would be unsound`
+    );
+  }
+  await writeMetafile(`${decision.outFile}.meta.json`, result.metafile);
+  const stats = await stat(decision.outFile);
+  return stats.size;
+}
+async function safeMtime(path) {
+  try {
+    const info = await stat(path);
+    return info.mtimeMs;
+  } catch {
+    return null;
+  }
+}
+async function writeMetafile(path, meta) {
+  const { writeFile } = await import("node:fs/promises");
+  const json = JSON.stringify({ inputs: Object.keys(meta.inputs) });
+  await writeFile(path, json, "utf8");
+}
+async function readMetafileInputs(metaPath, entryPath) {
+  const { readFile: readFile2 } = await import("node:fs/promises");
+  const raw3 = await readFile2(metaPath, "utf8");
+  const parsed = JSON.parse(raw3);
+  if (!isMetafileSidecar(parsed)) {
+    throw new Error(
+      `deskwork-studio: malformed metafile sidecar at ${metaPath}`
+    );
+  }
+  const entryDir = entryPath.slice(0, entryPath.lastIndexOf("/"));
+  return parsed.inputs.map((rel) => resolve2(entryDir, rel));
+}
+function isMetafileSidecar(value) {
+  if (typeof value !== "object" || value === null) return false;
+  if (!("inputs" in value)) return false;
+  const inputs = value.inputs;
+  if (!Array.isArray(inputs)) return false;
+  for (const item of inputs) {
+    if (typeof item !== "string") return false;
+  }
+  return true;
+}
+
 // ../core/src/review/report.ts
 var CATEGORY_KEYS = [
   "voice-drift",
@@ -25463,7 +28111,7 @@ function splitOutline(md) {
 
 // src/pages/review-scrapbook-drawer.ts
 import { readFileSync as readFileSync8 } from "node:fs";
-import { join as join8 } from "node:path";
+import { join as join9 } from "node:path";
 
 // src/components/scrapbook-item.ts
 var DEFAULT_PREVIEW_BYTES = 800;
@@ -25581,14 +28229,14 @@ function renderEmptyScrapbookRow() {
 
 // src/pages/review-scrapbook-drawer.ts
 function makeInlineTextLoader(ctx, site, entry, slug, index2) {
-  const scrapbookDir2 = entry ? scrapbookDirForEntry(ctx.projectRoot, ctx.config, site, entry, index2) : join8(
+  const scrapbookDir2 = entry ? scrapbookDirForEntry(ctx.projectRoot, ctx.config, site, entry, index2) : join9(
     resolveContentDir(ctx.projectRoot, ctx.config, site),
     slug,
     "scrapbook"
   );
   return (filename, maxBytes) => {
     try {
-      const buf = readFileSync8(join8(scrapbookDir2, filename));
+      const buf = readFileSync8(join9(scrapbookDir2, filename));
       const slice = buf.subarray(0, Math.min(buf.byteLength, maxBytes));
       return slice.toString("utf-8");
     } catch {
@@ -26917,7 +29565,7 @@ function renderScrapbookPage(ctx, site, path) {
 
 // ../core/src/content-tree-fs-walk.ts
 import { existsSync as existsSync10, readdirSync as readdirSync4, readFileSync as readFileSync9, statSync as statSync5 } from "node:fs";
-import { join as join9 } from "node:path";
+import { join as join10 } from "node:path";
 var INDEX_BASENAMES = /* @__PURE__ */ new Set([
   "index.md",
   "index.mdx",
@@ -26962,10 +29610,10 @@ function defaultFsWalk(projectRoot, config, site) {
       const lower = name.toLowerCase();
       if (INDEX_BASENAMES.has(lower)) {
         hasIndex = true;
-        if (titleSource === null) titleSource = join9(dirAbs, name);
+        if (titleSource === null) titleSource = join10(dirAbs, name);
       } else if (README_BASENAMES.has(lower)) {
         hasReadme = true;
-        if (titleSource === null && !hasIndex) titleSource = join9(dirAbs, name);
+        if (titleSource === null && !hasIndex) titleSource = join10(dirAbs, name);
       }
     }
     if (pathSoFar !== "") {
@@ -26975,7 +29623,7 @@ function defaultFsWalk(projectRoot, config, site) {
     for (const name of names) {
       if (name.startsWith(".")) continue;
       if (SKIP2.has(name.toLowerCase())) continue;
-      const childAbs = join9(dirAbs, name);
+      const childAbs = join10(dirAbs, name);
       let childStat;
       try {
         childStat = statSync5(childAbs);
@@ -26993,7 +29641,7 @@ function defaultFsWalk(projectRoot, config, site) {
 
 // ../core/src/content-tree-helpers.ts
 import { existsSync as existsSync11 } from "node:fs";
-import { join as join10 } from "node:path";
+import { join as join11 } from "node:path";
 function leafOfPath(path) {
   const idx = path.lastIndexOf("/");
   return idx < 0 ? path : path.slice(idx + 1);
@@ -27015,7 +29663,7 @@ function entryHasOwnIndex(contentDir, entryPath, fsHasIndex, fsHasReadme, boundF
   if (fsHasIndex) return true;
   if (fsHasReadme) return true;
   for (const basename of TEMPLATE_INDEX_BASENAMES) {
-    if (existsSync11(join10(contentDir, entryPath, basename))) return true;
+    if (existsSync11(join11(contentDir, entryPath, basename))) return true;
   }
   if (!hasFsDir) return true;
   return false;
@@ -27285,7 +29933,7 @@ import { relative as relative2 } from "node:path";
 
 // src/pages/content-detail.ts
 import { readFileSync as readFileSync10, existsSync as existsSync12 } from "node:fs";
-import { join as join11 } from "node:path";
+import { join as join12 } from "node:path";
 var PREVIEW_CHAR_BUDGET = 480;
 function renderEmptyDetail() {
   return unsafe(html6`
@@ -27353,11 +30001,11 @@ function makeInlineTextLoaderForNode(ctx, site, node2, index2) {
     scrapbookDir2 = resolveNodeScrapbookDir(ctx, site, node2, index2);
   } catch {
     const contentDir = resolveContentDir(ctx.projectRoot, ctx.config, site);
-    scrapbookDir2 = join11(contentDir, node2.path, "scrapbook");
+    scrapbookDir2 = join12(contentDir, node2.path, "scrapbook");
   }
   return (filename, maxBytes) => {
     try {
-      const buf = readFileSync10(join11(scrapbookDir2, filename));
+      const buf = readFileSync10(join12(scrapbookDir2, filename));
       const slice = buf.subarray(0, Math.min(buf.byteLength, maxBytes));
       return slice.toString("utf-8");
     } catch {
@@ -27399,7 +30047,7 @@ function findOrganizationalIndex(contentDir, slug) {
     "README.markdown"
   ];
   for (const name of candidates) {
-    const abs = join11(contentDir, slug, name);
+    const abs = join12(contentDir, slug, name);
     if (existsSync12(abs)) return abs;
   }
   return null;
@@ -28082,7 +30730,7 @@ function parseCliArgs(argv) {
     usage(`invalid port: ${port}`);
   }
   return {
-    projectRoot: isAbsolute(projectRoot) ? projectRoot : resolve2(process.cwd(), projectRoot),
+    projectRoot: isAbsolute(projectRoot) ? projectRoot : resolve3(process.cwd(), projectRoot),
     port,
     portExplicit,
     hostOverride,
@@ -28151,19 +30799,31 @@ function buildReviewRedirectUrl(entryId, requestUrl) {
   }
   return `/dev/editorial-review/${entryId}${search2}`;
 }
-function publicDir() {
+function pluginRoot() {
   const here = dirname5(fileURLToPath2(import.meta.url));
   const candidates = [
-    resolve2(here, "..", "public"),
-    resolve2(here, "..", "..", "..", "plugins", "deskwork-studio", "public")
+    resolve3(here, ".."),
+    resolve3(here, "..", "..", "..", "plugins", "deskwork-studio")
   ];
   for (const candidate of candidates) {
-    if (existsSync13(candidate)) return candidate;
+    if (existsSync13(resolve3(candidate, "public", "src"))) return candidate;
   }
   throw new Error(
-    `deskwork-studio: could not find public/ assets. Tried:
+    `deskwork-studio: could not find plugin root. Tried:
   ${candidates.join("\n  ")}`
   );
+}
+function publicDir() {
+  const root3 = resolve3(pluginRoot(), "public");
+  if (!existsSync13(root3)) {
+    throw new Error(
+      `deskwork-studio: could not find public/ assets at ${root3}`
+    );
+  }
+  return root3;
+}
+function clientAssetsDir() {
+  return resolve3(pluginRoot(), ".runtime-cache", "dist");
 }
 function createApp(ctx) {
   const app = new Hono2();
@@ -28273,6 +30933,13 @@ function createApp(ctx) {
     return c.html(r.html, r.status);
   });
   app.use(
+    "/static/dist/*",
+    serveStatic({
+      root: clientAssetsDir(),
+      rewriteRequestPath: (path) => path.replace(/^\/static\/dist/, "")
+    })
+  );
+  app.use(
     "/static/*",
     serveStatic({
       root: publicDir(),
@@ -28290,6 +30957,18 @@ async function main() {
   } catch (err2) {
     const reason = err2 instanceof Error ? err2.message : String(err2);
     process.stderr.write(`Could not load config: ${reason}
+`);
+    process.exit(1);
+  }
+  try {
+    const summary = await buildClientAssets({ pluginRoot: pluginRoot() });
+    process.stdout.write(
+      `deskwork-studio: built ${summary.entriesBuilt} client assets (${summary.entriesCached} cached) -> ${summary.outDir}
+`
+    );
+  } catch (err2) {
+    const reason = err2 instanceof Error ? err2.message : String(err2);
+    process.stderr.write(`deskwork-studio: client asset build failed: ${reason}
 `);
     process.exit(1);
   }

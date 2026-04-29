@@ -19,6 +19,11 @@ build/
 !plugins/deskwork-studio/public/dist/
 !plugins/deskwork-studio/public/dist/**
 
+## Phase 23e runtime build cache. The studio esbuilds client modules
+## from public/src/ into <pluginRoot>/.runtime-cache/dist/ at boot.
+## Never committed; populated on first run, reused on warm boots.
+plugins/deskwork-studio/.runtime-cache/
+
 ## Runtime / local state
 .env
 .env.*
