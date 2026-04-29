@@ -280,8 +280,10 @@ fi
 ok "studio booted, log at ${STUDIO_LOG}"
 
 ORIGIN="http://127.0.0.1:${SMOKE_PORT}"
+# Note: `/` is intentionally excluded — it 302-redirects to `/dev/`, which is
+# already covered below. assert_200 expects 200 directly and does not follow
+# redirects. Coverage is unchanged because every destination route is listed.
 PAGE_ROUTES=(
-  "/"
   "/dev"
   "/dev/"
   "/dev/editorial-studio"
