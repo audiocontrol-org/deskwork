@@ -1,0 +1,808 @@
+/* ============================================================
+   Bird's-Eye Content View — Writer's Catalog
+   Phase 16d (#18). Extracted from
+   docs/1.0/001-IN-PROGRESS/deskwork-plugin/mockups/birds-eye-content-view.html
+   and trimmed to the bits the studio actually serves. The mockup is
+   the design reference; the markup is generated from
+   packages/studio/src/pages/content.ts and content-detail.ts via
+   the existing render-function convention.
+   ============================================================ */
+
+/* ---------- Fonts ----------
+ * Phase 17 / cross-surface audit: editorial-review.css is loaded first
+ * on every content-view page and imports the same Fraunces / Newsreader
+ * / JetBrains Mono families. No second import needed here. (The earlier
+ * `@import url(...)` was a parallel font load left over from when the
+ * content view had its own font stack.) */
+
+/* ---------- Tokens ----------
+ *
+ * CSF-1 (cross-surface audit v0.5.0): the Writer's-Catalog viewport now
+ * consumes the editorial-print palette directly. The local `--paper`,
+ * `--ink`, `--rule`, `--accent` names remain as aliases so the rules
+ * below don't have to be rewritten one-by-one — but the *values* come
+ * from `--er-*` (defined in editorial-review.css, loaded first), which
+ * is the single source of truth for cream / ink / red-pencil across
+ * every studio surface.
+ *
+ * Lane indicators stay defined here — they are content-view specific
+ * (no editorial-print equivalent ships in the token sheet).
+ */
+
+:root {
+  /* Lifecycle lane indicators (content-view-specific). */
+  --lane-ideas:     #b39872;
+  --lane-planned:   #8a9a7a;
+  --lane-outlining: #7e8aa6;
+  --lane-drafting:  #b08a5e;
+  --lane-review:    #a37882;
+  --lane-published: #6f8265;
+  --lane-paused:    #9a8a7a;
+}
+
+/* Local aliases — bind the content.css class library to the
+ * editorial-print tokens. Every value below comes from `--er-*`; this
+ * block is the only place where Writer's-Catalog names exist. */
+.content-page {
+  --paper:       var(--er-paper);
+  --paper-deep:  var(--er-paper-2);
+  --paper-soft:  var(--er-paper-2);
+  --ink:         var(--er-ink);
+  --ink-mid:     var(--er-ink-soft);
+  --ink-light:   var(--er-faded);
+  --ink-faint:   var(--er-faded-2);
+  --rule:        var(--er-faded-2);
+  --rule-soft:   var(--er-faded-2);
+  --rule-deep:   var(--er-faded);
+  --accent:      var(--er-red-pencil);
+
+  --font-display: var(--er-font-display);
+  --font-body:    var(--er-font-body);
+  --font-mono:    var(--er-font-mono);
+
+  --row-h: 38px;
+  --indent: 22px;
+}
+
+/* Error fallback container also gets the aliases. */
+.content-error {
+  --paper:       var(--er-paper);
+  --paper-deep:  var(--er-paper-2);
+  --ink:         var(--er-ink);
+  --ink-mid:     var(--er-ink-soft);
+  --ink-light:   var(--er-faded);
+  --rule:        var(--er-faded-2);
+  --accent:      var(--er-red-pencil);
+  --font-display: var(--er-font-display);
+  --font-body:    var(--er-font-body);
+  --font-mono:    var(--er-font-mono);
+}
+
+* { box-sizing: border-box; }
+
+/* Body chrome is styled in editorial-review.css for [data-review-ui].
+ * Here we set the page-level container padding/centering for content
+ * surfaces. CSF-2: spacing literals replaced with --er-space-*; CSF-7:
+ * width pulled from the shared --er-container-wide token. */
+body[data-review-ui="studio"]:has(.content-page),
+body[data-review-ui="studio"]:has(.content-error) {
+  font-feature-settings: "kern", "liga", "onum";
+  font-variation-settings: "opsz" 14;
+}
+
+body[data-review-ui="studio"]:has(.content-page)::before,
+body[data-review-ui="studio"]:has(.content-error)::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  /* Subtle paper grain — uses the editorial-print ink at low alpha. */
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(26, 22, 20, 0.018) 1px, transparent 0);
+  background-size: 3px 3px;
+}
+
+/* ---------- Editorial chrome ----------
+ * Phase 17 removed the bespoke .ed-chrome strip. Cross-page nav now
+ * lives in editorial-nav.css (the .er-folio strip rendered above the
+ * content view's bird's-eye masthead).
+ */
+
+/* ---------- Page head ---------- */
+
+.content-page {
+  position: relative;
+  z-index: 1;
+  /* CSF-7: page width comes from the shared container token; previously
+   * 1280px hardcoded on body. CSF-2: side padding now token-driven. */
+  max-width: var(--er-container-wide);
+  margin: 0 auto;
+  padding: 0 var(--er-space-4) var(--er-space-6);
+}
+
+.page-head {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: var(--er-space-4);
+  padding: var(--er-space-4) 0 var(--er-space-3);
+}
+
+.page-head__title {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-size: clamp(2.6rem, 6vw, 4rem);
+  font-weight: 300;
+  letter-spacing: -0.025em;
+  line-height: 0.95;
+  margin: 0 0 var(--er-space-1);
+  color: var(--ink);
+}
+
+.page-head__title em {
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 1;
+  font-style: italic;
+  color: var(--accent);
+}
+
+.page-head__sub {
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-style: italic;
+  color: var(--ink-mid);
+  max-width: 38rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.page-head__meta {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--ink-light);
+  letter-spacing: 0.12em;
+  text-align: right;
+  line-height: 1.7;
+}
+
+.page-head__meta b { font-weight: 500; color: var(--ink-mid); }
+
+/* ---------- Top-level: site cards ---------- */
+
+.toplevel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--rule);
+  border: 1px solid var(--rule);
+  margin-top: var(--er-space-4);
+}
+
+@media (max-width: 900px) {
+  .toplevel { grid-template-columns: 1fr; }
+}
+
+.site-card {
+  background: var(--paper);
+  padding: var(--er-space-3) var(--er-space-4) var(--er-space-4);
+  position: relative;
+}
+
+.site-card__tag {
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.18em;
+  color: var(--ink-light);
+  text-transform: uppercase;
+  margin-bottom: var(--er-space-0);
+}
+
+.site-card__name {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 60, "SOFT" 30, "WONK" 0;
+  font-size: 1.85rem;
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  line-height: 1;
+  margin: 0 0 var(--er-space-0);
+  color: var(--ink);
+}
+
+.site-card__host {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--ink-light);
+  margin-bottom: var(--er-space-3);
+}
+
+.site-card__counts {
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  color: var(--ink-mid);
+  margin-bottom: var(--er-space-3);
+  padding-bottom: var(--er-space-3);
+  border-bottom: 1px dashed var(--rule);
+}
+
+.site-card__counts b {
+  font-weight: 500;
+  color: var(--ink);
+  font-feature-settings: "tnum";
+}
+
+.site-card__projects {
+  display: flex;
+  flex-direction: column;
+  gap: var(--er-space-0);
+}
+
+.site-card__empty {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 0.8rem;
+  color: var(--ink-light);
+  margin: var(--er-space-1) 0 0;
+}
+
+.site-card__empty code {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  background: var(--paper-deep);
+  padding: 1px 5px;
+  border-radius: 2px;
+}
+
+.site-card__rollup {
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.12em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  margin: var(--er-space-3) 0 0;
+}
+
+.project-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: baseline;
+  gap: var(--er-space-2);
+  padding: var(--er-space-1) 0;
+  border-bottom: 1px solid var(--rule-soft);
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.14s ease;
+}
+
+.project-row:hover { background: var(--paper-soft); }
+.project-row:last-of-type { border-bottom: none; }
+
+.project-row__num {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--ink-faint);
+  letter-spacing: 0.08em;
+  font-feature-settings: "tnum";
+}
+
+.project-row__name {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 36, "SOFT" 30, "WONK" 0;
+  font-size: 1.05rem;
+  font-weight: 400;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+}
+
+.project-row__name em {
+  font-variation-settings: "opsz" 36, "SOFT" 30, "WONK" 1;
+  font-style: italic;
+  color: var(--ink-mid);
+  font-size: 0.9rem;
+}
+
+.project-row__nodes {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--ink-light);
+  letter-spacing: 0.04em;
+  font-feature-settings: "tnum";
+}
+
+.project-row__lane {
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.12em;
+  color: var(--ink-mid);
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: var(--er-space-0);
+}
+
+.lane-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink-light);
+}
+
+.lane-dot--ideas     { background: var(--lane-ideas); }
+.lane-dot--planned   { background: var(--lane-planned); }
+.lane-dot--outlining { background: var(--lane-outlining); }
+.lane-dot--drafting  { background: var(--lane-drafting); }
+.lane-dot--review    { background: var(--lane-review); }
+.lane-dot--published { background: var(--lane-published); }
+.lane-dot--paused    { background: var(--lane-paused); }
+.lane-dot--unknown   { background: var(--ink-faint); }
+
+/* ---------- Drilldown ---------- */
+
+.drilldown {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 0;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  min-height: 720px;
+  margin-top: var(--er-space-3);
+}
+
+@media (max-width: 900px) {
+  .drilldown { grid-template-columns: 1fr; }
+}
+
+.drilldown__tree {
+  padding: var(--er-space-4) var(--er-space-4);
+  border-right: 1px solid var(--rule);
+  overflow: hidden;
+}
+
+@media (max-width: 900px) {
+  .drilldown__tree { border-right: none; border-bottom: 1px solid var(--rule); }
+}
+
+.breadcrumb {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--ink-light);
+  letter-spacing: 0.04em;
+  margin-bottom: var(--er-space-3);
+  padding-bottom: var(--er-space-2);
+  border-bottom: 1px solid var(--rule-soft);
+}
+
+.breadcrumb a {
+  color: var(--ink-mid);
+  text-decoration: none;
+}
+
+.breadcrumb a:hover { color: var(--accent); }
+.breadcrumb b { color: var(--ink); font-weight: 500; }
+.breadcrumb__sep { color: var(--ink-faint); margin: 0 0.5rem; }
+
+.tree-head {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  margin-bottom: var(--er-space-3);
+  padding-bottom: var(--er-space-1);
+  border-bottom: 1px dashed var(--rule);
+}
+
+.tree-head__title {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 60, "SOFT" 30, "WONK" 0;
+  font-size: 28px;
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  margin: 0;
+}
+
+.tree-head__count {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  color: var(--ink-light);
+  text-transform: uppercase;
+}
+
+.tree {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.tree-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: baseline;
+  gap: var(--er-space-2);
+  padding: var(--er-space-1) var(--er-space-1) var(--er-space-1) calc(var(--depth, 0) * var(--indent) + 24px);
+  border-radius: 2px;
+  transition: background 0.14s ease;
+  text-decoration: none;
+  color: inherit;
+}
+
+.tree-row:hover { background: var(--paper-soft); }
+.tree-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  background: var(--paper-soft);
+}
+
+.tree-row.is-selected {
+  background: var(--paper-deep);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.tree-row::before {
+  content: '';
+  position: absolute;
+  left: calc(var(--depth, 0) * var(--indent) + 8px);
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--rule-soft);
+  pointer-events: none;
+}
+
+.tree-row.is-last::before {
+  bottom: 50%;
+}
+
+.tree-row::after {
+  content: '';
+  position: absolute;
+  left: calc(var(--depth, 0) * var(--indent) + 8px);
+  top: 50%;
+  width: 11px;
+  height: 1px;
+  background: var(--rule-soft);
+  pointer-events: none;
+}
+
+.tree-row[style*="--depth: 0"]::before,
+.tree-row[style*="--depth: 0"]::after {
+  display: none;
+}
+
+.tree-row__main {
+  display: flex;
+  align-items: baseline;
+  gap: var(--er-space-1);
+  min-width: 0;
+}
+
+.tree-row__icon {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--ink-faint);
+  width: 12px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.tree-row__icon.is-branch { color: var(--ink-light); }
+
+.tree-row__title {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 24, "SOFT" 30, "WONK" 0;
+  font-size: 0.95rem;
+  font-weight: 400;
+  color: var(--ink);
+  letter-spacing: -0.003em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tree-row.is-leaf .tree-row__title {
+  font-variation-settings: "opsz" 24, "SOFT" 30, "WONK" 1;
+  font-style: italic;
+}
+
+.tree-row__slug {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--ink-faint);
+  letter-spacing: 0.02em;
+  margin-left: var(--er-space-0);
+}
+
+.tree-row__lane {
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.12em;
+  color: var(--ink-mid);
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: var(--er-space-0);
+  white-space: nowrap;
+}
+
+.tree-row__meta {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--ink-light);
+  letter-spacing: 0.04em;
+  font-feature-settings: "tnum";
+  white-space: nowrap;
+}
+
+.tree-row__meta .scrap-count { color: var(--ink-mid); }
+.tree-row__meta .mtime { color: var(--ink-faint); margin-left: var(--er-space-1); }
+
+.tree-row__actions {
+  display: flex;
+  gap: var(--er-space-2);
+  opacity: 0;
+  transition: opacity 0.16s ease;
+  white-space: nowrap;
+}
+
+.tree-row:hover .tree-row__actions,
+.tree-row.is-selected .tree-row__actions,
+.tree-row__actions:focus-within,
+.tree-row:focus-visible .tree-row__actions {
+  opacity: 1;
+}
+
+.tree-row__action {
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.12em;
+  color: var(--ink-mid);
+  text-transform: uppercase;
+  text-decoration: none;
+  padding: 2px 0;
+  border-bottom: 1px solid transparent;
+  transition: color 0.14s ease, border-color 0.14s ease;
+}
+
+.tree-row__action:hover,
+.tree-row__action:focus {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  outline: none;
+}
+
+.tree-row__action--review { color: var(--accent); }
+
+/* ---------- Detail panel ---------- */
+
+.detail {
+  padding: var(--er-space-4) var(--er-space-4);
+  background: var(--paper-deep);
+  overflow: hidden;
+  position: relative;
+}
+
+.detail::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  background: linear-gradient(to right, rgba(26, 22, 20, 0.04), transparent);
+  pointer-events: none;
+}
+
+.detail__crumb {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--ink-light);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: var(--er-space-1);
+}
+
+.detail__title {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 96, "SOFT" 50, "WONK" 0;
+  font-size: 1.85rem;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  margin: 0 0 var(--er-space-0);
+}
+
+.detail__sub {
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--ink-mid);
+  line-height: 1.55;
+  margin: 0 0 var(--er-space-3);
+}
+
+.detail__updated {
+  display: inline-block;
+  margin-left: var(--er-space-1);
+  font-family: var(--font-mono);
+  font-style: normal;
+  font-size: 0.65rem;
+  color: var(--ink-faint);
+  letter-spacing: 0.06em;
+}
+
+/* CSF-4: detail panel section heads now use the shared er-section-head
+ * markup. The legacy `.detail__sectionhead` class remains as a thin
+ * alias so any in-flight render output that uses it still styles
+ * correctly while the page renderer is migrated. */
+.detail__sectionhead,
+.detail .er-section-head {
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.18em;
+  color: var(--accent);
+  text-transform: uppercase;
+  margin: var(--er-space-3) 0 var(--er-space-1);
+  padding-top: var(--er-space-2);
+  border-top: 1px solid var(--rule);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.detail__sectionhead .marg,
+.detail .er-section-head .marg {
+  color: var(--ink-faint);
+  letter-spacing: 0.06em;
+  font-weight: 400;
+  text-transform: none;
+}
+
+.frontmatter {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--er-space-0) var(--er-space-3);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  line-height: 1.7;
+  margin: 0;
+}
+
+.frontmatter dt {
+  color: var(--ink-light);
+  letter-spacing: 0.04em;
+}
+
+.frontmatter dd {
+  color: var(--ink);
+  margin: 0;
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.frontmatter-empty,
+.preview-empty {
+  font-family: var(--font-body);
+  font-style: italic;
+  color: var(--ink-light);
+  font-size: 0.8rem;
+  margin: var(--er-space-0) 0 0;
+}
+
+.preview {
+  font-family: var(--font-body);
+  font-variation-settings: "opsz" 14;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--ink-mid);
+  max-height: 168px;
+  overflow: hidden;
+  position: relative;
+}
+
+.preview::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 48px;
+  background: linear-gradient(to bottom, rgba(236, 230, 212, 0), var(--paper-deep));
+}
+
+.preview p:first-child { margin-top: 0; }
+.preview p { margin: 0 0 var(--er-space-1); }
+
+.scraplist-secret-head {
+  margin: var(--er-space-3) 0 var(--er-space-0);
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.12em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+}
+
+.actions {
+  margin-top: var(--er-space-3);
+  padding-top: var(--er-space-2);
+  border-top: 1px solid var(--rule);
+  display: flex;
+  gap: var(--er-space-1);
+  flex-wrap: wrap;
+}
+
+.btn {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  color: var(--ink);
+  text-transform: uppercase;
+  text-decoration: none;
+  padding: var(--er-space-0) var(--er-space-2);
+  border: 1px solid var(--rule-deep);
+  background: var(--paper);
+  transition: all 0.16s ease;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.btn:hover {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+.btn--accent {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.btn--accent:hover {
+  background: var(--accent);
+  color: var(--paper);
+}
+
+.detail--empty {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: var(--er-space-6) var(--er-space-5);
+}
+
+.detail--empty .ornament {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  color: var(--ink-faint);
+  margin-bottom: var(--er-space-2);
+  letter-spacing: 0.4em;
+}
+
+.detail--empty .text {
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  color: var(--ink-light);
+  font-style: italic;
+  max-width: 18rem;
+  line-height: 1.5;
+}
+
+/* ---------- Error state ---------- */
+
+.content-error {
+  margin-top: var(--er-space-4);
+  padding: var(--er-space-4);
+  border: 1px solid var(--rule);
+  background: var(--paper);
+}
+
+.content-error h1 {
+  font-family: var(--font-display);
+  font-variation-settings: "opsz" 60, "SOFT" 30;
+  font-size: 1.75rem;
+  margin: 0 0 var(--er-space-1);
+  color: var(--accent);
+}
+
+.content-error p { font-size: 0.9rem; color: var(--ink-mid); }
+.content-error a { color: var(--accent); }

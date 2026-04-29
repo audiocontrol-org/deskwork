@@ -6,6 +6,18 @@ user_invocable: true
 
 # Feature Implement
 
+## 0. Verify the PRD is approved (STRICT GATE — DO NOT BYPASS)
+
+Before any implementation work:
+
+- Identify the feature slug from the worktree/branch.
+- Read the PRD at `docs/1.0/001-IN-PROGRESS/<slug>/prd.md`. Extract the `deskwork.id` from frontmatter.
+- Find the deskwork workflow for this PRD: `deskwork review-help --site <site>` lists open workflows; cross-reference the entry id.
+- If the workflow's state is **not `applied`**, refuse to proceed with a clear message:
+  > Workplan implementation blocked. The PRD's deskwork workflow is in state `<state>`. Iterate and approve via the deskwork pipeline before running /feature-implement. Studio review URL: /dev/editorial-review/<workflow-id>.
+- If no deskwork workflow exists for the PRD at all (legacy feature predating the deskwork-baked workflow): refuse the same way and direct the operator to `/feature-extend` (which will register the PRD with deskwork) or `deskwork ingest` + `deskwork review-start` directly.
+- This gate is **strict**, not a warning. Implementation against an un-reviewed PRD is the "started before the operator finished thinking" failure mode. No `--force` flag in the current iteration; if the gate is too strict in practice, relax later with explicit operator approval.
+
 ## 1. Identify current feature
 - Extract slug from worktree/branch
 

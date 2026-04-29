@@ -9,6 +9,11 @@ dist/
 build/
 *.tsbuildinfo
 
+## Phase 23e runtime build cache. The studio esbuilds client modules
+## from public/src/ into <pluginRoot>/.runtime-cache/dist/ at boot.
+## Never committed; populated on first run, reused on warm boots.
+plugins/deskwork-studio/.runtime-cache/
+
 ## Runtime / local state
 .env
 .env.*
@@ -26,10 +31,15 @@ yarn-error.log*
 *.swo
 
 ## Claude Code local
+.claude/settings.json
 .claude/settings.local.json
 .claude/worktrees/
 ## Agent memory belongs in ~/.claude/projects/, never committed
 /memory/
+
+## Playwright MCP local scratch (screenshots, console logs, page snapshots
+## generated during dogfood UX sessions). Never committed.
+.playwright-mcp/
 
 ## Local dogfood sandbox — a clone of audiocontrol.org used to drive the
 ## editorial-calendar lifecycle end-to-end against a real-shaped project

@@ -19,8 +19,13 @@ export const CONFIG_VERSION = 1;
 
 /** A single site the host project publishes to. */
 export interface SiteConfig {
-  /** Bare public hostname, no protocol (e.g. `audiocontrol.org`) */
-  host: string;
+  /**
+   * Bare public hostname, no protocol (e.g. `audiocontrol.org`). Optional —
+   * required only when the collection is rendered as a website. Internal-doc
+   * collections, books, or tool monorepos that use deskwork purely for
+   * content-lifecycle management omit this field.
+   */
+  host?: string;
   /** Blog content directory, relative to the project root */
   contentDir: string;
   /** Editorial calendar markdown file, relative to the project root */
@@ -85,9 +90,10 @@ const ALLOWED_TOP_LEVEL_KEYS = new Set([
   'author',
   'reviewJournalDir',
 ]);
-const REQUIRED_SITE_KEYS = ['host', 'contentDir', 'calendarPath'] as const;
-const ALLOWED_SITE_KEYS = new Set([
+const REQUIRED_SITE_KEYS = ['contentDir', 'calendarPath'] as const;
+const ALLOWED_SITE_KEYS = new Set<string>([
   ...REQUIRED_SITE_KEYS,
+  'host',
   'channelsPath',
   'blogLayout',
   'blogFilenameTemplate',
@@ -212,10 +218,19 @@ function parseSiteConfig(slug: string, value: unknown): SiteConfig {
   }
 
   const site: SiteConfig = {
-    host: obj.host as string,
     contentDir: obj.contentDir as string,
     calendarPath: obj.calendarPath as string,
   };
+
+  if (obj.host !== undefined) {
+    if (typeof obj.host !== 'string' || obj.host.length === 0) {
+      throw new Error(
+        `Invalid deskwork config: site "${slug}" has invalid "host" ` +
+          `(must be a non-empty string when set).`,
+      );
+    }
+    site.host = obj.host;
+  }
 
   if (obj.channelsPath !== undefined) {
     if (typeof obj.channelsPath !== 'string' || obj.channelsPath.length === 0) {

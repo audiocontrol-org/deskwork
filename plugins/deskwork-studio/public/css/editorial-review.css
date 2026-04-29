@@ -4,9 +4,22 @@
  * Metaphor: a press-check desk. Galley proofs under a pool of light.
  * Red pencil. Rubber stamps. Marginalia. A pot of ink, not a dashboard.
  *
- * Scoped via [data-review-ui="studio"|"longform"|"shortform"] on an
- * ancestor element so the longform route (which mounts inside the
+ * Scoped via [data-review-ui="studio"|"longform"|"shortform"|"manual"]
+ * on an ancestor element so the longform route (which mounts inside the
  * production BlogLayout) doesn't leak chrome styles into the site.
+ *
+ * CSF-10 (cross-surface audit v0.5.0) — architectural exception:
+ * the longform review route mounts INSIDE the production BlogLayout
+ * (see review.ts), which means the editorial-print masthead pattern
+ * cannot apply there unmodified. The review surface uses its own
+ * `er-dispatch-*` family (defined in review-viewport.css) that
+ * coexists with the host site's chrome rather than replacing it.
+ * This is by design — the longform review is the only studio surface
+ * where the chrome is shared with the published site, so margin notes
+ * and the prose render in the same visual context. Other surfaces
+ * (dashboard, content view, scrapbook viewer, manual, shortform,
+ * studio index) own their full body and use the unified
+ * `er-pagehead-*` family.
  */
 
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..900,0..100;1,9..144,300..900,0..100&family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&family=JetBrains+Mono:wght@400;500;600&display=swap');
@@ -49,6 +62,14 @@
   --er-rule-med: 1px solid var(--er-ink);
   --er-rule-heavy: 3px solid var(--er-ink);
   --er-rule-double: 2px double var(--er-ink);
+
+  /* CSF-7 (cross-surface audit v0.5.0): shared container widths.
+   * `wide` is the studio-default (78rem ≈ 1248px) used by the dashboard,
+   * shortform, content view, and folio strip. `narrow` is the studio
+   * index TOC (56rem). Every consumer pulls from these tokens — no
+   * raw `78rem` / `56rem` / `1280px` sprinkled through the stylesheets. */
+  --er-container-wide: 78rem;
+  --er-container-narrow: 56rem;
 }
 
 /* ---------- Scoped reset + page chrome ---------- */
@@ -94,7 +115,162 @@ body[data-review-ui="shortform"] {
   line-height: 1.55;
 }
 
-/* ---------- Masthead ---------- */
+/* ---------- Pagehead (CSF-3 cross-surface audit v0.5.0) ----------
+ *
+ * Unified page head used by every studio surface (dashboard,
+ * shortform, content view, studio index, manual, scrapbook viewer).
+ * Replaces six distinct class hierarchies (er-masthead-*, page-head,
+ * er-toc-head, eh-cover-*, scrapbook-header, er-dispatch-*) with a
+ * single family `er-pagehead-*` and four layout modifiers:
+ *
+ *   --centered   — text-aligned center (dashboard, shortform, manual)
+ *   --split      — title/deck on the left, meta on the right (content)
+ *   --compact    — smaller title scale (scrapbook viewer)
+ *   --imprint    — adds the strong/span imprint strip (manual)
+ *
+ * Slots (each optional):
+ *   __kicker     — small mono uppercase tag (Vol. / № / Press-check ...)
+ *   __title      — the display title (h1)
+ *   __deck       — italic display dek under the title
+ *   __meta       — mono uppercase meta strip
+ *   __imprint    — the manual's strong/span imprint pairs
+ *   __crumbs     — breadcrumb (used by scrapbook + content drilldown)
+ *
+ * Per the audit: the existing class names (er-masthead-*,
+ * scrapbook-header, page-head, eh-cover-*, er-toc-head) remain
+ * as styled aliases for back-compat with renders already in flight.
+ */
+
+.er-pagehead {
+  padding: var(--er-space-6) var(--er-space-5) var(--er-space-4);
+  border-bottom: var(--er-rule-double);
+  position: relative;
+  margin: 0 auto;
+}
+
+.er-pagehead--centered { text-align: center; }
+
+.er-pagehead--split {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: var(--er-space-4);
+  text-align: left;
+}
+
+.er-pagehead__kicker {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  margin: 0 0 var(--er-space-2);
+}
+
+.er-pagehead__kicker em {
+  font-style: normal;
+  color: var(--er-red-pencil);
+}
+
+.er-pagehead__title {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 144, "wght" 400, "SOFT" 0;
+  font-size: clamp(3rem, 7vw, 5.5rem);
+  line-height: 0.95;
+  letter-spacing: -0.022em;
+  margin: 0;
+  color: var(--er-ink);
+}
+
+.er-pagehead__title em {
+  font-style: italic;
+  font-variation-settings: "opsz" 144, "wght" 400, "SOFT" 100;
+}
+
+.er-pagehead--compact .er-pagehead__title {
+  font-size: clamp(1.8rem, 3.5vw, 2.6rem);
+}
+
+.er-pagehead__deck {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-variation-settings: "opsz" 48, "wght" 400;
+  font-size: 1.15rem;
+  color: var(--er-ink-soft);
+  margin: var(--er-space-2) 0 var(--er-space-3);
+  max-width: 44rem;
+  line-height: 1.45;
+}
+
+.er-pagehead--centered .er-pagehead__deck {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.er-pagehead__meta {
+  font-family: var(--er-font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  display: inline-flex;
+  gap: var(--er-space-2);
+  align-items: center;
+  margin: 0;
+}
+
+.er-pagehead__meta .sep { color: var(--er-faded-2); }
+
+.er-pagehead--split .er-pagehead__meta {
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  gap: 0.2rem;
+}
+
+.er-pagehead__imprint {
+  font-family: var(--er-font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--er-space-2);
+  margin-top: var(--er-space-3);
+  padding-top: var(--er-space-2);
+  border-top: var(--er-rule-thin);
+  border-bottom: var(--er-rule-thin);
+  padding-bottom: var(--er-space-2);
+}
+
+.er-pagehead__imprint strong {
+  color: var(--er-ink);
+  font-weight: 500;
+  margin-right: 0.4em;
+}
+
+.er-pagehead__imprint .sep { color: var(--er-faded-2); }
+
+.er-pagehead__crumbs {
+  font-family: var(--er-font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+  color: var(--er-faded);
+  margin: 0 0 var(--er-space-1);
+}
+
+.er-pagehead__crumbs a {
+  color: var(--er-ink-soft);
+  text-decoration: none;
+}
+
+.er-pagehead__crumbs a:hover { color: var(--er-red-pencil); }
+.er-pagehead__crumbs .sep { color: var(--er-faded-2); margin: 0 0.4em; }
+.er-pagehead__crumbs b { color: var(--er-ink); font-weight: 500; }
+
+/* ---------- Masthead (legacy alias of er-pagehead--centered) ---------- */
 
 .er-masthead {
   padding: var(--er-space-6) var(--er-space-5) var(--er-space-4);
@@ -156,7 +332,7 @@ body[data-review-ui="shortform"] {
 /* ---------- Layout primitives ---------- */
 
 .er-container {
-  max-width: 78rem;
+  max-width: var(--er-container-wide);
   margin: 0 auto;
   padding: 0 var(--er-space-4);
 }
@@ -171,6 +347,54 @@ body[data-review-ui="shortform"] {
   .er-layout { grid-template-columns: 1fr; gap: var(--er-space-4); }
 }
 
+/* CSF-5 (cross-surface audit v0.5.0): unified row base + modifiers.
+ *
+ * Five row hierarchies in the studio render conceptually the same
+ * component (left content, right meta, optional hover bg, dotted
+ * border-bottom). They are:
+ *
+ *   .er-calendar-row  — dashboard      (4col grid)
+ *   .scrap            — review drawer + content detail + scrapbook
+ *   .tree-row         — content drilldown (depth-indented)
+ *   .er-toc-entry     — studio index   (leader dots, route/page-no)
+ *   .project-row      — content top-level (4col grid)
+ *
+ * Each was self-consistent at the time it shipped; nothing was
+ * harmonized. The `.er-row` base below defines the shared shape
+ * (border-bottom, hover bg, padding rhythm) so a future renderer
+ * can reach for `.er-row + .er-row--<variant>` and not invent a
+ * sixth hierarchy. The five existing classes remain — the visual
+ * unification was achieved by harmonizing tokens (CSF-1) so the
+ * five classes already speak the same palette and rhythm.
+ *
+ * New rendering work should prefer `.er-row + .er-row--<variant>`
+ * over inventing yet-another row family.
+ */
+.er-row {
+  display: grid;
+  align-items: baseline;
+  gap: var(--er-space-2);
+  padding: var(--er-space-1) var(--er-space-2);
+  border-bottom: 1px dotted var(--er-faded-2);
+  transition: background 0.14s ease;
+}
+.er-row:hover { background: rgba(26, 22, 20, 0.03); }
+.er-row:last-child { border-bottom: none; }
+
+.er-row--calendar { grid-template-columns: auto minmax(0, 1fr) auto auto; }
+.er-row--toc      { grid-template-columns: auto 1fr auto; padding: var(--er-space-2) 0; }
+.er-row--tree     { grid-template-columns: 1fr auto auto; padding-left: calc(var(--er-row-depth, 0) * 1.4rem); }
+.er-row--scrap    { grid-template-columns: auto 1fr auto auto; }
+
+/* CSF-4 (cross-surface audit v0.5.0): unified section-head component.
+ * `er-section-head` is the canonical class; `er-section-title` is its
+ * legacy name and remains as an alias so longform-review surfaces
+ * (which still emit `er-section-title`) keep their styling. New
+ * surfaces should use `er-section-head` directly. The studio index's
+ * `er-toc-section-head` and the manual's `eh-section-head` keep their
+ * surface-specific class names but share this same shape (header with
+ * an ornament, a title, and a right-aligned count/sig). */
+.er-section-head,
 .er-section-title {
   font-family: var(--er-font-display);
   font-variation-settings: "opsz" 48, "wght" 500;
@@ -182,11 +406,13 @@ body[data-review-ui="shortform"] {
   gap: var(--er-space-2);
 }
 
+.er-section-head .ornament,
 .er-section-title .ornament {
   color: var(--er-red-pencil);
   font-size: 0.9em;
 }
 
+.er-section-head .count,
 .er-section-title .count {
   font-family: var(--er-font-mono);
   font-size: 0.7rem;
@@ -201,6 +427,7 @@ body[data-review-ui="shortform"] {
 /* Stage-level action button — sits at the right edge of the
  * section title, a small nudge off the count. Currently used by
  * the Ideas stage for the "intake new idea" toggle. */
+.er-section-head .er-section-action,
 .er-section-title .er-section-action {
   margin-left: var(--er-space-2);
   align-self: center;
@@ -861,7 +1088,31 @@ body:has([data-review-ui="longform"]) .site-footer {
 @media (max-width: 900px) {
   .er-strip-hint { display: none; }
 }
-.er-strip-right { margin-left: auto; display: flex; gap: var(--er-space-1); flex-wrap: wrap; }
+.er-strip-right { margin-left: auto; display: flex; gap: var(--er-space-1); flex-wrap: wrap; align-items: center; }
+
+/*
+ * Pending-state label rendered inline with the action buttons when a
+ * workflow has been transitioned by the studio but the matching
+ * /deskwork:* skill hasn't been invoked yet (states `iterating` and
+ * `approved`). Lives next to a "copy /deskwork:..." button so the
+ * operator can re-copy the command if the first paste failed.
+ */
+.er-pending-state {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  color: var(--er-stamp-purple);
+  font-size: 0.85rem;
+  padding: 0 0.3em 0 0.1em;
+  letter-spacing: 0.01em;
+}
+.er-pending-state--filed { color: var(--er-faded); }
+.er-strip-right .er-btn-small[data-action="copy-cmd"] code {
+  font-family: var(--er-font-mono, ui-monospace, monospace);
+  font-size: 0.85em;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 0 0.3em;
+  border-radius: 2px;
+}
 
 .er-strip-versions {
   display: inline-flex;
@@ -2267,3 +2518,102 @@ body.er-focus-mode .er-outline-tab {
 }
 .er-error p { margin: 0 0 var(--er-space-2); font-size: 1rem; line-height: 1.5; }
 .er-error code { font-size: 0.85em; }
+
+/* ---------- Scrapbook drawer (Phase 16c) ----------
+   The longform review surface gets a per-entry scrapbook drawer
+   docked to the right edge below the marginalia panel. Read-only —
+   mutations stay on the standalone scrapbook viewer. The drawer
+   reuses scrap-row.css for the row visuals; this block styles the
+   surrounding chrome only. */
+
+.er-scrapbook-drawer {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  width: var(--er-marg-width, 320px);
+  max-width: 36vw;
+  max-height: 45vh;
+  background: var(--er-paper);
+  border-left: var(--er-rule-thin);
+  border-top: var(--er-rule-thin);
+  box-shadow: -2px -2px 0 rgba(26, 22, 20, 0.04);
+  display: flex;
+  flex-direction: column;
+  font-family: var(--er-font-body);
+  z-index: 5;
+}
+
+.er-scrapbook-drawer-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: baseline;
+  padding: 10px 14px 8px;
+  border-bottom: 1px dashed var(--er-faded-2);
+}
+
+.er-scrapbook-drawer-kicker {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--er-ink-soft);
+}
+
+.er-scrapbook-drawer-count {
+  font-family: var(--er-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--er-faded);
+  text-transform: uppercase;
+}
+
+.er-scrapbook-drawer-open {
+  font-family: var(--er-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--er-red-pencil);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.14s ease;
+}
+
+.er-scrapbook-drawer-open:hover,
+.er-scrapbook-drawer-open:focus {
+  border-bottom-color: var(--er-red-pencil);
+  outline: none;
+}
+
+.er-scrapbook-drawer-body {
+  overflow-y: auto;
+  padding: 6px 14px 14px;
+}
+
+.er-scrapbook-drawer-secret {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--er-faded-2);
+}
+
+.er-scrapbook-drawer-secret-head {
+  margin: 0 0 6px;
+  font-family: var(--er-font-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--er-faded);
+  text-transform: uppercase;
+}
+
+.er-scrapbook-drawer .scrap {
+  border-bottom-color: var(--er-paper-2);
+}
+
+@media (max-width: 900px) {
+  /* On narrow screens the marginalia drawer already collapses; the
+     scrapbook drawer follows the same rule rather than fighting for
+     viewport space. Operators can still reach the standalone viewer
+     via the er-strip or page-link footer. */
+  .er-scrapbook-drawer {
+    display: none;
+  }
+}

@@ -3,8 +3,11 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync, existsSync
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { scaffoldBlogPost } from '../src/scaffold.ts';
+import { readFrontmatter } from '../src/frontmatter.ts';
 import type { DeskworkConfig } from '../src/config.ts';
 import type { CalendarEntry } from '../src/types.ts';
+
+const FIXED_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
 function makeConfig(overrides?: Partial<DeskworkConfig>): DeskworkConfig {
   return {
@@ -25,6 +28,7 @@ function makeConfig(overrides?: Partial<DeskworkConfig>): DeskworkConfig {
 
 function makeEntry(overrides?: Partial<CalendarEntry>): CalendarEntry {
   return {
+    id: FIXED_ID,
     slug: 'my-first-post',
     title: 'My First Post',
     description: 'A short description',
@@ -289,5 +293,87 @@ describe('scaffoldBlogPost', () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  describe('frontmatter id binding (Phase 19a, Issue #38 namespacing)', () => {
+    it("writes the entry's id under `deskwork.id` in the scaffolded file's frontmatter", () => {
+      const root = mkdtempSync(join(tmpdir(), 'deskwork-scaffold-id-'));
+      try {
+        const result = scaffoldBlogPost(
+          root,
+          makeConfig(),
+          'audiocontrol',
+          makeEntry(),
+        );
+        const body = readFileSync(result.filePath, 'utf-8');
+        // The id lives under a `deskwork:` namespace block (Issue #38).
+        // It's emitted as the first frontmatter field so operators
+        // reading the file see the namespaced binding immediately.
+        expect(body).toContain('deskwork:');
+        expect(body).toContain(`id: ${FIXED_ID}`);
+        // No top-level `id:` — that keyspace belongs to the operator.
+        expect(body).not.toMatch(/^id: /m);
+
+        const deskworkIdx = body.indexOf('deskwork:');
+        const titleIdx = body.indexOf('title: My First Post');
+        expect(deskworkIdx).toBeGreaterThan(-1);
+        expect(titleIdx).toBeGreaterThan(deskworkIdx);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    it('round-trips: readFrontmatter on the scaffolded file recovers entry.id under deskwork.id', () => {
+      const root = mkdtempSync(join(tmpdir(), 'deskwork-scaffold-rt-'));
+      try {
+        const entry = makeEntry({
+          id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        });
+        const result = scaffoldBlogPost(
+          root,
+          makeConfig(),
+          'audiocontrol',
+          entry,
+        );
+        const parsed = readFrontmatter(result.filePath);
+        const block = parsed.data.deskwork;
+        expect(block).toBeDefined();
+        expect(typeof block).toBe('object');
+        if (block && typeof block === 'object' && !Array.isArray(block)) {
+          expect((block as Record<string, unknown>).id).toBe(entry.id);
+        }
+        // Top-level `id:` must be absent — Issue #38.
+        expect(parsed.data.id).toBeUndefined();
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    it('throws a clear error when the entry has no id', () => {
+      const root = mkdtempSync(join(tmpdir(), 'deskwork-scaffold-no-id-'));
+      try {
+        // makeEntry returns the fixed FIXED_ID; explicit override to undefined
+        // exercises the defensive guard path.
+        const entry = makeEntry();
+        delete entry.id;
+        expect(() =>
+          scaffoldBlogPost(root, makeConfig(), 'audiocontrol', entry),
+        ).toThrow(/Cannot scaffold entry without id/);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    it('throws when the entry id is an empty string', () => {
+      const root = mkdtempSync(join(tmpdir(), 'deskwork-scaffold-empty-id-'));
+      try {
+        const entry = makeEntry({ id: '' });
+        expect(() =>
+          scaffoldBlogPost(root, makeConfig(), 'audiocontrol', entry),
+        ).toThrow(/Cannot scaffold entry without id/);
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
   });
 });

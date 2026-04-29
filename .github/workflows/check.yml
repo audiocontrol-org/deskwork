@@ -1,11 +1,9 @@
 name: check
 
-# Server-side safety net for the pre-commit hook. On every PR, runs the
-# full test suite and verifies the committed self-contained bundles are
-# in sync with their source — a fresh build against the PR's source
-# tree should match what's checked in. If a contributor commits a
-# source change without rebuilding (no husky hook installed, or hook
-# bypassed), the PR fails here.
+# Server-side safety net for local development. On every PR, runs the
+# full workspace test suite. Phase 23b (source-shipped re-architecture)
+# retired the committed bundles, so there is no longer a bundle-drift
+# verification step here.
 
 on:
   pull_request:
@@ -14,7 +12,7 @@ on:
     branches: [main]
 
 jobs:
-  test-and-verify-bundles:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,27 +22,11 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      # `npm install` runs the workspace `prepare` hooks, which include
-      # the studio and cli build scripts. We capture that as the "fresh
-      # build" against the PR's source.
-      - name: Install + build (via prepare hooks)
+      - name: Install
         run: npm install
 
       # --if-present skips workspaces without a 'test' script. Plugin
       # shells (plugins/deskwork, plugins/deskwork-studio) ship metadata
-      # + bash wrappers + bundles only — no tests.
+      # + bash wrappers + source only — no tests.
       - name: Run all tests
         run: npm --workspaces --if-present test
-
-      # The committed bundle paths. If `npm install` (which ran prepare
-      # → build) produced output that differs from what's checked in,
-      # `git diff --exit-code` fails and the PR is flagged with the
-      # specific path(s) that drifted. Bundles live inside the plugin
-      # tree per 956cd2d (so marketplace installs find them in the
-      # ~/.claude/plugins/cache copy of plugins/<name>/).
-      - name: Verify bundles are not stale
-        run: |
-          if ! git diff --exit-code -- plugins/deskwork/bundle/ plugins/deskwork-studio/bundle/; then
-            echo "::error::Committed bundles diverge from a fresh build. Run 'npm install' or 'npm --workspaces run build' locally and re-stage the bundle files, then push again."
-            exit 1
-          fi

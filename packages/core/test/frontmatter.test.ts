@@ -142,3 +142,168 @@ describe('readFrontmatter / writeFrontmatter', () => {
     }
   });
 });
+
+// Issue #37 — round-trip preservation. A naive parse → stringify dissolves
+// quoting styles and re-emits ISO date strings as `Date` objects on the next
+// parse. updateFrontmatter must mutate only the keys we touch, leaving every
+// other byte (including comments, blank lines, and quoting) untouched.
+describe('updateFrontmatter — round-trip preservation (Issue #37)', () => {
+  it('preserves double-quoted ISO date strings (Astro datePublished case)', () => {
+    const md = [
+      '---',
+      'title: Post',
+      'datePublished: "2020-10-01"',
+      '---',
+      '',
+      '# Body',
+    ].join('\n');
+
+    const out = updateFrontmatter(md, { dateModified: '2026-01-15' });
+    // Original key kept its double-quoted form on disk.
+    expect(out).toContain('datePublished: "2020-10-01"');
+    // Patch applied.
+    expect(out).toContain('dateModified:');
+
+    // Re-parse: datePublished is still a string, not a Date.
+    const { data } = parseFrontmatter(out);
+    expect(typeof data.datePublished).toBe('string');
+    expect(data.datePublished).toBe('2020-10-01');
+  });
+
+  it("preserves single-quoted apostrophe titles (\"What's in a Name?\" case)", () => {
+    const md = [
+      '---',
+      'title: "What\'s in a Name?"',
+      'date: 2025-04-01',
+      '---',
+      '',
+      '# Body',
+    ].join('\n');
+
+    const out = updateFrontmatter(md, { dateModified: '2026-01-15' });
+    // The original double-quoted title with embedded apostrophe stays intact.
+    expect(out).toContain('title: "What\'s in a Name?"');
+
+    const { data } = parseFrontmatter(out);
+    expect(data.title).toBe("What's in a Name?");
+  });
+
+  it('preserves comments and blank lines', () => {
+    const md = [
+      '---',
+      '# Editorial metadata',
+      'title: Post',
+      '',
+      '# Publication',
+      'datePublished: "2020-10-01"',
+      '---',
+      '',
+      '# Body',
+    ].join('\n');
+
+    const out = updateFrontmatter(md, { state: 'published' });
+    expect(out).toContain('# Editorial metadata');
+    expect(out).toContain('# Publication');
+    expect(out).toContain('datePublished: "2020-10-01"');
+    expect(out).toContain('state: published');
+  });
+
+  it('preserves key order; new keys append at the bottom', () => {
+    const md = [
+      '---',
+      'title: Post',
+      'description: A short description',
+      'datePublished: "2020-10-01"',
+      'author: Jane',
+      '---',
+      '',
+      '# Body',
+    ].join('\n');
+
+    const out = updateFrontmatter(md, { dateModified: '2026-01-15' });
+    const idxTitle = out.indexOf('title:');
+    const idxDescription = out.indexOf('description:');
+    const idxDatePublished = out.indexOf('datePublished:');
+    const idxAuthor = out.indexOf('author:');
+    const idxDateModified = out.indexOf('dateModified:');
+    // Original order intact.
+    expect(idxTitle).toBeGreaterThan(-1);
+    expect(idxTitle).toBeLessThan(idxDescription);
+    expect(idxDescription).toBeLessThan(idxDatePublished);
+    expect(idxDatePublished).toBeLessThan(idxAuthor);
+    // New key after the existing ones.
+    expect(idxAuthor).toBeLessThan(idxDateModified);
+  });
+
+  it('overwrites the value of an existing key while preserving its quoting', () => {
+    const md = [
+      '---',
+      'title: "Original Title"',
+      'state: draft',
+      '---',
+      '',
+      'body',
+    ].join('\n');
+
+    const out = updateFrontmatter(md, { state: 'published' });
+    // state was plain (no quotes) — value flips, no quotes added.
+    expect(out).toContain('state: published');
+    expect(out).not.toContain('state: "published"');
+    // Title was double-quoted; not touched, still double-quoted.
+    expect(out).toContain('title: "Original Title"');
+  });
+
+  it('handles every quoting style across one fixture', () => {
+    const md = [
+      '---',
+      'plain: 2020-10-01',
+      'doubleQuoted: "2020-10-01"',
+      "singleQuoted: '2020-10-01'",
+      'folded: >',
+      '  multiline',
+      '  folded value',
+      '---',
+      '',
+      'body',
+    ].join('\n');
+
+    const out = updateFrontmatter(md, { newKey: 'added' });
+    expect(out).toContain('doubleQuoted: "2020-10-01"');
+    expect(out).toContain("singleQuoted: '2020-10-01'");
+    expect(out).toContain('folded:');
+
+    // Plain ISO scalar re-parses to a Date by YAML's core schema. That's
+    // the legitimate behavior for plain scalars; our preservation is
+    // about NOT silently introducing this when the operator wrote
+    // the value as a quoted string.
+    const { data: dataPlain } = parseFrontmatter(out);
+    expect(typeof dataPlain.doubleQuoted).toBe('string');
+    expect(typeof dataPlain.singleQuoted).toBe('string');
+    expect(dataPlain.newKey).toBe('added');
+  });
+
+  it('mutates only the bytes corresponding to patched keys', () => {
+    // The strongest invariant: every byte that wasn't part of a patched
+    // key/value pair stays at its original offset.
+    const md = [
+      '---',
+      'title: Post',
+      'datePublished: "2020-10-01"',
+      'tags:',
+      '  - one',
+      '  - two',
+      '---',
+      '',
+      'Body',
+    ].join('\n');
+
+    const out = updateFrontmatter(md, { state: 'draft' });
+    // Original lines are preserved character-for-character.
+    expect(out).toContain('title: Post\n');
+    expect(out).toContain('datePublished: "2020-10-01"\n');
+    expect(out).toContain('tags:\n');
+    expect(out).toContain('  - one\n');
+    expect(out).toContain('  - two\n');
+    expect(out).toMatch(/^---\ntitle: Post\ndatePublished: "2020-10-01"\ntags:\n  - one\n  - two\n/);
+  });
+});

@@ -1,0 +1,16 @@
+{
+  "id": "9845c268-670f-4793-b986-0433e9ef4fb9",
+  "timestamp": "2026-04-28T23:18:22.810Z",
+  "event": "ingest",
+  "slug": "deskwork-plugin/prd",
+  "entryId": "9845c268-670f-4793-b986-0433e9ef4fb9",
+  "site": "deskwork-internal",
+  "stage": "Ideas",
+  "sourceFile": "docs/1.0/001-IN-PROGRESS/deskwork-plugin/prd.md",
+  "frontmatterSnapshot": {},
+  "derivation": {
+    "slug": "path",
+    "state": "default",
+    "date": "mtime"
+  }
+}

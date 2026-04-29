@@ -17,7 +17,12 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { readConfig } from '@deskwork/core/config';
-import { resolveSite, resolveBlogFilePath } from '@deskwork/core/paths';
+import {
+  resolveSite,
+  resolveCalendarPath,
+  resolveEntryFilePath,
+} from '@deskwork/core/paths';
+import { readCalendar } from '@deskwork/core/calendar';
 import { createWorkflow, readVersions } from '@deskwork/core/review/pipeline';
 import { bodyState } from '@deskwork/core/body-state';
 import { absolutize, emit, fail, parseArgs } from '@deskwork/core/cli-args';
@@ -47,7 +52,23 @@ export async function run(argv: string[]): Promise<void> {
   }
 
   const site = resolveSite(config, flags.site);
-  const file = resolveBlogFilePath(projectRoot, config, site, slug);
+
+  // Resolve entryId from the calendar BEFORE picking a file path. The
+  // entry id is what survives slug renames; the workflow records it,
+  // and the path resolver prefers the UUID-bound file to the slug
+  // template (Issue #67).
+  let entryId: string | undefined;
+  try {
+    const calendarPath = resolveCalendarPath(projectRoot, config, site);
+    if (existsSync(calendarPath)) {
+      const cal = readCalendar(calendarPath);
+      entryId = cal.entries.find((e) => e.slug === slug)?.id;
+    }
+  } catch {
+    entryId = undefined;
+  }
+
+  const file = resolveEntryFilePath(projectRoot, config, site, slug, entryId);
 
   if (!existsSync(file)) {
     const siblings = listSiblingSlugs(file);
@@ -68,6 +89,7 @@ export async function run(argv: string[]): Promise<void> {
   const workflow = createWorkflow(projectRoot, config, {
     site,
     slug,
+    ...(entryId !== undefined && entryId !== '' ? { entryId } : {}),
     contentKind: 'longform',
     initialMarkdown,
     initialOriginatedBy: 'agent',

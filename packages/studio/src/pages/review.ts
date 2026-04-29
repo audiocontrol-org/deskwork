@@ -30,11 +30,28 @@ import {
   parseDraftFrontmatter,
   renderMarkdownToHtml,
 } from '@deskwork/core/review/render';
-import { splitOutline } from '../../../../plugins/deskwork-studio/public/src/outline-split.ts';
+import { readCalendar } from '@deskwork/core/calendar';
+import { findEntry, findEntryById } from '@deskwork/core/calendar-mutations';
+import type { CalendarEntry } from '@deskwork/core/types';
+import type { ContentIndex } from '@deskwork/core/content-index';
+import { splitOutline } from '@deskwork/core/outline-split';
 import type { StudioContext } from '../routes/api.ts';
 import { html, unsafe, type RawHtml } from './html.ts';
 import { layout } from './layout.ts';
+import { renderEditorialFolio } from './chrome.ts';
 import { escapeHtml } from './html.ts';
+import { renderScrapbookDrawer } from './review-scrapbook-drawer.ts';
+import { existsSync } from 'node:fs';
+import { resolveCalendarPath } from '@deskwork/core/paths';
+
+/**
+ * Per-request content-index getter. The route layer wires this to the
+ * Hono context's memoized cache so a single review render only builds
+ * the index once per site even though both the inline-text loader and
+ * the scrapbook drawer ask for it. When omitted, callers fall back to
+ * slug-template path resolution.
+ */
+export type ReviewIndexGetter = (site: string) => ContentIndex;
 
 interface ReviewQuery {
   /** ?site=<slug> override; null falls back to config.defaultSite. */
@@ -44,6 +61,25 @@ interface ReviewQuery {
   /** ?kind=outline | longform; null defaults to longform. */
   kind?: string | null;
 }
+
+/**
+ * How the route resolved the request. Phase 19d added the canonical
+ * id-based URL; the legacy slug URL still resolves to a render via the
+ * 302-redirect path (the redirect target lands here as `kind: 'id'`).
+ *
+ * `kind: 'slug'` is reserved for the legacy fallback when the calendar
+ * entry has no id stamped on it yet — pre-doctor state, not a "fallback"
+ * the project rules forbid but the migration path the plan calls out.
+ *
+ * Phase 21c added `kind: 'workflow'` so the dashboard can deep-link
+ * straight to a specific workflow id without first knowing the entry
+ * id — shortform cells use this to land on the unified review surface
+ * after `start-shortform` returns the new workflow.
+ */
+export type ReviewLookup =
+  | { kind: 'id'; entryId: string; slug: string }
+  | { kind: 'slug'; slug: string }
+  | { kind: 'workflow'; workflowId: string };
 
 function isSuccessBody(
   body: unknown,
@@ -60,8 +96,12 @@ function errorFromBody(body: unknown): string {
   return 'unknown error';
 }
 
-function pickContentKind(rawKind: string | null | undefined): 'longform' | 'outline' {
-  return rawKind === 'outline' ? 'outline' : 'longform';
+function pickContentKind(
+  rawKind: string | null | undefined,
+): 'longform' | 'outline' | 'shortform' {
+  if (rawKind === 'outline') return 'outline';
+  if (rawKind === 'shortform') return 'shortform';
+  return 'longform';
 }
 
 function pickSite(ctx: StudioContext, raw: string | null): string {
@@ -81,12 +121,14 @@ interface PreparedRender {
 
 async function prepareRender(
   markdown: string,
-  contentKind: 'longform' | 'outline',
+  contentKind: 'longform' | 'outline' | 'shortform',
 ): Promise<PreparedRender> {
   const parsed = parseDraftFrontmatter(markdown);
   const fm = parsed.frontmatter;
 
-  const split = contentKind === 'outline'
+  // Outline + shortform render the body as-is (no outline-split). Only
+  // longform pulls the optional briefing-sheet drawer out of the body.
+  const split = contentKind !== 'longform'
     ? { body: parsed.body, outline: '', present: false, startLine: -1, endLine: -1 }
     : splitOutline(parsed.body);
 
@@ -117,19 +159,45 @@ function stateLabel(state?: string): string {
 function renderVersionsStrip(
   versions: readonly DraftVersion[],
   site: string,
-  contentKind: 'longform' | 'outline',
+  contentKind: 'longform' | 'outline' | 'shortform',
   current: DraftVersion,
 ): RawHtml {
   if (versions.length <= 1) return unsafe('');
+  const kindBit =
+    contentKind === 'outline'
+      ? '&kind=outline'
+      : contentKind === 'shortform'
+        ? '&kind=shortform'
+        : '';
   const links = versions
     .map((v) => {
       const isActive = v.version === current.version;
-      const kindBit = contentKind === 'outline' ? '&kind=outline' : '';
       const href = `?site=${site}${kindBit}&v=${v.version}`;
       return html`<a href="${href}" class="${isActive ? 'active' : ''}">v${v.version}</a>`;
     })
     .join('');
   return unsafe(html`<span class="er-strip-versions">${unsafe(links)}</span>`);
+}
+
+/**
+ * Build the slash command that the operator pastes into Claude Code to
+ * advance the workflow from its current pending state. Mirrors the
+ * client-side button-handler logic so server-rendered "copy again"
+ * affordances stay consistent.
+ */
+function pendingSkillCmd(workflow: DraftWorkflowItem): string {
+  const { site, slug, contentKind, state } = workflow;
+  if (state === 'iterating') {
+    return contentKind === 'outline'
+      ? `/deskwork:iterate --kind outline --site ${site} ${slug}`
+      : `/deskwork:iterate --site ${site} ${slug}`;
+  }
+  if (state === 'approved') {
+    // Outline-approve semantics still TBD (see editorial-review-client.ts);
+    // for now both kinds emit the same /deskwork:approve.
+    return `/deskwork:approve --site ${site} ${slug}`;
+  }
+  return '';
 }
 
 function renderControlsRight(workflow: DraftWorkflowItem): RawHtml {
@@ -145,25 +213,38 @@ function renderControlsRight(workflow: DraftWorkflowItem): RawHtml {
     buttons.push(html`<button class="er-btn er-btn-small er-btn-reject" data-action="reject" type="button">Reject</button>`);
   }
   if (isApproved) {
-    buttons.push(html`<button class="er-btn er-btn-small" disabled title="Run /editorial-approve in Claude Code" type="button">Apply</button>`);
+    const applyCmd = pendingSkillCmd(workflow);
+    buttons.push(html`<span class="er-pending-state">awaiting apply…</span>`);
+    buttons.push(html`<button class="er-btn er-btn-small" data-action="copy-cmd" data-cmd="${applyCmd}" title="Copy ${applyCmd} to clipboard" type="button">copy <code>/deskwork:approve</code></button>`);
     buttons.push(html`<button class="er-btn er-btn-small er-btn-reject" data-action="reject" type="button">Reject</button>`);
   }
   if (isIterating) {
-    buttons.push(html`<span style="font-family: var(--er-font-display); font-style: italic; color: var(--er-stamp-purple);">agent iterating…</span>`);
+    const iterateCmd = pendingSkillCmd(workflow);
+    buttons.push(html`<span class="er-pending-state">agent iterating…</span>`);
+    buttons.push(html`<button class="er-btn er-btn-small" data-action="copy-cmd" data-cmd="${iterateCmd}" title="Copy ${iterateCmd} to clipboard" type="button">copy <code>/deskwork:iterate</code></button>`);
   }
   if (isTerminal) {
-    buttons.push(html`<span style="font-family: var(--er-font-display); font-style: italic; color: var(--er-faded);">filed (${workflow.state})</span>`);
+    buttons.push(html`<span class="er-pending-state er-pending-state--filed">filed (${workflow.state})</span>`);
   }
   buttons.push(html`<button class="er-btn er-btn-small" data-action="shortcuts" type="button" aria-label="Show keyboard shortcuts" title="Keyboard shortcuts">?</button>`);
   return unsafe(`<span class="er-strip-right">${buttons.join('')}</span>`);
 }
 
-function renderError(slug: string, site: string, contentKind: 'longform' | 'outline', message: string): string {
-  const startCmd = contentKind === 'outline'
-    ? `/editorial-outline --site ${site} ${slug}`
-    : `/editorial-draft-review --site ${site} ${slug}`;
+function renderError(
+  slug: string,
+  site: string,
+  contentKind: 'longform' | 'outline' | 'shortform',
+  message: string,
+): string {
+  const startCmd =
+    contentKind === 'outline'
+      ? `/deskwork:outline --site ${site} ${slug}`
+      : contentKind === 'shortform'
+        ? `/deskwork:shortform-start --site ${site} ${slug} <platform>`
+        : `/deskwork:review-start --site ${site} ${slug}`;
   const body = html`
     <div data-review-ui="longform">
+      ${renderEditorialFolio('reviews', `longform · ${slug}`)}
       <div class="er-error">
         <h1>No galley to review.</h1>
         <p><strong>Slug:</strong> <code>${slug}</code></p>
@@ -175,7 +256,10 @@ function renderError(slug: string, site: string, contentKind: 'longform' | 'outl
     </div>`;
   return layout({
     title: `Review — ${slug} — error`,
-    cssHrefs: ['/static/css/editorial-review.css'],
+    cssHrefs: [
+      '/static/css/editorial-review.css',
+      '/static/css/editorial-nav.css',
+    ],
     bodyHtml: body,
     scriptModules: [],
   });
@@ -284,34 +368,108 @@ function renderOutlineDrawer(outlineHtml: string): RawHtml {
     </aside>`);
 }
 
+/**
+ * Resolve the calendar entry that backs this review surface. Callers
+ * have either an `entryId` (id-canonical route) or a slug (legacy
+ * route) to work with. Returns `null` when no calendar entry matches —
+ * ad-hoc workflows + pre-doctor entries fall through to the slug-
+ * template legacy path elsewhere.
+ *
+ * Failures (calendar absent, parse error) are swallowed to null so a
+ * transient calendar issue never blocks the review render.
+ */
+function lookupReviewEntry(
+  ctx: StudioContext,
+  site: string,
+  lookup: ReviewLookup,
+  fallbackSlug: string,
+): CalendarEntry | null {
+  try {
+    const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
+    if (!existsSync(calendarPath)) return null;
+    const cal = readCalendar(calendarPath);
+    if (lookup.kind === 'id') {
+      const byId = findEntryById(cal, lookup.entryId);
+      if (byId !== undefined) return byId;
+    }
+    const slug = lookup.kind === 'workflow' ? fallbackSlug : lookup.slug;
+    const bySlug = findEntry(cal, slug);
+    return bySlug ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function renderReviewPage(
   ctx: StudioContext,
-  slug: string,
+  lookup: ReviewLookup,
   query: ReviewQuery,
+  getIndex?: ReviewIndexGetter,
 ): Promise<string> {
-  const site = pickSite(ctx, query.site);
-  const contentKind = pickContentKind(query.kind ?? null);
+  const queryKind = pickContentKind(query.kind ?? null);
 
-  const fetched = handleGetWorkflow(ctx.projectRoot, ctx.config, {
-    id: null,
-    site,
-    slug,
-    contentKind,
-    platform: null,
-    channel: null,
-  });
+  // Workflow-id lookup short-circuits site + entryId resolution: the
+  // workflow record carries everything we need to render. Phase 21c
+  // added this path so the dashboard's shortform matrix (and any other
+  // surface that knows a workflow id) can deep-link to the unified
+  // review surface without first knowing the calendar entry id.
+  const fetched = lookup.kind === 'workflow'
+    ? handleGetWorkflow(ctx.projectRoot, ctx.config, {
+        id: lookup.workflowId,
+        entryId: null,
+        site: null,
+        slug: null,
+        contentKind: null,
+        platform: null,
+        channel: null,
+      })
+    : handleGetWorkflow(ctx.projectRoot, ctx.config, {
+        id: null,
+        entryId: lookup.kind === 'id' ? lookup.entryId : null,
+        site: pickSite(ctx, query.site),
+        slug: lookup.slug,
+        contentKind: queryKind,
+        platform: null,
+        channel: null,
+      });
+
+  // Slug used in error messages and the title fallback. For
+  // workflow-id lookups we don't know the slug until the fetch
+  // succeeds, so use the id as a placeholder for any pre-fetch error.
+  const lookupSlug =
+    lookup.kind === 'workflow' ? lookup.workflowId : lookup.slug;
+  // Site for the chrome / outbound links. Workflow-id lookups carry
+  // their own site through the fetched workflow record.
+  let resolvedSite = pickSite(ctx, query.site);
 
   if (fetched.status !== 200 || !isSuccessBody(fetched.body)) {
-    return renderError(slug, site, contentKind, errorFromBody(fetched.body));
+    return renderError(
+      lookupSlug,
+      resolvedSite,
+      queryKind,
+      errorFromBody(fetched.body),
+    );
   }
 
   const { workflow, versions } = fetched.body;
+  // Workflow-id paths drive contentKind from the workflow itself —
+  // it's the source of truth, not the URL kind hint.
+  const contentKind: 'longform' | 'outline' | 'shortform' =
+    lookup.kind === 'workflow' ? workflow.contentKind : queryKind;
+  if (lookup.kind === 'workflow') resolvedSite = workflow.site;
+  const slug = workflow.slug;
+
   const requested = query.version ? parseInt(query.version, 10) : workflow.currentVersion;
   const currentVersion =
     versions.find((v) => v.version === requested) ?? versions[versions.length - 1];
 
   if (!currentVersion) {
-    return renderError(slug, site, contentKind, 'no current version on this workflow');
+    return renderError(
+      slug,
+      resolvedSite,
+      contentKind,
+      'no current version on this workflow',
+    );
   }
 
   const { fm, bodyHtml, outlineHtml } = await prepareRender(
@@ -323,8 +481,39 @@ export async function renderReviewPage(
 
   const titleField = stringField(fm.title) ?? `Draft: ${slug}`;
 
+  // Phase 19c+: look up the calendar entry so the scrapbook drawer +
+  // inline-text loader can resolve the on-disk scrapbook directory via
+  // the content index when a frontmatter-id binding exists. Falls back
+  // to slug-template addressing when no entry / no id is present.
+  // Shortform skips the scrapbook drawer entirely — different surface
+  // shape, no margin-note workflow.
+  const reviewEntry = lookupReviewEntry(ctx, resolvedSite, lookup, slug);
+  const reviewIndex = getIndex ? getIndex(resolvedSite) : undefined;
+  const isShortform = contentKind === 'shortform';
+
+  // Phase 21c — shortform header. Renders above the editor on the
+  // unified review surface so the operator sees the platform (and
+  // channel, if any) at a glance. Reuses existing `--er-*` design
+  // tokens; no new CSS introduced.
+  const shortformMeta: RawHtml = isShortform
+    ? unsafe(html`
+      <div class="er-shortform-meta">
+        <span class="er-platform">${workflow.platform ?? 'other'}</span>
+        ${workflow.channel
+          ? unsafe(html`<span class="er-channel">${workflow.channel}</span>`)
+          : ''}
+      </div>`)
+    : unsafe('');
+
+  const reviewUiAttr = isShortform ? 'shortform' : 'longform';
+  const folioSpine = isShortform
+    ? `shortform · ${workflow.platform ?? '?'}${workflow.channel ? ` · ${workflow.channel}` : ''} · ${slug}`
+    : `longform · ${slug}`;
+
   const body = html`
-    <div data-review-ui="longform" class="er-review-shell">
+    <div data-review-ui="${reviewUiAttr}" class="er-review-shell">
+      ${renderEditorialFolio('reviews', folioSpine)}
+      ${shortformMeta}
       <div class="er-draft-frame">
         <div id="draft-body" data-draft-body
           title="Double-click to edit · select text to leave a margin note">${unsafe(bodyHtml)}</div>
@@ -334,7 +523,7 @@ export async function renderReviewPage(
         <a class="er-strip-back" href="/dev/editorial-studio" title="Back to the editorial studio">← studio</a>
         <span class="er-strip-galley">Galley <em>№ ${currentVersion.version}</em></span>
         <span class="er-strip-slug">${workflow.site} / ${workflow.slug}</span>
-        ${renderVersionsStrip(versions, site, contentKind, currentVersion)}
+        ${renderVersionsStrip(versions, resolvedSite, contentKind, currentVersion)}
         <span class="er-strip-center">
           <span class="er-stamp er-stamp-big er-stamp-${workflow.state}" data-state-label>
             ${stateLabel(workflow.state)}
@@ -345,7 +534,10 @@ export async function renderReviewPage(
       </div>
       ${renderMarginalia()}
       <button class="er-pencil-btn" data-add-comment-btn hidden type="button">Mark</button>
-      ${renderOutlineDrawer(outlineHtml)}
+      ${isShortform ? unsafe('') : renderOutlineDrawer(outlineHtml)}
+      ${isShortform
+        ? unsafe('')
+        : renderScrapbookDrawer(ctx, resolvedSite, reviewEntry, workflow.slug, reviewIndex)}
       <div class="er-toast" data-toast hidden></div>
       ${renderShortcutsOverlay()}
       <div class="er-poll-indicator" data-poll>auto-refresh · 8s</div>
@@ -355,8 +547,10 @@ export async function renderReviewPage(
     title: `${titleField} — Review`,
     cssHrefs: [
       '/static/css/editorial-review.css',
+      '/static/css/editorial-nav.css',
       '/static/css/blog-figure.css',
       '/static/css/review-viewport.css',
+      '/static/css/scrap-row.css',
     ],
     bodyHtml: body,
     embeddedJson: [{ id: 'draft-state', data: draftState }],

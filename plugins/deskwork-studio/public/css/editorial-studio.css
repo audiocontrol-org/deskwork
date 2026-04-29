@@ -198,3 +198,13 @@ a.er-calendar-meta-link:focus-visible {
 }
 .er-sf-draft-btn:hover { opacity: 1; }
 .er-sf-cell-covered { background: rgba(46, 93, 69, 0.06); }
+
+/* CSF-8 (cross-surface audit v0.5.0): replacements for the three
+ * inline `style=` attributes the dashboard renderer used to carry. */
+.er-link-marginalia {
+  color: var(--er-red-pencil);
+}
+.er-filter-label--gap {
+  margin-left: 1rem;
+}
+

@@ -434,7 +434,11 @@ describe('studio pages', () => {
     writeFileSync(join(sb, 'note.md'), '#', 'utf-8');
     const r = await getText(app, '/dev/scrapbook/a/clean');
     expect(r.status).toBe(200);
-    expect(r.text).not.toContain('scrapbook-secret');
+    // The Secret section block (wrapping <section class="scrapbook-secret">)
+    // should not be present. The page can still contain the
+    // `scrapbook-secret-toggle` checkbox class on the composer form (#28).
+    expect(r.text).not.toContain('scrapbook-secret-header');
+    expect(r.text).not.toContain('class="scrapbook-secret-title"');
   });
 
   it('GET /dev/editorial-review/:slug returns an error page for unknown slug', async () => {
@@ -459,10 +463,13 @@ describe('studio pages', () => {
     expect(r.text).toContain('/static/dist/editorial-review-client.js');
   });
 
-  it('GET / redirects to the dashboard', async () => {
+  it('GET / redirects to the studio index', async () => {
+    // Phase 17: index page at /dev/ replaces the prior "redirect to
+    // dashboard" landing. The dashboard moves to /dev/editorial-studio
+    // (one of the index entries).
     const res = await app.fetch(new Request('http://x/'), {});
     expect(res.status).toBe(302);
-    expect(res.headers.get('location')).toBe('/dev/editorial-studio');
+    expect(res.headers.get('location')).toBe('/dev/');
   });
 });
 

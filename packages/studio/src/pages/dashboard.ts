@@ -27,7 +27,7 @@ import {
 import { readWorkflows } from '@deskwork/core/review/pipeline';
 import type { DraftWorkflowItem } from '@deskwork/core/review/types';
 import { bodyState, type BodyState } from '@deskwork/core/body-state';
-import { countScrapbook } from '@deskwork/core/scrapbook';
+import { countScrapbook, countScrapbookForEntry } from '@deskwork/core/scrapbook';
 import {
   PLATFORMS,
   STAGES,
@@ -38,10 +38,25 @@ import {
   type Platform,
   type Stage,
 } from '@deskwork/core/types';
-import { resolveCalendarPath, resolveBlogFilePath } from '@deskwork/core/paths';
+import {
+  resolveCalendarPath,
+  resolveBlogFilePath,
+  findEntryFile,
+} from '@deskwork/core/paths';
+import type { ContentIndex } from '@deskwork/core/content-index';
 import type { StudioContext } from '../routes/api.ts';
 import { html, unsafe, type RawHtml } from './html.ts';
 import { layout } from './layout.ts';
+import { renderEditorialFolio } from './chrome.ts';
+
+/**
+ * Per-request content-index getter. The route layer wires this to the
+ * Hono context's memoized cache so a single dashboard render only
+ * builds the index once per site even though many entries call
+ * `entryBodyStateOf`. When omitted (e.g., a non-route caller), the
+ * dashboard falls back to the slug-template path.
+ */
+export type DashboardIndexGetter = (site: string) => ContentIndex;
 
 interface SitedEntry {
   site: string;
@@ -51,6 +66,12 @@ interface SitedDistribution {
   site: string;
   platform: string;
   slug: string;
+  /**
+   * Stable id of the joined calendar entry. Phase 19d: keys
+   * (site, entryId) when present, falls back to (site, slug) for
+   * pre-id distribution records.
+   */
+  entryId: string | null;
   shortform: boolean;
 }
 
@@ -67,6 +88,7 @@ const STAGE_ORNAMENTS: Record<Stage, string> = {
   Outlining: '⊹',
   Drafting: '✎',
   Review: '※',
+  Paused: '⏸',
   Published: '✓',
 };
 
@@ -87,8 +109,26 @@ function stateLabel(state: string): string {
   return state.replace('-', ' ');
 }
 
-function covKey(site: string, slug: string): string {
-  return `${site}::${slug}`;
+/**
+ * Internal correlation key for the dashboard's `Map<key, …>` joins.
+ * Phase 19d: prefer the calendar entry's stable UUID when present,
+ * falling back to the slug for legacy data (workflows / entries
+ * created before frontmatter ids landed). The function is overloaded
+ * via two arities — `covKey(site, slug)` for slug-only callers and
+ * `covKey(site, slug, entryId)` for callers that have access to the
+ * id. The latter form picks `entryId` when it's a non-empty string,
+ * else falls through to `slug`. Display still uses slug as the human
+ * label; this key only correlates internally.
+ *
+ * The "fallback" here is the legacy migration path — not the kind of
+ * silent fallback the project rules forbid. Doctor reports the legacy
+ * cases so operators can backfill ids.
+ */
+function covKey(site: string, slug: string, entryId?: string | null): string {
+  const stable = entryId !== undefined && entryId !== null && entryId !== ''
+    ? entryId
+    : slug;
+  return `${site}::${stable}`;
 }
 
 function fmtRelTime(iso: string, now: Date): string {
@@ -104,17 +144,26 @@ function fmtRelTime(iso: string, now: Date): string {
 
 function workflowLink(w: DraftWorkflowItem): string {
   if (w.contentKind === 'shortform') {
-    return `/dev/editorial-review-shortform?focus=${w.id}#workflow-${w.id}`;
+    // Phase 21c: shortform now renders inside the unified review
+    // surface. Workflow-id deep-links land on the right workflow
+    // without first resolving an entry id — the route handler
+    // recognises a workflow id and dispatches accordingly.
+    return `/dev/editorial-review/${w.id}`;
   }
-  if (w.contentKind === 'outline') {
-    return `/dev/editorial-review/${w.slug}?site=${w.site}&kind=outline`;
-  }
-  return `/dev/editorial-review/${w.slug}?site=${w.site}`;
+  // Phase 19d: prefer the canonical id-based URL when the workflow
+  // carries entryId. The legacy slug URL still works (server.ts will
+  // 302-redirect it), but emitting the canonical form skips the
+  // redirect round trip and makes the UI's outbound links honest.
+  const key = w.entryId ?? w.slug;
+  const kindBit = w.contentKind === 'outline' ? '&kind=outline' : '';
+  return `/dev/editorial-review/${key}?site=${w.site}${kindBit}`;
 }
 
 function blogPreviewLink(site: string, slug: string, host: string, entry: CalendarEntry): string {
   if (entry.stage === 'Published') return `https://${host}/blog/${slug}/`;
-  return `/dev/editorial-review/${slug}?site=${site}`;
+  // Phase 19d: prefer the canonical id-based URL.
+  const key = entry.id ?? slug;
+  return `/dev/editorial-review/${key}?site=${site}`;
 }
 
 interface DashboardData {
@@ -130,7 +179,15 @@ interface DashboardData {
   report: ReviewReport;
 }
 
-function loadDashboardData(ctx: StudioContext): DashboardData {
+function loadDashboardData(
+  ctx: StudioContext,
+  getIndex?: DashboardIndexGetter,
+): DashboardData {
+  // `getIndex` is currently consumed downstream by renderRow →
+  // entryBodyStateOf, not here. Threading it through keeps the call
+  // signature symmetric with renderDashboard and leaves room for
+  // future load-time uses (e.g., joining workflows by entry id).
+  void getIndex;
   const calendarEntries: SitedEntry[] = [];
   const distributions: SitedDistribution[] = [];
   const slugsBySite: Record<string, string[]> = {};
@@ -140,16 +197,23 @@ function loadDashboardData(ctx: StudioContext): DashboardData {
     slugsBySite[site] = [];
     const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
     const cal = readCalendar(calendarPath);
+    // Build a slug → id map up front so distributions can resolve
+    // their entry's stable id even when the DistributionRecord
+    // pre-dates the entryId field.
+    const idBySlug = new Map<string, string>();
     for (const entry of cal.entries) {
       calendarEntries.push({ site, entry });
       slugsBySite[site].push(entry.slug);
+      if (entry.id) idBySlug.set(entry.slug, entry.id);
     }
     for (const d of cal.distributions) {
       const dr: DistributionRecord = d;
+      const entryId = dr.entryId ?? idBySlug.get(dr.slug) ?? null;
       distributions.push({
         site,
         platform: dr.platform,
         slug: dr.slug,
+        entryId,
         shortform: typeof dr.shortform === 'string' && dr.shortform.length > 0,
       });
     }
@@ -166,9 +230,22 @@ function loadDashboardData(ctx: StudioContext): DashboardData {
   for (const d of distributions) {
     if (!d.shortform) continue;
     if (!isPlatform(d.platform)) continue;
-    const key = covKey(d.site, d.slug);
+    const key = covKey(d.site, d.slug, d.entryId);
     const set = shortformCoverage.get(key) ?? new Set<Platform>();
     set.add(d.platform);
+    shortformCoverage.set(key, set);
+  }
+  // Phase 21c — shortform workflows count as coverage too. Distributions
+  // come from the calendar (an `editorial-publish` side-effect), so a
+  // freshly-started shortform draft (no published-yet distribution
+  // record) wouldn't show in the matrix without this branch.
+  for (const w of workflows) {
+    if (w.contentKind !== 'shortform') continue;
+    if (w.state === 'applied' || w.state === 'cancelled') continue;
+    if (!w.platform || !isPlatform(w.platform)) continue;
+    const key = covKey(w.site, w.slug, w.entryId);
+    const set = shortformCoverage.get(key) ?? new Set<Platform>();
+    set.add(w.platform);
     shortformCoverage.set(key, set);
   }
 
@@ -184,7 +261,7 @@ function loadDashboardData(ctx: StudioContext): DashboardData {
   const activeBySitedSlug = new Map<string, DraftWorkflowItem[]>();
   for (const w of workflows) {
     if (w.state === 'applied' || w.state === 'cancelled') continue;
-    const key = covKey(w.site, w.slug);
+    const key = covKey(w.site, w.slug, w.entryId);
     const list = activeBySitedSlug.get(key) ?? [];
     list.push(w);
     activeBySitedSlug.set(key, list);
@@ -210,19 +287,39 @@ function entryBodyStateOf(
   ctx: StudioContext,
   site: string,
   entry: CalendarEntry,
+  getIndex?: DashboardIndexGetter,
 ): BodyState {
   if (!hasRepoContent(effectiveContentType(entry))) return 'missing';
-  const path = resolveBlogFilePath(ctx.projectRoot, ctx.config, site, entry.slug);
-  return bodyState(path);
+  // When the entry has a stable id AND the route layer wired in a
+  // per-request index getter, use the id-driven content-index lookup
+  // — this matches files whose path doesn't follow the slug template
+  // (e.g., writingcontrol-shape projects where slug `the-outbound`
+  // resolves to `projects/the-outbound/index.md` while the calendar
+  // slug doesn't bake the path). Without an id or getter, fall back
+  // to the slug-template behavior so non-route callers still work.
+  if (entry.id !== undefined && entry.id !== '' && getIndex) {
+    const path = findEntryFile(
+      ctx.projectRoot,
+      ctx.config,
+      site,
+      entry.id,
+      getIndex(site),
+      { slug: entry.slug },
+    );
+    if (path !== undefined) return bodyState(path);
+  }
+  const fallback = resolveBlogFilePath(ctx.projectRoot, ctx.config, site, entry.slug);
+  return bodyState(fallback);
 }
 
 function findStageWorkflow(
   data: DashboardData,
   site: string,
-  slug: string,
+  entry: CalendarEntry,
   stage: Stage,
 ): DraftWorkflowItem | undefined {
-  const list = data.activeBySitedSlug.get(covKey(site, slug)) ?? [];
+  const list =
+    data.activeBySitedSlug.get(covKey(site, entry.slug, entry.id)) ?? [];
   if (stage === 'Outlining') return list.find((w) => w.contentKind === 'outline');
   return list.find((w) => w.contentKind === 'longform');
 }
@@ -240,18 +337,18 @@ function renderHeader(
   const issueNum = String(data.workflows.length).padStart(2, '0');
   const issueDate = `${now.getDate()} ${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`;
   return unsafe(html`
-  <header class="er-masthead">
-    <div class="er-masthead-kicker">
+  <header class="er-pagehead er-pagehead--centered">
+    <p class="er-pagehead__kicker">
       Vol. ${volume} &middot; № ${issueNum} &middot; Press-check
-    </div>
-    <h1 class="er-masthead-title">
+    </p>
+    <h1 class="er-pagehead__title">
       Editorial <em>Studio</em>
     </h1>
-    <p class="er-masthead-deck">
+    <p class="er-pagehead__deck">
       Project: <code>${ctx.projectRoot}</code>
-      &nbsp;·&nbsp; <a href="/dev/editorial-help" style="color: var(--er-red-pencil);">the manual</a>
+      &nbsp;·&nbsp; <a class="er-link-marginalia" href="/dev/editorial-help">the manual</a>
     </p>
-    <div class="er-masthead-meta">
+    <p class="er-pagehead__meta">
       <span>${issueDate}</span>
       <span class="sep">·</span>
       <span>${data.calendarEntries.length} on the calendar</span>
@@ -259,7 +356,7 @@ function renderHeader(
       <span>${data.activeBySitedSlug.size} in review</span>
       <span class="sep">·</span>
       <span>${data.approved.length} awaiting press</span>
-    </div>
+    </p>
   </header>`);
 }
 
@@ -268,7 +365,7 @@ function renderFilterStrip(sites: readonly string[]): RawHtml {
     <section class="er-filter" data-filter-strip>
       <span class="er-filter-label">Find</span>
       <input type="search" data-filter-input placeholder="slug, title…" autocomplete="off" />
-      <span class="er-filter-label" style="margin-left: 1rem;">Site</span>
+      <span class="er-filter-label er-filter-label--gap">Site</span>
       <div class="er-chips" role="tablist">
         <button class="er-chip" aria-pressed="true" data-site-chip="all">all</button>
         ${sites.map(
@@ -276,7 +373,7 @@ function renderFilterStrip(sites: readonly string[]): RawHtml {
             unsafe(html`<button class="er-chip" data-site-chip="${s}">${siteLabel(s).toLowerCase()}</button>`),
         )}
       </div>
-      <span class="er-filter-label" style="margin-left: 1rem;">Stage</span>
+      <span class="er-filter-label er-filter-label--gap">Stage</span>
       <div class="er-chips" role="tablist">
         <button class="er-chip" aria-pressed="true" data-stage-chip="all">all</button>
         ${STAGES.map(
@@ -293,6 +390,7 @@ const STAGE_EMPTY_MESSAGES: Record<Stage, string> = {
   Outlining: 'Nothing in outlining. /editorial-outline <slug> to start one.',
   Drafting: 'No posts in drafting.',
   Review: 'Nothing in review stage.',
+  Paused: 'Nothing paused. /deskwork:pause <slug> sets an entry aside without losing where it was.',
   Published: 'No published posts yet.',
 };
 
@@ -302,6 +400,7 @@ function renderRowMeta(
   entry: CalendarEntry,
   stage: Stage,
   hasFile: boolean,
+  getIndex?: DashboardIndexGetter,
 ): RawHtml {
   const kind = effectiveContentType(entry);
   const parts: RawHtml[] = [];
@@ -316,11 +415,32 @@ function renderRowMeta(
   if (entry.datePublished && stage === 'Published') {
     parts.push(unsafe(html`<span class="er-calendar-meta">${entry.datePublished}</span>`));
   }
+  if (stage === 'Paused' && entry.pausedFrom) {
+    parts.push(
+      unsafe(html`<span class="er-calendar-meta"><em>was:</em> ${entry.pausedFrom}</span>`),
+    );
+  }
   if (kind !== 'blog') {
     parts.push(unsafe(html`<span class="er-calendar-meta er-calendar-meta-kind">${kind}</span>`));
   }
   if (kind === 'blog' && hasFile) {
-    const n = countScrapbook(ctx.projectRoot, ctx.config, site, entry.slug);
+    // Phase 19c+: prefer the id-driven content-index lookup so entries
+    // whose on-disk path doesn't match the slug template (e.g.
+    // writingcontrol-shape projects) report the correct count. When the
+    // entry has no id binding OR no per-request index getter is wired,
+    // fall through to the slug-template path. The fallback is the
+    // legacy migration path, not a silent default — doctor reports the
+    // unbound cases so operators can backfill ids.
+    const n =
+      entry.id !== undefined && entry.id !== '' && getIndex
+        ? countScrapbookForEntry(
+            ctx.projectRoot,
+            ctx.config,
+            site,
+            entry,
+            getIndex(site),
+          )
+        : countScrapbook(ctx.projectRoot, ctx.config, site, entry.slug);
     if (n > 0) {
       const label = n === 1 ? 'scrapbook item' : 'scrapbook items';
       parts.push(
@@ -399,6 +519,22 @@ function renderRowActions(
       data-copy="/editorial-draft-review --site ${site} ${entry.slug}"
       title="re-review a published post">re-review</button>`);
   }
+  // #27 — Paused gets a "resume" copy; pausable stages get a "pause" copy.
+  if (stage === 'Paused') {
+    buttons.push(html`<button class="er-btn er-btn-small er-btn-primary er-copy-btn" type="button"
+      data-copy="/deskwork:resume --site ${site} ${entry.slug}"
+      title="restore to ${entry.pausedFrom ?? 'prior stage'}">resume →</button>`);
+  } else if (
+    stage === 'Ideas' ||
+    stage === 'Planned' ||
+    stage === 'Outlining' ||
+    stage === 'Drafting' ||
+    stage === 'Review'
+  ) {
+    buttons.push(html`<button class="er-btn er-btn-small er-copy-btn" type="button"
+      data-copy="/deskwork:pause --site ${site} ${entry.slug}"
+      title="set aside without losing the prior stage">pause</button>`);
+  }
   if (kind === 'blog') {
     buttons.push(html`<button class="er-btn er-btn-small" type="button" data-action="rename-open"
       title="rename the slug — copies /editorial-rename-slug to clipboard">rename →</button>`);
@@ -412,13 +548,14 @@ function renderRow(
   sited: SitedEntry,
   stage: Stage,
   index: number,
+  getIndex?: DashboardIndexGetter,
 ): RawHtml {
   const { site, entry } = sited;
   const kind = effectiveContentType(entry);
-  const body = entryBodyStateOf(ctx, site, entry);
+  const body = entryBodyStateOf(ctx, site, entry, getIndex);
   const hasFile = body !== 'missing';
   const bodyWritten = body === 'written';
-  const wf = findStageWorkflow(data, site, entry.slug, stage);
+  const wf = findStageWorkflow(data, site, entry, stage);
   const search = [
     entry.slug,
     entry.title,
@@ -491,7 +628,7 @@ function renderRow(
           <span class="er-row-site er-row-site--${site}" title="${host}">${siteLabel(site)}</span>
           <span class="er-row-slug">${depth > 0 ? slugCellWithHierarchy : slugCell}</span>
           <span class="er-calendar-title">${entry.title}</span>
-          ${renderRowMeta(ctx, site, entry, stage, hasFile)}
+          ${renderRowMeta(ctx, site, entry, stage, hasFile, getIndex)}
         </div>
         <span class="er-calendar-status">${fileDot}${stamp}</span>
         ${renderRowActions(site, entry, stage, hasFile, bodyWritten, wf)}
@@ -506,6 +643,7 @@ function renderStageSection(
   stage: Stage,
   entries: SitedEntry[],
   sites: readonly string[],
+  getIndex?: DashboardIndexGetter,
 ): RawHtml {
   const intakeBlock =
     stage === 'Ideas'
@@ -564,13 +702,13 @@ function renderStageSection(
         </div>`)
       : unsafe(
           entries
-            .map((e, i) => renderRow(ctx, data, e, stage, i).__raw)
+            .map((e, i) => renderRow(ctx, data, e, stage, i, getIndex).__raw)
             .join(''),
         );
 
   return unsafe(html`
     <section class="er-section" data-stage-section="${stage}">
-      <h2 class="er-section-title">
+      <h2 class="er-section-head">
         <span>${stage}</span>
         <span class="ornament">${STAGE_ORNAMENTS[stage]}</span>
         <span class="count">№ ${entries.length}</span>
@@ -581,17 +719,58 @@ function renderStageSection(
     </section>`);
 }
 
+/**
+ * Shortform workflow lookup keyed by (site, entryId|slug, platform).
+ * Built once per dashboard render so the coverage matrix can render
+ * each covered cell as a direct link to the workflow's review surface
+ * — phase 21c replaces the prior "✓" sigil + copy-CLI-command flow.
+ */
+function indexShortformWorkflows(
+  data: DashboardData,
+): Map<string, DraftWorkflowItem> {
+  const out = new Map<string, DraftWorkflowItem>();
+  for (const w of data.workflows) {
+    if (w.contentKind !== 'shortform') continue;
+    if (w.state === 'applied' || w.state === 'cancelled') continue;
+    if (!w.platform) continue;
+    const key = `${covKey(w.site, w.slug, w.entryId)}::${w.platform}`;
+    out.set(key, w);
+  }
+  return out;
+}
+
 function renderShortformMatrix(data: DashboardData, ctx: StudioContext): RawHtml {
   if (data.publishedBlogEntries.length === 0) return unsafe('');
+  const wfIndex = indexShortformWorkflows(data);
   const rows = data.publishedBlogEntries.map(({ site, entry }) => {
-    const covered = data.shortformCoverage.get(covKey(site, entry.slug)) ?? new Set<Platform>();
+    const covered =
+      data.shortformCoverage.get(covKey(site, entry.slug, entry.id)) ??
+      new Set<Platform>();
     const cells = PLATFORMS_ORDER.map((p) => {
       const has = covered.has(p);
-      const inner = has
-        ? html`<span class="er-sf-check" title="${p} copy drafted">✓</span>`
-        : html`<button class="er-copy-btn er-sf-draft-btn" type="button"
-            data-copy="/editorial-shortform-draft --site ${site} ${entry.slug} ${p}"
-            title="copy /editorial-shortform-draft for ${p}">draft</button>`;
+      const wfKey = `${covKey(site, entry.slug, entry.id)}::${p}`;
+      const wf = wfIndex.get(wfKey);
+      // A covered cell with a live workflow → link straight into the
+      // unified review surface. A covered cell without a workflow
+      // (distribution recorded outside the studio's pipeline — legacy
+      // data) keeps the static "✓" so the matrix doesn't lie about
+      // what's clickable. Empty cells render a real start button that
+      // POSTs to /api/dev/editorial-review/start-shortform and
+      // navigates to the new workflow's review URL.
+      let inner: string;
+      if (has && wf) {
+        inner = html`<a class="er-sf-link" href="/dev/editorial-review/${wf.id}"
+          title="${p} workflow · open in review">✓</a>`;
+      } else if (has) {
+        inner = html`<span class="er-sf-check" title="${p} copy drafted">✓</span>`;
+      } else {
+        inner = html`<button class="er-sf-start-btn" type="button"
+          data-action="start-shortform"
+          data-site="${site}"
+          data-slug="${entry.slug}"
+          data-platform="${p}"
+          title="Start a ${p} shortform draft for ${entry.slug}">start</button>`;
+      }
       const cls = has ? 'er-sf-cell er-sf-cell-covered' : 'er-sf-cell er-sf-cell-empty';
       return html`<td class="${cls}">${unsafe(inner)}</td>`;
     }).join('');
@@ -608,7 +787,7 @@ function renderShortformMatrix(data: DashboardData, ctx: StudioContext): RawHtml
 
   return unsafe(html`
     <section class="er-section">
-      <h2 class="er-section-title">
+      <h2 class="er-section-head">
         <span>Short form · coverage</span>
         <span class="count">${data.publishedBlogEntries.length} × ${PLATFORMS_ORDER.length}</span>
       </h2>
@@ -656,7 +835,7 @@ function renderApprovedSection(data: DashboardData, ctx: StudioContext): RawHtml
     .join('');
   return unsafe(html`
     <section class="er-section">
-      <h2 class="er-section-title">
+      <h2 class="er-section-head">
         <span>Awaiting press</span>
         <span class="count">№ ${data.approved.length}</span>
       </h2>
@@ -686,7 +865,7 @@ function renderTerminalSection(data: DashboardData, ctx: StudioContext, now: Dat
     .join('');
   return unsafe(html`
     <section class="er-section">
-      <h2 class="er-section-title">
+      <h2 class="er-section-head">
         <span>Recent proofs</span>
         <span class="count">last ${data.terminal.length}</span>
       </h2>
@@ -735,11 +914,10 @@ function renderSidebar(data: DashboardData): RawHtml {
         <div class="er-slip-header">Short form</div>
         <h3 class="er-slip-title">Social copy</h3>
         <p style="font-size: 0.85rem; margin: 0 0 var(--er-space-1); color: var(--er-ink-soft);">
-          Agent-drafted. Run in Claude Code:
+          Click <em>start</em> in the coverage matrix above to begin a
+          shortform draft. Edit, iterate, and approve in the unified
+          review surface.
         </p>
-        <code style="display: block; font-size: 0.72rem; padding: var(--er-space-1) var(--er-space-2); word-break: break-all; background: var(--er-paper-2);">
-          /editorial-shortform-draft --site &lt;site&gt; &lt;slug&gt; &lt;platform&gt; [channel]
-        </code>
         <p style="margin-top: var(--er-space-2);">
           <a href="/dev/editorial-review-shortform">Go to the shortform desk →</a>
         </p>
@@ -751,9 +929,12 @@ function renderSidebar(data: DashboardData): RawHtml {
 // Entry point
 // ---------------------------------------------------------------------------
 
-export function renderDashboard(ctx: StudioContext): string {
+export function renderDashboard(
+  ctx: StudioContext,
+  getIndex?: DashboardIndexGetter,
+): string {
   const sites = Object.keys(ctx.config.sites);
-  const data = loadDashboardData(ctx);
+  const data = loadDashboardData(ctx, getIndex);
   const now = ctx.now ? ctx.now() : new Date();
 
   const stageSections = STAGES.map((stage) => {
@@ -768,10 +949,11 @@ export function renderDashboard(ctx: StudioContext): string {
         if (siteCmp !== 0) return siteCmp;
         return a.entry.slug.localeCompare(b.entry.slug);
       });
-    return renderStageSection(ctx, data, stage, stageEntries, sites).__raw;
+    return renderStageSection(ctx, data, stage, stageEntries, sites, getIndex).__raw;
   }).join('\n');
 
   const body = html`
+  ${renderEditorialFolio('dashboard', 'press-check')}
   ${renderHeader(data, ctx, now)}
   <main class="er-container">
     ${renderFilterStrip(sites)}
@@ -792,6 +974,7 @@ export function renderDashboard(ctx: StudioContext): string {
     title: 'Editorial Studio — dev',
     cssHrefs: [
       '/static/css/editorial-review.css',
+      '/static/css/editorial-nav.css',
       '/static/css/editorial-studio.css',
     ],
     bodyAttrs: 'data-review-ui="studio"',

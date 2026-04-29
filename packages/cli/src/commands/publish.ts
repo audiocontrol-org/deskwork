@@ -31,7 +31,7 @@ import {
 import {
   resolveSite,
   resolveCalendarPath,
-  resolveBlogFilePath,
+  resolveEntryFilePath,
 } from '@deskwork/core/paths';
 import { absolutize, emit, fail, parseArgs } from '@deskwork/core/cli-args';
 
@@ -88,7 +88,16 @@ export async function run(argv: string[]): Promise<void> {
 
   let filePath: string | undefined;
   if (hasRepoContent(contentType)) {
-    filePath = resolveBlogFilePath(projectRoot, config, site, slug);
+    // Prefer the UUID-bound path so a refactored / non-template file
+    // location is honored (Issue #67). The slug-template fallback is
+    // automatic when no UUID binding exists.
+    filePath = resolveEntryFilePath(
+      projectRoot,
+      config,
+      site,
+      slug,
+      existing.id,
+    );
     if (!existsSync(filePath)) {
       fail(
         `Cannot publish blog post "${slug}": no file at ${filePath}. ` +

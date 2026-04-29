@@ -97,12 +97,11 @@ export async function run(argv: string[]): Promise<void> {
     }
   }
 
-  // Record the file path on the entry when the scaffolder produced one
-  // that diverges from the site's default template — gives subsequent
-  // reads (review, publish) the explicit path to look at.
-  if (scaffolded && layout !== undefined) {
-    existing.filePath = scaffolded.contentRelativePath;
-  }
+  // Phase 19a removed CalendarEntry.filePath — path-encoding lives in
+  // the scaffolded file's frontmatter `id:` and is resolved through
+  // the content index at read time. The scaffolder still reports
+  // `contentRelativePath` in its result for the JSON emit so the
+  // caller can show the operator where the file was created.
 
   const updated = outlineEntry(calendar, slug);
   writeCalendar(calendarPath, calendar);

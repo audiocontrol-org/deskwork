@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>deskwork — editorial nav + studio index (mockup)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..900,0..100;1,9..144,300..900,0..100&family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    /* ============================================================
+       Editorial-print design tokens — sourced verbatim from
+       plugins/deskwork-studio/public/css/editorial-review.css
+       (do not introduce new tokens; harmonize with these).
+       ============================================================ */
+
+    :root {
+      --er-paper: #F5F1E8;
+      --er-paper-2: #ECE6D4;
+      --er-paper-3: #DFD7BF;
+      --er-ink: #1A1614;
+      --er-ink-soft: #3A332E;
+      --er-faded: #8A7F70;
+      --er-faded-2: #B5AC9B;
+
+      --er-red-pencil: #B8362A;
+      --er-red-soft: #D9867A;
+      --er-proof-blue: #2A4B7C;
+      --er-proof-blue-soft: #6E8AAF;
+      --er-highlight: #F4D58D;
+      --er-highlight-soft: #F9E8BE;
+      --er-stamp-green: #2E5D45;
+      --er-stamp-purple: #5A3E5F;
+
+      --er-font-display: 'Fraunces', 'Newsreader', Georgia, 'Times New Roman', serif;
+      --er-font-body:    'Newsreader', Georgia, 'Times New Roman', serif;
+      --er-font-mono:    'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+
+      --er-space-0: 0.25rem;
+      --er-space-1: 0.5rem;
+      --er-space-2: 0.875rem;
+      --er-space-3: 1.25rem;
+      --er-space-4: 1.75rem;
+      --er-space-5: 2.5rem;
+      --er-space-6: 4rem;
+
+      --er-rule-thin: 0.5px solid var(--er-ink);
+      --er-rule-med: 1px solid var(--er-ink);
+      --er-rule-heavy: 3px solid var(--er-ink);
+      --er-rule-double: 2px double var(--er-ink);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--er-paper);
+      color: var(--er-ink);
+      font-family: var(--er-font-body);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      line-height: 1.55;
+    }
+
+    /* The same paper-noise texture editorial-review.css uses on
+       full-page studio variants. Not a third aesthetic — this is
+       the existing studio surface. */
+    body {
+      background-color: var(--er-paper);
+      background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.05 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+      min-height: 100vh;
+    }
+
+    a { color: var(--er-proof-blue); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+    code {
+      font-family: var(--er-font-mono);
+      font-size: 0.8em;
+      background: var(--er-paper-2);
+      padding: 0.1em 0.35em;
+      border-radius: 2px;
+      color: var(--er-ink-soft);
+    }
+
+    /* ============================================================
+       SECTION LABELS (mockup-only — not part of the design)
+       ============================================================ */
+
+    .mockup-label {
+      max-width: 78rem;
+      margin: 0 auto;
+      padding: var(--er-space-5) var(--er-space-4) var(--er-space-2);
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: var(--er-space-3);
+      align-items: baseline;
+      border-top: 1px dashed var(--er-faded-2);
+      margin-top: var(--er-space-6);
+    }
+    .mockup-label:first-of-type { margin-top: var(--er-space-3); border-top: none; }
+
+    .mockup-label__num {
+      font-family: var(--er-font-mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      color: var(--er-red-pencil);
+      font-weight: 500;
+    }
+    .mockup-label__title {
+      font-family: var(--er-font-display);
+      font-variation-settings: "opsz" 60, "wght" 400, "SOFT" 30;
+      font-size: 1.2rem;
+      color: var(--er-ink);
+    }
+    .mockup-label__hint {
+      font-family: var(--er-font-body);
+      font-style: italic;
+      font-size: 0.85rem;
+      color: var(--er-faded);
+    }
+
+    /* ============================================================
+       SURFACE 1 — Folio / running-head strip
+       ============================================================
+       Reads like the top edge of a magazine page: publication name
+       at left, sections in the middle, volume/folio at the right.
+       Tight all-caps mono in the side strips frames the section
+       names (display-typeset to feel like a contents bar from a
+       printed page).
+
+       Active state: red-pencil tick mark above the link — like an
+       editor circled where you are. NOT a UI selected state, an
+       editorial mark. The tick is irregular (skewed transform) so
+       it doesn't read as a generic underline.
+       ============================================================ */
+
+    .er-folio {
+      border-bottom: var(--er-rule-double);
+      background: var(--er-paper);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .er-folio-inner {
+      max-width: 78rem;
+      margin: 0 auto;
+      padding: var(--er-space-1) var(--er-space-4);
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: var(--er-space-3);
+      min-height: 2.4rem;
+    }
+
+    .er-folio-name {
+      font-family: var(--er-font-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: var(--er-ink);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .er-folio-name em {
+      font-style: normal;
+      color: var(--er-red-pencil);
+      letter-spacing: 0.32em;
+      font-weight: 600;
+    }
+
+    .er-folio-spine {
+      font-family: var(--er-font-mono);
+      font-size: 0.6rem;
+      letter-spacing: 0.18em;
+      text-transform: lowercase;
+      color: var(--er-faded);
+      white-space: nowrap;
+      font-feature-settings: "tnum";
+    }
+
+    .er-folio-spine b {
+      font-weight: 500;
+      color: var(--er-ink-soft);
+    }
+
+    .er-folio-nav {
+      display: flex;
+      justify-content: center;
+      gap: 0;
+      align-items: baseline;
+    }
+
+    .er-folio-nav a {
+      font-family: var(--er-font-display);
+      font-variation-settings: "opsz" 28, "wght" 400, "SOFT" 30;
+      font-size: 0.95rem;
+      color: var(--er-ink);
+      text-decoration: none;
+      padding: 0.3rem 0.85rem;
+      letter-spacing: 0.005em;
+      position: relative;
+      transition: color 0.16s ease;
+    }
+
+    .er-folio-nav a:hover {
+      color: var(--er-red-pencil);
+    }
+
+    /* Leader dots between nav items — the typeset way to separate
+       contents-list entries on a printed page. Drawn as ::after on
+       each item except the last. */
+    .er-folio-nav a:not(:last-child)::after {
+      content: '·';
+      position: absolute;
+      right: -0.15rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--er-faded-2);
+      font-size: 1rem;
+      pointer-events: none;
+    }
+
+    /* Active link: red-pencil tick mark drawn above. The mark is a
+       short irregular curve (rendered via ::before with a skewed
+       border) — reads like an editor circled where you are. */
+    .er-folio-nav a.active {
+      color: var(--er-red-pencil);
+      font-variation-settings: "opsz" 28, "wght" 500, "SOFT" 30;
+    }
+    .er-folio-nav a.active::before {
+      content: '';
+      position: absolute;
+      left: 0.85rem;
+      right: 0.85rem;
+      top: -0.1rem;
+      height: 4px;
+      border-bottom: 1.5px solid var(--er-red-pencil);
+      border-right: 1.5px solid var(--er-red-pencil);
+      transform: skewX(-12deg) rotate(-1deg);
+      border-bottom-right-radius: 60% 90%;
+      border-bottom-left-radius: 30% 80%;
+      pointer-events: none;
+      opacity: 0.85;
+    }
+
+    /* On narrow viewports, collapse the spine and condense */
+    @media (max-width: 720px) {
+      .er-folio-inner {
+        grid-template-columns: auto 1fr;
+        padding: var(--er-space-1) var(--er-space-2);
+      }
+      .er-folio-spine { display: none; }
+      .er-folio-nav a { padding: 0.3rem 0.5rem; font-size: 0.85rem; }
+    }
+
+    /* ============================================================
+       Stub mastheads to show the folio strip in context
+       ============================================================ */
+
+    .stub-masthead {
+      padding: var(--er-space-5) var(--er-space-5) var(--er-space-4);
+      text-align: center;
+      border-bottom: var(--er-rule-double);
+      max-width: 78rem;
+      margin: 0 auto;
+    }
+
+    .stub-masthead__kicker {
+      font-family: var(--er-font-mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--er-faded);
+      margin-bottom: var(--er-space-2);
+    }
+
+    .stub-masthead__title {
+      font-family: var(--er-font-display);
+      font-variation-settings: "opsz" 144, "wght" 400, "SOFT" 0;
+      font-size: clamp(2.5rem, 6vw, 5rem);
+      line-height: 0.95;
+      letter-spacing: -0.02em;
+      margin: 0;
+      color: var(--er-ink);
+    }
+    .stub-masthead__title em {
+      font-style: italic;
+      font-variation-settings: "opsz" 144, "wght" 400, "SOFT" 100;
+    }
+
+    .stub-masthead__deck {
+      font-family: var(--er-font-display);
+      font-style: italic;
+      font-variation-settings: "opsz" 48, "wght" 400;
+      font-size: 1.15rem;
+      color: var(--er-ink-soft);
+      margin: var(--er-space-2) 0 var(--er-space-3);
+      max-width: 44rem;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .stub-masthead__meta {
+      font-family: var(--er-font-mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--er-faded);
+      display: inline-flex;
+      gap: var(--er-space-2);
+      align-items: center;
+    }
+    .stub-masthead__meta .sep { color: var(--er-faded-2); }
+
+    /* Content-view stub head — distinct from the editorial masthead.
+       This is the Writer's Catalog viewport's running head; the folio
+       strip ABOVE it is the cross-page nav. Demonstrates the strip
+       harmonizes on both visual contexts. */
+    .stub-content-head {
+      max-width: 78rem;
+      margin: 0 auto;
+      padding: var(--er-space-4) var(--er-space-5) var(--er-space-3);
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: end;
+      gap: var(--er-space-4);
+      border-bottom: var(--er-rule-thin);
+    }
+    .stub-content-head h2 {
+      font-family: var(--er-font-display);
+      font-variation-settings: "opsz" 96, "wght" 400, "SOFT" 50;
+      font-size: 2.4rem;
+      line-height: 1;
+      margin: 0 0 0.3rem;
+      letter-spacing: -0.018em;
+    }
+    .stub-content-head h2 em {
+      font-style: italic;
+      font-variation-settings: "opsz" 96, "wght" 400, "SOFT" 100;
+      color: var(--er-red-pencil);
+    }
+    .stub-content-head p {
+      font-family: var(--er-font-display);
+      font-style: italic;
+      font-size: 0.95rem;
+      color: var(--er-ink-soft);
+      margin: 0;
+      max-width: 36rem;
+    }
+    .stub-content-head__meta {
+      font-family: var(--er-font-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--er-faded);
+      text-align: right;
+      line-height: 1.7;
+    }
+
+    /* ============================================================
+       SURFACE 2 — Studio index (Table of Contents)
+       ============================================================
+       Reads like the TOC spread of a pressed volume. Roman numerals,
+       leader dots, route paths in mono on the right (the "page
+       numbers"). Section heads use small caps and a red-pencil
+       ornament. Italic descriptions hang below each entry.
+
+       This is NOT a links list. It is a page from a book.
+       ============================================================ */
+
+    .er-toc-page {
+      max-width: 56rem;
+      margin: 0 auto;
+      padding: var(--er-space-6) var(--er-space-4) var(--er-space-6);
+    }
+
+    .er-toc-head {
+      text-align: center;
+      padding-bottom: var(--er-space-4);
+      margin-bottom: var(--er-space-5);
+      border-bottom: var(--er-rule-double);
+      position: relative;
+    }
+
+    /* The little pressed ornament between rules — gives the head
+       the gravitas of a volume's title page. */
+    .er-toc-head::after {
+      content: '❦';
+      position: absolute;
+      bottom: -0.65rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--er-paper);
+      padding: 0 0.6rem;
+      color: var(--er-red-pencil);
+      font-size: 1rem;
+      line-height: 1;
+    }
+
+    .er-toc-head__kicker {
+      font-family: var(--er-font-mono);
+      font-size: 0.7rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--er-faded);
+      margin-bottom: var(--er-space-2);
+    }
+    .er-toc-head__kicker em {
+      font-style: normal;
+      color: var(--er-red-pencil);
+    }
+
+    .er-toc-head__title {
+      font-family: var(--er-font-display);
+      font-variation-settings: "opsz" 144, "wght" 400, "SOFT" 0;
+      font-size: clamp(3rem, 7vw, 5.5rem);
+      line-height: 0.95;
+      letter-spacing: -0.022em;
+      margin: 0;
+      color: var(--er-ink);
+    }
+    .er-toc-head__title em {
+      font-style: italic;
+      font-variation-settings: "opsz" 144, "wght" 400, "SOFT" 100;
+    }
+
+    .er-toc-head__deck {
+      font-family: var(--er-font-display);
+      font-style: italic;
+      font-variation-settings: "opsz" 48, "wght" 400;
+      font-size: 1.15rem;
+      color: var(--er-ink-soft);
+      margin: var(--er-space-2) auto 0;
+      max-width: 36rem;
+      line-height: 1.45;
+    }
+
+    /* Sections — small caps with red-pencil ornament */
+    .er-toc-section {
+      margin-bottom: var(--er-space-5);
+    }
+
+    .er-toc-section-head {
+      display: flex;
+      align-items: baseline;
+      gap: var(--er-space-2);
+      margin-bottom: var(--er-space-3);
+      padding-bottom: var(--er-space-1);
+      border-bottom: var(--er-rule-thin);
+    }
+
+    .er-toc-section-head__ornament {
+      color: var(--er-red-pencil);
+      font-family: var(--er-font-display);
+      font-size: 1rem;
+      line-height: 1;
+    }
+
+    .er-toc-section-head__name {
+      font-family: var(--er-font-display);
+      font-variation-settings: "opsz" 36, "wght" 500;
+      font-size: 0.85rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--er-ink);
+    }
+
+    .er-toc-section-head__count {
+      margin-left: auto;
+      font-family: var(--er-font-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--er-faded);
+    }
+
+    /* Entries — chapter row with leader dots + page-number route */
+    .er-toc-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .er-toc-entry {
+      padding: var(--er-space-2) 0;
+      border-bottom: 1px dotted var(--er-faded-2);
+    }
+    .er-toc-entry:last-child { border-bottom: none; }
+
+    .er-toc-entry__row {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: baseline;
+      gap: var(--er-space-2);
+      margin-bottom: 0.2rem;
+    }
+
+    .er-toc-entry__num {
+      font-family: var(--er-font-display);
+      font-variation-settings: "opsz" 24, "wght" 500;
+      font-style: italic;
+      font-size: 0.95rem;
+      color: var(--er-faded);
+      width: 2.4rem;
+      text-align: right;
+      letter-spacing: 0.04em;
+    }
+
+    .er-toc-entry__title {
+      font-family: var(--er-font-display);
+      font-variation-settings: "opsz" 36, "wght" 500;
+      font-size: 1.25rem;
+      color: var(--er-ink);
+      text-decoration: none;
+      letter-spacing: -0.005em;
+      transition: color 0.14s ease;
+      position: relative;
+    }
+    .er-toc-entry__title:hover {
+      color: var(--er-red-pencil);
+    }
+    .er-toc-entry__title em {
+      font-style: italic;
+      font-variation-settings: "opsz" 36, "wght" 500, "SOFT" 80;
+    }
+
+    /* Leader dots filling the space between title and page-number. */
+    .er-toc-entry__leaders {
+      flex: 1;
+      border-bottom: 1px dotted var(--er-faded);
+      position: relative;
+      bottom: 0.32rem;
+      margin: 0 0.4rem;
+      min-width: 1rem;
+      opacity: 0.7;
+    }
+
+    /* Route path — the "page number" of this entry */
+    .er-toc-entry__route {
+      font-family: var(--er-font-mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.04em;
+      color: var(--er-ink-soft);
+      white-space: nowrap;
+      font-feature-settings: "tnum";
+    }
+    .er-toc-entry__route.is-template {
+      color: var(--er-faded);
+    }
+    .er-toc-entry__route.is-template em {
+      font-style: italic;
+      color: var(--er-red-pencil);
+      opacity: 0.75;
+    }
+
+    /* Italic description hangs below the title — like a line of
+       editorial footing in a TOC. Indented to align under title. */
+    .er-toc-entry__desc {
+      font-family: var(--er-font-display);
+      font-style: italic;
+      font-variation-settings: "opsz" 24, "wght" 400;
+      font-size: 0.95rem;
+      color: var(--er-ink-soft);
+      margin: 0 0 0 calc(2.4rem + var(--er-space-2));
+      max-width: 38rem;
+      line-height: 1.5;
+    }
+
+    .er-toc-entry__hint {
+      display: inline-block;
+      margin-left: 0.45rem;
+      font-family: var(--er-font-mono);
+      font-size: 0.62rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--er-faded);
+      font-style: normal;
+      padding: 0.05em 0.3em;
+      background: var(--er-paper-2);
+      border-radius: 2px;
+      vertical-align: 1px;
+    }
+
+    /* Colophon at the bottom of the TOC — like the imprint page
+       of a printed volume. */
+    .er-toc-colophon {
+      margin-top: var(--er-space-6);
+      padding-top: var(--er-space-4);
+      border-top: var(--er-rule-thin);
+      text-align: center;
+      font-family: var(--er-font-display);
+      font-style: italic;
+      font-size: 0.85rem;
+      color: var(--er-faded);
+      line-height: 1.6;
+    }
+    .er-toc-colophon__rule {
+      display: block;
+      margin: var(--er-space-1) auto 0;
+      max-width: 8rem;
+      border-top: 1px solid var(--er-faded-2);
+      position: relative;
+    }
+    .er-toc-colophon__rule::after {
+      content: '·';
+      position: absolute;
+      top: -0.7rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--er-paper);
+      color: var(--er-faded);
+      padding: 0 0.4rem;
+    }
+
+    /* Page-load entrance — staggered, restrained. Reads like
+       sections of a folded-over page settling into place. */
+    @keyframes settle {
+      from { opacity: 0; transform: translateY(3px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .er-toc-section { animation: settle 0.5s ease backwards; }
+    .er-toc-section:nth-of-type(1) { animation-delay: 0.04s; }
+    .er-toc-section:nth-of-type(2) { animation-delay: 0.10s; }
+    .er-toc-section:nth-of-type(3) { animation-delay: 0.16s; }
+    .er-toc-section:nth-of-type(4) { animation-delay: 0.22s; }
+  </style>
+</head>
+<body>
+
+  <!-- ============================================================
+       STATE 1 — Folio strip atop a (stub) DASHBOARD masthead
+       ============================================================ -->
+
+  <div class="mockup-label">
+    <span class="mockup-label__num">01 — STATE</span>
+    <span class="mockup-label__title">Folio strip · atop the dashboard masthead</span>
+    <span class="mockup-label__hint">existing <code>er-masthead</code> stays intact below</span>
+  </div>
+
+  <header class="er-folio">
+    <div class="er-folio-inner">
+      <div class="er-folio-name">deskwork <em>STUDIO</em></div>
+      <nav class="er-folio-nav" aria-label="Studio sections">
+        <a href="/dev/">Index</a>
+        <a href="/dev/editorial-studio" class="active">Dashboard</a>
+        <a href="/dev/content">Content</a>
+        <a href="/dev/editorial-review-shortform">Reviews</a>
+        <a href="/dev/editorial-help">Manual</a>
+      </nav>
+      <div class="er-folio-spine">vol. <b>xxvi</b> · № <b>04</b> · press-check</div>
+    </div>
+  </header>
+
+  <header class="stub-masthead">
+    <div class="stub-masthead__kicker">Vol. 26 · № 04 · Press-check</div>
+    <h1 class="stub-masthead__title">Editorial <em>Studio</em></h1>
+    <p class="stub-masthead__deck">
+      Project: <code>~/work/writingcontrol.org</code>
+      &nbsp;·&nbsp; <a href="/dev/editorial-help" style="color: var(--er-red-pencil);">the manual</a>
+    </p>
+    <div class="stub-masthead__meta">
+      <span>27 Apr 2026</span><span class="sep">·</span><span>14 on the calendar</span><span class="sep">·</span><span>2 in review</span><span class="sep">·</span><span>1 awaiting press</span>
+    </div>
+  </header>
+
+  <!-- ============================================================
+       STATE 2 — Folio strip atop a (stub) CONTENT-VIEW header
+       ============================================================ -->
+
+  <div class="mockup-label">
+    <span class="mockup-label__num">02 — STATE</span>
+    <span class="mockup-label__title">Folio strip · atop the bird's-eye content-view header</span>
+    <span class="mockup-label__hint">writer's-catalog viewport sits below; folio replaces the v0.4.x <code>.ed-chrome</code></span>
+  </div>
+
+  <header class="er-folio">
+    <div class="er-folio-inner">
+      <div class="er-folio-name">deskwork <em>STUDIO</em></div>
+      <nav class="er-folio-nav" aria-label="Studio sections">
+        <a href="/dev/">Index</a>
+        <a href="/dev/editorial-studio">Dashboard</a>
+        <a href="/dev/content" class="active">Content</a>
+        <a href="/dev/editorial-review-shortform">Reviews</a>
+        <a href="/dev/editorial-help">Manual</a>
+      </nav>
+      <div class="er-folio-spine">vol. <b>xxvi</b> · № <b>04</b> · the shape of the work</div>
+    </div>
+  </header>
+
+  <header class="stub-content-head">
+    <div>
+      <h2>the-<em>outbound</em></h2>
+      <p>Drilldown of one project. 14 nodes · 5 levels deep. Click any node to read its head matter and browse its scrapbook.</p>
+    </div>
+    <div class="stub-content-head__meta">
+      <b>14</b> NODES<br>
+      <b>17</b> SCRAPBOOK ITEMS<br>
+      <b>writingcontrol</b> SITE
+    </div>
+  </header>
+
+  <!-- ============================================================
+       STATE 3 — Studio index page at /dev/
+       ============================================================ -->
+
+  <div class="mockup-label">
+    <span class="mockup-label__num">03 — STATE</span>
+    <span class="mockup-label__title">Studio index · table of contents at <code>/dev/</code></span>
+    <span class="mockup-label__hint">the title page of a pressed volume</span>
+  </div>
+
+  <header class="er-folio">
+    <div class="er-folio-inner">
+      <div class="er-folio-name">deskwork <em>STUDIO</em></div>
+      <nav class="er-folio-nav" aria-label="Studio sections">
+        <a href="/dev/" class="active">Index</a>
+        <a href="/dev/editorial-studio">Dashboard</a>
+        <a href="/dev/content">Content</a>
+        <a href="/dev/editorial-review-shortform">Reviews</a>
+        <a href="/dev/editorial-help">Manual</a>
+      </nav>
+      <div class="er-folio-spine">vol. <b>xxvi</b> · № <b>04</b> · index of the press</div>
+    </div>
+  </header>
+
+  <main class="er-toc-page">
+
+    <header class="er-toc-head">
+      <div class="er-toc-head__kicker">Vol. 26 · № 04 · <em>Index of the Press</em></div>
+      <h1 class="er-toc-head__title">Editorial <em>Studio</em></h1>
+      <p class="er-toc-head__deck">
+        A reference of the dev surfaces — pipeline, review desk, browse, manual.
+        Begin where the work is.
+      </p>
+    </header>
+
+    <section class="er-toc-section">
+      <div class="er-toc-section-head">
+        <span class="er-toc-section-head__ornament">¶</span>
+        <span class="er-toc-section-head__name">Pipeline</span>
+        <span class="er-toc-section-head__count">i. — 1 surface</span>
+      </div>
+      <ol class="er-toc-list">
+        <li class="er-toc-entry">
+          <div class="er-toc-entry__row">
+            <span class="er-toc-entry__num">I</span>
+            <a class="er-toc-entry__title" href="/dev/editorial-studio">Dashboard</a>
+            <span class="er-toc-entry__route">/dev/editorial-studio</span>
+          </div>
+          <p class="er-toc-entry__desc">Press-check. The calendar across all sites; awaiting press; recent proofs; voice-drift signal.</p>
+        </li>
+      </ol>
+    </section>
+
+    <section class="er-toc-section">
+      <div class="er-toc-section-head">
+        <span class="er-toc-section-head__ornament">¶</span>
+        <span class="er-toc-section-head__name">Review desk</span>
+        <span class="er-toc-section-head__count">ii.–iii. — 2 surfaces</span>
+      </div>
+      <ol class="er-toc-list">
+        <li class="er-toc-entry">
+          <div class="er-toc-entry__row">
+            <span class="er-toc-entry__num">II</span>
+            <a class="er-toc-entry__title" href="/dev/editorial-review-shortform">Shortform reviews</a>
+            <span class="er-toc-entry__route">/dev/editorial-review-shortform</span>
+          </div>
+          <p class="er-toc-entry__desc">Cross-platform copy desk. Reddit, LinkedIn, YouTube, Instagram — galley slips, one per platform.</p>
+        </li>
+        <li class="er-toc-entry">
+          <div class="er-toc-entry__row">
+            <span class="er-toc-entry__num">III</span>
+            <span class="er-toc-entry__title">Longform reviews</span>
+            <span class="er-toc-entry__route is-template">/dev/editorial-review/<em>&lt;slug&gt;</em></span>
+          </div>
+          <p class="er-toc-entry__desc">
+            Per-entry margin notes, decisions, iterate flow.
+            <span class="er-toc-entry__hint">entry-by-entry</span>
+            <em>Reach via the Dashboard or Content view; each review is opened against a specific slug.</em>
+          </p>
+        </li>
+      </ol>
+    </section>
+
+    <section class="er-toc-section">
+      <div class="er-toc-section-head">
+        <span class="er-toc-section-head__ornament">¶</span>
+        <span class="er-toc-section-head__name">Browse</span>
+        <span class="er-toc-section-head__count">iv.–v. — 2 surfaces</span>
+      </div>
+      <ol class="er-toc-list">
+        <li class="er-toc-entry">
+          <div class="er-toc-entry__row">
+            <span class="er-toc-entry__num">IV</span>
+            <a class="er-toc-entry__title" href="/dev/content">Content view</a>
+            <span class="er-toc-entry__route">/dev/content</span>
+          </div>
+          <p class="er-toc-entry__desc">The shape of the work. A drillable tree of nodes; click any to read its head matter and browse its scrapbook.</p>
+        </li>
+        <li class="er-toc-entry">
+          <div class="er-toc-entry__row">
+            <span class="er-toc-entry__num">V</span>
+            <span class="er-toc-entry__title">Scrapbook</span>
+            <span class="er-toc-entry__route is-template">/dev/scrapbook/<em>&lt;site&gt;/&lt;path&gt;</em></span>
+          </div>
+          <p class="er-toc-entry__desc">
+            Research, receipts, working notes. Addressed by hierarchical path; secret items appear in their own section.
+            <span class="er-toc-entry__hint">path-addressed</span>
+            <em>Reach via the Content view's per-node drawer, or address directly.</em>
+          </p>
+        </li>
+      </ol>
+    </section>
+
+    <section class="er-toc-section">
+      <div class="er-toc-section-head">
+        <span class="er-toc-section-head__ornament">¶</span>
+        <span class="er-toc-section-head__name">Reference</span>
+        <span class="er-toc-section-head__count">vi. — 1 surface</span>
+      </div>
+      <ol class="er-toc-list">
+        <li class="er-toc-entry">
+          <div class="er-toc-entry__row">
+            <span class="er-toc-entry__num">VI</span>
+            <a class="er-toc-entry__title" href="/dev/editorial-help">The Compositor's <em>Manual</em></a>
+            <span class="er-toc-entry__route">/dev/editorial-help</span>
+          </div>
+          <p class="er-toc-entry__desc">The workflow, the skill catalogue, the names of the things — read once, return when the work asks.</p>
+        </li>
+      </ol>
+    </section>
+
+    <footer class="er-toc-colophon">
+      Pressed in the deskwork studio. Loopback only.<br>
+      <span class="er-toc-colophon__rule"></span>
+    </footer>
+
+  </main>
+
+  <!-- ============================================================
+       Bottom spacer
+       ============================================================ -->
+  <div style="height: var(--er-space-6);"></div>
+
+</body>
+</html>

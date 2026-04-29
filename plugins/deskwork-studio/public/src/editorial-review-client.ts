@@ -9,7 +9,12 @@
  *
  * Both dev routes (audiocontrol and editorialcontrol) bundle this module via
  * a non-inline <script> tag; Astro/Vite dedupe it across entry points.
+ *
+ * v0.6.0 (#29): also wires the scrapbook drawer's image thumbnails to
+ * the in-context lightbox.
  */
+
+import { initScrapbookLightbox } from './lightbox.ts';
 
 interface DraftRange {
   start: number;
@@ -894,7 +899,7 @@ export function initEditorialReview(): void {
     if (previewDebounce !== null) window.clearTimeout(previewDebounce);
     previewDebounce = window.setTimeout(async () => {
       try {
-        const { splitOutline } = await import('./outline-split.ts');
+        const { splitOutline } = await import('@deskwork/core/outline-split');
         const bodyOnly = stripFrontmatter(md);
         const isOutlineKind = state.workflow.contentKind === 'outline';
         const bodyForPreview = isOutlineKind
@@ -1000,7 +1005,7 @@ export function initEditorialReview(): void {
     // Load both splitOutline AND joinOutline up front so the onChange
     // handler can rebuild the full document synchronously on every
     // keystroke — no race with a pending dynamic import.
-    const outlineMod = await import('./outline-split.ts');
+    const outlineMod = await import('@deskwork/core/outline-split');
     joinOutlineFn = outlineMod.joinOutline;
     const sourceMarkdown = state.currentVersion.markdown;
     // Outline-stage workflows: the outline IS the article. Don't
@@ -1464,21 +1469,23 @@ export function initEditorialReview(): void {
     await postApproveAnnotation();
     const ok = await postDecision('approved');
     if (!ok) { approveBtn.disabled = false; return; }
-    // Approve writes to disk + transitions to applied; both are done
-    // by /editorial-approve (longform/shortform) or
-    // /editorial-outline-approve (outline) in Claude Code, not by
-    // the studio click. Build the command that matches the workflow.
+    // Approve writes to disk + transitions to applied via
+    // /deskwork:approve in Claude Code, not by the studio click. Build
+    // the command that matches the workflow.
+    //
+    // TODO: outline-approve semantics. Legacy code emitted
+    // /editorial-outline-approve, but no such skill exists in the
+    // current /deskwork:* namespace. /deskwork:approve doesn't accept
+    // --kind. Outline approval may want to map to /deskwork:draft
+    // (advances Outlining → Drafting) — to be confirmed.
     const site = state.workflow.site;
     const slug = state.workflow.slug;
     const kind = state.workflow.contentKind;
-    const approveCmd =
-      kind === 'outline'
-        ? `/editorial-outline-approve --site ${site} ${slug}`
-        : `/editorial-approve --site ${site} ${slug}`;
+    const approveCmd = `/deskwork:approve --site ${site} ${slug}`;
     const approveHint =
       kind === 'outline'
-        ? `Approved outline v${versionNum}. Next: /editorial-outline-approve advances the calendar Outlining → Drafting.`
-        : `Approved v${versionNum}. Next: /editorial-approve writes the file and marks the workflow applied.`;
+        ? `Approved outline v${versionNum}. Next: ${approveCmd} finalizes the workflow.`
+        : `Approved v${versionNum}. Next: ${approveCmd} writes the file and marks the workflow applied.`;
     await copyAndToast(approveCmd, approveHint);
     setTimeout(() => window.location.reload(), 2400);
   });
@@ -1492,12 +1499,14 @@ export function initEditorialReview(): void {
     const site = state.workflow.site;
     const slug = state.workflow.slug;
     const kind = state.workflow.contentKind;
-    // /editorial-iterate defaults to --kind longform; outline
-    // workflows need the flag so the helper picks the right workflow.
+    // /deskwork:iterate defaults to --kind longform; outline and
+    // shortform workflows pass the flag so the helper picks the right
+    // workflow. Shortform additionally needs --platform / --channel,
+    // but the studio's shortform desk emits those via a different path.
     const iterateCmd =
       kind === 'outline'
-        ? `/editorial-iterate --kind outline --site ${site} ${slug}`
-        : `/editorial-iterate --site ${site} ${slug}`;
+        ? `/deskwork:iterate --kind outline --site ${site} ${slug}`
+        : `/deskwork:iterate --site ${site} ${slug}`;
     await copyAndToast(
       iterateCmd,
       `Iterating on v${versionNum}. Next: ${iterateCmd} revises against your comments and appends v${versionNum + 1}.`,
@@ -1518,6 +1527,20 @@ export function initEditorialReview(): void {
     } else {
       rejectBtn.disabled = false;
     }
+  });
+
+  // ---- Re-copy pending skill command ----
+  // Surfaced when the workflow is in `iterating` or `approved` and the
+  // operator's first clipboard paste failed (e.g., the v0.8.4 case where
+  // the legacy /editorial-iterate name shipped). The button carries the
+  // command in a data-cmd attribute; clicking it re-runs the same
+  // copyAndToast we use for the primary buttons.
+  document.querySelectorAll<HTMLButtonElement>('[data-action="copy-cmd"]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const cmd = btn.getAttribute('data-cmd') ?? '';
+      if (!cmd) return;
+      await copyAndToast(cmd, `Copied: ${cmd}`);
+    });
   });
 
   // ---- Keyboard shortcuts ----
@@ -1666,6 +1689,10 @@ export function initEditorialReview(): void {
   // ---- Boot ----
 
   loadAnnotations();
+  // #29: scrapbook drawer's image thumbnails open in the lightbox.
+  // The drawer is server-rendered, so we can bind on first boot and
+  // skip re-binding (the drawer doesn't lazy-render new image rows).
+  initScrapbookLightbox(document);
 }
 
 initEditorialReview();

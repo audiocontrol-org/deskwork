@@ -2,7 +2,7 @@
 
 Web studio for the deskwork editorial calendar — a local Hono server exposing a dashboard, longform review surface, shortform review desk, scrapbook viewer, and the compositor's manual.
 
-This is a thin Claude Code plugin shell. The actual server lives in the [@deskwork/studio](../../packages/studio/) npm package; this plugin's `bin/deskwork-studio` wrapper resolves to the workspace-linked binary on dev installs, or falls back to the self-contained bundle at `plugins/deskwork-studio/bundle/server.mjs` (committed to git) for fresh `claude plugin install` users. No `npm install` ceremony required either way.
+This is a thin Claude Code plugin shell. The actual server lives in the [@deskwork/studio](../../packages/studio/) npm package, vendored into the plugin tree at `vendor/studio/` (and `vendor/core/`) so that a fresh marketplace install has the package source at hand. The `bin/deskwork-studio` wrapper handles dev-vs-installed resolution: workspace clone uses the workspace-linked `tsx` binary; marketplace install does a one-time `npm install --omit=dev` against the plugin tree on first invocation, then exec's the resulting bin.
 
 ### Install
 
@@ -12,6 +12,24 @@ This is a thin Claude Code plugin shell. The actual server lives in the [@deskwo
 ```
 
 Pairs with the [`deskwork`](../deskwork/) plugin, which provides the editorial lifecycle skills. You can install both, or `deskwork` alone for headless use.
+
+### First-run install
+
+The first time you invoke `/deskwork-studio:studio` (or run `deskwork-studio` directly) after a marketplace install or fresh clone, the bin wrapper executes `npm install --omit=dev` inside the plugin tree (~30s on a typical machine). Subsequent invocations skip that step and exec straight through `tsx` — boot is fast (well under a second to first byte).
+
+### Runtime architecture
+
+The studio runs from source via `tsx` — there's no precompiled bundle to keep in sync with the source. Client-side assets (`/static/dist/*.js`) are produced by an on-startup esbuild pass that reads `plugins/deskwork-studio/public/src/*.ts` and writes outputs to `<pluginRoot>/.runtime-cache/dist/`. The cache is gitignored and regenerated automatically; cold boots include the build (a few hundred ms), warm boots check mtimes and skip the build (~50ms).
+
+### Customization layer
+
+Operators can override the plugin's built-in studio templates without forking the plugin. Drop a file at `<projectRoot>/.deskwork/templates/<name>.ts` and the runtime resolver uses it instead of the built-in. To get a starting point copied into the project:
+
+```
+/deskwork:customize templates dashboard
+```
+
+(or any other template basename — `content`, `content-project`, `scrapbook`, `review`, `help`). The skill also supports `doctor` rule overrides under `.deskwork/doctor/`. See the customize skill for the full list.
 
 ### Usage
 

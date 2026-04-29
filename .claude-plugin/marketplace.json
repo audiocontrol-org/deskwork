@@ -6,21 +6,30 @@
   },
   "metadata": {
     "description": "Open-source Claude Code plugins — editorial calendar, feature images, analytics",
-    "version": "0.1.0",
-    "pluginRoot": "./plugins"
+    "version": "0.9.4"
   },
   "plugins": [
     {
       "name": "deskwork",
-      "source": "./plugins/deskwork",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/audiocontrol-org/deskwork.git",
+        "path": "plugins/deskwork",
+        "ref": "v0.9.4"
+      },
       "description": "Editorial calendar lifecycle: capture, plan, draft, publish, distribute",
-      "version": "0.1.0"
+      "version": "0.9.4"
     },
     {
       "name": "deskwork-studio",
-      "source": "./plugins/deskwork-studio",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/audiocontrol-org/deskwork.git",
+        "path": "plugins/deskwork-studio",
+        "ref": "v0.9.4"
+      },
       "description": "Web studio for deskwork — dashboard, longform review, scrapbook, manual. Optional companion to the deskwork plugin",
-      "version": "0.1.0"
+      "version": "0.9.4"
     },
     {
       "name": "dw-lifecycle",

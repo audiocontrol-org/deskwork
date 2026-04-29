@@ -1,6 +1,25 @@
 ## deskwork
 
-Open-source Claude Code plugins distributed as a monorepo under the `deskwork` name (after its flagship plugin). Each plugin is self-contained under `plugins/<name>/`. The root `.claude-plugin/marketplace.json` wires plugins together as a marketplace that can be installed via `claude plugin install --marketplace https://github.com/audiocontrol-org/deskwork <plugin>`.
+Open-source Claude Code plugins distributed as a monorepo under the `deskwork` name (after its flagship plugin). Each plugin is self-contained under `plugins/<name>/`. The root `.claude-plugin/marketplace.json` wires plugins together as a marketplace.
+
+For acquisition and install, follow each plugin's own README (e.g. `plugins/deskwork/README.md`) — that's the canonical adopter-facing install path. Do not duplicate install commands here; doc-drift between this file and the plugin README is exactly the failure mode we want to avoid.
+
+## Core Principles
+
+### Deskwork manages **collections of markdown content**, not websites
+
+The unit deskwork operates on is a **content collection**: a tree of markdown files plus their supporting media (images, video, etc.), organized hierarchically and bound together by frontmatter UUIDs. *"Website"* is one possible downstream consumer of a collection — an Astro/Next/Hugo/Eleventy renderer reads the collection and produces a static site — but the collection model exists independently of any renderer. Other consumers: internal documentation, books, manuscripts, knowledge bases, engineering plans, tool documentation. The calendar lifecycle, review pipeline, frontmatter binding, and doctor rules all work on a collection regardless of whether anything renders it.
+
+Public-facing terminology is **collection**. Implementation talks about a tree of markdown + media. The legacy term *"site"* in current configs and code is being migrated.
+
+**Implications for design:**
+- The config schema treats `host` as optional metadata that only matters when a collection is published as a website. A collection without a host is fully valid.
+- The install skill detects content collections (directories of markdown organized hierarchically), with renderer detection (Astro/Next/Hugo/Eleventy) being a secondary attribute that conditionally informs schema-patch advice — not a required signal.
+- Studio surfaces don't assume a `host`. Per-collection dashboards work for any collection; per-website URL formatting only fires when a host is present.
+- Frontmatter binding (`deskwork.id` UUID) is collection-native and renderer-independent — already correct, no migration needed.
+- Doctor rules operate on the collection's content tree; rules that today reference renderer-specific schemas (Astro `z.object` rejection) become conditional on the collection having a configured renderer.
+
+This principle is foundational. If a design choice or piece of code couples deskwork's behavior to *"there must be a website here,"* that coupling is the bug.
 
 ## Plugins
 
@@ -42,6 +61,23 @@ Feature documentation lives in `docs/1.0/<status>/<slug>/`:
 
 Each feature directory contains: `prd.md`, `workplan.md`, `README.md`, and optionally `implementation-summary.md`.
 
+### Feature Lifecycle (canonical workflow)
+
+Every feature flows through this sequence. Skipping steps is the failure mode that motivates the gates.
+
+1. **`/feature-define <name>`** — interview the operator to define problem, scope, approach, task breakdown. Writes `/tmp/feature-definition-<slug>.md`. Does NOT create infrastructure.
+2. **`/feature-setup <slug>`** — creates branch + worktree + `docs/1.0/001-IN-PROGRESS/<slug>/{prd.md, workplan.md, README.md}`. The PRD is created with a `deskwork.id` UUID in frontmatter and registered with deskwork via `deskwork ingest` + `deskwork review-start`. Reports the studio review URL.
+3. **Operator iterates the PRD via deskwork.** Open the studio review URL, leave margin notes on the PRD, request iteration. Agent runs `/deskwork:iterate` to address comments and snapshot v(n+1). Repeat until the operator clicks Approve and the workflow state becomes `applied`. **The PRD is the document under review; the workplan is implementation tracking that follows from it.**
+4. **`/feature-issues`** — files GitHub issues from the (now-stable) workplan. Only run after the PRD is `applied`.
+5. **`/feature-implement`** — begins implementation. Strict gate: refuses to start if the PRD's deskwork workflow is not `applied`. The gate prevents the "started before the operator finished thinking" failure mode.
+6. **`/feature-extend <slug>`** (mid-implementation) — appends new phases to the PRD + workplan. The PRD-edit step always re-iterates via deskwork (operator clicks Iterate → agent runs `/deskwork:iterate`). Issues for new phases are filed only after re-approval.
+7. **`/feature-review`** / `/feature-ship`** — code review + PR.
+8. **`/feature-complete`** — moves docs to `003-COMPLETE/`, closes issues. Runs on the feature branch BEFORE merge.
+
+The deskwork iteration step (3) is **always required for new features and PRD extensions** — no `--skip-review` flag, no warning-with-override. If the gate is too strict in practice, relax later with explicit operator approval.
+
+For documents that are NOT features (blog posts, internal write-ups, external essays), use the deskwork lifecycle skills directly (`/deskwork:add` → `/deskwork:plan` → `/deskwork:outline` → `/deskwork:draft` → `/deskwork:review-start`). The feature skills are specifically for project-tracked work.
+
 ### Before Committing — Review Checklist
 
 - [ ] Workplan updated with completed acceptance criteria?
@@ -71,25 +107,36 @@ Always instruct agents to **use the Write/Edit tool to persist all changes to di
 ```text
 deskwork/
 ├── .claude-plugin/
-│   └── marketplace.json      # Marketplace manifest (git-subdir entries)
+│   └── marketplace.json        # Marketplace manifest (git-subdir entries)
+├── packages/
+│   ├── core/                   # @deskwork/core — pure lib (no entry point)
+│   ├── cli/                    # @deskwork/cli — single-dispatcher CLI
+│   └── studio/                 # @deskwork/studio — Hono web server
 ├── plugins/
-│   └── <plugin>/              # Self-contained plugin directory
+│   └── <plugin>/               # Self-contained plugin directory
 │       ├── .claude-plugin/
 │       │   └── plugin.json
 │       ├── skills/
 │       │   └── <skill>/SKILL.md
-│       ├── bin/               # Helper scripts — added to PATH by Claude Code
-│       ├── lib/               # Library code (TypeScript)
+│       ├── bin/                # Helper scripts — added to PATH by Claude Code
+│       ├── lib/                # Library code (TypeScript)
+│       ├── vendor/             # Vendored workspace packages (Phase 23b/23c)
+│       │   ├── core/           # Symlink to ../../packages/core in dev;
+│       │   └── cli/            # materialized to a real directory at release.
+│       ├── .runtime-cache/     # Auto-generated build outputs (gitignored;
+│       │                       # studio's on-startup esbuild lands here).
 │       ├── package.json
 │       └── README.md
-├── docs/                      # Feature PRDs, workplans, impl notes
-├── DEVELOPMENT-NOTES.md       # Session journal
-├── package.json               # npm workspaces root
-├── LICENSE                    # GPL-3.0-or-later
+├── scripts/
+│   └── materialize-vendor.sh   # Release-time: vendor symlinks → directory copies
+├── docs/                       # Feature PRDs, workplans, impl notes
+├── DEVELOPMENT-NOTES.md        # Session journal
+├── package.json                # npm workspaces root
+├── LICENSE                     # GPL-3.0-or-later
 └── README.md
 ```
 
-Plugins are self-contained — no cross-plugin `../` imports.
+Plugins are self-contained — no cross-plugin `../` imports. The `bundle/` directory referenced in earlier (pre-Phase-23) docs is retired; plugins now ship source under `vendor/` and build at first run.
 
 ## Worktree Convention
 
@@ -107,8 +154,12 @@ Feature work happens in worktrees under `~/work/deskwork-work/`. The worktree di
 - Skills are composable and UNIX-style — one skill per action, never a monolith
 - Interactive skills prompt one argument at a time when multiple are required
 - Bundle helper scripts as proper scripts under `bin/`, not ad-hoc shell
+- `bin/` wrappers do a one-time `npm install --omit=dev` on first invocation when the plugin tree has no `node_modules` (the marketplace-install case). Subsequent runs skip the install.
 - Adapter layer under `lib/` decouples skill logic from host project structure
 - Skills read configuration via the adapter; never hardcode paths
+- Workspace packages used by a plugin are vendored under `vendor/<pkg>/` (symlinked in dev, materialized to a real directory at release time by `scripts/materialize-vendor.sh`). Never reach across plugins or up to `packages/` from inside a plugin tree at runtime — read via `vendor/`.
+- Studio client assets are built on startup by an in-process esbuild pass; outputs land in `<pluginRoot>/.runtime-cache/` (gitignored). No precompiled bundle is committed.
+- Built-in studio templates and doctor rules are overridable per-project: `<projectRoot>/.deskwork/templates/<name>.ts` (and `.deskwork/doctor/<name>.ts`) are picked up by the runtime override resolver. Operators copy a default into the project via `/deskwork:customize <category> <name>`.
 
 ## Core Requirements
 
@@ -132,7 +183,7 @@ Never implement fallbacks or use mock data outside of test code. Throw errors wi
 
 ### Repository Hygiene
 
-- Build artifacts go in `dist/` (gitignored)
+- Build artifacts go in `dist/` or `.runtime-cache/` (both gitignored)
 - Never bypass pre-commit or pre-push hooks — fix issues instead
 - Never commit temporary files or build artifacts
 
@@ -143,6 +194,8 @@ npm install                              # install workspace deps
 npm --workspace plugins/<plugin> test    # run one plugin's tests
 claude plugin validate plugins/<plugin>  # validate plugin manifest
 claude --plugin-dir plugins/<plugin>     # load plugin into a Claude Code session
+bash scripts/smoke-marketplace.sh        # release-gate smoke (materializes vendor, boots studio, checks routes)
+bash scripts/materialize-vendor.sh       # turn vendor symlinks into directory copies (release path)
 ```
 
 ## Documentation Standards

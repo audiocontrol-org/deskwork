@@ -1,6 +1,6 @@
 {
   "name": "@deskwork/cli",
-  "version": "0.1.0",
+  "version": "0.9.4",
   "private": true,
   "type": "module",
   "description": "Editorial calendar + review CLI for the deskwork plugin",
@@ -17,9 +17,7 @@
     "deskwork": "./src/cli.ts"
   },
   "scripts": {
-    "build": "tsx build.ts",
-    "prepare": "npm run build",
-    "test": "npm run build && vitest run",
+    "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },

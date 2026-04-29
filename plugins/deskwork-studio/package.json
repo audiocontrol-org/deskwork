@@ -1,6 +1,6 @@
 {
   "name": "@deskwork/plugin-studio",
-  "version": "0.1.0",
+  "version": "0.9.4",
   "private": true,
   "description": "Web studio plugin for Claude Code — thin shell pointing at @deskwork/studio",
   "license": "GPL-3.0-or-later",
@@ -11,5 +11,20 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "dependencies": {
+    "@codemirror/commands": "^6.10.3",
+    "@codemirror/lang-markdown": "^6.5.0",
+    "@codemirror/language": "^6.12.3",
+    "@codemirror/state": "^6.6.0",
+    "@codemirror/view": "^6.41.1",
+    "@deskwork/core": "file:./vendor/core",
+    "@deskwork/studio": "file:./vendor/studio",
+    "@hono/node-server": "^1.13.7",
+    "@lezer/highlight": "^1.2.3",
+    "esbuild": "^0.28.0",
+    "hono": "^4.6.0",
+    "tsx": "^4.21.0",
+    "yaml": "^2.8.0"
   }
 }

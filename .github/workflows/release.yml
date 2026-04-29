@@ -1,10 +1,10 @@
 name: release
 
-# Triggered by pushing a v* tag. Runs the full test suite + bundle
-# verification (same as the PR check), then creates a GitHub release
-# with auto-generated notes from commits since the previous tag. The
-# release page on GitHub is the consumer-facing record of what changed
-# between versions.
+# Triggered by pushing a v* tag. Runs the full test suite, materializes
+# vendor symlinks for the source-shipped plugin tree (Phase 23c), then
+# creates a GitHub release with auto-generated notes from commits since
+# the previous tag. The release page on GitHub is the consumer-facing
+# record of what changed between versions.
 
 on:
   push:
@@ -29,20 +29,83 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install + build
+      - name: Install
         run: npm install
 
       # --if-present skips workspaces without a 'test' script (plugin
-      # shells ship metadata + wrappers + bundles only).
+      # shells ship metadata + wrappers + source only).
       - name: Run all tests
         run: npm --workspaces --if-present test
 
-      - name: Verify bundles match the tagged source
+      # Phase 23b/23c: each plugin's `vendor/<pkg>` symlinks (`core`,
+      # plus `studio` or `cli` for the corresponding plugin) survive
+      # marketplace install as symlinks, but the relative targets
+      # traverse out of the cached plugin tree (the marketplace copies
+      # plugins/<name>/ only — not the workspace root). Materialize the
+      # symlinks into plain directory copies on the tagged commit so
+      # adopters get a self-contained tree. The development branch
+      # keeps the symlinks intact; only the tagged release commit ships
+      # materialized.
+      - name: Materialize vendor symlinks
+        run: bash scripts/materialize-vendor.sh
+
+      - name: Configure git for tag move
         run: |
-          if ! git diff --exit-code -- plugins/deskwork/bundle/ plugins/deskwork-studio/bundle/; then
-            echo "::error::Tagged commit ships stale bundles. Bump the tag, rebuild, and re-tag."
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit materialized vendor + re-point tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          git add plugins/deskwork/vendor plugins/deskwork-studio/vendor
+          if git diff --cached --quiet; then
+            echo "no vendor changes to commit (nothing was a symlink?)"
             exit 1
           fi
+          git commit -m "release: materialize vendor symlinks for ${TAG}"
+          git tag -f "${TAG}"
+          git push --force origin "refs/tags/${TAG}"
+
+      # Why: Claude Code's marketplace install reads marketplace.json
+      # from the marketplace repo's default branch (not the tag), so
+      # each plugin's source.ref MUST already point at this tag on main.
+      # The version:bump script (scripts/bump-version.ts) does that as
+      # part of the chore: release commit, so by the time we get here
+      # the bump is already on main. This step is a regression gate:
+      # if marketplace.json on main doesn't reference this tag, fail
+      # the release before adopters install.
+      # See issue #88.
+      - name: Verify marketplace.json source.ref points at tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          git fetch origin main
+          node -e '
+            const fs = require("fs");
+            const { execSync } = require("child_process");
+            const tag = process.env.TAG;
+            const raw = execSync("git show origin/main:.claude-plugin/marketplace.json", { encoding: "utf8" });
+            const j = JSON.parse(raw);
+            const drift = [];
+            for (const entry of j.plugins) {
+              const s = entry.source;
+              if (s && typeof s === "object" && s.source === "git-subdir") {
+                if (s.ref !== tag) {
+                  drift.push(`${entry.name}: source.ref = ${s.ref}, expected ${tag}`);
+                }
+              }
+            }
+            if (drift.length) {
+              console.error("marketplace.json on main does not reference this tag:");
+              for (const d of drift) console.error("  " + d);
+              console.error("");
+              console.error("Run scripts/bump-version.ts as part of the release commit");
+              console.error("so source.ref is bumped on main before the tag is pushed.");
+              process.exit(1);
+            }
+            console.log("marketplace.json source.ref is " + tag + " for all git-subdir plugins");
+          '
 
       - name: Create GitHub release
         env:

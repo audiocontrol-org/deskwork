@@ -275,8 +275,14 @@ describe('hierarchical slugs', () => {
   });
 });
 
-describe('FilePath column', () => {
-  it('renders FilePath column only when at least one entry has it', () => {
+describe('FilePath column (Phase 19a — removed)', () => {
+  // Phase 19a dropped CalendarEntry.filePath. The renderer no longer
+  // emits a FilePath column, and the parser is column-tolerant: it
+  // ignores any `FilePath` column it sees in legacy hand-edited
+  // calendars without throwing. Path-encoding moved to frontmatter
+  // `id:` resolved through the content index.
+
+  it('renderer never emits a FilePath column', () => {
     const cal: EditorialCalendar = {
       entries: [
         {
@@ -292,30 +298,43 @@ describe('FilePath column', () => {
       distributions: [],
     };
     expect(renderCalendar(cal)).not.toContain('FilePath');
-    cal.entries[0].filePath = 'characters/alice.md';
-    const withPath = renderCalendar(cal);
-    expect(withPath).toContain('FilePath');
-    expect(withPath).toContain('characters/alice.md');
   });
 
-  it('round-trips filePath values', () => {
-    const cal: EditorialCalendar = {
-      entries: [
-        {
-          id: '77777777-7777-4777-8777-777777777777',
-          slug: 'characters/alice',
-          title: 'Alice',
-          description: 'a character',
-          stage: 'Drafting',
-          targetKeywords: [],
-          source: 'manual',
-          filePath: 'characters/alice.md',
-        },
-      ],
-      distributions: [],
-    };
-    const parsed = parseCalendar(renderCalendar(cal));
-    expect(parsed).toEqual(cal);
+  it('parser ignores a legacy FilePath column without throwing', () => {
+    const md = [
+      '# Editorial Calendar',
+      '',
+      '## Ideas',
+      '',
+      '| UUID | Slug | Title | Description | Keywords | FilePath | Source |',
+      '|------|------|------|------|------|------|------|',
+      '| 99999999-9999-4999-8999-999999999999 | legacy | Legacy | d | | characters/alice.md | manual |',
+      '',
+      '## Planned',
+      '',
+      '*No entries.*',
+      '',
+      '## Outlining',
+      '',
+      '*No entries.*',
+      '',
+      '## Drafting',
+      '',
+      '*No entries.*',
+      '',
+      '## Review',
+      '',
+      '*No entries.*',
+      '',
+      '## Published',
+      '',
+      '*No entries.*',
+    ].join('\n');
+    const cal = parseCalendar(md);
+    expect(cal.entries).toHaveLength(1);
+    expect(cal.entries[0].slug).toBe('legacy');
+    // The legacy column's value is silently dropped — no field exists
+    // on CalendarEntry to receive it.
   });
 
   it('legacy calendars without FilePath column read unchanged', () => {
@@ -349,7 +368,6 @@ describe('FilePath column', () => {
 `;
     const cal = parseCalendar(md);
     expect(cal.entries).toHaveLength(1);
-    expect(cal.entries[0].filePath).toBeUndefined();
   });
 });
 

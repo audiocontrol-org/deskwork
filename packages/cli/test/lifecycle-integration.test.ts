@@ -453,7 +453,7 @@ describe('hierarchical slugs', () => {
       .toBe(true);
   });
 
-  it('outline --layout flat writes <slug>.md and records filePath', () => {
+  it('outline --layout flat writes <slug>.md (Phase 19a: filePath no longer stored on calendar)', () => {
     run('deskwork-add', [project, '--slug', 'parent/leaf', 'Leaf']);
     run('deskwork-plan', [project, 'parent/leaf', 'kw']);
     const res = run('deskwork-outline', [
@@ -466,8 +466,14 @@ describe('hierarchical slugs', () => {
     expect(
       existsSync(join(project, 'src/sites/main/pages/blog/parent/leaf.md')),
     ).toBe(true);
-    const cal = readProjectCalendar(project);
-    expect(cal.entries[0].filePath).toBe('parent/leaf.md');
+    // The scaffolder still reports contentRelativePath in its JSON
+    // result for operator visibility, but the calendar no longer
+    // stores it (Phase 19c will rebind via frontmatter id + content
+    // index instead).
+    const scaffolded = (
+      res.json as { scaffolded?: { contentRelativePath?: string } }
+    ).scaffolded;
+    expect(scaffolded?.contentRelativePath).toBe('parent/leaf.md');
   });
 
   it('outline --layout readme writes <slug>/README.md', () => {
@@ -483,8 +489,10 @@ describe('hierarchical slugs', () => {
     expect(
       existsSync(join(project, 'src/sites/main/pages/blog/p/q/r/README.md')),
     ).toBe(true);
-    const cal = readProjectCalendar(project);
-    expect(cal.entries[0].filePath).toBe('p/q/r/README.md');
+    const scaffolded = (
+      res.json as { scaffolded?: { contentRelativePath?: string } }
+    ).scaffolded;
+    expect(scaffolded?.contentRelativePath).toBe('p/q/r/README.md');
   });
 
   it('outline rejects an unknown --layout value', () => {
@@ -498,6 +506,72 @@ describe('hierarchical slugs', () => {
     ]);
     expect(res.code).not.toBe(0);
     expect(res.stderr).toMatch(/--layout must be/);
+  });
+});
+
+describe('deskwork-pause / deskwork-resume (#27)', () => {
+  it('pauses an Outlining entry and resumes it back to Outlining', () => {
+    const project = bootstrapProject();
+    try {
+      run('deskwork-add', [project, 'Pause Test']);
+      run('deskwork-plan', [project, 'pause-test', 'kw']);
+      run('deskwork-outline', [project, 'pause-test']);
+
+      const pauseRes = run('deskwork-pause', [project, 'pause-test']);
+      expect(pauseRes.code).toBe(0);
+      expect(pauseRes.json).toMatchObject({
+        slug: 'pause-test',
+        stage: 'Paused',
+        pausedFrom: 'Outlining',
+      });
+
+      // Verify the on-disk calendar
+      let cal = readProjectCalendar(project);
+      expect(cal.entries[0].stage).toBe('Paused');
+      expect(cal.entries[0].pausedFrom).toBe('Outlining');
+
+      const resumeRes = run('deskwork-resume', [project, 'pause-test']);
+      expect(resumeRes.code).toBe(0);
+      expect(resumeRes.json).toMatchObject({
+        slug: 'pause-test',
+        stage: 'Outlining',
+      });
+
+      cal = readProjectCalendar(project);
+      expect(cal.entries[0].stage).toBe('Outlining');
+      expect(cal.entries[0].pausedFrom).toBeUndefined();
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses to pause a Published entry', () => {
+    const project = bootstrapProject();
+    try {
+      run('deskwork-add', [project, 'Already Shipped']);
+      run('deskwork-plan', [project, 'already-shipped', 'kw']);
+      run('deskwork-outline', [project, 'already-shipped']);
+      run('deskwork-draft', [project, 'already-shipped']);
+      run('deskwork-publish', [project, 'already-shipped']);
+
+      const res = run('deskwork-pause', [project, 'already-shipped']);
+      expect(res.code).not.toBe(0);
+      expect(res.stderr).toMatch(/non-terminal/);
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
+  });
+
+  it('refuses to resume a non-Paused entry', () => {
+    const project = bootstrapProject();
+    try {
+      run('deskwork-add', [project, 'Idle Idea']);
+      const res = run('deskwork-resume', [project, 'idle-idea']);
+      expect(res.code).not.toBe(0);
+      expect(res.stderr).toMatch(/only Paused/);
+    } finally {
+      rmSync(project, { recursive: true, force: true });
+    }
   });
 });
 

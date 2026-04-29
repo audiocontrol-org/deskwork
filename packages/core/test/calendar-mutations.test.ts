@@ -5,11 +5,15 @@ import {
   outlineEntry,
   draftEntry,
   publishEntry,
+  pauseEntry,
+  unpauseEntry,
   findEntry,
   addDistribution,
+  updateDistributionUrl,
   slugify,
 } from '../src/calendar-mutations.ts';
-import type { EditorialCalendar } from '../src/types.ts';
+import { parseCalendar, renderCalendar } from '../src/calendar.ts';
+import { PAUSABLE_STAGES, type EditorialCalendar } from '../src/types.ts';
 
 function emptyCalendar(): EditorialCalendar {
   return { entries: [], distributions: [] };
@@ -153,6 +157,113 @@ describe('publishEntry', () => {
   });
 });
 
+describe('pauseEntry / unpauseEntry (#27)', () => {
+  it('pauses from each non-terminal stage and resumes back to it', () => {
+    for (const targetStage of PAUSABLE_STAGES) {
+      const cal = emptyCalendar();
+      addEntry(cal, `Pause Me from ${targetStage}`);
+      const e = findEntry(cal, slugify(`Pause Me from ${targetStage}`))!;
+      e.stage = targetStage;
+
+      const paused = pauseEntry(cal, e.slug);
+      expect(paused.stage).toBe('Paused');
+      expect(paused.pausedFrom).toBe(targetStage);
+
+      const resumed = unpauseEntry(cal, e.slug);
+      expect(resumed.stage).toBe(targetStage);
+      expect(resumed.pausedFrom).toBeUndefined();
+    }
+  });
+
+  it('refuses to pause an already-Paused entry', () => {
+    const cal = emptyCalendar();
+    addEntry(cal, 'Already Paused');
+    pauseEntry(cal, 'already-paused');
+    expect(() => pauseEntry(cal, 'already-paused')).toThrow(/already Paused/);
+  });
+
+  it('refuses to pause a Published entry', () => {
+    const cal = emptyCalendar();
+    addEntry(cal, 'Shipped');
+    publishEntry(cal, 'shipped');
+    expect(() => pauseEntry(cal, 'shipped')).toThrow(/non-terminal stages/);
+  });
+
+  it('refuses to resume a non-Paused entry', () => {
+    const cal = emptyCalendar();
+    addEntry(cal, 'Idle');
+    expect(() => unpauseEntry(cal, 'idle')).toThrow(/only Paused/);
+  });
+
+  it('throws on unknown slug for both pause and resume', () => {
+    expect(() => pauseEntry(emptyCalendar(), 'missing')).toThrow(/No calendar entry/);
+    expect(() => unpauseEntry(emptyCalendar(), 'missing')).toThrow(/No calendar entry/);
+  });
+
+  it('refuses to resume when pausedFrom is missing (corrupt state)', () => {
+    const cal = emptyCalendar();
+    addEntry(cal, 'Hand Edit');
+    const e = findEntry(cal, 'hand-edit')!;
+    e.stage = 'Paused';
+    // pausedFrom intentionally absent — simulates a manually-edited
+    // calendar where the operator typed `Paused` without going
+    // through the mutation.
+    expect(() => unpauseEntry(cal, 'hand-edit')).toThrow(
+      /no pausedFrom/,
+    );
+  });
+
+  it('round-trips Paused + pausedFrom through parseCalendar / renderCalendar', () => {
+    const cal = emptyCalendar();
+    addEntry(cal, 'Drift Mid-Outline');
+    planEntry(cal, 'drift-mid-outline', ['x']);
+    outlineEntry(cal, 'drift-mid-outline');
+    pauseEntry(cal, 'drift-mid-outline');
+    const md = renderCalendar(cal);
+    expect(md).toContain('## Paused');
+    expect(md).toMatch(/PausedFrom/);
+    expect(md).toMatch(/Outlining/);
+
+    const parsed = parseCalendar(md);
+    const restored = parsed.entries.find((e) => e.slug === 'drift-mid-outline');
+    expect(restored?.stage).toBe('Paused');
+    expect(restored?.pausedFrom).toBe('Outlining');
+  });
+
+  it('parses legacy calendars (no Paused section) without breaking', () => {
+    const md = [
+      '# Editorial Calendar',
+      '',
+      '## Ideas',
+      '',
+      '*No entries.*',
+      '',
+      '## Planned',
+      '',
+      '*No entries.*',
+      '',
+      '## Outlining',
+      '',
+      '*No entries.*',
+      '',
+      '## Drafting',
+      '',
+      '*No entries.*',
+      '',
+      '## Review',
+      '',
+      '*No entries.*',
+      '',
+      '## Published',
+      '',
+      '*No entries.*',
+      '',
+    ].join('\n');
+    const cal = parseCalendar(md);
+    expect(cal.entries).toEqual([]);
+  });
+});
+
 describe('addDistribution', () => {
   it('appends a distribution record for a Published entry', () => {
     const cal = emptyCalendar();
@@ -191,5 +302,155 @@ describe('addDistribution', () => {
         dateShared: '2026-01-01',
       }),
     ).toThrow(/No calendar entry found/);
+  });
+
+  it('accepts an empty url at creation time (Phase 21a)', () => {
+    const cal = emptyCalendar();
+    addEntry(cal, 'EmptyUrl');
+    publishEntry(cal, 'emptyurl');
+    const rec = addDistribution(cal, {
+      slug: 'emptyurl',
+      platform: 'linkedin',
+      url: '',
+      dateShared: '2026-02-10',
+    });
+    expect(rec.url).toBe('');
+    expect(cal.distributions).toHaveLength(1);
+  });
+});
+
+describe('updateDistributionUrl (Phase 21a)', () => {
+  it('updates the URL on an existing record matched by slug + platform', () => {
+    const cal = emptyCalendar();
+    addEntry(cal, 'Existing');
+    publishEntry(cal, 'existing');
+    addDistribution(cal, {
+      slug: 'existing',
+      platform: 'linkedin',
+      url: '',
+      dateShared: '2026-03-01',
+    });
+
+    const updated = updateDistributionUrl(
+      cal,
+      { slug: 'existing', platform: 'linkedin' },
+      'https://linkedin.com/feed/update/abc',
+      '2026-03-05',
+    );
+    expect(updated.url).toBe('https://linkedin.com/feed/update/abc');
+    expect(updated.dateShared).toBe('2026-03-05');
+    expect(cal.distributions).toHaveLength(1);
+  });
+
+  it('matches by entryId in preference to slug', () => {
+    const cal = emptyCalendar();
+    const entry = addEntry(cal, 'Stable Id');
+    publishEntry(cal, 'stable-id');
+    if (entry.id === undefined) throw new Error('entry.id missing');
+    addDistribution(cal, {
+      entryId: entry.id,
+      slug: 'stable-id',
+      platform: 'reddit',
+      channel: 'synthdiy',
+      url: '',
+      dateShared: '2026-04-01',
+    });
+
+    const updated = updateDistributionUrl(
+      cal,
+      { entryId: entry.id, platform: 'reddit', channel: 'synthdiy' },
+      'https://reddit.com/r/synthdiy/post',
+    );
+    expect(updated.url).toBe('https://reddit.com/r/synthdiy/post');
+    expect(cal.distributions).toHaveLength(1);
+  });
+
+  it('creates a new record when none exists yet', () => {
+    const cal = emptyCalendar();
+    addEntry(cal, 'Fresh Distribution');
+    publishEntry(cal, 'fresh-distribution');
+
+    const created = updateDistributionUrl(
+      cal,
+      { slug: 'fresh-distribution', platform: 'linkedin' },
+      'https://linkedin.com/post/xyz',
+      '2026-05-10',
+      'first share',
+    );
+    expect(created.url).toBe('https://linkedin.com/post/xyz');
+    expect(created.dateShared).toBe('2026-05-10');
+    expect(created.notes).toBe('first share');
+    expect(cal.distributions).toHaveLength(1);
+    // entryId got stamped from the calendar entry.
+    expect(created.entryId).toBeDefined();
+    expect(created.entryId?.length).toBeGreaterThan(0);
+  });
+
+  it('compares channels case-insensitively', () => {
+    const cal = emptyCalendar();
+    addEntry(cal, 'Channel Match');
+    publishEntry(cal, 'channel-match');
+    addDistribution(cal, {
+      slug: 'channel-match',
+      platform: 'reddit',
+      channel: 'SynthDIY',
+      url: '',
+      dateShared: '2026-06-01',
+    });
+
+    const updated = updateDistributionUrl(
+      cal,
+      { slug: 'channel-match', platform: 'reddit', channel: 'synthdiy' },
+      'https://reddit.com/r/SynthDIY/x',
+    );
+    expect(updated.url).toBe('https://reddit.com/r/SynthDIY/x');
+    expect(cal.distributions).toHaveLength(1);
+  });
+
+  it('only updates fields that are explicitly supplied', () => {
+    const cal = emptyCalendar();
+    addEntry(cal, 'Selective Update');
+    publishEntry(cal, 'selective-update');
+    addDistribution(cal, {
+      slug: 'selective-update',
+      platform: 'linkedin',
+      url: 'https://old.example/url',
+      dateShared: '2026-07-01',
+      notes: 'original notes',
+    });
+
+    // Only url and dateShared supplied — notes must remain.
+    const updated = updateDistributionUrl(
+      cal,
+      { slug: 'selective-update', platform: 'linkedin' },
+      'https://new.example/url',
+      '2026-07-15',
+    );
+    expect(updated.url).toBe('https://new.example/url');
+    expect(updated.dateShared).toBe('2026-07-15');
+    expect(updated.notes).toBe('original notes');
+  });
+
+  it('throws when neither entryId nor slug is supplied', () => {
+    const cal = emptyCalendar();
+    expect(() =>
+      updateDistributionUrl(
+        cal,
+        { platform: 'linkedin' },
+        'https://x',
+      ),
+    ).toThrow(/entryId or slug is required/);
+  });
+
+  it('rejects creation when the entry is not Published (defers to addDistribution)', () => {
+    const cal = emptyCalendar();
+    addEntry(cal, 'Not Yet Published');
+    expect(() =>
+      updateDistributionUrl(
+        cal,
+        { slug: 'not-yet-published', platform: 'linkedin' },
+        'https://x',
+      ),
+    ).toThrow(/must be Published/);
   });
 });

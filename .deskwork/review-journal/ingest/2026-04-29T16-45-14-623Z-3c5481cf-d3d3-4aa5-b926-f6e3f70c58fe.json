@@ -1,0 +1,16 @@
+{
+  "id": "3c5481cf-d3d3-4aa5-b926-f6e3f70c58fe",
+  "timestamp": "2026-04-29T16:45:14.623Z",
+  "event": "ingest",
+  "slug": "release-skill-design",
+  "entryId": "3c5481cf-d3d3-4aa5-b926-f6e3f70c58fe",
+  "site": "deskwork-internal",
+  "stage": "Drafting",
+  "sourceFile": "docs/superpowers/specs/2026-04-29-release-skill-design.md",
+  "frontmatterSnapshot": {},
+  "derivation": {
+    "slug": "path",
+    "state": "explicit",
+    "date": "mtime"
+  }
+}

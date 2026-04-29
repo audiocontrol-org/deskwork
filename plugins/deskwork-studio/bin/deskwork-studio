@@ -1,53 +1,22 @@
 #!/usr/bin/env bash
 #
-# deskwork-studio — wrapper that locates and runs @deskwork/studio.
+# deskwork-studio — thin wrapper around @deskwork/studio.
 #
-# Resolution order (first match wins):
-#   1. Workspace-linked binary (`node_modules/.bin/deskwork-studio`) —
-#      the dev path; runs source via tsx, supports edits without rebuild.
-#   2. Self-contained ESM bundle inside the plugin tree at
-#      `bundle/server.mjs` — committed to git and shipped verbatim by
-#      the Claude Code marketplace install (which copies plugins/<name>/
-#      only). Runs via plain `node`, no `npm install` step required.
-#   3. Loud error.
+# All logic (workspace-bin lookup, first-run install with lock, partial-
+# install recovery, exec dispatch) lives in the shared bash runtime at
+# vendor/cli-bin-lib/install-lock.sh — see that file's header for the
+# detailed behavior contract. This wrapper exists only to bind the bin
+# name + plugin root and forward the operator's args.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-# (1) Workspace symlink — fastest, supports source-level edits.
-workspace_candidates=(
-  "${SCRIPT_DIR}/../../../node_modules/.bin/deskwork-studio"
-  "${SCRIPT_DIR}/../node_modules/.bin/deskwork-studio"
-  "${SCRIPT_DIR}/../../node_modules/.bin/deskwork-studio"
-)
-for candidate in "${workspace_candidates[@]}"; do
-  if [ -x "$candidate" ]; then
-    exec "$candidate" "$@"
-  fi
-done
+# shellcheck source=../vendor/cli-bin-lib/install-lock.sh
+source "${PLUGIN_ROOT}/vendor/cli-bin-lib/install-lock.sh"
 
-# (2) Plugin-internal bundle — sits next to bin/ and public/ so the
-# marketplace install payload is self-contained.
-bundle="${SCRIPT_DIR}/../bundle/server.mjs"
-if [ -f "$bundle" ]; then
-  exec node "$bundle" "$@"
-fi
-
-# (3) Nothing found.
-cat >&2 <<EOF
-deskwork-studio: cannot locate the @deskwork/studio binary or bundle.
-
-Looked for workspace bin in:
-  ${workspace_candidates[0]}
-  ${workspace_candidates[1]}
-  ${workspace_candidates[2]}
-
-Looked for bundle at:
-  ${bundle}
-
-If you cloned the deskwork repo manually, run 'npm install' at the repo
-root to populate node_modules/.bin/, or run 'npm --workspace packages/studio
-run build' to produce the bundle.
-EOF
-exit 127
+run_with_install_lock \
+  --bin-name "deskwork-studio" \
+  --plugin-root "${PLUGIN_ROOT}" \
+  -- "$@"

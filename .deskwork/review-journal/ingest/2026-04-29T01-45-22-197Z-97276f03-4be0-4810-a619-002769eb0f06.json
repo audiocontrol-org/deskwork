@@ -1,0 +1,16 @@
+{
+  "id": "97276f03-4be0-4810-a619-002769eb0f06",
+  "timestamp": "2026-04-29T01:45:22.197Z",
+  "event": "ingest",
+  "slug": "dogfood-v086-test",
+  "entryId": "97276f03-4be0-4810-a619-002769eb0f06",
+  "site": "deskwork-internal",
+  "stage": "Ideas",
+  "sourceFile": "docs/dogfood-v086-test.md",
+  "frontmatterSnapshot": {},
+  "derivation": {
+    "slug": "path",
+    "state": "default",
+    "date": "mtime"
+  }
+}

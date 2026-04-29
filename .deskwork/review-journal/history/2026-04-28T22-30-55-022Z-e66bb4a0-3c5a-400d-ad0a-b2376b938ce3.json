@@ -1,0 +1,18 @@
+{
+  "id": "e66bb4a0-3c5a-400d-ad0a-b2376b938ce3",
+  "timestamp": "2026-04-28T22:30:55.022Z",
+  "entry": {
+    "kind": "annotation",
+    "at": "2026-04-28T22:30:55.022Z",
+    "annotation": {
+      "type": "address",
+      "workflowId": "4180c05e-c6a3-4b3d-8fc1-2100492c3f38",
+      "commentId": "70d3c466-baaf-4e72-882d-241f7930d4ab",
+      "version": 2,
+      "disposition": "addressed",
+      "reason": "Replaced the prescriptive 'defaultSite → defaultCollection' rename with an explicit 'open question' that lays out three candidate treatments (rename / eliminate / re-term) and defers the decision to Phase 10. Doctor-rule and test bullets updated to reflect the deferred decision.",
+      "id": "e66bb4a0-3c5a-400d-ad0a-b2376b938ce3",
+      "createdAt": "2026-04-28T22:30:55.022Z"
+    }
+  }
+}

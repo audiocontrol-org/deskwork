@@ -9,14 +9,12 @@
  * (which honors the site's blogFilenameTemplate config).
  */
 
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import type { DeskworkConfig } from '../config.ts';
-import { resolveBlogFilePath } from '../paths.ts';
 import type { DraftAnnotation, DraftWorkflowState } from './types.ts';
 import {
   appendAnnotation,
   appendVersion,
-  createWorkflow,
   mintAnnotation,
   readAnnotations,
   readVersions,
@@ -24,19 +22,11 @@ import {
   readWorkflows,
   transitionState,
 } from './pipeline.ts';
+import { workflowFilePath } from './start-handlers.ts';
+import { err, ok, type HandlerResult } from './result.ts';
 
-export interface HandlerResult {
-  status: number;
-  body: unknown;
-}
-
-function err(status: number, message: string): HandlerResult {
-  return { status, body: { error: message } };
-}
-
-function ok(body: unknown): HandlerResult {
-  return { status: 200, body };
-}
+export type { HandlerResult } from './result.ts';
+export { handleStartLongform, handleStartShortform } from './start-handlers.ts';
 
 // Distribute Omit over the union so `Extract` on the `type` discriminant
 // still works. Plain `Omit<Union, K>` collapses the union into a single
@@ -302,19 +292,31 @@ export function handleCreateVersion(
   const diff = lineDiff(before.markdown, d.afterMarkdown);
 
   // SSOT: the markdown file on disk IS the article. Write disk first,
-  // then snapshot to the journal. Longform and outline both live on disk;
-  // shortform has no separate file (workflow markdown is canonical).
-  if (workflow.contentKind === 'longform' || workflow.contentKind === 'outline') {
-    const blogFile = resolveBlogFilePath(projectRoot, config, workflow.site, workflow.slug);
-    if (!existsSync(blogFile)) {
+  // then snapshot to the journal. All content kinds (longform, outline,
+  // shortform) are disk-backed — Phase 21a removed the shortform special
+  // case so the studio's save/iterate/approve handlers see one shape.
+  //
+  // Resolve via the content index first (so writingcontrol-shaped layouts
+  // where slug != fs path work), with template fallback for legacy
+  // / pre-doctor cases. For shortform, the path goes through
+  // resolveShortformFilePath (entry-dir + scrapbook/shortform/<…>.md).
+  const targetFile = workflowFilePath(projectRoot, config, workflow);
+  if (targetFile === undefined || !existsSync(targetFile)) {
+    const shown = targetFile ?? '(unresolved)';
+    if (workflow.contentKind === 'shortform') {
       return err(
         500,
-        `cannot save: blog file missing at ${blogFile}. ` +
-          `Scaffold the post with /deskwork:outline before saving edits.`,
+        `cannot save: shortform file missing at ${shown}. ` +
+          `Run /deskwork:shortform-start to scaffold the file before saving edits.`,
       );
     }
-    writeFileSync(blogFile, d.afterMarkdown, 'utf-8');
+    return err(
+      500,
+      `cannot save: blog file missing at ${shown}. ` +
+        `Scaffold the post with /deskwork:outline before saving edits.`,
+    );
   }
+  writeFileSync(targetFile, d.afterMarkdown, 'utf-8');
 
   const version = appendVersion(projectRoot, config, d.workflowId, d.afterMarkdown, 'operator');
   const annotation = mintAnnotation({
@@ -326,66 +328,6 @@ export function handleCreateVersion(
   });
   appendAnnotation(projectRoot, config, annotation);
   return ok({ version, annotation });
-}
-
-interface StartLongformBody {
-  site: string;
-  slug: string;
-  /** Optional stable id of the calendar entry — stamped onto the workflow. */
-  entryId?: string;
-}
-
-const SLUG_RE = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
-
-/**
- * Enqueue a longform draft review from the studio dashboard. Reads the
- * blog post markdown from disk (honoring blogFilenameTemplate) and calls
- * createWorkflow. Idempotent on (entryId | (site, slug), 'longform').
- */
-export function handleStartLongform(
-  projectRoot: string,
-  config: DeskworkConfig,
-  body: unknown,
-): HandlerResult {
-  if (!body || typeof body !== 'object') return err(400, 'expected JSON object body');
-  const b = body as Partial<StartLongformBody>;
-  if (!b.site) return err(400, 'site is required');
-  if (!(b.site in config.sites)) {
-    const known = Object.keys(config.sites).join(', ');
-    return err(400, `unknown site: ${b.site}. Configured: ${known}`);
-  }
-  if (!b.slug || typeof b.slug !== 'string') return err(400, 'slug is required');
-  if (!SLUG_RE.test(b.slug)) {
-    return err(400, `invalid slug: ${b.slug}. Must match ${SLUG_RE}`);
-  }
-
-  const path = resolveBlogFilePath(projectRoot, config, b.site, b.slug);
-  if (!existsSync(path)) {
-    return err(404, `blog draft not found at ${path}`);
-  }
-
-  const markdown = readFileSync(path, 'utf-8');
-  const before = readWorkflows(projectRoot, config).find((w) => {
-    const identityMatch =
-      b.entryId && w.entryId
-        ? w.entryId === b.entryId
-        : w.site === b.site && w.slug === b.slug;
-    return (
-      identityMatch &&
-      w.contentKind === 'longform' &&
-      w.state !== 'applied' &&
-      w.state !== 'cancelled'
-    );
-  });
-  const workflow = createWorkflow(projectRoot, config, {
-    site: b.site,
-    slug: b.slug,
-    ...(b.entryId !== undefined ? { entryId: b.entryId } : {}),
-    contentKind: 'longform',
-    initialMarkdown: markdown,
-    initialOriginatedBy: 'agent',
-  });
-  return ok({ workflow, existing: !!before && before.id === workflow.id });
 }
 
 /**

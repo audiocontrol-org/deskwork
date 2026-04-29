@@ -1,6 +1,6 @@
 {
   "name": "@deskwork/studio",
-  "version": "0.1.0",
+  "version": "0.9.4",
   "private": true,
   "type": "module",
   "description": "Editorial review studio — local web UI for the deskwork plugin",
@@ -16,10 +16,12 @@
   "bin": {
     "deskwork-studio": "./src/server.ts"
   },
+  "exports": {
+    "./server.ts": "./src/server.ts",
+    "./pages/*": "./src/pages/*"
+  },
   "scripts": {
-    "build": "tsx build.ts",
-    "prepare": "npm run build",
-    "test": "npm run build && vitest run",
+    "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },

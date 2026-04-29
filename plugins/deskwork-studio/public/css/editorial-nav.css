@@ -1,0 +1,435 @@
+/*
+ * editorial-nav.css — folio strip + studio index (TOC) styles.
+ *
+ * Phase 17. Loaded alongside editorial-review.css on every studio page.
+ * Reuses the existing --er-* tokens — no new design variables introduced.
+ *
+ * Scoped under [data-review-ui] to match the rest of the editorial-print
+ * surface; that way the chrome doesn't leak into pages mounted inside a
+ * production layout (cf. the longform review's iframe-equivalent shell).
+ *
+ * Two surfaces:
+ *   - .er-folio*       — sticky cross-page nav at the top of every page
+ *   - .er-toc-*        — the studio index page at /dev/
+ */
+
+/* ============================================================
+   FOLIO — running-head strip atop every studio page
+   ============================================================
+   Reads like the top edge of a printed magazine page: publication
+   name at left, sections in the middle, volume/folio at the right.
+
+   Active state: red-pencil tick mark above the link — like an
+   editor circled where you are. NOT a UI selected state, an
+   editorial mark. The tick is irregular (skewed transform) so
+   it doesn't read as a generic underline.
+   ============================================================ */
+
+[data-review-ui] .er-folio {
+  border-bottom: var(--er-rule-double);
+  background: var(--er-paper);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+[data-review-ui] .er-folio-inner {
+  max-width: var(--er-container-wide);
+  margin: 0 auto;
+  padding: var(--er-space-1) var(--er-space-4);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--er-space-3);
+  min-height: 2.4rem;
+}
+
+[data-review-ui] .er-folio-name {
+  font-family: var(--er-font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--er-ink);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+[data-review-ui] .er-folio-name em {
+  font-style: normal;
+  color: var(--er-red-pencil);
+  letter-spacing: 0.32em;
+  font-weight: 600;
+}
+
+[data-review-ui] .er-folio-spine {
+  font-family: var(--er-font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: lowercase;
+  color: var(--er-faded);
+  white-space: nowrap;
+  font-feature-settings: "tnum";
+}
+
+[data-review-ui] .er-folio-spine b {
+  font-weight: 500;
+  color: var(--er-ink-soft);
+}
+
+[data-review-ui] .er-folio-nav {
+  display: flex;
+  justify-content: center;
+  gap: 0;
+  align-items: baseline;
+}
+
+[data-review-ui] .er-folio-nav a {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 28, "wght" 400, "SOFT" 30;
+  font-size: 0.95rem;
+  color: var(--er-ink);
+  text-decoration: none;
+  padding: 0.3rem 0.85rem;
+  letter-spacing: 0.005em;
+  position: relative;
+  transition: color 0.16s ease;
+}
+
+[data-review-ui] .er-folio-nav a:hover {
+  color: var(--er-red-pencil);
+}
+
+/* Leader dots between nav items — the typeset way to separate
+   contents-list entries on a printed page. */
+[data-review-ui] .er-folio-nav a:not(:last-child)::after {
+  content: '·';
+  position: absolute;
+  right: -0.15rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--er-faded-2);
+  font-size: 1rem;
+  pointer-events: none;
+}
+
+/* Active link: red-pencil tick mark drawn above. The mark is a
+   short irregular curve (rendered via ::before with a skewed
+   border) — reads like an editor circled where you are. */
+[data-review-ui] .er-folio-nav a.active {
+  color: var(--er-red-pencil);
+  font-variation-settings: "opsz" 28, "wght" 500, "SOFT" 30;
+}
+
+[data-review-ui] .er-folio-nav a.active::before {
+  content: '';
+  position: absolute;
+  left: 0.85rem;
+  right: 0.85rem;
+  top: -0.1rem;
+  height: 4px;
+  border-bottom: 1.5px solid var(--er-red-pencil);
+  border-right: 1.5px solid var(--er-red-pencil);
+  transform: skewX(-12deg) rotate(-1deg);
+  border-bottom-right-radius: 60% 90%;
+  border-bottom-left-radius: 30% 80%;
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+/* On narrow viewports, collapse the spine and condense */
+@media (max-width: 720px) {
+  [data-review-ui] .er-folio-inner {
+    grid-template-columns: auto 1fr;
+    padding: var(--er-space-1) var(--er-space-2);
+  }
+  [data-review-ui] .er-folio-spine { display: none; }
+  [data-review-ui] .er-folio-nav a {
+    padding: 0.3rem 0.5rem;
+    font-size: 0.85rem;
+  }
+}
+
+/* ============================================================
+   TOC — studio index at /dev/
+   ============================================================
+   Reads like the TOC spread of a pressed volume. Roman numerals,
+   leader dots, route paths in mono on the right (the "page
+   numbers"). Section heads use small caps and a red-pencil
+   ornament. Italic descriptions hang below each entry.
+   ============================================================ */
+
+[data-review-ui] .er-toc-page {
+  max-width: var(--er-container-narrow);
+  margin: 0 auto;
+  padding: var(--er-space-6) var(--er-space-4) var(--er-space-6);
+}
+
+/* CSF-3 (cross-surface audit v0.5.0): the studio index's page head
+ * is the unified `er-pagehead--centered` with a `--toc` modifier that
+ * adds the pressed-ornament rule treatment unique to the index's
+ * title page. The legacy `er-toc-head*` class names remain as styled
+ * aliases — pages already in flight that emit them keep their look. */
+[data-review-ui] .er-pagehead--toc,
+[data-review-ui] .er-toc-head {
+  text-align: center;
+  padding: var(--er-space-3) 0 var(--er-space-4);
+  margin-bottom: var(--er-space-5);
+  border-bottom: var(--er-rule-double);
+  border-top: 0;
+  position: relative;
+}
+
+/* The little pressed ornament between rules — gives the head
+   the gravitas of a volume's title page. */
+[data-review-ui] .er-pagehead--toc::after,
+[data-review-ui] .er-toc-head::after {
+  content: '❦';
+  position: absolute;
+  bottom: -0.65rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--er-paper);
+  padding: 0 0.6rem;
+  color: var(--er-red-pencil);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+[data-review-ui] .er-toc-head__kicker {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  margin-bottom: var(--er-space-2);
+}
+
+[data-review-ui] .er-toc-head__kicker em {
+  font-style: normal;
+  color: var(--er-red-pencil);
+}
+
+[data-review-ui] .er-toc-head__title {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 144, "wght" 400, "SOFT" 0;
+  font-size: clamp(3rem, 7vw, 5.5rem);
+  line-height: 0.95;
+  letter-spacing: -0.022em;
+  margin: 0;
+  color: var(--er-ink);
+}
+
+[data-review-ui] .er-toc-head__title em {
+  font-style: italic;
+  font-variation-settings: "opsz" 144, "wght" 400, "SOFT" 100;
+}
+
+[data-review-ui] .er-toc-head__deck {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-variation-settings: "opsz" 48, "wght" 400;
+  font-size: 1.15rem;
+  color: var(--er-ink-soft);
+  margin: var(--er-space-2) auto 0;
+  max-width: 36rem;
+  line-height: 1.45;
+}
+
+/* When the unified pagehead is used inside the toc page, narrow the
+ * deck to the same 36rem the original used. */
+[data-review-ui] .er-pagehead--toc .er-pagehead__deck {
+  max-width: 36rem;
+}
+
+/* CSF-9 (cross-surface audit v0.5.0): the studio index's er-toc-list
+ * and the manual's eh-toc are conceptually the same component (TOC
+ * with leader dots and right-aligned page numbers / route paths).
+ * They differ in markup (cross-page list vs in-page anchor list) and
+ * in visual pitch (display title scale here vs body-copy scale in the
+ * manual), but both consume the same --er-* tokens. Future work can
+ * consolidate the markup if the visual pitch difference disappears.
+ * For now, both surfaces document the shared semantics here. */
+
+/* Sections — small caps with red-pencil ornament */
+[data-review-ui] .er-toc-section {
+  margin-bottom: var(--er-space-5);
+}
+
+[data-review-ui] .er-toc-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--er-space-2);
+  margin-bottom: var(--er-space-3);
+  padding-bottom: var(--er-space-1);
+  border-bottom: var(--er-rule-thin);
+}
+
+[data-review-ui] .er-toc-section-head__ornament {
+  color: var(--er-red-pencil);
+  font-family: var(--er-font-display);
+  font-size: 1rem;
+  line-height: 1;
+}
+
+[data-review-ui] .er-toc-section-head__name {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 36, "wght" 500;
+  font-size: 0.85rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--er-ink);
+}
+
+[data-review-ui] .er-toc-section-head__count {
+  margin-left: auto;
+  font-family: var(--er-font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+}
+
+[data-review-ui] .er-toc-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+[data-review-ui] .er-toc-entry {
+  padding: var(--er-space-2) 0;
+  border-bottom: 1px dotted var(--er-faded-2);
+}
+
+[data-review-ui] .er-toc-entry:last-child { border-bottom: none; }
+
+[data-review-ui] .er-toc-entry__row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: var(--er-space-2);
+  margin-bottom: 0.2rem;
+}
+
+[data-review-ui] .er-toc-entry__num {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 24, "wght" 500;
+  font-style: italic;
+  font-size: 0.95rem;
+  color: var(--er-faded);
+  width: 2.4rem;
+  text-align: right;
+  letter-spacing: 0.04em;
+}
+
+[data-review-ui] .er-toc-entry__title {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 36, "wght" 500;
+  font-size: 1.25rem;
+  color: var(--er-ink);
+  text-decoration: none;
+  letter-spacing: -0.005em;
+  transition: color 0.14s ease;
+  position: relative;
+}
+
+[data-review-ui] .er-toc-entry__title:hover {
+  color: var(--er-red-pencil);
+}
+
+[data-review-ui] .er-toc-entry__title em {
+  font-style: italic;
+  font-variation-settings: "opsz" 36, "wght" 500, "SOFT" 80;
+}
+
+[data-review-ui] .er-toc-entry__route {
+  font-family: var(--er-font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: var(--er-ink-soft);
+  white-space: nowrap;
+  font-feature-settings: "tnum";
+}
+
+[data-review-ui] .er-toc-entry__route.is-template {
+  color: var(--er-faded);
+}
+
+[data-review-ui] .er-toc-entry__route.is-template em {
+  font-style: italic;
+  color: var(--er-red-pencil);
+  opacity: 0.75;
+}
+
+/* Italic description hangs below the title — like a line of
+   editorial footing in a TOC. Indented to align under title. */
+[data-review-ui] .er-toc-entry__desc {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-variation-settings: "opsz" 24, "wght" 400;
+  font-size: 0.95rem;
+  color: var(--er-ink-soft);
+  margin: 0 0 0 calc(2.4rem + var(--er-space-2));
+  max-width: 38rem;
+  line-height: 1.5;
+}
+
+[data-review-ui] .er-toc-entry__hint {
+  display: inline-block;
+  margin-left: 0.45rem;
+  font-family: var(--er-font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  font-style: normal;
+  padding: 0.05em 0.3em;
+  background: var(--er-paper-2);
+  border-radius: 2px;
+  vertical-align: 1px;
+}
+
+/* Colophon at the bottom of the TOC — like the imprint page
+   of a printed volume. */
+[data-review-ui] .er-toc-colophon {
+  margin-top: var(--er-space-6);
+  padding-top: var(--er-space-4);
+  border-top: var(--er-rule-thin);
+  text-align: center;
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-size: 0.85rem;
+  color: var(--er-faded);
+  line-height: 1.6;
+}
+
+[data-review-ui] .er-toc-colophon__rule {
+  display: block;
+  margin: var(--er-space-1) auto 0;
+  max-width: 8rem;
+  border-top: 1px solid var(--er-faded-2);
+  position: relative;
+}
+
+[data-review-ui] .er-toc-colophon__rule::after {
+  content: '·';
+  position: absolute;
+  top: -0.7rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--er-paper);
+  color: var(--er-faded);
+  padding: 0 0.4rem;
+}
+
+/* Page-load entrance — staggered, restrained. Reads like
+   sections of a folded-over page settling into place. */
+@keyframes er-toc-settle {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+[data-review-ui] .er-toc-section { animation: er-toc-settle 0.5s ease backwards; }
+[data-review-ui] .er-toc-section:nth-of-type(1) { animation-delay: 0.04s; }
+[data-review-ui] .er-toc-section:nth-of-type(2) { animation-delay: 0.10s; }
+[data-review-ui] .er-toc-section:nth-of-type(3) { animation-delay: 0.16s; }
+[data-review-ui] .er-toc-section:nth-of-type(4) { animation-delay: 0.22s; }

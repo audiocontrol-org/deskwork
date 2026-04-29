@@ -1,0 +1,22 @@
+{
+  "id": "70d3c466-baaf-4e72-882d-241f7930d4ab",
+  "timestamp": "2026-04-28T22:09:23.856Z",
+  "entry": {
+    "kind": "annotation",
+    "at": "2026-04-28T22:09:23.856Z",
+    "annotation": {
+      "type": "comment",
+      "workflowId": "4180c05e-c6a3-4b3d-8fc1-2100492c3f38",
+      "version": 1,
+      "range": {
+        "start": 5201,
+        "end": 5232
+      },
+      "text": "Why do we need a default collection?",
+      "category": "other",
+      "anchor": "defaultSite → defaultCollection",
+      "id": "70d3c466-baaf-4e72-882d-241f7930d4ab",
+      "createdAt": "2026-04-28T22:09:23.856Z"
+    }
+  }
+}

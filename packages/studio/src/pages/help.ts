@@ -24,10 +24,11 @@ import {
   KIND_LABEL,
   SKILLS_SORTED,
   type Skill,
-} from '../../../../plugins/deskwork-studio/public/src/editorial-skills-catalogue.ts';
+} from '../lib/editorial-skills-catalogue.ts';
 import type { StudioContext } from '../routes/api.ts';
 import { html, unsafe, type RawHtml } from './html.ts';
 import { layout } from './layout.ts';
+import { renderEditorialFolio } from './chrome.ts';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -43,17 +44,17 @@ function renderCover(ctx: StudioContext, now: Date): RawHtml {
     .map((s) => s.host)
     .join(' · ');
   return unsafe(html`
-    <header class="eh-cover">
-      <p class="eh-cover-kicker">
+    <header class="er-pagehead er-pagehead--centered eh-cover">
+      <p class="er-pagehead__kicker eh-cover-kicker">
         Vol. 01 <span class="dot">·</span> Manual <span class="dot">·</span> Internal — for operators
       </p>
-      <h1 class="eh-cover-title">
+      <h1 class="er-pagehead__title eh-cover-title">
         The Compositor's <em>Manual</em>
       </h1>
-      <p class="eh-cover-dek">
+      <p class="er-pagehead__deck eh-cover-dek">
         Everything you need to move a thought from notebook to published dispatch without asking a colleague. The editorial calendar, the review pipelines, the skills that drive them, and the desk where you watch the whole thing happen.
       </p>
-      <p class="eh-imprint">
+      <p class="er-pagehead__imprint eh-imprint">
         <strong>Sites</strong><span>${sitesInline || ctx.projectRoot}</span>
         <span class="sep">§</span>
         <strong>Issued</strong><span>${formatIssueDate(now)}</span>
@@ -428,6 +429,7 @@ function renderColophon(): RawHtml {
 export function renderHelpPage(ctx: StudioContext): string {
   const now = ctx.now ? ctx.now() : new Date();
   const body = html`
+    ${renderEditorialFolio('manual', "compositor's manual")}
     <a class="eh-back" href="/dev/editorial-studio">back to the studio</a>
     <div class="eh-rail" aria-hidden="true"></div>
     <div class="eh-container">
@@ -445,6 +447,7 @@ export function renderHelpPage(ctx: StudioContext): string {
     title: "The Compositor's Manual — Editorial Calendar — dev",
     cssHrefs: [
       '/static/css/editorial-review.css',
+      '/static/css/editorial-nav.css',
       '/static/css/editorial-help.css',
     ],
     bodyAttrs: 'data-review-ui="manual"',

@@ -1,5 +1,15 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  rmSync,
+} from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import {
+  findEntryFile,
+  resolveShortformFilePath,
   resolveSite,
   resolveCalendarPath,
   resolveChannelsPath,
@@ -7,6 +17,7 @@ import {
   resolveSiteHost,
   resolveSiteBaseUrl,
 } from '../src/paths.ts';
+import type { ContentIndex } from '../src/content-index.ts';
 import type { DeskworkConfig } from '../src/config.ts';
 
 const singleSite: DeskworkConfig = {
@@ -120,6 +131,196 @@ describe('resolveSiteBaseUrl', () => {
   it('builds a canonical https URL with trailing slash', () => {
     expect(resolveSiteBaseUrl(multiSite, 'audiocontrol')).toBe(
       'https://audiocontrol.org/',
+    );
+  });
+});
+
+describe('findEntryFile (Phase 19c)', () => {
+  // findEntryFile precedence:
+  //   1. Index byId hit → that absolute path.
+  //   2. Legacy fallback (when entry passed) → template-driven path.
+  //   3. Otherwise → undefined.
+
+  let root: string;
+  const cfg: DeskworkConfig = {
+    version: 1,
+    sites: {
+      wc: {
+        host: 'wc.example',
+        contentDir: 'src/content/projects',
+        calendarPath: 'docs/cal.md',
+      },
+    },
+    defaultSite: 'wc',
+  };
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'deskwork-find-entry-'));
+  });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it('returns the indexed path when entry id is in the byId map', () => {
+    const id = '11111111-2222-4333-8444-555555555555';
+    const abs = '/some/abs/path/projects/the-outbound/index.md';
+    const idx: ContentIndex = {
+      byId: new Map([[id, abs]]),
+      byPath: new Map([['the-outbound/index.md', id]]),
+      invalid: [],
+    };
+    expect(findEntryFile(root, cfg, 'wc', id, idx)).toBe(abs);
+  });
+
+  it('returns undefined when id is missing AND no fallback entry passed', () => {
+    const idx: ContentIndex = {
+      byId: new Map(),
+      byPath: new Map(),
+      invalid: [],
+    };
+    expect(findEntryFile(root, cfg, 'wc', 'no-such-id', idx)).toBeUndefined();
+  });
+
+  it('falls back to slug-template when entry is passed and id is unknown', () => {
+    const idx: ContentIndex = {
+      byId: new Map(),
+      byPath: new Map(),
+      invalid: [],
+    };
+    const result = findEntryFile(root, cfg, 'wc', '', idx, { slug: 'my-post' });
+    expect(result).toBe(join(root, 'src/content/projects/my-post/index.md'));
+  });
+
+  it('builds the index on demand when none is passed', () => {
+    // Lay down a real fixture file with frontmatter id; let
+    // findEntryFile build the index.
+    const id = '99999999-aaaa-4bbb-8ccc-dddddddddddd';
+    const abs = join(root, 'src/content/projects/the-outbound/index.md');
+    mkdirSync(join(abs, '..'), { recursive: true });
+    writeFileSync(
+      abs,
+      `---\ndeskwork:\n  id: ${id}\ntitle: The Outbound\n---\n\n# The Outbound\n`,
+    );
+    expect(findEntryFile(root, cfg, 'wc', id)).toBe(abs);
+  });
+});
+
+describe('resolveShortformFilePath (Phase 21a)', () => {
+  let root: string;
+  const cfg: DeskworkConfig = {
+    version: 1,
+    sites: {
+      wc: {
+        host: 'wc.example',
+        contentDir: 'src/content/blog',
+        calendarPath: 'docs/cal.md',
+      },
+    },
+    defaultSite: 'wc',
+  };
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'deskwork-shortform-path-'));
+  });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it('returns <entry-dir>/scrapbook/shortform/<platform>.md when no channel', () => {
+    const id = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+    const entryFile = join(root, 'src/content/blog/my-post/index.md');
+    mkdirSync(join(entryFile, '..'), { recursive: true });
+    writeFileSync(
+      entryFile,
+      `---\ndeskwork:\n  id: ${id}\ntitle: My Post\n---\n\n# My Post\n`,
+    );
+
+    const out = resolveShortformFilePath(
+      root,
+      cfg,
+      'wc',
+      { id, slug: 'my-post' },
+      'linkedin',
+    );
+    expect(out).toBe(
+      join(root, 'src/content/blog/my-post/scrapbook/shortform/linkedin.md'),
+    );
+  });
+
+  it('appends -<channel> when channel is passed', () => {
+    const id = 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff';
+    const entryFile = join(root, 'src/content/blog/my-post/index.md');
+    mkdirSync(join(entryFile, '..'), { recursive: true });
+    writeFileSync(
+      entryFile,
+      `---\ndeskwork:\n  id: ${id}\ntitle: My Post\n---\n\n# Body\n`,
+    );
+
+    const out = resolveShortformFilePath(
+      root,
+      cfg,
+      'wc',
+      { id, slug: 'my-post' },
+      'reddit',
+      'rprogramming',
+    );
+    expect(out).toBe(
+      join(
+        root,
+        'src/content/blog/my-post/scrapbook/shortform/reddit-rprogramming.md',
+      ),
+    );
+  });
+
+  it('uses slug-template fallback when no id binding (legacy / pre-doctor)', () => {
+    // No file laid down; the slug-template fallback path under findEntryFile
+    // assumes the entry's body would land at <slug>/index.md. resolveShortformFilePath
+    // returns the derived shortform path even though the body doesn't yet exist.
+    const out = resolveShortformFilePath(
+      root,
+      cfg,
+      'wc',
+      { slug: 'planned-but-no-scaffold' },
+      'youtube',
+    );
+    expect(out).toBe(
+      join(
+        root,
+        'src/content/blog/planned-but-no-scaffold/scrapbook/shortform/youtube.md',
+      ),
+    );
+  });
+
+  it('throws on a channel with invalid characters', () => {
+    expect(() =>
+      resolveShortformFilePath(
+        root,
+        cfg,
+        'wc',
+        { slug: 'my-post' },
+        'reddit',
+        'rProgramming',
+      ),
+    ).toThrow(/Invalid shortform channel/);
+    expect(() =>
+      resolveShortformFilePath(
+        root,
+        cfg,
+        'wc',
+        { slug: 'my-post' },
+        'reddit',
+        'r/programming',
+      ),
+    ).toThrow(/Invalid shortform channel/);
+  });
+
+  it('treats empty channel as undefined and resolves to bare platform.md', () => {
+    const out = resolveShortformFilePath(
+      root,
+      cfg,
+      'wc',
+      { slug: 'p' },
+      'instagram',
+      '',
+    );
+    expect(out).toBe(
+      join(root, 'src/content/blog/p/scrapbook/shortform/instagram.md'),
     );
   });
 });
