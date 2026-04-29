@@ -5,10 +5,9 @@
  * Test coverage: ./test/release-helpers.test.ts (vitest).
  */
 
-export interface ValidateVersionResult {
-  readonly ok: boolean;
-  readonly reason?: string;
-}
+export type ValidateVersionResult =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly reason: string };
 
 const SEMVER_RE = /^(\d+)\.(\d+)\.(\d+)$/;
 
@@ -33,7 +32,7 @@ export function validateVersion(version: string, lastTag: string): ValidateVersi
   if (!lastMatch) {
     return {
       ok: false,
-      reason: `Last tag "${lastTag}" is not in v?MAJOR.MINOR.PATCH format.`,
+      reason: `Last tag "${lastTag}" is not in MAJOR.MINOR.PATCH format (optional leading 'v').`,
     };
   }
   const [la, lb, lc] = [Number(lastMatch[1]), Number(lastMatch[2]), Number(lastMatch[3])];
