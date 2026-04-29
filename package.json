@@ -9,7 +9,10 @@
   },
   "license": "GPL-3.0-or-later",
   "workspaces": [
-    "packages/*",
+    "packages/core",
+    "packages/cli",
+    "packages/studio",
+    "packages/cli-bin-lib",
     "plugins/*"
   ],
   "engines": {
@@ -17,6 +20,7 @@
   },
   "scripts": {
     "prepare": "command -v husky >/dev/null 2>&1 && husky || true",
+    "build": "npm run build --workspaces --if-present",
     "version:bump": "tsx scripts/bump-version.ts"
   },
   "devDependencies": {

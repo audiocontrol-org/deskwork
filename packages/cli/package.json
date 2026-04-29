@@ -17,10 +17,17 @@
   "engines": {
     "node": ">=20"
   },
+  "files": [
+    "dist",
+    "package.json",
+    "README.md"
+  ],
   "bin": {
-    "deskwork": "./src/cli.ts"
+    "deskwork": "./dist/cli.js"
   },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "tsc -p tsconfig.build.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"

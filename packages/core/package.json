@@ -17,37 +17,129 @@
   "engines": {
     "node": ">=20"
   },
+  "files": [
+    "dist",
+    "package.json",
+    "README.md"
+  ],
   "exports": {
-    ".": "./src/index.ts",
-    "./body-state": "./src/body-state.ts",
-    "./calendar": "./src/calendar.ts",
-    "./calendar-mutations": "./src/calendar-mutations.ts",
-    "./cli-args": "./src/cli.ts",
-    "./config": "./src/config.ts",
-    "./frontmatter": "./src/frontmatter.ts",
-    "./ingest": "./src/ingest.ts",
-    "./ingest-derive": "./src/ingest-derive.ts",
-    "./ingest-paths": "./src/ingest-paths.ts",
-    "./journal": "./src/journal.ts",
-    "./paths": "./src/paths.ts",
-    "./rename-slug": "./src/rename-slug.ts",
-    "./review": "./src/review/index.ts",
-    "./review/handlers": "./src/review/handlers.ts",
-    "./review/start-handlers": "./src/review/start-handlers.ts",
-    "./review/pipeline": "./src/review/pipeline.ts",
-    "./review/render": "./src/review/render.ts",
-    "./review/report": "./src/review/report.ts",
-    "./review/types": "./src/review/types.ts",
-    "./scaffold": "./src/scaffold.ts",
-    "./scrapbook": "./src/scrapbook.ts",
-    "./content-tree": "./src/content-tree.ts",
-    "./content-index": "./src/content-index.ts",
-    "./outline-split": "./src/outline-split.ts",
-    "./doctor": "./src/doctor/index.ts",
-    "./overrides": "./src/overrides.ts",
-    "./types": "./src/types.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json",
+    "./body-state": {
+      "types": "./dist/body-state.d.ts",
+      "default": "./dist/body-state.js"
+    },
+    "./calendar": {
+      "types": "./dist/calendar.d.ts",
+      "default": "./dist/calendar.js"
+    },
+    "./calendar-mutations": {
+      "types": "./dist/calendar-mutations.d.ts",
+      "default": "./dist/calendar-mutations.js"
+    },
+    "./cli-args": {
+      "types": "./dist/cli.d.ts",
+      "default": "./dist/cli.js"
+    },
+    "./config": {
+      "types": "./dist/config.d.ts",
+      "default": "./dist/config.js"
+    },
+    "./content-index": {
+      "types": "./dist/content-index.d.ts",
+      "default": "./dist/content-index.js"
+    },
+    "./content-tree": {
+      "types": "./dist/content-tree.d.ts",
+      "default": "./dist/content-tree.js"
+    },
+    "./doctor": {
+      "types": "./dist/doctor/index.d.ts",
+      "default": "./dist/doctor/index.js"
+    },
+    "./frontmatter": {
+      "types": "./dist/frontmatter.d.ts",
+      "default": "./dist/frontmatter.js"
+    },
+    "./ingest": {
+      "types": "./dist/ingest.d.ts",
+      "default": "./dist/ingest.js"
+    },
+    "./ingest-derive": {
+      "types": "./dist/ingest-derive.d.ts",
+      "default": "./dist/ingest-derive.js"
+    },
+    "./ingest-paths": {
+      "types": "./dist/ingest-paths.d.ts",
+      "default": "./dist/ingest-paths.js"
+    },
+    "./journal": {
+      "types": "./dist/journal.d.ts",
+      "default": "./dist/journal.js"
+    },
+    "./outline-split": {
+      "types": "./dist/outline-split.d.ts",
+      "default": "./dist/outline-split.js"
+    },
+    "./overrides": {
+      "types": "./dist/overrides.d.ts",
+      "default": "./dist/overrides.js"
+    },
+    "./paths": {
+      "types": "./dist/paths.d.ts",
+      "default": "./dist/paths.js"
+    },
+    "./rename-slug": {
+      "types": "./dist/rename-slug.d.ts",
+      "default": "./dist/rename-slug.js"
+    },
+    "./review": {
+      "types": "./dist/review/index.d.ts",
+      "default": "./dist/review/index.js"
+    },
+    "./review/handlers": {
+      "types": "./dist/review/handlers.d.ts",
+      "default": "./dist/review/handlers.js"
+    },
+    "./review/pipeline": {
+      "types": "./dist/review/pipeline.d.ts",
+      "default": "./dist/review/pipeline.js"
+    },
+    "./review/render": {
+      "types": "./dist/review/render.d.ts",
+      "default": "./dist/review/render.js"
+    },
+    "./review/report": {
+      "types": "./dist/review/report.d.ts",
+      "default": "./dist/review/report.js"
+    },
+    "./review/start-handlers": {
+      "types": "./dist/review/start-handlers.d.ts",
+      "default": "./dist/review/start-handlers.js"
+    },
+    "./review/types": {
+      "types": "./dist/review/types.d.ts",
+      "default": "./dist/review/types.js"
+    },
+    "./scaffold": {
+      "types": "./dist/scaffold.d.ts",
+      "default": "./dist/scaffold.js"
+    },
+    "./scrapbook": {
+      "types": "./dist/scrapbook.d.ts",
+      "default": "./dist/scrapbook.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "default": "./dist/types.js"
+    }
   },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json && cp src/*.mjs dist/",
+    "prepack": "tsc -p tsconfig.build.json && cp src/*.mjs dist/",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
