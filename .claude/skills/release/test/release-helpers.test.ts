@@ -163,3 +163,95 @@ describe('checkPreconditions', () => {
     }
   });
 });
+
+import { atomicPush } from '../lib/release-helpers.js';
+
+describe('atomicPush', () => {
+  it('pushes HEAD to origin/main + branch + tag in one operation', async () => {
+    const rig = createRig();
+    try {
+      // Add a commit on feature/test that will become the v0.0.1 release commit.
+      rig.sh('echo release > release.txt && git add release.txt && git commit -m "chore: release v0.0.1"');
+      // Annotated tag pointing at HEAD.
+      rig.sh('git tag -a v0.0.1 -m "test release"');
+      // Run atomicPush.
+      await atomicPush({ tag: 'v0.0.1', branch: 'feature/test', cwd: rig.localPath });
+      // Verify remote has the commit on main.
+      const remoteMainSha = rig.sh('git rev-parse origin/main').trim();
+      const localHeadSha = rig.sh('git rev-parse HEAD').trim();
+      expect(remoteMainSha).toBe(localHeadSha);
+      // Verify remote has the branch.
+      const remoteBranchSha = rig.sh('git rev-parse origin/feature/test').trim();
+      expect(remoteBranchSha).toBe(localHeadSha);
+      // Verify remote has the tag.
+      const remoteTagsRaw = rig.sh('git ls-remote --tags origin v0.0.1');
+      expect(remoteTagsRaw).toMatch(/refs\/tags\/v0\.0\.1/);
+    } finally {
+      rig.cleanup();
+    }
+  });
+
+  it('throws when the push is non-fast-forward', async () => {
+    const rig = createRig();
+    try {
+      // Push a commit to origin/main from another clone (so origin/main moves).
+      const otherClone = `${rig.localPath}-other`;
+      const { execSync } = await import('node:child_process');
+      execSync(`git clone "${rig.remotePath}" "${otherClone}"`, { stdio: 'pipe' });
+      execSync('git config user.email rig@example.com', { cwd: otherClone, stdio: 'pipe' });
+      execSync('git config user.name Rig', { cwd: otherClone, stdio: 'pipe' });
+      execSync('git checkout main', { cwd: otherClone, stdio: 'pipe' });
+      execSync('echo upstream > up.txt && git add up.txt && git commit -m up && git push', {
+        cwd: otherClone,
+        stdio: 'pipe',
+        shell: '/bin/bash',
+      });
+      // Local commit + tag (without fetching the new origin/main).
+      rig.sh('echo r > r.txt && git add r.txt && git commit -m "chore: release v0.0.1"');
+      rig.sh('git tag -a v0.0.1 -m "test"');
+      // atomicPush should fail because origin/main moved.
+      await expect(
+        atomicPush({ tag: 'v0.0.1', branch: 'feature/test', cwd: rig.localPath }),
+      ).rejects.toThrow(/non-fast-forward|rejected/i);
+      const { rmSync } = await import('node:fs');
+      rmSync(otherClone, { recursive: true, force: true });
+    } finally {
+      rig.cleanup();
+    }
+  });
+
+  it('preserves local state on push failure', async () => {
+    const rig = createRig();
+    try {
+      // Force divergence as in the prior test.
+      const otherClone = `${rig.localPath}-other`;
+      const { execSync } = await import('node:child_process');
+      execSync(`git clone "${rig.remotePath}" "${otherClone}"`, { stdio: 'pipe' });
+      execSync('git config user.email rig@example.com', { cwd: otherClone, stdio: 'pipe' });
+      execSync('git config user.name Rig', { cwd: otherClone, stdio: 'pipe' });
+      execSync('git checkout main', { cwd: otherClone, stdio: 'pipe' });
+      execSync('echo u > u.txt && git add u.txt && git commit -m u && git push', {
+        cwd: otherClone,
+        stdio: 'pipe',
+        shell: '/bin/bash',
+      });
+      rig.sh('echo r > r.txt && git add r.txt && git commit -m "chore: release v0.0.1"');
+      rig.sh('git tag -a v0.0.1 -m "test"');
+      const localHeadBefore = rig.sh('git rev-parse HEAD').trim();
+      const localTagBefore = rig.sh('git rev-parse v0.0.1').trim();
+
+      try {
+        await atomicPush({ tag: 'v0.0.1', branch: 'feature/test', cwd: rig.localPath });
+      } catch {
+        /* expected */
+      }
+      // Local commit + tag still present.
+      expect(rig.sh('git rev-parse HEAD').trim()).toBe(localHeadBefore);
+      expect(rig.sh('git rev-parse v0.0.1').trim()).toBe(localTagBefore);
+      const { rmSync } = await import('node:fs');
+      rmSync(otherClone, { recursive: true, force: true });
+    } finally {
+      rig.cleanup();
+    }
+  });
+});

@@ -169,3 +169,67 @@ export async function checkPreconditions(
     failures,
   };
 }
+
+export interface AtomicPushOptions {
+  readonly tag: string;
+  readonly branch: string;
+  /** cwd for git invocations. Default: process.cwd(). */
+  readonly cwd?: string;
+}
+
+/**
+ * Atomic push: HEAD to origin/main + HEAD to feature branch + annotated
+ * tag, all in one --follow-tags RPC.
+ *
+ * DELIBERATE PRE-1.0 VELOCITY DECISION. Direct-to-main push (rather than
+ * PR-merge) is intentional. Reasoning:
+ *   - Solo-maintainer project; PRs add drag without catching real bugs
+ *     (agent code-review already runs pre-commit)
+ *   - CI on this project is brutally slow; PR + CI gate adds friction the
+ *     project can't afford pre-1.0
+ *   - Smoke (scripts/smoke-marketplace.sh) is the real release-blocking
+ *     gate and runs locally before this function executes
+ *
+ * REVISIT AT 1.0 STABILIZATION. Once the project stabilizes, the case for
+ * PR-merge / CI-as-second-gate / branch protection grows substantially:
+ *   - Adopter base widens; CI catching regressions before tag-push protects them
+ *   - Multi-contributor work becomes plausible; PR is established muscle
+ *   - Branch protection on main becomes appropriate
+ * When this happens, replace this function with a PR-merge flow and
+ * remove this comment.
+ *
+ * Throws on push failure with git's stderr included. Local state (commit
+ * and tag) is preserved.
+ */
+export async function atomicPush(opts: AtomicPushOptions): Promise<void> {
+  const cwd = opts.cwd ?? process.cwd();
+  try {
+    execFileSync(
+      'git',
+      [
+        'push',
+        '--follow-tags',
+        'origin',
+        'HEAD:main',
+        `HEAD:refs/heads/${opts.branch}`,
+      ],
+      { cwd, stdio: ['pipe', 'pipe', 'pipe'] },
+    );
+  } catch (err) {
+    let stderr: string;
+    if (
+      err instanceof Error &&
+      'stderr' in err &&
+      err.stderr !== null &&
+      err.stderr !== undefined
+    ) {
+      const raw = err.stderr;
+      stderr = Buffer.isBuffer(raw) ? raw.toString() : String(raw);
+    } else if (err instanceof Error) {
+      stderr = err.message;
+    } else {
+      stderr = String(err);
+    }
+    throw new Error(`atomicPush failed (tag=${opts.tag}, branch=${opts.branch}):\n${stderr}`);
+  }
+}
