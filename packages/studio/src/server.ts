@@ -225,14 +225,19 @@ function buildReviewRedirectUrl(entryId: string, requestUrl: string): string {
 /**
  * Resolve the plugin tree root (`plugins/deskwork-studio/`) at runtime.
  *
- * Two runtime layouts (Phase 23 source-shipped re-architecture):
+ * Three runtime layouts (Phase 23 source-shipped re-architecture):
  *   - Workspace: `packages/studio/src/server.ts` (run via the workspace
  *     bin symlink) → plugin root is `<HERE>/../../../plugins/deskwork-studio`.
- *   - Marketplace: `<pluginRoot>/node_modules/@deskwork/studio/src/server.ts`
- *     (run via the plugin-local bin after first-run npm install) →
- *     plugin root is `<HERE>/../../../..`.
+ *   - Marketplace (legacy node_modules layout): `<pluginRoot>/node_modules/
+ *     @deskwork/studio/src/server.ts` → plugin root is `<HERE>/../../../..`.
+ *   - Marketplace (materialized vendor layout, Phase 23c): npm symlinks
+ *     `node_modules/@deskwork/studio` → `vendor/studio`, so `import.meta.url`
+ *     resolves through the symlink to `<pluginRoot>/vendor/studio/src/server.ts`
+ *     → plugin root is `<HERE>/../../..`. Surfaced by the Phase 23g
+ *     `scripts/smoke-marketplace.sh` smoke test, which boots the studio
+ *     against an extracted+materialized tree and asserts every route 200s.
  *
- * Both candidates are tried; whichever has a `public/src/` directory
+ * All candidates are tried; whichever has a `public/src/` directory
  * adjacent wins. `public/src/` ships in the plugin tree only.
  */
 function pluginRoot(): string {
@@ -240,6 +245,7 @@ function pluginRoot(): string {
   const candidates = [
     resolve(here, '..', '..', '..', 'plugins', 'deskwork-studio'),
     resolve(here, '..', '..', '..', '..'),
+    resolve(here, '..', '..', '..'),
   ];
   for (const candidate of candidates) {
     // Use the plugin's marker file (public/src exists in both layouts)

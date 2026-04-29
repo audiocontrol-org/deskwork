@@ -27,7 +27,19 @@ Review the diff:
 git diff
 ```
 
-**3. Commit + tag**
+**3. Run the marketplace smoke test (pre-tag gate)**
+
+```sh
+bash scripts/smoke-marketplace.sh
+```
+
+This reproduces the marketplace install path against the current commit: it `git archive`s `plugins/<name>` + `packages/` from HEAD, materializes the vendor symlinks the same way the release workflow does, runs `npm install --omit=dev`, boots the studio against an in-tmp fixture project, asserts every documented page route + every scraped `<script src>` / `<link href>` returns HTTP 200, and exercises `deskwork --help` for the CLI plugin. It catches the v0.6.0–v0.8.2 client-JS-404 bug class, dangling vendor symlinks, missing files, and broken bin wrappers — packaging regressions — before they ship.
+
+The smoke test reads from `HEAD`, so any fix you intend to release must be committed before this step. If the smoke test fails, do NOT tag — fix the bug, commit, re-run.
+
+Local-only by design (per `.claude/rules/agent-discipline.md`: "No test infrastructure in CI"). CI on this project is brutally slow; the smoke test materializes a vendor tree and boots a real HTTP listener, which would extend CI runtime significantly. The release-time gate is the operator running this script before pushing the tag.
+
+**4. Commit + tag**
 
 ```sh
 git commit -am "chore: release v0.2.0"
@@ -50,7 +62,7 @@ git push --delete origin v0.2.0
 # fix, then re-tag
 ```
 
-**4. Verify**
+**5. Verify**
 
 ```sh
 gh release view v0.2.0
