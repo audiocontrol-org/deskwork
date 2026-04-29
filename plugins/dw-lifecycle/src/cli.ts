@@ -1,7 +1,11 @@
+import { install } from './subcommands/install.js';
+
 const subcommand = process.argv[2];
 const args = process.argv.slice(3);
 
-const SUBCOMMANDS: Record<string, () => Promise<void>> = {};
+const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
+  install,
+};
 
 async function main() {
   if (!subcommand) {
@@ -16,7 +20,7 @@ async function main() {
     process.exit(1);
   }
 
-  await handler();
+  await handler(args);
 }
 
 main().catch((err) => {
