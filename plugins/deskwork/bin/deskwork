@@ -5,17 +5,21 @@
 # Resolution order (first match wins):
 #   1. Workspace-linked binary (`node_modules/.bin/deskwork`) — the dev
 #      path; runs source via tsx, supports edits without rebuild.
-#   2. Self-contained ESM bundle inside the plugin tree at
-#      `bundle/cli.mjs` — committed to git and shipped verbatim by the
-#      Claude Code marketplace install (which copies plugins/<name>/
-#      only). Runs via plain `node`, no `npm install` step required.
-#   3. Loud error.
+#   2. First-run install: when the plugin tree (the marketplace install
+#      payload) has no node_modules yet, run `npm install --omit=dev`
+#      from the plugin root, then exec the freshly-linked source bin
+#      via tsx. Phase 23d (source-shipped re-architecture).
+#   3. Self-contained ESM bundle inside the plugin tree at
+#      `bundle/cli.mjs` — the legacy committed-bundle path; retires in
+#      Phase 23b once 23c–23f are in place.
+#   4. Loud error.
 #
 # Either way, the operator's experience is the same: `deskwork <sub>`.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # (1) Workspace symlink — fastest, supports source-level edits.
 workspace_candidates=(
@@ -29,27 +33,48 @@ for candidate in "${workspace_candidates[@]}"; do
   fi
 done
 
-# (2) Plugin-internal bundle — sits next to bin/ so it ships with the
-# marketplace install payload. Single source of truth.
+# (2) First-run install path. Marketplace install copies plugins/<name>/
+# into ~/.claude/plugins/cache/<…>/, with no node_modules. Detect that
+# state, run `npm install --omit=dev` once, then exec the source bin.
+plugin_local_bin="${PLUGIN_ROOT}/node_modules/.bin/deskwork"
+if [ ! -x "${plugin_local_bin}" ]; then
+  if [ -f "${PLUGIN_ROOT}/package.json" ]; then
+    echo "deskwork: first run — installing dependencies (one-time)..." >&2
+    (
+      cd "${PLUGIN_ROOT}"
+      npm install --omit=dev --no-audit --no-fund --loglevel=error
+    )
+  fi
+fi
+if [ -x "${plugin_local_bin}" ]; then
+  exec "${plugin_local_bin}" "$@"
+fi
+
+# (3) Plugin-internal bundle — sits next to bin/ so it ships with the
+# marketplace install payload. Retires in 23b.
 bundle="${SCRIPT_DIR}/../bundle/cli.mjs"
 if [ -f "$bundle" ]; then
   exec node "$bundle" "$@"
 fi
 
-# (3) Nothing found.
+# (4) Nothing found.
 cat >&2 <<EOF
-deskwork: cannot locate the @deskwork/cli binary or bundle.
+deskwork: cannot locate the @deskwork/cli binary.
 
 Looked for workspace bin in:
   ${workspace_candidates[0]}
   ${workspace_candidates[1]}
   ${workspace_candidates[2]}
 
+Looked for first-run-install bin at:
+  ${plugin_local_bin}
+
 Looked for bundle at:
   ${bundle}
 
 If you cloned the deskwork repo manually, run 'npm install' at the repo
-root to populate node_modules/.bin/, or run 'npm --workspace packages/cli
-run build' to produce the bundle.
+root to populate node_modules/.bin/. If you installed via the
+marketplace, the first-run install above should have populated
+node_modules — re-run and capture the install output.
 EOF
 exit 127
