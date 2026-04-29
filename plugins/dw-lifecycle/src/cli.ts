@@ -1,0 +1,27 @@
+const subcommand = process.argv[2];
+const args = process.argv.slice(3);
+
+const SUBCOMMANDS: Record<string, () => Promise<void>> = {};
+
+async function main() {
+  if (!subcommand) {
+    console.error('Usage: dw-lifecycle <subcommand> [args...]');
+    console.error('Subcommands: install, setup, issues, transition, journal-append, doctor');
+    process.exit(1);
+  }
+
+  const handler = SUBCOMMANDS[subcommand];
+  if (!handler) {
+    console.error(`Unknown subcommand: ${subcommand}`);
+    process.exit(1);
+  }
+
+  await handler();
+}
+
+main().catch((err) => {
+  console.error(err.message ?? err);
+  process.exit(1);
+});
+
+export { SUBCOMMANDS, args };
