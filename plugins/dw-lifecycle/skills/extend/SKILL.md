@@ -1,0 +1,9 @@
+---
+name: dw-lifecycle:extend
+description: "Add phases to PRD/workplan; create new GitHub issues for added phases"
+user_invocable: true
+---
+
+# /dw-lifecycle:extend
+
+STUB — implementation deferred to Phase 5. See `docs/1.0/001-IN-PROGRESS/dw-lifecycle/workplan.md` for the wire-up tasks.
