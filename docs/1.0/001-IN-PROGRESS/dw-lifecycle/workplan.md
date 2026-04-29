@@ -1969,7 +1969,7 @@ git commit -m "feat(dw-lifecycle/bin): transition subcommand"
 - Create: `plugins/dw-lifecycle/src/tracking-github.ts`
 - Create: `plugins/dw-lifecycle/src/__tests__/tracking-github.test.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```typescript
 // src/__tests__/tracking-github.test.ts
@@ -2022,12 +2022,12 @@ describe('tracking-github', () => {
 });
 ```
 
-- [ ] **Step 2: Run, expect failure**
+- [x] **Step 2: Run, expect failure**
 
 Run: `cd plugins/dw-lifecycle && npm test -- tracking-github`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement `tracking-github.ts`**
+- [x] **Step 3: Implement `tracking-github.ts`**
 
 ```typescript
 // src/tracking-github.ts
@@ -2081,12 +2081,12 @@ export function createPhaseIssues(args: CreatePhaseIssuesArgs): IssueRef[] {
 }
 ```
 
-- [ ] **Step 4: Run tests, expect pass**
+- [x] **Step 4: Run tests, expect pass**
 
 Run: `cd plugins/dw-lifecycle && npm test -- tracking-github`
 Expected: 2 tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/src/tracking-github.ts plugins/dw-lifecycle/src/__tests__/tracking-github.test.ts
