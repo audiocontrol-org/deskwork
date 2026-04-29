@@ -14,7 +14,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
 async function main() {
   if (!subcommand) {
     console.error('Usage: dw-lifecycle <subcommand> [args...]');
-    console.error('Subcommands: install, setup, issues, transition, journal-append, doctor');
+    console.error(`Subcommands: ${Object.keys(SUBCOMMANDS).join(', ')}`);
     process.exit(1);
   }
 

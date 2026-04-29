@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -60,7 +60,7 @@ function renderTemplate(template: string, vars: Record<string, string>): string 
 
 function branchExists(root: string, branchName: string): boolean {
   try {
-    execSync(`git -C "${root}" rev-parse --verify "refs/heads/${branchName}"`, {
+    execFileSync('git', ['-C', root, 'rev-parse', '--verify', `refs/heads/${branchName}`], {
       stdio: 'ignore',
     });
     return true;
@@ -95,46 +95,84 @@ export async function setup(args: string[]): Promise<void> {
     throw new Error(`Worktree path already exists: ${worktreePath}`);
   }
 
+  // Pre-flight: definition file must exist before we create the worktree, so a typo
+  // doesn't strand the user with a worktree they need to clean up.
+  if (definitionFile && !existsSync(definitionFile)) {
+    throw new Error(`Definition file not found: ${definitionFile}`);
+  }
+
   // Create branch + worktree off the current HEAD (avoids hardcoding "main").
-  execSync(`git -C "${root}" worktree add "${worktreePath}" -b "${branchName}" HEAD`, {
+  execFileSync('git', ['-C', root, 'worktree', 'add', worktreePath, '-b', branchName, 'HEAD'], {
     stdio: 'inherit',
   });
 
-  // Scaffold docs in the new worktree
-  const docsDir = resolveFeatureDir(cfg, worktreePath, slug, {
-    stage: 'inProgress',
-    targetVersion: target,
-  });
-  mkdirSync(docsDir, { recursive: true });
+  // From this point on the worktree exists. If anything below fails, roll it back
+  // so the user isn't left with a half-scaffolded feature directory.
+  try {
+    // Scaffold docs in the new worktree
+    const docsDir = resolveFeatureDir(cfg, worktreePath, slug, {
+      stage: 'inProgress',
+      targetVersion: target,
+    });
+    mkdirSync(docsDir, { recursive: true });
 
-  const today = new Date().toISOString().slice(0, 10);
-  const vars: Record<string, string> = {
-    slug,
-    title: title ?? slug,
-    targetVersion: target,
-    date: today,
-    branch: branchName,
-    parentIssue: '',
-  };
+    const today = new Date().toISOString().slice(0, 10);
+    const vars: Record<string, string> = {
+      slug,
+      title: title ?? slug,
+      targetVersion: target,
+      date: today,
+      branch: branchName,
+      parentIssue: '',
+    };
 
-  for (const filename of ['prd.md', 'workplan.md', 'readme.md']) {
-    const tpl = readFileSync(join(TEMPLATES_DIR, filename), 'utf8');
-    const out = renderTemplate(tpl, vars);
-    const targetPath = join(docsDir, filename === 'readme.md' ? 'README.md' : filename);
-    writeFileSync(targetPath, out, 'utf8');
-  }
+    for (const filename of ['prd.md', 'workplan.md', 'readme.md']) {
+      const tpl = readFileSync(join(TEMPLATES_DIR, filename), 'utf8');
+      const out = renderTemplate(tpl, vars);
+      const targetPath = join(docsDir, filename === 'readme.md' ? 'README.md' : filename);
+      writeFileSync(targetPath, out, 'utf8');
+    }
 
-  // Optionally seed workplan content from a feature-definition.md file
-  if (definitionFile && existsSync(definitionFile)) {
-    const defContent = readFileSync(definitionFile, 'utf8');
-    const wpPath = join(docsDir, 'workplan.md');
-    const wp = readFileSync(wpPath, 'utf8');
-    writeFileSync(
-      wpPath,
-      wp + '\n<!-- Definition imported from: ' + definitionFile + ' -->\n' + defContent + '\n',
-      'utf8'
+    // Optionally seed workplan content from a feature-definition.md file. The
+    // existence check above guarantees this read won't ENOENT.
+    if (definitionFile) {
+      const defContent = readFileSync(definitionFile, 'utf8');
+      const wpPath = join(docsDir, 'workplan.md');
+      const wp = readFileSync(wpPath, 'utf8');
+      writeFileSync(
+        wpPath,
+        wp + '\n<!-- Definition imported from: ' + definitionFile + ' -->\n' + defContent + '\n',
+        'utf8'
+      );
+    }
+
+    console.log(
+      JSON.stringify({ slug, target, branch: branchName, worktreePath, docsDir }, null, 2)
+    );
+  } catch (err) {
+    const origMessage = err instanceof Error ? err.message : String(err);
+    let rollbackOk = true;
+    try {
+      execFileSync('git', ['-C', root, 'worktree', 'remove', '--force', worktreePath], {
+        stdio: 'ignore',
+      });
+    } catch {
+      rollbackOk = false;
+    }
+    try {
+      execFileSync('git', ['-C', root, 'branch', '-D', branchName], {
+        stdio: 'ignore',
+      });
+    } catch {
+      rollbackOk = false;
+    }
+    if (rollbackOk) {
+      throw new Error(
+        `Setup failed during scaffolding: ${origMessage}. Worktree and branch rolled back.`
+      );
+    }
+    throw new Error(
+      `Setup failed during scaffolding: ${origMessage}. Manual cleanup required: git worktree remove --force ${worktreePath} && git branch -D ${branchName}`
     );
   }
-
-  console.log(JSON.stringify({ slug, target, branch: branchName, worktreePath, docsDir }, null, 2));
 }
