@@ -20,6 +20,10 @@ export interface ParsedFrontmatter {
 
 const FRONTMATTER_RE = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/;
 
+function isPlainRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
 export function parseFrontmatter(source: string): ParsedFrontmatter {
   const match = FRONTMATTER_RE.exec(source);
   if (!match) {
@@ -30,7 +34,11 @@ export function parseFrontmatter(source: string): ParsedFrontmatter {
   const body = rawBody.startsWith('\n') ? rawBody.slice(1) : rawBody;
 
   const doc = parseDocument(yamlBlock);
-  const jsonData = (doc.toJSON() ?? {}) as Record<string, unknown>;
+  const raw = doc.toJSON() ?? {};
+  if (!isPlainRecord(raw)) {
+    throw new Error(`Expected YAML mapping at frontmatter root, got ${typeof raw}`);
+  }
+  const jsonData: Record<string, unknown> = raw;
 
   const data: FrontmatterData = { ...jsonData };
   Object.defineProperty(data, YAML_DOC_SYM, {
@@ -64,6 +72,13 @@ export function writeFrontmatter(data: FrontmatterData, body: string): string {
  */
 export function updateFrontmatter(source: string, patch: Record<string, unknown>): string {
   const { data, body } = parseFrontmatter(source);
+  const doc = data[YAML_DOC_SYM];
+  if (doc !== undefined) {
+    for (const [key, value] of Object.entries(patch)) {
+      doc.set(key, value);
+    }
+    return writeFrontmatter(data, body);
+  }
   const merged: FrontmatterData = { ...data, ...patch };
   return writeFrontmatter(merged, body);
 }

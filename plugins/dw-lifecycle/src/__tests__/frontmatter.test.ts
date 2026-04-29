@@ -30,4 +30,13 @@ describe('frontmatter', () => {
     expect(out).toContain('state: published');
     expect(out).toContain('\n\nbody\n');
   });
+
+  it('updateFrontmatter preserves quoted scalars on existing keys', () => {
+    const md = `---\ndate: "2026-04-29"\nname: 'foo'\nstate: draft\n---\n\nbody\n`;
+    const out = updateFrontmatter(md, { state: 'published' });
+    expect(out).toContain(`date: "2026-04-29"`);
+    expect(out).toContain(`name: 'foo'`);
+    expect(out).toContain('state: published');
+    expect(out).toContain('\n\nbody\n');
+  });
 });
