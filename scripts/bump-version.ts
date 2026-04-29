@@ -99,6 +99,7 @@ async function bumpFile(manifest: VersionedManifest, version: string): Promise<s
       const lines: string[] = [
         `  ${manifest.label} (metadata) ${String(beforeMeta)} -> ${version}`,
       ];
+      const tag = `v${version}`;
       for (const entry of plugins) {
         const before = entry.version;
         entry.version = version;
@@ -106,6 +107,24 @@ async function bumpFile(manifest: VersionedManifest, version: string): Promise<s
         lines.push(
           `  marketplace plugin ${name.padEnd(20)} ${String(before)} -> ${version}`,
         );
+        // Bump source.ref for git-subdir sources so adopters' marketplace
+        // install pulls from the materialized tag commit. See issue #88:
+        // marketplace.json on main is read by Claude Code at install time,
+        // so source.ref must point at this release's tag (which the release
+        // workflow re-points at the post-materialize commit).
+        const source = entry.source;
+        if (
+          source !== null &&
+          typeof source === 'object' &&
+          (source as Record<string, unknown>).source === 'git-subdir'
+        ) {
+          const src = source as Record<string, unknown>;
+          const beforeRef = src.ref;
+          src.ref = tag;
+          lines.push(
+            `  marketplace plugin ${name.padEnd(20)} source.ref ${String(beforeRef)} -> ${tag}`,
+          );
+        }
       }
       await writeJson(abs, data);
       return lines.join('\n');

@@ -39,6 +39,26 @@ The release workflow handles this via `scripts/materialize-vendor.sh`, run after
 
 Adopters cloning a `v*` ref get a tree where `plugins/<plugin>/vendor/<pkg>` is a real directory, identical to `packages/<pkg>` at the time of release. First-run `npm install --omit=dev` (triggered by the bin wrapper, see plugin READMEs) then links the vendored packages into `node_modules` and the plugin runs from source via `tsx`.
 
+### Marketplace.json `source.ref` and adopter install (Issue #88)
+
+Claude Code's marketplace install reads `marketplace.json` from the marketplace repo's **default branch** (not the tag), then clones each plugin from whatever `source` says. For the materialized-vendor mechanism above to actually reach adopters, every plugin entry in `marketplace.json` uses a `git-subdir` source with an explicit `ref` pointing at the current release tag:
+
+```json
+{
+  "name": "deskwork",
+  "source": {
+    "source": "git-subdir",
+    "url": "https://github.com/audiocontrol-org/deskwork.git",
+    "path": "plugins/deskwork",
+    "ref": "v0.9.3"
+  }
+}
+```
+
+The `ref` field is parameterized — `scripts/bump-version.ts` updates it for every git-subdir plugin in the same commit that bumps `version` everywhere else, so the chore-release commit on main carries the new ref atomically with the new version. The release workflow then re-points the tag at the materialize commit; because `source.ref` resolves through the tag (not a fixed sha), adopters running `/plugin marketplace update` after the workflow finishes get the materialized vendor.
+
+The release workflow's "Verify marketplace.json source.ref points at tag" step is a safety gate — if the chore-release commit on main didn't bump `source.ref` to the new tag, the workflow fails before creating the GitHub release. This catches the case where the bump script is bypassed.
+
 ### What gets released
 
 A deskwork release is a git tag on `main`. Consumers fetch the tagged commit when they pin their marketplace. The materialized vendor tree means a fresh `claude plugin install` against `audiocontrol-org/deskwork#v0.2.0` lands on a self-contained tree that runs end-to-end after a one-time first-run `npm install` driven by the plugin's bin wrapper.
