@@ -16,7 +16,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "prepare": "husky",
+    "prepare": "command -v husky >/dev/null 2>&1 && husky || true",
     "version:bump": "tsx scripts/bump-version.ts"
   },
   "devDependencies": {
