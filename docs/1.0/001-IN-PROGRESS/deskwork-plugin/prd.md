@@ -435,7 +435,47 @@ Schema rename `sites` → `collections`. Per-collection `host` becomes optional 
 
 ### What this is not
 
-- Not an npm-publish migration for `@deskwork/core`. The vendor-via-symlink approach keeps the marketplace tarball self-contained without registry coordination.
+- ~~Not an npm-publish migration for `@deskwork/core`.~~ **Superseded by Phase 26** (added 2026-04-29) — the vendor-via-symlink architecture turned out to be the source of a recurring install-blocker pattern (#88, husky walk-up, #93). Phase 26 is the npm-publish pivot.
 - Not the full elimination of compiled artifacts on disk. The on-startup esbuild produces client bundles into a runtime cache (`<install>/.runtime-cache/`); they're not committed but are still files on disk. The committed-bundles trap is what retires.
 - Not the agent-reply margin notes work ([#54](https://github.com/audiocontrol-org/deskwork/issues/54)). That's a downstream UX enhancement surfaced during the iteration session; tracked separately.
+
+---
+
+## Extension: npm-publish architecture pivot (Phase 26)
+
+Added 2026-04-29 after a series of v0.9.x release dogfood sessions surfaced a recurring class of install-blockers, all rooted in the vendor/workspace-symlink architecture introduced by Phase 23. The decision is to pivot from the source-shipped vendor architecture to publishing `@deskwork/core`, `@deskwork/cli`, and `@deskwork/studio` as proper npm packages, with plugin shells that npm-install on first invocation.
+
+The full feature definition is at `/tmp/feature-definition-npm-publish-pivot.md` — that file is the source-of-truth for the design reasoning. This PRD section is the project-state summary.
+
+### Why this lands now
+
+Three install-blockers in three releases all share a root cause: workspace dep resolution doesn't survive Claude Code's marketplace install path.
+
+| Release | Bug | Failure mode |
+|---|---|---|
+| v0.9.0 | [#88](https://github.com/audiocontrol-org/deskwork/issues/88) | Dangling vendor symlinks on marketplace clone; bin shim crashes on missing `vendor/cli-bin-lib/install-lock.sh` |
+| v0.9.4 | husky walk-up (commit `7f6961f`) | Workspace-root `prepare: husky` runs under `--omit=dev`; husky binary not present → exit 127 |
+| v0.9.4 | [#93](https://github.com/audiocontrol-org/deskwork/issues/93) | `tsx packages/studio/src/server.ts` can't resolve `@deskwork/core` workspace dep at runtime; `ERR_MODULE_NOT_FOUND` |
+
+Each has been a tactical patch on a fundamentally fragile shape. The npm pivot moves workspace dep resolution into npm's native domain (which it solves natively), retires the entire vendor/materialize/source.ref machinery, and ends the install-blocker class.
+
+### Scope of Phase 26
+
+Eight sub-phases (A–H), single PR, single `v0.10.0` release:
+
+- **A** — npm publishing infrastructure (Trusted Publishers / OIDC). Per [docs.npmjs.com/trusted-publishers](https://docs.npmjs.com/trusted-publishers): each `@deskwork/<pkg>` configured on npm with Org=`audiocontrol-org`, Repo=`deskwork`, Workflow=`release.yml`. Release workflow gets `permissions: id-token: write` and runs `npm publish --access public` (no `NPM_TOKEN` env var; auto-provenance on public-repo OIDC publishes). `NPM_TOKEN` repo secret retained as manual-fallback only.
+- **B** — Package shape audit + dist build. Each `@deskwork/{core,cli,studio}` ships a clean tarball (declared `exports`, `files`, `main`, `types`, `repository.url` exactly matching the GitHub URL).
+- **C** — Plugin bin shim rewrite. Both plugins' bin shims first-run `npm install --omit=dev @deskwork/<pkg>@<version>` and dispatch via `node_modules/.bin/`. No more `install-lock.sh`.
+- **D** — `deskwork-studio` → `dw-studio` rename. Organizational extension of the operator's `dw-*` convention (matching a separate `dw-lifecycle` plugin in another worktree). Not a fix for [#92](https://github.com/audiocontrol-org/deskwork/issues/92) (Claude Code dispatch bug at a different layer).
+- **E** — Retire vendor machinery. Delete `vendor/`, `materialize-vendor.sh`, `marketplace.json source.ref` parameterization. Update `.claude/CLAUDE.md`.
+- **F** — Release workflow + RELEASING.md + `/release` skill updates for the npm publish step (OIDC, no token, smoke-asserts version-not-yet-on-npm before tagging).
+- **G** — Migration docs. `MIGRATING.md` documents the v0.9.x → v0.10.0 adopter upgrade (uninstall `deskwork-studio`, clear stale registry, install `dw-studio`; npm install on first invocation is automatic). Plugin READMEs and root README updated.
+- **H** — End-to-end verification + `v0.10.0` ship. Clean-cache marketplace install, every CLI subcommand and the studio launch verified via the public path.
+
+### What Phase 26 is not
+
+- Not a fix for [#92](https://github.com/audiocontrol-org/deskwork/issues/92). That dispatch bug is in Claude Code's plugin namespace resolution (downstream of enumeration). The `dw-studio` rename in Phase 26 D is organizational, not a workaround. #92 stays a separate workstream against `anthropics/claude-code`.
+- Not a Phase 24 implementation. Phase 24 (content-collections vocabulary rename) defers to v0.11.0; the architecture pivot preempts it as the more urgent blocker.
+- Not an absorption of [#91](https://github.com/audiocontrol-org/deskwork/issues/91) (smoke alignment). PR #91 closes unmerged; the smoke gets rewritten as part of Phase 26 F (the install path it tests against changes substantially).
+- Not an absorption of the studio bug sweep ([#68](https://github.com/audiocontrol-org/deskwork/issues/68), [#69](https://github.com/audiocontrol-org/deskwork/issues/69), [#74](https://github.com/audiocontrol-org/deskwork/issues/74), [#75](https://github.com/audiocontrol-org/deskwork/issues/75)) or the `/deskwork:*` skill UX work ([#58](https://github.com/audiocontrol-org/deskwork/issues/58), [#62](https://github.com/audiocontrol-org/deskwork/issues/62), [#64](https://github.com/audiocontrol-org/deskwork/issues/64)). Those defer.
 
