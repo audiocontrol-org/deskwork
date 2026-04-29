@@ -424,3 +424,119 @@ The implementation arc kept the agent USING the plugin against this monorepo thr
 **O. Senior code review caught what unit tests missed.** The 4 blockers ([#76](https://github.com/audiocontrol-org/deskwork/issues/76)–[#79](https://github.com/audiocontrol-org/deskwork/issues/79)) were race conditions, atomic-write gaps, and signal-handling defects — none of which the 680-test workspace test suite would catch (concurrency tests are hard; atomic-write tests are non-trivial to design; signal-handling tests need real subprocess control). Code review by a senior reviewer agent IS the gate for these classes of bugs. Don't substitute a green test suite for that gate.
 
 **P. PR-shaped releases don't fit when implementation lands on main.** `/feature-ship`'s PR step adds value when the work is on a feature branch awaiting review. With each sub-phase committing direct to main during `/feature-implement`, there's no diff to review at PR time. The skill needs an explicit branch for "implementation already merged → run release ceremony directly." Worth amending the skill text to handle both cases.
+
+
+---
+
+## 2026-04-29 (cont'd): Dogfooding the deskwork pipeline on the /release skill's own design spec
+
+**Session goal:** brainstorm + write + iterate + approve a design spec for a new `/release` skill, USING the deskwork pipeline on the spec itself. The document under review is about a release skill for the deskwork repo — but the pipeline doesn't care about the document's subject matter, so the dogfood signal is the same as any longform editorial piece.
+
+**Surface exercised:** `/deskwork:add` (skipped — went via `/deskwork:ingest` since the file existed) → `/deskwork:ingest` → `/deskwork-studio:studio` → operator margin notes via studio → `/deskwork:iterate` (with `--dispositions`) → `/deskwork:approve`.
+
+### Ingest phase
+
+#### 1. /deskwork:ingest dry-run produced clean output, slug auto-derivation worked
+
+**fix.** Ran `deskwork ingest docs/superpowers/specs/` after writing the spec. Dry-run produced:
+
+```
+Plan: 1 add, 0 skip (dry-run; pass --apply to commit)
+
+add  release-skill-design                  Ideas       2026-04-29    slug:path state:default date:mtime
+```
+
+Slug came out clean (`release-skill-design`) — the `2026-04-29-` date prefix on the filename was stripped automatically. Provenance markers (`slug:path state:default date:mtime`) made the inferences inspectable. No surprises; ran `--apply --state Drafting` after the operator picked the right lane.
+
+**insight.** The dry-run-first contract is exactly right. The provenance columns saved a guess about whether the date prefix was correctly handled. For a file with no `state:` frontmatter, the default-to-Ideas fallback is a sensible floor — but for THIS file (an already-written spec, post-brainstorming), Ideas was wrong. Operator chose Drafting via `--state` flag. Worth flagging: there's no doc currently that walks "which state should I pick when the default is wrong"; the operator's mental model has to fill that gap.
+
+#### 2. ingest writes deskwork.id frontmatter on apply (Phase 22++++ behavior)
+
+**fix.** Post-apply, the spec file picked up frontmatter:
+
+```yaml
+---
+deskwork:
+  id: 3c5481cf-d3d3-4aa5-b926-f6e3f70c58fe
+---
+```
+
+This is Phase 22++++'s shipped behavior (v0.8.6). Worked transparently — no surprises, no follow-up needed. The `deskwork:` namespace (vs top-level `id:`) is the right call; the spec's existing markdown headings and links survived the frontmatter prepend cleanly.
+
+### Review phase
+
+#### 3. /deskwork-studio:studio booted with Tailscale-aware default (correctly, this time)
+
+**fix.** Ran `deskwork-studio` plain (no `--no-tailscale` flag). Studio bound to loopback + Tailscale CGNAT IP + magic-DNS hostname. Three URLs in the banner. This is correct — and a behavior change from earlier in the deskwork project where I'd reflexively pass `--no-tailscale` (saved as agent-discipline rule from prior session). The skill description fix in v0.8.7 also correctly documents the Tailscale-aware default now, so the description matches the body.
+
+**insight.** The agent-discipline rule + the v0.8.7 description fix together prevent the regression. Two layers (rule + correct doc) is more robust than either alone — the rule prevents reflexive `--no-tailscale`; the correct doc makes the rule self-evident from reading the skill.
+
+#### 4. Studio review surface — operator left ONE comment that switched the implementation form
+
+**insight.** The operator left a single comment anchored at `lib/release-helpers.sh` in the architecture section: *"I think we're going to regret using a shell script once we start needing to do parsing and more sophisticated output handling."*
+
+That comment did substantial work. It moved the spec from Approach 2 (bash) to Approach 3 (TypeScript) — which, in hindsight, was the right call (the project's primary language is TS; bash is reserved for thin wrappers). The cost of NOT acting on the comment would have surfaced as "this should be TS" rewrites the first time the helpers needed to parse `gh release view --json` output or `git diff --stat`.
+
+**friction (skill-doc gap, filed as [#84](https://github.com/audiocontrol-org/deskwork/issues/84)).** When the agent ran `/deskwork:iterate release-skill-design`, the helper correctly refused with *"File on disk is identical to workflow v1 — no revision to snapshot. Write the revision to disk first."* That's correct — there ARE pending comments to address — but the iterate skill's Step 2 says only "Read the studio's pending comments" with NO documented path for HOW. Spent 3-5 minutes:
+
+1. Tried `curl /api/dev/editorial-review/<workflowId>` → 404
+2. Tried `curl /api/dev/editorial-review/<workflowId>/comments` → 404
+3. Grep'd `packages/studio/src/routes/api.ts` and found the actual endpoint: `GET /api/dev/editorial-review/annotations?workflowId=<id>&version=<n>`
+4. Tried `find .deskwork -name "*<workflowId>*"` to find the comment on disk — annotation files don't carry the workflowId in their filename (they're at `.deskwork/review-journal/history/<timestamp>-<commentId>.json`), so the search returned nothing
+
+**fix.** Filed [#84](https://github.com/audiocontrol-org/deskwork/issues/84) with three suggested fixes (in preference order):
+1. `deskwork iterate-prep <slug>` CLI subcommand that prints unresolved comments as JSON (keeps agent off the studio's HTTP surface)
+2. Document the API endpoint in the skill body
+3. `deskwork iterate <slug> --list-comments` flag (mirrors `deskwork ingest`'s dry-run pattern)
+
+Plus a secondary item: annotation files should include `workflowId` in their filename so `find -name "*<id>*"` works.
+
+**insight.** This is a recurring pattern in agent-driven skills: the skill describes what to do at a high level but doesn't tell the agent HOW to do it. Step 2's "Read the comments" assumes a path that the agent must independently discover. For skills written for human users, "how" is sometimes obvious from context; for skills written for agents, it must be explicit. Audit the skill catalogue for similar gaps.
+
+### Iterate + approve phase
+
+#### 5. /deskwork:iterate with --dispositions worked cleanly
+
+**fix.** Wrote `dispositions.json` mapping the operator's comment ID to `{ "disposition": "addressed", "reason": "switched implementation form from Approach 2 (bash) to Approach 3 (TypeScript via tsx)..." }`. Rewrote the spec on disk (substantial v2 changes: new revision-history section, file-layout block updated, helper-contracts section rewritten in TS, maturity comment translated from bash `# ` block to JSDoc, testing section switched to vitest, open questions updated). Ran `deskwork iterate --site deskwork-internal release-skill-design --dispositions /tmp/release-spec-dispositions.json`. Got:
+
+```json
+{
+  "workflowId": "ac1c1945-...",
+  "site": "deskwork-internal",
+  "slug": "release-skill-design",
+  "state": "in-review",
+  "version": 2,
+  "addressedComments": ["6feb12be-..."]
+}
+```
+
+Workflow advanced to v2, state `in-review`, comment marked addressed. Studio dashboard reflects the new version.
+
+**insight.** The `--dispositions` flag is well-designed: per-comment disposition with optional reason, JSON file for the agent to write, helper reads + applies. The disposition pattern (addressed / deferred / wontfix) is exactly the right granularity. No friction.
+
+#### 6. /deskwork:approve transitioned cleanly to `applied`
+
+**fix.** Operator clicked Approve in the studio (workflow → `approved`). Agent ran `deskwork approve --site deskwork-internal release-skill-design`. Got:
+
+```json
+{
+  "workflowId": "ac1c1945-...",
+  "state": "applied",
+  "version": 2,
+  "filePath": "/Users/.../docs/superpowers/specs/2026-04-29-release-skill-design.md"
+}
+```
+
+Workflow `applied` — terminal state. Disk content already matches (longform SSOT).
+
+**insight.** The approve helper's "verify approvedVersion === workflow.currentVersion before applying" gate is the right invariant — disk-moved-on between approve-click and apply-helper-run is exactly the failure mode it prevents. Didn't trip it this session, but the gate's existence is reassuring.
+
+### Cross-cutting observations (continued from prior entries)
+
+**Q. Dogfooding the pipeline on its own meta-document works.** The /release skill IS for the deskwork repo. The spec describing it lives in the deskwork repo. The deskwork pipeline reviewed the spec. Nothing about that loop is awkward — the pipeline doesn't care that the document under review is about itself. The dogfood signal is fully present.
+
+**R. A single targeted comment can move substantial design.** Operator's one-sentence comment on Approach 2 (bash) drove a 7-section rewrite of the spec for Approach 3 (TS). The cost-to-author was minimal (one sentence in the studio); the cost-to-address was real (substantial doc edits + matching plan changes). Asymmetric cost is a feature, not a bug — the operator's review attention is the bottleneck; making it cheap to deploy is correct.
+
+**S. Step-2-says-do-X-without-saying-how is a recurring agent-skill antipattern.** Issue #84 is the third or fourth time we've found a skill where the documented step requires the agent to discover something not in the skill. Earlier examples: install skill's "explore the project structure" (operator-supplied paths only), iterate's "voice skill" reference (no path documented). Worth a separate audit pass on the skill catalog to find more.
+
+**T. The plan-checkbox-on-disk pattern keeps Task 12 alive.** When session-end comes and v0.9.0 hasn't shipped, that's normally a "did we forget?" risk. With the 12-task plan checked into git ([`docs/superpowers/plans/2026-04-29-release-skill.md`](docs/superpowers/plans/2026-04-29-release-skill.md)) and Task 12 explicitly NOT checked off, the next session can pick up exactly where this one left off. No memory-of-where-we-were required.

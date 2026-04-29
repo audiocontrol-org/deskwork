@@ -4,6 +4,96 @@ Session journal for `deskwork`. Each entry records what was tried, what worked, 
 
 ---
 
+## 2026-04-29 (cont'd): Phase 23 blockers + dedup → enshrine release procedure as `/release` skill (Phase 25)
+
+### Feature: deskwork-plugin
+### Worktree: deskwork-plugin
+
+**Goal:** Address the 4 v0.9.0 release blockers ([#76](https://github.com/audiocontrol-org/deskwork/issues/76)–[#79](https://github.com/audiocontrol-org/deskwork/issues/79)) surfaced last session, then ship v0.9.0. The session pivoted twice on operator principles:
+1. *"Duplicate code is cancer"* — drove a substantial dedup of the bin wrappers (195→22 lines each via shared `packages/cli-bin-lib/install-lock.sh`) and the smoke-script's near-duplicate materialize logic.
+2. *"What we do 'just for now' overwhelmingly becomes conventional canon. So, if we want a sane release process, we MUST enshrine it in a skill."* — drove a full brainstorm → spec → plan → build cycle for a `/release` skill, instead of just shipping v0.9.0 with the existing manual procedure.
+
+End state: `/release` skill complete, 703 tests passing, marketplace smoke passing. v0.9.0 ship deferred to a separate session-end-then-release cycle.
+
+**Accomplished:**
+
+- **All 4 blocker fixes shipped (commit `9610ad0`).**
+  - **#76 bin/ wrapper race** — portable `mkdir`-based directory lock at `${PLUGIN_ROOT}/.deskwork-install.lock` (Linux + macOS), 120s acquisition timeout, 300s stale recovery, EXIT/INT/TERM trap releases lock + cleans up. npm install stderr captured to mktemp file; surfaced with real exit code on failure (replaces the "cannot locate" misleading fallthrough). Partial-install state triggers a re-attempt with a clear log line.
+  - **#77 esbuild concurrent-boot race + non-atomic writes** — per-entry directory lock at `<outFile>.lock`, 30s acquisition cap, 60s stale recovery, `try/finally` release. esbuild writes to `<outFile>.tmp.<pid>.<rand>` then `rename()` to canonical (atomic). Sourcemap + metafile sidecar follow the same pattern. `readMetafileInputs` returns `null` on missing/malformed/parse-fail; caller treats as "rebuild this entry" (self-heal corrupt sidecar). 3 new tests in `packages/studio/test/build-client-assets.test.ts`.
+  - **#78 materialize-vendor mode bits + symlink-traversal** — refactored `materialize_one(source_dir, vendor_link)` (sourceable for testing). Portable `stat`-flavor probe (BSD `-f"%Lp %N"` vs GNU `-c"%a %n"`). `guard_symlinks()` walks every symlink under source, fails on absolute targets or any escape outside `source_dir` (awk-based `..`/`.` collapse avoids macOS-vs-Linux `realpath`/`readlink -f` flag drift). New `scripts/test-materialize-vendor.sh`: +x bit preservation, escape-the-tree symlink rejection, benign in-tree symlink survival.
+  - **#79 smoke-marketplace SIGINT + port pre-flight** — `preflight_port_free` via `lsof` then `nc` fallback (fails before slow extract+install). Portable `kill_tree` using `pgrep -P`. Cleanup walks `KILL_PIDS[]`, `STUDIO_PID`'s subtree, then sweeps remaining children of `$$`. Idempotent via `CLEANUP_RAN` flag; always reaches `rm -rf "$TMP"`. npm installs run via `( ... ) & ; wait $!` so SIGINT during install is signal-interruptible.
+
+- **Operator-driven dedup landed in same v0.9.0 prep commit.**
+  - **bin wrappers**: 195 → 22 lines each (-88%). New shared bash library at `packages/cli-bin-lib/install-lock.sh` — single source of truth for all lock + retry + npm-capture logic. Vendored into both plugins via symlink (`vendor/cli-bin-lib/`); materialized to a real directory at release time (extended `scripts/materialize-vendor.sh` VENDOR_PAIRS with `deskwork-studio:cli-bin-lib` + `deskwork:cli-bin-lib`).
+  - **smoke materialize**: `scripts/smoke-marketplace.sh` now sources `scripts/materialize-vendor.sh` and calls a new public `materialize_vendor_pairs(tree_root, pair...)` function. Smoke and release now share the symlink-traversal guard AND the mode-bit verification — previously smoke had its own near-duplicate without the safety checks.
+  - **canonicalize_relative tests**: 8 new edge case tests (`./foo`, `../../foo`, `foo/./bar`, `foo//bar`, single `..`, deep `..` cap-at-root, escape-the-parent). Closes the code-reviewer-flagged gap from Issue #78's review.
+
+- **`/release` skill built end-to-end (Phase 25; 13 commits `63efd9b`…`3187227`).**
+  - Brainstormed via `superpowers:brainstorming` (4 clarifying Qs answered: hard gates / decision-pause flow / project-level skill location / direct-to-main with maturity comment) → wrote spec ([`docs/superpowers/specs/2026-04-29-release-skill-design.md`](docs/superpowers/specs/2026-04-29-release-skill-design.md)) → ingested into deskwork pipeline (workflow `ac1c1945-…`) → operator left review comment *"we're going to regret using a shell script once we start needing to do parsing"* → `/deskwork:iterate` switched implementation form from Approach 2 (bash) to Approach 3 (TypeScript) at v2 → operator approved → spec `applied`.
+  - Wrote 12-task plan via `superpowers:writing-plans` ([`docs/superpowers/plans/2026-04-29-release-skill.md`](docs/superpowers/plans/2026-04-29-release-skill.md)).
+  - Executed Tasks 1–11 via `superpowers:subagent-driven-development` (11 implementer dispatches + 11 spec-compliance reviews + 11 code-quality reviews + 4 fix-cycle re-reviews + 1 final code review = ~38 subagent dispatches).
+  - **Skill artifacts**:
+    - `.claude/skills/release/SKILL.md` — operator-facing prose, 4 pauses
+    - `.claude/skills/release/lib/release-helpers.ts` — 3 functions + CLI dispatcher (310 lines)
+    - `.claude/skills/release/test/release-helpers.test.ts` + `dispatcher.test.ts` — 20 tests covering pure-function semver, tmp-repo fixture, structured precondition reports, atomic push (happy + non-FF + state-preserved), CLI subcommand dispatch
+    - `.claude/skills/release/test/fixtures.ts` — `createRig()` builds real bare-remote + clone + tracking-set-up branches per test
+    - `.claude/skills/release/{package.json, vitest.config.ts}` — standalone test runner
+  - **`RELEASING.md` rewritten** to point at the skill, with explicit "Pre-1.0 Maturity stance" section naming the revisit-at-1.0 trigger (adopter base widens / multi-contributor / branch protection on main).
+  - **Manual integration smoke** against tmp bare-remote sandbox: `check-preconditions` → 5-line report exit 0; `validate-version 0.0.1 v0.0.0` → exit 0; `validate-version 0.0.0 v0.0.1` → exit 1 with stderr; `atomic-push v0.0.1-smoke sandbox-test` → exit 0, sandbox-origin's main moved to clone HEAD, tag present.
+  - **703 tests pass total**: 20 skill + 339 core + 147 cli + 197 studio.
+  - **Final code review** (entire 13-commit branch): "Ship it. 0 Critical, 0 Important, 4 Minor (all polish)."
+
+- **Filed [#84](https://github.com/audiocontrol-org/deskwork/issues/84)** during dogfood: `/deskwork:iterate` skill says "read the studio's pending comments" without a documented agent path. Spent 3-5 min source-grepping `packages/studio/src/routes/api.ts` to find the right endpoint (`/api/dev/editorial-review/annotations?workflowId=…`). Suggested `deskwork iterate-prep <slug>` CLI subcommand as the cleanest fix.
+
+- **Branch upstream tracking corrected.** Local `feature/deskwork-plugin` was tracking `origin/docs/session-end-2026-04-29` (orphan from prior session). Retargeted to `origin/feature/deskwork-plugin`. Also pushed all 19 session commits to that remote.
+
+**Tests:** 703 passing (683 workspace + 20 skill). `scripts/test-materialize-vendor.sh` 4 tests + 8 canonicalize sub-cases pass. `scripts/smoke-marketplace.sh` end-to-end pass (vendor materialize for both plugins including new `cli-bin-lib`, npm install, studio boot, all routes + assets 200, `deskwork --help` clean).
+
+**Didn't Work:**
+
+- **Initial recommendation to push direct-to-main was inertia, not analysis.** Operator's *"Why push directly to main?"* probe forced me to defend the choice. I admitted: anchored on last session's pattern (12 commits to main). The honest analysis (PR-merge has CI-as-second-gate + audit trail + multi-contributor future-proofing) made me reverse my recommendation — but the operator overruled with explicit pre-1.0 velocity reasoning + insistence on a maturity comment naming the revisit trigger. Both moves were right; my initial reflex was wrong.
+- **Spec v1 reviewer comment switched implementation form mid-spec.** The brainstorming output recommended Approach 2 (bash helpers) on the reasoning that the load-bearing commands were trivial bash. Operator's review: *"we're going to regret using a shell script once we start needing to do parsing and more sophisticated output handling."* Forward-looking concern was legitimate — TypeScript matches the project's primary language pattern and handles future parsing trivially. Switched to Approach 3 (TS via tsx) at v2. The cost of the switch was zero; the cost of NOT switching would have been a forced rewrite when the next subcommand needed JSON parsing.
+- **Reflexive test-trust, again.** Halfway through subagent-driven implementation I trusted multiple agent reports that "20 tests pass" without independently verifying until Task 11's regression check. The reports were correct, but the discipline says verify load-bearing claims independently. Note: I DID independently verify after the Task 5 import-hoist fix (`npx vitest run` myself before commit) — that's the right pattern.
+- **Final code reviewer mis-counted dispatcher tests.** Said "0 dispatcher tests" because they only read `release-helpers.test.ts` and missed `dispatcher.test.ts`. Real count was 4 (verified independently: `Test Files 2 passed (2) / Tests 20 passed (20)`). Not blocking — the tests exist and pass — but a reminder that the reviewer agent's read can miss files.
+
+**Course Corrections:**
+
+- **[PROCESS] Branch upstream pointing at orphan.** Operator: *"we need to get back to using the feature/deskwork-plugin branch; we're currently on a 'temporary'."* Local branch was named `feature/deskwork-plugin` but its upstream tracking was `origin/docs/session-end-2026-04-29` (the orphaned temp branch from prior session). `git branch --set-upstream-to=origin/feature/deskwork-plugin` fixed the misalignment. Symptom: `git status` was reading "ahead of 'origin/docs/session-end-2026-04-29' by 16 commits" — confusing.
+- **[COMPLEXITY] Duplicate code is cancer.** Operator: *"You **must** remove duplicate code. It's a cancer."* The bin wrappers had drifted into 195 lines each of near-identical bash. The smoke script had its own re-implementation of materialize-vendor logic (without the new safety checks). Both got refactored into single-source-of-truth implementations. Lesson: when reviewer flags duplication as "polish, fold into v0.9.1," the operator may override based on the principle (drift is a long-tail compounding problem, not a polish item). Worth defaulting to "extract now while the duplication is small" rather than punting.
+- **[PROCESS] "Just for now" becomes canon.** Operator: *"There is no 'just for now.' What we do 'just for now' overwhelmingly becomes conventional canon. So, if we want a sane release process, we MUST enshrine it in a skill and document the use of that skill in RELEASING.md."* This drove the entire `/release` skill build instead of a manual-but-improved v0.9.0 ship. The skill IS now the canon; v0.9.0 will be its first user. The principle generalizes: any "small fix to ship X for now" is a candidate for the same enshrine-it move.
+- **[PROCESS] Worktree means no main checkout.** Operator: *"we do work in a git worktree, so we can't checkout main in our working directory."* My initial precondition spec assumed "skill must be on main." Reframed: skill cares about HEAD's relationship to `origin/main` (FF possible, branch up-to-date with tracking remote), NOT which local branch is checked out. The `git push --follow-tags origin HEAD:main HEAD:refs/heads/<branch>` pattern lands the commit on remote main from any worktree.
+- **[DOCUMENTATION] Existing `/deskwork:iterate` skill doesn't document agent path.** Surfaced during the spec's own dogfood through the deskwork pipeline. Filed [#84](https://github.com/audiocontrol-org/deskwork/issues/84). Recurring pattern: agent-driven skills must document "how the agent does X" not just "what the agent does."
+
+**Quantitative:**
+
+- Messages: ~140 user messages (rough)
+- Commits to feature branch: 19 (`10f9bcc` pipeline + `750f668` prd + `9610ad0` v0.9.0 prep + `bcbc6fa` spec v1 + `0cbe72b` spec v2 + `86818dc` plan + 13 skill commits + `3187227` RELEASING.md)
+- Issues filed: 1 ([#84](https://github.com/audiocontrol-org/deskwork/issues/84))
+- Issues closed: 4 (#76, #77, #78, #79 — closed by `9610ad0`'s "Closes" footer)
+- Releases shipped: 0 (v0.9.0 deferred to next session for /release-driven first run)
+- Tests at session start: 680 (339 + 147 + 194); at session end: 703 (339 + 147 + 197 + 20 skill = +23 net)
+- Sub-agent dispatches: ~50 across the session (3 typescript-pro for blocker fixes, 1 typescript-pro for dedup, 1 code-reviewer for blocker review, 1 code-reviewer for spec, 1 code-reviewer for final skill review, ~38 implementer/spec-reviewer/code-quality dispatches across Tasks 1-11 of the /release plan + ~3 fix-cycle re-reviews, plus the spec/plan-writing dispatches)
+- Course corrections: 4 ([PROCESS] x3, [COMPLEXITY] x1; plus 1 [DOCUMENTATION] from dogfood-surfaced #84)
+- Agent-discipline rules added: 0 this session (existing rules covered the patterns: read-docs-before-quoting kept me from fabricating release commands; dogfood-mode kept me filing #84)
+
+**Insights:**
+
+- **The brainstorm → spec → plan → subagent-driven build pipeline is rigorous but heavy.** ~38 subagent dispatches across 11 implementation tasks, each with implementer + spec review + code quality review + occasional fix cycles. The discipline catches real issues (vitest version drift, discriminated-union type miss, entry-point guard symlink fragility, ESM import order) that would have shipped without it. But the wall-clock cost is real — this session was ~3 hours of actual subagent time. For trivial scaffolding (Tasks 1, 2, 4, 8, 10) the review overhead may exceed the implementation; consider a lighter-weight review for those (or none) to spend the discipline budget on the substantive logic tasks (3, 5, 6, 7, 9, 11). Worth experimenting with selective review-skipping in future skill-build sessions.
+- **Dogfooding the deskwork pipeline on its own design spec works AND surfaces real issues.** `/deskwork:ingest`, `/deskwork-studio:studio`, `/deskwork:iterate`, `/deskwork:approve` against the `/release` skill spec produced [#84](https://github.com/audiocontrol-org/deskwork/issues/84) (the iterate-skill-step-2 documentation gap). Even better: it produced the substantive bash→TypeScript switch via the operator's review comment on v1. The fact that the document under review WAS about the release skill (not about deskwork itself) didn't change anything about the pipeline's value.
+- **Senior code review keeps catching real issues that tests miss.** This session: vitest version drift (Task 2), `ValidateVersionResult` interface→discriminated-union type-correctness gap (Task 3), `import` mid-file ESM violation (Task 5 fix), `import.meta.url === \`file://${process.argv[1]}\`` symlink/Windows fragility (Task 7 fix). Three of these would have manifested as silent bugs ("works on my machine") rather than test failures. Reviewer ROI is real; cost-of-skipping would be cumulative debugging time months later.
+- **Maturity comments deserve more weight than they get.** The `atomicPush` JSDoc names the deliberate pre-1.0 velocity choice + the revisit-at-1.0 trigger. This isn't decorative — it's a contract with future-self about when to re-evaluate. The operator insisted on the comment's prominence and the explicit revisit trigger; that insistence is the kind of discipline that prevents "we'll deal with it later" from rotting into "no one remembers why."
+- **The plan as canon-on-disk eliminates an entire class of "we forgot." ** The 12-task plan included Task 12 (first canonical run = ship v0.9.0). Even though Task 12 is operator-driven and didn't happen this session, it's IN THE PLAN as a checkbox-not-yet-checked. The next session won't forget to ship v0.9.0; it's right there.
+
+**Next session:**
+
+Ship v0.9.0 as the first canonical run of `/release`. Concrete: type `/release` in a Claude Code session against this worktree; walk the 4 pauses (precondition+version → confirm bump diff → confirm tag message after smoke → confirm push). Skill atomic-pushes commit + branch + tag in one operation. Workflow at `.github/workflows/release.yml` materializes vendor + creates the GitHub release. v0.9.0 will be the first version using the source-shipped architecture (Phase 23) AND the first version shipped via `/release` (Phase 25). Two firsts at once.
+
+After v0.9.0 ships: decide between Phase 24 (collection-vocabulary rename) and Phase 18 polish follow-ups in [#80](https://github.com/audiocontrol-org/deskwork/issues/80). Phase 24 is the natural next-substantive-arc; #80 is post-1.0-prep cleanup.
+
+The PRD's deskwork workflow `d05ebd7d-…` remains `applied` from prior session. The `/release` skill spec workflow `ac1c1945-…` is now `applied`. `/feature-implement`'s strict gate is unblocked indefinitely.
+
+---
+
 ## 2026-04-29 (cont'd): Phase 23 implementation — source-shipped re-architecture, end-to-end on main, ship gated by code-review blockers
 
 ### Feature: deskwork-plugin
