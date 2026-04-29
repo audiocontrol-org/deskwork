@@ -17,6 +17,7 @@
     "allowImportingTsExtensions": true,
     "rewriteRelativeImportExtensions": true,
     "verbatimModuleSyntax": false,
+    "composite": true,
     "outDir": "dist",
     "rootDir": "src",
     "declaration": true,
@@ -24,6 +25,9 @@
     "sourceMap": true,
     "noEmit": false
   },
+  "references": [
+    { "path": "../core/tsconfig.build.json" }
+  ],
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist", "test", "**/*.test.ts"]
 }

@@ -17,6 +17,7 @@
     "allowImportingTsExtensions": true,
     "rewriteRelativeImportExtensions": true,
     "verbatimModuleSyntax": false,
+    "composite": true,
     "outDir": "dist",
     "rootDir": "src",
     "declaration": true,
