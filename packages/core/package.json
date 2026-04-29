@@ -40,6 +40,7 @@
     "./content-index": "./src/content-index.ts",
     "./outline-split": "./src/outline-split.ts",
     "./doctor": "./src/doctor/index.ts",
+    "./overrides": "./src/overrides.ts",
     "./types": "./src/types.ts"
   },
   "scripts": {

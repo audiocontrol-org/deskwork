@@ -22,6 +22,7 @@ import schemaRejected from './rules/schema-rejected.ts';
 import workflowStale from './rules/workflow-stale.ts';
 import calendarUuidMissing from './rules/calendar-uuid-missing.ts';
 import legacyTopLevelIdMigration from './rules/legacy-top-level-id-migration.ts';
+import { loadProjectRules, mergeRules } from './project-rules.ts';
 import type {
   DoctorContext,
   DoctorInteraction,
@@ -59,7 +60,18 @@ const RULE_BY_ID: ReadonlyMap<string, DoctorRule> = new Map(
   RULES.map((r) => [r.id, r]),
 );
 
-/** Resolve a CSV/comma-separated `--fix=` argument to rule ids. */
+/**
+ * Resolve a CSV/comma-separated `--fix=` argument to rule ids.
+ *
+ * Returns the full list of built-in rule ids for `''` and `'all'`.
+ * Unknown built-in id strings are rejected (exit 2 in the CLI).
+ *
+ * Project rules registered via `<projectRoot>/.deskwork/doctor/*.ts`
+ * (Phase 23f) are selected by passing `'all'`; the runner picks them
+ * up from the merged rule list. Selecting an individual project rule
+ * by id via `--fix=<id>` is not yet supported — file an issue if the
+ * usage emerges.
+ */
 export function parseFixArgument(arg: string): string[] {
   const trimmed = arg.trim();
   if (trimmed === '' || trimmed === 'all') {
@@ -122,19 +134,40 @@ function selectSites(opts: DoctorRunOptions): string[] {
   return Object.keys(opts.config.sites);
 }
 
-function selectRules(ruleIds: string[] | undefined): DoctorRule[] {
-  if (ruleIds === undefined) return [...RULES];
+function selectRules(
+  available: ReadonlyArray<DoctorRule>,
+  ruleIds: string[] | undefined,
+): DoctorRule[] {
+  if (ruleIds === undefined) return [...available];
+  const byId = new Map(available.map((r) => [r.id, r]));
   const out: DoctorRule[] = [];
   for (const id of ruleIds) {
-    const rule = RULE_BY_ID.get(id);
+    const rule = byId.get(id);
     if (!rule) {
       throw new Error(
-        `Unknown doctor rule: "${id}". Known: ${RULES.map((r) => r.id).join(', ')}, all`,
+        `Unknown doctor rule: "${id}". Known: ${available.map((r) => r.id).join(', ')}, all`,
       );
     }
     out.push(rule);
   }
   return out;
+}
+
+/**
+ * Phase 23f: build the effective rule set for an audit or repair run.
+ * Built-in rules merged with project rules from
+ * `<projectRoot>/.deskwork/doctor/*.ts`. Project rules with a basename
+ * matching a built-in's basename REPLACE that built-in (override
+ * semantics); new basenames append.
+ *
+ * Loaded once per run — not per finding — so disk i/o for
+ * `readdirSync` + N dynamic imports happens at the start of an audit.
+ */
+async function buildEffectiveRules(
+  projectRoot: string,
+): Promise<DoctorRule[]> {
+  const projectRules = await loadProjectRules(projectRoot);
+  return mergeRules(RULES, projectRules);
 }
 
 /**
@@ -147,7 +180,8 @@ export async function runAudit(
   interaction: DoctorInteraction,
 ): Promise<DoctorReport> {
   const sites = selectSites(opts);
-  const rules = selectRules(opts.ruleIds);
+  const available = await buildEffectiveRules(opts.projectRoot);
+  const rules = selectRules(available, opts.ruleIds);
   const findings: Finding[] = [];
   for (const site of sites) {
     const ctx = buildContext(opts, site, interaction);
@@ -173,7 +207,8 @@ export async function runRepair(
   interaction: DoctorInteraction,
 ): Promise<DoctorReport> {
   const sites = selectSites(opts);
-  const rules = selectRules(opts.ruleIds);
+  const available = await buildEffectiveRules(opts.projectRoot);
+  const rules = selectRules(available, opts.ruleIds);
   const findings: Finding[] = [];
   const repairs: RepairResult[] = [];
 

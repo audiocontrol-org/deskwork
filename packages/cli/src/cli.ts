@@ -19,6 +19,7 @@
 const SUBCOMMANDS: Record<string, () => Promise<{ run: (argv: string[]) => Promise<void> }>> = {
   add: () => import('./commands/add.ts'),
   approve: () => import('./commands/approve.ts'),
+  customize: () => import('./commands/customize.ts'),
   distribute: () => import('./commands/distribute.ts'),
   doctor: () => import('./commands/doctor.ts'),
   draft: () => import('./commands/draft.ts'),
@@ -87,7 +88,8 @@ function printUsage(): void {
   out.write('  pause           move a non-terminal entry to Paused\n');
   out.write('  resume          restore a Paused entry to its prior stage\n\n');
   out.write('Maintenance:\n');
-  out.write('  doctor          audit/repair binding metadata\n\n');
+  out.write('  doctor          audit/repair binding metadata\n');
+  out.write('  customize       copy a plugin default into .deskwork/<category>/<name>.ts\n\n');
   out.write('Review loop:\n');
   out.write('  review-start    enqueue a longform draft for review\n');
   out.write('  shortform-start enqueue a shortform draft for review\n');

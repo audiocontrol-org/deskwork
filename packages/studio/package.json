@@ -16,6 +16,10 @@
   "bin": {
     "deskwork-studio": "./src/server.ts"
   },
+  "exports": {
+    "./server.ts": "./src/server.ts",
+    "./pages/*": "./src/pages/*"
+  },
   "scripts": {
     "build": "tsx build.ts",
     "prepare": "npm run build",

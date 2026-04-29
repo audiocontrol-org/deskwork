@@ -9397,12 +9397,138 @@ var init_approve = __esm({
   }
 });
 
+// src/commands/customize.ts
+var customize_exports = {};
+__export(customize_exports, {
+  run: () => run3
+});
+import {
+  copyFileSync,
+  existsSync as existsSync5,
+  mkdirSync as mkdirSync3,
+  readdirSync as readdirSync3
+} from "node:fs";
+import { dirname as dirname3, isAbsolute as isAbsolute2, join as join6, resolve as resolve2 } from "node:path";
+import { fileURLToPath } from "node:url";
+function isCategory(value) {
+  return VALID_CATEGORIES.includes(value);
+}
+function resolvePackageFile(specifier) {
+  try {
+    const url = import.meta.resolve(specifier);
+    return fileURLToPath(url);
+  } catch (err2) {
+    const reason = err2 instanceof Error ? err2.message : String(err2);
+    throw new Error(
+      `cannot resolve ${specifier} (broken install?): ${reason}`
+    );
+  }
+}
+function resolveDefaultSource(category, name) {
+  if (category === "prompts") {
+    throw new Error(
+      'category "prompts" is reserved for future use \u2014 no default sources to copy yet'
+    );
+  }
+  if (category === "templates") {
+    const serverPath = resolvePackageFile("@deskwork/studio/server.ts");
+    const candidate2 = resolve2(dirname3(serverPath), "pages", `${name}.ts`);
+    if (!existsSync5(candidate2)) {
+      throw new Error(
+        `no built-in template named "${name}". Available templates: ${listAvailable(
+          dirname3(candidate2)
+        )}`
+      );
+    }
+    return candidate2;
+  }
+  const doctorIndex = resolvePackageFile("@deskwork/core/doctor");
+  const candidate = resolve2(dirname3(doctorIndex), "rules", `${name}.ts`);
+  if (!existsSync5(candidate)) {
+    throw new Error(
+      `no built-in doctor rule named "${name}". Available rules: ${listAvailable(
+        dirname3(candidate)
+      )}`
+    );
+  }
+  return candidate;
+}
+function listAvailable(dir) {
+  if (!existsSync5(dir)) return "(none \u2014 broken install)";
+  const entries = readdirSync3(dir).filter((n) => n.endsWith(".ts")).map((n) => n.slice(0, -".ts".length)).sort();
+  return entries.join(", ");
+}
+async function run3(argv2) {
+  if (argv2.length !== 3) {
+    fail(
+      `Usage: deskwork customize <project-root> <category> <name>
+  category: ${VALID_CATEGORIES.join(" | ")}`,
+      2
+    );
+  }
+  const [projectRootArg, categoryArg, name] = argv2;
+  if (!isCategory(categoryArg)) {
+    fail(
+      `unknown category "${categoryArg}". Valid: ${VALID_CATEGORIES.join(", ")}`,
+      2
+    );
+  }
+  if (!name || name.includes("/") || name.includes("\\") || name.startsWith(".")) {
+    fail(
+      `name "${name}" must be a plain basename (no slashes, no leading dots)`,
+      2
+    );
+  }
+  const projectRoot = isAbsolute2(projectRootArg) ? projectRootArg : resolve2(process.cwd(), projectRootArg);
+  if (!existsSync5(projectRoot)) {
+    fail(`project root does not exist: ${projectRoot}`, 1);
+  }
+  let source;
+  try {
+    source = resolveDefaultSource(categoryArg, name);
+  } catch (err2) {
+    fail(err2 instanceof Error ? err2.message : String(err2), 1);
+  }
+  const destDir = join6(projectRoot, ".deskwork", categoryArg);
+  const destFile = join6(destDir, `${name}.ts`);
+  if (existsSync5(destFile)) {
+    fail(
+      `destination already exists: ${destFile}
+  Refusing to overwrite operator-edited overrides.
+  Move or delete the existing file before re-running.`,
+      1
+    );
+  }
+  mkdirSync3(destDir, { recursive: true });
+  copyFileSync(source, destFile);
+  process.stdout.write(`Customized ${categoryArg}/${name}
+`);
+  process.stdout.write(`  source: ${source}
+`);
+  process.stdout.write(`  dest:   ${destFile}
+`);
+  process.stdout.write(
+    "  Edit the destination file to customize behavior. The studio\n"
+  );
+  process.stdout.write(
+    "  loads the override automatically on the next request.\n"
+  );
+}
+var VALID_CATEGORIES;
+var init_customize = __esm({
+  "src/commands/customize.ts"() {
+    "use strict";
+    init_cli();
+    VALID_CATEGORIES = ["templates", "prompts", "doctor"];
+  }
+});
+
 // src/commands/distribute.ts
 var distribute_exports = {};
 __export(distribute_exports, {
-  run: () => run3
+  run: () => run4
 });
-async function run3(argv2) {
+async function run4(argv2) {
   const KNOWN_FLAGS3 = [
     "site",
     "platform",
@@ -9530,8 +9656,8 @@ var init_distribute = __esm({
 });
 
 // ../core/src/doctor/rules/missing-frontmatter-id.ts
-import { existsSync as existsSync5, readdirSync as readdirSync3, statSync as statSync2 } from "node:fs";
-import { basename, extname, join as join6, relative as relative2 } from "node:path";
+import { existsSync as existsSync6, readdirSync as readdirSync4, statSync as statSync2 } from "node:fs";
+import { basename, extname, join as join7, relative as relative2 } from "node:path";
 import { readFileSync as readFileSync7, writeFileSync as writeFileSync4 } from "node:fs";
 function shouldSkipDir2(name) {
   if (name.startsWith(".")) return true;
@@ -9545,12 +9671,12 @@ function collectMarkdownFiles2(dir) {
   function visit(currentDir) {
     let names;
     try {
-      names = readdirSync3(currentDir);
+      names = readdirSync4(currentDir);
     } catch {
       return;
     }
     for (const name of names) {
-      const abs = join6(currentDir, name);
+      const abs = join7(currentDir, name);
       let st;
       try {
         st = statSync2(abs);
@@ -9586,7 +9712,7 @@ function findCandidatesForEntry(projectRoot, config, site, entry) {
   const seen = /* @__PURE__ */ new Set();
   const contentDir = resolveContentDir(projectRoot, config, site);
   function consider(abs, reason) {
-    if (!existsSync5(abs)) return;
+    if (!existsSync6(abs)) return;
     if (seen.has(abs)) return;
     try {
       const parsed = readFrontmatter(abs);
@@ -9895,7 +10021,7 @@ var init_orphan_frontmatter_id = __esm({
 
 // ../core/src/doctor/rules/duplicate-id.ts
 import { readFileSync as readFileSync9, writeFileSync as writeFileSync6 } from "node:fs";
-import { join as join7, relative as relative4 } from "node:path";
+import { join as join8, relative as relative4 } from "node:path";
 function clearFrontmatterId2(absPath) {
   const raw = readFileSync9(absPath, "utf-8");
   const { data } = parseFrontmatter(raw);
@@ -9913,7 +10039,7 @@ function findDuplicateGroups(ctx) {
   const contentDir = resolveContentDir(ctx.projectRoot, ctx.config, ctx.site);
   const byUuid = /* @__PURE__ */ new Map();
   for (const [relPath, uuid] of ctx.index.byPath) {
-    const abs = join7(contentDir, relPath);
+    const abs = join8(contentDir, relPath);
     const list = byUuid.get(uuid);
     if (list) list.push(abs);
     else byUuid.set(uuid, [abs]);
@@ -10190,8 +10316,8 @@ var init_schema_rejected = __esm({
 });
 
 // ../core/src/doctor/rules/workflow-stale.ts
-import { unlinkSync as unlinkSync2, readdirSync as readdirSync4 } from "node:fs";
-import { join as join8 } from "node:path";
+import { unlinkSync as unlinkSync2, readdirSync as readdirSync5 } from "node:fs";
+import { join as join9 } from "node:path";
 function isStale(workflow, ctx) {
   if (workflow.site !== ctx.site) return false;
   if (workflow.state === "applied" || workflow.state === "cancelled") {
@@ -10206,13 +10332,13 @@ function findWorkflowFile(projectRoot, config, workflowId) {
   const dir = pipelinePath(projectRoot, config);
   let names;
   try {
-    names = readdirSync4(dir);
+    names = readdirSync5(dir);
   } catch {
     return null;
   }
   const suffix = `-${workflowId}.json`;
   for (const name of names) {
-    if (name.endsWith(suffix)) return join8(dir, name);
+    if (name.endsWith(suffix)) return join9(dir, name);
   }
   return null;
 }
@@ -10304,7 +10430,7 @@ var init_workflow_stale = __esm({
 });
 
 // ../core/src/doctor/rules/calendar-uuid-missing.ts
-import { readFileSync as readFileSync10, existsSync as existsSync6 } from "node:fs";
+import { readFileSync as readFileSync10, existsSync as existsSync7 } from "node:fs";
 function scanRowsMissingUuid(markdown) {
   const lines = markdown.split("\n");
   const rows = [];
@@ -10374,7 +10500,7 @@ var init_calendar_uuid_missing = __esm({
           ctx.config,
           ctx.site
         );
-        if (!existsSync6(calendarPath)) return [];
+        if (!existsSync7(calendarPath)) return [];
         let raw;
         try {
           raw = readFileSync10(calendarPath, "utf-8");
@@ -10455,8 +10581,8 @@ var init_calendar_uuid_missing = __esm({
 });
 
 // ../core/src/doctor/rules/legacy-top-level-id-migration.ts
-import { readFileSync as readFileSync11, readdirSync as readdirSync5, statSync as statSync3, writeFileSync as writeFileSync7 } from "node:fs";
-import { extname as extname2, join as join9, relative as relative5 } from "node:path";
+import { readFileSync as readFileSync11, readdirSync as readdirSync6, statSync as statSync3, writeFileSync as writeFileSync7 } from "node:fs";
+import { extname as extname2, join as join10, relative as relative5 } from "node:path";
 function shouldSkipDir3(name) {
   if (name.startsWith(".")) return true;
   return SKIP_DIRS3.has(name.toLowerCase());
@@ -10469,12 +10595,12 @@ function collectMarkdownFiles3(dir) {
   function visit(currentDir) {
     let names;
     try {
-      names = readdirSync5(currentDir);
+      names = readdirSync6(currentDir);
     } catch {
       return;
     }
     for (const name of names) {
-      const abs = join9(currentDir, name);
+      const abs = join10(currentDir, name);
       let st;
       try {
         st = statSync3(abs);
@@ -10637,6 +10763,102 @@ var init_legacy_top_level_id_migration = __esm({
   }
 });
 
+// ../core/src/doctor/project-rules.ts
+import { existsSync as existsSync8, readdirSync as readdirSync7 } from "node:fs";
+import { join as join11 } from "node:path";
+function assertDoctorRule(value, source) {
+  if (typeof value !== "object" || value === null) {
+    throw new Error(
+      `project doctor rule ${source}: default export must be an object`
+    );
+  }
+  const id = Reflect.get(value, "id");
+  const label = Reflect.get(value, "label");
+  const audit = Reflect.get(value, "audit");
+  const plan = Reflect.get(value, "plan");
+  const apply = Reflect.get(value, "apply");
+  if (typeof id !== "string" || id.length === 0) {
+    throw new Error(
+      `project doctor rule ${source}: 'id' must be a non-empty string`
+    );
+  }
+  if (typeof label !== "string" || label.length === 0) {
+    throw new Error(
+      `project doctor rule ${source}: 'label' must be a non-empty string`
+    );
+  }
+  if (typeof audit !== "function") {
+    throw new Error(
+      `project doctor rule ${source}: 'audit' must be a function`
+    );
+  }
+  if (typeof plan !== "function") {
+    throw new Error(
+      `project doctor rule ${source}: 'plan' must be a function`
+    );
+  }
+  if (typeof apply !== "function") {
+    throw new Error(
+      `project doctor rule ${source}: 'apply' must be a function`
+    );
+  }
+  return {
+    id,
+    label,
+    audit: audit.bind(value),
+    plan: plan.bind(value),
+    apply: apply.bind(value)
+  };
+}
+async function loadProjectRules(projectRoot) {
+  const dir = join11(projectRoot, ".deskwork", "doctor");
+  if (!existsSync8(dir)) return [];
+  const entries = readdirSync7(dir).filter((n) => n.endsWith(RULE_FILE_SUFFIX));
+  entries.sort();
+  const out = [];
+  for (const name of entries) {
+    const path = join11(dir, name);
+    const basename3 = name.slice(0, -RULE_FILE_SUFFIX.length);
+    const mod2 = await import(path);
+    if (typeof mod2 !== "object" || mod2 === null) {
+      throw new Error(
+        `project doctor rule ${path}: import did not produce a module object`
+      );
+    }
+    const def = Reflect.get(mod2, "default");
+    const rule9 = assertDoctorRule(def, path);
+    out.push({ basename: basename3, path, rule: rule9 });
+  }
+  return out;
+}
+function mergeRules(builtIns, projectRules) {
+  const builtInIndexByBasename = /* @__PURE__ */ new Map();
+  for (let i = 0; i < builtIns.length; i++) {
+    builtInIndexByBasename.set(builtIns[i].id, i);
+  }
+  const merged = builtIns.slice();
+  const overriddenBasenames = /* @__PURE__ */ new Set();
+  for (const p of projectRules) {
+    const idx = builtInIndexByBasename.get(p.basename);
+    if (idx !== void 0) {
+      merged[idx] = p.rule;
+      overriddenBasenames.add(p.basename);
+    }
+  }
+  for (const p of projectRules) {
+    if (overriddenBasenames.has(p.basename)) continue;
+    merged.push(p.rule);
+  }
+  return merged;
+}
+var RULE_FILE_SUFFIX;
+var init_project_rules = __esm({
+  "../core/src/doctor/project-rules.ts"() {
+    "use strict";
+    RULE_FILE_SUFFIX = ".ts";
+  }
+});
+
 // ../core/src/doctor/runner.ts
 function parseFixArgument(arg) {
   const trimmed = arg.trim();
@@ -10680,23 +10902,29 @@ function selectSites(opts) {
   }
   return Object.keys(opts.config.sites);
 }
-function selectRules(ruleIds) {
-  if (ruleIds === void 0) return [...RULES];
+function selectRules(available, ruleIds) {
+  if (ruleIds === void 0) return [...available];
+  const byId = new Map(available.map((r) => [r.id, r]));
   const out = [];
   for (const id of ruleIds) {
-    const rule9 = RULE_BY_ID.get(id);
+    const rule9 = byId.get(id);
     if (!rule9) {
       throw new Error(
-        `Unknown doctor rule: "${id}". Known: ${RULES.map((r) => r.id).join(", ")}, all`
+        `Unknown doctor rule: "${id}". Known: ${available.map((r) => r.id).join(", ")}, all`
       );
     }
     out.push(rule9);
   }
   return out;
 }
+async function buildEffectiveRules(projectRoot) {
+  const projectRules = await loadProjectRules(projectRoot);
+  return mergeRules(RULES, projectRules);
+}
 async function runAudit(opts, interaction) {
   const sites = selectSites(opts);
-  const rules = selectRules(opts.ruleIds);
+  const available = await buildEffectiveRules(opts.projectRoot);
+  const rules = selectRules(available, opts.ruleIds);
   const findings = [];
   for (const site of sites) {
     const ctx = buildContext(opts, site, interaction);
@@ -10709,7 +10937,8 @@ async function runAudit(opts, interaction) {
 }
 async function runRepair(opts, interaction) {
   const sites = selectSites(opts);
-  const rules = selectRules(opts.ruleIds);
+  const available = await buildEffectiveRules(opts.projectRoot);
+  const rules = selectRules(available, opts.ruleIds);
   const findings = [];
   const repairs = [];
   for (const site of sites) {
@@ -10801,6 +11030,7 @@ var init_runner = __esm({
     init_workflow_stale();
     init_calendar_uuid_missing();
     init_legacy_top_level_id_migration();
+    init_project_rules();
     RULES = [
       calendar_uuid_missing_default,
       legacy_top_level_id_migration_default,
@@ -10837,11 +11067,11 @@ var init_doctor = __esm({
 // src/commands/doctor.ts
 var doctor_exports = {};
 __export(doctor_exports, {
-  run: () => run4
+  run: () => run5
 });
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
-async function run4(argv2) {
+async function run5(argv2) {
   const { positional, flags, booleans } = parseInput(argv2);
   if (positional.length < 1) {
     fail(
@@ -10865,10 +11095,13 @@ async function run4(argv2) {
   }
   let ruleIds;
   if (flags.fix !== void 0) {
-    try {
-      ruleIds = parseFixArgument(flags.fix);
-    } catch (err2) {
-      fail(err2 instanceof Error ? err2.message : String(err2), 2);
+    const fixArg = flags.fix.trim();
+    if (fixArg !== "" && fixArg !== "all") {
+      try {
+        ruleIds = parseFixArgument(flags.fix);
+      } catch (err2) {
+        fail(err2 instanceof Error ? err2.message : String(err2), 2);
+      }
     }
   }
   const json = booleans.has("json");
@@ -11137,9 +11370,9 @@ var init_doctor2 = __esm({
 // src/commands/draft.ts
 var draft_exports = {};
 __export(draft_exports, {
-  run: () => run5
+  run: () => run6
 });
-async function run5(argv2) {
+async function run6(argv2) {
   const KNOWN_FLAGS3 = ["site", "issue"];
   const { positional, flags } = parse();
   if (positional.length < 2) {
@@ -11208,11 +11441,11 @@ var init_draft = __esm({
 
 // ../core/src/ingest-paths.ts
 import {
-  existsSync as existsSync7,
-  readdirSync as readdirSync6,
+  existsSync as existsSync9,
+  readdirSync as readdirSync8,
   statSync as statSync4
 } from "node:fs";
-import { isAbsolute as isAbsolute2, join as join10, resolve as resolve2, sep } from "node:path";
+import { isAbsolute as isAbsolute3, join as join12, resolve as resolve3, sep } from "node:path";
 function collectMarkdownFiles4(paths) {
   const seen = /* @__PURE__ */ new Map();
   for (const p of paths) {
@@ -11227,11 +11460,11 @@ function collectMarkdownFiles4(paths) {
   );
 }
 function expandPath(input) {
-  const absolute = isAbsolute2(input) ? input : resolve2(process.cwd(), input);
+  const absolute = isAbsolute3(input) ? input : resolve3(process.cwd(), input);
   if (containsGlob(input)) {
     return expandGlob(absolute);
   }
-  if (!existsSync7(absolute)) {
+  if (!existsSync9(absolute)) {
     throw new Error(`Path does not exist: ${input}`);
   }
   const stat = statSync4(absolute);
@@ -11255,9 +11488,9 @@ function dirnameOf(filePath) {
 }
 function walkDirectory(dir, root) {
   const out = [];
-  const entries = readdirSync6(dir, { withFileTypes: true });
+  const entries = readdirSync8(dir, { withFileTypes: true });
   for (const entry of entries) {
-    const child = join10(dir, entry.name);
+    const child = join12(dir, entry.name);
     if (entry.isDirectory()) {
       out.push(...walkDirectory(child, root));
     } else if (entry.isFile() && hasMarkdownExtension(entry.name)) {
@@ -11278,7 +11511,7 @@ function expandGlob(absolutePattern) {
   }
   const root = segments.slice(0, rootEnd + 1).join(sep) || sep;
   const remainder = segments.slice(rootEnd + 1);
-  if (!existsSync7(root)) {
+  if (!existsSync9(root)) {
     return [];
   }
   return matchPattern(root, remainder, root);
@@ -11294,7 +11527,7 @@ function matchPattern(currentDir, remaining, root) {
   const out = [];
   let entries;
   try {
-    entries = readdirSync6(currentDir, { withFileTypes: true });
+    entries = readdirSync8(currentDir, { withFileTypes: true });
   } catch {
     return out;
   }
@@ -11303,7 +11536,7 @@ function matchPattern(currentDir, remaining, root) {
     for (const entry of entries) {
       if (entry.isDirectory()) {
         out.push(
-          ...matchPattern(join10(currentDir, entry.name), remaining, root)
+          ...matchPattern(join12(currentDir, entry.name), remaining, root)
         );
       }
     }
@@ -11312,7 +11545,7 @@ function matchPattern(currentDir, remaining, root) {
   const matcher = globSegmentMatcher(head);
   for (const entry of entries) {
     if (!matcher(entry.name)) continue;
-    const child = join10(currentDir, entry.name);
+    const child = join12(currentDir, entry.name);
     if (rest.length === 0) {
       if (entry.isFile() && hasMarkdownExtension(entry.name)) {
         out.push({ filePath: child, root });
@@ -11357,8 +11590,8 @@ var init_ingest_paths = __esm({
 });
 
 // ../core/src/ingest-derive.ts
-import { readdirSync as readdirSync7, statSync as statSync5 } from "node:fs";
-import { join as join11, relative as relative6, sep as sep2 } from "node:path";
+import { readdirSync as readdirSync9, statSync as statSync5 } from "node:fs";
+import { join as join13, relative as relative6, sep as sep2 } from "node:path";
 function deriveSlug(input) {
   if (input.explicitSlug !== void 0) {
     return { value: input.explicitSlug, source: "explicit" };
@@ -11415,7 +11648,7 @@ function slugFromPath(filePath, root) {
   }
   let cursor = root;
   for (const dir of dirSegments) {
-    cursor = join11(cursor, dir);
+    cursor = join13(cursor, dir);
     if (directoryIsHierarchicalNode(cursor)) {
       prefix.push(dir);
     } else {
@@ -11427,7 +11660,7 @@ function slugFromPath(filePath, root) {
 function directoryIsHierarchicalNode(dir) {
   let entries;
   try {
-    entries = readdirSync7(dir, { withFileTypes: true });
+    entries = readdirSync9(dir, { withFileTypes: true });
   } catch {
     return false;
   }
@@ -11557,13 +11790,13 @@ var init_ingest_derive = __esm({
 });
 
 // ../core/src/ingest.ts
-import { basename as basename2, isAbsolute as isAbsolute3, relative as relative7, sep as sep3 } from "node:path";
+import { basename as basename2, isAbsolute as isAbsolute4, relative as relative7, sep as sep3 } from "node:path";
 import { readFileSync as readFileSync12 } from "node:fs";
 function discoverIngestCandidates(paths, options) {
   if (paths.length === 0) {
     throw new Error("discoverIngestCandidates: at least one path is required");
   }
-  if (!options.projectRoot || !isAbsolute3(options.projectRoot)) {
+  if (!options.projectRoot || !isAbsolute4(options.projectRoot)) {
     throw new Error(
       `discoverIngestCandidates: projectRoot must be an absolute path (got "${options.projectRoot ?? ""}")`
     );
@@ -11739,12 +11972,12 @@ var init_ingest = __esm({
 // src/commands/ingest.ts
 var ingest_exports = {};
 __export(ingest_exports, {
-  run: () => run6
+  run: () => run7
 });
-import { existsSync as existsSync8, mkdirSync as mkdirSync3, readFileSync as readFileSync13, writeFileSync as writeFileSync8 } from "node:fs";
-import { isAbsolute as isAbsolute4, join as join12, resolve as resolve3 } from "node:path";
+import { existsSync as existsSync10, mkdirSync as mkdirSync4, readFileSync as readFileSync13, writeFileSync as writeFileSync8 } from "node:fs";
+import { isAbsolute as isAbsolute5, join as join14, resolve as resolve4 } from "node:path";
 import { randomUUID as randomUUID4 } from "node:crypto";
-async function run6(argv2) {
+async function run7(argv2) {
   const { positional, flags, booleans } = parseInput2(argv2);
   if (positional.length < 2) {
     fail(
@@ -11768,10 +12001,10 @@ async function run6(argv2) {
   const calendarPath = resolveCalendarPath(projectRoot, config, site);
   const calendar = readCalendar(calendarPath);
   const absolutePaths = paths.map(
-    (p) => isAbsolute4(p) ? p : resolve3(projectRoot, p)
+    (p) => isAbsolute5(p) ? p : resolve4(projectRoot, p)
   );
   const contentDir = resolveContentDir(projectRoot, config, site);
-  const scrapbookRoots = [join12(contentDir, "scrapbook")];
+  const scrapbookRoots = [join14(contentDir, "scrapbook")];
   let discovery;
   try {
     discovery = discoverIngestCandidates(absolutePaths, {
@@ -11933,13 +12166,13 @@ function pad(s, n) {
   return s + " ".repeat(n - s.length);
 }
 function writeIngestJournalEntry(projectRoot, config, site, candidate, entry) {
-  const journalRoot = join12(
+  const journalRoot = join14(
     projectRoot,
     config.reviewJournalDir ?? ".deskwork/review-journal",
     "ingest"
   );
-  if (!existsSync8(journalRoot)) {
-    mkdirSync3(journalRoot, { recursive: true });
+  if (!existsSync10(journalRoot)) {
+    mkdirSync4(journalRoot, { recursive: true });
   }
   const record = {
     id: entry.id ?? randomUUID4(),
@@ -11990,17 +12223,17 @@ var init_ingest2 = __esm({
 });
 
 // src/commands/install-preflight.ts
-import { existsSync as existsSync9, readFileSync as readFileSync14, readdirSync as readdirSync8, statSync as statSync6 } from "node:fs";
-import { join as join13 } from "node:path";
+import { existsSync as existsSync11, readFileSync as readFileSync14, readdirSync as readdirSync10, statSync as statSync6 } from "node:fs";
+import { join as join15 } from "node:path";
 function isAstroProject(projectRoot) {
   return ASTRO_CONFIG_NAMES.some(
-    (name) => existsSync9(join13(projectRoot, name))
+    (name) => existsSync11(join15(projectRoot, name))
   );
 }
 function findContentSchemaFile(projectRoot) {
   for (const rel of CONTENT_SCHEMA_NAMES) {
-    const abs = join13(projectRoot, rel);
-    if (existsSync9(abs)) return abs;
+    const abs = join15(projectRoot, rel);
+    if (existsSync11(abs)) return abs;
   }
   return null;
 }
@@ -12087,24 +12320,24 @@ function printSchemaPreflight(projectRoot, config) {
 }
 function detectExistingPipeline(projectRoot) {
   const out = [];
-  if (existsSync9(join13(projectRoot, "journal/editorial"))) {
+  if (existsSync11(join15(projectRoot, "journal/editorial"))) {
     out.push({
       kind: "journal-tree",
       relativePath: "journal/editorial/"
     });
   }
-  const skillsDir = join13(projectRoot, ".claude/skills");
+  const skillsDir = join15(projectRoot, ".claude/skills");
   const skillMatches = [];
-  if (existsSync9(skillsDir)) {
+  if (existsSync11(skillsDir)) {
     let entries = [];
     try {
-      entries = readdirSync8(skillsDir);
+      entries = readdirSync10(skillsDir);
     } catch {
       entries = [];
     }
     for (const name of entries) {
       if (EDITORIAL_SKILL_NAMES.has(name)) {
-        const abs = join13(skillsDir, name);
+        const abs = join15(skillsDir, name);
         try {
           if (statSync6(abs).isDirectory()) {
             skillMatches.push(name);
@@ -12122,20 +12355,20 @@ function detectExistingPipeline(projectRoot) {
       });
     }
   }
-  const sitesDir = join13(projectRoot, "src/sites");
-  if (existsSync9(sitesDir)) {
+  const sitesDir = join15(projectRoot, "src/sites");
+  if (existsSync11(sitesDir)) {
     let siteNames = [];
     try {
-      siteNames = readdirSync8(sitesDir);
+      siteNames = readdirSync10(sitesDir);
     } catch {
       siteNames = [];
     }
     for (const site of siteNames) {
-      const pagesDir = join13(sitesDir, site, "pages/dev");
-      if (!existsSync9(pagesDir)) continue;
+      const pagesDir = join15(sitesDir, site, "pages/dev");
+      if (!existsSync11(pagesDir)) continue;
       let pageEntries = [];
       try {
-        pageEntries = readdirSync8(pagesDir);
+        pageEntries = readdirSync10(pagesDir);
       } catch {
         continue;
       }
@@ -12150,7 +12383,7 @@ function detectExistingPipeline(projectRoot) {
     }
   }
   for (const candidate of ["scripts/lib/editorial", "scripts/lib/editorial-review"]) {
-    if (existsSync9(join13(projectRoot, candidate))) {
+    if (existsSync11(join15(projectRoot, candidate))) {
       out.push({
         kind: "editorial-script-module",
         relativePath: `${candidate}/`
@@ -12218,11 +12451,11 @@ var init_install_preflight = __esm({
 // src/commands/install.ts
 var install_exports = {};
 __export(install_exports, {
-  run: () => run7
+  run: () => run8
 });
-import { readFileSync as readFileSync15, writeFileSync as writeFileSync9, existsSync as existsSync10, mkdirSync as mkdirSync4 } from "node:fs";
-import { dirname as dirname3, isAbsolute as isAbsolute5, join as join14, resolve as resolve4 } from "node:path";
-async function run7(argv2) {
+import { readFileSync as readFileSync15, writeFileSync as writeFileSync9, existsSync as existsSync12, mkdirSync as mkdirSync5 } from "node:fs";
+import { dirname as dirname4, isAbsolute as isAbsolute6, join as join16, resolve as resolve5 } from "node:path";
+async function run8(argv2) {
   function usage() {
     console.error(
       "Usage: deskwork install [<project-root>] <config-file>"
@@ -12239,14 +12472,14 @@ async function run7(argv2) {
   } else {
     usage();
   }
-  const projectRoot = isAbsolute5(projectRootArg) ? projectRootArg : resolve4(process.cwd(), projectRootArg);
-  const configFile = isAbsolute5(configFileArg) ? configFileArg : resolve4(process.cwd(), configFileArg);
+  const projectRoot = isAbsolute6(projectRootArg) ? projectRootArg : resolve5(process.cwd(), projectRootArg);
+  const configFile = isAbsolute6(configFileArg) ? configFileArg : resolve5(process.cwd(), configFileArg);
   console.log(`Installing into: ${projectRoot}`);
-  if (!existsSync10(projectRoot)) {
+  if (!existsSync12(projectRoot)) {
     console.error(`Project root does not exist: ${projectRoot}`);
     process.exit(1);
   }
-  if (!existsSync10(configFile)) {
+  if (!existsSync12(configFile)) {
     console.error(`Config file does not exist: ${configFile}`);
     process.exit(1);
   }
@@ -12269,7 +12502,7 @@ async function run7(argv2) {
   const pipelineSignals = detectExistingPipeline(projectRoot);
   printExistingPipelineWarning(pipelineSignals);
   const writtenConfigPath = configPath(projectRoot);
-  mkdirSync4(dirname3(writtenConfigPath), { recursive: true });
+  mkdirSync5(dirname4(writtenConfigPath), { recursive: true });
   writeFileSync9(
     writtenConfigPath,
     JSON.stringify(config, null, 2) + "\n",
@@ -12278,12 +12511,12 @@ async function run7(argv2) {
   const createdCalendars = [];
   const preservedCalendars = [];
   for (const [slug, site] of Object.entries(config.sites)) {
-    const absPath = join14(projectRoot, site.calendarPath);
-    if (existsSync10(absPath)) {
+    const absPath = join16(projectRoot, site.calendarPath);
+    if (existsSync12(absPath)) {
       preservedCalendars.push(`${slug}: ${site.calendarPath}`);
       continue;
     }
-    mkdirSync4(dirname3(absPath), { recursive: true });
+    mkdirSync5(dirname4(absPath), { recursive: true });
     writeFileSync9(absPath, renderEmptyCalendar(), "utf-8");
     createdCalendars.push(`${slug}: ${site.calendarPath}`);
   }
@@ -12312,10 +12545,10 @@ var init_install = __esm({
 // src/commands/iterate.ts
 var iterate_exports = {};
 __export(iterate_exports, {
-  run: () => run8
+  run: () => run9
 });
-import { existsSync as existsSync11, readFileSync as readFileSync16 } from "node:fs";
-async function run8(argv2) {
+import { existsSync as existsSync13, readFileSync as readFileSync16 } from "node:fs";
+async function run9(argv2) {
   const KNOWN_FLAGS3 = ["site", "kind", "platform", "channel", "dispositions"];
   const DISPOSITIONS = /* @__PURE__ */ new Set(["addressed", "deferred", "wontfix"]);
   const VALID_KINDS = ["longform", "outline", "shortform"];
@@ -12389,7 +12622,7 @@ async function run8(argv2) {
       workflow.entryId
     );
   }
-  if (!existsSync11(file)) {
+  if (!existsSync13(file)) {
     fail(
       kind === "shortform" ? `No shortform file at ${file}. Run /deskwork:shortform-start first.` : `No blog file at ${file}.`
     );
@@ -12411,7 +12644,7 @@ The studio must click 'Request iteration' to move the workflow to 'iterating' be
   let dispositions = null;
   if (flags.dispositions !== void 0) {
     const path = absolutize(flags.dispositions);
-    if (!existsSync11(path)) {
+    if (!existsSync13(path)) {
       fail(`--dispositions file not found: ${path}`);
     }
     let parsed;
@@ -12497,8 +12730,8 @@ var init_iterate = __esm({
 });
 
 // ../core/src/scaffold.ts
-import { existsSync as existsSync12, mkdirSync as mkdirSync5 } from "node:fs";
-import { dirname as dirname4, join as join15, relative as relative8 } from "node:path";
+import { existsSync as existsSync14, mkdirSync as mkdirSync6 } from "node:fs";
+import { dirname as dirname5, join as join17, relative as relative8 } from "node:path";
 function scaffoldBlogPost(projectRoot, config, site, entry, opts = {}) {
   const slug = resolveSite(config, site);
   const siteCfg = config.sites[slug];
@@ -12530,7 +12763,7 @@ function scaffoldBlogPost(projectRoot, config, site, entry, opts = {}) {
     contentRelativePath
   );
   const relativePath = relative8(projectRoot, filePath);
-  if (existsSync12(filePath)) {
+  if (existsSync14(filePath)) {
     throw new Error(`Blog post already exists at ${relativePath}`);
   }
   const dateStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
@@ -12545,9 +12778,9 @@ function scaffoldBlogPost(projectRoot, config, site, entry, opts = {}) {
   data.author = author;
   if (siteCfg.blogInitialState) data.state = siteCfg.blogInitialState;
   const body = buildBody(entry.title, siteCfg.blogOutlineSection === true);
-  mkdirSync5(dirname4(filePath), { recursive: true });
+  mkdirSync6(dirname5(filePath), { recursive: true });
   writeFrontmatter(filePath, data, body);
-  const reported = contentRelativePath ?? relative8(join15(projectRoot, siteCfg.contentDir), filePath);
+  const reported = contentRelativePath ?? relative8(join17(projectRoot, siteCfg.contentDir), filePath);
   return { filePath, relativePath, contentRelativePath: reported };
 }
 function layoutToContentRelativePath(layout, slug) {
@@ -12589,9 +12822,9 @@ var init_scaffold = __esm({
 // src/commands/outline.ts
 var outline_exports = {};
 __export(outline_exports, {
-  run: () => run9
+  run: () => run10
 });
-async function run9(argv2) {
+async function run10(argv2) {
   const KNOWN_FLAGS3 = ["site", "author", "layout"];
   const VALID_LAYOUTS = ["index", "readme", "flat"];
   const { positional, flags } = parse();
@@ -12676,9 +12909,9 @@ var init_outline = __esm({
 // src/commands/pause.ts
 var pause_exports = {};
 __export(pause_exports, {
-  run: () => run10
+  run: () => run11
 });
-async function run10(argv2) {
+async function run11(argv2) {
   const KNOWN_FLAGS3 = ["site"];
   const { positional, flags } = parse();
   if (positional.length < 2) {
@@ -12739,9 +12972,9 @@ var init_pause = __esm({
 // src/commands/plan.ts
 var plan_exports = {};
 __export(plan_exports, {
-  run: () => run11
+  run: () => run12
 });
-async function run11(argv2) {
+async function run12(argv2) {
   const KNOWN_FLAGS3 = ["site", "topics"];
   const { positional, flags } = parse();
   if (positional.length < 2) {
@@ -12804,10 +13037,10 @@ var init_plan = __esm({
 // src/commands/publish.ts
 var publish_exports = {};
 __export(publish_exports, {
-  run: () => run12
+  run: () => run13
 });
-import { existsSync as existsSync13 } from "node:fs";
-async function run12(argv2) {
+import { existsSync as existsSync15 } from "node:fs";
+async function run13(argv2) {
   const KNOWN_FLAGS3 = ["site", "date", "content-url"];
   const DATE_RE2 = /^\d{4}-\d{2}-\d{2}$/;
   const { positional, flags } = parse();
@@ -12852,7 +13085,7 @@ async function run12(argv2) {
       slug,
       existing.id
     );
-    if (!existsSync13(filePath)) {
+    if (!existsSync15(filePath)) {
       fail(
         `Cannot publish blog post "${slug}": no file at ${filePath}. Write the post before publishing.`
       );
@@ -12902,9 +13135,9 @@ var init_publish = __esm({
 // src/commands/resume.ts
 var resume_exports = {};
 __export(resume_exports, {
-  run: () => run13
+  run: () => run14
 });
-async function run13(argv2) {
+async function run14(argv2) {
   const KNOWN_FLAGS3 = ["site"];
   const { positional, flags } = parse();
   if (positional.length < 2) {
@@ -12964,9 +13197,9 @@ var init_resume = __esm({
 // src/commands/review-cancel.ts
 var review_cancel_exports = {};
 __export(review_cancel_exports, {
-  run: () => run14
+  run: () => run15
 });
-async function run14(argv2) {
+async function run15(argv2) {
   const KNOWN_FLAGS3 = ["site", "platform", "channel", "kind"];
   const { positional, flags } = parse();
   if (positional.length < 2) {
@@ -13052,9 +13285,9 @@ var init_review_cancel = __esm({
 // src/commands/review-help.ts
 var review_help_exports = {};
 __export(review_help_exports, {
-  run: () => run15
+  run: () => run16
 });
-async function run15(argv2) {
+async function run16(argv2) {
   const KNOWN_FLAGS3 = ["site"];
   const { positional, flags } = parse();
   if (positional.length < 1) {
@@ -13262,9 +13495,9 @@ var init_report = __esm({
 // src/commands/review-report.ts
 var review_report_exports = {};
 __export(review_report_exports, {
-  run: () => run16
+  run: () => run17
 });
-async function run16(argv2) {
+async function run17(argv2) {
   const KNOWN_FLAGS3 = ["site", "format"];
   const BOOLEAN_FLAGS3 = ["include-active"];
   const { positional, flags, booleans } = parse();
@@ -13312,7 +13545,7 @@ var init_review_report = __esm({
 });
 
 // ../core/src/body-state.ts
-import { existsSync as existsSync14, readFileSync as readFileSync17 } from "node:fs";
+import { existsSync as existsSync16, readFileSync as readFileSync17 } from "node:fs";
 function stripOutlineSection(body) {
   const lines = body.split("\n");
   const startIdx = lines.findIndex((line) => /^##[ \t]+Outline\b/.test(line));
@@ -13327,7 +13560,7 @@ function stripOutlineSection(body) {
   return [...lines.slice(0, startIdx), ...lines.slice(endIdx)].join("\n");
 }
 function bodyState(filePath) {
-  if (!existsSync14(filePath)) return "missing";
+  if (!existsSync16(filePath)) return "missing";
   const content = readFileSync17(filePath, "utf8");
   const fmMatch = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
   const body = fmMatch ? content.slice(fmMatch[0].length) : content;
@@ -13350,11 +13583,11 @@ var init_body_state = __esm({
 // src/commands/review-start.ts
 var review_start_exports = {};
 __export(review_start_exports, {
-  run: () => run17
+  run: () => run18
 });
-import { existsSync as existsSync15, readFileSync as readFileSync18, readdirSync as readdirSync9 } from "node:fs";
-import { dirname as dirname5 } from "node:path";
-async function run17(argv2) {
+import { existsSync as existsSync17, readFileSync as readFileSync18, readdirSync as readdirSync11 } from "node:fs";
+import { dirname as dirname6 } from "node:path";
+async function run18(argv2) {
   const KNOWN_FLAGS3 = ["site"];
   const SLUG_RE3 = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
   const { positional, flags } = parse();
@@ -13376,7 +13609,7 @@ async function run17(argv2) {
   let entryId;
   try {
     const calendarPath = resolveCalendarPath(projectRoot, config, site);
-    if (existsSync15(calendarPath)) {
+    if (existsSync17(calendarPath)) {
       const cal = readCalendar(calendarPath);
       entryId = cal.entries.find((e) => e.slug === slug)?.id;
     }
@@ -13384,7 +13617,7 @@ async function run17(argv2) {
     entryId = void 0;
   }
   const file = resolveEntryFilePath(projectRoot, config, site, slug, entryId);
-  if (!existsSync15(file)) {
+  if (!existsSync17(file)) {
     const siblings = listSiblingSlugs(file);
     const list = siblings.length > 0 ? siblings.join(", ") : "(none)";
     fail(
@@ -13434,9 +13667,9 @@ Run /deskwork:outline <slug> (or /deskwork:draft) to scaffold it first.`
     }
   }
   function listSiblingSlugs(blogFile) {
-    const dir = dirname5(blogFile);
-    if (!existsSync15(dir)) return [];
-    return readdirSync9(dir).filter((name) => name.endsWith(".md")).map((name) => name.replace(/\.md$/, ""));
+    const dir = dirname6(blogFile);
+    if (!existsSync17(dir)) return [];
+    return readdirSync11(dir).filter((name) => name.endsWith(".md")).map((name) => name.replace(/\.md$/, ""));
   }
 }
 var init_review_start = __esm({
@@ -13454,9 +13687,9 @@ var init_review_start = __esm({
 // src/commands/shortform-start.ts
 var shortform_start_exports = {};
 __export(shortform_start_exports, {
-  run: () => run18
+  run: () => run19
 });
-async function run18(argv2) {
+async function run19(argv2) {
   const KNOWN_FLAGS3 = ["site", "platform", "channel", "initial-markdown"];
   const SLUG_RE3 = /^[a-z0-9][a-z0-9-]*(\/[a-z0-9][a-z0-9-]*)*$/;
   const { positional, flags } = parse();
@@ -13560,6 +13793,7 @@ var init_shortform_start = __esm({
 var SUBCOMMANDS = {
   add: () => Promise.resolve().then(() => (init_add(), add_exports)),
   approve: () => Promise.resolve().then(() => (init_approve(), approve_exports)),
+  customize: () => Promise.resolve().then(() => (init_customize(), customize_exports)),
   distribute: () => Promise.resolve().then(() => (init_distribute(), distribute_exports)),
   doctor: () => Promise.resolve().then(() => (init_doctor2(), doctor_exports)),
   draft: () => Promise.resolve().then(() => (init_draft(), draft_exports)),
@@ -13616,7 +13850,8 @@ function printUsage() {
   out.write("  pause           move a non-terminal entry to Paused\n");
   out.write("  resume          restore a Paused entry to its prior stage\n\n");
   out.write("Maintenance:\n");
-  out.write("  doctor          audit/repair binding metadata\n\n");
+  out.write("  doctor          audit/repair binding metadata\n");
+  out.write("  customize       copy a plugin default into .deskwork/<category>/<name>.ts\n\n");
   out.write("Review loop:\n");
   out.write("  review-start    enqueue a longform draft for review\n");
   out.write("  shortform-start enqueue a shortform draft for review\n");

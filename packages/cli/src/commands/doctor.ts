@@ -82,10 +82,18 @@ export async function run(argv: string[]): Promise<void> {
 
   let ruleIds: string[] | undefined;
   if (flags.fix !== undefined) {
-    try {
-      ruleIds = parseFixArgument(flags.fix);
-    } catch (err) {
-      fail(err instanceof Error ? err.message : String(err), 2);
+    const fixArg = flags.fix.trim();
+    // Phase 23f: `--fix all` (and the empty form) leaves `ruleIds`
+    // undefined so the runner picks up project rules registered at
+    // `<projectRoot>/.deskwork/doctor/*.ts` along with the built-ins.
+    // Explicit ids still validate against the built-in set (parseFixArgument
+    // throws on unknown).
+    if (fixArg !== '' && fixArg !== 'all') {
+      try {
+        ruleIds = parseFixArgument(flags.fix);
+      } catch (err) {
+        fail(err instanceof Error ? err.message : String(err), 2);
+      }
     }
   }
 

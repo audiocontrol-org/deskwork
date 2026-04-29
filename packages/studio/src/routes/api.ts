@@ -21,6 +21,7 @@ import {
 import { handleStartShortform } from '@deskwork/core/review/start-handlers';
 import { renderMarkdownToHtml } from '@deskwork/core/review/render';
 import type { DeskworkConfig } from '@deskwork/core/config';
+import type { OverrideResolver } from '@deskwork/core/overrides';
 
 /**
  * Narrow a `HandlerResult.body` (typed as `unknown`) to extract the
@@ -63,6 +64,16 @@ export interface StudioContext {
    * Defaults to "live" (a fresh `Date()` per render) in `createApp`.
    */
   now?: () => Date;
+  /**
+   * Phase 23f: per-project override resolver. Looks up
+   * `<projectRoot>/.deskwork/{templates,prompts,doctor}/<name>.ts`.
+   * Optional on the type so existing call sites that pre-date the
+   * customization layer (and tests that only care about default
+   * rendering) can omit it; `createApp` derives one from `projectRoot`
+   * when not supplied. Production server boot constructs the resolver
+   * once and threads it through.
+   */
+  resolver?: OverrideResolver;
 }
 
 export function createApiRouter(ctx: StudioContext): Hono {

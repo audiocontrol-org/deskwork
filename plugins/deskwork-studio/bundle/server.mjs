@@ -12944,7 +12944,7 @@ async function listenWithAutoIncrement(options, serveImpl) {
 }
 
 // src/server.ts
-import { existsSync as existsSync13, realpathSync } from "node:fs";
+import { existsSync as existsSync14, realpathSync } from "node:fs";
 import { dirname as dirname5, isAbsolute, resolve as resolve3 } from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
@@ -30687,6 +30687,64 @@ function getRequestContentIndex(c, studioCtx, site) {
   return activeBuilder(studioCtx.projectRoot, studioCtx.config, site);
 }
 
+// ../core/src/overrides.ts
+import { existsSync as existsSync13 } from "node:fs";
+import { join as join13 } from "node:path";
+function createOverrideResolver(projectRoot) {
+  const root3 = join13(projectRoot, ".deskwork");
+  function lookup(category, name) {
+    const path = join13(root3, category, `${name}.ts`);
+    return existsSync13(path) ? path : null;
+  }
+  return {
+    template(name) {
+      return lookup("templates", name);
+    },
+    prompt(name) {
+      return lookup("prompts", name);
+    },
+    doctorRule(name) {
+      return lookup("doctor", name);
+    },
+    categoryDir(category) {
+      return join13(root3, category);
+    }
+  };
+}
+
+// src/lib/override-render.ts
+function getResolver(ctx) {
+  if (ctx.resolver) return ctx.resolver;
+  return createOverrideResolver(ctx.projectRoot);
+}
+function isOverrideRenderer(value) {
+  return typeof value === "function";
+}
+async function runTemplateOverride(ctx, name, args) {
+  const resolver2 = getResolver(ctx);
+  const path = resolver2.template(name);
+  if (path === null) return null;
+  const mod = await import(path);
+  if (typeof mod !== "object" || mod === null) {
+    throw new Error(
+      `template override at ${path} did not export a module object`
+    );
+  }
+  const fn = Reflect.get(mod, "default");
+  if (!isOverrideRenderer(fn)) {
+    throw new Error(
+      `template override at ${path} must export a 'default' function (got ${typeof fn})`
+    );
+  }
+  const out = await fn(...args);
+  if (typeof out !== "string") {
+    throw new Error(
+      `template override at ${path} returned a ${typeof out}; expected string`
+    );
+  }
+  return out;
+}
+
 // src/server.ts
 var DEFAULT_PORT = 47321;
 var LOOPBACK = "127.0.0.1";
@@ -30766,7 +30824,7 @@ function resolveEntryById(ctx, site, id) {
   if (!(site in ctx.config.sites)) return null;
   try {
     const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
-    if (!existsSync13(calendarPath)) return null;
+    if (!existsSync14(calendarPath)) return null;
     const cal = readCalendar(calendarPath);
     const entry = cal.entries.find((e) => e.id === id);
     if (!entry || entry.id === void 0) return null;
@@ -30779,7 +30837,7 @@ function resolveEntryBySlug(ctx, site, slug) {
   if (!(site in ctx.config.sites)) return "unknown-site";
   try {
     const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
-    if (!existsSync13(calendarPath)) return null;
+    if (!existsSync14(calendarPath)) return null;
     const cal = readCalendar(calendarPath);
     const entry = cal.entries.find((e) => e.slug === slug);
     if (!entry) return null;
@@ -30806,7 +30864,7 @@ function pluginRoot() {
     resolve3(here, "..", "..", "..", "plugins", "deskwork-studio")
   ];
   for (const candidate of candidates) {
-    if (existsSync13(resolve3(candidate, "public", "src"))) return candidate;
+    if (existsSync14(resolve3(candidate, "public", "src"))) return candidate;
   }
   throw new Error(
     `deskwork-studio: could not find plugin root. Tried:
@@ -30815,7 +30873,7 @@ function pluginRoot() {
 }
 function publicDir() {
   const root3 = resolve3(pluginRoot(), "public");
-  if (!existsSync13(root3)) {
+  if (!existsSync14(root3)) {
     throw new Error(
       `deskwork-studio: could not find public/ assets at ${root3}`
     );
@@ -30831,11 +30889,20 @@ function createApp(ctx) {
   app.route("/api/dev/editorial-review", createApiRouter(ctx));
   app.get("/dev", (c) => c.html(renderStudioIndex(ctx)));
   app.get("/dev/", (c) => c.html(renderStudioIndex(ctx)));
-  app.get("/dev/editorial-studio", (c) => {
+  app.get("/dev/editorial-studio", async (c) => {
     const getIndex = (site) => getRequestContentIndex(c, ctx, site);
+    const overridden = await runTemplateOverride(ctx, "dashboard", [
+      ctx,
+      getIndex
+    ]);
+    if (overridden !== null) return c.html(overridden);
     return c.html(renderDashboard(ctx, getIndex));
   });
-  app.get("/dev/editorial-help", (c) => c.html(renderHelpPage(ctx)));
+  app.get("/dev/editorial-help", async (c) => {
+    const overridden = await runTemplateOverride(ctx, "help", [ctx]);
+    if (overridden !== null) return c.html(overridden);
+    return c.html(renderHelpPage(ctx));
+  });
   app.get(
     "/dev/editorial-review-shortform",
     (c) => c.html(renderShortformPage(ctx))
@@ -30853,28 +30920,29 @@ function createApp(ctx) {
       };
       const wf = readWorkflow(ctx.projectRoot, ctx.config, id);
       if (wf !== null) {
+        const lookup2 = { kind: "workflow", workflowId: id };
+        const overridden2 = await runTemplateOverride(ctx, "review", [
+          ctx,
+          lookup2,
+          reviewQuery,
+          getIndex
+        ]);
+        if (overridden2 !== null) return c.html(overridden2);
         return c.html(
-          await renderReviewPage(
-            ctx,
-            { kind: "workflow", workflowId: id },
-            reviewQuery,
-            getIndex
-          )
+          await renderReviewPage(ctx, lookup2, reviewQuery, getIndex)
         );
       }
       const lookup = resolveEntryById(ctx, siteParam, id);
-      if (lookup === null) {
-        return c.html(
-          await renderReviewPage(
-            ctx,
-            { kind: "id", entryId: id, slug: id },
-            reviewQuery,
-            getIndex
-          )
-        );
-      }
+      const effectiveLookup = lookup ?? { kind: "id", entryId: id, slug: id };
+      const overridden = await runTemplateOverride(ctx, "review", [
+        ctx,
+        effectiveLookup,
+        reviewQuery,
+        getIndex
+      ]);
+      if (overridden !== null) return c.html(overridden);
       return c.html(
-        await renderReviewPage(ctx, lookup, reviewQuery, getIndex)
+        await renderReviewPage(ctx, effectiveLookup, reviewQuery, getIndex)
       );
     }
   );
@@ -30891,37 +30959,51 @@ function createApp(ctx) {
     }
     const lookup = found !== null ? found : { kind: "slug", slug };
     const getIndex = (s) => getRequestContentIndex(c, ctx, s);
+    const reviewQuery = {
+      site: c.req.query("site") ?? null,
+      version: c.req.query("v") ?? null,
+      kind: c.req.query("kind") ?? null
+    };
+    const overridden = await runTemplateOverride(ctx, "review", [
+      ctx,
+      lookup,
+      reviewQuery,
+      getIndex
+    ]);
+    if (overridden !== null) return c.html(overridden);
     return c.html(
-      await renderReviewPage(
-        ctx,
-        lookup,
-        {
-          site: c.req.query("site") ?? null,
-          version: c.req.query("v") ?? null,
-          kind: c.req.query("kind") ?? null
-        },
-        getIndex
-      )
+      await renderReviewPage(ctx, lookup, reviewQuery, getIndex)
     );
   });
-  app.get(
-    "/dev/scrapbook/:site/:path{.+}",
-    (c) => c.html(
-      renderScrapbookPage(
-        ctx,
-        c.req.param("site"),
-        decodeURIComponent(c.req.param("path"))
-      )
-    )
-  );
+  app.get("/dev/scrapbook/:site/:path{.+}", async (c) => {
+    const site = c.req.param("site");
+    const path = decodeURIComponent(c.req.param("path"));
+    const overridden = await runTemplateOverride(ctx, "scrapbook", [
+      ctx,
+      site,
+      path
+    ]);
+    if (overridden !== null) return c.html(overridden);
+    return c.html(renderScrapbookPage(ctx, site, path));
+  });
   app.get("/api/dev/scrapbook-file", (c) => serveScrapbookFile(c, ctx));
   app.route("/api/dev/scrapbook", createScrapbookMutationsRouter(ctx));
-  app.get("/dev/content", (c) => {
+  app.get("/dev/content", async (c) => {
     const getIndex = (site) => getRequestContentIndex(c, ctx, site);
+    const overridden = await runTemplateOverride(ctx, "content", [
+      ctx,
+      getIndex
+    ]);
+    if (overridden !== null) return c.html(overridden);
     return c.html(renderContentTopLevel(ctx, getIndex));
   });
-  app.get("/dev/content/:site", (c) => {
+  app.get("/dev/content/:site", async (c) => {
     const getIndex = (site) => getRequestContentIndex(c, ctx, site);
+    const overridden = await runTemplateOverride(ctx, "content", [
+      ctx,
+      getIndex
+    ]);
+    if (overridden !== null) return c.html(overridden);
     return c.html(renderContentTopLevel(ctx, getIndex));
   });
   app.get("/dev/content/:site/:project{.+}", async (c) => {
@@ -30929,6 +31011,14 @@ function createApp(ctx) {
     const project = decodeURIComponent(c.req.param("project"));
     const node2 = c.req.query("node") ?? null;
     const getIndex = (s) => getRequestContentIndex(c, ctx, s);
+    const overridden = await runTemplateOverride(ctx, "content-project", [
+      ctx,
+      site,
+      project,
+      node2,
+      getIndex
+    ]);
+    if (overridden !== null) return c.html(overridden);
     const r = await renderContentProject(ctx, site, project, node2, getIndex);
     return c.html(r.html, r.status);
   });
@@ -30972,7 +31062,8 @@ async function main() {
 `);
     process.exit(1);
   }
-  const ctx = { projectRoot, config };
+  const resolver2 = createOverrideResolver(projectRoot);
+  const ctx = { projectRoot, config, resolver: resolver2 };
   const app = createApp(ctx);
   let tailscale = null;
   let bindAddresses;

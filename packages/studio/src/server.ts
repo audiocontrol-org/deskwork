@@ -56,6 +56,8 @@ import {
   contentIndexMiddleware,
   getRequestContentIndex,
 } from './request-context.ts';
+import { runTemplateOverride } from './lib/override-render.ts';
+import { createOverrideResolver } from '@deskwork/core/overrides';
 
 interface CliArgs {
   projectRoot: string;
@@ -285,11 +287,24 @@ export function createApp(ctx: StudioContext): Hono {
   // Page routes
   app.get('/dev', (c) => c.html(renderStudioIndex(ctx)));
   app.get('/dev/', (c) => c.html(renderStudioIndex(ctx)));
-  app.get('/dev/editorial-studio', (c) => {
+  app.get('/dev/editorial-studio', async (c) => {
     const getIndex = (site: string) => getRequestContentIndex(c, ctx, site);
+    // Phase 23f: per-project override check. The override module's
+    // `default` is called with the same args the built-in renderer
+    // expects: (ctx, getIndex). When no override exists, we fall
+    // through to the built-in dashboard.
+    const overridden = await runTemplateOverride(ctx, 'dashboard', [
+      ctx,
+      getIndex,
+    ]);
+    if (overridden !== null) return c.html(overridden);
     return c.html(renderDashboard(ctx, getIndex));
   });
-  app.get('/dev/editorial-help', (c) => c.html(renderHelpPage(ctx)));
+  app.get('/dev/editorial-help', async (c) => {
+    const overridden = await runTemplateOverride(ctx, 'help', [ctx]);
+    if (overridden !== null) return c.html(overridden);
+    return c.html(renderHelpPage(ctx));
+  });
   app.get('/dev/editorial-review-shortform', (c) =>
     c.html(renderShortformPage(ctx)),
   );
@@ -318,30 +333,32 @@ export function createApp(ctx: StudioContext): Hono {
       // 1. Workflow-id branch — phase 21c.
       const wf = readWorkflow(ctx.projectRoot, ctx.config, id);
       if (wf !== null) {
+        const lookup: ReviewLookup = { kind: 'workflow', workflowId: id };
+        const overridden = await runTemplateOverride(ctx, 'review', [
+          ctx,
+          lookup,
+          reviewQuery,
+          getIndex,
+        ]);
+        if (overridden !== null) return c.html(overridden);
         return c.html(
-          await renderReviewPage(
-            ctx,
-            { kind: 'workflow', workflowId: id },
-            reviewQuery,
-            getIndex,
-          ),
+          await renderReviewPage(ctx, lookup, reviewQuery, getIndex),
         );
       }
 
       // 2. Entry-id branch — the legacy canonical longform/outline URL.
       const lookup = resolveEntryById(ctx, siteParam, id);
-      if (lookup === null) {
-        return c.html(
-          await renderReviewPage(
-            ctx,
-            { kind: 'id', entryId: id, slug: id },
-            reviewQuery,
-            getIndex,
-          ),
-        );
-      }
+      const effectiveLookup: ReviewLookup =
+        lookup ?? { kind: 'id', entryId: id, slug: id };
+      const overridden = await runTemplateOverride(ctx, 'review', [
+        ctx,
+        effectiveLookup,
+        reviewQuery,
+        getIndex,
+      ]);
+      if (overridden !== null) return c.html(overridden);
       return c.html(
-        await renderReviewPage(ctx, lookup, reviewQuery, getIndex),
+        await renderReviewPage(ctx, effectiveLookup, reviewQuery, getIndex),
       );
     },
   );
@@ -371,32 +388,37 @@ export function createApp(ctx: StudioContext): Hono {
     const lookup: ReviewLookup =
       found !== null ? found : { kind: 'slug', slug };
     const getIndex = (s: string) => getRequestContentIndex(c, ctx, s);
+    const reviewQuery = {
+      site: c.req.query('site') ?? null,
+      version: c.req.query('v') ?? null,
+      kind: c.req.query('kind') ?? null,
+    };
+    const overridden = await runTemplateOverride(ctx, 'review', [
+      ctx,
+      lookup,
+      reviewQuery,
+      getIndex,
+    ]);
+    if (overridden !== null) return c.html(overridden);
     return c.html(
-      await renderReviewPage(
-        ctx,
-        lookup,
-        {
-          site: c.req.query('site') ?? null,
-          version: c.req.query('v') ?? null,
-          kind: c.req.query('kind') ?? null,
-        },
-        getIndex,
-      ),
+      await renderReviewPage(ctx, lookup, reviewQuery, getIndex),
     );
   });
   // Wildcard path — `:site` is a single segment, the trailing path
   // captures arbitrarily-deep hierarchical addresses (e.g.
   // `the-outbound/characters/strivers`). Hono's `:path{.+}` regex
   // matcher swallows everything after the site segment.
-  app.get('/dev/scrapbook/:site/:path{.+}', (c) =>
-    c.html(
-      renderScrapbookPage(
-        ctx,
-        c.req.param('site'),
-        decodeURIComponent(c.req.param('path')),
-      ),
-    ),
-  );
+  app.get('/dev/scrapbook/:site/:path{.+}', async (c) => {
+    const site = c.req.param('site');
+    const path = decodeURIComponent(c.req.param('path'));
+    const overridden = await runTemplateOverride(ctx, 'scrapbook', [
+      ctx,
+      site,
+      path,
+    ]);
+    if (overridden !== null) return c.html(overridden);
+    return c.html(renderScrapbookPage(ctx, site, path));
+  });
 
   // Read-only binary endpoint for scrapbook files. Used by the
   // shared scrapbook-item renderer (`components/scrapbook-item.ts`)
@@ -419,12 +441,22 @@ export function createApp(ctx: StudioContext): Hono {
   //   GET /dev/content/:site               — same shape filtered to one site
   //   GET /dev/content/:site/:project{.+}  — drilldown for one project
   // The `?node=<slug>` query param toggles the detail panel.
-  app.get('/dev/content', (c) => {
+  app.get('/dev/content', async (c) => {
     const getIndex = (site: string) => getRequestContentIndex(c, ctx, site);
+    const overridden = await runTemplateOverride(ctx, 'content', [
+      ctx,
+      getIndex,
+    ]);
+    if (overridden !== null) return c.html(overridden);
     return c.html(renderContentTopLevel(ctx, getIndex));
   });
-  app.get('/dev/content/:site', (c) => {
+  app.get('/dev/content/:site', async (c) => {
     const getIndex = (site: string) => getRequestContentIndex(c, ctx, site);
+    const overridden = await runTemplateOverride(ctx, 'content', [
+      ctx,
+      getIndex,
+    ]);
+    if (overridden !== null) return c.html(overridden);
     return c.html(renderContentTopLevel(ctx, getIndex));
   });
   app.get('/dev/content/:site/:project{.+}', async (c) => {
@@ -432,6 +464,14 @@ export function createApp(ctx: StudioContext): Hono {
     const project = decodeURIComponent(c.req.param('project'));
     const node = c.req.query('node') ?? null;
     const getIndex = (s: string) => getRequestContentIndex(c, ctx, s);
+    const overridden = await runTemplateOverride(ctx, 'content-project', [
+      ctx,
+      site,
+      project,
+      node,
+      getIndex,
+    ]);
+    if (overridden !== null) return c.html(overridden);
     const r = await renderContentProject(ctx, site, project, node, getIndex);
     return c.html(r.html, r.status as never);
   });
@@ -495,7 +535,11 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const ctx: StudioContext = { projectRoot, config };
+  // Phase 23f: build the override resolver once at boot so every page
+  // request reuses the same instance. The resolver itself is cheap, but
+  // threading it through `ctx` makes the dependency explicit.
+  const resolver = createOverrideResolver(projectRoot);
+  const ctx: StudioContext = { projectRoot, config, resolver };
   const app = createApp(ctx);
 
   // Networking policy:
