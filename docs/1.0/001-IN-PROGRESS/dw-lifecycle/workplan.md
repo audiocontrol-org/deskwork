@@ -2985,7 +2985,7 @@ Expected: dw-lifecycle plugin shows all 15 skills loaded; no parsing errors.
 **Files:**
 - Modify: `plugins/dw-lifecycle/README.md`
 
-- [ ] **Step 1: Replace stub README**
+- [x] **Step 1: Replace stub README**
 
 Write a real README covering:
 - One-paragraph elevator pitch
@@ -2999,7 +2999,7 @@ Write a real README covering:
 
 (Aim ~150–250 lines; this is the adopter-facing landing page.)
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/README.md
@@ -3013,7 +3013,7 @@ git commit -m "docs(dw-lifecycle): adopter-facing README"
 **Files:**
 - Create: `scripts/smoke-dw-lifecycle.sh`
 
-- [ ] **Step 1: Write the smoke script**
+- [x] **Step 1: Write the smoke script**
 
 ```bash
 #!/usr/bin/env bash
@@ -3061,11 +3061,11 @@ echo "== smoke: doctor =="
 echo "== smoke: PASS =="
 ```
 
-- [ ] **Step 2: Make executable**
+- [x] **Step 2: Make executable**
 
 Run: `chmod +x scripts/smoke-dw-lifecycle.sh`
 
-- [ ] **Step 3: Run it**
+- [x] **Step 3: Run it**
 
 Run: `./scripts/smoke-dw-lifecycle.sh`
 Expected: prints `== smoke: PASS ==` at end.
@@ -3084,7 +3084,7 @@ git commit -m "test(dw-lifecycle): local smoke test script"
 **Files:**
 - Modify: `docs/1.0/001-IN-PROGRESS/dw-lifecycle/README.md`
 
-- [ ] **Step 1: Read the existing README (created by /dw-lifecycle:setup or hand-written)**
+- [x] **Step 1: Read the existing README (created by /dw-lifecycle:setup or hand-written)**
 
 If no README exists yet, scaffold one matching the existing /feature-* convention with:
 - Status table
@@ -3092,11 +3092,11 @@ If no README exists yet, scaffold one matching the existing /feature-* conventio
 - Links to PRD (design.md), workplan
 - Parent issue link (filled in by issues subcommand or manually)
 
-- [ ] **Step 2: Update phase status**
+- [x] **Step 2: Update phase status**
 
 Mark Phases 1–6 as Complete on the README phase-status table.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/1.0/001-IN-PROGRESS/dw-lifecycle/README.md
@@ -3109,7 +3109,7 @@ git commit -m "docs(dw-lifecycle): mark Phases 1-6 complete in README"
 
 This task does NOT cut the release. It verifies all v0.1.0 acceptance criteria pass and surfaces any remaining blockers. The actual release ceremony happens after audiocontrol-org/deskwork#81 (empty-`vendor/` packaging regression) is resolved upstream.
 
-- [ ] **Step 1: Run the v0.1.0 acceptance checklist from `design.md` §9**
+- [x] **Step 1: Run the v0.1.0 acceptance checklist from `design.md` §9**
 
 For each item in the design doc's acceptance criteria, verify:
 - All 15 slash commands exist as `SKILL.md` files: `ls plugins/dw-lifecycle/skills/*/SKILL.md | wc -l` → 15
@@ -3121,7 +3121,7 @@ For each item in the design doc's acceptance criteria, verify:
 - `plugin.json`, `marketplace.json` entry, README all exist
 - Plugin loads cleanly via `claude plugin install --marketplace .`
 
-- [ ] **Step 2: Check #81 status**
+- [x] **Step 2: Check #81 status**
 
 Run: `gh issue view 81 --repo audiocontrol-org/deskwork --json state`
 Expected: `OPEN` blocks the release. `CLOSED` allows it (verify the closing fix actually populated `vendor/` in a v0.8.x patch release).
