@@ -225,20 +225,21 @@ function buildReviewRedirectUrl(entryId: string, requestUrl: string): string {
 /**
  * Resolve the plugin tree root (`plugins/deskwork-studio/`) at runtime.
  *
- * Two runtime layouts:
- *   - Bundle: `plugins/deskwork-studio/bundle/server.mjs` → plugin root
- *     is `<HERE>/..`.
- *   - Source: `packages/studio/src/server.ts` → plugin root is
- *     `<HERE>/../../../plugins/deskwork-studio`.
+ * Two runtime layouts (Phase 23 source-shipped re-architecture):
+ *   - Workspace: `packages/studio/src/server.ts` (run via the workspace
+ *     bin symlink) → plugin root is `<HERE>/../../../plugins/deskwork-studio`.
+ *   - Marketplace: `<pluginRoot>/node_modules/@deskwork/studio/src/server.ts`
+ *     (run via the plugin-local bin after first-run npm install) →
+ *     plugin root is `<HERE>/../../../..`.
  *
- * The bundle candidate is checked first because that's the marketplace
- * install path; the source candidate only fires under workspace dev.
+ * Both candidates are tried; whichever has a `public/src/` directory
+ * adjacent wins. `public/src/` ships in the plugin tree only.
  */
 function pluginRoot(): string {
   const here = dirname(fileURLToPath(import.meta.url));
   const candidates = [
-    resolve(here, '..'),
     resolve(here, '..', '..', '..', 'plugins', 'deskwork-studio'),
+    resolve(here, '..', '..', '..', '..'),
   ];
   for (const candidate of candidates) {
     // Use the plugin's marker file (public/src exists in both layouts)

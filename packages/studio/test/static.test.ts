@@ -1,20 +1,26 @@
 /**
  * Smoke tests for the studio's static asset mount. The Hono server
- * exposes `public/` at `/static/*`, so:
- *   - `/static/css/<file>.css` returns the source CSS verbatim
- *   - `/static/dist/<file>.js`  returns the esbuild-bundled module
+ * exposes:
+ *   - `/static/css/<file>.css` — the source CSS verbatim from `public/css/`
+ *   - `/static/dist/<file>.js`  — the runtime-cached, esbuild-bundled
+ *     client module from `<pluginRoot>/.runtime-cache/dist/`.
  *
- * These tests assume `npm run build` has populated `public/dist/`. The
- * package.json `test` script chains the build before vitest, and the
- * `prepare` hook covers fresh `npm install` runs.
+ * Phase 23e (source-shipped re-architecture) replaced the committed
+ * `public/dist/` with an on-startup esbuild that writes to
+ * `.runtime-cache/dist/`. These tests trigger that build explicitly
+ * (the test app is constructed via `createApp`, which doesn't go
+ * through `main()`'s boot path) so the runtime cache is populated
+ * before the test fetches a client module.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { DeskworkConfig } from '@deskwork/core/config';
 import { createApp } from '../src/server.ts';
+import { buildClientAssets } from '../src/build-client-assets.ts';
 
 function makeConfig(): DeskworkConfig {
   return {
@@ -31,8 +37,20 @@ function makeConfig(): DeskworkConfig {
   };
 }
 
+function studioPluginRoot(): string {
+  const here = dirname(fileURLToPath(import.meta.url));
+  return resolve(here, '..', '..', '..', 'plugins', 'deskwork-studio');
+}
+
 describe('studio static assets', () => {
   let app: ReturnType<typeof createApp>;
+
+  beforeAll(async () => {
+    // The `/static/dist/*` mount serves from `<pluginRoot>/.runtime-cache/dist/`,
+    // which is populated by `buildClientAssets` at server boot. Test apps
+    // skip `main()`, so we trigger the build here instead.
+    await buildClientAssets({ pluginRoot: studioPluginRoot() });
+  });
 
   beforeEach(() => {
     const root = mkdtempSync(join(tmpdir(), 'deskwork-studio-static-'));
@@ -51,7 +69,7 @@ describe('studio static assets', () => {
     expect(body.length).toBeGreaterThan(0);
   });
 
-  it('GET /static/dist/editorial-review-client.js serves the bundled module', async () => {
+  it('GET /static/dist/editorial-review-client.js serves the runtime-built module', async () => {
     const res = await app.fetch(
       new Request('http://x/static/dist/editorial-review-client.js'),
     );

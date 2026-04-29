@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@deskwork/core": "file:./vendor/core",
+    "@deskwork/studio": "file:./vendor/studio",
     "@hono/node-server": "^1.13.7",
     "esbuild": "^0.28.0",
     "hono": "^4.6.0",

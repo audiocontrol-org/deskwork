@@ -62,8 +62,8 @@ deskwork-studio --host 100.64.0.5             # bind to a specific Tailscale IP 
 The wrapper resolves the studio binary in this order:
 
 1. Workspace-linked binary at `node_modules/.bin/deskwork-studio` (dev path; runs source via tsx, supports edits without rebuild)
-2. Self-contained ESM bundle at `plugins/deskwork-studio/bundle/server.mjs` (committed to git; what fresh `claude plugin install` users hit)
-3. Loud error pointing at `npm install` / `npm run build`
+2. First-run install: when the marketplace install copy of the plugin tree has no `node_modules/`, the wrapper runs `npm install --omit=dev` once and execs the freshly-linked source bin via tsx (Phase 23 source-shipped re-architecture — no committed bundle)
+3. Loud error pointing at `npm install`
 
 The server logs (loopback only — when Tailscale isn't running or `--no-tailscale` is passed):
 

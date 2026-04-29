@@ -1,10 +1,10 @@
 name: release
 
-# Triggered by pushing a v* tag. Runs the full test suite + bundle
-# verification (same as the PR check), then creates a GitHub release
-# with auto-generated notes from commits since the previous tag. The
-# release page on GitHub is the consumer-facing record of what changed
-# between versions.
+# Triggered by pushing a v* tag. Runs the full test suite, materializes
+# vendor symlinks for the source-shipped plugin tree (Phase 23c), then
+# creates a GitHub release with auto-generated notes from commits since
+# the previous tag. The release page on GitHub is the consumer-facing
+# record of what changed between versions.
 
 on:
   push:
@@ -29,22 +29,24 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install + build
+      - name: Install
         run: npm install
 
       # --if-present skips workspaces without a 'test' script (plugin
-      # shells ship metadata + wrappers + bundles only).
+      # shells ship metadata + wrappers + source only).
       - name: Run all tests
         run: npm --workspaces --if-present test
 
-      # Phase 23c (Path B): the committed `vendor/core` symlinks survive
-      # marketplace install as symlinks, but the relative target traverses
-      # out of the cached plugin tree (the marketplace copies plugins/<name>/
-      # only — not the workspace root). Materialize the symlinks into
-      # plain directory copies on the tagged commit so adopters get a
-      # self-contained tree. The development branch keeps the symlinks
-      # intact; only the tagged release commit ships materialized.
-      - name: Materialize vendor/core symlinks
+      # Phase 23b/23c: each plugin's `vendor/<pkg>` symlinks (`core`,
+      # plus `studio` or `cli` for the corresponding plugin) survive
+      # marketplace install as symlinks, but the relative targets
+      # traverse out of the cached plugin tree (the marketplace copies
+      # plugins/<name>/ only — not the workspace root). Materialize the
+      # symlinks into plain directory copies on the tagged commit so
+      # adopters get a self-contained tree. The development branch
+      # keeps the symlinks intact; only the tagged release commit ships
+      # materialized.
+      - name: Materialize vendor symlinks
         run: bash scripts/materialize-vendor.sh
 
       - name: Configure git for tag move
@@ -61,7 +63,7 @@ jobs:
             echo "no vendor changes to commit (nothing was a symlink?)"
             exit 1
           fi
-          git commit -m "release: materialize vendor/core for ${TAG}"
+          git commit -m "release: materialize vendor symlinks for ${TAG}"
           git tag -f "${TAG}"
           git push --force origin "refs/tags/${TAG}"
 

@@ -17,9 +17,7 @@
     "deskwork": "./src/cli.ts"
   },
   "scripts": {
-    "build": "tsx build.ts",
-    "prepare": "npm run build",
-    "test": "npm run build && vitest run",
+    "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
