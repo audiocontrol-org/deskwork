@@ -272,12 +272,61 @@ test_d_canonicalize_relative_cases() {
   ok "Test D: all canonicalize_relative cases passed"
 }
 
+# ----- Test E: source with node_modules verifies cleanly ----------------
+#
+# Regression for v0.9.0 release-workflow failure: CI's checkout has
+# `npm install` + `npm test` populated by the time materialize runs,
+# so packages/<pkg>/ contains node_modules/.vite/vitest/<hash>/results.json
+# (and similar). The vendor copy excludes node_modules per rsync's
+# --exclude. The mode-bit listing must apply the SAME exclusion at find
+# time, otherwise the source listing has a node_modules/... line the
+# vendor side doesn't, and the diff -u fails.
+
+test_e_source_with_node_modules() {
+  info "Test E: source with node_modules + dist + .turbo verifies cleanly"
+  local src="${TMP}/e-src"
+  local link="${TMP}/e-vendor/pkg"
+  make_source_tree "${src}"
+  # Populate the same junk drawers CI does. Different perms on each
+  # to force a real mode-bit divergence if the prune isn't working.
+  mkdir -p "${src}/node_modules/.vite/vitest/aaaa"
+  printf '{"results":[]}\n' > "${src}/node_modules/.vite/vitest/aaaa/results.json"
+  chmod 600 "${src}/node_modules/.vite/vitest/aaaa/results.json"
+  mkdir -p "${src}/dist"
+  printf 'compiled\n' > "${src}/dist/build-output.js"
+  chmod 600 "${src}/dist/build-output.js"
+  mkdir -p "${src}/.turbo"
+  printf 'cache\n' > "${src}/.turbo/cache-key"
+  : > "${src}/built.tsbuildinfo"
+  chmod 600 "${src}/built.tsbuildinfo"
+  rig_vendor_link "${src}" "${link}"
+
+  if ! materialize_one "${src}" "${link}" >"${TMP}/e.log" 2>&1; then
+    fail "Test E: materialize_one failed when source has node_modules + dist + .turbo"
+    cat "${TMP}/e.log" >&2
+    FAILURES=$((FAILURES + 1))
+    return
+  fi
+
+  # Vendor copy should NOT contain any of the excluded paths.
+  for excluded in node_modules dist .turbo built.tsbuildinfo; do
+    if [ -e "${link}/${excluded}" ]; then
+      fail "Test E: vendor copy contains excluded path '${excluded}'"
+      FAILURES=$((FAILURES + 1))
+      return
+    fi
+  done
+
+  ok "Test E: source with node_modules / dist / .turbo / *.tsbuildinfo verifies cleanly"
+}
+
 # ----- Run --------------------------------------------------------------
 
 test_a_exec_bit_preserved
 test_b_symlink_traversal_rejected
 test_c_intree_symlink_preserved
 test_d_canonicalize_relative_cases
+test_e_source_with_node_modules
 
 echo
 if [ "${FAILURES}" -gt 0 ]; then

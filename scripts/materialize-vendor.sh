@@ -79,12 +79,17 @@ fi
 # stat_mode_listing <dir>
 #   Emits "<octal-perms> <relative-path>" lines for every regular file
 #   under <dir>, sorted, with <dir>'s prefix stripped so two listings
-#   from different roots line up for diff.
+#   from different roots line up for diff. Excludes the same paths
+#   rsync skips (node_modules / .turbo / dist / *.tsbuildinfo) at find
+#   time via -prune, so the source-side listing matches the vendor
+#   side regardless of whether the source has been npm-installed.
 stat_mode_listing() {
   local dir="$1"
   local prefix="${dir%/}/"
   if [ "${STAT_FLAVOR}" = "bsd" ]; then
-    find "${dir}" -type f -print0 \
+    find "${dir}" \
+      \( -name node_modules -o -name .turbo -o -name dist \) -prune -o \
+      -type f ! -name '*.tsbuildinfo' -print0 \
       | xargs -0 stat -f "%Lp %N" \
       | awk -v p="${prefix}" '{
           mode=$1
@@ -95,7 +100,9 @@ stat_mode_listing() {
         }' \
       | sort
   else
-    find "${dir}" -type f -print0 \
+    find "${dir}" \
+      \( -name node_modules -o -name .turbo -o -name dist \) -prune -o \
+      -type f ! -name '*.tsbuildinfo' -print0 \
       | xargs -0 stat -c "%a %n" \
       | awk -v p="${prefix}" '{
           mode=$1
@@ -231,13 +238,12 @@ materialize_one() {
   dst_modes="$(mktemp -t materialize-vendor-dstmodes.XXXXXX)"
   mode_diff="$(mktemp -t materialize-vendor-modediff.XXXXXX)"
 
-  # We have to filter the listings to match rsync's exclude set; the
-  # vendor copy never contains those paths, so listing them on the
-  # source side would produce false mismatches.
-  stat_mode_listing "${source_dir}" \
-    | grep -Ev '(^|/)(node_modules|\.turbo|dist)(/|$)|\.tsbuildinfo$' \
-    > "${src_modes}" || true
-  stat_mode_listing "${vendor_link}" > "${dst_modes}" || true
+  # stat_mode_listing already prunes the same paths rsync excludes, so
+  # the source listing matches the vendor side even when the source
+  # tree has been npm-installed (CI's case: node_modules + vitest
+  # cache populated before materialize-vendor runs).
+  stat_mode_listing "${source_dir}" > "${src_modes}"
+  stat_mode_listing "${vendor_link}" > "${dst_modes}"
 
   if ! diff -u "${src_modes}" "${dst_modes}" > "${mode_diff}"; then
     echo "materialize-vendor: mode-bit drift between ${source_dir} and ${vendor_link}" >&2
