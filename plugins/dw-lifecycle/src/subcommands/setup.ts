@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { loadConfig } from '../config.js';
 import { resolveFeatureDir } from '../docs.js';
 import { repoRoot, expandWorktreeName } from '../repo.js';
+import { validateSlug } from '../slug.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -71,6 +72,7 @@ function branchExists(root: string, branchName: string): boolean {
 
 export async function setup(args: string[]): Promise<void> {
   const { slug, targetVersion, title, definitionFile } = parseArgs(args);
+  validateSlug(slug);
   const root = repoRoot();
   const cfg = loadConfig(root);
   const target = targetVersion ?? cfg.docs.defaultTargetVersion;

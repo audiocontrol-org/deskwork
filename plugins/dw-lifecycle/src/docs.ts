@@ -4,6 +4,10 @@ import type { Config } from './config.types.js';
 
 export type Stage = 'inProgress' | 'waiting' | 'complete';
 
+export function isStage(v: unknown): v is Stage {
+  return v === 'inProgress' || v === 'waiting' || v === 'complete';
+}
+
 export interface ResolveOpts {
   stage: Stage;
   targetVersion?: string;

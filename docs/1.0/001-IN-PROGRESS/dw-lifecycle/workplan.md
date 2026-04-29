@@ -1900,7 +1900,7 @@ git commit -m "feat(dw-lifecycle/bin): atomic state transitions"
 - Create: `plugins/dw-lifecycle/src/subcommands/transition.ts`
 - Modify: `plugins/dw-lifecycle/src/cli.ts`
 
-- [ ] **Step 1: Implement subcommand**
+- [x] **Step 1: Implement subcommand**
 
 ```typescript
 // src/subcommands/transition.ts
@@ -1940,7 +1940,7 @@ export async function transition(args: string[]): Promise<void> {
 }
 ```
 
-- [ ] **Step 2: Wire into cli.ts**
+- [x] **Step 2: Wire into cli.ts**
 
 ```typescript
 import { transition } from './subcommands/transition.js';
@@ -1954,7 +1954,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
 };
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/src/subcommands/transition.ts plugins/dw-lifecycle/src/cli.ts
