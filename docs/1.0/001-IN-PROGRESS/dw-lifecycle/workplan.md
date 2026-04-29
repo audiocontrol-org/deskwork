@@ -1058,7 +1058,7 @@ Expected: no errors.
 - Create: `plugins/dw-lifecycle/src/docs.ts`
 - Create: `plugins/dw-lifecycle/src/__tests__/docs.test.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```typescript
 // src/__tests__/docs.test.ts
@@ -1115,12 +1115,12 @@ describe('docs', () => {
 });
 ```
 
-- [ ] **Step 2: Run, expect failure**
+- [x] **Step 2: Run, expect failure**
 
 Run: `cd plugins/dw-lifecycle && npm test -- docs`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implement `docs.ts`**
+- [x] **Step 3: Implement `docs.ts`**
 
 ```typescript
 // src/docs.ts
@@ -1160,12 +1160,12 @@ export function resolveFeaturePath(
 }
 ```
 
-- [ ] **Step 4: Run tests, expect pass**
+- [x] **Step 4: Run tests, expect pass**
 
 Run: `cd plugins/dw-lifecycle && npm test -- docs`
 Expected: 5 tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/src/docs.ts plugins/dw-lifecycle/src/__tests__/docs.test.ts
@@ -1183,7 +1183,7 @@ The workplan is a markdown file with a known structure (frontmatter + phase head
 - Create: `plugins/dw-lifecycle/src/__tests__/workplan.test.ts`
 - Create: `plugins/dw-lifecycle/src/__tests__/fixtures/workplan-sample.md`
 
-- [ ] **Step 1: Create the fixture**
+- [x] **Step 1: Create the fixture**
 
 ```markdown
 <!-- src/__tests__/fixtures/workplan-sample.md -->
@@ -1207,7 +1207,7 @@ targetVersion: "1.0"
 - [ ] Step 2: not yet
 ```
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 ```typescript
 // src/__tests__/workplan.test.ts
@@ -1245,12 +1245,12 @@ describe('workplan', () => {
 });
 ```
 
-- [ ] **Step 3: Run, expect failure**
+- [x] **Step 3: Run, expect failure**
 
 Run: `cd plugins/dw-lifecycle && npm test -- workplan`
 Expected: FAIL — module not found.
 
-- [ ] **Step 4: Implement `workplan.ts`**
+- [x] **Step 4: Implement `workplan.ts`**
 
 ```typescript
 // src/workplan.ts
@@ -1322,12 +1322,12 @@ export function markStepDone(source: string, args: MarkStepArgs): string {
 }
 ```
 
-- [ ] **Step 5: Run tests, expect pass**
+- [x] **Step 5: Run tests, expect pass**
 
 Run: `cd plugins/dw-lifecycle && npm test -- workplan`
 Expected: 3 tests pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/src/workplan.ts plugins/dw-lifecycle/src/__tests__/workplan.test.ts plugins/dw-lifecycle/src/__tests__/fixtures/workplan-sample.md
@@ -1344,13 +1344,13 @@ git commit -m "feat(dw-lifecycle/bin): workplan parser + step-mark helpers"
 - Create: `plugins/dw-lifecycle/templates/readme.md`
 - Create: `plugins/dw-lifecycle/templates/feature-definition.md`
 
-- [ ] **Step 1: Read existing templates**
+- [x] **Step 1: Read existing templates**
 
 Run: `find /Users/orion/work/deskwork-work/deskwork-plugin/.claude/skills/feature-setup -name "*.md" -type f`
 
 The feature-setup skill almost certainly embeds template content inline (e.g., as heredocs or markdown blocks). Read the SKILL.md and extract the embedded templates.
 
-- [ ] **Step 2: Save each template as a file with placeholders**
+- [x] **Step 2: Save each template as a file with placeholders**
 
 Templates use `<placeholder>` syntax for substitution at scaffold time. Required placeholders:
 
@@ -1363,12 +1363,12 @@ Templates use `<placeholder>` syntax for substitution at scaffold time. Required
 
 Templates faithfully reproduce the in-tree shape. PRD has Problem / Scope / Approach / Tasks sections; workplan has phase headings and task tables; readme has status table + phase status.
 
-- [ ] **Step 3: Verify the templates render**
+- [x] **Step 3: Verify the templates render**
 
 Run: `node -e "console.log(require('fs').readFileSync('plugins/dw-lifecycle/templates/prd.md', 'utf8'))"`
 Expected: prints the PRD template content with placeholders visible.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/templates/
@@ -1383,7 +1383,7 @@ git commit -m "feat(dw-lifecycle): port PRD/workplan/README/definition templates
 - Create: `plugins/dw-lifecycle/src/subcommands/setup.ts`
 - Modify: `plugins/dw-lifecycle/src/cli.ts`
 
-- [ ] **Step 1: Implement setup**
+- [x] **Step 1: Implement setup**
 
 ```typescript
 // src/subcommands/setup.ts
@@ -1479,7 +1479,7 @@ export async function setup(args: string[]): Promise<void> {
 }
 ```
 
-- [ ] **Step 2: Wire into cli.ts**
+- [x] **Step 2: Wire into cli.ts**
 
 ```typescript
 import { setup } from './subcommands/setup.js';
@@ -1491,7 +1491,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
 };
 ```
 
-- [ ] **Step 3: Smoke test against a temp git repo**
+- [x] **Step 3: Smoke test against a temp git repo**
 
 ```bash
 TMP=$(mktemp -d)
@@ -1512,7 +1512,7 @@ git -C "$TMP" worktree remove "$(dirname "$TMP")/$(basename "$TMP")-test-feature
 rm -rf "$TMP" "$(dirname "$TMP")/$(basename "$TMP")-test-feature"
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/src/subcommands/setup.ts plugins/dw-lifecycle/src/cli.ts
@@ -1526,7 +1526,7 @@ git commit -m "feat(dw-lifecycle/bin): setup subcommand (branch + worktree + doc
 **Files:**
 - Create: `plugins/dw-lifecycle/src/__tests__/setup.smoke.test.ts`
 
-- [ ] **Step 1: Write the integration test**
+- [x] **Step 1: Write the integration test**
 
 ```typescript
 // src/__tests__/setup.smoke.test.ts
@@ -1584,12 +1584,12 @@ describe('setup (smoke)', () => {
 });
 ```
 
-- [ ] **Step 2: Run, expect pass**
+- [x] **Step 2: Run, expect pass**
 
 Run: `cd plugins/dw-lifecycle && npm test -- setup.smoke`
 Expected: 1 test passes.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/src/__tests__/setup.smoke.test.ts
@@ -1600,12 +1600,12 @@ git commit -m "test(dw-lifecycle/bin): setup integration smoke test"
 
 ### Task 19: Phase 3 verification
 
-- [ ] **Step 1: Run full test suite**
+- [x] **Step 1: Run full test suite**
 
 Run: `cd plugins/dw-lifecycle && npm test`
 Expected: all tests pass.
 
-- [ ] **Step 2: Tsc clean**
+- [x] **Step 2: Tsc clean**
 
 Run: `cd plugins/dw-lifecycle && npx tsc --noEmit`
 Expected: no errors.
@@ -2297,7 +2297,7 @@ The helper writes `.dw-lifecycle/config.json` with the agreed values.
 Run: `cat plugins/dw-lifecycle/skills/install/SKILL.md | head`
 Expected: frontmatter + content visible.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/skills/install/SKILL.md
@@ -3070,7 +3070,7 @@ Run: `chmod +x scripts/smoke-dw-lifecycle.sh`
 Run: `./scripts/smoke-dw-lifecycle.sh`
 Expected: prints `== smoke: PASS ==` at end.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add scripts/smoke-dw-lifecycle.sh

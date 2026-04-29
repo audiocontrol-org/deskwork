@@ -4,6 +4,68 @@ Session journal for `deskwork`. Each entry records what was tried, what worked, 
 
 ---
 
+## 2026-04-29: dw-lifecycle Phase 3 — Doc tree + workplan I/O + setup
+
+### Feature: dw-lifecycle
+### Worktree: deskwork-dw-lifecycle
+
+**Goal:** Land Phase 3 (T14–T19) of the `dw-lifecycle` plugin workplan: version-aware doc-tree resolution, workplan markdown parser/writer, ported `/feature-*` templates, and the `dw-lifecycle setup` subcommand that creates a branch + worktree + scaffolded docs from templates.
+
+**Accomplished:**
+
+- T14: `src/docs.ts` with `resolveFeatureDir` / `resolveFeaturePath` for version-aware path resolution. 5 tests, TDD.
+- T15: `src/workplan.ts` with `parseWorkplan` + `markStepDone` plus fixture. Initial impl shipped at `68d3772`; code review caught two real issues (bold-step text not normalized, silent no-op on missing task/step) and a fix at `165a688` added `stripBold`, descriptive throws, and 5 regression tests.
+- T16: 4 templates (`prd.md`, `workplan.md`, `readme.md`, `feature-definition.md`) under `plugins/dw-lifecycle/templates/`. Placeholder syntax `<word>`; substitutions for slug, title, targetVersion, date, branch, parentIssue. 110 lines total.
+- T17: `src/subcommands/setup.ts` (138 lines) with branch + worktree creation, template rendering, optional definition append, JSON output. Initial impl at `c336b73`; review flagged shell-injection risk via `execSync` template literals, no rollback on partial-failure, and silent `--definition` skip. Fix at `4649812`: switched to `execFileSync` array form, try/catch with worktree+branch rollback, pre-flight throw on missing definition file, dynamic help text from `Object.keys(SUBCOMMANDS)`.
+- T18: `src/__tests__/setup.smoke.test.ts` integration test. Handles the macOS `/var` → `/private/var` symlink case via `realpathSync`. Sets local `user.email`/`user.name` so the empty initial commit succeeds without host git config.
+- T19: full vitest suite green (28/28, was 14/14 at session start), `npx tsc --noEmit` clean.
+- 7 commits ahead of `8d959049` (T14, T15 + fix, T16, T17 + fix, T18) on `feature/deskwork-dw-lifecycle`.
+- Used subagent-driven development per workplan instruction. Roughly 8 implementer dispatches and 4 reviewer dispatches across the phase. Reviewers caught 2 substantive bug clusters before they shipped (T15 bold/throw, T17 injection/rollback).
+
+**Didn't Work (caught in review and fixed):**
+
+- T15's verbatim-spec parser stored `**Step 1: foo**` (with asterisks) as `step.text` because the project's own workplan uses bold step bullets. Phase 4 callers passing `Step 1: foo` would have silently no-matched. Spec tests didn't cover bold input. Fix: `stripBold` helper applied symmetrically on parse and on `markStepDone` comparison; rewrite uses `line.replace('[ ]', '[x]')` to preserve the original bold formatting.
+- T15's `markStepDone` returned source unchanged when the task or step didn't exist — a violation of CLAUDE.md's "throw, don't fall back" rule. The argument that "idempotency requires silent failure" conflated two distinct cases (already-done step vs missing target). Fix: track `taskFound`/`stepFound`, throw with descriptive errors on miss, stay silent only on already-done.
+- T17's verbatim-spec used `execSync` with template-literal interpolation of `worktreePath` and `branchName`. A slug like `foo"; rm -rf /` would have terminated the quoted argument and injected. Fix: `execFileSync(cmd, args[])` array form bypasses the shell entirely.
+- T17's verbatim-spec scaffolded files after creating the worktree with no rollback on failure. A disk-full or permissions error mid-scaffold left a half-built worktree the user had to clean up by hand. Fix: try/catch around post-worktree work; best-effort `git worktree remove --force` + `git branch -D` on error; error message includes manual cleanup instructions if rollback itself fails.
+- T17's verbatim-spec silently skipped `--definition <path>` when the path didn't exist. Fix: pre-flight `existsSync(definitionFile)` throw before worktree creation.
+
+**Course Corrections:**
+
+- [PROCESS] When the implementer flags a deviation from verbatim spec citing an external constraint (here: `noUncheckedIndexedAccess: true` rejecting `match[1]` direct access on T15), verify the constraint is real and the deviation is semantically equivalent before accepting. The spec reviewer here did this thoroughly — confirmed the regex capture groups are non-optional, so `match?.[N] !== undefined` reduces to the spec's `if (match)` predicate at runtime. Took ~5 minutes of analysis but produced confidence the deviation was zero behavioral drift.
+- [PROCESS] Code reviewers worth their cost. On T15 and T17, the spec reviewer said ✅ but the code quality reviewer found real bugs that would have shipped. The marginal cost of the second pass (one extra subagent dispatch) caught 4 substantive issues across two tasks. The "save the second review for tasks with real logic" heuristic from prior session held up — both tasks had non-trivial logic (regex parsing, shell-out + file I/O), and both benefited.
+- [COMPLEXITY] T16 templates were intentionally minimal (110 lines for 4 files). The risk in template-writing is gold-plating with prose that doesn't survive contact with real PRDs. Bracketed `[fill in here]` placeholders survive better than full prose drafts.
+
+**Quantitative:**
+
+- Messages from user: ~3 (proceed, session-end, plus implicit "continue" via auto mode)
+- Commits: 7 implementation + 1 docs (this entry) = 8
+- Files added/modified: 9 src files (docs.ts, workplan.ts, setup.ts, cli.ts modified, 4 templates, 1 smoke test) + 3 test files (docs.test, workplan.test, setup.smoke.test) + 1 fixture
+- Tests: 14 → 28 passing (+14 net)
+- Sub-agent dispatches: ~14 (4 implementers, 4 reviewers across spec/code, 2 fix implementers, 4 verification + cleanup)
+- Corrections from user: 0 — user confirmed "proceed" once and let auto mode run; reviewer signals drove all course corrections
+- Corrections caught by reviewers (mid-session, fixed before next task): 4 substantive (bold parse, throw-on-missing, shell injection, rollback) + minor cleanup (silent definition skip, stale help text)
+
+**Insights:**
+
+- The "spec test blind spots" memory from prior session paid off twice this session. T15's verbatim spec tests passed but missed both the bold-text round-trip case and the missing-target case. The reviewer prompt explicitly asked "what realistic call patterns aren't tested?" — the question itself drove the discoveries. Worth keeping that prompt language for future TDD reviews.
+- The "verify reviewer-cited constraints" memory also paid off. The T15 implementer self-applied the discipline: hit `noUncheckedIndexedAccess`, decided the spec couldn't compile as written, deviated minimally with semantic-equivalent guards, flagged DONE_WITH_CONCERNS so I could verify. That self-discipline is exactly what the memory was meant to encode.
+- Auto mode worked well for this phase. The plan was well-specified, tasks were independent, and reviewer feedback could be acted on without checking back with the user. Two implementer follow-up dispatches (T15 fix, T17 fix) were the right call vs escalating.
+- `Object.keys(SUBCOMMANDS).join(', ')` for the cli.ts help text is a small thing but it removes a class of stale-doc bugs forever. Worth adopting for similar registry-driven help text in future subcommands.
+
+**Open follow-ups (not blockers):**
+
+- `branchExists` only checks local refs (`refs/heads/`); a remote-only `origin/feature/<slug>` collision still creates a tracking branch. Not a bug per spec, but worth a one-line code comment documenting the scope.
+- `import.meta.url` resolution for `TEMPLATES_DIR` works under tsx but would break if a `dist/` build is ever added. Add a comment noting the tsx assumption, or walk up to find the nearest `package.json` instead.
+- `parentIssue: ''` in setup.ts renders as `Parent Issue: ` (empty trailing) in the README template. Could leave the literal `<parentIssue>` placeholder visible until `/dw-lifecycle:issues` fills it in. Punted — intent unclear, defer to Phase 5 when the issues subcommand exists.
+- Phase 6 README rewrite still needs to document the peer-plugin relationship dropped from `plugin.json` last session.
+
+**Next session:**
+
+Phase 4 (T20–T26): journal append, `dw-lifecycle journal-append` subcommand, transitions (state moves between status dirs), `dw-lifecycle transition`, GitHub tracking helpers, `dw-lifecycle issues`. End state: every state-mutating subcommand exists.
+
+---
+
 ## 2026-04-29: dw-lifecycle Phases 1–2 in one session
 
 ### Feature: dw-lifecycle
