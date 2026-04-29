@@ -858,62 +858,62 @@ Tasks are grouped by sub-phase. Sub-phases are sequential (19a → 19b → 19c �
 
 **Result: Path B confirmed.** `git clone` preserves committed symlinks. The proposed `vendor/core → ../../../packages/core/` symlink would be preserved through marketplace install, but the relative path traverses out of the cache directory (`~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/`) and resolves to a non-existent location (`~/.claude/plugins/cache/<marketplace>/packages/core/` does not exist — the marketplace install copies only the plugin tree, not the workspace). Therefore 23c's release workflow needs a **materialize-vendor** step that replaces symlinks with directory copies before tagging.
 
-#### 23b — Retire bundled artifacts
+#### 23b — Retire bundled artifacts — **DONE 2026-04-29 (commit 23b4032)**
 
-- [ ] Delete `plugins/deskwork-studio/bundle/server.mjs`, `plugins/deskwork/bundle/cli.mjs`, `packages/studio/build.ts`, the `plugins/deskwork-studio/public/dist/` exception in `.gitignore`.
-- [ ] Drop bundle-fallback branch in both `bin/` wrappers.
-- [ ] Drop `build` / `prepare` scripts from `packages/studio/package.json`.
-- [ ] Drop bundle-relative path resolution in `packages/studio/src/server.ts:publicDir()`.
-- [ ] Drop bundle-verification step from `.github/workflows/release.yml`.
+- [x] Delete `plugins/deskwork-studio/bundle/server.mjs`, `plugins/deskwork/bundle/cli.mjs`, `packages/studio/build.ts`, the `plugins/deskwork-studio/public/dist/` exception in `.gitignore`.
+- [x] Drop bundle-fallback branch in both `bin/` wrappers.
+- [x] Drop `build` / `prepare` scripts from `packages/studio/package.json`.
+- [x] Drop bundle-relative path resolution in `packages/studio/src/server.ts:publicDir()` (replaced by 23e's `.runtime-cache/dist/` mount).
+- [x] Drop bundle-verification step from `.github/workflows/release.yml`.
 
-#### 23c — Vendor `@deskwork/core` via symlink (Path A or B per 23a)
+#### 23c — Vendor `@deskwork/core` via symlink (Path A or B per 23a) — **DONE 2026-04-29 (commit bbbec30; expanded in 23b commit 23b4032 to include vendor/studio + vendor/cli)**
 
-- [ ] Symlinks: `plugins/deskwork-studio/vendor/core` → `../../../packages/core`; same for `plugins/deskwork`.
-- [ ] Each plugin's `package.json` declares `"@deskwork/core": "file:./vendor/core"` + runtime deps (hono, @hono/node-server, tsx, esbuild).
-- [ ] **Path A only** (symlink dereferenced): no further work.
-- [ ] **Path B only** (symlink preserved): release workflow's materialize-vendor step replaces symlinks with directory copies + `diff -r` verification before tagging.
+- [x] Symlinks: `plugins/deskwork-studio/vendor/{core,studio}` → workspace packages; `plugins/deskwork/vendor/{core,cli}` → workspace packages.
+- [x] Each plugin's `package.json` declares `file:./vendor/<pkg>` deps + runtime deps (hono, @hono/node-server, tsx, esbuild, codemirror/lezer for the studio per 23g's findings).
+- [x] **Path B confirmed by 23a**: release workflow's `scripts/materialize-vendor.sh` replaces symlinks with directory copies + `diff -r` verification before tagging.
 
-#### 23d — Update `bin/` wrappers for first-run npm install
+#### 23d — Update `bin/` wrappers for first-run npm install — **DONE 2026-04-29 (commit 8e0d851)**
 
-- [ ] On invocation: detect missing `node_modules`; run `npm install --omit=dev --no-audit --no-fund --loglevel=error`; exec source via tsx.
-- [ ] Both `plugins/deskwork-studio/bin/deskwork-studio` and `plugins/deskwork/bin/deskwork`.
+- [x] On invocation: detect missing `node_modules`; run `npm install --omit=dev --no-audit --no-fund --loglevel=error`; exec source via tsx.
+- [x] Both `plugins/deskwork-studio/bin/deskwork-studio` and `plugins/deskwork/bin/deskwork`.
 
-#### 23e — On-startup esbuild for client assets
+#### 23e — On-startup esbuild for client assets — **DONE 2026-04-29 (commit b619ecd)**
 
-- [ ] New `packages/studio/src/build-client-assets.ts` — esbuild's programmatic `build()` API into `<install>/.runtime-cache/dist/`.
-- [ ] Server boot calls it once; mtime cache means warm boots are ~50ms.
-- [ ] `publicDir()` and static-serve mount serve from `.runtime-cache/dist/` instead of `public/dist/`.
-- [ ] No changes to page renderers (`<script src>` URLs unchanged).
+- [x] New `packages/studio/src/build-client-assets.ts` — esbuild's programmatic `build()` API into `<pluginRoot>/.runtime-cache/dist/`.
+- [x] Server boot calls it once; mtime cache (with metafile sidecar for transitive-import busting) means warm boots are ~50ms.
+- [x] Static-serve mount uses a more-specific `/static/dist/*` route pointing at `.runtime-cache/dist/`, registered ahead of the catchall (preserving `/static/css/*`).
+- [x] No changes to page renderers (`<script src>` URLs unchanged).
 
-#### 23f — Override resolver
+#### 23f — Override resolver — **DONE 2026-04-29 (commit 196a5a4)**
 
-- [ ] `packages/core/src/overrides.ts` — `createOverrideResolver(projectRoot)` returns paths under `<projectRoot>/.deskwork/{templates,prompts,doctor}/` when present, else null.
-- [ ] Inject into request context in `packages/studio/src/server.ts` boot.
-- [ ] Page renderers in `packages/studio/src/pages/*.ts` check resolver before falling back to default render.
-- [ ] Doctor runner merges plugin-default + project-repo rules.
-- [ ] New `plugins/deskwork/skills/customize/SKILL.md` — `/deskwork:customize <category> <name>` copies a plugin default into the operator's project repo.
+- [x] `packages/core/src/overrides.ts` — `createOverrideResolver(projectRoot)` returns paths under `<projectRoot>/.deskwork/{templates,prompts,doctor}/` when present, else null.
+- [x] Injected into request context in `packages/studio/src/server.ts` boot.
+- [x] Page renderer override loader at `packages/studio/src/lib/override-render.ts` consults resolver before default render.
+- [x] Doctor runner merges plugin-default + project-repo rules via `packages/core/src/doctor/project-rules.ts`.
+- [x] New `plugins/deskwork/skills/customize/SKILL.md` + CLI subcommand `packages/cli/src/commands/customize.ts`.
 
-#### 23g — Local smoke test (`scripts/smoke-marketplace.sh`)
+#### 23g — Local smoke test (`scripts/smoke-marketplace.sh`) — **DONE 2026-04-29 (commits 6dd0052 + bf12db6)**
 
-- [ ] `git archive HEAD plugins/deskwork-studio | tar -x -C $tmp/install/` reproduces marketplace install path.
-- [ ] `npm install --omit=dev` in extracted tree.
-- [ ] Boot studio against a fixture project, curl every page, scrape every `<script src>` and `<link href>`, assert 200.
-- [ ] Repeat for `plugins/deskwork`.
-- [ ] Add to `RELEASING.md` as a pre-tag step. Local-only execution per `feedback_no_ci_test_infrastructure` (CI testing policy).
+- [x] `git archive HEAD plugins/<name>` reproduces marketplace install path.
+- [x] `npm install --omit=dev` in extracted tree.
+- [x] Boot studio against a fixture project, curl every page, scrape every `<script src>` and `<link href>`, assert 200.
+- [x] Repeat for `plugins/deskwork`.
+- [x] Added to `RELEASING.md` as a pre-tag step. Local-only execution per the no-test-infrastructure-in-CI rule.
+- [x] Caught + fixed two real packaging bugs while landing: `pluginRoot()` resolution for materialized-vendor layout (3 levels up needed); codemirror/lezer deps promoted from workspace devDeps to plugin-shell runtime deps.
 
-#### 23h — Tests
+#### 23h — Tests — **DONE 2026-04-29 (folded into 23e + 23f commits)**
 
-- [ ] `packages/core/test/overrides.test.ts` — resolver returns operator path when present, null otherwise.
-- [ ] `packages/studio/test/template-override.test.ts` — page renderer uses operator override when present.
-- [ ] `packages/studio/test/runtime-cache.test.ts` — build-client-assets caches results; rebuilds on mtime change.
-- [ ] Existing 627 tests pass after `build.ts` deletion (drop `npm run build &&` from test scripts).
+- [x] `packages/core/test/overrides.test.ts` — resolver returns operator path when present, null otherwise.
+- [x] `packages/studio/test/template-override.test.ts` — page renderer uses operator override when present.
+- [x] `packages/studio/test/build-client-assets.test.ts` — runtime-cache esbuild caches results; rebuilds on mtime change.
+- [x] All 680 workspace tests pass (core 339, cli 147, studio 194). Up from 652 pre-23.
 
-#### 23i — Documentation
+#### 23i — Documentation — **DONE 2026-04-29 (commit 096b184)**
 
-- [ ] `RELEASING.md` — pre-tag smoke-test step; vendor mechanism (Path A or B).
-- [ ] `plugins/deskwork-studio/README.md`, `plugins/deskwork/README.md` — install path note: first run does `npm install` (~30s).
-- [ ] `.claude/CLAUDE.md` — architecture overview update; no more `bundle/`; vendor-via-symlink mechanism.
-- [ ] Migration notes for existing adopters (writingcontrol, editorialcontrol, audiocontrol).
+- [x] `RELEASING.md` — pre-tag smoke-test step + vendor materialize mechanism (Path B).
+- [x] `plugins/deskwork-studio/README.md`, `plugins/deskwork/README.md` — install path note: first run does `npm install` (~30s); customization layer reference.
+- [x] `.claude/CLAUDE.md` — architecture overview update; no more `bundle/`; vendor-via-symlink + runtime-cache + override resolver.
+- [x] New `MIGRATING.md` with adopter checklist for v0.9.0.
 
 #### 23j — Release v0.9.0
 

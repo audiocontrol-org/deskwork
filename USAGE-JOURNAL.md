@@ -351,3 +351,76 @@ Dispatched typescript-pro with a precise brief covering the 4-bug cluster (#63, 
 **K. The `/dev/editorial-review/<id>` error page when no workflow exists is reasonable.** When I navigated to the PRD's review URL with no workflow yet, the page rendered: *"No galley to review."* with the slug, the error reason, the suggested CLI command, and a back link. Clear and actionable. (The suggested command would have failed due to #67, but that's a downstream of the bug, not the error page's fault.)
 
 **L. Studio breadcrumb inconsistency** — minor friction not filed yet. Scrapbook viewer's breadcrumb collection-name links to `/dev/editorial-studio` (dashboard), but content-tree's collection-name breadcrumb links to `/dev/content/<collection>/`. Same context, two destinations. Could consolidate as part of a future studio polish pass.
+
+---
+
+## 2026-04-29 (cont'd): Phase 23 implementation arc — using deskwork through the PRD review while building deskwork's source-shipped re-architecture
+
+**Session goal:** Implement Phase 23 (the architectural re-design that ships plugins as source instead of as committed bundles) end-to-end. The dogfood thread that started this session continued into the implementation: agent uses the plugin to author + review the plan, agent implements the plan, agent uses the new plugin to verify the implementation, surface friction along the way.
+
+**Surface exercised:** `/deskwork:approve` for the omnibus PRD; `/deskwork-studio:studio` boot via the documented Tailscale-aware default (after correcting an earlier reflex to pass `--no-tailscale`); `/dev/editorial-review/<id>` review surface margin notes + Approve/Iterate buttons; `/dev/content/<collection>/<path>` content tree (verified the v0.8.6 ghost-path fix landed); studio's overall navigation across the unified review surface, scrapbook viewer, and dashboard.
+
+### The first surface friction: `/reload-plugins` discovery
+
+**friction.** I quoted three slash commands for the plugin upgrade flow — `/plugin marketplace update deskwork`, `/plugin install deskwork@deskwork`, `/plugin install deskwork-studio@deskwork`. The plugin's own README documents only two: `/plugin marketplace update` followed by `/reload-plugins`.
+
+**Operator's correction:** *"What does the /deskwork-studio:studio skill say to do?"* — pointing me at the canonical doc rather than memory.
+
+**fix.** I read the README and corrected myself. Then operator probed deeper: *"Are you *sure* the public readme is correct? Did you check the claude code plugin docs?"* — forcing a cross-check via the `claude-code-guide` agent against the official Claude Code docs. Result: `/reload-plugins` IS a real Claude Code command; the marketplace-update + reload sequence IS sufficient for already-installed-plugin upgrades; `/plugin install` is NOT needed when upgrading. The README is right; my 3-command flow was the fabrication.
+
+**insight.** The agent-discipline rule "Read documentation before quoting commands" needs an even stricter reading: don't just trust any single doc — cross-check the source-of-truth docs (Claude Code's official site for Claude Code commands; the plugin's README for plugin-specific behavior) when the command crosses a tool boundary. The plugin documenting its own upgrade flow is one source; the platform documenting how that flow works is another. Both have to agree.
+
+### The Tailscale flag friction
+
+**friction.** I booted the studio with `--no-tailscale` reflexively. The skill's documented default is Tailscale-aware (auto-detects + binds to the magic-DNS hostname). I had no reason for the override; the operator was trying to reach the studio via `orion-m4:port` (Tailscale magic-DNS) and got a connection refused.
+
+**Operator's correction:** *"why did you decide to run it without tailscale? Did I ask you to do that? Is that the expected default behavior?"*
+
+**fix.** Restarted with no flags. The studio bound to all expected interfaces (loopback + Tailscale IP + magic-DNS hostname); the operator's URL worked.
+
+**insight.** Same shape as the slash-command fabrication: when I add a flag/option/argument that wasn't requested, my default should be "the documented default is what the docs say" — not "loopback feels safer." Saving this as a corollary to the existing read-docs rule.
+
+### The skill description drift
+
+**friction.** The studio skill's frontmatter `description` field still said *"loopback only"* — but Step 3 of the body said *"Tailscale-aware default"*. The model uses the `description` line to decide whether/how to invoke the skill. The drift between description and body is what produced my reflexive `--no-tailscale` (the description steered me wrong).
+
+**fix.** Updated the description to match the body. Shipped as v0.8.7 (one-line description fix; tagged + released through the public path; `/plugin marketplace update deskwork && /reload-plugins` got the corrected description into the cached install).
+
+**insight.** Skills' `description:` line is load-bearing — it's the model's input for the skill-selection decision. Treating the description as a 3-line API surface (must match Step 1 of the body) prevents future drift. If the body changes, audit the description.
+
+### The PRD review loop
+
+**Reviewing the omnibus PRD.** The operator opened the studio at the PRD review URL, left margin notes (the omnibus PRD predates Phase 23, so most of its body was thin or absent on the new phases), and the workflow transitioned `open → approved` → I ran `/deskwork:approve` → terminal `applied`. `/feature-implement` gate then cleared cleanly. Workflow id: `d05ebd7d-6b2a-4875-b537-5189003114c0`.
+
+**friction (filed [#73](https://github.com/audiocontrol-org/deskwork/issues/73)).** The unified review surface has no table of contents. For long documents (the omnibus PRD has many H2/H3 sections accumulated across phases), the operator can't see the document's overarching shape — they have to scroll the body to discover what's there. *"there's no table of contents view in the review UI so we can't see the overarching shape of the document."*
+
+**friction (filed [#74](https://github.com/audiocontrol-org/deskwork/issues/74)).** The Approve button in the review surface didn't auto-copy the resulting slash command to the clipboard, AND the popup showing the command disappeared before the operator could manually select-and-copy. This is the same shape as the v0.8.5 re-copy affordance bug, but for the Approve button specifically. Operator's framing: *"I pressed the 'approve' button, but the command didn't go into my clipboard. And, the command popup disappears before I can physically select and copy the command."*
+
+**friction (filed [#75](https://github.com/audiocontrol-org/deskwork/issues/75)).** Clicking Publish on the PRD entry AND on the source-shipped plan entry (both in the dashboard's Drafting lane) returned 404. The button is wired to a server endpoint that either doesn't exist or has been renamed since the dashboard's button-handler was wired. *"I clicked 'publish' on the PRD and the plan entries in the studio, but I got a 404 error on both."*
+
+### The "documents preserve, they don't delete" insight
+
+**friction (resolved by operator-as-Socrates).** I argued, after the dogfood test files were cleaned up, that the PRD calendar entry should also be removed because *"the dogfood is over; now we should clean up."* That tidiness instinct is the bug.
+
+**Operator's correction:** *"wait--what? The PRD is a living document. It ABSOLUTELY belongs in the editorial pipeline. We *will* return to it continuously and revise it. Documents shouldn't get DELETED from a database because they've reached a terminal state. They should be REMEMBERED by the database as IN THE TERMINAL STATE. Deleting from a database wipes them from history which is THE EXACT OPPOSITE OF WHAT YOU WANT IN A DATABASE!!!!!"*
+
+**insight.** A content-management database's entire purpose is historical record-keeping. Terminal states are checkpoints, not deletions. The PRD specifically: it's a living document; future Phase 25 / Phase 30 extensions re-iterate via deskwork; the calendar entry persists across all those revisions; each revision adds a new workflow version, not a new entry. Saved as a durable agent-discipline rule.
+
+### Phase 23 implementation as continuous dogfood
+
+The implementation arc kept the agent USING the plugin against this monorepo throughout:
+
+- **`scripts/smoke-marketplace.sh`** — the new pre-tag gate — was the dogfood instrument that caught two real packaging bugs while landing 23g itself (pluginRoot 3-levels-up resolution + codemirror runtime deps). The smoke test paid for itself before it was even committed.
+- **`/deskwork:approve`** transitioned the PRD's workflow to `applied`. Without that approval the gate would have stayed shut and Phase 23 implementation would have been blocked.
+- **The materialize-vendor mechanism** built in 23c was directly dogfooded by 23g's smoke test (which materializes vendor in its tmp tree before booting). That's why it caught both bugs.
+- **The override resolver** built in 23f was smoke-checked end-to-end (drop a `.deskwork/templates/dashboard.ts` stub; boot; confirm stub renders; remove; reboot; confirm default returns).
+
+### Cross-cutting observations (continued from prior entries)
+
+**M. The model's reflex-toward-flags pattern is real.** Twice this session I added unrequested flags to documented invocations (`--no-tailscale`, the spurious `/plugin install`). Both surfaced via Socratic correction. The mechanism feels like "the model adds caveats / safety / explicitness even when not asked," and that mechanism is sometimes wrong because the documented default is the considered choice. Treating the documented invocation as the FIRST candidate (and override flags as opt-in only when justified) closes that gap.
+
+**N. Skill description drift is a model-input bug.** Beyond the editorial sense in which docs should match — skills' `description:` field is what the model reads to decide what the skill does. Drift between the description and the body changes model behavior. Audit description ↔ body alignment as part of skill maintenance.
+
+**O. Senior code review caught what unit tests missed.** The 4 blockers ([#76](https://github.com/audiocontrol-org/deskwork/issues/76)–[#79](https://github.com/audiocontrol-org/deskwork/issues/79)) were race conditions, atomic-write gaps, and signal-handling defects — none of which the 680-test workspace test suite would catch (concurrency tests are hard; atomic-write tests are non-trivial to design; signal-handling tests need real subprocess control). Code review by a senior reviewer agent IS the gate for these classes of bugs. Don't substitute a green test suite for that gate.
+
+**P. PR-shaped releases don't fit when implementation lands on main.** `/feature-ship`'s PR step adds value when the work is on a feature branch awaiting review. With each sub-phase committing direct to main during `/feature-implement`, there's no diff to review at PR time. The skill needs an explicit branch for "implementation already merged → run release ceremony directly." Worth amending the skill text to handle both cases.
