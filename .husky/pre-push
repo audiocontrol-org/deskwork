@@ -12,8 +12,16 @@
 # source drift.
 #
 # The hook file is kept so future push-time checks can be added without
-# re-bootstrapping husky. To add one: implement it here, set -euo
-# pipefail, exit non-zero on failure.
+# re-bootstrapping husky. To add one: implement it here and exit non-zero
+# on failure.
+#
+# Husky 9 invokes hooks via sh, not bash, regardless of the shebang. On
+# Debian-family hosts (CI runners included) /bin/sh is dash, which does
+# NOT support `set -o pipefail`. Stick to posix-compat strict mode
+# (set -eu) and check pipe results explicitly with $? if needed. Adding
+# `set -o pipefail` here will silently break the release workflow's
+# "Commit materialized vendor + re-point tag" step (regression: v0.9.1
+# release run 25126363101).
 
-set -euo pipefail
+set -eu
 exit 0
