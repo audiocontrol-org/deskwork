@@ -40,3 +40,21 @@ describe('validateVersion', () => {
     expect(validateVersion('0.10.0', 'v0.9.0')).toEqual({ ok: true });
   });
 });
+
+import { createRig } from './fixtures.js';
+
+describe('createRig (fixture self-test)', () => {
+  it('creates a working local + remote with main + feature branch', () => {
+    const rig = createRig();
+    try {
+      // Confirm branch is feature/test
+      expect(rig.sh('git rev-parse --abbrev-ref HEAD').trim()).toBe('feature/test');
+      // Confirm origin/main exists
+      expect(rig.sh('git rev-parse origin/main').trim()).toMatch(/^[0-9a-f]{40}$/);
+      // Confirm tracking is set up
+      expect(rig.sh('git rev-parse --abbrev-ref feature/test@{u}').trim()).toBe('origin/feature/test');
+    } finally {
+      rig.cleanup();
+    }
+  });
+});
