@@ -2224,12 +2224,12 @@ git commit -m "feat(dw-lifecycle/bin): issues subcommand (parent + phase issue c
 
 ### Task 26: Phase 4 verification
 
-- [ ] **Step 1: Run full suite**
+- [x] **Step 1: Run full suite**
 
 Run: `cd plugins/dw-lifecycle && npm test`
 Expected: all tests pass.
 
-- [ ] **Step 2: Tsc clean**
+- [x] **Step 2: Tsc clean**
 
 Run: `cd plugins/dw-lifecycle && npx tsc --noEmit`
 Expected: no errors.
