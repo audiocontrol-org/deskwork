@@ -1,0 +1,12 @@
+{
+  "name": "dw-lifecycle",
+  "version": "0.1.0",
+  "description": "Project lifecycle orchestration plugin — define → setup → issues → implement → review → ship → complete. Composes superpowers (process disciplines) and feature-dev (specialist agents).",
+  "license": "GPL-3.0-or-later",
+  "metadata": {
+    "peerPlugins": {
+      "required": ["superpowers"],
+      "recommended": ["feature-dev"]
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "name": "@deskwork/plugin-dw-lifecycle",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Workspace package for the dw-lifecycle Claude Code plugin",
+  "license": "GPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "tsx": "^4.21.0",
+    "yaml": "^2.8.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
