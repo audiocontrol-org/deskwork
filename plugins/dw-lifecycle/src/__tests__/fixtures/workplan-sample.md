@@ -17,3 +17,10 @@ targetVersion: "1.0"
 
 - [x] Step 1: already done
 - [ ] Step 2: not yet
+
+## Phase 2
+
+### Task 3: Bold steps
+
+- [ ] **Step 1: bold thing**
+- [x] **Step 2: bold done**

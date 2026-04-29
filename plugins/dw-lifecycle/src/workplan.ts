@@ -15,6 +15,12 @@ export interface ParsedWorkplan {
 
 const TASK_HEADER_RE = /^### (Task .+)$/;
 const STEP_RE = /^- \[( |x)\] (.+)$/;
+const BOLD_RE = /^\*\*(.+)\*\*$/;
+
+function stripBold(text: string): string {
+  const m = BOLD_RE.exec(text);
+  return m?.[1] ?? text;
+}
 
 export function parseWorkplan(source: string): ParsedWorkplan {
   const lines = source.split('\n');
@@ -25,7 +31,7 @@ export function parseWorkplan(source: string): ParsedWorkplan {
     const taskMatch = TASK_HEADER_RE.exec(line);
     const taskTitle = taskMatch?.[1];
     if (taskTitle !== undefined) {
-      currentTask = { title: taskTitle, steps: [] };
+      currentTask = { title: stripBold(taskTitle), steps: [] };
       tasks.push(currentTask);
       continue;
     }
@@ -34,7 +40,7 @@ export function parseWorkplan(source: string): ParsedWorkplan {
     const marker = stepMatch?.[1];
     const stepText = stepMatch?.[2];
     if (marker !== undefined && stepText !== undefined) {
-      currentTask.steps.push({ done: marker === 'x', text: stepText });
+      currentTask.steps.push({ done: marker === 'x', text: stripBold(stepText) });
     }
   }
 
@@ -49,6 +55,10 @@ export interface MarkStepArgs {
 export function markStepDone(source: string, args: MarkStepArgs): string {
   const lines = source.split('\n');
   let inTask = false;
+  let taskFound = false;
+  let stepFound = false;
+  const targetStep = stripBold(args.step);
+  const targetTask = stripBold(args.task);
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -56,15 +66,25 @@ export function markStepDone(source: string, args: MarkStepArgs): string {
     const taskMatch = TASK_HEADER_RE.exec(line);
     const taskTitle = taskMatch?.[1];
     if (taskTitle !== undefined) {
-      inTask = taskTitle === args.task;
+      const normalizedTitle = stripBold(taskTitle);
+      inTask = normalizedTitle === targetTask;
+      if (inTask) taskFound = true;
       continue;
     }
     if (!inTask) continue;
     const stepMatch = STEP_RE.exec(line);
     const stepText = stepMatch?.[2];
-    if (stepText !== undefined && stepText === args.step) {
-      lines[i] = `- [x] ${stepText}`;
+    if (stepText !== undefined && stripBold(stepText) === targetStep) {
+      stepFound = true;
+      lines[i] = line.replace('[ ]', '[x]');
     }
+  }
+
+  if (!taskFound) {
+    throw new Error('Task not found in workplan: ' + args.task);
+  }
+  if (!stepFound) {
+    throw new Error('Step not found in task "' + args.task + '": ' + args.step);
   }
 
   return lines.join('\n');
