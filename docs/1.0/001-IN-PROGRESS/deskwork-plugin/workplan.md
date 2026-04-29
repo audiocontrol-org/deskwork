@@ -1033,7 +1033,8 @@ Tasks are grouped by sub-phase. Sub-phases are sequential (19a → 19b → 19c �
 
 **Scope decisions baked in (operator-confirmed):**
 - npm scope: `@deskwork` (operator-owned).
-- Auth path: npm Trusted Publishers (OIDC). `NPM_TOKEN` repo secret retained as manual-fallback only; the release workflow does not consume it. `permissions: id-token: write` on the publish job; auto-provenance on public-repo OIDC publishes.
+- **Publish path: manual from operator's terminal** (not CI for v0.10.0). Operator iterates the local manual publish flow until solid; then a future `26-CI` phase moves it to GitHub Actions OIDC. Decision rationale: GitHub Actions latency + opacity makes packaging iteration painful; local manual flow gives fast feedback for the first version.
+- Auth path eventually: npm Trusted Publishers (OIDC). `NPM_TOKEN` repo secret retained as manual-fallback only. For v0.10.0, operator publishes manually with 2FA OTP per package; trusted publishers configured AFTER first publish (npm requires the package to exist before binding).
 - Plugin manifest version === npm package version. Single bump via `scripts/bump-version.ts` extension.
 - First-run install: `npm install --omit=dev @deskwork/<pkg>@<version>` into `plugins/<plugin>/node_modules/`.
 - Plugin rename: `deskwork-studio` → `dw-studio`. Organizational, NOT a fix for [#92](https://github.com/audiocontrol-org/deskwork/issues/92) (Claude Code dispatch bug, separate workstream).
@@ -1043,15 +1044,34 @@ Tasks are grouped by sub-phase. Sub-phases are sequential (19a → 19b → 19c �
 
 **Sub-phases:**
 
-#### 26a — npm publishing infrastructure (Trusted Publishers / OIDC)
+> **Re-sequencing decision (2026-04-29):** Operator opted out of CI-driven publishing for Phase 26. The full local manual publish flow gets ironed out first (GitHub Actions latency + opacity makes packaging iteration painful); CI OIDC publishing becomes a future phase shipped only after the manual flow is solid. This also drops the trusted-publisher pre-publish question — operator confirms first publish must happen manually per package, THEN trusted publishers can be configured.
+>
+> Tasks in 26a originally targeting CI YAML (release.yml permissions block, OIDC dry-run workflow) are removed. They land in **26-CI** (future phase, no v0.10.0 commitment).
 
-- [ ] Audit each `packages/<pkg>/package.json` — set `name: "@deskwork/<pkg>"`, `version`, `description`, `homepage`, `license`, `author`. Set `repository.url` to EXACTLY `https://github.com/audiocontrol-org/deskwork.git` (trusted-publisher requirement).
-- [ ] Set `publishConfig.access: "public"` per package.
-- [ ] Verify whether npm allows configuring trusted publishing for a package name BEFORE any publish. If yes: configure trusted publishing per package on npm UI and let CI do the first publish. If no: operator does one-time manual `npm publish` per package (with 2FA OTP) to claim each name, THEN configures trusted publishing.
-- [ ] Add `permissions: id-token: write` + `contents: read` to the publish job in `.github/workflows/release.yml`.
-- [ ] Verify OIDC handshake end-to-end via `npm publish --dry-run --access public` from a feature-branch CI run.
+#### 26a — Package.json setup for npm publishability ✅ shipped `da2c921`
 
-**Acceptance:** Trusted Publishers configured for all three packages. `permissions: id-token: write` block present. Test publish from feature branch attaches provenance and lands at `npm view @deskwork/<pkg>@<test-version>`. `repository.url` exactly matches the trusted-publisher binding.
+- [x] Audit each `packages/<pkg>/package.json` — set `name: "@deskwork/<pkg>"`, `version`, `description`, `homepage`, `license`, `author`. Set `repository.url` to EXACTLY `https://github.com/audiocontrol-org/deskwork.git` (trusted-publisher requirement). Add `repository.directory` per package.
+- [x] Drop `private: true` per package (required to make publishable).
+- [x] Set `publishConfig.access: "public"` per package.
+
+**Acceptance:** `repository.url` exactly matches the canonical GitHub URL. `private: true` removed. `publishConfig.access: "public"` set. Met by `da2c921`.
+
+#### 26b — Package shape audit + dist build
+
+- [ ] `exports` field declared per package (explicit subpath exports for what consumers need).
+- [ ] `files` whitelist: `dist/`, `package.json`, `README.md`. Excludes tests, fixtures, source maps unless wanted.
+- [ ] `tsconfig.build.json` per package: `outDir: "dist"`, `declaration: true`, `declarationMap: true`.
+- [ ] `npm run build` script per package; `npm run build --workspaces` at root.
+- [ ] `npm pack` smoke verifies tarball contents per package (no test fixtures, no node_modules).
+
+**Acceptance:** All three packages produce tarballs with the expected file set. `npm pack --workspace @deskwork/<pkg>` produces a tarball that, after extraction, has only the whitelisted files.
+
+#### Manual reservation publish (operator action between 26b and 26c)
+
+- [ ] Operator publishes each `@deskwork/<pkg>` to npm with a placeholder version (e.g., `0.0.0-reserve.0`) using `npm publish --access public --workspace @deskwork/<pkg>` from their terminal (with 2FA OTP). Reserves the package names.
+- [ ] Operator configures Trusted Publishers per package on npm UI (Org=`audiocontrol-org`, Repo=`deskwork`, Workflow=`release.yml`). Required setup for any future CI publishing in 26-CI.
+
+**Acceptance:** `npm view @deskwork/core`, `npm view @deskwork/cli`, `npm view @deskwork/studio` all return the placeholder version. Trusted publishers configured per package (visible in npm UI Settings → Trusted publishing).
 
 #### 26b — Package shape audit + dist build
 
@@ -1096,14 +1116,18 @@ Tasks are grouped by sub-phase. Sub-phases are sequential (19a → 19b → 19c �
 
 **Acceptance:** `git grep -n "vendor"` returns only intentional historical refs. `npm install` at repo root succeeds. `npm run test --workspaces` still passes.
 
-#### 26f — Release workflow + RELEASING.md + `/release` skill updates
+#### 26f — Manual release flow: RELEASING.md + `/release` skill (CI deferred to 26-CI)
 
-- [ ] `.github/workflows/release.yml` — `permissions: id-token: write` + `contents: read`. `npm publish --access public` step (per workspace package, no `NPM_TOKEN` env var). Drop `materialize-vendor` step. Rename marketplace.json verification step (since `source.ref` is gone — verifies plugin paths instead).
-- [ ] `RELEASING.md` — update procedure (bump → build → smoke → publish → tag). Drop source.ref pin section. Add npm Trusted Publishers explanation.
-- [ ] `.claude/skills/release/` — update SKILL.md procedure + helpers + tests. Hard gate: smoke must verify `npm view @deskwork/<pkg>@<version>` returns 404 BEFORE tagging; verify it returns the new version AFTER publishing.
-- [ ] `scripts/smoke-marketplace.sh` rewritten to exercise the npm-install path. PR #91's `scripts/smoke-clone-install.sh` deleted (superseded).
+- [ ] `RELEASING.md` — update procedure (bump → build → smoke → manual `npm publish` per package → tag). Drop source.ref pin section. Document the 2FA prompt expectation. Note: CI-driven publishing is a future phase (26-CI), not v0.10.0.
+- [ ] `.claude/skills/release/` — update SKILL.md procedure + helpers + tests. Add `npm publish --access public --workspace @deskwork/<pkg>` step to the canonical flow (run from operator's terminal, NOT CI). Hard gate: smoke must verify `npm view @deskwork/<pkg>@<version>` returns 404 BEFORE tagging; verify it returns the new version AFTER publishing.
+- [ ] `scripts/smoke-marketplace.sh` rewritten to exercise the npm-install path against placeholder-published `@deskwork/*` packages. PR #91's `scripts/smoke-clone-install.sh` deleted (superseded).
+- [ ] `.github/workflows/release.yml` — drop `materialize-vendor` step; rename marketplace.json verification step (since `source.ref` is gone — verifies plugin paths instead). Do NOT add the `npm publish` step here — that's 26-CI. The workflow continues to do tagging + GitHub release creation only.
 
-**Acceptance:** Test release on a feature branch (or staged v0.10.0-rc.1) goes through the new workflow end-to-end without manual intervention. `/release` skill catches a stale npm version.
+**Acceptance:** Operator can run `/release` end-to-end from their terminal; the skill orchestrates bump → build → smoke → manual `npm publish` per package (with 2FA prompts visible) → tag → push. CI continues to handle tagging + GitHub release creation only. `/release` skill catches a stale npm version (404 check + post-publish verification).
+
+#### 26-CI (future phase, deferred from v0.10.0) — CI-driven npm publish via Trusted Publishers (OIDC)
+
+Shipped only after the manual flow in 26f is solid. Adds `permissions: id-token: write` + `contents: read` to the publish job in `release.yml`. Adds `npm publish --access public` step (per workspace package, no `NPM_TOKEN` env var). Auto-provenance attaches on public-repo OIDC publishes. Operator's call when to ship.
 
 #### 26g — Migration docs + adopter upgrade path
 
