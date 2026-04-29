@@ -11143,6 +11143,14 @@ function findEntryFile(projectRoot, config, site, entryId, index2, legacyEntryFo
   }
   return void 0;
 }
+function resolveEntryFilePath(projectRoot, config, site, slug, entryId, index2) {
+  if (entryId !== void 0 && entryId !== "") {
+    const idx = index2 ?? buildContentIndex(projectRoot, config, resolveSite(config, site));
+    const hit = idx.byId.get(entryId);
+    if (hit !== void 0) return hit;
+  }
+  return resolveBlogFilePath(projectRoot, config, site, slug);
+}
 var CHANNEL_RE = /^[a-z0-9][a-z0-9-]*$/;
 function resolveShortformFilePath(projectRoot, config, site, entry, platform, channel, index2) {
   if (channel !== void 0 && channel !== "") {
@@ -11493,19 +11501,16 @@ function resolveLongformFilePath(projectRoot, config, site, slug, hint) {
   } else if (entryId === void 0 || entryId === "") {
     entryId = entry?.id;
   }
-  if (entryId !== void 0 && entryId !== "") {
-    const idx = hint.index ?? buildContentIndex(projectRoot, config, site);
-    const fromIndex = findEntryFile(
-      projectRoot,
-      config,
-      site,
-      entryId,
-      idx,
-      entry !== void 0 ? { slug: entry.slug } : { slug }
-    );
-    if (fromIndex !== void 0) return fromIndex;
-  }
-  return resolveBlogFilePath(projectRoot, config, site, slug);
+  const idx = hint.index ?? buildContentIndex(projectRoot, config, site);
+  const slugForFallback = entry?.slug ?? slug;
+  return resolveEntryFilePath(
+    projectRoot,
+    config,
+    site,
+    slugForFallback,
+    entryId,
+    idx
+  );
 }
 function resolveShortformWorkflowFilePath(projectRoot, config, site, slug, platform, channel, hint) {
   let entry = hint.entry;
@@ -27109,8 +27114,9 @@ function buildContentTree(site, entries, config, projectRoot, options = {}) {
     );
     const title = overlay?.title ?? (fsEntry?.title ?? null) ?? leafOfPath(path);
     let hasOwnIndex = false;
+    let boundFile;
     if (overlay !== null) {
-      const boundFile = idBoundFile(overlay, contentIndex);
+      boundFile = idBoundFile(overlay, contentIndex);
       hasOwnIndex = entryHasOwnIndex(
         contentDir,
         path,
@@ -27136,6 +27142,9 @@ function buildContentTree(site, entries, config, projectRoot, options = {}) {
     };
     if (overlay?.slug !== void 0) {
       node2.slug = overlay.slug;
+    }
+    if (boundFile !== void 0) {
+      node2.filePath = boundFile;
     }
     nodeByPath.set(path, node2);
   }
@@ -27270,6 +27279,9 @@ function flattenForRender(root3) {
   walk(root3, 0, true);
   return out;
 }
+
+// src/pages/content.ts
+import { relative as relative2 } from "node:path";
 
 // src/pages/content-detail.ts
 import { readFileSync as readFileSync10, existsSync as existsSync12 } from "node:fs";
@@ -27650,7 +27662,11 @@ function nodeIcon(node2) {
   }
   return unsafe(html6`<span class="tree-row__icon" aria-hidden="true">·</span>`);
 }
-function nodeFilePathHint(node2) {
+function nodeFilePathHint(node2, contentDir) {
+  if (node2.filePath !== void 0) {
+    const rel = relative2(contentDir, node2.filePath);
+    if (!rel.startsWith("..")) return `/${rel}`;
+  }
   if (node2.entry !== null) return `/${node2.path}/index.md`;
   return `/${node2.path}/`;
 }
@@ -27679,7 +27695,7 @@ function renderTreeRowActions(node2, site) {
           tabindex="0" aria-label="Open scrapbook for ${node2.title}">→ scrapbook</a>` : "";
   return unsafe(reviewLink + scrapLink);
 }
-function renderTreeRow(site, project, flat, selectedPath) {
+function renderTreeRow(site, project, flat, selectedPath, contentDir) {
   const { node: node2, depth, isLast } = flat;
   const isSelected = selectedPath === node2.path;
   const isLeaf = node2.children.length === 0;
@@ -27700,7 +27716,7 @@ function renderTreeRow(site, project, flat, selectedPath) {
       <div class="tree-row__main">
         ${nodeIcon(node2)}
         <span class="tree-row__title">${node2.title}</span>
-        <span class="tree-row__slug">${nodeFilePathHint(node2)}</span>
+        <span class="tree-row__slug">${nodeFilePathHint(node2, contentDir)}</span>
         ${publicUrlHint}
       </div>
       <span class="tree-row__lane">
@@ -27711,11 +27727,11 @@ function renderTreeRow(site, project, flat, selectedPath) {
       <span class="tree-row__actions">${renderTreeRowActions(node2, site)}</span>
     </a>`);
 }
-function renderTree(site, project, selectedPath) {
+function renderTree(site, project, selectedPath, contentDir) {
   const flat = flattenForRender(project.root);
   return unsafe(html6`
     <div class="tree" role="tree">
-      ${flat.map((f) => renderTreeRow(site, project, f, selectedPath))}
+      ${flat.map((f) => renderTreeRow(site, project, f, selectedPath, contentDir))}
     </div>`);
 }
 async function renderContentProject(ctx, site, projectSlug, selectedPath, getIndex) {
@@ -27745,7 +27761,7 @@ async function renderContentProject(ctx, site, projectSlug, selectedPath, getInd
               ${project.totalNodes} NODES · ${project.maxDepth} LEVELS DEEP
             </span>
           </header>
-          ${renderTree(site, project, selectedNode?.path ?? null)}
+          ${renderTree(site, project, selectedNode?.path ?? null, resolveContentDir(ctx.projectRoot, ctx.config, site))}
         </div>
         ${detailBlock}
       </section>

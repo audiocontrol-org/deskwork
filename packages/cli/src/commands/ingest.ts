@@ -40,7 +40,7 @@
  * review-start has provenance to anchor against.
  */
 
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { readConfig } from '@deskwork/core/config';
@@ -49,6 +49,7 @@ import { resolveSite, resolveCalendarPath, resolveContentDir } from '@deskwork/c
 import { isStage, type CalendarEntry, type Stage } from '@deskwork/core/types';
 import { absolutize, fail, parseArgs } from '@deskwork/core/cli-args';
 import { appendJournal } from '@deskwork/core/journal';
+import { updateFrontmatter } from '@deskwork/core/frontmatter';
 import {
   candidateToEntry,
   discoverIngestCandidates,
@@ -72,7 +73,7 @@ const KNOWN_FLAGS = [
   'date-field',
 ] as const;
 
-const BOOLEAN_FLAGS = ['apply', 'json', 'force'] as const;
+const BOOLEAN_FLAGS = ['apply', 'json', 'force', 'no-write-frontmatter'] as const;
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -82,7 +83,8 @@ export async function run(argv: string[]): Promise<void> {
   if (positional.length < 2) {
     fail(
       'Usage: deskwork ingest <project-root> [--site <slug>] [--apply] [--json] ' +
-        '[--force] [--slug-from frontmatter|path] [--state-from frontmatter|datePublished] ' +
+        '[--force] [--no-write-frontmatter] ' +
+        '[--slug-from frontmatter|path] [--state-from frontmatter|datePublished] ' +
         '[--slug <s>] [--state <stage>] [--date YYYY-MM-DD] [--title-field <n>] ' +
         '[--description-field <n>] [--slug-field <n>] [--state-field <n>] ' +
         '[--date-field <n>] <path>...',
@@ -181,16 +183,40 @@ export async function run(argv: string[]): Promise<void> {
 
   if (!booleans.has('apply')) return;
 
+  const writeFrontmatterBinding = !booleans.has('no-write-frontmatter');
+
   // Apply path: append entries and write journal records. The
   // calendar is written once at the end so a partial run does not
-  // leave a torn calendar file.
+  // leave a torn calendar file. Issue #63: also persist the freshly-
+  // minted UUID into the source file's frontmatter under `deskwork.id`
+  // so the calendar entry isn't orphaned at creation (doctor was
+  // immediately flagging `missing-frontmatter-id` against every ingest).
   for (const { candidate, stage } of actionable) {
     const id = randomUUID();
     const entry: CalendarEntry = { id, ...candidateToEntry(candidate, stage) };
     calendar.entries.push(entry);
     writeIngestJournalEntry(projectRoot, config, site, candidate, entry);
+    if (writeFrontmatterBinding) {
+      writeDeskworkIdToFile(candidate.filePath, id);
+    }
   }
   writeCalendar(calendarPath, calendar);
+}
+
+/**
+ * Patch the markdown file at `filePath` so its frontmatter includes
+ * `deskwork.id: <id>`. Round-trip-preserving (Issue #37): only the
+ * `deskwork:` namespace is touched; existing frontmatter fields keep
+ * their byte-for-byte formatting (quoting, comments, key order). When
+ * the file has no existing frontmatter, a fresh `---` block is
+ * prepended.
+ */
+function writeDeskworkIdToFile(filePath: string, id: string): void {
+  const original = readFileSync(filePath, 'utf-8');
+  const updated = updateFrontmatter(original, { deskwork: { id } });
+  if (updated !== original) {
+    writeFileSync(filePath, updated, 'utf-8');
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -231,6 +231,54 @@ export function findEntryFile(
   return undefined;
 }
 
+/**
+ * Resolve the markdown file backing a calendar entry, preferring the
+ * UUID frontmatter binding (refactor-proof) and falling back to the
+ * site's slug-template only when no binding exists.
+ *
+ * Equivalent to the studio's `resolveLongformFilePath` but exposed as a
+ * top-level helper from `paths.ts` so CLI commands can use it without
+ * pulling in `review/` infrastructure. Always returns an absolute path
+ * (the slug-template fallback is unconditional); callers should
+ * `existsSync` if they need an existence guarantee.
+ *
+ * Precedence:
+ *   1. Content index — when `entryId` is supplied (and non-empty), look
+ *      up the file whose frontmatter `deskwork.id:` matches. Refactor-
+ *      proof: the binding follows the file regardless of slug rename or
+ *      directory relocation.
+ *   2. Slug-template fallback — when the index has no record (entry's
+ *      file isn't bound to frontmatter yet, e.g. pre-doctor / pre-ingest
+ *      state) or no `entryId` was supplied, fall back to
+ *      `resolveBlogFilePath(slug)`.
+ *
+ * @param projectRoot Absolute path to the deskwork project root.
+ * @param config Loaded deskwork config.
+ * @param site Site slug (or null/undefined for the default site).
+ * @param slug Calendar entry slug — used both as the legacy fallback
+ *             template input and as a hint for the slug-template fallback.
+ * @param entryId Calendar entry's stable UUID. When omitted or empty,
+ *                resolution falls straight through to the slug template.
+ * @param index Pre-built content index. When omitted, this function
+ *              builds one. Pass the per-request memoized index when
+ *              calling from the studio; let the CLI build per call.
+ */
+export function resolveEntryFilePath(
+  projectRoot: string,
+  config: DeskworkConfig,
+  site: string | null | undefined,
+  slug: string,
+  entryId?: string,
+  index?: ContentIndex,
+): string {
+  if (entryId !== undefined && entryId !== '') {
+    const idx = index ?? buildContentIndex(projectRoot, config, resolveSite(config, site));
+    const hit = idx.byId.get(entryId);
+    if (hit !== undefined) return hit;
+  }
+  return resolveBlogFilePath(projectRoot, config, site, slug);
+}
+
 // ---------------------------------------------------------------------------
 // Phase 21a — shortform file resolution
 // ---------------------------------------------------------------------------

@@ -27,9 +27,8 @@ import type { DeskworkConfig } from '../config.ts';
 import type { ContentIndex } from '../content-index.ts';
 import { buildContentIndex } from '../content-index.ts';
 import {
-  findEntryFile,
-  resolveBlogFilePath,
   resolveCalendarPath,
+  resolveEntryFilePath,
   resolveShortformFilePath,
 } from '../paths.ts';
 import { readCalendar } from '../calendar.ts';
@@ -107,19 +106,19 @@ export function resolveLongformFilePath(
     entryId = entry?.id;
   }
 
-  if (entryId !== undefined && entryId !== '') {
-    const idx = hint.index ?? buildContentIndex(projectRoot, config, site);
-    const fromIndex = findEntryFile(
-      projectRoot,
-      config,
-      site,
-      entryId,
-      idx,
-      entry !== undefined ? { slug: entry.slug } : { slug },
-    );
-    if (fromIndex !== undefined) return fromIndex;
-  }
-  return resolveBlogFilePath(projectRoot, config, site, slug);
+  // Delegate to the top-level helper — same precedence (id-bound path
+  // first, slug-template fallback). The studio passes a per-request
+  // memoized index; the CLI can let it build per call.
+  const idx = hint.index ?? buildContentIndex(projectRoot, config, site);
+  const slugForFallback = entry?.slug ?? slug;
+  return resolveEntryFilePath(
+    projectRoot,
+    config,
+    site,
+    slugForFallback,
+    entryId,
+    idx,
+  );
 }
 
 /**

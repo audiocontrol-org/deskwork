@@ -237,10 +237,14 @@ export function buildContentTree(
       (fsEntry?.title ?? null) ??
       leafOfPath(path);
 
-    // hasOwnIndex resolution.
+    // hasOwnIndex resolution + on-disk file path resolution. Both
+    // depend on the content index's id-binding when an entry overlays
+    // — the bound file is the SSOT for both the existence check
+    // (`hasOwnIndex`) and the renderer's path display (Issue #70).
     let hasOwnIndex = false;
+    let boundFile: string | undefined;
     if (overlay !== null) {
-      const boundFile = idBoundFile(overlay, contentIndex);
+      boundFile = idBoundFile(overlay, contentIndex);
       hasOwnIndex = entryHasOwnIndex(
         contentDir,
         path,
@@ -270,6 +274,12 @@ export function buildContentTree(
       // the "public URL" hover hint. Honoring exactOptionalPropertyTypes:
       // omit the field entirely rather than assigning undefined.
       node.slug = overlay.slug;
+    }
+    if (boundFile !== undefined) {
+      // Issue #70: surface the actual on-disk path so the renderer
+      // doesn't have to reconstruct `<path>/index.md` (which is wrong
+      // for hierarchical / non-template layouts).
+      node.filePath = boundFile;
     }
     nodeByPath.set(path, node);
   }

@@ -8490,6 +8490,14 @@ function findEntryFile(projectRoot, config, site, entryId, index, legacyEntryFor
   }
   return void 0;
 }
+function resolveEntryFilePath(projectRoot, config, site, slug, entryId, index) {
+  if (entryId !== void 0 && entryId !== "") {
+    const idx = index ?? buildContentIndex(projectRoot, config, resolveSite(config, site));
+    const hit = idx.byId.get(entryId);
+    if (hit !== void 0) return hit;
+  }
+  return resolveBlogFilePath(projectRoot, config, site, slug);
+}
 function resolveShortformFilePath(projectRoot, config, site, entry, platform, channel, index) {
   if (channel !== void 0 && channel !== "") {
     if (!CHANNEL_RE.test(channel)) {
@@ -8998,19 +9006,16 @@ function resolveLongformFilePath(projectRoot, config, site, slug, hint) {
   } else if (entryId === void 0 || entryId === "") {
     entryId = entry?.id;
   }
-  if (entryId !== void 0 && entryId !== "") {
-    const idx = hint.index ?? buildContentIndex(projectRoot, config, site);
-    const fromIndex = findEntryFile(
-      projectRoot,
-      config,
-      site,
-      entryId,
-      idx,
-      entry !== void 0 ? { slug: entry.slug } : { slug }
-    );
-    if (fromIndex !== void 0) return fromIndex;
-  }
-  return resolveBlogFilePath(projectRoot, config, site, slug);
+  const idx = hint.index ?? buildContentIndex(projectRoot, config, site);
+  const slugForFallback = entry?.slug ?? slug;
+  return resolveEntryFilePath(
+    projectRoot,
+    config,
+    site,
+    slugForFallback,
+    entryId,
+    idx
+  );
 }
 function resolveShortformWorkflowFilePath(projectRoot, config, site, slug, platform, channel, hint) {
   let entry = hint.entry;
@@ -9279,7 +9284,13 @@ async function run2(argv2) {
         `Approved v${approvedVersion2}, but workflow is at v${workflow2.currentVersion}. Disk has moved on since the approve click \u2014 re-click Approve on v${workflow2.currentVersion} or iterate back.`
       );
     }
-    const blogFile = resolveBlogFilePath(projectRoot, config, site, slug);
+    const blogFile = resolveEntryFilePath(
+      projectRoot,
+      config,
+      site,
+      slug,
+      workflow2.entryId
+    );
     if (!existsSync4(blogFile)) {
       fail(`Blog file missing at ${blogFile}. Nothing to approve against.`);
     }
@@ -11730,14 +11741,14 @@ var ingest_exports = {};
 __export(ingest_exports, {
   run: () => run6
 });
-import { existsSync as existsSync8, mkdirSync as mkdirSync3 } from "node:fs";
+import { existsSync as existsSync8, mkdirSync as mkdirSync3, readFileSync as readFileSync13, writeFileSync as writeFileSync8 } from "node:fs";
 import { isAbsolute as isAbsolute4, join as join12, resolve as resolve3 } from "node:path";
 import { randomUUID as randomUUID4 } from "node:crypto";
 async function run6(argv2) {
   const { positional, flags, booleans } = parseInput2(argv2);
   if (positional.length < 2) {
     fail(
-      "Usage: deskwork ingest <project-root> [--site <slug>] [--apply] [--json] [--force] [--slug-from frontmatter|path] [--state-from frontmatter|datePublished] [--slug <s>] [--state <stage>] [--date YYYY-MM-DD] [--title-field <n>] [--description-field <n>] [--slug-field <n>] [--state-field <n>] [--date-field <n>] <path>...",
+      "Usage: deskwork ingest <project-root> [--site <slug>] [--apply] [--json] [--force] [--no-write-frontmatter] [--slug-from frontmatter|path] [--state-from frontmatter|datePublished] [--slug <s>] [--state <stage>] [--date YYYY-MM-DD] [--title-field <n>] [--description-field <n>] [--slug-field <n>] [--state-field <n>] [--date-field <n>] <path>...",
       2
     );
   }
@@ -11809,13 +11820,24 @@ async function run6(argv2) {
     });
   }
   if (!booleans.has("apply")) return;
+  const writeFrontmatterBinding = !booleans.has("no-write-frontmatter");
   for (const { candidate, stage } of actionable) {
     const id = randomUUID4();
     const entry = { id, ...candidateToEntry(candidate, stage) };
     calendar.entries.push(entry);
     writeIngestJournalEntry(projectRoot, config, site, candidate, entry);
+    if (writeFrontmatterBinding) {
+      writeDeskworkIdToFile(candidate.filePath, id);
+    }
   }
   writeCalendar(calendarPath, calendar);
+}
+function writeDeskworkIdToFile(filePath, id) {
+  const original = readFileSync13(filePath, "utf-8");
+  const updated = updateFrontmatter(original, { deskwork: { id } });
+  if (updated !== original) {
+    writeFileSync8(filePath, updated, "utf-8");
+  }
 }
 function parseInput2(argv2) {
   try {
@@ -11947,6 +11969,7 @@ var init_ingest2 = __esm({
     init_types();
     init_cli();
     init_journal();
+    init_frontmatter();
     init_ingest();
     KNOWN_FLAGS2 = [
       "site",
@@ -11961,13 +11984,13 @@ var init_ingest2 = __esm({
       "state-field",
       "date-field"
     ];
-    BOOLEAN_FLAGS2 = ["apply", "json", "force"];
+    BOOLEAN_FLAGS2 = ["apply", "json", "force", "no-write-frontmatter"];
     DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
   }
 });
 
 // src/commands/install-preflight.ts
-import { existsSync as existsSync9, readFileSync as readFileSync13, readdirSync as readdirSync8, statSync as statSync6 } from "node:fs";
+import { existsSync as existsSync9, readFileSync as readFileSync14, readdirSync as readdirSync8, statSync as statSync6 } from "node:fs";
 import { join as join13 } from "node:path";
 function isAstroProject(projectRoot) {
   return ASTRO_CONFIG_NAMES.some(
@@ -11998,7 +12021,7 @@ function preflightSchemaForProject(projectRoot) {
   }
   let raw;
   try {
-    raw = readFileSync13(schemaPath, "utf-8");
+    raw = readFileSync14(schemaPath, "utf-8");
   } catch (err2) {
     const reason = err2 instanceof Error ? err2.message : String(err2);
     return {
@@ -12197,7 +12220,7 @@ var install_exports = {};
 __export(install_exports, {
   run: () => run7
 });
-import { readFileSync as readFileSync14, writeFileSync as writeFileSync8, existsSync as existsSync10, mkdirSync as mkdirSync4 } from "node:fs";
+import { readFileSync as readFileSync15, writeFileSync as writeFileSync9, existsSync as existsSync10, mkdirSync as mkdirSync4 } from "node:fs";
 import { dirname as dirname3, isAbsolute as isAbsolute5, join as join14, resolve as resolve4 } from "node:path";
 async function run7(argv2) {
   function usage() {
@@ -12229,7 +12252,7 @@ async function run7(argv2) {
   }
   let rawConfig;
   try {
-    rawConfig = JSON.parse(readFileSync14(configFile, "utf-8"));
+    rawConfig = JSON.parse(readFileSync15(configFile, "utf-8"));
   } catch (err2) {
     const reason = err2 instanceof Error ? err2.message : String(err2);
     console.error(`Config file is not valid JSON: ${reason}`);
@@ -12247,7 +12270,7 @@ async function run7(argv2) {
   printExistingPipelineWarning(pipelineSignals);
   const writtenConfigPath = configPath(projectRoot);
   mkdirSync4(dirname3(writtenConfigPath), { recursive: true });
-  writeFileSync8(
+  writeFileSync9(
     writtenConfigPath,
     JSON.stringify(config, null, 2) + "\n",
     "utf-8"
@@ -12261,7 +12284,7 @@ async function run7(argv2) {
       continue;
     }
     mkdirSync4(dirname3(absPath), { recursive: true });
-    writeFileSync8(absPath, renderEmptyCalendar(), "utf-8");
+    writeFileSync9(absPath, renderEmptyCalendar(), "utf-8");
     createdCalendars.push(`${slug}: ${site.calendarPath}`);
   }
   console.log(`Wrote config: ${writtenConfigPath}`);
@@ -12291,7 +12314,7 @@ var iterate_exports = {};
 __export(iterate_exports, {
   run: () => run8
 });
-import { existsSync as existsSync11, readFileSync as readFileSync15 } from "node:fs";
+import { existsSync as existsSync11, readFileSync as readFileSync16 } from "node:fs";
 async function run8(argv2) {
   const KNOWN_FLAGS3 = ["site", "kind", "platform", "channel", "dispositions"];
   const DISPOSITIONS = /* @__PURE__ */ new Set(["addressed", "deferred", "wontfix"]);
@@ -12332,6 +12355,14 @@ async function run8(argv2) {
     fail(err2 instanceof Error ? err2.message : String(err2));
   }
   const site = resolveSite(config, flags.site);
+  const workflow = readWorkflows(projectRoot, config).find(
+    (w) => w.site === site && w.slug === slug && w.contentKind === kind && (kind !== "shortform" || w.platform === flags.platform) && (kind !== "shortform" || (w.channel ?? null) === (flags.channel ?? null)) && w.state !== "applied" && w.state !== "cancelled"
+  );
+  if (!workflow) {
+    fail(
+      `No active ${kind} workflow for ${site}/${slug}. Run /deskwork:review-start <slug> to enqueue one first.`
+    );
+  }
   let file;
   if (kind === "shortform" && flags.platform !== void 0 && isPlatform(flags.platform)) {
     const channel = flags.channel;
@@ -12339,7 +12370,7 @@ async function run8(argv2) {
       projectRoot,
       config,
       site,
-      { slug },
+      workflow.entryId !== void 0 && workflow.entryId !== "" ? { id: workflow.entryId, slug } : { slug },
       flags.platform,
       channel
     );
@@ -12350,22 +12381,20 @@ async function run8(argv2) {
     }
     file = resolved;
   } else {
-    file = resolveBlogFilePath(projectRoot, config, site, slug);
+    file = resolveEntryFilePath(
+      projectRoot,
+      config,
+      site,
+      slug,
+      workflow.entryId
+    );
   }
   if (!existsSync11(file)) {
     fail(
       kind === "shortform" ? `No shortform file at ${file}. Run /deskwork:shortform-start first.` : `No blog file at ${file}.`
     );
   }
-  const diskMarkdown = readFileSync15(file, "utf8");
-  const workflow = readWorkflows(projectRoot, config).find(
-    (w) => w.site === site && w.slug === slug && w.contentKind === kind && (kind !== "shortform" || w.platform === flags.platform) && (kind !== "shortform" || (w.channel ?? null) === (flags.channel ?? null)) && w.state !== "applied" && w.state !== "cancelled"
-  );
-  if (!workflow) {
-    fail(
-      `No active ${kind} workflow for ${site}/${slug}. Run /deskwork:review-start <slug> to enqueue one first.`
-    );
-  }
+  const diskMarkdown = readFileSync16(file, "utf8");
   if (workflow.state !== "iterating") {
     fail(
       `Workflow state is '${workflow.state}', not 'iterating'.
@@ -12387,7 +12416,7 @@ The studio must click 'Request iteration' to move the workflow to 'iterating' be
     }
     let parsed;
     try {
-      parsed = JSON.parse(readFileSync15(path, "utf8"));
+      parsed = JSON.parse(readFileSync16(path, "utf8"));
     } catch (err2) {
       const reason = err2 instanceof Error ? err2.message : String(err2);
       fail(`--dispositions: invalid JSON at ${path}: ${reason}`);
@@ -12479,6 +12508,19 @@ function scaffoldBlogPost(projectRoot, config, site, entry, opts = {}) {
       `Cannot scaffold blog post: no author configured. Set "author" at the top level of .deskwork/config.json, or pass an explicit author.`
     );
   }
+  if (!entry.id || entry.id.trim() === "") {
+    throw new Error(
+      `Cannot scaffold entry without id; this is a bug in calendar-mutations or upstream. Entry slug: "${entry.slug}".`
+    );
+  }
+  const index = opts.index ?? buildContentIndex(projectRoot, config, slug);
+  const existingBinding = index.byId.get(entry.id);
+  if (existingBinding !== void 0) {
+    const existingRel = relative8(projectRoot, existingBinding);
+    throw new Error(
+      `Cannot scaffold: entry "${entry.slug}" is already bound to file at "${existingRel}". Use that file directly, or unbind it first (remove its frontmatter \`deskwork.id\`) before scaffolding a new one.`
+    );
+  }
   const contentRelativePath = opts.layout ? layoutToContentRelativePath(opts.layout, entry.slug) : void 0;
   const filePath = resolveBlogFilePath(
     projectRoot,
@@ -12492,11 +12534,6 @@ function scaffoldBlogPost(projectRoot, config, site, entry, opts = {}) {
     throw new Error(`Blog post already exists at ${relativePath}`);
   }
   const dateStr = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-  if (!entry.id || entry.id.trim() === "") {
-    throw new Error(
-      `Cannot scaffold entry without id; this is a bug in calendar-mutations or upstream. Entry slug: "${entry.slug}".`
-    );
-  }
   const data = {};
   data.deskwork = { id: entry.id };
   if (siteCfg.blogLayout) data.layout = siteCfg.blogLayout;
@@ -12543,6 +12580,7 @@ function formatDateHuman(isoDate) {
 var init_scaffold = __esm({
   "../core/src/scaffold.ts"() {
     "use strict";
+    init_content_index();
     init_paths();
     init_frontmatter();
   }
@@ -12807,7 +12845,13 @@ async function run12(argv2) {
   }
   let filePath;
   if (hasRepoContent(contentType)) {
-    filePath = resolveBlogFilePath(projectRoot, config, site, slug);
+    filePath = resolveEntryFilePath(
+      projectRoot,
+      config,
+      site,
+      slug,
+      existing.id
+    );
     if (!existsSync13(filePath)) {
       fail(
         `Cannot publish blog post "${slug}": no file at ${filePath}. Write the post before publishing.`
@@ -13268,7 +13312,7 @@ var init_review_report = __esm({
 });
 
 // ../core/src/body-state.ts
-import { existsSync as existsSync14, readFileSync as readFileSync16 } from "node:fs";
+import { existsSync as existsSync14, readFileSync as readFileSync17 } from "node:fs";
 function stripOutlineSection(body) {
   const lines = body.split("\n");
   const startIdx = lines.findIndex((line) => /^##[ \t]+Outline\b/.test(line));
@@ -13284,7 +13328,7 @@ function stripOutlineSection(body) {
 }
 function bodyState(filePath) {
   if (!existsSync14(filePath)) return "missing";
-  const content = readFileSync16(filePath, "utf8");
+  const content = readFileSync17(filePath, "utf8");
   const fmMatch = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
   const body = fmMatch ? content.slice(fmMatch[0].length) : content;
   const withoutH1 = body.replace(/^\s*#[^\n]*\n?/, "");
@@ -13308,7 +13352,7 @@ var review_start_exports = {};
 __export(review_start_exports, {
   run: () => run17
 });
-import { existsSync as existsSync15, readFileSync as readFileSync17, readdirSync as readdirSync9 } from "node:fs";
+import { existsSync as existsSync15, readFileSync as readFileSync18, readdirSync as readdirSync9 } from "node:fs";
 import { dirname as dirname5 } from "node:path";
 async function run17(argv2) {
   const KNOWN_FLAGS3 = ["site"];
@@ -13329,18 +13373,6 @@ async function run17(argv2) {
     fail(err2 instanceof Error ? err2.message : String(err2));
   }
   const site = resolveSite(config, flags.site);
-  const file = resolveBlogFilePath(projectRoot, config, site, slug);
-  if (!existsSync15(file)) {
-    const siblings = listSiblingSlugs(file);
-    const list = siblings.length > 0 ? siblings.join(", ") : "(none)";
-    fail(
-      `No blog markdown at ${file}.
-Existing slugs on ${site}: ${list}.
-Run /deskwork:outline <slug> (or /deskwork:draft) to scaffold it first.`
-    );
-  }
-  const initialMarkdown = readFileSync17(file, "utf8");
-  const body = bodyState(file);
   let entryId;
   try {
     const calendarPath = resolveCalendarPath(projectRoot, config, site);
@@ -13351,6 +13383,18 @@ Run /deskwork:outline <slug> (or /deskwork:draft) to scaffold it first.`
   } catch {
     entryId = void 0;
   }
+  const file = resolveEntryFilePath(projectRoot, config, site, slug, entryId);
+  if (!existsSync15(file)) {
+    const siblings = listSiblingSlugs(file);
+    const list = siblings.length > 0 ? siblings.join(", ") : "(none)";
+    fail(
+      `No blog markdown at ${file}.
+Existing slugs on ${site}: ${list}.
+Run /deskwork:outline <slug> (or /deskwork:draft) to scaffold it first.`
+    );
+  }
+  const initialMarkdown = readFileSync18(file, "utf8");
+  const body = bodyState(file);
   const before = Date.now();
   const workflow = createWorkflow(projectRoot, config, {
     site,

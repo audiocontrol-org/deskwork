@@ -21,6 +21,8 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import type { CalendarEntry } from './types.ts';
 import type { DeskworkConfig } from './config.ts';
+import type { ContentIndex } from './content-index.ts';
+import { buildContentIndex } from './content-index.ts';
 import { resolveSite, resolveBlogFilePath } from './paths.ts';
 import { writeFrontmatter } from './frontmatter.ts';
 
@@ -59,6 +61,13 @@ export interface ScaffoldOptions {
    *   own directory; useful for many small chapters under one parent)
    */
   layout?: ScaffoldLayout;
+  /**
+   * Pre-built content index (per-request memoization). When omitted,
+   * the scaffolder builds one fresh. Used for the duplicate-binding
+   * preflight (Issue #66): if the entry's id already binds a file
+   * elsewhere under contentDir, refuse to scaffold a parallel file.
+   */
+  index?: ContentIndex;
 }
 
 /**
@@ -82,6 +91,39 @@ export function scaffoldBlogPost(
     );
   }
 
+  // The `deskwork.id` field binds this file to its CalendarEntry
+  // refactor-proof. Phase 19 made entry id (UUID) the canonical internal
+  // identifier; writing it into frontmatter lets the content-index pick
+  // this file up regardless of slug renames or fs relocations. The id
+  // lives under a `deskwork:` namespace (Issue #38) so deskwork doesn't
+  // claim the global top-level `id:` keyspace — operators may use that
+  // freely. `addEntry` always sets `entry.id` to a UUID; if it's missing
+  // here we have a real bug upstream — fail loud rather than scaffold an
+  // unbindable file. Validated UP FRONT so the duplicate-binding check
+  // below can rely on it.
+  if (!entry.id || entry.id.trim() === '') {
+    throw new Error(
+      'Cannot scaffold entry without id; this is a bug in calendar-mutations or upstream. ' +
+        `Entry slug: "${entry.slug}".`,
+    );
+  }
+
+  // Issue #66: if this entry's id is already bound to a file elsewhere
+  // under contentDir, refuse to scaffold a parallel file. Two files
+  // sharing the same `deskwork.id` is exactly the duplicate-id state
+  // doctor flags; better to bail here with an actionable message than
+  // create the bug.
+  const index = opts.index ?? buildContentIndex(projectRoot, config, slug);
+  const existingBinding = index.byId.get(entry.id);
+  if (existingBinding !== undefined) {
+    const existingRel = relative(projectRoot, existingBinding);
+    throw new Error(
+      `Cannot scaffold: entry "${entry.slug}" is already bound to file at ` +
+        `"${existingRel}". Use that file directly, or unbind it first ` +
+        `(remove its frontmatter \`deskwork.id\`) before scaffolding a new one.`,
+    );
+  }
+
   // When a layout is requested, compute the contentDir-relative path
   // explicitly. Otherwise fall back to the site template.
   const contentRelativePath = opts.layout
@@ -101,22 +143,6 @@ export function scaffoldBlogPost(
   }
 
   const dateStr = new Date().toISOString().slice(0, 10);
-
-  // The `deskwork.id` field binds this file to its CalendarEntry
-  // refactor-proof. Phase 19 made entry id (UUID) the canonical internal
-  // identifier; writing it into frontmatter lets the content-index pick
-  // this file up regardless of slug renames or fs relocations. The id
-  // lives under a `deskwork:` namespace (Issue #38) so deskwork doesn't
-  // claim the global top-level `id:` keyspace — operators may use that
-  // freely. `addEntry` always sets `entry.id` to a UUID; if it's missing
-  // here we have a real bug upstream — fail loud rather than scaffold an
-  // unbindable file.
-  if (!entry.id || entry.id.trim() === '') {
-    throw new Error(
-      'Cannot scaffold entry without id; this is a bug in calendar-mutations or upstream. ' +
-        `Entry slug: "${entry.slug}".`,
-    );
-  }
 
   const data: Record<string, unknown> = {};
   // `deskwork` block first so it's the visually-stable top of the

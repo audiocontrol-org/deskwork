@@ -37,7 +37,8 @@ import type { ContentIndex } from '@deskwork/core/content-index';
 import {
   formatRelativeTime,
 } from '@deskwork/core/scrapbook';
-import { resolveCalendarPath } from '@deskwork/core/paths';
+import { resolveCalendarPath, resolveContentDir } from '@deskwork/core/paths';
+import { relative } from 'node:path';
 import type { Stage } from '@deskwork/core/types';
 import type { StudioContext } from '../routes/api.ts';
 import { html, unsafe, type RawHtml } from './html.ts';
@@ -292,7 +293,21 @@ function nodeIcon(node: ContentNode): RawHtml {
   return unsafe(html`<span class="tree-row__icon" aria-hidden="true">·</span>`);
 }
 
-function nodeFilePathHint(node: ContentNode): string {
+function nodeFilePathHint(node: ContentNode, contentDir: string): string {
+  // Issue #70: when the content index has a real file binding for this
+  // node, display the actual on-disk path (relative to contentDir) so
+  // the operator sees where the file actually lives — not a slug-derived
+  // ghost path that may not exist on disk. Hierarchical layouts where
+  // the file is at `<path>/prd.md` (not `<path>/index.md`) used to
+  // render the wrong path here.
+  if (node.filePath !== undefined) {
+    const rel = relative(contentDir, node.filePath);
+    // `relative` may emit `../` segments if the file lives outside
+    // contentDir (shouldn't happen, but defend against it). Fall through
+    // to the slug-derived hint when that's the case so we never display
+    // an escaping path string in the UI.
+    if (!rel.startsWith('..')) return `/${rel}`;
+  }
   // Phase 19c: node.path is the fs-relative path (the structural key).
   // Tracked entries display the index file shape; organizational
   // nodes show the directory shape. The host's actual file basename
@@ -357,6 +372,7 @@ function renderTreeRow(
   project: ContentProject,
   flat: FlatNode,
   selectedPath: string | null,
+  contentDir: string,
 ): RawHtml {
   const { node, depth, isLast } = flat;
   const isSelected = selectedPath === node.path;
@@ -396,7 +412,7 @@ function renderTreeRow(
       <div class="tree-row__main">
         ${nodeIcon(node)}
         <span class="tree-row__title">${node.title}</span>
-        <span class="tree-row__slug">${nodeFilePathHint(node)}</span>
+        <span class="tree-row__slug">${nodeFilePathHint(node, contentDir)}</span>
         ${publicUrlHint}
       </div>
       <span class="tree-row__lane">
@@ -412,11 +428,12 @@ function renderTree(
   site: string,
   project: ContentProject,
   selectedPath: string | null,
+  contentDir: string,
 ): RawHtml {
   const flat = flattenForRender(project.root);
   return unsafe(html`
     <div class="tree" role="tree">
-      ${flat.map((f) => renderTreeRow(site, project, f, selectedPath))}
+      ${flat.map((f) => renderTreeRow(site, project, f, selectedPath, contentDir))}
     </div>`);
 }
 
@@ -465,7 +482,7 @@ export async function renderContentProject(
               ${project.totalNodes} NODES · ${project.maxDepth} LEVELS DEEP
             </span>
           </header>
-          ${renderTree(site, project, selectedNode?.path ?? null)}
+          ${renderTree(site, project, selectedNode?.path ?? null, resolveContentDir(ctx.projectRoot, ctx.config, site))}
         </div>
         ${detailBlock}
       </section>

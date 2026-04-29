@@ -19,8 +19,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { readConfig } from '@deskwork/core/config';
 import {
   resolveSite,
-  resolveBlogFilePath,
   resolveCalendarPath,
+  resolveEntryFilePath,
   resolveShortformFilePath,
 } from '@deskwork/core/paths';
 import { readCalendar, writeCalendar } from '@deskwork/core/calendar';
@@ -120,7 +120,16 @@ export async function run(argv: string[]): Promise<void> {
       );
     }
 
-    const blogFile = resolveBlogFilePath(projectRoot, config, site, slug);
+    // The workflow already records the stable entry id; prefer it for
+    // path resolution so the UUID-bound file wins over the slug-template
+    // (Issue #67).
+    const blogFile = resolveEntryFilePath(
+      projectRoot,
+      config,
+      site,
+      slug,
+      workflow.entryId,
+    );
     if (!existsSync(blogFile)) {
       fail(`Blog file missing at ${blogFile}. Nothing to approve against.`);
     }

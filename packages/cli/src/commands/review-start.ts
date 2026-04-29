@@ -19,8 +19,8 @@ import { dirname } from 'node:path';
 import { readConfig } from '@deskwork/core/config';
 import {
   resolveSite,
-  resolveBlogFilePath,
   resolveCalendarPath,
+  resolveEntryFilePath,
 } from '@deskwork/core/paths';
 import { readCalendar } from '@deskwork/core/calendar';
 import { createWorkflow, readVersions } from '@deskwork/core/review/pipeline';
@@ -52,7 +52,23 @@ export async function run(argv: string[]): Promise<void> {
   }
 
   const site = resolveSite(config, flags.site);
-  const file = resolveBlogFilePath(projectRoot, config, site, slug);
+
+  // Resolve entryId from the calendar BEFORE picking a file path. The
+  // entry id is what survives slug renames; the workflow records it,
+  // and the path resolver prefers the UUID-bound file to the slug
+  // template (Issue #67).
+  let entryId: string | undefined;
+  try {
+    const calendarPath = resolveCalendarPath(projectRoot, config, site);
+    if (existsSync(calendarPath)) {
+      const cal = readCalendar(calendarPath);
+      entryId = cal.entries.find((e) => e.slug === slug)?.id;
+    }
+  } catch {
+    entryId = undefined;
+  }
+
+  const file = resolveEntryFilePath(projectRoot, config, site, slug, entryId);
 
   if (!existsSync(file)) {
     const siblings = listSiblingSlugs(file);
@@ -66,20 +82,6 @@ export async function run(argv: string[]): Promise<void> {
 
   const initialMarkdown = readFileSync(file, 'utf8');
   const body = bodyState(file);
-
-  // Resolve entryId from the calendar so the workflow records the
-  // stable identity. Surviving slug renames depends on having this id
-  // baked in at workflow creation time.
-  let entryId: string | undefined;
-  try {
-    const calendarPath = resolveCalendarPath(projectRoot, config, site);
-    if (existsSync(calendarPath)) {
-      const cal = readCalendar(calendarPath);
-      entryId = cal.entries.find((e) => e.slug === slug)?.id;
-    }
-  } catch {
-    entryId = undefined;
-  }
 
   // createWorkflow is idempotent. Capture `before` to detect whether a
   // fresh workflow was created vs an existing one matched.

@@ -32,7 +32,11 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { readConfig } from '@deskwork/core/config';
-import { resolveSite, resolveBlogFilePath, resolveShortformFilePath } from '@deskwork/core/paths';
+import {
+  resolveSite,
+  resolveEntryFilePath,
+  resolveShortformFilePath,
+} from '@deskwork/core/paths';
 import {
   appendAnnotation,
   appendVersion,
@@ -105,38 +109,9 @@ export async function run(argv: string[]): Promise<void> {
 
   const site = resolveSite(config, flags.site);
 
-  let file: string;
-  if (kind === 'shortform' && flags.platform !== undefined && isPlatform(flags.platform)) {
-    const channel = flags.channel;
-    const resolved = resolveShortformFilePath(
-      projectRoot,
-      config,
-      site,
-      { slug },
-      flags.platform,
-      channel,
-    );
-    if (resolved === undefined) {
-      fail(
-        `Cannot resolve shortform file for site=${site} slug=${slug} platform=${flags.platform}. ` +
-          `Run /deskwork:shortform-start to scaffold it first.`,
-      );
-    }
-    file = resolved;
-  } else {
-    file = resolveBlogFilePath(projectRoot, config, site, slug);
-  }
-
-  if (!existsSync(file)) {
-    fail(
-      kind === 'shortform'
-        ? `No shortform file at ${file}. Run /deskwork:shortform-start first.`
-        : `No blog file at ${file}.`,
-    );
-  }
-
-  const diskMarkdown = readFileSync(file, 'utf8');
-
+  // Find the workflow BEFORE resolving the file path. The workflow
+  // records the stable entry id, which the path resolver uses to
+  // prefer the UUID-bound file over the slug-template (Issue #67).
   const workflow = readWorkflows(projectRoot, config).find(
     (w) =>
       w.site === site &&
@@ -153,6 +128,46 @@ export async function run(argv: string[]): Promise<void> {
         `Run /deskwork:review-start <slug> to enqueue one first.`,
     );
   }
+
+  let file: string;
+  if (kind === 'shortform' && flags.platform !== undefined && isPlatform(flags.platform)) {
+    const channel = flags.channel;
+    const resolved = resolveShortformFilePath(
+      projectRoot,
+      config,
+      site,
+      workflow.entryId !== undefined && workflow.entryId !== ''
+        ? { id: workflow.entryId, slug }
+        : { slug },
+      flags.platform,
+      channel,
+    );
+    if (resolved === undefined) {
+      fail(
+        `Cannot resolve shortform file for site=${site} slug=${slug} platform=${flags.platform}. ` +
+          `Run /deskwork:shortform-start to scaffold it first.`,
+      );
+    }
+    file = resolved;
+  } else {
+    file = resolveEntryFilePath(
+      projectRoot,
+      config,
+      site,
+      slug,
+      workflow.entryId,
+    );
+  }
+
+  if (!existsSync(file)) {
+    fail(
+      kind === 'shortform'
+        ? `No shortform file at ${file}. Run /deskwork:shortform-start first.`
+        : `No blog file at ${file}.`,
+    );
+  }
+
+  const diskMarkdown = readFileSync(file, 'utf8');
 
   if (workflow.state !== 'iterating') {
     fail(

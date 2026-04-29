@@ -35,6 +35,20 @@ export interface ContentNode {
    * nodes and for fs nodes that have no calendar entry.
    */
   slug?: string;
+  /**
+   * Absolute path of the markdown file backing this node, when one
+   * is known. Populated from the content index's id-binding (Issue #70)
+   * — the actual on-disk file, not a slug-template ghost. The studio's
+   * "file path" hint reads this to display the real path; renderers
+   * that previously reconstructed `<path>/index.md` from `path` were
+   * showing a path that didn't necessarily exist.
+   *
+   * `undefined` for ghost calendar entries (no fs binding yet) and for
+   * organizational nodes without a tracked calendar entry. Callers
+   * needing a fallback should check `hasOwnIndex` and fall back to
+   * a path constructed from `path`.
+   */
+  filePath?: string;
   /** Display title. Resolution order: calendar entry title → README/index frontmatter title → leaf path segment. */
   title: string;
   /**
