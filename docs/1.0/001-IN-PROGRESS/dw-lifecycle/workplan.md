@@ -2101,7 +2101,7 @@ git commit -m "feat(dw-lifecycle/bin): github issue tracking helpers"
 - Create: `plugins/dw-lifecycle/src/subcommands/issues.ts`
 - Modify: `plugins/dw-lifecycle/src/cli.ts`
 
-- [ ] **Step 1: Implement issues subcommand**
+- [x] **Step 1: Implement issues subcommand**
 
 ```typescript
 // src/subcommands/issues.ts
@@ -2198,7 +2198,7 @@ export async function issues(parsedArgs: string[]): Promise<void> {
 }
 ```
 
-- [ ] **Step 2: Wire into cli.ts**
+- [x] **Step 2: Wire into cli.ts**
 
 ```typescript
 import { issues } from './subcommands/issues.js';
@@ -2213,7 +2213,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
 };
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/src/subcommands/issues.ts plugins/dw-lifecycle/src/cli.ts

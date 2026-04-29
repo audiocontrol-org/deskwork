@@ -3,6 +3,7 @@ import { setup } from './subcommands/setup.js';
 import { doctor } from './subcommands/doctor.js';
 import { journalAppend } from './subcommands/journal-append.js';
 import { transition } from './subcommands/transition.js';
+import { issues } from './subcommands/issues.js';
 
 const subcommand = process.argv[2];
 const args = process.argv.slice(3);
@@ -10,9 +11,10 @@ const args = process.argv.slice(3);
 const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   install,
   setup,
-  doctor,
+  issues,
   transition,
   'journal-append': journalAppend,
+  doctor,
 };
 
 async function main() {
