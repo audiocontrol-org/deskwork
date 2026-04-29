@@ -17,6 +17,10 @@ claude --plugin-dir plugins/deskwork
 
 Pair with the optional [`deskwork-studio`](../deskwork-studio/) plugin for a local Hono web surface (dashboard, unified review pane for longform + shortform, scrapbook viewer, manual).
 
+### First-run install
+
+The first invocation of any `/deskwork:*` skill (or direct `deskwork` CLI call) after a marketplace install or fresh clone runs `npm install --omit=dev` inside the plugin tree (~30s, one-time). Subsequent invocations skip that step and exec straight through `tsx` — startup is fast.
+
 ### Bootstrap a project
 
 ```
@@ -24,6 +28,17 @@ Pair with the optional [`deskwork-studio`](../deskwork-studio/) plugin for a loc
 ```
 
 The install skill explores the project (Astro / Next / Hugo / etc), proposes a config shape, and writes `.deskwork/config.json` plus an empty `editorial-calendar-<site>.md`. Idempotent — safe to re-run.
+
+### Customization layer
+
+Operators can override built-in studio templates and doctor rules without forking the plugin. Drop a file at `<projectRoot>/.deskwork/templates/<name>.ts` (templates) or `<projectRoot>/.deskwork/doctor/<name>.ts` (doctor rules); the runtime resolver picks up the override automatically. The `/deskwork:customize` skill copies a default into the project so you have a starting point:
+
+```
+/deskwork:customize templates dashboard
+/deskwork:customize doctor missing-frontmatter-id
+```
+
+See the customize skill for the full list of overridable names and the safety rules.
 
 ### Content schema requirement
 
@@ -70,6 +85,7 @@ All skills are under the `/deskwork:` namespace. Slugs accept `/`-separated keba
 | `review-cancel` | Cancel a review workflow |
 | `review-help` | List open workflows |
 | `review-report` | Voice-drift report across recent terminal workflows |
+| `customize` | Copy a built-in template or doctor rule into `.deskwork/<category>/<name>.ts` for in-project override |
 | `doctor` | Audit (and optionally repair) binding metadata across the calendar, content tree, and workflow store |
 
 #### `doctor` — keep calendar, files, and workflows in sync
@@ -234,10 +250,10 @@ Lives in `.deskwork/config.json` in the host project. Written by `/deskwork:inst
 The wrapper tries, in order:
 
 1. **Workspace-linked binary** at `node_modules/.bin/deskwork` (tsx-runtime symlink, present after `npm install` in the monorepo). Dev path — runs source, edits show up immediately.
-2. **Self-contained bundle** at `packages/cli/bundle/cli.mjs` (committed to git; produced by `npm --workspace packages/cli run build`). Plain `node bundle.mjs` — no install ceremony, ships with every clone.
+2. **First-run install path** — when the marketplace install copies `plugins/deskwork/` into the operator's plugin cache without a `node_modules` directory, the wrapper runs `npm install --omit=dev` inside the plugin tree once, then exec's the freshly-linked source bin via `tsx`. The plugin's `package.json` declares the vendored `@deskwork/cli` and `@deskwork/core` packages (under `vendor/cli/`, `vendor/core/`) as workspace dependencies, so the install resolves locally without going to a registry.
 3. Loud error pointing at the two recovery paths.
 
-Fresh `claude plugin install` users hit path 2 — nothing extra to do. Local-dev installs hit path 1.
+Local-dev installs hit path 1. Marketplace-install users hit path 2 once, then path 1 on every subsequent invocation.
 
 ### Updates + pinning
 

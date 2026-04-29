@@ -107,25 +107,36 @@ Always instruct agents to **use the Write/Edit tool to persist all changes to di
 ```text
 deskwork/
 ├── .claude-plugin/
-│   └── marketplace.json      # Marketplace manifest (git-subdir entries)
+│   └── marketplace.json        # Marketplace manifest (git-subdir entries)
+├── packages/
+│   ├── core/                   # @deskwork/core — pure lib (no entry point)
+│   ├── cli/                    # @deskwork/cli — single-dispatcher CLI
+│   └── studio/                 # @deskwork/studio — Hono web server
 ├── plugins/
-│   └── <plugin>/              # Self-contained plugin directory
+│   └── <plugin>/               # Self-contained plugin directory
 │       ├── .claude-plugin/
 │       │   └── plugin.json
 │       ├── skills/
 │       │   └── <skill>/SKILL.md
-│       ├── bin/               # Helper scripts — added to PATH by Claude Code
-│       ├── lib/               # Library code (TypeScript)
+│       ├── bin/                # Helper scripts — added to PATH by Claude Code
+│       ├── lib/                # Library code (TypeScript)
+│       ├── vendor/             # Vendored workspace packages (Phase 23b/23c)
+│       │   ├── core/           # Symlink to ../../packages/core in dev;
+│       │   └── cli/            # materialized to a real directory at release.
+│       ├── .runtime-cache/     # Auto-generated build outputs (gitignored;
+│       │                       # studio's on-startup esbuild lands here).
 │       ├── package.json
 │       └── README.md
-├── docs/                      # Feature PRDs, workplans, impl notes
-├── DEVELOPMENT-NOTES.md       # Session journal
-├── package.json               # npm workspaces root
-├── LICENSE                    # GPL-3.0-or-later
+├── scripts/
+│   └── materialize-vendor.sh   # Release-time: vendor symlinks → directory copies
+├── docs/                       # Feature PRDs, workplans, impl notes
+├── DEVELOPMENT-NOTES.md        # Session journal
+├── package.json                # npm workspaces root
+├── LICENSE                     # GPL-3.0-or-later
 └── README.md
 ```
 
-Plugins are self-contained — no cross-plugin `../` imports.
+Plugins are self-contained — no cross-plugin `../` imports. The `bundle/` directory referenced in earlier (pre-Phase-23) docs is retired; plugins now ship source under `vendor/` and build at first run.
 
 ## Worktree Convention
 
@@ -143,8 +154,12 @@ Feature work happens in worktrees under `~/work/deskwork-work/`. The worktree di
 - Skills are composable and UNIX-style — one skill per action, never a monolith
 - Interactive skills prompt one argument at a time when multiple are required
 - Bundle helper scripts as proper scripts under `bin/`, not ad-hoc shell
+- `bin/` wrappers do a one-time `npm install --omit=dev` on first invocation when the plugin tree has no `node_modules` (the marketplace-install case). Subsequent runs skip the install.
 - Adapter layer under `lib/` decouples skill logic from host project structure
 - Skills read configuration via the adapter; never hardcode paths
+- Workspace packages used by a plugin are vendored under `vendor/<pkg>/` (symlinked in dev, materialized to a real directory at release time by `scripts/materialize-vendor.sh`). Never reach across plugins or up to `packages/` from inside a plugin tree at runtime — read via `vendor/`.
+- Studio client assets are built on startup by an in-process esbuild pass; outputs land in `<pluginRoot>/.runtime-cache/` (gitignored). No precompiled bundle is committed.
+- Built-in studio templates and doctor rules are overridable per-project: `<projectRoot>/.deskwork/templates/<name>.ts` (and `.deskwork/doctor/<name>.ts`) are picked up by the runtime override resolver. Operators copy a default into the project via `/deskwork:customize <category> <name>`.
 
 ## Core Requirements
 
@@ -168,7 +183,7 @@ Never implement fallbacks or use mock data outside of test code. Throw errors wi
 
 ### Repository Hygiene
 
-- Build artifacts go in `dist/` (gitignored)
+- Build artifacts go in `dist/` or `.runtime-cache/` (both gitignored)
 - Never bypass pre-commit or pre-push hooks — fix issues instead
 - Never commit temporary files or build artifacts
 
@@ -179,6 +194,8 @@ npm install                              # install workspace deps
 npm --workspace plugins/<plugin> test    # run one plugin's tests
 claude plugin validate plugins/<plugin>  # validate plugin manifest
 claude --plugin-dir plugins/<plugin>     # load plugin into a Claude Code session
+bash scripts/smoke-marketplace.sh        # release-gate smoke (materializes vendor, boots studio, checks routes)
+bash scripts/materialize-vendor.sh       # turn vendor symlinks into directory copies (release path)
 ```
 
 ## Documentation Standards

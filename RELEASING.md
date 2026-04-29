@@ -51,7 +51,7 @@ The push of the `v*` tag triggers `.github/workflows/release.yml`, which:
 
 - Installs deps
 - Runs the full test suite
-- Verifies the bundles in `packages/*/bundle/` are up-to-date
+- Materializes the vendor tree (see "Vendor materialize mechanism" below)
 - Creates a GitHub release with auto-generated notes from commits since the previous tag
 
 If the workflow fails, the tag is pushed but no release exists. Fix the issue, retry the workflow, or delete the tag and re-tag the fix:
@@ -61,6 +61,22 @@ git tag -d v0.2.0
 git push --delete origin v0.2.0
 # fix, then re-tag
 ```
+
+### Vendor materialize mechanism
+
+Each plugin tree under `plugins/<name>/vendor/` holds committed symlinks pointing at the corresponding workspace package under `packages/<pkg>/`. In dev (a clone of the repo with `npm install` run at the root), the symlinks resolve correctly — edits to `packages/core/src/*.ts` are picked up immediately by anything reading `plugins/<plugin>/vendor/core/...`. This is the inner-loop convenience.
+
+At release time, those symlinks have to become real directory copies, because the marketplace install path copies `plugins/<name>/` into the operator's plugin cache **without** the surrounding `packages/` tree. A symlink whose relative target traverses out of the copied subtree (`../../../packages/core`) resolves to nothing on the operator's side.
+
+The release workflow handles this via `scripts/materialize-vendor.sh`, run after the test suite passes and before the tag is finalized:
+
+1. For each `(plugin, vendored-package)` pair, replace the symlink at `plugins/<plugin>/vendor/<pkg>` with an `rsync`-driven directory copy of `packages/<pkg>/` (excluding `node_modules`, `dist`, `.turbo`, `*.tsbuildinfo`).
+2. Verify byte-for-byte parity via `diff -r` between the source `packages/<pkg>` and the materialized vendor copy. Any drift fails the workflow.
+3. Commit the materialized tree on top of the version-bump commit. The tag points at this materialized commit, so any consumer cloning `audiocontrol-org/deskwork#vX.Y.Z` lands on a self-contained tree.
+
+This is "Path B" from the Phase 23 verification spike. Path A (rewriting the symlinks to point inside the cache at install time) was rejected because Claude Code's marketplace install is opaque — there's no install hook the plugin can run on the operator's side. Path B keeps all the work at the repo's release boundary, where we control it.
+
+Adopters cloning a `v*` ref get a tree where `plugins/<plugin>/vendor/<pkg>` is a real directory, identical to `packages/<pkg>` at the time of release. First-run `npm install --omit=dev` (triggered by the bin wrapper, see plugin READMEs) then links the vendored packages into `node_modules` and the plugin runs from source via `tsx`.
 
 **5. Verify**
 
@@ -72,15 +88,13 @@ Should print the release with auto-generated notes. The release page on GitHub s
 
 ### Pre-push hook (separate from releases)
 
-A pre-push hook at `.husky/pre-push` rebuilds the cli and studio bundles whenever source under `packages/{core,cli,studio}/src/` has changed since the remote tip. If the rebuilt bundle differs from what's committed, the push aborts with a message asking you to commit the regenerated bundle and try again. This keeps `bundle/cli.mjs` and `bundle/server.mjs` in sync with their source on every push, so a release tag can never include a stale bundle.
+A pre-push hook at `.husky/pre-push` runs the workspace test suite and validates the plugin manifests. It does NOT rebuild bundles — bundles are no longer part of the architecture (Phase 23b retired the `bundle/` directory in favor of the source-shipped + on-startup-build model documented in the plugin READMEs).
 
-Originally a pre-commit hook (issue #4 install-gap fix). Moved to pre-push in v0.6.0 (issue #16) because the commit-level rebuild added perceptible friction to every commit. Pre-push catches the same correctness problem (no stale bundle ever lands on a remote branch) without paying the cost on every local commit. CI is the layered safety net for anyone whose local hook is disabled.
-
-Contributors get the hook installed automatically when they `npm install` (via husky's `prepare` script). If the hook fails, the push fails — fix the build, commit the rebuilt bundle, and push again.
+Contributors get the hook installed automatically when they `npm install` (via husky's `prepare` script). If the hook fails, the push fails — fix the underlying issue and push again.
 
 ### What gets released
 
-A deskwork release is just a git tag on `main`. Consumers fetch the tagged commit when they pin their marketplace. Bundles ship with the tag (committed to git), so a fresh `claude plugin install` against `audiocontrol-org/deskwork#v0.2.0` runs end-to-end with zero install ceremony.
+A deskwork release is a git tag on `main`, with one materialize-vendor commit on top of the version-bump commit. Consumers fetch the tagged commit when they pin their marketplace. The materialized vendor tree means a fresh `claude plugin install` against `audiocontrol-org/deskwork#v0.2.0` lands on a self-contained tree that runs end-to-end after a one-time first-run `npm install` driven by the plugin's bin wrapper.
 
 No npm registry involvement. No release-artifact attachments. The git tag IS the release.
 
