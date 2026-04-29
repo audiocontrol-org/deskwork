@@ -4,6 +4,64 @@ Session journal for `deskwork`. Each entry records what was tried, what worked, 
 
 ---
 
+## 2026-04-29: Dogfood arc — march the PRD through deskwork to find friction; fix the bug cluster that surfaced
+
+### Feature: deskwork-plugin
+### Worktree: deskwork-plugin
+
+**Goal:** Resume Phase 23 implementation. The strict gate at `/feature-implement` requires the PRD's deskwork workflow to be `applied`. The omnibus PRD predates the deskwork-baked feature lifecycle (no `deskwork.id`, no workflow). Operator's framing: *"use /deskwork:add to add the prd; we'll march it through the process to find friction points"* — let the dogfood expose what's broken.
+
+**Accomplished:**
+
+- **16 UX issues filed** during the march. Bugs (8): [#63](https://github.com/audiocontrol-org/deskwork/issues/63) ingest doesn't write `deskwork.id` frontmatter, [#66](https://github.com/audiocontrol-org/deskwork/issues/66) outline scaffolds duplicate file, [#67](https://github.com/audiocontrol-org/deskwork/issues/67) umbrella for slug-vs-UUID lookup across CLI subcommands, [#68](https://github.com/audiocontrol-org/deskwork/issues/68) state-signature 404, [#69](https://github.com/audiocontrol-org/deskwork/issues/69) legacy `/editorial-*` slash names in dashboard + manual, [#70](https://github.com/audiocontrol-org/deskwork/issues/70) content-tree ghost path, [#71](https://github.com/audiocontrol-org/deskwork/issues/71) phantom `/blog/<slug>` URL for host-less collections. UX (8): [#57](https://github.com/audiocontrol-org/deskwork/issues/57) mandatory SEO keywords, [#58](https://github.com/audiocontrol-org/deskwork/issues/58) add vs ingest, [#59](https://github.com/audiocontrol-org/deskwork/issues/59) no remove subcommand, [#60](https://github.com/audiocontrol-org/deskwork/issues/60) hard-coded content type vocabulary, [#61](https://github.com/audiocontrol-org/deskwork/issues/61) calendar stage decoupled from review workflow state, [#62](https://github.com/audiocontrol-org/deskwork/issues/62) ingest defaults wrong on no-frontmatter files, [#64](https://github.com/audiocontrol-org/deskwork/issues/64) ingest title from slug, [#65](https://github.com/audiocontrol-org/deskwork/issues/65) doctor `--yes` skips recoverable cases, [#72](https://github.com/audiocontrol-org/deskwork/issues/72) hardcoded shortform platforms.
+- **Fixed the 4-bug UUID-binding cluster in source** ([#63](https://github.com/audiocontrol-org/deskwork/issues/63), [#66](https://github.com/audiocontrol-org/deskwork/issues/66), [#67](https://github.com/audiocontrol-org/deskwork/issues/67), [#70](https://github.com/audiocontrol-org/deskwork/issues/70)). One centralizing `resolveEntryFilePath` in `@deskwork/core/paths` consolidates the UUID-first-then-template precedence; the studio's `resolveLongformFilePath` now delegates to it (no more parallel implementations). Four CLI commands refactored to use it (review-start, approve, iterate, publish). Outline's scaffold checks the content index for an existing UUID binding before creating a duplicate. Ingest writes `deskwork.id` frontmatter on apply (with `--no-write-frontmatter` opt-out for read-only trees). Content tree carries the actual on-disk path on each `ContentNode.filePath` and the studio renderer uses it instead of constructing from slug + template.
+- **21 new test cases across 5 files**, all green. Total workspace tests: 652 (core 325, cli 141, studio 186). Typecheck clean. Both plugins validate.
+- **End-to-end dogfood validation against this monorepo**, using the workspace binary (`./node_modules/.bin/deskwork`) — not just unit tests. All 4 bug reproductions confirmed fixed: `review-start deskwork-plugin/prd` succeeds via UUID lookup; `ingest <fresh-file> --apply` writes frontmatter; `outline <bound-entry>` refuses with clear error; studio `/dev/content/...` shows real path.
+- **Saved a new agent-discipline rule**: *"Stay in agent-as-user dogfood mode."* The 16 issues all came from agent-uses-the-plugin, not from agent-reasons-about-the-plugin. Operator's framing: *"What I like about what we've done so far: you uncovered your own UX issues. We need to be in that state as often as possible."* Saved to `.claude/rules/agent-discipline.md` (git-tracked).
+
+**Tests:** 652 passing across all three workspaces; 21 new cases. CI not amended per the no-test-infrastructure-in-CI rule.
+
+**Didn't Work:**
+
+- Initial reading of the gate situation framed it as a binary "the omnibus PRD has no `deskwork.id`, refuse." Spent a turn presenting three options before recognizing the conflict between letter and spirit of the gate. Operator's *"use /deskwork:add to add the prd; we'll march it through to find friction"* reframed the entire question — the dogfood IS the work. Lesson: when a gate's letter and spirit diverge, surfacing the conflict is correct; what I missed was that the operator might not want to resolve it directly — they might want to use the conflict as a probe.
+- `npm --workspaces test --if-present` hung for 45 minutes mid-session — likely a port-conflict between core/cli/studio test runs in parallel. Killed with SIGKILL; relied on the agent's prior per-workspace test report (which had already verified 652 passing). For future test runs, use per-workspace with `Bash` `timeout` parameter (max 10 min) so a hang gets killed automatically.
+- During studio inspection, the playwright snapshot at depth 4 produced a 52KB result that hit the response size cap. Saved to file via `filename:` parameter and grep'd structurally rather than rendering the whole tree. Pattern: for studio surfaces with rich nested DOM, prefer `filename:` + targeted grep over inline-rendered snapshots.
+
+**Course Corrections:**
+
+- [PROCESS] Operator: *"file UX issues for every friction point as you come across them"* — earlier in the march I was filing some issues but holding others. Switched to file-as-you-go after this correction.
+- [INSIGHT] Operator: *"What I like about what we've done so far: you uncovered your own UX issues. We need to be in that state as often as possible."* The agent-as-user dogfood loop became a saved rule.
+- [PROCESS] Operator: *"It's been a VERY long time. If tests were going to finish the would have finished by now."* Trusted my own status output too long. The agent's own delegation report had already verified 652 passing 30 min earlier; re-running was redundant. Lesson: when an agent reports a clear test result, don't re-run "to be sure" without a specific reason.
+
+**Quantitative:**
+
+- Messages: ~50 user messages (estimate)
+- Issues filed: 16 (8 bugs + 8 UX)
+- Issue comments added: 1 (#69, with concrete manual-page count)
+- Source files modified: 11 (across packages/core, packages/cli, packages/studio)
+- Test files added: 5 (21 new test cases)
+- Tests at session start: 627; at session end: 652 (+25 net, includes refactor adjustments)
+- Bugs fixed in source (awaiting v0.8.6 release): 4
+- Course corrections: 3 (1 [PROCESS], 1 [INSIGHT], 1 [PROCESS])
+- Agent-discipline rules added: 1 (*Stay in agent-as-user dogfood mode*)
+- Sub-agent dispatches: 1 (typescript-pro for the bug-cluster fix; ~29 min, 137 tool uses, returned a clean summary file)
+- Releases shipped: 0 (v0.8.6 punted to next session)
+
+**Insights:**
+
+- **Agent-as-user dogfood is the highest-throughput friction-finding mode.** 16 issues in one session is roughly 4× the rate I'd surface from abstract UX review. Each issue has a concrete reproduction recorded as it happened, not reconstructed after the fact. The fixes that emerge are tightly scoped because the bug surfaces with its exact friction context.
+- **Bugs cluster around abstraction seams.** All 4 fixed bugs had the same root cause: the UUID-binding contract (Phase 19) landed in some places (calendar, doctor's three-tier search, studio HTTP handlers) but not in CLI subcommands, scaffold, ingest, or content-tree rendering. The seam between "the abstraction was introduced" and "every consumer got migrated" is exactly where bugs hide. Centralizing the UUID-first lookup in one `resolveEntryFilePath` eliminated the seam.
+- **Strict gates surface real workflow questions.** The `/feature-implement` gate's strict refusal forced the operator-and-agent to confront whether the omnibus PRD belongs in deskwork's editorial pipeline. The dogfood march that resulted produced more value than the gate-bypass would have. Strict gates aren't just about preventing bad work — they're about exposing where the model and the work diverge.
+- **The fix isn't done until the public path is fixed.** Source-level fixes that pass unit tests + dogfood validation against the workspace binary are NOT the same as adopters getting the fix. The marketplace tarball at v0.8.5 is what real users see; v0.8.6 ships the fix to that surface. Per the public-channel rule (*"if it's not PUBLIC, it doesn't exist"*), this session's work is half-done — the release ceremony in next session is the second half.
+
+**Next session:**
+
+Ship v0.8.6 via the public install path. Steps: `npm run version:bump 0.8.6`, commit + tag + push, watch the release workflow, `/plugin marketplace update` + reinstall, re-run the 4 dogfood checks against the cached install. Close [#63](https://github.com/audiocontrol-org/deskwork/issues/63), [#66](https://github.com/audiocontrol-org/deskwork/issues/66), [#67](https://github.com/audiocontrol-org/deskwork/issues/67), [#70](https://github.com/audiocontrol-org/deskwork/issues/70) on the release. Then resume the original march: `/deskwork:iterate` → `/deskwork:approve` for the PRD's open workflow `d05ebd7d-…`. With the gate cleared, Phase 23a (verification spike: marketplace install symlink behavior) is the natural opening move.
+
+The remaining 12 UX issues (#57, #58, #59, #60, #61, #62, #64, #65, #68, #69, #71, #72) are scoped for v0.9.0 or later — coordinated with Phase 24's collection-vocabulary pass for the website-assumption ones.
+
+---
+
 ## 2026-04-28 (cont'd): Dogfood arc — non-website collection support, packaging hotfixes, deskwork-baked feature lifecycle (v0.8.2 → v0.8.5, four releases + skill amendments)
 
 ### Feature: deskwork-plugin

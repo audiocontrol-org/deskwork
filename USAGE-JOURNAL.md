@@ -211,3 +211,143 @@ Five releases earlier in the same calendar day (v0.7.0 → v0.8.1, prior session
 **E. The studio's port auto-increment worked silently and well.** Multi-process testing across this session left a cluster of studios on 47321/47322/47323/47324. Phase 22c's auto-increment + boot-banner-prints-the-actual-port worked exactly as designed; never had to figure out which studio was on which port from external context.
 
 **F. Marketplace cache vs install cache.** Two separate things. `/plugin marketplace update` refreshes the marketplace clone at `~/.claude/plugins/marketplaces/deskwork/`. `/plugin install` replaces the install cache at `~/.claude/plugins/cache/deskwork/<plugin>/<version>/` ONLY if the version differs. Doc/skill changes pushed without a version bump don't propagate. Hit this twice; required v0.8.3 + v0.8.4 to actually be discrete version bumps. Worth documenting more visibly in `RELEASING.md`.
+
+
+---
+
+## 2026-04-29: March the omnibus PRD through deskwork to expose adoption friction; fix the bug cluster
+
+**Session goal:** Clear the `/feature-implement` strict gate so Phase 23 (source-shipped re-architecture) can begin. The gate requires the omnibus PRD's deskwork workflow to be `applied`. The PRD predates the deskwork-baked feature lifecycle (no `deskwork.id` in frontmatter, no review workflow). Operator's framing on hitting the gate-letter-vs-spirit conflict: *"use /deskwork:add to add the prd; we'll march it through the process to find friction points."*
+
+**Surface exercised:** `/deskwork:add` + `/deskwork:plan` + `/deskwork:ingest` + `/deskwork:outline` + `/deskwork:draft` + `/deskwork:review-start` + `deskwork doctor` + `deskwork-studio` + `/dev/editorial-studio` + `/dev/content/<collection>/<path>` + `/dev/editorial-review/<id>` + `/dev/editorial-review-shortform` + `/dev/editorial-help` + `/dev/scrapbook/<collection>/<slug>`.
+
+### Phase 1 — march the PRD through deskwork
+
+#### 1. `/deskwork:add` for an existing file is the wrong skill
+
+**friction.** Used `/deskwork:add "PRD: deskwork-plugin"` against an existing file at `docs/1.0/001-IN-PROGRESS/deskwork-plugin/prd.md`. Lands the entry in Ideas with no binding to the actual file. The skill prose doesn't mention `/deskwork:ingest` exists. Adopter mental model: *"I have a file; I want it in the calendar"* → `/deskwork:add`. But `/deskwork:add` is for **new ideas not yet drafted**.
+
+**fix.** Filed [#58](https://github.com/audiocontrol-org/deskwork/issues/58). `/deskwork:add` should redirect to `/deskwork:ingest` for existing files; both should be discoverable from each other's prose.
+
+#### 2. Mandatory SEO keywords are nonsensical for internal docs
+
+**friction.** `/deskwork:plan` requires keywords. SEO keywords for a PRD make no sense — there's no search index this doc is optimizing for. Forced descriptive tags (`deskwork-plugin`, `prd`, `feature-tracking`, `internal-doc`) just to advance the stage.
+
+**fix.** Filed [#57](https://github.com/audiocontrol-org/deskwork/issues/57). Make keywords optional, or generalize the field from `targetKeywords` to `tags`.
+
+#### 3. Content type vocabulary hard-coded for websites
+
+**friction.** `/deskwork:add --type` accepts `blog` / `youtube` / `tool`. PRD doesn't fit any. Forced `blog` because it has the right technical shape (markdown file in contentDir) — but it's not a blog post.
+
+**fix.** Filed [#60](https://github.com/audiocontrol-org/deskwork/issues/60). Make content types collection-defined; `doc` / `internal-doc` / `spec` as built-in defaults.
+
+#### 4. No remove subcommand
+
+**friction.** Realized #58 mid-march; wanted to delete the wrong-skill entry and start over. Closest is `/deskwork:pause` — but pause is for *"actively-not-working-on, may resume,"* not *"never should have been added."* Recovery required hand-editing `.deskwork/calendar.md`.
+
+**fix.** Filed [#59](https://github.com/audiocontrol-org/deskwork/issues/59). New `/deskwork:remove <slug>` subcommand for the added-by-mistake case.
+
+#### 5. Calendar stage decoupled from review workflow state
+
+**friction.** While editing the calendar, noticed the source-shipped-plan entry sits in `Drafting` stage despite its review workflow being terminal `applied`. No auto-advance from workflow → calendar.
+
+**fix.** Filed [#61](https://github.com/audiocontrol-org/deskwork/issues/61). Define the relationship between workflow state and calendar stage; auto-advance on `applied`/`cancelled`.
+
+#### 6. `/deskwork:ingest` on a file with no frontmatter — wrong defaults
+
+**friction.** PRD has no YAML frontmatter at all. Dry-run plan: `add deskwork-plugin/prd Ideas 2026-04-28 slug:path state:default date:mtime`. Three problems: (1) defaults to Ideas stage despite the file having multi-thousand-word body, (2) date is mtime (last edit) not first-commit (editorial creation), (3) no documented behavior for what `--apply` does on a frontmatter-free file.
+
+**fix.** Filed [#62](https://github.com/audiocontrol-org/deskwork/issues/62). State-inference heuristic for legacy docs; date waterfall through git history; explicit no-frontmatter behavior.
+
+#### 7. `/deskwork:ingest --apply` doesn't write `deskwork.id` to the file (BUG)
+
+**friction.** This is the one. Ingest creates a calendar entry with UUID `9845c268-...` but does NOT write `deskwork:` frontmatter to the source file. Calendar entry is **orphaned at creation**. Doctor immediately flags `missing-frontmatter-id`.
+
+**fix.** Filed [#63](https://github.com/audiocontrol-org/deskwork/issues/63). FIXED IN SOURCE this session. Awaiting v0.8.6 release.
+
+#### 8. Ingest derives title from slug, ignores headings + frontmatter title
+
+**friction.** Calendar shows title as `Prd` (titlecased last slug segment) — not `PRD: deskwork-plugin` from the H2 heading. Studio renders the bad title throughout. Manual fix would touch every surface.
+
+**fix.** Filed [#64](https://github.com/audiocontrol-org/deskwork/issues/64). Title-derivation waterfall: frontmatter `title:` > H1 > H2 > slug-titlecase fallback.
+
+#### 9. Doctor `--yes` skips ambiguous cases (couldn't auto-recover from #63)
+
+**friction.** Tried `deskwork doctor --fix=missing-frontmatter-id --yes` to recover from #63. Doctor detected the unbound entry but skipped in `--yes` mode (couldn't guess which file to bind). The originating ingest call already KNEW the file path — the data was just lost in transit.
+
+**fix.** Filed [#65](https://github.com/audiocontrol-org/deskwork/issues/65). Capture binding hint at ingest time; doctor uses it for `--yes` auto-fix.
+
+#### 10. `/deskwork:outline` scaffolds a duplicate file even when entry is bound elsewhere (BUG)
+
+**friction.** With the PRD bound (after I manually added `deskwork.id`), ran `/deskwork:outline deskwork-plugin/prd`. The slug-derived path is `docs/deskwork-plugin/prd/index.md`; the actual file is at `docs/1.0/001-IN-PROGRESS/deskwork-plugin/prd.md`. Outline created a NEW file at the slug-derived path. Doctor immediately flagged `duplicate-id` — both files have UUID `9845c268-...`.
+
+**fix.** Filed [#66](https://github.com/audiocontrol-org/deskwork/issues/66). FIXED IN SOURCE. Outline now consults the content index for the entry's UUID before scaffolding; refuses with *"Cannot scaffold: entry … is already bound to file at …"*.
+
+#### 11. `/deskwork:review-start` can't find the file — slug-derived path lookup ignores UUID binding (BUG umbrella)
+
+**friction.** Ran `/deskwork:review-start deskwork-plugin/prd`. Failed: *"No blog markdown at docs/deskwork-plugin/prd/index.md."* The actual file is at `docs/1.0/001-IN-PROGRESS/deskwork-plugin/prd.md` with the right `deskwork.id`. Studio's HTTP handler does the right thing (UUID first, then template); CLI's review-start command calls `resolveBlogFilePath` directly. **Two parallel implementations of the same lookup.**
+
+Likely additional instances (untested but suspected): `/deskwork:approve`, `/deskwork:iterate`, `/deskwork:publish`, all inheriting the same bug.
+
+**fix.** Filed [#67](https://github.com/audiocontrol-org/deskwork/issues/67) as the umbrella. FIXED IN SOURCE. New `resolveEntryFilePath` in `@deskwork/core/paths` consolidates the UUID-first-then-template precedence; the studio's `resolveLongformFilePath` now delegates to it (one source of truth). Four CLI commands refactored.
+
+### Phase 2 — exercise the studio surfaces, surface remaining friction
+
+#### 12. Dashboard polls a 404 endpoint
+
+**friction.** Console error: `404 /api/dev/editorial-studio/state-signature`. Dashboard footer claims `auto-refresh · 10s`. Either the endpoint doesn't exist or the client URL is wrong.
+
+**fix.** Filed [#68](https://github.com/audiocontrol-org/deskwork/issues/68).
+
+#### 13. Dashboard + manual still emit legacy `/editorial-*` slash names
+
+**friction.** v0.8.4 fixed BUTTON-emitted commands. Empty-state PROSE was missed. Ideas section: *"Run `/editorial-add` to capture one."* Same for `/editorial-plan`, `/editorial-outline`. Paused was correctly updated — inconsistent. The manual page has 12 legacy references.
+
+**fix.** Filed [#69](https://github.com/audiocontrol-org/deskwork/issues/69). Single grep + replace across renderers.
+
+#### 14. Content tree renders ghost path for non-template-located files (BUG)
+
+**friction.** `/dev/content/deskwork-internal/1.0` shows the PRD's file path as `/1.0/001-IN-PROGRESS/deskwork-plugin/prd/index.md` — that path doesn't exist. Real path is `/1.0/001-IN-PROGRESS/deskwork-plugin/prd.md` (no `prd/` directory). The same review link uses the correct UUID — proving the binding is in the data; only display is broken.
+
+**fix.** Filed [#70](https://github.com/audiocontrol-org/deskwork/issues/70). FIXED IN SOURCE. `ContentNode.filePath` now carries the actual on-disk path; renderer uses it.
+
+#### 15. Content tree fabricates `/blog/<slug>` URL for host-less collection
+
+**friction.** Same content tree shows `/blog/deskwork-plugin/prd` labelled *"public URL on the host site"* — but the `deskwork-internal` collection has no `host` configured. v0.8.2's host-optional work missed this rendering surface.
+
+**fix.** Filed [#71](https://github.com/audiocontrol-org/deskwork/issues/71). Coordinated with Phase 24's collection-vocabulary sweep.
+
+#### 16. Shortform desk shows hard-coded platform list
+
+**friction.** *"Supported platforms: reddit, linkedin, youtube, instagram"* — these are audiocontrol.org's distribution targets, not universal. Shows on every collection regardless.
+
+**fix.** Filed [#72](https://github.com/audiocontrol-org/deskwork/issues/72). Make platforms collection-config-defined.
+
+### Phase 3 — fix the bug cluster, validate end-to-end
+
+After 16 issues filed, operator's framing: *"What I like about what we've done so far: you uncovered your own UX issues. We need to be in that state as often as possible."* Saved as agent-discipline rule.
+
+Dispatched typescript-pro with a precise brief covering the 4-bug cluster (#63, #66, #67, #70). Agent returned with: 11 source files modified, 5 test files added (21 cases), 652 workspace tests green, both plugins validate, typecheck clean. One judgment call worth noting: `packages/studio/src/pages/content.ts` was already over the 500-line guideline before the changes — agent flagged in summary, did not refactor (correctly per the no-opportunistic-cleanup constraint).
+
+**Dogfood validation against this monorepo via the workspace binary** (`./node_modules/.bin/deskwork`):
+
+| Bug | Reproduction | Result |
+|---|---|---|
+| **#67** | `deskwork review-start deskwork-plugin/prd` | ✓ workflow `d05ebd7d-…` created via UUID lookup |
+| **#63** | `deskwork ingest <fresh-file> --apply` (no frontmatter) | ✓ `deskwork.id` prepended; UUID matches calendar |
+| **#66** | `deskwork outline <bound-entry>` | ✓ refused with *"Cannot scaffold: entry … is already bound to file at …"* |
+| **#70** | `/dev/content/deskwork-internal/1.0` | ✓ PRD shows `/1.0/001-IN-PROGRESS/deskwork-plugin/prd.md` (real path) |
+
+### Cross-cutting observations
+
+**G. Bugs cluster around abstraction seams.** Phase 19's UUID-binding contract landed in some places (calendar, doctor's three-tier search, studio HTTP handlers) but not in CLI subcommands, scaffold, ingest, or content-tree rendering. The seam between "abstraction introduced" and "every consumer migrated" is exactly where bugs hide. Centralizing the UUID-first lookup in one `resolveEntryFilePath` eliminated the seam.
+
+**H. Agent-as-user dogfood is the highest-throughput friction-finding mode.** 16 issues in one session — roughly 4× the rate I'd surface from abstract UX review. Each issue has a concrete reproduction recorded as it happened, not reconstructed after the fact. The fixes that emerge are tightly scoped because the bug surfaces with its exact friction context. Operator's quote is now a project rule.
+
+**I. Strict gates surface real workflow questions.** The `/feature-implement` strict refusal forced a confrontation: does the omnibus PRD belong in deskwork's editorial pipeline at all? The march that resulted produced 16 issues + 4 bug fixes. A gate-bypass would have produced 0 of those. Strict gates aren't just preventing bad work — they expose where the model and the work diverge.
+
+**J. The fix isn't done until the public path is fixed.** Source-level fixes that pass unit tests + dogfood validation against the workspace binary are NOT the same as adopters getting the fix. The marketplace tarball at v0.8.5 is what real users see; v0.8.6 ships the fix to that surface. This session's work is half-done; release-and-reinstall in next session is the second half. (And THAT validation step uses the public-channel install path — closing the loop honestly.)
+
+**K. The `/dev/editorial-review/<id>` error page when no workflow exists is reasonable.** When I navigated to the PRD's review URL with no workflow yet, the page rendered: *"No galley to review."* with the slug, the error reason, the suggested CLI command, and a back link. Clear and actionable. (The suggested command would have failed due to #67, but that's a downstream of the bug, not the error page's fault.)
+
+**L. Studio breadcrumb inconsistency** — minor friction not filed yet. Scrapbook viewer's breadcrumb collection-name links to `/dev/editorial-studio` (dashboard), but content-tree's collection-name breadcrumb links to `/dev/content/<collection>/`. Same context, two destinations. Could consolidate as part of a future studio polish pass.
