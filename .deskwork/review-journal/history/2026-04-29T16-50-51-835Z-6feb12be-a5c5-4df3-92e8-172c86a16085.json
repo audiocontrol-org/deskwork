@@ -1,0 +1,22 @@
+{
+  "id": "6feb12be-a5c5-4df3-92e8-172c86a16085",
+  "timestamp": "2026-04-29T16:50:51.835Z",
+  "entry": {
+    "kind": "annotation",
+    "at": "2026-04-29T16:50:51.835Z",
+    "annotation": {
+      "type": "comment",
+      "workflowId": "ac1c1945-dda6-4a77-8ad5-c27231adea57",
+      "version": 1,
+      "range": {
+        "start": 2689,
+        "end": 2711
+      },
+      "text": "I think we're going to regret using a shell script once we start needing to do parsing and more sophisticated output handling.",
+      "category": "other",
+      "anchor": "lib/release-helpers.sh",
+      "id": "6feb12be-a5c5-4df3-92e8-172c86a16085",
+      "createdAt": "2026-04-29T16:50:51.835Z"
+    }
+  }
+}

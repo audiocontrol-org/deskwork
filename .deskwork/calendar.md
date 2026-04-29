@@ -18,6 +18,7 @@
 |------|------|------|------|------|------|
 | 9845c268-670f-4793-b986-0433e9ef4fb9 | deskwork-plugin/prd | Prd |  | deskwork-plugin, prd, feature-tracking, internal-doc | manual |
 | c68dc297-1f25-4eed-903f-f051a9a194a6 | source-shipped-deskwork-plan | Source-shipped deskwork plugins (drop the bundles) | Architectural plan to retire bundle/server.mjs + bundle/cli.mjs and ship deskwork plugins as source. Includes the collection-not-website data-model reframe. Discovered during the dogfood attempt to install deskwork in this monorepo. | deskwork, content-collections, source-shipped | manual |
+| 3c5481cf-d3d3-4aa5-b926-f6e3f70c58fe | release-skill-design | Release Skill Design |  |  | manual |
 
 ## Review
 

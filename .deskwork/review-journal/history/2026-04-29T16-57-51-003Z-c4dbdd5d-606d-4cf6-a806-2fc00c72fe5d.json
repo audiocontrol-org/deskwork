@@ -1,0 +1,18 @@
+{
+  "id": "c4dbdd5d-606d-4cf6-a806-2fc00c72fe5d",
+  "timestamp": "2026-04-29T16:57:51.003Z",
+  "entry": {
+    "kind": "annotation",
+    "at": "2026-04-29T16:57:51.003Z",
+    "annotation": {
+      "type": "address",
+      "workflowId": "ac1c1945-dda6-4a77-8ad5-c27231adea57",
+      "commentId": "6feb12be-a5c5-4df3-92e8-172c86a16085",
+      "version": 2,
+      "disposition": "addressed",
+      "reason": "switched implementation form from Approach 2 (bash helpers) to Approach 3 (TypeScript helpers via tsx). Project's primary language is TS; bash is reserved for thin wrappers. Switching now avoids the future-regret cost the operator's comment names.",
+      "id": "c4dbdd5d-606d-4cf6-a806-2fc00c72fe5d",
+      "createdAt": "2026-04-29T16:57:51.003Z"
+    }
+  }
+}
