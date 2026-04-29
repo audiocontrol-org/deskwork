@@ -1,14 +1,18 @@
 {
   "name": "@deskwork/studio",
   "version": "0.9.4",
-  "private": true,
   "type": "module",
   "description": "Editorial review studio — local web UI for the deskwork plugin",
+  "homepage": "https://github.com/audiocontrol-org/deskwork#readme",
   "license": "GPL-3.0-or-later",
+  "author": "audiocontrol-org",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/audiocontrol-org/deskwork.git",
+    "url": "https://github.com/audiocontrol-org/deskwork.git",
     "directory": "packages/studio"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "engines": {
     "node": ">=20"
