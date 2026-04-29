@@ -112,7 +112,7 @@ The plan is organized into 6 phases. Each phase ends in a working, testable stat
 - Create: `plugins/dw-lifecycle/README.md` (placeholder)
 - Create: `plugins/dw-lifecycle/LICENSE` (copy from sibling plugin)
 
-- [ ] **Step 1: Create `plugin.json`**
+- [x] **Step 1: Create `plugin.json`**
 
 ```json
 {
@@ -129,7 +129,7 @@ The plan is organized into 6 phases. Each phase ends in a working, testable stat
 }
 ```
 
-- [ ] **Step 2: Create `package.json`**
+- [x] **Step 2: Create `package.json`**
 
 ```json
 {
@@ -159,11 +159,11 @@ The plan is organized into 6 phases. Each phase ends in a working, testable stat
 }
 ```
 
-- [ ] **Step 3: Copy LICENSE from sibling**
+- [x] **Step 3: Copy LICENSE from sibling**
 
 Run: `cp plugins/deskwork/LICENSE plugins/dw-lifecycle/LICENSE`
 
-- [ ] **Step 4: Stub README**
+- [x] **Step 4: Stub README**
 
 ```markdown
 # dw-lifecycle
@@ -173,7 +173,7 @@ Project lifecycle orchestration plugin for Claude Code. Composes `superpowers` a
 Status: under development (v0.1.0). See `docs/1.0/001-IN-PROGRESS/dw-lifecycle/` in the deskwork repo for design and workplan.
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/
@@ -188,7 +188,7 @@ git commit -m "feat(dw-lifecycle): plugin skeleton"
 - Create: `plugins/dw-lifecycle/tsconfig.json`
 - Create: `plugins/dw-lifecycle/vitest.config.ts`
 
-- [ ] **Step 1: Create `tsconfig.json`**
+- [x] **Step 1: Create `tsconfig.json`**
 
 ```jsonc
 {
@@ -211,7 +211,7 @@ git commit -m "feat(dw-lifecycle): plugin skeleton"
 
 (If `tsconfig.base.json` doesn't exist at the repo root, replace `extends` with the equivalent inline config from `plugins/deskwork/tsconfig.json`.)
 
-- [ ] **Step 2: Create `vitest.config.ts`**
+- [x] **Step 2: Create `vitest.config.ts`**
 
 ```typescript
 import { defineConfig } from 'vitest/config';
@@ -224,12 +224,12 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 3: Verify TS compiles**
+- [x] **Step 3: Verify TS compiles**
 
 Run: `cd plugins/dw-lifecycle && npx tsc --noEmit`
 Expected: no errors (no source files yet, exits clean).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/tsconfig.json plugins/dw-lifecycle/vitest.config.ts
@@ -244,7 +244,7 @@ git commit -m "build(dw-lifecycle): tsc + vitest config"
 - Create: `plugins/dw-lifecycle/bin/dw-lifecycle` (executable shell script)
 - Create: `plugins/dw-lifecycle/src/cli.ts` (stub)
 
-- [ ] **Step 1: Create the bin wrapper**
+- [x] **Step 1: Create the bin wrapper**
 
 ```bash
 #!/usr/bin/env bash
@@ -256,7 +256,7 @@ exec npx tsx "$PLUGIN_ROOT/src/cli.ts" "$@"
 
 Run: `chmod +x plugins/dw-lifecycle/bin/dw-lifecycle`
 
-- [ ] **Step 2: Create the cli stub**
+- [x] **Step 2: Create the cli stub**
 
 ```typescript
 // plugins/dw-lifecycle/src/cli.ts
@@ -289,12 +289,12 @@ main().catch((err) => {
 export { SUBCOMMANDS, args };
 ```
 
-- [ ] **Step 3: Verify the wrapper runs**
+- [x] **Step 3: Verify the wrapper runs**
 
 Run: `plugins/dw-lifecycle/bin/dw-lifecycle`
 Expected: prints `Usage: dw-lifecycle <subcommand>...` to stderr and exits 1.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/bin/dw-lifecycle plugins/dw-lifecycle/src/cli.ts
@@ -322,7 +322,7 @@ git commit -m "feat(dw-lifecycle): bin wrapper + cli stub"
 - `skills/doctor/SKILL.md`
 - `skills/help/SKILL.md`
 
-- [ ] **Step 1: Write the stub template**
+- [x] **Step 1: Write the stub template**
 
 Each `SKILL.md` follows this stub shape (replace `<command>` and `<one-line description>`):
 
@@ -355,11 +355,11 @@ Use these descriptions (from design.md):
 - `doctor`: "Audit binding metadata across calendar/journal/docs/issues; opt-in --fix"
 - `help`: "Render lifecycle diagram + current state of active features"
 
-- [ ] **Step 2: Create all 15 stub files**
+- [x] **Step 2: Create all 15 stub files**
 
 Use the Write tool 15 times (or batch via a script). Each file gets the appropriate header.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/skills/
@@ -373,12 +373,12 @@ git commit -m "feat(dw-lifecycle): stub all 15 skills"
 **Files:**
 - Modify: `.claude-plugin/marketplace.json` (root of deskwork repo)
 
-- [ ] **Step 1: Read existing marketplace.json**
+- [x] **Step 1: Read existing marketplace.json**
 
 Run: `cat .claude-plugin/marketplace.json`
 Note the existing `plugins[]` array shape.
 
-- [ ] **Step 2: Append the dw-lifecycle entry**
+- [x] **Step 2: Append the dw-lifecycle entry**
 
 Add this object to the `plugins[]` array (after the `deskwork-studio` entry):
 
@@ -391,19 +391,19 @@ Add this object to the `plugins[]` array (after the `deskwork-studio` entry):
 }
 ```
 
-- [ ] **Step 3: Validate marketplace JSON**
+- [x] **Step 3: Validate marketplace JSON**
 
 Run: `node -e "JSON.parse(require('fs').readFileSync('.claude-plugin/marketplace.json'))"`
 Expected: silent success.
 
-- [ ] **Step 4: Verify plugin loads in Claude Code**
+- [x] **Step 4: Verify plugin loads in Claude Code**
 
 Run: `claude plugin install --marketplace $(pwd)`
 Expected: dw-lifecycle plugin appears in the install list, all 15 skills enumerated.
 
 (If `claude plugin install` complains, follow the documentation surfaced — the install path is the source of truth per `agent-discipline.md`'s "Read documentation before quoting commands" rule.)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add .claude-plugin/marketplace.json
@@ -420,7 +420,7 @@ git commit -m "feat(dw-lifecycle): register in marketplace.json"
 - Create: `plugins/dw-lifecycle/src/frontmatter.ts`
 - Create: `plugins/dw-lifecycle/src/__tests__/frontmatter.test.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```typescript
 // src/__tests__/frontmatter.test.ts
@@ -459,12 +459,12 @@ describe('frontmatter', () => {
 });
 ```
 
-- [ ] **Step 2: Run the test, expect failure**
+- [x] **Step 2: Run the test, expect failure**
 
 Run: `cd plugins/dw-lifecycle && npm test -- frontmatter`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implement `frontmatter.ts`**
+- [x] **Step 3: Implement `frontmatter.ts`**
 
 ```typescript
 // src/frontmatter.ts
@@ -503,12 +503,12 @@ export function updateFrontmatter(source: string, patch: Record<string, unknown>
 
 (If round-trip preservation of scalar quoting is fragile, switch to `yaml`'s `parseDocument` + manual node update for the quoted-scalar case — same approach used in the deskwork doctor's frontmatter rewrite per audiocontrol-org/deskwork#37 fix.)
 
-- [ ] **Step 4: Run tests, expect pass**
+- [x] **Step 4: Run tests, expect pass**
 
 Run: `cd plugins/dw-lifecycle && npm test -- frontmatter`
 Expected: 4 tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/src/frontmatter.ts plugins/dw-lifecycle/src/__tests__/frontmatter.test.ts
@@ -525,7 +525,7 @@ git commit -m "feat(dw-lifecycle/bin): frontmatter parse/write helpers"
 - Create: `plugins/dw-lifecycle/src/__tests__/config.test.ts`
 - Create: `plugins/dw-lifecycle/src/__tests__/fixtures/configs/`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```typescript
 // src/__tests__/config.test.ts
@@ -566,12 +566,12 @@ describe('config', () => {
 });
 ```
 
-- [ ] **Step 2: Run, expect failure**
+- [x] **Step 2: Run, expect failure**
 
 Run: `cd plugins/dw-lifecycle && npm test -- config`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implement `config.types.ts` + `config.ts`**
+- [x] **Step 3: Implement `config.types.ts` + `config.ts`**
 
 ```typescript
 // src/config.types.ts
@@ -674,12 +674,12 @@ export function loadConfig(projectRoot: string): Config {
 }
 ```
 
-- [ ] **Step 4: Run tests, expect pass**
+- [x] **Step 4: Run tests, expect pass**
 
 Run: `cd plugins/dw-lifecycle && npm test -- config`
 Expected: 4 tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/src/config.ts plugins/dw-lifecycle/src/config.types.ts plugins/dw-lifecycle/src/__tests__/config.test.ts
@@ -693,7 +693,7 @@ git commit -m "feat(dw-lifecycle/bin): config schema + loader"
 **Files:**
 - Create: `plugins/dw-lifecycle/src/repo.ts`
 
-- [ ] **Step 1: Implement `repo.ts`**
+- [x] **Step 1: Implement `repo.ts`**
 
 ```typescript
 // src/repo.ts
@@ -721,12 +721,12 @@ export function expandWorktreeName(template: string, slug: string, cwd: string =
 }
 ```
 
-- [ ] **Step 2: Verify tsc passes**
+- [x] **Step 2: Verify tsc passes**
 
 Run: `cd plugins/dw-lifecycle && npx tsc --noEmit`
 Expected: no errors.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/src/repo.ts
@@ -741,7 +741,7 @@ git commit -m "feat(dw-lifecycle/bin): repo + git helpers"
 - Create: `plugins/dw-lifecycle/src/subcommands/install.ts`
 - Modify: `plugins/dw-lifecycle/src/cli.ts`
 
-- [ ] **Step 1: Implement install subcommand**
+- [x] **Step 1: Implement install subcommand**
 
 ```typescript
 // src/subcommands/install.ts
@@ -770,7 +770,7 @@ export async function install(args: string[]): Promise<void> {
 }
 ```
 
-- [ ] **Step 2: Wire into `cli.ts`**
+- [x] **Step 2: Wire into `cli.ts`**
 
 Replace the empty `SUBCOMMANDS` map in `src/cli.ts`:
 
@@ -788,7 +788,7 @@ And wire `handler(args)` instead of `handler()`:
 await handler(args);
 ```
 
-- [ ] **Step 3: Smoke test against a temp directory**
+- [x] **Step 3: Smoke test against a temp directory**
 
 ```bash
 TMP=$(mktemp -d)
@@ -800,7 +800,7 @@ rm -rf "$TMP"
 
 Expected: prints config JSON; the file matches the default schema shape.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/src/subcommands/install.ts plugins/dw-lifecycle/src/cli.ts
@@ -814,7 +814,7 @@ git commit -m "feat(dw-lifecycle/bin): install subcommand"
 **Files:**
 - Create: `plugins/dw-lifecycle/src/__tests__/install.smoke.test.ts`
 
-- [ ] **Step 1: Write the smoke test**
+- [x] **Step 1: Write the smoke test**
 
 ```typescript
 // src/__tests__/install.smoke.test.ts
@@ -847,12 +847,12 @@ describe('install (smoke)', () => {
 });
 ```
 
-- [ ] **Step 2: Run, expect pass**
+- [x] **Step 2: Run, expect pass**
 
 Run: `cd plugins/dw-lifecycle && npm test -- install.smoke`
 Expected: 1 test passes.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/src/__tests__/install.smoke.test.ts
@@ -870,7 +870,7 @@ This task adds the `dw-lifecycle doctor` subcommand with one rule (peer-plugins 
 - Create: `plugins/dw-lifecycle/src/__tests__/doctor.test.ts`
 - Modify: `plugins/dw-lifecycle/src/cli.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```typescript
 // src/__tests__/doctor.test.ts
@@ -923,12 +923,12 @@ describe('doctor', () => {
 });
 ```
 
-- [ ] **Step 2: Run, expect failure**
+- [x] **Step 2: Run, expect failure**
 
 Run: `cd plugins/dw-lifecycle && npm test -- doctor`
 Expected: FAIL — module not found.
 
-- [ ] **Step 3: Implement doctor**
+- [x] **Step 3: Implement doctor**
 
 ```typescript
 // src/subcommands/doctor.ts
@@ -1001,7 +1001,7 @@ export async function doctor(args: string[]): Promise<void> {
 
 (Note: real peer-plugin detection requires walking `~/.claude/plugins/cache/` or reading the host's installed-plugins state. Phase 5 wires this; for now `detectPeerPlugin` is a hardcoded `() => false` stub. Tests inject a mock.)
 
-- [ ] **Step 4: Wire into cli.ts**
+- [x] **Step 4: Wire into cli.ts**
 
 Add to the `SUBCOMMANDS` map in `src/cli.ts`:
 
@@ -1014,12 +1014,12 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
 };
 ```
 
-- [ ] **Step 5: Run tests, expect pass**
+- [x] **Step 5: Run tests, expect pass**
 
 Run: `cd plugins/dw-lifecycle && npm test -- doctor`
 Expected: 4 tests pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/src/subcommands/doctor.ts plugins/dw-lifecycle/src/__tests__/doctor.test.ts plugins/dw-lifecycle/src/cli.ts
@@ -1030,17 +1030,17 @@ git commit -m "feat(dw-lifecycle/bin): doctor subcommand (peer-plugins + missing
 
 ### Task 12: Run all Phase 2 tests + verify clean
 
-- [ ] **Step 1: Run full test suite**
+- [x] **Step 1: Run full test suite**
 
 Run: `cd plugins/dw-lifecycle && npm test`
 Expected: all tests pass (config + frontmatter + install.smoke + doctor).
 
-- [ ] **Step 2: Verify tsc clean**
+- [x] **Step 2: Verify tsc clean**
 
 Run: `cd plugins/dw-lifecycle && npx tsc --noEmit`
 Expected: no errors.
 
-- [ ] **Step 3: No commit needed (verification step)**
+- [x] **Step 3: No commit needed (verification step)**
 
 ---
 
