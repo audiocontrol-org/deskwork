@@ -10,10 +10,10 @@
  * Files updated (relative to repo root):
  *   - package.json
  *   - packages/{core,cli,studio}/package.json
- *   - plugins/{deskwork,deskwork-studio}/package.json
- *   - plugins/{deskwork,deskwork-studio}/.claude-plugin/plugin.json
+ *   - plugins/{deskwork,deskwork-studio,dw-lifecycle}/package.json
+ *   - plugins/{deskwork,deskwork-studio,dw-lifecycle}/.claude-plugin/plugin.json
  *   - .claude-plugin/marketplace.json (top-level metadata.version + each
- *     plugin entry's version)
+ *     plugin entry's version + each git-subdir source.ref)
  *
  * Intentionally manual: writes the files, you review the diff, then
  * commit + tag yourself. No "auto-publish on every merge" semantics.
@@ -49,8 +49,10 @@ const MANIFESTS: readonly VersionedManifest[] = [
   { path: 'packages/studio/package.json', label: '@deskwork/studio', kind: 'package-json' },
   { path: 'plugins/deskwork/package.json', label: 'deskwork plugin shell', kind: 'package-json' },
   { path: 'plugins/deskwork-studio/package.json', label: 'deskwork-studio plugin shell', kind: 'package-json' },
+  { path: 'plugins/dw-lifecycle/package.json', label: 'dw-lifecycle plugin shell', kind: 'package-json' },
   { path: 'plugins/deskwork/.claude-plugin/plugin.json', label: 'deskwork plugin.json', kind: 'plugin-json' },
   { path: 'plugins/deskwork-studio/.claude-plugin/plugin.json', label: 'deskwork-studio plugin.json', kind: 'plugin-json' },
+  { path: 'plugins/dw-lifecycle/.claude-plugin/plugin.json', label: 'dw-lifecycle plugin.json', kind: 'plugin-json' },
   { path: '.claude-plugin/marketplace.json', label: 'marketplace manifest', kind: 'marketplace-json' },
 ];
 
