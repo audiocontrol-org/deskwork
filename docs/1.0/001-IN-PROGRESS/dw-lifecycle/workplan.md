@@ -2244,12 +2244,12 @@ The skills follow the existing deskwork skill-doc shape — read `plugins/deskwo
 
 ### Task 27: /dw-lifecycle:install
 
-- [ ] **Step 1: Read the existing pattern**
+- [x] **Step 1: Read the existing pattern**
 
 Run: `cat plugins/deskwork/skills/install/SKILL.md`
 Note: structure is frontmatter → intent paragraph → numbered steps → error handling.
 
-- [ ] **Step 2: Write `skills/install/SKILL.md`**
+- [x] **Step 2: Write `skills/install/SKILL.md`**
 
 ```markdown
 ---
@@ -2292,7 +2292,7 @@ The helper writes `.dw-lifecycle/config.json` with the agreed values.
 - **No GitHub remote.** Skill warns; config gets written with `tracking.platform: "github"` but operator must update remote before `/dw-lifecycle:issues` can run.
 ```
 
-- [ ] **Step 3: Verify the file is valid markdown**
+- [x] **Step 3: Verify the file is valid markdown**
 
 Run: `cat plugins/dw-lifecycle/skills/install/SKILL.md | head`
 Expected: frontmatter + content visible.
@@ -2308,7 +2308,7 @@ git commit -m "feat(dw-lifecycle/skills): install skill"
 
 ### Task 28: /dw-lifecycle:define
 
-- [ ] **Step 1: Write `skills/define/SKILL.md`**
+- [x] **Step 1: Write `skills/define/SKILL.md`**
 
 ```markdown
 ---
@@ -2339,7 +2339,7 @@ Capture a new feature's problem, scope, approach, and task breakdown. Hands off 
 - **feature-dev not installed.** Warning at start; the `code-explorer` step is skipped. Skill continues.
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/skills/define/SKILL.md
@@ -2350,7 +2350,7 @@ git commit -m "feat(dw-lifecycle/skills): define skill"
 
 ### Task 29: /dw-lifecycle:setup
 
-- [ ] **Step 1: Write `skills/setup/SKILL.md`**
+- [x] **Step 1: Write `skills/setup/SKILL.md`**
 
 ```markdown
 ---
@@ -2388,7 +2388,7 @@ The helper:
 - **Version directory missing.** Helper creates it atomically. `/dw-lifecycle:doctor` flags any version directories present in the file tree but absent from `config.docs.knownVersions`.
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/skills/setup/SKILL.md
@@ -2399,7 +2399,7 @@ git commit -m "feat(dw-lifecycle/skills): setup skill"
 
 ### Task 30: /dw-lifecycle:issues
 
-- [ ] **Step 1: Write `skills/issues/SKILL.md`**
+- [x] **Step 1: Write `skills/issues/SKILL.md`**
 
 ```markdown
 ---
@@ -2433,7 +2433,7 @@ The helper creates the parent issue, then one issue per phase (referencing the p
 - **Repo not detectable from origin.** Surface the parsed URL and ask operator to pass `--repo` explicitly.
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/skills/issues/SKILL.md
@@ -2444,7 +2444,7 @@ git commit -m "feat(dw-lifecycle/skills): issues skill"
 
 ### Task 31: /dw-lifecycle:implement
 
-- [ ] **Step 1: Write `skills/implement/SKILL.md`**
+- [x] **Step 1: Write `skills/implement/SKILL.md`**
 
 ```markdown
 ---
@@ -2477,7 +2477,7 @@ Drive implementation through the workplan. Selects the next unchecked task, disp
 - **Test failures during TDD.** Per the TDD discipline: failing test is expected before implementation. Failing tests AFTER implementation means the impl is wrong; iterate, don't bypass the test.
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/skills/implement/SKILL.md
@@ -2488,7 +2488,7 @@ git commit -m "feat(dw-lifecycle/skills): implement skill"
 
 ### Task 32: /dw-lifecycle:review
 
-- [ ] **Step 1: Write `skills/review/SKILL.md`**
+- [x] **Step 1: Write `skills/review/SKILL.md`**
 
 ```markdown
 ---
@@ -2516,7 +2516,7 @@ Delegate review of recent changes to feature-dev's `code-reviewer` agent. Replac
 (Author's note: revisit this carve-out — if the user prefers a soft-fallback for review, change this skill to print a warning and skip the dispatch.)
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/skills/review/SKILL.md
@@ -2527,7 +2527,7 @@ git commit -m "feat(dw-lifecycle/skills): review skill"
 
 ### Task 33: /dw-lifecycle:ship
 
-- [ ] **Step 1: Write `skills/ship/SKILL.md`**
+- [x] **Step 1: Write `skills/ship/SKILL.md`**
 
 ```markdown
 ---
@@ -2554,7 +2554,7 @@ Final pre-merge gate. Verify acceptance criteria, run tests, open the PR. **Stop
 - **Tests fail.** Same — stop and iterate. Tests passing is non-negotiable for ship.
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/skills/ship/SKILL.md
@@ -2565,7 +2565,7 @@ git commit -m "feat(dw-lifecycle/skills): ship skill (stop-at-PR rule)"
 
 ### Task 34: /dw-lifecycle:complete
 
-- [ ] **Step 1: Write `skills/complete/SKILL.md`**
+- [x] **Step 1: Write `skills/complete/SKILL.md`**
 
 ```markdown
 ---
@@ -2604,7 +2604,7 @@ gh issue close <number> --comment "Completed in feature/<slug>; see <feature-dir
 - **gh close fails.** Surface and stop; doc moves stay (idempotent transition handles re-run).
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/skills/complete/SKILL.md
@@ -2615,7 +2615,7 @@ git commit -m "feat(dw-lifecycle/skills): complete skill"
 
 ### Task 35: /dw-lifecycle:pickup
 
-- [ ] **Step 1: Write `skills/pickup/SKILL.md`**
+- [x] **Step 1: Write `skills/pickup/SKILL.md`**
 
 ```markdown
 ---
@@ -2645,7 +2645,7 @@ Resume a feature mid-flight. Read the workplan, check GitHub issue status, repor
 - **Slug doesn't exist.** Suggest `/dw-lifecycle:doctor` to find orphan dirs or unbound features.
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/skills/pickup/SKILL.md
@@ -2656,7 +2656,7 @@ git commit -m "feat(dw-lifecycle/skills): pickup skill"
 
 ### Task 36: /dw-lifecycle:extend
 
-- [ ] **Step 1: Write `skills/extend/SKILL.md`**
+- [x] **Step 1: Write `skills/extend/SKILL.md`**
 
 ```markdown
 ---
@@ -2694,7 +2694,7 @@ dw-lifecycle transition <slug> --from inProgress --to inProgress --target <new-v
 - **Cannot retarget if `byVersion: false`.** Skill warns and skips the version-change operation.
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/skills/extend/SKILL.md
@@ -2705,7 +2705,7 @@ git commit -m "feat(dw-lifecycle/skills): extend skill"
 
 ### Task 37: /dw-lifecycle:teardown
 
-- [ ] **Step 1: Write `skills/teardown/SKILL.md`**
+- [x] **Step 1: Write `skills/teardown/SKILL.md`**
 
 ```markdown
 ---
@@ -2737,7 +2737,7 @@ git branch -D feature/<slug>
 - **Operator declines confirmation.** Stop, no changes.
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/skills/teardown/SKILL.md
@@ -2748,7 +2748,7 @@ git commit -m "feat(dw-lifecycle/skills): teardown skill"
 
 ### Task 38: /dw-lifecycle:session-start
 
-- [ ] **Step 1: Write `skills/session-start/SKILL.md`**
+- [x] **Step 1: Write `skills/session-start/SKILL.md`**
 
 ```markdown
 ---
@@ -2775,7 +2775,7 @@ Bootstrap a session. Reads the active feature's workplan, last journal entry, an
 - **Not on a feature branch.** Skill prompts: "Current branch is `main` (or other non-feature branch). Switch to a feature worktree before continuing."
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/skills/session-start/SKILL.md
@@ -2786,7 +2786,7 @@ git commit -m "feat(dw-lifecycle/skills): session-start skill"
 
 ### Task 39: /dw-lifecycle:session-end
 
-- [ ] **Step 1: Write `skills/session-end/SKILL.md`**
+- [x] **Step 1: Write `skills/session-end/SKILL.md`**
 
 ```markdown
 ---
@@ -2840,7 +2840,7 @@ git commit -m "docs: session-end <YYYY-MM-DD> [<slug>]"
 - **Uncommitted code changes outside docs.** Skill warns: "There are non-doc changes uncommitted. Commit those separately first to keep the session-end commit doc-only."
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/skills/session-end/SKILL.md
@@ -2851,7 +2851,7 @@ git commit -m "feat(dw-lifecycle/skills): session-end skill"
 
 ### Task 40: /dw-lifecycle:doctor
 
-- [ ] **Step 1: Write `skills/doctor/SKILL.md`**
+- [x] **Step 1: Write `skills/doctor/SKILL.md`**
 
 ```markdown
 ---
@@ -2889,7 +2889,7 @@ The helper runs all rules:
 - **No findings.** Report `no findings` and exit 0.
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/skills/doctor/SKILL.md
@@ -2900,7 +2900,7 @@ git commit -m "feat(dw-lifecycle/skills): doctor skill"
 
 ### Task 41: /dw-lifecycle:help
 
-- [ ] **Step 1: Write `skills/help/SKILL.md`**
+- [x] **Step 1: Write `skills/help/SKILL.md`**
 
 ```markdown
 ---
@@ -2953,7 +2953,7 @@ Show the lifecycle diagram and current state. Read-only; does not start any work
 - **No config.** Suggest `/dw-lifecycle:install` to bootstrap.
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/skills/help/SKILL.md
@@ -2964,17 +2964,17 @@ git commit -m "feat(dw-lifecycle/skills): help skill"
 
 ### Task 42: Phase 5 verification
 
-- [ ] **Step 1: List all 15 SKILL.md files**
+- [x] **Step 1: List all 15 SKILL.md files**
 
 Run: `ls plugins/dw-lifecycle/skills/*/SKILL.md | wc -l`
 Expected: `15`
 
-- [ ] **Step 2: Verify plugin loads**
+- [x] **Step 2: Verify plugin loads**
 
 Run: `claude plugin install --marketplace $(pwd)`
 Expected: dw-lifecycle plugin shows all 15 skills loaded; no parsing errors.
 
-- [ ] **Step 3: No commit (verification)**
+- [x] **Step 3: No commit (verification)**
 
 ---
 
