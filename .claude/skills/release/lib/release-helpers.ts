@@ -6,6 +6,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 
 export type ValidateVersionResult =
   | { readonly ok: true }
@@ -291,8 +292,10 @@ async function dispatch(argv: readonly string[]): Promise<number> {
   }
 }
 
-// Run when invoked directly via tsx (not when imported).
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Run when invoked directly via tsx (not when imported). Uses
+// pathToFileURL so the comparison survives symlinks and Windows path
+// quirks (a naive `file://${process.argv[1]}` breaks on either).
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   dispatch(process.argv.slice(2)).then(
     (code) => process.exit(code),
     (err) => {
