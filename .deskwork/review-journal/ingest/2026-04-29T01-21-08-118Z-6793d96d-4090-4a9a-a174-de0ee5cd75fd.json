@@ -1,0 +1,16 @@
+{
+  "id": "6793d96d-4090-4a9a-a174-de0ee5cd75fd",
+  "timestamp": "2026-04-29T01:21:08.118Z",
+  "event": "ingest",
+  "slug": "dogfood-no-frontmatter",
+  "entryId": "6793d96d-4090-4a9a-a174-de0ee5cd75fd",
+  "site": "deskwork-internal",
+  "stage": "Ideas",
+  "sourceFile": "docs/dogfood-no-frontmatter.md",
+  "frontmatterSnapshot": {},
+  "derivation": {
+    "slug": "path",
+    "state": "default",
+    "date": "mtime"
+  }
+}
