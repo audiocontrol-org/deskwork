@@ -30,14 +30,24 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SMOKE_PORT="${SMOKE_PORT:-47399}"
 STUDIO_BOOT_TIMEOUT_S="${STUDIO_BOOT_TIMEOUT_S:-60}"
 
+# Source the release-time materialization runtime so the smoke uses the
+# SAME code path the release uses — including the symlink-traversal
+# guard and the mode-bit verification. Sourcing must happen at script
+# top, not inside a function (sourcing is one-time and exposes the
+# functions to the rest of this script).
+# shellcheck source=./materialize-vendor.sh
+. "${REPO_ROOT}/scripts/materialize-vendor.sh"
+
 # (plugin, vendored-pkg) pairs. Mirrors scripts/materialize-vendor.sh.
 STUDIO_VENDOR_PAIRS=(
   "deskwork-studio:core"
   "deskwork-studio:studio"
+  "deskwork-studio:cli-bin-lib"
 )
 CLI_VENDOR_PAIRS=(
   "deskwork:core"
   "deskwork:cli"
+  "deskwork:cli-bin-lib"
 )
 
 # ----- ANSI helpers -------------------------------------------------------
@@ -61,17 +71,87 @@ TMP="$(mktemp -d -t deskwork-smoke.XXXXXX)"
 STUDIO_PID=""
 STUDIO_LOG=""
 FAILURES=0
+# Tracked subprocess PIDs the cleanup trap should tear down. Append PIDs of
+# long-running subshells (npm install, studio) here when launched so SIGINT
+# mid-run kills them rather than orphaning. Entries are removed (best-effort)
+# once the subprocess exits cleanly.
+KILL_PIDS=()
 
+# Recursively send `signal` to `pid` AND every descendant. Order matters:
+# we descend first (kill grandchildren before children) so that a child
+# can't reparent its grandchildren to init in the window between parent
+# kill and grandchild kill. pgrep is portable on macOS + Linux.
+kill_tree() {
+  local signal="$1"
+  local pid="$2"
+  [ -z "${pid}" ] && return 0
+  if ! command -v pgrep >/dev/null 2>&1; then
+    kill "${signal}" "${pid}" 2>/dev/null || true
+    return 0
+  fi
+  local child
+  while IFS= read -r child; do
+    [ -z "${child}" ] && continue
+    kill_tree "${signal}" "${child}"
+  done < <(pgrep -P "${pid}" 2>/dev/null)
+  kill "${signal}" "${pid}" 2>/dev/null || true
+}
+
+# Idempotent cleanup. Safe to call from EXIT, INT, TERM trap or directly.
+# Tears down (in order): tracked subprocess PIDs (with their entire process
+# subtree, since each was launched in a `( ... ) &` subshell whose grandchild
+# may be the actual server / npm process), the recorded studio PID's tree,
+# any direct children of the script (catch-all), then the tmp dir.
+CLEANUP_RAN=0
 cleanup() {
-  if [ -n "${STUDIO_PID}" ] && kill -0 "${STUDIO_PID}" 2>/dev/null; then
-    kill "${STUDIO_PID}" 2>/dev/null || true
-    # Give it a moment, then SIGKILL if it didn't go.
+  if [ "${CLEANUP_RAN}" = "1" ]; then
+    return 0
+  fi
+  CLEANUP_RAN=1
+
+  # Tear down each tracked subprocess subtree (TERM → 1s grace → KILL).
+  # We walk descendants and kill them too because launching a server with
+  # `( cd ... ; node server.ts ) &` records the subshell's PID, NOT the
+  # node grandchild. SIGTERM to the subshell does not reliably propagate
+  # to the grandchild on macOS — the grandchild reparents to init and
+  # keeps running. kill_tree fixes that.
+  local pid
+  for pid in "${KILL_PIDS[@]:-}"; do
+    [ -z "${pid}" ] && continue
+    kill_tree -TERM "${pid}"
+  done
+  if [ "${#KILL_PIDS[@]}" -gt 0 ]; then
     sleep 1
-    kill -9 "${STUDIO_PID}" 2>/dev/null || true
+    for pid in "${KILL_PIDS[@]:-}"; do
+      [ -z "${pid}" ] && continue
+      kill_tree -KILL "${pid}"
+    done
   fi
-  if [ -n "${STUDIO_LOG}" ] && [ -f "${STUDIO_LOG}" ] && [ "${KEEP_TMP:-}" != "1" ]; then
-    :
+
+  # Defense in depth: kill the recorded studio PID's subtree even if it
+  # wasn't tracked in KILL_PIDS.
+  if [ -n "${STUDIO_PID}" ]; then
+    kill_tree -TERM "${STUDIO_PID}"
+    sleep 1
+    kill_tree -KILL "${STUDIO_PID}"
   fi
+
+  # Final sweep: any direct children of this script (catches grandchildren
+  # spawned inside subshells we did not record). Use the recursive walker
+  # via pgrep -P $$ so we hit the full subtree, not just direct children.
+  if command -v pgrep >/dev/null 2>&1; then
+    local child
+    while IFS= read -r child; do
+      [ -z "${child}" ] && continue
+      kill_tree -TERM "${child}"
+    done < <(pgrep -P $$ 2>/dev/null)
+    sleep 1
+    while IFS= read -r child; do
+      [ -z "${child}" ] && continue
+      kill_tree -KILL "${child}"
+    done < <(pgrep -P $$ 2>/dev/null)
+  fi
+
   if [ "${KEEP_TMP:-}" = "1" ]; then
     warn "KEEP_TMP=1 set — leaving tmp at ${TMP}"
   else
@@ -83,36 +163,63 @@ trap cleanup EXIT INT TERM
 info "smoke tmp: ${TMP}"
 info "smoke port: ${SMOKE_PORT}"
 
+# ----- Pre-flight: SMOKE_PORT must be free --------------------------------
+#
+# Belt-and-suspenders check. The studio refuses to auto-increment when
+# --port is passed explicitly (which we do), so a port collision will
+# surface as a hard boot failure with a clear error from the studio. But
+# checking here too means we fail BEFORE the (slow) git archive + npm
+# install, which is a much better operator experience.
+#
+# Detection method (macOS + Linux):
+#   1. lsof -nP -iTCP:<port> -sTCP:LISTEN -t  — preferred; macOS default,
+#      common on Linux. Exits with PIDs listed if occupied.
+#   2. nc -z 127.0.0.1 <port>                 — fallback; widely available.
+#      Exits 0 when a connection succeeds (= port occupied).
+preflight_port_free() {
+  local port="$1"
+  if command -v lsof >/dev/null 2>&1; then
+    local occupant
+    occupant="$(lsof -nP -iTCP:"${port}" -sTCP:LISTEN -t 2>/dev/null | tr '\n' ',' | sed 's/,$//' || true)"
+    if [ -n "${occupant}" ]; then
+      fail "smoke-marketplace: port ${port} is in use (pid(s): ${occupant}); set SMOKE_PORT=<free port> and retry"
+      return 1
+    fi
+    return 0
+  fi
+  if command -v nc >/dev/null 2>&1; then
+    if nc -z 127.0.0.1 "${port}" >/dev/null 2>&1; then
+      fail "smoke-marketplace: port ${port} is in use; set SMOKE_PORT=<free port> and retry"
+      return 1
+    fi
+    return 0
+  fi
+  warn "neither lsof nor nc available — skipping port pre-flight; studio will fail fast on EADDRINUSE"
+  return 0
+}
+
+if ! preflight_port_free "${SMOKE_PORT}"; then
+  exit 1
+fi
+ok "port ${SMOKE_PORT} is free"
+
 # ----- Materialize one extracted plugin's vendor symlinks ----------------
+#
+# Delegates to materialize_vendor_pairs (sourced from materialize-vendor.sh
+# above). The shared function does the symlink-traversal guard, content
+# diff, and mode-bit verification — keeping smoke and release on a
+# single code path so they cannot disagree about what materialization
+# does.
 #
 # Args: $1 = root of extracted tree (containing plugins/ and packages/).
 #       $2..$N = "<plugin>:<pkg>" pairs to materialize.
 materialize_vendor_in_tree() {
   local tree_root="$1"
   shift
-  local pair plugin pkg source_dir vendor_link
-  for pair in "$@"; do
-    plugin="${pair%%:*}"
-    pkg="${pair#*:}"
-    source_dir="${tree_root}/packages/${pkg}"
-    vendor_link="${tree_root}/plugins/${plugin}/vendor/${pkg}"
-    if [ ! -d "${source_dir}" ]; then
-      fail "materialize: source dir missing in extracted tree: ${source_dir}"
-      return 1
-    fi
-    if [ ! -L "${vendor_link}" ]; then
-      fail "materialize: expected symlink in extracted tree at ${vendor_link} (got: $(ls -ld "${vendor_link}" 2>/dev/null || echo missing))"
-      return 1
-    fi
-    rm "${vendor_link}"
-    rsync -a \
-      --exclude 'node_modules' \
-      --exclude '.turbo' \
-      --exclude 'dist' \
-      --exclude '*.tsbuildinfo' \
-      "${source_dir}/" "${vendor_link}/"
-    ok "materialized ${plugin}/vendor/${pkg}"
-  done
+  if ! materialize_vendor_pairs "${tree_root}" "$@"; then
+    fail "materialize: materialize_vendor_pairs failed under ${tree_root}"
+    return 1
+  fi
 }
 
 # ----- Fixture project ---------------------------------------------------
@@ -232,10 +339,28 @@ rm -rf "${TMP}/studio-tree/packages"
 
 STUDIO_INSTALL="${TMP}/studio-tree/plugins/deskwork-studio"
 info "first-run npm install in ${STUDIO_INSTALL}"
+# Run in background + wait so SIGINT can interrupt the wait (bash's `wait`
+# is signal-interruptible) and the trap can find the npm subshell PID in
+# KILL_PIDS to tear it down cleanly. A bare `(...)` synchronous subshell
+# does not propagate SIGINT predictably to the npm child.
 (
   cd "${STUDIO_INSTALL}"
   npm install --omit=dev --no-audit --no-fund --loglevel=error
-)
+) &
+STUDIO_NPM_PID=$!
+KILL_PIDS+=("$STUDIO_NPM_PID")
+set +e
+wait "$STUDIO_NPM_PID"
+STUDIO_NPM_EXIT=$?
+set -e
+# Best-effort: drop the just-finished PID from KILL_PIDS so the trap doesn't
+# try to TERM a reaped process. (Trap is already idempotent w.r.t. dead PIDs
+# via `kill -0` guard, so this is purely cosmetic / future-proofing.)
+KILL_PIDS=("${KILL_PIDS[@]/$STUDIO_NPM_PID}")
+if [ "${STUDIO_NPM_EXIT}" -ne 0 ]; then
+  fail "npm install failed in ${STUDIO_INSTALL} (exit ${STUDIO_NPM_EXIT})"
+  exit 1
+fi
 ok "npm install completed"
 
 # Fixture project
@@ -255,6 +380,7 @@ info "booting deskwork-studio (--no-tailscale --port ${SMOKE_PORT} --project-roo
     > "${STUDIO_LOG}" 2>&1
 ) &
 STUDIO_PID=$!
+KILL_PIDS+=("$STUDIO_PID")
 
 # Wait for "listening on" in the log.
 boot_deadline=$(( $(date +%s) + STUDIO_BOOT_TIMEOUT_S ))
@@ -301,11 +427,14 @@ done
 # ----- CLI plugin smoke --------------------------------------------------
 
 info "stopping studio for CLI plugin smoke"
-if kill -0 "${STUDIO_PID}" 2>/dev/null; then
-  kill "${STUDIO_PID}" 2>/dev/null || true
-  sleep 1
-  kill -9 "${STUDIO_PID}" 2>/dev/null || true
-fi
+# Use kill_tree to reach grandchildren — STUDIO_PID points at the `( ... ) &`
+# subshell, but the actual node process is its grandchild via tsx. A bare
+# kill on the subshell does NOT reliably propagate on macOS.
+kill_tree -TERM "${STUDIO_PID}"
+sleep 1
+kill_tree -KILL "${STUDIO_PID}"
+# Drop from KILL_PIDS now that we've reaped it ourselves.
+KILL_PIDS=("${KILL_PIDS[@]/$STUDIO_PID}")
 STUDIO_PID=""
 
 info "extracting plugins/deskwork + packages/ from HEAD"
@@ -320,10 +449,23 @@ rm -rf "${TMP}/cli-tree/packages"
 
 CLI_INSTALL="${TMP}/cli-tree/plugins/deskwork"
 info "first-run npm install in ${CLI_INSTALL}"
+# Same trackable-background pattern as the studio install above so SIGINT
+# mid-install tears down the npm subshell instead of orphaning it.
 (
   cd "${CLI_INSTALL}"
   npm install --omit=dev --no-audit --no-fund --loglevel=error
-)
+) &
+CLI_NPM_PID=$!
+KILL_PIDS+=("$CLI_NPM_PID")
+set +e
+wait "$CLI_NPM_PID"
+CLI_NPM_EXIT=$?
+set -e
+KILL_PIDS=("${KILL_PIDS[@]/$CLI_NPM_PID}")
+if [ "${CLI_NPM_EXIT}" -ne 0 ]; then
+  fail "npm install failed in ${CLI_INSTALL} (exit ${CLI_NPM_EXIT})"
+  exit 1
+fi
 ok "npm install completed"
 
 info "running deskwork --help"

@@ -146,4 +146,99 @@ describe('buildClientAssets', () => {
       await fx.cleanup();
     }
   });
+
+  // --- Issue #77: concurrency safety + atomic writes + self-heal ----
+
+  it('concurrent rebuilds converge: both calls resolve, output and sidecar are valid', async () => {
+    const fx = await makeFixture();
+    try {
+      await writeEntry(fx.srcDir, 'shared', "export const shared = 'v1';\n");
+
+      const [a, b] = await Promise.all([
+        buildClientAssets({ pluginRoot: fx.pluginRoot }),
+        buildClientAssets({ pluginRoot: fx.pluginRoot }),
+      ]);
+
+      // Together, exactly one rebuild + one cache OR two rebuilds is acceptable
+      // (the latter only if the first one finished before the second started),
+      // but never two stuck-in-progress or two errors.
+      expect(a.entriesBuilt + a.entriesCached).toBe(1);
+      expect(b.entriesBuilt + b.entriesCached).toBe(1);
+
+      // The combined view: at most ONE actual esbuild invocation under
+      // the lock. Allow "both built" only as a tolerated outcome — if
+      // that ever fires, the lock is still serializing them (just not
+      // overlapping enough to dedupe).
+      const totalBuilt = a.entriesBuilt + b.entriesBuilt;
+      expect(totalBuilt).toBeGreaterThanOrEqual(1);
+      expect(totalBuilt).toBeLessThanOrEqual(2);
+
+      // Output JS exists and contains the expected content.
+      const outJs = await readFile(join(fx.outDir, 'shared.js'), 'utf8');
+      expect(outJs).toContain('shared');
+
+      // Sidecar exists and parses as valid JSON with an inputs[] array.
+      const sidecar = await readFile(join(fx.outDir, 'shared.js.meta.json'), 'utf8');
+      const parsed: unknown = JSON.parse(sidecar);
+      expect(parsed).toHaveProperty('inputs');
+      if (typeof parsed === 'object' && parsed !== null && 'inputs' in parsed) {
+        const inputs: unknown = parsed.inputs;
+        expect(Array.isArray(inputs)).toBe(true);
+      }
+    } finally {
+      await fx.cleanup();
+    }
+  });
+
+  it('leaves no temp files behind after a successful build (atomic rename)', async () => {
+    const fx = await makeFixture();
+    try {
+      await writeEntry(fx.srcDir, 'tmpcheck', "export const t = 1;\n");
+      await buildClientAssets({ pluginRoot: fx.pluginRoot });
+
+      const { readdir } = await import('node:fs/promises');
+      const files = await readdir(fx.outDir);
+      const leaks = files.filter((n) => n.includes('.tmp.'));
+      expect(leaks).toEqual([]);
+      // Verify the canonical outputs landed.
+      expect(files).toContain('tmpcheck.js');
+      expect(files).toContain('tmpcheck.js.meta.json');
+    } finally {
+      await fx.cleanup();
+    }
+  });
+
+  it('self-heals a corrupt metafile sidecar by rebuilding that entry', async () => {
+    const fx = await makeFixture();
+    try {
+      await writeEntry(fx.srcDir, 'heal', "export const h = 1;\n");
+
+      // First build populates the cache + sidecar.
+      const first = await buildClientAssets({ pluginRoot: fx.pluginRoot });
+      expect(first.entriesBuilt).toBe(1);
+
+      const sidecarPath = join(fx.outDir, 'heal.js.meta.json');
+      // Corrupt the sidecar. Truncated JSON (`{"inputs":`) is the
+      // pathological case from a kill mid-write.
+      await writeFile(sidecarPath, '{"inputs":', 'utf8');
+
+      // Bump the cache mtime to be NEWER than the entry, so the only
+      // way the rebuild fires is via the corrupt-sidecar self-heal
+      // path (otherwise the entry-mtime check might short-circuit).
+      const future = new Date(Date.now() + 5000);
+      await utimes(join(fx.outDir, 'heal.js'), future, future);
+
+      const second = await buildClientAssets({ pluginRoot: fx.pluginRoot });
+      // Self-heal triggered a rebuild even though the entry's mtime
+      // was older than the cache.
+      expect(second.entriesBuilt).toBe(1);
+
+      // Sidecar is now valid JSON again.
+      const after = await readFile(sidecarPath, 'utf8');
+      const parsed: unknown = JSON.parse(after);
+      expect(parsed).toHaveProperty('inputs');
+    } finally {
+      await fx.cleanup();
+    }
+  });
 });
