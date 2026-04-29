@@ -233,3 +233,71 @@ export async function atomicPush(opts: AtomicPushOptions): Promise<void> {
     throw new Error(`atomicPush failed (tag=${opts.tag}, branch=${opts.branch}):\n${stderr}`);
   }
 }
+
+// ---------------------------------------------------------------------
+// CLI dispatcher — invoked when this file is run directly via tsx.
+// SKILL.md prose calls these subcommands.
+// ---------------------------------------------------------------------
+
+function formatPreconditionReport(report: PreconditionReport): string {
+  const lines: string[] = [];
+  lines.push(`HEAD: ${report.head.sha.slice(0, 7)} (${report.head.branch})`);
+  lines.push(
+    `Relative to origin/main: ${report.relativeToOriginMain.aheadBy} commits ahead, fast-forward ${report.relativeToOriginMain.canFastForward ? 'possible' : 'NOT possible'}`,
+  );
+  lines.push(`Working tree: ${report.workingTreeClean ? 'clean' : 'DIRTY'}`);
+  lines.push(
+    `Tracking remote: ${report.trackingRemoteUpToDate ? 'up-to-date' : 'NOT up-to-date'}`,
+  );
+  lines.push(`Last release: ${report.lastReleaseTag ?? '(no tags found)'}`);
+  if (report.failures.length > 0) {
+    lines.push('');
+    lines.push('Failures:');
+    for (const f of report.failures) lines.push(`  - ${f}`);
+  }
+  return lines.join('\n');
+}
+
+async function dispatch(argv: readonly string[]): Promise<number> {
+  const [subcommand, ...args] = argv;
+  switch (subcommand) {
+    case 'check-preconditions': {
+      const report = await checkPreconditions();
+      process.stdout.write(formatPreconditionReport(report) + '\n');
+      return report.ok ? 0 : 1;
+    }
+    case 'validate-version': {
+      const [version, lastTag] = args;
+      if (!version || !lastTag) {
+        process.stderr.write('usage: validate-version <version> <last-tag>\n');
+        return 2;
+      }
+      const result = validateVersion(version, lastTag);
+      if (!result.ok) process.stderr.write(result.reason + '\n');
+      return result.ok ? 0 : 1;
+    }
+    case 'atomic-push': {
+      const [tag, branch] = args;
+      if (!tag || !branch) {
+        process.stderr.write('usage: atomic-push <tag> <branch>\n');
+        return 2;
+      }
+      await atomicPush({ tag, branch });
+      return 0;
+    }
+    default:
+      process.stderr.write(`Unknown subcommand: ${subcommand ?? '(none)'}\n`);
+      return 2;
+  }
+}
+
+// Run when invoked directly via tsx (not when imported).
+if (import.meta.url === `file://${process.argv[1]}`) {
+  dispatch(process.argv.slice(2)).then(
+    (code) => process.exit(code),
+    (err) => {
+      process.stderr.write((err instanceof Error ? err.message : String(err)) + '\n');
+      process.exit(1);
+    },
+  );
+}
