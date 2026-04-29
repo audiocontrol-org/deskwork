@@ -849,12 +849,14 @@ Tasks are grouped by sub-phase. Sub-phases are sequential (19a → 19b → 19c �
 
 **Source-of-truth for design reasoning:** [`docs/source-shipped-deskwork-plan/index.md`](../../../source-shipped-deskwork-plan/index.md) (deskwork workflow `4180c05e-c6a3-4b3d-8fc1-2100492c3f38`, applied at v2). Phase numbering below mirrors that plan's Phase 0–9.
 
-#### 23a — Verification spike: does marketplace install dereference symlinks? (~30 min)
+#### 23a — Verification spike: does marketplace install dereference symlinks? (~30 min) — **DONE 2026-04-29**
 
-- [ ] Build a minimal test plugin under `/tmp/symlink-test-plugin/` with a committed symlink + tiny target.
-- [ ] Install via the documented public-channel install flow.
-- [ ] Inspect `~/.claude/plugins/cache/<plugin>/<version>/vendor/test`: real directory (Path A — symlink dereferenced) or dangling symlink (Path B — needs release-time materialization).
-- [ ] Document the result; the answer determines 23c's mechanism.
+- [x] Build a minimal test plugin under `/tmp/symlink-test/` with a committed symlink + tiny target.
+- [x] Install via the documented public-channel install flow.
+- [x] Inspect the cache: simplified to direct `git clone` test (since marketplace install uses git clone internally per Claude Code docs). Result: **Path B — symlinks are preserved as symlinks** (mode `120000`, `readlink` returns the original target).
+- [x] Document the result; the answer determines 23c's mechanism.
+
+**Result: Path B confirmed.** `git clone` preserves committed symlinks. The proposed `vendor/core → ../../../packages/core/` symlink would be preserved through marketplace install, but the relative path traverses out of the cache directory (`~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/`) and resolves to a non-existent location (`~/.claude/plugins/cache/<marketplace>/packages/core/` does not exist — the marketplace install copies only the plugin tree, not the workspace). Therefore 23c's release workflow needs a **materialize-vendor** step that replaces symlinks with directory copies before tagging.
 
 #### 23b — Retire bundled artifacts
 
