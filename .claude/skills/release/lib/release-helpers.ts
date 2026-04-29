@@ -5,6 +5,8 @@
  * Test coverage: ./test/release-helpers.test.ts (vitest).
  */
 
+import { execFileSync } from 'node:child_process';
+
 export type ValidateVersionResult =
   | { readonly ok: true }
   | { readonly ok: false; readonly reason: string };
@@ -45,8 +47,6 @@ export function validateVersion(version: string, lastTag: string): ValidateVersi
   if (c > lc) return { ok: true };
   return { ok: false, reason: `Version ${version} must be strictly greater than ${lastTag}.` };
 }
-
-import { execFileSync } from 'node:child_process';
 
 export interface PreconditionReport {
   readonly ok: boolean;
