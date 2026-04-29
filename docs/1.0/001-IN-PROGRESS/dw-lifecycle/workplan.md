@@ -1772,7 +1772,7 @@ git commit -m "feat(dw-lifecycle/bin): journal-append subcommand"
 - Create: `plugins/dw-lifecycle/src/transitions.ts`
 - Create: `plugins/dw-lifecycle/src/__tests__/transitions.test.ts`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```typescript
 // src/__tests__/transitions.test.ts
@@ -1836,12 +1836,12 @@ describe('transitions', () => {
 });
 ```
 
-- [ ] **Step 2: Run, expect failure**
+- [x] **Step 2: Run, expect failure**
 
 Run: `cd plugins/dw-lifecycle && npm test -- transitions`
 Expected: FAIL.
 
-- [ ] **Step 3: Implement `transitions.ts`**
+- [x] **Step 3: Implement `transitions.ts`**
 
 ```typescript
 // src/transitions.ts
@@ -1880,12 +1880,12 @@ export function transitionFeature(
 }
 ```
 
-- [ ] **Step 4: Run tests, expect pass**
+- [x] **Step 4: Run tests, expect pass**
 
 Run: `cd plugins/dw-lifecycle && npm test -- transitions`
 Expected: 3 tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add plugins/dw-lifecycle/src/transitions.ts plugins/dw-lifecycle/src/__tests__/transitions.test.ts
