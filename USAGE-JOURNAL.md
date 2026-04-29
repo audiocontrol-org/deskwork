@@ -540,3 +540,72 @@ Workflow `applied` — terminal state. Disk content already matches (longform SS
 **S. Step-2-says-do-X-without-saying-how is a recurring agent-skill antipattern.** Issue #84 is the third or fourth time we've found a skill where the documented step requires the agent to discover something not in the skill. Earlier examples: install skill's "explore the project structure" (operator-supplied paths only), iterate's "voice skill" reference (no path documented). Worth a separate audit pass on the skill catalog to find more.
 
 **T. The plan-checkbox-on-disk pattern keeps Task 12 alive.** When session-end comes and v0.9.0 hasn't shipped, that's normally a "did we forget?" risk. With the 12-task plan checked into git ([`docs/superpowers/plans/2026-04-29-release-skill.md`](docs/superpowers/plans/2026-04-29-release-skill.md)) and Task 12 explicitly NOT checked off, the next session can pick up exactly where this one left off. No memory-of-where-we-were required.
+
+
+---
+
+## 2026-04-29 (cont'd): Marketplace install dogfood — install-blocker → release-pipeline fix → upgrade-path edge case
+
+**Session goal:** Resume the project from session-start. Operator triggered `/deskwork:install` to dogfood the public marketplace install path. The bin wrapper crashed on first invocation. Diagnose, fix, re-verify.
+
+**Surface exercised:** `/plugin marketplace add` + `/plugin install deskwork@deskwork` + `/plugin marketplace update` + `/plugin uninstall` + `/plugin install` (multiple cycles) + `/reload-plugins` + `/release` (twice) + `/deskwork:install` (intercepted before invocation).
+
+### Install phase
+
+#### 1. v0.9.0 marketplace tarball ships empty `vendor/`
+
+**friction.** First `/plugin install deskwork@deskwork` followed by a shell `deskwork --help` died on line 17:
+
+```
+/Users/.../cache/deskwork/deskwork/0.9.0/bin/deskwork: line 17:
+  /Users/.../cache/deskwork/deskwork/0.9.0/vendor/cli-bin-lib/install-lock.sh:
+  No such file or directory
+```
+
+`ls -la cache/deskwork/deskwork/0.9.0/vendor/` showed `total 0` — completely empty. Same for the studio plugin. Same on v0.9.2 after `/plugin marketplace update` bumped to latest. The bin wrappers were non-functional out of the box for every adopter installing through the documented marketplace path. Filed as [#88](https://github.com/audiocontrol-org/deskwork/issues/88) (closes [#81](https://github.com/audiocontrol-org/deskwork/issues/81), same family from v0.8.7).
+
+**insight.** *"Packaging IS UX."* The release workflow successfully materialized vendor symlinks AT THE TAG (force-pushed off main) — but Claude Code's marketplace install reads `marketplace.json` from the marketplace repo's default branch, not the tag. Main only ever had symlinks pointing at `../../../packages/<pkg>` — out-of-tree relative paths that get stripped on copy. The materialize step was running. The materialized output was visible in the tag commit. None of it reached adopters.
+
+**fix.** Shipped v0.9.3: switched each plugin's `marketplace.json` source from a relative path to a `git-subdir` source pinned at the release tag. Adopters now clone from the materialized tag rather than from main.
+
+#### 2. `prepare: husky` workspace-root walk-up under `--omit=dev`
+
+**friction.** v0.9.3's fix unblocked the bin wrapper — install-lock.sh sourced cleanly (vendor symlinks resolve through the marketplace clone's `packages/` tree at the workspace root). But `npm install --omit=dev` at the plugin shell walked UP to the workspace root (because root `package.json` declares `workspaces`), and the root's `prepare: husky` script exited 127 (`husky: command not found`) because husky is a devDependency.
+
+**fix.** Shipped v0.9.4 with defensive form: `"prepare": "command -v husky >/dev/null 2>&1 && husky || true"`. Skips silently when husky isn't on PATH.
+
+**insight.** **Smoke validates a fictional install path.** `scripts/smoke-marketplace.sh` extracts only `plugins/deskwork + packages/` via `git archive`, so npm install at the plugin shell never sees a workspace-root `package.json` to walk up to. The smoke marked v0.9.0 + v0.9.4 green. Real marketplace install pulls the full repo (because marketplace.json is at the root). Two consecutive install-blockers shipped through smoke — a reliable false-pass on the install path that matters most. Filed as a followup; smoke needs to do real `git clone` against an HTTP-served repo or `file://` fixture, not `git archive | tar`.
+
+#### 3. The `/plugin uninstall` soft-disable trap
+
+**friction.** Mid-session attempted to refresh the install via `/plugin uninstall deskwork@deskwork` followed by `/plugin install deskwork@deskwork`. The uninstall reported `"✓ Disabled deskwork in .claude/settings.local.json. Run /reload-plugins to apply."` — note the wording *"Disabled"*, not *"Uninstalled"*. After `/plugin install` reported success and `/reload-plugins` ran, `command -v deskwork` was still empty. Reload count went from 10 plugins to 9. The disable flag stuck.
+
+**insight.** `/plugin uninstall` is a soft-disable, not a real uninstall — `installed_plugins.json` registry entry persists. Subsequent `/plugin install` is a no-op because the version is already recorded. The escape hatch requires editing both `installed_plugins.json` AND `settings.local.json` directly. This is Claude Code-side UX, but we hit it dogfooding our own plugin. Documented in `MIGRATING.md`.
+
+#### 4. Source-shape change leaves stale `installPath` (Issue #89)
+
+**friction.** After v0.9.3 shipped, `installed_plugins.json` recorded `installPath: cache/deskwork/deskwork/0.9.4` (the relative-path-source layout). But Claude Code's git-subdir source uses a different on-disk layout — the actual files moved to `marketplaces/deskwork/plugins/deskwork/`. The registry pointed at a directory Claude Code itself had cleaned up. `command -v deskwork` returned empty despite reload reporting 10 plugins loaded.
+
+**fix.** Documented the workaround (clear stale registry entry + reinstall fresh) in `MIGRATING.md`. Filed as [#89](https://github.com/audiocontrol-org/deskwork/issues/89).
+
+**insight.** Migration-only friction. Fresh adopters never hit this. The compounding factor for THIS session was: dogfood install on this project predates the source-shape change AND went through an `/plugin uninstall` cycle, leaving inconsistent state across `installed_plugins.json` + `settings.local.json` + the actual on-disk install. The two-state-files-and-disk gives Claude Code three places where it can disagree with itself.
+
+### Release phase
+
+#### 5. The `/release` skill kept its promise (twice)
+
+**fix / insight.** Two consecutive `/release` runs end-to-end: v0.9.3 (the source.ref pin fix) and v0.9.4 (the prepare:husky defensive form). Each walked the 4-pause flow (precondition → diff → smoke → push), each end-to-end successful, each landed via the atomic-push helper, each triggered the GitHub release workflow. The new "Verify marketplace.json source.ref points at tag" step shipped in v0.9.3's workflow ran on v0.9.4's release and passed. Phase 25's promise — *"if we want a sane release process, we MUST enshrine it in a skill"* — paid off the day after the skill landed.
+
+**friction (minor).** `/release`'s precondition check reports `"Last release: v0.9.1"` because the v0.9.2 tag was force-pushed off main's ancestry (to the materialize commit). Validation against this reported last-tag still passes (0.9.3 > 0.9.1 holds), but the misreport is potentially confusing. Future ergonomics fix: use `git tag -l --sort=-v:refname` (which sees all tags) rather than ancestry-based lookup.
+
+### Cross-cutting observations (continued from prior entries)
+
+**U. The single biggest packaging-UX defect is invisible to local smoke.** Smoke runs the *intended* install path — `git archive | tar` of just the plugin subdir + workspace packages. Adopters run the *real* install path — `git clone` of the full marketplace repo + git-subdir clone of the plugin. Different code paths, different state. Two consecutive blockers shipped because smoke validated the intended path; both surfaced in the operator's real install. The fix isn't to add more assertions to the existing smoke; it's to swap the smoke's extract mechanism for the same code path Claude Code uses.
+
+**V. Two-state-files + disk = upgrade-path landmines.** Claude Code maintains `installed_plugins.json` (registry) AND `settings.local.json.enabledPlugins` (per-project enable bits) AND the actual on-disk plugin cache. When source shape changes (or `/plugin uninstall` is mistaken for a true uninstall), these can drift apart. We can't fix Claude Code state, but we can document escape hatches and avoid amplifying the problem in our own release shape.
+
+**W. Source-of-truth lookup beats inference for external tool semantics.** The diagnosis of #88 hinged on whether Claude Code's marketplace install reads from the default branch or the tag. Inferring from observed behavior would have been guessing — the diagnostic could have gone either way. The `claude-code-guide` agent doc lookup against `code.claude.com/docs` returned the canonical answer and the citation. Habit: when a load-bearing assumption involves external tool behavior, prefer the documented source over the deduced inference. Time investment was ~30s; alternative was hours of mis-aimed fixes.
+
+**X. The fix-cycle-as-test pattern.** v0.9.3 fixed the empty-vendor blocker. While verifying v0.9.3 in the operator's real environment, surfaced the prepare:husky workspace-root walk-up. Shipped v0.9.4 to fix that. The two-release-in-one-session cadence wasn't over-eager — it was the dogfood loop closing the gap between "release is correct" and "real install works." Without the operator running the actual install path between v0.9.3 and v0.9.4, the prepare:husky bug would have shipped to adopters and surfaced after-the-fact in user reports. Treat the fix cycle itself as a test environment.
+
+**Y. The smoke false-pass is a long-tail liability.** Two install-blockers in one session, both green-lit by smoke. Each fix-cycle would have caught the next bug class — but nothing prevents the NEXT install-blocker class from also being smoke-invisible. Without smoke alignment, the same trap will catch us again. Smoke alignment is high leverage; deferring it is borrowing against future release confidence.
