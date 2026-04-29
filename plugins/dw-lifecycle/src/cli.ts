@@ -1,4 +1,5 @@
 import { install } from './subcommands/install.js';
+import { setup } from './subcommands/setup.js';
 import { doctor } from './subcommands/doctor.js';
 
 const subcommand = process.argv[2];
@@ -6,6 +7,7 @@ const args = process.argv.slice(3);
 
 const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   install,
+  setup,
   doctor,
 };
 
