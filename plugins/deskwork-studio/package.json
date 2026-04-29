@@ -1,6 +1,6 @@
 {
   "name": "@deskwork/plugin-studio",
-  "version": "0.9.3",
+  "version": "0.9.4",
   "private": true,
   "description": "Web studio plugin for Claude Code — thin shell pointing at @deskwork/studio",
   "license": "GPL-3.0-or-later",
