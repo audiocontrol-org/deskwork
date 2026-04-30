@@ -13,6 +13,96 @@ Populating this file is a step in `/session-end`. If a session didn't exercise t
 
 ---
 
+## 2026-04-29: First end-to-end dogfood of dw-lifecycle on this project
+
+**Session goal:** walk dw-lifecycle's lifecycle skills (`/dw-lifecycle:help`, `/dw-lifecycle:install`, `/dw-lifecycle:complete`) through the public-channel install path against the deskwork project itself; treat every friction surface as adopter-experience data; complete the dw-lifecycle feature lifecycle by moving its docs to 003-COMPLETE/.
+
+**Surface exercised:** `/plugin marketplace update deskwork` + `/plugin install <plugin>@deskwork` + `/reload-plugins` + `/dw-lifecycle:help` + `/dw-lifecycle:install` + `dw-lifecycle install`/`doctor` CLI + `/dw-lifecycle:complete` + `dw-lifecycle transition` CLI + `deskwork repair-install` recovery flow (v0.9.8).
+
+### /dw-lifecycle:help phase
+
+#### 1. Skill ran with no config without warning
+
+**friction.** With no `.dw-lifecycle/config.json` in the project, `/dw-lifecycle:help` Step 2 still walked `docs/1.0/001-IN-PROGRESS/*` — happened to work because the conventional shape matches the deskwork default, but the SKILL.md's explicit "no config → suggest install" error-handling never fired.
+
+**insight.** A help skill that silently uses default paths is a bug factory in disguise. An adopter with non-default `docs.statusDirs` would get either an empty walk or a wrong walk, and the result would silently misrepresent project state. Tracked as #115.
+
+#### 2. Step 3 issue-search predicate undefined
+
+**friction.** *"List open dw-lifecycle-related GitHub issues across the repo"* doesn't define what counts as "related" — label? title? body? Different interpretations produce different lists; same skill, different runs, different results.
+
+**insight.** Skill bodies that delegate filter decisions to model interpretation are non-deterministic by design. Pin the exact `gh` invocation in the skill body. Tracked as #116.
+
+### /dw-lifecycle:install phase
+
+#### 3. The install helper's bin wasn't on PATH
+
+**friction.** `command -v dw-lifecycle` exited 1. `~/.claude/plugins/installed_plugins.json` recorded the install at `cache/deskwork/dw-lifecycle/0.9.7/` — a path that did not exist on disk. The plugin source actually lived at the marketplace clone (`marketplaces/deskwork/plugins/dw-lifecycle/`), with no `node_modules/` and no first-run install ever triggered. **All three deskwork plugins** (`deskwork`, `deskwork-studio`, `dw-lifecycle`) showed the same shape — same shape as #89, but on dw-lifecycle which had never had a relative-path source.
+
+**fix shipped this session (out-of-session, by another worker):** v0.9.8 added `deskwork repair-install` — prunes registry entries that point to non-existent paths. PATH-independent (runs via marketplace clone bin path). Documented in `plugins/deskwork/README.md` troubleshooting.
+
+**fix applied during this session:** `/plugin marketplace update deskwork` → `deskwork repair-install` (pruned 10 stale entries, kept 1 valid) → `/plugin install` for each lost plugin → `/reload-plugins`. After: `command -v dw-lifecycle` resolved correctly, `dw-lifecycle --help` triggered the first-run npm install + dispatched.
+
+**insight.** The recovery flow took five distinct user/agent steps and required marketplace-update FIRST so the new subcommand existed. Operator caught my first attempt that skipped the marketplace-update: *"Don't we need to install the latest version of the plugin first?"* Adopters hitting this in the wild will need a clear sequenced playbook in the README — not just the subcommand reference.
+
+**insight.** I almost reached for the privileged shortcut (`tsx ~/.claude/plugins/marketplaces/.../src/cli.ts install $(pwd)` would have worked locally). The agent-discipline rule's explicit *"the only valid response is to FIX the public path"* held. Result: filed evidence comment to #89; v0.9.8 shipment was the public-path fix; the dogfood signal stayed honest.
+
+#### 4. `dw-lifecycle install --help` prints config JSON, not help
+
+**friction.** Standard convention violated. `--help` is consumed as the positional `<project-root>` arg, helper outputs config JSON with `configPath: "--help/.dw-lifecycle/config.json"`. Created an actual `--help/` directory in the worktree as a side-effect that I had to clean up.
+
+**insight.** Argv parsing should reject unknown `--flags` rather than silently consuming them as positional args. Tracked as #118.
+
+#### 5. `dw-lifecycle install --dry-run` silently writes the config anyway
+
+**friction.** Tried `--dry-run` to preview before commit per the SKILL.md's *"Do NOT silently use defaults that might be wrong"* guidance. Flag was silently consumed; config was written; only realized after `test -f .dw-lifecycle/config.json` returned true. The skill's contract assumes probe → confirm → commit; the helper only supports commit. The architectural gap means the agent literally cannot honor Step 4 of the SKILL.md without writing the file first.
+
+**insight.** Tracked as #119. SKILL.md and helper need to be co-designed — when the contract requires preview, the helper has to support it. Otherwise the contract is aspirational.
+
+#### 6. `knownVersions: []` written when `docs/1.0/` is on disk
+
+**friction.** The probe correctly detected `docs.byVersion: true` and `docs.defaultTargetVersion: "1.0"`, but wrote `docs.knownVersions: []`. The version directory it had just enumerated to find `defaultTargetVersion` didn't make it into `knownVersions`.
+
+**fix applied:** Hand-edited config to `"knownVersions": ["1.0"]` after the silent write.
+
+**insight.** Internal inconsistency in the probe — different logic paths look at the same directory and disagree about what they found. Tracked as #120.
+
+#### 7. Doctor false-negative on `superpowers` peer-plugin check
+
+**friction.** `/dw-lifecycle:install` Step 6 ("run `dw-lifecycle doctor` to surface peer-plugin status") reported `superpowers` as not installed. It IS installed (registry entry valid, install path exists, `superpowers:*` skills functional in Claude Code).
+
+**insight.** Filed as #121. After `/plugin install feature-dev@claude-plugins-official`, doctor STILL reported feature-dev not-installed — same false-negative shape. The rule fails on **both** peers it knows about; effectively 0/2 hit rate. Updated #121 with the feature-dev evidence.
+
+### /dw-lifecycle:complete phase
+
+#### 8. Clean execution — no friction
+
+**insight.** First-ever invocation of `/dw-lifecycle:complete` against a real shipped feature on this repo. Helper moved `docs/1.0/001-IN-PROGRESS/dw-lifecycle/` → `docs/1.0/003-COMPLETE/dw-lifecycle/` cleanly. Steps that don't apply (no ROADMAP.md, no parentIssue) skipped without complaint. Commit `d263b77`.
+
+**insight.** Notable contrast to all preceding friction: the *transition* helper has no flag-parsing, no probe inconsistency, no false-negatives. It does one thing — atomic directory move — and does it correctly. The friction-density gradient suggests where to look for similar bugs: subcommands with flag parsing or detection logic are riskier than subcommands that do straightforward filesystem operations.
+
+### Design conversation
+
+#### 9. Session-start/session-end skills are project-coupled (no override path)
+
+**friction.** I proposed `/dw-lifecycle:session-end` as the natural next step after complete. Operator: *"I don't think session-end belongs in dw-lifecycle yet. It needs to be tailorable per project and it isn't yet."*
+
+**insight.** The published session-* skills hardcode deskwork's journal format: `DEVELOPMENT-NOTES.md` filename, the per-section structure (Goal/Accomplished/Didn't Work/Course Corrections/Quantitative/Insights), the [PROCESS]/[UX]/[COMPLEXITY]/[FABRICATION]/[DOCUMENTATION] correction taxonomy from this project's `session-analytics.md` rule. Adopters get those defaults verbatim with no override hook. Tracked as #122. Saved a project memory so I don't propose them again until tailoring lands.
+
+#### 10. Feature-doc format and file layout same root cause
+
+**friction.** Operator extended the design feedback: *"Every project will likely have their own standards for documentation and we don't want to be opinionated about that. That's something we'll want to make explicitly customizable by the user."*
+
+**insight.** Tracked as #123. Specifics enumerated: directory shape (`<status>/<slug>/`), status taxonomy (3 fixed states), per-feature file set (README/PRD/workplan), frontmatter schema, section structure within each file. Same fix shape as #122: customize hook pattern (`.dw-lifecycle/templates/<name>.md` overrides, `dw-lifecycle customize` subcommand), and the published defaults become minimal generic skeletons rather than deskwork-specific documents.
+
+### Cumulative
+
+**8 issues filed** (#115, #116, #118, #119, #120, #121, #122, #123) + **2 substantive comments** (#89 with new evidence; #121 with feature-dev confirmation) from two-and-a-half lifecycle skills (`help`, `install`, `complete`). Friction-issue rate: ~3.6 issues per skill executed. The dogfood-as-you-go pattern continues to outperform abstract reasoning by a wide margin.
+
+**One privileged-shortcut almost-reach** caught and reverted (the `tsx <marketplace-clone>/src/cli.ts` workaround for the broken PATH). Filed honest issue (#89 evidence comment) instead. The agent-discipline rule held under pressure.
+
+---
+
 ## 2026-04-28: Authoring + reviewing the source-shipped-plan via the public-channel marketplace install
 
 **Session goal:** install deskwork in the deskwork-plugin monorepo (a non-website tool repo, dogfooding the plugin against itself), then use the lifecycle skills + studio to author + review the architectural plan that defines the source-shipped re-architecture.

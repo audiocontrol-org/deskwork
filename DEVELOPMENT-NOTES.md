@@ -4,6 +4,58 @@ Session journal for `deskwork`. Each entry records what was tried, what worked, 
 
 ---
 
+## 2026-04-29: dw-lifecycle dogfood arc on deskwork — 8 issues filed, feature → 003-COMPLETE
+
+### Feature: dw-lifecycle (post-ship dogfood)
+### Worktree: deskwork-dw-lifecycle
+
+**Goal:** End-to-end dogfood of the published dw-lifecycle plugin against the deskwork project itself. Walk the lifecycle skills (`help`, `install`, `complete`) through the public install path, file every friction point as it surfaced, and finalize the dw-lifecycle feature in 003-COMPLETE/.
+
+**Accomplished:**
+
+- **/dw-lifecycle:help** — surfaced two friction signals: (a) skill silently runs without warning when `.dw-lifecycle/config.json` is missing, even though its error-handling stanza explicitly says to suggest `/dw-lifecycle:install`; (b) Step 3's "list dw-lifecycle-related issues" predicate is unspecified, producing inconsistent results between runs. Filed as #115 (bug) and #116 (enhancement).
+- **/dw-lifecycle:install pre-flight blocker** — registry/disk path mismatch: `installed_plugins.json` claimed cache paths at `~/.claude/plugins/cache/deskwork/{deskwork,deskwork-studio,dw-lifecycle}/0.9.7/` that did not exist on disk; actual plugin source lived at the marketplace clone path. Added evidence comment to existing #89, with new framing: this happens to fresh installs of new plugins (dw-lifecycle never had a relative-path source), falsifying #89's "fresh adopters never hit this / no release blocker" conclusion. Out-of-session, v0.9.8 shipped a `deskwork repair-install` subcommand as the adopter-side mitigation. Ran the documented recovery flow: `/plugin marketplace update deskwork` → `deskwork repair-install` (pruned 10 stale entries) → `/plugin install` for each lost plugin → `/reload-plugins`. PATH restored.
+- **/dw-lifecycle:install proper run** — three more friction signals filed: #118 (`--help` consumed as positional `<project-root>`, no help text), #119 (`--dry-run` silently ignored, file written anyway), #120 (`docs.knownVersions: []` written even though `docs/1.0/` exists on disk; probe didn't seed). Manually patched `knownVersions` to `["1.0"]`.
+- **/dw-lifecycle:install Step 6 doctor run** — surfaced false-negative on `superpowers` peer-plugin check (#121); after `/plugin install feature-dev@claude-plugins-official` to clear the recommended warning, doctor STILL reported feature-dev not installed — same bug fires for both peers, not just superpowers. Added evidence comment to #121 raising priority (the rule has 0/2 hit rate on real installs).
+- **/dw-lifecycle:complete dw-lifecycle** — first feature-completion run on this repo. Helper transitioned `docs/1.0/001-IN-PROGRESS/dw-lifecycle/` → `docs/1.0/003-COMPLETE/dw-lifecycle/` cleanly. ROADMAP step skipped (no ROADMAP.md). Issue-close step skipped (parentIssue empty — `/dw-lifecycle:issues` was never run for this feature). Commit `d263b77`. No new friction signals from the complete skill itself.
+- **Design-gap issues** — operator pushed back on running `/dw-lifecycle:session-end` next: *"I don't think session-end belongs in dw-lifecycle yet. It needs to be tailorable per project and it isn't yet."* Filed #122 (session-start/session-end project-coupled). Operator extended: *"Every project will likely have their own standards for documentation and we don't want to be opinionated about that."* Filed #123 (feature-doc format and file layout project-coupled). Both propose mirroring deskwork's customize-hook pattern; the published defaults should be generic skeletons, with deskwork's specifics living in this project's `.dw-lifecycle/templates/` overrides.
+
+**Didn't Work:**
+
+- **First attempt to run `repair-install` from the marketplace clone path** — the marketplace clone was at v0.9.7, didn't have the subcommand yet. Operator caught this: *"Don't we need to install the latest version of the plugin first?"* Correct flow: `/plugin marketplace update deskwork` first (fast-forwards the marketplace clone to v0.9.8), then `repair-install` exists.
+- **`dw-lifecycle install --dry-run` to preview before commit** — `--dry-run` is silently consumed (filed as #119). The helper has only commit-mode; no preview. Result: I wrote the config before confirming with the operator, against the SKILL.md's explicit *"Do NOT silently use defaults that might be wrong"* guidance. Course-corrected by reporting what got written, having the operator approve the values, then patching the one wrong value (`knownVersions`) in place.
+
+**Course Corrections:**
+
+- [PROCESS] *"Don't we need to install the latest version of the plugin first?"* — I had attempted to invoke the v0.9.8 `repair-install` subcommand without first running `/plugin marketplace update`. The marketplace clone was still at v0.9.7. Right call: always run the marketplace update before trying a newly-shipped subcommand.
+- [DOCUMENTATION] *"I don't think session-end belongs in dw-lifecycle yet. It needs to be tailorable per project and it isn't yet."* — corrected my assumption that `/dw-lifecycle:session-end` was a valid next step. The skill bakes in deskwork-specific journal conventions (DEVELOPMENT-NOTES.md format, Course Corrections taxonomy, Quantitative block sections). Filed #122. Saved a project memory so I don't propose them again until tailoring lands.
+- [DOCUMENTATION] *"we should also file a similar issue about the feature documentation format and file layout"* — operator extended the design pattern from #122 to the broader feature-doc layer. Filed #123 covering directory shape, status taxonomy, file set, frontmatter schema, and section structure within each file.
+
+**Quantitative:**
+
+- Messages from operator: ~22 (session-start confirmations, /dw-lifecycle:help and :install invocations, multiple "do it" / "file it" directives, marketplace-update correction, design-feedback exchanges, /session-end)
+- Commits: 1 prior to this session-end (`d263b77`); +1 for session-end docs = 2 total this session
+- GitHub issues filed: 8 (#115, #116, #118, #119, #120, #121, #122, #123)
+- GitHub issue comments: 2 (#89 — registry/disk mismatch evidence; #121 — false-negative not just superpowers)
+- Sub-agent dispatches: 0 — friction-finding is single-thread observation work; delegating would have hidden the friction
+- Corrections from operator: 3 substantive (marketplace-update sequencing; session-end design-coupling; feature-doc design-coupling)
+
+**Insights:**
+
+- **Dogfood-as-you-go is the right pattern.** Two slash-command invocations (`/dw-lifecycle:help` + `/dw-lifecycle:install`) produced 7 of the 8 issues filed this session; `/dw-lifecycle:complete` produced 0 new bugs but the design conversation produced 2 more. Reasoning ABOUT the plugin from outside would have surfaced none of these — they only show up when an agent is actually trying to get a real task done with the public-channel install.
+- **The privileged-shortcut discipline pays off mid-arc.** When `/dw-lifecycle:install` Step 5's `dw-lifecycle install <project-root>` was unreachable (PATH wired against a non-existent cache path), the temptation was `tsx ~/.claude/plugins/marketplaces/deskwork/plugins/dw-lifecycle/src/cli.ts install $(pwd)` — which would have worked but would have silently invalidated the dogfood signal. Stopping and reporting "the public path is broken; fix that" produced the v0.9.8 `repair-install` shipment as the adopter-side mitigation. Two failure modes were avoided: hiding the bug, and shipping a plugin that requires hand-rolled tsx invocations to bootstrap.
+- **Customize hooks are emerging as dw-lifecycle's biggest design debt.** Two issues filed today (#122, #123) reduce to the same pattern: dw-lifecycle ships deskwork's specific conventions (journal format, doc layout) as the published defaults with no override path. The fix shape is consistent — mirror deskwork's existing `customize` mechanism for templates/doctor rules. Once that pattern lands once, applying it to session-* skills, feature-doc templates, and frontmatter schemas is mechanical. Without it, dw-lifecycle is structurally incompatible with adopters whose conventions aren't deskwork's.
+- **The `--dry-run` / `--help` flag-handling defects are tiny but corrosive.** Both were silent-consumption bugs on unknown flags (#118, #119). The cumulative effect: the agent's only way to verify behavior before commit is to read the source. SKILL.md's explicit *"confirm with the operator"* contract becomes unenforceable. A 10-line argv-parser fix in the bin wrapper closes a class of "agent ran the helper before checking" failure modes.
+- **Issue #121's universal false-negative scaling matters.** With superpowers + feature-dev both reporting as not-installed when both ARE installed, the doctor's peer-plugins rule has zero true-positive coverage on real-world peer registrations. Adopters who trust the "Required peer plugin not installed" error will install plugins they already have, then doubt their own setup when nothing changes. The rule needs to read `installed_plugins.json` rather than whatever it's checking today.
+
+**Open follow-ups (not blockers for this session):**
+
+- The 8 issues filed this session need triage; #89 may want to be reframed (or split) given the new evidence.
+- `.dw-lifecycle/config.json` was committed as part of session-end; if the operator decides this project shouldn't track its config, easy revert.
+- The next dogfood arc should exercise `/dw-lifecycle:setup` against a real new feature on this repo, to surface the feature-doc-format coupling concretely (i.e., #123) under conditions where it actually matters.
+
+---
+
 ## 2026-04-29: dw-lifecycle integration with v0.9.5/v0.9.6 architecture, landed on main
 
 ### Feature: dw-lifecycle
