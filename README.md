@@ -6,14 +6,13 @@ Open-source plugins for [Claude Code](https://claude.com/claude-code). Flagship 
 
 | Name | Status | Purpose |
 |---|---|---|
-| `deskwork` | Shipping (v0.4.2) | Editorial calendar lifecycle: capture, plan, outline, draft, review, publish |
-| `deskwork-studio` | Shipping (v0.4.2) | Optional local Hono web surface — dashboard, review pane, scrapbook, content view, manual |
+| `deskwork` | Shipping (v0.9.6) | Editorial calendar lifecycle: capture, plan, outline, draft, review, publish |
+| `deskwork-studio` | Shipping (v0.9.6) | Optional local Hono web surface — dashboard, review pane, scrapbook, content view, manual |
+| `dw-lifecycle` | Shipping (v0.9.6) | Project lifecycle orchestration: define → setup → issues → implement → review → ship → complete. Composes `superpowers` (required) and `feature-dev` (recommended) |
 | `feature-image` | Planned | Feature image generation for blog posts and pages |
 | `analytics` | Planned | Content performance analytics |
 
-v0.4.2 patch — fixes: `deskwork ingest` skips `README.md` files without frontmatter (organizational, not pipeline content); provenance labels say `default` instead of `frontmatter` when a derived value came from a fallback rather than the file (#23).
-
-v0.4.1 patch — fixes: scrapbook ingest predicate handles nested scrapbook dirs (#20); standalone scrapbook viewer save/rename/delete/create/upload endpoints now exist (#21).
+Per-release notes live on the [GitHub releases page](https://github.com/audiocontrol-org/deskwork/releases).
 
 ### Capabilities
 
@@ -33,15 +32,17 @@ The monorepo publishes a Claude Code marketplace at the repository root. Inside 
 /plugin marketplace add https://github.com/audiocontrol-org/deskwork
 /plugin install deskwork@deskwork
 /plugin install deskwork-studio@deskwork    # optional companion
+/plugin install dw-lifecycle@deskwork       # project lifecycle orchestration
 ```
 
 Then bootstrap the host project:
 
 ```
-/deskwork:install
+/deskwork:install        # if using deskwork
+/dw-lifecycle:install    # if using dw-lifecycle
 ```
 
-The plugins ship as thin shells. On the first `/deskwork:*` skill invocation (or a direct `deskwork` / `deskwork-studio` CLI call) after marketplace install, the plugin's `bin/` shim runs `npm install --omit=dev` inside the plugin tree once (~30s, one-time), which fetches the corresponding `@deskwork/*` package from the public npm registry at the version pinned in the plugin's `plugin.json`. Subsequent invocations skip that step. The plugin manifest version is kept in lockstep with the published `@deskwork/{core,cli,studio}` npm package versions — bumping one bumps the others (see [`RELEASING.md`](./RELEASING.md)).
+The plugins ship as thin shells. On the first invocation after marketplace install, each plugin's `bin/` shim runs `npm install --omit=dev` inside the plugin tree once (~30s, one-time) to fetch its runtime dependencies. For `deskwork` and `deskwork-studio`, that means the corresponding `@deskwork/*` package from the public npm registry at the version pinned in the plugin's `plugin.json`; their manifest version is kept in lockstep with the published `@deskwork/{core,cli,studio}` npm package versions — bumping one bumps the others (see [`RELEASING.md`](./RELEASING.md)). For `dw-lifecycle`, the install fetches public deps (tsx, yaml, zod) only — its own logic ships in-tree, no `@deskwork/*` package involved. Subsequent invocations of any plugin skip the install step.
 
 See each plugin's `README.md` under `plugins/` for configuration and usage. The `deskwork` plugin README documents the host content-schema requirement (Astro projects must allow the `deskwork:` namespace in frontmatter) and the `doctor` maintenance command.
 
