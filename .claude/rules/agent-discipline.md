@@ -54,6 +54,33 @@ When dogfooding deskwork — running its commands, exercising its skills, using 
 - Do not write a workaround into this rule, into a sibling rule, or into the docs — workarounds are signal that the docs/tool are wrong; fix the underlying thing.
 - The only legitimate work outside the public path is the work of fixing the public path itself — and that work isn't done until it's pushed.
 
+## Never pass `--no-tailscale` to deskwork-studio unprompted
+
+When booting `deskwork-studio` for any operator-facing use, do NOT pass `--no-tailscale`. Default behavior (Tailscale-aware auto-detection) is what the operator needs.
+
+**Why:** the operator is regularly NOT at the laptop where the studio is running — that is the whole reason Tailscale support exists. Passing `--no-tailscale` strands them with a `http://localhost:<port>/` URL useless from any other machine. The operator has called this out at least five separate times across sessions and has explicitly asked for the rule to live here (not in auto-memory, which is keyed to the working-directory path and does not survive worktree switches or fresh clones). The repeated correction is the cost; this rule is the fix.
+
+This is a sibling concern to the existing v0.8.7 fix that aligned the studio skill description with its body — that fix removed the description-level signal that prompted reflexive `--no-tailscale` passes, but the underlying agent reflex persisted and needs an explicit rule to prevent it.
+
+**How to apply:**
+- Boot the studio with no `--no-tailscale` flag by default. The studio's auto-detection will bind to loopback + Tailscale interface(s); the startup banner prints all reachable URLs (loopback, Tailscale IP, magic-DNS hostname).
+- Always surface the **magic-DNS URL** to the operator (not the loopback URL) so they can reach the studio from another machine.
+- The only legitimate `--no-tailscale` is in fully non-interactive contexts: `scripts/smoke-marketplace.sh` and equivalent automated smokes that explicitly need loopback-only.
+- If a reasoning shortcut tempts the agent toward `--no-tailscale` — *"simpler,"* *"for testing,"* *"doesn't matter,"* *"I'm just going to verify quickly"* — STOP. That is the exact pattern the operator is calling out. The default works.
+
+## Memory-vs-rule placement: durable lessons go in this file
+
+When a recurring agent failure surfaces in conversation and the lesson would otherwise go to auto-memory: it goes in this file (`.claude/rules/agent-discipline.md`) instead, OR in `.claude/CLAUDE.md` if it's project-level convention rather than agent behavior.
+
+**Why:** auto-memory is keyed to the agent's working-directory path. When work moves to a new worktree, a fresh clone, or another machine, the auto-memory does not follow. The operator has explicitly called out at least five times that auto-memory is useless for durable lessons — and at least once with emphatic framing: *"MEMORIES ARE FUCKING USELESS!!! STOP USING THEM!!! PUT IT IN A SKILL OR A RULE OR CLAUDE.md OR IT DOESN'T EXIST!!!"*
+
+**How to apply:**
+- For agent behavior lessons (corrections to how the agent acts): add a section to this file.
+- For project conventions (architecture, naming, workflow): add to `.claude/CLAUDE.md`.
+- For per-skill behavior (specifically scoped to one skill's invocation): edit the SKILL.md.
+- Do NOT save the lesson as an auto-memory file under `~/.claude/projects/.../memory/`. That defeats the entire point.
+- Each lesson edit should be committed to the repo so it propagates to every worktree and fresh clone.
+
 ## Namespace deskwork-owned metadata in user-supplied documents
 
 Any frontmatter, config, or other metadata deskwork embeds into operator-owned files (markdown frontmatter, config files, etc.) MUST live under a `deskwork:` namespace. We cannot assume the global keyspace is unused.
