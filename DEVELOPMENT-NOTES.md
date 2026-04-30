@@ -4,6 +4,78 @@ Session journal for `deskwork`. Each entry records what was tried, what worked, 
 
 ---
 
+## 2026-04-29: dw-lifecycle integration with v0.9.5/v0.9.6 architecture, landed on main
+
+### Feature: dw-lifecycle
+### Worktree: deskwork-dw-lifecycle
+
+**Goal:** Resume the dw-lifecycle feature after Phase 26 (npm-publish architecture pivot) shipped on main as v0.9.5. Integrate dw-lifecycle into the new release model, catch up with subsequent v0.9.6 packaging fixes, and land the feature on `origin/main`.
+
+**Accomplished:**
+
+- **First sync with v0.9.5.** Fetched 17 commits past last session: vendor-materialize machinery retired, `@deskwork/{core,cli,studio}` now ship as published npm packages, marketplace.json drops `source.ref` pinning, plugin shells do first-run `npm install --omit=dev` in adopter mode. Merged origin/main into feature branch; resolved conflicts in `marketplace.json` (deskwork-studio version + dw-lifecycle entry placement) and `bump-version.ts` (deskwork+studio upgraded to `kind: 'plugin-shell-package-json'` for @deskwork/* dep lockstep). Resolved DEVELOPMENT-NOTES.md by interleaving entries.
+- **Aligned dw-lifecycle with v0.9.5 architecture** in commit `c53f614`:
+  - Dropped `source.ref: v0.9.4` from dw-lifecycle's marketplace entry (Phase 26e — entries now resolve to repo's default branch).
+  - Bumped versions 0.9.4 → 0.9.5 across plugin.json + package.json.
+  - **Replaced bin shim** from 5-line `exec npx tsx src/cli.ts` to 60-line first-run-install pattern. Walks up from PLUGIN_ROOT looking for `node_modules/.bin/tsx` (handles npm workspace hoist in dev + post-install in adopter mode); if absent, runs `npm install --omit=dev --workspaces=false` then dispatches. Simpler than deskwork's bin (no @deskwork/* dep to pin, no version-drift detection, no concurrency lock). Verified: dev-mode help text + smoke against fresh tmp repo both pass.
+- **Documented trunk-based release stance** in `RELEASING.md` (commit `a32b29a`). User asked whether to introduce a long-lived `release` branch or per-version `release/v0.x` branches; recommended neither for solo pre-1.0 work and captured the reasoning so future contributors don't re-litigate. Named the deferred decision: revisit at 1.0 stabilization when v1.x maintenance branches become real.
+- **Confirmed dw-lifecycle does NOT need to publish to npm.** Unlike deskwork+deskwork-studio (whose actual logic lives in `packages/cli` and `packages/studio` — sources NOT in the sparse-clone tree, so adopters MUST fetch from npm), dw-lifecycle's entire implementation ships in `plugins/dw-lifecycle/src/*.ts` which IS in the cloned tree. The `@deskwork/plugin-dw-lifecycle` name in `package.json` is `"private": true` workspace-internal naming, not a publish target.
+- **Second sync with v0.9.6.** A subsequent release cycle landed packaging fixes (#95 customize anchor, #97 studio runtime deps, Phase 26f release-skill npm-publish step). Merged again; resolved marketplace.json + DEVELOPMENT-NOTES.md conflicts; bumped dw-lifecycle to 0.9.6. Smoke + tests still green.
+- **Landed dw-lifecycle on `origin/main`** via fast-forward push of `feature/deskwork-dw-lifecycle:main` (`b24fe77..a54e5d8`, 42 commits including the two prior origin/main merges). Bypassed the `~/work/deskwork` worktree entirely (it had unrelated in-progress edits to `.claude/CLAUDE.md` that I declined to touch). dw-lifecycle@0.9.6 now visible to adopters running `/plugin marketplace update deskwork`.
+
+**Didn't Work:**
+
+- **First merge attempt** of origin/main (~17 commits) couldn't auto-resolve marketplace.json — both branches had touched the deskwork-studio entry. Hand-resolution chose origin/main's version bump and kept dw-lifecycle entry in its old (relative-path) form for the merge commit; the architectural conversion (drop source.ref, switch to git-subdir) happened in a clearly-named follow-up commit. Same shape on the second merge.
+- **Smoke script (Phase 4 era) had latent bugs** that surfaced when it ran post-merge — actually no, smoke kept passing. The latent issues from prior session (commit config before setup; cd into worktree before transition) had already been fixed. Both smoke runs this session passed clean.
+- **`/release` from this branch** would have bumped to 0.9.7 and re-published @deskwork/{core,cli,studio}@0.9.7 with identical content — duplicate npm publish. Skipped in favor of plain merge to main.
+
+**Course Corrections:**
+
+- [PROCESS] Hit the main worktree (`~/work/deskwork`) had uncommitted edits to `.claude/CLAUDE.md` — operator's in-progress doc work. Declined to auto-stash; surfaced the situation and three options (commit-or-discard, authorize stash/pop, push-direct-bypass). Operator chose push-direct. Per work-level CLAUDE.md "investigate before deleting or overwriting" + system-prompt "executing actions with care" — touching another worktree's uncommitted state needs explicit authorization, even in auto mode. Right call.
+- [DOCUMENTATION] User asked about release-branch best practice. Resisted the urge to immediately answer and execute; instead replied with 2–3 sentences + tradeoff matrix and waited for confirmation before documenting. The `respond in 2-3 sentences with a recommendation` system-prompt rule for exploratory questions paid off — operator confirmed the recommendation, THEN asked for documentation. Sequencing matters for exploratory vs. directive questions.
+- [DOCUMENTATION] T46 workplan steps 4–6 (per-plugin `dw-lifecycle-v0.1.0` tag, PR open, operator-merge) are now obsolete artifacts of the pre-Phase-26 model. Updated feature README's "v0.1.0 release readiness" section to reflect actual landing path (trunk-based fast-forward to main at v0.9.6). Workplan steps left unchecked as historical record — they document intent that was overtaken by the architecture pivot, not work that was skipped.
+- [PROCESS] Recommended `--no-ff` merge initially for "feature-branch shape visibility", then realized the feature branch already has two `Merge origin/main` commits IN its history, so a `--no-ff` cap would be redundant noise. Switched to fast-forward push. The shape IS visible because the merge commits explicitly say what they are.
+
+**Quantitative:**
+
+- Messages from user: ~12 (resume, fast-track decisions, branch-model question, npm-publish question, multiple "release published, integrate again", final push directive, session-end)
+- Commits: 5 implementation/docs + 1 docs (this entry) = 6
+  - `4f9dc60` (merge v0.9.5 architecture pivot)
+  - `c53f614` (align dw-lifecycle with v0.9.5: drop source.ref, bump 0.9.4→0.9.5, new bin shim)
+  - `a32b29a` (RELEASING.md: trunk-based stance)
+  - `f25b8ae` (merge v0.9.6 release)
+  - `a54e5d8` (bump dw-lifecycle 0.9.5→0.9.6)
+- Tests: 63/63 passing throughout (no test changes this session)
+- Files touched: 6 (marketplace.json, bump-version.ts, dw-lifecycle's package.json + plugin.json + bin/dw-lifecycle, RELEASING.md) plus DEVELOPMENT-NOTES.md merges
+- Sub-agent dispatches: 0 — this was all main-thread integration work, no implementation requiring delegation
+- Corrections from user: 2 substantive (don't touch the main worktree; document the branch-model rationale)
+- Corrections caught by reviewers: 0 (no reviewer dispatches this session — pure integration)
+
+**Insights:**
+
+- **The `--ref`-less marketplace pattern is genuinely simpler.** Phase 26 dropped per-tag pinning of marketplace entries' `source.ref`. The result: when main moves, adopters running `/plugin marketplace update` see the change. No workflow ceremony to "publish" a plugin-tree change separately from the tag. Trunk-based shipping with a single source of truth (`main`) becomes the natural shape.
+- **Trunk-based requires the "feature catches up with main" discipline, but that's a feature.** Two consecutive merges-from-main this session (v0.9.5 then v0.9.6) demonstrated the model in action. Each merge surfaced architecture drift early, before adopters saw broken plugins. A long-lived `release` branch would have shifted the same merges to a different boundary; it wouldn't have reduced the merge count.
+- **Plain merge vs. /release ceremony depends on whether the feature IS the release.** dw-lifecycle was a ride-along — no version bump beyond what monorepo already had at 0.9.6, no @deskwork/* package change. Plain merge correct. /release would have published 0.9.7 with identical npm content to 0.9.6 — duplicate publish, no benefit. The decision is "are we cutting a release, or just landing work?"
+- **The original v0.1.0 per-plugin-tag plan was wrong, in retrospect — and that's fine.** When dw-lifecycle's workplan was written (pre-Phase 26), per-plugin tags were the working model. By the time we shipped, the architecture moved. The right response is to document the obsolescence (feature README updated) rather than retroactively rewrite the workplan to look like we always knew. Honest history > clean history for archaeology.
+
+**Open follow-ups (not blockers):**
+
+- `targetVersion` arg still not validated at the CLI boundary (slug is). Path traversal via `--target ../../etc` would still escape the docs tree; carry forward from prior session.
+- `branchExists` only checks local refs; remote-only `origin/feature/<slug>` collision still creates a tracking branch.
+- `TEMPLATES_DIR` resolution via `import.meta.url` works under tsx but would break if a `dist/` build is added to dw-lifecycle.
+- The bin shim has no concurrency lock on first-run install. Two parallel invocations could race the npm install. Acceptable for now (dw-lifecycle unlikely to be invoked in parallel during first-run); revisit if real adopters hit it.
+- The `~/work/deskwork` main worktree at `b24fe77` needs `git pull` once the operator's `.claude/CLAUDE.md` edits are committed or stashed, to catch up to `a54e5d8`.
+
+**Next session:**
+
+dw-lifecycle is shipped. Natural follow-up arcs in priority order:
+
+1. **Dogfood** — drive a real feature through `/dw-lifecycle:define → setup → issues → implement → review → ship → complete` end-to-end. The Phase 2 plan in the original workplan (post-v0.1.0 dogfood) still applies. Until two consecutive features go through dw-lifecycle, the in-tree `/feature-*` skills should stay as fallback.
+2. **`targetVersion` validation** at the CLI boundary — close the path-traversal symmetry from slug.
+3. **Concurrency lock on the bin shim's first-run install** — only if real adopters hit a race.
+
+---
+
 ## 2026-04-29: dw-lifecycle Phases 4–6 — bin completion, skills, release prep
 
 ### Feature: dw-lifecycle

@@ -30,11 +30,13 @@ Project lifecycle orchestration plugin for Claude Code. Composes `superpowers` (
 - Local smoke: `scripts/smoke-dw-lifecycle.sh`
 - Parent Issue: <parentIssue>
 
-## v0.1.0 release readiness
+## Release status
 
-All implementation phases complete. 63/63 vitest tests pass. tsc clean. Plugin manifest validates. Local smoke (`./scripts/smoke-dw-lifecycle.sh`) passes against a fresh tmp repo.
+**Shipped on `main` at v0.9.6** (2026-04-29). The original workplan (T46) envisioned a per-plugin `dw-lifecycle-v0.1.0` tag, but Phase 26's npm-publish architecture pivot (v0.9.5+) and the trunk-based stance documented in `RELEASING.md` superseded that model: dw-lifecycle now rides the unified monorepo version line alongside `deskwork` and `deskwork-studio`. Adopters running `/plugin marketplace update deskwork` see dw-lifecycle@0.9.6 as a new entry.
 
-The actual v0.1.0 release ceremony is gated on upstream issue [audiocontrol-org/deskwork#81](https://github.com/audiocontrol-org/deskwork/issues/81) (empty-`vendor/` packaging regression). Hold tag until that ships in a verified v0.8.x patch.
+T46 workplan steps 4–6 (per-plugin tag, PR open, operator-merge) are obsolete artifacts of the original plan. The feature landed via direct fast-forward push to `origin/main` per the trunk-based release model.
+
+Verification at landing: 63/63 vitest tests pass, tsc clean, plugin manifest validates, local smoke (`scripts/smoke-dw-lifecycle.sh`) passes against a fresh tmp repo, bin shim's first-run npm install verified.
 
 ## Open follow-ups (non-blockers)
 

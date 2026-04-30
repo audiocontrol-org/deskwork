@@ -708,3 +708,26 @@ The instinct to "keep the existing architecture working with a small workaround"
 **BB. Operator owns scope; agent owns implementation.** The session's best moves were operator decisions: re-sequence Phase 26 (manual publish first), bundle 26c+26e (delete cruft), strip CI tests (not a test gate). The session's worst moves were my unilateral decisions: synthetic placeholder version (operator: *"Why?"*), in-progress workaround for 26b smoke fail (operator: *"delete cruft"*), v0.9.6 reflex after release.yml fix (operator: *"Why are we cutting a new release?"*). Default to the operator's read on scope.
 
 **CC. Read documentation, especially when confident.** Three documentation-skip mistakes this session: hyphen-namespace diagnosis, NPM_CONFIG_TOKEN env var, the `feature-extend` skill's iterate-required step. All three would have been avoided by 30 seconds of doc lookup. Confidence is when fabrication slips in — exactly the moment to verify.
+
+---
+
+## 2026-04-29: dw-lifecycle landed on main (infrastructure-only — no plugin exercise)
+
+**Session goal:** integrate dw-lifecycle with the new v0.9.5/v0.9.6 npm-publish architecture, document the trunk-based branch model, land on main.
+
+**Surface exercised:** None. Pure release-infrastructure work — merges, version bumps, bin shim refactor, RELEASING.md docs, fast-forward push to origin/main. No `/dw-lifecycle:*` skill invocation, no `/deskwork:*` skill invocation, no studio interaction.
+
+### Reflection: should something have been exercised?
+
+**Yes — and we punted it.** dw-lifecycle@0.9.6 is now on `origin/main`, which means an adopter running `/plugin marketplace update deskwork` against a fresh Claude Code install would now see the new plugin and could `/plugin install dw-lifecycle@deskwork`. That adopter path is exactly what USAGE-JOURNAL is supposed to capture, and we have not run it.
+
+The bin shim's first-run `npm install --omit=dev --workspaces=false` path was verified locally against a fresh tmp repo via `scripts/smoke-dw-lifecycle.sh` — but that smoke runs from inside the worktree where the workspace deps are hoisted, NOT from a sparse-cloned plugin tree the way Claude Code's marketplace install actually delivers it. The "did the bin shim actually work for a real adopter on first run?" question is unanswered.
+
+**friction (latent).** Risk of an install-path bug class that the local smoke doesn't catch — Phase 26's whole motivation was install-path bugs the v0.6.0–v0.8.7 smoke didn't catch. By analogy, a fresh-install dogfood of dw-lifecycle is the right gate before declaring the integration done.
+
+### Carry forward to next session
+
+- **Acquisition path test:** in a fresh Claude Code session, run `/plugin marketplace update deskwork`, then `/plugin install dw-lifecycle@deskwork`, then invoke a `/dw-lifecycle:*` skill against a host project. Capture every surprise. This is the first real adopter-experience signal for dw-lifecycle.
+- **Phase 2 dogfood from the original workplan** — drive a real feature through `/dw-lifecycle:define → setup → issues → implement → review → ship → complete` end-to-end. Until two consecutive features run through dw-lifecycle, the in-tree `/feature-*` skills should stay as fallback. Two adopter-experience arcs at once.
+
+**insight.** Infrastructure-only sessions still produce signal worth capturing here, because the *next* adopter-facing arc is foreshadowed by what was deferred. "We built the surface but didn't try to use it" is a USAGE-JOURNAL observation in its own right — it names what the next session should test before it becomes a complaint from a real adopter.
