@@ -14,8 +14,7 @@
       "source": {
         "source": "git-subdir",
         "url": "https://github.com/audiocontrol-org/deskwork.git",
-        "path": "plugins/deskwork",
-        "ref": "v0.9.5"
+        "path": "plugins/deskwork"
       },
       "description": "Editorial calendar lifecycle: capture, plan, draft, publish, distribute",
       "version": "0.9.5"
@@ -25,8 +24,7 @@
       "source": {
         "source": "git-subdir",
         "url": "https://github.com/audiocontrol-org/deskwork.git",
-        "path": "plugins/deskwork-studio",
-        "ref": "v0.9.5"
+        "path": "plugins/deskwork-studio"
       },
       "description": "Web studio for deskwork — dashboard, longform review, scrapbook, manual. Optional companion to the deskwork plugin",
       "version": "0.9.5"
