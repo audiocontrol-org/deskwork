@@ -13,9 +13,6 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@deskwork/cli": "file:./vendor/cli",
-    "@deskwork/core": "file:./vendor/core",
-    "tsx": "^4.21.0",
-    "yaml": "^2.8.0"
+    "@deskwork/cli": "0.9.5"
   }
 }

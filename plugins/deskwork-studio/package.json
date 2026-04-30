@@ -18,13 +18,8 @@
     "@codemirror/language": "^6.12.3",
     "@codemirror/state": "^6.6.0",
     "@codemirror/view": "^6.41.1",
-    "@deskwork/core": "file:./vendor/core",
-    "@deskwork/studio": "file:./vendor/studio",
-    "@hono/node-server": "^1.13.7",
+    "@deskwork/studio": "0.9.5",
     "@lezer/highlight": "^1.2.3",
-    "esbuild": "^0.28.0",
-    "hono": "^4.6.0",
-    "tsx": "^4.21.0",
-    "yaml": "^2.8.0"
+    "esbuild": "^0.28.0"
   }
 }
