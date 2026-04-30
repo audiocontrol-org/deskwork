@@ -1034,3 +1034,15 @@ Two findings in one operator turn:
 - `/deskwork:iterate` not installed (or broken) needs investigation + filing.
 - Resume the post-release acceptance design review at `/dev/editorial-review/970aa75d-f586-47f0-bc89-4481830a7676`. Margin notes work after the studio restart; ready for the operator's annotations.
 - The dw-lifecycle bug cluster filed during today's morning session (#127, #128, #129, #130) and #126 are the natural next-arc — same UX friction family as Phase 27, just on a different plugin.
+
+---
+
+## 2026-04-30 (cont'd 2): review-and-ship for #132 — no plugin exercise this session
+
+**Session shape:** review issue #132 → operator chose smaller-shape fix (hint, not install surface) → ship as v0.10.2.
+
+**Surface exercised:** none of the deskwork lifecycle skills, none of the studio. The session was pure tooling/release work on `scripts/repair-install.sh`. No `/deskwork:*` invocations, no `deskwork-studio` boot, no margin notes, no review workflow.
+
+**Should something have been exercised?** Not in this session. The fix is a CLI-output hint with no editorial-pipeline surface area. The natural next-step exercise — the operator's promised fresh-session walk to verify #131 + #125 + (now) #132 — happens in a future session, not this one. Skipping the journal entry here is honest; the prior session's recursive dogfood (which surfaced #132 in the first place) is the relevant data point.
+
+**Insight worth keeping:** issues filed from one session's plugin exercise feed the next session's tooling/release work. The dogfood signal compounds across the boundary — the prior session ran the plugin, hit the friction, filed the issue; this session shipped the response. The journal captures both halves cleanly when each session is honest about which kind it was.

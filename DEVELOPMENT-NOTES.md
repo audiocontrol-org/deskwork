@@ -4,6 +4,69 @@ Session journal for `deskwork`. Each entry records what was tried, what worked, 
 
 ---
 
+## 2026-04-30 (cont'd 2): review #132 → ship hint-not-install fix as v0.10.2
+
+### Feature: deskwork-plugin
+### Worktree: deskwork-plugin
+
+**Goal:** Review issue [#132](https://github.com/audiocontrol-org/deskwork/issues/132) (the agent-driven install gap surfaced during v0.10.1 customer-acceptance dogfood — agent reached for the privileged `update-config` harness skill to install the SessionStart auto-repair hook; reverted; filed issue). Decide on shape; ship.
+
+**Accomplished:**
+
+- **Reviewed #132 substantively.** Confirmed the gap is real (verified `grep -E "(SessionStart|repair-install\.sh|settings\.json)"` against every `plugins/*/skills/*/SKILL.md` returns zero matches; only the README mentions the hook). Surfaced the design questions the issue intentionally defers — JSONC vs JSON parsing for merge quality, command-string stability for idempotency detection, stale-path detection, scope prompting cadence, README sync, single-hook vs generic-registry scope. Recommended shape: skill + bin subcommand pair (matching existing `/deskwork:doctor` → `deskwork doctor` pattern).
+
+- **Operator pivoted to a smaller-shape fix.** *"I would be happy with a user agent-facing hint that the agent (or the user) should add the session start hook."* Smaller scope = no install surface, no JSONC merge, no skill, no `deskwork install-repair-hook` subcommand. Just a hint at the moment the operator/agent encounters the cache-eviction symptom.
+
+- **Implemented the hint in `scripts/repair-install.sh` (commit `e44c6df`).** New `session_hook_installed()` helper greps both `~/.claude/settings.json` and `./.claude/settings.json` for `repair-install.sh` substring; new TIP block at end of `main()` prints when not installed. Suppressed in `--quiet` (preserves SessionStart-hook silence-on-healthy contract). Detection leans on the script-path stability rule shipped in v0.10.1 — no JSONC parser needed. End-to-end verified: hint shows in default + `--check` modes when no hook installed; `--quiet` zero-output exit 0; hint suppressed when project-scope settings.json contains the hook.
+
+- **Released v0.10.2 via the five-pause `/release` flow.** All five pauses cleared on first try:
+  - Pause 1 (preconditions): clean tree, 3 commits ahead of origin/main, FF-eligible. Validated `0.10.2 > 0.10.1`.
+  - Pause 2 (post-bump diff): 11-file version-bump diff, all `0.10.1 → 0.10.2`, lockstep deps + marketplace metadata + per-plugin versions all aligned. Committed `d03f01b`.
+  - Pause 3 (npm publish): `assert-not-published` confirmed all three packages free at v0.10.2; operator ran `make publish` in their own terminal (3 OTPs); `assert-published` confirmed all three landed.
+  - Pause 4 (smoke): `bash scripts/smoke-marketplace.sh` passed against the freshly-published packages — phase A (registry install) + phase B (git-subdir source) + studio boot at port 47399 + asset-scrape across `/dev/`, `/dev/editorial-studio`, `/dev/editorial-help`, `/dev/editorial-review-shortform`, `/dev/content`, `/dev/content/smoke-collection`. All assets 200.
+  - Pause 5 (atomic push): tag `v0.10.2` annotated with the commit subject (`feat(repair-install): hint when SessionStart hook isn't installed (#132)`); single-RPC push pushed HEAD → origin/main + HEAD → feature/deskwork-plugin + tag in one `--follow-tags` call. `git ls-remote` confirms `451af59` at `refs/tags/v0.10.2`. Release workflow `25186940873` triggered (in_progress at session-end).
+
+- **Posted status comment on #132 with the released-version note.** Issue left OPEN per the "issue closure is the customer's call, not the agent's" rule that landed alongside v0.10.1.
+
+**Didn't Work:**
+
+- (Nothing notable. The session was a clean review → smaller-shape pivot → ship cycle. The issue-closure rule held — I flagged the open-vs-close question explicitly in the comment rather than reflexively closing post-ship.)
+
+**Course Corrections:**
+
+- (None this session. Operator's smaller-shape directive was a scope refinement, not a correction. The original review correctly surfaced the design questions the issue deferred; the operator's pick from the recommendation space was the next-step decision the review was supposed to enable.)
+
+**Quantitative:**
+
+- Messages from user: ~7 (auto-mode session — operator picked the issue, ratified the smaller-shape, then walked the five `/release` pauses)
+- Commits to feature branch this session: 2 (`e44c6df` hint + `d03f01b` chore-release)
+- Commits in the release: 3 (the hint + two prior session-end + agent-discipline-rule docs commits already on the branch from the prior session)
+- Releases shipped: 1 (v0.10.2)
+- Sub-agent dispatches: 0
+- GitHub issues commented on: 1 (#132 status note)
+- GitHub issues closed: 0 (#132 stays open per the closure rule)
+- Tests: no new tests this session (the bash hint addition is verified by manual smoke; consistent with the project's "no test infrastructure in CI" rule and the absence of test coverage for `scripts/repair-install.sh` at v0.10.1)
+- Course corrections: 0
+
+**Insights:**
+
+- **The "review issue → ship smaller-shape fix" cycle is faster when the review surfaces the recommendation space honestly.** The review of #132 listed the question-by-question design surface (JSONC handling, command-string stability, prompt cadence, etc.). The operator then picked the smallest shape that closed the surfaced gap — a hint, not an install surface. If the review had skipped to "here's the implementation," the operator wouldn't have had the visible smaller option. Same pattern as the recent `/deskwork:iterate` UX gap surfacing — the act of reviewing reveals choices.
+
+- **Path-stability rule pays compound interest.** The v0.10.1 rule "Adopter-facing scripts have a stable CLI contract" was originally framed as protection against breaking adopter `.claude/settings.json` hook configs. This session, that rule did a second job: it justified using a substring match on the script's filename for hook-detection without needing a JSONC parser. The rule reduced implementation cost on the next change that depended on the stable surface.
+
+- **Issue-closure discipline scales naturally to the new fix.** I posted the status comment with explicit "leaving this issue open for you to close after you've verified on a fresh session" wording. Caught myself before reflexively closing — the new rule is sticking. Whether it scales further (#125 left open from v0.10.1 + #131 same posture) is a forward-test, but the discipline is consistent across the cluster.
+
+- **The hint cadence is naturally self-erasing.** Adopters who install the hook never see the hint again (the substring match suppresses it; their next manual run is rare anyway since the hook handles automatic recovery). Adopters who don't install it see the hint at every manual recovery — exactly the moment the prompt is most actionable. The cost of leaving the hint visible is bounded by adopter inaction.
+
+**Next session:**
+
+- Operator verifies #131 + #125 + #132 on a fresh session — close any that pass, reopen-with-evidence if anything regressed.
+- The dw-lifecycle bug cluster (#126, #127, #128, #129, #130) remains the natural next-arc — same family as Phase 27's deskwork bugs, surfaced during 2026-04-30 morning's dogfood.
+- Resume the post-release acceptance playbook design review at the studio review URL if the operator wants to continue that thread.
+- Watch [anthropics/claude-code#54905](https://github.com/anthropics/claude-code/issues/54905) for the upstream registry-hygiene fix — once that lands, `repair-install.sh` becomes a backstop rather than primary recovery.
+
+---
+
 ## 2026-04-30 (cont'd): ship Phase 27 studio bug tranche v0.10.0 → recursive-dogfood surfaces #131 → ship v0.10.1 cache-restore hook
 
 ### Feature: deskwork-plugin

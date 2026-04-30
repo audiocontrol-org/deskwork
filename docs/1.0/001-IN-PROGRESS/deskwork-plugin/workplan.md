@@ -1344,3 +1344,24 @@ Shipped only after the manual flow in 26f is solid. Adds `permissions: id-token:
 - [ ] v0.10.0 shipped via the five-pause `/release` flow.
 
 **Issues closed in this phase:** [#103](https://github.com/audiocontrol-org/deskwork/issues/103), [#104](https://github.com/audiocontrol-org/deskwork/issues/104), [#105](https://github.com/audiocontrol-org/deskwork/issues/105), [#106](https://github.com/audiocontrol-org/deskwork/issues/106), [#107](https://github.com/audiocontrol-org/deskwork/issues/107), [#108](https://github.com/audiocontrol-org/deskwork/issues/108), [#110](https://github.com/audiocontrol-org/deskwork/issues/110). Plus [#74](https://github.com/audiocontrol-org/deskwork/issues/74) and [#99](https://github.com/audiocontrol-org/deskwork/issues/99) (subsumed by sub-phase C).
+
+
+### Phase 28: durable cache-restore script + auto-repair hook — v0.10.1
+
+Shipped. Customer-blocking [#131](https://github.com/audiocontrol-org/deskwork/issues/131). New `scripts/repair-install.sh` at the marketplace clone path (durable across cache eviction); restores cache subtrees from clone + prunes stale registry entries. Modes: default, `--quiet` (silent on healthy ~150ms; SessionStart hook usage), `--check` (read-only). Version banner when not `--quiet`. `deskwork repair-install` becomes a thin TS shell-out wrapper. README adopter snippet documents the SessionStart hook. New rule in `agent-discipline.md`: "Adopter-facing scripts have a stable CLI contract."
+
+**Issues:** [#131](https://github.com/audiocontrol-org/deskwork/issues/131) (left open — customer-acceptance verification per the closure rule).
+
+### Phase 28+: SessionStart hook hint in `repair-install.sh` — v0.10.2
+
+Shipped. Issue [#132](https://github.com/audiocontrol-org/deskwork/issues/132) — agent-driven install gap surfaced during v0.10.1 customer-acceptance dogfood (agent reached for `update-config` harness skill to install the hook; reverted; filed issue). Operator chose smaller-shape: hint, not install surface.
+
+- [x] `scripts/repair-install.sh` detects whether the SessionStart hook is wired in `~/.claude/settings.json` or `./.claude/settings.json` via substring match on `repair-install.sh` (leans on script-path stability rule).
+- [x] Hint printed at end of default + `--check` output when not installed; suppressed in `--quiet` (silence-on-healthy contract holds).
+- [x] Verified locally: hint shows when no hook installed; `--quiet` zero-output exit 0; hint suppressed when project-scope `.claude/settings.json` has the hook.
+
+**Acceptance:**
+
+- [x] v0.10.2 shipped via the five-pause `/release` flow.
+
+**Issues:** [#132](https://github.com/audiocontrol-org/deskwork/issues/132) (left open — operator's call after fresh-session verification).
