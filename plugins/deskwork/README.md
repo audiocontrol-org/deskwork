@@ -259,30 +259,74 @@ Local-dev installs hit path 1. Marketplace-install users hit path 3 once, then p
 
 Tracks the default branch of `audiocontrol-org/deskwork`. To pull the latest, run `/plugin marketplace update deskwork && /reload-plugins`. To pin to a stable release, install the marketplace with a tag: `/plugin marketplace add audiocontrol-org/deskwork#v0.1.0`. See the [root README](../../README.md#getting-updates) for the full update story.
 
-### Troubleshooting: bin not on PATH after install ([#89](https://github.com/audiocontrol-org/deskwork/issues/89))
+### Troubleshooting: bin not on PATH after install ([#89](https://github.com/audiocontrol-org/deskwork/issues/89), [#125](https://github.com/audiocontrol-org/deskwork/issues/125), [#131](https://github.com/audiocontrol-org/deskwork/issues/131))
 
-If `command -v deskwork` returns empty after `/plugin install deskwork@deskwork && /reload-plugins`, your local `~/.claude/plugins/installed_plugins.json` has accumulated stale entries pointing at cache directories that no longer exist on disk. Claude Code wires PATH from these entries; when the registered installPath is missing, the bin is unreachable even though the marketplace clone at `~/.claude/plugins/marketplaces/deskwork/plugins/deskwork/` is intact.
+If `command -v deskwork` returns empty (or `deskwork: not found`), Claude Code's plugin cache at `~/.claude/plugins/cache/deskwork/<plugin>/<version>/` has been evicted between sessions. The marketplace clone at `~/.claude/plugins/marketplaces/deskwork/` is durable; the cache layer isn't. PATH wired against the cache layer breaks after eviction.
 
-This is a Claude Code bug (registry hygiene), not a deskwork bug. While it gets fixed upstream, deskwork ships a recovery command that runs without depending on PATH:
+deskwork ships a recovery script at the marketplace clone path that restores the cache subtrees from the clone. The script runs without depending on the deskwork CLI being on PATH — it lives in the durable layer, not the cache layer.
+
+**Manual one-shot recovery:**
 
 ```bash
-~/.claude/plugins/marketplaces/deskwork/plugins/deskwork/bin/deskwork repair-install
+~/.claude/plugins/marketplaces/deskwork/scripts/repair-install.sh
 ```
 
-The command reads `~/.claude/plugins/installed_plugins.json`, identifies entries for `deskwork@deskwork`, `deskwork-studio@deskwork`, `dw-lifecycle@deskwork` whose `installPath` doesn't exist on disk, and prunes them. It reports which plugins now have no live entry so you know what to re-install.
+The script:
 
-After running it, re-install in Claude Code:
+1. Reads `~/.claude/plugins/installed_plugins.json` and the marketplace clone's plugin manifests to enumerate every (plugin, version) tuple referenced by PATH, registry, and canonical metadata.
+2. For each tuple whose cache subtree is missing or has no executable bin, restores the subtree by copying from the marketplace clone (`~/.claude/plugins/marketplaces/deskwork/plugins/<plugin>/`).
+3. Prunes registry entries pointing at cache paths that still don't exist after restoration.
+4. Validates that each plugin has at least one working bin; surfaces a `/plugin install` hint for any unrecoverable plugin.
+
+Pass `--check` (or `--dry-run` — back-compat alias) to see what would be repaired without writing.
+Pass `--quiet` to silence output when the cache is healthy (used by the SessionStart hook below).
+
+The `deskwork repair-install` subcommand is a thin wrapper around the same script:
+
+```bash
+deskwork repair-install        # if deskwork is on PATH after the cache is restored
+```
+
+**Auto-recover at session start:**
+
+To stop seeing this every fresh session, configure Claude Code to run the script before each session boots. Add to `~/.claude/settings.json` (user-scope) or your project's `.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/plugins/marketplaces/deskwork/scripts/repair-install.sh --quiet"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+When the cache is healthy, the script exits silently in ~200ms. When it's broken, the script repairs the cache and prints `deskwork repair-install: repaired <plugin@version>...` so you know the hook fired. Either way, you never see `command not found`.
+
+After running the script (manually or via the hook), verify:
+
+```bash
+command -v deskwork
+command -v deskwork-studio    # if you use the studio
+command -v dw-lifecycle       # if you use dw-lifecycle
+```
+
+If any plugin reports unrecoverable, re-install it in Claude Code:
 
 ```
-/plugin install deskwork@deskwork
-/plugin install deskwork-studio@deskwork    # if you use the studio
-/plugin install dw-lifecycle@deskwork       # if you use dw-lifecycle
+/plugin install <plugin>@deskwork
 /reload-plugins
 ```
 
-Then verify: `command -v deskwork` should print the bin path.
-
-Pass `--dry-run` to see what would be pruned without writing the file. Pass `--json` for machine-readable output.
+**Note on running studio processes:** if `deskwork-studio` is already running when the cache gets wiped, its in-process state references files that no longer exist (404s on `/static/dist/*.js`). The repair script restores the static surface but can't repatch a long-running process. Stop and restart the studio after a recovery: `Ctrl-C` the running process and re-launch with `deskwork-studio`. The studio rebuilds its client-asset cache on each launch.
 
 ### License
 

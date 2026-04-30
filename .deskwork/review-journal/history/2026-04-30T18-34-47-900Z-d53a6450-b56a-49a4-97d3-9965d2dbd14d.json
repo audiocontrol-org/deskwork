@@ -1,0 +1,22 @@
+{
+  "id": "d53a6450-b56a-49a4-97d3-9965d2dbd14d",
+  "timestamp": "2026-04-30T18:34:47.900Z",
+  "entry": {
+    "kind": "annotation",
+    "at": "2026-04-30T18:34:47.900Z",
+    "annotation": {
+      "type": "comment",
+      "workflowId": "970aa75d-f586-47f0-bc89-4481830a7676",
+      "version": 1,
+      "range": {
+        "start": 2654,
+        "end": 2685
+      },
+      "text": "We need to mark this entire feature as a stop-gap until dw-lifecycle has the capability to customize/override lifecycle stages & skills. The current /release and the planned /post-release skills will eventually be migrated to dw-lifecycle. When that happens, the path of this file will change to something of dw-lifecycle's choosing.",
+      "category": "other",
+      "anchor": "(docs/post-release/playbook.md)",
+      "id": "d53a6450-b56a-49a4-97d3-9965d2dbd14d",
+      "createdAt": "2026-04-30T18:34:47.900Z"
+    }
+  }
+}

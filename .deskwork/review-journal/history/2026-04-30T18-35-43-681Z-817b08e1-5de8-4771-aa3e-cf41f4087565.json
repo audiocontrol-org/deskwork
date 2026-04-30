@@ -1,0 +1,22 @@
+{
+  "id": "817b08e1-5de8-4771-aa3e-cf41f4087565",
+  "timestamp": "2026-04-30T18:35:43.681Z",
+  "entry": {
+    "kind": "annotation",
+    "at": "2026-04-30T18:35:43.681Z",
+    "annotation": {
+      "type": "comment",
+      "workflowId": "970aa75d-f586-47f0-bc89-4481830a7676",
+      "version": 1,
+      "range": {
+        "start": 0,
+        "end": 189
+      },
+      "text": "We need to mark this as as a stop gap until dw-lifecycle has the capability to customize/override lifecycle stages & skills.",
+      "category": "other",
+      "anchor": "A pair of skills that codify how to evaluate the freshly-installed deskwork marketplace plugin, surface friction, and file issues — using the deskwork pipeline itself as the triage surface.",
+      "id": "817b08e1-5de8-4771-aa3e-cf41f4087565",
+      "createdAt": "2026-04-30T18:35:43.681Z"
+    }
+  }
+}

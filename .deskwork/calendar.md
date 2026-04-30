@@ -2,7 +2,9 @@
 
 ## Ideas
 
-*No entries.*
+| UUID | Slug | Title | Description | Keywords | Source |
+|------|------|------|------|------|------|
+| 1c3bfe8f-e9c2-4133-ab88-2aa08d9fa702 | post-release-acceptance-design | Post-release customer acceptance playbook | A pair of skills that codify how to evaluate the freshly-installed deskwork marketplace plugin, surface friction, and file issues — using the deskwork pipeline itself as the triage surface. |  | manual |
 
 ## Planned
 
