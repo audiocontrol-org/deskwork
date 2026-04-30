@@ -32,15 +32,6 @@ import { writeCalendar } from '@deskwork/core/calendar';
 import type { EditorialCalendar } from '@deskwork/core/types';
 import { createApp } from '../src/server.ts';
 
-// Catches `/editorial-add`, `/editorial-plan`, `/editorial-outline`,
-// `/editorial-draft`, `/editorial-publish`, `/editorial-distribute`
-// AND their dashed variants (`/editorial-outline-approve`,
-// `/editorial-draft-review`, `/editorial-shortform-draft` etc.) — every
-// slash command from the legacy era. Excludes `/dev/editorial-*` paths
-// (the leading slash + `dev/` makes those non-matches) and CSS asset
-// paths.
-const LEGACY_SLASH_RE = / \/editorial-[a-z][a-z-]*/g;
-
 function makeConfig(): DeskworkConfig {
   return {
     version: 1,

@@ -15,6 +15,7 @@
  */
 
 import { initScrapbookLightbox } from './lightbox.ts';
+import { copyOrShowFallback, isManualCopyOpen } from './clipboard.ts';
 
 interface DraftRange {
   start: number;
@@ -1446,20 +1447,38 @@ export function initEditorialReview(): void {
   const rejectBtn = qn<HTMLButtonElement>('[data-action="reject"]');
 
   /**
-   * Copy the Claude Code command that the operator needs to run next
-   * to the clipboard. Studio clicks only transition the workflow state;
-   * the actual cognitive work (iterate, approve-and-write, etc.) lives
-   * in a skill that must be invoked by the operator. Without the
-   * clipboard copy + toast, the operator is left staring at a page
-   * that looks like it did something but didn't tell them what's next.
+   * Copy the Claude Code command the operator needs to run next.
+   * Studio clicks only transition workflow state; the cognitive work
+   * (iterate, approve-and-write) lives in a skill the operator must
+   * invoke. On clipboard failure (HTTP origin, sandboxed iframe), the
+   * unified `copyOrShowFallback` helper renders a persistent manual-
+   * copy panel — this is the #74 fix (the prior auto-reload destroyed
+   * the toast before the operator could grab the command).
+   *
+   * Returns whether the clipboard write succeeded; callers gate their
+   * auto-reload on this.
    */
-  async function copyAndToast(command: string, hint: string): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(command);
-      showToast(`${hint}  (command copied — paste into Claude Code)`);
-    } catch {
-      showToast(`${hint}  Run: ${command}`, true);
-    }
+  async function copyCommandForNextStep(command: string, hint: string): Promise<boolean> {
+    return copyOrShowFallback(command, {
+      successMessage: `${hint}  (command copied — paste into Claude Code)`,
+      fallbackMessage: 'Clipboard unavailable — select and Cmd-C to copy this command, then paste it into Claude Code:',
+      // When the operator dismisses the manual-copy panel, the page
+      // reloads to advance to the post-mutation state — same effect
+      // as the auto-reload would have had if the clipboard had worked.
+      onDismiss: () => window.location.reload(),
+    });
+  }
+
+  /**
+   * Auto-reload after a state-mutation flow, but only if the manual-
+   * copy panel isn't open. When the panel is open the operator is
+   * mid-grab — reloading would destroy the panel. The panel's Dismiss
+   * button triggers the reload via `onDismiss` instead.
+   */
+  function reloadUnlessManualCopyOpen(delayMs: number): void {
+    setTimeout(() => {
+      if (!isManualCopyOpen()) window.location.reload();
+    }, delayMs);
   }
 
   approveBtn?.addEventListener('click', async () => {
@@ -1486,8 +1505,8 @@ export function initEditorialReview(): void {
       kind === 'outline'
         ? `Approved outline v${versionNum}. Next: ${approveCmd} finalizes the workflow.`
         : `Approved v${versionNum}. Next: ${approveCmd} writes the file and marks the workflow applied.`;
-    await copyAndToast(approveCmd, approveHint);
-    setTimeout(() => window.location.reload(), 2400);
+    await copyCommandForNextStep(approveCmd, approveHint);
+    reloadUnlessManualCopyOpen(2400);
   });
 
   iterateBtn?.addEventListener('click', async () => {
@@ -1507,11 +1526,11 @@ export function initEditorialReview(): void {
       kind === 'outline'
         ? `/deskwork:iterate --kind outline --site ${site} ${slug}`
         : `/deskwork:iterate --site ${site} ${slug}`;
-    await copyAndToast(
+    await copyCommandForNextStep(
       iterateCmd,
       `Iterating on v${versionNum}. Next: ${iterateCmd} revises against your comments and appends v${versionNum + 1}.`,
     );
-    setTimeout(() => window.location.reload(), 2400);
+    reloadUnlessManualCopyOpen(2400);
   });
 
   rejectBtn?.addEventListener('click', async () => {
@@ -1533,13 +1552,21 @@ export function initEditorialReview(): void {
   // Surfaced when the workflow is in `iterating` or `approved` and the
   // operator's first clipboard paste failed (e.g., the v0.8.4 case where
   // the legacy /editorial-iterate name shipped). The button carries the
-  // command in a data-cmd attribute; clicking it re-runs the same
-  // copyAndToast we use for the primary buttons.
+  // command in a data-cmd attribute. No auto-reload here — this is a
+  // pure re-copy, no state mutation, so on manual-copy fallback the
+  // operator just dismisses the panel and stays on the same page.
   document.querySelectorAll<HTMLButtonElement>('[data-action="copy-cmd"]').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const cmd = btn.getAttribute('data-cmd') ?? '';
-      if (!cmd) return;
-      await copyAndToast(cmd, `Copied: ${cmd}`);
+      if (!cmd) {
+        // eslint-disable-next-line no-console
+        console.warn('copy-cmd: missing data-cmd attribute', btn);
+        return;
+      }
+      await copyOrShowFallback(cmd, {
+        successMessage: `Copied: ${cmd}  (paste into Claude Code)`,
+        fallbackMessage: 'Clipboard unavailable — select and Cmd-C to copy this command, then paste it into Claude Code:',
+      });
     });
   });
 
