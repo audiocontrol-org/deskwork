@@ -1314,9 +1314,11 @@ Shipped only after the manual flow in 26f is solid. Adds `permissions: id-token:
 
 **Sub-phase E — Index page sensible defaults for un-linked surfaces ([#107](https://github.com/audiocontrol-org/deskwork/issues/107)):**
 
-- [ ] Longform reviews entry (III): if a most-recent in-review workflow exists, link to its `/dev/editorial-review/<uuid>`. Otherwise link to `/dev/editorial-studio?stage=review`.
-- [ ] Scrapbook entry (V): link to `/dev/content` (the scrapbook is reached by drilling into a content node).
-- [ ] Visual: keep the URL template hint (`<slug>` / `<site>/<path>`) visible alongside the link, so adopters still see the URL shape.
+- [x] Longform reviews entry (III): if a most-recent in-review workflow exists, link to its `/dev/editorial-review/<uuid>`. Otherwise link to `/dev/editorial-studio#stage-review` (re-using the anchor mounted in sub-phase D; cleaner than introducing a new `?stage=` query parameter just for this fallback).
+- [x] Scrapbook entry (V): link to `/dev/content` (the scrapbook is reached by drilling into a content node).
+- [x] Visual: keep the URL template hint (`<slug>` / `<site>/<path>`) visible alongside the link, so adopters still see the URL shape.
+
+**Diagnosis:** `IndexEntry` had no way to express "templated route, but here's a link target." The renderer treated `template` as exclusive with linking. Refactor: added optional `linkHref` field — when set, the title becomes a link to that URL even for templated entries; the route hint span stays alongside as a placeholder. `SECTIONS` const moved to `buildSections(ctx)` so the Longform entry can compute `linkHref` from the workflow journal at render-time. `pickDefaultLongformWorkflow` returns the most-recent open longform (by `updatedAt`); falls through to `/dev/editorial-studio#stage-review` when none exists. Scrapbook entry hardcoded to `/dev/content`. Stale "Loopback only." string in the colophon dropped while in the file (pre-Tailscale support claim, no longer accurate; cosmetic). Regression tests at `packages/studio/test/index-page-defaults.test.ts` cover three branches: empty calendar (Longform → anchor), populated longform (Longform → deep-link), and Scrapbook → /dev/content; all assert the URL template hint stays visible.
 
 **Sub-phase F — Destructive shortcut soft-confirm ([#108](https://github.com/audiocontrol-org/deskwork/issues/108)):**
 
