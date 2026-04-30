@@ -228,6 +228,27 @@ process_plugin() {
   done <<< "$versions"
 }
 
+# Detect whether the SessionStart auto-repair hook is wired up in either
+# the user-scope or project-scope settings.json. Substring match on the
+# script filename — settings.json is JSONC (comments + trailing commas
+# allowed) so a plain grep is safer than a JSON.parse round-trip, and
+# the script path is already a stable contract surface (see the
+# "Adopter-facing scripts have a stable CLI contract" rule). A false
+# positive (e.g. a comment that mentions the script) only suppresses a
+# hint; it doesn't break anything.
+session_hook_installed() {
+  local needle="repair-install.sh"
+  local user_settings="${HOME}/.claude/settings.json"
+  local project_settings="${PWD}/.claude/settings.json"
+  if [[ -f "$user_settings" ]] && grep -F -q "$needle" "$user_settings" 2>/dev/null; then
+    return 0
+  fi
+  if [[ -f "$project_settings" ]] && grep -F -q "$needle" "$project_settings" 2>/dev/null; then
+    return 0
+  fi
+  return 1
+}
+
 # Prune installed_plugins.json entries whose installPath doesn't exist
 # on disk after the cache-restore pass. Inlined node -e so the script
 # stays self-contained.
@@ -318,6 +339,21 @@ main() {
     fi
   elif [[ $QUIET -eq 0 ]]; then
     log "all plugins healthy."
+  fi
+
+  # Hint: the SessionStart auto-repair hook is the durable fix for
+  # cache-eviction breakage. If it isn't wired up, point the operator
+  # (or the agent reading this output) at the README's documented
+  # snippet. We never install the hook ourselves — that's an
+  # operator-consent decision (see issue #132). Suppressed in --quiet
+  # mode, where the silence-on-healthy contract holds.
+  if [[ $QUIET -eq 0 ]] && ! session_hook_installed; then
+    log ""
+    log "TIP: the SessionStart auto-repair hook isn't installed."
+    log "     Add it once and this manual step goes away. Snippet + paste"
+    log "     instructions are in the Troubleshooting section of:"
+    log "       https://github.com/audiocontrol-org/deskwork/blob/main/plugins/deskwork/README.md"
+    log "     Or ask your agent to walk you through it."
   fi
 
   if [[ ${#ERRORS[@]} -gt 0 ]]; then
