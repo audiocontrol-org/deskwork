@@ -1233,3 +1233,22 @@ Shipped only after the manual flow in 26f is solid. Adds `permissions: id-token:
 **Issues closed in this phase:** [#55](https://github.com/audiocontrol-org/deskwork/issues/55), [#77](https://github.com/audiocontrol-org/deskwork/issues/77), [#78](https://github.com/audiocontrol-org/deskwork/issues/78), [#79](https://github.com/audiocontrol-org/deskwork/issues/79), [#80](https://github.com/audiocontrol-org/deskwork/issues/80), [#95](https://github.com/audiocontrol-org/deskwork/issues/95) (Phase 26+ ship), [#96](https://github.com/audiocontrol-org/deskwork/issues/96) (Phase 26+ ship), [#97](https://github.com/audiocontrol-org/deskwork/issues/97) (Phase 26+ ship), [#100](https://github.com/audiocontrol-org/deskwork/issues/100) (Phase 26+ ship).
 
 **Operator action:** Two commits (`f1ddcb7` + `d087fa6`) ride along in the next release. The /release UX fix is itself release-tested by the next /release run.
+
+### Phase 26+++: wildcard inter-package dep fix — v0.9.7
+
+**Deliverable:** Close [#101](https://github.com/audiocontrol-org/deskwork/issues/101). The v0.9.6 customize fix (#95) didn't deliver to adopters in the marketplace install because `@deskwork/cli` and `@deskwork/studio` declared `dependencies: { "@deskwork/core": "*" }`. Wildcard ranges let npm resolve to whatever stale `@deskwork/core` happened to be in the install tree, defeating lockstep at the resolution layer.
+
+**Implementation:**
+
+- [x] Pin `@deskwork/core` in `packages/cli/package.json` and `packages/studio/package.json` to an exact version (was `"*"`, now matches `version`).
+- [x] Extend `scripts/bump-version.ts`: rename the `plugin-shell-package-json` kind to `lockstep-package-json` and apply it to `packages/cli` and `packages/studio` so future bumps maintain the inter-package pins. Same code path that already maintains plugin-shell pins; the rename clarifies the broader scope.
+- [x] Add manifest-shape regression in `packages/cli/test/customize-skill.test.ts`: assert every `@deskwork/*` dep across `packages/cli`, `packages/studio`, `plugins/deskwork`, `plugins/deskwork-studio` is pinned to exactly `<rootVersion>`. Four parametrized assertions per release.
+- [x] Tests: `packages/cli` 149 → 153 (+4 manifest-invariant cases). 757 workspace tests pass.
+
+**Acceptance:**
+
+- [ ] v0.9.7 shipped via the five-pause `/release` flow.
+- [ ] `npm view @deskwork/cli@0.9.7 dependencies` shows `@deskwork/core` pinned to `0.9.7`. Same for `@deskwork/studio`.
+- [ ] Marketplace install dogfood post-publish: `deskwork customize . doctor calendar-uuid-missing` succeeds against a fresh adopter tree.
+
+**Issues closed in this phase:** [#101](https://github.com/audiocontrol-org/deskwork/issues/101).
