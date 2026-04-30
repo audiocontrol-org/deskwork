@@ -6,13 +6,13 @@ Open-source plugins for [Claude Code](https://claude.com/claude-code). Flagship 
 
 | Name | Status | Purpose |
 |---|---|---|
-| `deskwork` | Shipping (v0.9.6) | Editorial calendar lifecycle: capture, plan, outline, draft, review, publish |
-| `deskwork-studio` | Shipping (v0.9.6) | Optional local Hono web surface — dashboard, review pane, scrapbook, content view, manual |
-| `dw-lifecycle` | Shipping (v0.9.6) | Project lifecycle orchestration: define → setup → issues → implement → review → ship → complete. Composes `superpowers` (required) and `feature-dev` (recommended) |
+| `deskwork` | Shipping | Editorial calendar lifecycle: capture, plan, outline, draft, review, publish |
+| `deskwork-studio` | Shipping | Optional local Hono web surface — dashboard, review pane, scrapbook, content view, manual |
+| `dw-lifecycle` | Shipping | Project lifecycle orchestration: define → setup → issues → implement → review → ship → complete. Composes `superpowers` (required) and `feature-dev` (recommended) |
 | `feature-image` | Planned | Feature image generation for blog posts and pages |
 | `analytics` | Planned | Content performance analytics |
 
-Per-release notes live on the [GitHub releases page](https://github.com/audiocontrol-org/deskwork/releases).
+Current version + per-release notes live on the [GitHub releases page](https://github.com/audiocontrol-org/deskwork/releases).
 
 ### Capabilities
 
@@ -61,13 +61,13 @@ By default, third-party marketplaces don't auto-update — run those two command
 
 ### Pinning to a stable release
 
-Tagged releases (e.g. `v0.1.0`) give a stable point-in-time ref. Pin to one at install time:
+Tagged releases give a stable point-in-time ref. Pick a version from the [releases page](https://github.com/audiocontrol-org/deskwork/releases) and pin at install time:
 
 ```
-/plugin marketplace add audiocontrol-org/deskwork#v0.1.0
+/plugin marketplace add audiocontrol-org/deskwork#<tag>
 ```
 
-Releases are listed at <https://github.com/audiocontrol-org/deskwork/releases>. The release procedure is documented in [`RELEASING.md`](./RELEASING.md) for contributors.
+The release procedure is documented in [`RELEASING.md`](./RELEASING.md) for contributors.
 
 ### Migrating from earlier versions
 
