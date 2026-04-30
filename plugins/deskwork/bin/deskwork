@@ -171,10 +171,19 @@ if [ "${LOCK_STATUS}" -eq 0 ]; then
     NPM_EXIT=0
     # The plugin shell's package.json declares @deskwork/cli at the
     # pinned version. `npm install --omit=dev` reads that and fetches
-    # from the registry — no explicit pkg@version arg needed.
+    # from the registry.
+    #
+    # --workspaces=false: when the plugin tree is sparse-cloned from a
+    # workspaces-declaring monorepo (the marketplace install shape;
+    # cone-mode includes the workspace-root package.json), npm would
+    # otherwise walk up, treat this as a workspace install, and hoist
+    # node_modules/ to the workspace root — leaving
+    # ${PLUGIN_ROOT}/node_modules/.bin/deskwork empty. Disabling
+    # workspaces forces install into the plugin's own node_modules/.
     (
       cd "${PLUGIN_ROOT}"
-      npm install --omit=dev --no-audit --no-fund --loglevel=error
+      npm install --omit=dev --workspaces=false \
+        --no-audit --no-fund --loglevel=error
     ) 2>"${NPM_STDERR}" || NPM_EXIT=$?
     if [ "${NPM_EXIT}" -ne 0 ]; then
       echo "${BIN_NAME}: npm install failed (exit ${NPM_EXIT}). Captured stderr:" >&2
