@@ -7,7 +7,7 @@ description: Copy a deskwork plugin default (a studio template page renderer or 
 
 `deskwork customize` copies one of the plugin's built-in default files into the project at `<projectRoot>/.deskwork/<category>/<name>.ts`. After the copy, edit the file to change behavior. The plugin reads the override on the next request (studio templates) or the next audit/repair run (doctor rules) — no plugin fork or rebuild required.
 
-This is the customization layer added in Phase 23f. Operators get a clean way to tweak a single template or rule without forking the plugin and shipping their own marketplace entry.
+This is the customization layer for studio templates and doctor rules. Operators get a clean way to tweak a single template or rule without forking the plugin and shipping their own marketplace entry.
 
 ### Categories
 

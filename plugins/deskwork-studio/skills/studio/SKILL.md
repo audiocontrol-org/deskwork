@@ -59,11 +59,11 @@ deskwork-studio --host 0.0.0.0                # all interfaces (LAN + Wi-Fi + Ta
 deskwork-studio --host 100.64.0.5             # bind to a specific Tailscale IP only
 ```
 
-The wrapper resolves the studio binary in this order:
+The wrapper resolves the studio binary in this order (npm-published architecture; v0.9.5+):
 
-1. Workspace-linked binary at `node_modules/.bin/deskwork-studio` (dev path; runs source via tsx, supports edits without rebuild)
-2. First-run install: when the marketplace install copy of the plugin tree has no `node_modules/`, the wrapper runs `npm install --omit=dev` once and execs the freshly-linked source bin via tsx (Phase 23 source-shipped re-architecture — no committed bundle)
-3. Loud error pointing at `npm install`
+1. **Workspace symlink (dev path).** When the plugin lives inside the deskwork monorepo, `node_modules/@deskwork/studio` is a workspace symlink into `packages/studio/`. The wrapper detects the symlink and dispatches via `node_modules/.bin/deskwork-studio` directly. No install. (Walks up from the plugin root to find the workspace `node_modules/`.)
+2. **Already installed at the pinned version.** When `<pluginRoot>/node_modules/@deskwork/studio/package.json` version === plugin manifest version (`<pluginRoot>/.claude-plugin/plugin.json#version`) and `<pluginRoot>/node_modules/.bin/deskwork-studio` is executable, dispatch directly. (Warm-cache path.)
+3. **First-run / version-drift install.** Run `npm install --omit=dev --workspaces=false @deskwork/studio@<plugin-manifest-version>` against the public npm registry, scoped to `<pluginRoot>` (the `--workspaces=false` flag prevents npm from walking up and treating the plugin as a workspace member). Concurrent invocations are serialized by a directory-based lock (`<pluginRoot>/.deskwork-install.lock`; `mkdir` is atomic on POSIX, macOS-portable). After install, dispatch via `<pluginRoot>/node_modules/.bin/deskwork-studio`.
 
 The server logs (loopback only — when Tailscale isn't running or `--no-tailscale` is passed):
 
