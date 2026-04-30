@@ -259,6 +259,31 @@ Local-dev installs hit path 1. Marketplace-install users hit path 3 once, then p
 
 Tracks the default branch of `audiocontrol-org/deskwork`. To pull the latest, run `/plugin marketplace update deskwork && /reload-plugins`. To pin to a stable release, install the marketplace with a tag: `/plugin marketplace add audiocontrol-org/deskwork#v0.1.0`. See the [root README](../../README.md#getting-updates) for the full update story.
 
+### Troubleshooting: bin not on PATH after install ([#89](https://github.com/audiocontrol-org/deskwork/issues/89))
+
+If `command -v deskwork` returns empty after `/plugin install deskwork@deskwork && /reload-plugins`, your local `~/.claude/plugins/installed_plugins.json` has accumulated stale entries pointing at cache directories that no longer exist on disk. Claude Code wires PATH from these entries; when the registered installPath is missing, the bin is unreachable even though the marketplace clone at `~/.claude/plugins/marketplaces/deskwork/plugins/deskwork/` is intact.
+
+This is a Claude Code bug (registry hygiene), not a deskwork bug. While it gets fixed upstream, deskwork ships a recovery command that runs without depending on PATH:
+
+```bash
+~/.claude/plugins/marketplaces/deskwork/plugins/deskwork/bin/deskwork repair-install
+```
+
+The command reads `~/.claude/plugins/installed_plugins.json`, identifies entries for `deskwork@deskwork`, `deskwork-studio@deskwork`, `dw-lifecycle@deskwork` whose `installPath` doesn't exist on disk, and prunes them. It reports which plugins now have no live entry so you know what to re-install.
+
+After running it, re-install in Claude Code:
+
+```
+/plugin install deskwork@deskwork
+/plugin install deskwork-studio@deskwork    # if you use the studio
+/plugin install dw-lifecycle@deskwork       # if you use dw-lifecycle
+/reload-plugins
+```
+
+Then verify: `command -v deskwork` should print the bin path.
+
+Pass `--dry-run` to see what would be pruned without writing the file. Pass `--json` for machine-readable output.
+
 ### License
 
 GPL-3.0-or-later. See the monorepo `LICENSE`.

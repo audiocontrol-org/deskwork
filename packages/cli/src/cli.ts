@@ -30,6 +30,7 @@ const SUBCOMMANDS: Record<string, () => Promise<{ run: (argv: string[]) => Promi
   pause: () => import('./commands/pause.ts'),
   plan: () => import('./commands/plan.ts'),
   publish: () => import('./commands/publish.ts'),
+  'repair-install': () => import('./commands/repair-install.ts'),
   resume: () => import('./commands/resume.ts'),
   'review-cancel': () => import('./commands/review-cancel.ts'),
   'review-help': () => import('./commands/review-help.ts'),
@@ -89,7 +90,8 @@ function printUsage(): void {
   out.write('  resume          restore a Paused entry to its prior stage\n\n');
   out.write('Maintenance:\n');
   out.write('  doctor          audit/repair binding metadata\n');
-  out.write('  customize       copy a plugin default into .deskwork/<category>/<name>.ts\n\n');
+  out.write('  customize       copy a plugin default into .deskwork/<category>/<name>.ts\n');
+  out.write('  repair-install  prune stale entries from Claude Code\'s plugin registry (#89)\n\n');
   out.write('Review loop:\n');
   out.write('  review-start    enqueue a longform draft for review\n');
   out.write('  shortform-start enqueue a shortform draft for review\n');
