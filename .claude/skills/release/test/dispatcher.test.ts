@@ -65,4 +65,16 @@ describe('CLI dispatcher', () => {
     expect(r.status).toBe(2);
     expect(r.stderr).toMatch(/unknown subcommand/i);
   });
+
+  it('assert-not-published: missing version arg exits 2 with usage', () => {
+    const r = runHelper(['assert-not-published']);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/usage: assert-not-published/i);
+  });
+
+  it('assert-published: missing version arg exits 2 with usage', () => {
+    const r = runHelper(['assert-published']);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toMatch(/usage: assert-published/i);
+  });
 });

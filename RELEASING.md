@@ -10,7 +10,7 @@ The skill walks five operator decision points:
 
 1. **Precondition + version** — clean tree, FF over origin/main, branch up-to-date. Operator types the new version; skill validates it as strictly greater than the last tag.
 2. **Post-bump diff review** — operator confirms the manifest bump diff before commit.
-3. **Publish to npm** — skill verifies `@deskwork/{core,cli,studio}@<version>` are NOT yet published (catches "version already published" before any OTPs); operator confirms; `make publish` runs (one 2FA OTP per package, three total).
+3. **Publish to npm** — skill verifies `@deskwork/{core,cli,studio}@<version>` are NOT yet published (catches "version already published" before any OTPs); operator runs `make publish` **in their own terminal** (the agent's Bash tool can't accept interactive 2FA OTPs); operator confirms when done; skill verifies all three are now on the registry before continuing.
 4. **Smoke + tag message** — `scripts/smoke-marketplace.sh` runs as a hard gate against the just-published packages; on pass, operator confirms the tag message.
 5. **Final push confirmation** — skill prints the exact push command + what it will do; operator confirms; skill atomic-pushes commit + branch + tag in one `git push --follow-tags` RPC.
 
@@ -48,7 +48,13 @@ Plugin runtime code ships as published npm packages under the `@deskwork/*` scop
 
 The plugin shell's `plugin.json` `version` field is kept in lockstep with the published npm package version. `scripts/bump-version.ts` bumps both atomically, plus the per-plugin shell `package.json#dependencies` pin (e.g. `"@deskwork/cli": "0.9.5"`), so the entire repo moves to the same version in one commit.
 
-**Publish path (driven by `/release`, runs in the operator's terminal):** the publish step is the third pause of the `/release` flow. The skill verifies the version is not yet on npm (`assert-not-published`), then runs `make publish` — which sources an npm token from `~/.config/deskwork/npm-credentials.txt` and writes an ephemeral `.npmrc` per `npm publish` invocation. The OTP prompts are interactive — the operator types one 2FA OTP per package (three total). Publish happens BEFORE the smoke gate, so smoke can `npm install` against the freshly-published packages.
+**Publish path (driven by `/release`, executed in the operator's terminal):** the publish step is the third pause of the `/release` flow.
+
+1. The skill verifies the version is not yet on npm (`assert-not-published`).
+2. The skill prints clear instructions and **the operator runs `make publish` in their own terminal**. The agent's Bash tool can't accept interactive stdin (2FA OTP prompts) — running it from the agent context would hang. `make publish` sources an npm token from `~/.config/deskwork/npm-credentials.txt`, writes an ephemeral `.npmrc` per `npm publish`, and prompts for one 2FA OTP per package (three total).
+3. When all three packages are published, the operator confirms in chat ("done") and the skill runs `assert-published` to verify the registry actually has all three. Only then does it proceed to the smoke gate.
+
+Publish happens BEFORE the smoke gate, so smoke can `npm install` against the freshly-published packages.
 
 **Adopter install:** Claude Code clones the plugin's `git-subdir` source into the operator's plugin cache. On first invocation, the bin shim (`plugins/<plugin>/bin/<bin>`) runs `npm install --omit=dev` inside the plugin tree, which fetches `@deskwork/<pkg>@<pinned-version>` from the public registry into `<pluginRoot>/node_modules/`. Subsequent invocations skip that step. Plugin updates (via `/plugin marketplace update`) ship a new plugin shell with a bumped `plugin.json` version; the bin shim's version-drift check triggers a re-install on next invocation.
 
@@ -58,7 +64,7 @@ The vendor-materialization mechanism that this replaces (Phase 23b–23g, v0.5.0
 
 Each release has two surfaces:
 
-1. **`@deskwork/{core,cli,studio}@<version>` on npm** — published via the `make publish` step inside `/release` (Pause 3) from the operator's terminal. This is the primary artifact; the plugin shells fetch this at adopter first-run.
+1. **`@deskwork/{core,cli,studio}@<version>` on npm** — published via `make publish`, run by the operator in their own terminal during Pause 3 of `/release`. This is the primary artifact; the plugin shells fetch this at adopter first-run.
 2. **A git tag on `main`** (e.g. `v0.9.5`). The tag triggers `.github/workflows/release.yml`, which validates `marketplace.json` plugin paths and creates a GitHub release with auto-generated notes from commits since the previous tag. The marketplace's `git-subdir` sources resolve to the default branch (no per-tag `source.ref` pin), so an operator running `/plugin marketplace update deskwork` after the release picks up the new shell.
 
 ### Operator update path
