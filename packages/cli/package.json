@@ -1,6 +1,6 @@
 {
   "name": "@deskwork/cli",
-  "version": "0.9.5",
+  "version": "0.9.6",
   "type": "module",
   "description": "Editorial calendar + review CLI for the deskwork plugin",
   "homepage": "https://github.com/audiocontrol-org/deskwork#readme",
