@@ -4,6 +4,94 @@ Session journal for `deskwork`. Each entry records what was tried, what worked, 
 
 ---
 
+## 2026-04-30 (cont'd 3): Phase 29 framing → deskwork pipeline redesign brainstorm + spec + plan
+
+### Feature: deskwork-plugin
+### Worktree: deskwork-plugin
+
+**Goal:** Pick up from prior session's hand-off (verify #131/#125/#132 + tackle dw-lifecycle bug cluster). Operator redirected to design Phase 29 (post-release acceptance playbook) using the deskwork pipeline itself. Mid-session, the deskwork-plugin PRD review cycle surfaced an architectural-level friction: calendar stage and review workflow state are decoupled, with the dashboard hiding truth and the `Review` calendar stage unreachable. Pivoted into a comprehensive redesign of the deskwork pipeline.
+
+**Accomplished:**
+
+- **Phase 29 design v1 → v2 → applied via deskwork pipeline.** Iterated `post-release-acceptance-design` to address two operator margin notes (both flagged this whole feature as stop-gap pending dw-lifecycle migration). v2 added a "Stop-gap status — migrates into dw-lifecycle when ready" section binding on schema/file-path choices. Both comments addressed; workflow `970aa75d` → `applied`.
+
+- **`/dw-lifecycle:extend` hand-driven against the deskwork-plugin feature.** Bootstrapped `.dw-lifecycle/config.json` from `feature/deskwork-dw-lifecycle` (the canonical config with `knownVersions: ["1.0"]`). The local `dw-lifecycle install` probe wrote `knownVersions: []` despite `docs/1.0/` existing on disk — confirms bug [#120](https://github.com/audiocontrol-org/deskwork/issues/120). Used the canonical config from the sibling branch instead.
+
+- **Phase 29 added to deskwork-plugin feature** in `workplan.md` (sub-phases A–G, 20 tasks), `prd.md` (new "Extension: post-release customer acceptance playbook (Phase 29)" section with stop-gap framing), and `README.md` (phase status table row). Filed [#133](https://github.com/audiocontrol-org/deskwork/issues/133) as parent issue. Commit `fb3c108`.
+
+- **deskwork-plugin PRD itself ran through deskwork's review pipeline.** Workflow `57b2e635` enqueued at v1; operator clicked Approve in the studio; agent ran `deskwork approve` → `applied`. The "PRD-edit step always re-iterates via deskwork" project-internal rule satisfied for Phase 29. Commit `2317a60`.
+
+- **Architectural problem surfaced through dashboard observation.** Operator: *"Why is the PRD still in Drafting?"* — three previously-`applied` workflows on this calendar all showed Drafting on the dashboard, identical to never-reviewed entries. The `Review` calendar stage exists in the dashboard but no CLI verb writes to it; `Paused` is a process not a stage. Operator: *"There's an explicit 'review' and an explicit 'paused' state. That seems wrong."* — proposed the clean linear-pipeline model: Ideas → Planned → Outlining → Drafting → Final → Published, with approve-as-graduation, Final mutable until Published.
+
+- **Brainstormed comprehensive redesign through `superpowers:brainstorming` skill.** Nine architectural decisions converged with operator picking ABC options each time:
+  - Migration: A (in-place via `doctor`, breaking changes acceptable since this project + audiocontrol.org are the only adopters)
+  - Workflow shape: C (entry-centric for linear pipeline; shortform stays on workflow-object model, deferred)
+  - Source of truth: C (calendar.md scannable index + per-entry JSON sidecars at `.deskwork/entries/<uuid>.json`; doctor reconciles)
+  - Iterate semantics: universal (every stage has a markdown artifact; iterate works the same way at every stage)
+  - CLI surface: keep `iterate` only (multi-write transactional); rest is skill-prose + doctor
+  - LLM-as-judge: sub-agent dispatch from SKILL via Claude Code's Agent tool with configurable model (Haiku 4.5 default)
+- **10 sub-decisions resolved** with default recommendations (S1–D2) — scaffolding behavior, hand-edit divergence, verb defaults, migration edges, vocabulary.
+
+- **Wrote design spec** at [`docs/superpowers/specs/2026-04-30-deskwork-pipeline-redesign-design.md`](docs/superpowers/specs/2026-04-30-deskwork-pipeline-redesign-design.md) (654 lines, 26 sections). Self-review pass: no placeholders, schema definitions consistent, scope focused, eight-stage list consistent throughout. Commit `5687404`.
+
+- **Wrote implementation plan** at [`docs/superpowers/plans/2026-04-30-deskwork-pipeline-redesign.md`](docs/superpowers/plans/2026-04-30-deskwork-pipeline-redesign.md) (3535 lines, 42 TDD-shaped tasks across 7 phases). Each phase reaches a stable checkpoint. Commit `88b1bf3`.
+
+**Didn't Work:**
+
+- **Initial LLM-as-judge architecture was wrong.** Designed it as direct Anthropic API SDK calls with token economics + prompt caching. Operator: *"We won't be using token-based pricing for anything... I meant the skill should be invoked inside claude code with a specific model configured."* Rewrote Section 6 of the spec to use Agent tool sub-agent dispatch from within the SKILL prose; helper stays pure (no API keys, no token math); operator's existing Claude Code subscription pays. Cleaner architecture overall.
+
+- **Hand-driven `/dw-lifecycle:extend` without project bootstrap.** Started executing the SKILL prose by hand even though `.dw-lifecycle/config.json` didn't exist locally. Operator: *"I *definitely* want to use the dw-lifecycle plugin."* Pivoted to bootstrap (`dw-lifecycle install`); discovered bug #120 (knownVersions: []); fixed by sourcing canonical config from `feature/deskwork-dw-lifecycle`. Then later operator reversed: *"Let's NOT use the deskwork plugins at all of this process"* for the redesign work specifically. Both directives correct in their respective scopes — first one was about Phase 29 work (use dw-lifecycle), second was about the redesign work (don't use any deskwork plugins to redesign deskwork).
+
+- **Redundant `--site deskwork-internal` flag on every `/deskwork:*` invocation.** Operator: *"Why do we need to specify a site?"* The config has `defaultSite: "deskwork-internal"`; flag is unnecessary. Stopped passing it.
+
+- **Initial brainstorm jumped to migration question (Q1) before the architectural model was pinned.** Operator subtly redirected by responding to migration with a process-level constraint about review-surface preservation rather than answering A/B/C. Read the signal; backed up to confirm the spine before returning to migration mechanics.
+
+**Course Corrections:**
+
+- **[FABRICATION] LLM-as-judge architected as Anthropic API SDK calls.** Reasoning was based on assumed token-based pricing model. Operator corrected: use Claude Code's Agent tool for sub-agent dispatch with configurable model. Cost ledger is operator's existing Claude Code subscription, not per-token API billing. Rewrote spec Section 6.
+
+- **[PROCESS] Verbosity bias on CLI flags.** I had been passing `--site deskwork-internal` everywhere because the SKILL prose for `/deskwork:review-start`, `/deskwork:iterate`, `/deskwork:approve` shows `--site` in usage examples. The operator's `defaultSite` config makes it unnecessary. Discipline: when SKILL examples show flags, check whether the config makes them optional before reflexively including them.
+
+- **[PROCESS] Hand-driven dw-lifecycle:extend without bootstrap.** SKILL prose mentions `dw-lifecycle setup` and `dw-lifecycle transition` helpers — but those require `.dw-lifecycle/config.json` to exist. I started running the SKILL prose by hand without checking the prerequisite. Operator's *"I *definitely* want to use the dw-lifecycle plugin"* meant: actually invoke the plugin, don't just paraphrase its prose. Bootstrap first.
+
+- **[COMPLEXITY] Brainstorm priority order.** I led with the migration question (process detail) before the architectural spine (the model itself) was confirmed. Migration is a real concern but follows from the model, not the other way around. Right order: pin the model first, then derive migration. Worth remembering for future brainstorms — present big-rocks before tactical choices.
+
+**Quantitative:**
+
+- Messages from user: ~40 (sustained brainstorming + mid-session pivots)
+- Commits to feature branch this session: 5 (`b1f1815` design v2 + `fb3c108` Phase 29 docs + `2317a60` PRD review-applied journal + `5687404` redesign spec + `88b1bf3` redesign plan)
+- GitHub issues filed: 1 ([#133](https://github.com/audiocontrol-org/deskwork/issues/133) — Phase 29 parent)
+- GitHub issues closed: 0
+- Sub-agent dispatches: 0 (writing-plans loaded inline)
+- Spec lines written: 654
+- Plan lines written: 3535
+- Tasks in implementation plan: 42 (across 7 phases)
+- Course corrections: 4 (1 [FABRICATION], 2 [PROCESS], 1 [COMPLEXITY])
+- New agent-discipline rules added: 0 (existing rules covered the corrections)
+- Files migrated to new schema: 0 (the redesign isn't implemented yet — this session designed it)
+
+**Insights:**
+
+- **Architectural friction surfaces through dashboard observation, not source audit.** The calendar-stage/workflow-state decoupling is documented behavior — anyone reading the deskwork CLI source could have figured it out. But the friction only became visible when looking at the dashboard during a real review cycle and noticing that approved-and-applied workflows don't move the calendar stage. *"Why is the PRD still in Drafting?"* — that single observation produced 4000+ lines of design + plan output. The recursive-dogfood pattern from prior sessions remains the highest-yield bug-finding mechanism this project has.
+
+- **"We are the only customer; breaking changes acceptable" is a substantial unblocker.** Removed deprecation runways, dual-mode runtimes, URL-redirect tax — every accepted breaking-change shape simplified the design. Pre-1.0 maturity stance pays off most when honored explicitly. The redesign's migration is one `deskwork doctor --repair` invocation; that wouldn't have been possible if compatibility were a constraint.
+
+- **"Don't use deskwork plugins for the redesign work itself" is the right discipline.** The earlier post-release-acceptance-design recursive-dogfood (which surfaced #131) showed the upside of running the plugin against its own design work. But for foundational rearchitecture — where the tool we use to review IS what we're redesigning — that same recursive coupling becomes a risk vector. Operator's directive to skip deskwork plugins for the redesign is the right circuit-breaker. Plain markdown + git diff + chat-iteration is honest tooling that won't break mid-redesign.
+
+- **Sub-agent dispatch as the LLM-as-judge architecture is cleaner than direct SDK calls.** Helper stays pure (no API keys, no token budgets, no SDK plumbing). Skill-side orchestrates the dispatch with configurable model. Operator's existing Claude Code subscription pays. Failure modes (API down, malformed response) handled gracefully without breaking helper-side doctor's invariants. The operator's correction simplified the design substantially.
+
+- **The Phase 29 "stop-gap" framing now has its destination.** When dw-lifecycle ships customizable lifecycle stages, the `/release` + `/post-release:*` family migrates into dw-lifecycle's customizable-workflow surface. The redesign of the deskwork pipeline itself is the foundation that both Phase 29 (which we shelved as stop-gap) and dw-lifecycle's eventual customizable-workflow capability depend on. Order of operations: redesign deskwork → ship dw-lifecycle customizable workflows → migrate `/release` + `/post-release:*` into dw-lifecycle. Phase 29's stop-gap status is binding on schema choices precisely because of this future migration.
+
+**Next session:**
+
+- **Decide implementation strategy** for the redesign plan (subagent-driven vs inline). Plan structure (7 phases with stable checkpoints) supports either; subagent-driven is recommended for a 42-task plan to keep each subagent's context narrow.
+- **Or fold dw-lifecycle bug cluster** (#126–#130 + #120) into the redesign's Phase 1 scope, since dw-lifecycle inherits the new model anyway. Some of the cluster bugs may dissolve in the new architecture (e.g., #120 knownVersions might just be a config-bootstrap edge case in the new shape).
+- **Or pause the redesign** and return to verify #131 + #125 + #132 on a fresh session before starting any major implementation arc.
+- **Audiocontrol.org calendar dry-run** is a Phase 7 task (Task 40) — could be done earlier as a sanity check on the migration design.
+- **Watch [anthropics/claude-code#54905](https://github.com/anthropics/claude-code/issues/54905)** for the upstream registry-hygiene fix — once that lands, `repair-install.sh` becomes a backstop rather than primary recovery.
+
+---
+
 ## 2026-04-30 (cont'd 2): review #132 → ship hint-not-install fix as v0.10.2
 
 ### Feature: deskwork-plugin

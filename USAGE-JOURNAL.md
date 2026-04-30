@@ -1046,3 +1046,104 @@ Two findings in one operator turn:
 **Should something have been exercised?** Not in this session. The fix is a CLI-output hint with no editorial-pipeline surface area. The natural next-step exercise — the operator's promised fresh-session walk to verify #131 + #125 + (now) #132 — happens in a future session, not this one. Skipping the journal entry here is honest; the prior session's recursive dogfood (which surfaced #132 in the first place) is the relevant data point.
 
 **Insight worth keeping:** issues filed from one session's plugin exercise feed the next session's tooling/release work. The dogfood signal compounds across the boundary — the prior session ran the plugin, hit the friction, filed the issue; this session shipped the response. The journal captures both halves cleanly when each session is honest about which kind it was.
+
+---
+
+## 2026-04-30: Phase 29 round-trip + the dashboard observation that surfaced an architectural-level redesign
+
+**Session shape:** exercised deskwork's review pipeline twice (post-release-acceptance-design iteration v1→v2→applied; deskwork-plugin PRD review-start→approved→applied) plus dw-lifecycle's `extend` skill (hand-driven). Mid-session, dashboard observation produced an architectural-level finding that pivoted the rest of the session into a comprehensive deskwork pipeline redesign.
+
+**Surface exercised:** `/deskwork:iterate`, `/deskwork:approve`, `deskwork review-help`, `deskwork ingest`, `deskwork-studio` (`/dev/editorial-studio` dashboard + `/dev/editorial-review/<workflow-id>`), `/dw-lifecycle:extend` (hand-driven from SKILL prose), `dw-lifecycle install` helper, `scripts/repair-install.sh`.
+
+### Setup phase
+
+#### 1. SessionStart hook fired correctly on cache eviction
+
+**fix.** Session opened with `deskwork-studio` not on PATH (cache-eviction symptom from #131). Ran `bash ~/.claude/plugins/marketplaces/deskwork/scripts/repair-install.sh` → restored cache subtrees for all six plugin-version pairs in seconds. Studio booted on retry. The v0.10.2 hint also fired correctly: *"TIP: the SessionStart auto-repair hook isn't installed."* Exactly the cadence intended — visible at the moment the operator hits the symptom; self-erasing once the hook is configured.
+
+**insight.** Two-session dogfood for #131: prior session shipped the fix; this session is the first session that hit the cache-eviction symptom organically and the auto-repair worked. Customer-acceptance-style validation of the v0.10.1 fix happened naturally without explicit setup. The v0.10.2 hint is doing its job — the operator doesn't have it installed yet, the hint reminded them to install it, both on the same trigger.
+
+### Phase 29 review cycle
+
+#### 2. Review surface UX is solid
+
+**insight.** Operator quote: *"The review surface, though, seems to work well."* Margin notes, `Save` / `Iterate` / `Approve` / `Reject` buttons, two-key destructive shortcuts, manual-copy fallback panels — everything cooperated. v1 → v2 cycle on `post-release-acceptance-design` ran cleanly: agent rewrote the file to address both operator margin comments (both "stop-gap pending dw-lifecycle migration" framing); agent ran `/deskwork:iterate` which appended v2 to journal; workflow flipped back to `in-review`; operator clicked Approve in studio; agent ran `/deskwork:approve` → `applied`. Whole cycle felt tight.
+
+#### 3. Bug #84 still lingers (no documented agent path for "read pending comments")
+
+**friction.** When `/deskwork:iterate` was about to fire, agent had to read pending comments from disk by grepping `.deskwork/review-journal/history/*-annotation-*.json` directly because no documented agent affordance for "list pending comments for workflow N." Operator agreed this is friction — bug [#84](https://github.com/audiocontrol-org/deskwork/issues/84) catalogues it.
+
+**didn't break this session, but it's lossy.** Agents working on iterate don't have a clean read-the-comments verb. Workaround works but is non-obvious for fresh agents.
+
+### `/dw-lifecycle:extend` hand-driven (no helper available)
+
+#### 4. The dw-lifecycle bug cluster bites — agent had to hand-drive the extend skill
+
+**friction.** Operator wanted `/dw-lifecycle:extend` to add Phase 29 to the deskwork-plugin feature. Project hadn't been bootstrapped for dw-lifecycle (`.dw-lifecycle/config.json` missing); `dw-lifecycle` CLI not on PATH this session.
+
+**fix.** Used absolute cache-bin path (`~/.claude/plugins/cache/deskwork/dw-lifecycle/0.10.2/bin/dw-lifecycle`) to bootstrap config, then ran the SKILL prose by hand (Edit/Write tools) for the actual extend operation. Worked but was tedious.
+
+**friction (within fix):** `dw-lifecycle install` probe wrote `knownVersions: []` despite `docs/1.0/` existing on disk. Confirms bug [#120](https://github.com/audiocontrol-org/deskwork/issues/120) (filed in this morning's session). Workaround: sourced canonical `.dw-lifecycle/config.json` from `feature/deskwork-dw-lifecycle` branch (which had it manually corrected to `knownVersions: ["1.0"]`).
+
+**insight.** Operator: *"both branches are using the dw-lifecycle plugin, so they both need to share the config."* Two branches needed identical config; using the canonical from one as the source-of-truth for both is the right discipline. The bug means new adopters using `dw-lifecycle install` against existing project trees get a half-broken config; documenting the workaround in MIGRATING.md or fixing the probe will be needed before dw-lifecycle ships for general use.
+
+### deskwork-plugin PRD review cycle (the second exercise)
+
+#### 5. `deskwork review-start` slug-resolution required hierarchical slug
+
+**friction.** First attempt to `deskwork review-start deskwork-plugin` failed with *"No blog markdown at /Users/orion/work/deskwork-work/deskwork-plugin/docs/deskwork-plugin/index.md."* The PRD lives at `docs/1.0/001-IN-PROGRESS/deskwork-plugin/prd.md` (feature-doc convention, not editorial-content convention).
+
+**fix.** Passing the hierarchical slug `deskwork-plugin/prd` worked. Workflow `57b2e635` enqueued at v1.
+
+**insight.** The deskwork CLI's slug-to-path mapping for `review-start` doesn't gracefully handle feature-doc paths. Worth surfacing as a friction item — the file is bound to the calendar by `deskwork.id` UUID (the Phase 22++++ binding fix), so the CLI HAS the entry, but slug-resolution falls back to path-derivation. The redesign's UUID-keyed entry resolution should fix this.
+
+#### 6. Why `--site` everywhere?
+
+**friction (self-correction).** I had been passing `--site deskwork-internal` to every `/deskwork:*` invocation throughout the session. Operator: *"Why do we need to specify a site?"* Config has `defaultSite: "deskwork-internal"`; flag is unnecessary.
+
+**fix.** Stopped passing it. Skill prose for `/deskwork:iterate`, `/deskwork:approve`, etc. shows `--site` in usage examples — that prose drove the verbosity. The skill prose should mark `--site` as optional when default is configured.
+
+**insight.** Documentation default-value gaps surface as agent verbosity. The SKILL examples are the agent's primary reference; if they show every flag verbatim, the agent reflexively passes them all. Worth a discipline pass on SKILL prose to mark which flags are config-defaultable.
+
+### Dashboard observation that tipped the session
+
+#### 7. The PRD is still in Drafting after `applied` (the architectural finding)
+
+**friction.** After `deskwork approve deskwork-plugin/prd` → `applied`, operator opened the dashboard and asked: *"Why is the PRD still in Drafting?"* Three previously-applied workflows on this calendar (`deskwork-plugin/prd`, `source-shipped-deskwork-plan`, `release-skill-design`) all rendered as Drafting on the dashboard, identical to never-reviewed entries. The post-release-acceptance-design (just-approved through deskwork) sat in **Ideas** — even worse.
+
+**insight.** Calendar stage and review-workflow state are independent. `approve` transitions only the workflow state to `applied`; it does NOT advance the calendar stage. This is by design (per the CLI Lifecycle / Review-loop split) but the dashboard hides the truth — there's no visual indicator that an entry has been through a full review cycle. Adopters seeing this conclude the entry "isn't published yet" but there's no path to publish a PRD anyway. The `Review` calendar stage exists in the dashboard but no CLI verb writes to it.
+
+**this is the most consequential finding this journal has logged.** The architectural friction here drove ~3.5 hours of brainstorming + a 654-line spec + a 3535-line implementation plan. The redesign collapses the two state machines into one entry-centric model where approve IS graduation; eliminates the `Review` and `Paused` vestigial stages; introduces `Final` (mutable) + `Blocked` + `Cancelled`.
+
+#### 8. Operator's correction on the "approve = workflow-only" architecture
+
+**operator quote:** *"Reviewing and pausing are not workflow states, they are processes that can happen at any part of the workflow. So, the actual workflow stages are: ideas -> planned -> outlining -> drafting -> final -> published; Any number of review/edit/iterate cycles can happen to a document at any stage of that workflow. BUT, 'approving' a document signifies the terminal state of that workflow and REQUIRES that the document be moved to the next stage in the workflow."*
+
+This single message reframed the entire deskwork pipeline. Approve became universal stage-graduation. Final introduced as mutable-but-publication-ready label. Blocked replaces Paused (Pause is a subset of Blocked semantically — *"It's blocked because I don't want to think about it right now"*). Published is the only frozen stage.
+
+### Skill-prose process discoveries
+
+#### 9. Operator's "agent-as-user" thesis bears out again on the redesign work
+
+**insight.** Operator: *"We will only use the deskwork review surface for this project, since the deskwork pipeline is what we're rearchitecting. The review surface, though, seems to work well."* Then later: *"Let's NOT use the deskwork plugins at all of this process. We are the only customers at the moment, so we can and should make breaking changes."*
+
+The constraint matters. For Phase 29, using deskwork to review the design surfaced friction (#84 the agent-comment-read gap, #117 dashboard badge styling, the hierarchical-slug issue above). For the deskwork pipeline redesign itself, using deskwork would be recursive — running broken-or-being-rearchitected tools on the foundational redesign. Plain markdown + git diff + chat-based iteration is the right tooling for tearing-down-and-rebuilding the foundation.
+
+**fix.** Followed the operator's redirection. The redesign spec + plan are plain markdown; the next implementation arc will be subagent-driven against the plan.
+
+### Quantitative
+
+- Workflows enqueued: 1 new (`57b2e635` for deskwork-plugin/prd) + 1 iterated to applied (`970aa75d` for post-release-acceptance-design v1→v2)
+- `/deskwork:iterate` invocations: 1 (post-release-acceptance-design v2 with dispositions)
+- `/deskwork:approve` invocations: 2 (post-release-acceptance-design + deskwork-plugin/prd)
+- Studio surface visited: `/dev/editorial-studio` (multiple times — the dashboard observation pivoted the session), `/dev/editorial-review/970aa75d-...`, `/dev/editorial-review/57b2e635-...`
+- Friction items captured: 6 ([#84](https://github.com/audiocontrol-org/deskwork/issues/84) lingering; [#120](https://github.com/audiocontrol-org/deskwork/issues/120) confirmed; the hierarchical-slug review-start issue; the `--site` verbosity SKILL-prose gap; the dashboard architectural-finding which drove the redesign; the single-customer breaking-changes-OK clarification on migration)
+- Issues filed: 1 ([#133](https://github.com/audiocontrol-org/deskwork/issues/133) Phase 29 parent)
+- Architectural-level findings: 1 (the calendar-stage / workflow-state decoupling — drove a comprehensive redesign; spec + plan committed in this session)
+
+### Insights summary
+
+- **Agent-as-user dogfood remains the highest-yield bug-finding mechanism.** The architectural-level finding that drove the redesign came from looking at the dashboard during a real review cycle — not from auditing source. The single observation *"Why is the PRD still in Drafting?"* produced 4000+ lines of design + plan output.
+- **The recursive coupling has limits.** Using deskwork to review a deskwork redesign is a category error. Plain markdown is the honest tooling for foundational rearchitecture work.
+- **Operator's `defaultSite` config + SKILL prose drift.** Skill examples show flags that the config makes optional; the agent reflexively includes them. Worth a SKILL-prose-pass to mark config-defaultable flags.
+- **The two-session dogfood pattern keeps validating.** Prior session shipped #131 + #132 fixes; this session hit the symptoms organically, both fixes worked. The repair-install.sh + the v0.10.2 hint are doing their jobs.

@@ -1433,6 +1433,64 @@ Shipped. Issue [#132](https://github.com/audiocontrol-org/deskwork/issues/132) �
 
 **GitHub tracking:** Parent issue [#133](https://github.com/audiocontrol-org/deskwork/issues/133). Sub-phase issues filed as work progresses if scope warrants — small phases stay as one issue per the project's existing per-phase-one-issue convention.
 
+**Phase 30 dependency:** Phase 29 implementation is likely deferred behind Phase 30 (deskwork pipeline redesign — see below). The new entry-centric model becomes the foundation Phase 29 will eventually build on; designing `/post-release:walk` + `/post-release:file-issues` against a CLI/calendar/dashboard surface that's about to change substantially would be wasted work. Operator decision pending.
+
+---
+
+### Phase 30: deskwork pipeline redesign — entry-centric calendar with universal verbs
+
+**Deliverable:** Foundational rearchitecture of the deskwork pipeline. Calendar stage and review-workflow state collapse into one entry-centric state machine. Eight stages (Ideas → Planned → Outlining → Drafting → Final → Published linear pipeline; Blocked + Cancelled off-pipeline). Universal `iterate` and `approve` verbs. Per-entry JSON sidecars at `.deskwork/entries/<uuid>.json` as source-of-truth; calendar.md becomes a regenerated scannable index. `iterate` retained as the only multi-write CLI helper; all other verbs are skill-prose + doctor. LLM-as-judge sub-agent dispatch from `/deskwork:doctor`. Migration via `deskwork doctor --repair` (one-shot; breaking changes acceptable). Major release.
+
+**Source-of-truth:**
+- Spec: [`docs/superpowers/specs/2026-04-30-deskwork-pipeline-redesign-design.md`](../../../superpowers/specs/2026-04-30-deskwork-pipeline-redesign-design.md) (654 lines, 26 sections; written 2026-04-30)
+- Plan: [`docs/superpowers/plans/2026-04-30-deskwork-pipeline-redesign.md`](../../../superpowers/plans/2026-04-30-deskwork-pipeline-redesign.md) (3535 lines, 42 TDD-shaped tasks across 7 phases; written 2026-04-30)
+
+**Operator principle driving the work:** *"There's an explicit 'review' and an explicit 'paused' state. That seems wrong. Reviewing and pausing are not workflow states, they are processes that can happen at any part of the workflow. So, the actual workflow stages are: ideas → planned → outlining → drafting → final → published; Any number of review/edit/iterate cycles can happen to a document at any stage of that workflow. BUT, 'approving' a document signifies the terminal state of that workflow and REQUIRES that the document be moved to the next stage in the workflow."*
+
+**Key design decisions (resolved during brainstorm):**
+- Migration: in-place via `deskwork doctor --repair`; breaking changes acceptable since this project + audiocontrol.org are the only adopters.
+- Workflow shape: entry-centric for linear pipeline; shortform stays on workflow-object model (deferred).
+- Source of truth: per-entry JSON sidecars + regenerated calendar.md scannable index; doctor reconciles three sources (sidecar, calendar.md, file frontmatter).
+- CLI surface: keep `iterate` only (multi-write transactional); rest is skill-prose + doctor.
+- LLM-as-judge: sub-agent dispatch via Claude Code's Agent tool with configurable model (Haiku 4.5 default); operator's existing Claude Code subscription pays.
+- Stop-gap features (`/release`, `/post-release:*`) migrate into dw-lifecycle once it ships customizable lifecycle stages — this redesign is the foundation that arc depends on.
+
+**Process directive:** *"Let's NOT use the deskwork plugins at all of this process. We are the only customers at the moment, so we can and should make breaking changes."* Plain markdown + git diff + chat-iteration for the design and review work. No deskwork plugins, no dw-lifecycle plugin involvement. Foundational rearchitecture is the wrong artifact to walk through deskwork's own pipeline.
+
+#### Phases (per implementation plan)
+
+- [ ] **Phase 1** — Schema + sidecar IO + calendar render (Tasks 1–7)
+- [ ] **Phase 2** — Migration via `deskwork doctor --repair` (Tasks 8–11; includes migrating this project's calendar)
+- [ ] **Phase 3** — `iterate` helper rewrite (Tasks 12–14)
+- [ ] **Phase 4** — Skill-prose verbs (add/approve/block/cancel/induct/publish/status/doctor; retire old skills) (Tasks 15–22)
+- [ ] **Phase 5** — Doctor expansion + LLM-as-judge orchestration (Tasks 23–32)
+- [ ] **Phase 6** — Studio dashboard + review surface + Manual rewrite (Tasks 33–37)
+- [ ] **Phase 7** — Migration runbook + integration smoke + major release (Tasks 38–42)
+
+Each phase reaches a stable checkpoint suitable for review and commit.
+
+**Acceptance:**
+
+- [ ] All eight stages exist in the calendar; entries can move through the linear pipeline, into Blocked/Cancelled, and be inducted back.
+- [ ] All listed CLI verbs work via skill prose (or as the `iterate` helper); retired verbs print stable error messages.
+- [ ] Doctor's nine validation categories all run; `--repair` handles the non-destructive classes.
+- [ ] LLM-as-judge sub-agent dispatch fires from `/deskwork:doctor` with the operator's configured model.
+- [ ] Migration of this project's calendar (and audiocontrol.org's, if operator opts in) succeeds via `deskwork doctor --repair`.
+- [ ] Studio dashboard renders eight stages with stage-aware row affordances.
+- [ ] Studio review surface keys URLs by entry-uuid.
+- [ ] Compositor's Manual rewritten with new vocabulary.
+- [ ] MIGRATING.md ships with the major release naming the breaking changes and migration steps.
+- [ ] All existing in-tree tests pass; new validation logic has integration coverage against fresh project trees.
+- [ ] Major release (e.g., v0.11.0) shipped via the existing `/release` skill.
+
+**GitHub tracking:** Will be filed at the start of Phase 1 implementation as the parent feature issue. Sub-phase issues filed per phase as work progresses.
+
+**Notes:**
+
+- Bug [#120](https://github.com/audiocontrol-org/deskwork/issues/120) (`dw-lifecycle install` writes `knownVersions: []`) confirmed during this session's hand-driven `/dw-lifecycle:extend`. May be subsumed by the redesign's new schema or kept as a separate fix; decide during Phase 1.
+- The dw-lifecycle bug cluster (#126–#130) intersects with this redesign — dw-lifecycle inherits the new model. Some cluster bugs may dissolve in the new architecture; others persist as dw-lifecycle-specific concerns. Decide per-bug during Phase 4 implementation.
+- Audiocontrol.org calendar dry-run is Task 40 in the plan — could move earlier as a sanity check on the migration design before full Phase 2 execution.
+
 **Notes:**
 
 - **Stop-gap exit criteria:** when dw-lifecycle ships customizable lifecycle stages (tracked separately, no current target), file a migration issue to (1) move `/release` and `/post-release:*` skill bodies into dw-lifecycle, (2) move `docs/post-release/*` paths to whatever dw-lifecycle prescribes, (3) convert the procedural "review playbook" amendment into a typed workflow phase. Until then, the design + this workplan + the implementation are the contract.
