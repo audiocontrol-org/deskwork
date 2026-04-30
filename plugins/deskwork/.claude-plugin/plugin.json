@@ -1,6 +1,6 @@
 {
   "name": "deskwork",
-  "version": "0.9.7",
+  "version": "0.9.8",
   "description": "Editorial calendar lifecycle for Claude Code — capture, plan, draft, publish, and distribute content through an agent-driven workflow",
   "homepage": "https://github.com/audiocontrol-org/deskwork",
   "repository": "https://github.com/audiocontrol-org/deskwork",

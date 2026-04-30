@@ -1,6 +1,6 @@
 {
   "name": "@deskwork/plugin-dw-lifecycle",
-  "version": "0.9.7",
+  "version": "0.9.8",
   "private": true,
   "description": "Workspace package for the dw-lifecycle Claude Code plugin",
   "license": "GPL-3.0-or-later",
