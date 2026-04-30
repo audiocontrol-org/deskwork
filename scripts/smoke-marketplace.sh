@@ -240,6 +240,7 @@ build_release_source_clone "${RELEASE_SOURCE}"
 PLUGIN_BIN_PAIRS=(
   "deskwork:deskwork"
   "deskwork-studio:deskwork-studio"
+  "dw-lifecycle:dw-lifecycle"
 )
 
 # ----- Phase A: full marketplace clone -----------------------------------

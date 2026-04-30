@@ -17,10 +17,24 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   doctor,
 };
 
+function printUsage(stream: NodeJS.WriteStream): void {
+  stream.write('Usage: dw-lifecycle <subcommand> [args...]\n');
+  stream.write(`Subcommands: ${Object.keys(SUBCOMMANDS).join(', ')}\n`);
+}
+
 async function main() {
+  // Help is a top-level concern: explicit `--help`/`-h`/`help` prints the
+  // usage banner to stdout and exits 0. Bare invocation (no subcommand)
+  // is an error — usage to stderr, exit 1. The smoke at
+  // scripts/smoke-marketplace.sh runs `bin/<bin> --help` to assert the
+  // bin shim resolves and dispatches; without this branch, dw-lifecycle
+  // would exit 1 there even though the install path is healthy.
+  if (subcommand === '--help' || subcommand === '-h' || subcommand === 'help') {
+    printUsage(process.stdout);
+    process.exit(0);
+  }
   if (!subcommand) {
-    console.error('Usage: dw-lifecycle <subcommand> [args...]');
-    console.error(`Subcommands: ${Object.keys(SUBCOMMANDS).join(', ')}`);
+    printUsage(process.stderr);
     process.exit(1);
   }
 
