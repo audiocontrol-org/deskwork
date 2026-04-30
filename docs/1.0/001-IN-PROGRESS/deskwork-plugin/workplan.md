@@ -1247,8 +1247,64 @@ Shipped only after the manual flow in 26f is solid. Adds `permissions: id-token:
 
 **Acceptance:**
 
-- [ ] v0.9.7 shipped via the five-pause `/release` flow.
-- [ ] `npm view @deskwork/cli@0.9.7 dependencies` shows `@deskwork/core` pinned to `0.9.7`. Same for `@deskwork/studio`.
-- [ ] Marketplace install dogfood post-publish: `deskwork customize . doctor calendar-uuid-missing` succeeds against a fresh adopter tree.
+- [x] v0.9.7 shipped via the five-pause `/release` flow (commit `cf88937`, chore-release `02efb92`, tag `v0.9.7` on origin, GitHub release auto-created).
+- [x] `npm view @deskwork/cli@0.9.7 dependencies` shows `@deskwork/core` pinned to `0.9.7`. Same for `@deskwork/studio`.
+- [x] Marketplace install dogfood post-publish: `deskwork customize . doctor calendar-uuid-missing` succeeds against a fresh adopter tree (verified 2026-04-30 — bin shim detected drift, reinstalled `@deskwork/cli@0.9.7`, resolved `@deskwork/core@0.9.7`).
 
 **Issues closed in this phase:** [#101](https://github.com/audiocontrol-org/deskwork/issues/101).
+
+### Phase 27: studio bug tranche — v0.10.0
+
+**Deliverable:** Fix the seven adopter-facing studio bugs surfaced by the v0.9.7 marketplace-install dogfood ([#103](https://github.com/audiocontrol-org/deskwork/issues/103), [#104](https://github.com/audiocontrol-org/deskwork/issues/104), [#105](https://github.com/audiocontrol-org/deskwork/issues/105), [#106](https://github.com/audiocontrol-org/deskwork/issues/106), [#107](https://github.com/audiocontrol-org/deskwork/issues/107), [#108](https://github.com/audiocontrol-org/deskwork/issues/108), [#110](https://github.com/audiocontrol-org/deskwork/issues/110)). Single PR, single `v0.10.0` release.
+
+**Sub-phase A — Content-detail panel read-path ([#103](https://github.com/audiocontrol-org/deskwork/issues/103)):**
+
+- [ ] Trace the API endpoint that backs `/dev/content/<collection>/<root>?node=<path>`'s right-panel render. Identify whether the failure is in path resolution, the frontmatter parser, or the body preview renderer.
+- [ ] Reproduce against this project's `docs/1.0/001-IN-PROGRESS/deskwork-plugin/prd.md` (481 lines, valid `deskwork.id` + `title` frontmatter). Confirm the failure shape end-to-end.
+- [ ] Fix the underlying read. The fix must handle the `deskwork:` namespace correctly (per the v0.7.2 frontmatter convention).
+- [ ] Add a regression test using the project's own `prd.md` as the fixture; assert the right-panel render returns frontmatter-with-fields and a non-empty body preview.
+
+**Sub-phase B — Manual content rewrite ([#104](https://github.com/audiocontrol-org/deskwork/issues/104)):**
+
+- [ ] Walk every `/editorial-(add|plan|outline|draft|publish|distribute)` reference in `packages/studio/src/pages/help.ts` (and any related help-content files) and replace with the canonical `/deskwork:*` name.
+- [ ] Add a regression test asserting `/dev/editorial-help` HTML contains zero `/editorial-(add|plan|outline|draft|publish|distribute)` matches (and a positive assertion that `/deskwork:*` references appear).
+
+**Sub-phase C — Studio copy-to-clipboard input validation + manual-copy fallback ([#105](https://github.com/audiocontrol-org/deskwork/issues/105)):**
+
+- [ ] Audit all studio copy-to-clipboard buttons (rename, intake, Approve hint popup, any others). Catalog them.
+- [ ] Implement a unified validation + fallback helper: validate empty inputs before generating the command; on `navigator.clipboard.writeText` failure or unavailability (HTTP context, sandboxed iframe), render the command in a persistent `<pre>` block as a manual-copy fallback.
+- [ ] Apply the helper to all catalogued buttons.
+- [ ] Note: closing [#74](https://github.com/audiocontrol-org/deskwork/issues/74) and [#99](https://github.com/audiocontrol-org/deskwork/issues/99) is in scope here — same family, same fix shape.
+
+**Sub-phase D — "Coverage matrix" empty-state copy fix ([#106](https://github.com/audiocontrol-org/deskwork/issues/106)):**
+
+- [ ] Rewrite the shortform desk's empty-state copy to match what the dashboard actually renders (e.g., "Start a new shortform draft from the dashboard's Drafting list").
+- [ ] Update the link target to `/dev/editorial-studio#drafting` (anchor-scroll to the Drafting section).
+- [ ] Verify the anchor scrolls correctly on click.
+
+**Sub-phase E — Index page sensible defaults for un-linked surfaces ([#107](https://github.com/audiocontrol-org/deskwork/issues/107)):**
+
+- [ ] Longform reviews entry (III): if a most-recent in-review workflow exists, link to its `/dev/editorial-review/<uuid>`. Otherwise link to `/dev/editorial-studio?stage=review`.
+- [ ] Scrapbook entry (V): link to `/dev/content` (the scrapbook is reached by drilling into a content node).
+- [ ] Visual: keep the URL template hint (`<slug>` / `<site>/<path>`) visible alongside the link, so adopters still see the URL shape.
+
+**Sub-phase F — Destructive shortcut soft-confirm ([#108](https://github.com/audiocontrol-org/deskwork/issues/108)):**
+
+- [ ] Implement two-key sequence handling for `a a`, `i i`, `r r` (within ~500ms). Single keystroke pops a transient hint ("press a again to approve") that auto-dismisses; second matching keystroke fires the action.
+- [ ] Update the `?` shortcuts panel to document the two-key behavior.
+- [ ] Keep `j` / `k` (next/prev margin note) and `e` (toggle edit) as single-key — they're not destructive.
+
+**Sub-phase G — Dashboard row link fallback ([#110](https://github.com/audiocontrol-org/deskwork/issues/110)):**
+
+- [ ] When no open workflow exists for a calendar entry, link the row to `/dev/content/<collection>/<path>` (the content-detail page). Workflow-linked entries keep their `/dev/editorial-review/<uuid>` target.
+- [ ] Every dashboard row in every stage becomes clickable. Visual treatment can differ between the two link targets (or stay identical — operator preference; default to identical for consistency).
+- [ ] Same fallback applies to "Recent proofs" rows on the dashboard, which are also currently un-linked.
+
+**Acceptance:**
+
+- [ ] All 7 bugs verified fixed via the public path: `/plugin marketplace update deskwork` → `/reload-plugins` → boot studio → walk each surface → confirm the fix renders.
+- [ ] Regression tests pass: content-detail (#103), help-page slash-name (#104), studio test suite for copy-button helpers (#105).
+- [ ] No new console errors introduced.
+- [ ] v0.10.0 shipped via the five-pause `/release` flow.
+
+**Issues closed in this phase:** [#103](https://github.com/audiocontrol-org/deskwork/issues/103), [#104](https://github.com/audiocontrol-org/deskwork/issues/104), [#105](https://github.com/audiocontrol-org/deskwork/issues/105), [#106](https://github.com/audiocontrol-org/deskwork/issues/106), [#107](https://github.com/audiocontrol-org/deskwork/issues/107), [#108](https://github.com/audiocontrol-org/deskwork/issues/108), [#110](https://github.com/audiocontrol-org/deskwork/issues/110). Plus [#74](https://github.com/audiocontrol-org/deskwork/issues/74) and [#99](https://github.com/audiocontrol-org/deskwork/issues/99) (subsumed by sub-phase C).

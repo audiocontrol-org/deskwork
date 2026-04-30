@@ -479,3 +479,36 @@ Eight sub-phases (A–H), single PR, single `v0.10.0` release:
 - Not an absorption of [#91](https://github.com/audiocontrol-org/deskwork/issues/91) (smoke alignment). PR #91 closes unmerged; the smoke gets rewritten as part of Phase 26 F (the install path it tests against changes substantially).
 - Not an absorption of the studio bug sweep ([#68](https://github.com/audiocontrol-org/deskwork/issues/68), [#69](https://github.com/audiocontrol-org/deskwork/issues/69), [#74](https://github.com/audiocontrol-org/deskwork/issues/74), [#75](https://github.com/audiocontrol-org/deskwork/issues/75)) or the `/deskwork:*` skill UX work ([#58](https://github.com/audiocontrol-org/deskwork/issues/58), [#62](https://github.com/audiocontrol-org/deskwork/issues/62), [#64](https://github.com/audiocontrol-org/deskwork/issues/64)). Those defer.
 
+---
+
+## Extension: studio bug tranche — v0.10.0 (Phase 27)
+
+Added 2026-04-30 after a v0.9.7 marketplace-install dogfood walked the studio surfaces (dashboard, content tree, longform review, shortform desk, help, index) and catalogued 12 distinct findings. Five Tier-A bugs ([#103](https://github.com/audiocontrol-org/deskwork/issues/103), [#104](https://github.com/audiocontrol-org/deskwork/issues/104), [#105](https://github.com/audiocontrol-org/deskwork/issues/105), [#106](https://github.com/audiocontrol-org/deskwork/issues/106), [#107](https://github.com/audiocontrol-org/deskwork/issues/107)) plus two Tier-B bug-class items ([#108](https://github.com/audiocontrol-org/deskwork/issues/108), [#110](https://github.com/audiocontrol-org/deskwork/issues/110)) form this tranche. The remaining five Tier-B quality items ([#109](https://github.com/audiocontrol-org/deskwork/issues/109), [#111](https://github.com/audiocontrol-org/deskwork/issues/111), [#112](https://github.com/audiocontrol-org/deskwork/issues/112), [#113](https://github.com/audiocontrol-org/deskwork/issues/113), [#114](https://github.com/audiocontrol-org/deskwork/issues/114)) defer to v0.10.x or get picked up opportunistically.
+
+### Why this lands now
+
+The operator named the constraint directly: *"There are a bunch of UX problems with the studio that I want to address before we design new features."* The dogfood arc is the cheapest way to surface them — running the studio against this project's own collection through the public path (the v0.9.7 marketplace install) produced 12 findings in a single ~30-minute walk. Two of the seven bugs in this tranche are particularly costly:
+
+- [#103](https://github.com/audiocontrol-org/deskwork/issues/103) — content-detail panel reports "no frontmatter / no body" for a real, populated file (`docs/1.0/001-IN-PROGRESS/deskwork-plugin/prd.md`, 481 lines, valid `deskwork.id` + `title` frontmatter). The panel's stated promise ("Select a node to read its head matter, preview its body...") fails. Adopters seeing this conclude their file is broken.
+- [#104](https://github.com/audiocontrol-org/deskwork/issues/104) — The Compositor's Manual contains 8+ legacy `/editorial-*` slash references and zero `/deskwork:*` references. The primary onboarding doc is teaching adopters the wrong vocabulary. Distinct from [#69](https://github.com/audiocontrol-org/deskwork/issues/69) (which only covers dashboard empty-state copy).
+
+The other five (#105 silent-no-op rename, #106 dead-link "coverage matrix", #107 unlinked Index surfaces, #108 destructive single-letter shortcuts, #110 dashboard rows have no link target without a workflow) are mid-task friction the operator hits during normal use. Each has a sketched fix in its issue body.
+
+### Scope of Phase 27
+
+Single PR, single `v0.10.0` release.
+
+- **A** — Content-detail panel read-path fix ([#103](https://github.com/audiocontrol-org/deskwork/issues/103)). Trace the API endpoint that backs `/dev/content/<collection>/<root>?node=<path>`'s right-panel render. Probe the failure mode (frontmatter parser silently mishandling `deskwork:` namespace? path resolution reading wrong file? hierarchical-path encoding bug?). Fix the underlying read; add a regression test using the project's own `prd.md` as the fixture.
+- **B** — Manual content rewrite ([#104](https://github.com/audiocontrol-org/deskwork/issues/104)). Walk every `/editorial-*` reference in `packages/studio/src/pages/help.ts` and replace with the canonical `/deskwork:*` name. Add a regression test asserting `/dev/editorial-help` HTML contains zero `/editorial-(add|plan|outline|draft|publish|distribute)` matches.
+- **C** — Studio copy-to-clipboard input validation + manual-copy fallback ([#105](https://github.com/audiocontrol-org/deskwork/issues/105); related: [#74](https://github.com/audiocontrol-org/deskwork/issues/74), [#99](https://github.com/audiocontrol-org/deskwork/issues/99)). Validate empty inputs before generating the command; on `navigator.clipboard.writeText` failure or unavailability (HTTP context), render the command in a persistent `<pre>` block. Unify across all studio copy buttons.
+- **D** — "Coverage matrix" empty-state copy fix ([#106](https://github.com/audiocontrol-org/deskwork/issues/106)). Either rename to match the dashboard's actual section names + anchor-link to `/dev/editorial-studio#drafting`, or add a real `start shortform →` button to dashboard rows. Cheapest path is option 1.
+- **E** — Index page sensible defaults for un-linked surfaces ([#107](https://github.com/audiocontrol-org/deskwork/issues/107)). Longform reviews → link to most recent in-review workflow (or `/dev/editorial-studio?stage=review`). Scrapbook → link to `/dev/content`.
+- **F** — Destructive shortcut soft-confirm ([#108](https://github.com/audiocontrol-org/deskwork/issues/108)). Two-key sequence (`a` `a` within 500ms to fire approve; same for `i` `i` and `r` `r`). Single keystrokes pop a transient hint that auto-dismisses. Update the `?` panel to document the new behavior.
+- **G** — Dashboard row link fallback ([#110](https://github.com/audiocontrol-org/deskwork/issues/110)). When no open workflow exists for a calendar entry, link the row to the content-detail page (`/dev/content/<collection>/<path>`). Workflow-linked entries keep their `/dev/editorial-review/<uuid>` target. Every dashboard row becomes clickable.
+
+### What Phase 27 is not
+
+- Not the full UX dogfood backlog. The five Tier-B quality items ([#109](https://github.com/audiocontrol-org/deskwork/issues/109), [#111](https://github.com/audiocontrol-org/deskwork/issues/111), [#112](https://github.com/audiocontrol-org/deskwork/issues/112), [#113](https://github.com/audiocontrol-org/deskwork/issues/113), [#114](https://github.com/audiocontrol-org/deskwork/issues/114)) defer. Tight tranche; ship; reassess.
+- Not a Phase 24 implementation. Content-collections vocabulary rename (`sites` → `collections`) still defers; this tranche keeps the legacy term in the affected files and migrates them in Phase 24.
+- Not an absorption of the longstanding studio backlog ([#54](https://github.com/audiocontrol-org/deskwork/issues/54), [#61](https://github.com/audiocontrol-org/deskwork/issues/61), [#73](https://github.com/audiocontrol-org/deskwork/issues/73), [#84](https://github.com/audiocontrol-org/deskwork/issues/84)). Those are larger features (margin-note replies, calendar/workflow auto-advance, TOC view, agent-path documentation) and warrant their own scoping.
+
