@@ -164,6 +164,46 @@ describe('checkPreconditions', () => {
   });
 });
 
+import { verifyNpmStatus, DESKWORK_PACKAGES, type NpmViewer } from '../lib/release-helpers.js';
+
+describe('verifyNpmStatus', () => {
+  it('reports all unpublished when viewer returns false for every spec', () => {
+    const viewer: NpmViewer = () => false;
+    const r = verifyNpmStatus('0.9.6', viewer);
+    expect(r.version).toBe('0.9.6');
+    expect(r.published).toEqual([]);
+    expect(r.unpublished).toEqual([...DESKWORK_PACKAGES]);
+  });
+
+  it('reports all published when viewer returns true for every spec', () => {
+    const viewer: NpmViewer = () => true;
+    const r = verifyNpmStatus('0.9.5', viewer);
+    expect(r.published).toEqual([...DESKWORK_PACKAGES]);
+    expect(r.unpublished).toEqual([]);
+  });
+
+  it('reports a mixed state when only some packages are published', () => {
+    const viewer: NpmViewer = (spec) => spec.startsWith('@deskwork/core@');
+    const r = verifyNpmStatus('0.9.6', viewer);
+    expect(r.published).toEqual(['@deskwork/core']);
+    expect(r.unpublished).toEqual(['@deskwork/cli', '@deskwork/studio']);
+  });
+
+  it('queries every spec exactly once and threads the version into each query', () => {
+    const seen: string[] = [];
+    const viewer: NpmViewer = (spec) => {
+      seen.push(spec);
+      return false;
+    };
+    verifyNpmStatus('0.9.6', viewer);
+    expect(seen).toEqual([
+      '@deskwork/core@0.9.6',
+      '@deskwork/cli@0.9.6',
+      '@deskwork/studio@0.9.6',
+    ]);
+  });
+});
+
 import { atomicPush } from '../lib/release-helpers.js';
 
 describe('atomicPush', () => {

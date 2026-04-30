@@ -171,6 +171,63 @@ export async function checkPreconditions(
   };
 }
 
+export const DESKWORK_PACKAGES = [
+  '@deskwork/core',
+  '@deskwork/cli',
+  '@deskwork/studio',
+] as const;
+
+export type NpmViewer = (pkgAtVersion: string) => boolean;
+
+/**
+ * Real npm-registry probe. Calls `npm view <spec> version --json`; returns
+ * true if the spec resolves (package@version exists on the registry), false
+ * otherwise. Any non-zero exit from npm view is treated as "not published"
+ * — npm view returns E404 for missing versions, and we don't want to
+ * distinguish between "missing" and "registry transient error" here (the
+ * follow-on `make publish` will fail loudly if the registry is broken).
+ */
+export const realNpmViewer: NpmViewer = (spec) => {
+  try {
+    execFileSync('npm', ['view', spec, 'version', '--json'], { stdio: 'pipe' });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export interface NpmStatusReport {
+  readonly version: string;
+  readonly published: readonly string[];
+  readonly unpublished: readonly string[];
+}
+
+/**
+ * Probe the npm registry for each of the three @deskwork packages at
+ * `version`. Returns a structured report. Pure with respect to its viewer
+ * argument — tests pass a fake viewer; the dispatcher uses the real one.
+ *
+ * Used by Pause 3 of the /release flow to gate `make publish` on "no
+ * package is already at this version" — npm forbids re-publishing the
+ * same version, so we surface the conflict before the operator types
+ * any OTPs.
+ */
+export function verifyNpmStatus(
+  version: string,
+  viewer: NpmViewer = realNpmViewer,
+): NpmStatusReport {
+  const published: string[] = [];
+  const unpublished: string[] = [];
+  for (const pkg of DESKWORK_PACKAGES) {
+    if (viewer(`${pkg}@${version}`)) {
+      published.push(pkg);
+    } else {
+      unpublished.push(pkg);
+    }
+  }
+  return { version, published, unpublished };
+}
+
 export interface AtomicPushOptions {
   readonly tag: string;
   readonly branch: string;
@@ -276,6 +333,25 @@ async function dispatch(argv: readonly string[]): Promise<number> {
       const result = validateVersion(version, lastTag);
       if (!result.ok) process.stderr.write(result.reason + '\n');
       return result.ok ? 0 : 1;
+    }
+    case 'assert-not-published': {
+      const [version] = args;
+      if (!version) {
+        process.stderr.write('usage: assert-not-published <version>\n');
+        return 2;
+      }
+      const report = verifyNpmStatus(version);
+      if (report.published.length > 0) {
+        process.stderr.write(
+          `Version ${version} is already published on npm for: ${report.published.join(', ')}.\n` +
+            `npm forbids republishing the same version. Bump to a new version and re-run.\n`,
+        );
+        return 1;
+      }
+      process.stdout.write(
+        `All ${DESKWORK_PACKAGES.length} packages are unpublished at v${version} — safe to publish.\n`,
+      );
+      return 0;
     }
     case 'atomic-push': {
       const [tag, branch] = args;
