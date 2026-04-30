@@ -111,7 +111,7 @@ function renderEmptyState(): RawHtml {
       No short-form galleys on the desk.<br />
       Supported platforms: <em>${platformList}</em>.<br />
       Start a new shortform draft from the dashboard's
-      <a href="/dev/editorial-studio">coverage matrix</a>.
+      <a href="/dev/editorial-studio#stage-drafting">Drafting list</a>.
     </div>`);
 }
 

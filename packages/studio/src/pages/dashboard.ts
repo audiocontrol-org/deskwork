@@ -707,7 +707,7 @@ function renderStageSection(
         );
 
   return unsafe(html`
-    <section class="er-section" data-stage-section="${stage}">
+    <section class="er-section" id="stage-${stage.toLowerCase()}" data-stage-section="${stage}">
       <h2 class="er-section-head">
         <span>${stage}</span>
         <span class="ornament">${STAGE_ORNAMENTS[stage]}</span>

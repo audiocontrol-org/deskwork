@@ -1306,9 +1306,11 @@ Shipped only after the manual flow in 26f is solid. Adds `permissions: id-token:
 
 **Sub-phase D — "Coverage matrix" empty-state copy fix ([#106](https://github.com/audiocontrol-org/deskwork/issues/106)):**
 
-- [ ] Rewrite the shortform desk's empty-state copy to match what the dashboard actually renders (e.g., "Start a new shortform draft from the dashboard's Drafting list").
-- [ ] Update the link target to `/dev/editorial-studio#drafting` (anchor-scroll to the Drafting section).
-- [ ] Verify the anchor scrolls correctly on click.
+- [x] Rewrite the shortform desk's empty-state copy to match what the dashboard actually renders (e.g., "Start a new shortform draft from the dashboard's Drafting list").
+- [x] Update the link target to `/dev/editorial-studio#stage-drafting` (anchor-scroll to the Drafting section). Anchor namespaced `stage-<lowercase>` so every stage section gets a consistent `id="stage-${stage.toLowerCase()}"` rather than reserving the bare slug for one stage.
+- [x] Verify the anchor scrolls correctly on click. Test asserts both the empty-state link target and the dashboard's `id="stage-drafting"` anchor mount; cross-stage consistency also asserted.
+
+**Diagnosis:** The shortform desk pointed at a "coverage matrix" that doesn't exist on the dashboard, with a link target (`/dev/editorial-studio`) that landed at the top of the page. Adopters hit a dead end. Fix: empty-state copy in `packages/studio/src/pages/shortform.ts:107` names the Drafting list; `renderStageSection` in `packages/studio/src/pages/dashboard.ts:710` emits `id="stage-${stage.toLowerCase()}"`. Regression test at `packages/studio/test/shortform-empty-state.test.ts`; pre-existing `shortform-routing.test.ts` test updated.
 
 **Sub-phase E — Index page sensible defaults for un-linked surfaces ([#107](https://github.com/audiocontrol-org/deskwork/issues/107)):**
 

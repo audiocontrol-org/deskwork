@@ -312,13 +312,14 @@ describe('GET /dev/editorial-review-shortform — index page', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('shows an empty state pointing at the dashboard matrix', async () => {
+  it('shows an empty state pointing at the dashboard Drafting list (#106)', async () => {
     const r = await getText(app, '/dev/editorial-review-shortform');
     expect(r.status).toBe(200);
     expect(r.text).toContain('No short-form galleys on the desk.');
     expect(r.text).toMatch(
-      /Start a new shortform draft from the dashboard's[\s\S]*coverage matrix/,
+      /Start a new shortform draft from the dashboard's[\s\S]*Drafting list/,
     );
+    expect(r.text).toContain('href="/dev/editorial-studio#stage-drafting"');
     // No textarea or compose-style action buttons in the empty state.
     expect(r.text).not.toContain('<textarea');
     expect(r.text).not.toContain('data-action="save"');
