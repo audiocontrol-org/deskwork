@@ -1,5 +1,61 @@
 #!/usr/bin/env bash
+#
+# dw-lifecycle — thin wrapper that first-run-installs runtime deps in
+# adopter (sparse-clone) mode, then dispatches to src/cli.ts via tsx.
+#
+# Resolution order (first match wins):
+#   1. Workspace dev path: tsx exists in some ancestor's node_modules/.bin/
+#      via npm workspace hoist. Dispatch via that tsx.
+#   2. Adopter post-install: tsx exists at $PLUGIN_ROOT/node_modules/.bin/tsx
+#      (after first-run `npm install --omit=dev --workspaces=false`).
+#   3. First run, neither present: npm install in $PLUGIN_ROOT, then dispatch.
+#
+# Unlike the deskwork/deskwork-studio shells, dw-lifecycle's logic ships
+# in-tree (plugins/dw-lifecycle/src/*.ts), not as a published @deskwork/*
+# npm package. The shell needs npm install to fetch tsx + yaml + zod
+# (declared in this plugin's package.json), and nothing else.
+
 set -euo pipefail
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-exec npx tsx "$PLUGIN_ROOT/src/cli.ts" "$@"
+PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+# Walk up from PLUGIN_ROOT looking for a usable tsx bin. Handles the
+# workspace-hoist case (deps land in monorepo root's node_modules/.bin)
+# and the adopter post-install case (deps land in this plugin's
+# node_modules/.bin).
+find_tsx() {
+  local cur="${PLUGIN_ROOT}"
+  while [ "${cur}" != "/" ]; do
+    if [ -x "${cur}/node_modules/.bin/tsx" ]; then
+      printf '%s' "${cur}/node_modules/.bin/tsx"
+      return 0
+    fi
+    cur="$(dirname "${cur}")"
+  done
+  return 1
+}
+
+TSX_BIN="$(find_tsx || true)"
+
+if [ -z "${TSX_BIN}" ]; then
+  echo "dw-lifecycle: first run — installing dependencies..." >&2
+  (
+    cd "${PLUGIN_ROOT}"
+    # --workspaces=false: when the plugin tree is sparse-cloned from a
+    # workspaces-declaring monorepo, npm would otherwise walk up, treat
+    # this as a workspace install, and hoist node_modules/ to the
+    # workspace root — leaving ${PLUGIN_ROOT}/node_modules/.bin/tsx
+    # empty. Disabling workspaces forces install into the plugin's own
+    # node_modules/.
+    npm install --omit=dev --workspaces=false \
+      --no-audit --no-fund --loglevel=error
+  ) >&2
+  TSX_BIN="$(find_tsx || true)"
+  if [ -z "${TSX_BIN}" ]; then
+    echo "dw-lifecycle: npm install completed but tsx is still not resolvable from ${PLUGIN_ROOT}. Aborting." >&2
+    exit 1
+  fi
+fi
+
+exec "${TSX_BIN}" "${PLUGIN_ROOT}/src/cli.ts" "$@"

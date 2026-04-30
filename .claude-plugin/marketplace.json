@@ -34,11 +34,10 @@
       "source": {
         "source": "git-subdir",
         "url": "https://github.com/audiocontrol-org/deskwork.git",
-        "path": "plugins/dw-lifecycle",
-        "ref": "v0.9.4"
+        "path": "plugins/dw-lifecycle"
       },
       "description": "Project lifecycle orchestration; composes superpowers + feature-dev.",
-      "version": "0.9.4"
+      "version": "0.9.5"
     }
   ]
 }
