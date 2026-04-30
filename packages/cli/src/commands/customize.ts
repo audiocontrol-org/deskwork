@@ -2,9 +2,9 @@
  * deskwork customize — copy a plugin-default file into the project's
  * `.deskwork/<category>/<name>.ts` so the operator can edit it.
  *
- * Phase 23f. Categories:
- *   - templates  → copies `packages/studio/src/pages/<name>.ts`
- *   - doctor     → copies `packages/core/src/doctor/rules/<name>.ts`
+ * Categories:
+ *   - templates  → copies `<@deskwork/studio>/dist/pages/<name>.ts`
+ *   - doctor     → copies `<@deskwork/core>/dist/doctor/rules/<name>.ts`
  *   - prompts    → reserved (no default-source mapping yet)
  *
  * Usage (after the dispatcher injects projectRoot):
@@ -13,7 +13,7 @@
  * The command:
  *   1. Resolves the plugin-default source file via `import.meta.resolve`
  *      against the published package paths so it works in both
- *      workspace dev and marketplace install.
+ *      workspace dev and npm-installed plugins.
  *   2. Copies the source verbatim into
  *      `<projectRoot>/.deskwork/<category>/<name>.ts`, creating the
  *      directory tree as needed.
@@ -85,15 +85,18 @@ function resolvePackageRoot(packageName: string): string {
  * Find the source-of-truth file for a customize request. Returns an
  * absolute path or throws. The mapping per category:
  *
- *   templates → @deskwork/studio package root, then src/pages/<name>.ts.
- *   doctor    → @deskwork/core package root, then src/doctor/rules/<name>.ts.
+ *   templates → @deskwork/studio package root, then dist/pages/<name>.ts.
+ *   doctor    → @deskwork/core package root, then dist/doctor/rules/<name>.ts.
  *   prompts   → throws (reserved).
  *
- * Note: this assumes the published package ships its `src/` tree.
- * Phase 26b's `files: ["dist", ...]` whitelist drops `src/`, so the
- * customize command currently works only against workspace-symlinked
- * packages (the dev path). A follow-up issue tracks shipping the
- * customize sources alongside dist or vendoring template snapshots.
+ * The build pipeline (`packages/studio/package.json` and
+ * `packages/core/package.json` build scripts) copies the `.ts` source
+ * files verbatim from `src/<category>/` into `dist/<category>/`
+ * alongside the compiled `.js`/`.d.ts`. This keeps the customize
+ * anchor inside the package's `files` whitelist (`["dist", ...]`),
+ * so customize works for npm-installed adopters as well as workspace
+ * dev. Adopters get the readable `.ts` content because cp preserves
+ * it byte-for-byte.
  */
 function resolveDefaultSource(category: Category, name: string): string {
   if (category === 'prompts') {
@@ -103,7 +106,7 @@ function resolveDefaultSource(category: Category, name: string): string {
   }
   if (category === 'templates') {
     const studioRoot = resolvePackageRoot('@deskwork/studio');
-    const candidate = resolve(studioRoot, 'src', 'pages', `${name}.ts`);
+    const candidate = resolve(studioRoot, 'dist', 'pages', `${name}.ts`);
     if (!existsSync(candidate)) {
       throw new Error(
         `no built-in template named "${name}". Available templates: ${listAvailable(
@@ -115,7 +118,7 @@ function resolveDefaultSource(category: Category, name: string): string {
   }
   // doctor
   const coreRoot = resolvePackageRoot('@deskwork/core');
-  const candidate = resolve(coreRoot, 'src', 'doctor', 'rules', `${name}.ts`);
+  const candidate = resolve(coreRoot, 'dist', 'doctor', 'rules', `${name}.ts`);
   if (!existsSync(candidate)) {
     throw new Error(
       `no built-in doctor rule named "${name}". Available rules: ${listAvailable(
@@ -133,28 +136,16 @@ function resolveDefaultSource(category: Category, name: string): string {
  */
 function listAvailable(dir: string): string {
   if (!existsSync(dir)) return '(none — broken install)';
+  // Filter to .ts files, excluding TypeScript declaration files (.d.ts)
+  // and source maps. The customize anchor is the verbatim source-copy
+  // shipped under dist/<category>/<name>.ts; declaration files alongside
+  // it would surface as bogus "available templates" entries.
   const entries = readdirSync(dir)
-    .filter((n) => n.endsWith('.ts'))
+    .filter((n) => n.endsWith('.ts') && !n.endsWith('.d.ts'))
     .map((n) => n.slice(0, -'.ts'.length))
     .sort();
   return entries.join(', ');
 }
-
-/**
- * Add `@deskwork/studio/server.ts` resolution support. The studio
- * package's `package.json` lists `bin: { "deskwork-studio": "./src/server.ts" }`
- * but no top-level `exports.server.ts`. We work around that by
- * resolving the package root through `package.json#main` if available;
- * here we cheat and use the studio's own `import.meta` from the
- * compiled bundle. To keep this implementation simple, we resolve via
- * the studio package's `package.json` root and then join the source
- * tree path.
- *
- * (This doc-comment reserves the explanation; the actual logic above
- * uses `@deskwork/studio/server.ts`. Studio's package.json must list
- * an exports entry for that subpath. If it doesn't yet, resolveDefaultSource
- * will throw a clear error and the test will catch the omission.)
- */
 
 export async function run(argv: string[]): Promise<void> {
   // Argv shape after dispatcher inject:
