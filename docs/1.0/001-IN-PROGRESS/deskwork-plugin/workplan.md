@@ -1330,9 +1330,11 @@ Shipped only after the manual flow in 26f is solid. Adds `permissions: id-token:
 
 **Sub-phase G — Dashboard row link fallback ([#110](https://github.com/audiocontrol-org/deskwork/issues/110)):**
 
-- [ ] When no open workflow exists for a calendar entry, link the row to `/dev/content/<collection>/<path>` (the content-detail page). Workflow-linked entries keep their `/dev/editorial-review/<uuid>` target.
-- [ ] Every dashboard row in every stage becomes clickable. Visual treatment can differ between the two link targets (or stay identical — operator preference; default to identical for consistency).
-- [ ] Same fallback applies to "Recent proofs" rows on the dashboard, which are also currently un-linked.
+- [x] When no open workflow exists for a calendar entry, link the row to `/dev/content/<collection>/<path>` (the content-detail page). Workflow-linked entries keep their `/dev/editorial-review/<uuid>` target.
+- [x] Every dashboard row in every stage becomes clickable. Visual treatment is identical (consistency over per-target styling) — the `<a>` carries `title` attributes that distinguish the destination on hover.
+- [x] Same fallback applies to "Recent proofs" rows on the dashboard, which are also currently un-linked.
+
+**Diagnosis:** Three render paths were broken: (1) Drafting/Review entries with no workflow rendered slug as plain text (no link); (2) entries with `hasFile` but no workflow ALSO had a broken target — `blogPreviewLink` returned `/dev/editorial-review/<key>` for non-Published stages even when no workflow existed (would 404 or render an empty workflow page); (3) Recent proofs rows in the terminal-workflows section were `<div>` elements with no link target. New `contentDetailLink(site, slug)` helper builds `/dev/content/<site>/<root>?node=<slug>` URLs (encodeURIComponent on both segments and the node param). `slugCell` resolution is now: workflow → review surface; Published → public host URL; else → content-detail. Hierarchical-slug branch updated similarly so depth-aware rows also wrap in `<a>`. Recent proofs section converted from `<div class="er-row">` to `<a class="er-row" href={workflowLink(w)}>` so terminal workflows are clickable. Regression test at `packages/studio/test/dashboard-row-link-fallback.test.ts` covers all three cases.
 
 **Acceptance:**
 

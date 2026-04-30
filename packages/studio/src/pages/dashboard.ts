@@ -166,6 +166,25 @@ function blogPreviewLink(site: string, slug: string, host: string, entry: Calend
   return `/dev/editorial-review/${key}?site=${site}`;
 }
 
+/**
+ * Issue #110: when a calendar entry has no open workflow, the row
+ * still needs a navigation target so it doesn't read as decoration.
+ * The content-detail page (`/dev/content/<site>/<root>?node=<slug>`)
+ * is the right surface — it shows frontmatter + body + scrapbook for
+ * the entry without requiring a review workflow. Workflow-linked
+ * entries keep their `/dev/editorial-review/<id>` target via
+ * `workflowLink` above.
+ *
+ * The `<root>` segment is the entry slug's first path segment (the
+ * project root). For flat slugs (`the-outbound`), the project root
+ * IS the slug itself; for hierarchical slugs (`projects/x/y`), it's
+ * the first segment.
+ */
+function contentDetailLink(site: string, slug: string): string {
+  const root = slug.split('/')[0];
+  return `/dev/content/${encodeURIComponent(site)}/${encodeURIComponent(root)}?node=${encodeURIComponent(slug)}`;
+}
+
 interface DashboardData {
   calendarEntries: SitedEntry[];
   distributions: SitedDistribution[];
@@ -564,12 +583,24 @@ function renderRow(
     site,
   ].join(' ').toLowerCase();
   const host = ctx.config.sites[site]?.host ?? site;
-  const slugCell = wf
-    ? unsafe(html`<a href="${workflowLink(wf)}" title="open the review surface">${entry.slug}</a>`)
-    : hasFile
-      ? unsafe(html`<a href="${blogPreviewLink(site, entry.slug, host, entry)}"
-          title="${entry.stage === 'Published' ? 'read the published article' : 'open the review surface for this draft'}">${entry.slug}</a>`)
-      : entry.slug;
+  // Issue #110: every row gets a link target. Workflow-linked rows
+  // open the review surface; Published rows link to the public host
+  // URL; everything else links to the content-detail page so the
+  // operator can read the entry's frontmatter, body, and scrapbook
+  // without inventing a workflow.
+  const slugLink = wf
+    ? workflowLink(wf)
+    : entry.stage === 'Published'
+      ? blogPreviewLink(site, entry.slug, host, entry)
+      : contentDetailLink(site, entry.slug);
+  const slugTitle = wf
+    ? 'open the review surface'
+    : entry.stage === 'Published'
+      ? 'read the published article'
+      : 'view content details';
+  const slugCell = unsafe(
+    html`<a href="${slugLink}" title="${slugTitle}">${entry.slug}</a>`,
+  );
 
   const fileDot = hasRepoContent(kind)
     ? unsafe(html`<span class="er-file-dot er-file-${body}"
@@ -610,11 +641,12 @@ function renderRow(
       : '';
   // For nested entries, show only the leaf segment as the prominent
   // identifier — the ancestor segments are implied by the visual indent
-  // and the position in the sorted list.
+  // and the position in the sorted list. Issue #110: the hierarchical
+  // shape still wraps in an <a> so the row has a link target.
   const slugDisplay =
     depth > 0
       ? unsafe(
-          html`<span class="er-row-slug-ancestors" aria-hidden="true">${entry.slug.slice(0, entry.slug.lastIndexOf('/') + 1)}</span><span class="er-row-slug-leaf">${entry.slug.slice(entry.slug.lastIndexOf('/') + 1)}</span>`,
+          html`<a href="${slugLink}" title="${slugTitle}"><span class="er-row-slug-ancestors" aria-hidden="true">${entry.slug.slice(0, entry.slug.lastIndexOf('/') + 1)}</span><span class="er-row-slug-leaf">${entry.slug.slice(entry.slug.lastIndexOf('/') + 1)}</span></a>`,
         )
       : '';
   const slugCellWithHierarchy = depth > 0 ? slugDisplay : slugCell;
@@ -845,6 +877,10 @@ function renderApprovedSection(data: DashboardData, ctx: StudioContext): RawHtml
 
 function renderTerminalSection(data: DashboardData, ctx: StudioContext, now: Date): RawHtml {
   if (data.terminal.length === 0) return unsafe('');
+  // Issue #110: Recent proofs rows are now `<a>` so adopters can
+  // click into the historical review record (the review surface
+  // renders terminal workflows for inspection just as well as
+  // active ones).
   const rows = data.terminal
     .map((w) => {
       const host = ctx.config.sites[w.site]?.host ?? w.site;
@@ -853,14 +889,15 @@ function renderTerminalSection(data: DashboardData, ctx: StudioContext, now: Dat
           ? html`<span class="er-row-channel"> · ${w.platform}</span>`
           : '';
       return html`
-        <div class="er-row" data-state="${w.state}" data-site="${w.site}">
+        <a class="er-row" href="${workflowLink(w)}" data-state="${w.state}" data-site="${w.site}"
+           title="open the ${w.state} review record">
           <span class="er-row-num">—</span>
           <span class="er-row-site er-row-site--${w.site}" title="${host}">${siteLabel(w.site)}</span>
           <span class="er-row-slug" style="color: var(--er-ink-soft);">${w.slug}</span>
           <span class="er-row-kind">${w.contentKind}${unsafe(platformBit)}</span>
           <span class="er-stamp er-stamp-${w.state}">${w.state}</span>
           <span class="er-row-ts">${fmtRelTime(w.updatedAt, now)}</span>
-        </div>`;
+        </a>`;
     })
     .join('');
   return unsafe(html`
