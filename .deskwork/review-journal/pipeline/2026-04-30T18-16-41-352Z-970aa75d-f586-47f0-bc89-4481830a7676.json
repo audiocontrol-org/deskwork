@@ -3,9 +3,9 @@
   "site": "deskwork-internal",
   "slug": "post-release-acceptance-design",
   "contentKind": "longform",
-  "state": "iterating",
-  "currentVersion": 1,
+  "state": "applied",
+  "currentVersion": 2,
   "createdAt": "2026-04-30T18:16:41.352Z",
-  "updatedAt": "2026-04-30T18:35:48.622Z",
+  "updatedAt": "2026-04-30T20:22:09.420Z",
   "entryId": "1c3bfe8f-e9c2-4133-ab88-2aa08d9fa702"
 }

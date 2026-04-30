@@ -12,8 +12,19 @@ deskwork:
 
 ## Design: post-release customer acceptance playbook
 
-**Status:** in brainstorming review (2026-04-30)
+**Status:** in brainstorming review (2026-04-30) — **stop-gap, migrates into dw-lifecycle when ready** (see *Stop-gap status* below).
 **Source:** operator framing — *"We should have a post-release customer acceptance playbook that we run through — not hard-coded tooling, but a skill (or a composition of skills) that codify how to evaluate the installed plugin to ensure it's sane and file bugs if it's not. This should include playwright inspection of the studio. We should update that playbook as we add/update features."*
+
+### Stop-gap status — migrates into dw-lifecycle when ready
+
+This entire feature — both the `/post-release:*` skill family designed below AND the existing `/release` skill it integrates with — is **stop-gap scaffolding** that lives inside the deskwork plugin only because dw-lifecycle does not yet expose the capability to customize or override lifecycle stages and skills. When dw-lifecycle gains that capability, the migration is a forward-marching certainty, not a maybe:
+
+- **`/release` and `/post-release:walk` + `/post-release:file-issues` migrate into dw-lifecycle.** They are deskwork-project-management procedures, not editorial-pipeline procedures; their natural home is dw-lifecycle's customizable-workflow surface. Folding them in there lets adopters override or extend the procedures per-project (which is the whole reason dw-lifecycle exists).
+- **The path of this design doc itself will change.** Once dw-lifecycle owns the migration target, this file moves to whatever path dw-lifecycle prescribes for in-flight feature designs (likely under a dw-lifecycle-managed `docs/` subtree, or as a dw-lifecycle calendar entry with its own conventions). Treat the current path `docs/1.0/post-release-acceptance-design.md` as ephemeral.
+- **Generated artifacts move too.** The findings docs at `docs/post-release/<version>-acceptance.md` and the playbook at `docs/post-release/playbook.md` are similarly transitional. Their final location is dw-lifecycle's call.
+- **Stays-current procedural amendments** (the dw-lifecycle / feature-define checklist additions described in *Playbook — stays-current mechanism* below) become typed phases in dw-lifecycle's customizable workflow surface once it lands. Cross-reference: *Stays-current mechanism (future — once dw-lifecycle ships customizable workflows)*.
+
+This stop-gap framing is binding: any decision in this design that conflicts with eventual migration into dw-lifecycle should be re-opened. Specifically: schema choices, file paths, and skill names should stay simple enough that the migration is a move-and-rename rather than a re-architect.
 
 ### Problem
 
@@ -220,6 +231,7 @@ Format: per-surface sections with assertions tagged `cursory` or `deep`:
 **Stays-current mechanism (future — once dw-lifecycle ships customizable workflows):**
 
 - The playbook-update step becomes a typed phase in dw-lifecycle's feature workflow. The phase has acceptance criteria that block the workflow from advancing until the operator confirms playbook updates were considered. This is a sentence today; it requires real engineering in dw-lifecycle to land. Tracked separately from this skill.
+- This is the same migration arc described in *Stop-gap status* at the top. The whole `/release` + `/post-release:*` family lands inside dw-lifecycle's customizable-workflow surface at that point; the playbook-update phase is one piece of that broader move. Designs and paths in this doc are provisional until that lands.
 
 ### Integration with `/release`
 
