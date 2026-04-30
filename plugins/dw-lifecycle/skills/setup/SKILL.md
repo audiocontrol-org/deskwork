@@ -1,7 +1,6 @@
 ---
-name: dw-lifecycle:setup
+name: setup
 description: "Create branch + worktree + version-aware docs/<v>/<status>/<slug>/ + populate PRD/workplan/README"
-user_invocable: true
 ---
 
 # /dw-lifecycle:setup

@@ -1,7 +1,6 @@
 ---
-name: dw-lifecycle:teardown
+name: teardown
 description: "Remove branch + worktree (infrastructure-only)"
-user_invocable: true
 ---
 
 # /dw-lifecycle:teardown

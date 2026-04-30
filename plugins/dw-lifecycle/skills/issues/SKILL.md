@@ -1,7 +1,6 @@
 ---
-name: dw-lifecycle:issues
+name: issues
 description: "Create parent + per-phase GitHub issues from workplan; back-fill issue links"
-user_invocable: true
 ---
 
 # /dw-lifecycle:issues

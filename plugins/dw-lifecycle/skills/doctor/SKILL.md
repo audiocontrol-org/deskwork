@@ -1,7 +1,6 @@
 ---
-name: dw-lifecycle:doctor
+name: doctor
 description: "Audit binding metadata across calendar/journal/docs/issues; opt-in --fix"
-user_invocable: true
 ---
 
 # /dw-lifecycle:doctor

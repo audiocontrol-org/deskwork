@@ -1,7 +1,6 @@
 ---
-name: dw-lifecycle:define
+name: define
 description: "Interview to capture problem/scope/approach/tasks; writes feature-definition.md"
-user_invocable: true
 ---
 
 # /dw-lifecycle:define

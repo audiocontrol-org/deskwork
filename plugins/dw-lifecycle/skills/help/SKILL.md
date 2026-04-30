@@ -1,7 +1,6 @@
 ---
-name: dw-lifecycle:help
+name: help
 description: "Render lifecycle diagram + current state of active features"
-user_invocable: true
 ---
 
 # /dw-lifecycle:help

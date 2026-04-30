@@ -1,7 +1,6 @@
 ---
-name: dw-lifecycle:session-end
+name: session-end
 description: "Append journal entry; update feature docs; commit documentation changes"
-user_invocable: true
 ---
 
 # /dw-lifecycle:session-end

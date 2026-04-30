@@ -1,7 +1,6 @@
 ---
-name: dw-lifecycle:install
+name: install
 description: "Bootstrap dw-lifecycle in a host project: probe structure, write .dw-lifecycle/config.json"
-user_invocable: true
 ---
 
 # /dw-lifecycle:install

@@ -1,7 +1,6 @@
 ---
-name: dw-lifecycle:implement
+name: implement
 description: "Walk workplan tasks; delegate to subagents; commit at task boundaries"
-user_invocable: true
 ---
 
 # /dw-lifecycle:implement

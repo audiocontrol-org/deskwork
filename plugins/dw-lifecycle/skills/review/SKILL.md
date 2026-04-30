@@ -1,7 +1,6 @@
 ---
-name: dw-lifecycle:review
+name: review
 description: "Delegate code review of recent changes; collate findings"
-user_invocable: true
 ---
 
 # /dw-lifecycle:review

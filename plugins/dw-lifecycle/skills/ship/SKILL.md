@@ -1,7 +1,6 @@
 ---
-name: dw-lifecycle:ship
+name: ship
 description: "Verify acceptance criteria; open PR; stop at PR creation (operator owns merge)"
-user_invocable: true
 ---
 
 # /dw-lifecycle:ship

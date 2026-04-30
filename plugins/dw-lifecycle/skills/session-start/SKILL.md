@@ -1,7 +1,6 @@
 ---
-name: dw-lifecycle:session-start
+name: session-start
 description: "Bootstrap session: read workplan + journal + open issues; report context"
-user_invocable: true
 ---
 
 # /dw-lifecycle:session-start

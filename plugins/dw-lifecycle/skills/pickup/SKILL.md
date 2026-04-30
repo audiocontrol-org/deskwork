@@ -1,7 +1,6 @@
 ---
-name: dw-lifecycle:pickup
+name: pickup
 description: "Read workplan + check issue status + report next-action"
-user_invocable: true
 ---
 
 # /dw-lifecycle:pickup

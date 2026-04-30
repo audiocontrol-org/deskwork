@@ -1,7 +1,6 @@
 ---
-name: dw-lifecycle:complete
+name: complete
 description: "Move docs to <complete-dir>; update ROADMAP; close issues"
-user_invocable: true
 ---
 
 # /dw-lifecycle:complete

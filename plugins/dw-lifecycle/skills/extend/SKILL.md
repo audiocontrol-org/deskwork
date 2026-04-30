@@ -1,7 +1,6 @@
 ---
-name: dw-lifecycle:extend
+name: extend
 description: "Add phases to PRD/workplan; create new GitHub issues for added phases"
-user_invocable: true
 ---
 
 # /dw-lifecycle:extend
