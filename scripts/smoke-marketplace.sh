@@ -11,39 +11,21 @@
 # does. Per `RELEASING.md` § "Maturity stance" this is the release-
 # blocking gate.
 #
-# Issue #90: the previous smoke used `git archive | tar` to materialize
-# the install payload. That extraction silently dropped the workspace-
-# root package.json AND let the smoke pre-materialize vendor symlinks
-# the real install would never see. Both #88 and the husky walk-up
-# bug shipped to operators despite a green smoke. This rewrite runs
-# real `git clone`s — both shapes Claude Code uses — so the smoke
-# fails under the same conditions an adopter's install would.
-#
-# Three checks, run in order:
+# Phase 26 rewrite (v0.9.5+):
+#   The vendor-materialization architecture is gone. Plugins now ship
+#   as thin shells that first-run-install @deskwork/<pkg>@<version>
+#   from npm at first invocation. The smoke mirrors that path:
 #
 #   1. Phase A (marketplace.json read) — full clone of the release-
 #      source repo + validation that marketplace.json parses and
-#      every plugin entry has a usable source spec. This is the
-#      cheap pre-flight before the slower per-plugin install
-#      simulations.
+#      every plugin entry has a usable source spec.
 #
-#   2. Phase B (per-plugin install, branched on source kind) —
-#      for each plugin, mirror Claude Code's install behavior based
-#      on what marketplace.json declares as the source:
-#        - relative-path source → copy plugins/<plugin>/ from
-#          REPO_ROOT (UNMATERIALIZED). Vendor symlinks dangle here,
-#          which catches the #88 class (relative-path source pointed
-#          at unmaterialized HEAD, dangling vendor in operator's
-#          cache).
-#        - git-subdir source     → cone-mode sparse-clone of
-#          plugins/<plugin>/ from the release-source (where vendor
-#          IS materialized). Cone mode includes the workspace-root
-#          package.json too — exactly the shape Claude Code's
-#          sparse-clone produces — which catches the workspace-root
-#          walk-up class (the v0.9.4 prepare:husky bug).
-#      Both branches end by running the bin wrapper, whose first-run
-#      `npm install --omit=dev` triggers the real npm-side behavior
-#      that surfaces the bugs above.
+#   2. Phase B (per-plugin install via git-subdir + cone-mode sparse-
+#      clone) — mirror Claude Code's install behavior. Each plugin's
+#      bin shim's first-run `npm install --omit=dev @deskwork/<pkg>@
+#      <version>` runs against the actual npm public registry. This
+#      means the version pinned in plugin.json MUST be published
+#      before this smoke can pass.
 #
 #   3. Studio HTTP smoke — boot the studio against a fixture project,
 #      curl every documented page route, scrape <script>/<link> assets
@@ -188,12 +170,11 @@ ok "port ${SMOKE_PORT} is free"
 
 # ----- Pre-flight: working tree must be committed -------------------------
 #
-# build_release_source_clone clones REPO_ROOT and then runs
-# materialize-vendor on the clone's checked-out HEAD. A dirty working
-# tree in REPO_ROOT means smoke would test a different code state
-# than what's committed (and what would actually be tagged at release).
-# The /release skill already enforces a clean tree as a precondition;
-# this is belt-and-suspenders so the smoke can be run independently.
+# build_release_source_clone clones REPO_ROOT, so a dirty working tree
+# means the smoke tests a different code state than what's committed
+# (and what would actually be tagged at release). The /release skill
+# enforces a clean tree as a precondition; this is belt-and-suspenders
+# so the smoke can be run independently.
 #
 # Untracked files are tolerated (they aren't part of HEAD) but
 # modifications and staged changes are not.
@@ -207,6 +188,39 @@ if ! git -C "${REPO_ROOT}" diff --quiet 2>/dev/null \
   # loudly so they can't miss it.
 fi
 
+# ----- Pre-flight: pinned npm versions must be published ------------------
+#
+# Phase B's bin shims run `npm install --omit=dev @deskwork/<pkg>@
+# <version>` against the public registry. If the pinned version
+# (plugin.json#version) isn't on npm yet, that install will fail with a
+# misleading "404 Not Found". Surface that condition explicitly here so
+# the operator knows to publish before re-running the smoke.
+preflight_npm_version_published() {
+  local plugin_dir="$1"
+  local pkg="$2"
+  local version
+  version="$(node -e "
+    const fs = require('fs');
+    const j = JSON.parse(fs.readFileSync('${plugin_dir}/.claude-plugin/plugin.json', 'utf8'));
+    process.stdout.write(j.version);
+  ")"
+  local got
+  got="$(npm view "${pkg}@${version}" version 2>/dev/null || true)"
+  if [ "${got}" = "${version}" ]; then
+    ok "${pkg}@${version} is published"
+    return 0
+  fi
+  fail "${pkg}@${version} is NOT published on npm — run \`make publish\` (or \`npm publish --access public --workspace ${pkg}\`) before re-running smoke"
+  return 1
+}
+
+PREFLIGHT_FAIL=0
+preflight_npm_version_published "${REPO_ROOT}/plugins/deskwork" "@deskwork/cli" || PREFLIGHT_FAIL=1
+preflight_npm_version_published "${REPO_ROOT}/plugins/deskwork-studio" "@deskwork/studio" || PREFLIGHT_FAIL=1
+if [ "${PREFLIGHT_FAIL}" -ne 0 ]; then
+  exit 1
+fi
+
 # ----- Source the clone-install helper -----------------------------------
 
 # shellcheck source=./smoke-clone-install.sh
@@ -214,8 +228,10 @@ fi
 
 # ----- Build the release-source clone ------------------------------------
 #
-# Both phases A and B clone from this repo (a clone of REPO_ROOT with
-# vendor materialized + committed). See smoke-clone-install.sh for why.
+# Phases A and B both clone from this repo. With Phase 26's vendor
+# retirement, the clone is the release source as-is — no materialize-
+# vendor step. See smoke-clone-install.sh for why we clone (rather than
+# point at REPO_ROOT directly).
 
 RELEASE_SOURCE="${TMP}/release-source"
 build_release_source_clone "${RELEASE_SOURCE}"

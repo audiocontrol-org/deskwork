@@ -4,47 +4,34 @@
 # scripts/smoke-marketplace.sh. Sourced by the main smoke; not an entry
 # point.
 #
-# Why this file exists (Issue #90):
-#   The original smoke used `git archive HEAD plugins/<plugin> packages/
-#   | tar -x` to materialize the install payload. That extraction does
-#   not match Claude Code's real marketplace install path on two
-#   dimensions:
+# Phase 26 rewrite (v0.9.5+):
+#   The vendor-materialization architecture is gone. Plugins now ship
+#   as thin shells that first-run-install @deskwork/<pkg>@<version> from
+#   npm at first invocation. The smoke mirrors that path: cone-mode
+#   sparse-clone of plugins/<plugin>/ from a clone of REPO_ROOT, then
+#   run the bin shim, which triggers the real `npm install --omit=dev
+#   @deskwork/<pkg>@<version>` against the public registry.
 #
-#     1. Workspace-root visibility. Real install does `git clone` of
-#        the full marketplace repo, so npm install inside
-#        plugins/<plugin>/ walks UP and runs the workspace-root
-#        `prepare` script. The archive-extracted tree had no root
-#        package.json, so the walk-up never happened — the v0.9.4
-#        `prepare: husky` --omit=dev failure was invisible.
-#
-#     2. Vendor symlink behavior. Real install for a `git-subdir`
-#        source sparse-clones JUST the plugin path. Committed vendor
-#        symlinks dangle (their relative target traverses out of the
-#        sparse-checkout). The old smoke materialized symlinks
-#        locally before testing, so #88's empty-vendor failure was
-#        invisible.
-#
-#   This helper drives both install shapes via real `git clone`:
-#
+#   Phases:
 #     phase_a_marketplace_read — full clone of release-source HEAD;
 #       mirrors Claude Code's marketplace.json read step and validates
 #       the catalog itself (every plugin entry parses + names a usable
-#       source). Cheap pre-flight before phase B.
+#       source).
 #
-#     phase_b_per_source — for each plugin, branch on the source
-#       declared in marketplace.json:
-#         relative-path → copy plugins/<plugin>/ from REPO_ROOT
-#                          (UNMATERIALIZED). Vendor symlinks dangle
-#                          because packages/ doesn't ride along —
-#                          this is the #88 install-blocker shape.
-#         git-subdir    → cone-mode sparse-clone of plugins/<plugin>/
-#                          from the release-source (vendor MATERIALIZED).
-#                          Cone mode includes root-level files
-#                          (workspace package.json) — this is the
-#                          husky walk-up shape that hit operators in
-#                          v0.9.4.
-#       Then run the bin wrapper. The wrapper's first-run
-#       `npm install --omit=dev` is what surfaces the bugs above.
+#     phase_b_per_source — for each plugin declared as `git-subdir`
+#       in marketplace.json, cone-mode sparse-clone of plugins/<plugin>/
+#       (cone mode includes root-level files including the workspace-
+#       declaring root package.json, exactly the shape Claude Code's
+#       sparse clone produces). Then run the bin shim's --help. The
+#       shim's first-run install fetches from npm.
+#
+#   What this does NOT cover (intentional):
+#     - Local-state shortcuts (no `file://` substitution for the npm
+#       registry): the bin shim's `npm install` runs against the actual
+#       public registry. This requires the version pinned in the plugin
+#       shell's plugin.json to already be published.
+#     - source.ref pinning logic (retired with vendor): we no longer
+#       point marketplace entries at materialized tag commits.
 #
 # Inputs:
 #   REPO_ROOT — set by the main smoke before sourcing.
@@ -69,98 +56,37 @@ fi
 
 # build_release_source_clone <dest>
 #
-# Clone REPO_ROOT into <dest> with all branches + tags, then run
-# scripts/materialize-vendor.sh inside the clone and commit the result.
-# The output is a git repo whose HEAD represents the materialized
-# release state — the same shape the release workflow tags on GitHub.
+# Clone REPO_ROOT into <dest>. With the vendor architecture retired,
+# there is no materialize-vendor step — the clone is the release source
+# as-is.
 #
-# Why a clone-and-commit rather than running materialize-vendor on
-# REPO_ROOT directly: the working tree must stay clean between smoke
-# runs (the operator may iterate). Mutating REPO_ROOT's vendor/
-# symlinks would break dev. Cloning isolates the materialization to
-# a throwaway tree that subsequent clones can fetch from via
-# file://<dest>.
-#
-# We do NOT push or tag; the materialization commit lives only in
-# this temp clone. Phase B clones using the commit SHA / branch from
-# this clone, not via tag — which is fine because the only thing we
-# care about for the smoke is the materialized vendor shape.
+# We do still clone (rather than just point at REPO_ROOT) because Phase B
+# uses cone-mode sparse-checkout, which mutates per-clone state we don't
+# want leaking into the developer's working tree.
 build_release_source_clone() {
   local dest="$1"
   info "building release-source clone at ${dest}"
-  # --no-local opt-out: file:// URL forces git to use the wire protocol
-  # rather than hardlink-by-default optimizations, so the clone is
-  # representative of what `git clone <url>` would produce over the
-  # network. We need this for Phase B's sparse-clone behavior.
+  # --no-local opt-out via file:// URL forces git to use the wire
+  # protocol rather than hardlink-by-default optimizations, so the clone
+  # is representative of what `git clone <url>` would produce over the
+  # network. Phase B's sparse-clone needs this.
   git clone --quiet "file://${REPO_ROOT}" "${dest}"
   ok "cloned REPO_ROOT into release-source"
-
-  info "materializing vendor symlinks inside release-source clone"
-  # Run the SAME materialize-vendor.sh code path the release uses,
-  # but inside the clone. After this, vendor/<pkg> is a real
-  # directory; sparse-clones from this repo will produce
-  # self-contained plugin trees.
-  ( cd "${dest}" && bash scripts/materialize-vendor.sh ) >/dev/null
-  ok "materialized vendor symlinks in release-source"
-
-  # Commit the materialization so subsequent clones from file://${dest}
-  # see the materialized shape. Use a local-only identity so we don't
-  # depend on the operator's git config being set in unusual ways.
-  #
-  # `git add -A` (NOT `commit -am`) is critical here. After
-  # materialize-vendor.sh, git sees each `vendor/<pkg>` symlink as
-  # DELETED (the symlink blob is gone) and the new directory contents
-  # as UNTRACKED (rsync output isn't auto-tracked). `commit -am` only
-  # stages tracked-file changes — it would commit the deletions and
-  # leave the directory contents untracked, producing a release-source
-  # tree where `vendor/<pkg>/` is absent entirely. `add -A` stages
-  # both deletions AND untracked, which is what we need.
-  (
-    cd "${dest}"
-    git add -A
-    git -c user.email=smoke@deskwork.local \
-        -c user.name=smoke \
-        commit --quiet -m "smoke: materialize vendor for install simulation"
-  )
-  ok "committed materialized release-source"
-}
-
-# run_npm_install_at <dir>
-#
-# Run `npm install --omit=dev` at <dir> and return its exit code.
-# Captures stderr to a temp file shown only on failure (keeps the
-# success path quiet). Used by both phase_a and phase_b.
-run_npm_install_at() {
-  local dir="$1"
-  local stderr_file
-  stderr_file="$(mktemp -t smoke-npm-stderr.XXXXXX)"
-  local rc=0
-  ( cd "${dir}" && npm install --omit=dev --no-audit --no-fund --loglevel=error ) \
-    2>"${stderr_file}" || rc=$?
-  if [ "${rc}" -ne 0 ]; then
-    fail "npm install --omit=dev failed in ${dir} (exit ${rc})"
-    echo "----- captured stderr -----" >&2
-    cat "${stderr_file}" >&2 || true
-    echo "----- end stderr ----------" >&2
-  fi
-  rm -f "${stderr_file}"
-  return "${rc}"
 }
 
 # run_bin_help_at <plugin_dir> <bin_name>
 #
-# Invoke <plugin_dir>/bin/<bin_name> --help. The bin wrapper does its
-# own first-run `npm install` if node_modules is absent — this is the
-# exact path Claude Code's install triggers when the operator first
-# invokes a slash command that backs onto the bin.
+# Invoke <plugin_dir>/bin/<bin_name> --help. The bin shim does its own
+# first-run `npm install --omit=dev @deskwork/<pkg>@<version>` if the
+# pinned version isn't installed.
 #
-# We do NOT pre-run npm install here; we want the bin wrapper to do
-# it itself, so that any wrapper-level regressions surface (e.g.
-# install-lock corruption, missing tsx, broken node version detection).
+# We do NOT pre-run npm install here; we want the shim to do it itself,
+# so any shim-level regressions surface (lock corruption, wrong version
+# pin, etc.).
 #
-# We DO assert that the bin completes within a reasonable timeout —
-# install-lock's first-run install can take 15-30s on a fresh tree
-# but anything beyond a minute is a hang we should surface.
+# 180s ceiling: cold npm install of the studio package and its deps can
+# take 30-60s on a fresh tree under load. 180s gives headroom but still
+# surfaces a hang.
 run_bin_help_at() {
   local plugin_dir="$1"
   local bin_name="$2"
@@ -172,16 +98,12 @@ run_bin_help_at() {
   local out_file
   out_file="$(mktemp -t smoke-bin-out.XXXXXX)"
   local rc=0
-  # 120s ceiling: first-run install on a cold tree under load can take
-  # 30-60s. 120s gives headroom but still surfaces a hang. We use the
-  # `&` + `wait` pattern so SIGINT to the smoke is signal-interruptible
-  # (bash's `wait` is a cancellation point).
   (
     cd "${plugin_dir}"
     "${bin_path}" --help
   ) >"${out_file}" 2>&1 &
   local bin_pid=$!
-  local deadline=$(( $(date +%s) + 120 ))
+  local deadline=$(( $(date +%s) + 180 ))
   while [ "$(date +%s)" -lt "${deadline}" ]; do
     if ! kill -0 "${bin_pid}" 2>/dev/null; then
       break
@@ -189,7 +111,7 @@ run_bin_help_at() {
     sleep 1
   done
   if kill -0 "${bin_pid}" 2>/dev/null; then
-    fail "${bin_name} --help did not exit within 120s (likely hang or first-run install stalled)"
+    fail "${bin_name} --help did not exit within 180s (likely hang or first-run install stalled)"
     kill -TERM "${bin_pid}" 2>/dev/null || true
     sleep 1
     kill -KILL "${bin_pid}" 2>/dev/null || true
@@ -215,17 +137,8 @@ run_bin_help_at() {
 # Sanity check on the marketplace.json read step: clone the FULL
 # release-source repo at HEAD (mirrors Claude Code's marketplace.json
 # read of the default branch) and assert marketplace.json parses and
-# every plugin entry has a usable source spec. This is intentionally
-# lightweight — we don't run bins here because Claude Code doesn't
-# run bins from the marketplace clone either; it only reads the
-# catalog. The bin install paths are exercised by phase_b_per_source.
-#
-# Why this matters: catches the failure mode where marketplace.json
-# is itself malformed or points at non-existent paths. A bad ref
-# in a git-subdir source would fail here AND in phase_b; a bad
-# relative-path would also fail here AND in phase_b. Phase_b is the
-# real test; this phase is just a faster-failing pre-flight against
-# the catalog itself.
+# every plugin entry has a usable source spec. Cheap pre-flight before
+# the slower per-plugin install simulations.
 phase_a_marketplace_read() {
   local release_source="$1"
   local clone_dir="${TMP}/phase-a-marketplace"
@@ -237,7 +150,6 @@ phase_a_marketplace_read() {
     FAILURES=$((FAILURES + 1))
     return 1
   fi
-  # Validate every plugin entry has a parseable source via node.
   local validation_log
   validation_log="$(mktemp -t smoke-validation.XXXXXX)"
   if ! node -e "
@@ -285,19 +197,9 @@ phase_a_marketplace_read() {
 #   relative <path>
 #   git-subdir <url> <path> <ref>
 #
-# We use a node one-liner because jq isn't a hard dep on macOS and
-# bash JSON parsing is a fool's errand. node IS a hard dep (the
-# whole project runs on it), so this is safe.
-#
-# Why this matters (Issue #90, #88 repro):
-#   The smoke must mirror what Claude Code does per the source field.
-#   A relative-path source is copied as-is from the marketplace clone
-#   (no materialization, no separate fetch) — vendor symlinks dangle.
-#   A git-subdir source is cloned from <url>@<ref> — the operator
-#   gets whatever vendor shape lives at <ref>. Pinning <ref> to a
-#   materialized tag is exactly what #88's fix did, so reverting
-#   that pin (back to relative-path or git-subdir@main) must make
-#   this smoke fail.
+# `<ref>` is `HEAD` when omitted from marketplace.json (Phase 26e: ref
+# is no longer pinned per release; defaults to the repo's default
+# branch).
 read_marketplace_source() {
   local plugin="$1"
   node -e "
@@ -318,27 +220,26 @@ read_marketplace_source() {
 
 # phase_b_per_source <release_source_repo> <plugin> <bin_name>
 #
-# Mirrors Claude Code's per-plugin install path, branching on the
-# source type declared in marketplace.json:
+# Mirror Claude Code's per-plugin install path. With Phase 26 we have a
+# single shape: git-subdir + cone-mode sparse-clone. We keep the
+# relative-path branch as a safety net in case marketplace.json changes
+# in the future, but the active path is git-subdir.
 #
-#   relative-path source  → copy plugins/<plugin>/ from REPO_ROOT
-#                            HEAD (the unmaterialized working tree).
-#                            Vendor symlinks survive the copy and
-#                            then dangle at install time. This is
-#                            the install shape that hit operators
-#                            on the pre-#88 marketplace.json.
+# Cone mode is critical: per Claude Code docs, git-subdir uses sparse-
+# clone in cone mode, which includes root-level files (workspace-
+# declaring root package.json) even though only `<path>` directories are
+# populated. This is the exact shape the husky walk-up bug surfaced in
+# (v0.9.4): npm install at the plugin shell walked UP into the root
+# package.json's prepare script. We test against the same shape.
 #
-#   git-subdir + ref      → clone from <url>@<ref>. Locally we
-#                            substitute file://<release-source> for
-#                            <url> (the release-source's HEAD
-#                            represents the materialized tag).
-#                            Vendor is real directories.
+# For git-subdir, `ref` defaults to HEAD when marketplace.json omits the
+# field; we substitute "the release-source's HEAD" for "the repo's
+# default branch" since the smoke runs against a local clone.
 #
-# Either way, after the install we run the bin wrapper. The wrapper's
-# first-run `npm install --omit=dev` is what surfaces vendor-visibility
-# bugs (the bin tries to source vendor/cli-bin-lib/install-lock.sh
-# on line 17 — if vendor is empty, exit 1 with "No such file or
-# directory").
+# After cloning, the bin shim's first-run `npm install --omit=dev
+# @deskwork/<pkg>@<version>` runs against the actual npm public
+# registry. This means the version pinned in plugin.json MUST be
+# published before the smoke can pass.
 phase_b_per_source() {
   local release_source="$1"
   local plugin="$2"
@@ -355,24 +256,7 @@ phase_b_per_source() {
       local rel_path
       rel_path="$(printf '%s' "${source_line}" | awk '{print $2}')"
       info "phase B (relative-path source) — plugin=${plugin} path=${rel_path}"
-      # Strip leading "./" so destination paths don't carry it.
       local src_path="${rel_path#./}"
-      # Claude Code copies the plugin path from the marketplace clone.
-      # We mirror with rsync to preserve symlinks faithfully on both
-      # macOS (BSD cp) and Linux (GNU cp). rsync -a copies symlinks
-      # as symlinks (not their targets) by default — exactly what we
-      # want, because the bug is that those committed symlinks dangle
-      # post-copy when packages/ isn't beside the plugin in the
-      # operator's cache.
-      #
-      # The marketplace clone here is REPO_ROOT itself — the
-      # unmaterialized working tree.
-      #
-      # mkdir -p of the FULL destination path (not just clone_dir)
-      # is required: rsync's "create dest if missing" only handles
-      # the leaf, not intermediate components, so a multi-segment
-      # src_path (e.g. plugins/deskwork) needs the parent
-      # directories pre-created.
       mkdir -p "${clone_dir}/${src_path}"
       rsync -a --exclude=node_modules --exclude=.runtime-cache \
         "${REPO_ROOT}/${src_path}/" "${clone_dir}/${src_path}/"
@@ -399,21 +283,6 @@ phase_b_per_source() {
       path="$(printf '%s' "${source_line}" | awk '{print $3}')"
       ref="$(printf '%s' "${source_line}" | awk '{print $4}')"
       info "phase B (git-subdir source) — plugin=${plugin} path=${path} ref=${ref}"
-      # Sparse-clone from the release-source. We treat the release-
-      # source's HEAD as the materialized state for whatever ref is
-      # configured (the smoke runs pre-tag, so we can't actually clone
-      # by tag name — we substitute "the materialized HEAD" for "the
-      # tag we're about to create").
-      #
-      # CONE MODE is critical here. Per Claude Code docs, git-subdir
-      # uses sparse-clone — and in cone mode (the git default since
-      # 2.27, and what Claude Code uses), root-level files including
-      # package.json ARE present even though only `<path>` directories
-      # are populated. This is how the husky walk-up bug hit operators:
-      # the sparse-cloned tree had workspaces-declaring root
-      # package.json, so npm install at the plugin shell walked UP.
-      # --no-cone would HIDE that bug class — we'd be back to the
-      # false-pass behavior #90 was filed about.
       git clone --quiet --filter=blob:none --no-checkout \
         "file://${release_source}" "${clone_dir}"
       ( cd "${clone_dir}" && git sparse-checkout init --cone >/dev/null )
@@ -424,16 +293,6 @@ phase_b_per_source() {
       local plugin_dir="${clone_dir}/${path}"
       if [ ! -d "${plugin_dir}" ]; then
         fail "phase B: ${path} missing after sparse-checkout"
-        FAILURES=$((FAILURES + 1))
-        return 1
-      fi
-
-      # Vendor sanity check: every vendor/<pkg> entry must be a real
-      # directory with content. A symlink here would dangle (because
-      # packages/ is not in the sparse-checkout) and the resulting
-      # copy would be invisible to the bin wrapper's tsx exec.
-      if ! assert_vendor_materialized "${plugin_dir}"; then
-        fail "phase B: vendor materialization check failed for ${path}"
         FAILURES=$((FAILURES + 1))
         return 1
       fi
@@ -452,49 +311,4 @@ phase_b_per_source() {
       return 1
       ;;
   esac
-}
-
-# assert_vendor_materialized <plugin_dir>
-#
-# Walk plugin_dir/vendor/* and require each entry to be either:
-#   - a real directory containing at least a package.json, OR
-#   - absent (no vendor/ directory at all is fine for plugins
-#     that don't vendor packages).
-#
-# Symlinks fail. Empty directories fail. Directories without a
-# package.json fail (catches the case where rsync wrote an empty
-# stub).
-#
-# Why we don't allow symlinks even if they "happen to resolve":
-# the install shape we're asserting (sparse clone of plugins/<plugin>
-# only) by definition has no out-of-tree resolution path. Any
-# symlink with a relative parent escape would dangle.
-assert_vendor_materialized() {
-  local plugin_dir="$1"
-  local vendor_dir="${plugin_dir}/vendor"
-  if [ ! -d "${vendor_dir}" ]; then
-    dim "  no vendor/ in ${plugin_dir} — nothing to check"
-    return 0
-  fi
-  local entry
-  local rc=0
-  for entry in "${vendor_dir}"/*; do
-    [ -e "${entry}" ] || continue
-    if [ -L "${entry}" ]; then
-      fail "vendor symlink found at ${entry} — sparse clone would dangle"
-      rc=1
-      continue
-    fi
-    if [ ! -d "${entry}" ]; then
-      fail "vendor entry not a directory: ${entry}"
-      rc=1
-      continue
-    fi
-    if [ ! -s "${entry}/package.json" ]; then
-      fail "vendor entry missing/empty package.json: ${entry}/package.json"
-      rc=1
-      continue
-    fi
-  done
-  return "${rc}"
 }
