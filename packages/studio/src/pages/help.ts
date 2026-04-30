@@ -145,25 +145,25 @@ function renderTracksSection(): RawHtml {
           <p class="eh-track-title">Longform</p>
           <p class="eh-track-sub">Blog posts · dispatches</p>
           <ol class="eh-track-steps">
-            <li>Capture the idea.<code>/editorial-add "Title"</code></li>
-            <li>Promote and set keywords.<code>/editorial-plan &lt;slug&gt;</code></li>
-            <li>Scaffold the draft file.<code>/editorial-draft &lt;slug&gt;</code><span class="note">or click "scaffold" in the studio.</span></li>
+            <li>Capture the idea.<code>/deskwork:add "Title"</code></li>
+            <li>Promote and set keywords.<code>/deskwork:plan &lt;slug&gt;</code></li>
+            <li>Scaffold the draft file.<code>/deskwork:draft &lt;slug&gt;</code><span class="note">or click "scaffold" in the studio.</span></li>
             <li>Write the prose. No skill; this is the human doing the work.</li>
-            <li>Open a review workflow.<code>/editorial-draft-review &lt;slug&gt;</code></li>
-            <li>Annotate in the browser, then iterate.<code>/editorial-iterate</code></li>
-            <li>Approve — writes to the destination file.<code>/editorial-approve</code></li>
-            <li>Mark published. Then commit + push by hand.<code>/editorial-publish &lt;slug&gt;</code></li>
+            <li>Open a review workflow.<code>/deskwork:review-start &lt;slug&gt;</code></li>
+            <li>Annotate in the browser, then iterate.<code>/deskwork:iterate</code></li>
+            <li>Approve — writes to the destination file.<code>/deskwork:approve</code></li>
+            <li>Mark published. Then commit + push by hand.<code>/deskwork:publish &lt;slug&gt;</code></li>
           </ol>
         </div>
         <div class="eh-track">
           <p class="eh-track-title">Shortform</p>
           <p class="eh-track-sub">Social copy · cross-posts</p>
           <ol class="eh-track-steps">
-            <li>Draft per platform.<code>/editorial-shortform-draft &lt;slug&gt; &lt;platform&gt;</code><span class="note">Reddit, YouTube, LinkedIn, newsletter.</span></li>
+            <li>Draft per platform.<code>/deskwork:shortform-start &lt;slug&gt; &lt;platform&gt;</code><span class="note">Reddit, YouTube, LinkedIn, newsletter.</span></li>
             <li>Review the same way as longform (same page, shortform mode).<span class="note">/dev/editorial-review-shortform</span></li>
-            <li>Iterate or approve as with longform.<code>/editorial-iterate · /editorial-approve</code></li>
+            <li>Iterate or approve as with longform.<code>/deskwork:iterate · /deskwork:approve</code></li>
             <li>Post the copy yourself to the platform.</li>
-            <li>Record the distribution.<code>/editorial-distribute &lt;slug&gt; &lt;platform&gt; &lt;url&gt;</code></li>
+            <li>Record the distribution.<code>/deskwork:distribute &lt;slug&gt; &lt;platform&gt; &lt;url&gt;</code></li>
           </ol>
         </div>
         <div class="eh-track">
@@ -235,11 +235,11 @@ function renderStudioSection(): RawHtml {
           <h4>Calendar panels</h4>
           <p>Five columns: <em>Ideas · Planned · Drafting · Review · Published</em>. Each row shows slug, title, stage-specific metadata (keywords for Planned; dates for Published), a file-present dot, and the active review workflow stamp when one exists.</p>
           <h4>Next-move column</h4>
-          <p>Per row, the studio surfaces either a copy-to-clipboard command (for cognitive work that lives in Claude Code) or a one-click button (for mechanical transitions). <code>scaffold →</code> calls <code>/editorial-draft</code>. <code>publish →</code> calls <code>/editorial-publish</code>.</p>
+          <p>Per row, the studio surfaces either a copy-to-clipboard command (for cognitive work that lives in Claude Code) or a one-click button (for mechanical transitions). <code>scaffold →</code> calls <code>/deskwork:draft</code>. <code>publish →</code> calls <code>/deskwork:publish</code>.</p>
           <h4>Shortform coverage matrix</h4>
-          <p>For each <em>Published</em> blog, a row of platform cells (reddit, linkedin, youtube, instagram). Shaded cells are covered by a DistributionRecord; empty cells surface the exact <code>/editorial-shortform-draft</code> command to copy.</p>
+          <p>For each <em>Published</em> blog, a row of platform cells (reddit, linkedin, youtube, instagram). Shaded cells are covered by a DistributionRecord; empty cells surface the exact <code>/deskwork:shortform-start</code> command to copy.</p>
           <h4>Voice-drift signal</h4>
-          <p>A small panel on the right, backed by <code>/editorial-review-report</code>. Names the two voice-skill categories that are producing the most operator corrections. Shows once you have at least five terminal workflows on record.</p>
+          <p>A small panel on the right, backed by <code>/deskwork:review-report</code>. Names the two voice-skill categories that are producing the most operator corrections. Shows once you have at least five terminal workflows on record.</p>
         </div>
         <div class="eh-panel">
           <p class="eh-panel-head">Secondary surfaces</p>
@@ -250,7 +250,7 @@ function renderStudioSection(): RawHtml {
           <h4>Keyboard</h4>
           <p>In the studio: <kbd>1</kbd>–<kbd>5</kbd> jump to stage columns. In a longform review: <kbd>e</kbd> / double-click toggles edit mode; <kbd>a</kbd> approves; <kbd>i</kbd> iterates; <kbd>r</kbd> rejects; <kbd>j</kbd>/<kbd>k</kbd> step through margin notes; <kbd>?</kbd> shows a full shortcuts overlay.</p>
           <h4>Polling</h4>
-          <p>Both routes poll every 8–10 seconds when idle. If the agent runs <code>/editorial-iterate</code> in Claude Code, a new draft version shows up in the browser without a reload.</p>
+          <p>Both routes poll every 8–10 seconds when idle. If the agent runs <code>/deskwork:iterate</code> in Claude Code, a new draft version shows up in the browser without a reload.</p>
         </div>
       </div>
     </section>`);
@@ -260,17 +260,17 @@ const RUNTHROUGH_STEPS: ReadonlyArray<{ title: string; op: string; body: RawHtml
   {
     title: 'Capture an idea',
     op: 'terminal',
-    body: unsafe('<p>You have a title in mind. Run <code>/editorial-add "Your Title"</code>. A row lands in <em>Ideas</em>. Slug is generated; calendar is committed-able.</p>'),
+    body: unsafe('<p>You have a title in mind. Run <code>/deskwork:add "Your Title"</code>. A row lands in <em>Ideas</em>. Slug is generated; calendar is committed-able.</p>'),
   },
   {
     title: 'Promote to Planned',
     op: 'terminal',
-    body: unsafe('<p>The idea has shape. Run <code>/editorial-plan &lt;slug&gt;</code>. You are prompted for target keywords and topic tags; they land on the calendar row. The studio\'s Planned column now shows it with a tag strip.</p>'),
+    body: unsafe('<p>The idea has shape. Run <code>/deskwork:plan &lt;slug&gt;</code>. You are prompted for target keywords and topic tags; they land on the calendar row. The studio\'s Planned column now shows it with a tag strip.</p>'),
   },
   {
     title: 'Scaffold the draft',
     op: 'studio or terminal',
-    body: unsafe('<p>Click the <code>scaffold →</code> button on the row, or run <code>/editorial-draft --site &lt;site&gt; &lt;slug&gt;</code>. The blog file appears with frontmatter filled in, and the entry moves to <em>Drafting</em>.</p>'),
+    body: unsafe('<p>Click the <code>scaffold →</code> button on the row, or run <code>/deskwork:draft --site &lt;site&gt; &lt;slug&gt;</code>. The blog file appears with frontmatter filled in, and the entry moves to <em>Drafting</em>.</p>'),
   },
   {
     title: 'Write the prose',
@@ -280,7 +280,7 @@ const RUNTHROUGH_STEPS: ReadonlyArray<{ title: string; op: string; body: RawHtml
   {
     title: 'Open the review workflow',
     op: 'terminal',
-    body: unsafe('<p><code>/editorial-draft-review &lt;slug&gt;</code> prints the dev URL: <code>/dev/editorial-review/&lt;slug&gt;</code>. The draft renders inside the review chrome. State: <em>open</em>.</p>'),
+    body: unsafe('<p><code>/deskwork:review-start &lt;slug&gt;</code> prints the dev URL: <code>/dev/editorial-review/&lt;workflow-id&gt;</code>. The draft renders inside the review chrome. State: <em>open</em>.</p>'),
   },
   {
     title: 'Annotate in the browser',
@@ -290,12 +290,12 @@ const RUNTHROUGH_STEPS: ReadonlyArray<{ title: string; op: string; body: RawHtml
   {
     title: 'Iterate',
     op: 'browser then terminal',
-    body: unsafe('<p>Click <em>Iterate</em>. State becomes <em>iterating</em>. Back in Claude Code, run <code>/editorial-iterate</code>. The agent revises using the site voice skill, writes v2 to the journal, flips back to <em>in-review</em>. Polling surfaces v2 in the browser without a reload.</p>'),
+    body: unsafe('<p>Click <em>Iterate</em>. State becomes <em>iterating</em>. Back in Claude Code, run <code>/deskwork:iterate</code>. The agent revises using the site voice skill, writes v2 to the journal, flips back to <em>in-review</em>. Polling surfaces v2 in the browser without a reload.</p>'),
   },
   {
     title: 'Approve and write',
     op: 'browser then terminal',
-    body: unsafe('<p>Click <em>Approve</em>. State becomes <em>approved</em>. Run <code>/editorial-approve</code>. The approved version is written to the blog file on disk; state becomes <em>applied</em>.</p>'),
+    body: unsafe('<p>Click <em>Approve</em>. State becomes <em>approved</em>. Run <code>/deskwork:approve</code>. The approved version is written to the blog file on disk; state becomes <em>applied</em>.</p>'),
   },
   {
     title: 'Commit by hand',
@@ -305,17 +305,17 @@ const RUNTHROUGH_STEPS: ReadonlyArray<{ title: string; op: string; body: RawHtml
   {
     title: 'Mark published',
     op: 'studio or terminal',
-    body: unsafe('<p>Click <code>publish →</code> on the Drafting or Review row, or run <code>/editorial-publish &lt;slug&gt;</code>. The entry moves to <em>Published</em>; today\'s date is stamped as <code>datePublished</code>.</p>'),
+    body: unsafe('<p>Click <code>publish →</code> on the Drafting or Review row, or run <code>/deskwork:publish &lt;slug&gt;</code>. The entry moves to <em>Published</em>; today\'s date is stamped as <code>datePublished</code>.</p>'),
   },
   {
     title: 'Cross-post',
     op: 'terminal × platform',
-    body: unsafe('<p>For each platform worth posting to: <code>/editorial-shortform-draft &lt;slug&gt; &lt;platform&gt;</code>. Review it exactly like a longform workflow. Approve, then post it yourself. Record the URL with <code>/editorial-distribute &lt;slug&gt; &lt;platform&gt; &lt;url&gt;</code>.</p>'),
+    body: unsafe('<p>For each platform worth posting to: <code>/deskwork:shortform-start &lt;slug&gt; &lt;platform&gt;</code>. Review it exactly like a longform workflow. Approve, then post it yourself. Record the URL with <code>/deskwork:distribute &lt;slug&gt; &lt;platform&gt; &lt;url&gt;</code>.</p>'),
   },
   {
     title: 'Reconcile and reflect',
     op: 'cadence',
-    body: unsafe('<p><code>/editorial-reddit-sync</code> to pull external state; <code>/editorial-social-review</code> to see the coverage matrix; <code>/editorial-review-report</code> to see which voice-skill principles are drifting. Feed the observations back into the voice skills. The cycle compounds.</p>'),
+    body: unsafe('<p><code>/deskwork:review-report</code> shows which voice-skill principles are drifting. Feed the observations back into the voice skills. The cycle compounds.</p>'),
   },
 ];
 
@@ -410,8 +410,8 @@ function renderReferenceSection(): RawHtml {
           <h4>First-run tripwires</h4>
           <dl>
             <dt>404 on /dev/*</dt><dd>the dev routes only run when <code>deskwork-studio</code> is up. Start it: <code>npx tsx packages/studio/src/server.ts</code>.</dd>
-            <dt>no galley to review</dt><dd>start one with <code>/editorial-draft-review --site &lt;site&gt; &lt;slug&gt;</code>.</dd>
-            <dt>iterate doesn't trigger</dt><dd>the agent has to run <code>/editorial-iterate</code>. The browser button just marks the workflow; Claude does the writing.</dd>
+            <dt>no galley to review</dt><dd>start one with <code>/deskwork:review-start --site &lt;site&gt; &lt;slug&gt;</code>.</dd>
+            <dt>iterate doesn't trigger</dt><dd>the agent has to run <code>/deskwork:iterate</code>. The browser button just marks the workflow; Claude does the writing.</dd>
           </dl>
         </div>
       </div>

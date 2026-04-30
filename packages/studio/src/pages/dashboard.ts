@@ -385,9 +385,9 @@ function renderFilterStrip(sites: readonly string[]): RawHtml {
 }
 
 const STAGE_EMPTY_MESSAGES: Record<Stage, string> = {
-  Ideas: 'No open ideas. Run /editorial-add to capture one.',
-  Planned: 'Nothing planned. /editorial-plan <slug> to promote an idea.',
-  Outlining: 'Nothing in outlining. /editorial-outline <slug> to start one.',
+  Ideas: 'No open ideas. Run /deskwork:add to capture one.',
+  Planned: 'Nothing planned. /deskwork:plan <slug> to promote an idea.',
+  Outlining: 'Nothing in outlining. /deskwork:outline <slug> to start one.',
   Drafting: 'No posts in drafting.',
   Review: 'Nothing in review stage.',
   Paused: 'Nothing paused. /deskwork:pause <slug> sets an entry aside without losing where it was.',
@@ -465,7 +465,7 @@ function renderRowActions(
   const buttons: string[] = [];
   if (stage === 'Ideas') {
     buttons.push(html`<button class="er-btn er-btn-small er-copy-btn" type="button"
-      data-copy="/editorial-plan --site ${site} ${entry.slug}" title="copy command">plan →</button>`);
+      data-copy="/deskwork:plan --site ${site} ${entry.slug}" title="copy command">plan →</button>`);
   }
   if (stage === 'Planned' && !hasFile) {
     buttons.push(html`<button class="er-btn er-btn-small er-btn-primary" type="button"
@@ -473,17 +473,17 @@ function renderRowActions(
   }
   if (stage === 'Planned' && hasFile) {
     buttons.push(html`<button class="er-btn er-btn-small er-btn-primary er-copy-btn" type="button"
-      data-copy="/editorial-outline --site ${site} ${entry.slug}"
+      data-copy="/deskwork:outline --site ${site} ${entry.slug}"
       title="scaffold file exists — copy to sketch the outline in Claude Code">outline →</button>`);
   }
   if (stage === 'Outlining' && wf && wf.state === 'iterating') {
     buttons.push(html`<button class="er-btn er-btn-small er-btn-primary er-copy-btn" type="button"
-      data-copy="/editorial-iterate --kind outline --site ${site} ${entry.slug}"
+      data-copy="/deskwork:iterate --kind outline --site ${site} ${entry.slug}"
       title="operator clicked Iterate">iterate outline →</button>`);
   }
   if (stage === 'Outlining' && wf && wf.state === 'approved') {
     buttons.push(html`<button class="er-btn er-btn-small er-btn-approve er-copy-btn" type="button"
-      data-copy="/editorial-outline-approve --site ${site} ${entry.slug}"
+      data-copy="/deskwork:approve --site ${site} ${entry.slug}"
       title="outline approved — advance to Drafting">approve outline →</button>`);
   }
   if (
@@ -496,12 +496,12 @@ function renderRowActions(
   }
   if (stage === 'Outlining' && !wf) {
     buttons.push(html`<button class="er-btn er-btn-small er-btn-primary er-copy-btn" type="button"
-      data-copy="/editorial-outline --site ${site} ${entry.slug}"
+      data-copy="/deskwork:outline --site ${site} ${entry.slug}"
       title="no outline workflow found — copy to (re)start one">outline →</button>`);
   }
   if ((stage === 'Drafting' || stage === 'Review') && !bodyWritten) {
     buttons.push(html`<button class="er-btn er-btn-small er-btn-primary er-copy-btn" type="button"
-      data-copy="/editorial-draft --site ${site} ${entry.slug}"
+      data-copy="/deskwork:draft --site ${site} ${entry.slug}"
       title="body is still the placeholder">draft body →</button>`);
   }
   if ((stage === 'Drafting' || stage === 'Review') && bodyWritten && !wf) {
@@ -516,7 +516,7 @@ function renderRowActions(
   }
   if (stage === 'Published' && !wf) {
     buttons.push(html`<button class="er-btn er-btn-small er-copy-btn" type="button"
-      data-copy="/editorial-draft-review --site ${site} ${entry.slug}"
+      data-copy="/deskwork:review-start --site ${site} ${entry.slug}"
       title="re-review a published post">re-review</button>`);
   }
   // #27 — Paused gets a "resume" copy; pausable stages get a "pause" copy.
@@ -537,7 +537,7 @@ function renderRowActions(
   }
   if (kind === 'blog') {
     buttons.push(html`<button class="er-btn er-btn-small" type="button" data-action="rename-open"
-      title="rename the slug — copies /editorial-rename-slug to clipboard">rename →</button>`);
+      title="rename the slug">rename →</button>`);
   }
   return unsafe(`<span class="er-calendar-action">${buttons.join('')}</span>`);
 }
@@ -828,7 +828,7 @@ function renderApprovedSection(data: DashboardData, ctx: StudioContext): RawHtml
           <span class="er-stamp er-stamp-approved">approved</span>
           <span class="er-row-ts">v${w.currentVersion}</span>
           <span class="er-row-hint">
-            Run · <code>/editorial-approve --site ${w.site} ${w.slug}${flagBit}</code>
+            Run · <code>/deskwork:approve --site ${w.site} ${w.slug}${flagBit}</code>
           </span>
         </a>`;
     })
@@ -893,7 +893,7 @@ function renderSidebar(data: DashboardData): RawHtml {
         }
         <div style="margin-top: var(--er-space-2); font-family: var(--er-font-mono); font-size: 0.68rem; color: var(--er-faded);">
           from ${data.report.all.approvedCount} approved · ${data.report.all.cancelledCount} cancelled<br />
-          <code style="margin-top: 0.25rem; display: inline-block;">/editorial-review-report --site &lt;site&gt;</code>
+          <code style="margin-top: 0.25rem; display: inline-block;">/deskwork:review-report --site &lt;site&gt;</code>
         </div>`)
     : unsafe(html`
         <p style="font-family: var(--er-font-display); font-style: italic; color: var(--er-ink-soft); margin: 0;">
