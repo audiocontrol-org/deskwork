@@ -1322,9 +1322,11 @@ Shipped only after the manual flow in 26f is solid. Adds `permissions: id-token:
 
 **Sub-phase F — Destructive shortcut soft-confirm ([#108](https://github.com/audiocontrol-org/deskwork/issues/108)):**
 
-- [ ] Implement two-key sequence handling for `a a`, `i i`, `r r` (within ~500ms). Single keystroke pops a transient hint ("press a again to approve") that auto-dismisses; second matching keystroke fires the action.
-- [ ] Update the `?` shortcuts panel to document the two-key behavior.
-- [ ] Keep `j` / `k` (next/prev margin note) and `e` (toggle edit) as single-key — they're not destructive.
+- [x] Implement two-key sequence handling for `a a`, `i i`, `r r` (within ~500ms). Single keystroke pops a transient hint ("press a again to approve") that auto-dismisses; second matching keystroke fires the action.
+- [x] Update the `?` shortcuts panel to document the two-key behavior.
+- [x] Keep `j` / `k` (next/prev margin note) and `e` (toggle edit) as single-key — they're not destructive.
+
+**Diagnosis:** `editorial-review-client.ts:1664-1666` (post-disarm-refactor: 1670-1685) bound `a`/`i`/`r` to single-keystroke `approveBtn?.click()` etc. Stray keystroke while reading collapsed weeks of work. Fix: module-level `armedKey` + `armedTimer` state. `armKey(key)` shows a hint toast ("Press a again to approve"), schedules `disarm()` in 500ms. Destructive-key path checks `armedKey === key` → fire and disarm; else → arm. Non-destructive shortcuts (`e`, `j`, `k`) call `disarm()` defensively before their own action so a half-armed state can't leak across navigation. The `?` shortcuts panel in `packages/studio/src/pages/review.ts:278-280` updated to show double-`<kbd>` rows + "press twice within 500ms" prose. Regression test at `packages/studio/test/review-shortcuts-panel.test.ts` covers (1) double-`<kbd>` rendering, (2) absence of the pre-fix single-`<kbd>` shape, (3) preservation of `j`/`k`/`e` single-key shortcuts. Two-key behavior itself is client-only — no jsdom infrastructure means no direct unit test; the panel-content test is the server-side artifact that documents the fix.
 
 **Sub-phase G — Dashboard row link fallback ([#110](https://github.com/audiocontrol-org/deskwork/issues/110)):**
 

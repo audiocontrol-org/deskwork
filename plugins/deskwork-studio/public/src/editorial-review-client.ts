@@ -1583,6 +1583,34 @@ export function initEditorialReview(): void {
   shortcutsBtn?.addEventListener('click', () => showShortcuts(true));
   shortcutsBackdrop?.addEventListener('click', () => showShortcuts(false));
 
+  // ---- Destructive shortcut soft-confirm (#108) ----
+  // Approve / Iterate / Reject all transition workflow state and are
+  // hard to undo. Single-keystroke firing meant a stray `a` while the
+  // operator was reading collapsed weeks of work. The two-key sequence
+  // pattern (a-a, i-i, r-r within 500ms) keeps the keystroke speed
+  // muscle-memory advantage while requiring intent to fire.
+  type DestructiveKey = 'a' | 'i' | 'r';
+  const DESTRUCTIVE_LABELS: Readonly<Record<DestructiveKey, string>> = {
+    a: 'approve',
+    i: 'iterate',
+    r: 'reject',
+  };
+  let armedKey: DestructiveKey | null = null;
+  let armedTimer: ReturnType<typeof setTimeout> | null = null;
+  function disarm(): void {
+    armedKey = null;
+    if (armedTimer !== null) {
+      clearTimeout(armedTimer);
+      armedTimer = null;
+    }
+  }
+  function armKey(key: DestructiveKey): void {
+    disarm();
+    armedKey = key;
+    showToast(`Press ${key} again to ${DESTRUCTIVE_LABELS[key]}`);
+    armedTimer = setTimeout(() => disarm(), 500);
+  }
+
   let commentFocusIndex = -1;
   function focusCommentByIndex(dir: 1 | -1): void {
     const items = Array.from(sidebarList.children).filter(
@@ -1660,12 +1688,26 @@ export function initEditorialReview(): void {
       toggleOutlineDrawer();
       return;
     }
-    if (ev.key === 'e') { ev.preventDefault(); toggleBtn.click(); return; }
-    if (ev.key === 'a') { ev.preventDefault(); approveBtn?.click(); return; }
-    if (ev.key === 'i') { ev.preventDefault(); iterateBtn?.click(); return; }
-    if (ev.key === 'r') { ev.preventDefault(); rejectBtn?.click(); return; }
-    if (ev.key === 'j') { ev.preventDefault(); focusCommentByIndex(1); return; }
-    if (ev.key === 'k') { ev.preventDefault(); focusCommentByIndex(-1); return; }
+    if (ev.key === 'e') { ev.preventDefault(); disarm(); toggleBtn.click(); return; }
+    // Destructive actions (#108): two-key sequence within 500ms.
+    if (ev.key === 'a' || ev.key === 'i' || ev.key === 'r') {
+      ev.preventDefault();
+      const key = ev.key as DestructiveKey;
+      if (armedKey === key) {
+        disarm();
+        if (key === 'a') approveBtn?.click();
+        else if (key === 'i') iterateBtn?.click();
+        else rejectBtn?.click();
+      } else {
+        armKey(key);
+      }
+      return;
+    }
+    if (ev.key === 'j') { ev.preventDefault(); disarm(); focusCommentByIndex(1); return; }
+    if (ev.key === 'k') { ev.preventDefault(); disarm(); focusCommentByIndex(-1); return; }
+    // Any other non-destructive key disarms (modifier-keys filter
+    // already excluded; this catches genuine other keystrokes).
+    disarm();
   });
 
   // ---- Polling: check for new versions or state changes ----

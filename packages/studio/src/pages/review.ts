@@ -275,9 +275,9 @@ function renderShortcutsOverlay(): RawHtml {
           <dt><kbd>e</kbd> / dbl-click</dt><dd>toggle edit mode</dd>
           <dt>select text</dt><dd>leave a margin note</dd>
           <dt><kbd>⌘</kbd><kbd>↵</kbd> / <kbd>ctrl</kbd><kbd>↵</kbd></dt><dd>save margin note (in composer)</dd>
-          <dt><kbd>a</kbd></dt><dd>approve</dd>
-          <dt><kbd>i</kbd></dt><dd>iterate</dd>
-          <dt><kbd>r</kbd></dt><dd>reject</dd>
+          <dt><kbd>a</kbd> <kbd>a</kbd></dt><dd>approve <em>— press twice within 500ms; first press arms, second fires</em></dd>
+          <dt><kbd>i</kbd> <kbd>i</kbd></dt><dd>iterate <em>— press twice within 500ms</em></dd>
+          <dt><kbd>r</kbd> <kbd>r</kbd></dt><dd>reject <em>— press twice within 500ms</em></dd>
           <dt><kbd>j</kbd> / <kbd>k</kbd></dt><dd>next / previous margin note</dd>
           <dt><kbd>?</kbd></dt><dd>this panel</dd>
           <dt><kbd>esc</kbd></dt><dd>close / cancel composer</dd>
