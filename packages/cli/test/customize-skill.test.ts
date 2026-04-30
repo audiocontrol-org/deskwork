@@ -231,3 +231,54 @@ describe('deskwork customize — npm-installed shape (#95 regression)', () => {
     },
   );
 });
+
+/**
+ * Manifest-shape regression for #101.
+ *
+ * `@deskwork/cli` and `@deskwork/studio` previously declared
+ * `dependencies: { "@deskwork/core": "*" }`. Wildcard ranges let npm
+ * satisfy the requirement with whatever stale @deskwork/core happened
+ * to be in the install tree, so the v0.9.6 customize fix (#95) didn't
+ * deliver to adopters running an older @deskwork/core. Lockstep is
+ * enforced by `scripts/bump-version.ts` — every @deskwork/* dep across
+ * the monorepo must move with the package version it travels with.
+ *
+ * This test asserts the invariant directly against the on-disk
+ * manifests: no @deskwork/* dep anywhere uses "*", "latest", or any
+ * range expression. Caret/tilde would also break lockstep; the only
+ * legitimate value is an exact-version pin matching the root version.
+ */
+describe('monorepo manifest invariants (#101 regression)', () => {
+  const rootPkg = JSON.parse(
+    readFileSync(join(workspaceRoot, 'package.json'), 'utf-8'),
+  ) as { version: string };
+  const ROOT_VERSION = rootPkg.version;
+
+  const LOCKSTEP_MANIFESTS = [
+    'packages/cli/package.json',
+    'packages/studio/package.json',
+    'plugins/deskwork/package.json',
+    'plugins/deskwork-studio/package.json',
+  ];
+
+  for (const relPath of LOCKSTEP_MANIFESTS) {
+    it(`${relPath}: every @deskwork/* dep is pinned to exactly ${ROOT_VERSION}`, () => {
+      const manifest = JSON.parse(
+        readFileSync(join(workspaceRoot, relPath), 'utf-8'),
+      ) as { dependencies?: Record<string, string> };
+      const deps = manifest.dependencies ?? {};
+      const deskworkDeps = Object.entries(deps).filter(([name]) =>
+        name.startsWith('@deskwork/'),
+      );
+      // Each lockstep manifest must declare at least one @deskwork/*
+      // dep — otherwise the entry is in the wrong list.
+      expect(deskworkDeps.length).toBeGreaterThan(0);
+      for (const [name, range] of deskworkDeps) {
+        expect(
+          range,
+          `${relPath} dep ${name} must be pinned to "${ROOT_VERSION}", got "${range}"`,
+        ).toBe(ROOT_VERSION);
+      }
+    });
+  }
+});

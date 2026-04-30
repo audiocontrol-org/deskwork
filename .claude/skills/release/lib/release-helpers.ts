@@ -353,6 +353,26 @@ async function dispatch(argv: readonly string[]): Promise<number> {
       );
       return 0;
     }
+    case 'assert-published': {
+      const [version] = args;
+      if (!version) {
+        process.stderr.write('usage: assert-published <version>\n');
+        return 2;
+      }
+      const report = verifyNpmStatus(version);
+      if (report.unpublished.length > 0) {
+        process.stderr.write(
+          `Version ${version} is NOT yet published on npm for: ${report.unpublished.join(', ')}.\n` +
+            `Either the publish step did not complete (re-run \`make publish\` in your terminal),\n` +
+            `or registry propagation is still pending (try again in a few seconds).\n`,
+        );
+        return 1;
+      }
+      process.stdout.write(
+        `All ${DESKWORK_PACKAGES.length} packages are published at v${version} — safe to smoke + tag.\n`,
+      );
+      return 0;
+    }
     case 'atomic-push': {
       const [tag, branch] = args;
       if (!tag || !branch) {

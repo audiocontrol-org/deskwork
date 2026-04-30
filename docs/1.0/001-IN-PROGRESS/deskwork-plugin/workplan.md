@@ -1186,3 +1186,69 @@ Shipped only after the manual flow in 26f is solid. Adds `permissions: id-token:
 **Operator action:** v0.9.6 release runs separately via `/release` after this PR merges.
 
 **Issues closed via /release:** [#95](https://github.com/audiocontrol-org/deskwork/issues/95), [#96](https://github.com/audiocontrol-org/deskwork/issues/96), [#97](https://github.com/audiocontrol-org/deskwork/issues/97), [#100](https://github.com/audiocontrol-org/deskwork/issues/100).
+
+### Phase 26++: release-skill discipline + post-v0.9.6 dogfood
+
+**Deliverable:** Three classes of work on top of Phase 26+. (1) Land Phase 26f's enshrinement of the npm-publish step inside `/release`; (2) ship v0.9.6 as the first canonical run through the new five-pause flow; (3) catalog adopter-experience defects surfaced by dogfooding v0.9.6 and integrate `dw-lifecycle` (which landed on `main` via a parallel branch) into the release-blocking smoke.
+
+**Phase 26f — `/release` Pause 3 publish step:**
+
+- [x] Insert "Pause 3 — Publish to npm" between the bump-commit (was Pause 2) and the smoke (was Pause 3, now Pause 4). Final-push renumbered to Pause 5. Commit `ac6a987`.
+- [x] Add `assert-not-published <version>` helper (DESKWORK_PACKAGES list + `npm view` probe + structured stderr listing the conflicting packages). Pure function with `NpmViewer` injection seam; tests use a fake viewer. Real-registry smoke verified.
+- [x] Update `RELEASING.md` to describe the 5-pause flow.
+
+**v0.9.6 release run:**
+
+- [x] First canonical release through the five-pause flow. Commits `b24fe77` (chore-release commit), tag `v0.9.6`. Atomic-pushed to `origin/main` + `origin/feature/deskwork-plugin` + tag in one `git push --follow-tags` RPC.
+- [x] All four Phase 26+ issues closed via `/release` post-tag commentary (#95, #96, #97, #100).
+
+**Post-v0.9.6 dogfood + bug filings:**
+
+- [x] Closed five Phase 23-era obsolete issues now superseded by Phase 26: [#55](https://github.com/audiocontrol-org/deskwork/issues/55) (Phase 23 tracking), [#77](https://github.com/audiocontrol-org/deskwork/issues/77) (esbuild concurrent-boot race — fix shipped pre-pivot, still in `build-client-assets.ts`), [#78](https://github.com/audiocontrol-org/deskwork/issues/78) (materialize-vendor.sh — script deleted), [#79](https://github.com/audiocontrol-org/deskwork/issues/79) (smoke-marketplace SIGINT/port — both fixes survived in the Phase 26 smoke rewrite), [#80](https://github.com/audiocontrol-org/deskwork/issues/80) (Phase 23 follow-ups umbrella — most items moot post-vendor-retirement).
+- [x] Filed [#99](https://github.com/audiocontrol-org/deskwork/issues/99) — studio intake form on the dashboard auto-collapses with no visible feedback when "copy intake →" is clicked. In `http://` (Tailscale magic-DNS) browsers `navigator.clipboard` is undefined and the toast fallback dismisses with the form. Recommended fix: persistent `<pre>` block with the slash-command payload as a manual-copy fallback. Same UX family as [#74](https://github.com/audiocontrol-org/deskwork/issues/74).
+- [x] Filed [#101](https://github.com/audiocontrol-org/deskwork/issues/101) — **`@deskwork/cli` and `@deskwork/studio` declare `dependencies: { "@deskwork/core": "*" }`**. Wildcard violates the project's lockstep convention. Adopters with stale `@deskwork/core@<earlier>` in their install tree never get the v0.9.6 customize fix because the new `dist/doctor/rules/*.ts` source files only exist in `@deskwork/core@0.9.6`. **The v0.9.6 fix for #95 doesn't actually deliver in the shipping marketplace install** because of this wildcard. Pin recommendation: exact-version ([0.9.7](https://github.com/audiocontrol-org/deskwork/issues/101) maintained by `bump-version.ts`).
+- [x] Filed [#102](https://github.com/audiocontrol-org/deskwork/issues/102) — `customize templates <name>` fails with `Cannot find package '@deskwork/studio'`. The customize CLI lives in `@deskwork/cli` (deskwork plugin shell); templates anchor on `@deskwork/studio`, which only exists in the *separate* `deskwork-studio` plugin shell's `node_modules/`. Architectural seam — needs a binary placement decision (likely shipping a separate `deskwork-studio customize` binary).
+- [x] [#95](https://github.com/audiocontrol-org/deskwork/issues/95) re-opened in spirit via #101/#102: package-level fix landed cleanly (tarballs are correct), but adopter outcome doesn't hold. Tracking remediation in #101 (cheap fix) + #102 (design fork).
+
+**`dw-lifecycle` integration into release process (parallel-branch merge integration):**
+
+- [x] After `/release` of v0.9.6, fast-forwarded `feature/deskwork-plugin` to tip-of-`origin/main`, integrating 42 commits from a parallel-branch implementation of `plugins/dw-lifecycle/` (16-task project-lifecycle-orchestration plugin). Already at v0.9.6 via the parallel branch's `chore(dw-lifecycle): bump 0.9.5 -> 0.9.6 to match monorepo` commit (`a54e5d8`). 748 tests pass post-merge (685 + 63 new from `@deskwork/plugin-dw-lifecycle`).
+- [x] Audited dw-lifecycle's release-process integration. Findings: `bump-version.ts` already aware (lines 56, 59 — bumps `plugins/dw-lifecycle/{package.json,plugin.json}`); `marketplace.json` already registered with `git-subdir` source; `make publish` correctly excludes (private package, no `@deskwork/*` runtime dep). One gap: **`scripts/smoke-marketplace.sh` did not exercise `bin/dw-lifecycle`**, leaving its install path silently un-validated by the release-blocking gate.
+- [x] **Fix shipped (`f1ddcb7`):** Added `dw-lifecycle:dw-lifecycle` to `PLUGIN_BIN_PAIRS`. Required a coupled fix to `plugins/dw-lifecycle/src/cli.ts` because `bin/dw-lifecycle --help` previously returned `Unknown subcommand: --help` exit 1 (which would fail the smoke gate). Added explicit `--help` / `-h` / `help` handling: prints usage to stdout, exits 0; bare invocation continues to print to stderr + exit 1; unknown subcommands continue to exit 1. Five new dispatcher tests in `plugins/dw-lifecycle/src/__tests__/cli.test.ts` (dw-lifecycle suite: 63 → 68). Smoke verified end-to-end against the new shape.
+
+**`/release` publish-step UX fix (post-v0.9.6 surfaced via this session's run):**
+
+- [x] **Bug:** Phase 26f shipped with Pause 3 step 5 saying "On y, run `make publish`" — i.e., the agent runs it through the Bash tool. But the agent's Bash tool cannot pass interactive 2FA OTP prompts through to the operator's terminal — the call hangs indefinitely. The v0.9.6 release run surfaced this; recovery was: agent asks operator to run `make publish` in their own terminal, operator confirms, agent verifies via `npm view`. That recovery path was ad-hoc.
+- [x] **Fix shipped (`d087fa6`):** Pause 3 restructured around explicit operator-side execution. The skill now: (1) prints **bold instructions** for the operator to run `make publish` in their own terminal (with explicit "the agent does NOT run `make publish` itself" callout); (2) waits for operator's "done" confirmation (no auto-poll); (3) verifies with new `assert-published <version>` helper that all three packages actually landed on the registry before continuing. Mirror of `assert-not-published` (same `verifyNpmStatus` helper, opposite predicate). RELEASING.md updated to match. Two new dispatcher tests (release skill 24 → 26).
+
+**Acceptance:**
+- [x] v0.9.6 shipped via the new five-pause `/release` flow.
+- [x] All five Phase-23-era obsolete issues closed.
+- [x] Three new packaging-bug issues filed (#99, #101, #102).
+- [x] dw-lifecycle is release-gated by `scripts/smoke-marketplace.sh`.
+- [x] `/release` Pause 3 no longer attempts to run `make publish` through the agent; the operator-side handoff is canonical.
+
+**Issues opened in this phase:** [#99](https://github.com/audiocontrol-org/deskwork/issues/99), [#101](https://github.com/audiocontrol-org/deskwork/issues/101), [#102](https://github.com/audiocontrol-org/deskwork/issues/102).
+
+**Issues closed in this phase:** [#55](https://github.com/audiocontrol-org/deskwork/issues/55), [#77](https://github.com/audiocontrol-org/deskwork/issues/77), [#78](https://github.com/audiocontrol-org/deskwork/issues/78), [#79](https://github.com/audiocontrol-org/deskwork/issues/79), [#80](https://github.com/audiocontrol-org/deskwork/issues/80), [#95](https://github.com/audiocontrol-org/deskwork/issues/95) (Phase 26+ ship), [#96](https://github.com/audiocontrol-org/deskwork/issues/96) (Phase 26+ ship), [#97](https://github.com/audiocontrol-org/deskwork/issues/97) (Phase 26+ ship), [#100](https://github.com/audiocontrol-org/deskwork/issues/100) (Phase 26+ ship).
+
+**Operator action:** Two commits (`f1ddcb7` + `d087fa6`) ride along in the next release. The /release UX fix is itself release-tested by the next /release run.
+
+### Phase 26+++: wildcard inter-package dep fix — v0.9.7
+
+**Deliverable:** Close [#101](https://github.com/audiocontrol-org/deskwork/issues/101). The v0.9.6 customize fix (#95) didn't deliver to adopters in the marketplace install because `@deskwork/cli` and `@deskwork/studio` declared `dependencies: { "@deskwork/core": "*" }`. Wildcard ranges let npm resolve to whatever stale `@deskwork/core` happened to be in the install tree, defeating lockstep at the resolution layer.
+
+**Implementation:**
+
+- [x] Pin `@deskwork/core` in `packages/cli/package.json` and `packages/studio/package.json` to an exact version (was `"*"`, now matches `version`).
+- [x] Extend `scripts/bump-version.ts`: rename the `plugin-shell-package-json` kind to `lockstep-package-json` and apply it to `packages/cli` and `packages/studio` so future bumps maintain the inter-package pins. Same code path that already maintains plugin-shell pins; the rename clarifies the broader scope.
+- [x] Add manifest-shape regression in `packages/cli/test/customize-skill.test.ts`: assert every `@deskwork/*` dep across `packages/cli`, `packages/studio`, `plugins/deskwork`, `plugins/deskwork-studio` is pinned to exactly `<rootVersion>`. Four parametrized assertions per release.
+- [x] Tests: `packages/cli` 149 → 153 (+4 manifest-invariant cases). 757 workspace tests pass.
+
+**Acceptance:**
+
+- [ ] v0.9.7 shipped via the five-pause `/release` flow.
+- [ ] `npm view @deskwork/cli@0.9.7 dependencies` shows `@deskwork/core` pinned to `0.9.7`. Same for `@deskwork/studio`.
+- [ ] Marketplace install dogfood post-publish: `deskwork customize . doctor calendar-uuid-missing` succeeds against a fresh adopter tree.
+
+**Issues closed in this phase:** [#101](https://github.com/audiocontrol-org/deskwork/issues/101).

@@ -37,22 +37,24 @@ interface VersionedManifest {
   readonly label: string;
   /**
    * For marketplace.json, we update top-level `metadata.version` AND
-   * each plugin entry's `version`. For plugin-shell-package-json, we
-   * update `version` AND any `dependencies['@deskwork/*']` entries (the
-   * plugin shell pins the npm package version that its bin shim
-   * fetches at first run; lockstep with `version`). For everything
-   * else, just `version`.
+   * each plugin entry's `version`. For lockstep-package-json, we
+   * update `version` AND any `dependencies['@deskwork/*']` entries —
+   * applies both to plugin shells (whose bin shim first-run-installs
+   * @deskwork/<pkg>@<version>) AND to inter-package deps within
+   * `packages/` (e.g. @deskwork/cli depends on @deskwork/core; both
+   * must move together to avoid the wildcard-resolution failure mode
+   * documented in #101). For everything else, just `version`.
    */
-  readonly kind: 'package-json' | 'plugin-shell-package-json' | 'plugin-json' | 'marketplace-json';
+  readonly kind: 'package-json' | 'lockstep-package-json' | 'plugin-json' | 'marketplace-json';
 }
 
 const MANIFESTS: readonly VersionedManifest[] = [
   { path: 'package.json', label: 'root package.json', kind: 'package-json' },
   { path: 'packages/core/package.json', label: '@deskwork/core', kind: 'package-json' },
-  { path: 'packages/cli/package.json', label: '@deskwork/cli', kind: 'package-json' },
-  { path: 'packages/studio/package.json', label: '@deskwork/studio', kind: 'package-json' },
-  { path: 'plugins/deskwork/package.json', label: 'deskwork plugin shell', kind: 'plugin-shell-package-json' },
-  { path: 'plugins/deskwork-studio/package.json', label: 'deskwork-studio plugin shell', kind: 'plugin-shell-package-json' },
+  { path: 'packages/cli/package.json', label: '@deskwork/cli', kind: 'lockstep-package-json' },
+  { path: 'packages/studio/package.json', label: '@deskwork/studio', kind: 'lockstep-package-json' },
+  { path: 'plugins/deskwork/package.json', label: 'deskwork plugin shell', kind: 'lockstep-package-json' },
+  { path: 'plugins/deskwork-studio/package.json', label: 'deskwork-studio plugin shell', kind: 'lockstep-package-json' },
   { path: 'plugins/dw-lifecycle/package.json', label: 'dw-lifecycle plugin shell', kind: 'package-json' },
   { path: 'plugins/deskwork/.claude-plugin/plugin.json', label: 'deskwork plugin.json', kind: 'plugin-json' },
   { path: 'plugins/deskwork-studio/.claude-plugin/plugin.json', label: 'deskwork-studio plugin.json', kind: 'plugin-json' },
@@ -91,16 +93,20 @@ async function bumpFile(manifest: VersionedManifest, version: string): Promise<s
       await writeJson(abs, data);
       return `  ${manifest.label.padEnd(36)} ${String(before)} -> ${version}`;
     }
-    case 'plugin-shell-package-json': {
+    case 'lockstep-package-json': {
       const before = data.version;
       data.version = version;
       const lines: string[] = [
         `  ${manifest.label.padEnd(36)} ${String(before)} -> ${version}`,
       ];
-      // Plugin shells pin @deskwork/* npm packages at the same version
-      // their plugin.json declares (lockstep — the bin shim's first-run
-      // install resolves these via npm). Bump every dependency whose
-      // name starts with "@deskwork/".
+      // Lockstep packages pin @deskwork/* deps at the same version
+      // they themselves declare. Two cases share the same shape:
+      //   1. Plugin shells (bin-shim first-run-installs @deskwork/<pkg>@<v>).
+      //   2. Inter-package deps in packages/* (e.g. @deskwork/cli ->
+      //      @deskwork/core). Wildcards here let npm resolve to a
+      //      stale on-disk version, breaking the lockstep contract
+      //      (issue #101). Pin every dep whose name starts with
+      //      "@deskwork/" to the same version.
       const deps = data.dependencies as Record<string, unknown> | undefined;
       if (deps && typeof deps === 'object') {
         for (const [name, before] of Object.entries(deps)) {

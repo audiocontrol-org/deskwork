@@ -731,3 +731,125 @@ The bin shim's first-run `npm install --omit=dev --workspaces=false` path was ve
 - **Phase 2 dogfood from the original workplan** — drive a real feature through `/dw-lifecycle:define → setup → issues → implement → review → ship → complete` end-to-end. Until two consecutive features run through dw-lifecycle, the in-tree `/feature-*` skills should stay as fallback. Two adopter-experience arcs at once.
 
 **insight.** Infrastructure-only sessions still produce signal worth capturing here, because the *next* adopter-facing arc is foreshadowed by what was deferred. "We built the surface but didn't try to use it" is a USAGE-JOURNAL observation in its own right — it names what the next session should test before it becomes a complaint from a real adopter.
+
+---
+
+## 2026-04-30: Dogfood v0.9.6 from the public marketplace install — surfaces wildcard-dep adoption-blocker + cross-plugin customize seam
+
+**Session goal:** dogfood the just-shipped v0.9.6 from the public marketplace install path (no privileged shortcuts) to verify the four packaging follow-ups (#95 customize, #96 READMEs, #97 deps, #100 SKILL prose) actually deliver in the adopter shape. Also exercise the `/release` skill end-to-end for the first canonical run through the new five-pause flow.
+
+**Surface exercised:** `/plugin marketplace update deskwork`, `/reload-plugins`, `bin/deskwork-studio` (post-update; auto-reinstalled @deskwork/studio@0.9.6 via the bin shim's drift detection), Playwright-driven studio dashboard intake flow, `bin/deskwork customize . doctor <rule>`, `bin/deskwork customize . templates <name>`, `/release` Pause 1-5, `make publish` (operator-side terminal during Pause 3), `bash scripts/smoke-marketplace.sh` end-to-end against the just-published v0.9.6 packages, `bin/dw-lifecycle --help` (post-merge).
+
+### v0.9.5-installed studio dogfood — pre-shipping the four follow-ups
+
+#### 1. Bin-shim version drift detection works
+
+**fix.** Previous session shipped the version-drift detector. This session was the first time it fired in the wild post-marketplace-update: `installed @deskwork/studio@0.9.5 differs from plugin manifest 0.9.6; reinstalling...` followed by clean `npm install` + dispatch. No manual intervention needed. Same drift detection silently re-installed @deskwork/cli@0.9.6 on the deskwork plugin shell side (no message because the install happened on first invocation, before I was watching).
+
+**insight.** Bin-shim drift detection is the right design. Adopters running `/plugin marketplace update` get the bumped plugin shell; the next time they invoke a bin, the shim notices `node_modules/@deskwork/<pkg>/package.json#version` doesn't match `plugin.json#version` and reinstalls. Zero manual steps, no docs friction. The cost is one slow first-invocation post-update — an acceptable tax.
+
+#### 2. Studio intake form has zero feedback on copy success/failure
+
+**friction.** Drove the dashboard's "intake new idea →" flow via Playwright. Filled Title + Description, clicked "copy intake →", and **the form silently auto-collapsed**. No toast. No "copied ✓" indicator. No persistent visible affordance with the slash-command payload as a manual-copy fallback.
+
+Root cause: `editorial-studio-client.ts` line 406+ tries `navigator.clipboard.writeText`, falls back to a hidden-textarea `execCommand('copy')`. In Playwright over `http://` (Tailscale magic-DNS context), `navigator.clipboard` is `undefined`. The fallback may also fail silently. The form's auto-collapse runs regardless — operator gets no record of what was supposed to be copied.
+
+**Filed [#99](https://github.com/audiocontrol-org/deskwork/issues/99).** Same UX family as [#74](https://github.com/audiocontrol-org/deskwork/issues/74) (review-surface Approve popup-disappears-before-manual-select) and the rename-copy buttons. Recommended fix: persistent `<pre>` block with the slash-command payload, regardless of clipboard outcome. Best of both — clipboard works for the secure-context happy path, the visible block is the recovery surface.
+
+**insight.** Browser-over-Tailscale is a real adopter context — operators on a tailnet running the studio on their laptop and viewing on their phone will see exactly the same `http://` non-secure-context that Playwright did. The clipboard-API failure mode isn't a Playwright artifact, it's an honest representation of a real adopter shape. Treating Playwright's friction as the dogfood signal earned the bug filing.
+
+#### 3. SKILL.md prose lagging Phase 26
+
+**friction.** Slash-command output for `/deskwork-studio:studio` showed Step 4 still describing the retired Phase 23 source-shipped wrapper resolution: *"the wrapper runs `npm install --omit=dev` once and execs the freshly-linked source bin via tsx (Phase 23 source-shipped re-architecture — no committed bundle)"*. v0.9.6 actually does `npm install --omit=dev --workspaces=false @deskwork/<pkg>@<plugin-manifest-version>` then dispatches via `node_modules/.bin/`. Adopters reading the skill body get an incorrect mental model.
+
+**fix.** Filed [#100](https://github.com/audiocontrol-org/deskwork/issues/100), shipped in v0.9.6 (`e507290`). SKILL.md Step 4 rewritten to describe the three-tier resolution; Phase 23 references purged. Plugin shell READMEs got the same scrub (`b195278`).
+
+**insight.** Doc drift after architecture pivots is a recurring signal. Phase 26 retired Phase 23's vendor architecture, but the SKILL prose carrying Phase 23 references survived the pivot because nobody re-read the prose end-to-end. **The agent skill body is a contract with the adopter**; it should match the implementation. Worth adding to the release-prep checklist: `git grep -n "Phase <N-2>\|<old-architecture>"` before tagging.
+
+### v0.9.6 release run — first canonical pass through the five-pause flow
+
+**fix.** `/release` ran through Pauses 1–2 cleanly (preconditions clean, version 0.9.6 validated as strictly greater than v0.9.5, bump-version.ts touched 9 manifests, chore-release commit landed). Pause 3 surfaced its UX gap (see below). Operator's `make publish` succeeded for all three packages (three OTPs typed). Pauses 4–5 ran cleanly: smoke passed against the just-published v0.9.6 packages, tag created with custom message, atomic-pushed to `origin/main` + `origin/feature/deskwork-plugin` + tag in one `git push --follow-tags` RPC. GitHub release page auto-created (the v0.9.5 fix to release.yml — stripping the test step — cleaned the path).
+
+**insight.** Hard-gated `/release` is paying off. Each pause forced an explicit operator decision that previously would have been hand-waved through the manual procedure. Pause 1's preconditions report ("HEAD: ..., 8 commits ahead, FF possible, working tree: clean, last release: v0.9.5") gives the operator a clean snapshot before deciding the version. Pause 4's smoke is the real release-blocking gate.
+
+#### 4. `/release` Pause 3 tried to run `make publish` through the agent
+
+**friction.** Phase 26f's Pause 3 step 5 said *"On y, run `make publish` (output streamed to operator; the OTP prompts are interactive)"* — i.e., the agent runs it. But `npm publish` prompts for a 2FA OTP on stdin per package, and the agent's Bash tool can't pass interactive prompts to the operator's terminal. Running `make publish` through the agent would have hung indefinitely.
+
+> *"the agent's Bash tool can't accept interactive 2FA OTP prompts"*
+
+— recovery message I had to surface to the operator mid-Pause-3. Recovery worked (operator opened a terminal, ran `make publish`, came back with "packages are published", agent verified via `npm view`). But the recovery was ad-hoc — not part of the canonical flow.
+
+**fix.** Same session, post-v0.9.6: canonicalized the recovery into the skill (`d087fa6`). Pause 3 now prints **bold operator-side instructions** + waits for "done" confirmation + verifies via new `assert-published <version>` helper (mirror of `assert-not-published`). Real-registry-tested both directions: `assert-published 0.9.6 → exit 0`, `assert-published 99.99.99 → exit 1` with helpful stderr. RELEASING.md updated to match.
+
+**insight.** The skill-as-discipline-encoder pattern strikes again: enshrining the manual flow in a skill *forced* the OTP-handoff design question that the manual flow had been silently working around. The first `/release` run made the gap explicit — the design question got asked and answered in the same session. Without the skill, the operator would have been recovering ad-hoc on every release, never settling the canonical handoff.
+
+**Cross-cutting principle:** Anything in the agent's flow that requires terminal-bound interactive input (2FA OTPs, password prompts, sudo, ssh-confirm) needs the same operator-handoff discipline. The skill canonicalizes this for `make publish`; the same pattern applies to any future step with the same shape.
+
+### v0.9.6-installed dogfood — post-shipping verification
+
+#### 5. v0.9.6 fix for #95 doesn't actually deliver in the marketplace install
+
+**friction.** Updated marketplace + reloaded plugins to v0.9.6. Started the studio (drift detection reinstalled @deskwork/studio@0.9.6 cleanly). Ran `bin/deskwork customize . doctor calendar-uuid-missing` — got back:
+
+```
+no built-in doctor rule named "calendar-uuid-missing". Available rules:
+```
+
+(Empty list.) But v0.9.6 specifically shipped these `.ts` files in `@deskwork/core/dist/doctor/rules/`. Verified via `npm pack @deskwork/core@0.9.6 && tar -tzf` — yes, they're in the published tarball.
+
+So why don't they reach the adopter? Inspected `<deskwork-plugin>/node_modules/@deskwork/core/package.json#version`: **0.9.5**. The new fix landed at the package layer but never reached this install.
+
+Root cause: `@deskwork/cli@0.9.6` declares `dependencies: { "@deskwork/core": "*" }` — wildcard. When the bin shim runs `npm install --omit=dev` in the plugin shell post-update, npm satisfies the wildcard with whatever `@deskwork/core` is already in the install tree (a stale 0.9.5 from a prior session). The plugin shell pinned `@deskwork/cli@0.9.6` directly, so cli got bumped — but core's wildcard let it lag.
+
+**The v0.9.6 fix for #95 (which is supposed to deliver `customize doctor <rule>` to adopters) doesn't actually deliver.** Tarballs are correct; resolution is broken.
+
+**Filed [#101](https://github.com/audiocontrol-org/deskwork/issues/101)** with a recommended exact-version pin (`0.9.7` maintained by `bump-version.ts`).
+
+**insight.** **Tarball-shape regression tests are not equivalent to install-shape regression tests.** v0.9.6's regression test (`packages/cli/test/customize-skill.test.ts`) packs each package and asserts contents; both correct in isolation. But the failure mode lives at install-time resolution from one plugin shell to a transitive dep — several layers above package-level packing. Future Phase 26-class fixes should pair every package-level test with an "install marketplace, run command, assert outcome" smoke step. The smoke surfaced #101 immediately post-`/release`; the unit tests passed clean.
+
+> *"Packaging IS UX"* (operator's principle from the prior arc) — and packaging-resolution-semantics is a layer of UX that unit tests can't see.
+
+#### 6. `customize templates <name>` fails with "Cannot find package '@deskwork/studio'"
+
+**friction.** Ran `bin/deskwork customize . templates dashboard` — got:
+
+```
+cannot resolve @deskwork/studio/package.json (broken install?):
+Cannot find package '@deskwork/studio' imported from
+.../node_modules/@deskwork/cli/dist/commands/customize.js
+```
+
+The customize CLI lives in `@deskwork/cli` (deskwork plugin shell). For `templates` category, it anchors on `@deskwork/studio`'s package root. But `@deskwork/studio` is only in the **separate** `deskwork-studio` plugin shell's `node_modules/`. The two plugin trees are isolated — no Node resolution path between them.
+
+**Filed [#102](https://github.com/audiocontrol-org/deskwork/issues/102).** Architectural seam — three viable shapes outlined (add @deskwork/studio as dep of @deskwork/cli; ship a separate `deskwork-studio customize templates` binary; project-root-aware walk-up). Likely option 2 — templates are studio-side concerns, the customize subcommand for them belongs in the studio binary.
+
+**insight.** v0.9.6 unit tests didn't catch this because they exercise each tarball in isolation. Real adopters live in the marketplace install where plugins are isolated trees. **The thing that earns its keep at this layer is end-to-end install-and-invoke**, not pack-and-assert.
+
+### dw-lifecycle integration into release-blocking smoke (post-merge)
+
+#### 7. `bin/dw-lifecycle --help` returned "Unknown subcommand: --help" exit 1
+
+**friction.** After fast-forwarding `feature/deskwork-plugin` to tip-of-`origin/main` (42 commits behind, including the entire `dw-lifecycle` plugin from a parallel branch), audited the release-process integration. Found that `scripts/smoke-marketplace.sh`'s `PLUGIN_BIN_PAIRS` list didn't include dw-lifecycle. Adding it directly would have failed the smoke gate because `bin/dw-lifecycle --help` returned exit 1 with "Unknown subcommand: --help".
+
+The CLI's dispatcher recognized 6 subcommand names (install, setup, issues, transition, journal-append, doctor) but had no handler for `--help` / `-h` / `help` — they fell through to "Unknown subcommand."
+
+**fix.** Added explicit `--help` / `-h` / `help` handling: prints usage to stdout, exits 0. Bare invocation continues to print to stderr + exit 1; unknown subcommands continue to exit 1. Five new dispatcher tests. Then added `dw-lifecycle:dw-lifecycle` to `PLUGIN_BIN_PAIRS`. Smoke verified end-to-end against the new shape — sparse-clones the plugin, runs `bin/dw-lifecycle --help`, asserts exit 0. Commit `f1ddcb7`.
+
+**insight.** The smoke gate forced the issue, but the underlying problem ("CLIs should always handle `--help`") would have surfaced for any adopter on first interaction. **Smoke gates that match real adopter UX surfaces are also UX QA.** The smoke isn't just gating bad packaging — it's gating bad CLI ergonomics.
+
+> *"`bin/dw-lifecycle --help` returning exit 1 is a UX bug, not a smoke-incompatibility."*
+
+The fix that landed makes dw-lifecycle's CLI surface match deskwork's and deskwork-studio's. Ergonomic uniformity across the plugin family.
+
+### Cross-cutting observations
+
+**DD. The marketplace install path is the canonical adopter shape — verify against it.** Three classes of bugs surfaced this session that existed in the marketplace install but not in workspace dev: #99 (clipboard fallback over `http://`), #101 (wildcard core dep + stale resolution), #102 (cross-plugin-shell resolution). Each was invisible in the workspace because `npm install` in the workspace creates symlinks (everything points to source); each is real in the marketplace because plugins live in separated `node_modules/` trees. Future verification: probe in the public marketplace install before declaring a fix shipped.
+
+**EE. Skills surface design questions the manual flow hand-waves.** The Phase 26f extension to `/release` exposed the "agent runs `make publish`" question that the manual procedure had been silently working around. The first canonical run made the gap explicit; the same session canonicalized the fix. **Discipline + the public surface compound to surface friction earlier than either alone.**
+
+**FF. Sub-agent regression tests are necessary but not sufficient.** The `feature-orchestrator`'s tarball-shape test for #95 passed. Both #101 and #102 slipped through because they live above the package layer. For Phase 26-class fixes, the regression test that matters is "install marketplace, invoke command, assert outcome" — i.e., the smoke. Sub-agents writing regression tests should default to the smoke layer for any cross-plugin or cross-package concern.
+
+**GG. Closing five obsolete Phase-23-era issues was clarifying.** The issue list shrunk from 30 open to 26 open, and the remaining 26 are honestly active. Stale issues are noise that mask the real signal. Audit-and-close is cheap; the cost of leaving them open is paid every time someone reads the issue list.
+
+**HH. dw-lifecycle's parallel-branch landing was clean.** 42 commits, fast-forward, no conflicts. Both branches advanced from the same shared base (`b24fe77` chore-release commit) without diverging. The trunk-based "merge from main into feature, push to main" pattern worked exactly as the (newly-documented) RELEASING.md "Branch model: trunk-based" section describes. Two parallel agent sessions composed cleanly.

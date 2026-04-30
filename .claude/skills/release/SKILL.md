@@ -56,32 +56,45 @@ The smoke gate (next pause) runs `npm install @deskwork/<pkg>@<version>` against
 
 2. On non-zero exit: surface stderr (lists which package(s) are already at `<version>`) and abort. The chore-release commit stays in place. Operator must bump to a new version (`git reset --soft HEAD~1`, then re-run `/release` with a new version) — npm forbids republishing the same version, so this isn't recoverable in-place.
 
-3. On zero exit: surface what's about to happen and prompt:
+3. On zero exit: surface the operator-side instructions and wait for confirmation.
+
+   **Important — the agent does NOT run `make publish` itself.** `npm publish` prompts for a 2FA OTP on stdin per package, and the agent's Bash tool cannot pass interactive prompts through to the operator's terminal. Running it from the agent context blocks indefinitely. The publish must happen in the operator's own terminal, with the agent waiting on confirmation.
+
+   Surface this verbatim:
 
    ```
-   About to publish to the public npm registry:
+   ──────────────────────────────────────────────────────────────────
+   Publish step — RUN IN YOUR OWN TERMINAL (not through the agent):
+
+     cd <repo-root>
+     make publish
+
+   This publishes (in dependency order, with one 2FA OTP per package):
      @deskwork/core@<version>
      @deskwork/cli@<version>
      @deskwork/studio@<version>
 
-   `make publish` runs `npm publish --access public` per package in dependency
-   order (core then cli then studio). Each package will prompt for a 2FA OTP
-   independently — three OTPs total. The operator must enter each one.
-
-   Run 'make publish'? [y/N]
-   >
+   Three OTPs total. When all three succeed, reply with 'done' (or any
+   confirmation) and the agent will verify and continue. If any package
+   fails, paste the error.
+   ──────────────────────────────────────────────────────────────────
    ```
 
-4. On `n`: abort. The chore-release commit stays in the working tree. Operator can `git reset --soft HEAD~1` to back out of the bump, OR run `make publish` manually later and then re-run `/release` from a fresh state.
+4. **Wait for the operator's confirmation** before any further action. Do NOT auto-poll npm view, do NOT spawn `make publish` via Bash — wait for the operator to say it's done.
 
-5. On `y`: run `make publish` (output streamed to operator; the OTP prompts are interactive). Each `npm publish --access public --workspace @deskwork/<pkg>` runs in turn.
+5. On operator confirmation: verify all three are now on the registry:
 
-6. On `make publish` non-zero exit: abort.
-   - If the failure was an early package (e.g., core failed before cli or studio), nothing is published; operator can re-run `make publish` once they fix the underlying issue.
-   - If a partial-publish state results (e.g., core published but cli's OTP rejected), surface that fact to the operator. Recovery options: bump to v<next-patch> + re-run `/release` (cleanest — the half-published version stays orphaned on npm, which is fine), OR finish the publish manually with `make publish-cli publish-studio` then re-run `/release` from a fresh tree.
+   ```
+   tsx .claude/skills/release/lib/release-helpers.ts assert-published <version>
+   ```
+
+   - On zero exit: continue to Pause 4.
+   - On non-zero exit: surface stderr (lists which package(s) are still missing). Possible causes: partial-publish state (some succeeded, some failed), registry CDN propagation delay (rare; usually resolves within seconds), or operator confirmed prematurely. Either ask the operator to retry the missing package(s) and reconfirm, OR — if the gap is genuinely partial-publish unrecoverable — abort with the same recovery guidance as below.
+
+6. On operator-reported failure: abort.
+   - If the failure was an early package (e.g., core failed before cli or studio), nothing is published; operator can re-run `make publish` once they fix the underlying issue, then reconfirm.
+   - If a partial-publish state results (e.g., core published but cli's OTP rejected), surface that fact. Recovery options: bump to v<next-patch> + re-run `/release` (cleanest — the half-published version stays orphaned on npm, which is fine), OR finish the publish manually with `make publish-cli publish-studio` then re-run `/release` from a fresh tree.
    - Do NOT continue past this pause on partial failure. Smoke would fail anyway.
-
-7. On `make publish` success: continue to Pause 4.
 
 ### Pause 4 — Smoke + tag message
 
@@ -138,7 +151,8 @@ All helpers live in `.claude/skills/release/lib/release-helpers.ts` and are invo
 |---|---|---|
 | `check-preconditions` | Verify clean tree, FF over origin/main, branch up-to-date. Prints status line. | 0 ok / 1 fail / 2 usage |
 | `validate-version <ver> <last-tag>` | Pure semver tuple compare. Strictly greater required. | 0 ok / 1 fail (reason on stderr) / 2 usage |
-| `assert-not-published <ver>` | Verify `@deskwork/{core,cli,studio}@<ver>` are NOT yet published on npm (gate before `make publish`). Calls `npm view` per package. | 0 ok / 1 fail (lists already-published packages on stderr) / 2 usage |
+| `assert-not-published <ver>` | Verify `@deskwork/{core,cli,studio}@<ver>` are NOT yet published on npm (pre-flight before `make publish`). Calls `npm view` per package. | 0 ok / 1 fail (lists already-published packages on stderr) / 2 usage |
+| `assert-published <ver>` | Verify `@deskwork/{core,cli,studio}@<ver>` ARE published on npm (post-flight after the operator runs `make publish` in their terminal). Calls `npm view` per package. | 0 ok / 1 fail (lists missing packages on stderr) / 2 usage |
 | `atomic-push <tag> <branch>` | Single-RPC push: HEAD to origin/main, HEAD to branch, annotated tag. | 0 ok / 1 fail (git stderr surfaced) |
 
 Tests live at `.claude/skills/release/test/`. Run via `cd .claude/skills/release && npx vitest run` (local-only; not in CI per project rules).
