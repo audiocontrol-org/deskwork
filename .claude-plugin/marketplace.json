@@ -37,7 +37,7 @@
         "path": "plugins/dw-lifecycle"
       },
       "description": "Project lifecycle orchestration; composes superpowers + feature-dev.",
-      "version": "0.9.5"
+      "version": "0.9.6"
     }
   ]
 }
