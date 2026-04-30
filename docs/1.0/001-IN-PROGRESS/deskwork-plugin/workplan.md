@@ -1081,14 +1081,19 @@ Tasks are grouped by sub-phase. Sub-phases are sequential (19a → 19b → 19c �
 
 **Acceptance:** `npm view @deskwork/core`, `npm view @deskwork/cli`, `npm view @deskwork/studio` all return the placeholder version. Trusted publishers configured per package (visible in npm UI Settings → Trusted publishing).
 
-#### 26c — Plugin bin shim rewrite
+#### 26c — Plugin bin shim rewrite ✅ shipped (v0.9.5 combined PR)
 
-- [ ] Rewrite `plugins/deskwork/bin/deskwork` — first-run check `node_modules/@deskwork/cli/package.json` matches the plugin's manifest version; if absent, `npm install --omit=dev @deskwork/cli@<version>`; exec via `node_modules/.bin/deskwork`.
-- [ ] Rewrite `plugins/deskwork-studio/bin/deskwork-studio` (same pattern for `@deskwork/studio`; renamed in 26d).
-- [ ] Local-dev verification: bin works against the local source tree (npm workspaces symlinks).
-- [ ] npm-installed verification: in tmp dir, `npm install @deskwork/studio@<version>`, run via the bin shim, observe successful boot.
+- [x] Rewrite `plugins/deskwork/bin/deskwork` — first-run check `node_modules/@deskwork/cli/package.json` matches the plugin's manifest version; if absent, `npm install --omit=dev @deskwork/cli@<version>`; exec via `node_modules/.bin/deskwork`.
+- [x] Rewrite `plugins/deskwork-studio/bin/deskwork-studio` (same pattern for `@deskwork/studio`; rename to `dw-studio` deferred to a future PR).
+- [x] Local-dev verification: bin works against the local source tree (workspace symlink detection skips install).
+- [x] npm-installed verification: bin shim's first-run install fetches `@deskwork/<pkg>@<version>` from the public registry and dispatches.
 
-**Acceptance:** Bin shims <50 lines each (no install-lock.sh complexity). Both local-dev (cwd inside this monorepo) and npm-installed (cwd outside) paths work.
+**Acceptance:** Bin shims handle workspace-dev + npm-install + version-drift cases via a directory-based concurrency lock (mkdir-atomic; macOS-portable). Met in v0.9.5 combined PR with 26e.
+
+**Notes:**
+- Plugin shell `package.json` is now empty (no `dependencies`) — the bin shim performs install at runtime against the public registry.
+- The shim detects local-workspace mode by checking whether `node_modules/@deskwork/<pkg>` is a symlink (workspace mode) and bypasses install in that case. This prevents npm-installing over a workspace symlink (which would corrupt dev state).
+- Version drift between `plugin.json` and an existing `node_modules/@deskwork/<pkg>` triggers reinstall — this covers the case where an operator updates the plugin shell (e.g. via a marketplace upgrade) while the npm-cached package is still on an older version.
 
 #### 26d — Plugin rename: `deskwork-studio` → `dw-studio`
 
@@ -1102,17 +1107,24 @@ Tasks are grouped by sub-phase. Sub-phases are sequential (19a → 19b → 19c �
 
 **Acceptance:** `claude plugin validate plugins/dw-studio` passes. Marketplace install of v0.10.0 produces `enabledPlugins.dw-studio@deskwork`.
 
-#### 26e — Retire vendor machinery
+#### 26e — Retire vendor machinery ✅ shipped (v0.9.5 combined PR)
 
-- [ ] Delete `plugins/deskwork/vendor/` and `plugins/dw-studio/vendor/`.
-- [ ] Delete `scripts/materialize-vendor.sh`.
-- [ ] Delete or simplify `packages/cli-bin-lib/install-lock.sh` (likely deleted entirely after 26c).
-- [ ] `.claude-plugin/marketplace.json` — drop `source.ref` from each plugin's `git-subdir` source. Verify `git-subdir` is still the right source kind (or switch).
-- [ ] `scripts/bump-version.ts` — drop `source.ref` bump logic; add npm package version bump logic.
-- [ ] `.claude/CLAUDE.md` — drop "Repository Layout" `vendor/` line; rewrite "Plugin Conventions" vendor rule as the npm-install rule.
-- [ ] `.gitignore` — drop vendor-related entries.
+- [x] Delete `plugins/deskwork/vendor/` and `plugins/deskwork-studio/vendor/`.
+- [x] Delete `scripts/materialize-vendor.sh` (and `scripts/test-materialize-vendor.sh`).
+- [x] Delete `packages/cli-bin-lib/` entirely (the install-lock.sh runtime is replaced by the directory-lock implementation inline in the new bin shims).
+- [x] `.claude-plugin/marketplace.json` — drop `source.ref` from each plugin's `git-subdir` source. Per Claude Code's marketplace docs, omitting `ref` defaults to the repository's default branch (verified via plugin-marketplaces docs).
+- [x] `scripts/bump-version.ts` — drop `source.ref` bump logic. The script still bumps root + 3 workspace + 2 plugin shell + 2 plugin.json + marketplace metadata + per-plugin marketplace versions (10 versioned positions across 9 manifests).
+- [x] Drop `packages/cli-bin-lib` from root `package.json` workspaces array.
+- [x] `.claude/CLAUDE.md` — drop "Repository Layout" `vendor/` line; rewrite "Plugin Conventions" vendor rule as the npm-install rule; update "Common Commands" (drop materialize-vendor; add `make publish`).
+- [x] `.github/workflows/release.yml` — drop `materialize-vendor` step + commit-and-re-point-tag step; rename source.ref verifier to a plugin-path verifier.
+- [x] `.gitignore` — no vendor-related entries to remove (vendor was committed, not gitignored).
 
-**Acceptance:** `git grep -n "vendor"` returns only intentional historical refs. `npm install` at repo root succeeds. `npm run test --workspaces` still passes.
+**Acceptance:** `npm install` at repo root succeeds. `npm test --workspaces` still passes. Met in v0.9.5 combined PR with 26c.
+
+**Notes:**
+- 26c and 26e shipped together in v0.9.5 (rather than 26h's planned v0.10.0 cut) because half-states (npm packages published but plugin shells still consuming `file:./vendor/cli`) are pure cruft — the operator's directive: "delete now. Let's not work around cruft."
+- 26d (plugin rename `deskwork-studio` → `dw-studio`) intentionally deferred to a separate PR — it's an organizational rename that needs its own adopter migration story.
+- 26f-26h tasks (manual-release flow updates, MIGRATING.md, end-to-end verification) deferred per scope decision: this PR strictly delivers the architectural change.
 
 #### 26f — Manual release flow: RELEASING.md + `/release` skill (CI deferred to 26-CI)
 
