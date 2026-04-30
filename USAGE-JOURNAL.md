@@ -959,3 +959,78 @@ After the dogfood walk + `repair-install` ship, scoped Phase 27 (studio bug tran
 **NN. The `iterating v1` badge case in [#117](https://github.com/audiocontrol-org/deskwork/issues/117) is structurally the worst-case for [#110](https://github.com/audiocontrol-org/deskwork/issues/110).** Entries with an active workflow have NO clickable affordance to reach the review surface — the `review →` button is replaced by the badge, the badge isn't a link, and the slug isn't a link. Workflowless entries at least had a `review →` button (which auto-spawned a fresh workflow). The existing-workflow case is strictly worse. Phase 27 sub-phase G's fix has to absorb both.
 
 **OO. The customer-blocking framing cuts decisions short.** The operator framed #89 as "blocking a customer." That framing made the implementation-vs-design call obvious: ship a `repair-install` subcommand TODAY, file upstream in parallel. No back-and-forth on whether to absorb it into Phase 27 (which would have delayed by days). Customer-blocking is a real signal; treat it as such.
+
+---
+
+## 2026-04-30: Recursive dogfood ships v0.10.0 + uses deskwork to design its own acceptance playbook → surfaces #131 cache-eviction blocker → ships v0.10.1
+
+**Session goal:** Approve the Phase 27 PRD that was iterated to v2 the prior session; ship the studio-bug tranche as v0.10.0. Then design a post-release customer-acceptance playbook skill (deskwork brainstorm → write spec → review through the deskwork pipeline). The recursion — using the deskwork plugin to design the acceptance playbook *for the deskwork plugin* — surfaced a customer-blocking cache eviction bug; pivoted to ship that fix as v0.10.1 before resuming the design review.
+
+**Surface exercised:** Studio review surface for the Phase 27 PRD approval + the post-release-acceptance design doc; `deskwork ingest` + `deskwork review-start` for design-doc registration; manual recovery via `~/.claude/plugins/marketplaces/deskwork/scripts/repair-install.sh`; Playwright walk of the live `47321` studio for regression diagnosis; the full `/release` five-pause flow ×2.
+
+### Phase 27 PRD approval — happy path
+
+**fix.** The cumulative work across prior sessions to get the PRD review pipeline working paid off this morning. The operator opened the studio at the v2 review URL, dropped one-line approval (state advanced to `approved`), I ran `deskwork approve --site deskwork-internal deskwork-plugin/prd` via the marketplace-clone bin path, state hit `applied`, `/feature-implement` gate cleared. Total elapsed: under 2 minutes. *"do it"* — no friction.
+
+**insight.** When the deskwork pipeline works as designed, it's invisible. The 13 sessions of cumulative work to make the PRD-as-document-under-review flow honest are paying off in shorter approval-to-implementation cycles.
+
+### Recursive dogfood discovers #131 (the headline event of the session)
+
+**friction.** I wrote the post-release acceptance playbook design as `docs/superpowers/specs/2026-04-30-post-release-acceptance-design.md` (per the brainstorming skill's default), ingested it into deskwork, started a review workflow, surfaced the studio review URL. Operator opened the URL and tried to leave margin notes. **Couldn't.** Tried the inline editor. **Also couldn't.**
+
+> *"yikes. The review surface affordances for margin notes AND editing are broken. I want to flag this path as incorrect: docs/post-release/<version>-acceptance.md — our default docs file layout is docs/<target-release>/<slug>-<doc-type>.md. I would have flagged that with a margin note, but that capability is currently missing. This seems like a regression that should have been caught"*
+
+Two findings in one operator turn:
+1. The margin-note + editor surface was broken on the live install.
+2. I'd written the spec to a path that violated project convention.
+
+**fix (the path issue).** Moved the file to `docs/1.0/post-release-acceptance-design.md`. Should have grepped for existing similar-purpose files first; precedent existed at both `docs/superpowers/specs/2026-04-29-release-skill-design.md` and `docs/1.0/001-IN-PROGRESS/<slug>/`.
+
+**insight (the path issue).** *"Read project conventions before placing files"* — the same fabrication pattern as quoting commands from memory. When a doc has any non-trivial decision about location, a 5-second `find docs -name "*.md"` would have prevented the friction.
+
+**fix (the regression).** Playwright probed the live studio: `/static/dist/editorial-review-client.js` returns **404**. Without that bundle, no client JS runs on the review surface — no margin-note event handlers, no editor toggle, no Approve / Iterate / Reject button bindings. Workaround: stop and restart the studio (which rebuilds dist on launch). Real fix: the cache-restore script that became v0.10.1.
+
+**insight (the regression).** Cache-eviction symptoms are partial and confusing. This morning's session opened with `which deskwork-studio` working (PATH still pointed at a healthy `0.7.2/bin/`) but `which deskwork` failing. The studio booted via PATH and served HTTP — but its `.runtime-cache/dist/` was wiped, so dist files 404'd. **Different cache subdirectories evict at different times, producing partial-functionality states that look "kind of working" until you exercise the broken surface.** Without the recursive dogfood (operator opening the studio review surface for real work), the bundle 404 would have lurked until the next adopter hit it cold.
+
+### #131 — the customer-blocking framing again
+
+**insight.** Per a prior session's *"customer-blocking framing cuts decisions short"* — operator filed #131 as `customer-blocking, urgent` and the decision shape immediately collapsed: ship the cache-restore script + auto-repair hook BEFORE returning to the design review. No back-and-forth on whether to absorb #131 into the design's "implementation order" section (which would have delayed by days). The framing IS the signal.
+
+**fix.** v0.10.1 shipped end-to-end in one continuous arc from "operator filed the issue" to "operator confirms /release succeeded": ~90 minutes including bash script authoring, TS wrapper refactor, README rewrite, two new agent-discipline rules, full five-pause `/release` flow, banner + CLI contract follow-ups, and post-comment on the issue. The pivot worked.
+
+### Premature issue closure — corrected
+
+**friction.** After v0.10.1 shipped and I posted unblock instructions on #131, I closed the issue. Operator: *"why did you close it? The customer hasn't accepted the fix yet"*.
+
+**fix.** Reopened, posted clarifying comment, added new rule to `agent-discipline.md`: *"Issue closure is the customer's call, not the agent's."* The discipline: customer-filed issues stay open until the customer confirms on their own environment. The agent's "I implemented the acceptance criteria" is a status update, not a disposition.
+
+**insight.** This is the third or fourth pattern of "agent unilaterally decides what the operator should be deciding" caught this session arc. The cumulative rule set in `agent-discipline.md` is approaching ~12 distinct disciplines; the file is becoming the project's effective contributor handbook for agent collaboration. Worth pulling into a more reader-friendly index at some point — but for now, append-only as new patterns surface keeps the friction history compounding.
+
+### Slash-command not installed
+
+**friction.** Operator received "Unknown command: /deskwork:iterate" when trying to invoke the iterate skill in their terminal during the design review. The Compositor's Manual at `/dev/editorial-help` (which I just rewrote in Phase 27 sub-phase B) instructs adopters to *"Click Iterate, then run /deskwork:iterate in Claude Code"* — but the slash command apparently doesn't exist in their installed plugin. Either the slash isn't shipped, or the install state is inconsistent (related to #131?).
+
+**insight.** The Manual's prose teaches a workflow that requires the slash to exist. If the slash command genuinely doesn't ship, the Manual is teaching a broken flow — adjacent to #104 (Manual taught wrong slash names) and #117 (false affordances) but a different shape. Worth filing as a follow-up after this session ends. Could also be a ghost from #131-class cache breakage (the slash is registered but the cached file isn't reachable). Verification needed before filing.
+
+### Quotes worth keeping
+
+> *"yikes. The review surface affordances for margin notes AND editing are broken... This seems like a regression that should have been caught"* — the framing that turned a session pivot into a customer-blocker fix.
+
+> *"There's another urgent, customer-blocking packaging issue that was just filed. We need to fix that as well before we continue with anything else."* — the explicit interrupt that re-prioritized the session in real time.
+
+> *"why did you close it? The customer hasn't accepted the fix yet"* — the correction that produced the new agent-discipline rule.
+
+> *"let's use the deskwork plugin to review/edit/iterate/approve instead of asking me to read and approve/comment a bunch of text in the terminal. This is exactly what the deskwork plugin is designed to do."* — the redirect that moved the brainstorm from terminal Q&A to deskwork's own review surface.
+
+### What worked
+
+- **Phase 27 v0.10.0 ship was clean** — five-pause flow, no rework, no rebase. The cumulative discipline of the `/release` skill + the lockstep version-bump tooling is paying off.
+- **The recursive dogfood found exactly the bug it was designed to find.** The post-release acceptance playbook's whole purpose is to catch issues like #131 on the public install path — and it caught one before it shipped, by virtue of the design-doc-review session running through the broken pipeline. Worth treating this as evidence the design is right, not just an incidental win.
+- **Two follow-ups bundled with the substantive fix were the right cadence.** Operator asked for the version banner + CLI contract rule before v0.10.1 shipped. Both 5-minute additions; would have been awkward to ship as a separate v0.10.2 immediately afterward.
+
+### Open follow-ups
+
+- Operator verifies #131 fix on a fresh session before close. Two-session dogfood: simulate cache wipe (Claude Code does this naturally between sessions) → SessionStart hook fires → boot is clean.
+- `/deskwork:iterate` not installed (or broken) needs investigation + filing.
+- Resume the post-release acceptance design review at `/dev/editorial-review/970aa75d-f586-47f0-bc89-4481830a7676`. Margin notes work after the studio restart; ready for the operator's annotations.
+- The dw-lifecycle bug cluster filed during today's morning session (#127, #128, #129, #130) and #126 are the natural next-arc — same UX friction family as Phase 27, just on a different plugin.

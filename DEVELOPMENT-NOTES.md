@@ -4,6 +4,90 @@ Session journal for `deskwork`. Each entry records what was tried, what worked, 
 
 ---
 
+## 2026-04-30 (cont'd): ship Phase 27 studio bug tranche v0.10.0 → recursive-dogfood surfaces #131 → ship v0.10.1 cache-restore hook
+
+### Feature: deskwork-plugin
+### Worktree: deskwork-plugin
+
+**Goal:** Operator opened the session by approving the Phase 27 PRD that was iterated to v2 the prior session. Implement all 7 sub-phases, ship as v0.10.0 via `/release`. Mid-session pivot: design a post-release customer-acceptance playbook skill family. Recursive dogfood — using the deskwork plugin's review pipeline to design the acceptance playbook for itself — surfaced a customer-blocking cache-eviction bug (#131). Pivot again: ship v0.10.1 with a durable cache-restore script + auto-repair hook before resuming the design review.
+
+**Accomplished:**
+
+- **Phase 27 v0.10.0 shipped via the five-pause `/release` flow.** All 7 sub-phases A–G landed in 7 commits (`0bd3c82` → `fad6b14`):
+  - **A — Content-detail panel read-path (#103):** `loadDetailRender` in `content-detail.ts:218` resolved files only via `findOrganizationalIndex(contentDir, node.path)` — never consulted `node.filePath` (the id-bound on-disk file from Phase 22++++). Single-file entries (peer `.md` like the project's `prd.md`) rendered empty-state. Fix: prefer `node.filePath` when set; fall back to organizational-index lookup. Regression test against the project's actual PRD shape.
+  - **B — Manual + dashboard slash-name migration (#104, closes #69 in passing):** Walked every `/editorial-(add|plan|outline|draft|publish|distribute)` reference in `help.ts`, `editorial-skills-catalogue.ts`, AND `dashboard.ts` (extended scope mid-implementation when the dashboard's `data-copy` button payloads were also broken — adopters paste `/editorial-plan` and hit "command not found"). 12 catalogue slugs migrated; dashboard's empty-state prose + 8 `data-copy` payloads + Awaiting-press hint + Voice-drift report all now use canonical `/deskwork:*`. Audiocontrol-specific commands (`/editorial-reddit-sync` etc.) left untouched — they reference commands that don't exist in OSS deskwork; separate concern.
+  - **C — Unified clipboard helper + manual-copy fallback (#105, subsumes #74, #99):** Dispatched `typescript-pro` for the multi-file frontend refactor. New leaf module `plugins/deskwork-studio/public/src/clipboard.ts` exports `copyToClipboard` (async API → execCommand fallback, throws on empty) and `copyOrShowFallback` (best-effort copy → on failure renders a fixed-position dismiss-able `<aside>` with pre-selected `<pre>` block; sets `body.dataset.manualCopyOpen='1'`). Approve/Iterate handlers now check `isManualCopyOpen()` before reloading; dismiss button triggers the deferred reload. Rename form moved to `rename-form.ts` (sibling extraction kept `editorial-studio-client.ts` under 500 lines). Intake form validates required fields BEFORE generating the payload + skips auto-collapse on fallback. Filed [#124](https://github.com/audiocontrol-org/deskwork/issues/124) follow-up (rename emits non-existent slash command — architectural question).
+  - **D — Coverage matrix → Drafting list (#106):** Empty-state copy in `shortform.ts:107` named a "coverage matrix" that doesn't exist on the dashboard. Fix: rewrite copy to "Drafting list" + anchor to `/dev/editorial-studio#stage-drafting`. `renderStageSection` in `dashboard.ts:710` emits `id="stage-${stage.toLowerCase()}"` on every stage section.
+  - **E — Index page sensible defaults (#107):** Refactored `IndexEntry` with optional `linkHref`. `SECTIONS` const moved to `buildSections(ctx)` so Longform entry computes target from workflow journal. Picks most-recent open longform → deep-link; else fallback to `#stage-review` (re-using D's anchor).
+  - **F — Two-key destructive shortcut soft-confirm (#108):** Module-level `armedKey` + `armedTimer` state; `armKey` shows hint toast + schedules disarm in 500ms. Non-destructive shortcuts call `disarm()` defensively. `?` panel updated to show double-`<kbd>` rows.
+  - **G — Dashboard row link fallback (#110):** Every dashboard row now has a link target. Workflow → review surface; Published → public host URL; else → content-detail page (`/dev/content/<site>/<root>?node=<slug>`). Recent proofs `<div>` → `<a>`. Hierarchical-slug branch wrapped too.
+
+- **Tests grew 200 → 211 in studio (+11 regression cases across 7 new test files).**
+
+- **Recursive dogfood surfaced #131.** Operator wanted the post-release acceptance playbook design reviewed via the deskwork plugin (the very tool being designed) — wrote the design to `docs/1.0/post-release-acceptance-design.md`, ingested + review-started, surfaced URL. Operator opened the studio review surface and tried to leave margin notes — couldn't. Investigation found `/static/dist/editorial-review-client.js` returns 404; root cause is Claude Code's plugin-cache eviction wiping `.runtime-cache/dist/`. Quick workaround: restart studio. Real fix: cache-restore script.
+
+- **v0.10.1 — `scripts/repair-install.sh` + thin TS wrapper + adopter SessionStart hook snippet (#131).** Self-contained bash script at the marketplace clone path (durable across cache eviction). Enumerates every (plugin, version) tuple referenced by PATH, registry, or marketplace plugin.json; restores missing cache subtrees from the clone via rsync (cp fallback); prunes stale registry entries via inline `node -e`. Modes: default, `--quiet` (silent on healthy ~150ms; for SessionStart hooks), `--check`/`--dry-run` (read-only). Version banner when not `--quiet`. `deskwork repair-install` becomes a thin TS shell-out wrapper. README Troubleshooting section rewritten with the SessionStart hook config. End-to-end verified by simulated cache wipe + `command -v dw-lifecycle` recovery.
+
+- **Two new agent-discipline rules** committed in `agent-discipline.md`:
+  - *"Adopter-facing scripts have a stable CLI contract"* — once a script is documented in adopter `.claude/settings.json`, its path/flags/exit-codes/output-shape become a contract. `--dry-run` kept as alias for `--check`; `--json` kept as no-op for back-compat.
+  - *"Issue closure is the customer's call, not the agent's"* — added after I closed #131 prematurely. The customer hasn't verified the fix on their environment yet; closure belongs to the issue author. Specifically distinct from the existing "Operator owns scope decisions" rule (which is about scope) and "Packaging is UX" rule (which is about ground-truth-vs-reasoning).
+
+**Didn't Work:**
+
+- **I closed #131 prematurely.** After shipping v0.10.1 with all acceptance criteria met IN MY ENVIRONMENT, I commented on the issue with the unblock instructions and closed it. The operator caught it: *"why did you close it? The customer hasn't accepted the fix yet"*. Reopened, posted a clarifying comment, added the new rule. **[PROCESS]** — the agent's "I shipped it" is a status update, not a disposition. Customer-filed issues stay open until the customer confirms.
+
+- **I wrote the design doc to the wrong path.** Used `docs/post-release/<version>-acceptance.md` (project convention I invented) instead of the actual project convention `docs/<target-release>/<slug>-<doc-type>.md`. Operator: *"yikes... I want to flag this path as incorrect"*. Moved the file to `docs/1.0/post-release-acceptance-design.md`. **[FABRICATION]** — invented a path convention without checking; precedent existed at `docs/superpowers/specs/2026-04-29-release-skill-design.md` and `docs/1.0/001-IN-PROGRESS/<slug>/`. Same family as prior fabrication failure modes.
+
+- **Sub-phase C agent left two `/editorial-add` and `/editorial-publish` slash names in the intake form's clipboard payload** because it treated all legacy slash-command emissions as out-of-scope. The intake clipboard payload IS user-facing — adopters paste it into Claude Code and hit "command not found." Caught it on review of the agent's work; fixed before commit. **[PROCESS]** — over-conservative scoping is its own failure mode (counterpart to under-conservative); the dispatch brief should have named "all clipboard payloads" as in-scope explicitly.
+
+- **Initial brainstorming approach was terminal Q&A instead of using the deskwork plugin** for design review. Three sections in, operator: *"let's use the deskwork plugin to review/edit/iterate/approve instead of asking me to read and approve/comment a bunch of text in the terminal. This is exactly what the deskwork plugin is designed to do."* Switched immediately. **[PROCESS]** — when the operator's project IS a tool for reviewing prose, designing prose without using that tool is a missed dogfood signal.
+
+- **Tried to invoke `/deskwork:iterate`** to revise the design doc after operator margin-noted, but the slash command doesn't exist in their installed plugin (got "Unknown command: /deskwork:iterate" in their terminal). Likely friction point for adopters following the Compositor's Manual flow. Captured for follow-up.
+
+**Course Corrections:**
+
+- **[PROCESS] Issue closure belongs to the issue author.** Posted comment + closed #131 in one motion. Operator caught it. Reopened, kept the comment, added rule to `agent-discipline.md`. Future fixes for customer-filed issues: comment with status, leave open, let the customer decide.
+
+- **[FABRICATION] Read project conventions before placing files.** Both `docs/superpowers/specs/` (brainstorming convention) and `docs/1.0/001-IN-PROGRESS/<slug>/` (feature convention) existed. I invented a third location. The discipline: when uncertain about file path, grep for existing similar-purpose files first.
+
+- **[PROCESS] Use the deskwork plugin to review prose.** The operator's project is a tool for reviewing prose; designing prose without it is wrong. The full discipline: when the project being worked on IS a workflow surface, use the workflow surface for the work being designed about that workflow surface. (Recursive but real.)
+
+- **[PROCESS] Sub-agent dispatch briefs need explicit scope for "all instances of X" patterns.** When sub-phase C dispatched, the brief listed 5 callers explicitly. The agent processed the 5 callers but left intake-form clipboard payloads' slash names alone because they weren't in the explicit list. The fix: when the work is "migrate all instances of X across the codebase," name the search pattern (regex) AND the file globs, not just the audited callers.
+
+**Quantitative:**
+
+- Messages from user: ~80 (rough — heavy session with many small back-and-forth confirms)
+- Commits to feature branch this session: 13 (`0bd3c82` → `a4890fc`)
+- Releases shipped: 2 (v0.10.0 + v0.10.1)
+- Sub-agent dispatches: 1 (typescript-pro for Phase 27 sub-phase C)
+- GitHub issues commented on: 2 (#131 ×2: status + close-correction)
+- GitHub issues filed in this session: 1 (#124, rename-emits-nonexistent-command followup)
+- GitHub issues closed: 0 (close attempts: 1 — #131, but reverted)
+- Tests at session start: 200 (studio) + 162 (cli) + 339 (core) + 68 (dw-lifecycle) = 769
+- Tests at session end: 211 (studio, +11) + 153 (cli, -9 from repair-install refactor) + 339 (core) + 68 (dw-lifecycle) = 771
+- Course corrections: 4 (1 [PROCESS] for issue-closure, 1 [FABRICATION] for path-invention, 1 [PROCESS] for over-conservative dispatch scoping, 1 [PROCESS] for terminal-vs-deskwork design review)
+
+**Insights:**
+
+- **Recursive dogfood is the highest-yield finding mechanism.** Using the deskwork plugin's review pipeline to design the post-release acceptance playbook for the deskwork plugin → immediately surfaced #131 (customer-blocking cache eviction). The system being designed pointed at a bug it was specifically designed to catch. None of #131's symptoms would have surfaced without driving the review surface for real work.
+
+- **Cache-eviction symptoms are partial and confusing.** This morning's session opened with `which deskwork-studio` working (PATH still pointed at a healthy `0.7.2/bin/`) but `which deskwork` failing. The studio booted via PATH and served HTTP — but its `.runtime-cache/dist/` was wiped, so dist files 404'd. Different cache subdirectories evicted at different times produces partial-functionality states that look "kind of working" until you exercise the broken surface.
+
+- **Premature closure is a tax on adopter trust.** A closed issue tells the world "this is fixed." If it isn't (because the customer hasn't verified), the next adopter encountering the same problem won't find an open issue to attach context to — they'll file a duplicate, or worse, give up. The new rule prevents that loss of trust signal.
+
+- **Two follow-ups before shipping a fix can be cheaper than one.** Operator asked for the version banner + CLI contract rule before v0.10.1 shipped. Both were 5-minute additions — but they would have been awkward to ship as a v0.10.2 immediately afterward. Bundling small adjacent improvements with the substantive fix is the right cadence when they're truly small.
+
+- **The "stay on `feature/deskwork-plugin` for ongoing work" convention got tested.** Phase 28 (the cache-restore script) is genuinely a different shape from Phase 27 (studio bug tranche) — but extending the existing feature branch with a new phase row + workplan section was lighter than spinning up a new feature track. The convention held; the new phase rows in the README + workplan capture the distinct concerns without forcing branch-splitting.
+
+**Next session:**
+
+- Operator verifies #131 fix on a fresh session — close the issue if recovery works; reopen-with-evidence if it doesn't.
+- Resume the post-release acceptance playbook design review at `http://orion-m4.tail8254f4.ts.net:47321/dev/editorial-review/970aa75d-f586-47f0-bc89-4481830a7676`. Margin notes work now after the studio restart.
+- The dw-lifecycle bug cluster (#127, #128, #129, #130) and #126 are the natural next-arc — same family as the deskwork bugs Phase 27 fixed, surfaced during this morning's dogfood.
+- Watch [anthropics/claude-code#54905](https://github.com/anthropics/claude-code/issues/54905) for the upstream registry-hygiene fix; once that lands, `repair-install.sh` becomes a backstop rather than a primary recovery path.
+
+---
+
 ## 2026-04-30: ship v0.9.7 (#101 wildcard pin) + v0.9.8 (#89 repair-install) + Phase 27 studio-bug tranche scoped
 
 ### Feature: deskwork-plugin
