@@ -25,6 +25,22 @@ The skill currently pushes directly to `origin/main` (no PR-merge, no CI-as-seco
 
 **Revisit at 1.0 stabilization.** Once the project stabilizes, the case for PR-merge / CI-as-second-gate / branch protection grows substantially: adopter base widens; multi-contributor work becomes plausible; branch protection becomes appropriate. The release skill (specifically `atomicPush` in `lib/release-helpers.ts`) is the place to swap in a PR-merge flow when that happens. The maturity comment on `atomicPush` itself names the trigger.
 
+### Branch model: trunk-based, no release branches
+
+`main` IS the release surface. `/release` runs from a working branch, smokes, and atomic-pushes HEAD to `origin/main` + the tag in one RPC. There is no long-lived `release` branch; there is no per-version `release/v0.x` branch. The model is trunk-based:
+
+- **Feature branches** (`feature/<slug>`) develop in isolation. Merge or rebase from `main` before integration.
+- **Integration**: when a feature is ready, it merges to `main` (typically via `/release` from the feature branch when the feature itself is the next release, or via plain merge when batched into a later release).
+- **Releases**: `/release` from any branch whose HEAD should become the next tagged version. The skill validates clean tree + fast-forward over `origin/main` + tracking-up-to-date as preconditions; if those pass, HEAD goes to `origin/main` and gets tagged.
+
+**The cost** is that a feature branch must catch up with `main` before it can release. If `main` advanced (e.g. an architecture pivot landed) while a feature was in flight, the feature branch needs `git merge origin/main` before `/release` will accept it. This is intended — it forces the feature to integrate against current reality before becoming the release.
+
+**Why not a long-lived `release` branch?** It would have to merge from `main` for every architecture change anyway; it would shift the integration cost without removing it. For solo / small-team pre-1.0 work, the extra branch is overhead without payoff.
+
+**Why not short-lived per-version release branches** (`release/v0.9.6`, etc.)? They earn their keep when `main` needs to keep accepting work *while* a release is being prepared (parallel teams, CI race conditions during smoke, last-minute fixes). For solo pre-1.0 work where `/release` runs serially, there is no "main keeps moving" — only one operator, one release at a time.
+
+**When to introduce release branches**: at 1.0 stabilization, when the project starts supporting v1.x bugfixes alongside v2.x development. `release/v1.x` then becomes a real maintenance branch with its own backport policy. Mark this as a deferred decision; the trunk-based model holds for now.
+
 ### npm-publish architecture (Phase 26, v0.9.5+)
 
 Plugin runtime code ships as published npm packages under the `@deskwork/*` scope: `@deskwork/core`, `@deskwork/cli`, `@deskwork/studio`. Plugin trees themselves are thin shells (`bin/` + `skills/` + `plugin.json`) that first-run-install the corresponding package from the public registry.
