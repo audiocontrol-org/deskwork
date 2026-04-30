@@ -609,3 +609,102 @@ Workflow `applied` — terminal state. Disk content already matches (longform SS
 **X. The fix-cycle-as-test pattern.** v0.9.3 fixed the empty-vendor blocker. While verifying v0.9.3 in the operator's real environment, surfaced the prepare:husky workspace-root walk-up. Shipped v0.9.4 to fix that. The two-release-in-one-session cadence wasn't over-eager — it was the dogfood loop closing the gap between "release is correct" and "real install works." Without the operator running the actual install path between v0.9.3 and v0.9.4, the prepare:husky bug would have shipped to adopters and surfaced after-the-fact in user reports. Treat the fix cycle itself as a test environment.
 
 **Y. The smoke false-pass is a long-tail liability.** Two install-blockers in one session, both green-lit by smoke. Each fix-cycle would have caught the next bug class — but nothing prevents the NEXT install-blocker class from also being smoke-invisible. Without smoke alignment, the same trap will catch us again. Smoke alignment is high leverage; deferring it is borrowing against future release confidence.
+
+
+---
+
+## 2026-04-29 (cont'd): Dispatch failure on the published v0.9.4 plugin → architecture pivot to npm-published packages → v0.9.5
+
+**Session goal:** confirm the published v0.9.4 plugin works after the v0.9.3+ marketplace install-blocker fixes. Surfaced two new blockers, then pivoted the entire packaging architecture.
+
+**Surface exercised:** `/deskwork-studio:studio` slash-command + Skill tool dispatch on the published v0.9.4 plugin; `/deskwork:approve` slash-command on the same plugin; direct `bin/deskwork-studio` invocation; `make publish` for npm publishing; `/feature-extend` for the architecture pivot's PRD update; `/release` for v0.9.5.
+
+### Dispatch failure phase
+
+#### 1. The published plugin enumerates but doesn't dispatch
+
+**friction.** Operator tried `/deskwork-studio:studio` against the freshly-installed v0.9.4 plugin. Got *"Unknown command."* Same with the Skill tool. The plugin shows up in the available-skills system-reminder as `deskwork-studio:studio`. Enumeration works; dispatch silently drops the namespace. Same surface for `/deskwork:approve` later in the session — proving it isn't hyphen-specific.
+
+**fix attempted.** `/reload-plugins` didn't help. Full Claude Code restart didn't help. The diagnostic ladder bottoms out at "this is a Claude Code bug, not a deskwork bug." Workaround: direct bin invocation (`plugins/deskwork-studio/bin/deskwork-studio`) bypasses the dispatch layer and works.
+
+**friction (compounded).** I (the agent) initially diagnosed the bug as "hyphens in plugin namespace" without reading the docs. Operator's Socratic correction: *"do you know for sure (i.e., did you read the documentation) that hyphenated plugin names don't work?"* Lookup against canonical docs confirmed kebab-case is *prescribed*, not disallowed. Updated the issue body, retitled, retraced as upstream Claude Code bug. The agent-discipline rule *"Read documentation before quoting commands"* applies to bug diagnosis too.
+
+**insight.** Filing a bug with a fabricated root cause wastes operator time even more than not filing. The cost of "let me verify against docs first" is 30 seconds; the cost of operator chasing a wrong-cause hypothesis is hours.
+
+#### 2. The runtime workspace-dep crash (#93)
+
+**friction.** Direct bin invocation worked for `--help`, but the studio crashed at boot: *"Cannot find package '@deskwork/core' imported from packages/studio/src/server.ts"*. The `tsx`-from-source path can't resolve workspace dep symlinks under the marketplace install layout — same fundamental class as #88's empty vendor and v0.9.4's husky walk-up. Three install-blockers in three releases, all pointing at the same root cause: workspace dep resolution doesn't survive Claude Code's marketplace install path.
+
+**insight.** The vendor-via-symlink architecture exists to solve a problem npm packages already solve. Each tactical patch perpetuates the load. The right answer is to use the ecosystem.
+
+### Architecture pivot phase
+
+#### 3. Operator surfaces the pivot question
+
+> *"Would we be better off publishing our code as an npm package?"*
+
+The answer is yes — publishing `@deskwork/{core,cli,studio}` to npm makes workspace dep resolution npm's job (which it solves natively), retires the entire vendor/materialize/source.ref machinery, and ends the install-blocker class.
+
+**insight.** The right architectural decisions surface from doing the work, not from up-front design. We didn't "decide" to ship vendored source — we did it as the lowest-friction path to a v0.9.0 demo, then it became canon. The operator's question reframes it: now that we've felt the friction, should we still believe the original answer?
+
+#### 4. `/feature-extend` and the PRD-iterate gate
+
+**friction (minor).** `/feature-extend` enforces a strict gate: the PRD must go through deskwork's iterate cycle (operator clicks Iterate → agent rewrites → operator approves) before issues can be filed. But when the operator has no margin notes — just wants to approve the disk content as-written — the iterate step is procedural drift.
+
+**fix.** Operator's call: *"If I have no changes to make, I don't need to call iterate. So, I just called approve."* The CLI `deskwork approve` transitions `approved` → `applied` directly. The skill prose could acknowledge this path; right now it implies iterate-then-approve as the canonical flow.
+
+**friction (separate).** Approving via the studio button hit the dispatch bug from §1 — the studio's "Approve" button shows the slash command to copy/paste, but the operator can't run `/deskwork:approve` because of the dispatch failure. Workaround: run `bin/deskwork approve` directly.
+
+### Publish phase
+
+#### 5. `make publish` first attempt: 401/404, not auth-friendly diagnostics
+
+**friction.** First `make publish` got `npm error 404 Not Found - PUT https://registry.npmjs.org/@deskwork%2fcore - Not found / '@deskwork/core@0.9.5' is not in this registry.` The 404 is misleading — the actual cause was that npm's package PUT endpoint returns 404 (instead of 401) when no auth credentials are present, presumably to avoid leaking package-existence information.
+
+**fix.** I (the agent) had the Makefile setting `NPM_CONFIG_TOKEN`, which isn't a real npm config key. npm uses per-registry auth via `//registry.npmjs.org/:_authToken` in `.npmrc`. Fixed by writing an ephemeral `.npmrc` via `mktemp` + `NPM_CONFIG_USERCONFIG`. Verified by `npm whoami` returning a 401 (auth missing); after fix, `make publish-core` got past whoami and hit `npm error code EOTP` — exactly the 2FA signal the operator wanted as proof of "auth works, take it from here."
+
+**insight.** "Read documentation before quoting commands" applies to env var names too — I made up `NPM_CONFIG_TOKEN`. Should have read `npm config` docs before writing the Makefile. The 30-second cost of doc lookup beats the 5-minute cost of 404-debugging.
+
+#### 6. Three OTPs, three packages live
+
+**fix / insight.** Operator ran `make publish` (sequential `make publish-{core,cli,studio}` — three OTPs back-to-back). All three packages live: `@deskwork/{core,cli,studio}@0.9.5` on the public registry. No dry-run-first ceremony, no synthetic placeholder version, no TLS pinning gymnastics. The Trusted Publishers (OIDC) path stays as a future option for CI; the manual flow is a fine v0.10.0-and-beyond steady state if the operator wants to keep release control local.
+
+### Vendor retirement phase
+
+#### 7. Operator's "delete cruft" directive
+
+**fix / insight.** The 26b interim state (npm packages published, vendor still present, smoke failing because bin field changed to `dist/cli.js` but materialize-vendor doesn't ship dist) was the architecture telling us the vendor model was past its expiration. I (the agent) proposed three paths: (A) workaround with build step, (B) revert 26b's bin changes, (C) full pivot. Operator: *"delete now. Let's not work around cruft. Let's remove cruft."* The full pivot landed in one PR shipping as v0.9.5. -1188 lines net.
+
+The instinct to "keep the existing architecture working with a small workaround" is reflexive but often wrong. When the cost of the workaround approaches the cost of the pivot, do the pivot.
+
+#### 8. The `--workspaces=false` walk-up bug
+
+**friction → fix.** During smoke testing the new bin shim, npm install from the plugin root walked up to the workspace root (sparse-clone cone-mode includes the workspace `package.json`) and hoisted `node_modules/` to the wrong place. Same class as v0.9.4's husky walk-up. The fix was a single flag: `--workspaces=false`. The new smoke caught it before tag — the test path that mirrors Claude Code's actual install layout did its job.
+
+**insight.** The smoke's design (test the real install path, not a synthetic stub) earns its keep. Same lesson as PR #91 (which we superseded — the design endured even though the architecture changed under it).
+
+### Release phase
+
+#### 9. Atomic-push: silent success looks like failure
+
+**friction (minor).** `tsx atomic-push v0.9.5 feature/deskwork-plugin` exited 0 with no stdout. I worried it had failed; verified via `git ls-remote --tags origin v0.9.5` that the tag was on origin. It had succeeded silently. Should print at least "pushed" to stdout — silent success is anxiety-inducing.
+
+**friction.** GitHub release workflow failed because release.yml ran `npm --workspaces test` without first running `npm run build`. Studio's tests can't resolve `@deskwork/core/config` from the new exports map without dist/ existing. Local tests pass; CI fails. The fix wasn't to add a build step — the fix was to remove the test step entirely. Per `.claude/rules/agent-discipline.md`: *"No test infrastructure in CI."*
+
+**fix.** Operator's catch — *"Why are we running a CI workflow?"* — was the sharpest correction of the session. Stripped tests + marketplace verification from release.yml. The workflow now does just `gh release create --generate-notes`. The local smoke is the gate; CI is post-tag bookkeeping.
+
+#### 10. v0.9.5 ships, but the GitHub release page didn't auto-create
+
+**friction.** The npm packages are live (`make publish` was manual, succeeded). The git tag is on origin. The GitHub release page is missing because the release workflow failed. Adopters fetching via npm aren't affected; adopters reading the GitHub release page get nothing for v0.9.5.
+
+**fix (deferred to next session).** Manually create the v0.9.5 release page once: `gh release create v0.9.5 --generate-notes`. Future tags get it automatically from the simplified workflow.
+
+### Cross-cutting observations (continued)
+
+**Z. The vendor architecture lasted three releases.** v0.9.0 (#88) → v0.9.4 husky → v0.9.4 #93. Three install-blockers, three releases, same root cause. Each tactical patch deferred the architecture decision. The pivot was the right answer all along; we listened too late. Recurring patterns deserve earlier attention.
+
+**AA. "Packaging IS UX" applies to architecture, not just bugs.** The operator named this principle in 2026-04-29's earlier marketplace-install arc. The npm pivot is the same principle applied at architectural scale: if the way we ship code creates install-blockers as a class, that's a UX problem at the architecture layer.
+
+**BB. Operator owns scope; agent owns implementation.** The session's best moves were operator decisions: re-sequence Phase 26 (manual publish first), bundle 26c+26e (delete cruft), strip CI tests (not a test gate). The session's worst moves were my unilateral decisions: synthetic placeholder version (operator: *"Why?"*), in-progress workaround for 26b smoke fail (operator: *"delete cruft"*), v0.9.6 reflex after release.yml fix (operator: *"Why are we cutting a new release?"*). Default to the operator's read on scope.
+
+**CC. Read documentation, especially when confident.** Three documentation-skip mistakes this session: hyphen-namespace diagnosis, NPM_CONFIG_TOKEN env var, the `feature-extend` skill's iterate-required step. All three would have been avoided by 30 seconds of doc lookup. Confidence is when fabrication slips in — exactly the moment to verify.

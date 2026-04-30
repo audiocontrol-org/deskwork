@@ -1162,3 +1162,27 @@ Shipped only after the manual flow in 26f is solid. Adds `permissions: id-token:
 **Notes:**
 - The npm Trusted Publishers (OIDC) approach was operator-introduced after the initial draft used `NPM_TOKEN`. Avoids token rotation, avoids 2FA/OTP friction in CI, and gets supply-chain provenance for free on public-repo publishes. Per [docs.npmjs.com/trusted-publishers](https://docs.npmjs.com/trusted-publishers).
 - This pivot reverses one of Phase 23's load-bearing decisions ("retire bundles → ship source via vendor"). The reversal is justified by three install-blockers in three releases pointing at the same root cause (workspace dep resolution doesn't survive Claude Code's marketplace install path). The operator framing: "Would we be better off publishing our code as an npm package?" — answer surfaced after Bug #93 made the install path crash on workspace dep resolution at runtime, not just at install time.
+
+---
+
+### Phase 26+: packaging follow-ups — v0.9.6
+
+**Deliverable:** Close four packaging defects that surfaced after the Phase 26 v0.9.5 ship. All four stem from the architectural pivot (npm-publish + `files: ["dist", ...]` whitelist + bin-shim resolution); none independent of it.
+
+**Sub-phase fixes (single PR):**
+
+- [x] **Fix #97** (P0 bug) — `@deskwork/studio` runtime deps moved from `devDependencies` to `dependencies`. The package's `dist/build-client-assets.js` imports `esbuild`; the on-startup esbuild pass bundles `@codemirror/*` + `@lezer/highlight` from the plugin-shell client entries. v0.9.5 shipped with these in `devDependencies`; adopters got `ERR_MODULE_NOT_FOUND`. The v0.9.5 stopgap (plugin-shell `package.json` declaring them) is removed in this fix. Commit `3be7921`.
+- [x] **Fix #95** (P0 bug) — `deskwork customize` re-anchored from `<pkg>/src/<category>/<name>.ts` to `<pkg>/dist/<category>/<name>.ts`. The npm tarball ships only `dist/` per the `files` whitelist; customize broke for npm-installed plugins (worked only in workspace-symlink dev). Build pipeline copies `.ts` source files verbatim from `src/<category>/` into `dist/<category>/`, mirroring the existing precedent for `@deskwork/core`'s three `.mjs` remark plugins. Two regression tests added (685 total, was 683). `listAvailable` tightened to exclude `.d.ts` declaration files from error-message listings. Commit `0a07d38`.
+- [x] **Fix #96** (P1 doc) — Per-package READMEs authored for `packages/{core,cli,studio}` so npmjs.com landing pages render content (each package's `files` whitelist already declared `README.md`; the file just didn't exist at the package level). Each README is short (<35 lines), self-contained for an adopter landing from search, and points at the canonical marketplace install path for end-users. Commit `b195278`.
+- [x] **Fix #100** (P1 doc) — `plugins/deskwork-studio/skills/studio/SKILL.md` Step 4 rewritten to describe the Phase 26 three-tier wrapper resolution (workspace symlink → pinned-version cache → first-run / version-drift install). Same drift fixed in `plugins/deskwork-studio/README.md` and `plugins/deskwork/README.md`. Phase 23-numbered reference in `plugins/deskwork/skills/customize/SKILL.md` dropped (the customize feature still exists; the prose just no longer pins to a phase). `git grep -n "Phase 23\|source-shipped\|materialize"` against plugin skill bodies returns nothing. Commits `e507290` (SKILL.md cleanup), `b195278` (README cleanup folded into the per-package README work).
+
+**Acceptance:**
+- [x] `@deskwork/studio` tarball declares `esbuild`, `@codemirror/*`, `@lezer/highlight` in `dependencies` (verified via `npm pack` + manifest inspection).
+- [x] `deskwork customize templates dashboard` works against an extracted-tarball shape (covered by two new tests under `packages/cli/test/customize-skill.test.ts`).
+- [x] `npm pack --workspace @deskwork/<pkg>` produces a tarball whose extraction has `package/README.md` for all three packages.
+- [x] `git grep -n "Phase 23\|source-shipped\|materialize" plugins/` returns nothing.
+- [x] All workspace tests pass: 685 total (683 baseline + 2 regression tests).
+
+**Operator action:** v0.9.6 release runs separately via `/release` after this PR merges.
+
+**Issues closed via /release:** [#95](https://github.com/audiocontrol-org/deskwork/issues/95), [#96](https://github.com/audiocontrol-org/deskwork/issues/96), [#97](https://github.com/audiocontrol-org/deskwork/issues/97), [#100](https://github.com/audiocontrol-org/deskwork/issues/100).
