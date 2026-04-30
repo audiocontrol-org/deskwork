@@ -68,14 +68,32 @@ function resolvePackageFile(specifier: string): string {
 }
 
 /**
+ * Resolve a package's root directory by anchoring on its `package.json`
+ * subpath export. Both `@deskwork/core` and `@deskwork/studio` expose
+ * `./package.json` implicitly through Node's package-exports machinery
+ * (or via a dedicated entry — see each package's exports map).
+ *
+ * Returns the absolute directory containing the package.json. From there,
+ * the customize anchor walks into `src/<...>` for the requested file.
+ */
+function resolvePackageRoot(packageName: string): string {
+  const pkgJsonPath = resolvePackageFile(`${packageName}/package.json`);
+  return dirname(pkgJsonPath);
+}
+
+/**
  * Find the source-of-truth file for a customize request. Returns an
  * absolute path or throws. The mapping per category:
  *
- *   templates → resolve @deskwork/studio's index, then walk to
- *               src/pages/<name>.ts.
- *   doctor    → resolve @deskwork/core/doctor/rules export pattern via
- *               the doctor index, then walk to src/doctor/rules/<name>.ts.
+ *   templates → @deskwork/studio package root, then src/pages/<name>.ts.
+ *   doctor    → @deskwork/core package root, then src/doctor/rules/<name>.ts.
  *   prompts   → throws (reserved).
+ *
+ * Note: this assumes the published package ships its `src/` tree.
+ * Phase 26b's `files: ["dist", ...]` whitelist drops `src/`, so the
+ * customize command currently works only against workspace-symlinked
+ * packages (the dev path). A follow-up issue tracks shipping the
+ * customize sources alongside dist or vendoring template snapshots.
  */
 function resolveDefaultSource(category: Category, name: string): string {
   if (category === 'prompts') {
@@ -84,12 +102,8 @@ function resolveDefaultSource(category: Category, name: string): string {
     );
   }
   if (category === 'templates') {
-    // Use the studio's package.json `bin` entry as a deterministic
-    // anchor — it points at src/server.ts in dev and src/server.ts
-    // post-install. From there, sibling pages/<name>.ts is the
-    // template source.
-    const serverPath = resolvePackageFile('@deskwork/studio/server.ts');
-    const candidate = resolve(dirname(serverPath), 'pages', `${name}.ts`);
+    const studioRoot = resolvePackageRoot('@deskwork/studio');
+    const candidate = resolve(studioRoot, 'src', 'pages', `${name}.ts`);
     if (!existsSync(candidate)) {
       throw new Error(
         `no built-in template named "${name}". Available templates: ${listAvailable(
@@ -100,10 +114,8 @@ function resolveDefaultSource(category: Category, name: string): string {
     return candidate;
   }
   // doctor
-  // The core package exposes ./doctor → src/doctor/index.ts. From
-  // there, sibling rules/<name>.ts is the rule source.
-  const doctorIndex = resolvePackageFile('@deskwork/core/doctor');
-  const candidate = resolve(dirname(doctorIndex), 'rules', `${name}.ts`);
+  const coreRoot = resolvePackageRoot('@deskwork/core');
+  const candidate = resolve(coreRoot, 'src', 'doctor', 'rules', `${name}.ts`);
   if (!existsSync(candidate)) {
     throw new Error(
       `no built-in doctor rule named "${name}". Available rules: ${listAvailable(

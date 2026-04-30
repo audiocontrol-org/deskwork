@@ -13,7 +13,7 @@
  *   - plugins/{deskwork,deskwork-studio,dw-lifecycle}/package.json
  *   - plugins/{deskwork,deskwork-studio,dw-lifecycle}/.claude-plugin/plugin.json
  *   - .claude-plugin/marketplace.json (top-level metadata.version + each
- *     plugin entry's version + each git-subdir source.ref)
+ *     plugin entry's version)
  *
  * Intentionally manual: writes the files, you review the diff, then
  * commit + tag yourself. No "auto-publish on every merge" semantics.
@@ -37,9 +37,13 @@ interface VersionedManifest {
   readonly label: string;
   /**
    * For marketplace.json, we update top-level `metadata.version` AND
-   * each plugin entry's `version`. For everything else, just `version`.
+   * each plugin entry's `version`. For plugin-shell-package-json, we
+   * update `version` AND any `dependencies['@deskwork/*']` entries (the
+   * plugin shell pins the npm package version that its bin shim
+   * fetches at first run; lockstep with `version`). For everything
+   * else, just `version`.
    */
-  readonly kind: 'package-json' | 'plugin-json' | 'marketplace-json';
+  readonly kind: 'package-json' | 'plugin-shell-package-json' | 'plugin-json' | 'marketplace-json';
 }
 
 const MANIFESTS: readonly VersionedManifest[] = [
@@ -47,8 +51,8 @@ const MANIFESTS: readonly VersionedManifest[] = [
   { path: 'packages/core/package.json', label: '@deskwork/core', kind: 'package-json' },
   { path: 'packages/cli/package.json', label: '@deskwork/cli', kind: 'package-json' },
   { path: 'packages/studio/package.json', label: '@deskwork/studio', kind: 'package-json' },
-  { path: 'plugins/deskwork/package.json', label: 'deskwork plugin shell', kind: 'package-json' },
-  { path: 'plugins/deskwork-studio/package.json', label: 'deskwork-studio plugin shell', kind: 'package-json' },
+  { path: 'plugins/deskwork/package.json', label: 'deskwork plugin shell', kind: 'plugin-shell-package-json' },
+  { path: 'plugins/deskwork-studio/package.json', label: 'deskwork-studio plugin shell', kind: 'plugin-shell-package-json' },
   { path: 'plugins/dw-lifecycle/package.json', label: 'dw-lifecycle plugin shell', kind: 'package-json' },
   { path: 'plugins/deskwork/.claude-plugin/plugin.json', label: 'deskwork plugin.json', kind: 'plugin-json' },
   { path: 'plugins/deskwork-studio/.claude-plugin/plugin.json', label: 'deskwork-studio plugin.json', kind: 'plugin-json' },
@@ -87,6 +91,29 @@ async function bumpFile(manifest: VersionedManifest, version: string): Promise<s
       await writeJson(abs, data);
       return `  ${manifest.label.padEnd(36)} ${String(before)} -> ${version}`;
     }
+    case 'plugin-shell-package-json': {
+      const before = data.version;
+      data.version = version;
+      const lines: string[] = [
+        `  ${manifest.label.padEnd(36)} ${String(before)} -> ${version}`,
+      ];
+      // Plugin shells pin @deskwork/* npm packages at the same version
+      // their plugin.json declares (lockstep — the bin shim's first-run
+      // install resolves these via npm). Bump every dependency whose
+      // name starts with "@deskwork/".
+      const deps = data.dependencies as Record<string, unknown> | undefined;
+      if (deps && typeof deps === 'object') {
+        for (const [name, before] of Object.entries(deps)) {
+          if (!name.startsWith('@deskwork/')) continue;
+          deps[name] = version;
+          lines.push(
+            `  ${manifest.label} dep ${name.padEnd(20)} ${String(before)} -> ${version}`,
+          );
+        }
+      }
+      await writeJson(abs, data);
+      return lines.join('\n');
+    }
     case 'marketplace-json': {
       const metadata = data.metadata as Record<string, unknown> | undefined;
       const beforeMeta = metadata?.version;
@@ -101,6 +128,13 @@ async function bumpFile(manifest: VersionedManifest, version: string): Promise<s
       const lines: string[] = [
         `  ${manifest.label} (metadata) ${String(beforeMeta)} -> ${version}`,
       ];
+      // Phase 26e (v0.9.5+): source.ref is no longer pinned per release.
+      // The vendor materialization that motivated the pin is gone — plugin
+      // shells now first-run-install @deskwork/<pkg>@<plugin-manifest-
+      // version> from npm, so the version coupling lives in the plugin
+      // shell's plugin.json, not in marketplace.json's git-subdir ref.
+      // git-subdir sources omit `ref` and resolve to the repository's
+      // default branch.
       for (const entry of plugins) {
         const before = entry.version;
         entry.version = version;

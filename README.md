@@ -41,7 +41,7 @@ Then bootstrap the host project:
 /deskwork:install
 ```
 
-The plugins ship source — there are no precompiled bundles to track. On the first `/deskwork:*` skill invocation (or a direct `deskwork` / `deskwork-studio` CLI call) after marketplace install, the plugin's `bin/` wrapper runs `npm install --omit=dev` inside the plugin tree once (~30s, one-time), then exec's the source via `tsx`. Subsequent invocations skip that step. Workspace packages (`@deskwork/core`, `@deskwork/cli`, `@deskwork/studio`) are vendored under `plugins/<plugin>/vendor/` — symlinked in dev clones, materialized to real directory copies at release time so a marketplace install is self-contained. See [`RELEASING.md`](./RELEASING.md#vendor-materialize-mechanism) for the mechanism.
+The plugins ship as thin shells. On the first `/deskwork:*` skill invocation (or a direct `deskwork` / `deskwork-studio` CLI call) after marketplace install, the plugin's `bin/` shim runs `npm install --omit=dev` inside the plugin tree once (~30s, one-time), which fetches the corresponding `@deskwork/*` package from the public npm registry at the version pinned in the plugin's `plugin.json`. Subsequent invocations skip that step. The plugin manifest version is kept in lockstep with the published `@deskwork/{core,cli,studio}` npm package versions — bumping one bumps the others (see [`RELEASING.md`](./RELEASING.md)).
 
 See each plugin's `README.md` under `plugins/` for configuration and usage. The `deskwork` plugin README documents the host content-schema requirement (Astro projects must allow the `deskwork:` namespace in frontmatter) and the `doctor` maintenance command.
 
@@ -54,7 +54,7 @@ deskwork tracks the default branch of `audiocontrol-org/deskwork`. To pull the l
 /reload-plugins
 ```
 
-The first invocation of any deskwork skill after an update may rerun the plugin tree's `npm install --omit=dev` if package versions changed (still a one-time ~30s step per update). Subsequent invocations are fast.
+The first invocation of any deskwork skill after an update may rerun the plugin tree's `npm install --omit=dev` if the pinned `@deskwork/*` version changed (still a one-time ~30s step per update). Subsequent invocations are fast.
 
 By default, third-party marketplaces don't auto-update — run those two commands when you want to refresh. To toggle auto-update, use `/plugin` and look for the **Marketplaces** tab.
 
@@ -79,21 +79,23 @@ deskwork/
 ├── .claude-plugin/
 │   └── marketplace.json     # Marketplace manifest (lists each plugin)
 ├── packages/
-│   ├── core/                # @deskwork/core — pure lib (no entry point)
-│   ├── cli/                 # @deskwork/cli — single-dispatcher CLI
-│   └── studio/              # @deskwork/studio — Hono web server
+│   ├── core/                # @deskwork/core   — pure lib, npm-published
+│   ├── cli/                 # @deskwork/cli    — CLI, npm-published
+│   └── studio/              # @deskwork/studio — Hono web server, npm-published
 ├── plugins/
-│   ├── deskwork/            # Lifecycle plugin shell (SKILL.md + bash wrapper + vendor/)
-│   └── deskwork-studio/     # Studio plugin shell (single launch skill + vendor/)
+│   ├── deskwork/            # Lifecycle plugin shell (SKILL.md + bin shim)
+│   └── deskwork-studio/     # Studio plugin shell (SKILL.md + bin shim)
 ├── scripts/
-│   └── materialize-vendor.sh # Release-time vendor symlink → directory-copy
+│   ├── bump-version.ts      # Atomic version bump across every manifest
+│   └── smoke-marketplace.sh # Local-only release-blocking smoke
+├── Makefile                 # Publish targets for the @deskwork/* npm packages
 ├── docs/                    # Feature PRDs, workplans, implementation notes
 ├── package.json             # npm workspaces root
 ├── LICENSE
 └── README.md
 ```
 
-Plugins are self-contained — no cross-plugin `../` imports. The plugin shells are thin (manifest + SKILL.md + bash wrapper); all logic lives in the npm packages under `packages/`, vendored into each plugin under `vendor/`.
+Plugins are self-contained — no cross-plugin `../` imports. The plugin shells are thin (manifest + SKILL.md + bin shim); the bin shim first-run-installs `@deskwork/<pkg>@<version>` from npm into the plugin's `node_modules/`, then dispatches.
 
 ### Development
 

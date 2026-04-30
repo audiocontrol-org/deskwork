@@ -1,4 +1,4 @@
-#!/usr/bin/env tsx
+#!/usr/bin/env node
 /**
  * @deskwork/studio — local web server for the editorial review surface.
  *

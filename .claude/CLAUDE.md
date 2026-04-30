@@ -109,26 +109,28 @@ deskwork/
 ├── .claude-plugin/
 │   └── marketplace.json        # Marketplace manifest (git-subdir entries)
 ├── packages/
-│   ├── core/                   # @deskwork/core — pure lib (no entry point)
-│   ├── cli/                    # @deskwork/cli — single-dispatcher CLI
+│   ├── core/                   # @deskwork/core   — pure lib (no entry point)
+│   ├── cli/                    # @deskwork/cli    — single-dispatcher CLI
 │   └── studio/                 # @deskwork/studio — Hono web server
 ├── plugins/
-│   └── <plugin>/               # Self-contained plugin directory
+│   └── <plugin>/               # Self-contained plugin shell (thin)
 │       ├── .claude-plugin/
-│       │   └── plugin.json
+│       │   └── plugin.json     # name + version (== npm pkg version)
 │       ├── skills/
 │       │   └── <skill>/SKILL.md
-│       ├── bin/                # Helper scripts — added to PATH by Claude Code
-│       ├── lib/                # Library code (TypeScript)
-│       ├── vendor/             # Vendored workspace packages (Phase 23b/23c)
-│       │   ├── core/           # Symlink to ../../packages/core in dev;
-│       │   └── cli/            # materialized to a real directory at release.
+│       ├── bin/                # Bin shim — first-run npm-installs
+│       │                       # @deskwork/<pkg>@<plugin.json#version>
+│       │                       # then dispatches to it.
 │       ├── .runtime-cache/     # Auto-generated build outputs (gitignored;
 │       │                       # studio's on-startup esbuild lands here).
-│       ├── package.json
+│       ├── package.json        # Empty shell (no deps; bin shim handles
+│       │                       # install at runtime).
 │       └── README.md
 ├── scripts/
-│   └── materialize-vendor.sh   # Release-time: vendor symlinks → directory copies
+│   ├── bump-version.ts         # Atomic version bump across all manifests
+│   ├── smoke-marketplace.sh    # Local-only release-blocking smoke
+│   └── smoke-clone-install.sh  # Sourced by smoke-marketplace.sh
+├── Makefile                    # publish targets for @deskwork/* npm packages
 ├── docs/                       # Feature PRDs, workplans, impl notes
 ├── DEVELOPMENT-NOTES.md        # Session journal
 ├── package.json                # npm workspaces root
@@ -136,7 +138,13 @@ deskwork/
 └── README.md
 ```
 
-Plugins are self-contained — no cross-plugin `../` imports. The `bundle/` directory referenced in earlier (pre-Phase-23) docs is retired; plugins now ship source under `vendor/` and build at first run.
+Plugins are self-contained shells — at first invocation they
+`npm install --omit=dev @deskwork/<pkg>@<version>` from the public npm
+registry into `node_modules/`, then dispatch through
+`node_modules/.bin/<bin>`. The plugin's manifest version === the npm
+package version (lockstep). The `vendor/` directory referenced in
+pre-Phase-26 docs is retired; the `bundle/` directory referenced in
+pre-Phase-23 docs is also retired.
 
 ## Worktree Convention
 
@@ -154,10 +162,8 @@ Feature work happens in worktrees under `~/work/deskwork-work/`. The worktree di
 - Skills are composable and UNIX-style — one skill per action, never a monolith
 - Interactive skills prompt one argument at a time when multiple are required
 - Bundle helper scripts as proper scripts under `bin/`, not ad-hoc shell
-- `bin/` wrappers do a one-time `npm install --omit=dev` on first invocation when the plugin tree has no `node_modules` (the marketplace-install case). Subsequent runs skip the install.
-- Adapter layer under `lib/` decouples skill logic from host project structure
-- Skills read configuration via the adapter; never hardcode paths
-- Workspace packages used by a plugin are vendored under `vendor/<pkg>/` (symlinked in dev, materialized to a real directory at release time by `scripts/materialize-vendor.sh`). Never reach across plugins or up to `packages/` from inside a plugin tree at runtime — read via `vendor/`.
+- `bin/` shims first-run-install `@deskwork/<pkg>@<plugin.json#version>` from the public npm registry into `<pluginRoot>/node_modules/` and then dispatch to `<pluginRoot>/node_modules/.bin/<bin>`. Subsequent runs skip the install. The plugin shell's `plugin.json` version MUST equal the published npm package version (lockstep — bumped together by `scripts/bump-version.ts`).
+- Workspace dev path: when the plugin lives inside this monorepo, `<pluginRoot>/node_modules/@deskwork/<pkg>` is a workspace symlink into `packages/<pkg>`. The bin shim detects the symlink and dispatches directly — never npm-install over a workspace symlink.
 - Studio client assets are built on startup by an in-process esbuild pass; outputs land in `<pluginRoot>/.runtime-cache/` (gitignored). No precompiled bundle is committed.
 - Built-in studio templates and doctor rules are overridable per-project: `<projectRoot>/.deskwork/templates/<name>.ts` (and `.deskwork/doctor/<name>.ts`) are picked up by the runtime override resolver. Operators copy a default into the project via `/deskwork:customize <category> <name>`.
 
@@ -191,11 +197,11 @@ Never implement fallbacks or use mock data outside of test code. Throw errors wi
 
 ```bash
 npm install                              # install workspace deps
-npm --workspace plugins/<plugin> test    # run one plugin's tests
+npm --workspace @deskwork/<pkg> test     # run one workspace package's tests
 claude plugin validate plugins/<plugin>  # validate plugin manifest
 claude --plugin-dir plugins/<plugin>     # load plugin into a Claude Code session
-bash scripts/smoke-marketplace.sh        # release-gate smoke (materializes vendor, boots studio, checks routes)
-bash scripts/materialize-vendor.sh       # turn vendor symlinks into directory copies (release path)
+make publish                             # publish @deskwork/{core,cli,studio}@<version> to npm
+bash scripts/smoke-marketplace.sh        # release-gate smoke (clones, npm-installs from registry, boots studio, checks routes)
 ```
 
 ## Documentation Standards

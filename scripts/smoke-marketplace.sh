@@ -1,25 +1,36 @@
 #!/usr/bin/env bash
 #
-# smoke-marketplace.sh — local-only pre-tag smoke test that reproduces the
-# marketplace install path against the current commit and asserts every
-# page route + every <script>/<link> static asset returns HTTP 200.
+# smoke-marketplace.sh — local-only pre-tag smoke that exercises the
+# real marketplace install path and asserts the resulting plugin tree
+# boots cleanly.
 #
-# Why: catches the v0.6.0–v0.8.2 client-JS-404 bug class, dangling vendor
-# symlinks, missing files, broken bin wrappers — packaging regressions —
-# at release time rather than after adopters install.
+# Why: catches packaging regressions before they reach adopters. The
+# v0.6.0–v0.8.2 client-JS-404 bug, #88's empty vendor, the v0.9.4
+# prepare:husky walk-up — all of these are install-path bugs that
+# only surface when the install matches what Claude Code actually
+# does. Per `RELEASING.md` § "Maturity stance" this is the release-
+# blocking gate.
 #
-# How:
-#   1. git archive HEAD plugins/<plugin> packages/ → $tmp (reproduces the
-#      marketplace tarball as Claude Code's clone+copy would see it).
-#   2. Materialize vendor symlinks in the extracted tree (rsync from the
-#      extracted packages/ into plugins/<plugin>/vendor/<pkg>/). This is
-#      the same step the release workflow runs; we run it locally against
-#      the extracted tree, not the working tree.
-#   3. Boot the studio against a fixture project; curl every documented
-#      page route; scrape <script src> and <link href> URLs from each
-#      page body and curl those too. Assert every response is 200.
-#   4. Repeat for the deskwork CLI plugin (no HTTP routes — verify
-#      `deskwork --help` exits 0).
+# Phase 26 rewrite (v0.9.5+):
+#   The vendor-materialization architecture is gone. Plugins now ship
+#   as thin shells that first-run-install @deskwork/<pkg>@<version>
+#   from npm at first invocation. The smoke mirrors that path:
+#
+#   1. Phase A (marketplace.json read) — full clone of the release-
+#      source repo + validation that marketplace.json parses and
+#      every plugin entry has a usable source spec.
+#
+#   2. Phase B (per-plugin install via git-subdir + cone-mode sparse-
+#      clone) — mirror Claude Code's install behavior. Each plugin's
+#      bin shim's first-run `npm install --omit=dev @deskwork/<pkg>@
+#      <version>` runs against the actual npm public registry. This
+#      means the version pinned in plugin.json MUST be published
+#      before this smoke can pass.
+#
+#   3. Studio HTTP smoke — boot the studio against a fixture project,
+#      curl every documented page route, scrape <script>/<link> assets
+#      from each, assert every response is 200. Catches the client-JS
+#      404 class of bugs that an install-only smoke can't see.
 #
 # Local-only. Not wired into CI per .claude/rules/agent-discipline.md
 # ("No test infrastructure in CI").
@@ -29,26 +40,6 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SMOKE_PORT="${SMOKE_PORT:-47399}"
 STUDIO_BOOT_TIMEOUT_S="${STUDIO_BOOT_TIMEOUT_S:-60}"
-
-# Source the release-time materialization runtime so the smoke uses the
-# SAME code path the release uses — including the symlink-traversal
-# guard and the mode-bit verification. Sourcing must happen at script
-# top, not inside a function (sourcing is one-time and exposes the
-# functions to the rest of this script).
-# shellcheck source=./materialize-vendor.sh
-. "${REPO_ROOT}/scripts/materialize-vendor.sh"
-
-# (plugin, vendored-pkg) pairs. Mirrors scripts/materialize-vendor.sh.
-STUDIO_VENDOR_PAIRS=(
-  "deskwork-studio:core"
-  "deskwork-studio:studio"
-  "deskwork-studio:cli-bin-lib"
-)
-CLI_VENDOR_PAIRS=(
-  "deskwork:core"
-  "deskwork:cli"
-  "deskwork:cli-bin-lib"
-)
 
 # ----- ANSI helpers -------------------------------------------------------
 
@@ -98,10 +89,6 @@ kill_tree() {
 }
 
 # Idempotent cleanup. Safe to call from EXIT, INT, TERM trap or directly.
-# Tears down (in order): tracked subprocess PIDs (with their entire process
-# subtree, since each was launched in a `( ... ) &` subshell whose grandchild
-# may be the actual server / npm process), the recorded studio PID's tree,
-# any direct children of the script (catch-all), then the tmp dir.
 CLEANUP_RAN=0
 cleanup() {
   if [ "${CLEANUP_RAN}" = "1" ]; then
@@ -109,12 +96,6 @@ cleanup() {
   fi
   CLEANUP_RAN=1
 
-  # Tear down each tracked subprocess subtree (TERM → 1s grace → KILL).
-  # We walk descendants and kill them too because launching a server with
-  # `( cd ... ; node server.ts ) &` records the subshell's PID, NOT the
-  # node grandchild. SIGTERM to the subshell does not reliably propagate
-  # to the grandchild on macOS — the grandchild reparents to init and
-  # keeps running. kill_tree fixes that.
   local pid
   for pid in "${KILL_PIDS[@]:-}"; do
     [ -z "${pid}" ] && continue
@@ -128,17 +109,12 @@ cleanup() {
     done
   fi
 
-  # Defense in depth: kill the recorded studio PID's subtree even if it
-  # wasn't tracked in KILL_PIDS.
   if [ -n "${STUDIO_PID}" ]; then
     kill_tree -TERM "${STUDIO_PID}"
     sleep 1
     kill_tree -KILL "${STUDIO_PID}"
   fi
 
-  # Final sweep: any direct children of this script (catches grandchildren
-  # spawned inside subshells we did not record). Use the recursive walker
-  # via pgrep -P $$ so we hit the full subtree, not just direct children.
   if command -v pgrep >/dev/null 2>&1; then
     local child
     while IFS= read -r child; do
@@ -164,18 +140,7 @@ info "smoke tmp: ${TMP}"
 info "smoke port: ${SMOKE_PORT}"
 
 # ----- Pre-flight: SMOKE_PORT must be free --------------------------------
-#
-# Belt-and-suspenders check. The studio refuses to auto-increment when
-# --port is passed explicitly (which we do), so a port collision will
-# surface as a hard boot failure with a clear error from the studio. But
-# checking here too means we fail BEFORE the (slow) git archive + npm
-# install, which is a much better operator experience.
-#
-# Detection method (macOS + Linux):
-#   1. lsof -nP -iTCP:<port> -sTCP:LISTEN -t  — preferred; macOS default,
-#      common on Linux. Exits with PIDs listed if occupied.
-#   2. nc -z 127.0.0.1 <port>                 — fallback; widely available.
-#      Exits 0 when a connection succeeds (= port occupied).
+
 preflight_port_free() {
   local port="$1"
   if command -v lsof >/dev/null 2>&1; then
@@ -203,30 +168,115 @@ if ! preflight_port_free "${SMOKE_PORT}"; then
 fi
 ok "port ${SMOKE_PORT} is free"
 
-# ----- Materialize one extracted plugin's vendor symlinks ----------------
+# ----- Pre-flight: working tree must be committed -------------------------
 #
-# Delegates to materialize_vendor_pairs (sourced from materialize-vendor.sh
-# above). The shared function does the symlink-traversal guard, content
-# diff, and mode-bit verification — keeping smoke and release on a
-# single code path so they cannot disagree about what materialization
-# does.
+# build_release_source_clone clones REPO_ROOT, so a dirty working tree
+# means the smoke tests a different code state than what's committed
+# (and what would actually be tagged at release). The /release skill
+# enforces a clean tree as a precondition; this is belt-and-suspenders
+# so the smoke can be run independently.
 #
-# Args: $1 = root of extracted tree (containing plugins/ and packages/).
-#       $2..$N = "<plugin>:<pkg>" pairs to materialize.
-materialize_vendor_in_tree() {
-  local tree_root="$1"
-  shift
-  if ! materialize_vendor_pairs "${tree_root}" "$@"; then
-    fail "materialize: materialize_vendor_pairs failed under ${tree_root}"
-    return 1
+# Untracked files are tolerated (they aren't part of HEAD) but
+# modifications and staged changes are not.
+if ! git -C "${REPO_ROOT}" diff --quiet 2>/dev/null \
+   || ! git -C "${REPO_ROOT}" diff --cached --quiet 2>/dev/null; then
+  warn "working tree at ${REPO_ROOT} has uncommitted changes"
+  warn "smoke clones HEAD; uncommitted changes will NOT be tested"
+  warn "for full coverage, commit changes (or stash) before re-running"
+  # Not a hard failure — the operator may legitimately want to smoke
+  # against committed-state for an iteration loop. We surface it
+  # loudly so they can't miss it.
+fi
+
+# ----- Pre-flight: pinned npm versions must be published ------------------
+#
+# Phase B's bin shims run `npm install --omit=dev @deskwork/<pkg>@
+# <version>` against the public registry. If the pinned version
+# (plugin.json#version) isn't on npm yet, that install will fail with a
+# misleading "404 Not Found". Surface that condition explicitly here so
+# the operator knows to publish before re-running the smoke.
+preflight_npm_version_published() {
+  local plugin_dir="$1"
+  local pkg="$2"
+  local version
+  version="$(node -e "
+    const fs = require('fs');
+    const j = JSON.parse(fs.readFileSync('${plugin_dir}/.claude-plugin/plugin.json', 'utf8'));
+    process.stdout.write(j.version);
+  ")"
+  local got
+  got="$(npm view "${pkg}@${version}" version 2>/dev/null || true)"
+  if [ "${got}" = "${version}" ]; then
+    ok "${pkg}@${version} is published"
+    return 0
   fi
+  fail "${pkg}@${version} is NOT published on npm — run \`make publish\` (or \`npm publish --access public --workspace ${pkg}\`) before re-running smoke"
+  return 1
 }
 
-# ----- Fixture project ---------------------------------------------------
+PREFLIGHT_FAIL=0
+preflight_npm_version_published "${REPO_ROOT}/plugins/deskwork" "@deskwork/cli" || PREFLIGHT_FAIL=1
+preflight_npm_version_published "${REPO_ROOT}/plugins/deskwork-studio" "@deskwork/studio" || PREFLIGHT_FAIL=1
+if [ "${PREFLIGHT_FAIL}" -ne 0 ]; then
+  exit 1
+fi
+
+# ----- Source the clone-install helper -----------------------------------
+
+# shellcheck source=./smoke-clone-install.sh
+. "${REPO_ROOT}/scripts/smoke-clone-install.sh"
+
+# ----- Build the release-source clone ------------------------------------
 #
-# A minimal collection: one site, one stub markdown file, no host. The
-# studio only needs .deskwork/config.json + the contentDir to be present;
-# calendar.md is optional (renderer treats absence as "no entries").
+# Phases A and B both clone from this repo. With Phase 26's vendor
+# retirement, the clone is the release source as-is — no materialize-
+# vendor step. See smoke-clone-install.sh for why we clone (rather than
+# point at REPO_ROOT directly).
+
+RELEASE_SOURCE="${TMP}/release-source"
+build_release_source_clone "${RELEASE_SOURCE}"
+
+# (plugin, bin_name) pairs to validate against both install shapes.
+PLUGIN_BIN_PAIRS=(
+  "deskwork:deskwork"
+  "deskwork-studio:deskwork-studio"
+)
+
+# ----- Phase A: full marketplace clone -----------------------------------
+
+info "===== Phase A — marketplace.json read (catalog validation) ====="
+phase_a_marketplace_read "${RELEASE_SOURCE}" || true
+
+# ----- Phase B: sparse git-subdir clone ----------------------------------
+
+info "===== Phase B — per-plugin install (marketplace.json source) ====="
+for pair in "${PLUGIN_BIN_PAIRS[@]}"; do
+  plugin="${pair%%:*}"
+  bin_name="${pair#*:}"
+  phase_b_per_source "${RELEASE_SOURCE}" "${plugin}" "${bin_name}" || true
+done
+
+# Bail before the (slower) studio HTTP smoke if the install path is
+# already broken. Saves the operator a 60s wait when the answer is
+# "fix the install first."
+if [ "${FAILURES}" -gt 0 ]; then
+  fail "${FAILURES} install-path assertion(s) failed — skipping studio HTTP smoke"
+  exit 1
+fi
+
+# ----- Studio HTTP smoke -------------------------------------------------
+#
+# We re-use the Phase B sparse clone of deskwork-studio for the HTTP
+# smoke — its node_modules are already populated (the bin wrapper
+# install ran during phase_b), so we can skip a redundant install. We
+# just need a fixture project + a studio process bound to SMOKE_PORT.
+
+STUDIO_INSTALL="${TMP}/phase-b-deskwork-studio/plugins/deskwork-studio"
+if [ ! -d "${STUDIO_INSTALL}/node_modules" ]; then
+  fail "studio install dir has no node_modules — Phase B must have failed silently"
+  exit 1
+fi
+
 make_fixture_project() {
   local fixture_root="$1"
   mkdir -p "${fixture_root}/.deskwork"
@@ -259,8 +309,6 @@ MD
 MD
 }
 
-# ----- HTTP assertion helpers --------------------------------------------
-
 assert_200() {
   local url="$1"
   local code
@@ -274,31 +322,25 @@ assert_200() {
   return 1
 }
 
-# Scrape <script src="..."> and <link href="..."> from a URL's body. Emits
-# resolved absolute URLs (one per line). Resolution: anything that already
-# starts with http:// or https:// is left alone; anything else is treated
-# as path-relative to the page's origin.
+# Scrape <script src="..."> and <link href="..."> from a URL's body.
+# Emits resolved absolute URLs, one per line, deduped.
 scrape_assets() {
   local page_url="$1"
   local origin="$2"
   local body
   body="$(curl -sS --max-time 15 "${page_url}")"
-  # Extract script src and link href values. Tolerate single or double
-  # quotes; ignore inline scripts (no `src=`).
   printf '%s' "${body}" \
     | grep -oE '<(script|link)[^>]+(src|href)=("[^"]+"|'"'"'[^'"'"']+'"'"')' \
     | grep -oE '(src|href)=("[^"]+"|'"'"'[^'"'"']+'"'"')' \
     | grep -oE '("[^"]+"|'"'"'[^'"'"']+'"'"')' \
     | tr -d '"'"'" \
     | while IFS= read -r ref; do
-        # Skip empty, data:, mailto:, javascript:, fragment-only.
         case "${ref}" in
           ''|data:*|mailto:*|javascript:*|'#'*) continue ;;
           http://*|https://*) printf '%s\n' "${ref}" ;;
           //*) printf 'http:%s\n' "${ref}" ;;
           /*) printf '%s%s\n' "${origin}" "${ref}" ;;
-          *)  # treat as relative-to-page; rare in this codebase but safe.
-              printf '%s/%s\n' "${origin}" "${ref}" ;;
+          *)  printf '%s/%s\n' "${origin}" "${ref}" ;;
         esac
       done \
     | sort -u
@@ -316,59 +358,14 @@ assert_page_and_assets() {
     assert_200 "${asset}" || true
   done < <(scrape_assets "${page_url}" "${origin}")
   if [ "${asset_count}" -gt 0 ]; then
-    dim "  → ${asset_count} asset(s) checked from ${page_url}"
+    dim "  -> ${asset_count} asset(s) checked from ${page_url}"
   fi
 }
 
-# ----- Studio plugin smoke -----------------------------------------------
-
-info "extracting plugins/deskwork-studio + packages/ from HEAD"
-mkdir -p "${TMP}/studio-tree"
-git -C "${REPO_ROOT}" archive HEAD plugins/deskwork-studio packages \
-  | tar -x -C "${TMP}/studio-tree/"
-ok "extracted to ${TMP}/studio-tree"
-
-materialize_vendor_in_tree "${TMP}/studio-tree" "${STUDIO_VENDOR_PAIRS[@]}"
-
-# Drop packages/ AFTER materialization so the npm install sees a fully
-# self-contained plugin tree (the marketplace install does not include
-# packages/; it only sees plugins/<name>/).
-# We keep the studio tree at studio-tree/plugins/deskwork-studio. The
-# packages/ dir can be removed to mirror what the operator's machine has.
-rm -rf "${TMP}/studio-tree/packages"
-
-STUDIO_INSTALL="${TMP}/studio-tree/plugins/deskwork-studio"
-info "first-run npm install in ${STUDIO_INSTALL}"
-# Run in background + wait so SIGINT can interrupt the wait (bash's `wait`
-# is signal-interruptible) and the trap can find the npm subshell PID in
-# KILL_PIDS to tear it down cleanly. A bare `(...)` synchronous subshell
-# does not propagate SIGINT predictably to the npm child.
-(
-  cd "${STUDIO_INSTALL}"
-  npm install --omit=dev --no-audit --no-fund --loglevel=error
-) &
-STUDIO_NPM_PID=$!
-KILL_PIDS+=("$STUDIO_NPM_PID")
-set +e
-wait "$STUDIO_NPM_PID"
-STUDIO_NPM_EXIT=$?
-set -e
-# Best-effort: drop the just-finished PID from KILL_PIDS so the trap doesn't
-# try to TERM a reaped process. (Trap is already idempotent w.r.t. dead PIDs
-# via `kill -0` guard, so this is purely cosmetic / future-proofing.)
-KILL_PIDS=("${KILL_PIDS[@]/$STUDIO_NPM_PID}")
-if [ "${STUDIO_NPM_EXIT}" -ne 0 ]; then
-  fail "npm install failed in ${STUDIO_INSTALL} (exit ${STUDIO_NPM_EXIT})"
-  exit 1
-fi
-ok "npm install completed"
-
-# Fixture project
 FIXTURE_ROOT="${TMP}/fixture-project"
 make_fixture_project "${FIXTURE_ROOT}"
 ok "fixture project at ${FIXTURE_ROOT}"
 
-# Boot the studio.
 STUDIO_LOG="${TMP}/studio.log"
 info "booting deskwork-studio (--no-tailscale --port ${SMOKE_PORT} --project-root ${FIXTURE_ROOT})"
 (
@@ -406,9 +403,6 @@ fi
 ok "studio booted, log at ${STUDIO_LOG}"
 
 ORIGIN="http://127.0.0.1:${SMOKE_PORT}"
-# Note: `/` is intentionally excluded — it 302-redirects to `/dev/`, which is
-# already covered below. assert_200 expects 200 directly and does not follow
-# redirects. Coverage is unchanged because every destination route is listed.
 PAGE_ROUTES=(
   "/dev"
   "/dev/"
@@ -423,59 +417,6 @@ info "asserting page routes + scraped assets"
 for route in "${PAGE_ROUTES[@]}"; do
   assert_page_and_assets "${ORIGIN}${route}" "${ORIGIN}"
 done
-
-# ----- CLI plugin smoke --------------------------------------------------
-
-info "stopping studio for CLI plugin smoke"
-# Use kill_tree to reach grandchildren — STUDIO_PID points at the `( ... ) &`
-# subshell, but the actual node process is its grandchild via tsx. A bare
-# kill on the subshell does NOT reliably propagate on macOS.
-kill_tree -TERM "${STUDIO_PID}"
-sleep 1
-kill_tree -KILL "${STUDIO_PID}"
-# Drop from KILL_PIDS now that we've reaped it ourselves.
-KILL_PIDS=("${KILL_PIDS[@]/$STUDIO_PID}")
-STUDIO_PID=""
-
-info "extracting plugins/deskwork + packages/ from HEAD"
-mkdir -p "${TMP}/cli-tree"
-git -C "${REPO_ROOT}" archive HEAD plugins/deskwork packages \
-  | tar -x -C "${TMP}/cli-tree/"
-ok "extracted to ${TMP}/cli-tree"
-
-materialize_vendor_in_tree "${TMP}/cli-tree" "${CLI_VENDOR_PAIRS[@]}"
-
-rm -rf "${TMP}/cli-tree/packages"
-
-CLI_INSTALL="${TMP}/cli-tree/plugins/deskwork"
-info "first-run npm install in ${CLI_INSTALL}"
-# Same trackable-background pattern as the studio install above so SIGINT
-# mid-install tears down the npm subshell instead of orphaning it.
-(
-  cd "${CLI_INSTALL}"
-  npm install --omit=dev --no-audit --no-fund --loglevel=error
-) &
-CLI_NPM_PID=$!
-KILL_PIDS+=("$CLI_NPM_PID")
-set +e
-wait "$CLI_NPM_PID"
-CLI_NPM_EXIT=$?
-set -e
-KILL_PIDS=("${KILL_PIDS[@]/$CLI_NPM_PID}")
-if [ "${CLI_NPM_EXIT}" -ne 0 ]; then
-  fail "npm install failed in ${CLI_INSTALL} (exit ${CLI_NPM_EXIT})"
-  exit 1
-fi
-ok "npm install completed"
-
-info "running deskwork --help"
-if ( cd "${CLI_INSTALL}" && ./bin/deskwork --help >/dev/null 2>&1 ); then
-  ok "deskwork --help exited 0"
-else
-  fail "deskwork --help exited non-zero"
-  ( cd "${CLI_INSTALL}" && ./bin/deskwork --help || true ) >&2
-  FAILURES=$((FAILURES + 1))
-fi
 
 # ----- Summary -----------------------------------------------------------
 

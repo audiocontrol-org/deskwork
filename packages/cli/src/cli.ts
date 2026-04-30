@@ -1,4 +1,4 @@
-#!/usr/bin/env tsx
+#!/usr/bin/env node
 /**
  * deskwork — single dispatch entry for the editorial CLI.
  *

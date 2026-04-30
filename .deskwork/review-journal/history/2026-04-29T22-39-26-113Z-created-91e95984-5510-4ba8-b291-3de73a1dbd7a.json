@@ -1,0 +1,19 @@
+{
+  "id": "created-91e95984-5510-4ba8-b291-3de73a1dbd7a",
+  "timestamp": "2026-04-29T22:39:26.113Z",
+  "entry": {
+    "kind": "workflow-created",
+    "at": "2026-04-29T22:39:26.113Z",
+    "workflow": {
+      "id": "91e95984-5510-4ba8-b291-3de73a1dbd7a",
+      "site": "deskwork-internal",
+      "slug": "deskwork-plugin/prd",
+      "contentKind": "longform",
+      "state": "open",
+      "currentVersion": 1,
+      "createdAt": "2026-04-29T22:39:26.113Z",
+      "updatedAt": "2026-04-29T22:39:26.113Z",
+      "entryId": "9845c268-670f-4793-b986-0433e9ef4fb9"
+    }
+  }
+}

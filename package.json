@@ -1,6 +1,6 @@
 {
   "name": "deskwork",
-  "version": "0.9.4",
+  "version": "0.9.5",
   "private": true,
   "description": "Open-source Claude Code plugins monorepo — deskwork editorial calendar plugin, feature-image, analytics",
   "repository": {
@@ -9,7 +9,9 @@
   },
   "license": "GPL-3.0-or-later",
   "workspaces": [
-    "packages/*",
+    "packages/core",
+    "packages/cli",
+    "packages/studio",
     "plugins/*"
   ],
   "engines": {
@@ -17,6 +19,7 @@
   },
   "scripts": {
     "prepare": "command -v husky >/dev/null 2>&1 && husky || true",
+    "build": "npm run build --workspaces --if-present",
     "version:bump": "tsx scripts/bump-version.ts"
   },
   "devDependencies": {
