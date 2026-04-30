@@ -70,6 +70,23 @@ ERRORS=()
 log() { [[ $QUIET -eq 1 ]] || echo "$@"; }
 err() { echo "$@" >&2; }
 
+# Read the marketplace metadata version (lockstep with plugin versions).
+# Used for the one-line banner so operators running the script manually
+# see exactly which version they're on. Returns empty string if the
+# marketplace.json is unreadable — the banner is a nice-to-have, never
+# blocking.
+script_version() {
+  local manifest="$MARKETPLACE_CLONE/.claude-plugin/marketplace.json"
+  [[ -f "$manifest" ]] || { echo ""; return 0; }
+  node -e "
+    try {
+      const m = JSON.parse(require('fs').readFileSync('$manifest', 'utf8'));
+      const v = m.metadata && m.metadata.version;
+      if (typeof v === 'string' && v) console.log(v);
+    } catch (e) { /* banner is optional; never fail the script over it */ }
+  " 2>/dev/null
+}
+
 ensure_marketplace_clone() {
   if [[ ! -d "$MARKETPLACE_CLONE" ]]; then
     err "marketplace clone missing at $MARKETPLACE_CLONE"
@@ -252,6 +269,16 @@ prune_registry() {
 
 main() {
   ensure_marketplace_clone || exit 1
+
+  # Banner — only when not --quiet and not --check (banner adds noise to
+  # the read-only diagnostic which already prefixes its lines with [check]).
+  if [[ $QUIET -eq 0 ]] && [[ $CHECK_ONLY -eq 0 ]]; then
+    local version
+    version=$(script_version)
+    if [[ -n "$version" ]]; then
+      log "deskwork repair-install v$version"
+    fi
+  fi
 
   for plugin in "${PLUGINS[@]}"; do
     log "checking $plugin"

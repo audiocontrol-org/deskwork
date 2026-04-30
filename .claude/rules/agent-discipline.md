@@ -150,3 +150,18 @@ When working on deskwork (or any tool the project is building), use the tool act
 - When exploring a new surface (a page, a skill, a CLI subcommand), drive it with real input from this project, not synthetic test data. Test data hides the friction synthetic data was specifically constructed to avoid.
 - Privileged shortcuts disable the dogfood signal — see the existing *"Use the deskwork plugin only through the publicly-advertised distribution channel"* rule. The two are paired: dogfood requires using the public path, and the public path is what makes dogfood honest.
 - If the gate the dogfood would normally clear (e.g. `/feature-implement`'s strict PRD-applied gate) is in the way of using the tool, the friction itself is the data — surface it, ask what to do; don't bypass silently.
+
+## Adopter-facing scripts have a stable CLI contract
+
+Once a script at `~/.claude/plugins/marketplaces/deskwork/scripts/<name>.sh` is documented for adopters (e.g., in a `.claude/settings.json` SessionStart hook snippet, or in a README troubleshooting section), its **path, name, and CLI flag set become a contract**. Breaking changes silently break deployed adopter configurations.
+
+**Why:** adopters wire these scripts into their Claude Code session-start hooks (per `plugins/deskwork/README.md` Troubleshooting section, post-#131). Their `.claude/settings.json` references the absolute marketplace-clone path with specific flags. When `/plugin marketplace update deskwork` runs, the script gets updated in place — but the adopter's settings.json doesn't. If the new script renames a flag, the hook fires with an unknown flag and exits 2; the operator's session boots with a broken hook and no obvious diagnostic. Same shape as a public API breakage.
+
+**How to apply:**
+- **Path stability:** never rename or relocate a script that's been documented for adopters. Adding new scripts under `scripts/` is fine; moving an existing one isn't.
+- **Flag stability:** documented flags (`--quiet`, `--check`, `--dry-run`, etc.) are forever. Adding new flags is fine; removing or renaming existing ones is a breaking change. When a flag's behavior is genuinely improved, keep the old flag as an alias or a no-op so existing hooks don't fail (e.g., `--dry-run` aliases to `--check` after the v0.10.1 rename; `--json` is now a no-op for back-compat with v0.9.8 of `deskwork repair-install`).
+- **Behavior stability:** documented exit-code contracts (0 healthy/repaired, 1 failure, 2 usage error) shouldn't churn. Adopters write their hooks against these.
+- **Output stability:** `--quiet` mode's silent-on-healthy contract is load-bearing for hook UX. Don't add new "informational" stdout in `--quiet` mode without thinking about whether it'll spam adopter sessions.
+- The same discipline applies to the `deskwork` / `deskwork-studio` / `dw-lifecycle` CLI subcommands more broadly, but the marketplace-clone scripts have a special exposure because they get wired directly into session-start hooks rather than invoked via the bin shim. Friction in the bin shim is recoverable; friction in the script is invisible until the operator notices their session-start hook stopped working.
+
+The repair-install.sh script (post-#131) prints a one-line version banner when not `--quiet`. Operators triaging "did the fix land?" can see the version without reading the file. That banner format is now also part of the contract — keep it stable enough that adopters can grep for it if they ever build automation around it.
