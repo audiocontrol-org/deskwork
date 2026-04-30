@@ -12,7 +12,6 @@
     "packages/core",
     "packages/cli",
     "packages/studio",
-    "packages/cli-bin-lib",
     "plugins/*"
   ],
   "engines": {
