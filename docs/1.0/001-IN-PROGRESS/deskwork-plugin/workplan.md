@@ -1253,6 +1253,28 @@ Shipped only after the manual flow in 26f is solid. Adds `permissions: id-token:
 
 **Issues closed in this phase:** [#101](https://github.com/audiocontrol-org/deskwork/issues/101).
 
+### Phase 26++++: `deskwork repair-install` recovery for #89 — v0.9.8
+
+**Deliverable:** Adopter-side recovery for [#89](https://github.com/audiocontrol-org/deskwork/issues/89) — `~/.claude/plugins/installed_plugins.json` accumulates entries pointing at cache directories that no longer exist on disk; Claude Code wires PATH from these stale entries and the bin is unreachable. The root-cause fix is registry hygiene in Claude Code (filed upstream as [anthropics/claude-code#54905](https://github.com/anthropics/claude-code/issues/54905)). Until that lands, deskwork ships a recovery command that runs without depending on PATH.
+
+**Implementation:**
+
+- [x] New CLI subcommand `deskwork repair-install` (`packages/cli/src/commands/repair-install.ts`). Reads `~/.claude/plugins/installed_plugins.json`, identifies entries for `deskwork@deskwork`, `deskwork-studio@deskwork`, `dw-lifecycle@deskwork` whose `installPath` doesn't exist on disk, prunes them, and reports which plugins now have no live entry. Supports `--dry-run` and `--json` flags.
+- [x] Subcommand registered in `packages/cli/src/cli.ts` under "Maintenance" in help text.
+- [x] 9 unit tests in `packages/cli/test/repair-install.test.ts`: live-only no-op, mixed prune, all-stale delete-key, third-party-untouched, missing-after-prune reporting, empty-installPath handling, ordering preservation.
+- [x] Adopter recovery flow documented in [`plugins/deskwork/README.md`](../../../plugins/deskwork/README.md). Adopter invokes via the marketplace-clone path so a broken PATH doesn't prevent self-heal: `~/.claude/plugins/marketplaces/deskwork/plugins/deskwork/bin/deskwork repair-install`.
+- [x] End-to-end verified against the dev machine's actual broken state — 10 stale entries identified across 6 `deskwork@deskwork` records, 3 `deskwork-studio@deskwork` records, 1 `dw-lifecycle@deskwork` record; only 1 valid entry preserved (`deskwork-studio@deskwork v0.7.2`).
+- [x] 766 workspace tests pass (was 757; +9 repair-install).
+- [x] Upstream [anthropics/claude-code#54905](https://github.com/anthropics/claude-code/issues/54905) filed in parallel — concrete repro from the dev machine, suggested PATH-wire reconciliation fix.
+
+**Acceptance:**
+
+- [x] v0.9.8 shipped via the five-pause `/release` flow (commit `68f40e6`, chore-release `f62cb61`, tag `v0.9.8` on origin, GitHub release auto-created).
+- [x] `deskwork repair-install --dry-run` reports stale entries accurately on a known-broken machine.
+- [x] [#89](https://github.com/audiocontrol-org/deskwork/issues/89) updated with adopter recovery instructions + cross-link to the upstream Claude Code issue.
+
+**Issues commented:** [#89](https://github.com/audiocontrol-org/deskwork/issues/89) (adopter recovery + upstream cross-link).
+
 ### Phase 27: studio bug tranche — v0.10.0
 
 **Deliverable:** Fix the seven adopter-facing studio bugs surfaced by the v0.9.7 marketplace-install dogfood ([#103](https://github.com/audiocontrol-org/deskwork/issues/103), [#104](https://github.com/audiocontrol-org/deskwork/issues/104), [#105](https://github.com/audiocontrol-org/deskwork/issues/105), [#106](https://github.com/audiocontrol-org/deskwork/issues/106), [#107](https://github.com/audiocontrol-org/deskwork/issues/107), [#108](https://github.com/audiocontrol-org/deskwork/issues/108), [#110](https://github.com/audiocontrol-org/deskwork/issues/110)). Single PR, single `v0.10.0` release.
