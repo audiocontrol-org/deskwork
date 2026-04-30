@@ -1281,10 +1281,12 @@ Shipped only after the manual flow in 26f is solid. Adds `permissions: id-token:
 
 **Sub-phase A — Content-detail panel read-path ([#103](https://github.com/audiocontrol-org/deskwork/issues/103)):**
 
-- [ ] Trace the API endpoint that backs `/dev/content/<collection>/<root>?node=<path>`'s right-panel render. Identify whether the failure is in path resolution, the frontmatter parser, or the body preview renderer.
-- [ ] Reproduce against this project's `docs/1.0/001-IN-PROGRESS/deskwork-plugin/prd.md` (481 lines, valid `deskwork.id` + `title` frontmatter). Confirm the failure shape end-to-end.
-- [ ] Fix the underlying read. The fix must handle the `deskwork:` namespace correctly (per the v0.7.2 frontmatter convention).
-- [ ] Add a regression test using the project's own `prd.md` as the fixture; assert the right-panel render returns frontmatter-with-fields and a non-empty body preview.
+- [x] Trace the API endpoint that backs `/dev/content/<collection>/<root>?node=<path>`'s right-panel render. Identify whether the failure is in path resolution, the frontmatter parser, or the body preview renderer.
+- [x] Reproduce against this project's `docs/1.0/001-IN-PROGRESS/deskwork-plugin/prd.md` (481 lines, valid `deskwork.id` + `title` frontmatter). Confirm the failure shape end-to-end.
+- [x] Fix the underlying read. The fix must handle the `deskwork:` namespace correctly (per the v0.7.2 frontmatter convention).
+- [x] Add a regression test using the project's own `prd.md` as the fixture; assert the right-panel render returns frontmatter-with-fields and a non-empty body preview.
+
+**Diagnosis:** `loadDetailRender` at `packages/studio/src/pages/content-detail.ts:218` only resolved the file via `findOrganizationalIndex(contentDir, node.path)`, which checks for `<path>/index.md` / `<path>/README.md` only. It never consulted `node.filePath` — the id-bound on-disk file already attached to the tree node by `content-tree.ts:282` (Phase 22++++ / Issue #70). For single-file entries (peer `.md` naming, like the PRD at `docs/1.0/001-IN-PROGRESS/deskwork-plugin/prd.md`), the lookup missed entirely and both panes rendered empty-state. Fix: prefer `node.filePath` when set, fall back to `findOrganizationalIndex` for purely organizational nodes. Regression test at `packages/studio/test/content-detail-single-file-entry.test.ts` reproduces the PRD shape (peer `.md` with `deskwork.id` namespace + multi-paragraph body) and asserts the dl renders with the id present and the body preview is non-empty.
 
 **Sub-phase B — Manual content rewrite ([#104](https://github.com/audiocontrol-org/deskwork/issues/104)):**
 
