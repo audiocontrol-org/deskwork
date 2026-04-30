@@ -2,7 +2,7 @@
 
 Web studio for the deskwork editorial calendar — a local Hono server exposing a dashboard, longform review surface, shortform review desk, scrapbook viewer, and the compositor's manual.
 
-This is a thin Claude Code plugin shell. The actual server lives in the [@deskwork/studio](../../packages/studio/) npm package, vendored into the plugin tree at `vendor/studio/` (and `vendor/core/`) so that a fresh marketplace install has the package source at hand. The `bin/deskwork-studio` wrapper handles dev-vs-installed resolution: workspace clone uses the workspace-linked `tsx` binary; marketplace install does a one-time `npm install --omit=dev` against the plugin tree on first invocation, then exec's the resulting bin.
+This is a thin Claude Code plugin shell. The actual server lives in the [`@deskwork/studio`](https://www.npmjs.com/package/@deskwork/studio) npm package; the `bin/deskwork-studio` wrapper handles dev-vs-installed resolution. In a workspace clone, the wrapper detects the workspace symlink at `node_modules/@deskwork/studio` and dispatches directly. On a fresh marketplace install, the wrapper runs `npm install --omit=dev --workspaces=false @deskwork/studio@<version>` against the public npm registry on first invocation, caches the result under `<pluginRoot>/node_modules/`, and dispatches via `node_modules/.bin/deskwork-studio`.
 
 ### Install
 
@@ -15,11 +15,11 @@ Pairs with the [`deskwork`](../deskwork/) plugin, which provides the editorial l
 
 ### First-run install
 
-The first time you invoke `/deskwork-studio:studio` (or run `deskwork-studio` directly) after a marketplace install or fresh clone, the bin wrapper executes `npm install --omit=dev` inside the plugin tree (~30s on a typical machine). Subsequent invocations skip that step and exec straight through `tsx` — boot is fast (well under a second to first byte).
+The first time you invoke `/deskwork-studio:studio` (or run `deskwork-studio` directly) after a marketplace install or fresh clone, the bin wrapper executes `npm install --omit=dev --workspaces=false @deskwork/studio@<version>` against the public npm registry to populate `<pluginRoot>/node_modules/`. Subsequent invocations skip that step and dispatch straight to the cached binary — startup is under a second.
 
 ### Runtime architecture
 
-The studio runs from source via `tsx` — there's no precompiled bundle to keep in sync with the source. Client-side assets (`/static/dist/*.js`) are produced by an on-startup esbuild pass that reads `plugins/deskwork-studio/public/src/*.ts` and writes outputs to `<pluginRoot>/.runtime-cache/dist/`. The cache is gitignored and regenerated automatically; cold boots include the build (a few hundred ms), warm boots check mtimes and skip the build (~50ms).
+The studio's server-side code is compiled (`@deskwork/studio` ships a `dist/` tree under `node_modules/`). Client-side assets (`/static/dist/*.js`) are produced by an on-startup esbuild pass that reads `plugins/deskwork-studio/public/src/*.ts` and writes outputs to `<pluginRoot>/.runtime-cache/dist/`. The cache is gitignored and regenerated automatically; cold boots include the build (a few hundred ms), warm boots check mtimes and skip the build (~50ms).
 
 ### Customization layer
 

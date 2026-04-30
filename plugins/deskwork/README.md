@@ -19,7 +19,7 @@ Pair with the optional [`deskwork-studio`](../deskwork-studio/) plugin for a loc
 
 ### First-run install
 
-The first invocation of any `/deskwork:*` skill (or direct `deskwork` CLI call) after a marketplace install or fresh clone runs `npm install --omit=dev` inside the plugin tree (~30s, one-time). Subsequent invocations skip that step and exec straight through `tsx` — startup is fast.
+The first invocation of any `/deskwork:*` skill (or direct `deskwork` CLI call) after a marketplace install or fresh clone runs `npm install --omit=dev --workspaces=false @deskwork/cli@<version>` against the public npm registry to populate `<pluginRoot>/node_modules/` (one-time, typically under ~30s). Subsequent invocations skip that step and dispatch straight to the cached binary — startup is fast.
 
 ### Bootstrap a project
 
@@ -249,11 +249,11 @@ Lives in `.deskwork/config.json` in the host project. Written by `/deskwork:inst
 
 The wrapper tries, in order:
 
-1. **Workspace-linked binary** at `node_modules/.bin/deskwork` (tsx-runtime symlink, present after `npm install` in the monorepo). Dev path — runs source, edits show up immediately.
-2. **First-run install path** — when the marketplace install copies `plugins/deskwork/` into the operator's plugin cache without a `node_modules` directory, the wrapper runs `npm install --omit=dev` inside the plugin tree once, then exec's the freshly-linked source bin via `tsx`. The plugin's `package.json` declares the vendored `@deskwork/cli` and `@deskwork/core` packages (under `vendor/cli/`, `vendor/core/`) as workspace dependencies, so the install resolves locally without going to a registry.
-3. Loud error pointing at the two recovery paths.
+1. **Workspace symlink (dev path)** — when the plugin lives inside the deskwork monorepo, `node_modules/@deskwork/cli` is a workspace symlink into `packages/cli/`. The wrapper detects the symlink and dispatches via `node_modules/.bin/deskwork` directly, with no install step. Code edits show up on the next invocation after `npm run build`.
+2. **Already installed at the pinned version** — when `<pluginRoot>/node_modules/@deskwork/cli/package.json` version equals the plugin manifest's version (`<pluginRoot>/.claude-plugin/plugin.json#version`), dispatch directly. (Warm-cache path.)
+3. **First-run / version-drift install** — run `npm install --omit=dev --workspaces=false @deskwork/cli@<plugin-manifest-version>` against the public npm registry, scoped to `<pluginRoot>` (the `--workspaces=false` flag prevents npm from walking up and treating the plugin as a workspace member). Concurrent invocations are serialized by a directory-based lock (`<pluginRoot>/.deskwork-install.lock`; `mkdir` is atomic on POSIX, macOS-portable). After install, dispatch via `<pluginRoot>/node_modules/.bin/deskwork`.
 
-Local-dev installs hit path 1. Marketplace-install users hit path 2 once, then path 1 on every subsequent invocation.
+Local-dev installs hit path 1. Marketplace-install users hit path 3 once, then path 2 on every subsequent invocation.
 
 ### Updates + pinning
 
