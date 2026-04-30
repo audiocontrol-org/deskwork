@@ -512,3 +512,42 @@ Single PR, single `v0.10.0` release.
 - Not a Phase 24 implementation. Content-collections vocabulary rename (`sites` → `collections`) still defers; this tranche keeps the legacy term in the affected files and migrates them in Phase 24.
 - Not an absorption of the longstanding studio backlog ([#54](https://github.com/audiocontrol-org/deskwork/issues/54), [#61](https://github.com/audiocontrol-org/deskwork/issues/61), [#73](https://github.com/audiocontrol-org/deskwork/issues/73), [#84](https://github.com/audiocontrol-org/deskwork/issues/84)). Those are larger features (margin-note replies, calendar/workflow auto-advance, TOC view, agent-path documentation) and warrant their own scoping.
 
+## Extension: post-release customer acceptance playbook (Phase 29)
+
+Added 2026-04-30 from operator framing during recursive dogfood: *"We should have a post-release customer acceptance playbook that we run through — not hard-coded tooling, but a skill (or a composition of skills) that codify how to evaluate the installed plugin to ensure it's sane and file bugs if it's not. This should include playwright inspection of the studio. We should update that playbook as we add/update features."*
+
+The walk has been the highest-yield bug-finding mechanism this project has — every Phase 27 issue came from running the v0.9.7 marketplace install, none from auditing source. Phase 29 codifies the walk as a skill so it can't drift, and routes the findings through deskwork's own review pipeline so triage is structured rather than ad-hoc.
+
+**Source-of-truth for design reasoning:** [`docs/1.0/post-release-acceptance-design.md`](../../post-release-acceptance-design.md) — design v2 applied 2026-04-30 via deskwork workflow `970aa75d-f586-47f0-bc89-4481830a7676` (commit `b1f1815`). Both operator margin notes addressed by the v2 stop-gap framing.
+
+### Stop-gap status (binding)
+
+Per the design's Stop-gap status section, the entire Phase 29 surface — both new `/post-release:walk` + `/post-release:file-issues` skills AND the existing `/release` skill it integrates with — is **stop-gap scaffolding** that lives inside the deskwork plugin only because dw-lifecycle has not yet shipped the capability to customize or override lifecycle stages. When dw-lifecycle gains that capability:
+
+- `/release` and `/post-release:*` migrate into dw-lifecycle's customizable-workflow surface.
+- The path of the design doc itself, the playbook (`docs/post-release/playbook.md`), and per-version findings docs (`docs/post-release/<version>-acceptance.md`) all change to whatever dw-lifecycle prescribes.
+- Procedural amendments (the playbook-update checklist line we'll add to feature-define / feature-extend in sub-phase G) become typed phases in dw-lifecycle's customizable workflow surface.
+
+This framing is binding on Phase 29 design choices: schema, file paths, and skill names should stay simple enough that the migration is a move-and-rename rather than a re-architect.
+
+### Scope of Phase 29
+
+Seven sub-phases (A–G), shipped in order:
+
+- **A** — Playbook scaffold (`docs/post-release/playbook.md` + parser TS module).
+- **B** — `/post-release:walk` cursory mode (HTTP-only): boot studio, auto-discover surfaces from `/dev/`, per-surface walk, aggregate findings, generate findings doc, ingest + review-start.
+- **C** — Playbook assertions wired into the cursory walk.
+- **D** — `/post-release:walk --mode deep`: sandbox project + CLI drive (add → plan → outline → draft → review-start → iterate → approve → publish) + studio cross-check via Playwright.
+- **E** — `/post-release:file-issues`: parse approved findings doc, per-finding `gh issue create` with confirmation prompt + cross-link footer.
+- **F** — `/release` end-prompt integration (Pause 5 success → "Run /post-release:walk now? [y/N]" → invoke walk).
+- **G** — Procedural amendment: add a one-line "Review/update playbook" checklist item to `feature-define` and `feature-extend` skills.
+
+The first canonical run is the post-release walk against the v(N+1) shipped after Phase 29 lands. Real findings file as real issues — that's the end-to-end smoke.
+
+### What Phase 29 is not
+
+- **Not gated CI.** The walk involves a real marketplace install + a deskwork review cycle that takes operator time. CI conflicts with the project's "No test infrastructure in CI" rule.
+- **Not a security review.** The studio is dev-only with no auth. The walk verifies functional surface, not threat-model surface.
+- **Not a replacement for dogfood-as-development discipline** (`agent-discipline.md` *"Stay in agent-as-user dogfood mode"*). The walk is post-release verification; it doesn't substitute for using the plugin on real work during development.
+- **Not the dw-lifecycle-native version.** This is the stop-gap that lives inside the deskwork plugin until dw-lifecycle ships customizable lifecycle stages. The migration into dw-lifecycle is forward-marching once that capability lands; the file paths chosen in Phase 29 are explicitly ephemeral.
+
