@@ -293,15 +293,15 @@ Every Category-A issue → where it's addressed in the spec. Verify-then-redesig
 | # | Title (abbrev) | Surface chapter | Status entering impl |
 |---|---|---|---|
 | #68 | dashboard polls dead `/state-signature` | §5.1 | ACTIVE — confirmed pre-existing per Phase 32 journal |
-| #71 | content tree fabricates `/blog/<slug>` for non-website | §5.5 | VERIFY — v0.8.x non-website support may have caught it |
+| #71 | content tree fabricates `/blog/<slug>` for non-website | §5.5 | ACTIVE (Phase 0 verified 2026-05-01) — source-level fabrication in `content.ts:400-404` and `content-detail.ts:302-307` not gated on `host` presence; dormant in this project (docs lack `slug` field) but real for any collection with slug-bearing docs |
 | #72 | shortform desk hard-coded platforms | §5.4 | ACTIVE |
 | #73 | longform review has no TOC | §5.3 | ACTIVE |
-| #74 | longform Approve clipboard race | §5.3 | VERIFY — Phase 27 unified clipboard helper may cover it |
-| #75 | dashboard Publish button 404 on PRDs | §5.1 | VERIFY — Phase 30 dashboard rewrite may have removed/rewired |
-| #98 | dashboard scaffold button POSTs to dead endpoint | §5.1 | VERIFY-THEN-REMOVE — endpoint almost certainly retired in Phase 30 |
-| #99 | intake form silent on copy click | §5.1 | VERIFY — Phase 27 unified clipboard helper may cover it |
-| #103 | content-detail panel false "no frontmatter / no body" | §5.5 | VERIFY — Phase 32 #145 collateral may have fixed |
-| #104 | Manual uses legacy `/editorial-*` slash names | §5.6 | VERIFY — Phase 30 Manual rewrite may have caught most |
+| #74 | longform Approve clipboard race | §5.3 | MOOT (Phase 0 verified 2026-05-01) — Phase 27 unified `copyOrShowFallback` is integrated in `editorial-review-client.ts:1462`, with explicit code comment citing #74 |
+| #75 | dashboard Publish button 404 on PRDs | §5.1 | MOOT (Phase 0 verified 2026-05-01) — Phase 30 dashboard rewrite removed the Publish button; publishing is now CLI-only |
+| #98 | dashboard scaffold button POSTs to dead endpoint | §5.1 | MOOT (Phase 0 verified 2026-05-01) — Phase 30 retired the button + endpoint (orphaned client handler at line 76 of editorial-studio-client.ts is unreachable) |
+| #99 | intake form silent on copy click | §5.1 | MOOT (Phase 0 verified 2026-05-01) — new dashboard intake form (lines 356-407) uses `copyOrShowFallback` with input validation + fallback panel; explicit code comment cites #99 |
+| #103 | content-detail panel false "no frontmatter / no body" | §5.5 | MOOT (Phase 0 verified 2026-05-01) — fixture file with both fields renders both correctly; Phase 32 #145 collateral fix |
+| #104 | Manual uses legacy `/editorial-*` slash names | §5.6 | ACTIVE (Phase 0 verified 2026-05-01) — 7 legacy references remain in rendered manual: `/editorial-cross-link-review`, `/editorial-performance`, `/editorial-reddit-opportunities`, `/editorial-reddit-sync`, `/editorial-review-shortform`, `/editorial-social-review`, `/editorial-suggest` |
 | #105 | dashboard rename empty-slug no-op | §5.1 / §5.2 | ACTIVE — Phase 32 #124 deleted the orphaned form; rename UX needs new home |
 | #106 | shortform desk empty-state references nonexistent matrix | §5.4 | ACTIVE |
 | #107 | Index page leaves Longform / Scrapbook unlinked | §5.7 | ACTIVE |
