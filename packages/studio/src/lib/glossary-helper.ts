@@ -1,5 +1,5 @@
-import glossary from '@/data/glossary.json';
-import { unsafe, type RawHtml } from '@/pages/html';
+import glossary from '../data/glossary.json' with { type: 'json' };
+import { unsafe, type RawHtml } from '../pages/html.ts';
 
 interface GlossaryEntry {
   term: string;
@@ -7,10 +7,10 @@ interface GlossaryEntry {
   seeAlso?: string[];
 }
 
-type GlossaryKey = keyof typeof glossary;
+type GlossaryKey = Extract<keyof typeof glossary, string>;
 
 function isKey(s: string): s is GlossaryKey {
-  return s in glossary;
+  return Object.prototype.hasOwnProperty.call(glossary, s);
 }
 
 function escapeAttr(s: string): string {
@@ -28,7 +28,7 @@ function escapeAttr(s: string): string {
  */
 export function gloss(key: GlossaryKey): RawHtml {
   if (!isKey(key)) {
-    throw new Error(`unknown glossary term: ${key}`);
+    throw new Error(`unknown glossary term: ${String(key)}`);
   }
   const entry: GlossaryEntry = glossary[key];
   const k = escapeAttr(key);

@@ -80,5 +80,5 @@ export function html(
 }
 
 // Re-export glossary helpers so page renderers can use them in template literals
-export { gloss } from '@/lib/glossary-helper';
-export type { GlossaryKey } from '@/lib/glossary-helper';
+export { gloss } from '../lib/glossary-helper.ts';
+export type { GlossaryKey } from '../lib/glossary-helper.ts';
