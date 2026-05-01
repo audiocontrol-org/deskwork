@@ -4,6 +4,7 @@
  */
 
 import { escapeHtml } from './html.ts';
+import { clientScriptTag } from '../lib/client-script.ts';
 
 export interface EmbeddedJson {
   /** `id` attribute of the `<script type="application/json">` tag. */
@@ -30,7 +31,12 @@ export interface LayoutOptions {
    * `JSON.parse`s it for hydration.
    */
   embeddedJson?: ReadonlyArray<EmbeddedJson>;
-  /** Module scripts loaded after the body. */
+  /**
+   * Module-script names (e.g. "editorial-studio-client"). Layout emits the
+   * `<script>` tag via clientScriptTag() so DESKWORK_DEV=1 sessions get
+   * Vite-served TS source with HMR; prod sessions get the esbuild output
+   * under /static/dist/<name>.js.
+   */
   scriptModules: string[];
 }
 
@@ -57,7 +63,7 @@ export function layout(options: LayoutOptions): string {
     .join('\n');
 
   const scriptTags = scriptModules
-    .map((src) => `    <script type="module" src="${escapeAttr(src)}"></script>`)
+    .map((name) => `    ${clientScriptTag(name)}`)
     .join('\n');
 
   const bodyOpen = bodyAttrs ? `<body ${bodyAttrs}>` : '<body>';

@@ -245,7 +245,7 @@ export function renderContentTopLevel(
     // #29: lightbox listener for image thumbnails in detail-panel
     // scrap rows. Idempotent — safe to load on the top-level page
     // too (no scrap rows there → no work).
-    scriptModules: ['/static/dist/content-view-client.js'],
+    scriptModules: ['content-view-client'],
   });
 }
 
@@ -503,7 +503,7 @@ export async function renderContentProject(
       bodyHtml: body,
       // #29: scrap rows in the detail panel have image thumbnails;
       // wire up the lightbox.
-      scriptModules: ['/static/dist/content-view-client.js'],
+      scriptModules: ['content-view-client'],
     }),
   };
 }

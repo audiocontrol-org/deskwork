@@ -157,6 +157,6 @@ export function renderShortformPage(ctx: StudioContext): string {
     bodyAttrs: 'data-review-ui="shortform"',
     bodyHtml: body,
     embeddedJson: [],
-    scriptModules: ['/static/dist/editorial-studio-client.js'],
+    scriptModules: ['editorial-studio-client'],
   });
 }

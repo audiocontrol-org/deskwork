@@ -554,6 +554,6 @@ export async function renderReviewPage(
     ],
     bodyHtml: body,
     embeddedJson: [{ id: 'draft-state', data: draftState }],
-    scriptModules: ['/static/dist/editorial-review-client.js'],
+    scriptModules: ['editorial-review-client'],
   });
 }

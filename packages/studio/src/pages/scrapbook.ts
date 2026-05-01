@@ -294,6 +294,6 @@ export function renderScrapbookPage(
     ],
     bodyAttrs: 'data-review-ui="studio"',
     bodyHtml: body,
-    scriptModules: ['/static/dist/scrapbook-client.js'],
+    scriptModules: ['scrapbook-client'],
   });
 }

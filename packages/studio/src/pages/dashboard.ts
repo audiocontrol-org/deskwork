@@ -88,6 +88,6 @@ export async function renderDashboard(
     ],
     bodyAttrs: 'data-review-ui="studio"',
     bodyHtml: body,
-    scriptModules: ['/static/dist/editorial-studio-client.js'],
+    scriptModules: ['editorial-studio-client'],
   });
 }
