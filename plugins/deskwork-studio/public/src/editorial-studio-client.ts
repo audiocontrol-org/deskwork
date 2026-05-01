@@ -2,12 +2,10 @@
  * Client-side behavior for the /dev/editorial-studio route. Each row
  * and action button carries its own `data-site` attribute, so the
  * studio can act on workflows from any site without a page-wide site
- * marker. Inline rename-slug form behavior lives in `./rename-form.ts`
- * and clipboard helpers live in `./clipboard.ts`.
+ * marker. Clipboard helpers live in `./clipboard.ts`.
  */
 
 import { copyOrShowFallback } from './clipboard.ts';
-import { initRenameForms } from './rename-form.ts';
 
 function siteFromButton(btn: HTMLButtonElement): string {
   const site = btn.dataset.site;
@@ -510,7 +508,6 @@ function init(): void {
   initKeyboardShortcuts();
   initPolling();
   initIntakeForm();
-  initRenameForms();
   initLocaleDates();
 }
 
