@@ -60,6 +60,10 @@
       "types": "./dist/doctor/index.d.ts",
       "default": "./dist/doctor/index.js"
     },
+    "./doctor/migrate": {
+      "types": "./dist/doctor/migrate.d.ts",
+      "default": "./dist/doctor/migrate.js"
+    },
     "./frontmatter": {
       "types": "./dist/frontmatter.d.ts",
       "default": "./dist/frontmatter.js"

@@ -6,7 +6,8 @@
  * on a clean tree or 1 if anything was reported. `--fix=<rule>` (or
  * `--fix=all`) engages repair mode; `--yes` makes repairs non-
  * interactive (skipping ambiguous cases). `--json` produces machine-
- * readable output that composes with `jq`.
+ * readable output that composes with `jq`. `--check` previews the
+ * legacy-schema migration (dry run) without applying it.
  *
  * Argv shape (after the dispatcher injects projectRoot when needed):
  *
@@ -17,6 +18,11 @@
  *   --fix <rule|all>      Engage repair mode for the named rule(s).
  *   --yes                 Non-interactive repair (skip ambiguous).
  *   --json                Emit JSON instead of human-readable text.
+ *   --check               Dry-run preview of the entry-centric
+ *                         migration. Reports what would change without
+ *                         touching the calendar / sidecar tree. Has no
+ *                         effect when the project is already on the
+ *                         entry-centric schema.
  *
  * Exit codes (Issue #44, Phase 22):
  *   0  Audit clean. OR --fix succeeded for every applicable finding.
@@ -28,7 +34,8 @@
  *      follow-ups: ambiguous cases requiring interactive resolution,
  *      schema rejections needing the operator to patch the host
  *      schema, editorial decisions, operator declines, or hard
- *      apply-failures.
+ *      apply-failures. ALSO: legacy-schema detected without --fix, or
+ *      --check preview emitted.
  *   2  Usage / config error.
  */
 
@@ -49,16 +56,17 @@ import {
   type RepairResult,
   type SkipReason,
 } from '@deskwork/core/doctor';
+import { maybeMigrate } from './doctor-migrate-gate.ts';
 
 const KNOWN_FLAGS = ['site', 'fix'] as const;
-const BOOLEAN_FLAGS = ['yes', 'json'] as const;
+const BOOLEAN_FLAGS = ['yes', 'json', 'check'] as const;
 
 export async function run(argv: string[]): Promise<void> {
   const { positional, flags, booleans } = parseInput(argv);
 
   if (positional.length < 1) {
     fail(
-      'Usage: deskwork doctor <project-root> [--site <slug>] [--fix <rule|all>] [--yes] [--json]',
+      'Usage: deskwork doctor <project-root> [--site <slug>] [--fix <rule|all>] [--yes] [--json] [--check]',
       2,
     );
   }
@@ -72,6 +80,17 @@ export async function run(argv: string[]): Promise<void> {
   } catch (err) {
     fail(err instanceof Error ? err.message : String(err), 2);
   }
+
+  // Phase 29: legacy-schema detection runs BEFORE the rule loop. The
+  // entry-centric redesign moved calendar shape from "Review/Paused
+  // sections" to per-stage sections + .deskwork/entries/ sidecars.
+  // Pre-redesign trees can't be audited by the rule loop without an
+  // up-front migration; this gate routes to migrateCalendar() in
+  // --fix mode and prints a how-to-fix hint in audit-only mode.
+  const check = booleans.has('check');
+  const repairMode = flags.fix !== undefined;
+  const migrateResult = await maybeMigrate(projectRoot, repairMode, check);
+  if (migrateResult.handled) process.exit(migrateResult.exitCode);
 
   if (flags.site !== undefined && !(flags.site in config.sites)) {
     fail(
@@ -99,7 +118,6 @@ export async function run(argv: string[]): Promise<void> {
 
   const json = booleans.has('json');
   const yes = booleans.has('yes');
-  const repairMode = flags.fix !== undefined;
 
   const opts = {
     projectRoot,
