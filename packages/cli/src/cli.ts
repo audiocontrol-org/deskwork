@@ -16,6 +16,8 @@
  *   deskwork outline draft-me --author "Jane"
  */
 
+import { isRetired, printRetiredError } from './commands/retired.ts';
+
 const SUBCOMMANDS: Record<string, () => Promise<{ run: (argv: string[]) => Promise<void> }>> = {
   add: () => import('./commands/add.ts'),
   approve: () => import('./commands/approve.ts'),
@@ -45,6 +47,13 @@ const rawArgv = process.argv.slice(3);
 if (!subcommand || subcommand === 'help' || subcommand === '--help') {
   printUsage();
   process.exit(subcommand ? 0 : 2);
+}
+
+// Retired verbs (v0.11.0): print a stable migration error before the
+// SUBCOMMANDS lookup so adopters with stale skill invocations get a
+// clear pointer instead of "unknown subcommand". Never returns.
+if (isRetired(subcommand)) {
+  printRetiredError(subcommand);
 }
 
 // Each command treats the first positional as <project-root>. To keep
