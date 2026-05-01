@@ -114,40 +114,49 @@ plugin_canonical_version() {
 }
 
 # Enumerate every (plugin, version) tuple referenced by:
-#   1. PATH entries pointing at cache bin dirs
-#   2. installed_plugins.json registry entries
-#   3. The marketplace clone's canonical version
+#   1. installed_plugins.json registry entries (filtered by scope/projectPath
+#      — see #138)
+#   2. The marketplace clone's canonical version
 # Output: one version per line (deduped, blanks dropped).
+#
+# #137: PATH was previously a third source. Stale PATH within a session
+# (e.g., after a registry edit + cache-subtree delete) caused this helper
+# to keep "knowing about" orphan versions and re-restoring them. The
+# registry + canonical manifest are authoritative; PATH-derived versions
+# are never authoritative.
+#
+# #138: scope/projectPath filtering. Project-scope entries from OTHER
+# projects are excluded. Plugin entries declared at user scope always
+# apply; project-scope entries apply only when projectPath matches the
+# current invocation's PWD.
 versions_referenced() {
   local plugin=$1
   {
-    # 1. PATH-referenced versions
-    if [[ -n "${PATH:-}" ]]; then
-      echo "$PATH" | tr ':' '\n' | while IFS= read -r dir; do
-        # Match: <home>/.claude/plugins/cache/deskwork/<plugin>/<version>/bin
-        case "$dir" in
-          "$CACHE_BASE/$plugin/"*"/bin"|"$CACHE_BASE/$plugin/"*"/bin/")
-            local rest=${dir#"$CACHE_BASE/$plugin/"}
-            echo "${rest%%/*}"
-            ;;
-        esac
-      done
-    fi
-
-    # 2. Registry-referenced versions
+    # 1. Registry-referenced versions, filtered by scope/projectPath.
     if [[ -f "$REGISTRY" ]]; then
-      node -e "
+      REGISTRY_PATH="$REGISTRY" PLUGIN_KEY="${plugin}@deskwork" \
+      node -e '
         try {
-          const r = JSON.parse(require('fs').readFileSync('$REGISTRY', 'utf8'));
-          const entries = r.plugins && r.plugins['${plugin}@deskwork'] || [];
+          const r = JSON.parse(require("fs").readFileSync(process.env.REGISTRY_PATH, "utf8"));
+          const cwd = process.env.PWD || "";
+          const entries = (r.plugins && r.plugins[process.env.PLUGIN_KEY]) || [];
           for (const e of entries) {
-            if (typeof e.version === 'string' && e.version) console.log(e.version);
+            if (typeof e.version !== "string" || !e.version) continue;
+            if (e.scope === "user") {
+              console.log(e.version);
+              continue;
+            }
+            if (e.scope === "project" && e.projectPath === cwd) {
+              console.log(e.version);
+              continue;
+            }
+            // Other-project scope: skip. (#138)
           }
         } catch (e) { /* registry parse failures are surfaced elsewhere */ }
-      " 2>/dev/null || true
+      ' 2>/dev/null || true
     fi
 
-    # 3. Canonical version from marketplace clone manifest
+    # 2. Canonical version from marketplace clone manifest
     plugin_canonical_version "$plugin"
   } | awk 'NF && !seen[$0]++'
 }
@@ -252,6 +261,10 @@ session_hook_installed() {
 # Prune installed_plugins.json entries whose installPath doesn't exist
 # on disk after the cache-restore pass. Inlined node -e so the script
 # stays self-contained.
+#
+# #138: only prune entries this invocation has standing to prune —
+# user-scope (always) and project-scope where projectPath == cwd.
+# Other-project scope is left alone; that's another project's setup.
 prune_registry() {
   [[ -f "$REGISTRY" ]] || return 0
   if [[ $CHECK_ONLY -eq 1 ]]; then
@@ -264,6 +277,7 @@ prune_registry() {
     const fs = require("fs");
     const path = process.env.REGISTRY_PATH;
     const quiet = process.env.QUIET === "1";
+    const cwd = process.env.PWD || "";
     const plugins = (process.env.PLUGINS_LIST || "").split(/\s+/).filter(Boolean);
     const keys = plugins.map(p => p + "@deskwork");
     let r;
@@ -271,10 +285,18 @@ prune_registry() {
     catch (e) { process.stderr.write("registry parse failed: " + e.message + "\n"); process.exit(0); }
     if (typeof r.plugins !== "object" || r.plugins === null) { process.exit(0); }
     let pruned = 0;
+    function applies(e) {
+      if (e.scope === "user") return true;
+      if (e.scope === "project" && e.projectPath === cwd) return true;
+      return false;
+    }
     for (const k of keys) {
       const entries = r.plugins[k];
       if (!Array.isArray(entries)) continue;
-      const live = entries.filter(e => e.installPath && fs.existsSync(e.installPath));
+      const live = entries.filter(e => {
+        if (!applies(e)) return true; // out-of-scope entries pass through untouched
+        return e.installPath && fs.existsSync(e.installPath);
+      });
       pruned += entries.length - live.length;
       if (live.length === 0) { delete r.plugins[k]; }
       else { r.plugins[k] = live; }
