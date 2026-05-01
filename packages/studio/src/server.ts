@@ -360,6 +360,19 @@ export function createApp(ctx: StudioContext): Hono {
         kind: c.req.query('kind') ?? null,
       };
 
+      // #146: when the UUID is a Phase 30 entry sidecar id, route to the
+      // entry-centric review surface (entry-review.ts) instead of the
+      // legacy workflow renderer. Try sidecar first; fall through to the
+      // legacy paths only when the UUID isn't an entry id.
+      try {
+        const entryResult = await renderEntryReviewPage(ctx.projectRoot, id);
+        if (entryResult.status === 200) {
+          return c.html(entryResult.html);
+        }
+      } catch {
+        // fall through to legacy resolution
+      }
+
       // 1. Workflow-id branch — phase 21c.
       const wf = readWorkflow(ctx.projectRoot, ctx.config, id);
       if (wf !== null) {
