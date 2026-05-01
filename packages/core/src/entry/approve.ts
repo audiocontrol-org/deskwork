@@ -1,6 +1,7 @@
 import { readSidecar } from '../sidecar/read.ts';
 import { writeSidecar } from '../sidecar/write.ts';
 import { appendJournalEvent } from '../journal/append.ts';
+import { regenerateCalendar } from '../calendar/regenerate.ts';
 import { nextStage } from '../schema/entry.ts';
 import type { Entry, Stage } from '../schema/entry.ts';
 
@@ -67,5 +68,9 @@ export async function approveEntryStage(
     from,
     to,
   });
+  // #148: keep calendar.md in sync after every transition. Without
+  // this, the canonical visible representation of the pipeline lags
+  // the SSOT until `doctor --fix=all` is run.
+  await regenerateCalendar(projectRoot);
   return { entryId: sidecar.uuid, fromStage: from, toStage: to };
 }

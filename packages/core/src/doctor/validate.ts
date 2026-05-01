@@ -84,6 +84,7 @@ async function validateCalendarSidecar(projectRoot: string): Promise<ValidationF
   }
   const calendarEntries = extractEntriesForMigration(md);
   const calendarUuids = new Set(calendarEntries.map((e) => e.uuid));
+  const calendarStageByUuid = new Map(calendarEntries.map((e) => [e.uuid, e.currentStage] as const));
   const sidecarUuids = await readSidecarUuids(projectRoot);
 
   for (const uuid of calendarUuids) {
@@ -103,6 +104,25 @@ async function validateCalendarSidecar(projectRoot: string): Promise<ValidationF
         message: `sidecar ${uuid}.json exists but calendar.md does not list this uuid`,
         entryId: uuid,
         path: join(projectRoot, '.deskwork', 'entries', `${uuid}.json`),
+      });
+    }
+  }
+
+  // #148: each entry should appear under the section that matches its
+  // sidecar's currentStage. If a stage transition wrote the sidecar but
+  // didn't regenerate calendar.md, the entry will appear under the
+  // pre-transition section. Surface this as a finding so --check sees
+  // the drift; the repair pass regenerates calendar.md from sidecars.
+  const sidecars = await loadSidecars(projectRoot);
+  for (const sc of sidecars) {
+    const calendarStage = calendarStageByUuid.get(sc.entry.uuid);
+    if (calendarStage === undefined) continue;
+    if (calendarStage !== sc.entry.currentStage) {
+      failures.push({
+        category: 'calendar-sidecar',
+        message: `calendar.md shows entry ${sc.entry.uuid} under "## ${calendarStage}" but sidecar.currentStage=${sc.entry.currentStage} (calendar.md is stale; run with --fix=all to regenerate)`,
+        entryId: sc.entry.uuid,
+        path: calendarPath,
       });
     }
   }

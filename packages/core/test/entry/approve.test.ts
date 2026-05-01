@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, mkdir, writeFile, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { approveEntryStage } from '@/entry/approve';
@@ -94,5 +94,29 @@ describe('approveEntryStage', () => {
       await writeSidecar(projectRoot, e);
       await expect(approveEntryStage(projectRoot, { uuid: u })).rejects.toThrow(/cannot/i);
     }
+  });
+
+  // #148: every entry transition must regenerate calendar.md so the
+  // canonical visible representation of the pipeline doesn't lag the
+  // sidecar SSOT.
+  it('regenerates calendar.md after the transition (#148)', async () => {
+    await setupEntry({ currentStage: 'Ideas', slug: 'my-idea', title: 'My Idea' });
+    // Pre-write calendar.md showing the entry under the OLD stage.
+    await writeFile(
+      join(projectRoot, '.deskwork', 'calendar.md'),
+      '# Editorial Calendar\n\n## Ideas\n\n*pre-existing stale content*\n',
+    );
+
+    await approveEntryStage(projectRoot, { uuid });
+
+    const md = await readFile(join(projectRoot, '.deskwork', 'calendar.md'), 'utf8');
+    // The entry should now appear under ## Planned, not ## Ideas, and
+    // the stale "pre-existing stale content" placeholder should be gone.
+    expect(md).not.toMatch(/pre-existing stale content/);
+    // After regeneration, the entry's UUID should be inside the Planned section.
+    const plannedSection = md.match(/## Planned[\s\S]*?(?=^## )/m)?.[0] ?? '';
+    expect(plannedSection).toContain(uuid);
+    const ideasSection = md.match(/## Ideas[\s\S]*?(?=^## )/m)?.[0] ?? '';
+    expect(ideasSection).not.toContain(uuid);
   });
 });

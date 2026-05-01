@@ -101,4 +101,45 @@ describe('validateAll - calendar-sidecar', () => {
     const calSideFails = result.failures.filter((f) => f.category === 'calendar-sidecar');
     expect(calSideFails).toEqual([]);
   });
+
+  // #148: when sidecar.currentStage disagrees with the section the entry
+  // appears under in calendar.md, surface as a calendar-sidecar finding
+  // (so --check actually exits non-zero on drift instead of reporting
+  // clean while --fix=all unconditionally regenerates).
+  it('flags drift when calendar.md section does not match sidecar.currentStage (#148)', async () => {
+    const u = '55555555-5555-5555-5555-555555555555';
+    // calendar.md shows the entry under Planned…
+    const md =
+      CAL_HEADER +
+      '## Planned\n\n' + TABLE_HEADER + calendarRow(u, 'drifty') + '\n';
+    await writeFile(join(projectRoot, '.deskwork', 'calendar.md'), md);
+    // …but the sidecar says Drafting.
+    await writeFile(
+      join(projectRoot, '.deskwork', 'entries', `${u}.json`),
+      entryJson(u, 'drifty', 'Drafting'),
+    );
+
+    const result = await validateAll(projectRoot);
+    const calSideFails = result.failures.filter((f) => f.category === 'calendar-sidecar');
+    expect(calSideFails).toHaveLength(1);
+    expect(calSideFails[0].message).toContain('Planned');
+    expect(calSideFails[0].message).toContain('Drafting');
+    expect(calSideFails[0].entryId).toBe(u);
+  });
+
+  it('does not flag drift when calendar.md section matches sidecar.currentStage', async () => {
+    const u = '66666666-6666-6666-6666-666666666666';
+    const md =
+      CAL_HEADER +
+      '## Drafting\n\n' + TABLE_HEADER + calendarRow(u, 'aligned') + '\n';
+    await writeFile(join(projectRoot, '.deskwork', 'calendar.md'), md);
+    await writeFile(
+      join(projectRoot, '.deskwork', 'entries', `${u}.json`),
+      entryJson(u, 'aligned', 'Drafting'),
+    );
+
+    const result = await validateAll(projectRoot);
+    const calSideFails = result.failures.filter((f) => f.category === 'calendar-sidecar');
+    expect(calSideFails).toEqual([]);
+  });
 });

@@ -1,6 +1,7 @@
 import { readSidecar } from '../sidecar/read.ts';
 import { writeSidecar } from '../sidecar/write.ts';
 import { appendJournalEvent } from '../journal/append.ts';
+import { regenerateCalendar } from '../calendar/regenerate.ts';
 import { isLinearPipelineStage } from '../schema/entry.ts';
 import type { Entry, Stage } from '../schema/entry.ts';
 
@@ -70,5 +71,7 @@ export async function inductEntry(
     to,
     ...(opts.reason !== undefined && { reason: opts.reason }),
   });
+  // #148: keep calendar.md in sync after every transition.
+  await regenerateCalendar(projectRoot);
   return { entryId: sidecar.uuid, fromStage: from, toStage: to };
 }

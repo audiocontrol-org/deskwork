@@ -1,6 +1,7 @@
 import { readSidecar } from '../sidecar/read.ts';
 import { writeSidecar } from '../sidecar/write.ts';
 import { appendJournalEvent } from '../journal/append.ts';
+import { regenerateCalendar } from '../calendar/regenerate.ts';
 import type { Entry, Stage } from '../schema/entry.ts';
 
 interface BlockOptions {
@@ -49,5 +50,7 @@ export async function blockEntry(
     to: 'Blocked',
     ...(opts.reason !== undefined && { reason: opts.reason }),
   });
+  // #148: keep calendar.md in sync after every transition.
+  await regenerateCalendar(projectRoot);
   return { entryId: sidecar.uuid, fromStage: from, toStage: 'Blocked' };
 }
