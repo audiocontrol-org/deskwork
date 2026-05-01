@@ -1,0 +1,456 @@
+/*
+ * entry-review.css — design system extension for the entry-review surface
+ * (/dev/editorial-review/<uuid>).
+ *
+ * Sub-metaphor: "the desk inset — a clipboard view of one entry under
+ * inspection. Sits between the workbench (dashboard) and the galley
+ * (longform review). Stage-aware controls for graduating an entry."
+ *
+ * Spec: docs/superpowers/specs/2026-05-01-studio-uxui-design.md §5.2
+ * Issue: #152 (frontend-design output)
+ *
+ * All tokens reference --er-* from editorial-review.css. No new tokens.
+ * All selectors scoped via [data-review-ui="entry-review"].
+ *
+ * Companion edit: editorial-review.css extends its body[data-review-ui=...]
+ * scope-list (around line 107) to include "entry-review" so this surface
+ * inherits the paper-grain background applied to studio + shortform.
+ */
+
+/* ---------- Shell + container ---------- */
+
+[data-review-ui="entry-review"] .er-entry-shell {
+  max-width: var(--er-container-narrow);
+  margin: 0 auto;
+  padding: var(--er-space-5) var(--er-space-4) var(--er-space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--er-space-4);
+}
+
+[data-review-ui="entry-review"] .er-entry-shell--missing {
+  min-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: var(--er-space-3);
+  max-width: var(--er-container-narrow);
+  margin: 0 auto;
+  padding: var(--er-space-6) var(--er-space-4);
+}
+
+[data-review-ui="entry-review"] .er-entry-shell--missing h1 {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 96, "wght" 400, "SOFT" 0;
+  font-size: clamp(2.2rem, 4.5vw, 3rem);
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  color: var(--er-ink);
+  margin: 0;
+}
+
+[data-review-ui="entry-review"] .er-entry-shell--missing p {
+  font-family: var(--er-font-body);
+  font-size: 1rem;
+  line-height: 1.55;
+  color: var(--er-ink-soft);
+  margin: 0;
+  max-width: 36rem;
+}
+
+[data-review-ui="entry-review"] .er-entry-shell--missing code {
+  /* code styling already comes from the scoped reset in editorial-review.css */
+  font-size: 0.85em;
+}
+
+[data-review-ui="entry-review"] .er-entry-shell--missing a {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 14, "wght" 500;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  color: var(--er-proof-blue);
+  text-decoration: none;
+  border-bottom: 1px solid var(--er-proof-blue);
+  padding-bottom: 1px;
+  margin-top: var(--er-space-2);
+}
+
+[data-review-ui="entry-review"] .er-entry-shell--missing a:hover {
+  background: var(--er-proof-blue);
+  color: var(--er-paper);
+  border-bottom-color: var(--er-proof-blue);
+}
+
+[data-review-ui="entry-review"] .er-entry-detail {
+  font-family: var(--er-font-mono);
+  font-size: 0.78rem;
+  color: var(--er-faded);
+  letter-spacing: 0.04em;
+  margin: 0;
+}
+
+/* ---------- Head ---------- */
+
+[data-review-ui="entry-review"] .er-entry-head {
+  padding: 0 0 var(--er-space-3) 0;
+  border-bottom: var(--er-rule-double);
+  display: flex;
+  flex-direction: column;
+  gap: var(--er-space-2);
+}
+
+[data-review-ui="entry-review"] .er-entry-kicker {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  margin: 0;
+}
+
+[data-review-ui="entry-review"] .er-entry-title {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 96, "wght" 400, "SOFT" 0;
+  font-size: clamp(2rem, 4vw, 2.8rem);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--er-ink);
+  margin: 0;
+}
+
+[data-review-ui="entry-review"] .er-entry-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--er-space-2);
+  align-items: center;
+  margin: 0;
+  font-family: var(--er-font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: var(--er-faded);
+}
+
+[data-review-ui="entry-review"] .er-entry-uuid {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+  background: var(--er-paper-2);
+  color: var(--er-ink-soft);
+  padding: 0.15rem 0.5rem;
+  border-radius: 2px;
+  border: 1px solid var(--er-paper-3);
+  white-space: nowrap;
+}
+
+[data-review-ui="entry-review"] .er-entry-artifact-path {
+  margin: 0;
+  font-family: var(--er-font-mono);
+  font-size: 0.72rem;
+  color: var(--er-faded);
+  letter-spacing: 0.02em;
+}
+
+[data-review-ui="entry-review"] .er-entry-artifact-path code {
+  background: transparent;
+  color: var(--er-ink-soft);
+  padding: 0;
+  font-size: inherit;
+}
+
+/* ---------- Stage badges ---------- */
+
+[data-review-ui="entry-review"] .er-entry-stage {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 14, "wght" 600;
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.6rem;
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+  display: inline-block;
+  white-space: nowrap;
+  background: transparent;
+  line-height: 1.3;
+  box-shadow: 1px 1px 0 rgba(26, 22, 20, 0.06);
+}
+
+/* Per-stage pigment + border-style mapped to lifecycle position */
+
+[data-review-ui="entry-review"] .er-entry-stage[data-stage="Ideas"] {
+  color: var(--er-faded);
+  border-style: dashed;
+}
+
+[data-review-ui="entry-review"] .er-entry-stage[data-stage="Planned"] {
+  color: var(--er-proof-blue);
+  border-style: solid;
+}
+
+[data-review-ui="entry-review"] .er-entry-stage[data-stage="Outlining"] {
+  color: var(--er-stamp-purple);
+  border-style: dotted;
+}
+
+[data-review-ui="entry-review"] .er-entry-stage[data-stage="Drafting"] {
+  color: var(--er-stamp-purple);
+  border-style: solid;
+}
+
+[data-review-ui="entry-review"] .er-entry-stage[data-stage="Final"] {
+  color: var(--er-stamp-green);
+  border-style: solid;
+  border-width: 2px;
+}
+
+[data-review-ui="entry-review"] .er-entry-stage[data-stage="Published"] {
+  color: var(--er-stamp-green);
+  background: var(--er-paper-3);
+  border-style: solid;
+  border-color: var(--er-stamp-green);
+}
+
+[data-review-ui="entry-review"] .er-entry-stage[data-stage="Blocked"] {
+  color: var(--er-red-pencil);
+  border-style: solid;
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+}
+
+[data-review-ui="entry-review"] .er-entry-stage[data-stage="Cancelled"] {
+  color: var(--er-faded);
+  border-style: dashed;
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+}
+
+[data-review-ui="entry-review"] .er-entry-prior-stage {
+  font-family: var(--er-font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  font-style: italic;
+}
+
+/* ---------- Controls strip ---------- */
+
+[data-review-ui="entry-review"] .er-entry-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--er-space-2);
+  align-items: center;
+  padding: var(--er-space-3) 0;
+  border-top: 1px dotted var(--er-faded-2);
+  border-bottom: 1px dotted var(--er-faded-2);
+  margin: 0;
+}
+
+[data-review-ui="entry-review"] .er-entry-controls--readonly {
+  border-top-color: var(--er-paper-3);
+  border-bottom-color: var(--er-paper-3);
+}
+
+/* Generic control button — extends .er-btn pattern */
+
+[data-review-ui="entry-review"] .er-entry-control {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 14, "wght" 500;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  color: var(--er-ink);
+}
+
+[data-review-ui="entry-review"] .er-entry-control--button {
+  padding: 0.4rem 0.85rem;
+  border: var(--er-rule-med);
+  background: var(--er-paper);
+  color: var(--er-ink);
+  cursor: pointer;
+  border-radius: 2px;
+  text-transform: uppercase;
+  transition: background 120ms ease, color 120ms ease, transform 120ms ease;
+}
+
+[data-review-ui="entry-review"] .er-entry-control--button:hover:not(:disabled) {
+  background: var(--er-ink);
+  color: var(--er-paper);
+}
+
+[data-review-ui="entry-review"] .er-entry-control--button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+[data-review-ui="entry-review"] .er-entry-control--button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+[data-review-ui="entry-review"] .er-entry-control--button:focus-visible {
+  outline: 2px solid var(--er-proof-blue);
+  outline-offset: 2px;
+}
+
+/* Per-action pigment for action buttons (data-control attribute) */
+
+[data-review-ui="entry-review"] .er-entry-control--button[data-control="approve"] {
+  border-color: var(--er-stamp-green);
+  color: var(--er-stamp-green);
+}
+
+[data-review-ui="entry-review"] .er-entry-control--button[data-control="approve"]:hover:not(:disabled) {
+  background: var(--er-stamp-green);
+  color: var(--er-paper);
+}
+
+[data-review-ui="entry-review"] .er-entry-control--button[data-control="reject"] {
+  border-color: var(--er-red-pencil);
+  color: var(--er-red-pencil);
+}
+
+[data-review-ui="entry-review"] .er-entry-control--button[data-control="reject"]:hover:not(:disabled) {
+  background: var(--er-red-pencil);
+  color: var(--er-paper);
+}
+
+[data-review-ui="entry-review"] .er-entry-control--button[data-control="iterate"],
+[data-review-ui="entry-review"] .er-entry-control--button[data-control="save"] {
+  border-color: var(--er-proof-blue);
+  color: var(--er-proof-blue);
+}
+
+[data-review-ui="entry-review"] .er-entry-control--button[data-control="iterate"]:hover:not(:disabled),
+[data-review-ui="entry-review"] .er-entry-control--button[data-control="save"]:hover:not(:disabled) {
+  background: var(--er-proof-blue);
+  color: var(--er-paper);
+}
+
+/* Labeled selector controls (induct, history) */
+
+[data-review-ui="entry-review"] .er-entry-control--induct,
+[data-review-ui="entry-review"] .er-entry-control--history {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--er-space-1);
+}
+
+[data-review-ui="entry-review"] .er-entry-control-label {
+  font-family: var(--er-font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+}
+
+[data-review-ui="entry-review"] .er-entry-control--induct select,
+[data-review-ui="entry-review"] .er-entry-control--history select {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 14, "wght" 500;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  padding: 0.3rem 0.55rem;
+  border: 1.5px solid var(--er-ink);
+  border-radius: 2px;
+  background: var(--er-paper);
+  color: var(--er-ink);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+[data-review-ui="entry-review"] .er-entry-control--induct select:hover,
+[data-review-ui="entry-review"] .er-entry-control--history select:hover {
+  background: var(--er-paper-2);
+}
+
+[data-review-ui="entry-review"] .er-entry-control--induct select:focus-visible,
+[data-review-ui="entry-review"] .er-entry-control--history select:focus-visible {
+  outline: 2px solid var(--er-proof-blue);
+  outline-offset: 2px;
+}
+
+/* Read-only label (terminal stages) */
+
+[data-review-ui="entry-review"] .er-entry-control--readonly {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 14, "wght" 500;
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 0.3rem 0.7rem;
+  border: 1.5px dashed var(--er-faded);
+  border-radius: 2px;
+  color: var(--er-faded);
+  background: transparent;
+}
+
+/* ---------- Artifact body — the manuscript clipped to the desk ---------- */
+
+[data-review-ui="entry-review"] .er-entry-artifact {
+  padding: 0;
+  margin: 0;
+}
+
+[data-review-ui="entry-review"] .er-entry-body {
+  display: block;
+  width: 100%;
+  min-height: 22rem;
+  padding: var(--er-space-3);
+  font-family: var(--er-font-mono);
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--er-ink);
+  background: var(--er-paper-2);
+  border: 1.5px solid var(--er-ink);
+  border-radius: 2px;
+  box-shadow: inset 1px 2px 0 rgba(26, 22, 20, 0.06);
+  resize: vertical;
+  outline: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+[data-review-ui="entry-review"] textarea.er-entry-body:focus-visible {
+  border-color: var(--er-proof-blue);
+  box-shadow:
+    inset 1px 2px 0 rgba(26, 22, 20, 0.06),
+    0 0 0 2px var(--er-proof-blue-soft);
+}
+
+[data-review-ui="entry-review"] .er-entry-body--readonly {
+  cursor: default;
+  color: var(--er-ink-soft);
+  background: var(--er-paper-2);
+  resize: none;
+  user-select: text;
+}
+
+/* Reduced motion */
+
+@media (prefers-reduced-motion: reduce) {
+  [data-review-ui="entry-review"] .er-entry-control--button,
+  [data-review-ui="entry-review"] .er-entry-control--induct select,
+  [data-review-ui="entry-review"] .er-entry-control--history select {
+    transition: none;
+  }
+}
+
+/* Small viewport — controls strip wraps and the title scales down */
+
+@media (max-width: 36rem) {
+  [data-review-ui="entry-review"] .er-entry-shell {
+    padding: var(--er-space-3) var(--er-space-2) var(--er-space-5);
+  }
+
+  [data-review-ui="entry-review"] .er-entry-controls {
+    gap: var(--er-space-1);
+  }
+
+  [data-review-ui="entry-review"] .er-entry-control--button {
+    font-size: 0.72rem;
+    padding: 0.35rem 0.65rem;
+  }
+}

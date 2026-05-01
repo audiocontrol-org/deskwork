@@ -103,9 +103,10 @@
   color: var(--er-ink-soft);
 }
 
-/* Full-page variants (studio + shortform own html/body) */
+/* Full-page variants (studio + shortform + entry-review own html/body) */
 body[data-review-ui="studio"],
-body[data-review-ui="shortform"] {
+body[data-review-ui="shortform"],
+body[data-review-ui="entry-review"] {
   margin: 0;
   background-color: var(--er-paper);
   background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.05 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
