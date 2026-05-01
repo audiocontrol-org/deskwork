@@ -1,0 +1,21 @@
+{
+  "kind": "entry-created",
+  "at": "2026-05-01T00:17:31.525Z",
+  "entryId": "9845c268-670f-4793-b986-0433e9ef4fb9",
+  "entry": {
+    "uuid": "9845c268-670f-4793-b986-0433e9ef4fb9",
+    "slug": "deskwork-plugin/prd",
+    "title": "Prd",
+    "keywords": [
+      "deskwork-plugin",
+      "prd",
+      "feature-tracking",
+      "internal-doc"
+    ],
+    "source": "manual",
+    "currentStage": "Drafting",
+    "iterationByStage": {},
+    "createdAt": "2026-05-01T00:17:31.515Z",
+    "updatedAt": "2026-05-01T00:17:31.515Z"
+  }
+}
