@@ -199,5 +199,24 @@ if ! node "$CLI" doctor "$TMP" --fix=all --yes; then
   exit 1
 fi
 
+# ---------------------------------------------------------------------------
+# Step 5 (v0.12.0): assert --help text matches Phase 30 verb structure (#139).
+# Universal verbs visible; retired verbs absent from the active listing.
+# ---------------------------------------------------------------------------
+echo "smoke: step 5 — 'deskwork --help' (expect Phase 30 verb structure, #139)"
+HELP_OUT="$(node "$CLI" --help)"
+for verb in iterate approve publish doctor block cancel induct status; do
+  if ! printf '%s' "$HELP_OUT" | grep -q "\\b$verb\\b"; then
+    echo "smoke: FAIL — --help missing verb '$verb'" >&2
+    exit 1
+  fi
+done
+for retired in "  plan" "  outline" "  draft" "  pause" "  resume"; do
+  if printf '%s' "$HELP_OUT" | grep -qE "^$retired\\b"; then
+    echo "smoke: FAIL — --help still lists retired verb '$retired' as if usable" >&2
+    exit 1
+  fi
+done
+
 echo ""
 echo "smoke: all checks passed"
