@@ -362,6 +362,70 @@ async function validateStageInvariants(projectRoot: string): Promise<ValidationF
   return failures;
 }
 
+async function validateCrossEntry(projectRoot: string): Promise<ValidationFailure[]> {
+  const failures: ValidationFailure[] = [];
+  const sidecars = await loadSidecars(projectRoot);
+
+  // UUID-filename mismatch: the canonical name is `<uuid>.json`. If the body's
+  // uuid field doesn't match the filename, downstream lookups break.
+  for (const { filename, path, entry } of sidecars) {
+    const expectedUuid = filename.replace(/\.json$/, '');
+    if (entry.uuid !== expectedUuid) {
+      failures.push({
+        category: 'cross-entry',
+        message: `sidecar filename ${filename} does not match body uuid ${entry.uuid}`,
+        entryId: entry.uuid,
+        path,
+      });
+    }
+  }
+
+  // Slug uniqueness: each slug should map to at most one entry. Group sidecars
+  // by slug and emit one failure per duplicate cluster.
+  const bySlug = new Map<string, LoadedSidecar[]>();
+  for (const sc of sidecars) {
+    const list = bySlug.get(sc.entry.slug) ?? [];
+    list.push(sc);
+    bySlug.set(sc.entry.slug, list);
+  }
+  for (const [slug, group] of bySlug) {
+    if (group.length < 2) continue;
+    const uuids = group.map((g) => g.entry.uuid).join(', ');
+    for (const sc of group) {
+      failures.push({
+        category: 'cross-entry',
+        message: `slug "${slug}" is shared by ${group.length} sidecars (uuids: ${uuids})`,
+        entryId: sc.entry.uuid,
+        path: sc.path,
+      });
+    }
+  }
+
+  // UUID uniqueness across body fields. Same body uuid in two different files
+  // is unusual (the filename naming convention prevents the obvious case) but
+  // worth catching when it happens.
+  const byUuid = new Map<string, LoadedSidecar[]>();
+  for (const sc of sidecars) {
+    const list = byUuid.get(sc.entry.uuid) ?? [];
+    list.push(sc);
+    byUuid.set(sc.entry.uuid, list);
+  }
+  for (const [uuid, group] of byUuid) {
+    if (group.length < 2) continue;
+    const filenames = group.map((g) => g.filename).join(', ');
+    for (const sc of group) {
+      failures.push({
+        category: 'cross-entry',
+        message: `uuid ${uuid} appears in ${group.length} sidecar bodies (files: ${filenames})`,
+        entryId: uuid,
+        path: sc.path,
+      });
+    }
+  }
+
+  return failures;
+}
+
 export async function validateAll(projectRoot: string): Promise<ValidationResult> {
   const failures: ValidationFailure[] = [];
   failures.push(...(await validateSchema(projectRoot)));
@@ -371,6 +435,6 @@ export async function validateAll(projectRoot: string): Promise<ValidationResult
   failures.push(...(await validateIterationHistory(projectRoot)));
   failures.push(...(await validateFilePresence(projectRoot)));
   failures.push(...(await validateStageInvariants(projectRoot)));
-  // Task 30 adds: validateCrossEntry.
+  failures.push(...(await validateCrossEntry(projectRoot)));
   return { failures };
 }
