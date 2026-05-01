@@ -80,6 +80,10 @@
       "types": "./dist/ingest-paths.d.ts",
       "default": "./dist/ingest-paths.js"
     },
+    "./iterate": {
+      "types": "./dist/iterate/iterate.d.ts",
+      "default": "./dist/iterate/iterate.js"
+    },
     "./journal": {
       "types": "./dist/journal.d.ts",
       "default": "./dist/journal.js"
@@ -135,6 +139,10 @@
     "./scrapbook": {
       "types": "./dist/scrapbook.d.ts",
       "default": "./dist/scrapbook.js"
+    },
+    "./sidecar": {
+      "types": "./dist/sidecar/index.d.ts",
+      "default": "./dist/sidecar/index.js"
     },
     "./types": {
       "types": "./dist/types.d.ts",
