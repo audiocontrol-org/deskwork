@@ -21,16 +21,20 @@ Read the following and report a concise summary to the user:
    - Read: `DEVELOPMENT-NOTES.md` (last entry only)
    - Note: what was accomplished, what failed, course corrections
 
-4. **Check open GitHub issues**:
+4. **Skim the dev workflow doc**:
+   - Read: `DEVELOPMENT.md` (top-level)
+   - This is the inner-loop reference: `npm run dev`, `node_modules/.bin/deskwork`, watch builds, studio dev mode, when to invoke which path. Re-read it instead of reasoning about how to fix-and-test from scratch — the patterns are documented to avoid relitigating them every session.
+
+5. **Check open GitHub issues**:
    - Run: `gh issue list --state open`
 
-5. **Plan sub-agent delegation for the proposed goal:**
+6. **Plan sub-agent delegation for the proposed goal:**
    - Consult the **Sub-Agent Delegation** table in `.claude/CLAUDE.md` and map each chunk of work to its specialist (e.g. TypeScript implementation → `typescript-pro`; SKILL.md prose → `documentation-engineer`; multi-chunk implementation with PR delivery → `feature-orchestrator`).
    - Default to delegating: per the project's "Before Committing" checklist, *"Could this task have been delegated to a sub-agent?"* is the leading question. The default answer is yes. The `[PROCESS] didn't delegate` correction in `.claude/rules/session-analytics.md` exists because in-thread implementation is a recurring failure mode.
    - When in doubt — multi-chunk feature work, anything that crosses package boundaries, anything matching a row in the delegation table — pick `feature-orchestrator` and let it dispatch the specialists.
    - Keep work in-thread only for trivial single-file edits, doc-only changes, or skill/workplan updates where delegation overhead exceeds the task itself.
 
-6. **Report to the user**:
+7. **Report to the user**:
    - Feature name and current phase
    - Last session's key accomplishments and failures
    - Top unresolved issues
