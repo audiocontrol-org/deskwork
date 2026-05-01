@@ -151,24 +151,31 @@ When working on deskwork (or any tool the project is building), use the tool act
 - Privileged shortcuts disable the dogfood signal — see the existing *"Use the deskwork plugin only through the publicly-advertised distribution channel"* rule. The two are paired: dogfood requires using the public path, and the public path is what makes dogfood honest.
 - If the gate the dogfood would normally clear (e.g. `/feature-implement`'s strict PRD-applied gate) is in the way of using the tool, the friction itself is the data — surface it, ask what to do; don't bypass silently.
 
-## Issue closure is the customer's call, not the agent's
+## Issue closure requires verification in a formally-installed release
 
-When an issue is filed by the operator (or a customer / user / external party) — especially one labeled `customer-blocking` or `urgent` — **shipping the fix is not the same as resolving the issue**. Closure requires the issue's author to confirm the fix unblocks them on their own install. The agent's "I implemented the acceptance criteria" is a status update, not a disposition.
+**No issue gets closed until the fix has been verified in a formally-installed release.** This applies uniformly — to operator-filed issues, customer-filed issues, AND agent-filed issues (e.g. issues filed during a dogfood walk). Who filed it doesn't change the bar.
 
-**Why:** issue closure is a public statement. *"This is fixed"* tells the issue author and any future reader that the problem is gone. If the agent closes a customer-blocking issue before the customer has actually verified the fix on their environment, three failure modes get masked:
-- The fix only works in the agent's environment (different OS, shell, plugin install state, etc.) and silently fails for the customer.
-- The fix works mechanically but doesn't address the customer's lived friction (the agent solved the wrong problem).
-- The customer would have caught a regression or follow-up during their own walk-through that the agent's smoke didn't reach.
+A commit, a passing local test, a green workspace test suite — none of those are "fixed." Each is a status update that the implementation is plausible. The release is what makes the fix reachable by adopters, and an install + walk-through against the released artifact is what proves the fix actually fixes the thing.
 
-Closing while the customer is mid-verification *also* loses the signal — issue lists filtered by "open customer-blocking" are how the operator triages priorities. A prematurely-closed issue disappears from the queue and looks done when it isn't.
+**Why:** local + workspace tests can pass while the marketplace install or packaging breaks the fix. v0.11.0 shipped to npm with `@deskwork/core` missing a `zod` dependency that workspace tests didn't catch (because zod was hoisted from another workspace package's dev-deps). The release-blocking smoke caught it BEFORE tag/push specifically because the smoke runs `npm install` from the registry — exactly the adopter path. That's the gap closure-on-commit ignores.
 
-This is closely related to the *"Operator owns scope decisions"* rule above (which is about scope) and the *"Packaging is UX — never paper over install bugs"* rule (which is about ground-truth-vs-reasoning). This rule is specifically about **disposition**: who gets to say "fixed."
+Three failure modes that closing-on-commit masks:
+- **Packaging defects:** the fix lands in source but the published artifact doesn't include it (excluded by the `files` whitelist, missed by a build script's `cp` step, etc.).
+- **Wrong-environment success:** the fix works in the dev workspace where `node_modules/.bin/deskwork` resolves through the workspace symlink, but breaks in the marketplace-installed cache copy adopters actually run.
+- **Address-the-wrong-problem:** the agent's smoke exercises a synthetic case that doesn't reflect the lived friction; only a real walk-through against the released artifact catches that the user-facing experience hasn't actually changed.
+
+Closing while a fix is committed-but-not-released *also* loses the triage signal — issue lists filtered by "open" are how the operator decides what's still pending. A prematurely-closed issue disappears from the queue and looks done when it isn't.
+
+This is closely related to the *"Packaging is UX — never paper over install bugs"* rule above (which is about ground-truth-vs-reasoning during evaluation). This rule is specifically about **disposition**: when can the agent say "this is fixed."
 
 **How to apply:**
-- After shipping a fix for a customer-filed issue: post a comment with status (commit / release / unblock instructions), but **leave the issue open**.
-- The closing transition belongs to the issue author. They close it after they've verified — or they hand the agent an explicit "close it" before the verification, which is fine because that's their call.
-- For agent-filed issues against the same project (e.g., issues filed during a dogfood walk): closing after the fix lands is fine — the agent IS the issue author.
+- After committing a fix: post a comment with the commit hash + description of what changed. The issue **stays open**.
+- After the fix ships in a release: post a comment naming the version and noting the fix is now reachable by adopters. The issue **still stays open** until the fix is verified against the released artifact (run a real install + walk-through, prove the original symptoms are gone).
+- The closing transition is the operator's call (or the issue author's, whichever is the disposition holder). The agent doesn't close issues; the agent posts evidence and waits for the operator's go-ahead.
+- For multi-issue release batches: list which issues are believed-fixed-pending-verification in the release notes. Don't close any of them on tag/push — verify post-release, then ask the operator before closing.
 - The same logic generalizes: status updates on shared artifacts (issue dispositions, PR review states, calendar workflow approvals) where another party owns the disposition belong to that party, not the agent.
+
+This rule supersedes the previous version that distinguished agent-filed from customer-filed issues. The earlier wording allowed *"closing after the fix lands"* for agent-filed issues, which conflated commit with release and made the agent the implicit verifier of its own fixes. Releases verified by re-installing the released artifact are the only durable signal.
 
 Once a script at `~/.claude/plugins/marketplaces/deskwork/scripts/<name>.sh` is documented for adopters (e.g., in a `.claude/settings.json` SessionStart hook snippet, or in a README troubleshooting section), its **path, name, and CLI flag set become a contract**. Breaking changes silently break deployed adopter configurations.
 
