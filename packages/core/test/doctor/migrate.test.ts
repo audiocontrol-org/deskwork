@@ -152,6 +152,86 @@ describe('migrateCalendar', () => {
     } finally { await rm(projectRoot, { recursive: true, force: true }); }
   });
 
+  it('reads legacy pipeline workflow records into iterationByStage + reviewState (#141)', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'dw-test-'));
+    try {
+      await mkdir(join(projectRoot, '.deskwork', 'review-journal', 'pipeline'), { recursive: true });
+      await writeFile(join(projectRoot, '.deskwork', 'calendar.md'),
+        `# Editorial Calendar
+
+## Drafting
+| UUID | Slug | Title | Description | Keywords | Source |
+|------|------|------|------|------|------|
+| 33333333-3333-3333-3333-333333333333 | applied-doc | Applied Doc |  | kw | manual |
+`);
+      await writeFile(
+        join(projectRoot, '.deskwork', 'review-journal', 'pipeline', '2026-01-01T00-00-00-000Z-aaa.json'),
+        JSON.stringify({
+          id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+          site: 'main',
+          slug: 'applied-doc',
+          contentKind: 'longform',
+          state: 'applied',
+          currentVersion: 3,
+          entryId: '33333333-3333-3333-3333-333333333333',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-02T00:00:00.000Z',
+        }),
+      );
+
+      await migrateCalendar(projectRoot, { dryRun: false });
+
+      const sidecarBody = await readFile(
+        join(projectRoot, '.deskwork', 'entries', '33333333-3333-3333-3333-333333333333.json'),
+        'utf8',
+      );
+      const sidecar: { iterationByStage: Record<string, number>; reviewState?: string } =
+        JSON.parse(sidecarBody);
+      expect(sidecar.iterationByStage.Drafting).toBe(3);
+      expect(sidecar.reviewState).toBe('approved');
+    } finally { await rm(projectRoot, { recursive: true, force: true }); }
+  });
+
+  it('keeps the highest currentVersion across multiple pipeline records for one entry', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'dw-test-'));
+    try {
+      await mkdir(join(projectRoot, '.deskwork', 'review-journal', 'pipeline'), { recursive: true });
+      await writeFile(join(projectRoot, '.deskwork', 'calendar.md'),
+        `# Editorial Calendar
+
+## Drafting
+| UUID | Slug | Title | Description | Keywords | Source |
+|------|------|------|------|------|------|
+| 44444444-4444-4444-4444-444444444444 | multi | Multi |  | kw | manual |
+`);
+      await writeFile(
+        join(projectRoot, '.deskwork', 'review-journal', 'pipeline', 'a.json'),
+        JSON.stringify({
+          id: 'a-id',
+          state: 'applied',
+          currentVersion: 1,
+          entryId: '44444444-4444-4444-4444-444444444444',
+        }),
+      );
+      await writeFile(
+        join(projectRoot, '.deskwork', 'review-journal', 'pipeline', 'b.json'),
+        JSON.stringify({
+          id: 'b-id',
+          state: 'iterating',
+          currentVersion: 5,
+          entryId: '44444444-4444-4444-4444-444444444444',
+        }),
+      );
+
+      await migrateCalendar(projectRoot, { dryRun: false });
+      const sidecar: { iterationByStage: Record<string, number> } = JSON.parse(await readFile(
+        join(projectRoot, '.deskwork', 'entries', '44444444-4444-4444-4444-444444444444.json'),
+        'utf8',
+      ));
+      expect(sidecar.iterationByStage.Drafting).toBe(5);
+    } finally { await rm(projectRoot, { recursive: true, force: true }); }
+  });
+
   it('does not write when dryRun is true', async () => {
     const projectRoot = await mkdtemp(join(tmpdir(), 'dw-test-'));
     try {
