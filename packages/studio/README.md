@@ -35,7 +35,7 @@ npm run dev --workspace @deskwork/studio     # Vite-in-Hono on port 47321
 `npm run dev` boots the studio with `DESKWORK_DEV=1` and `tsx --watch`, mounting Vite's dev middleware in front of Hono. Effects:
 
 - Edits under `packages/studio/src/*.ts` (server-side) auto-restart the process.
-- Edits under `plugins/deskwork-studio/public/src/*.ts` (client-side) are served by Vite — refresh the browser to see them. (Full HMR is a follow-up.)
+- Edits under `plugins/deskwork-studio/public/src/*.ts` (client-side) are served by Vite with HMR — the browser auto-reloads on save (full module HMR engages whenever modules add `import.meta.hot` handlers).
 - The in-process esbuild step is skipped; client TS source is served directly via Vite at `/src/<name>.ts`.
 
 The dev server points at the workspace root (`--project-root ../..`) so it reads the project's own `.deskwork/config.json` and surfaces the project's calendar.

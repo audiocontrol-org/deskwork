@@ -4,7 +4,7 @@
  */
 
 import { escapeHtml } from './html.ts';
-import { clientScriptTag } from '../lib/client-script.ts';
+import { clientScriptTag, viteClientTag } from '../lib/client-script.ts';
 
 export interface EmbeddedJson {
   /** `id` attribute of the `<script type="application/json">` tag. */
@@ -62,9 +62,11 @@ export function layout(options: LayoutOptions): string {
     })
     .join('\n');
 
-  const scriptTags = scriptModules
-    .map((name) => `    ${clientScriptTag(name)}`)
-    .join('\n');
+  const hmrTag = viteClientTag();
+  const scriptTags = [
+    ...(hmrTag ? [`    ${hmrTag}`] : []),
+    ...scriptModules.map((name) => `    ${clientScriptTag(name)}`),
+  ].join('\n');
 
   const bodyOpen = bodyAttrs ? `<body ${bodyAttrs}>` : '<body>';
 
