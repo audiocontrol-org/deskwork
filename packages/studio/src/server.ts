@@ -58,6 +58,7 @@ import {
   getRequestContentIndex,
 } from './request-context.ts';
 import { runTemplateOverride } from './lib/override-render.ts';
+import { getStudioVersion } from './lib/version.ts';
 import { createOverrideResolver } from '@deskwork/core/overrides';
 
 interface CliArgs {
@@ -291,6 +292,10 @@ export function createApp(ctx: StudioContext): Hono {
 
   // API routes
   app.route('/api/dev/editorial-review', createApiRouter(ctx));
+
+  // #111: version endpoint so adopters / scripts can verify which studio
+  // build is actually running. Surfaced in the dashboard masthead too.
+  app.get('/api/dev/version', (c) => c.json({ version: getStudioVersion() }));
 
   // Page routes
   app.get('/dev', async (c) => c.html(await renderStudioIndex(ctx)));

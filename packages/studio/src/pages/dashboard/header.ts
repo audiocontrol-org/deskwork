@@ -10,6 +10,7 @@
 import type { DashboardData } from './data.ts';
 import { DASHBOARD_STAGE_ORDER } from './data.ts';
 import { html, unsafe, type RawHtml } from '../html.ts';
+import { getStudioVersion } from '../../lib/version.ts';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -51,6 +52,8 @@ export function renderHeader(
     <p class="er-pagehead__deck">
       Project: <code>${projectRoot}</code>
       &nbsp;·&nbsp; <a class="er-link-marginalia" href="/dev/editorial-help">the manual</a>
+      &nbsp;·&nbsp; <span class="er-pagehead__version" data-studio-version
+        title="@deskwork/studio version">v${getStudioVersion()}</span>
     </p>
     <p class="er-pagehead__meta">
       <span>${issueDate}</span>

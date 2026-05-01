@@ -263,4 +263,69 @@ describe('studio dashboard — eight stage sections (Task 34)', () => {
     // Hono surfaces uncaught throws as 500.
     expect(res.status).toBeGreaterThanOrEqual(500);
   });
+
+  // #109: dashboard rows emit `<time data-format="date">` so client-side
+  // JS can format dates in the operator's locale instead of the
+  // server's UTC date slice.
+  it('emits <time data-format="date"> for entry updatedAt (#109)', async () => {
+    await writeSidecar(root, makeEntry({ uuid: UUID_IDEA, currentStage: 'Ideas' }));
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    expect(r.html).toMatch(
+      /<time class="er-calendar-meta er-calendar-meta-updated" data-format="date"[^>]*datetime="[^"]+"/,
+    );
+  });
+
+  // #111: studio version surfaces in the dashboard masthead and via a
+  // dedicated /api/dev/version endpoint so adopters / scripts can
+  // verify which build is actually running.
+  it('renders the studio version in the masthead (#111)', async () => {
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    expect(r.html).toMatch(/data-studio-version[^>]*>v\d+\.\d+\.\d+</);
+  });
+
+  it('exposes GET /api/dev/version (#111)', async () => {
+    const res = await app.fetch(new Request('http://x/api/dev/version'));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { version: string };
+    expect(body.version).toMatch(/^\d+\.\d+\.\d+/);
+  });
+
+  // #112: empty stage sections render compact (header-only, no
+  // placeholder body). Keeps the operator's sense of pipeline shape
+  // without padding the dashboard with multi-line empty placeholders
+  // for low-volume calendars.
+  it('renders empty stages compactly without placeholder body (#112)', async () => {
+    await writeSidecar(root, makeEntry({ uuid: UUID_IDEA, currentStage: 'Ideas' }));
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    // Empty stages get the er-section--empty marker class.
+    expect(r.html).toMatch(/er-section--empty/);
+    // Empty stages should NOT carry the legacy multi-line placeholder body.
+    expect(r.html).not.toMatch(
+      /er-section--empty[\s\S]*?<div class="er-empty"[\s\S]*?Run \/deskwork:add/,
+    );
+  });
+
+  // #117: status badges are wrapped in an anchor pointing at the
+  // entry's review surface — clicking the dashed-border stamp now
+  // navigates instead of being inert decoration.
+  it('wraps the reviewState badge in a link to the review surface (#117)', async () => {
+    await writeSidecar(
+      root,
+      makeEntry({
+        uuid: UUID_DRAFTING,
+        currentStage: 'Drafting',
+        reviewState: 'in-review',
+      }),
+    );
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    expect(r.html).toMatch(
+      new RegExp(
+        `<a href="/dev/editorial-review/${UUID_DRAFTING}"[^>]*class="er-stamp-link"[^>]*><span class="er-stamp er-stamp-in-review"`,
+      ),
+    );
+  });
 });

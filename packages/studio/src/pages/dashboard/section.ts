@@ -71,10 +71,12 @@ export function renderRow(entry: Entry, index: number): RawHtml {
           <span class="er-calendar-title">${entry.title}</span>
           <span class="er-calendar-meta er-calendar-meta-iteration"
             data-iteration="${iteration}">iteration: ${iteration}</span>
-          <span class="er-calendar-meta er-calendar-meta-updated"
-            title="${entry.updatedAt}">${formatDate(entry.updatedAt)}</span>
+          <time class="er-calendar-meta er-calendar-meta-updated" data-format="date"
+            datetime="${entry.updatedAt}" title="${entry.updatedAt}">${formatDate(entry.updatedAt)}</time>
         </div>
-        <span class="er-calendar-status">${renderReviewStateBadge(entry.reviewState)}</span>
+        <span class="er-calendar-status"><a href="${reviewLink}"
+          title="open the review surface for ${entry.slug}"
+          class="er-stamp-link">${renderReviewStateBadge(entry.reviewState)}</a></span>
         ${renderRowActions(entry)}
       </div>
     </div>`);
@@ -82,18 +84,29 @@ export function renderRow(entry: Entry, index: number): RawHtml {
 
 /**
  * Render one full stage section: heading + ornaments + count + rows.
- * Empty stages render the placeholder message — keeping the section
- * visible (rather than collapsing it) so the operator sees that the
- * stage exists and is currently empty.
+ *
+ * Empty stages render compact (just the heading, no placeholder body)
+ * — keeps the operator's sense of pipeline shape without padding the
+ * dashboard with multi-line empty placeholders for low-volume
+ * calendars (#112). The hover title still surfaces the stage's
+ * "what to run next" hint when the operator points at the heading.
  */
 export function renderStageSection(stage: Stage, entries: readonly Entry[]): RawHtml {
-  const body =
-    entries.length === 0
-      ? unsafe(html`<div class="er-empty" data-empty-stage="${stage}"
-          style="padding: 1rem 0.25rem; font-size: 0.95rem;">
-          ${STAGE_EMPTY_MESSAGES[stage]}
-        </div>`)
-      : unsafe(entries.map((e, i) => renderRow(e, i).__raw).join(''));
+  if (entries.length === 0) {
+    return unsafe(html`
+      <section class="er-section er-section--empty"
+        id="stage-${stage.toLowerCase()}" data-stage-section="${stage}"
+        data-empty-stage="${stage}">
+        <h2 class="er-section-head er-section-head--empty"
+          title="${STAGE_EMPTY_MESSAGES[stage]}">
+          <span>${stage}</span>
+          <span class="ornament">${STAGE_ORNAMENTS[stage]}</span>
+          <span class="count">№ 00</span>
+        </h2>
+      </section>`);
+  }
+
+  const body = unsafe(entries.map((e, i) => renderRow(e, i).__raw).join(''));
 
   return unsafe(html`
     <section class="er-section" id="stage-${stage.toLowerCase()}" data-stage-section="${stage}">

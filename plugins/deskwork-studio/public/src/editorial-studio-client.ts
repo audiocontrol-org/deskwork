@@ -479,6 +479,27 @@ function initStartShortformButtons(): void {
     });
 }
 
+/**
+ * #109: render `<time data-format="date">` elements in the operator's
+ * locale instead of the server's UTC date slice. Falls back silently
+ * if `datetime` is missing or unparseable — the server-emitted UTC
+ * slice stays as the visible text.
+ */
+function initLocaleDates(): void {
+  const fmt = new Intl.DateTimeFormat(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+  });
+  document.querySelectorAll<HTMLTimeElement>('time[data-format="date"]').forEach((t) => {
+    const iso = t.dateTime || t.getAttribute('datetime');
+    if (!iso) return;
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return;
+    t.textContent = fmt.format(d);
+  });
+}
+
 function init(): void {
   initCopyButtons();
   initScaffoldButtons();
@@ -490,6 +511,7 @@ function init(): void {
   initPolling();
   initIntakeForm();
   initRenameForms();
+  initLocaleDates();
 }
 
 init();
