@@ -20,8 +20,21 @@ import {
 } from '@deskwork/core/review/handlers';
 import { handleStartShortform } from '@deskwork/core/review/start-handlers';
 import { renderMarkdownToHtml } from '@deskwork/core/review/render';
+import { approveEntryStage } from '@deskwork/core/entry/approve';
+import { blockEntry } from '@deskwork/core/entry/block';
+import { cancelEntry } from '@deskwork/core/entry/cancel';
+import { inductEntry } from '@deskwork/core/entry/induct';
+import type { Stage } from '@deskwork/core/schema/entry';
 import type { DeskworkConfig } from '@deskwork/core/config';
 import type { OverrideResolver } from '@deskwork/core/overrides';
+
+const VALID_STAGES = new Set<Stage>([
+  'Ideas', 'Planned', 'Outlining', 'Drafting', 'Final', 'Published',
+]);
+
+function isStage(value: unknown): value is Stage {
+  return typeof value === 'string' && VALID_STAGES.has(value as Stage);
+}
 
 /**
  * Narrow a `HandlerResult.body` (typed as `unknown`) to extract the
@@ -202,6 +215,83 @@ export function createApiRouter(ctx: StudioContext): Hono {
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       return c.json({ error: `render failed: ${reason}` }, 500);
+    }
+  });
+
+  // Phase 30 entry-stage actions (#146).
+  // POST /api/dev/editorial-review/entry/:entryId/approve  → Ideas → Planned, etc.
+  // POST /api/dev/editorial-review/entry/:entryId/block    → currentStage → Blocked
+  // POST /api/dev/editorial-review/entry/:entryId/cancel   → currentStage → Cancelled
+  // POST /api/dev/editorial-review/entry/:entryId/induct   → teleport to body.targetStage
+
+  app.post('/entry/:entryId/approve', async (c) => {
+    const entryId = c.req.param('entryId');
+    try {
+      const r = await approveEntryStage(ctx.projectRoot, { uuid: entryId });
+      return c.json(r);
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+    }
+  });
+
+  app.post('/entry/:entryId/block', async (c) => {
+    const entryId = c.req.param('entryId');
+    let body: { reason?: string } = {};
+    try {
+      const parsed = await c.req.json().catch(() => ({}));
+      if (parsed && typeof parsed === 'object' && typeof (parsed as { reason?: unknown }).reason === 'string') {
+        body = { reason: (parsed as { reason: string }).reason };
+      }
+    } catch {
+      // body optional
+    }
+    try {
+      const r = await blockEntry(ctx.projectRoot, { uuid: entryId, ...body });
+      return c.json(r);
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+    }
+  });
+
+  app.post('/entry/:entryId/cancel', async (c) => {
+    const entryId = c.req.param('entryId');
+    let body: { reason?: string } = {};
+    try {
+      const parsed = await c.req.json().catch(() => ({}));
+      if (parsed && typeof parsed === 'object' && typeof (parsed as { reason?: unknown }).reason === 'string') {
+        body = { reason: (parsed as { reason: string }).reason };
+      }
+    } catch {
+      // body optional
+    }
+    try {
+      const r = await cancelEntry(ctx.projectRoot, { uuid: entryId, ...body });
+      return c.json(r);
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+    }
+  });
+
+  app.post('/entry/:entryId/induct', async (c) => {
+    const entryId = c.req.param('entryId');
+    let parsed: unknown;
+    try {
+      parsed = await c.req.json();
+    } catch {
+      return c.json({ error: 'invalid JSON body' }, 400);
+    }
+    if (!parsed || typeof parsed !== 'object') {
+      return c.json({ error: 'expected JSON object body' }, 400);
+    }
+    const targetStage = (parsed as { targetStage?: unknown }).targetStage;
+    if (!isStage(targetStage)) {
+      return c.json({ error: 'targetStage must be one of Ideas|Planned|Outlining|Drafting|Final|Published' }, 400);
+    }
+    try {
+      const r = await inductEntry(ctx.projectRoot, { uuid: entryId, targetStage });
+      return c.json(r);
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
     }
   });
 

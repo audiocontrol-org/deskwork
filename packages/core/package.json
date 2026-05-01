@@ -92,6 +92,22 @@
       "types": "./dist/iterate/iterate.d.ts",
       "default": "./dist/iterate/iterate.js"
     },
+    "./entry/approve": {
+      "types": "./dist/entry/approve.d.ts",
+      "default": "./dist/entry/approve.js"
+    },
+    "./entry/block": {
+      "types": "./dist/entry/block.d.ts",
+      "default": "./dist/entry/block.js"
+    },
+    "./entry/cancel": {
+      "types": "./dist/entry/cancel.d.ts",
+      "default": "./dist/entry/cancel.js"
+    },
+    "./entry/induct": {
+      "types": "./dist/entry/induct.d.ts",
+      "default": "./dist/entry/induct.js"
+    },
     "./journal": {
       "types": "./dist/journal.d.ts",
       "default": "./dist/journal.js"
