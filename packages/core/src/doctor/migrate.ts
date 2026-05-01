@@ -1,4 +1,4 @@
-import { readFile, writeFile, access } from 'node:fs/promises';
+import { readFile, writeFile, access, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { extractEntriesForMigration } from '../calendar/parse.ts';
 import { writeSidecar } from '../sidecar/write.ts';
@@ -7,6 +7,43 @@ import { appendJournalEvent } from '../journal/append.ts';
 import { readJournalEvents } from '../journal/read.ts';
 import type { Entry, Stage, ReviewState } from '../schema/entry.ts';
 import type { JournalEvent } from '../schema/journal-events.ts';
+
+interface IngestRecord {
+  readonly entryId?: string;
+  readonly sourceFile?: string;
+}
+
+/**
+ * Read .deskwork/review-journal/ingest/*.json and return the sourceFile
+ * for the record whose entryId matches. Used by migration to populate
+ * Entry.artifactPath from the legacy data instead of deriving from the
+ * slug+stage heuristic (#140).
+ */
+async function findIngestSourceFile(
+  projectRoot: string,
+  entryId: string,
+): Promise<string | undefined> {
+  const dir = join(projectRoot, '.deskwork', 'review-journal', 'ingest');
+  let files: string[];
+  try {
+    files = await readdir(dir);
+  } catch {
+    return undefined;
+  }
+  for (const f of files) {
+    if (!f.endsWith('.json')) continue;
+    let rec: IngestRecord;
+    try {
+      rec = JSON.parse(await readFile(join(dir, f), 'utf8')) as IngestRecord;
+    } catch {
+      continue;
+    }
+    if (rec.entryId === entryId && typeof rec.sourceFile === 'string') {
+      return rec.sourceFile;
+    }
+  }
+  return undefined;
+}
 
 interface MigrateOptions {
   dryRun: boolean;
@@ -56,6 +93,11 @@ export async function migrateCalendar(
     const reviewState = latestReviewStateFromJournal(events);
     const description = src.description !== '' ? src.description : undefined;
 
+    // #140: prefer the actual on-disk path recorded in the ingest journal.
+    // Without this, doctor's file-presence validator derives a slug+stage
+    // path that misses entries laid out under custom directories.
+    const artifactPath = await findIngestSourceFile(projectRoot, src.uuid);
+
     // Build entry with conditional spread to satisfy exactOptionalPropertyTypes.
     const entry: Entry = {
       uuid: src.uuid,
@@ -70,6 +112,7 @@ export async function migrateCalendar(
       ...(description !== undefined && { description }),
       ...(priorStage !== undefined && { priorStage }),
       ...(reviewState !== undefined && { reviewState }),
+      ...(artifactPath !== undefined && { artifactPath }),
     };
     sidecars.push(entry);
   }

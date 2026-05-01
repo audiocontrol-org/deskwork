@@ -90,6 +90,68 @@ describe('migrateCalendar', () => {
     } finally { await rm(projectRoot, { recursive: true, force: true }); }
   });
 
+  it('reads sourceFile from ingest journal and writes artifactPath on the sidecar (#140)', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'dw-test-'));
+    try {
+      await mkdir(join(projectRoot, '.deskwork', 'review-journal', 'ingest'), { recursive: true });
+      await writeFile(join(projectRoot, '.deskwork', 'calendar.md'),
+        `# Editorial Calendar
+
+## Drafting
+| UUID | Slug | Title | Description | Keywords | Source |
+|------|------|------|------|------|------|
+| 11111111-1111-1111-1111-111111111111 | foo | Foo |  | kw | manual |
+`);
+      // Legacy ingest journal records the actual on-disk path.
+      await writeFile(
+        join(projectRoot, '.deskwork', 'review-journal', 'ingest', '2026-01-01T00-00-00-000Z-foo.json'),
+        JSON.stringify({
+          id: '11111111-1111-1111-1111-111111111111',
+          timestamp: '2026-01-01T00:00:00.000Z',
+          event: 'ingest',
+          slug: 'foo',
+          entryId: '11111111-1111-1111-1111-111111111111',
+          site: 'main',
+          stage: 'Drafting',
+          sourceFile: 'docs/1.0/foo.md',
+          frontmatterSnapshot: {},
+          derivation: { slug: 'path', state: 'default', date: 'mtime' },
+        }),
+      );
+
+      await migrateCalendar(projectRoot, { dryRun: false });
+
+      const sidecarBody = await readFile(
+        join(projectRoot, '.deskwork', 'entries', '11111111-1111-1111-1111-111111111111.json'),
+        'utf8',
+      );
+      const sidecar: { artifactPath?: string } = JSON.parse(sidecarBody);
+      expect(sidecar.artifactPath).toBe('docs/1.0/foo.md');
+    } finally { await rm(projectRoot, { recursive: true, force: true }); }
+  });
+
+  it('omits artifactPath when no ingest journal entry references the entry', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'dw-test-'));
+    try {
+      await mkdir(join(projectRoot, '.deskwork'), { recursive: true });
+      await writeFile(join(projectRoot, '.deskwork', 'calendar.md'),
+        `# Editorial Calendar
+
+## Drafting
+| UUID | Slug | Title | Description | Keywords | Source |
+|------|------|------|------|------|------|
+| 22222222-2222-2222-2222-222222222222 | bar | Bar |  | kw | manual |
+`);
+      await migrateCalendar(projectRoot, { dryRun: false });
+      const sidecarBody = await readFile(
+        join(projectRoot, '.deskwork', 'entries', '22222222-2222-2222-2222-222222222222.json'),
+        'utf8',
+      );
+      const sidecar: { artifactPath?: string } = JSON.parse(sidecarBody);
+      expect(sidecar.artifactPath).toBeUndefined();
+    } finally { await rm(projectRoot, { recursive: true, force: true }); }
+  });
+
   it('does not write when dryRun is true', async () => {
     const projectRoot = await mkdtemp(join(tmpdir(), 'dw-test-'));
     try {
