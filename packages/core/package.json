@@ -64,6 +64,14 @@
       "types": "./dist/doctor/migrate.d.ts",
       "default": "./dist/doctor/migrate.js"
     },
+    "./doctor/validate": {
+      "types": "./dist/doctor/validate.d.ts",
+      "default": "./dist/doctor/validate.js"
+    },
+    "./doctor/repair": {
+      "types": "./dist/doctor/repair.d.ts",
+      "default": "./dist/doctor/repair.js"
+    },
     "./frontmatter": {
       "types": "./dist/frontmatter.d.ts",
       "default": "./dist/frontmatter.js"

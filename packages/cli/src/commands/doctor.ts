@@ -56,6 +56,8 @@ import {
   type RepairResult,
   type SkipReason,
 } from '@deskwork/core/doctor';
+import { validateAll } from '@deskwork/core/doctor/validate';
+import { repairAll } from '@deskwork/core/doctor/repair';
 import { maybeMigrate } from './doctor-migrate-gate.ts';
 
 const KNOWN_FLAGS = ['site', 'fix'] as const;
@@ -127,6 +129,7 @@ export async function run(argv: string[]): Promise<void> {
   };
 
   let report: DoctorReport;
+  let legacyExitCode: number;
 
   if (!repairMode) {
     // Audit-only — interaction is unused but the type insists on a
@@ -134,35 +137,67 @@ export async function run(argv: string[]): Promise<void> {
     // in this mode).
     report = await runAudit(opts, yesInteraction);
     emitReport(report, { json, repairMode: false });
-    process.exit(report.findings.length === 0 ? 0 : 1);
+    legacyExitCode = report.findings.length === 0 ? 0 : 1;
+  } else {
+    if (yes) {
+      report = await runRepair(opts, yesInteraction);
+    } else {
+      const adapter = interactiveAdapter();
+      try {
+        report = await runRepair(opts, adapter.interaction);
+      } finally {
+        adapter.close();
+      }
+    }
+    emitReport(report, { json, repairMode: true });
+
+    // Exit-code logic (Issue #44):
+    //   - applied → success.
+    //   - skipped because the prerequisite isn't met (e.g. no body file
+    //     yet for missing-frontmatter-id) → success. The operator's
+    //     next action is `/deskwork:outline`, not "look at doctor."
+    //   - skipped because the operator chose "leave as-is" on an orphan
+    //     prompt → success. The operator made a choice; respect it.
+    //   - everything else (ambiguous, schema-rejected, editorial-
+    //     decision, operator-declined, apply-failed) → exit 1. These
+    //     are real follow-ups doctor can't auto-resolve.
+    const realFollowUps = report.repairs.filter(
+      (r) => !r.applied && !isExpectedSkip(r.skipReason),
+    ).length;
+    legacyExitCode = realFollowUps === 0 ? 0 : 1;
   }
 
-  if (yes) {
-    report = await runRepair(opts, yesInteraction);
-  } else {
-    const adapter = interactiveAdapter();
-    try {
-      report = await runRepair(opts, adapter.interaction);
-    } finally {
-      adapter.close();
+  // Phase 30 (Task 32): entry-centric validation pass. Runs after the
+  // legacy rule-based audit/repair so both schemas are covered during
+  // the migration window. Output is appended to the existing stream;
+  // exit code is the OR of legacy + new failures.
+  const newValidation = await validateAll(projectRoot);
+  if (newValidation.failures.length > 0) {
+    process.stderr.write(
+      `\nEntry-centric validation: ${newValidation.failures.length} failure(s)\n`,
+    );
+    for (const f of newValidation.failures) {
+      const loc = f.path !== undefined ? ` (${f.path})` : '';
+      const eid = f.entryId !== undefined ? ` [entry=${f.entryId}]` : '';
+      process.stderr.write(`  ${f.category}${eid}: ${f.message}${loc}\n`);
     }
   }
-  emitReport(report, { json, repairMode: true });
 
-  // Exit-code logic (Issue #44):
-  //   - applied → success.
-  //   - skipped because the prerequisite isn't met (e.g. no body file
-  //     yet for missing-frontmatter-id) → success. The operator's
-  //     next action is `/deskwork:outline`, not "look at doctor."
-  //   - skipped because the operator chose "leave as-is" on an orphan
-  //     prompt → success. The operator made a choice; respect it.
-  //   - everything else (ambiguous, schema-rejected, editorial-
-  //     decision, operator-declined, apply-failed) → exit 1. These
-  //     are real follow-ups doctor can't auto-resolve.
-  const realFollowUps = report.repairs.filter(
-    (r) => !r.applied && !isExpectedSkip(r.skipReason),
-  ).length;
-  process.exit(realFollowUps === 0 ? 0 : 1);
+  if (repairMode) {
+    const newRepair = await repairAll(projectRoot, { destructive: false });
+    for (const a of newRepair.applied) {
+      process.stdout.write(`Entry-centric repair applied: ${a}\n`);
+    }
+    for (const p of newRepair.pendingDestructive) {
+      process.stdout.write(
+        `Entry-centric repair pending (destructive — re-run with explicit confirmation): ${p}\n`,
+      );
+    }
+  }
+
+  const newFailureCount = newValidation.failures.length;
+  const exitCode = legacyExitCode === 0 && newFailureCount === 0 ? 0 : 1;
+  process.exit(exitCode);
 }
 
 /**
