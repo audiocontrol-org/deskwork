@@ -1,6 +1,6 @@
-import { readdir, readFile } from 'node:fs/promises';
+import { readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { EntrySchema } from '../schema/entry.ts';
+import { EntrySchema, type Entry, type Stage } from '../schema/entry.ts';
 import { extractEntriesForMigration } from '../calendar/parse.ts';
 
 export interface ValidationFailure {
@@ -102,12 +102,128 @@ async function validateCalendarSidecar(projectRoot: string): Promise<ValidationF
   return failures;
 }
 
+interface LoadedSidecar {
+  filename: string;
+  path: string;
+  entry: Entry;
+}
+
+async function loadSidecars(projectRoot: string): Promise<LoadedSidecar[]> {
+  const dir = join(projectRoot, '.deskwork', 'entries');
+  let names: string[] = [];
+  try {
+    names = await readdir(dir);
+  } catch {
+    return [];
+  }
+  const out: LoadedSidecar[] = [];
+  for (const name of names.filter((n) => n.endsWith('.json'))) {
+    const path = join(dir, name);
+    const raw = await readFile(path, 'utf8');
+    let json: unknown;
+    try {
+      json = JSON.parse(raw);
+    } catch {
+      continue;
+    }
+    const result = EntrySchema.safeParse(json);
+    if (!result.success) continue;
+    out.push({ filename: name, path, entry: result.data });
+  }
+  return out;
+}
+
+/**
+ * Stage-conventional artifact path. Returns null when a stage does not have a
+ * primary on-disk artifact (e.g. Blocked / Cancelled).
+ *
+ * Note: Published shares the Drafting/Final path (`docs/<slug>/index.md`).
+ */
+function artifactPathForStage(projectRoot: string, slug: string, stage: Stage): string | null {
+  switch (stage) {
+    case 'Ideas':
+      return join(projectRoot, 'docs', slug, 'scrapbook', 'idea.md');
+    case 'Planned':
+      return join(projectRoot, 'docs', slug, 'scrapbook', 'plan.md');
+    case 'Outlining':
+      return join(projectRoot, 'docs', slug, 'scrapbook', 'outline.md');
+    case 'Drafting':
+    case 'Final':
+    case 'Published':
+      return join(projectRoot, 'docs', slug, 'index.md');
+    case 'Blocked':
+    case 'Cancelled':
+      return null;
+  }
+}
+
+/**
+ * Minimal frontmatter `deskwork.stage` extractor.
+ *
+ * The plugin's frontmatter is YAML-ish, but for the validator's narrow purpose
+ * (read `deskwork.stage`) a regex avoids pulling a full YAML parser into the
+ * validator codepath. We match the `deskwork:` block and find a `stage:` line
+ * inside it, accepting any indentation.
+ */
+function extractDeskworkStage(markdown: string): string | undefined {
+  const fmMatch = markdown.match(/^---\n([\s\S]*?)\n---/);
+  if (!fmMatch) return undefined;
+  const fm = fmMatch[1];
+  // Find the line `deskwork:` (the block opener) and then any subsequent
+  // indented child line of the form `  stage: <value>` before either the next
+  // unindented line or end-of-frontmatter.
+  const lines = fm.split('\n');
+  let inBlock = false;
+  for (const line of lines) {
+    if (!inBlock) {
+      if (/^deskwork:\s*$/.test(line)) inBlock = true;
+      continue;
+    }
+    // Exit the block when we hit a non-indented, non-empty line.
+    if (line.length > 0 && !/^\s/.test(line)) break;
+    const m = line.match(/^\s+stage:\s*([^\s#]+)/);
+    if (m) return m[1];
+  }
+  return undefined;
+}
+
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function validateFrontmatterSidecar(projectRoot: string): Promise<ValidationFailure[]> {
+  const failures: ValidationFailure[] = [];
+  const sidecars = await loadSidecars(projectRoot);
+  for (const { entry, path: sidecarPath } of sidecars) {
+    const artifactPath = artifactPathForStage(projectRoot, entry.slug, entry.currentStage);
+    if (!artifactPath) continue;
+    if (!(await fileExists(artifactPath))) continue; // file-presence handles missing artifacts
+    const md = await readFile(artifactPath, 'utf8');
+    const fmStage = extractDeskworkStage(md);
+    if (fmStage === undefined) continue;
+    if (fmStage !== entry.currentStage) {
+      failures.push({
+        category: 'frontmatter-sidecar',
+        message: `frontmatter deskwork.stage=${fmStage} at ${artifactPath} does not match sidecar currentStage=${entry.currentStage}`,
+        entryId: entry.uuid,
+        path: sidecarPath,
+      });
+    }
+  }
+  return failures;
+}
+
 export async function validateAll(projectRoot: string): Promise<ValidationResult> {
   const failures: ValidationFailure[] = [];
   failures.push(...(await validateSchema(projectRoot)));
   failures.push(...(await validateCalendarSidecar(projectRoot)));
-  // Tasks 25-30 add: validateFrontmatterSidecar, validateJournalSidecar,
-  // validateIterationHistory, validateFilePresence, validateStageInvariants,
-  // validateCrossEntry.
+  failures.push(...(await validateFrontmatterSidecar(projectRoot)));
+  // Tasks 26-30 add: validateJournalSidecar, validateIterationHistory,
+  // validateFilePresence, validateStageInvariants, validateCrossEntry.
   return { failures };
 }
