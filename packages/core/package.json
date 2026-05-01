@@ -144,6 +144,10 @@
       "types": "./dist/scaffold.d.ts",
       "default": "./dist/scaffold.js"
     },
+    "./schema/entry": {
+      "types": "./dist/schema/entry.d.ts",
+      "default": "./dist/schema/entry.js"
+    },
     "./scrapbook": {
       "types": "./dist/scrapbook.d.ts",
       "default": "./dist/scrapbook.js"
