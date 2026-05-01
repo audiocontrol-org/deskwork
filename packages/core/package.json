@@ -112,6 +112,10 @@
       "types": "./dist/entry/induct.d.ts",
       "default": "./dist/entry/induct.js"
     },
+    "./entry/publish": {
+      "types": "./dist/entry/publish.d.ts",
+      "default": "./dist/entry/publish.js"
+    },
     "./journal": {
       "types": "./dist/journal.d.ts",
       "default": "./dist/journal.js"
