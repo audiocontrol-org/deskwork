@@ -1,3 +1,37 @@
+## Migrating to v0.12.0 (post-v0.11.1 dogfood fixes)
+
+v0.12.0 is a corrective release that fixes a cluster of issues surfaced by dogfooding v0.11.1's entry-centric redesign on real calendars. **No breaking changes**; everything below is upgrade housekeeping.
+
+### TL;DR
+
+- After upgrading, re-run `deskwork doctor --fix=all` (or wipe `.deskwork/entries/` and re-run; both work). The migration now reads the legacy ingest journal's `sourceFile` into a new `Entry.artifactPath` field, and pulls iteration counts + review state from the legacy pipeline-workflow records instead of leaving them empty.
+- The studio's per-entry review surface (`/dev/editorial-review/<entry-uuid>`) now exposes the entry-stage universal verbs — Approve, Block, Cancel, Induct — as buttons that POST to `/api/dev/editorial-review/entry/<uuid>/<action>`. Previously the URL fell through to the legacy workflow renderer with no entry-stage actions.
+- The CLI's `deskwork --help` now matches the Phase 30 verb structure: retired verbs are no longer listed in the active surface; the new universal verbs (`block`, `cancel`, `induct`, `status`) are flagged as skill-only.
+- The 9 retired-verb source files are deleted from the CLI tree. The retirement gate at `commands/retired.ts` still prints the migration message for any operator who tries them.
+- `scripts/repair-install.sh` no longer enumerates plugin versions from `$PATH`, and filters registry walks by `scope`/`projectPath` so other-project installs don't bleed into the current cwd.
+- A local dev workflow lands: `npm run dev --workspace @deskwork/studio` boots the studio with Vite-mounted-in-Hono and HMR. See `packages/studio/README.md#local-development`.
+
+### Adopter actions
+
+After upgrading the marketplace install:
+
+```bash
+deskwork doctor --fix=all
+```
+
+Doctor walks the legacy `.deskwork/review-journal/ingest/*.json` and `pipeline/*.json` records and patches entry sidecars in-place. If the migration found stale ingest paths (the source file was moved after ingest), doctor reports a `file-presence` failure with the recorded path — update either the file location or the sidecar's `artifactPath` field.
+
+### Issues closed in v0.12.0
+
+- [#137](https://github.com/audiocontrol-org/deskwork/issues/137) — `repair-install.sh` re-restored orphan caches when PATH was stale.
+- [#138](https://github.com/audiocontrol-org/deskwork/issues/138) — `repair-install.sh` restored project-scope entries from other projects.
+- [#139](https://github.com/audiocontrol-org/deskwork/issues/139) — `deskwork --help` listed retired verbs, omitted universals.
+- [#140](https://github.com/audiocontrol-org/deskwork/issues/140) — Migration derived sidecar paths from a slug heuristic, ignoring real path in ingest journal.
+- [#141](https://github.com/audiocontrol-org/deskwork/issues/141) — Migration didn't carry over review-workflow state.
+- [#146](https://github.com/audiocontrol-org/deskwork/issues/146) — Studio per-entry review surface used the legacy renderer; no entry-stage actions.
+
+---
+
 ## Migrating to v0.11.0 (entry-centric pipeline redesign)
 
 > **Version note:** `v0.11.0` is a placeholder used throughout this section. The actual release version is set at tag time — check the [GitHub releases page](https://github.com/audiocontrol-org/deskwork/releases) for the canonical version string and substitute it where you see `v0.11.0` below.
