@@ -256,13 +256,56 @@ async function validateJournalSidecar(projectRoot: string): Promise<ValidationFa
   return failures;
 }
 
+async function validateIterationHistory(projectRoot: string): Promise<ValidationFailure[]> {
+  const failures: ValidationFailure[] = [];
+  const sidecars = await loadSidecars(projectRoot);
+  for (const { entry, path } of sidecars) {
+    const stages = Object.keys(entry.iterationByStage);
+    // Migration tolerance: a sidecar with no recorded iteration counts is
+    // exempt from journal-vs-sidecar checks (legacy history may exist in the
+    // journal that simply hasn't been backfilled into iterationByStage).
+    if (stages.length === 0) continue;
+
+    const events = await readJournalEvents(projectRoot, {
+      entryId: entry.uuid,
+      kinds: ['iteration'],
+    });
+
+    // Count iterations per stage in the journal.
+    const journalCount: Record<string, number> = {};
+    for (const e of events) {
+      if (e.kind !== 'iteration') continue;
+      journalCount[e.stage] = (journalCount[e.stage] ?? 0) + 1;
+    }
+
+    // Compare sidecar counts to journal counts for every stage we know about
+    // (union of sidecar-recorded stages and journal-witnessed stages).
+    const allStages = new Set<string>([...stages, ...Object.keys(journalCount)]);
+    for (const stage of allStages) {
+      const sidecarN = entry.iterationByStage[stage as Stage] ?? 0;
+      const journalN = journalCount[stage] ?? 0;
+      if (sidecarN === 0) continue; // migration tolerance: only flag stages the sidecar tracks
+      if (sidecarN !== journalN) {
+        failures.push({
+          category: 'iteration-history',
+          message: `iterationByStage[${stage}]=${sidecarN} but journal has ${journalN} iteration event(s) for that stage`,
+          entryId: entry.uuid,
+          path,
+        });
+      }
+    }
+  }
+  return failures;
+}
+
 export async function validateAll(projectRoot: string): Promise<ValidationResult> {
   const failures: ValidationFailure[] = [];
   failures.push(...(await validateSchema(projectRoot)));
   failures.push(...(await validateCalendarSidecar(projectRoot)));
   failures.push(...(await validateFrontmatterSidecar(projectRoot)));
   failures.push(...(await validateJournalSidecar(projectRoot)));
-  // Tasks 27-30 add: validateIterationHistory, validateFilePresence,
-  // validateStageInvariants, validateCrossEntry.
+  failures.push(...(await validateIterationHistory(projectRoot)));
+  // Tasks 28-30 add: validateFilePresence, validateStageInvariants,
+  // validateCrossEntry.
   return { failures };
 }
