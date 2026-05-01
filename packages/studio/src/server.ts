@@ -43,6 +43,7 @@ import { createScrapbookMutationsRouter } from './routes/scrapbook-mutations.ts'
 import { buildClientAssets } from './build-client-assets.ts';
 import { renderDashboard } from './pages/dashboard.ts';
 import { renderReviewPage, type ReviewLookup } from './pages/review.ts';
+import { renderEntryReviewPage } from './pages/entry-review.ts';
 import { renderShortformPage } from './pages/shortform.ts';
 import { renderHelpPage } from './pages/help.ts';
 import { renderScrapbookPage } from './pages/scrapbook.ts';
@@ -315,9 +316,31 @@ export function createApp(ctx: StudioContext): Hono {
   app.get('/dev/editorial-review-shortform', (c) =>
     c.html(renderShortformPage(ctx)),
   );
+  // Pipeline-redesign Task 35: entry-uuid keyed review surface. The
+  // path `/dev/editorial-review/entry/<uuid>` distinguishes this sibling
+  // route from the legacy workflow-uuid + calendar-entry routes below.
+  // The handler resolves the uuid to a sidecar via `resolveEntry()` and
+  // renders the eight-stage entry view with stage-aware affordances.
+  // Registered FIRST so the literal "entry" segment is matched before
+  // the slug catch-all below has a chance to swallow it.
+  app.get(
+    '/dev/editorial-review/entry/:entryId{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}',
+    async (c) => {
+      const entryId = c.req.param('entryId');
+      const result = await renderEntryReviewPage(ctx.projectRoot, entryId);
+      return c.html(result.html, result.status);
+    },
+  );
   // Phase 19d: id-based canonical review URL. Strict UUID-shape regex
   // matched FIRST so it wins over the legacy `:slug{.+}` route below.
   // Hono evaluates routes in registration order; first match wins.
+  //
+  // DEPRECATED (pipeline-redesign Task 35): this route is workflow-uuid
+  // + calendar-entry keyed; the entry-centric replacement lives at
+  // `/dev/editorial-review/entry/<uuid>` (registered above). Both
+  // coexist during the migration window; this route is removed once
+  // every dashboard surface and operator skill points at the entry
+  // route.
   //
   // Phase 21c added a workflow-id branch: the dashboard's shortform
   // matrix (and any other surface that knows a workflow id) deep-links
