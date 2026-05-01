@@ -102,10 +102,11 @@ describe('manual + dashboard — canonical /deskwork:* slash names (#104, #69)',
     expect(r.html).not.toMatch(/\/editorial-approve\b/);
 
     // Positive: canonical /deskwork:* names DO appear.
+    // Pipeline-redesign Phase 4 retired plan/outline/draft/review-start
+    // and Phase 6 rewrote the Manual to feature universal verbs (iterate,
+    // approve, induct, block, cancel, status). This assertion targets the
+    // verbs that survive the redesign and remain canonical.
     expect(r.html).toContain('/deskwork:add');
-    expect(r.html).toContain('/deskwork:plan');
-    expect(r.html).toContain('/deskwork:draft');
-    expect(r.html).toContain('/deskwork:review-start');
     expect(r.html).toContain('/deskwork:iterate');
     expect(r.html).toContain('/deskwork:approve');
     expect(r.html).toContain('/deskwork:publish');
