@@ -4,6 +4,92 @@ Session journal for `deskwork`. Each entry records what was tried, what worked, 
 
 ---
 
+## 2026-05-01: Phase 31 — local dev workflow + post-v0.11.1 dogfood fixes shipped as v0.12.0 (single session, brainstorm → plan → inline execute → release)
+
+### Feature: deskwork-plugin
+### Worktree: deskwork-plugin
+
+**Goal:** Dogfood the freshly-shipped v0.11.1, file the friction, fix the highest-leverage cluster, plus build a real local dev workflow so we stop publishing to test changes. Operator framing: *"I want to try the latest version of the plugin locally to see what works and what's broken"* → escalated to a 35-task plan after the dogfood surfaced 9 issues.
+
+**Accomplished:**
+
+- **Dogfood walk against v0.11.1**, ran via the marketplace install path (no privileged shortcuts). Surfaced and filed [#137](https://github.com/audiocontrol-org/deskwork/issues/137)–[#146](https://github.com/audiocontrol-org/deskwork/issues/146): repair-install PATH-source bug, repair-install cross-project leak, CLI `--help` out-of-sync with Phase 30, migration derives sidecar paths from heuristic, migration drops workflow state, pipeline-stages-vs-internal-feature-docs design question, three studio routing 404s, and the per-entry review surface still rendering legacy workflow state (`applied`).
+
+- **`/superpowers:brainstorming` → spec → plan → inline execute → `/release`** in one continuous session. Spec at `docs/superpowers/specs/2026-04-30-v0.12-dev-workflow-and-fixes-design.md`. Plan at `docs/superpowers/plans/2026-04-30-v0.12-dev-workflow-and-fixes.md` (35 tasks across 6 phases).
+
+- **Phase 0 — Local dev workflow (Vite middleware in Hono):** added `vite ^5.4.0` devDep + `dev` script (`DESKWORK_DEV=1 tsx --watch src/server.ts --project-root ../..`); branched `server.ts` on `DESKWORK_DEV=1`; built a plain `http.Server` chaining Vite's middleware in front of `getRequestListener(app.fetch)` from `@hono/node-server`; new `clientScriptTag` + `viteClientTag` helpers; `layout.ts` consumes both — emits `<script src="/@vite/client">` plus `<script src="/src/<name>.ts">` in dev. Operator-driven correction: *"you should wire HMR. That's a must have in modern web development"* → added `viteClientTag()` to inject the HMR runtime so the browser auto-reloads on client-source edits. End-to-end smoke verified live: edit + save + browser reload, no publish cycle.
+
+- **Phase 1 — Migration data fixes (#140 + #141):** added `Entry.artifactPath` schema field. `migrateCalendar` now walks `.deskwork/review-journal/ingest/*.json` for `sourceFile` and `.deskwork/review-journal/pipeline/*.json` for legacy `currentVersion` + `state` (translates `applied`→`approved`, `iterating`→`iterating`, `open`→`in-review`). Doctor's `file-presence` validator and the studio's `entry-resolver` both consume `artifactPath` when present, fall back to slug+stage heuristic otherwise. New `getContentDir(projectRoot, site?)` helper in `@deskwork/core/config`; `iterate.ts` + `entry-resolver.ts` use it instead of hardcoded `'docs'`. `missing-frontmatter-id` SKIP_DIRS no longer excludes the entire `scrapbook/` tree; only `scrapbook/secret/` stays excluded via path-aware check. `iterate.ts` gained a same-disk-as-last-iteration guard. The iteration-history validator relaxed to fail only on `journalN > sidecarN` (real corruption); migrated counts where `sidecarN > journalN` is the legitimate post-#141 case.
+
+- **Live re-migration of this project's calendar.** Wiped `.deskwork/entries/`, ran `node_modules/.bin/deskwork doctor --fix=all`, all 4 sidecars regenerated. 3 had stale `sourceFile`s in the ingest journal (the docs were moved post-ingest); patched the artifactPaths manually to current locations. Post-fix `deskwork doctor` clean.
+
+- **Phase 2 — Studio per-entry review surface (#146):** new core helpers `approveEntryStage` / `blockEntry` / `cancelEntry` / `inductEntry` (each writes the new currentStage, records priorStage where appropriate, emits a stage-transition journal event). New POST endpoints `/api/dev/editorial-review/entry/:entryId/{approve,block,cancel,induct}`. New client at `plugins/deskwork-studio/public/src/entry-review-client.ts` wires the buttons. **Critical fix in `server.ts:351`:** `/dev/editorial-review/<uuid>` route now tries the entry surface first via `renderEntryReviewPage`, falls through to legacy renderer only when the UUID isn't an entry sidecar. End-to-end Ideas → Planned → Ideas verified live via the studio API.
+
+- **Phase 3 — CLI help + retired-verb cleanup (#139):** rewrote `printUsage()` along Phase 30's verb structure; deleted 9 retired-verb source files; `SUBCOMMANDS` shrunk 20 → 11. Retirement gate at `commands/retired.ts` still fires correctly.
+
+- **Phase 4 — repair-install fixes (#137 + #138):** `versions_referenced()` no longer reads `$PATH`; registry walk filtered by `scope`/`projectPath` in both `versions_referenced` and `prune_registry`. 4 fixture-driven bash tests via `spawnSync`.
+
+- **Phase 5 — Release v0.12.0:** extended `scripts/smoke-redesign.sh` with `--help` shape assertions; MIGRATING.md v0.12.0 entry; ran `/release` skill end-to-end. All 5 pauses cleared. Release page live at <https://github.com/audiocontrol-org/deskwork/releases/tag/v0.12.0>; `@deskwork/{core,cli,studio}@0.12.0` on npm.
+
+**Didn't Work:**
+
+- **First studio dev-mode boot 404'd `/src/<name>.ts`.** Vite was rooted at `public/src/`; my `clientScriptTag` emitted `/src/<name>.ts`. Vite serves URLs relative to `root`, so `/src/<name>.ts` looked for `public/src/src/<name>.ts`. Fix: moved Vite root to `public/`.
+
+- **Workspace symlink expectations were wrong.** Plan-Task-1's verification looked for `plugins/<plugin>/node_modules/@deskwork/<pkg>` — but npm-workspaces hoists everything to the workspace root's `node_modules/@deskwork/`. The bin shim's `find_workspace_bin()` already walks up and was working; the verification step needed adjustment.
+
+- **Re-migrating this project's calendar via the on-PATH `deskwork` invoked the cache-version, not my freshly-built one.** The bin shim's path-1 detection only fires when the plugin SHELL is inside the monorepo. Cache-based invocation always runs the registered cache version. Fix: invoke `node_modules/.bin/deskwork` directly to hit the workspace dist with the new code.
+
+- **Stale ingest-journal `sourceFile`s.** The migration faithfully reads `sourceFile` per the journal record, but several docs were moved post-ingest, so the recorded paths don't match current on-disk locations. The engineering fix is correct (read what the journal says); the data state is real-world friction surfaced as a doctor diagnostic. Patched 3 sidecars manually for this project.
+
+- **`migrate.test.ts`'s first edit silently failed.** The Edit tool's "must read first" requirement caught me; the edit didn't take, the existing iterate.test failures persisted. Re-read + re-applied. Cost ~10s. Same shape repeated on the MIGRATING.md edit during Phase 5.
+
+**Course Corrections:**
+
+- **[PROCESS] Don't pre-decide deferral; ask.** Initial framing offered "Approach 3: tsx --watch + esbuild --watch (no Vite) — minimum viable" with HMR-deferred-as-follow-up. Operator's correction: *"you should wire HMR. That's a must have in modern web development"* → escalated immediately. Lesson: when "minimum viable" means losing a default-expected affordance, flag the trade-off explicitly rather than pre-defaulting it out.
+
+- **[PROCESS] Plan-task verification steps need ground-truthing.** Plan Task 1's verification command didn't match how npm-workspaces actually lays out symlinks. Same shape as Phase 30's "file-path drift between plan and codebase" lesson. Lesson reinforced: include `cat <path>` / `ls <path>` ground-truth checks in plan-writing.
+
+- **[FABRICATION] *"applied" is not a valid Phase 30 review state.*** Operator caught me framing the studio's display of `applied` as authoritative when in fact `applied` isn't in Phase 30's `ReviewState` enum (`'in-review' | 'iterating' | 'approved'`). Lesson: when the operator says a value is wrong, check the schema, not the rendered output.
+
+- **[COMPLEXITY] Iteration-history validator: tightened only when migration revealed it was over-strict.** The validator originally failed when `sidecarN !== journalN` (any direction). Phase 30 migration sourced iteration counts from legacy pipeline records that never had per-event journal entries — so `sidecarN > journalN === 0` for every migrated entry was a false positive. Relaxed to fail only on `journalN > sidecarN` (the corruption direction).
+
+- **[PROCESS] Test fixtures need their own config.json setups now that helpers read it.** Adding `getContentDir(projectRoot)` to `iterate.ts` + `entry-resolver.ts` broke 7 existing tests. Lesson: when a helper grows a new disk dependency, sweep the test fixtures in the same task.
+
+**Quantitative:**
+
+- Messages from user: ~25 over the session.
+- Commits to feature branch: ~30 (since `ac5d2f0`).
+- Tasks completed: 35/35 plan tasks; brainstorm + spec + plan + execute + release all in one session.
+- Phases: 6 (Phase 0 dev workflow → Phase 5 release).
+- Issues filed during dogfood: 9 (#137–#145), plus #146 mid-session.
+- Issues closed in v0.12.0: 6 (#137, #138, #139, #140, #141, #146).
+- Tier C deferred: #142, #143, #144, #145, plus older #109/#110/#112.
+- Lines of code: ~1,500 net additions in src/, ~1,300 in test/, 9 retired source files deleted (~837 lines removed).
+- Test counts at release: core 442 / cli 153+29 skipped / studio 250+10 skipped / dw-lifecycle 68 — total ~915 passing.
+- npm publishes: 3 packages × v0.12.0, all clean (no abandoned versions like v0.11.0's zod-dep miss).
+- Course corrections: 5 (1 [PROCESS] HMR-as-stretch-goal, 1 [PROCESS] plan-paths, 1 [FABRICATION] applied-state, 1 [COMPLEXITY] validator strictness, 1 [PROCESS] test-fixture sweep).
+
+**Insights:**
+
+- **Brainstorm → spec → plan → execute → release in one session is sustainable.** Phase 30 proved subagent-driven works at 42 tasks; this proves inline-execution works at 35 tasks for a single-session arc that includes design, planning, AND release. Each phase landed in 1–2 hours of execution.
+
+- **Live re-migration as part of the release surfaces real-world friction the unit tests can't.** This project's calendar exercised stale `sourceFile`s — a data state no synthesized fixture would have. Pattern worth preserving: when a migration fix lands, ALSO run it against this project's real calendar before shipping.
+
+- **Vite middleware in Hono is cleaner than expected.** The integration is just `getRequestListener(app.fetch)` chained into `http.createServer((req, res) => vite.middlewares(req, res, () => honoListener(req, res)))`. HMR via `<script src="/@vite/client">` works for vanilla TS without any plugin config.
+
+- **`/release` skill's hard-pause shape is the right discipline.** Same skill that shipped v0.11.1 shipped v0.12.0 unchanged — well-trodden, just works.
+
+- **CLI --help drift is sneakily costly.** The operator running `deskwork --help` after Phase 30 saw retired verbs as if they were live. The runtime gate worked, but the discoverability gap meant operators hit the gate as failure-first instead of the new verbs as discovery. Worth a future check: `--help` parsed + diff-checked against a per-release expected listing.
+
+**Next session:**
+
+- **Tier C issues** ([#142](https://github.com/audiocontrol-org/deskwork/issues/142), [#143](https://github.com/audiocontrol-org/deskwork/issues/143), [#144](https://github.com/audiocontrol-org/deskwork/issues/144), [#145](https://github.com/audiocontrol-org/deskwork/issues/145)) plus older ([#109](https://github.com/audiocontrol-org/deskwork/issues/109), [#110](https://github.com/audiocontrol-org/deskwork/issues/110), [#112](https://github.com/audiocontrol-org/deskwork/issues/112)).
+- **Phase 29 (post-release acceptance playbook)** — now unblocked. The `/post-release:walk` skill could automate the dogfood walk we just did by hand.
+- **Bin-shim path resolution from cache vs. workspace** — when the bin is invoked via the cache path, the shim's path-1 never finds the workspace symlink. Worth a follow-up.
+- **Audiocontrol.org calendar dry-run** (Phase 30 carryover Task 40) — verify v0.12.0's migration behaves correctly against a second collection.
+
+---
+
 ## 2026-05-01: Phase 30 implementation — entry-centric pipeline redesign shipped as v0.11.1 (subagent-driven, 42 tasks across 7 phases, single session)
 
 ### Feature: deskwork-plugin

@@ -1223,3 +1223,92 @@ The friction surfaced this session: doing it twice (v0.11.0 fail → v0.11.1 ret
 - **42 tasks in one session is a lot.** Subagent-driven-development at this scale required the controller (me) to keep dispatch quality high — accurate file paths, anticipate convention conflicts (the `@/` import-resolution gap, NodeNext build constraints, `exactOptionalPropertyTypes`), follow up on flagged concerns. Most expensive controller work: catching that "26 pre-existing test failures" was actually Task 22 collateral that needed a Task 41 cleanup, not actually pre-existing. The implementer subagents are honest reporters of state; the controller's job is to interpret correctly.
 
 - **What worked, in operator's framing:** *"keep going"* / *"do it"* / *"proceed"* — auto mode + hard-gated skill execution scales surprisingly well for a major-version release. The hard pauses brought operator back at the irreversible moments (Pause 3 publish, Pause 5 push). The rest is dispatch quality + smoke discipline.
+
+---
+
+## 2026-05-01: Adopter dogfood of v0.11.1 → 9 issues filed → v0.12.0 fixes shipped
+
+**Session goal:** *"I want to try the latest version of the plugin locally to see what works and what's broken."* Operator's framing was a single dogfood walk; turned into a full brainstorm → spec → plan → 35-task inline-execute → release loop after the walk surfaced enough to justify a corrective release.
+
+**Surface exercised:** marketplace install path (`/plugin marketplace update deskwork`), `~/.claude/plugins/marketplaces/deskwork/scripts/repair-install.sh`, `deskwork --help`, `deskwork doctor`, `deskwork-studio` (Tailscale-aware default), `/dev/editorial-studio`, `/dev/editorial-review/<entry-uuid>`, the studio's per-entry button surface (Approve / iterate / reject / `?` shortcuts), Playwright-driven keyboard interaction (`a a` shortcut for approve), the `/release` skill end-to-end.
+
+### Acquisition phase
+
+#### 1. SessionStart auto-repair hook missing from this branch
+
+**friction.** Fresh session in the worktree → all three plugin bins (`deskwork`, `deskwork-studio`, `dw-lifecycle`) returned empty `command -v`. Claude Code's plugin cache had been evicted between sessions (the v0.10.1 / v0.10.2 documented concern). The remediation script lives at `~/.claude/plugins/marketplaces/deskwork/scripts/repair-install.sh` and the README documents the `SessionStart` auto-repair hook for `~/.claude/settings.json` or project `.claude/settings.json`. **Neither was installed in this worktree's `.claude/settings.json`** — even the project's own contributors weren't getting the hook.
+
+**fix.** Operator: *"It's actually supposed to be in our session start hook, but I don't think we have it in our branch."* Used the harness `update-config` skill to add the hook to project `.claude/settings.json`. Verified the SessionStart hook fires correctly on the next session restart. Committed.
+
+**insight.** *"Don't eat your own dogfood"* surfaces in the smallest places — the project shipping the auto-repair plumbing for adopters didn't have its own auto-repair hook installed for its own contributors. The fix was 18 lines of JSON. The cost of NOT having it: every fresh session in this worktree would have gone through manual `repair-install.sh` first.
+
+#### 2. Cross-project PATH leakage via Claude Code's plugin loader
+
+**friction.** `command -v deskwork-studio` resolved to the v0.7.2 binary (not the user-scope v0.11.1) because the registry held a stale `scope: project, projectPath: /Users/orion/work/writingcontrol.org` entry from 2026-04-27. Even though the project-scope entry wasn't relevant to this worktree, Claude Code's PATH builder added BOTH entries' `bin/` dirs to PATH. The older one won on first match.
+
+**fix.** Operator: *"writingcontrol is NOT in this project. This project should know nothing about writingcontrol."* — sharply identified this as a Claude Code (harness) bug, not a deskwork bug. Surgical fix for the immediate session: edited `installed_plugins.json` to drop the writingcontrol project-scope entry. Operator's broader stance: *"I'm thinking that I shouldn't install plugins project-wide until claude code's plugin infrastructure is less buggy."*
+
+**insight.** Adopter scope semantics: the registry already encodes `scope` + `projectPath`. The PATH builder ignores those fields. Two follow-ups: file an upstream Claude Code bug, AND make `repair-install.sh` honor the same scoping (which the script DID NOT — restoring writingcontrol's cache subtree from the marketplace clone) — that became #138 and was fixed in v0.12.0 this session.
+
+#### 3. `repair-install.sh` re-restored an orphan cache subtree mid-session
+
+**friction.** Pipe-tested the SessionStart hook's command (`echo '{}' | repair-install.sh --quiet`) — the script reported `repaired deskwork-studio@0.7.2` even though I had just `rm -rf`'d that cache subtree and removed the entry from the registry. Investigation: the script's `versions_referenced()` reads `$PATH` as a third source for "what versions exist." Stale PATH from before the registry edit kept feeding 0.7.2 back in.
+
+**fix.** This became #137. Fixed in v0.12.0: dropped the PATH-source entirely — the registry + canonical marketplace manifest cover legitimate versions; PATH-derived entries are never authoritative.
+
+**insight.** Test-flow ergonomics: when the agent edits the registry mid-session and runs `repair-install.sh`, the script "remembers" the pre-edit state via PATH. Self-heals at next session start (Claude Code rebuilds PATH against the current registry), but in-session the symptom was confusing — the script appeared to be ignoring my registry edit. Lesson: side-channel inputs (PATH) are footguns when they shadow intentional state changes; prefer authoritative sources.
+
+### Walking the v0.11.1 surfaces
+
+#### 4. `deskwork --help` advertised retired verbs as if they were live
+
+**friction.** Phase 30 retired `plan` / `outline` / `draft` / `pause` / `resume` / `review-*` (9 verbs) but `--help` still listed them under "Lifecycle:" and "Review loop:". Runtime gate at `commands/retired.ts` printed the migration message correctly, but the discoverability gap meant a fresh adopter reading `--help` would build the wrong mental model and only learn about retirement by hitting the gate.
+
+**fix.** This became #139. Fixed in v0.12.0: rewrote `printUsage()` with Phase 30's verb structure (Setup / Pipeline / Shortform / Maintenance), dropped retired verbs from the active listing, flagged `block` / `cancel` / `induct` / `status` as skill-only.
+
+**insight.** `--help` text is a contract surface. Drift between what `--help` advertises and what runtime accepts is the same shape as adopter-doc drift — same fix discipline applies (subprocess-based test that asserts on the live `--help` output post-build, runs in `smoke-redesign.sh`).
+
+#### 5. `deskwork doctor` post-Phase-30 reported phantom `file-presence` failures
+
+**friction.** Doctor complained about 3 of 4 entries having missing artifacts at paths like `docs/post-release-acceptance-design/scrapbook/idea.md`. The actual files lived at `docs/1.0/post-release-acceptance-design.md` (this project organizes feature docs at `docs/1.0/<status>/<slug>/`, not the slug-shaped layout the heuristic assumed). The migration had derived expected paths from a stage+slug heuristic, ignoring the legacy ingest journal's `sourceFile` (which recorded the actual path).
+
+**fix.** This became #140. Fixed in v0.12.0: added `Entry.artifactPath` schema field; migration reads `sourceFile` from `.deskwork/review-journal/ingest/*.json`. Doctor + studio resolver consume `artifactPath` when present, fall back to heuristic only when absent.
+
+**insight.** **The data was already in the legacy journal.** The migration ignored it and derived a heuristic instead. *"Faithful migration"* means reading the old format's data, not constructing new data from old shape. Same shape as **#141** (legacy pipeline-workflow records carried `currentVersion` + `state`; migration ignored those too — also fixed in v0.12.0).
+
+#### 6. Studio per-entry review surface still rendered legacy workflow state (`applied`)
+
+**friction.** Operator opened `/dev/editorial-review/1c3bfe8f-...` (an entry uuid). The page rendered with `applied` as the workflow status — but `applied` isn't a Phase 30 review state. The valid enum is `'in-review' | 'iterating' | 'approved'`. Operator's correction: *"'applied' is not a valid state."* Investigation: the new entry-review surface DOES exist (Phase 30 Task 35) at `/dev/editorial-review/entry/<uuid>`, but the legacy `/dev/editorial-review/<uuid>` route (no `/entry/` segment) still rendered the workflow surface — and the dashboard's `open →` links didn't include the `/entry/` segment, so they all fell into the legacy renderer. Plus: the entry-review surface (when reachable) had no UI for the new entry-stage actions; "Approve" was bound to `a a` keyboard shortcut only, on the WORKFLOW (already in legacy `applied`), not the ENTRY (still at `Ideas`).
+
+**fix.** This became #146 (the operator's "I asked you to try to approve the item to surface the bug. File the bug" line). Fixed in v0.12.0: legacy UUID route now delegates to the entry surface when the UUID matches an entry sidecar; new POST endpoints `/api/dev/editorial-review/entry/:entryId/{approve,block,cancel,induct}`; new `entry-review-client.ts` wires the buttons to those endpoints. End-to-end Ideas → Planned → Ideas verified live.
+
+**insight.** *"I asked you to try to approve the item to surface the bug."* — the operator's framing is sharper than mine. The dogfood task wasn't *"approve this thing"*, it was *"surface the gap by trying."* I framed it as a task and treated the friction as a side-effect; the operator framed it as "the friction IS the data." Lesson: when the operator asks you to use a feature you suspect is broken, the goal is to make the brokenness reproducible and file it, not to find a workaround that gets the underlying mutation done. Different goal, different posture.
+
+#### 7. Filed 9 issues during the dogfood, in real time
+
+**insight.** This is the rhythm the project's `/post-release:walk` skill (#133, deferred) is supposed to automate. Doing it manually surfaced friction the synthetic walk wouldn't have:
+- Stale registry entries from other projects (#138).
+- Stale PATH within a session (#137).
+- Stale ingest-journal `sourceFile`s (the data layer of #140 — files moved post-ingest).
+
+Each surface a real-world wrinkle no fixture exercises. Worth preserving when `/post-release:walk` lands: include "scan registry/PATH/journal for stale entries" as a check, not just per-route HTTP probes.
+
+### The `/release` skill, second canonical run
+
+#### 8. v0.11.1 → v0.12.0 was a textbook release
+
+**fix.** No abandoned packages this time (vs v0.11.0's zod-missing). Pause 1 clean (preconditions). Pause 2 clean (11 manifest files bumped). Pause 3 — operator ran `make publish` in their terminal, three OTPs, success in one round (vs six OTPs across two rounds for v0.11.1). Pause 4 — smoke passed against the freshly-published packages. Pause 5 — atomic push, exit 0. Release page live within seconds.
+
+**insight.** The `/release` skill is settling into its shape. Same skill that shipped v0.11.1 shipped v0.12.0 unchanged — well-trodden, just works. The operator's role at Pause 3 (the OTP-blocking constraint) is the right kind of friction: visible, intentional, not surprising. Cost paid: one terminal session for three OTPs.
+
+### Bigger-picture observations
+
+- **Live re-migration of this project's calendar surfaced friction synthesized fixtures wouldn't have.** v0.12.0's `#140` fix made migration read `sourceFile` from the journal — but several `sourceFile`s in this project's journal are now stale (the docs were moved post-ingest). Doctor surfaces the staleness as `file-presence` failures pointing at the recorded path. The engineering fix was correct (faithful migration); the surfaced data state is **operator-resolvable real-world friction**, not a code bug. Patched 3 sidecars manually for this project. Pattern worth preserving: when a migration fix lands, run it against this project's real calendar before shipping.
+
+- **The dogfood-walk → file-issues → fix-the-issues → ship loop is ~1 day for a focused cluster.** This session: walk took ~30 min, file 9 issues took ~30 min, brainstorm + spec + plan took ~45 min, 35-task inline execution took ~5 hours, release ran ~15 min. End-to-end ~7 hours of agent time + operator interaction at the gates (Pause 3 OTPs, several mid-execution corrections). The bottleneck wasn't agent throughput; it was the depth of the cluster (6 fixes in one release, plus the dev-workflow infrastructure). For smaller clusters this loop probably halves.
+
+- **HMR was almost left out as a "stretch goal."** Initial framing offered "Approach 3: tsx + esbuild --watch — minimum viable" with HMR as a follow-up. Operator's correction (*"you should wire HMR. That's a must have in modern web development"*) escalated it back into Phase 0. Lesson: when the agent frames a default-expected affordance as YAGNI-able, the operator usually corrects. Worth flagging trade-offs explicitly rather than pre-defaulting them out.
+
+- **Operator's stance hardened on Claude Code plugin scope:** *"I shouldn't install plugins project-wide until claude code's plugin infrastructure is less buggy."* Cross-project PATH leakage + stale-entry persistence + cache eviction add up to a "stay user-scope only" posture. The deskwork plugins cooperate with that (the v0.10.1 SessionStart hook + v0.12.0's repair-install scope filter both make user-scope safer). Adopter friction in the broader Claude Code plugin model is the reason the deskwork project keeps shipping cache-resilience work.
+
+- **The `/post-release:walk` deferred feature would have automated this session's first 30 minutes.** Each issue I filed manually is a finding the playbook would have generated. Worth keeping that as the "next sprint" hook: when Phase 29 lands, this session's surface is the validation set.
