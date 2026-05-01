@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { EntrySchema } from '@/schema/entry';
-import { AnnotationSchema } from '@/schema/annotation';
+import { EntrySchema } from './entry.ts';
+import { AnnotationSchema } from './annotation.ts';
 
 const StageEnum = z.enum(['Ideas', 'Planned', 'Outlining', 'Drafting', 'Final', 'Published', 'Blocked', 'Cancelled']);
 const ReviewStateEnum = z.enum(['in-review', 'iterating', 'approved']);

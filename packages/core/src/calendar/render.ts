@@ -1,4 +1,4 @@
-import type { Entry, Stage } from '@/schema/entry';
+import type { Entry, Stage } from '../schema/entry.ts';
 
 const STAGE_ORDER: readonly Stage[] = [
   'Ideas', 'Planned', 'Outlining', 'Drafting', 'Final', 'Published', 'Blocked', 'Cancelled',

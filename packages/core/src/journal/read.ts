@@ -1,6 +1,6 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { JournalEventSchema, type JournalEvent } from '@/schema/journal-events';
+import { JournalEventSchema, type JournalEvent } from '../schema/journal-events.ts';
 
 interface ReadOptions {
   entryId?: string;

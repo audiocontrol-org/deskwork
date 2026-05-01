@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
-import { EntrySchema, type Entry } from '@/schema/entry';
-import { sidecarPath } from '@/sidecar/paths';
+import { EntrySchema, type Entry } from '../schema/entry.ts';
+import { sidecarPath } from './paths.ts';
 
 export async function readSidecar(projectRoot: string, uuid: string): Promise<Entry> {
   const path = sidecarPath(projectRoot, uuid);

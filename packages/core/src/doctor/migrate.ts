@@ -1,12 +1,12 @@
 import { readFile, writeFile, access } from 'node:fs/promises';
 import { join } from 'node:path';
-import { extractEntriesForMigration } from '@/calendar/parse';
-import { writeSidecar } from '@/sidecar/write';
-import { renderCalendar } from '@/calendar/render';
-import { appendJournalEvent } from '@/journal/append';
-import { readJournalEvents } from '@/journal/read';
-import type { Entry, Stage, ReviewState } from '@/schema/entry';
-import type { JournalEvent } from '@/schema/journal-events';
+import { extractEntriesForMigration } from '../calendar/parse.ts';
+import { writeSidecar } from '../sidecar/write.ts';
+import { renderCalendar } from '../calendar/render.ts';
+import { appendJournalEvent } from '../journal/append.ts';
+import { readJournalEvents } from '../journal/read.ts';
+import type { Entry, Stage, ReviewState } from '../schema/entry.ts';
+import type { JournalEvent } from '../schema/journal-events.ts';
 
 interface MigrateOptions {
   dryRun: boolean;

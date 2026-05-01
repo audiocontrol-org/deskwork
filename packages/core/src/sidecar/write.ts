@@ -1,7 +1,7 @@
 import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { EntrySchema, type Entry } from '@/schema/entry';
-import { sidecarPath } from '@/sidecar/paths';
+import { EntrySchema, type Entry } from '../schema/entry.ts';
+import { sidecarPath } from './paths.ts';
 
 export async function writeSidecar(projectRoot: string, entry: Entry): Promise<void> {
   const result = EntrySchema.safeParse(entry);

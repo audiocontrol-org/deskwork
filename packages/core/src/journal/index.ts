@@ -1,2 +1,2 @@
-export * from '@/journal/append';
-export * from '@/journal/read';
+export * from './append.ts';
+export * from './read.ts';

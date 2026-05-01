@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { JournalEventSchema, type JournalEvent } from '@/schema/journal-events';
+import { JournalEventSchema, type JournalEvent } from '../schema/journal-events.ts';
 
 export async function appendJournalEvent(projectRoot: string, event: JournalEvent): Promise<string> {
   const result = JournalEventSchema.safeParse(event);

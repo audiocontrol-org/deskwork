@@ -11,7 +11,7 @@
  * converts a legacy calendar.md into one sidecar per entry.
  */
 
-import type { Stage } from '@/schema/entry';
+import type { Stage } from '../schema/entry.ts';
 
 export interface MigrationSourceEntry {
   currentStage: Stage;

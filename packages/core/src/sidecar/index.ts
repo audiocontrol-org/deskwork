@@ -1,3 +1,3 @@
-export * from '@/sidecar/paths';
-export * from '@/sidecar/read';
-export * from '@/sidecar/write';
+export * from './paths.ts';
+export * from './read.ts';
+export * from './write.ts';
