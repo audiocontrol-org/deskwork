@@ -223,7 +223,14 @@ describe('review loop', () => {
     expect(res.stderr).toMatch(/no revision to snapshot/);
   });
 
-  it('review-help lists open workflows; review-cancel removes them', () => {
+  // SKIPPED: Pipeline-redesign Phase 4 (Tasks 21+22) retired the
+  // `review-help`, `review-cancel`, and `review-start` verbs in favour
+  // of the universal-verb model (`/deskwork:iterate`,
+  // `/deskwork:approve`, `/deskwork:cancel`, `/deskwork:status`). The
+  // CLI dispatcher gate now exits 1 with a stable retirement message
+  // for each of these verbs. Re-target this test once the new
+  // verb-driven path is dogfood-tested.
+  it.skip('review-help lists open workflows; review-cancel removes them', () => {
     run('deskwork-add', [project, 'Cancelled Test']);
     run('deskwork-plan', [project, 'cancelled-test', 'kw']);
     run('deskwork-outline', [project, 'cancelled-test']);
@@ -245,7 +252,10 @@ describe('review loop', () => {
     expect((after.json as { count: number }).count).toBe(0);
   });
 
-  it('review-report returns an empty report on a fresh project', () => {
+  // SKIPPED: Pipeline-redesign Phase 4 (Tasks 21+22) retired the
+  // `review-report` verb. Re-target once an equivalent reporting
+  // surface lands on the universal-verb path.
+  it.skip('review-report returns an empty report on a fresh project', () => {
     const res = run('deskwork-review-report', [project]);
     expect(res.code).toBe(0);
     expect(res.json).toMatchObject({
@@ -253,7 +263,10 @@ describe('review loop', () => {
     });
   });
 
-  it('review-report --format text produces human-readable output', () => {
+  // SKIPPED: Pipeline-redesign Phase 4 (Tasks 21+22) retired the
+  // `review-report` verb. Re-target once an equivalent reporting
+  // surface lands on the universal-verb path.
+  it.skip('review-report --format text produces human-readable output', () => {
     const res = run('deskwork-review-report', [project, '--format', 'text']);
     expect(res.code).toBe(0);
     expect(res.stdout).toMatch(/voice-drift signal/);

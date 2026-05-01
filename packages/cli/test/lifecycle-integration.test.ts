@@ -145,7 +145,14 @@ describe('deskwork-add', () => {
   });
 });
 
-describe('deskwork-plan', () => {
+// SKIPPED: Pipeline-redesign Phase 4 (Tasks 21+22) retired the
+// `deskwork-plan` verb. The legacy lifecycle-integration tests drive
+// the verb end-to-end; the new universal-verb model achieves the same
+// outcome via /deskwork:iterate + /deskwork:approve. The CLI dispatcher
+// gate now exits 1 with a stable retirement message for this verb.
+// Re-target these tests once the new verb-driven path has been
+// dogfood-tested.
+describe.skip('deskwork-plan', () => {
   it('moves Ideas → Planned with keywords and topics', () => {
     const project = bootstrapProject();
     try {
@@ -190,7 +197,12 @@ describe('deskwork-plan', () => {
   });
 });
 
-describe('deskwork-outline', () => {
+// SKIPPED: Pipeline-redesign Phase 4 (Tasks 21+22) retired the
+// `deskwork-outline` verb. The legacy lifecycle-integration tests drive
+// the verb end-to-end; the new universal-verb model achieves the same
+// outcome via /deskwork:iterate + /deskwork:approve. The CLI dispatcher
+// gate now exits 1 with a stable retirement message for this verb.
+describe.skip('deskwork-outline', () => {
   it('scaffolds a blog post and moves entry to Outlining', () => {
     const project = bootstrapProject();
     try {
@@ -261,7 +273,12 @@ describe('deskwork-outline', () => {
   });
 });
 
-describe('deskwork-draft', () => {
+// SKIPPED: Pipeline-redesign Phase 4 (Tasks 21+22) retired the
+// `deskwork-draft` verb. The legacy lifecycle-integration tests drive
+// the verb end-to-end; the new universal-verb model achieves the same
+// outcome via /deskwork:iterate + /deskwork:approve. The CLI dispatcher
+// gate now exits 1 with a stable retirement message for this verb.
+describe.skip('deskwork-draft', () => {
   it('moves Outlining to Drafting and records issue number', () => {
     const project = bootstrapProject();
     try {
@@ -296,7 +313,13 @@ describe('deskwork-draft', () => {
   });
 });
 
-describe('deskwork-publish', () => {
+// SKIPPED: Pipeline-redesign Phase 4 (Tasks 21+22) retired several of
+// the lifecycle helpers these tests stitch together (`plan`, `outline`,
+// `draft`). The `publish` verb is preserved on the universal-verb path,
+// but the legacy fixture seeding here cannot reach a Published state
+// without the retired predecessors. Re-target these tests against the
+// new universal-verb seeding flow once it's dogfood-tested.
+describe.skip('deskwork-publish', () => {
   it('publishes a blog entry after the file has been written', () => {
     const project = bootstrapProject();
     try {
@@ -435,7 +458,12 @@ describe('hierarchical slugs', () => {
     expect(res.stderr).toMatch(/--slug must be/);
   });
 
-  it('plan + outline accept hierarchical slug positional', () => {
+  // SKIPPED: Pipeline-redesign Phase 4 (Tasks 21+22) retired
+  // `deskwork-plan` and `deskwork-outline`. The hierarchical-slug
+  // behaviour they test is preserved on the new universal-verb path
+  // (slug-as-positional + scaffolder layouts), but exercising it
+  // requires re-targeting against the new seeding flow.
+  it.skip('plan + outline accept hierarchical slug positional', () => {
     run('deskwork-add', [
       project,
       '--slug',
@@ -453,7 +481,11 @@ describe('hierarchical slugs', () => {
       .toBe(true);
   });
 
-  it('outline --layout flat writes <slug>.md (Phase 19a: filePath no longer stored on calendar)', () => {
+  // SKIPPED: Pipeline-redesign Phase 4 (Tasks 21+22) retired
+  // `deskwork-outline`. Layout selection (`flat` / `readme`) is
+  // preserved on the new universal-verb path; re-target once dogfood-
+  // tested.
+  it.skip('outline --layout flat writes <slug>.md (Phase 19a: filePath no longer stored on calendar)', () => {
     run('deskwork-add', [project, '--slug', 'parent/leaf', 'Leaf']);
     run('deskwork-plan', [project, 'parent/leaf', 'kw']);
     const res = run('deskwork-outline', [
@@ -476,7 +508,11 @@ describe('hierarchical slugs', () => {
     expect(scaffolded?.contentRelativePath).toBe('parent/leaf.md');
   });
 
-  it('outline --layout readme writes <slug>/README.md', () => {
+  // SKIPPED: Pipeline-redesign Phase 4 (Tasks 21+22) retired
+  // `deskwork-outline`. Layout selection (`flat` / `readme`) is
+  // preserved on the new universal-verb path; re-target once dogfood-
+  // tested.
+  it.skip('outline --layout readme writes <slug>/README.md', () => {
     run('deskwork-add', [project, '--slug', 'p/q/r', 'R']);
     run('deskwork-plan', [project, 'p/q/r', 'kw']);
     const res = run('deskwork-outline', [
@@ -495,7 +531,10 @@ describe('hierarchical slugs', () => {
     expect(scaffolded?.contentRelativePath).toBe('p/q/r/README.md');
   });
 
-  it('outline rejects an unknown --layout value', () => {
+  // SKIPPED: Pipeline-redesign Phase 4 (Tasks 21+22) retired
+  // `deskwork-outline`. Layout-validation behaviour is preserved on the
+  // new universal-verb path; re-target once dogfood-tested.
+  it.skip('outline rejects an unknown --layout value', () => {
     run('deskwork-add', [project, '--slug', 'x/y', 'Y']);
     run('deskwork-plan', [project, 'x/y', 'kw']);
     const res = run('deskwork-outline', [
@@ -509,7 +548,13 @@ describe('hierarchical slugs', () => {
   });
 });
 
-describe('deskwork-pause / deskwork-resume (#27)', () => {
+// SKIPPED: Pipeline-redesign Phase 4 (Tasks 21+22) retired the
+// `deskwork-pause` and `deskwork-resume` verbs. The new universal-verb
+// model collapses pause/resume into the `block` verb (and induct/teleport
+// for explicit stage moves). The CLI dispatcher gate now exits 1 with a
+// stable retirement message for these verbs. Re-target these tests once
+// the new verb-driven path has been dogfood-tested.
+describe.skip('deskwork-pause / deskwork-resume (#27)', () => {
   it('pauses an Outlining entry and resumes it back to Outlining', () => {
     const project = bootstrapProject();
     try {
