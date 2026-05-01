@@ -12,6 +12,7 @@ export default defineConfig({
   },
   test: {
     include: ['test/**/*.test.ts'],
-    environment: 'jsdom',
+    // Default environment is node. Tests that need jsdom set it per-file
+    // via the `@vitest-environment jsdom` comment (see e.g. glossary-tooltip-client.test.ts).
   },
 });
