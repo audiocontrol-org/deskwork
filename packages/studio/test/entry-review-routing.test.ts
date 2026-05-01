@@ -26,7 +26,8 @@ function makeConfig(): DeskworkConfig {
     sites: {
       a: {
         host: 'a.example',
-        contentDir: 'src/sites/a/content/blog',
+        // Aligned with seedArtifact() below which writes to projectRoot/docs/.
+        contentDir: 'docs',
         calendarPath: 'docs/cal-a.md',
         blogFilenameTemplate: '{slug}.md',
       },
@@ -72,6 +73,12 @@ describe('GET /dev/editorial-review/entry/:entryId', () => {
   beforeEach(async () => {
     projectRoot = await mkdtemp(join(tmpdir(), 'dw-entry-review-'));
     cfg = makeConfig();
+    // Persist the config to disk: entry-resolver reads it via getContentDir.
+    await mkdir(join(projectRoot, '.deskwork'), { recursive: true });
+    await writeFile(
+      join(projectRoot, '.deskwork', 'config.json'),
+      JSON.stringify(cfg),
+    );
   });
 
   afterEach(async () => {

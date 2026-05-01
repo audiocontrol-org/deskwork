@@ -15,6 +15,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { readSidecar } from '@deskwork/core/sidecar';
+import { getContentDir } from '@deskwork/core/config';
 import type { Entry, Stage } from '@deskwork/core/schema/entry';
 
 interface ResolveResult {
@@ -36,16 +37,22 @@ const STAGE_ARTIFACT: Record<Stage, ((slug: string, contentDir: string) => strin
 
 export async function resolveEntry(projectRoot: string, uuid: string): Promise<ResolveResult> {
   const entry = await readSidecar(projectRoot, uuid);
-  // TODO(pipeline-redesign Phase 6+): read content dir from .deskwork/config.json.
-  // Until config plumbing lands, default to `docs/` (matches every test fixture
-  // and the canonical layout in the redesign spec).
-  const contentDir = join(projectRoot, 'docs');
-  const stage = entry.priorStage ?? entry.currentStage;
-  const pathFn = STAGE_ARTIFACT[stage];
-  if (pathFn === null) {
-    throw new Error(`No artifact path for stage ${stage}`);
+
+  // #140: prefer the explicit artifactPath when set; fall back to the
+  // slug+stage heuristic only for entries that don't have one (entries
+  // created pre-#140 fix and not yet doctor-repaired).
+  let artifactPath: string;
+  if (entry.artifactPath) {
+    artifactPath = join(projectRoot, entry.artifactPath);
+  } else {
+    const stage = entry.priorStage ?? entry.currentStage;
+    const pathFn = STAGE_ARTIFACT[stage];
+    if (pathFn === null) {
+      throw new Error(`No artifact path for stage ${stage}`);
+    }
+    const contentDir = getContentDir(projectRoot);
+    artifactPath = pathFn(entry.slug, contentDir);
   }
-  const artifactPath = pathFn(entry.slug, contentDir);
   const artifactBody = await readFile(artifactPath, 'utf8');
   return { entry, artifactBody, artifactPath };
 }

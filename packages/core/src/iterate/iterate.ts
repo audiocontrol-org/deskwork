@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { readSidecar } from '../sidecar/read.ts';
 import { writeSidecar } from '../sidecar/write.ts';
 import { appendJournalEvent } from '../journal/append.ts';
+import { getContentDir } from '../config.ts';
 import type { Entry, Stage } from '../schema/entry.ts';
 
 interface IterateOptions {
@@ -38,13 +39,19 @@ export async function iterateEntry(projectRoot: string, opts: IterateOptions): P
     throw new Error(`Cannot iterate: entry is ${sidecar.currentStage}; induct it back into the pipeline first.`);
   }
 
-  const pathFn = STAGE_ARTIFACT_PATH[sidecar.currentStage];
-  if (!pathFn) {
-    throw new Error(`Cannot iterate at stage ${sidecar.currentStage}: no artifact path defined.`);
+  // #140: prefer the explicit artifactPath on the sidecar when present.
+  // Fall back to the slug+stage heuristic for entries without one.
+  let artifactPath: string;
+  if (sidecar.artifactPath) {
+    artifactPath = join(projectRoot, sidecar.artifactPath);
+  } else {
+    const pathFn = STAGE_ARTIFACT_PATH[sidecar.currentStage];
+    if (!pathFn) {
+      throw new Error(`Cannot iterate at stage ${sidecar.currentStage}: no artifact path defined.`);
+    }
+    const contentDir = getContentDir(projectRoot);
+    artifactPath = pathFn(sidecar.slug, contentDir);
   }
-
-  const contentDir = join(projectRoot, 'docs');  // FIXME: read from .deskwork/config.json
-  const artifactPath = pathFn(sidecar.slug, contentDir);
   const markdown = await readFile(artifactPath, 'utf8');
 
   const priorVersion = sidecar.iterationByStage[sidecar.currentStage] ?? 0;

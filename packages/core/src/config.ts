@@ -329,6 +329,25 @@ function resolveDefaultSite(value: unknown, siteSlugs: string[]): string {
   return value;
 }
 
+/**
+ * Resolve a site's contentDir. Returns the absolute path to the site's
+ * content directory. Used by helpers that need to find on-disk artifacts
+ * without hardcoding `docs/` (the legacy default — see #140 carryover
+ * notes).
+ */
+export function getContentDir(projectRoot: string, site?: string): string {
+  const cfg = readConfig(projectRoot);
+  const siteName = site ?? cfg.defaultSite;
+  const siteCfg = cfg.sites[siteName];
+  if (!siteCfg) {
+    throw new Error(
+      `Unknown site "${siteName}" in .deskwork/config.json. ` +
+        `Configured sites: ${Object.keys(cfg.sites).join(', ')}.`,
+    );
+  }
+  return join(projectRoot, siteCfg.contentDir);
+}
+
 /** Read and parse the deskwork config for a project root. */
 export function readConfig(projectRoot: string): DeskworkConfig {
   const path = configPath(projectRoot);

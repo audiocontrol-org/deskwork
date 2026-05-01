@@ -17,6 +17,14 @@ describe('iterateEntry', () => {
     projectRoot = await mkdtemp(join(tmpdir(), 'dw-test-'));
     await mkdir(join(projectRoot, '.deskwork', 'entries'), { recursive: true });
     await mkdir(join(projectRoot, 'docs', slug, 'scrapbook'), { recursive: true });
+    await writeFile(
+      join(projectRoot, '.deskwork', 'config.json'),
+      JSON.stringify({
+        version: 1,
+        sites: { main: { contentDir: 'docs', calendarPath: '.deskwork/calendar.md' } },
+        defaultSite: 'main',
+      }),
+    );
   });
 
   afterEach(async () => {
