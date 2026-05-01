@@ -10,7 +10,11 @@
   ],
   "source": "manual",
   "currentStage": "Drafting",
-  "iterationByStage": {},
-  "createdAt": "2026-05-01T00:17:31.515Z",
-  "updatedAt": "2026-05-01T00:17:31.515Z"
+  "iterationByStage": {
+    "Drafting": 2
+  },
+  "createdAt": "2026-05-01T00:17:31.525Z",
+  "updatedAt": "2026-05-01T04:08:23.605Z",
+  "reviewState": "approved",
+  "artifactPath": "docs/1.0/001-IN-PROGRESS/deskwork-plugin/prd.md"
 }

@@ -5,7 +5,11 @@
   "keywords": [],
   "source": "manual",
   "currentStage": "Drafting",
-  "iterationByStage": {},
-  "createdAt": "2026-05-01T00:17:31.523Z",
-  "updatedAt": "2026-05-01T00:17:31.523Z"
+  "iterationByStage": {
+    "Drafting": 2
+  },
+  "createdAt": "2026-05-01T00:17:31.526Z",
+  "updatedAt": "2026-05-01T04:08:23.606Z",
+  "reviewState": "approved",
+  "artifactPath": "docs/superpowers/specs/2026-04-29-release-skill-design.md"
 }

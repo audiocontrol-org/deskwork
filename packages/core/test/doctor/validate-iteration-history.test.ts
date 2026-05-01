@@ -50,9 +50,12 @@ describe('validateAll - iteration-history', () => {
     await rm(projectRoot, { recursive: true, force: true });
   });
 
-  it('flags when sidecar.iterationByStage[s] > journal iteration count for s', async () => {
+  it('does NOT flag when sidecar.iterationByStage[s] > journal iteration count (migration tolerance #141)', async () => {
+    // Sidecar carries iteration count from a legacy pipeline-workflow record
+    // (#141) that never had per-event iteration journal entries. We treat
+    // sidecar > journal as the migration case rather than drift.
     const uuid = '11111111-1111-1111-1111-111111111111';
-    const slug = 'incomplete';
+    const slug = 'migrated-from-legacy';
     await writeFile(
       join(projectRoot, '.deskwork', 'entries', `${uuid}.json`),
       entryJson(uuid, slug, 'Drafting', { Drafting: 3 }),
@@ -71,6 +74,37 @@ describe('validateAll - iteration-history', () => {
       version: 1,
       markdown: '#',
     });
+
+    const result = await validateAll(projectRoot);
+    const fails = result.failures.filter((f) => f.category === 'iteration-history');
+    expect(fails).toEqual([]);
+  });
+
+  it('flags when journal iteration count > sidecar.iterationByStage[s] (real drift)', async () => {
+    // The dangerous direction: events exist in the journal that the sidecar
+    // doesn't track. Suggests sidecar lost data.
+    const uuid = '11112222-1111-1111-1111-111111111111';
+    const slug = 'lost-count';
+    await writeFile(
+      join(projectRoot, '.deskwork', 'entries', `${uuid}.json`),
+      entryJson(uuid, slug, 'Drafting', { Drafting: 1 }),
+    );
+    await writeFile(
+      join(projectRoot, '.deskwork', 'calendar.md'),
+      calendarMd(uuid, slug, 'Drafting'),
+    );
+    await seedArtifact(projectRoot, slug);
+
+    for (let v = 1; v <= 3; v++) {
+      await appendJournalEvent(projectRoot, {
+        kind: 'iteration',
+        at: NOW,
+        entryId: uuid,
+        stage: 'Drafting',
+        version: v,
+        markdown: `# v${v}`,
+      });
+    }
 
     const result = await validateAll(projectRoot);
     const fails = result.failures.filter((f) => f.category === 'iteration-history');

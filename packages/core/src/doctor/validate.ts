@@ -304,12 +304,19 @@ async function validateIterationHistory(projectRoot: string): Promise<Validation
 
     // Compare sidecar counts to journal counts for every stage we know about
     // (union of sidecar-recorded stages and journal-witnessed stages).
+    //
+    // We only fail when the journal has MORE events than the sidecar — that
+    // direction means the sidecar lost data that the journal still witnesses
+    // (real drift). The other direction (sidecar count > journal count) is
+    // the migration case: #141 carries iteration counts forward from legacy
+    // pipeline-workflow records that never had per-event iteration journal
+    // entries. Treating that as drift would flag every migrated entry.
     const allStages = new Set<string>([...stages, ...Object.keys(journalCount)]);
     for (const stage of allStages) {
       const sidecarN = entry.iterationByStage[stage as Stage] ?? 0;
       const journalN = journalCount[stage] ?? 0;
       if (sidecarN === 0) continue; // migration tolerance: only flag stages the sidecar tracks
-      if (sidecarN !== journalN) {
+      if (journalN > sidecarN) {
         failures.push({
           category: 'iteration-history',
           message: `iterationByStage[${stage}]=${sidecarN} but journal has ${journalN} iteration event(s) for that stage`,

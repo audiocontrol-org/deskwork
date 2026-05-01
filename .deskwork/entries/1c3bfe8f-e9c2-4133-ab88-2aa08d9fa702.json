@@ -5,8 +5,12 @@
   "keywords": [],
   "source": "manual",
   "currentStage": "Ideas",
-  "iterationByStage": {},
-  "createdAt": "2026-05-01T00:17:31.511Z",
-  "updatedAt": "2026-05-01T00:17:31.511Z",
-  "description": "A pair of skills that codify how to evaluate the freshly-installed deskwork marketplace plugin, surface friction, and file issues — using the deskwork pipeline itself as the triage surface."
+  "iterationByStage": {
+    "Ideas": 2
+  },
+  "createdAt": "2026-05-01T00:17:31.524Z",
+  "updatedAt": "2026-05-01T04:08:23.604Z",
+  "description": "A pair of skills that codify how to evaluate the freshly-installed deskwork marketplace plugin, surface friction, and file issues — using the deskwork pipeline itself as the triage surface.",
+  "reviewState": "approved",
+  "artifactPath": "docs/1.0/post-release-acceptance-design.md"
 }
