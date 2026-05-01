@@ -2,6 +2,7 @@ import { readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { EntrySchema, type Entry, type Stage } from '../schema/entry.ts';
 import { extractEntriesForMigration } from '../calendar/parse.ts';
+import { readJournalEvents } from '../journal/read.ts';
 
 export interface ValidationFailure {
   category:
@@ -218,12 +219,50 @@ async function validateFrontmatterSidecar(projectRoot: string): Promise<Validati
   return failures;
 }
 
+async function validateJournalSidecar(projectRoot: string): Promise<ValidationFailure[]> {
+  const failures: ValidationFailure[] = [];
+  const sidecars = await loadSidecars(projectRoot);
+  for (const { entry, path } of sidecars) {
+    const events = await readJournalEvents(projectRoot, { entryId: entry.uuid });
+
+    // readJournalEvents sorts ascending by `at`, so the latest is at the end.
+    const stageTransitions = events.filter((e) => e.kind === 'stage-transition');
+    const latestStageTransition = stageTransitions.at(-1);
+    if (latestStageTransition && latestStageTransition.kind === 'stage-transition') {
+      if (latestStageTransition.to !== entry.currentStage) {
+        failures.push({
+          category: 'journal-sidecar',
+          message: `latest stage-transition.to=${latestStageTransition.to} does not match sidecar currentStage=${entry.currentStage}`,
+          entryId: entry.uuid,
+          path,
+        });
+      }
+    }
+
+    const reviewChanges = events.filter((e) => e.kind === 'review-state-change');
+    const latestReview = reviewChanges.at(-1);
+    if (latestReview && latestReview.kind === 'review-state-change') {
+      const sidecarReview = entry.reviewState ?? null;
+      if (latestReview.to !== sidecarReview) {
+        failures.push({
+          category: 'journal-sidecar',
+          message: `latest review-state-change.to=${String(latestReview.to)} does not match sidecar reviewState=${String(sidecarReview)}`,
+          entryId: entry.uuid,
+          path,
+        });
+      }
+    }
+  }
+  return failures;
+}
+
 export async function validateAll(projectRoot: string): Promise<ValidationResult> {
   const failures: ValidationFailure[] = [];
   failures.push(...(await validateSchema(projectRoot)));
   failures.push(...(await validateCalendarSidecar(projectRoot)));
   failures.push(...(await validateFrontmatterSidecar(projectRoot)));
-  // Tasks 26-30 add: validateJournalSidecar, validateIterationHistory,
-  // validateFilePresence, validateStageInvariants, validateCrossEntry.
+  failures.push(...(await validateJournalSidecar(projectRoot)));
+  // Tasks 27-30 add: validateIterationHistory, validateFilePresence,
+  // validateStageInvariants, validateCrossEntry.
   return { failures };
 }
