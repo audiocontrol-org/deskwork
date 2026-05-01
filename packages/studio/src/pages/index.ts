@@ -17,12 +17,21 @@
  * Read-only — links to existing routes only. No editing capability here.
  */
 
-import { readWorkflows } from '@deskwork/core/review/pipeline';
-import type { DraftWorkflowItem } from '@deskwork/core/review/types';
+import { readAllSidecars } from '@deskwork/core/sidecar';
+import type { Entry } from '@deskwork/core/schema/entry';
 import type { StudioContext } from '../routes/api.ts';
 import { html, unsafe, type RawHtml } from './html.ts';
 import { layout } from './layout.ts';
 import { renderEditorialFolio } from './chrome.ts';
+
+/** Stages that are part of the longform pipeline for review-default purposes. */
+const LONGFORM_PIPELINE_STAGES: ReadonlySet<Entry['currentStage']> = new Set([
+  'Ideas',
+  'Planned',
+  'Outlining',
+  'Drafting',
+  'Final',
+]);
 
 interface IndexEntry {
   /** Roman numeral display ("I", "II", …). */
@@ -64,39 +73,46 @@ interface IndexSection {
 }
 
 /**
- * Pick the workflow that should be the default Longform-reviews target —
- * the most-recent open longform workflow (in-review or open). Returns
- * null when no candidate exists; the caller falls back to the dashboard's
- * Review section anchor.
+ * Pick the entry that should be the default Longform-reviews target —
+ * the most-recent in-pipeline entry whose review state is in-review or
+ * iterating. Returns null when no candidate exists; the caller falls
+ * back to the dashboard's Review section anchor.
+ *
+ * Replaces the legacy workflow-based picker as part of the pipeline
+ * redesign (Task 36) — the studio's review surfaces are now keyed by
+ * entry uuid, not workflow uuid.
  */
-function pickDefaultLongformWorkflow(
-  workflows: readonly DraftWorkflowItem[],
-): DraftWorkflowItem | null {
-  const candidates = workflows
-    .filter((w) => w.contentKind === 'longform')
-    .filter((w) => w.state === 'in-review' || w.state === 'open')
+export function pickDefaultLongformEntry(
+  entries: readonly Entry[],
+): Entry | null {
+  const candidates = entries
+    .filter((e) => LONGFORM_PIPELINE_STAGES.has(e.currentStage))
+    .filter((e) => e.reviewState === 'in-review' || e.reviewState === 'iterating')
     .slice()
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   return candidates[0] ?? null;
 }
 
-function buildSections(ctx: StudioContext): readonly IndexSection[] {
-  const workflows: readonly DraftWorkflowItem[] = (() => {
+async function buildSections(ctx: StudioContext): Promise<readonly IndexSection[]> {
+  const entries: readonly Entry[] = await (async () => {
     try {
-      return readWorkflows(ctx.projectRoot, ctx.config);
+      return await readAllSidecars(ctx.projectRoot);
     } catch {
       return [];
     }
   })();
-  const longformDefault = pickDefaultLongformWorkflow(workflows);
-  // Issue #107: III links to the most-recent in-review longform when
-  // one exists, else falls back to the dashboard's Review section
-  // anchor (`#stage-review`, mounted in sub-phase D). The visual
-  // template hint stays alongside the link so adopters still see the
-  // URL shape — `<slug>` placeholder shown in red-pencil italic.
+  const longformDefaultEntry = pickDefaultLongformEntry(entries);
+  // Issue #107 / pipeline-redesign Task 36: III links to the
+  // most-recent in-review (or iterating) longform entry when one
+  // exists, else falls back to the dashboard's Review section anchor
+  // (`#stage-review`, mounted in sub-phase D). The visual template
+  // hint stays alongside the link so adopters still see the URL
+  // shape — `<slug>` placeholder shown in red-pencil italic. The
+  // link target is the entry-uuid keyed review route added in
+  // Task 35 (`/dev/editorial-review/entry/<uuid>`).
   const longformLinkHref =
-    longformDefault !== null
-      ? `/dev/editorial-review/${longformDefault.id}`
+    longformDefaultEntry !== null
+      ? `/dev/editorial-review/entry/${longformDefaultEntry.uuid}`
       : '/dev/editorial-studio#stage-review';
 
   return [
@@ -136,8 +152,8 @@ function buildSections(ctx: StudioContext): readonly IndexSection[] {
           desc: 'Per-entry margin notes, decisions, iterate flow.',
           hint: 'entry-by-entry',
           postHint:
-            longformDefault !== null
-              ? `Defaults to the most-recent in-review longform (${longformDefault.slug}). Or reach via the Dashboard or Content view.`
+            longformDefaultEntry !== null
+              ? `Defaults to the most-recent in-review longform (${longformDefaultEntry.slug}). Or reach via the Dashboard or Content view.`
               : 'Defaults to the dashboard\'s Review section. Open a longform workflow to populate the per-entry deep-link.',
         },
       ],
@@ -241,8 +257,8 @@ function renderSection(section: IndexSection): RawHtml {
     </section>`);
 }
 
-export function renderStudioIndex(ctx: StudioContext): string {
-  const sections = buildSections(ctx);
+export async function renderStudioIndex(ctx: StudioContext): Promise<string> {
+  const sections = await buildSections(ctx);
   const body = html`
     ${renderEditorialFolio('index', 'index of the press')}
     <main class="er-toc-page">

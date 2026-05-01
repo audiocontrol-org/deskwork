@@ -293,8 +293,8 @@ export function createApp(ctx: StudioContext): Hono {
   app.route('/api/dev/editorial-review', createApiRouter(ctx));
 
   // Page routes
-  app.get('/dev', (c) => c.html(renderStudioIndex(ctx)));
-  app.get('/dev/', (c) => c.html(renderStudioIndex(ctx)));
+  app.get('/dev', async (c) => c.html(await renderStudioIndex(ctx)));
+  app.get('/dev/', async (c) => c.html(await renderStudioIndex(ctx)));
   app.get('/dev/editorial-studio', async (c) => {
     const getIndex = (site: string) => getRequestContentIndex(c, ctx, site);
     // Phase 23f: per-project override check. The override module's

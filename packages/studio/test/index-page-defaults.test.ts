@@ -12,8 +12,9 @@
  *   2. Longform reviews (III) with no open workflows links to
  *      `/dev/editorial-studio#stage-review` (the dashboard's Review
  *      anchor mounted in sub-phase D); the URL template hint stays.
- *   3. Longform reviews (III) with an open in-review workflow links
- *      directly to that workflow's `/dev/editorial-review/<id>`.
+ *   3. Longform reviews (III) with an in-review longform entry links
+ *      directly to that entry's `/dev/editorial-review/entry/<uuid>`
+ *      (pipeline-redesign Task 36 — entry-uuid keyed review surface).
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -21,12 +22,11 @@ import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { DeskworkConfig } from '@deskwork/core/config';
-import { writeCalendar } from '@deskwork/core/calendar';
-import type { EditorialCalendar } from '@deskwork/core/types';
-import { createWorkflow } from '@deskwork/core/review/pipeline';
+import { writeSidecar } from '@deskwork/core/sidecar';
+import type { Entry } from '@deskwork/core/schema/entry';
 import { createApp } from '../src/server.ts';
 
-const ENTRY_ID = 'cccccccc-dddd-4eee-8fff-aaaaaaaaaaaa';
+const ENTRY_UUID = 'cccccccc-dddd-4eee-8fff-aaaaaaaaaaaa';
 
 function makeConfig(): DeskworkConfig {
   return {
@@ -41,40 +41,26 @@ function makeConfig(): DeskworkConfig {
   };
 }
 
-function seedEmpty(root: string, cfg: DeskworkConfig): void {
+function seedEmpty(root: string): void {
   mkdirSync(join(root, '.deskwork'), { recursive: true });
   mkdirSync(join(root, 'docs'), { recursive: true });
-  writeCalendar(
-    join(root, cfg.sites.d.calendarPath),
-    { entries: [], distributions: [] } satisfies EditorialCalendar,
-  );
 }
 
-function seedWithLongform(root: string, cfg: DeskworkConfig): void {
-  seedEmpty(root, cfg);
-  const cal: EditorialCalendar = {
-    entries: [
-      {
-        id: ENTRY_ID,
-        slug: 'a-longform',
-        title: 'A Longform',
-        description: '',
-        stage: 'Review',
-        targetKeywords: [],
-        source: 'manual',
-      },
-    ],
-    distributions: [],
-  };
-  writeCalendar(join(root, cfg.sites.d.calendarPath), cal);
-  createWorkflow(root, cfg, {
-    entryId: ENTRY_ID,
-    site: 'd',
+async function seedWithLongform(root: string): Promise<void> {
+  seedEmpty(root);
+  const entry: Entry = {
+    uuid: ENTRY_UUID,
     slug: 'a-longform',
-    contentKind: 'longform',
-    initialMarkdown:
-      '---\ntitle: A Longform\n---\n\n# A Longform\n\nProse.\n',
-  });
+    title: 'A Longform',
+    keywords: [],
+    source: 'manual',
+    currentStage: 'Drafting',
+    iterationByStage: { Drafting: 1 },
+    reviewState: 'in-review',
+    createdAt: '2026-04-30T10:00:00.000Z',
+    updatedAt: '2026-04-30T10:00:00.000Z',
+  };
+  await writeSidecar(root, entry);
 }
 
 async function getHtml(
@@ -99,7 +85,7 @@ describe('studio index — sensible link defaults (#107)', () => {
   });
 
   it('Scrapbook (V) links to /dev/content with template hint visible', async () => {
-    seedEmpty(root, cfg);
+    seedEmpty(root);
     const app = createApp({ projectRoot: root, config: cfg });
     const r = await getHtml(app, '/dev/');
     expect(r.status).toBe(200);
@@ -113,8 +99,8 @@ describe('studio index — sensible link defaults (#107)', () => {
     expect(r.html).toContain('&lt;site&gt;/&lt;path&gt;');
   });
 
-  it('Longform (III) with no open workflows links to dashboard Review anchor', async () => {
-    seedEmpty(root, cfg);
+  it('Longform (III) with no open entries links to dashboard Review anchor', async () => {
+    seedEmpty(root);
     const app = createApp({ projectRoot: root, config: cfg });
     const r = await getHtml(app, '/dev/');
     expect(r.status).toBe(200);
@@ -129,18 +115,19 @@ describe('studio index — sensible link defaults (#107)', () => {
     expect(r.html).toContain('Defaults to the dashboard');
   });
 
-  it('Longform (III) with an open longform workflow deep-links to it', async () => {
-    seedWithLongform(root, cfg);
+  it('Longform (III) with an in-review longform entry deep-links to it by uuid', async () => {
+    await seedWithLongform(root);
     const app = createApp({ projectRoot: root, config: cfg });
     const r = await getHtml(app, '/dev/');
     expect(r.status).toBe(200);
 
-    // The href is `/dev/editorial-review/<workflow-uuid>` for the
-    // most-recent in-review longform.
-    expect(r.html).toMatch(
-      /<a class="er-toc-entry__title" href="\/dev\/editorial-review\/[0-9a-f-]+">\s*Longform reviews\s*<\/a>/,
+    // The href is `/dev/editorial-review/entry/<entry-uuid>` for the
+    // most-recent in-review longform entry (Task 36 — entry-uuid keyed
+    // review surface replaces the legacy workflow-uuid keyed path).
+    expect(r.html).toContain(
+      `<a class="er-toc-entry__title" href="/dev/editorial-review/entry/${ENTRY_UUID}">`,
     );
-    // postHint surfaces the slug so the operator knows which workflow
+    // postHint surfaces the slug so the operator knows which entry
     // they'll land on.
     expect(r.html).toContain('a-longform');
   });
