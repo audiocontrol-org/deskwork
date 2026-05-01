@@ -15,7 +15,7 @@ function calendarMd(uuid: string, slug: string, stage: string): string {
     `| ${uuid} | ${slug} | T-${slug} |  |  |  | ${NOW} |\n\n`;
 }
 
-function entryJson(uuid: string, slug: string, stage: string): string {
+function entryJson(uuid: string, slug: string, stage: string, artifactPath?: string): string {
   return JSON.stringify({
     uuid,
     slug,
@@ -24,6 +24,7 @@ function entryJson(uuid: string, slug: string, stage: string): string {
     source: '',
     currentStage: stage,
     iterationByStage: {},
+    ...(artifactPath !== undefined && { artifactPath }),
     createdAt: NOW,
     updatedAt: NOW,
   });
@@ -109,5 +110,44 @@ describe('validateAll - file-presence', () => {
     const fails = result.failures.filter((f) => f.category === 'file-presence');
     expect(fails.length).toBe(1);
     expect(fails[0].entryId).toBe(uuid);
+  });
+
+  it('reads entry.artifactPath when present (does not derive from slug+stage heuristic, #140)', async () => {
+    const uuid = '55555555-5555-5555-5555-555555555555';
+    const slug = 'custom-layout';
+    // Sidecar declares an explicit artifactPath outside the heuristic shape.
+    await writeFile(
+      join(projectRoot, '.deskwork', 'entries', `${uuid}.json`),
+      entryJson(uuid, slug, 'Drafting', 'docs/1.0/custom-layout.md'),
+    );
+    await writeFile(
+      join(projectRoot, '.deskwork', 'calendar.md'),
+      calendarMd(uuid, slug, 'Drafting'),
+    );
+    // File at the explicit path; heuristic path (docs/<slug>/index.md) is empty.
+    await mkdir(join(projectRoot, 'docs', '1.0'), { recursive: true });
+    await writeFile(join(projectRoot, 'docs', '1.0', 'custom-layout.md'), '');
+
+    const result = await validateAll(projectRoot);
+    const fails = result.failures.filter((f) => f.category === 'file-presence');
+    expect(fails).toEqual([]);
+  });
+
+  it('still flags missing file at the explicit artifactPath', async () => {
+    const uuid = '66666666-6666-6666-6666-666666666666';
+    const slug = 'custom-missing';
+    await writeFile(
+      join(projectRoot, '.deskwork', 'entries', `${uuid}.json`),
+      entryJson(uuid, slug, 'Drafting', 'docs/1.0/custom-missing.md'),
+    );
+    await writeFile(
+      join(projectRoot, '.deskwork', 'calendar.md'),
+      calendarMd(uuid, slug, 'Drafting'),
+    );
+
+    const result = await validateAll(projectRoot);
+    const fails = result.failures.filter((f) => f.category === 'file-presence');
+    expect(fails.length).toBe(1);
+    expect(fails[0].message).toMatch(/docs\/1\.0\/custom-missing\.md/);
   });
 });

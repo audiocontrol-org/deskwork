@@ -165,6 +165,24 @@ function artifactPathForStage(projectRoot: string, slug: string, stage: Stage): 
 }
 
 /**
+ * Resolve the on-disk artifact path for an entry.
+ *
+ * Precedence:
+ *   1. entry.artifactPath (when set — see #140 / migration)
+ *   2. slug+stage heuristic (`artifactPathForStage`) for entries without
+ *      an explicit path. Off-pipeline stages (Blocked / Cancelled) still
+ *      return null.
+ *
+ * Returns null when no artifact is expected for this stage.
+ */
+function resolveArtifactPath(projectRoot: string, entry: Entry): string | null {
+  if (entry.artifactPath) {
+    return join(projectRoot, entry.artifactPath);
+  }
+  return artifactPathForStage(projectRoot, entry.slug, entry.currentStage);
+}
+
+/**
  * Minimal frontmatter `deskwork.stage` extractor.
  *
  * The plugin's frontmatter is YAML-ish, but for the validator's narrow purpose
@@ -207,7 +225,7 @@ async function validateFrontmatterSidecar(projectRoot: string): Promise<Validati
   const failures: ValidationFailure[] = [];
   const sidecars = await loadSidecars(projectRoot);
   for (const { entry, path: sidecarPath } of sidecars) {
-    const artifactPath = artifactPathForStage(projectRoot, entry.slug, entry.currentStage);
+    const artifactPath = resolveArtifactPath(projectRoot, entry);
     if (!artifactPath) continue;
     if (!(await fileExists(artifactPath))) continue; // file-presence handles missing artifacts
     const md = await readFile(artifactPath, 'utf8');
@@ -308,7 +326,7 @@ async function validateFilePresence(projectRoot: string): Promise<ValidationFail
   const failures: ValidationFailure[] = [];
   const sidecars = await loadSidecars(projectRoot);
   for (const { entry, path } of sidecars) {
-    const artifactPath = artifactPathForStage(projectRoot, entry.slug, entry.currentStage);
+    const artifactPath = resolveArtifactPath(projectRoot, entry);
     if (!artifactPath) continue;
     if (!(await fileExists(artifactPath))) {
       failures.push({
