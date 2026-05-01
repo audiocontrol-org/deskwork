@@ -1,0 +1,62 @@
+{
+  "press-check": {
+    "term": "press-check",
+    "gloss": "The final pre-print review of a galley proof. In the studio, the longform-review surface where margin notes are added before approval.",
+    "seeAlso": ["galley", "proof"]
+  },
+  "galley": {
+    "term": "galley",
+    "gloss": "A column-proof of typeset copy. In the studio, the rendered article under review.",
+    "seeAlso": ["proof", "press-check"]
+  },
+  "compositor": {
+    "term": "compositor",
+    "gloss": "The typesetter at the press. In the studio, the operator-and-agent pair driving the editorial workflow.",
+    "seeAlso": []
+  },
+  "proof": {
+    "term": "proof",
+    "gloss": "A draft printed for review. In the studio, the document state passed between pipeline stages.",
+    "seeAlso": ["galley", "press-check"]
+  },
+  "marginalia": {
+    "term": "margin notes",
+    "gloss": "Notes written in the margins of a proof. In the studio, the comments left on the longform-review surface.",
+    "seeAlso": ["press-check"]
+  },
+  "stamp": {
+    "term": "stamp",
+    "gloss": "A status badge on a proof — approved, iterating, applied, etc.",
+    "seeAlso": []
+  },
+  "kicker": {
+    "term": "kicker",
+    "gloss": "A small label above the title of an article — typographic context for what's about to be read.",
+    "seeAlso": []
+  },
+  "flat-plan": {
+    "term": "flat plan",
+    "gloss": "An editorial layout-planning document showing what runs where. In the studio, the dashboard.",
+    "seeAlso": []
+  },
+  "desk-inset": {
+    "term": "desk inset",
+    "gloss": "A clipboard view of a single entry under inspection — the entry-review surface.",
+    "seeAlso": []
+  },
+  "dispatch": {
+    "term": "dispatch",
+    "gloss": "Moving a proof through pipeline stages. In the studio, the approve / iterate / publish actions.",
+    "seeAlso": ["proof"]
+  },
+  "stet": {
+    "term": "stet",
+    "gloss": "A proofreading mark meaning 'let it stand' — undoes a previous correction.",
+    "seeAlso": []
+  },
+  "scrapbook": {
+    "term": "scrapbook",
+    "gloss": "Research material kept alongside an article — clippings, screenshots, drafts. In the studio, the per-entry research store.",
+    "seeAlso": []
+  }
+}
