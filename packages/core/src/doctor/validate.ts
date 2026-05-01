@@ -298,6 +298,24 @@ async function validateIterationHistory(projectRoot: string): Promise<Validation
   return failures;
 }
 
+async function validateFilePresence(projectRoot: string): Promise<ValidationFailure[]> {
+  const failures: ValidationFailure[] = [];
+  const sidecars = await loadSidecars(projectRoot);
+  for (const { entry, path } of sidecars) {
+    const artifactPath = artifactPathForStage(projectRoot, entry.slug, entry.currentStage);
+    if (!artifactPath) continue;
+    if (!(await fileExists(artifactPath))) {
+      failures.push({
+        category: 'file-presence',
+        message: `sidecar currentStage=${entry.currentStage} requires artifact at ${artifactPath} but the file is missing`,
+        entryId: entry.uuid,
+        path,
+      });
+    }
+  }
+  return failures;
+}
+
 export async function validateAll(projectRoot: string): Promise<ValidationResult> {
   const failures: ValidationFailure[] = [];
   failures.push(...(await validateSchema(projectRoot)));
@@ -305,7 +323,7 @@ export async function validateAll(projectRoot: string): Promise<ValidationResult
   failures.push(...(await validateFrontmatterSidecar(projectRoot)));
   failures.push(...(await validateJournalSidecar(projectRoot)));
   failures.push(...(await validateIterationHistory(projectRoot)));
-  // Tasks 28-30 add: validateFilePresence, validateStageInvariants,
-  // validateCrossEntry.
+  failures.push(...(await validateFilePresence(projectRoot)));
+  // Tasks 29-30 add: validateStageInvariants, validateCrossEntry.
   return { failures };
 }
