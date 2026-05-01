@@ -1,6 +1,6 @@
 {
   "name": "@deskwork/plugin-studio",
-  "version": "0.10.2",
+  "version": "0.11.0",
   "private": true,
   "description": "Web studio plugin for Claude Code — thin shell pointing at @deskwork/studio",
   "license": "GPL-3.0-or-later",
@@ -13,6 +13,6 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@deskwork/studio": "0.10.2"
+    "@deskwork/studio": "0.11.0"
   }
 }
