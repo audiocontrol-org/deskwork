@@ -297,6 +297,13 @@ export function createApp(ctx: StudioContext): Hono {
   // build is actually running. Surfaced in the dashboard masthead too.
   app.get('/api/dev/version', (c) => c.json({ version: getStudioVersion() }));
 
+  // #144: bare `/dev/editorial-review` (no UUID, no slug) redirects to
+  // the dashboard. The Index page promised a meaningful default; the
+  // dashboard IS the canonical entry point for picking which entry to
+  // review.
+  app.get('/dev/editorial-review', (c) => c.redirect('/dev/editorial-studio'));
+  app.get('/dev/editorial-review/', (c) => c.redirect('/dev/editorial-studio'));
+
   // Page routes
   app.get('/dev', async (c) => c.html(await renderStudioIndex(ctx)));
   app.get('/dev/', async (c) => c.html(await renderStudioIndex(ctx)));
@@ -456,6 +463,17 @@ export function createApp(ctx: StudioContext): Hono {
   // captures arbitrarily-deep hierarchical addresses (e.g.
   // `the-outbound/characters/strivers`). Hono's `:path{.+}` regex
   // matcher swallows everything after the site segment.
+  // #143: bare `/dev/scrapbook/<site>` (no path segment) is reachable
+  // from the Index page copy ("address directly") but had no route. The
+  // intended discovery path for scrapbook is the Content view's
+  // per-node drawer, so redirect to the site's content tree.
+  app.get('/dev/scrapbook/:site', (c) =>
+    c.redirect(`/dev/content/${c.req.param('site')}`),
+  );
+  app.get('/dev/scrapbook/:site/', (c) =>
+    c.redirect(`/dev/content/${c.req.param('site')}`),
+  );
+
   app.get('/dev/scrapbook/:site/:path{.+}', async (c) => {
     const site = c.req.param('site');
     const path = decodeURIComponent(c.req.param('path'));
