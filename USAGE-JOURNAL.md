@@ -1312,3 +1312,94 @@ Each surface a real-world wrinkle no fixture exercises. Worth preserving when `/
 - **Operator's stance hardened on Claude Code plugin scope:** *"I shouldn't install plugins project-wide until claude code's plugin infrastructure is less buggy."* Cross-project PATH leakage + stale-entry persistence + cache eviction add up to a "stay user-scope only" posture. The deskwork plugins cooperate with that (the v0.10.1 SessionStart hook + v0.12.0's repair-install scope filter both make user-scope safer). Adopter friction in the broader Claude Code plugin model is the reason the deskwork project keeps shipping cache-resilience work.
 
 - **The `/post-release:walk` deferred feature would have automated this session's first 30 minutes.** Each issue I filed manually is a finding the playbook would have generated. Worth keeping that as the "next sprint" hook: when Phase 29 lands, this session's surface is the validation set.
+
+---
+
+## 2026-05-01: Pipeline-walk dogfood against v0.12.0 — testing the rearchitecture by actually using it
+
+**Session goal:** answer *"how confident are we that the big rearchitecture of the workflow pipeline is functionally sound?"* by walking a real entry through Ideas → Planned → ... → Published on this project's calendar. Not a synthesized fixture; the actual entries that have been accumulating in `.deskwork/entries/` since Phase 30 shipped.
+
+**Surface exercised:** `node_modules/.bin/deskwork {approve,publish,doctor}` (workspace bin, dev workflow); `deskwork-studio` boot via `npm run dev`; studio HTTP API endpoints (`/api/dev/editorial-review/entry/<uuid>/{approve,block,cancel,induct}`, `/api/dev/version`); studio dashboard (Playwright in-browser eval for #109 timezone verification); `deskwork doctor --check` and `--fix=all` against the live calendar after each mutation.
+
+### What the walk surfaced
+
+#### 1. CLI `approve` crashes on Ideas-stage entries
+
+**friction.** First step of the walk: `node_modules/.bin/deskwork approve . post-release-acceptance-design` against an Ideas-stage entry. Immediate `TypeError: Cannot read properties of undefined (reading 'kind')` from `@deskwork/core/dist/review/pipeline.js:195`. Stack trace: `readVersions` → `handleGetWorkflow` → CLI `approve.js`. The CLI was unconditionally calling `handleGetWorkflow` (legacy review-workflow store), which chokes on `undefined.kind` when no `review-journal/pipeline/*.json` workflow record exists for the entry. After Phase 30, entry-centric entries don't have such records.
+
+**diagnosis.** Phase 30 split the `iterate` CLI dispatcher (longform/outline → entry-centric `iterateEntry`; shortform → legacy). The same split was never applied to `approve`. Phase 31 added the entry-centric `approveEntryStage` core helper + studio POST endpoint, but the CLI / `/deskwork:approve` skill path was unchanged.
+
+**fix.** Filed [#147](https://github.com/audiocontrol-org/deskwork/issues/147), then applied the dispatcher split: `--platform` set → legacy shortform; otherwise → `runLongformApprove` which delegates to `approveEntryStage`. Verified end-to-end against the same Ideas-stage entry: clean JSON output, no crash, sidecar advanced to Planned. Time from "edit" to "verified live": ~2 minutes.
+
+**insight.** *"Two-thirds of the verb surface (CLI `approve`, CLI `publish`) is on the legacy path and crashes or corrupts state on the entry-centric data model that v0.11.1+ creates."* The vitest suites pass at v0.12.0 because no test exercises the dispatcher boundary against entry-centric data — the unit tests cover legacy workflow records, the entry-centric tests use the helper directly. The seam between them is only walked when an adopter runs the CLI/skill against a real entry. Pattern: dispatcher boundaries need integration tests that run the CLI against entry-centric fixtures, not just helper-level tests.
+
+#### 2. Studio API works, calendar.md silently lags
+
+**friction.** Switched the walk to the studio API (`POST /api/dev/editorial-review/entry/<uuid>/approve`). Each call advanced one stage cleanly — sidecar updated, journal event written, response 200 with `{fromStage, toStage}`. But `calendar.md` was NOT regenerated. After Ideas → Planned, the file still showed the entry under `## Ideas`. After Outlining → Drafting, still under Ideas. Visible state lagged the SSOT by every transition the operator made.
+
+**second friction.** Ran `deskwork doctor --check` to see if it caught the drift. It reported `Doctor: clean (no findings across 1 site(s))`. False clean. Ran `deskwork doctor --fix=all` — it printed `Doctor: clean` AND `Entry-centric repair applied: calendar-regenerated`. The repair fired unconditionally and regenerated calendar.md, but the validator output still said "clean" — there was no preceding finding to repair against.
+
+**fix.** Filed [#148](https://github.com/audiocontrol-org/deskwork/issues/148). Two-part fix: extracted shared `regenerateCalendar(projectRoot)` helper; called it from all four entry helpers (`approveEntryStage`, `blockEntry`, `cancelEntry`, `inductEntry`). Extended `validateCalendarSidecar` to compare each entry's calendar-section membership against `sidecar.currentStage` and surface mismatch as a `calendar-sidecar` failure. Verified live: studio approve immediately re-renders calendar.md; manually-injected drift caught by `--check` (exit 1) with structured failure message.
+
+**insight.** The "sidecar is SSOT" model was correct in concept but had a quiet leak: the studio mutation path bypassed the SSOT projection. Adopters opening calendar.md after a studio click would see stale data; only `doctor --fix=all` would reconcile it (silently). The fix preserves the SSOT promise — every mutation path now projects to calendar.md atomically.
+
+#### 3. CLI `publish` corrupts state silently
+
+**friction.** Walked Drafting → Final via studio API, then ran `deskwork publish . post-release-acceptance-design` from the CLI. The command succeeded — emitted `{stage: "Published", datePublished: "2026-05-01", ...}`. But the sidecar still recorded `currentStage: "Final"`. The two SSOTs disagreed. If `doctor --fix=all` ran afterward, it would regenerate calendar.md from sidecars (which still said Final) — silently reverting the publish, with the only persistent record of the publish being the now-orphaned `datePublished` field that would also get wiped on regen.
+
+**diagnosis.** `publish` is the SAME bug as `approve` (#147): legacy-only dispatcher, no entry-centric path. Confirmed during the walk; filed [#150](https://github.com/audiocontrol-org/deskwork/issues/150). Same fix shape: new `publishEntry` core helper (refuses if `currentStage !== 'Final'`, sets sidecar.currentStage + datePublished, emits journal event, regenerates calendar); CLI dispatcher tries entry-centric first via `resolveEntryUuid`, falls through to legacy when no sidecar exists.
+
+**fix.** Verified live: walked through to Final via studio, then `deskwork publish` produced clean JSON, sidecar updated to Published with datePublished, calendar regenerated, doctor reports clean. End-to-end ~5 minutes from edit to verification.
+
+**insight.** Not just one CLI verb left behind by the entry-centric refactor — TWO. The dispatcher-split pattern is a load-bearing recurring shape across all CLI verbs that operate on entries. Worth elevating as a coding convention: any future CLI verb operating on entries follows the same dispatcher shape from day one.
+
+#### 4. Doctor migration was non-idempotent
+
+**friction.** During the walk, after CLI publish (which wrote calendar.md via the legacy renderer), I ran `doctor --fix=all` to see what it would say. It reported *"Doctor: legacy schema detected — would migrate 4 entries (dry run)"* — even though the project had been fully migrated since Phase 30 (4 valid sidecars in `.deskwork/entries/`). Then `--fix=all` actually re-ran the migration AND printed 3 validation failures. The migration overrode my Ideas-stage entry's correct `artifactPath: docs/1.0/post-release-acceptance-design.md` with `docs/superpowers/specs/2026-04-30-post-release-acceptance-design.md` — a path that doesn't exist on disk (was the original `sourceFile` from the legacy ingest journal, but the file had moved post-ingest).
+
+**diagnosis.** `detectLegacySchema` checked calendar.md for `## Paused` / `## Review` section names. After CLI publish wrote calendar.md via the legacy 7-stage renderer, those section names came back. Doctor saw them and inferred "pre-migration." The migration treated the existing sidecars as starting state to overwrite, not as authoritative data to preserve.
+
+**fix.** Filed [#149](https://github.com/audiocontrol-org/deskwork/issues/149). `detectLegacySchema` now gates on `.deskwork/entries/` directory presence — if it exists (even empty), the project has been migrated. Calendar.md drift is a SEPARATE problem to fix via #148's reconciliation pass, not via destructive re-migration.
+
+**insight.** Three distinct bugs cascaded from one root cause: legacy CLI verbs writing calendar.md in the legacy shape. Each individual bug surfaced separately during the walk, but they fed each other. The cleanest fix was at three layers: (a) the dispatcher splits stop legacy verbs from writing legacy-shaped calendars (#147, #150); (b) the regenerate hook keeps calendar.md in sync after entry-centric mutations (#148); (c) the migration gate refuses to re-migrate already-migrated state (#149). Defense in depth — any one layer would have masked symptoms; all three together preserve the SSOT promise.
+
+### Studio UX walkthrough
+
+**friction.** Boot studio via `npm run dev`, open dashboard at `/dev/editorial-studio`. Issues observed:
+- Dates rendered as `2026-05-01` (UTC slice) for a `2026-05-01T04:20:20Z` timestamp — operator in PT (UTC-7) sees the wrong day (`Apr 30` would be correct).
+- Studio version not visible anywhere in the UI; no way to verify which build is running without grepping the cache directory.
+- Empty stages render with multi-line placeholder bodies; six empty stages × 3 lines each = ~18 lines of nothing on a low-volume calendar.
+- Status badges (`OPEN V1`, `ITERATING V1`, `APPLIED`) styled with dashed borders that read as interactive controls, but they're inert `<span>` elements — clicking does nothing.
+
+**fix.** Filed nothing new — these matched [#109](https://github.com/audiocontrol-org/deskwork/issues/109), [#111](https://github.com/audiocontrol-org/deskwork/issues/111), [#112](https://github.com/audiocontrol-org/deskwork/issues/112), [#117](https://github.com/audiocontrol-org/deskwork/issues/117) already on the backlog. Fixed all four in one commit using the dev workflow:
+- #109: server emits `<time datetime="..." data-format="date">` with UTC fallback; client `Intl.DateTimeFormat` rewrites in the operator's locale post-load. Verified via Playwright `browser_evaluate`: `2026-05-01T04:20Z` rendered as `Apr 30, 2026` in PT.
+- #111: `getStudioVersion()` reads package.json via `import.meta.url`; surfaced in masthead + new `/api/dev/version` JSON endpoint.
+- #112: empty stages render compact (header only, no placeholder body).
+- #117: status badges wrapped in `<a>` to the entry's review surface — clicking the dashed border now navigates.
+
+**insight.** The browser test (Playwright eval) caught one case curl couldn't: the timezone fix is client-side enhancement, invisible to server-rendered HTML scrapes. Worth recognizing the pattern: dynamic UI behavior needs in-browser verification, not just HTTP probes.
+
+### Studio routing — promised URLs that 404'd
+
+**friction.** Three URLs the Index page (`/dev/`) describes as reachable but the router 404'd on:
+- `/dev/scrapbook/<site>` (bare site root, no path) — Index says *"address directly"*, route returned 404.
+- `/dev/editorial-review` (no UUID/slug) — Index says *"defaults to the dashboard's Review section"*, route returned 404.
+- `/dev/content/<site>/<slug>` for entries whose artifact lives DEEP in the tree (e.g. `<contentDir>/1.0/<slug>.md`) — route returned `unknown project: <slug>`.
+
+**fix.** Filed nothing new — matched [#143](https://github.com/audiocontrol-org/deskwork/issues/143), [#144](https://github.com/audiocontrol-org/deskwork/issues/144), [#145](https://github.com/audiocontrol-org/deskwork/issues/145) already on the backlog. Each now redirects to the canonical surface — `/dev/scrapbook/<site>` → `/dev/content/<site>` (302); `/dev/editorial-review` → `/dev/editorial-studio` (302); slug-only URL for nested entries → meta-refresh to canonical deep path. Verified end-to-end against the live studio.
+
+**insight.** Index page copy is a UX contract. When prose says "this URL works," it shouldn't 404. Either implement the route or correct the copy. The fix shape (redirect to the documented canonical surface) was simpler than I expected — three small route handlers.
+
+### Bigger-picture observations
+
+- **The dev workflow shipped by Phase 31 paid for itself this session.** Each of the 4 fundamental bugs surfaced (#147/#148/#149/#150) would have cost a full release cycle (~20 min + operator OTP rounds) under the old workflow. With `npm run dev` + workspace bin, each verified end-to-end in <15 min. Operator's framing was binding: *"the release cycle is very expensive, I want to fix as many issues as we can before cutting the next release."* — the dev workflow IS the answer to that constraint.
+
+- **A pipeline walk surfaces fundamentally different bugs than a test suite.** The vitest suites were green at v0.12.0, but #147/#148/#149/#150 are all dispatcher-boundary or migration-state bugs that no unit test exercises. The walk surfaced them within 30 minutes of starting. Pattern worth preserving: one walk per release, against this project's real calendar. Phase 29's `/post-release:walk` skill (still deferred) is precisely the automation of this rhythm.
+
+- **"How confident?" is best answered by walking the system.** Operator asked the question; my first answer was a hedged 70%/50%/60% breakdown across schema/migration/studio. Operator's pointed *"why can't you run an item through the pipeline?"* converted my speculation into 4 issue filings + 4 commits + 4 verified live behaviors in under an hour. The walk replaced 6 paragraphs of speculation with an actionable assessment grounded in observation. **insight.** Operators don't trust hedged percentages from systems they can audit. They trust filed issues + demonstrated fixes. *"How confident?"* maps to *"have you tried it?"* — and the only honest answer is doing the trial.
+
+- **Issue closure rule generalized.** I proposed closing #147/#148/#149 immediately after the commits landed. Operator: *"we cant close issues until we've verified they are fixed in a formally installed release."* The previous rule had a carve-out for agent-filed issues (could close on commit). The carve-out was wrong — the formal-release verification IS the bar that distinguishes "I tested it locally" from "adopters can use it." Updated `.claude/rules/agent-discipline.md` to be uniform: every issue waits for formal-release verification, regardless of who filed it.
+
+- **Dead code as adopter-facing latent bug.** #124's rename-form client (236 lines of orphaned TypeScript) was technically broken since Phase 30 — the client looks for a server-rendered form that no renderer emits. The bug only "existed" if someone happened to encounter it; deleting the module is the cleanest fix. Pattern: when phasing out a feature, delete the client code in the same release as the server-side removal — orphaned client code is a latent bug surface that surfaces unpredictably.
+
+- **The `/post-release:walk` deferred feature would have automated this session's first hour.** Each of the 4 issues filed manually is a finding the playbook (Phase 29) would have generated. The walk pattern itself is becoming the validation set for that feature when it lands.

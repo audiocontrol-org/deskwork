@@ -1496,3 +1496,54 @@ Each phase reached a stable checkpoint, reviewed and committed.
 - **Stop-gap exit criteria:** when dw-lifecycle ships customizable lifecycle stages (tracked separately, no current target), file a migration issue to (1) move `/release` and `/post-release:*` skill bodies into dw-lifecycle, (2) move `docs/post-release/*` paths to whatever dw-lifecycle prescribes, (3) convert the procedural "review playbook" amendment into a typed workflow phase. Until then, the design + this workplan + the implementation are the contract.
 - **Why HTTP-only cursory + Playwright-only deep:** the design called for Playwright in cursory, but Playwright adds significant boot time and cross-platform install friction. Splitting the dependency means cursory stays fast (5–10 min budget) and Playwright failures don't block the post-release walk for adopters who only want the cursory check. If this scope split proves wrong in practice, fold Playwright back into cursory in a follow-up sub-phase.
 - **Open questions from design** (`Open questions for operator review` section): #1 sandbox path (`mktemp` vs deterministic) — recommendation `mktemp` carries forward; will confirm at T11. #2 `post-release` label — recommendation yes, baked into T16. #3 stalled findings doc — leave as-is per content-management-databases-preserve rule. #4 issue de-dup — recommendation no de-dup; baked into T16. #5 skill family location — `plugins/deskwork/skills/post-release/{walk,file-issues}/SKILL.md` baked into T8 + T17.
+
+---
+
+### Phase 32: Post-v0.12.0 pipeline-walk dogfood + bug-fix sweep — v0.12.1 candidate
+
+**Status:** source-complete; awaiting `/release` to publish v0.12.1, then verify-against-installed-artifact before any issue closures.
+
+**Trigger:** operator question — *"how confident are we that the big rearchitecture of the workflow pipeline is functionally sound?"* — escalated into a manual pipeline walk on this project's calendar. The walk surfaced fundamental bugs that local tests missed because the test suite didn't exercise the dispatcher boundary between legacy CLI verbs and Phase 30 entry-centric helpers.
+
+**Goal:** prove (or refute) the entry-centric pipeline's functional soundness by walking a real entry through Ideas → Planned → ... → Published, then fix every defect surfaced and verify each fix against the live calendar in the dev environment — without paying the release cycle for each iteration.
+
+**Pipeline walk findings (filed in real time):**
+- [#147](https://github.com/audiocontrol-org/deskwork/issues/147) — CLI `approve` crashes with `TypeError` on entry-centric Ideas-stage entries.
+- [#148](https://github.com/audiocontrol-org/deskwork/issues/148) — Studio API stage transitions don't regenerate calendar.md; doctor `--check` misses the drift.
+- [#149](https://github.com/audiocontrol-org/deskwork/issues/149) — `doctor --fix=all` re-runs legacy migration on already-migrated state, overwriting correct sidecar fields.
+- [#150](https://github.com/audiocontrol-org/deskwork/issues/150) — CLI `publish` writes calendar.md without updating sidecar.
+
+**Tasks (all completed):**
+
+- [x] Walk an Ideas-stage entry through every linear pipeline stage via studio API and CLI; surface and file friction as discovered.
+- [x] Fix #147: dispatcher split for CLI `approve` mirroring `iterate.ts` (commit `b9d3b7c`). 6 vitest regression cases.
+- [x] Fix #148: extract `regenerateCalendar(projectRoot)` helper; wire into `approveEntryStage`/`blockEntry`/`cancelEntry`/`inductEntry`; extend `validateCalendarSidecar` to flag stage-section drift (commit `a382bb1`). 3 regression cases.
+- [x] Fix #149: `detectLegacySchema` gates on entries-dir presence rather than calendar.md section names (commit `3fafdc9`). 3 regression cases.
+- [x] Document agent-discipline rule: no issue closure until verified in a formally-installed release; supersedes prior agent-filed-vs-customer-filed distinction (commit `4e38c53`).
+- [x] Fix #150: dispatcher split for CLI `publish` with new `publishEntry` core helper (commit `2ab4517`). 14 regression cases (9 core + 5 cli).
+- [x] Studio UX sweep — #109 (locale-aware `<time>` rendering via Intl.DateTimeFormat); #111 (`/api/dev/version` endpoint + masthead version display); #112 (compact empty-stage rendering, header-only); #117 (status badges wrapped in `<a>` to review surface) (commit `145dd6a`). 5 regression cases.
+- [x] #124 — delete orphaned rename-form client (dead since Phase 30 dashboard rewrite, never reaches an adopter at runtime) (commit `d3dd9f8`).
+- [x] Studio routing — #143 (bare `/dev/scrapbook/<site>` redirects to content view); #144 (bare `/dev/editorial-review` redirects to dashboard); #145 (slug-only `/dev/content/<site>/<slug>` for deeply-nested entries redirects to canonical deep path) (commit `0726b47`). 8 regression cases.
+- [x] Verify #110 (uniform UUID-keyed row links) and #113 (site-filter chrome removal) already fixed by Phase 30; both moot, awaiting release-time verification before closure.
+
+**Deferred / out of scope:**
+
+- [ ] Cut v0.12.1 via `/release` — operator decision; not done in this session per cost-of-release-cycle constraint.
+- [ ] Verify each fix against the marketplace install post-release; post evidence on each issue; operator closes per the new rule.
+- [ ] Investigate auto-refresh polling 404 (`/api/dev/editorial-studio/state-signature` returns 404 — surfaced in browser console during #109 verification; pre-existing, not regressed). File separately.
+- [ ] Tier C / older issues not touched: #109/#111/#112/#117 covered; #142 (design question), #114 (jargon glossary), #133 (Phase 29 playbook) — design or scope-too-big for v0.12.1.
+- [ ] dw-lifecycle plugin issues (#115–#136) — separate plugin, parked per project memory (per-project tailoring not yet landed).
+
+**Acceptance:**
+
+- [x] Functional soundness assessment for the entry-centric pipeline grounded in real walk data, not speculation.
+- [x] All four pipeline-walk-surfaced bugs (#147/#148/#149/#150) fixed in source with regression tests, verified live against this project's calendar.
+- [x] Studio UX sweep delivered against operator's "fix as many issues as we can before cutting the next release" directive.
+- [x] No issue closures pending v0.12.1 release + post-install verification (per the rule committed this session).
+- [x] Total: 9 commits since `08c1248`; 12 issues touched (10 fixed in source, 2 verified-already-moot); 959 tests passing (was 933 baseline, +26 regression cases); 0 regressions.
+
+**Notes:**
+
+- The session validated the Phase 31 dev-workflow infrastructure (`npm run dev` + `node_modules/.bin/deskwork`) as a successful release-cycle skip: ~15 minutes from "edit code" to "verified end-to-end against live calendar" per fix, vs. the 20+ minute release cycle that #147 alone would have cost.
+- The dispatcher-split pattern (longform/outline → entry-centric, shortform/legacy-platform → legacy) is now applied to `iterate` (Phase 30), `approve` (#147), and `publish` (#150). All other CLI verbs that operate on entries should follow the same shape going forward — there's no remaining "legacy-only" verb that operates on entry-centric data.
+- `.claude/rules/agent-discipline.md` updated: the prior distinction between agent-filed and customer-filed issues for closure purposes is removed. All issues — including agent dogfood findings — wait for formal-release verification before closure.

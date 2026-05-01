@@ -4,6 +4,105 @@ Session journal for `deskwork`. Each entry records what was tried, what worked, 
 
 ---
 
+## 2026-05-01: Phase 32 — pipeline-walk dogfood + bug-fix sweep, all in dev, no release cycle (v0.12.1 candidate)
+
+### Feature: deskwork-plugin
+### Worktree: deskwork-plugin
+
+**Goal:** answer the operator's "how confident are we that the rearchitecture is functionally sound?" question by walking a real entry through the entry-centric pipeline, then fix every defect surfaced — using only the dev workflow shipped by Phase 31, no release cycles. Operator's binding constraint: *"the release cycle is very expensive, I want to fix as many issues as we can before cutting the next release."*
+
+**Accomplished:**
+
+- **Pipeline walk against this project's live calendar.** Started with `post-release-acceptance-design` (Ideas) and tried to advance via CLI `deskwork approve` — immediate `TypeError` from legacy `handleGetWorkflow`. Switched to studio API for advancement (worked). Tried CLI `publish` from Final — succeeded but silently corrupted state (calendar.md updated, sidecar untouched). Each defect filed in real time as a GitHub issue.
+
+- **Filed 4 issues during the walk** ([#147](https://github.com/audiocontrol-org/deskwork/issues/147) approve dispatcher gap, [#148](https://github.com/audiocontrol-org/deskwork/issues/148) studio drift + doctor blindness, [#149](https://github.com/audiocontrol-org/deskwork/issues/149) doctor migration non-idempotency, [#150](https://github.com/audiocontrol-org/deskwork/issues/150) publish dispatcher gap).
+
+- **Fixed each issue using `npm run dev` + `node_modules/.bin/deskwork`.** ~15 min per fix (edit → save → workspace bin invocation against live data → vitest regression). The Phase 31 dev workflow paid for itself: 0 release cycles for 4 fundamental bugs.
+
+- **Studio UX sweep (#109/#111/#112/#117)** — dashboard locale-aware date rendering via Intl.DateTimeFormat (verified live in PT showing `2026-05-01T04:20Z` as `Apr 30, 2026`); studio version surfaced in masthead + new `/api/dev/version` endpoint; empty stages collapsed to header-only (no padding for low-volume calendars); status badges wrapped in `<a>` so the dashed-border affordance navigates instead of being inert.
+
+- **Studio routing fixes (#143/#144/#145)** — three URLs the Index page promised but the router 404'd. Each now redirects to the canonical surface: bare `/dev/scrapbook/<site>` → `/dev/content/<site>`; bare `/dev/editorial-review` → dashboard; slug-only `/dev/content/<site>/<slug>` for deeply-nested entries → canonical deep path.
+
+- **Dead-code cleanup (#124).** The rename-form client (`rename-form.ts`, 236 lines) was orphaned by Phase 30's dashboard rewrite — no server-side renderer emits the `data-rename-form` element it looks for, so the broken `/editorial-rename-slug` slash command never reaches an adopter at runtime. Deleted the module + import.
+
+- **Verified two issues already moot.** #110 (dashboard rows have no link target when no open workflow) — Phase 30's entry-centric refactor uniformly links every row to `/dev/editorial-review/<uuid>`. #113 (site-filter chrome on single-collection setups) — Phase 30's dashboard rewrite removed the site filter and per-row site badge entirely. Both verified by curl + DOM inspection; awaiting release-time verification before closure.
+
+- **New rule committed: no issue closure until verified in a formally-installed release.** Operator correction: *"we cant close issues until we've verified they are fixed in a formally installed release."* Updated `.claude/rules/agent-discipline.md` to remove the prior distinction between agent-filed (could close on commit) and customer-filed (waits for verification). The new rule is uniform: every issue waits for formal-release verification.
+
+- **Dev workflow infra committed.** Wrote `DEVELOPMENT.md` documenting the inner-loop pattern (`npm run dev`, `node_modules/.bin/deskwork`, watch builds, when to use which path); added `dev` scripts to root + cli/core packages; updated `/session-start` to reference the doc. Operator's framing: *"I would prefer to document the dev workflow and tooling in a top-level markdown file (maybe DEVELOPMENT.md?) and reference it from /session-start (we use this pattern for other process/workflow documentation to avoid such relitigation)."*
+
+- **Session statistics:** 9 commits since `08c1248`; 4 new issues filed; 12 issues touched (10 fixed in source, 2 verified-moot); 959 tests passing (was 933 baseline, +26 regression cases); 0 regressions across all four workspaces.
+
+**Didn't Work:**
+
+- **My initial confidence rating was speculation.** When asked "how confident?", my first answer was a hedged 70%/50%/60% breakdown across schema/migration/studio. Operator's pointed follow-up (*"why can't you run an item through the pipeline in this project?"*) revealed I was speculating without exercising the system. The rating wasn't grounded in any walk; the project HAD entries; I HAD verbs; nothing prevented me from just trying. Lesson: when the operator asks for a confidence assessment, exercising the system IS the assessment, not a precursor.
+
+- **First curl repro of the studio approve endpoint hit it twice** (separate curl for `-w "%{http_code}"`), so the entry advanced Ideas → Planned → Outlining instead of just Ideas → Planned. Useful data point that the endpoint is non-idempotent (advances on every POST), but the test methodology was sloppy. Lesson: state-mutating endpoints need single-call repros; don't run separate "status check" curls against a mutation URL.
+
+- **Initial #149 fix had a hole.** First version of `detectLegacySchema` returned `false` only when sidecars existed AND calendar.md had no legacy section names. That broke the existing test "returns true when no .deskwork/entries directory exists" — empty entries dir + clean calendar should still be migration-needed. Refined to gate on entries-dir presence alone (the directory IS the migration marker; even empty means migrated). Test suite caught it on first re-run.
+
+- **Test regex with backticks failed silently.** First version of the #147 regression test used `expect(stderr).toMatch(/use \`publish\`/)` — backticks inside the regex don't escape cleanly. Switched to `toContain('uses \`publish\`')`. Then the test still failed because the actual error message says "uses" not "use" (mine was off by one letter). Two iterations to get the assertion right; ~30s total.
+
+- **Studio dashboard test setup mismatch.** New regression cases used `getHtml(path)` but the existing helper takes `getHtml(app, path)`. First test run all 4 new cases failed with `app.fetch is not a function` (because `path` was being interpreted as `app`). Trivial fix; reminder that integration-test harnesses have specific signatures even when they look generic.
+
+**Course Corrections:**
+
+- **[FABRICATION] Speculation framed as confidence assessment.** Initial answer to "how confident?" was a tier-list with percentages, treated as authoritative, but grounded in nothing tangible. The walk took 15 minutes and replaced 6 paragraphs of speculation with 4 concrete bug filings. Lesson: when answering questions about system soundness, exercise the system before speaking.
+
+- **[PROCESS] Proposed closing issues immediately after committing fixes.** End of the multi-fix session, my "next moves" list said "push + close #147/#148/#149." Operator: *"we cant close issues until we've verified they are fixed in a formally installed release."* The rule was already in `agent-discipline.md` for customer-filed issues but had a carve-out for agent-filed ones. The carve-out was wrong. Updated the rule to be uniform.
+
+- **[COMPLEXITY] First fix attempt for #149 was over-restrictive.** Tried to gate the legacy-schema detection on BOTH sidecar existence AND clean calendar shape. The dual condition was wrong — the entries dir alone is the migration marker. Refined after the existing test suite caught the regression.
+
+- **[PROCESS] Sub-agent unused; all work in-thread.** This session was 6 commits' worth of TypeScript work + tests, end-to-end verification, and documentation. Per `.claude/rules/session-analytics.md`'s `[PROCESS] didn't delegate` correction, the default answer should have been "yes delegate." But each fix was small (single-file or two-file), the dev-workflow loop was tight, and breaking the work into agent dispatches would have added context-handoff overhead larger than the work itself. The leading question still applies — but the answer here was reasonably "in-thread" for genuinely small, well-defined fixes.
+
+**Quantitative:**
+
+- Messages from user: ~15 (mostly directive: *"do it"*, *"yes"*, *"can you fix more issues"*, plus the foundational *"how confident"* question and the closure-rule correction).
+- Commits to feature branch: 9 (since `08c1248`).
+  - `82c1bd6` — dev workflow infra (DEVELOPMENT.md + npm run dev + session-start ref)
+  - `b9d3b7c` — #147 CLI approve fix
+  - `a382bb1` — #148 calendar regen + drift validator
+  - `3fafdc9` — #149 doctor migration idempotency
+  - `4e38c53` — issue-closure rule update
+  - `2ab4517` — #150 CLI publish fix
+  - `145dd6a` — #109/#111/#112/#117 dashboard UX sweep
+  - `d3dd9f8` — #124 rename-form cleanup
+  - `0726b47` — #143/#144/#145 routing redirects
+- Issues filed during dogfood: 4 (#147, #148, #149, #150).
+- Issues touched: 12 (10 fixed in source, 2 verified-already-moot).
+- Files changed: ~25 (across `packages/core/`, `packages/cli/`, `packages/studio/`, `plugins/deskwork-studio/public/src/`, `.claude/rules/`, root docs).
+- Lines of code: ~1,400 net additions in src/, ~750 in test/, 236 deletions (rename-form cleanup).
+- Test counts at session end: core 459 (+17), cli 168 / 29 skipped (+5), studio 264 / 10 skipped (+12), dw-lifecycle 68 (unchanged). Total **959 passing**, 0 regressions.
+- Course corrections: 4 (1 [FABRICATION] speculation-as-assessment, 1 [PROCESS] premature-closure-proposal, 1 [COMPLEXITY] over-restrictive detection, 1 [PROCESS] no-delegation — judged appropriate this time).
+- Sub-agent dispatches: 0 (all in-thread).
+- Release cycles avoided: 4 minimum (#147, #148, #149, #150 each independently would have warranted a verify-before-fix cycle without the dev workflow).
+
+**Insights:**
+
+- **The Phase 31 dev workflow paid for itself in this single session.** Each of the 4 fundamental bugs (#147/#148/#149/#150) would have cost a full release cycle (~20 min + operator OTP rounds) to verify under the old workflow. With `npm run dev` + workspace bin, each verified end-to-end in <15 min. The infrastructure investment from Phase 31 was justified by THIS session's reliance on it.
+
+- **A pipeline walk surfaces fundamentally different bugs than a test suite.** The vitest suites were green at v0.12.0, but #147/#148/#149/#150 are all dispatcher-boundary or migration-state bugs that no unit test exercises (they live across legacy/entry-centric path splits, between studio and CLI, or at the doctor's repair-vs-validate seam). The walk surfaced them by exercising the realistic adopter path: open studio + use the CLI + run doctor afterward. Pattern worth preserving: one walk per release, against this project's real calendar.
+
+- **"Confidence" as a user-facing notion is best expressed by reproducing the failure modes, not by asserting a percentage.** Operators don't trust hedged percentages from systems they can audit. They trust filed issues and demonstrated fixes. The walk converted my speculation into 4 filings + 4 commits + 4 verified live behaviors. That's a different *kind* of answer than "70% confident."
+
+- **`/release` skill discipline keeps holding up.** The "no closure until released" rule is the same discipline that v0.11.0's smoke gate caught (zod missing). Both are about treating "shipped" as a higher bar than "tested." The agent-discipline.md update encodes that consistency.
+
+- **The dispatcher-split pattern is a load-bearing recurring shape.** Phase 30's iterate, this session's approve and publish — three CLI verbs needing the same legacy/entry-centric split. There's no remaining CLI verb that's legacy-only-on-entry-centric-data, but if a future verb operates on entries, the same dispatcher should be applied from day one. Worth elevating into a coding-convention note (likely already implied by the entry/* helpers' pattern).
+
+- **In-browser verification (Playwright) caught a fix that curl couldn't have.** The #109 timezone fix can't be observed via curl — the server emits UTC text and the client rewrites it post-load with `Intl.DateTimeFormat`. Browser eval confirmed `2026-05-01T04:20:20Z` rendered as `Apr 30, 2026` in PT. Worth recognizing: client-side enhancements need browser verification, not just HTTP probes.
+
+- **Dead code surfacing as adopter-facing bugs is real.** #124's rename-form client was technically broken since Phase 30 (the form was no longer rendered) but the bug only "existed" if someone happened to encounter it. Deleting the module is the cleanest fix. Pattern: when phasing out a feature, delete the client code in the same release as the server-side removal — orphaned client code is a latent bug surface.
+
+**Next session:**
+
+- **Cut v0.12.1 via `/release`** — the operator decision. Once shipped, walk each touched issue against the marketplace install: re-run the original repro on v0.12.1, post evidence as a comment on each issue, hand the closing transition to the operator.
+- **File the auto-refresh polling 404** (`/api/dev/editorial-studio/state-signature`) as a separate issue. Pre-existing, surfaced in browser console during this session's #109 verification. Likely a Phase 30 leftover where the polling endpoint was never wired up to the new entry-centric data.
+- **Tier B issues unaddressed:** #142 (design — pipeline stages vs. project-internal docs), #114 (jargon glossary), #133 (Phase 29 post-release playbook). All design-shaped; operator decides scope.
+- **Audiocontrol.org calendar dry-run** (Phase 30 carryover Task 40) — still deferred. Worth running before the next major release as a second-collection sanity check on migration + entry-centric behavior.
+- **Investigate the `--no-tailscale` default of `npm run dev`.** Studio dev mode bound only to loopback during this session (per `deskwork-studio: dev listening on http://localhost:47321/`); the rule says default behavior should auto-detect Tailscale. Possible Tailscale-detection skip in `DESKWORK_DEV=1` mode. Not blocking but worth verifying.
+
+---
+
 ## 2026-05-01: Phase 31 — local dev workflow + post-v0.11.1 dogfood fixes shipped as v0.12.0 (single session, brainstorm → plan → inline execute → release)
 
 ### Feature: deskwork-plugin
