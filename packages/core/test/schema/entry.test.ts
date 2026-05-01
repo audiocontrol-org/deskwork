@@ -102,6 +102,57 @@ describe('EntrySchema', () => {
     expect(EntrySchema.safeParse(invalid).success).toBe(false);
   });
 
+  it('accepts artifactPath as optional', () => {
+    const valid: Entry = {
+      uuid: '550e8400-e29b-41d4-a716-446655440010',
+      slug: 'my-article',
+      title: 'My Article',
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Drafting',
+      iterationByStage: {},
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    };
+    expect(EntrySchema.safeParse(valid).success).toBe(true);
+  });
+
+  it('accepts artifactPath when provided', () => {
+    const valid: Entry = {
+      uuid: '550e8400-e29b-41d4-a716-446655440011',
+      slug: 'my-article',
+      title: 'My Article',
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Drafting',
+      iterationByStage: {},
+      artifactPath: 'docs/1.0/my-article.md',
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    };
+    const result = EntrySchema.safeParse(valid);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.artifactPath).toBe('docs/1.0/my-article.md');
+    }
+  });
+
+  it('rejects artifactPath if not a string', () => {
+    const invalid = {
+      uuid: '550e8400-e29b-41d4-a716-446655440012',
+      slug: 'my-article',
+      title: 'My Article',
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Drafting',
+      iterationByStage: {},
+      artifactPath: 42,
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    };
+    expect(EntrySchema.safeParse(invalid).success).toBe(false);
+  });
+
   it('parses a Blocked entry with priorStage', () => {
     const valid: Entry = {
       uuid: '550e8400-e29b-41d4-a716-446655440003',

@@ -54,6 +54,13 @@ export const EntrySchema = z.object({
   targetVersion: z.string().optional(),
   datePublished: z.string().datetime().optional(),
 
+  // Explicit on-disk artifact path (relative to contentDir). Set by
+  // `add` / `outline` / `induct` at creation time, and by migration's
+  // ingest-journal lookup. When absent (legacy entries pre-Phase 30
+  // migration data fixes), consumers fall back to the slug+stage
+  // heuristic.
+  artifactPath: z.string().optional(),
+
   // Distribution (deferred — shortform model)
   shortformWorkflows: z.record(z.string(), z.string()).optional(),
 
