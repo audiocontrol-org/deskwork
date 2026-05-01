@@ -134,7 +134,7 @@ function renderEntryReview(
     </main>`;
   return layout({
     title: `${entry.title} — entry review — dev`,
-    cssHrefs: ['/static/css/editorial-review.css'],
+    cssHrefs: ['/static/css/editorial-review.css', '/static/css/entry-review.css'],
     bodyAttrs: 'data-review-ui="entry-review"',
     bodyHtml: body,
     scriptModules: ['entry-review-client'],
@@ -151,7 +151,7 @@ function renderNotFound(entryId: string, reason: string): string {
     </main>`;
   return layout({
     title: 'Entry not found — dev',
-    cssHrefs: ['/static/css/editorial-review.css'],
+    cssHrefs: ['/static/css/editorial-review.css', '/static/css/entry-review.css'],
     bodyAttrs: 'data-review-ui="entry-review-missing"',
     bodyHtml: body,
     scriptModules: [],
