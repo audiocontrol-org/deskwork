@@ -23,6 +23,25 @@ The studio binds to loopback by default (`127.0.0.1`) plus the local Tailscale i
 | `/dev/scrapbook/<site>/<path>` | Scrapbook viewer at any depth |
 | `/dev/content/<site>/<project>` | Bird's-eye content tree view |
 
+### Local development (deskwork monorepo)
+
+When working on the studio itself from inside this monorepo:
+
+```sh
+npm install                                  # creates workspace symlinks
+npm run dev --workspace @deskwork/studio     # Vite-in-Hono on port 47321
+```
+
+`npm run dev` boots the studio with `DESKWORK_DEV=1` and `tsx --watch`, mounting Vite's dev middleware in front of Hono. Effects:
+
+- Edits under `packages/studio/src/*.ts` (server-side) auto-restart the process.
+- Edits under `plugins/deskwork-studio/public/src/*.ts` (client-side) are served by Vite — refresh the browser to see them. (Full HMR is a follow-up.)
+- The in-process esbuild step is skipped; client TS source is served directly via Vite at `/src/<name>.ts`.
+
+The dev server points at the workspace root (`--project-root ../..`) so it reads the project's own `.deskwork/config.json` and surfaces the project's calendar.
+
+Production code path (no `DESKWORK_DEV`) is unchanged — the studio runs the in-process esbuild on boot and serves bundled JS from `.runtime-cache/dist/`.
+
 ### Source
 
 Repository: [`audiocontrol-org/deskwork`](https://github.com/audiocontrol-org/deskwork). The studio source lives at [`packages/studio/`](https://github.com/audiocontrol-org/deskwork/tree/main/packages/studio); shared core logic in [`@deskwork/core`](https://www.npmjs.com/package/@deskwork/core); the lifecycle CLI in [`@deskwork/cli`](https://www.npmjs.com/package/@deskwork/cli).
