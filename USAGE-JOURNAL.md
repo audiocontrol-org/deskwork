@@ -1147,3 +1147,79 @@ The constraint matters. For Phase 29, using deskwork to review the design surfac
 - **The recursive coupling has limits.** Using deskwork to review a deskwork redesign is a category error. Plain markdown is the honest tooling for foundational rearchitecture work.
 - **Operator's `defaultSite` config + SKILL prose drift.** Skill examples show flags that the config makes optional; the agent reflexively includes them. Worth a SKILL-prose-pass to mark config-defaultable flags.
 - **The two-session dogfood pattern keeps validating.** Prior session shipped #131 + #132 fixes; this session hit the symptoms organically, both fixes worked. The repair-install.sh + the v0.10.2 hint are doing their jobs.
+
+---
+
+## 2026-05-01: Phase 30 implementation — using `deskwork doctor` to migrate this project's own calendar mid-implementation; `/release` end-to-end with a smoke save
+
+**Session goal:** execute the 42-task Phase 30 implementation plan as a subagent-driven build, including a live `deskwork doctor --fix=all` against this project's own `.deskwork/calendar.md` (Phase 2 Task 11) and a `/release` skill run to ship the redesign as v0.11.0.
+
+**Surface exercised:** `deskwork doctor` (legacy + new entry-centric validate/repair); the legacy-schema migration gate; `/release` skill end-to-end (preconditions, version-bump, npm-publish, marketplace-smoke, atomic-push); npm publish retry after smoke-fail.
+
+### Migration phase
+
+#### 1. `deskwork doctor --check` reads as a useful migration preview
+
+**insight.** When the agent ran `deskwork doctor --check` on this project mid-Phase-2, the dry-run output was *"Doctor: legacy schema detected — would migrate 4 entries (dry run)"* — exact and quotable. Operator can read this and decide to proceed without ambiguity. The exit code (1) communicates "this is not in a clean state yet" which is correct semantics for a dry-run that surfaced unmigrated state. No friction.
+
+#### 2. Phase 24 work-in-progress polluted the dry-run output
+
+**friction.** First `--check` invocation surfaced *"deskwork: config uses legacy `sites` key; rename to `collections`. Run `deskwork doctor --fix=legacy-sites-key-migration` to migrate."* — twice — before the migration line. Cause: prior session left a 521-line uncommitted refactor in `packages/core/src/config.ts` partway through a sites→collections rename (Phase 24, separate from Phase 30). The half-merged code was treating this project's `sites` key as legacy.
+
+**fix.** Stashed the Phase 24 WIP before running the live migration (`git stash push packages/core/src/config.ts packages/core/test/config.test.ts`). After stash: clean output, just the migration line. Lesson: at session-start, surface uncommitted work in adjacent files and decide explicitly. Auto-memory + memory rules wouldn't have caught this; only an explicit "stash before destructive operations" check did.
+
+#### 3. The actual migration was uneventful
+
+**insight.** `deskwork doctor --fix=all` exited with: *"Doctor: migrated 4 entries to entry-centric schema"* + *"Doctor: clean (no findings across 1 site(s))"*. Sidecars at `.deskwork/entries/<uuid>.json` (4 files), regenerated calendar.md (eight stages, Distribution preserved), 4 new `entry-created` journal events. Reversible via `git checkout`. Zero ambiguity. Operator approved the commit `359079c`.
+
+The migration converted this calendar **without** populating `iterationByStage` (the legacy journal had `state-*` events, not new `iteration` events). That's documented as intentional best-effort behavior in the migrate.ts code; the new `iterateEntry` will start incrementing from 0.
+
+### Doctor's new validation surface running on real (migrated) data
+
+**insight.** After migration, `deskwork doctor` (no flags, just audit) on this project surfaces 3 `file-presence` failures — the migrated entries point at conventional paths (`docs/<slug>/index.md`, `docs/<slug>/scrapbook/idea.md`) but the actual artifacts are PRDs/specs at non-conventional paths in `docs/superpowers/specs/...`. This is *real* drift — the new validators are catching a real gap between the entry-centric model and how the actual content tree is laid out for this project.
+
+**fix-pending.** The redesign hasn't reconciled artifact-path conventions yet. Either (a) `Entry` schema gets an explicit `artifactPath?` field that overrides the stage-conventional resolution, or (b) per-collection `pathConventions` config in `.deskwork/config.json`. Worth a separate design pass — not blocking the v0.11.x release.
+
+### `/release` skill end-to-end run for v0.11.0/v0.11.1
+
+#### 4. Pause 1 caught untracked scratch file as a precondition violation
+
+**friction.** `tsx .claude/skills/release/lib/release-helpers.ts check-preconditions` exited 1 with *"working tree has untracked files: .git-commit-msg.tmp"*. Subagents had been writing commit messages to that file (per the project's file-handling rule), but the rule says it should be gitignored. .gitignore didn't contain it.
+
+**fix.** One-line `.gitignore` addition + `rm` of the file (commit `9d95b03`). Re-ran preconditions: clean. Lesson: the file-handling rule documents that `.git-commit-msg.tmp` should be gitignored, but the rule doesn't enforce its own existence. Adding `make audit-gitignore` or similar is overkill; this pattern only surfaces during release prep when preconditions check working-tree cleanliness.
+
+**insight.** The release skill's hard-gate on untracked files is the right discipline. Even small unattended state pollutes the release commit and the smoke run. No override flag is correct.
+
+#### 5. Smoke gate caught v0.11.0's missing zod dep — saved the release
+
+**friction.** v0.11.0 published successfully (3 OTPs from operator, all packages on npm). Smoke gate immediately after: `bash scripts/smoke-marketplace.sh` failed at the Phase B `deskwork-studio --help` step with *"Cannot find package 'zod' imported from .../node_modules/@deskwork/core/dist/schema/entry.js"*. Phase 30 added `zod`-using schema modules but `@deskwork/core/package.json` never declared `zod` as a dep — workspace tests passed via hoisting from `plugins/dw-lifecycle/package.json`'s `"zod": "^3.24.0"`, but the standalone npm install of `@deskwork/core@0.11.0` couldn't find it.
+
+**fix.** Per skill recovery: bump-to-next-patch + re-run. Added `"zod": "^3.24.0"` to `packages/core/package.json` dependencies (commit `78afda2`); v0.11.1 bump (commit `3540c5a`); operator did three more OTPs; smoke v0.11.1 passed; tagged + pushed.
+
+**insight.** *"This is exactly the failure mode the marketplace smoke is designed to catch."* The smoke's value is running the actual adopter install path (`npm install` from public registry, not workspace) — that's what surfaced the hoisting-vs-standalone gap. **The pre-1.0 maturity stance ("push direct to main, no PR gate, smoke is the gate") works *because* the smoke is rigorous.** A weaker smoke would have shipped v0.11.0 broken.
+
+The released-but-broken v0.11.0 packages stay orphaned on npm — adopters running `/plugin marketplace update deskwork` will pick up v0.11.1. Not a recall, just an unreferenced version.
+
+#### 6. `make publish` UX is operator-side, three OTPs
+
+**friction (acknowledged, by-design).** The skill explicitly does NOT run `make publish` itself — npm's interactive 2FA OTP prompt can't pass through the agent's Bash tool. Operator runs it in their own terminal, three OTPs (one per package), then says "done" to continue.
+
+**insight.** This is a documented constraint in the skill (Pause 3) and worked exactly as documented. The constraint is correct: agent autonomy stops at irrevocable shared-state writes that need a 2FA. The operator's role at Pause 3 is intentional, not a friction.
+
+The friction surfaced this session: doing it twice (v0.11.0 fail → v0.11.1 retry) means six OTPs, not three. Operator sat at terminal for both rounds. That's the cost of getting the publish wrong on the first try; the cost is the right shape (visible to operator, no surprise) but worth noting.
+
+#### 7. Atomic push was zero-friction
+
+**insight.** `tsx .claude/skills/release/lib/release-helpers.ts atomic-push v0.11.1 feature/deskwork-plugin` pushed HEAD to origin/main + branch + tag in one RPC, exit 0, no surprises. GitHub Actions release workflow ran in 8s. `gh release view v0.11.1` returned the URL within 5 seconds of the push. The publish-then-tag-then-push sequencing means the release page can reference the published packages immediately. The `git ls-remote --tags origin v<version>` pre-check before push prevents accidental re-tag mutation.
+
+### Bigger-picture observations
+
+- **Migrating the project's own calendar mid-Phase-30 was the right discipline.** This is the kind of recursive dogfood the project rules call out (*"agent-as-user dogfood mode"*) — using deskwork on its own calendar surfaced the file-presence drift at Task 32, which would have been invisible against synthetic test data. The 4 migrated entries are real PRDs/specs/plans whose stage-conventional artifact paths don't match this project's actual layout. That's not a bug in the migration; it's a real gap the redesign hasn't reconciled yet.
+
+- **The smoke gate is the smoke gate.** v0.11.0's zod-missing dep is the third release this project has caught at the smoke gate (#88, #97 transitive deps, this one). Each catch validates the gate. Each catch also catalogs a class of npm-install-vs-workspace-install gap that pre-publish testing systemically misses. Worth a longer-term fix: add a "simulate npm install of every package" check to the workspace test phase, not just the release smoke.
+
+- **The release loop has memory.** When v0.11.0 failed, the recovery (bump + fix + republish) was clean: the chore-release commit for v0.11.0 stays in history, the zod-fix commit lands between bumps, the v0.11.1 chore-release commit cleanly bumps from there. No git surgery, no force-push, no rewriting history. The skill's "bump-to-next-patch" recovery is the right shape — npm forbids republishing the same version anyway, so the orphan strategy is the only option.
+
+- **42 tasks in one session is a lot.** Subagent-driven-development at this scale required the controller (me) to keep dispatch quality high — accurate file paths, anticipate convention conflicts (the `@/` import-resolution gap, NodeNext build constraints, `exactOptionalPropertyTypes`), follow up on flagged concerns. Most expensive controller work: catching that "26 pre-existing test failures" was actually Task 22 collateral that needed a Task 41 cleanup, not actually pre-existing. The implementer subagents are honest reporters of state; the controller's job is to interpret correctly.
+
+- **What worked, in operator's framing:** *"keep going"* / *"do it"* / *"proceed"* — auto mode + hard-gated skill execution scales surprisingly well for a major-version release. The hard pauses brought operator back at the irreversible moments (Pause 3 publish, Pause 5 push). The rest is dispatch quality + smoke discipline.

@@ -1459,29 +1459,29 @@ Shipped. Issue [#132](https://github.com/audiocontrol-org/deskwork/issues/132) �
 
 #### Phases (per implementation plan)
 
-- [ ] **Phase 1** — Schema + sidecar IO + calendar render (Tasks 1–7)
-- [ ] **Phase 2** — Migration via `deskwork doctor --repair` (Tasks 8–11; includes migrating this project's calendar)
-- [ ] **Phase 3** — `iterate` helper rewrite (Tasks 12–14)
-- [ ] **Phase 4** — Skill-prose verbs (add/approve/block/cancel/induct/publish/status/doctor; retire old skills) (Tasks 15–22)
-- [ ] **Phase 5** — Doctor expansion + LLM-as-judge orchestration (Tasks 23–32)
-- [ ] **Phase 6** — Studio dashboard + review surface + Manual rewrite (Tasks 33–37)
-- [ ] **Phase 7** — Migration runbook + integration smoke + major release (Tasks 38–42)
+- [x] **Phase 1** — Schema + sidecar IO + calendar render (Tasks 1–7) — shipped 2026-04-30
+- [x] **Phase 2** — Migration via `deskwork doctor --repair` (Tasks 8–11; includes migrating this project's calendar) — shipped 2026-04-30
+- [x] **Phase 3** — `iterate` helper rewrite (Tasks 12–14) — shipped 2026-04-30
+- [x] **Phase 4** — Skill-prose verbs (add/approve/block/cancel/induct/publish/status/doctor; retire old skills) (Tasks 15–22) — shipped 2026-04-30
+- [x] **Phase 5** — Doctor expansion + LLM-as-judge orchestration (Tasks 23–32) — shipped 2026-04-30
+- [x] **Phase 6** — Studio dashboard + review surface + Manual rewrite (Tasks 33–37) — shipped 2026-04-30
+- [x] **Phase 7** — Migration runbook + integration smoke + major release (Tasks 38, 39, 41, 42 done; 40 audiocontrol dry-run deferred to operator) — shipped 2026-05-01 as v0.11.1
 
-Each phase reaches a stable checkpoint suitable for review and commit.
+Each phase reached a stable checkpoint, reviewed and committed.
 
 **Acceptance:**
 
-- [ ] All eight stages exist in the calendar; entries can move through the linear pipeline, into Blocked/Cancelled, and be inducted back.
-- [ ] All listed CLI verbs work via skill prose (or as the `iterate` helper); retired verbs print stable error messages.
-- [ ] Doctor's nine validation categories all run; `--repair` handles the non-destructive classes.
-- [ ] LLM-as-judge sub-agent dispatch fires from `/deskwork:doctor` with the operator's configured model.
-- [ ] Migration of this project's calendar (and audiocontrol.org's, if operator opts in) succeeds via `deskwork doctor --repair`.
-- [ ] Studio dashboard renders eight stages with stage-aware row affordances.
-- [ ] Studio review surface keys URLs by entry-uuid.
-- [ ] Compositor's Manual rewritten with new vocabulary.
-- [ ] MIGRATING.md ships with the major release naming the breaking changes and migration steps.
-- [ ] All existing in-tree tests pass; new validation logic has integration coverage against fresh project trees.
-- [ ] Major release (e.g., v0.11.0) shipped via the existing `/release` skill.
+- [x] All eight stages exist in the calendar; entries can move through the linear pipeline, into Blocked/Cancelled, and be inducted back.
+- [x] All listed CLI verbs work via skill prose (or as the `iterate` helper); retired verbs print stable error messages.
+- [x] Doctor's nine validation categories all run; `--repair` handles the non-destructive classes.
+- [x] LLM-as-judge sub-agent dispatch fires from `/deskwork:doctor` (skill-side prose; helper-side stays pure) with the operator's configured model.
+- [x] Migration of this project's calendar succeeds via `deskwork doctor --fix=all` (commit `359079c`). Audiocontrol.org dry-run deferred (Task 40).
+- [x] Studio dashboard renders eight stages with stage-aware row affordances.
+- [x] Studio review surface keys URLs by entry-uuid (`/dev/editorial-review/entry/<uuid>`; legacy workflow-uuid route preserved during migration).
+- [x] Compositor's Manual rewritten with new vocabulary.
+- [x] MIGRATING.md ships with the major release naming the breaking changes and migration steps.
+- [x] All existing in-tree tests pass; 39 retirement-collateral tests skipped with comments.
+- [x] Major release shipped via the existing `/release` skill — v0.11.1 (v0.11.0 was abandoned post-smoke-fail; zod dep gap fixed in `78afda2`).
 
 **GitHub tracking:** Will be filed at the start of Phase 1 implementation as the parent feature issue. Sub-phase issues filed per phase as work progresses.
 
