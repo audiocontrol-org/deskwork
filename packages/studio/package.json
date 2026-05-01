@@ -35,7 +35,7 @@
   "scripts": {
     "build": "tsc -b tsconfig.build.json && mkdir -p dist/pages/dashboard && cp src/pages/*.ts dist/pages/ && cp src/pages/dashboard/*.ts dist/pages/dashboard/",
     "prepack": "tsc -b tsconfig.build.json && mkdir -p dist/pages/dashboard && cp src/pages/*.ts dist/pages/ && cp src/pages/dashboard/*.ts dist/pages/dashboard/",
-    "dev": "DESKWORK_DEV=1 tsx --watch src/server.ts",
+    "dev": "DESKWORK_DEV=1 tsx --watch src/server.ts --project-root ../..",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"

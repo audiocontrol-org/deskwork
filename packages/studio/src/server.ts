@@ -548,21 +548,33 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  // Phase 23e: build client modules from source into the runtime cache
-  // BEFORE wiring routes (the `/static/dist/*` mount records its root
-  // at registration time and warns when the path doesn't exist yet).
-  // Failures abort startup — serving stale or missing JS would silently
-  // break the UI.
-  try {
-    const summary = await buildClientAssets({ pluginRoot: pluginRoot() });
+  // Dev mode (DESKWORK_DEV=1): skip the in-process esbuild step. The
+  // Vite middleware mounted later serves the TS source from
+  // <pluginRoot>/public/src/ directly, with HMR. See the dev-mode branch
+  // further down for the Vite + http.Server wiring.
+  const devMode = process.env.DESKWORK_DEV === '1';
+
+  if (!devMode) {
+    // Phase 23e: build client modules from source into the runtime cache
+    // BEFORE wiring routes (the `/static/dist/*` mount records its root
+    // at registration time and warns when the path doesn't exist yet).
+    // Failures abort startup — serving stale or missing JS would silently
+    // break the UI.
+    try {
+      const summary = await buildClientAssets({ pluginRoot: pluginRoot() });
+      process.stdout.write(
+        `deskwork-studio: built ${summary.entriesBuilt} client assets ` +
+          `(${summary.entriesCached} cached) -> ${summary.outDir}\n`,
+      );
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      process.stderr.write(`deskwork-studio: client asset build failed: ${reason}\n`);
+      process.exit(1);
+    }
+  } else {
     process.stdout.write(
-      `deskwork-studio: built ${summary.entriesBuilt} client assets ` +
-        `(${summary.entriesCached} cached) -> ${summary.outDir}\n`,
+      'deskwork-studio: dev mode (DESKWORK_DEV=1) — Vite middleware enabled, esbuild step skipped\n',
     );
-  } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
-    process.stderr.write(`deskwork-studio: client asset build failed: ${reason}\n`);
-    process.exit(1);
   }
 
   // Phase 23f: build the override resolver once at boot so every page
@@ -590,6 +602,46 @@ async function main(): Promise<void> {
   } else {
     tailscale = detectTailscale();
     bindAddresses = tailscale === null ? [LOOPBACK] : [LOOPBACK, ...tailscale.ipv4];
+  }
+
+  // Dev mode: spin up Vite middleware in front of the Hono fetch handler.
+  // We run a plain http.Server (not @hono/node-server's serve()) so we
+  // can chain Vite's connect-style middleware before Hono. Auto-increment
+  // + Tailscale binding are skipped in dev — the dev server is for local
+  // iteration only.
+  if (devMode) {
+    const { createServer: createViteServer } = await import('vite');
+    const { getRequestListener } = await import('@hono/node-server');
+    const http = await import('node:http');
+    const { join } = await import('node:path');
+
+    // Vite root is the plugin's public/ dir; client TS lives at public/src/.
+    // clientScriptTag emits /src/<name>.ts which maps to public/src/<name>.ts
+    // under this root.
+    const viteRoot = join(pluginRoot(), 'public');
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'custom',
+      root: viteRoot,
+    });
+
+    const honoListener = getRequestListener(app.fetch);
+    const httpServer = http.createServer((req, res) => {
+      vite.middlewares(req, res, () => {
+        // Vite didn't handle — pass to Hono.
+        honoListener(req, res);
+      });
+    });
+
+    httpServer.listen(port, LOOPBACK, () => {
+      process.stdout.write(
+        `deskwork-studio: dev listening on http://localhost:${port}/\n`,
+      );
+      process.stdout.write(`  vite root: ${viteRoot}\n`);
+      process.stdout.write(`  project:   ${projectRoot}\n`);
+      process.stdout.write(`  sites:     ${Object.keys(config.sites).join(', ')}\n`);
+    });
+    return;
   }
 
   // Issue #43: bind every address with EADDRINUSE handling.
