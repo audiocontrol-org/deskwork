@@ -1,6 +1,12 @@
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { EntrySchema, type Entry, type Stage } from '../schema/entry.ts';
+import {
+  EntrySchema,
+  isLinearPipelineStage,
+  isOffPipelineStage,
+  type Entry,
+  type Stage,
+} from '../schema/entry.ts';
 import { extractEntriesForMigration } from '../calendar/parse.ts';
 import { readJournalEvents } from '../journal/read.ts';
 
@@ -316,6 +322,46 @@ async function validateFilePresence(projectRoot: string): Promise<ValidationFail
   return failures;
 }
 
+async function validateStageInvariants(projectRoot: string): Promise<ValidationFailure[]> {
+  const failures: ValidationFailure[] = [];
+  const sidecars = await loadSidecars(projectRoot);
+  for (const { entry, path } of sidecars) {
+    // Off-pipeline stages (Blocked, Cancelled) MUST record priorStage so the
+    // editor knows where to send the entry on resume.
+    if (isOffPipelineStage(entry.currentStage)) {
+      if (!entry.priorStage) {
+        failures.push({
+          category: 'stage-invariants',
+          message: `currentStage=${entry.currentStage} requires priorStage to be set`,
+          entryId: entry.uuid,
+          path,
+        });
+      }
+    }
+    // Pipeline-stage entries MUST NOT carry a priorStage — that field is for
+    // off-pipeline entries to remember where they paused.
+    if (isLinearPipelineStage(entry.currentStage) && entry.priorStage !== undefined) {
+      failures.push({
+        category: 'stage-invariants',
+        message: `pipeline-stage entry (currentStage=${entry.currentStage}) must not have priorStage set (got ${entry.priorStage})`,
+        entryId: entry.uuid,
+        path,
+      });
+    }
+    // Published is frozen — no further iterations are allowed.
+    const publishedIters = entry.iterationByStage.Published ?? 0;
+    if (publishedIters > 1) {
+      failures.push({
+        category: 'stage-invariants',
+        message: `iterationByStage.Published=${publishedIters} but Published is frozen (max 1)`,
+        entryId: entry.uuid,
+        path,
+      });
+    }
+  }
+  return failures;
+}
+
 export async function validateAll(projectRoot: string): Promise<ValidationResult> {
   const failures: ValidationFailure[] = [];
   failures.push(...(await validateSchema(projectRoot)));
@@ -324,6 +370,7 @@ export async function validateAll(projectRoot: string): Promise<ValidationResult
   failures.push(...(await validateJournalSidecar(projectRoot)));
   failures.push(...(await validateIterationHistory(projectRoot)));
   failures.push(...(await validateFilePresence(projectRoot)));
-  // Tasks 29-30 add: validateStageInvariants, validateCrossEntry.
+  failures.push(...(await validateStageInvariants(projectRoot)));
+  // Task 30 adds: validateCrossEntry.
   return { failures };
 }
