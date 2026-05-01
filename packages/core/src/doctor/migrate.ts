@@ -1,4 +1,4 @@
-import { readFile, writeFile, access, readdir } from 'node:fs/promises';
+import { readFile, writeFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { extractEntriesForMigration } from '../calendar/parse.ts';
 import { writeSidecar } from '../sidecar/write.ts';
@@ -114,18 +114,31 @@ interface MigrateResult {
 }
 
 export async function detectLegacySchema(projectRoot: string): Promise<boolean> {
-  // Legacy: calendar.md has Paused/Review sections, OR no .deskwork/entries directory.
+  // #149: the .deskwork/entries directory is the migration marker —
+  // its presence (even empty) means the project has been migrated to
+  // (or natively created in) the entry-centric schema. Drift in
+  // calendar.md (legacy CLI verbs that haven't been split yet, e.g.
+  // publish, can re-emit `## Paused` / `## Review` section names via
+  // the legacy renderer) is a SEPARATE problem to be fixed by the
+  // doctor's reconciliation pass, NOT by re-running migration on top
+  // of valid sidecars (which would overwrite correct fields with
+  // stale heuristic data — artifactPath from old ingest-journal
+  // entries, iterationByStage shape regression, etc.).
+  const entriesDir = join(projectRoot, '.deskwork', 'entries');
   try {
-    const md = await readFile(join(projectRoot, '.deskwork', 'calendar.md'), 'utf8');
-    if (/^## Paused\b/m.test(md) || /^## Review\b/m.test(md)) return true;
-  } catch {
+    await readdir(entriesDir);
     return false;
+  } catch {
+    // No entries dir.
   }
+  // No entries dir: pre-migration shape. Calendar.md presence is the
+  // "this is a deskwork project that needs to be migrated" signal.
   try {
-    await access(join(projectRoot, '.deskwork', 'entries'));
-    return false;
-  } catch {
+    await readFile(join(projectRoot, '.deskwork', 'calendar.md'), 'utf8');
     return true;
+  } catch {
+    // No calendar.md and no entries dir: not a deskwork project at all.
+    return false;
   }
 }
 

@@ -34,6 +34,49 @@ describe('detectLegacySchema', () => {
       expect(await detectLegacySchema(projectRoot)).toBe(false);
     } finally { await rm(projectRoot, { recursive: true, force: true }); }
   });
+
+  // #149: legacy CLI verbs that haven't been split (publish at the time
+  // of writing) emit calendar.md via the legacy renderer, which puts
+  // back `## Paused` and `## Review` sections. Detection MUST NOT take
+  // that drift as a signal to re-run migration on already-migrated
+  // sidecars — that overwrites correct sidecar fields with stale
+  // heuristic data. Sidecar tree presence is the only authoritative
+  // migration marker.
+  it('returns false when entries dir exists even if calendar.md has legacy section names (#149)', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'dw-test-'));
+    try {
+      await mkdir(join(projectRoot, '.deskwork', 'entries'), { recursive: true });
+      await writeFile(
+        join(projectRoot, '.deskwork', 'entries', '550e8400-e29b-41d4-a716-446655440000.json'),
+        JSON.stringify({ uuid: '550e8400-e29b-41d4-a716-446655440000', currentStage: 'Ideas' }),
+      );
+      await writeFile(
+        join(projectRoot, '.deskwork', 'calendar.md'),
+        '# Editorial Calendar\n\n## Ideas\n\n*No entries.*\n\n## Paused\n\n*No entries.*\n\n## Review\n\n*No entries.*\n',
+      );
+      expect(await detectLegacySchema(projectRoot)).toBe(false);
+    } finally { await rm(projectRoot, { recursive: true, force: true }); }
+  });
+
+  it('returns false when entries dir exists but is empty (already-migrated zero state)', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'dw-test-'));
+    try {
+      await mkdir(join(projectRoot, '.deskwork', 'entries'), { recursive: true });
+      await writeFile(
+        join(projectRoot, '.deskwork', 'calendar.md'),
+        '# Editorial Calendar\n\n## Paused\n\n*No entries.*\n',
+      );
+      expect(await detectLegacySchema(projectRoot)).toBe(false);
+    } finally { await rm(projectRoot, { recursive: true, force: true }); }
+  });
+
+  it('returns false when neither entries dir nor calendar.md exist (not a deskwork project)', async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), 'dw-test-'));
+    try {
+      await mkdir(join(projectRoot, '.deskwork'), { recursive: true });
+      expect(await detectLegacySchema(projectRoot)).toBe(false);
+    } finally { await rm(projectRoot, { recursive: true, force: true }); }
+  });
 });
 
 describe('migrateCalendar', () => {
