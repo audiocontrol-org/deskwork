@@ -78,3 +78,7 @@ export function html(
   }
   return out;
 }
+
+// Re-export glossary helpers so page renderers can use them in template literals
+export { gloss } from '@/lib/glossary-helper';
+export type { GlossaryKey } from '@/lib/glossary-helper';
