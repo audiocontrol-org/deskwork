@@ -43,6 +43,20 @@ describe('iterateEntry', () => {
     return entry;
   }
 
+  it('refuses to iterate when on-disk content matches the last iteration journal entry', async () => {
+    await setupEntry('Ideas');
+    const ideaPath = join(projectRoot, 'docs', slug, 'scrapbook', 'idea.md');
+    const body = `---\ndeskwork:\n  id: ${uuid}\n---\n\n# unchanged\n`;
+    await writeFile(ideaPath, body);
+
+    // First iterate succeeds and records v1.
+    const r1 = await iterateEntry(projectRoot, { uuid });
+    expect(r1.version).toBe(1);
+
+    // Second iterate without editing should refuse.
+    await expect(iterateEntry(projectRoot, { uuid })).rejects.toThrow(/unchanged/i);
+  });
+
   it('produces v1 from iteration 0 (no prior iteration)', async () => {
     await setupEntry('Ideas');
     const ideaPath = join(projectRoot, 'docs', slug, 'scrapbook', 'idea.md');
