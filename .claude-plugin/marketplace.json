@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Open-source Claude Code plugins — editorial calendar, feature images, analytics",
-    "version": "0.11.1"
+    "version": "0.12.0"
   },
   "plugins": [
     {
@@ -17,7 +17,7 @@
         "path": "plugins/deskwork"
       },
       "description": "Editorial calendar lifecycle: capture, plan, draft, publish, distribute",
-      "version": "0.11.1"
+      "version": "0.12.0"
     },
     {
       "name": "deskwork-studio",
@@ -27,7 +27,7 @@
         "path": "plugins/deskwork-studio"
       },
       "description": "Web studio for deskwork — dashboard, longform review, scrapbook, manual. Optional companion to the deskwork plugin",
-      "version": "0.11.1"
+      "version": "0.12.0"
     },
     {
       "name": "dw-lifecycle",
@@ -37,7 +37,7 @@
         "path": "plugins/dw-lifecycle"
       },
       "description": "Project lifecycle orchestration; composes superpowers + feature-dev.",
-      "version": "0.11.1"
+      "version": "0.12.0"
     }
   ]
 }

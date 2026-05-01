@@ -1,6 +1,6 @@
 {
   "name": "deskwork",
-  "version": "0.11.1",
+  "version": "0.12.0",
   "private": true,
   "description": "Open-source Claude Code plugins monorepo — deskwork editorial calendar plugin, feature-image, analytics",
   "repository": {
