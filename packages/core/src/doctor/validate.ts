@@ -1,6 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { EntrySchema } from '../schema/entry.ts';
+import { extractEntriesForMigration } from '../calendar/parse.ts';
 
 export interface ValidationFailure {
   category:
@@ -50,11 +51,63 @@ async function validateSchema(projectRoot: string): Promise<ValidationFailure[]>
   return failures;
 }
 
+async function readSidecarUuids(projectRoot: string): Promise<Set<string>> {
+  const dir = join(projectRoot, '.deskwork', 'entries');
+  const uuids = new Set<string>();
+  let names: string[] = [];
+  try {
+    names = await readdir(dir);
+  } catch {
+    return uuids;
+  }
+  for (const name of names.filter((n) => n.endsWith('.json'))) {
+    uuids.add(name.replace(/\.json$/, ''));
+  }
+  return uuids;
+}
+
+async function validateCalendarSidecar(projectRoot: string): Promise<ValidationFailure[]> {
+  const failures: ValidationFailure[] = [];
+  const calendarPath = join(projectRoot, '.deskwork', 'calendar.md');
+  let md: string;
+  try {
+    md = await readFile(calendarPath, 'utf8');
+  } catch {
+    return failures;
+  }
+  const calendarEntries = extractEntriesForMigration(md);
+  const calendarUuids = new Set(calendarEntries.map((e) => e.uuid));
+  const sidecarUuids = await readSidecarUuids(projectRoot);
+
+  for (const uuid of calendarUuids) {
+    if (!sidecarUuids.has(uuid)) {
+      failures.push({
+        category: 'calendar-sidecar',
+        message: `calendar.md lists uuid ${uuid} but no sidecar exists at .deskwork/entries/${uuid}.json`,
+        entryId: uuid,
+        path: calendarPath,
+      });
+    }
+  }
+  for (const uuid of sidecarUuids) {
+    if (!calendarUuids.has(uuid)) {
+      failures.push({
+        category: 'calendar-sidecar',
+        message: `sidecar ${uuid}.json exists but calendar.md does not list this uuid`,
+        entryId: uuid,
+        path: join(projectRoot, '.deskwork', 'entries', `${uuid}.json`),
+      });
+    }
+  }
+  return failures;
+}
+
 export async function validateAll(projectRoot: string): Promise<ValidationResult> {
   const failures: ValidationFailure[] = [];
   failures.push(...(await validateSchema(projectRoot)));
-  // Tasks 24-30 add: validateCalendarSidecar, validateFrontmatterSidecar,
-  // validateJournalSidecar, validateIterationHistory, validateFilePresence,
-  // validateStageInvariants, validateCrossEntry. Each follows the same shape.
+  failures.push(...(await validateCalendarSidecar(projectRoot)));
+  // Tasks 25-30 add: validateFrontmatterSidecar, validateJournalSidecar,
+  // validateIterationHistory, validateFilePresence, validateStageInvariants,
+  // validateCrossEntry.
   return { failures };
 }
