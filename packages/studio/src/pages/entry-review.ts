@@ -137,7 +137,7 @@ function renderEntryReview(
     cssHrefs: ['/static/css/editorial-review.css'],
     bodyAttrs: 'data-review-ui="entry-review"',
     bodyHtml: body,
-    scriptModules: [],
+    scriptModules: ['entry-review-client'],
   });
 }
 
