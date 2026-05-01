@@ -371,7 +371,14 @@ describe('GET /dev/editorial-studio — coverage matrix', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('empty cells render a start button (data-action="start-shortform")', async () => {
+  // SKIPPED: Pipeline-redesign Task 34 — the dashboard no longer renders
+  // the shortform coverage matrix. Distribution / shortform tracking is
+  // a deferred concern in the redesign; the dashboard's reserved
+  // Distribution placeholder section is its only surface here. The
+  // shortform start-button affordance moves to the per-entry review
+  // surface (Task 35) once that lands; this test should be re-targeted
+  // there at that point.
+  it.skip('empty cells render a start button (data-action="start-shortform")', async () => {
     const r = await getText(app, '/dev/editorial-studio');
     expect(r.status).toBe(200);
     // Every empty cell becomes an inline start button. Phase 21c
@@ -385,7 +392,9 @@ describe('GET /dev/editorial-studio — coverage matrix', () => {
     expect(r.text).not.toContain('/editorial-shortform-draft');
   });
 
-  it('covered cells with a live workflow render an anchor to the review URL', async () => {
+  // SKIPPED: Pipeline-redesign Task 34 — see sibling skip note above.
+  // The shortform coverage matrix is retired from the dashboard surface.
+  it.skip('covered cells with a live workflow render an anchor to the review URL', async () => {
     const start = await postJson(
       app,
       '/api/dev/editorial-review/start-shortform',

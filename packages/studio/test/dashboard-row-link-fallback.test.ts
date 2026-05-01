@@ -145,7 +145,18 @@ async function getHtml(
   return { status: res.status, html: await res.text() };
 }
 
-describe('dashboard row link fallback (#110)', () => {
+// SKIPPED: Pipeline-redesign Task 34 — the dashboard no longer renders
+// the legacy `<a href="/dev/content/...">` content-detail fallback or
+// the workflow-store-driven Recent proofs section. The new dashboard is
+// sidecar-driven; every row links to the per-entry review surface via
+// `/dev/editorial-review/<uuid>` regardless of stage. The #110 concern
+// (no plain-text-only rows) is now satisfied structurally — every row
+// IS a link.
+//
+// Re-enable a successor of this test once Task 35's per-entry review
+// surface lands; at that point we'd want a dashboard test that asserts
+// every row's link target resolves to a real review page.
+describe.skip('dashboard row link fallback (#110)', () => {
   let root: string;
   let cfg: DeskworkConfig;
   let app: ReturnType<typeof createApp>;

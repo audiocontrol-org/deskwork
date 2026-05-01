@@ -76,7 +76,18 @@ async function getHtml(
   return { status: res.status, html: await res.text() };
 }
 
-describe('studio dashboard — body-state via content index', () => {
+// SKIPPED: Pipeline-redesign Task 34 — the dashboard no longer reads
+// the legacy calendar.md and no longer renders the per-entry file-state
+// dot or the legacy scrapbook chip. The new dashboard is sidecar-driven
+// (`<projectRoot>/.deskwork/entries/*.json`) and surfaces iteration
+// count + reviewState badge instead. The body-state content-index
+// concern moves to the per-entry review surface (Task 35); these tests
+// exercised the legacy dashboard rendering path that no longer exists.
+//
+// Re-enable once the per-entry review surface lands and an equivalent
+// content-index lookup is wired into THAT surface — at which point the
+// regression target is the review page, not the dashboard.
+describe.skip('studio dashboard — body-state via content index', () => {
   let root: string;
   let cfg: DeskworkConfig;
   let app: ReturnType<typeof createApp>;
