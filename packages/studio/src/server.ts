@@ -372,18 +372,16 @@ export function createApp(ctx: StudioContext): Hono {
         kind: c.req.query('kind') ?? null,
       };
 
-      // #146: when the UUID is a Phase 30 entry sidecar id, route to the
-      // entry-centric review surface (entry-review.ts) instead of the
-      // legacy workflow renderer. Try sidecar first; fall through to the
-      // legacy paths only when the UUID isn't an entry id.
-      try {
-        const entryResult = await renderEntryReviewPage(ctx.projectRoot, id);
-        if (entryResult.status === 200) {
-          return c.html(entryResult.html);
-        }
-      } catch {
-        // fall through to legacy resolution
-      }
+      // The entry-review-first short-circuit added by #146 was a regression:
+      // it routed every dashboard click (every row links here per #110) to
+      // the minimal entry-review surface, which is a stage-controller, not a
+      // press-check review surface. Operators lost margin-note authoring,
+      // rendered preview, and the decision strip. Restore the status quo
+      // ante: fall straight through to the workflow / entry-id resolution
+      // paths (renderReviewPage) so the dashboard's UUID links land on the
+      // working review surface. The minimal entry-review surface remains
+      // reachable via the explicit `/dev/editorial-review/entry/<uuid>`
+      // route registered above.
 
       // 1. Workflow-id branch — phase 21c.
       const wf = readWorkflow(ctx.projectRoot, ctx.config, id);
