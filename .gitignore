@@ -46,6 +46,9 @@ yarn-error.log*
 ## generated during dogfood UX sessions). Never committed.
 .playwright-mcp/
 
+## Superpowers brainstorming companion mockups (visual session content).
+.superpowers/
+
 ## Local dogfood sandbox — a clone of audiocontrol.org used to drive the
 ## editorial-calendar lifecycle end-to-end against a real-shaped project
 ## tree. Lives inside this worktree (not a sibling) to avoid confusion
