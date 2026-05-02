@@ -49,9 +49,78 @@ export function initScrapbook(): void {
   wireOverlay(ctx);
   wireIndexScrollSync(ctx);
   restoreOpenStates(ctx);
+  // #154 Dispatch E phase 3 — filter chips + search input + "/" shortcut.
+  wireFiltersAndSearch(ctx);
   // #29: bind clicks on image thumbnails (and on expanded image
   // bodies once they render) to the in-context lightbox overlay.
   initScrapbookLightbox(ctx.root);
+}
+
+// ---------------------------------------------------------------------------
+// Filters + search (Dispatch E phase 3)
+// ---------------------------------------------------------------------------
+
+/**
+ * Wire the filter chips above the items grid + the search input.
+ * Filtered-out items get `data-filtered-out="true"`; the CSS uses that
+ * to hide the card while preserving the grid flow. The `/` keystroke
+ * focuses the search input (when no other text input is active).
+ */
+function wireFiltersAndSearch(ctx: Ctx): void {
+  const items = Array.from(
+    ctx.root.querySelectorAll<HTMLElement>('.scrapbook-item'),
+  );
+  const chips = Array.from(
+    ctx.root.querySelectorAll<HTMLElement>('[data-filter-kind]'),
+  );
+  const searchInput = ctx.root.querySelector<HTMLInputElement>(
+    '[data-scrapbook-search]',
+  );
+
+  let activeKind = 'all';
+  let activeQuery = '';
+
+  const applyFilters = (): void => {
+    const q = activeQuery.toLowerCase();
+    for (const item of items) {
+      const kind = item.dataset.kind ?? '';
+      const filename = (item.dataset.filename ?? '').toLowerCase();
+      const matchKind = activeKind === 'all' || kind === activeKind;
+      const matchQuery = q === '' || filename.includes(q);
+      item.dataset.filteredOut = matchKind && matchQuery ? 'false' : 'true';
+    }
+  };
+
+  for (const chip of chips) {
+    chip.addEventListener('click', () => {
+      for (const c of chips) {
+        c.classList.remove('is-active');
+        c.setAttribute('aria-selected', 'false');
+      }
+      chip.classList.add('is-active');
+      chip.setAttribute('aria-selected', 'true');
+      activeKind = chip.dataset.filterKind ?? 'all';
+      applyFilters();
+    });
+  }
+
+  if (searchInput) {
+    searchInput.addEventListener('input', () => {
+      activeQuery = searchInput.value;
+      applyFilters();
+    });
+    document.addEventListener('keydown', (ev) => {
+      if (
+        ev.key === '/' &&
+        !(ev.target instanceof HTMLInputElement) &&
+        !(ev.target instanceof HTMLTextAreaElement)
+      ) {
+        ev.preventDefault();
+        searchInput.focus();
+        searchInput.select();
+      }
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -140,6 +209,12 @@ function toggleItem(ctx: Ctx, item: HTMLLIElement): void {
 
 async function expandItem(ctx: Ctx, item: HTMLLIElement): Promise<void> {
   item.dataset.open = 'true';
+  // #154 Dispatch E — also flip data-state so the CSS grid rule
+  // (.scrapbook-item[data-state="expanded"] { grid-column: 1 / -1 })
+  // expands the card across the full grid row. Existing callers like
+  // delete-confirm set data-state="deleting"; keep their flow intact
+  // by only flipping when the item is currently in the closed state.
+  if (item.dataset.state === 'closed') item.dataset.state = 'expanded';
   item.querySelector('.scrapbook-item-header')?.setAttribute('aria-expanded', 'true');
   persistOpenState(ctx, item, true);
   const bodyContent = item.querySelector<HTMLElement>('[data-body-content]');
@@ -160,6 +235,9 @@ async function expandItem(ctx: Ctx, item: HTMLLIElement): Promise<void> {
 
 function collapseItem(item: HTMLLIElement): void {
   item.dataset.open = 'false';
+  // #154 Dispatch E — restore the closed state so the card returns
+  // to its single-grid-cell footprint.
+  if (item.dataset.state === 'expanded') item.dataset.state = 'closed';
   item.querySelector('.scrapbook-item-header')?.setAttribute('aria-expanded', 'false');
   const site = item.closest<HTMLElement>('[data-scrapbook-root]')?.dataset.site;
   const slug = item.closest<HTMLElement>('[data-scrapbook-root]')?.dataset.slug;

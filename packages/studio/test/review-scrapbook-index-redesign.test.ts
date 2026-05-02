@@ -169,3 +169,21 @@ describe('scrapbook index — Dispatch E phase 2: peeks + sticky aside', () => {
     }
   });
 });
+
+describe('scrapbook index — Dispatch E phase 3: client wiring', () => {
+  it('client wires filter chips, search input, and "/" shortcut', () => {
+    const client = readFileSync(CLIENT_PATH, 'utf8');
+    expect(client).toContain('data-filter-kind');
+    expect(client).toContain('data-scrapbook-search');
+    // "/" key handler — accept either the literal '/' character or
+    // a key check, whichever the source uses.
+    expect(client).toMatch(/ev\.key\s*===\s*['"]\/['"]/);
+    // applyFilters branches on data-filtered-out
+    expect(client).toContain('filteredOut');
+  });
+
+  it('client toggles data-state="expanded" alongside data-open on disclosure', () => {
+    const client = readFileSync(CLIENT_PATH, 'utf8');
+    expect(client).toMatch(/data-state="expanded"|dataset\.state\s*=\s*['"]expanded['"]/);
+  });
+});
