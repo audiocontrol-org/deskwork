@@ -4,6 +4,67 @@ Session journal for `deskwork`. Each entry records what was tried, what worked, 
 
 ---
 
+## 2026-05-02: brainstorm-arc discarded for `/frontend-design` direct → review surface + scrapbook redesign mockups (1411 + 842 lines HTML) + 5-dispatch integration plan → Dispatch A folio-half shipped (issue #154)
+
+### Feature: deskwork-plugin
+### Worktree: deskwork-plugin
+
+**Goal:** continue addressing the four operator-surfaced design concerns the prior session's refinement pass didn't reach (edit-mode cramping, read-mode whitespace + cramped marginalia, scrapbook-deceptive-drawer-as-link, missing-global-folio on review). The prior session left a paused brainstorm arc with state in `.superpowers/brainstorm/3483-1777699675/`.
+
+**Accomplished:**
+
+- **Brainstorm arc discarded.** Operator's framing on resume: *"I ditched the brainstorm arc because it produces considerably worse design results than using the frontend design plugin by itself. We can throw that one away."* Cleared `.superpowers/brainstorm/3483-1777699675/`.
+- **Two full-document HTML mockups produced via `/frontend-design`** against [issue #154](https://github.com/audiocontrol-org/deskwork/issues/154):
+  - [`review-redesign.html`](docs/superpowers/frontend-design/2026-05-02-review-redesign/review-redesign.html) — 1411 lines. Demonstrates: marginalia in a CSS Grid column inside a `.er-page` container (anchored TO THE PAGE, not the viewport); folio + strip stacked correctly above the page; bottom scrapbook drawer that expands in place; edit-mode toolbar above the page (not under marginalia); both modes (read / edit) with a JS toggle. Tokens sourced from existing `editorial-review.css`; new layout tokens for `--er-page-max`, `--er-article-col`, `--er-marginalia-col`, `--er-drawer-h`.
+  - [`scrapbook-redesign.html`](docs/superpowers/frontend-design/2026-05-02-review-redesign/scrapbook-redesign.html) — 842 lines. Always-on inline previews per item (md excerpts, image thumbnails, JSON snippets, txt excerpts); cards expand in place via `data-state="expanded"` with `grid-column: 1 / -1`; filter chips, search input with `/` shortcut, sticky aside with file index.
+- **Diagnosis-by-concern + 5-dispatch integration plan** at [`README.md`](docs/superpowers/frontend-design/2026-05-02-review-redesign/README.md) — each dispatch ≤4 logical changes, the upper bound that's succeeded under sub-agent dispatch this project. Plan committed in `0995cd3`.
+- **Dispatch A — folio half — shipped in `4c558f7`.** Root cause once located: the folio is already a single component (`renderEditorialFolio` in `chrome.ts`) used by every surface — but `.er-strip` at `top: 0; z-index: 40` was sitting on top of the folio at `top: 0; z-index: 10`, so the global nav was invisible on the longform review page. Fix: folio relocated to `position: fixed; top: 0; height: var(--er-folio-h); z-index: 60`; strip relocated to `top: var(--er-folio-h); z-index: 40`. Markup flattened — `.er-folio-inner` wrapper dropped; new `.er-folio-mark` (italic Fraunces with `※` proof-mark) replaces the mono `deskwork STUDIO` wordmark. Active state changes from a skewed-curve `::before` tick mark to a red-pencil bottom rule (`::after`). `aria-current="page"` added to the active link.
+- **Tests updated.** `folio-cross-page.test.ts` + `index-page.test.ts` had assertions on `er-folio-inner` and `'deskwork <em>STUDIO</em>'` — both removed; new assertions match the redesigned markup + `aria-current="page"` attribute. **295 studio tests pass; 0 regressions.**
+- **Live verification at 1440px.** Folio: `top: 0`, height 38.4px (= 2.4rem), `position: fixed`, `z-index: 60`, visible. Strip: `top: 38.4px` (= folio height), `z-index: 40`, fully below the folio. Body padding-top: 89.6px (= `calc(2.4rem + 3.2rem)`). Screenshots committed at [`integrated-review-1440.png`](docs/superpowers/frontend-design/2026-05-02-review-redesign/integrated-review-1440.png) + [`integrated-dashboard-1440.png`](docs/superpowers/frontend-design/2026-05-02-review-redesign/integrated-dashboard-1440.png).
+- **Issue #154 updated** with progress + every artifact link: <https://github.com/audiocontrol-org/deskwork/issues/154#issuecomment-4363198375>.
+
+**Didn't Work:**
+
+- **Initially proposed using the brainstorming skill before the design pass.** At session start, plan was to "resume the brainstorming arc" against the saved state-dir. Operator immediately countered: brainstorming produces worse design results than `/frontend-design` directly. Revised approach in one message; proceeded to design without brainstorm scaffolding.
+- **First Read failed on the mktemp file for the issue body.** mktemp returned a path; my subsequent Write tool call hit "File has not been read yet" because the freshly-created empty file hadn't been Read first. One-step recovery: Read first, then Write. The Write tool's "must read first" precondition is still catching me; pattern is recurring across sessions and is now well-known.
+- **Used a fragile mktemp template syntax** initially: `mktemp /tmp/dw-issue-154-XXXXXX.md`. macOS mktemp wants either `-t <prefix>` (which appends `.XXXXXX`) or a template ending in 6+ X's. The literal-template form returned the unsubstituted string. Recovered with `mktemp -t dw-issue-154`.
+
+**Course Corrections:**
+
+- **[PROCESS] Operator overrode the brainstorming-first instinct mid-session.** Auto-mode rule says "prefer action over planning"; brainstorming IS planning. Operator framing: *"the brainstorming arc... produces considerably worse design results than using the frontend design plugin by itself."* Lesson: when a frontend-design task has a clear visual reference (issue with screenshots), drive `/frontend-design` directly and skip brainstorming. Reserve brainstorming for when the problem statement itself is unclear — not for design exploration on a well-specified problem.
+- **[UX] First chrome integration plan covered ONLY the visual treatment, missed the layering fix.** Operator clarified mid-stream: *"the review/edit page doesn't currently have the chrome visible (if it's on the page, it's not visible on the page)."* The folio was rendered server-side; the visual issue was elsewhere. Diagnosis: strip-eclipses-folio via z-index + position. Lesson: when "the chrome doesn't appear" is the user-visible symptom, don't assume the markup is missing — verify with `getBoundingClientRect` + computed styles before designing the fix.
+- **[PROCESS] Two-commit split for design vs. implementation paid off.** Could've shipped one combined commit; split into `0995cd3` (mockups + plan, design-only, no source changes) + `4c558f7` (chrome integration + tests + verification screenshots). The split makes the issue comment cleaner — the mockups stand on their own as a design artifact independent of how much of the integration ships when. Pattern worth keeping for future design-then-integrate arcs.
+- **[PROCESS] Posted issue comment with detailed implementation plan + status table per dispatch.** Closer to a project-tracker entry than a one-off comment, but issue #154 is the spine of this work and surfacing the dispatches inline lets operator track progress without reading the workplan. Pattern: when an issue spawns a multi-dispatch effort, the issue comment IS the durable status surface.
+
+**Quantitative:**
+
+- Messages from user: ~7 (mostly directive — "do it", "yes", "for the better"; one substantive correction about chrome visibility).
+- Commits to feature branch: 2 (`0995cd3` design mockups; `4c558f7` chrome integration).
+- Files touched: 5 source (`chrome.ts`, `editorial-nav.css`, `editorial-review.css`, 2 test files); 5 docs (3 mockup HTMLs + README + screenshot PNGs × 2).
+- Lines added/removed: docs commit +2437 / -0; integration commit +152 / -121.
+- Tests: 295 passing (unchanged count — assertion updates, no new test cases for the chrome change since coverage was already in place).
+- Course corrections: 4 (1 [PROCESS] brainstorm-first instinct, 1 [UX] chrome-not-rendered-vs-not-visible, 1 [PROCESS] two-commit split, 1 [PROCESS] issue-comment-as-tracker).
+- Sub-agent dispatches: 0 (all in-thread; the design pass + integration were small enough to keep in-thread without context overhead).
+
+**Insights:**
+
+- **`/frontend-design` direct beats brainstorm-then-design when the problem is visually-specified.** Issue #154 had three screenshots showing the failure modes plus operator quotes. That's a complete problem statement. Brainstorming on top of it would explore alternatives the operator didn't ask for. Direct invocation produced production-grade mockups in one pass; integration shipped the same session.
+- **The folio component already existed as a single source of truth.** "Make it consistent + reusable" sounded like a refactor; turned out to be a one-line z-index + position fix. Always check what's already in place before treating an operator complaint as a design problem. The actual design work (italic Fraunces + proof-mark + bottom-bar active) was a small visual upgrade riding on the layering fix.
+- **Cross-highlight on hover is a key affordance for the press-check metaphor.** When marginalia lives next to the prose, hovering a margin note should mark the corresponding text in the article (and vice-versa). Mockup demonstrates this with a small JS handler; integration in Dispatch B will reuse the existing event surface from `editorial-review-client.ts` with a selector swap.
+- **The redesign retains the press-check metaphor and reuses every design token from `editorial-review.css`.** Only the *composition* changes — page becomes the unit, marginalia inside the page, drawer that's actually a drawer. The aesthetic commitment (Fraunces / Newsreader / JetBrains Mono, cream paper + ink + red pencil) is unchanged. Integration risk is structural, not aesthetic.
+
+**Next session:**
+
+- **Dispatch A — page-grid half** (the architectural fix). Replace `.er-marginalia` `position: fixed` with a CSS Grid column inside a new `.er-page` container. Resolves issue #154 concerns 1 + 2 in full. Likely the largest dispatch by file count (`review.ts` markup, `editorial-review.css` layout, possibly `review-viewport.css`).
+- **Dispatch B** — marginalia behavior on the new layout (rotation, hover cross-highlight, composer styling). Small follow-up after A lands.
+- **Dispatch C** — edit-mode toolbar above the page. Cleanup commit; should compose well with A+B.
+- **Dispatch D** — real bottom scrapbook drawer. Touches `review-scrapbook-drawer.ts`, `editorial-review-client.ts` for toggle handler.
+- **Dispatch E** — scrapbook index rewrite. Touches `scrapbook.ts`, `scrapbook-item.ts`, `scrapbook-client.ts`. Largest cross-cut.
+- **Verify each dispatch in Playwright** at 1440 / 1024 / 768 / 390 widths before committing.
+- **`audiocontrol.org` dry-run** stays deferred until the studio redesign lands.
+
+---
+
 ## 2026-05-01 (evening): longform-review refinement integration shipped (11 issues × 11 commits) → operator surfaced fundamental layout problems the refinement didn't reach → brainstorming arc started
 
 ### Feature: deskwork-plugin

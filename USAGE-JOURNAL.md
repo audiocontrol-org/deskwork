@@ -13,6 +13,46 @@ Populating this file is a step in `/session-end`. If a session didn't exercise t
 
 ---
 
+## 2026-05-02: design pass via `/frontend-design` directly + Dispatch A folio-half integrated → studio walked at 1440px to verify the chrome is now visible on review
+
+**Session goal (development side):** address [issue #154](https://github.com/audiocontrol-org/deskwork/issues/154) — a 5-concern UX/UI complaint with screenshots — using the frontend-design skill rather than the brainstorming arc the prior session left paused.
+
+**Surface exercised (usage side):** dev-mode `deskwork-studio` (`npm run dev`) on `127.0.0.1:47321`. Opened the longform review surface (`/dev/editorial-review/<entry-uuid>`) and the dashboard (`/dev/editorial-studio`) at 1440×900 to verify the integrated chrome change. Static mockups (HTML files) opened in a separate tab during design — `/frontend-design` produced two full-document mockups demonstrating the architectural fixes.
+
+### Operator framing on session start: brainstorm-as-design is worse than design-direct
+
+**insight.** Operator's opening line on the new session: *"I ditched the brainstorm arc because it produces considerably worse design results than using the frontend design plugin by itself. We can throw that one away."* The prior session ended with a paused brainstorm at `.superpowers/brainstorm/3483-1777699675/` — the agent had been about to resume it. Operator's correction reframes the tool selection: brainstorming is for *unclear problems*; `/frontend-design` is for *visually-specified problems*. Issue #154 came with three screenshots and direct quotes — that's a complete problem statement, not a brainstorm input. Skipping the scaffolding and invoking `/frontend-design` directly produced production-grade mockups in one pass.
+
+### What surfaced when the chrome was integrated
+
+#### 1. The folio was rendered but invisible — strip eclipsed it on review
+
+**friction.** First integration plan covered visual treatment only (italic Fraunces wordmark, red proof-mark prefix, bottom-rule active state). Operator interrupted with: *"the review/edit page doesn't currently have the chrome visible (if it's on the page, it's not visible on the page)."* Diagnosis via curl + browser inspection: `renderEditorialFolio` was rendered server-side on every studio surface (it's already a single component), but on the longform route the strip at `position: fixed; top: 0; z-index: 40` covered the folio at `position: sticky; top: 0; z-index: 10`. Layering bug, not a markup bug.
+
+**fix.** Folio relocated to `position: fixed; top: 0; height: var(--er-folio-h); z-index: 60`; strip relocated to `top: var(--er-folio-h); z-index: 40`. Body padding-top on longform extended to `calc(var(--er-folio-h) + 3.2rem)`. Marginalia (still viewport-fixed in this dispatch) bumped to `calc(var(--er-folio-h) + 3.4rem)` to clear the relocated strip. Verified live via `getBoundingClientRect`: folio at `top: 0`, height 38.4px, visible; strip at `top: 38.4px`, fully below the folio.
+
+**insight.** "Single source, applied consistently" is a real concern even when the component is already centralized. The visual *and* layering behavior have to compose. A future review surface that adds a third fixed bar (a contextual pill, a notification rail) would need the same explicit-stack discipline. Worth elevating to a CSS pattern: every fixed bar declares `top: <prior bar's bottom>` as a `calc()` of named height tokens, never literal pixels.
+
+#### 2. The redesign keeps the press-check metaphor; only composition changes
+
+**insight.** Walked through the existing `editorial-review.css` (3191 lines) before designing. The aesthetic commitments were correct — Fraunces / Newsreader / JetBrains Mono, cream paper + ink + red pencil + proof blue + stamp green/purple, slight rotation on margin notes for handwritten variety. What was wrong was the *layout architecture*: marginalia anchored to the viewport's right edge instead of inside the page's right margin. Fixing the architecture preserves every aesthetic token and only adds a handful of layout tokens (`--er-page-max`, `--er-article-col`, `--er-marginalia-col`, `--er-folio-h`, `--er-drawer-h`).
+
+**friction-adjacent (not a bug, a pattern).** The "page is a tangible object on a desk" metaphor was load-bearing for the design but only partially implemented in the source code. The marginalia panel's name (`er-marginalia`) carried the right semantic; the implementation drifted. This is a recurring pattern in this codebase — semantically-correct names with implementation that doesn't fully wire up the metaphor (cf. the earlier "scrapbook drawer that isn't a drawer" finding from issue #154 concern 3). The redesign brings the implementation into line with the names.
+
+#### 3. The dashboard inherits the new chrome cleanly
+
+**fix-verified.** After the integration commit, walked `/dev/editorial-studio` at 1440px. Folio renders identically to the review surface: `※ deskwork` italic wordmark, "press-check" spine, 5 nav items with DASHBOARD highlighted via the new red-pencil bottom-bar active state. Page content sits cleanly below the folio (body padding-top accommodates it). One component, every surface — confirmed by visual walk.
+
+**insight.** The "single source of truth" claim was already partially true at the markup level (`renderEditorialFolio` is shared); now it's also true at the visual + layering level. Future chrome iterations can be made by editing one component + one stylesheet, no per-surface coordination needed. This is the property that makes the chrome durable — adopters won't see surface drift if they only ever edit one place.
+
+### Tooling notes
+
+- **`mktemp` template syntax on macOS** got me again. Wrote `mktemp /tmp/dw-issue-154-XXXXXX.md` (extension after the X's); macOS mktemp wants `-t <prefix>` form (gives `/tmp/<prefix>.XXXXXX`) or trailing X's only. The literal-template form returned the unsubstituted string. Workaround: `TMPFILE=$(mktemp -t dw-issue-154)`. Worth remembering.
+- **Write-tool's "must read first" precondition** caught me on the freshly-created mktemp file. Even though the file was created in the same bash invocation that returned its path, the Write tool requires a Read first. Pattern: when handing a file path to Write, Read it first (even if it's empty or just-created). Recurring across sessions; it's now in muscle memory.
+- **Posted detailed status comment on issue #154** with diagnosis-by-concern table, 5-dispatch implementation plan with status, links to every artifact, and inline-rendered screenshots. Pattern: when an issue spawns a multi-dispatch effort, the issue comment IS the durable status surface. Operators reading the issue see what's done, what's pending, with file links and commit hashes.
+
+---
+
 ## 2026-05-01 (evening): post-refinement walkthrough of the longform review surface — operator surfaces fundamental composition problems the polish pass didn't reach
 
 **Session goal (development side):** integrate 11 longform-review refinement issues from the prior session's design doc into the surface. Three subagent dispatches landed cleanly.
