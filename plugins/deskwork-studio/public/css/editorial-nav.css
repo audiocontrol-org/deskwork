@@ -62,7 +62,8 @@
  * editorial-review.css. */
 body[data-review-ui="studio"],
 body[data-review-ui="shortform"],
-body[data-review-ui="entry-review"] {
+body[data-review-ui="entry-review"],
+body[data-review-ui="manual"] {
   padding-top: var(--er-folio-h);
 }
 

@@ -168,7 +168,6 @@ describe('longform review surface page-grid (Issue #154 Dispatch A)', () => {
     expect(css).toMatch(/--er-page-max\s*:/);
     expect(css).toMatch(/--er-article-col\s*:\s*minmax\(28rem, 42rem\)/);
     expect(css).toMatch(/--er-marginalia-col\s*:\s*minmax\(16rem, 19rem\)/);
-    expect(css).toMatch(/--er-paper-4\s*:\s*#C9BFA3/i);
   });
 
   it('does not retain the obsolete .essay max-width:calc(100vw - 19rem) workaround', () => {
@@ -178,5 +177,18 @@ describe('longform review surface page-grid (Issue #154 Dispatch A)', () => {
     // so this rule is obsolete and was deleted.
     const css = readFileSync(CSS_PATH, 'utf8');
     expect(css).not.toMatch(/calc\(100vw\s*-\s*19rem\)/);
+  });
+
+  it('does not paint an asymmetric binding edge on .er-page::before', () => {
+    // Initial Dispatch-A treatment painted a 6px gradient + 1px
+    // --er-paper-4 rule on the left edge of .er-page only. The right
+    // edge had just the page's own --er-paper-3 hairline, so the two
+    // vertical edges read as visibly different — left dark spine,
+    // right barely visible. The press-check metaphor is a loose
+    // galley proof on a desk (not a bound codex), so both edges
+    // should carry the same paper-3 hairline + symmetric shadow.
+    const css = readFileSync(CSS_PATH, 'utf8');
+    expect(css).not.toMatch(/\.er-page::before\s*\{/);
+    expect(css).not.toMatch(/--er-paper-4/);
   });
 });

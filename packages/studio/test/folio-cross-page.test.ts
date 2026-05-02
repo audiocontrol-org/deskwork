@@ -20,11 +20,12 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   mkdtempSync,
   mkdirSync,
+  readFileSync,
   writeFileSync,
   rmSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import type { DeskworkConfig } from '@deskwork/core/config';
 import { writeCalendar } from '@deskwork/core/calendar';
 import type { EditorialCalendar } from '@deskwork/core/types';
@@ -248,4 +249,33 @@ describe('editorial folio — cross-page', () => {
       });
     });
   }
+
+  // The fixed `.er-folio` (height var(--er-folio-h), z-index 60) eclipses
+  // the top of any surface whose body lacks `padding-top: var(--er-folio-h)`
+  // — content slides directly under the folio on initial render, and any
+  // scroll exposes the eclipse immediately. Studio / shortform / entry-review
+  // / manual all own their full body, so all four belong in the
+  // padding-top selector group. Longform mounts inside the host BlogLayout
+  // and uses its own combined folio + strip rule in editorial-review.css;
+  // not in scope for this assertion.
+  it("editorial-nav.css pads the body for every surface that owns it", () => {
+    const navCss = readFileSync(
+      resolve(
+        __dirname,
+        '../../../plugins/deskwork-studio/public/css/editorial-nav.css',
+      ),
+      'utf8',
+    );
+    const ruleStart = navCss.search(
+      /^body\[data-review-ui="studio"\]/m,
+    );
+    expect(ruleStart, 'body padding-top selector group should exist').toBeGreaterThan(0);
+    const ruleEnd = navCss.indexOf('}', ruleStart);
+    const block = navCss.slice(ruleStart, ruleEnd + 1);
+    expect(block).toMatch(/data-review-ui="studio"/);
+    expect(block).toMatch(/data-review-ui="shortform"/);
+    expect(block).toMatch(/data-review-ui="entry-review"/);
+    expect(block).toMatch(/data-review-ui="manual"/);
+    expect(block).toMatch(/padding-top:\s*var\(--er-folio-h\)/);
+  });
 });

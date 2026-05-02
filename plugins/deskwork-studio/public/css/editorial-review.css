@@ -85,11 +85,6 @@
   --er-article-col:     minmax(28rem, 42rem);
   --er-marginalia-col:  minmax(16rem, 19rem);
   --er-page-gap:        var(--er-space-5);
-
-  /* Page binding edge — slightly darker than --er-paper-3 so the
-   * faint left-edge gradient on `.er-page::before` reads as a
-   * physical binding rather than as background noise. */
-  --er-paper-4: #C9BFA3;
 }
 
 /* ---------- Scoped reset + page chrome ---------- */
@@ -1188,9 +1183,10 @@ body:has([data-review-ui="longform"]) .site-footer {
  *
  * The longform review surface composes one tangible page on the desk:
  * `.er-page` is the page itself (max-width capped at `--er-page-max`,
- * centered, with a faint binding edge on the left); `.er-page-grid` is
- * the three-track grid inside it — article column, 1px gutter, and
- * marginalia column. The middle "column" is just the gutter rule.
+ * centered, with a uniform faint border + drop shadow that reads as a
+ * loose galley proof on the desk). `.er-page-grid` is the three-track
+ * grid inside it — article column, 1px gutter, and marginalia column.
+ * The middle "column" is just the gutter rule.
  *
  * Marginalia previously anchored to the viewport's right edge with
  * `position: fixed`, which (a) cramped edit mode (Save / Focus
@@ -1199,6 +1195,11 @@ body:has([data-review-ui="longform"]) .site-footer {
  * — marginalia now sits inside the page next to the prose it
  * annotates, scrolling with the page rather than pinned to the
  * viewport. See issue #154 for the full diagnosis.
+ *
+ * Edge treatment: the page is a galley proof under review (loose
+ * sheet on a desk), not a bound codex page. So both vertical edges
+ * carry the same paper-3 hairline + symmetric drop shadow rather
+ * than asymmetric binding chrome on the left.
  */
 
 .er-page {
@@ -1213,25 +1214,6 @@ body:has([data-review-ui="longform"]) .site-footer {
     0 14px 28px -10px rgba(26, 22, 20, 0.18),
     0 4px 8px -2px rgba(26, 22, 20, 0.06);
   position: relative;
-}
-
-/* Faint binding edge on the page's left side — a subtle nod to the
- * codex metaphor without competing with the prose for attention. */
-.er-page::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: -1px;
-  width: 6px;
-  background: linear-gradient(
-    to right,
-    var(--er-paper-4) 0%,
-    var(--er-paper-3) 50%,
-    transparent 100%
-  );
-  border-right: 1px solid var(--er-paper-4);
-  pointer-events: none;
 }
 
 .er-page-grid {
