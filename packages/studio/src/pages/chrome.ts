@@ -3,23 +3,24 @@
  * surface (dashboard, longform review, shortform, content view, scrapbook,
  * help, and the studio index).
  *
- * Three-column grid: wordmark / nav / spine. The active surface gets a
- * red-pencil tick mark drawn via `::before` — reads like an editor
- * circled where you are, not a UI selected state.
+ * Single component, every consumer. Markup intentionally flat (no
+ * inner wrapper) so the folio can flex its three children — wordmark,
+ * spine, nav — directly. The active surface is marked with a red-pencil
+ * underline drawn via `::after` in editorial-nav.css.
  *
- * Phase 17: replaces the prior `renderEditorialChrome` (Writer's Catalog
- * `.ed-chrome` strip), which only the bird's-eye content view used.
- * The folio commits to the editorial-print design language so every
- * surface shares one cross-page nav. CSS lives in
- * `plugins/deskwork-studio/public/css/editorial-nav.css` and uses the
- * existing `--er-*` tokens — no new variables.
+ * Layout invariant: the folio is `position: fixed; top: 0` and other
+ * fixed chrome (the review surface's `.er-strip`) sits BELOW it at
+ * `top: var(--er-folio-h)`. Earlier versions used `position: sticky` +
+ * a lower z-index, which left the folio eclipsed by the longform
+ * review's strip — the user couldn't see the global nav at all on
+ * review pages.
  */
 
 import { html, unsafe, type RawHtml } from './html.ts';
 
 /**
  * The set of values callers can pass as the active key. The first five
- * map to a nav-item that gets a `class="active"`; `'longform'` is a
+ * map to a nav-item that gets `class="active"`; `'longform'` is a
  * special "no nav match" key for the longform review surface — it
  * carries an active context (we ARE inside a review) but no nav-item
  * represents that destination, so none gets highlighted. Issue 4 fixed
@@ -50,9 +51,10 @@ const NAV_LINKS: readonly FolioLink[] = [
 
 /**
  * Render the folio strip. `spineLabel` is the page-specific subtitle
- * shown at the right edge ("press-check", "the shape of the work",
- * "index of the press", etc.). Defaults to no spine when omitted —
- * which collapses to a 2-column layout.
+ * shown to the right of the wordmark ("press-check", "the shape of the
+ * work", "longform · <slug>", etc.). When omitted the spine renders
+ * empty (an `aria-hidden` placeholder so the flex layout stays balanced
+ * across pages).
  */
 export function renderEditorialFolio(
   active: ChromeActiveLink,
@@ -60,21 +62,20 @@ export function renderEditorialFolio(
 ): RawHtml {
   const links = NAV_LINKS.map((link) => {
     const cls = link.key === active ? 'active' : '';
-    return html`<a class="${cls}" href="${link.href}">${link.label}</a>`;
+    const aria = link.key === active ? ' aria-current="page"' : '';
+    return html`<a class="${cls}" href="${link.href}"${unsafe(aria)}>${link.label}</a>`;
   }).join('');
 
   const spine = spineLabel
-    ? html`<div class="er-folio-spine">${spineLabel}</div>`
-    : '<div class="er-folio-spine" aria-hidden="true"></div>';
+    ? html`<span class="er-folio-spine">${spineLabel}</span>`
+    : '<span class="er-folio-spine" aria-hidden="true"></span>';
 
   return unsafe(html`
-    <header class="er-folio">
-      <div class="er-folio-inner">
-        <div class="er-folio-name">deskwork <em>STUDIO</em></div>
-        <nav class="er-folio-nav" aria-label="Studio sections">
-          ${unsafe(links)}
-        </nav>
-        ${unsafe(spine)}
-      </div>
+    <header class="er-folio" role="banner">
+      <span class="er-folio-mark">deskwork</span>
+      ${unsafe(spine)}
+      <nav class="er-folio-nav" aria-label="Studio sections">
+        ${unsafe(links)}
+      </nav>
     </header>`);
 }

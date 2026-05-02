@@ -978,7 +978,11 @@ body[data-review-ui="entry-review"] {
 
 [data-review-ui="longform"] .er-strip {
   position: fixed;
-  top: 0;
+  /* Stack BELOW the global folio (which is fixed at top:0 with
+   * height var(--er-folio-h)). Earlier the strip was at top:0
+   * and z-index:40, eclipsing the folio (z-index:10) — the
+   * global nav was invisible on review pages. */
+  top: var(--er-folio-h);
   left: 0;
   right: 0;
   z-index: 40;
@@ -994,10 +998,12 @@ body[data-review-ui="entry-review"] {
   backdrop-filter: blur(6px);
 }
 
-/* Push the page content down so it doesn't hide behind the fixed strip.
- * Applied only on the longform route via a body-level rule injected by
- * the chrome wrapper. */
-body:has([data-review-ui="longform"] .er-strip) { padding-top: 3.2rem; }
+/* Push the page content down so it isn't hidden behind the
+ * folio + strip stack. Applied only on the longform route via
+ * a body-level rule injected by the chrome wrapper. */
+body:has([data-review-ui="longform"] .er-strip) {
+  padding-top: calc(var(--er-folio-h) + 3.2rem);
+}
 
 /* Suppress the host site's sticky header + footer on longform review
  * pages. The review chrome (press-check strip, margin-notes sidebar)
@@ -1162,7 +1168,11 @@ body:has([data-review-ui="longform"]) .site-footer {
 .er-marginalia {
   position: fixed;
   right: var(--er-space-3);
-  top: 5.5rem;
+  /* Clear the folio (--er-folio-h) + strip (~3.4rem). Earlier
+   * 5.5rem assumed strip-at-top:0; with the folio now stacked
+   * above the strip, the marginalia would otherwise tuck under
+   * the strip's bottom edge. */
+  top: calc(var(--er-folio-h) + 3.4rem);
   bottom: var(--er-space-3);
   width: 18rem;
   overflow-y: auto;

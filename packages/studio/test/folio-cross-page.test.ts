@@ -181,9 +181,12 @@ describe('editorial folio — cross-page', () => {
       it('renders the er-folio strip', async () => {
         const r = await getHtml(app, surface.path);
         expect(r.html).toContain('class="er-folio"');
-        expect(r.html).toContain('class="er-folio-inner"');
-        // Wordmark.
-        expect(r.html).toContain('deskwork <em>STUDIO</em>');
+        // Wordmark — italic Fraunces, ※ proof-mark applied via CSS ::before.
+        expect(r.html).toContain('class="er-folio-mark">deskwork');
+        // Spine sits between the wordmark and the nav.
+        expect(r.html).toMatch(/class="er-folio-spine"/);
+        // Nav lives in its own <nav> element labelled "Studio sections".
+        expect(r.html).toContain('class="er-folio-nav"');
       });
 
       const activeLabelCase = surface.activeLabel;
@@ -191,8 +194,9 @@ describe('editorial folio — cross-page', () => {
         it(`marks ${activeLabelCase} as the active nav link`, async () => {
           const r = await getHtml(app, surface.path);
           // Pattern: <a class="active" href="<route>">Label</a>
+          // chrome.ts emits aria-current="page" alongside class="active".
           const re = new RegExp(
-            `class="active"\\s+href="[^"]+"\\s*>\\s*${activeLabelCase}\\s*<`,
+            `class="active"\\s+href="[^"]+"\\s+aria-current="page"\\s*>\\s*${activeLabelCase}\\s*<`,
           );
           expect(r.html).toMatch(re);
         });
