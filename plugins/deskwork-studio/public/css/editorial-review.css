@@ -1272,22 +1272,106 @@ body:has([data-review-ui="longform"]) .site-footer {
   .er-page { margin: 0 var(--er-space-1); }
 }
 
-/* Issue #159 — operator-driven marginalia visibility toggle. When
- * `body[data-marginalia="hidden"]` is set (by `editorial-review-client`'s
- * Shift+M / strip ⊟ Notes button), collapse `.er-page-grid` to a
- * single article column and hide the marginalia + gutter tracks
- * entirely. The article reflows to claim the freed width. Independent
- * of focus mode (which uses `body.er-focus-mode` to hide everything);
- * exiting focus mode restores marginalia to whatever this toggle says.
+/* Issue #159 — operator-driven marginalia visibility toggle. The
+ * affordances live ON the marginalia component, mirroring the
+ * outline-drawer's pull-tab pattern:
  *
- * Selector specificity: `body[data-marginalia="hidden"]` keeps the
- * rule winning over the responsive media-query layouts (which still
- * stack marginalia below the article at narrow widths). */
+ *   - `.er-marginalia-stow` — chevron in the head row, visible when
+ *     marginalia is visible (head is inside `.er-marginalia`, which
+ *     is `display: none` when stowed, so this naturally disappears).
+ *   - `.er-marginalia-tab` — pull tab on the right edge of the
+ *     viewport, visible ONLY when marginalia is stowed.
+ *   - Both + `Shift+M` dispatch through `toggleMarginalia` in
+ *     `editorial-review-client.ts`.
+ *
+ * When `body[data-marginalia="hidden"]` is set, collapse the
+ * `.er-page-grid` to a single article column and hide the marginalia +
+ * gutter tracks entirely. Independent of focus mode. */
 body[data-marginalia="hidden"] .er-page-grid {
   grid-template-columns: 1fr;
 }
 body[data-marginalia="hidden"] .er-marginalia,
 body[data-marginalia="hidden"] .er-page-gutter {
+  display: none;
+}
+
+/* Stow chevron — small button in the marginalia head. */
+.er-marginalia-stow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  padding: 0;
+  border: 1px solid var(--er-faded-2);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--er-faded);
+  font-family: var(--er-font-mono);
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+.er-marginalia-stow:hover {
+  color: var(--er-red-pencil);
+  border-color: var(--er-red-pencil);
+  background: var(--er-paper);
+}
+.er-marginalia-stow:focus-visible {
+  outline: 2px solid var(--er-red-pencil);
+  outline-offset: 1px;
+}
+
+/* Pull tab on the right edge of the viewport — mirrors `.er-outline-tab`
+ * (left edge) so the project's affordance vocabulary is consistent.
+ * Hidden by default; revealed when marginalia is stowed. */
+.er-marginalia-tab {
+  display: none;
+  position: fixed;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  z-index: 50;
+  background: var(--er-paper);
+  border: 1px solid var(--er-red-pencil);
+  border-right: 0;
+  border-radius: 3px 0 0 3px;
+  padding: var(--er-space-2) 0.45rem;
+  cursor: pointer;
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--er-red-pencil);
+  transition: background 150ms ease, padding-right 200ms ease;
+  box-shadow: -2px 0 6px rgba(26, 22, 20, 0.08);
+  /* Stack glyph above label vertically. */
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+body[data-marginalia="hidden"] .er-marginalia-tab {
+  display: flex;
+}
+.er-marginalia-tab:hover {
+  background: var(--er-paper-2);
+  padding-right: 0.7rem;
+}
+.er-marginalia-tab:focus-visible {
+  outline: 2px solid var(--er-red-pencil);
+  outline-offset: 2px;
+}
+.er-marginalia-tab-glyph {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+.er-marginalia-tab-label {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+/* Don't intrude in focus mode — the editor owns the canvas. */
+body.er-focus-mode .er-marginalia-tab {
   display: none;
 }
 
@@ -1302,6 +1386,15 @@ body[data-marginalia="hidden"] .er-page-gutter {
 }
 
 .er-marginalia-head {
+  /* Flex row: stow chevron + label. The chevron sits on the LEFT
+   * because the marginalia column lives on the right side of the
+   * page — clicking ›-pointing-left "pushes" the column off-stage,
+   * matching the spatial mental model. (When stowed, the
+   * `.er-marginalia-tab` on the right edge of the viewport carries
+   * a ‹-pointing-left chevron to "pull" the column back.) */
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
   font-family: var(--er-font-mono);
   font-size: 0.68rem;
   letter-spacing: 0.18em;

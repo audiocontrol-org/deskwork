@@ -270,14 +270,6 @@ function renderControlsRight(workflow: DraftWorkflowItem): RawHtml {
   if (isTerminal) {
     buttons.push(html`<span class="er-pending-state er-pending-state--filed">filed (${workflow.state})</span>`);
   }
-  // Issue #159 — marginalia visibility toggle. Operator may want to
-  // hide the margin-notes column to claim the freed width for the
-  // article (or, in edit mode, the source/preview panes). Lives in
-  // the strip rather than the edit toolbar so it's reachable from
-  // read mode too. Initial aria-pressed reflects no-toggle (visible);
-  // the client (editorial-review-client.ts) restores from localStorage
-  // and updates aria-pressed + body[data-marginalia] in lockstep.
-  buttons.push(html`<button class="er-btn er-btn-small" data-action="toggle-marginalia" type="button" aria-pressed="false" title="Hide margin notes (Shift+M)" aria-label="Toggle margin notes column">⊟ Notes</button>`);
   buttons.push(html`<button class="er-btn er-btn-small" data-action="shortcuts" type="button" aria-label="Show keyboard shortcuts" title="Keyboard shortcuts">?</button>`);
   return unsafe(`<span class="er-strip-right">${buttons.join('')}</span>`);
 }
@@ -332,7 +324,7 @@ function renderShortcutsOverlay(): RawHtml {
           <dt><kbd>r</kbd> <kbd>r</kbd></dt><dd>reject <em>— press twice within 500ms</em></dd>
           <dt><kbd>j</kbd> / <kbd>k</kbd></dt><dd>next / previous margin note</dd>
           <dt><kbd>shift</kbd><kbd>F</kbd></dt><dd>focus mode <em>(edit mode only)</em></dd>
-          <dt><kbd>shift</kbd><kbd>M</kbd></dt><dd>show / hide margin notes column</dd>
+          <dt><kbd>shift</kbd><kbd>M</kbd></dt><dd>show / hide margin notes column <em>— or click the chevron in the head when visible, or the pull tab on the right edge when stowed</em></dd>
           <dt><kbd>?</kbd></dt><dd>this panel</dd>
           <dt><kbd>esc</kbd></dt><dd>close / cancel composer</dd>
         </dl>
@@ -341,10 +333,44 @@ function renderShortcutsOverlay(): RawHtml {
     </div>`);
 }
 
+/* Issue #159 — marginalia stow affordance.
+ *
+ * The toggle for "show / hide the margin-notes column" lives ON the
+ * marginalia component, not in a generic toolbar. Two paired
+ * affordances drive the same state:
+ *
+ *   - `.er-marginalia-stow` — chevron button INSIDE the marginalia
+ *     head (next to "Margin notes" label). Clicking it stows the
+ *     column. Visible only when marginalia is visible (the head is
+ *     inside `.er-marginalia`, which is `display: none` when stowed).
+ *
+ *   - `.er-marginalia-tab` — pull tab on the right edge of the
+ *     viewport, mirroring `.er-outline-tab` on the left edge. Visible
+ *     ONLY when marginalia is stowed (CSS rule `body[data-marginalia=
+ *     "hidden"] .er-marginalia-tab { display: block }`). Clicking it
+ *     unstows.
+ *
+ * Both affordances + Shift+M dispatch through the same client-side
+ * toggleMarginalia handler. Mirrors the outline-drawer's pull-tab
+ * pattern so the project's affordance vocabulary stays consistent.
+ */
+function renderMarginaliaTab(): RawHtml {
+  return unsafe(html`
+    <button class="er-marginalia-tab" data-action="toggle-marginalia" type="button" aria-pressed="true" aria-label="Show margin notes (Shift+M)" title="Show margin notes (Shift+M)">
+      <span class="er-marginalia-tab-glyph" aria-hidden="true">‹</span>
+      <span class="er-marginalia-tab-label">Notes</span>
+    </button>`);
+}
+
 function renderMarginalia(): RawHtml {
   return unsafe(html`
     <aside class="er-marginalia" data-comments-sidebar aria-label="Margin notes">
-      <p class="er-marginalia-head">Margin notes</p>
+      <p class="er-marginalia-head">
+        <button class="er-marginalia-stow" data-action="toggle-marginalia" type="button" aria-pressed="false" aria-label="Hide margin notes (Shift+M)" title="Hide margin notes (Shift+M)">
+          <span aria-hidden="true">›</span>
+        </button>
+        <span class="er-marginalia-head-label">Margin notes</span>
+      </p>
       <p class="er-marginalia-empty" data-sidebar-empty>Select text in the draft to leave a <em>margin note</em>.</p>
       <section class="er-marginalia-composer" data-comment-composer hidden aria-label="New margin note">
         <p class="er-marginalia-composer-head">New mark</p>
@@ -398,7 +424,6 @@ function renderEditToolbar(outlineHasContent: boolean): RawHtml {
       </div>
       <div class="er-edit-actions">
         <button class="er-btn er-btn-small" data-action="outline-drawer" type="button" title="Show the outline for reference (O)" aria-pressed="false"${unsafe(outlineBtnAttrs)}>Outline ↗</button>
-        <button class="er-btn er-btn-small" data-action="toggle-marginalia" type="button" aria-pressed="false" title="Hide margin notes (Shift+M)" aria-label="Toggle margin notes column">⊟ Notes</button>
         <button class="er-btn er-btn-small" data-action="focus-mode" type="button" title="Distraction-free mode (Shift+F)" aria-pressed="false">Focus ⛶</button>
         <button class="er-btn er-btn-primary" data-action="save-version" type="button">Save as new version</button>
         <button class="er-btn" data-action="cancel-edit" type="button">Cancel</button>
@@ -658,6 +683,7 @@ export async function renderReviewPage(
       <article class="er-page">
         ${unsafe(pageGrid)}
       </article>
+      ${isShortform ? unsafe('') : renderMarginaliaTab()}
       <button class="er-pencil-btn" data-add-comment-btn hidden type="button">Mark</button>
       ${isShortform ? unsafe('') : renderOutlineDrawer(outlineHtml)}
       ${isShortform

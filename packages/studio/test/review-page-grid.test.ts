@@ -192,20 +192,30 @@ describe('longform review surface page-grid (Issue #154 Dispatch A)', () => {
     expect(css).not.toMatch(/--er-paper-4/);
   });
 
-  it('exposes a marginalia visibility toggle in the strip + CSS rule that collapses the page-grid', () => {
-    // Issue #159 — operator-driven marginalia hide. The toggle lives
-    // in the strip (visible in both read and edit modes) and drives a
-    // body attribute that the CSS rule consumes to collapse the grid.
-    // Pre-#159 there was no way to hide marginalia without entering
-    // focus mode (which is all-or-nothing).
+  it('exposes the marginalia visibility toggle as on-component affordances (Issue #159)', () => {
+    // The toggle for hiding/showing marginalia lives ON the marginalia
+    // component, mirroring the outline-drawer pull-tab pattern:
+    //   - `.er-marginalia-stow` chevron in the head (visible state)
+    //   - `.er-marginalia-tab` pull tab on the right edge (stowed state)
+    // Body attribute `[data-marginalia="hidden"]` collapses the
+    // page-grid + reveals the tab. Earlier iterations placed buttons
+    // in the strip and edit toolbar; that shape is retired —
+    // affordances belong on their components, not in generic chrome.
     const css = readFileSync(CSS_PATH, 'utf8');
-    // CSS rule that collapses the grid + hides marginalia/gutter.
+    // Page-grid collapse + marginalia/gutter hide when stowed.
     expect(css).toMatch(
       /body\[data-marginalia="hidden"\]\s+\.er-page-grid\s*\{[^}]*grid-template-columns:\s*1fr/,
     );
     expect(css).toMatch(
       /body\[data-marginalia="hidden"\]\s+\.er-marginalia,?[\s\S]*body\[data-marginalia="hidden"\]\s+\.er-page-gutter\s*\{[^}]*display:\s*none/,
     );
+    // Pull tab is hidden by default and revealed when marginalia is stowed.
+    expect(css).toMatch(/\.er-marginalia-tab\s*\{[\s\S]*?display:\s*none/);
+    expect(css).toMatch(
+      /body\[data-marginalia="hidden"\]\s+\.er-marginalia-tab\s*\{[^}]*display:\s*flex/,
+    );
+    // Stow chevron exists as a styled affordance.
+    expect(css).toMatch(/\.er-marginalia-stow\s*\{/);
   });
 
   it('renders the longform strip as sticky (not fixed) so its actual height takes space in flow', () => {

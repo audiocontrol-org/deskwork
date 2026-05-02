@@ -1349,26 +1349,26 @@ export function initEditorialReview(): void {
 
   // ---- Marginalia visibility toggle (Issue #159) ----
   //
-  // Operator-driven control to hide the margin-notes column from the
-  // page-grid and reclaim the freed width for the article (and, in
-  // edit mode, the source/preview panes). Independent of focus mode:
-  // a hidden-via-toggle marginalia stays hidden when entering and
-  // leaving focus. Toggle persists via localStorage so the operator's
-  // last preference sticks across reloads.
+  // Affordances live ON the marginalia component (mirrors the
+  // outline-drawer pull-tab pattern):
   //
-  // Two activation surfaces:
-  //   - `[data-action="toggle-marginalia"]` button in the strip
-  //     (rendered by review.ts:renderControlsRight)
-  //   - Shift+M anywhere on the page (handled in the global keymap
-  //     below alongside Shift+F)
+  //   - `.er-marginalia-stow` chevron in the marginalia head — visible
+  //     when marginalia is visible (it's inside `.er-marginalia`, which
+  //     is `display: none` when stowed, so it disappears with the
+  //     column).
+  //   - `.er-marginalia-tab` pull tab on the right edge of the
+  //     viewport — visible only when marginalia is stowed.
+  //   - `Shift+M` keyboard shortcut.
+  //
+  // All three carry `data-action="toggle-marginalia"` and are wired
+  // here. Both buttons reflect aria-pressed in lockstep with body
+  // [data-marginalia]. Identical placement across read and edit modes
+  // (the toggle is on the marginalia, not in either toolbar). The
+  // toolbar-button shape from earlier iterations is retired —
+  // affordances belong on the components they affect, not in generic
+  // chrome rows.
 
   const MARGINALIA_HIDDEN_KEY = 'deskwork:review:marginalia-hidden';
-  // There are two toggle-marginalia buttons in the markup: one in the
-  // strip (visible in read mode) and one in the edit toolbar (visible
-  // in edit mode, since the strip's right side is hidden during edit
-  // by the Dispatch C `body:has(.er-edit-toolbar:not([hidden]))` rule).
-  // Both buttons drive the same state and both must reflect aria-pressed
-  // in lockstep.
   const marginaliaToggleBtns = Array.from(
     document.querySelectorAll<HTMLButtonElement>('[data-action="toggle-marginalia"]'),
   );
