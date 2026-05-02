@@ -992,11 +992,18 @@ body[data-review-ui="entry-review"] {
 }
 
 [data-review-ui="longform"] .er-strip {
-  position: fixed;
-  /* Stack BELOW the global folio (which is fixed at top:0 with
-   * height var(--er-folio-h)). Earlier the strip was at top:0
-   * and z-index:40, eclipsing the folio (z-index:10) — the
-   * global nav was invisible on review pages. */
+  /* Sticky so the strip occupies its actual rendered height in
+   * document flow (eliminating the body-padding hack that has to
+   * guess the strip height up front). When unscrolled the strip
+   * sits naturally at body-padding-top (= folio bottom); on scroll
+   * it sticks to `top: var(--er-folio-h)` so the global folio
+   * remains uneclipsed. Issue #155 / #154 polish: the prior
+   * `position: fixed` + `body padding-top: calc(folio + 3.2rem)`
+   * combo undersized when `.er-strip-inner` wraps to 2 rows at
+   * desktop widths (rendered ~109px / 6.85rem at 1440px), and the
+   * marginalia head landed underneath the strip. Sticky is
+   * self-sizing; no recalculation required when content changes. */
+  position: sticky;
   top: var(--er-folio-h);
   left: 0;
   right: 0;
@@ -1013,11 +1020,12 @@ body[data-review-ui="entry-review"] {
   backdrop-filter: blur(6px);
 }
 
-/* Push the page content down so it isn't hidden behind the
- * folio + strip stack. Applied only on the longform route via
- * a body-level rule injected by the chrome wrapper. */
+/* The longform body only has to clear the fixed folio; the strip is
+ * sticky and takes its own height in document flow, so it cannot
+ * eclipse the article or marginalia regardless of how many rows
+ * `.er-strip-inner` wraps to. */
 body:has([data-review-ui="longform"] .er-strip) {
-  padding-top: calc(var(--er-folio-h) + 3.2rem);
+  padding-top: var(--er-folio-h);
 }
 
 /* Suppress the host site's sticky header + footer on longform review

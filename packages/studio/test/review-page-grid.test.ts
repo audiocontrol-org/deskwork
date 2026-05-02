@@ -191,4 +191,40 @@ describe('longform review surface page-grid (Issue #154 Dispatch A)', () => {
     expect(css).not.toMatch(/\.er-page::before\s*\{/);
     expect(css).not.toMatch(/--er-paper-4/);
   });
+
+  it('renders the longform strip as sticky (not fixed) so its actual height takes space in flow', () => {
+    // Pre-fix: `.er-strip` was `position: fixed` and the body padding
+    // was a hardcoded `calc(var(--er-folio-h) + 3.2rem)`. When
+    // `.er-strip-inner` wraps to two rows at desktop widths
+    // (rendered ~109px / 6.85rem at 1440px because the children
+    // sum to wider than --er-container-wide), the strip
+    // overflowed the body padding and eclipsed the page below it.
+    // Live measurement showed the marginalia head sitting -1.25px
+    // *behind* the strip's bottom. Sticky resolves this by letting
+    // the strip take its actual rendered height in flow (issue #155).
+    const css = readFileSync(CSS_PATH, 'utf8');
+    const stripStart = css.search(
+      /^\[data-review-ui="longform"\]\s+\.er-strip\s*\{/m,
+    );
+    expect(stripStart, '.er-strip rule should exist').toBeGreaterThan(0);
+    const stripEnd = css.indexOf('}', stripStart);
+    const stripBlock = css.slice(stripStart, stripEnd + 1);
+    expect(stripBlock).toMatch(/position:\s*sticky\s*;/);
+    // Require trailing `;` so prose mentions of the prior `position:
+    // fixed` state inside the explanatory comment don't false-positive.
+    expect(stripBlock).not.toMatch(/position:\s*fixed\s*;/);
+    expect(stripBlock).toMatch(/top:\s*var\(--er-folio-h\)/);
+
+    // The body padding-top hack is no longer needed: the strip is
+    // self-sizing in flow, so the longform body only needs to clear
+    // the (still fixed) folio.
+    const bodyStart = css.search(
+      /^body:has\(\[data-review-ui="longform"\]\s+\.er-strip\)\s*\{/m,
+    );
+    expect(bodyStart, 'longform body padding rule should exist').toBeGreaterThan(0);
+    const bodyEnd = css.indexOf('}', bodyStart);
+    const bodyBlock = css.slice(bodyStart, bodyEnd + 1);
+    expect(bodyBlock).toMatch(/padding-top:\s*var\(--er-folio-h\)\s*;/);
+    expect(bodyBlock).not.toMatch(/calc\(\s*var\(--er-folio-h\)\s*\+\s*3\.2rem\s*\)/);
+  });
 });
