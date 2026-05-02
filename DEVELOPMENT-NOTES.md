@@ -4,6 +4,67 @@ Session journal for `deskwork`. Each entry records what was tried, what worked, 
 
 ---
 
+## 2026-05-01 (afternoon): v0.12.1 release + studio UX/UI design pass arc — Phase 2 reframed mid-flight
+
+### Feature: deskwork-plugin
+### Worktree: deskwork-plugin
+
+**Goal:** ship v0.12.1 (the Phase 32 9-commit bug-fix sweep), then begin the comprehensive studio UX/UI design pass per operator framing — fix UX/UI before audiocontrol.org dogfood.
+
+**Accomplished:**
+
+- **v0.12.1 shipped via `/release`** (single tag, atomic push, three packages on npm, smoke green).
+- **14-issue marketplace-install verification arc.** Walked every Phase-32-touched issue against v0.12.1, dispatched parallel verification subagents, posted evidence comments, operator approved closures. Closed: #109, #110, #111, #112, #113, #117, #124, #143, #144, #145, #147, #148, #149, #150.
+- **Filed [#151](https://github.com/audiocontrol-org/deskwork/issues/151)** (`deskwork publish` doesn't persist `publishedDate` to sidecar) and **[#152](https://github.com/audiocontrol-org/deskwork/issues/152)** (entry-review CSS missing — the deferred-styling TODO from Phase 30).
+- **Brainstorm + spec + plan for the studio UX/UI design pass.** Used `superpowers:brainstorming` with the visual companion. Locked: Approach C (comprehensive scope), Approach 1 (one umbrella spec, phased plan), Approach B (keep typesetting jargon + add glossary tooltips). Theme support out of scope. Spec: `docs/superpowers/specs/2026-05-01-studio-uxui-design.md` (487 lines). Plan: `docs/superpowers/plans/2026-05-01-studio-uxui.md` (1786 lines, 41 tasks across 9 phases).
+- **Phase 0 — verification of 7 VERIFY items.** 6 parallel haiku subagents + 1 in-thread. Outcomes: #75 / #98 / #103 / #74 / #99 MOOT; #71 ACTIVE (source-level fabrication; dormant locally because docs lack `slug`); #104 ACTIVE (7 legacy slash-command refs in manual). Spec §6 issue matrix updated with ACTIVE/MOOT + dated provenance. Phase 3 reduced 5→2; Phase 4 reduced 4→3; Phase 6 reduced 2→1.
+- **Phase 1 — glossary mechanism foundation (#114).** 6 tasks, 8 commits. New `glossary.json` (12 terms with seeAlso). New `gloss(<key>)` template helper. Frontend-design output for the tooltip pattern integrated as `er-gloss` + `er-gloss-tip` rules. Client-side TS module with jsdom-tested hover/focus/Esc/click-outside behaviors + single-tooltip invariant. Layout integration: `window.__GLOSSARY__` inlined; client script loaded on every surface. End-state: 977 → 982 tests.
+- **Phase 2 — entry-review surface designed → operator caught fundamental error → restored working surface.** Designed CSS for what turned out to be a stage-controller (no rendered article, no margin notes, no decision strip — just title + textarea + control buttons). Operator: *"The core functionality of the review surface is missing: neither margin notes nor in-surface editing is supported. What do you think the review surface is for?"* And then: *"Phase 30 destroyed it. I want *that* back."* Removed two Phase 30 regressions in commit `f19f68f`: (a) `server.ts:379-386` short-circuit that diverted every dashboard click to the minimal surface; (b) `readHistory()` choking on Phase 30's flat-shape `entry-created` journal records (`unwrap()` returned `env.entry` for unwrapped records → `TypeError` on `.kind` of undefined; added a pre-unwrap shape filter). Dashboard's per-row links now land on the working press-check tool with margin notes, rendered preview, decision strip, voice-drift column. The Phase 2 entry-review CSS commits (`a1ae4bb`/`f381833`/`34672c2`) ship unchanged but only apply at the explicit `/dev/editorial-review/entry/<uuid>` URL — out of operator's default path.
+- **Longform review refinement design doc.** Walked the restored surface in Playwright at desktop / tablet / phone. Cataloged **11 distinct UX/UI issues**: (1) decision-strip duplicate state indicators, (2) Edit-button vs Mark-pencil distinction, (3) glossary tooltip application to jargon, (4) "Reviews" → "Shortform" nav rename + active-state fix, (5) inline keyboard-shortcut chips, (6) empty-state cleanup, (7) edit-mode disclosure label, (8) **er-folio + er-strip stack collision**, (9) **er-marginalia obscures er-scrapbook-drawer**, (10) **wide-viewport alignment**, (11) **surface is not responsive**. Issues 8/9/10/11 all caught by the operator after I missed them. Frontend-design output committed at `docs/superpowers/frontend-design/longform-review-refinement.md` (627 lines).
+- **19 commits, 1 release, 14 issues closed, 2 issues filed, 3 design artifacts.**
+
+**Didn't Work:**
+
+- **Designed the wrong surface for #152.** Spec's §5.2 sub-metaphor ("desk inset / clipboard view") locked the entry-review as a stage-controller, not a review surface. Four commits of CSS shipped before operator caught it. The brainstorming-time question "what is this surface FOR?" never got asked. Same fabrication failure mode as Phase 32's "speculation framed as confidence assessment" — designing without exercising the system.
+- **First Playwright walk missed three visible layout collisions** (er-folio+er-strip stacking, er-marginalia obscuring er-scrapbook-drawer, wide-viewport alignment). Static-markup walk + thumbnail screenshot at default viewport — caught polish issues, missed layout collisions. Operator pointed at all three; on a re-walk at 1440×900 with a `getBoundingClientRect` audit they were obvious.
+- **Missed responsiveness entirely.** Operator: *"Also, did you notice that the review surface is not responsive?"* Verified at 768px (broken — marginalia overlaps article body) and 390px (catastrophic — article body has ~100px usable; strip clips off Edit/filed/?). Surface has zero responsive breakpoints on the major layout pieces.
+- **Subagent-driven integration of the longform refinement timed out.** Sonnet subagent dispatched with the full 627-line design doc — stream idle timeout after ~7min and 32 tool uses, partial response, no commits. Brief was too broad (11 issues × CSS + markup + client + tests + nav rename).
+- **Phase 1 Task 1.5 subagent set vitest's environment to jsdom GLOBALLY**, broke 26 existing tests (esbuild requires real Node TextEncoder/Uint8Array). Reverted in `185452d`. The new test file already had `@vitest-environment jsdom` per-file; the global override was wrong-knob.
+
+**Course Corrections:**
+
+- **[FABRICATION]** Designed a stage-controller for #152 instead of a review surface. The brainstorming-time question "what is this surface FOR?" went unasked. Lesson: when designing a surface, walk the existing functional version FIRST; don't start from the markup-class-list.
+- **[UX]** Missed three visible layout collisions in the first Playwright walk + missed responsiveness entirely. Lesson: every Playwright walk on a candidate "design pass" surface should include (a) a `getBoundingClientRect` audit on fixed/sticky/sidebar elements and (b) a sweep across desktop, tablet, and phone widths before cataloging issues.
+- **[PROCESS]** Subagent-driven integration brief was too broad (11 issues, multi-file, multi-concern). Lesson: target ≤4 logical changes per integration dispatch.
+- **[PROCESS]** Phase 2 work shipped CSS for a surface not in the operator's default path. The CSS isn't harmful but the work was misdirected. Lesson: when integrating design output, validate against the operator's actual click path (dashboard → review), not just the URL the design output targets.
+
+**Quantitative:**
+
+- Messages from user: ~40 (mostly directive — "1", "yes", "approve", "continue" — plus the foundational corrections about the entry-review surface, the layout collisions, and responsiveness).
+- Commits to feature branch: 19 (49fee37 → ebd535d).
+- Issues closed: 14. Issues filed: 2. Releases shipped: 1 (v0.12.1).
+- Frontend-design invocations: 3 (glossary tooltip; entry-review surface — design rolled-back from operator's path; longform review refinement — design committed, integration deferred).
+- Subagent dispatches: 8 (6 parallel verifications + 1 successful Phase 1 task + 1 timed-out integration).
+- Test count: 977 → 982 passing across all four workspaces (Phase 1's +5).
+- Course corrections: 4 (1 [FABRICATION], 2 [UX], 1 [PROCESS]).
+
+**Insights:**
+
+- **Framing matters more than CSS quality.** I produced excellent CSS for a surface that doesn't do its job. The framing failure ("desk inset / clipboard view" vs "press-check tool") was the upstream error; downstream design effort was misdirected. The brainstorming-time question to pin: "what should this surface DO?" before "what should it LOOK like?"
+- **The operator catches what the agent misses by looking.** Three of today's biggest findings (entry-review's missing functionality, layout collisions, responsiveness) came from operator visual inspection. The agent's static markup analysis missed all three. The operator-as-visual-reviewer is essential when the agent can only see DOM trees.
+- **Subagent-driven integration has scope limits per dispatch.** The 11-issue brief timed out; the 6-task Phase 1 was the upper bound that succeeded. Target ≤4 logical changes.
+- **Phase 0 verification paid off again.** 5/7 VERIFY items moot — the cheapest possible scope reduction before redesign work.
+- **Two Phase 30 regressions surfaced in the same arc.** The server short-circuit and the `readHistory()` shape mismatch were both Phase 30 collateral; both fixable by tiny rules; both went unnoticed for months because they only surfaced via DOGFOOD, not release-time tests. The walk-the-real-surface principle is what surfaced them.
+- **Session ended mid-arc.** v0.12.1 shipped + Phases 0+1 of the design pass landed + working press-check surface restored + 11-issue refinement design doc committed. The longform-review integration (subagent timed-out) is unmade work. Phases 3-8 of the implementation plan unstarted.
+
+**Next session:**
+
+- **Integrate the longform review refinement design doc** in chunked dispatches of ≤4 issues each: (a) layout collisions + responsive (Issues 8 + 9 + 10 + 11); (b) decision-strip refinement (Issues 1 + 2 + 5 + 7); (c) glossary application + nav + empty states (Issues 3 + 4 + 6).
+- **Continue the broader plan from Phase 3.** Phase 0 reduced Phase 3 to #68 + #105 only.
+- **Audiocontrol.org dry-run** stays deferred until the studio is in working order.
+
+---
+
 ## 2026-05-01: Phase 32 — pipeline-walk dogfood + bug-fix sweep, all in dev, no release cycle (v0.12.1 candidate)
 
 ### Feature: deskwork-plugin
