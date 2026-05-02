@@ -4,7 +4,7 @@
 
 **Goal:** Rebuild the studio scrapbook surface (`/dev/scrapbook/<site>/<path>`) to match the operator-approved mockup composition — aside-left folder card with numbered item list, vertical card grid with per-kind colored ribbons + always-visible foot toolbar + per-kind preview rendering, drop zone, secret section, single-expanded card invariant, aside cross-linking.
 
-**Architecture:** Five dispatches (F1–F5). F1 is a coherent rebuild of `scrapbook.ts` + `scrapbook.css` + `scrapbook-client.ts` from scratch using the mockup's markup tree; tests rewritten in the same commit. F2–F5 incrementally add per-kind preview refinement, aside numbered list + per-kind extra meta, aside cross-linking + single-expanded invariant + URL hash sync, drop zone + secret section. No backwards-compat shims; clean replace per the project's "no garbage turds" rule. Each dispatch is one commit.
+**Architecture:** Six dispatches (F1–F6). F1 is a coherent rebuild of `scrapbook.ts` + `scrapbook.css` + `scrapbook-client.ts` from scratch using the mockup's markup tree; tests rewritten in the same commit. F2–F5 incrementally add per-kind preview refinement, aside numbered list + per-kind extra meta, aside cross-linking + single-expanded invariant + URL hash sync, drop zone + secret section. F6 is a non-code dispatch: `/frontend-design` final integrated sign-off against the mockup at all 4 viewports, producing the audit-trail walkthrough document and the issue's fix-landed comment. No backwards-compat shims; clean replace per the project's "no garbage turds" rule. Each dispatch is one commit. **Design-review gates G1–G4 are non-negotiable** (see "Design-review gates" section below).
 
 **Tech Stack:** TypeScript (Node 22+, ECMAScript), Hono framework for server, vanilla DOM client (no framework), CodeMirror 6 (carried over from review surface, not used here), Vitest for tests, Playwright MCP for live verification. Press-check tokens (`--er-paper`, `--er-ink`, `--er-red-pencil`, etc.) defined in `editorial-review.css` already; mono / serif / display font families already loaded.
 
@@ -13,6 +13,32 @@
 **Issue:** [#161](https://github.com/audiocontrol-org/deskwork/issues/161)
 
 **Mockup:** [`docs/superpowers/frontend-design/2026-05-02-review-redesign/scrapbook-redesign.html`](../frontend-design/2026-05-02-review-redesign/scrapbook-redesign.html)
+
+---
+
+## Design-review gates (NON-NEGOTIABLE)
+
+The plan was authored against the mockup; the executor MUST use `/frontend-design:frontend-design` at four explicit gates. Skipping any of these is a process failure on the same severity tier as skipping `ui-verification.md`'s playwright steps. The operator's framing on the cost of skipping: *"don't 'just for now' it and be lazy. That just creates more work for us to cleanup the garbage turds you leave lying around."*
+
+| Gate | When | Input | Required output |
+|---|---|---|---|
+| **G1** — pre-CSS design review | Before Task **F1.4** (rewriting `scrapbook.css`) | Current page screenshot at 1440 + the mockup HTML file. | Deviation list (each tagged small/medium/large) + go/no-go to write the CSS as drafted in the plan. Any large-tagged deviations must be resolved before proceeding. |
+| **G2** — pre-preview-refinement design review | Before Task **F2.2** (refining `renderPreview`) | F1's live preview rendering for each kind + the mockup's preview blocks (md italic excerpt, img frame, json mono pre, txt mono pre). | Per-kind sign-off OR list of deviations to fix in F2.2 / file as follow-up. |
+| **G3** — pre-secret/drop-zone design review | Before Task **F5.2** (rendering drop zone + secret section) | Mockup's `.scrap-drop` and `.scrap-secret` blocks + the F4 live state of the page. | Sign-off on the drop-zone visual treatment + secret section's purple stamp + mark-public label flow + dragover state design. |
+| **G4** — final integrated sign-off | After **F5** lands (= new Dispatch F6) | Integrated live page at 4 viewports + the mockup. | Either explicit sign-off ("integration matches mockup") OR a list of blocking deviations that must be fixed before issue closure. The sign-off is itself a deliverable; without it the plan is not done. |
+
+`/frontend-design` is invoked the same way the planning phase did: as a Skill tool call with a specific brief (current state + mockup section + question), producing a structured response. The response is captured in the dispatch's verification step (commit message + issue comment) so the audit trail shows the design review actually happened.
+
+## Verification mandate (per `.claude/rules/ui-verification.md`, EXTENDED)
+
+Every dispatch's verification step requires BOTH:
+
+1. **Playwright** — drive the live surface, capture measurements, take screenshots, exercise interactions. Proves the implementation **functions** as specified.
+2. **`/frontend-design`** — review the live screenshots + DOM state against the mockup. Proves the implementation **looks** as specified.
+
+Both, not either. Playwright catches "the click handler is broken." `/frontend-design` catches "the click handler works but the button is in the wrong color." The cost of dropping either is exactly what motivated the verification rule; the cost of dropping `/frontend-design` specifically is what motivated this amendment.
+
+If `/frontend-design`'s response says any aspect deviates from the mockup, the dispatch is **not** marked done until either (a) the deviation is fixed in the same dispatch, or (b) it is filed as a follow-up issue with the deviation captured precisely.
 
 ---
 
@@ -579,6 +605,62 @@ npm test --workspace @deskwork/studio --silent -- --reporter=verbose review-scra
 ```
 
 Expected: server-shape assertions in tests pass (`.scrap-page`, `.scrap-aside`, `.scrap-main`, etc. all present in HTML response). The CSS-shape test (Task F1.2 last assertion block) still fails because `scrapbook.css` hasn't been rewritten yet.
+
+### Task F1.3.5: Gate G1 — pre-CSS design review (REQUIRED, blocks F1.4)
+
+This is gate G1. Cannot be skipped. The CSS draft in F1.4 is the planner's translation of the mockup; this gate verifies the translation before code is written.
+
+- [ ] **Step 1: Capture the current state for design review**
+
+```bash
+# Drive playwright after F1.3 (server is now emitting new markup but old CSS is still applied):
+#   browser_resize 1440 900
+#   browser_navigate http://127.0.0.1:47321/dev/scrapbook/deskwork-internal/source-shipped-deskwork-plan
+#   browser_take_screenshot .playwright-mcp/scrapbook-after-f1.3-pre-css-1440.png (fullPage: true)
+```
+
+This screenshot shows the new markup with stale CSS — useful for the design reviewer to see the "raw shape before styling."
+
+- [ ] **Step 2: Invoke `/frontend-design` with the pre-CSS brief**
+
+```
+Skill: frontend-design:frontend-design
+Args: Review the planned CSS for the scrapbook redesign (Issue #161) against the operator-approved mockup.
+
+CURRENT STATE: the server in scrapbook.ts now emits the new .scrap-* markup tree (Task F1.3 just landed). The old scrapbook.css is still applied, so the visual is broken — but the markup tree is in place. Screenshot at .playwright-mcp/scrapbook-after-f1.3-pre-css-1440.png.
+
+PLANNED CSS: see docs/superpowers/plans/2026-05-02-scrapbook-redesign-dispatch-e-visual.md Task F1.4 — the planner's translation of the mockup CSS into the project's token system. About 400 lines total: page grid, aside chrome, main header, filter chips, search, cards grid, card chrome, per-kind ribbons, preview surface, foot toolbar, expanded state.
+
+MOCKUP: docs/superpowers/frontend-design/2026-05-02-review-redesign/scrapbook-redesign.html lines 104-518 (CSS) + lines 537-806 (markup it targets).
+
+REQUIRED OUTPUT:
+1. Deviation list: each item tagged small / medium / large, with the mockup line + the plan line + what differs.
+2. For each large deviation: must this be fixed in F1.4 (planner got it wrong) OR is the planned divergence acceptable?
+3. Aesthetic refinements: anything the mockup does not specify but should be added (e.g., focus-visible outlines on .scrap-tool buttons, reduced-motion handling on .scrap-card hover).
+4. Sign-off statement: "F1.4 may proceed as drafted" OR "F1.4 must amend [X, Y, Z] before proceeding."
+
+This gate is non-negotiable per the plan's Design-review gates section. Skip = process failure.
+```
+
+- [ ] **Step 3: Capture the response in a notes file alongside the plan**
+
+```bash
+# Write the /frontend-design response to docs/superpowers/plans/2026-05-02-scrapbook-redesign-design-reviews.md as
+#   ## G1 — pre-CSS design review (YYYY-MM-DD HH:MM)
+#   ### Deviations
+#   - [size] description (mockup line, plan line)
+#   ### Sign-off
+#   <verbatim from /frontend-design>
+# This file is the audit trail for the design-review gates.
+```
+
+- [ ] **Step 4: Decision point**
+
+If `/frontend-design` signed off: proceed to F1.4 with the planned CSS.
+
+If it flagged large deviations that need fixing: amend the F1.4 CSS draft inline with the fixes, then proceed.
+
+If it flagged ambiguities the operator must decide: **stop here**; surface the ambiguity to the operator and wait. Do not proceed to F1.4 with unresolved design questions.
 
 ### Task F1.4: Rewrite the CSS (`scrapbook.css`)
 
@@ -1301,6 +1383,43 @@ Expected: only `md` cards have `hidden: false`; all other kinds `hidden: true`.
 
 Expected: `true` — search input is focused.
 
+- [ ] **Step 5: `/frontend-design` post-F1 visual review (REQUIRED — verification mandate)**
+
+```
+Skill: frontend-design:frontend-design
+Args: Review the as-built F1 dispatch of the scrapbook redesign (Issue #161) against the mockup.
+
+LIVE PAGE: http://127.0.0.1:47321/dev/scrapbook/deskwork-internal/source-shipped-deskwork-plan
+SCREENSHOTS (post-F1, post-CSS): .playwright-mcp/scrapbook-after-f1-1440.png, scrapbook-after-f1-1024.png, scrapbook-after-f1-768.png, scrapbook-after-f1-390.png
+
+MOCKUP: docs/superpowers/frontend-design/2026-05-02-review-redesign/scrapbook-redesign.html
+
+WHAT F1 SHIPS: page-grid swap (aside-LEFT), card chrome (vertical: head + meta + preview + foot toolbar), per-kind colored ribbons, filter chips (preserved behavior, new class names), search input + / shortcut (preserved), data-state="expanded" model preserved (mechanic unchanged; markup new).
+
+WHAT F1 DOES NOT YET SHIP (deferred to later dispatches): aside numbered item list (F3), aside cross-link active state (F4), single-expanded invariant (F4), URL hash sync (F4), drop zone (F5), secret section (F5), per-kind preview refinement (F2), per-kind extra meta lines/dimensions/keys (F3).
+
+REQUIRED OUTPUT:
+1. Match list: each section of the mockup that F1 successfully ships (aside chrome, main header, filter chips, search, cards grid, card chrome, per-kind ribbons, preview, foot toolbar, expanded state). Confirm each lines up with the mockup at 1440x900.
+2. Multi-viewport check: at 1024 / 768 / 390, confirm the responsive collapse to single-column happens correctly and the aside stacks above main when grid breaks.
+3. Deviation list: anything in F1 scope that does NOT match the mockup. Tag small/medium/large.
+4. Sign-off: "F1 verified — proceed to F2" OR "F1 has [X, Y, Z] deviations; fix before tagging F1 done."
+
+Hold to the rule: a "yes it works" response from playwright is not enough. The /frontend-design review is the visual sign-off that distinguishes "the click handler fires" from "the click handler fires AND the button is colored right AND the spacing matches AND the hover state is correct."
+```
+
+- [ ] **Step 6: Capture the response in the design-reviews notes file**
+
+```bash
+# Append to docs/superpowers/plans/2026-05-02-scrapbook-redesign-design-reviews.md:
+#   ## F1 post-implementation verification (YYYY-MM-DD HH:MM)
+#   ### /frontend-design review
+#   <verbatim>
+#   ### Resolution
+#   - [item] fixed in F1 / filed as follow-up #N / accepted as deliberate variation
+```
+
+If the review signs off cleanly, proceed to commit. If deviations remain, decide per the Design-review gates rule: fix-in-dispatch OR file-as-follow-up. No silent acceptance.
+
 ### Task F1.7: Commit F1
 
 - [ ] **Step 1: Stage + commit with falsifiable claims in the message**
@@ -1417,6 +1536,58 @@ npm test --workspace @deskwork/studio --silent -- --reporter=verbose review-scra
 
 Expected: F2 tests fail (frontmatter still leaks into preview; no graceful fallback yet).
 
+### Task F2.1.5: Gate G2 — pre-preview-refinement design review (REQUIRED, blocks F2.2)
+
+This is gate G2. The per-kind preview is one of the mockup's most distinctive choices — italic Newsreader excerpt for md, aspect-ratio bg-frame for img, mono pre for json/txt. Implementation choices (line-clamp count, frontmatter strip rule, fallback handling) need design judgment.
+
+- [ ] **Step 1: Capture per-kind live state after F1**
+
+```bash
+# Drive playwright to a multi-kind scrapbook (the F2 test fixture has md + json + txt + img)
+# Capture per-card screenshots showing the F1 preview rendering for each kind at closed AND expanded states.
+# Save as .playwright-mcp/scrapbook-f2-pre-{kind}-{state}-1440.png
+```
+
+- [ ] **Step 2: Invoke `/frontend-design` with the per-kind brief**
+
+```
+Skill: frontend-design:frontend-design
+Args: Review per-kind preview rendering for F2 of the scrapbook redesign (Issue #161).
+
+CURRENT (F1) STATE: per-kind previews emit:
+- md: <div class="scrap-preview scrap-preview-md"><p>{first 8 lines of file, 600 chars max}</p></div>
+- img: <div class="scrap-preview scrap-preview--img"><div class="scrap-preview--img-frame" style="background-image: url(...)"></div></div>
+- json: <pre class="scrap-preview scrap-preview--mono">{content excerpt}</pre>
+- txt: <pre class="scrap-preview scrap-preview--mono">{content excerpt}</pre>
+- other: no preview
+
+PLANNED F2 REFINEMENTS (Task F2.2):
+- md: strip frontmatter (--- ... --- block), italic Newsreader, -webkit-line-clamp: 5 in closed state, unclamped in expanded.
+- img: same shape; verify aspect-ratio: 4/3 in closed state and unconstrained in expanded.
+- json/txt: mono pre, line-clamp ~6 in closed, overflow auto in expanded.
+- All kinds: graceful fallback to empty preview on binary-as-text or read error (no crash).
+
+MOCKUP: docs/superpowers/frontend-design/2026-05-02-review-redesign/scrapbook-redesign.html lines 599-616 (md card example), 627-649 (img card example), 651-678 (json card example), 680-707 (txt card example).
+
+SCREENSHOTS: .playwright-mcp/scrapbook-f2-pre-*
+
+REQUIRED OUTPUT:
+1. Per-kind sign-off: for each of md / img / json / txt, does the F1 rendering already match the mockup, or are F2 refinements needed? Be specific.
+2. Implementation details: exact -webkit-line-clamp values; exact aspect-ratio decisions; exact frontmatter-strip rule (closing --- after the first frontmatter block? or any --- on a line by itself?).
+3. Edge cases: empty file, file with only frontmatter (no body), file with very long single line, image too small to show meaningfully at 4/3 — recommendations.
+4. Sign-off: "F2.2 may proceed as drafted with the following amendments [...]" OR "F2.2 must redesign [X] before proceeding."
+
+The mockup gives the visual target; this gate captures the implementation judgment that turns target into code.
+```
+
+- [ ] **Step 3: Capture the response in the design-reviews notes file**
+
+Same format as G1.
+
+- [ ] **Step 4: Decision — proceed to F2.2 with the response baked in**
+
+If `/frontend-design` recommends additional refinements (e.g., a different line-clamp number, a different frontmatter-strip approach), amend the F2.2 implementation accordingly.
+
 ### Task F2.2: Refine `renderPreview` in `scrapbook.ts`
 
 - [ ] **Step 1: Replace the `renderPreview` function with the F2 version**
@@ -1504,15 +1675,41 @@ Expected: all F2 tests pass.
 - [ ] **Step 1: Drive a multi-kind scrapbook in playwright**
 
 ```bash
-# Navigate to the test fixture or a real scrapbook with multiple kinds.
-# Capture screenshot at 1440x900.
-# Verify card backgrounds, kind ribbons, preview rendering for each kind.
+# Navigate to the F2 test fixture (md + json + txt + img + other).
+# Capture screenshots at 1440 / 1024 / 768 / 390.
+# For each kind, capture both closed and expanded states.
+# Save as .playwright-mcp/scrapbook-after-f2-{kind}-{state}-{viewport}.png
 ```
 
-- [ ] **Step 2: Commit F2**
+- [ ] **Step 2: Inner-element inspection (per ui-verification.md)**
+
+For markdown previews: `getComputedStyle()` on `.scrap-preview-md p` to confirm font-family resolves to Newsreader and font-style is italic. For mono previews: `getComputedStyle()` on `.scrap-preview--mono` to confirm font-family resolves to JetBrains Mono.
+
+- [ ] **Step 3: `/frontend-design` post-F2 visual review (REQUIRED — verification mandate)**
+
+```
+Skill: frontend-design:frontend-design
+Args: Review the as-built F2 dispatch (per-kind preview refinement) of the scrapbook redesign (Issue #161).
+
+LIVE: F2 test fixture, 4 viewports, both closed and expanded states for md / img / json / txt / other.
+SCREENSHOTS: .playwright-mcp/scrapbook-after-f2-*
+
+MOCKUP: docs/superpowers/frontend-design/2026-05-02-review-redesign/scrapbook-redesign.html — per-kind preview blocks.
+
+WHAT F2 SHIPS: frontmatter strip on md; aspect-ratio bg-frame on img; mono pre with line-clamp on json/txt; graceful fallback on binary or read error.
+
+REQUIRED OUTPUT:
+1. Per-kind match: each kind's preview matches the mockup at closed AND expanded states. For each, list deviations or sign off.
+2. Edge cases live: confirm the binary-as-text fixture renders without crashing AND without a broken preview block (graceful empty).
+3. Inner-element check: verify italic Newsreader on md, JetBrains Mono on json/txt — playwright getComputedStyle output is part of the verification proof, not a substitute for visual review.
+4. Sign-off: "F2 verified — proceed to F3" OR "F2 has [X, Y, Z] deviations; fix or file."
+```
+
+- [ ] **Step 4: Capture response, resolve deviations, commit F2**
 
 ```bash
-# Write commit message to .git-commit-msg.tmp; commit; remove tmp.
+# Append the /frontend-design review to the design-reviews notes file.
+# If clean: commit F2. If deviations: fix-in-dispatch OR file follow-up issue, then commit.
 ```
 
 ---
@@ -1648,9 +1845,36 @@ describe('scrapbook redesign — per-kind extra meta (Issue #161, dispatch F3)',
 
 ### Task F3.3: Live verification + commit F3
 
-- [ ] **Step 1: Drive playwright; verify aside `<ol>` populates with all items + active hover state**
+- [ ] **Step 1: Drive playwright at 1440 / 1024 / 768 / 390**
 
-- [ ] **Step 2: Commit F3**
+```bash
+# Navigate to a scrapbook with at least 4 items (cover all kinds for the per-kind meta).
+# Capture screenshots showing the populated aside list + per-kind extra meta in card-meta rows.
+# Verify aside list scrolls properly when items overflow the 16rem max-height.
+# Verify hover state on aside <a> shows red-pencil color + dotted underline.
+```
+
+- [ ] **Step 2: `/frontend-design` post-F3 visual review (REQUIRED)**
+
+```
+Skill: frontend-design:frontend-design
+Args: Review the as-built F3 dispatch (aside numbered list + per-kind extra meta) of the scrapbook redesign (Issue #161).
+
+LIVE: scrapbook with multi-kind items; aside list populated.
+SCREENSHOTS: .playwright-mcp/scrapbook-after-f3-* (1440 / 1024 / 768 / 390)
+
+MOCKUP: docs/superpowers/frontend-design/2026-05-02-review-redesign/scrapbook-redesign.html lines 550-560 (aside list) + lines 602-606, 633-637, 657-661, 686-690 (per-kind meta examples).
+
+WHAT F3 SHIPS: aside <ol> with one <li> per item (numbered, monospaced); per-kind extra meta in .scrap-card-meta (md "{N} lines", img "{W} × {H}" via PNG header parse, json "{N} keys", txt "{N} lines").
+
+REQUIRED OUTPUT:
+1. Aside list match: numbering, link styling, ellipsis on overflow, hover state, scrollability.
+2. Per-kind meta match: each kind shows the right extra info; format matches mockup ("72 lines" not "72 LINES" or "72L").
+3. Long-filename handling: aside list's text-overflow ellipsis kicks in correctly.
+4. Sign-off: "F3 verified — proceed to F4" OR list of deviations.
+```
+
+- [ ] **Step 3: Capture response, resolve, commit F3**
 
 ---
 
@@ -1773,12 +1997,33 @@ function init(): void {
 - [ ] **Step 1: Drive playwright; verify single-expanded + aside-active + hash-sync**
 
 ```bash
-# Open card 1; verify card 1 expanded, aside link 1 active, hash = #item-1
-# Click aside link 2; verify card 2 expanded, card 1 collapsed, aside link 2 active (link 1 inactive), hash = #item-2
-# Reload the page with hash #item-2; verify card 2 auto-opens
+# At 1440x900:
+# - Open card 1; verify data-state="expanded" on card 1, [data-active="true"] on aside link 1, window.location.hash === '#item-1'
+# - Click aside link 2; verify card 2 expanded, card 1 collapsed (single-expanded invariant), aside link 2 active (link 1 inactive), hash === '#item-2'
+# - Reload with hash '#item-2'; verify card 2 auto-opens on bootstrap
+# - Click card 2 to close; verify hash cleared, no aside link active
 ```
 
-- [ ] **Step 2: Commit F4**
+- [ ] **Step 2: `/frontend-design` post-F4 visual review (REQUIRED)**
+
+```
+Skill: frontend-design:frontend-design
+Args: Review the as-built F4 dispatch (single-expanded + aside cross-link + URL hash) of the scrapbook redesign (Issue #161).
+
+LIVE: scrapbook with multiple items; capture screenshots in: (a) no card expanded, (b) card 1 expanded with aside link 1 active, (c) card 2 expanded with aside link 2 active (link 1 deactivated), (d) hash-restore-on-reload state.
+
+WHAT F4 SHIPS: single-expanded invariant (opening a new card collapses any other expanded one); aside <a data-active="true"> active styling synced with expanded state; URL hash sync via history.replaceState; restoreFromHash() on bootstrap.
+
+MOCKUP: only shows static state; dynamic behavior (hash-sync, single-expanded) is design-judgment beyond what the mockup specifies.
+
+REQUIRED OUTPUT:
+1. Active-state visual: does the aside [data-active="true"] state read clearly as "this card is currently open"? Is the red-pencil + dotted-underline treatment legible on the aside list's small-mono text?
+2. Single-expanded UX: does the collapse-on-new-open feel right, or jarring? Recommendation on transition (instant vs animated).
+3. Hash-restore behavior: when the page loads with #item-N, the smooth-scroll into the card is good UX OR jumpy? Recommendation.
+4. Sign-off: "F4 verified — proceed to F5" OR deviations.
+```
+
+- [ ] **Step 3: Capture response, resolve, commit F4**
 
 ---
 
@@ -1824,6 +2069,48 @@ describe('scrapbook redesign — drop zone + secret section (Issue #161, dispatc
   });
 });
 ```
+
+### Task F5.1.5: Gate G3 — pre-secret/drop-zone design review (REQUIRED, blocks F5.2)
+
+This is gate G3. Drop zone has dragover state + click-to-pick affordance + drop-handling behavior; secret section has purple stamp + mark-public-toggle behavior. Both are visual elements not fully specified in the static mockup; the implementation needs design judgment beyond what the mockup shows.
+
+- [ ] **Step 1: Capture pre-F5 live state**
+
+```bash
+# Drive playwright to a scrapbook + (a) without secret items + (b) with secret items.
+# Capture screenshots showing the post-F4 state (no drop zone yet, no secret section yet).
+# Save as .playwright-mcp/scrapbook-pre-f5-{with|without}-secret-1440.png
+```
+
+- [ ] **Step 2: Invoke `/frontend-design` with the brief**
+
+```
+Skill: frontend-design:frontend-design
+Args: Review the planned F5 dispatch (drop zone + secret section) of the scrapbook redesign (Issue #161).
+
+CURRENT (post-F4) STATE: page has aside-left + main-right, cards grid, filter chips, search, single-expanded + aside cross-link. No drop zone. No secret section. Screenshots at .playwright-mcp/scrapbook-pre-f5-*
+
+PLANNED F5 ELEMENTS:
+1. Drop zone (.scrap-drop) at end of cards grid: dashed border 2px var(--er-faded-2), padding var(--er-space-4), centered mono-caps text "── drop a file here, or pick one ──", hover/focus changes border + text to red-pencil. Drop event accepts files; click opens hidden <input type="file">. Dragover state: data-dragover="true" on the .scrap-drop element changes border + bg + text color to red-pencil.
+
+2. Secret section (.scrap-secret) below the public cards (above the drop zone? below the drop zone? — design call). Header has purple stamp glyph (⚿) + h2 "Secret" + dashed-purple badge "private — never published". Items are .scrap-card with same template; mark-secret button reads "mark public" (the action toggles public/secret).
+
+MOCKUP: docs/superpowers/frontend-design/2026-05-02-review-redesign/scrapbook-redesign.html lines 472-486 (drop zone CSS), 488-518 (secret section CSS), 763-803 (drop + secret markup).
+
+DESIGN QUESTIONS THE MOCKUP DOESN'T ANSWER:
+1. Drop zone above or below secret section? Mockup shows drop after public cards then secret after drop. Does that order match the press-check metaphor (drop = where new items land = adjacent to public cards) or break it (secret items below drop creates ambiguity)?
+2. Dragover state styling: mockup doesn't show drag-over treatment. Recommend the exact CSS.
+3. Secret section: should secret cards have a tinted background or different border to distinguish from public, or rely on the section header alone? Mockup has no per-card visual difference.
+4. Empty state: when scrapbook has zero items, what shows? Just the drop zone? Or "no items yet" message + drop zone?
+
+REQUIRED OUTPUT:
+1. Sign-off on the planned drop zone composition.
+2. Recommendations on the design questions above.
+3. Sign-off on the planned secret section composition.
+4. "F5.2 may proceed as drafted with amendments [...]" OR "F5.2 must redesign [X] before proceeding."
+```
+
+- [ ] **Step 3: Capture response, amend F5.2 plan inline if needed**
 
 ### Task F5.2: Implement drop zone + secret section in `scrapbook.ts`
 
@@ -1983,13 +2270,145 @@ function init(): void {
 
 ### Task F5.4: Live verification + commit F5
 
-- [ ] **Step 1: Drive a scrapbook with secret items in playwright**
+- [ ] **Step 1: Drive a scrapbook with secret items in playwright at 1440 / 1024 / 768 / 390**
 
-- [ ] **Step 2: Verify drop zone visual + drag-over state**
+```bash
+# Capture screenshots showing the drop zone, secret section, public-cards-then-secret order.
+# Test the dragover state by simulating a drag (browser_evaluate with dispatchEvent of DragEvent).
+# Click on .scrap-drop; verify the file picker opens.
+# Click "mark secret" on a public card; verify the card moves to secret section after reload.
+# Click "mark public" on a secret card; verify the card moves to public section after reload.
+```
 
-- [ ] **Step 3: Verify secret section renders with purple stamp + correct mark-public labels**
+- [ ] **Step 2: `/frontend-design` post-F5 visual review (REQUIRED)**
 
-- [ ] **Step 4: Commit F5**
+```
+Skill: frontend-design:frontend-design
+Args: Review the as-built F5 dispatch (drop zone + secret section) of the scrapbook redesign (Issue #161).
+
+LIVE: scrapbook with both public and secret items; multiple kinds.
+SCREENSHOTS: .playwright-mcp/scrapbook-after-f5-* (4 viewports + dragover state + with/without secret items)
+
+WHAT F5 SHIPS: .scrap-drop with click + drag-and-drop; .scrap-secret section rendered conditionally (only when secret items exist); mark-secret toggle moves items between sections.
+
+REQUIRED OUTPUT:
+1. Drop zone match: visual treatment (dashed border, mono caps, red-pencil hover) + dragover state (data-dragover styling) match mockup + G3 recommendations.
+2. Secret section match: purple stamp, header treatment, "private — never published" badge, mark-public label on the toggle button.
+3. Section order: confirm the cards-then-drop-zone-then-secret order (or whatever G3 finalized) reads correctly.
+4. Empty state: when scrapbook has 0 items, the drop zone appears prominently; recommend further treatment if needed.
+5. Sign-off: "F5 verified — proceed to F6 final sign-off" OR deviations.
+```
+
+- [ ] **Step 3: Capture response, resolve, commit F5**
+
+---
+
+## Dispatch F6 — Final integrated design sign-off (REQUIRED before issue closure)
+
+**Goal:** `/frontend-design` walks the integrated implementation against the mockup at all 4 viewports and either signs off the issue as ready for closure, or produces a list of blocking deviations. This dispatch produces no code changes (typically); it produces an audit-trail document and an issue comment with the sign-off.
+
+**Why it exists:** Per the operator's framing, the implementation is not done when the last code-shipping dispatch (F5) lands. It is done when a design-discipline review confirms the integrated result looks like the mockup. Without F6, "I think it matches" replaces "design review confirms it matches," which is exactly the failure mode the verification rule was written to prevent.
+
+**Files (potentially):**
+- `docs/superpowers/plans/2026-05-02-scrapbook-redesign-design-reviews.md` — append the F6 sign-off
+- `docs/superpowers/plans/2026-05-02-scrapbook-redesign-final-walkthrough.md` (new) — capture the final per-section walkthrough as a durable artifact
+- Issue #161 — comment with sign-off OR blocking deviation list
+
+### Task F6.1: Capture full-coverage screenshots at 4 viewports
+
+- [ ] **Step 1: Drive playwright at 1440 / 1024 / 768 / 390**
+
+```bash
+# Navigate to a scrapbook with rich content: at least one item per kind (md, img, json, txt) + at least one secret item.
+# At each viewport:
+#   - Full-page screenshot, no expansion: .playwright-mcp/scrapbook-final-{viewport}-default.png
+#   - With md card expanded: .playwright-mcp/scrapbook-final-{viewport}-md-expanded.png
+#   - With img card expanded: .playwright-mcp/scrapbook-final-{viewport}-img-expanded.png
+#   - With aside list active state on item-3: .playwright-mcp/scrapbook-final-{viewport}-aside-active.png
+#   - With drop zone dragover: .playwright-mcp/scrapbook-final-{viewport}-dragover.png
+#   - With secret section visible: .playwright-mcp/scrapbook-final-{viewport}-secret.png
+```
+
+### Task F6.2: Invoke `/frontend-design` with the integrated brief
+
+- [ ] **Step 1: Send the final-walkthrough brief**
+
+```
+Skill: frontend-design:frontend-design
+Args: FINAL SIGN-OFF on the integrated scrapbook redesign (Issue #161).
+
+LIVE: http://127.0.0.1:47321/dev/scrapbook/<site>/<path-with-rich-content>
+SCREENSHOTS: .playwright-mcp/scrapbook-final-*
+
+MOCKUP: docs/superpowers/frontend-design/2026-05-02-review-redesign/scrapbook-redesign.html
+
+WHAT'S SHIPPED: F1 + F2 + F3 + F4 + F5 — the complete redesign per the spec at docs/superpowers/specs/2026-05-02-scrapbook-redesign-impl-spec.md.
+
+This is the final integrated review. The implementation is considered "shipped to feature/deskwork-plugin" but NOT considered "done" until this review signs off OR produces a blocking-deviations list. The operator will use this review's output to decide whether to close issue #161 (or to request a follow-up dispatch).
+
+REQUIRED OUTPUT:
+1. **Section-by-section walkthrough** — for each section of the mockup (folio, page grid, aside chrome, aside numbered list, main header, breadcrumb, search, filter chips, cards grid, card chrome, per-kind ribbons, card head, card meta, per-kind preview at closed AND expanded states, foot toolbar, drop zone, secret section), state: MATCHES / MINOR DEVIATION (description) / MAJOR DEVIATION (description).
+2. **Multi-viewport check** — confirm responsive behavior at 1440 / 1024 / 768 / 390 matches mockup intent (single-column collapse, aside stacking, etc.).
+3. **Affordance compliance audit** — per .claude/rules/affordance-placement.md: every affordance is component-attached (not toolbar-attached), reveal/hide is symmetric, identical position across modes (n/a — single mode here).
+4. **Verification compliance audit** — per .claude/rules/ui-verification.md: all five dispatches have falsifiable measurements in their commit messages; multi-instance tests passed; inner-element inspection passed for styled content.
+5. **Final sign-off** — one of:
+   - "INTEGRATION VERIFIED — issue #161 ready for operator review and closure."
+   - "INTEGRATION INCOMPLETE — blocking deviations: [X, Y, Z]. F6 cannot sign off until these are resolved (in this dispatch or a follow-up F7)."
+   - "INTEGRATION COMPLETE WITH FOLLOW-UP — sign-off granted with these non-blocking follow-ups filed as separate issues: [list]."
+
+This sign-off is the gate between "implementation done" and "issue closed." Operator-facing: this output goes verbatim into the #161 fix-landed comment.
+```
+
+- [ ] **Step 2: Capture the final walkthrough document**
+
+```bash
+# Write the /frontend-design response to docs/superpowers/plans/2026-05-02-scrapbook-redesign-final-walkthrough.md
+# Format:
+#   # Scrapbook Redesign — F6 Final Walkthrough
+#   ## Date / commits-included / viewports tested
+#   ## Section-by-section walkthrough
+#     ### {section name}: MATCHES / DEVIATION / etc.
+#   ## Multi-viewport
+#   ## Affordance compliance audit
+#   ## Verification compliance audit
+#   ## Sign-off
+#     <verbatim>
+#   ## Follow-up issues filed
+#     - [#N] description
+```
+
+### Task F6.3: Resolve any blocking deviations (if applicable)
+
+- [ ] **Step 1: If sign-off is "INTEGRATION INCOMPLETE"**
+
+For each blocking deviation:
+1. Decide: fix in this dispatch (F6 becomes a code-ship dispatch) OR file as F7 follow-up.
+2. If fix-in-dispatch: implement, re-verify per the verification mandate, update the walkthrough doc.
+3. If file-as-follow-up: open a GitHub issue with the deviation captured precisely + a screenshot.
+
+- [ ] **Step 2: Re-invoke `/frontend-design` until sign-off is "INTEGRATION VERIFIED"**
+
+The dispatch isn't done until sign-off is unconditional (or "with follow-up" where every follow-up is filed).
+
+### Task F6.4: Commit the walkthrough document + post the #161 fix-landed comment
+
+- [ ] **Step 1: Commit the walkthrough doc**
+
+```bash
+git add docs/superpowers/plans/2026-05-02-scrapbook-redesign-final-walkthrough.md \
+        docs/superpowers/plans/2026-05-02-scrapbook-redesign-design-reviews.md
+git commit -m "docs(plan): scrapbook redesign — F6 final walkthrough + sign-off (#161)"
+```
+
+- [ ] **Step 2: Post the fix-landed comment on issue #161**
+
+The comment includes:
+- All commit hashes from F1 through F5 (and F6 if it shipped code)
+- The verbatim sign-off from `/frontend-design`
+- Links to the walkthrough doc + design-reviews notes file
+- Multi-viewport screenshots links
+- Follow-up issues filed (if any)
+- Note that closure stays pending operator verification post-release per the agent-discipline rule
 
 ---
 
