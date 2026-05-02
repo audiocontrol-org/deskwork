@@ -1,51 +1,23 @@
 /**
- * Issue #154 Dispatch E — scrapbook index rewrite.
+ * Issue #161 — scrapbook redesign structural contract.
  *
- * Pre-Dispatch-E, the scrapbook index was a single vertical list of
- * collapsed disclosure rows that required a click before the operator
- * saw any preview. The redesigned surface lays items out as a CSS
- * Grid of cards with always-on previews, filter chips above the grid
- * (all / md / img / json / txt / other), and a search input the
- * operator can focus with the "/" keystroke.
- *
- * These tests pin the structural + CSS contracts so a future refactor
- * doesn't silently regress the new surface. Each phase of Dispatch E
- * appends its own block of assertions.
+ * Asserts the new markup tree from the operator-approved mockup at
+ * `docs/superpowers/frontend-design/2026-05-02-review-redesign/scrapbook-redesign.html`
+ * is rendered by the server. Behavior tests are covered in dispatch-specific
+ * test additions (F2-F5).
  */
 
-import { describe, it, expect } from 'vitest';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
-import { renderScrapbookPage } from '../src/pages/scrapbook.ts';
-import type { StudioContext } from '../src/routes/api.ts';
+import { join } from 'node:path';
 import type { DeskworkConfig } from '@deskwork/core/config';
+import { writeCalendar } from '@deskwork/core/calendar';
+import type { EditorialCalendar } from '@deskwork/core/types';
+import { createApp } from '../src/server.ts';
 
-const CSS_PATH = resolve(
-  __dirname,
-  '../../../plugins/deskwork-studio/public/css/scrapbook.css',
-);
-
-const CLIENT_PATH = resolve(
-  __dirname,
-  '../../../plugins/deskwork-studio/public/src/scrapbook-client.ts',
-);
-
-interface Fixture {
-  ctx: StudioContext;
-  cleanup: () => void;
-  site: 'd';
-  path: 'a-piece';
-}
-
-function makeFixture(items: ReadonlyArray<{ name: string; body: string }>): Fixture {
-  const root = mkdtempSync(join(tmpdir(), 'deskwork-scrapbook-index-'));
-  const scrapDir = join(root, 'docs', 'a-piece', 'scrapbook');
-  mkdirSync(scrapDir, { recursive: true });
-  for (const it of items) {
-    writeFileSync(join(scrapDir, it.name), it.body);
-  }
-  const config: DeskworkConfig = {
+function makeConfig(): DeskworkConfig {
+  return {
     version: 1,
     sites: {
       d: {
@@ -55,163 +27,153 @@ function makeFixture(items: ReadonlyArray<{ name: string; body: string }>): Fixt
     },
     defaultSite: 'd',
   };
-  return {
-    ctx: { projectRoot: root, config },
-    cleanup: () => rmSync(root, { recursive: true, force: true }),
-    site: 'd',
-    path: 'a-piece',
-  };
 }
 
-describe('scrapbook index — Dispatch E phase 1: grid + filters + search', () => {
-  it('CSS gives .scrapbook-items grid layout with auto-fill 15rem columns', () => {
-    const css = readFileSync(CSS_PATH, 'utf8');
-    expect(css).toMatch(
-      /\.scrapbook-items\s*\{[^}]*display:\s*grid/,
+function seedScrapbookFixture(root: string, cfg: DeskworkConfig): void {
+  const cal: EditorialCalendar = { entries: [], distributions: [] };
+  mkdirSync(join(root, '.deskwork'), { recursive: true });
+  writeCalendar(join(root, cfg.sites.d.calendarPath), cal);
+  // Create a content tree node with a scrapbook containing one md file + one txt file.
+  const dir = join(root, 'docs/folder/scrapbook');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'note.md'), '---\ntitle: A Note\n---\n\nProse line one.\n');
+  writeFileSync(join(dir, 'arrangement.txt'), 'short text content\n');
+  // Force deterministic mtimes — listScrapbook sorts mtime-desc; note.md must
+  // be newer so it lands at item-1 (md), with arrangement.txt at item-2 (txt).
+  const newer = Date.now() / 1000;
+  const older = newer - 60;
+  utimesSync(join(dir, 'arrangement.txt'), older, older);
+  utimesSync(join(dir, 'note.md'), newer, newer);
+}
+
+async function fetchScrapbook(
+  app: ReturnType<typeof createApp>,
+  site: string,
+  path: string,
+): Promise<{ status: number; html: string }> {
+  const res = await app.fetch(new Request(`http://x/dev/scrapbook/${site}/${path}`));
+  return { status: res.status, html: await res.text() };
+}
+
+describe('scrapbook redesign — structural contract (Issue #161)', () => {
+  let root: string;
+  let app: ReturnType<typeof createApp>;
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'deskwork-scrapbook-'));
+    const cfg = makeConfig();
+    seedScrapbookFixture(root, cfg);
+    app = createApp({ projectRoot: root, config: cfg });
+  });
+
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('renders the .scrap-page container with aside-left + main-right', async () => {
+    const r = await fetchScrapbook(app, 'd', 'folder');
+    expect(r.status).toBe(200);
+    // .scrap-page wraps both aside and main; aside appears BEFORE main in source order
+    // (which CSS grid renders as left-then-right).
+    const asideIdx = r.html.indexOf('class="scrap-aside"');
+    const mainIdx = r.html.indexOf('class="scrap-main"');
+    expect(asideIdx).toBeGreaterThan(0);
+    expect(mainIdx).toBeGreaterThan(asideIdx);
+  });
+
+  it('emits data-site / data-path on .scrap-page so the client can read them without parsing display text', async () => {
+    // The client (`scrapbook-client.ts:readCtx`) reads these attributes
+    // directly. If the server stops emitting them — or renames them — the
+    // client silently fails the `if (!site || !path) return null;` guard
+    // and the entire page becomes unwired with no diagnostic. Lock the
+    // contract here.
+    const r = await fetchScrapbook(app, 'd', 'folder');
+    expect(r.html).toMatch(/<main class="scrap-page" data-site="d" data-path="folder"/);
+  });
+
+  it('renders the aside chrome (kicker, title, totals, actions, path)', async () => {
+    const r = await fetchScrapbook(app, 'd', 'folder');
+    expect(r.html).toMatch(/<aside class="scrap-aside"/);
+    expect(r.html).toMatch(/scrap-aside-kicker/);
+    expect(r.html).toMatch(/<h1 class="scrap-aside-title">/);
+    expect(r.html).toMatch(/scrap-aside-totals/);
+    expect(r.html).toMatch(/scrap-aside-actions/);
+    expect(r.html).toMatch(/data-action="new-note"/);
+    expect(r.html).toMatch(/data-action="upload"/);
+    expect(r.html).toMatch(/scrap-aside-path/);
+  });
+
+  it('renders the .scrap-main with breadcrumb + search + filter chips + cards grid', async () => {
+    const r = await fetchScrapbook(app, 'd', 'folder');
+    expect(r.html).toMatch(/<section class="scrap-main">/);
+    expect(r.html).toMatch(/<nav class="scrap-breadcrumb"/);
+    expect(r.html).toMatch(/<div class="scrap-search">/);
+    expect(r.html).toMatch(/<div class="scrap-filters"/);
+    expect(r.html).toMatch(/<ol class="scrap-cards"/);
+  });
+
+  it('renders cards with the new vertical chrome — head + meta + preview + foot', async () => {
+    const r = await fetchScrapbook(app, 'd', 'folder');
+    // Each card has data-kind, data-state="closed" (default), and an id="item-N"
+    expect(r.html).toMatch(/<li class="scrap-card" data-kind="md" data-state="closed" id="item-1"/);
+    expect(r.html).toMatch(/<li class="scrap-card" data-kind="txt" data-state="closed" id="item-2"/);
+    expect(r.html).toMatch(/<div class="scrap-card-head">/);
+    expect(r.html).toMatch(/<span class="scrap-seq">/);
+    expect(r.html).toMatch(/<span class="scrap-name" data-action="open">/);
+    expect(r.html).toMatch(/<time class="scrap-time"/);
+    expect(r.html).toMatch(/<div class="scrap-card-meta">/);
+    expect(r.html).toMatch(/<span class="scrap-kind scrap-kind--md">MD<\/span>/);
+    expect(r.html).toMatch(/<span class="scrap-kind scrap-kind--txt">TXT<\/span>/);
+    expect(r.html).toMatch(/<div class="scrap-card-foot">/);
+    expect(r.html).toMatch(/data-action="open">open</);
+    expect(r.html).toMatch(/data-action="rename">rename</);
+    expect(r.html).toMatch(/data-action="delete">delete</);
+    expect(r.html).toMatch(/data-action="mark-secret"/);
+  });
+
+  it('preserves filter chips with kind labels + counts', async () => {
+    const r = await fetchScrapbook(app, 'd', 'folder');
+    expect(r.html).toMatch(/<button class="scrap-filter"/);
+    expect(r.html).toMatch(/aria-pressed="true">all/i);
+    // Per-kind chips with counts
+    expect(r.html).toMatch(/all\s*·\s*2/);
+    expect(r.html).toMatch(/md\s*·\s*1/);
+    expect(r.html).toMatch(/txt\s*·\s*1/);
+  });
+
+  it('preserves search input with / shortcut keybind hint', async () => {
+    const r = await fetchScrapbook(app, 'd', 'folder');
+    expect(r.html).toMatch(/<input[^>]*type="search"/);
+    expect(r.html).toMatch(/scrap-search-kbd/);
+    expect(r.html).toMatch(/[/]<\/span>/); // the literal "/" inside the kbd hint
+  });
+
+  it('does NOT retain the old .scrapbook-* classes (clean rebuild, no compat shims)', async () => {
+    const r = await fetchScrapbook(app, 'd', 'folder');
+    // The rebuild replaces; per the spec "no backwards-compat shims; clean replace
+    // per the project's no-garbage-turds rule".
+    expect(r.html).not.toMatch(/class="scrapbook-page"/);
+    expect(r.html).not.toMatch(/class="scrapbook-items"/);
+    expect(r.html).not.toMatch(/class="scrapbook-item"/);
+    expect(r.html).not.toMatch(/class="scrapbook-index"/);
+  });
+
+  it('CSS file uses the new .scrap-* class vocabulary', () => {
+    const cssPath = join(
+      __dirname,
+      '../../../plugins/deskwork-studio/public/css/scrapbook.css',
     );
-    expect(css).toMatch(
-      /grid-template-columns:\s*repeat\(auto-fill,\s*minmax\(15rem,\s*1fr\)\)/,
-    );
-  });
-
-  it('CSS expands data-state="expanded" cards across the full grid row', () => {
-    const css = readFileSync(CSS_PATH, 'utf8');
-    expect(css).toMatch(
-      /\.scrapbook-item\[data-state="expanded"\]\s*\{[^}]*grid-column:\s*1\s*\/\s*-1/,
-    );
-  });
-
-  it('CSS defines .scrapbook-filter-chip + the active variant', () => {
-    const css = readFileSync(CSS_PATH, 'utf8');
-    expect(css).toMatch(/\.scrapbook-filter-chip\s*\{/);
-    expect(css).toMatch(/\.scrapbook-filter-chip\.is-active\s*\{/);
-  });
-
-  it('markup contains the controls strip with all six filter chips', () => {
-    const fx = makeFixture([
-      { name: 'a-note.md', body: '# a-note\n' },
-      { name: 'b.json', body: '{}\n' },
-    ]);
-    try {
-      const html = renderScrapbookPage(fx.ctx, fx.site, fx.path);
-      expect(html).toContain('data-scrapbook-controls');
-      for (const k of ['all', 'md', 'img', 'json', 'txt', 'other']) {
-        expect(html).toMatch(
-          new RegExp(`data-filter-kind="${k}"`),
-        );
-      }
-    } finally {
-      fx.cleanup();
-    }
-  });
-
-  it('markup contains the search input with data-scrapbook-search', () => {
-    const fx = makeFixture([{ name: 'a-note.md', body: '# a-note\n' }]);
-    try {
-      const html = renderScrapbookPage(fx.ctx, fx.site, fx.path);
-      expect(html).toMatch(
-        /<input\s+type="search"[^>]*data-scrapbook-search/,
-      );
-    } finally {
-      fx.cleanup();
-    }
-  });
-});
-
-describe('scrapbook index — Dispatch E phase 2: peeks + sticky aside', () => {
-  it('CSS defines .scrapbook-item-peek with the kind variants', () => {
-    const css = readFileSync(CSS_PATH, 'utf8');
-    expect(css).toMatch(/\.scrapbook-item-peek\s*\{/);
-    expect(css).toMatch(/\.scrapbook-item-peek--img\s*\{/);
-    expect(css).toMatch(/\.scrapbook-item-peek--prose/);
-    expect(css).toMatch(/\.scrapbook-item-peek--mono/);
-  });
-
-  it('CSS hides .scrapbook-item-peek when the card is expanded', () => {
-    const css = readFileSync(CSS_PATH, 'utf8');
-    expect(css).toMatch(
-      /\.scrapbook-item\[data-state="expanded"\]\s*\.scrapbook-item-peek\s*\{[^}]*display:\s*none/,
-    );
-  });
-
-  it('CSS makes the .scrapbook-index aside sticky on tall enough viewports', () => {
-    const css = readFileSync(CSS_PATH, 'utf8');
-    expect(css).toMatch(
-      /@media\s*\(min-width:\s*64rem\)\s*and\s*\(min-height:\s*50rem\)\s*\{[\s\S]*?\.scrapbook-index\s*\{[^}]*position:\s*sticky/,
-    );
-  });
-
-  it('renders a prose peek for markdown items at server-render time', () => {
-    const body = '# Hello\n\nFirst line.\nSecond line.\nThird line.\n';
-    const fx = makeFixture([{ name: 'a-note.md', body }]);
-    try {
-      const html = renderScrapbookPage(fx.ctx, fx.site, fx.path);
-      expect(html).toContain('class="scrapbook-item-peek scrapbook-item-peek--prose"');
-      // The peek text should contain content from the file body
-      expect(html).toContain('First line.');
-    } finally {
-      fx.cleanup();
-    }
-  });
-
-  it('renders an image peek as a background-image div for img items', () => {
-    // PNG magic bytes — not a valid full PNG, but classify() just looks
-    // at the extension, so this exercises the kind=img code path.
-    const fx = makeFixture([{ name: 'shot.png', body: 'pngbytes' }]);
-    try {
-      const html = renderScrapbookPage(fx.ctx, fx.site, fx.path);
-      expect(html).toContain('scrapbook-item-peek scrapbook-item-peek--img');
-      expect(html).toMatch(
-        /background-image:\s*url\(&quot;\/api\/dev\/scrapbook-file\?[^"]*name=shot\.png[^"]*&quot;\)/,
-      );
-    } finally {
-      fx.cleanup();
-    }
-  });
-});
-
-describe('scrapbook index — Dispatch E phase 3: client wiring', () => {
-  it('client wires filter chips, search input, and "/" shortcut', () => {
-    const client = readFileSync(CLIENT_PATH, 'utf8');
-    expect(client).toContain('data-filter-kind');
-    expect(client).toContain('data-scrapbook-search');
-    // "/" key handler — accept either the literal '/' character or
-    // a key check, whichever the source uses.
-    expect(client).toMatch(/ev\.key\s*===\s*['"]\/['"]/);
-    // applyFilters branches on data-filtered-out
-    expect(client).toContain('filteredOut');
-  });
-
-  it('client toggles data-state="expanded" alongside data-open on disclosure', () => {
-    const client = readFileSync(CLIENT_PATH, 'utf8');
-    expect(client).toMatch(/data-state="expanded"|dataset\.state\s*=\s*['"]expanded['"]/);
-  });
-
-  it('client bootstraps initScrapbook at module load (was a latent gap)', () => {
-    // Pre-Dispatch-E the file exported initScrapbook but never invoked
-    // it — so the disclosure handler never bound and Dispatch E's new
-    // filter wiring would have been silently dead too. Assert the
-    // bootstrap is present so this can't regress.
-    const client = readFileSync(CLIENT_PATH, 'utf8');
-    expect(client).toMatch(/document\.readyState/);
-    expect(client).toMatch(/initScrapbook\(\)/);
-    expect(client).toMatch(/DOMContentLoaded/);
-  });
-
-  it('CSS gives each .scrapbook-item card chrome (border + flex column)', () => {
-    const css = readFileSync(CSS_PATH, 'utf8');
-    expect(css).toMatch(
-      /\.scrapbook-item\s*\{[^}]*flex-direction:\s*column/,
-    );
-    expect(css).toMatch(
-      /\.scrapbook-item\s*\{[^}]*border:\s*1px\s+solid/,
-    );
-  });
-
-  it('CSS hides the body slot when the card is collapsed', () => {
-    const css = readFileSync(CSS_PATH, 'utf8');
-    expect(css).toMatch(
-      /\.scrapbook-item:not\(\[data-state="expanded"\]\)\s*\.scrapbook-item-body\s*\{[^}]*display:\s*none/,
-    );
+    const css = readFileSync(cssPath, 'utf8');
+    expect(css).toMatch(/\.scrap-page\s*\{/);
+    expect(css).toMatch(/\.scrap-aside\s*\{/);
+    expect(css).toMatch(/\.scrap-main\s*\{/);
+    expect(css).toMatch(/\.scrap-cards\s*\{/);
+    expect(css).toMatch(/\.scrap-card\s*\{/);
+    expect(css).toMatch(/\.scrap-card::before/);
+    expect(css).toMatch(/\.scrap-card-foot\s*\{/);
+    // No old .scrapbook-* selectors remain
+    expect(css).not.toMatch(/\.scrapbook-page\s*\{/);
+    expect(css).not.toMatch(/\.scrapbook-items\s*\{/);
+    expect(css).not.toMatch(/\.scrapbook-item\s*\{/);
   });
 });

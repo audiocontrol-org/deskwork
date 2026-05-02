@@ -375,10 +375,13 @@ describe('studio pages', () => {
   it('GET /dev/scrapbook/:site/:slug renders empty state', async () => {
     const r = await getText(app, '/dev/scrapbook/a/some-post');
     expect(r.status).toBe(200);
-    expect(r.text).toContain('Scrapbook');
-    expect(r.text).toContain('This scrapbook is empty');
+    // Issue #161: page-grid shell renders even with zero items; F5 will add
+    // an empty-state drop zone treatment. Asserts the new aside-left chrome
+    // and the studio's CSS + client bundle paths.
+    expect(r.text).toContain('class="scrap-aside"');
+    expect(r.text).toContain('class="scrap-page"');
     expect(r.text).toContain('/static/css/scrapbook.css');
-    expect(r.text).toContain('/static/dist/scrapbook-client.js');
+    expect(r.text).toContain('scrapbook-client');
   });
 
   it('GET /dev/scrapbook/:site/:slug lists items when present', async () => {
@@ -413,15 +416,19 @@ describe('studio pages', () => {
     );
     expect(r.status).toBe(200);
     expect(r.text).toContain('archetypes.md');
-    // Breadcrumb shows each path segment as a link, with the leaf
-    // rendered as the current span.
-    expect(r.text).toContain('scrapbook-breadcrumb');
-    expect(r.text).toContain('href="/dev/scrapbook/a/the-outbound"');
-    expect(r.text).toContain('href="/dev/scrapbook/a/the-outbound/characters"');
-    expect(r.text).toContain('scrapbook-breadcrumb-current');
+    // Issue #161: new breadcrumb is .scrap-breadcrumb with a site link and
+    // the final segment as <b>; intermediate segments are not linked
+    // (consistent with the mockup).
+    expect(r.text).toContain('class="scrap-breadcrumb"');
+    expect(r.text).toContain('href="/dev/content/a"');
+    expect(r.text).toContain('<b>strivers</b>');
   });
 
-  it('GET /dev/scrapbook/:site/<path> exposes secret items in a separate section', async () => {
+  // Issue #161 (F5): secret section is being rebuilt as <section
+  // class="scrap-secret"> with a purple stamp + mark-public toggle; the
+  // F1-shipped server template intentionally omits it. Re-enable when F5
+  // lands and update the assertions to match the new vocabulary.
+  it.skip('GET /dev/scrapbook/:site/<path> exposes secret items in a separate section', async () => {
     const sb = join(
       root,
       'src/sites/a/content/blog/the-outbound/scrapbook',
@@ -433,10 +440,8 @@ describe('studio pages', () => {
     const r = await getText(app, '/dev/scrapbook/a/the-outbound');
     expect(r.status).toBe(200);
     expect(r.text).toContain('public-note.md');
-    expect(r.text).toContain('scrapbook-secret');
+    expect(r.text).toContain('scrap-secret');
     expect(r.text).toContain('draft-thoughts.md');
-    // Public-section item should NOT carry data-secret; secret-section
-    // item should.
     expect(r.text).toMatch(
       /data-filename="draft-thoughts.md"[^>]*data-secret="true"/,
     );

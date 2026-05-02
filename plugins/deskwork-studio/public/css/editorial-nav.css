@@ -63,7 +63,8 @@
 body[data-review-ui="studio"],
 body[data-review-ui="shortform"],
 body[data-review-ui="entry-review"],
-body[data-review-ui="manual"] {
+body[data-review-ui="manual"],
+body[data-review-ui="scrapbook"] {
   padding-top: var(--er-folio-h);
 }
 
