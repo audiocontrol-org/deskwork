@@ -1599,6 +1599,31 @@ Each phase reached a stable checkpoint, reviewed and committed.
 - [ ] #155 / #156 / #157 follow-ups — separate from #154 closure.
 - [ ] Issue #154 closure pending operator visual review.
 
+### Phase 33+: Post-walkthrough polish + UI verification rules (#155, #159, #160) — 2026-05-02 (post-walkthrough)
+
+The operator's walkthrough of the just-shipped #154 redesign surfaced six follow-up bugs and one design-discipline gap. Six commits this session plus two new project rule files. See README status table row "Phase 33+" and the DEVELOPMENT-NOTES entry "2026-05-02 (post-walkthrough)".
+
+- [x] Manual page kicker cramped under folio — added `body[data-review-ui="manual"]` to `editorial-nav.css` padding-top group (commit `2200e61`).
+- [x] Asymmetric `.er-page` edges — dropped the `.er-page::before` 6px gradient + `--er-paper-4` token (commit `2200e61`).
+- [x] [#155](https://github.com/audiocontrol-org/deskwork/issues/155) — longform strip wraps to 2 rows at desktop widths and eclipses marginalia head — switched `.er-strip` from `position: fixed` to `position: sticky; top: var(--er-folio-h)`; body padding-top reduced from `calc(folio + 3.2rem)` to just `var(--er-folio-h)` (commit `6333150`). Fix-landed comment posted; closure pending operator verification in formally-installed release.
+- [x] [#160](https://github.com/audiocontrol-org/deskwork/issues/160) — editor body switched from Newsreader serif to JetBrains Mono at 0.875rem / 1.5 lh; heading scale trimmed (h1 1.6→1.35, h2 1.3→1.15, etc) (commit `86b155a`).
+- [x] [#160](https://github.com/audiocontrol-org/deskwork/issues/160) — Setext heading purge: passed `extensions: [{ remove: ['SetextHeading'] }]` to `markdown()` so YAML frontmatter no longer mistags as h2 (commit `86b155a`).
+- [x] [#159](https://github.com/audiocontrol-org/deskwork/issues/159) — marginalia toggle: third iteration on the right shape. Replaced both prior toolbar buttons (commits `86b155a` + `d474d35`) with on-component pull-tab pattern mirroring `.er-outline-tab` (commit `b205a7c`): `.er-marginalia-stow` chevron in head + `.er-marginalia-tab` on right edge; identical physical position across read AND edit modes; `Shift+M` keyboard; localStorage persistence.
+- [x] Two new project rules in `.claude/rules/` (commit `7391783`): `ui-verification.md` (pre-claim playwright checklist + falsifiable claims + one-fix-per-commit) and `affordance-placement.md` (component-attached over toolbar-attached + symmetric reveal/hide + pre-implementation gate). Both auto-load on session start; propagate to fresh worktrees.
+- Tests: 334 → **338** (+4 net regression cases).
+
+**Deferred / out of scope:**
+
+- [ ] Dispatch E (visual) — scrapbook redesign visual composition. Operator-confirmed the prior session's "Dispatch E shipped" claim was true for FUNCTION (auto-fill grid, filter chips, search, peeks, expand-in-place, press-check tokens) but not for COMPOSITION: aside is on the right (mockup wants it on the left); no per-kind colored top-edge ribbons; cards lack the mockup's vertical chrome; class vocabulary differs (`.scrapbook-*` vs `.scrap-*`). Mockup at `docs/superpowers/frontend-design/2026-05-02-review-redesign/scrapbook-redesign.html`. Not yet scoped or planned.
+- [ ] Discoverability of edit-toolbar `Source / Split / Preview` buttons + `Focus ⛶` — operator was unaware these existed; they are visually quiet. Separate concern from the affordance-placement rule.
+- [ ] #155 / #159 / #160 closure pending operator verification in formally-installed release (per agent-discipline rule).
+
+**Notes:**
+
+- Six rounds of operator-driven corrective oversight in one session was a pattern, not occasional sloppiness. Mitigations are the two new rule files; the cumulative cost (operator attention, polluted commit history, trust erosion) is what they prevent.
+- The right marginalia-toggle shape (on-component pull tab) was sitting in the codebase the whole time as `.er-outline-tab`. The agent didn't look at existing patterns before reaching for "add a button." The pre-implementation gate in the new affordance-placement rule encodes "find the existing pattern before writing markup."
+- The Setext-heading mistagging bug shows why the verification rule says "inspect inner styled spans, not just line/container elements." The agent's first eval sampled `.cm-line` (which inherits 14px mono) and missed that inner spans were rendering at Fraunces 18.4px 600. Operator surfaced the bug on a different entry; that drove the parser-config fix.
+
 **Notes:**
 
 - The redesign is *composition*, not *reskin*. Every aesthetic token (Fraunces / Newsreader / JetBrains Mono, cream paper + ink + red pencil) is unchanged; only the structural relationships moved. Marginalia → onto the page; edit toolbar → above the page; scrapbook drawer → real drawer; scrapbook index → card grid.
