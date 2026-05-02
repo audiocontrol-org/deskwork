@@ -1557,3 +1557,88 @@ Each surface a real-world wrinkle no fixture exercises. Worth preserving when `/
 - **friction:** The agent's first response to the entry-review CSS failure was "let me roll back Phase 2 and re-open the brainstorm." Operator overrode: *"I don't want to relitigate the review surface. It was mostly working before phase 30 destroyed it. I want *that* back and I don't want to do any 'brainstorming' or discussion until the status quo ante is restored."* The right path was repair (remove the short-circuit + fix `readHistory`), not rebrainstorm. Pattern: when the operator has already lived with a working version and lost it to a regression, restoration is cheaper than redesign. Don't redesign restored functionality.
 
 - **fix:** The session ended mid-arc by design. v0.12.1 shipped + Phases 0+1 of the comprehensive design pass landed cleanly + working press-check surface restored + 11-issue refinement design doc committed. The integration of the longform-review refinement is unmade work; next session picks up against the committed design doc as the contract. Issue 8 (folio hide), Issue 9 (marginalia carve-out), Issue 11 (responsive breakpoints) are the most-impactful restorations to land first.
+
+---
+
+## 2026-05-02 (continued): #154 redesign integrated end-to-end — page-grid + marginalia behavior + edit toolbar + scrapbook drawer + scrapbook index
+
+**Session goal (development side):** ship Dispatches A page-grid + B + C + D + E for [issue #154](https://github.com/audiocontrol-org/deskwork/issues/154). Operator framing on resume: *"press on with implementation."*
+
+**Surface exercised (usage side):** dev-mode `deskwork-studio` on `127.0.0.1:47321`, walked at 1440px (Dispatch A also at 1024 / 768 / 390). Two scrapbook surfaces: the per-entry drawer on the longform review surface (Dispatch D) and the standalone scrapbook viewer at `/dev/scrapbook/<site>/<path>` (Dispatch E). 9 screenshots committed alongside integrations.
+
+### Pre-existing latent bug surfaced — and it had been silent for who knows how long
+
+**friction.** Dispatch E phase 3 added new `data-filter-kind` event listeners alongside the existing CRUD wiring in `scrapbook-client.ts`. After committing, the agent navigated to the standalone scrapbook viewer to verify — and the new chips weren't binding. The disclosure controls weren't binding either. None of it was working. Inspection of the source revealed: `scrapbook-client.ts` exported `initScrapbook` at module top but **never called it**. Every disclosure click + every CRUD button on the standalone scrapbook viewer had been silently dead since 6b75985 (the original commit creating the file).
+
+The studio dashboard never linked to scrapbook viewers ([#157](https://github.com/audiocontrol-org/deskwork/issues/157) — separate finding), so the standalone viewer was reachable only by typing `/dev/scrapbook/<site>/<path>` directly. The surface was hard enough to find that nobody hit the dead-on-arrival code path. Until Dispatch E added new wiring with the same pattern, and the agent noticed.
+
+**fix.** 13-line bootstrap added to `scrapbook-client.ts`:
+```ts
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => initScrapbook());
+} else {
+  initScrapbook();
+}
+```
+The dual-export-no-call pattern may exist in other client files; filed [#156](https://github.com/audiocontrol-org/deskwork/issues/156) for a sweep + regression test pattern.
+
+**insight.** Dead code discoverable only through adjacent change is exactly the failure mode of low-traffic surfaces. The standalone scrapbook viewer is reachable, the markup loads, the DOM looks right — only the *interactivity* is missing. The fix is small; the bigger question is what other client modules have the same shape. **The lesson: when entry points exist that the dashboard doesn't link to, those entry points compound the cost of pre-existing bugs because operators can't easily find them to report.**
+
+### "I don't want to do any brainstorming" — the design tool selection lesson keeps generalizing
+
+**insight.** This morning's session-start framing already established the pattern: *"the brainstorming arc... produces considerably worse design results than using the frontend design plugin by itself."* In this continued session, the same logic applied to dispatching: each `ui-engineer` sub-agent invocation skipped the "have the agent reason through the approach first" step. Instead the dispatch prompt named the **specific files**, **specific selectors**, **specific tokens**, and **specific test patterns** — letting the agent execute against a concrete spec rather than design.
+
+The result: 5 dispatches × clean integrations × 12 commits in one continuous session. Two corrections (Dispatch B timeout-then-retry; Dispatch C sticky→relative position) were the only deviations, and both were the *agent surfacing live-verification feedback*, not the design being wrong.
+
+### Sub-agent reliability: stream-idle timeout with zero commits
+
+**friction.** Dispatch B's first run timed out after ~72 minutes elapsed and 17 tool uses with **zero commits** to disk. Inspection: working tree clean, no edits, no test file, no nothing. The agent had been silently working without writing anything — a recurring failure mode the project's CLAUDE.md explicitly calls out: *"Agents often fail to write their work to disk. Always instruct agents to use the Write tool to write their work to disk when appropriate."*
+
+**fix.** Re-dispatched the same prompt with this preamble:
+> CRITICAL — write to disk frequently
+> A prior dispatch on this exact task **timed out without writing anything to disk**. Avoid that:
+> - Make CSS edits FIRST and write them via the Edit tool immediately. Don't accumulate in your head.
+> - Then make TS edits. Write them via Edit.
+> - Then write tests. Write them via Write.
+> - Run tests. If they pass, commit immediately via the Bash tool.
+> - ONLY THEN do Playwright verification.
+> If you exceed 30 tool uses without a commit, STOP and commit what you have.
+
+Second attempt: clean single commit in 26 tool uses, ~3 minutes elapsed.
+
+**insight.** Sequential plans benefit from explicit "commit then move on" framing in the dispatch prompt body. The agent treats commits as the persistence boundary; without explicit framing, it can defer disk writes indefinitely. **For Dispatch E, the prompt explicitly named "Phase 1 / Phase 2 / Phase 3 / Phase 3b" as commit boundaries** — and the agent shipped four staged commits cleanly.
+
+### Live verification autonomy worked — Dispatch C's two recovery commits
+
+**fix.** Dispatch C's spec called for `position: sticky` with `top: calc(var(--er-folio-h) + var(--er-strip-h))`. The agent followed the spec verbatim, then verified live in Playwright at 1440px. The strip's `flex-wrap: wrap` produced a 2-row strip at narrower widths; the toolbar's z-index (35) lost to the strip's wrapped second row (z-index 40). Two recovery commits:
+
+1. `4002883` — switched toolbar to `position: relative` so it flows naturally between the strip and the page.
+2. `b6e3bb0` — added `.er-strip-center` to the `:has()` hide rule (strip-center carries an "APPLIED · select text to mark · double-click to edit" affordance that's read-mode-only; safe to hide during edit AND keeping it hidden keeps the strip one row tall).
+
+After both fixes: strip stays one row (52.9px), toolbar lands at y=97-157, page starts at y=171. Clean separation.
+
+**insight.** The agent didn't need the operator to surface the layering bug. The dispatch prompt empowered the agent to "match the visual contract from the mockup, but verify live in Playwright at four widths" — and live verification was where the failure surfaced. **Sub-agent dispatch prompts should explicitly authorize the agent to deviate from the prescribed CSS values when live verification surfaces an interaction not anticipated by the spec.** The alternative — agent feeling locked into the literal spec, shipping the broken sticky positioning — would have produced friction the operator only saw at visual-review time.
+
+### "Out of scope" filed as real issues, not silent disposals
+
+**fix.** Three follow-up issues filed within the same conversation turns where the friction was surfaced:
+- [#155](https://github.com/audiocontrol-org/deskwork/issues/155) — longform review strip wraps to two rows in read mode (Dispatch C surfaced; pre-existing).
+- [#156](https://github.com/audiocontrol-org/deskwork/issues/156) — `scrapbook-client.ts initScrapbook` bootstrap audit (Dispatch E phase 3b surfaced; pre-existing).
+- [#157](https://github.com/audiocontrol-org/deskwork/issues/157) — studio dashboard does not link to scrapbook viewers (Dispatch E surfaced during verification; pre-existing).
+
+**insight.** The agent-discipline rule "out of scope but worth flagging is not a valid disposition" worked end-to-end this session. Every dispatch report's adjacent-friction flag became either an in-scope fix (Dispatch C's strip-center addition; Dispatch E's bootstrap fix) or a filed GitHub issue with reproduction + candidate fixes. Zero items disposed silently in dispatch reports.
+
+### Studio interactions
+
+**Surface exercised:**
+- Longform review at `/dev/editorial-review/<workflow-id>` — verified the page-grid layout, marginalia rotation, edit-mode toolbar, scrapbook drawer (collapsed + expanded states).
+- Standalone scrapbook viewer at `/dev/scrapbook/<site>/<path>` — verified the new grid + filter chips + search + always-on previews + sticky aside + per-card chrome.
+- Studio dashboard at `/dev/editorial-studio` — used to navigate INTO the longform review surface; **did NOT** surface the scrapbook viewer (pre-existing gap, [#157](https://github.com/audiocontrol-org/deskwork/issues/157)).
+
+The studio behaved correctly across all 5 dispatches; no live-server bugs surfaced (the `initScrapbook` bug was a client-side bundle issue, not a server-side bug). HMR via Vite middleware kept the dev cycle tight — agents could re-load and verify within seconds of an edit.
+
+**friction-adjacent.** The single-entry test calendar in this project means the scrapbook grid effect (multiple cards per row) couldn't be visually verified in dogfood — only one scrapbook entry exists (`source-shipped-deskwork-plan/scrapbook/ux-audit-2026-04-28.md`). The CSS is correct (`grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr))` produces the right layout); regression tests cover the rule. But this is the same pattern as the dashboard scrapbook discoverability ([#157](https://github.com/audiocontrol-org/deskwork/issues/157)): **dogfooding a feature against a single-item-test calendar can mask multi-item bugs.** Worth noting for future Dispatch-style work — seed N items into the calendar as a verification step before walking the surface.
+
+### Closing thought
+
+This session was the inverse of the "operator overrode the brainstorm-first instinct" pattern from this morning. Operator framing was minimal: *"press on with implementation"* and *"keep going"*. The dispatch arc proceeded autonomously across 5 dispatches + 3 follow-up issues + per-dispatch issue comments + this session-end documentation. **The agent-discipline rules + the dispatch-prompt patterns refined this morning carried the work through.** The redesign is fully integrated; pending operator visual review.

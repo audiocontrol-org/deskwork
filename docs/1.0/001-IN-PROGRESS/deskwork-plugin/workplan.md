@@ -1547,3 +1547,64 @@ Each phase reached a stable checkpoint, reviewed and committed.
 - The session validated the Phase 31 dev-workflow infrastructure (`npm run dev` + `node_modules/.bin/deskwork`) as a successful release-cycle skip: ~15 minutes from "edit code" to "verified end-to-end against live calendar" per fix, vs. the 20+ minute release cycle that #147 alone would have cost.
 - The dispatcher-split pattern (longform/outline → entry-centric, shortform/legacy-platform → legacy) is now applied to `iterate` (Phase 30), `approve` (#147), and `publish` (#150). All other CLI verbs that operate on entries should follow the same shape going forward — there's no remaining "legacy-only" verb that operates on entry-centric data.
 - `.claude/rules/agent-discipline.md` updated: the prior distinction between agent-filed and customer-filed issues for closure purposes is removed. All issues — including agent dogfood findings — wait for formal-release verification before closure.
+
+### Phase 33: Studio UX/UI design pass — review surface + scrapbook redesign (issue #154)
+
+**Status:** all five dispatches shipped on `feature/deskwork-plugin`. Pending operator visual review + cut-a-release decision.
+
+**Trigger:** [issue #154](https://github.com/audiocontrol-org/deskwork/issues/154) filed five concrete UX/UI concerns on the longform review surface + scrapbook with screenshots and operator framing. Concerns: (1) edit mode cramped — Focus/Save buttons hidden under marginalia; source pane fixed-width. (2) read mode wastes huge whitespace on the left while marginalia sits cramped at top-right far from the prose. (3) scrapbook drawer that isn't a drawer — primary action navigates away. (4) scrapbook index has no previews; clicking does nothing. (5) review surface has no global folio nav.
+
+**Goal:** address all five concerns by redesigning the composition (not the aesthetic) — pull every chrome element back ONTO the page. Marginalia inside the page (not the viewport's right edge); edit toolbar above the page (not buried below the article); scrapbook a real drawer (not a navigate-away link); scrapbook index a card grid with always-on previews (not click-to-disclose).
+
+**Approach:** ran `/frontend-design` directly against #154 (skipping the brainstorming arc per operator's session-start framing — *"the brainstorming arc produces considerably worse design results than using the frontend design plugin by itself"*). Produced two full HTML mockups + a 5-dispatch integration plan committed at [`docs/superpowers/frontend-design/2026-05-02-review-redesign/`](../../superpowers/frontend-design/2026-05-02-review-redesign/). Then executed each dispatch via `ui-engineer` sub-agent.
+
+**Dispatches (in order):**
+
+| Dispatch | Commits | Concept |
+|---|---|---|
+| **A folio** | `4c558f7` | Unified folio chrome on review surface — fix layering (strip eclipsed folio via z-index) |
+| **A page-grid** | `fe2de2d` | `.er-page` CSS Grid replaces position:fixed marginalia; drop `.essay { max-width: calc(100vw - 19rem) }` workaround; new layout tokens |
+| **B** | `7ea34ff` | Marginalia rotation (±0.35–0.4deg, hover straightens), mark↔note cross-highlight via pointerover/pointerout delegation, `prefers-reduced-motion` |
+| **C** | `5e5942f` `4002883` `b6e3bb0` `dc6e819` | Edit toolbar above .er-page; strip-actions hide while editing; corrected from sticky to relative position to handle strip flex-wrap interaction |
+| **D** | `3d6dac5` | Real bottom scrapbook drawer (in-place expansion vs. navigate-away link); `body[data-drawer]` mechanic; `prefers-reduced-motion` |
+| **E** | `2db7eb9` `883153c` `061329e` `b05be03` | Scrapbook index: grid + filter chips + search + always-on previews + sticky aside + bootstrap fix for latent `initScrapbook` never-called bug |
+
+**Tasks (all completed):**
+
+- [x] `/frontend-design` direct against #154 — two full HTML mockups + 5-dispatch integration plan + diagnosis-by-concern rationale (commit `0995cd3`).
+- [x] Dispatch A folio half (commit `4c558f7`): folio z-index/position fix, italic Fraunces wordmark with ※ proof-mark, red-pencil bottom-bar active state.
+- [x] Dispatch A page-grid half (commit `fe2de2d`): `.er-page` CSS Grid container; marginalia `position: relative`; drop obsolete `.essay { max-width: calc(100vw - 19rem) }`. 5 regression cases.
+- [x] Dispatch B (commit `7ea34ff`): rotation per note; hover/active straightens; mark→note cross-highlight via event delegation reusing `setActiveHighlight`; `prefers-reduced-motion`. 3 regression cases.
+- [x] Dispatch C (commits `5e5942f` `4002883` `b6e3bb0` `dc6e819`): split `renderEditMode` into `renderEditToolbar` (above `.er-page`) + `renderEditPanes` (inside `.er-draft-frame`); strip-right + strip-center hide via `:has()` rule while toolbar visible; client toggles both wrappers atomically. 6 regression cases.
+- [x] Dispatch D (commit `3d6dac5`): bottom-anchored expandable drawer; `body[data-drawer]` height transition (4rem ↔ 22rem); peek line with truncation contract; demoted standalone-viewer link; remove obsolete narrow-width hide rule. 10 regression cases.
+- [x] Dispatch E phases 1-3b (commits `2db7eb9` `883153c` `061329e` `b05be03`): grid layout + filter chips + search; always-on server-side peeks (md/img/json/txt); sticky aside; client filter wiring + `/` shortcut; pre-existing `initScrapbook` never-called bootstrap fix; per-card chrome. 15 regression cases.
+
+**Out-of-scope friction filed:**
+
+- [#155](https://github.com/audiocontrol-org/deskwork/issues/155) — longform review strip wraps to two rows in read mode and overlaps `.er-page` (pre-existing; surfaced during Dispatch C).
+- [#156](https://github.com/audiocontrol-org/deskwork/issues/156) — `scrapbook-client.ts initScrapbook` never invoked at module load (pre-existing since 6b75985; surfaced during Dispatch E phase 3; pattern hygiene audit + regression test recommended).
+- [#157](https://github.com/audiocontrol-org/deskwork/issues/157) — studio dashboard does not link to scrapbook viewers (pre-existing UX discoverability gap; surfaced when verifying Dispatch E).
+
+**Acceptance:**
+
+- [x] All five concerns from #154 addressed structurally, not cosmetically.
+- [x] Aesthetic tokens unchanged — Fraunces, Newsreader, JetBrains Mono, cream paper + ink + red pencil + proof blue + stamp green/purple all preserved.
+- [x] 12 commits across 5 dispatches; 295 → **334** studio tests passing (+47 regression cases since session start). 0 regressions.
+- [x] Each dispatch verified live in Playwright at 1440px (Dispatch A also at 1024/768/390); screenshots committed alongside each integration.
+- [x] Pre-existing latent bug surfaced + fixed (#156): `initScrapbook` was never called at module load — every disclosure click + every CRUD button on the standalone scrapbook viewer was silently dead since 6b75985.
+
+**Deferred / out of scope:**
+
+- [ ] Cut a release with the #154 redesign (operator decision; pending visual walk-through).
+- [ ] #155 / #156 / #157 follow-ups — separate from #154 closure.
+- [ ] Issue #154 closure pending operator visual review.
+
+**Notes:**
+
+- The redesign is *composition*, not *reskin*. Every aesthetic token (Fraunces / Newsreader / JetBrains Mono, cream paper + ink + red pencil) is unchanged; only the structural relationships moved. Marginalia → onto the page; edit toolbar → above the page; scrapbook drawer → real drawer; scrapbook index → card grid.
+- The folio integration (`4c558f7`) revealed the strip-eclipses-folio z-index bug only when checked via `getBoundingClientRect`. Pure visual review wouldn't have surfaced it — the folio markup was rendered, just covered. Worth carrying forward: every "chrome doesn't appear" symptom needs a layering check before a markup check.
+- Dispatch B confirmed the rule-of-thumb "if the design feels architecturally sound, the change is small": note-rotation + cross-highlight took 35 lines of CSS + 28 lines of TS + 3 tests. Compare to Dispatch E (the largest dispatch — 4 staged commits) where structural change crossed both server and client.
+- Dispatch C surfaced [#155](https://github.com/audiocontrol-org/deskwork/issues/155) — the strip's `flex-wrap: wrap` causes a read-mode layout bug at narrow viewports. The dispatch's `:has()` hide rule fixed it for edit-mode only; the read-mode case is filed separately because ResizeObserver-driven body padding is a real refactor.
+- Dispatch E surfaced [#156](https://github.com/audiocontrol-org/deskwork/issues/156) — `scrapbook-client.ts initScrapbook` was never bootstrapped at module load. Pre-existing latent bug; pattern may exist in other client files. Pattern hygiene audit recommended.
+- Sub-agent dispatch reliability: 1 stream-idle timeout (Dispatch B first attempt produced no commits in ~72 minutes elapsed). Re-dispatched with a tighter "write each phase to disk before the next" directive; second attempt completed in ~3 minutes. Pattern: dispatches that imply a long sequential plan benefit from explicit "commit early, commit often" framing in the prompt.
+- All five dispatches respected the scope-guard rule (no auto-fixing of out-of-scope friction). Three follow-up issues filed in real time per the project's rule that "out of scope but worth flagging" notes must become real GitHub issues, not dispatch-report disclosures.
