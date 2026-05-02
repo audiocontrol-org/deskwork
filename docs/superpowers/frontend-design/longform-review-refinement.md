@@ -335,6 +335,125 @@ The header counter (`.er-scrapbook-drawer-count`) already shows "0 items"; the b
 
 ---
 
+### ISSUE 8 — er-strip + er-folio stack collision
+
+The decision strip (`.er-strip`) is `position: fixed; top: 0; z-index: 40` (rendered height ~64px). The studio chrome's `.er-folio` (the deskwork STUDIO + nav header) is `position: sticky; z-index: 10`, sitting just below the strip. Body has `padding-top: 3.2rem` (~51px) for the strip — so the strip's bottom 12px overlaps the folio's top, AND both compete for the top of the viewport with two parallel navigations stacked. From the operator's perspective there are two menus and the lower one looks like it's hiding behind the upper.
+
+**Fix:** suppress the folio on the longform review surface. The strip already carries the necessary navigation context (back-to-studio, galley/version, slug, actions). The site-wide nav (Index/Dashboard/Content/Shortform/Manual) is operator-context that doesn't add value on a focused review surface — same reasoning that already suppresses the host site's `.header-wrapper` per editorial-review.css line 1011. The CSS hide is one rule.
+
+```css
+/* ISSUE 8 — suppress the studio folio header on the longform review surface.
+ * The er-strip already provides back-to-studio + galley/slug/actions.
+ * Keeping both means two navigations stacking at the top of the viewport
+ * with the strip overlapping the folio by ~12px. Hide the folio so the
+ * strip is the canonical chrome on this surface (matching the existing
+ * pattern that suppresses the host site's .header-wrapper). */
+[data-review-ui="longform"] .er-folio {
+  display: none;
+}
+
+/* The body's padding-top: 3.2rem rule (line 1000) was tuned for
+ * strip-only. Confirmed sufficient when folio is hidden. */
+```
+
+Test: confirm that the cross-surface navigation links (Index / Dashboard / Content / Shortform / Manual) are still discoverable. They are — the strip's `← studio` returns to the dashboard, which has all those links in its own folio. The longform review surface is reachable only from the dashboard, so the operator never needs to reach Manual or Content from inside a review without first going back.
+
+### ISSUE 9 — er-marginalia obscures er-scrapbook-drawer
+
+Both panels are `position: fixed` to the right edge:
+- `.er-marginalia`: `right: var(--er-space-3); top: 5.5rem; bottom: var(--er-space-3); width: 18rem; z-index: 30` (height filling the right column).
+- `.er-scrapbook-drawer`: `right: 0; bottom: 0; width: 320px; max-height: 45vh; z-index: 5` (anchored bottom-right).
+
+At 1440 × 900: marginalia goes 1132 → 1420 horizontally, 88 → 880 vertically. Scrapbook drawer goes 1120 → 1440 horizontally, 800 → 900 vertically. They overlap horizontally (almost identical X) and vertically (800-880 = 80px overlap). The marginalia's z-index 30 covers the top 80px of the scrapbook — operator sees only the bottom ~20px peeking out.
+
+**Fix:** raise the marginalia's bottom so it stops above the scrapbook drawer. The scrapbook is `max-height: 45vh` — the marginalia's `bottom` should clear that range. Use `calc(45vh + var(--er-space-3))` to account for the scrapbook's height plus a small margin gap.
+
+```css
+/* ISSUE 9 — leave room at the bottom of the right column for the
+ * scrapbook drawer. The marginalia previously extended all the way to
+ * the bottom of the viewport, occluding the top of the scrapbook
+ * drawer. Calculation: scrapbook is max-height 45vh; marginalia stops
+ * one --er-space-3 above the scrapbook's top edge.
+ *
+ * The scrapbook drawer's max-height matches the carved-out space; the
+ * two now share the right column without overlap. */
+[data-review-ui="longform"] .er-marginalia {
+  bottom: calc(45vh + var(--er-space-3));
+}
+```
+
+This shrinks the marginalia panel by ~405px on a 900px-tall viewport (a meaningful chunk). Acceptable trade-off — the scrapbook drawer is integral to the review workflow and was always meant to be visible. If the marginalia content overflows after this change, its existing `overflow-y: auto` keeps it scrollable.
+
+### ISSUE 10 — wide-viewport alignment of strip + folio elements
+
+At 1440px the strip's elements (`← studio`, `Galley № 1`, slug, stamp, hint, Edit, ?, etc.) have too much breathing room — the strip is full-bleed (left: 0; right: 0) but the elements bunch up at left + right with awkward whitespace in the middle. Same with the folio nav: deskwork STUDIO at far-left, nav centered, spine at far-right — three anchored zones with empty space between them.
+
+The folio is being hidden by Issue 8's fix, so its alignment problem is moot. The strip's alignment can be improved by capping its inner content width to the same `--er-container-wide` (78rem ≈ 1248px) used by the dashboard + content surfaces, with the elements centered horizontally within that cap.
+
+```css
+/* ISSUE 10 — cap the strip's inner content width so elements don't
+ * float in awkward whitespace at wide viewports. The strip itself
+ * stays full-bleed (background spans the viewport, registration
+ * marks at the left edge); the inner flex container is capped at
+ * --er-container-wide and centered.
+ *
+ * The simplest implementation: wrap the strip's children in a
+ * pseudo-container via a max-width on a child wrapper. Without a
+ * wrapper element we use margin-inline: auto on the strip itself
+ * but cap with max-width — the registration mark from ::before
+ * adheres to the left edge so we lose its left-edge anchoring;
+ * keep the strip full-bleed and add a max-width to the strip's
+ * direct children's flex base instead, OR add a child wrapper.
+ *
+ * Cleanest: add a child wrapper in the page renderer (markup
+ * adjustment) and apply the cap to it. Markup adjustment list
+ * below details the wrapper. */
+[data-review-ui="longform"] .er-strip-inner {
+  max-width: var(--er-container-wide);
+  margin-inline: auto;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--er-space-3);
+  flex-wrap: wrap;
+}
+
+/* When strip-inner is missing (no markup adjustment yet), fall back
+ * to capping the strip's flex layout via a broader rule. Harmless
+ * if the wrapper is present. */
+@media (min-width: 90rem) {
+  [data-review-ui="longform"] .er-strip:not(:has(.er-strip-inner)) {
+    padding-inline: max(var(--er-space-3), calc((100% - var(--er-container-wide)) / 2));
+  }
+}
+```
+
+Markup adjustment (in `review.ts`'s strip rendering function): wrap the strip's flex children in a `<div class="er-strip-inner">…</div>`. The strip element itself becomes the full-bleed background + border container; the inner div carries the flex layout.
+
+```html
+<!-- BEFORE -->
+<div class="er-strip">
+  <a class="er-strip-back">← studio</a>
+  <span class="er-strip-galley">Galley № 1</span>
+  ...
+  <span class="er-strip-right">...</span>
+</div>
+
+<!-- AFTER -->
+<div class="er-strip">
+  <div class="er-strip-inner">
+    <a class="er-strip-back">← studio</a>
+    <span class="er-strip-galley">Galley № 1</span>
+    ...
+    <span class="er-strip-right">...</span>
+  </div>
+</div>
+```
+
+The `::before` registration-mark pseudo-element on `.er-strip` stays attached to the outer strip — it adheres to the left viewport edge as before.
+
+---
+
 ## Open design notes / things the operator should validate live
 
 1. **The kbd chips below buttons assume modal-key chord style (`⌘+A`).** If the existing shortcuts modal uses a different rendering (e.g. spelled out as "Cmd+A" or "Ctrl A"), match that style instead of the macOS-glyph form. Verify against the modal's content.
