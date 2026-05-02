@@ -1347,6 +1347,53 @@ export function initEditorialReview(): void {
   });
   exitFocusBtn?.addEventListener('click', exitFocus);
 
+  // ---- Marginalia visibility toggle (Issue #159) ----
+  //
+  // Operator-driven control to hide the margin-notes column from the
+  // page-grid and reclaim the freed width for the article (and, in
+  // edit mode, the source/preview panes). Independent of focus mode:
+  // a hidden-via-toggle marginalia stays hidden when entering and
+  // leaving focus. Toggle persists via localStorage so the operator's
+  // last preference sticks across reloads.
+  //
+  // Two activation surfaces:
+  //   - `[data-action="toggle-marginalia"]` button in the strip
+  //     (rendered by review.ts:renderControlsRight)
+  //   - Shift+M anywhere on the page (handled in the global keymap
+  //     below alongside Shift+F)
+
+  const MARGINALIA_HIDDEN_KEY = 'deskwork:review:marginalia-hidden';
+  const marginaliaToggleBtn = document.querySelector<HTMLButtonElement>(
+    '[data-action="toggle-marginalia"]',
+  );
+
+  function applyMarginaliaState(hidden: boolean): void {
+    if (hidden) document.body.setAttribute('data-marginalia', 'hidden');
+    else document.body.removeAttribute('data-marginalia');
+    marginaliaToggleBtn?.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+  }
+
+  function toggleMarginalia(): void {
+    const hidden = document.body.getAttribute('data-marginalia') !== 'hidden';
+    applyMarginaliaState(hidden);
+    try {
+      window.localStorage.setItem(MARGINALIA_HIDDEN_KEY, hidden ? '1' : '0');
+    } catch {
+      // localStorage unavailable (private mode / cookie-blocked) — toggle still works in-memory.
+    }
+  }
+
+  // Initial state: read the persisted preference and apply.
+  try {
+    if (window.localStorage.getItem(MARGINALIA_HIDDEN_KEY) === '1') {
+      applyMarginaliaState(true);
+    }
+  } catch {
+    // localStorage read failure is non-fatal — default to visible.
+  }
+
+  marginaliaToggleBtn?.addEventListener('click', toggleMarginalia);
+
   // Double-click anywhere in the rendered draft enters edit mode. This
   // mirrors the comment gesture (select → Mark) with its own shape so
   // the operator doesn't have to reach for the top strip. Ignore
@@ -1738,6 +1785,15 @@ export function initEditorialReview(): void {
       ev.preventDefault();
       if (!editing) return;
       if (focusMode) exitFocus(); else enterFocus();
+      return;
+    }
+    // Shift+M toggles the marginalia visibility (Issue #159). Works
+    // in both read and edit modes; complements the strip's ⊟ Notes
+    // button. Independent of focus mode — a marginalia-hidden state
+    // persists across focus toggles via localStorage.
+    if (ev.shiftKey && ev.key === 'M') {
+      ev.preventDefault();
+      toggleMarginalia();
       return;
     }
     if (ev.key === 'o' && outlineDrawerAvailable()) {

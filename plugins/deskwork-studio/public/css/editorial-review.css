@@ -1272,6 +1272,25 @@ body:has([data-review-ui="longform"]) .site-footer {
   .er-page { margin: 0 var(--er-space-1); }
 }
 
+/* Issue #159 — operator-driven marginalia visibility toggle. When
+ * `body[data-marginalia="hidden"]` is set (by `editorial-review-client`'s
+ * Shift+M / strip ⊟ Notes button), collapse `.er-page-grid` to a
+ * single article column and hide the marginalia + gutter tracks
+ * entirely. The article reflows to claim the freed width. Independent
+ * of focus mode (which uses `body.er-focus-mode` to hide everything);
+ * exiting focus mode restores marginalia to whatever this toggle says.
+ *
+ * Selector specificity: `body[data-marginalia="hidden"]` keeps the
+ * rule winning over the responsive media-query layouts (which still
+ * stack marginalia below the article at narrow widths). */
+body[data-marginalia="hidden"] .er-page-grid {
+  grid-template-columns: 1fr;
+}
+body[data-marginalia="hidden"] .er-marginalia,
+body[data-marginalia="hidden"] .er-page-gutter {
+  display: none;
+}
+
 /* Margin notes (marginalia column inside the page) */
 .er-marginalia {
   position: relative;

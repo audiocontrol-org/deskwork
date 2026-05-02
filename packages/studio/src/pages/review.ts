@@ -270,6 +270,14 @@ function renderControlsRight(workflow: DraftWorkflowItem): RawHtml {
   if (isTerminal) {
     buttons.push(html`<span class="er-pending-state er-pending-state--filed">filed (${workflow.state})</span>`);
   }
+  // Issue #159 — marginalia visibility toggle. Operator may want to
+  // hide the margin-notes column to claim the freed width for the
+  // article (or, in edit mode, the source/preview panes). Lives in
+  // the strip rather than the edit toolbar so it's reachable from
+  // read mode too. Initial aria-pressed reflects no-toggle (visible);
+  // the client (editorial-review-client.ts) restores from localStorage
+  // and updates aria-pressed + body[data-marginalia] in lockstep.
+  buttons.push(html`<button class="er-btn er-btn-small" data-action="toggle-marginalia" type="button" aria-pressed="false" title="Hide margin notes (Shift+M)" aria-label="Toggle margin notes column">⊟ Notes</button>`);
   buttons.push(html`<button class="er-btn er-btn-small" data-action="shortcuts" type="button" aria-label="Show keyboard shortcuts" title="Keyboard shortcuts">?</button>`);
   return unsafe(`<span class="er-strip-right">${buttons.join('')}</span>`);
 }
@@ -323,6 +331,8 @@ function renderShortcutsOverlay(): RawHtml {
           <dt><kbd>i</kbd> <kbd>i</kbd></dt><dd>iterate <em>— press twice within 500ms</em></dd>
           <dt><kbd>r</kbd> <kbd>r</kbd></dt><dd>reject <em>— press twice within 500ms</em></dd>
           <dt><kbd>j</kbd> / <kbd>k</kbd></dt><dd>next / previous margin note</dd>
+          <dt><kbd>shift</kbd><kbd>F</kbd></dt><dd>focus mode <em>(edit mode only)</em></dd>
+          <dt><kbd>shift</kbd><kbd>M</kbd></dt><dd>show / hide margin notes column</dd>
           <dt><kbd>?</kbd></dt><dd>this panel</dd>
           <dt><kbd>esc</kbd></dt><dd>close / cancel composer</dd>
         </dl>

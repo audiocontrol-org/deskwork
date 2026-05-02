@@ -192,6 +192,22 @@ describe('longform review surface page-grid (Issue #154 Dispatch A)', () => {
     expect(css).not.toMatch(/--er-paper-4/);
   });
 
+  it('exposes a marginalia visibility toggle in the strip + CSS rule that collapses the page-grid', () => {
+    // Issue #159 — operator-driven marginalia hide. The toggle lives
+    // in the strip (visible in both read and edit modes) and drives a
+    // body attribute that the CSS rule consumes to collapse the grid.
+    // Pre-#159 there was no way to hide marginalia without entering
+    // focus mode (which is all-or-nothing).
+    const css = readFileSync(CSS_PATH, 'utf8');
+    // CSS rule that collapses the grid + hides marginalia/gutter.
+    expect(css).toMatch(
+      /body\[data-marginalia="hidden"\]\s+\.er-page-grid\s*\{[^}]*grid-template-columns:\s*1fr/,
+    );
+    expect(css).toMatch(
+      /body\[data-marginalia="hidden"\]\s+\.er-marginalia,?[\s\S]*body\[data-marginalia="hidden"\]\s+\.er-page-gutter\s*\{[^}]*display:\s*none/,
+    );
+  });
+
   it('renders the longform strip as sticky (not fixed) so its actual height takes space in flow', () => {
     // Pre-fix: `.er-strip` was `position: fixed` and the body padding
     // was a hardcoded `calc(var(--er-folio-h) + 3.2rem)`. When
