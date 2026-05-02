@@ -288,7 +288,7 @@ function renderError(
         : `/deskwork:review-start --site ${site} ${slug}`;
   const body = html`
     <div data-review-ui="longform">
-      ${renderEditorialFolio('reviews', `longform · ${slug}`)}
+      ${renderEditorialFolio('longform', `longform · ${slug}`)}
       <div class="er-error">
         <h1>No galley to review.</h1>
         <p><strong>Slug:</strong> <code>${slug}</code></p>
@@ -553,10 +553,17 @@ export async function renderReviewPage(
   const folioSpine = isShortform
     ? `shortform · ${workflow.platform ?? '?'}${workflow.channel ? ` · ${workflow.channel}` : ''} · ${slug}`
     : `longform · ${slug}`;
+  // Issue 4 — shortform reviews highlight the "Shortform" nav item;
+  // longform reviews don't match any nav-item (no longform desk
+  // exists). Pre-Issue-4, longform mistakenly highlighted shortform
+  // because the chrome treated all review surfaces as 'reviews'.
+  const folioActive: 'shortform' | 'longform' = isShortform
+    ? 'shortform'
+    : 'longform';
 
   const body = html`
     <div data-review-ui="${reviewUiAttr}" class="er-review-shell">
-      ${renderEditorialFolio('reviews', folioSpine)}
+      ${renderEditorialFolio(folioActive, folioSpine)}
       ${shortformMeta}
       <div class="er-draft-frame">
         <div id="draft-body" data-draft-body

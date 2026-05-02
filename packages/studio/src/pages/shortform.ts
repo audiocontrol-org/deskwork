@@ -128,7 +128,7 @@ export function renderShortformPage(ctx: StudioContext): string {
           .join('');
 
   const body = html`
-    ${renderEditorialFolio('reviews', 'shortform desk')}
+    ${renderEditorialFolio('shortform', 'shortform desk')}
     <header class="er-pagehead er-pagehead--centered">
       <p class="er-pagehead__kicker">All sites · short form</p>
       <h1 class="er-pagehead__title">The <em>compositor</em>'s desk</h1>

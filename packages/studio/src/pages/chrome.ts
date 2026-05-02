@@ -17,15 +17,25 @@
 
 import { html, unsafe, type RawHtml } from './html.ts';
 
+/**
+ * The set of values callers can pass as the active key. The first five
+ * map to a nav-item that gets a `class="active"`; `'longform'` is a
+ * special "no nav match" key for the longform review surface — it
+ * carries an active context (we ARE inside a review) but no nav-item
+ * represents that destination, so none gets highlighted. Issue 4 fixed
+ * the prior behaviour where the longform review highlighted the
+ * shortform nav-item by prefix-matching, which was misleading.
+ */
 export type ChromeActiveLink =
   | 'index'
   | 'dashboard'
   | 'content'
-  | 'reviews'
-  | 'manual';
+  | 'shortform'
+  | 'manual'
+  | 'longform';
 
 interface FolioLink {
-  key: ChromeActiveLink;
+  key: Exclude<ChromeActiveLink, 'longform'>;
   href: string;
   label: string;
 }
@@ -34,7 +44,7 @@ const NAV_LINKS: readonly FolioLink[] = [
   { key: 'index', href: '/dev/', label: 'Index' },
   { key: 'dashboard', href: '/dev/editorial-studio', label: 'Dashboard' },
   { key: 'content', href: '/dev/content', label: 'Content' },
-  { key: 'reviews', href: '/dev/editorial-review-shortform', label: 'Reviews' },
+  { key: 'shortform', href: '/dev/editorial-review-shortform', label: 'Shortform' },
   { key: 'manual', href: '/dev/editorial-help', label: 'Manual' },
 ];
 
