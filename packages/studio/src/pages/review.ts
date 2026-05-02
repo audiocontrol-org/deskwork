@@ -335,7 +335,7 @@ function renderMarginalia(): RawHtml {
   return unsafe(html`
     <aside class="er-marginalia" data-comments-sidebar aria-label="Margin notes">
       <p class="er-marginalia-head">Margin notes</p>
-      <p class="er-marginalia-empty" data-sidebar-empty>Select text in the draft, then either click the floating <em>Mark</em> pencil above your selection — or click anywhere here in the margin to open the note.</p>
+      <p class="er-marginalia-empty" data-sidebar-empty>Select text in the draft to leave a <em>margin note</em>.</p>
       <section class="er-marginalia-composer" data-comment-composer hidden aria-label="New margin note">
         <p class="er-marginalia-composer-head">New mark</p>
         <div class="er-marginalia-composer-quote" data-composer-quote></div>

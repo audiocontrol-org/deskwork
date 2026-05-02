@@ -79,7 +79,7 @@ function renderScrapbookDrawerItems(
   loader: InlineTextLoader,
 ): RawHtml {
   if (items.length === 0) {
-    return renderEmptyScrapbookRow();
+    return renderEmptyScrapbookRow({ site, path: slug });
   }
   const rows = items.map((item) =>
     renderReadOnlyScrapbookRow(

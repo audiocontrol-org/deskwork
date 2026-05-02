@@ -271,10 +271,21 @@ export function renderReadOnlyScrapbookRow(
  * Render an empty-state row for a scrapbook drawer / panel that has
  * no items. Shown faded so the operator still sees the section exists
  * for this node.
+ *
+ * Issue 6 — the empty state now invites action: it points the operator
+ * at the scrapbook viewer for THIS node so they can drop research notes
+ * directly. When `address` is supplied (drawer + content-detail
+ * callsites both have one in scope), the link resolves to the per-entry
+ * viewer URL `/dev/scrapbook/<site>/<slug>`. With no address, we fall
+ * back to the scrapbook index `/dev/scrapbook/` — used only by callers
+ * that haven't been threaded site/slug yet.
  */
-export function renderEmptyScrapbookRow(): RawHtml {
+export function renderEmptyScrapbookRow(
+  address?: ScrapbookAddress,
+): RawHtml {
+  const href = address ? scrapbookViewerUrl(address) : '/dev/scrapbook/';
   return unsafe(html`
     <div class="scrap scrap--empty" data-state="empty">
-      <span class="scrap__empty-text">no scrapbook items</span>
+      <span class="scrap__empty-text">No items yet. <a class="scrap__empty-link" href="${href}">Drop research notes →</a></span>
     </div>`);
 }

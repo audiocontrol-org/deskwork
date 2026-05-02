@@ -3150,3 +3150,42 @@ body.er-focus-mode .er-outline-tab {
   font-size: 0.85em;
   opacity: 0.7;
 }
+
+/* ===========================================================================
+ * Issue 6 — empty-state polish
+ * ---------------------------------------------------------------------------
+ * Two empty-state surfaces on the longform review page got tightened:
+ *
+ *   1. Marginalia ("no margin notes") — shrunk from a multi-clause
+ *      instructional paragraph to a single short sentence. The shorter
+ *      copy lives in review.ts; this rule keeps the typographic
+ *      treatment (italic, faded, small) consistent with the existing
+ *      `.er-marginalia-empty` declaration above. No new selectors
+ *      needed — copy change alone carries Issue 6 for marginalia.
+ *
+ *   2. Scrapbook drawer ("no scrapbook items") — replaced with an
+ *      action-prompting variant: "No items yet. Drop research notes →"
+ *      that links to the per-entry scrapbook viewer. The base styling
+ *      lives in scrap-row.css under `.scrap--empty` /
+ *      `.scrap__empty-text`; the link adornment is local to the
+ *      review surface.
+ * =========================================================================== */
+
+.scrap--empty .scrap__empty-link {
+  /* Keep the link visually subordinate so the copy reads as a single
+   * faded line, not a button. The arrow glyph carries the action
+   * affordance. */
+  margin-left: 0.25em;
+  color: var(--er-pencil);
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 0.18em;
+  font-style: normal;
+  transition: color 120ms ease, text-decoration-style 120ms ease;
+}
+
+.scrap--empty .scrap__empty-link:hover,
+.scrap--empty .scrap__empty-link:focus-visible {
+  color: var(--er-ink);
+  text-decoration-style: solid;
+}

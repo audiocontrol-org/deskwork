@@ -80,7 +80,7 @@ describe('studio index page', () => {
     expect(r.html).toContain('href="/dev/editorial-studio">Dashboard</a>');
     expect(r.html).toContain('href="/dev/content">Content</a>');
     expect(r.html).toContain(
-      'href="/dev/editorial-review-shortform">Reviews</a>',
+      'href="/dev/editorial-review-shortform">Shortform</a>',
     );
     expect(r.html).toContain('href="/dev/editorial-help">Manual</a>');
   });
