@@ -3105,3 +3105,48 @@ body.er-focus-mode .er-outline-tab {
     display: none;
   }
 }
+
+/* ---------- Longform review refinement (Phase 2 follow-up — Issue 7) ---------- */
+/*
+ * ISSUE 7 — Edit-mode disclosure label.
+ *
+ * The Edit button toggles between Preview and Source panes. Previously
+ * the operator had no signal of which pane was active until they
+ * clicked. A small uppercase tag next to the button shows the current
+ * mode so the toggle's effect is legible.
+ *
+ * The label sits inline with the button (er-strip-right is a flex row).
+ * Class is `.er-edit-mode-label`. Two data-mode values: 'preview' and
+ * 'source'. CSS picks the right color/border via attribute selector;
+ * the client flips both attribute and inner text on each toggle.
+ */
+[data-review-ui="longform"] .er-edit-mode-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--er-space-0);
+  font-family: var(--er-font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  margin-left: calc(-1 * var(--er-space-0));
+  padding: 0.1rem 0.4rem;
+  border: 1px dashed var(--er-paper-3);
+  border-radius: 2px;
+  background: transparent;
+  user-select: none;
+}
+
+[data-review-ui="longform"] .er-edit-mode-label[data-mode="source"] {
+  color: var(--er-proof-blue);
+  border-color: var(--er-proof-blue-soft);
+  border-style: solid;
+}
+
+[data-review-ui="longform"] .er-edit-mode-label::before {
+  content: '⇄';
+  font-family: var(--er-font-mono);
+  margin-right: 0.15em;
+  font-size: 0.85em;
+  opacity: 0.7;
+}

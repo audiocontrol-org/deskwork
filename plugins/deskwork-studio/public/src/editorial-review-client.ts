@@ -798,6 +798,19 @@ export function initEditorialReview(): void {
   const editModeBtns = Array.from(
     document.querySelectorAll<HTMLButtonElement>('[data-edit-view]'),
   );
+  // Issue 7: edit-mode disclosure label sits next to the Edit button in
+  // the strip (server-rendered with data-mode="preview" + text "preview"
+  // matching the surface's initial state). Both the attribute and the
+  // inner text flip on enterEdit / exitEdit so the operator sees which
+  // pane the button will reveal next. Optional in DOM — querySelector
+  // returns null on surfaces that don't render the strip (e.g. error
+  // page); the helper is a no-op when the element is absent.
+  const editModeLabel = document.querySelector<HTMLElement>('.er-edit-mode-label');
+  function setEditModeLabel(mode: 'preview' | 'source'): void {
+    if (!editModeLabel) return;
+    editModeLabel.dataset.mode = mode;
+    editModeLabel.textContent = mode;
+  }
   let editing = false;
   let editorHandle: import('./editorial-review-editor').EditorHandle | null = null;
   let previewDebounce: number | null = null;
@@ -1024,6 +1037,11 @@ export function initEditorialReview(): void {
     editToolbar.hidden = false;
     draftBody.classList.add('hidden');
     toggleBtn.textContent = 'View';
+    // Issue 7 — flip the disclosure label to "source" while the source
+    // pane is the active mode. The button label says "View" (because
+    // clicking returns the operator to preview); the disclosure label
+    // says "source" (because that's what they're currently looking at).
+    setEditModeLabel('source');
     editing = true;
     // Lazy-import the editor module so the CodeMirror bundle only
     // loads when the operator actually enters edit mode.
@@ -1180,6 +1198,10 @@ export function initEditorialReview(): void {
     editToolbar.hidden = true;
     draftBody.classList.remove('hidden');
     toggleBtn.textContent = 'Edit';
+    // Issue 7 — flip the disclosure label back to "preview" alongside
+    // the button reverting to "Edit". Two-way: every transition
+    // through this code path keeps both views consistent.
+    setEditModeLabel('preview');
     editing = false;
     stashedOutline = '';
     if (editorHandle) {

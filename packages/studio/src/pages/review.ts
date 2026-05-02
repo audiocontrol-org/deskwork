@@ -225,7 +225,11 @@ function renderControlsRight(workflow: DraftWorkflowItem): RawHtml {
   const isIterating = workflow.state === 'iterating';
   const isTerminal = workflow.state === 'applied' || workflow.state === 'cancelled';
   const buttons: string[] = [];
-  buttons.push(html`<button class="er-btn er-btn-small" data-action="toggle-edit" type="button">Edit</button>`);
+  // Issue 7 — emit the edit-mode disclosure label next to the Edit
+  // button. The client (editorial-review-client.ts) flips both the
+  // `data-mode` attribute AND inner text on each toggle. Initial state
+  // matches the surface's initial mode (preview).
+  buttons.push(html`<button class="er-btn er-btn-small" data-action="toggle-edit" type="button">Edit</button><span class="er-edit-mode-label" data-mode="preview">preview</span>`);
   if (isActive) {
     // Issue 5 — wrap each destructive action button with its chord chip.
     buttons.push(
