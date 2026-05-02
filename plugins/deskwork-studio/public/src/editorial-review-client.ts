@@ -1762,6 +1762,51 @@ export function initEditorialReview(): void {
   // The drawer is server-rendered, so we can bind on first boot and
   // skip re-binding (the drawer doesn't lazy-render new image rows).
   initScrapbookLightbox(document);
+  // Issue 11: at <48rem the marginalia + scrapbook drawers collapse to
+  // header-only and expand on tap. Initialize the toggle handlers; on
+  // wider viewports the click handler is a no-op so desktop behavior
+  // stays unchanged.
+  initMobileDrawerToggles();
+}
+
+/**
+ * Issue 11 mobile-drawer wiring.
+ *
+ * At <48rem the longform review surface collapses the marginalia +
+ * scrapbook-drawer asides to header-only. Tapping the header toggles
+ * `aria-expanded` on the aside; CSS rules pick up the attribute and
+ * animate the height. On wider viewports the click handler returns
+ * early so desktop interactions (margin-note composer, scrapbook
+ * scrolling) are unaffected.
+ *
+ * Additive — does not bind any new behavior outside of the mobile
+ * breakpoint. The aria-expanded attribute is initialized to "false"
+ * server-render-friendly via this client; CSS defaults the closed
+ * state regardless.
+ */
+function initMobileDrawerToggles(): void {
+  const isMobile = (): boolean =>
+    window.matchMedia('(max-width: 48rem)').matches;
+
+  const pairs: Array<{ aside: string; head: string }> = [
+    { aside: '.er-marginalia', head: '.er-marginalia-head' },
+    { aside: '.er-scrapbook-drawer', head: '.er-scrapbook-drawer-head' },
+  ];
+
+  for (const { aside: asideSel, head: headSel } of pairs) {
+    const aside = document.querySelector<HTMLElement>(asideSel);
+    if (!aside) continue;
+    if (!aside.hasAttribute('aria-expanded')) {
+      aside.setAttribute('aria-expanded', 'false');
+    }
+    const head = aside.querySelector<HTMLElement>(headSel);
+    if (!head) continue;
+    head.addEventListener('click', () => {
+      if (!isMobile()) return;
+      const expanded = aside.getAttribute('aria-expanded') === 'true';
+      aside.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+    });
+  }
 }
 
 initEditorialReview();
