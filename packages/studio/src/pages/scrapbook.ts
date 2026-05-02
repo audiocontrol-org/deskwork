@@ -169,9 +169,37 @@ function renderEmpty(): RawHtml {
     </section>`);
 }
 
+function renderFiltersAndSearch(items: readonly ScrapbookItem[]): RawHtml {
+  const kinds = ['all', 'md', 'img', 'json', 'txt', 'other'] as const;
+  const counts: Record<string, number> = { all: items.length };
+  for (const item of items) counts[item.kind] = (counts[item.kind] ?? 0) + 1;
+  const chips = kinds
+    .map((k) => {
+      const active = k === 'all' ? ' is-active' : '';
+      const ariaSel = k === 'all' ? 'true' : 'false';
+      return html`<button type="button" class="scrapbook-filter-chip${active}"
+        data-filter-kind="${k}" role="tab"
+        aria-selected="${ariaSel}">
+        ${k}<span class="scrapbook-filter-count">${counts[k] ?? 0}</span>
+      </button>`;
+    })
+    .join('');
+  return unsafe(html`
+    <div class="scrapbook-controls" data-scrapbook-controls>
+      <nav class="scrapbook-filters" role="tablist" aria-label="filter by kind">
+        ${unsafe(chips)}
+      </nav>
+      <label class="scrapbook-search">
+        <input type="search" class="scrapbook-search-input" data-scrapbook-search
+          placeholder="filter by name…  (press /)" aria-label="filter scrapbook items by filename" />
+      </label>
+    </div>`);
+}
+
 function renderReadingPanel(items: readonly ScrapbookItem[]): RawHtml {
   return unsafe(html`
     <section class="scrapbook-reading">
+      ${renderFiltersAndSearch(items)}
       <form class="scrapbook-composer" data-scrapbook-composer hidden>
         <div class="scrapbook-composer-header">
           <span class="scrapbook-composer-seq" aria-hidden="true">✎</span>

@@ -790,3 +790,99 @@ a.er-calendar-meta-scrapbook:hover .scrapbook-chip-arrow {
   .scrapbook-confirm-bar::after { animation-duration: 8000ms; }
   .scrapbook-disclosure { transition: none; }
 }
+
+/* ---------- Dispatch E (#154) — scrapbook index rewrite ---------- */
+
+/* Items grid replaces the vertical list — cards lay out in
+ * auto-fill columns at 15rem min-width. Expanded cards span the
+ * full row via data-state="expanded". */
+.scrapbook-items {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: var(--er-space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.scrapbook-item[data-state="expanded"] {
+  grid-column: 1 / -1;
+}
+
+/* Filter chips + search bar above the grid */
+.scrapbook-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--er-space-2);
+  align-items: center;
+  margin-bottom: var(--er-space-3);
+  padding-bottom: var(--er-space-2);
+  border-bottom: 1px dashed var(--er-faded-2);
+}
+.scrapbook-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.scrapbook-filter-chip {
+  font-family: var(--er-font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 0.3rem 0.7rem;
+  background: transparent;
+  border: 1px solid var(--er-faded-2);
+  border-radius: 2px;
+  color: var(--er-faded);
+  cursor: pointer;
+  transition: color 120ms, border-color 120ms;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+}
+.scrapbook-filter-chip:hover {
+  color: var(--er-ink);
+  border-color: var(--er-ink-soft);
+}
+.scrapbook-filter-chip.is-active {
+  color: var(--er-paper);
+  background: var(--er-ink);
+  border-color: var(--er-ink);
+}
+.scrapbook-filter-count {
+  font-size: 0.6rem;
+  color: var(--er-faded);
+  font-variation-settings: "tnum" 1;
+}
+.scrapbook-filter-chip.is-active .scrapbook-filter-count {
+  color: var(--er-paper-2);
+}
+
+/* Hidden cards via the filter — preserve grid flow */
+.scrapbook-item[data-filtered-out="true"] {
+  display: none !important;
+}
+
+/* Search input — reuse the editorial typography */
+.scrapbook-search {
+  flex: 1 1 18rem;
+  display: flex;
+  align-items: center;
+}
+.scrapbook-search-input {
+  width: 100%;
+  font-family: var(--er-font-mono);
+  font-size: 0.78rem;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--er-faded-2);
+  background: var(--er-paper);
+  color: var(--er-ink);
+}
+.scrapbook-search-input:focus {
+  outline: 2px solid var(--er-red-pencil);
+  outline-offset: 0;
+  border-color: var(--er-red-pencil);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scrapbook-filter-chip { transition: none; }
+}
