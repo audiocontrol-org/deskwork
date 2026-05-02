@@ -181,13 +181,14 @@ describe('edit-mode toolbar relocation (Issue #154 Dispatch C)', () => {
     expect(r.html).toMatch(/<div class="er-edit-mode"[^>]*data-edit-panes-host[^>]*\bhidden\b/);
   });
 
-  it('CSS hides .er-strip-right while the edit toolbar is visible', () => {
+  it('CSS hides .er-strip-right and .er-strip-center while the edit toolbar is visible', () => {
     const css = readFileSync(CSS_PATH, 'utf8');
-    // The :has() rule is the single contract; matching it as a string
-    // (whitespace-tolerant) is sufficient — the rule is small and
-    // unambiguous, and the alternative (parsing the CSS) is overkill.
-    const rule = css.match(/body:has\(\.er-edit-toolbar:not\(\[hidden\]\)\)\s*\.er-strip-right\s*\{[^}]*display:\s*none[^}]*\}/);
-    expect(rule, 'expected strip-right hide rule keyed on toolbar visibility').not.toBeNull();
+    // The :has() rule keys both .er-strip-right (the action buttons,
+    // replaced by toolbar actions) and .er-strip-center (the
+    // "APPLIED · select text to mark" row, which would otherwise
+    // wrap and occlude the toolbar below the fixed strip).
+    expect(css).toMatch(/body:has\(\.er-edit-toolbar:not\(\[hidden\]\)\)\s*\.er-strip-right/);
+    expect(css).toMatch(/body:has\(\.er-edit-toolbar:not\(\[hidden\]\)\)\s*\.er-strip-center/);
   });
 
   it('CSS defines the .er-edit-toolbar layout above the page', () => {

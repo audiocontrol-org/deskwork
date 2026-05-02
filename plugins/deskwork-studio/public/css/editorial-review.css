@@ -1821,8 +1821,17 @@ body:has(.er-edit-mode:not([hidden])) .toc {
 }
 
 /* Hide the strip's right-side action buttons while edit mode is
- * active — the toolbar above the page replaces them. */
-body:has(.er-edit-toolbar:not([hidden])) .er-strip-right {
+ * active — the toolbar above the page replaces them.
+ *
+ * Also hide `.er-strip-center` (the wrapping "APPLIED" stamp + hint
+ * row): the strip's flex-wrap layout pushes that row to a second
+ * line at this column count, which then occludes the toolbar
+ * underneath the fixed strip. The toolbar already communicates
+ * edit-state via the `[data-edit-hint]` span — the strip-center row
+ * is purely a read-mode affordance ("select text to mark · double-
+ * click to edit"). */
+body:has(.er-edit-toolbar:not([hidden])) .er-strip-right,
+body:has(.er-edit-toolbar:not([hidden])) .er-strip-center {
   display: none;
 }
 
