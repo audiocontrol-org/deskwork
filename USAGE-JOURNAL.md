@@ -13,6 +13,77 @@ Populating this file is a step in `/session-end`. If a session didn't exercise t
 
 ---
 
+## 2026-05-01 (evening): post-refinement walkthrough of the longform review surface — operator surfaces fundamental composition problems the polish pass didn't reach
+
+**Session goal (development side):** integrate 11 longform-review refinement issues from the prior session's design doc into the surface. Three subagent dispatches landed cleanly.
+
+**Surface exercised (usage side):** dev-mode `deskwork-studio` (`npm run dev` → `tsx --watch` + Vite middleware on `127.0.0.1:47321`) — opened `/dev/editorial-review/<entry-uuid>` against this project's calendar and walked the longform review surface in the browser.
+
+### What surfaced when the operator looked
+
+After the 11-commit refinement integration finished, the operator opened the actual review surface and surfaced four fundamental composition concerns the refinement didn't reach. The pattern is now-familiar (same shape as the prior session's er-folio/er-strip / er-marginalia / responsiveness findings): the agent's static-markup analysis catches polish-shaped issues; the operator's visual inspection catches architecture-shaped issues.
+
+#### 1. Edit mode is visually cramped
+
+**friction.** In SOURCE+SPLIT view, the "Focus" and "Save as..." buttons appear at the right edge of the editor toolbar, but the marginalia panel (still pinned to the viewport's right edge) overlaps them — the buttons render *under* the marginalia panel. The source pane has a fixed width that doesn't extend with the viewport; massive empty band on the right between source pane and marginalia.
+
+**operator quote.** *"the edit screen has a bunch of weird layout issues where things don't seem like they extend as far as they should and other things look cramped and tucked under other things. It looks messy and haphazard."*
+
+**insight.** Editor and review use the same chrome (strip + marginalia + scrapbook) but the modes have different content shapes. Marginalia in edit mode is dubious to begin with — you're editing source, not annotating prose. The chrome was designed for review and inherits awkwardly into edit.
+
+#### 2. Read mode wastes the LEFT half of the viewport while marginalia cramps at the top right
+
+**friction.** Article body renders inside `BlogLayout`'s centered max-width (~700px) column. Viewport is 1440px+. Margin notes are pinned to the viewport's right edge in an 18rem column. Net result: ~370px of empty whitespace on the LEFT, and marginalia squeezed into 288px on the RIGHT, physically separated from the prose by hundreds of pixels of empty space.
+
+**operator quote.** *"the review surface has a huge amount of unused whitespace, but the margin notes are cramped up at the top right of the page and the scrapbook is cramped down at the bottom right of the page. The use of space is very poor and the marginalia is very cramped — which is bad because that's where the majority of the work gets done on the review surface. That's literally where we interact with the review surface as reviewers."*
+
+**insight.** The semantic mismatch is at the root: "marginalia" should live in the *article's* margin (next to the line it annotates). Today's implementation puts marginalia in the *viewport's* margin. On any non-trivial viewport width, the article and the marginalia are far from each other. The press-check metaphor was correct; the layout implementation never wired it up properly. The 11-issue refinement polished the marginalia panel without questioning where it lived.
+
+#### 3. The scrapbook drawer is a deceptive affordance
+
+**friction.** The "§ Scrapbook · 1 item · OPEN ↗" element at the bottom-right of the surface looks exactly like a drawer that would expand in-place when clicked: it has a header, a body, a count, and a clear "OPEN" action. But clicking it *navigates to a different page* (`/dev/scrapbook/<site>/<slug>`). The visual language lies about the interaction model.
+
+**operator quote.** *"the scrapbook *looks* like it should be a drawer, but it's actual a link to a whole different page. That's very confusing and terrible UX."*
+
+**insight.** Drawers are a learned visual pattern (header + collapse-state-arrow + click-to-expand). When something inherits drawer chrome but doesn't deliver drawer behavior, the result is worse than either a plain link OR an actual drawer. Two valid resolutions: drop the drawer chrome entirely (just a labeled link `§ Scrapbook · 1 item ↗`) or implement the actual drawer (click expands inline). Neither has been built.
+
+#### 4. The review surface doesn't share the global nav
+
+**friction.** The longform review surface hides the site-wide folio (Index / Dashboard / Content / Shortform / Manual). To navigate anywhere else, you have to use the strip's `← studio` button to go back to the dashboard first.
+
+**operator quote.** *"why doesn't the edit/review surface share the same global nav as the rest of the pages?"*
+
+**diagnosis.** This was an intentional Issue-8 fix EARLIER THIS SESSION — a sub-agent dispatch hid the folio on the longform review surface to resolve a folio+strip stack-collision visual bug. Rationale was "the strip carries enough navigation context (back-to-studio + galley + slug + actions); site-wide nav is operator-context that doesn't add value on a focused review surface." Operator's direct question makes the call read as the wrong tradeoff.
+
+**insight.** A sub-agent decision suppressed a global chrome element on one surface, with rationale that read as reasonable inside the design-doc context but contradicted the operator's expectation of cross-surface consistency. The right move (for this and future sub-agent dispatches that touch global chrome) is to flag the architectural choice in the dispatch report for explicit operator review, not bury it under a polish issue. Same lesson as the prior session's Phase-2 framing-failure but applied to chrome decisions specifically.
+
+### Why the agent didn't catch these
+
+Static-markup analysis (the surface mode the agent uses for non-Playwright work) doesn't see whitespace, doesn't feel proportions, and doesn't sense affordance/behavior mismatches. The 11 refinement issues the agent enumerated last session were all visible from DOM inspection: redundant indicators, missing chips, copy that referenced unbuilt features, glossary terms that wanted tooltips, responsive breakpoints, layout collisions caught by `getBoundingClientRect`. None of those four operator concerns surface that way:
+
+- *Cramped under another panel* in edit mode → only visible when the editor and marginalia are both on screen at realistic widths.
+- *Wasted whitespace + far-from-text marginalia* → only visible at desktop viewport widths where the disconnection is geometric.
+- *Drawer that's a link* → only visible when you try to interact with it.
+- *Missing global nav* → only visible when you want to go somewhere else.
+
+**insight.** This is now the second consecutive session where the operator's visual inspection caught architecture-shaped issues that agent static analysis missed. Worth elevating into the agent-discipline rules: any surface review the agent produces should be annotated with a "live walkthrough required for: layout/composition, affordance/behavior consistency, cross-surface chrome decisions" advisory — and the agent should explicitly NOT claim a surface is in good shape based on static analysis alone.
+
+### Side-channel: the studio dev mode binds only to loopback
+
+**friction.** `npm run dev` (DESKWORK_DEV=1) intentionally skips Tailscale auto-detection per `server.ts:644` comment: *"Auto-increment + Tailscale binding are skipped in dev — the dev server is for local iteration only."* This means the dev studio is unreachable from any device that's not the laptop running the watch process. The operator was at the laptop this session so it didn't bite; the prior session's "next session" list flagged this as worth investigating, and the gap remains.
+
+**insight.** "Dev server for local iteration only" is a tradition; in this project it's a bad fit. The operator is regularly NOT at the laptop where the studio runs, exactly the pattern that motivated Tailscale support in production mode. The dev/prod distinction here is privileging dev-loop ergonomics (HMR doesn't need network exposure) over operator-loop ergonomics (operator wants to look at the surface from any device). Either flip the default (Tailscale + loopback in dev too) or document the constraint loudly and add a `--tailscale` opt-in flag.
+
+### Visual companion friction
+
+**friction.** Tried to use `superpowers:brainstorming`'s visual companion to present three layout alternatives. The frame template's `.card-image` div has `aspect-ratio: 16/10` + flex-centering that collapsed all three of my absolute-positioned layout mockups to single thin vertical lines. Operator caught it immediately ("Do these look like viable options to you?" with a screenshot of the broken render).
+
+**fix (next session).** Regenerate using `<!DOCTYPE html>` full-document mode to bypass the frame template's container styling.
+
+**insight.** Frame templates with strict container constraints are easy to misuse. Verify with one sample mockup before generating multiple.
+
+---
+
 ## 2026-04-28: Authoring + reviewing the source-shipped-plan via the public-channel marketplace install
 
 **Session goal:** install deskwork in the deskwork-plugin monorepo (a non-website tool repo, dogfooding the plugin against itself), then use the lifecycle skills + studio to author + review the architectural plan that defines the source-shipped re-architecture.

@@ -4,6 +4,67 @@ Session journal for `deskwork`. Each entry records what was tried, what worked, 
 
 ---
 
+## 2026-05-01 (evening): longform-review refinement integration shipped (11 issues × 11 commits) → operator surfaced fundamental layout problems the refinement didn't reach → brainstorming arc started
+
+### Feature: deskwork-plugin
+### Worktree: deskwork-plugin
+
+**Goal:** integrate the 627-line longform-review refinement design doc landed by the prior session, in chunked subagent dispatches of ≤4 issues each (the prior session's full-doc dispatch timed out at ~7min/32 tools — chunking was the explicit lesson). Then continue Phase 3 of the broader UX/UI plan (#68 + #105).
+
+**Accomplished:**
+
+- **All 11 longform-review refinement issues integrated.** Three `ui-engineer` subagent dispatches; one commit per issue.
+  - **Dispatch 1 — layout collisions + responsive (Issues 8/9/10/11):** commits `282b383` / `e648a35` / `8eeda2f` / `9520187`. Folio hide on longform surface; marginalia bottom raised to clear scrapbook drawer (`calc(45vh + var(--er-space-3))`); `.er-strip-inner` wrapper added to cap inner content at `--er-container-wide` for wide-viewport alignment; three responsive breakpoints (≥80rem desktop / ≥48rem tablet / <48rem mobile / <30rem tiny) including mobile drawer-collapse with `aria-expanded` toggle. +2 tests.
+  - **Dispatch 2 — decision-strip refinement (Issues 1/2/5/7):** commits `9ca3890` / `c4663b8` / `ebe0600` / `661b468`. CSS-hide redundant filed-applied pill (markup gating skipped per design-doc-permitted simpler path); Edit button gets `⇄` direction glyph; inline `.er-shortcut-chip` chips render under each Approve/Iterate/Reject button (chord style: design doc speculated `⌘+A`; agent read `editorial-review-client.ts` and confirmed actual #108 fix is **two-tap bare-letter** — chip text is `<kbd>a</kbd> <kbd>a</kbd>` matching the existing modal); `.er-edit-mode-label` next to Edit button toggles `data-mode` + inner text on click. +2 tests.
+  - **Dispatch 3 — glossary + nav + empty states (Issues 3/4/6):** commits `3990e35` / `00ad749` / `06e202b`. Strip jargon ("Galley", "mark") wrapped in glossary spans (Phase-1 `gloss('galley')` helper + hand-rolled `<span data-term="marginalia">mark</span>` to keep the verb readable); chrome nav-key model rewritten — added `'longform'` `ChromeActiveLink` type that's `Exclude`'d from `FolioLink.key`, so longform review surfaces never match a nav-item, eliminating the prefix-match active-state bug; empty-state copy tightened (marginalia: "Select text in the draft to leave a *margin note*."; scrapbook: "No items yet. *Drop research notes →*" with site/slug threaded from in-scope locals — no `/dev/scrapbook/` fallback ever exercised). +1 test plus 2 fixes for ripple effects (folio-cross-page + index-page tests asserted old "Reviews" label).
+- **Subagent stream-idle timeout in dispatch 3 handled cleanly.** The dispatch-3 subagent timed out after 56 tool uses with one commit landed (`3990e35`) and uncommitted changes for Issue 4 in the working tree. Inspected the diff, judged it correct apart from a stale test fixture, resumed via `SendMessage` with explicit "don't redo Issue 3" instructions; agent finished Issues 4 + 6 plus one ripple-fix.
+- **Final test count:** 295 passing, 10 skipped (was 287 before this session's work).
+- **Studio booted in dev mode for operator inspection.** Existing dev server (`tsx --watch src/server.ts --project-root ../..`) was running on `127.0.0.1:47321` from a prior agent dispatch; operator looked at the actual surface against this project's calendar.
+- **Operator surfaced four NEW design concerns the refinement didn't reach.** (1) Edit mode is visually cramped — "Focus" and "Save as..." buttons hidden under the marginalia panel, source pane has fixed width that doesn't extend with the viewport. (2) Read mode has huge unused whitespace on the LEFT half of the viewport while the marginalia is cramped at top-right — "the marginalia is very cramped — which is bad because that's where the majority of the work gets done on the review surface." (3) Scrapbook visually presents as a drawer (header + body + count + "OPEN ↗" button) but actually navigates to a different page — deceptive affordance. (4) "Why doesn't the edit/review surface share the same global nav as the rest of the pages?" — questioning the Issue 8 folio-hide decision from earlier this session.
+- **Started `/superpowers:brainstorming` arc** to address the four new concerns. Visual companion server started at <http://localhost:50030> with state persisted in `.superpowers/brainstorm/3483-1777699675/` (gitignored). First screen — three marginalia-layout candidates (Bound Book / Reviewer's Desk / Two-Column Workspace) — rendered incorrectly because the frame template's `.card-image` has `aspect-ratio: 16/10` and flex centering that collapsed my absolute-positioned mockups to a single thin line each. Operator caught it ("Do these look like viable options to you?" with a screenshot of the broken render). Brainstorm paused mid-flight when operator invoked `/session-end`.
+
+**Didn't Work:**
+
+- **Visual companion frame template clipping.** Wrote three layout mockups with absolute-positioned children inside `.card-image` divs without first verifying the frame template's container styling. The `aspect-ratio: 16/10` + flex-centering collapsed everything to a vertical line. Lesson: when using a templated frame, render ONE test mockup first and verify the container honors the inline CSS before generating a full set.
+- **Refinement passes hide architectural defects.** The 11 issues integrated this session were genuine improvements (responsive layout, decision-strip ergonomics, glossary application, nav rename) but the operator's "I feel like /frontend-design needs another few passes" + the four follow-up concerns reveal that the fundamental composition is wrong. Marginalia anchored to viewport edge (not article); article centered at ~700px max-width with massive viewport gutters; scrapbook drawer that's not actually a drawer. None of those are addressed by polishing buttons and copy. Lesson: when a refinement set was "11 issues" deep, that should have been a signal that the underlying architecture needed re-examination, not a pile of fixes.
+- **Subagent decisions lock in architectural choices that need explicit operator validation.** Dispatch 1's Issue 8 fix hid the folio on the longform surface with the rationale "the strip already carries enough context, site-wide nav is operator-context that doesn't add value on a focused review surface." That rationale read as reasonable in the design-doc context but the operator's later "why doesn't the review surface share the global nav?" reveals it was the wrong call. Lesson: when a sub-agent dispatch makes a cross-surface architectural choice (suppressing a global chrome element on one surface; binding two interaction patterns; renaming a verb that ripples), flag it in the dispatch report for explicit operator review even if the design doc seems to authorize it.
+
+**Course Corrections:**
+
+- **[PROCESS]** Visual companion mockups didn't render — should have tested the frame template with a single sample card before generating three. Lesson: verify scaffold/frame container behavior with a minimum reproducible mockup before scaling up.
+- **[UX]** The 11-issue refinement was a polish pass that didn't reach the fundamental composition problems (marginalia placement, read-mode whitespace, scrapbook affordance, folio integration). Lesson: large refinement sets are a signal the underlying architecture needs re-examination, not just more polish.
+- **[PROCESS]** The dispatch 1 Issue 8 folio-hide was a cross-surface architectural call made inside a sub-agent, not flagged for explicit operator review. Operator later questioned it, exactly as it should have been escalated up-front. Lesson: cross-surface chrome decisions in sub-agents need to be flagged in the dispatch report.
+
+**Quantitative:**
+
+- Messages from user: ~10 (mostly directive — "confirm", "yes do it", "try again" — plus the four foundational design observations that paused the integration arc).
+- Commits to feature branch: 11 (all from the three integration dispatches; `282b383` → `06e202b`).
+- Subagent dispatches: 3 (one timed out after 56 tool uses; resumed via SendMessage; landed cleanly).
+- Tests: 287 → 295 (+8 net new tests across the three dispatches; +2 ripple fixes for the nav rename).
+- Issues touched: 11 design-doc issues integrated; 4 new design concerns surfaced (not yet filed as GitHub issues — they're brainstorm input).
+- Course corrections: 3 (1 [PROCESS] visual-companion verification, 1 [UX] refinement-vs-architecture, 1 [PROCESS] sub-agent architectural decisions).
+
+**Insights:**
+
+- **Chunked subagent dispatch is the cure for large refinement integrations.** Three dispatches of ≤4 issues × 5min each landed cleanly; the prior session's single 11-issue dispatch timed out at 7min. The chunking lesson from the prior session was correct, applied verbatim, and worked.
+- **`SendMessage` resume after a stream-idle timeout is operationally cheap.** Dispatch 3 timed out with one of three commits done; resuming with explicit "don't redo X, finish Y + Z" took ~6min and produced a clean result. Worth keeping in the toolbox for any large dispatch — when the timeout is from steady tool-use volume rather than a logic deadlock, resume is faster than restart.
+- **The operator-as-visual-reviewer pattern keeps proving its value.** The four new concerns (edit-mode cramping, read-mode whitespace, scrapbook affordance, folio integration) all came from the operator looking at the surface in a browser. The agent's static-markup analysis caught none of them. This is the same pattern as the prior session (er-folio/er-strip stack collision, er-marginalia obscures er-scrapbook-drawer, responsiveness gaps — all caught by operator visual inspection after the agent missed them in static analysis).
+- **The press-check metaphor is correct; the layout implementation isn't.** Marginalia means "in the article's right margin." Today's implementation has marginalia in the *viewport's* right margin — not the article's. The semantic/visual mismatch is the root cause of the cramped+far-from-text-it-annotates feeling. Fixing this is a layout-architecture change, not a polish change.
+- **Refinement sets as architecture signals.** When the agent enumerates 11 distinct refinement issues for a surface and the operator responds with "needs more passes," the refinement count itself is the signal that the underlying composition is wrong. Pattern worth naming: *refinement-set-as-architectural-debt-meter*.
+
+**Next session:**
+
+- **Resume the brainstorming arc** at <http://localhost:50030> (or restart the server; state persisted in `.superpowers/brainstorm/3483-1777699675/`).
+- **Regenerate the marginalia-layout screen** using full-document mode (`<!DOCTYPE html>`) to bypass the frame template's `.card-image` aspect-ratio constraint. Three options stand: A. Bound Book (single centered page with article + integrated right-margin marginalia); B. Reviewer's Desk (left-leaning article + adjacent wider marginalia panel, both in a unified composition); C. Two-Column Workspace (explicit 60/40 grid + line-anchored marginalia).
+- **Add a chrome-treatment screen** alongside marginalia layout — operator's "why doesn't the review surface share the global nav?" question wants a decision: reverse Issue 8's folio-hide vs. merge folio + strip into a single chrome bar (recommended).
+- **Address edit-mode cramping** (Focus/Save-as buttons under marginalia; source pane fixed-width) — separate brainstorm screen or bundled with the marginalia decision.
+- **Scrapbook treatment decision** — drop the drawer affordance entirely (just a labeled link in the surface chrome), or convert it to a real expand-in-place drawer.
+- **After brainstorm complete:** spec → writing-plans → chunked subagent dispatches for integration. Probably ≥4 dispatches given the layout work spans multiple files (chrome, marginalia, scrapbook, edit mode).
+- **Defer Phase 3 of the broader UX/UI plan** (#68 + #105) until the layout-redesign arc lands — fixing the dashboard scrapbook polling 404 inside a fundamentally-wrong layout would be wasted work if the surface gets re-architected.
+- **Audiocontrol.org dry-run** stays deferred.
+
+---
+
 ## 2026-05-01 (afternoon): v0.12.1 release + studio UX/UI design pass arc — Phase 2 reframed mid-flight
 
 ### Feature: deskwork-plugin
