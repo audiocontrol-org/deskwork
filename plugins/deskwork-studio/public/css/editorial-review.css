@@ -70,6 +70,26 @@
    * raw `78rem` / `56rem` / `1280px` sprinkled through the stylesheets. */
   --er-container-wide: 78rem;
   --er-container-narrow: 56rem;
+
+  /* Issue #154 Dispatch A — page-grid composition tokens.
+   *
+   * The review surface composes a single tangible page object on the
+   * desk, holding both the article column AND the marginalia column
+   * inside its own bounds. Each column is a CSS Grid track on
+   * `.er-page-grid`; marginalia is `position: relative` inside its own
+   * column rather than `position: fixed` on the viewport. These tokens
+   * are the layout contract — see `.er-page` / `.er-page-grid` below. */
+  --er-page-max:        var(--er-container-wide);   /* 78rem outer page frame */
+  --er-page-pad-x:      var(--er-space-6);
+  --er-page-pad-y:      var(--er-space-5);
+  --er-article-col:     minmax(28rem, 42rem);
+  --er-marginalia-col:  minmax(16rem, 19rem);
+  --er-page-gap:        var(--er-space-5);
+
+  /* Page binding edge — slightly darker than --er-paper-3 so the
+   * faint left-edge gradient on `.er-page::before` reads as a
+   * physical binding rather than as background noise. */
+  --er-paper-4: #C9BFA3;
 }
 
 /* ---------- Scoped reset + page chrome ---------- */
@@ -1164,24 +1184,112 @@ body:has([data-review-ui="longform"]) .site-footer {
   border-radius: 2px;
 }
 
-/* Margin notes (marginalia sidebar) */
-.er-marginalia {
-  position: fixed;
-  right: var(--er-space-3);
-  /* Clear the folio (--er-folio-h) + strip (~3.4rem). Earlier
-   * 5.5rem assumed strip-at-top:0; with the folio now stacked
-   * above the strip, the marginalia would otherwise tuck under
-   * the strip's bottom edge. */
-  top: calc(var(--er-folio-h) + 3.4rem);
-  bottom: var(--er-space-3);
-  width: 18rem;
-  overflow-y: auto;
-  padding: var(--er-space-3);
-  font-family: var(--er-font-body);
-  z-index: 30;
+/* ---- Page composition (Issue #154 Dispatch A) ---------------------- *
+ *
+ * The longform review surface composes one tangible page on the desk:
+ * `.er-page` is the page itself (max-width capped at `--er-page-max`,
+ * centered, with a faint binding edge on the left); `.er-page-grid` is
+ * the three-track grid inside it — article column, 1px gutter, and
+ * marginalia column. The middle "column" is just the gutter rule.
+ *
+ * Marginalia previously anchored to the viewport's right edge with
+ * `position: fixed`, which (a) cramped edit mode (Save / Focus
+ * collided with the rail), and (b) left a huge whitespace pool on the
+ * left of the article in read mode. The grid composition resolves both
+ * — marginalia now sits inside the page next to the prose it
+ * annotates, scrolling with the page rather than pinned to the
+ * viewport. See issue #154 for the full diagnosis.
+ */
+
+.er-page {
+  width: 100%;
+  max-width: var(--er-page-max);
+  margin: 0 auto;
   background: var(--er-paper);
-  border-left: var(--er-rule-thin);
-  box-shadow: -4px 0 12px rgba(26,22,20,0.04);
+  border: 1px solid var(--er-paper-3);
+  border-radius: 2px;
+  box-shadow:
+    0 1px 0 var(--er-paper-3),
+    0 14px 28px -10px rgba(26, 22, 20, 0.18),
+    0 4px 8px -2px rgba(26, 22, 20, 0.06);
+  position: relative;
+}
+
+/* Faint binding edge on the page's left side — a subtle nod to the
+ * codex metaphor without competing with the prose for attention. */
+.er-page::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -1px;
+  width: 6px;
+  background: linear-gradient(
+    to right,
+    var(--er-paper-4) 0%,
+    var(--er-paper-3) 50%,
+    transparent 100%
+  );
+  border-right: 1px solid var(--er-paper-4);
+  pointer-events: none;
+}
+
+.er-page-grid {
+  display: grid;
+  grid-template-columns: var(--er-article-col) 1px var(--er-marginalia-col);
+  gap: 0 var(--er-page-gap);
+  padding: var(--er-page-pad-y) var(--er-page-pad-x);
+  align-items: start;
+}
+
+/* Single thin gutter rule between article and marginalia columns.
+ * `subgrid` would be the textbook tool but support is uneven; a 1px
+ * grid track with an absolutely-positioned background is robust. */
+.er-page-gutter {
+  position: relative;
+}
+.er-page-gutter::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  background: var(--er-paper-3);
+}
+
+/* Stack at narrow widths — marginalia drops below the article rather
+ * than competing for the same row. The gutter rule disappears (it
+ * would be a meaningless 1px track in a single-column layout) and
+ * the marginalia gets a dashed top rule to signal the column break. */
+@media (max-width: 64rem) {
+  .er-page-grid {
+    grid-template-columns: 1fr;
+    padding: var(--er-page-pad-y) var(--er-space-3);
+  }
+  .er-page-gutter { display: none; }
+  .er-marginalia {
+    border-top: 1px dashed var(--er-faded-2);
+    padding-top: var(--er-space-3);
+    margin-top: var(--er-space-3);
+  }
+}
+
+@media (max-width: 40rem) {
+  .er-page-grid {
+    padding: var(--er-space-3) var(--er-space-2);
+  }
+  .er-page { margin: 0 var(--er-space-1); }
+}
+
+/* Margin notes (marginalia column inside the page) */
+.er-marginalia {
+  position: relative;
+  padding: var(--er-space-1) 0 0;
+  font-family: var(--er-font-body);
+  /* Allow long words / quotes to wrap inside the column instead of
+   * blowing out the grid track. */
+  min-width: 0;
 }
 
 .er-marginalia-head {
@@ -1453,9 +1561,14 @@ body:has([data-review-ui="longform"]) .essay-header {
   text-decoration-thickness: 1px;
 }
 
-/* Draft body wrapper within BlogLayout */
+/* Draft body wrapper within BlogLayout. `min-width: 0` is required
+ * because `.er-draft-frame` is a CSS Grid item (Issue #154 Dispatch A
+ * — the page-grid lays out draft + marginalia side-by-side); without
+ * it, BlogLayout's `.essay`/`.essay-body` content can blow out the
+ * grid track at narrow viewports, producing horizontal scroll. */
 .er-draft-frame {
   position: relative;
+  min-width: 0;
 }
 
 /* Per-row site badge. Two letters (AC / EC) so the operator can scan a
@@ -1624,26 +1737,14 @@ body:has([data-review-ui="longform"]) .essay-header {
   scroll-margin-top: 5rem;
 }
 
-/* When the edit mode is active, widen BlogLayout's host column
- * AND collapse its reserved TOC slot so the source/preview panes
- * can use the full width. BlogLayout uses
- *   .essay-body-wrap { grid-template-columns: 1fr 14rem }
- * to reserve space for a TOC on the right. In edit mode we don't
- * need the TOC column; flattening it frees up 17rem. Also widen
- * .essay (66rem cap) and .essay-body (34rem cap). Specificity via
- * :has() + body beats the component-scoped Astro rules without
- * reaching into BlogLayout internals. 19rem reserved for the
- * fixed margin rail. */
-body:has(.er-edit-mode:not([hidden])) .essay,
-body:has(.er-edit-mode:not([hidden])) .essay-body {
-  max-width: calc(100vw - 19rem);
-  /* Left-align in edit mode so the content doesn't center under the
-   * fixed margin rail (18rem wide) on the right. The .essay's
-   * `margin: 0 auto` would otherwise split the viewport-minus-rail
-   * remainder on both sides, pulling the preview pane under the rail. */
-  margin-left: 0;
-  margin-right: auto;
-}
+/* In edit mode, collapse BlogLayout's reserved TOC slot so the
+ * source/preview panes can use the full article column. BlogLayout
+ * uses `.essay-body-wrap { grid-template-columns: 1fr 14rem }` to
+ * reserve a TOC track on the right; flattening it returns that 14rem
+ * to the source/preview panes. We no longer need to chase
+ * viewport-minus-marginalia for `.essay` widths — the page-grid owns
+ * the marginalia gutter now (Issue #154 Dispatch A), so widths fall
+ * out of the article column track automatically. */
 body:has(.er-edit-mode:not([hidden])) .essay-body-wrap {
   grid-template-columns: 1fr !important;
 }
@@ -2838,33 +2939,30 @@ body.er-focus-mode .er-outline-tab {
 }
 
 /* ---------- Longform review refinement (Issue 8) ---------- */
-/* ISSUE 8 — suppress the studio folio header on the longform review surface.
- * The er-strip already provides back-to-studio + galley/slug/actions.
- * Keeping both means two navigations stacking at the top of the viewport
- * with the strip overlapping the folio by ~12px. Hide the folio so the
- * strip is the canonical chrome on this surface (matching the existing
- * pattern that suppresses the host site's .header-wrapper).
- *
- * Cross-surface navigation links (Index / Dashboard / Content / Shortform /
- * Manual) remain reachable via the strip's `← studio` back-link → the
- * dashboard's own folio. */
-[data-review-ui="longform"] .er-folio {
-  display: none;
-}
+/*
+ * The earlier Issue 8 rule hid `.er-folio` on the longform review
+ * surface (display: none) because the strip and folio stacked
+ * awkwardly. Issue #154's folio half (Dispatch A, commit 4c558f7)
+ * resolves that overlap by stacking the strip below the folio at
+ * `top: var(--er-folio-h)`. The folio is now the canonical
+ * cross-surface nav on every studio surface, including longform,
+ * and the strip's `← studio` back-link is the per-galley back path.
+ * Hiding the folio is no longer necessary; the rule has been
+ * removed.
+ */
 
-/* ISSUE 9 — leave room at the bottom of the right column for the
- * scrapbook drawer. The marginalia previously extended all the way to
- * the bottom of the viewport, occluding the top of the scrapbook
- * drawer. Calculation: scrapbook is max-height 45vh; marginalia stops
- * one --er-space-3 above the scrapbook's top edge.
+/* Issue 9's bottom-offset rule (obsolete since #154 Dispatch A).
  *
- * The scrapbook drawer's max-height matches the carved-out space; the
- * two now share the right column without overlap. If the marginalia
- * content overflows, its existing `overflow-y: auto` keeps it
- * scrollable. */
-[data-review-ui="longform"] .er-marginalia {
-  bottom: calc(45vh + var(--er-space-3));
-}
+ * The original rule (`[data-review-ui="longform"] .er-marginalia
+ * { bottom: calc(45vh + var(--er-space-3)) }`) was load-bearing when
+ * marginalia was `position: fixed` on the viewport — it carved a gap
+ * for the scrapbook drawer at the bottom. With marginalia now
+ * `position: relative` inside the page-grid (Dispatch A), `bottom`
+ * still shifts the box upward, leaving an empty 45vh strip at the
+ * end of the column. The page composition no longer overlaps the
+ * scrapbook drawer (the drawer is fixed at the viewport's bottom and
+ * the page scrolls behind it), so the offset is not needed.
+ */
 
 /* ISSUE 10 — cap the strip's inner content width so elements don't
  * float in awkward whitespace at wide viewports. The strip itself
@@ -2913,11 +3011,10 @@ body.er-focus-mode .er-outline-tab {
 
 /* TABLET — 48rem to 80rem */
 @media (max-width: 80rem) {
-  /* Narrow the marginalia from 18rem to 14rem. Article body gains ~64px. */
-  [data-review-ui="longform"] .er-marginalia {
-    width: 14rem;
-    /* Scrapbook drawer remains; carve-out from Issue 9 still applies. */
-  }
+  /* Pre-Dispatch-A: this rule narrowed marginalia from 18rem to 14rem
+   * because marginalia was a fixed-width viewport rail. The page-grid
+   * now sizes the column via `--er-marginalia-col` (Issue #154
+   * Dispatch A); the override is obsolete and was removed. */
 
   /* Strip elements wrap cleanly. Hide secondary chrome (kbd shortcut chips
    * already hidden at 60rem; here we also hide the slug breadcrumb to free
@@ -2932,30 +3029,13 @@ body.er-focus-mode .er-outline-tab {
 
 /* MOBILE — below 48rem (768px) */
 @media (max-width: 48rem) {
-  /* Margin-notes panel collapses to a bottom-anchored expandable sheet.
-   * Default state: closed (height: 3rem — just the header). Operator
-   * opens via the header tap target (client wires aria-expanded).
-   * Expanded state: height: 60vh.
-   *
-   * Default closed; client toggles via aria-expanded attribute. */
-  [data-review-ui="longform"] .er-marginalia {
-    top: auto;
-    bottom: 3.5rem;  /* sits above the bottom-anchored scrapbook (also collapsed) */
-    left: 0;
-    right: 0;
-    width: 100%;
-    height: 3rem;
-    overflow: hidden;
-    border-left: none;
-    border-top: var(--er-rule-thin);
-    box-shadow: 0 -4px 12px rgba(26,22,20,0.04);
-    transition: height 150ms ease;
-  }
-
-  [data-review-ui="longform"] .er-marginalia[aria-expanded="true"] {
-    height: 60vh;
-    overflow-y: auto;
-  }
+  /* Pre-Dispatch-A: marginalia at this breakpoint became a fixed-bottom
+   * collapsible sheet because the desktop layout pinned marginalia to
+   * the viewport. With the page-grid (Issue #154 Dispatch A), the
+   * 64rem media query already collapses marginalia to a single column
+   * stacked below the article. The bottom-sheet treatment is reserved
+   * for a follow-up dispatch (B) if we want to bring it back; the
+   * single-column stack is the mobile experience for now. */
 
   /* Scrapbook drawer collapses similarly. Default: header-only at the
    * bottom. Expanded: max-height: 50vh as before. */

@@ -561,15 +561,37 @@ export async function renderReviewPage(
     ? 'shortform'
     : 'longform';
 
+  // Issue #154 Dispatch A — `.er-page` wraps the draft frame +
+  // marginalia inside a CSS Grid composition so marginalia sits next
+  // to the prose it annotates rather than pinned to the viewport.
+  // Shortform reviews skip the marginalia column (no margin-note
+  // workflow on shortform), so the page collapses to the draft frame
+  // alone for that surface — keeping the same `.er-page` shell
+  // preserves the desk metaphor across longform/shortform.
+  const pageGrid = isShortform
+    ? html`
+        <div class="er-page-grid">
+          <div class="er-draft-frame">
+            <div id="draft-body" data-draft-body
+              title="Double-click to edit · select text to leave a margin note">${unsafe(bodyHtml)}</div>
+            ${renderEditMode(outlineHtml.length > 0)}
+          </div>
+        </div>`
+    : html`
+        <div class="er-page-grid">
+          <div class="er-draft-frame">
+            <div id="draft-body" data-draft-body
+              title="Double-click to edit · select text to leave a margin note">${unsafe(bodyHtml)}</div>
+            ${renderEditMode(outlineHtml.length > 0)}
+          </div>
+          <div class="er-page-gutter" aria-hidden="true"></div>
+          ${renderMarginalia()}
+        </div>`;
+
   const body = html`
     <div data-review-ui="${reviewUiAttr}" class="er-review-shell">
       ${renderEditorialFolio(folioActive, folioSpine)}
       ${shortformMeta}
-      <div class="er-draft-frame">
-        <div id="draft-body" data-draft-body
-          title="Double-click to edit · select text to leave a margin note">${unsafe(bodyHtml)}</div>
-        ${renderEditMode(outlineHtml.length > 0)}
-      </div>
       <div class="er-strip">
         <div class="er-strip-inner">
           <a class="er-strip-back" href="/dev/editorial-studio" title="Back to the editorial studio">← studio</a>
@@ -585,7 +607,9 @@ export async function renderReviewPage(
           ${renderControlsRight(workflow)}
         </div>
       </div>
-      ${renderMarginalia()}
+      <article class="er-page">
+        ${unsafe(pageGrid)}
+      </article>
       <button class="er-pencil-btn" data-add-comment-btn hidden type="button">Mark</button>
       ${isShortform ? unsafe('') : renderOutlineDrawer(outlineHtml)}
       ${isShortform
