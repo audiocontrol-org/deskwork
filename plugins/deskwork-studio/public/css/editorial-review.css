@@ -3028,3 +3028,20 @@ body.er-focus-mode .er-outline-tab {
 [data-review-ui="longform"] .er-pending-state--filed {
   display: none;
 }
+
+/* ---------- Longform review refinement (Phase 2 follow-up — Issue 2) ---------- */
+/*
+ * ISSUE 2 — Edit button visual parity with Mark pencil.
+ *
+ * Both are pencil-family controls (Edit toggles source view; Mark
+ * annotates). The Mark button has `::before { content: '✎ ' }` — Edit
+ * gets a `⇄` glyph to signal "toggle" not "annotate". Same visual
+ * weight, different verb. The class hook is the existing
+ * `data-action="toggle-edit"` attribute on the button.
+ */
+[data-review-ui="longform"] .er-strip-right .er-btn-small[data-action="toggle-edit"]::before {
+  content: '⇄ ';
+  font-family: var(--er-font-mono);
+  font-weight: 500;
+  margin-right: 0.1em;
+}
