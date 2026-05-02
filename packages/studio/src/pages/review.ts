@@ -398,6 +398,7 @@ function renderEditToolbar(outlineHasContent: boolean): RawHtml {
       </div>
       <div class="er-edit-actions">
         <button class="er-btn er-btn-small" data-action="outline-drawer" type="button" title="Show the outline for reference (O)" aria-pressed="false"${unsafe(outlineBtnAttrs)}>Outline ↗</button>
+        <button class="er-btn er-btn-small" data-action="toggle-marginalia" type="button" aria-pressed="false" title="Hide margin notes (Shift+M)" aria-label="Toggle margin notes column">⊟ Notes</button>
         <button class="er-btn er-btn-small" data-action="focus-mode" type="button" title="Distraction-free mode (Shift+F)" aria-pressed="false">Focus ⛶</button>
         <button class="er-btn er-btn-primary" data-action="save-version" type="button">Save as new version</button>
         <button class="er-btn" data-action="cancel-edit" type="button">Cancel</button>

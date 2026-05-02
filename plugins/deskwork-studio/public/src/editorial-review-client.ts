@@ -1363,14 +1363,22 @@ export function initEditorialReview(): void {
   //     below alongside Shift+F)
 
   const MARGINALIA_HIDDEN_KEY = 'deskwork:review:marginalia-hidden';
-  const marginaliaToggleBtn = document.querySelector<HTMLButtonElement>(
-    '[data-action="toggle-marginalia"]',
+  // There are two toggle-marginalia buttons in the markup: one in the
+  // strip (visible in read mode) and one in the edit toolbar (visible
+  // in edit mode, since the strip's right side is hidden during edit
+  // by the Dispatch C `body:has(.er-edit-toolbar:not([hidden]))` rule).
+  // Both buttons drive the same state and both must reflect aria-pressed
+  // in lockstep.
+  const marginaliaToggleBtns = Array.from(
+    document.querySelectorAll<HTMLButtonElement>('[data-action="toggle-marginalia"]'),
   );
 
   function applyMarginaliaState(hidden: boolean): void {
     if (hidden) document.body.setAttribute('data-marginalia', 'hidden');
     else document.body.removeAttribute('data-marginalia');
-    marginaliaToggleBtn?.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+    for (const btn of marginaliaToggleBtns) {
+      btn.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+    }
   }
 
   function toggleMarginalia(): void {
@@ -1392,7 +1400,9 @@ export function initEditorialReview(): void {
     // localStorage read failure is non-fatal — default to visible.
   }
 
-  marginaliaToggleBtn?.addEventListener('click', toggleMarginalia);
+  for (const btn of marginaliaToggleBtns) {
+    btn.addEventListener('click', toggleMarginalia);
+  }
 
   // Double-click anywhere in the rendered draft enters edit mode. This
   // mirrors the comment gesture (select → Mark) with its own shape so
