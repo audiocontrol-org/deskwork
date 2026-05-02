@@ -13,6 +13,42 @@ Populating this file is a step in `/session-end`. If a session didn't exercise t
 
 ---
 
+## 2026-05-02 (F1 implementation): scrapbook redesign — driving the studio in subagent-driven mode surfaces the cascade-ordering bug that escaped the design-review gate
+
+**Arc:** Execute the prior session's 6-dispatch plan for Issue #161 in subagent-driven mode (operator-confirmed). Two `typescript-pro` dispatches (server-side first, then CSS+client) bracketed around a `/frontend-design` G1 design gate. After F1.5 landed in the working tree, ran the verification mandate (BOTH playwright AND `/frontend-design`) at four viewports.
+
+### What the dogfood surfaced
+
+- **insight** — **The plan's gate model + per-dispatch split is the right shape for design-touching work.** Splitting F1 across two implementer subagents at the G1 gate boundary gave the gate REAL material to review: the post-F1.3 live page rendering the new `.scrap-*` markup with the OLD `.scrapbook-*` CSS still applied. That "raw shape before styling" view is what made the gate useful; if the entire F1 had been one subagent dispatch, the G1 gate would have reviewed two static documents (plan CSS vs mockup CSS) and missed the runtime context. **Lesson for future plans (F2-F5):** split each dispatch at its design-review-gate boundary so the gate has live state to evaluate.
+
+- **friction** — **The G1 design-review gate compared planner-CSS-vs-mockup-CSS and missed a cascade-ordering bug present in BOTH.** The mockup HTML (line 105-117) and the planner's CSS draft both placed `@media (max-width: 64rem) { .scrap-aside { position: static } }` BEFORE the `.scrap-aside { position: sticky }` base rule. Same specificity (0,0,1,0); the later rule wins. The responsive `static` override never landed. Visually OK at <=64rem because single-column had no scroll context, but during scroll the aside would pin to viewport top while main scrolled beneath it. The gate didn't catch it (both compared documents had the bug); the post-F1 verification caught it via live `getComputedStyle()` reporting `position: "sticky"` at 1023px. **The plan's verification mandate — "BOTH playwright AND `/frontend-design`" — paid off here.** Operator framing carried forward: this is an instance of "the mockup is not a contract, it's a target." The implementation is what runs; live verification is what catches the diff between intention and execution.
+
+- **fix** — **2-line CSS reorder repaired the cascade.** Moved the `@media` block to AFTER the `.scrap-aside` base rule + added a comment explaining the cascade-ordering rationale. Verified live: at 1023px `position: "static"` (correct); at 1440px `position: "sticky"` (correct). Tests stayed green at 330 / 0 / 11.
+
+- **friction** — **Subagent split a TS module into 4 files without controller approval.** The brief said "if it grows larger than 300-500 lines, stop and report DONE_WITH_CONCERNS — don't split files on your own without plan guidance." Implementer-B reported `DONE_WITH_CONCERNS` flagging the split AFTER making it. The naive single-file port was 755 lines (violating the 300-500 line cap with no path to lower it without splitting). The split IS clean (markdown is self-contained; toast is self-contained; mutations share a small `Ctx` interface), but the precedent of "subagent makes a structural decision without asking" is exactly the failure mode the workflow's two-stage review is designed to catch. **Lesson for future briefs:** when the file-size cap is going to bite, give the subagent EXPLICIT instructions on the split shape (or pre-approve splitting at named cut points), not just "stop and report." The "stop and report" instruction is ambiguously interpretable as "stop and report the decision" OR "stop and report the question."
+
+- **insight** — **`/frontend-design` does two distinct jobs at gate vs verification.** As a **gate** (G1, G2, G3, pre-implementation): compares planned-CSS-vs-mockup-CSS, identifies missing-from-plan production polish, signs off the implementation contract. As **verification** (post-F1, F2.3, etc.): compares as-built-page-vs-mockup, catches deviations the gate missed (cascade ordering!), validates inner-element rendering. Both are necessary; the verification is the catch-all for bugs that are present in BOTH the mockup and the plan. The plan's "BOTH playwright AND `/frontend-design`" mandate is doing what it's supposed to.
+
+- **insight** — **Studio dev mode (Vite + tsx --watch + HMR) made the playwright iteration loop instant.** Each subagent's CSS/TS change hot-reloaded in <1s; reloading the live page in playwright showed the diff immediately. The dev workflow shipped in Phase 31 (`npm run dev --workspace @deskwork/studio`) is precisely the loop this kind of design-driven implementation needs. Without HMR, every iteration would have been a tsc rebuild + manual reload + ~15s of friction; with HMR, the verification step is a few seconds.
+
+- **friction** — **Single-card scrapbook fixture limits live verification scope.** The dogfood scrapbook (`/dev/scrapbook/deskwork-internal/source-shipped-deskwork-plan`) has only ONE item — the ux-audit md file. F1's mockup fidelity for multi-card grids, per-kind ribbon variation across kinds (img-green / json-purple / txt-faded), mono preview rendering — none of these can be verified live with a single-card fixture. F2's plan adds a multi-kind fixture (md+json+txt+png) and the F2 verification will exercise these. **Lesson:** pure unit-tests with synthetic fixtures cover the markup contract; live multi-kind verification is needed before sign-off. F1's single-card live verification is acceptable only because the test fixture covers the structural contract.
+
+- **insight** — **The bug found at post-F1 review (cascade ordering) is the kind of bug that ONLY surfaces when running the actual application.** No amount of static-document review (mockup vs plan diff) would have caught it because both source documents had the bug. The implementation faithfully copied the bug from both. The catch was running the page at 1023px and asking `getComputedStyle` what `position` it resolved to. This is the strongest argument for the verification mandate — "the gate signed off; the page is broken" is the failure mode that the post-implementation `/frontend-design` review is designed to catch.
+
+- **friction (ergonomics)** — **F1 implementation in working tree, uncommitted at session-end.** The session-end skill commits docs only; implementation work that hasn't gone through spec/quality reviews stays dirty. Next session needs to dispatch reviewers + commit before moving to F2. This is a reasonable trade-off for the workflow's "never skip reviews" rule, but it leaves the working tree in a state that requires the next session's first move to be procedural cleanup (review + commit) before any new work. Could be smoother if the workflow had a "commit-pending review" half-state, but that would weaken the review gate. Keep as-is.
+
+### Operator quotes preserved
+
+- (from prior session, still binding) *"don't 'just for now' it and be lazy. That just creates more work for us to cleanup the garbage turds you leave lying around."* — applied this session by NOT taking the easy path on the cascade bug (file as F2 follow-up); fixed in-thread before F1 commits.
+
+### Tags summary
+
+- **insight** ×4 — gate model + per-dispatch split / two jobs of /frontend-design / dev-mode iteration speed / cascade-bug-only-surfaces-at-runtime
+- **friction** ×3 — gate missed cascade bug shared by mockup+plan / subagent unilaterally split modules / single-card fixture limits live verification + dirty working tree at session-end
+- **fix** ×1 — 2-line CSS reorder repaired the cascade
+
+---
+
 ## 2026-05-02 (planning): scrapbook redesign Dispatch E (visual) — diagnostic playwright drive surfaces the function-vs-composition gap; planning-only session with one operator-caught design-discipline gap on the plan itself
 
 **Surface exercised (usage side):** dev-mode `deskwork-studio` (`npm run dev`) on `127.0.0.1:47321`. Single playwright drive of `/dev/scrapbook/deskwork-internal/source-shipped-deskwork-plan` at 1440×900 to verify whether the prior session's Dispatch E shipped what the mockup proposed. After the diagnostic, the session was infrastructure-only — spec + plan written; no further plugin/studio interaction.
