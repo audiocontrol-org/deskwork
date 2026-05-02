@@ -452,6 +452,165 @@ Markup adjustment (in `review.ts`'s strip rendering function): wrap the strip's 
 
 The `::before` registration-mark pseudo-element on `.er-strip` stays attached to the outer strip — it adheres to the left viewport edge as before.
 
+### ISSUE 11 — surface is not responsive
+
+The longform review surface is hard-coded for wide desktop. Verified live at 768px (tablet) and 390px (phone):
+
+- At 768px: the strip wraps to a second row but its right-side elements still get clipped against the marginalia (which holds its 18rem fixed width). The article body shrinks to ~250px usable; the rest is occluded by the marginalia panel.
+- At 390px: catastrophic. The marginalia takes ~250px of the 390px viewport. The article body has ~100px to render in — words break mid-syllable. The strip clips off `Edit` / `filed` / `?` entirely. The folio nav is completely hidden behind the marginalia.
+
+The fixed-positioned panels (`er-strip`, `er-marginalia`, `er-scrapbook-drawer`) are designed for ≥1280px desktops and don't reflow. The only responsive rule in the existing code is `@media (max-width: 60rem) { .er-strip-hint { display: none; } }` (line 1090) — a single hide rule, not an actual responsive layout.
+
+**Fix philosophy:** the press-check metaphor is desktop-native (it's literally a workshop with a galley proof and side panels). On small viewports, collapse the chrome to a single column with the article body taking full width and the secondary panels (margin notes, scrapbook) accessible via expandable drawers triggered from a small toolbar. The strip wraps cleanly with prioritized items.
+
+```css
+/* ---------- Longform review responsive layout ---------- */
+/*
+ * The press-check surface is desktop-native — galley column + margin-notes
+ * sidebar + scrapbook drawer all assume ≥1280px. Below that, the panels
+ * occlude the article body and the strip clips off action buttons.
+ *
+ * Three breakpoints:
+ *   - ≥80rem (1280px): full desktop layout — strip + marginalia + scrapbook all visible.
+ *   - ≥48rem (768px): tablet — marginalia narrows; scrapbook moves to bottom; strip wraps gracefully.
+ *   - <48rem (mobile): single-column reading; marginalia + scrapbook collapse to icon toggles in the strip; article body takes full width.
+ *
+ * The principle: never lose the article body's column to chrome. At every
+ * breakpoint the prose is the full-bleed primary content; chrome adapts
+ * around it.
+ */
+
+/* TABLET — 48rem to 80rem */
+@media (max-width: 80rem) {
+  /* Narrow the marginalia from 18rem to 14rem. Article body gains ~64px. */
+  [data-review-ui="longform"] .er-marginalia {
+    width: 14rem;
+    /* Scrapbook drawer remains; carve-out from Issue 9 still applies. */
+  }
+
+  /* Strip elements wrap cleanly. Hide secondary chrome (kbd shortcut chips
+   * already hidden at 60rem; here we also hide the slug breadcrumb to free
+   * row space). */
+  [data-review-ui="longform"] .er-strip-slug {
+    display: none;
+  }
+
+  /* The strip's full-bleed background stays; the inner cap from Issue 10
+   * keeps centered alignment. */
+}
+
+/* MOBILE — below 48rem (768px) */
+@media (max-width: 48rem) {
+  /* Margin-notes panel collapses to a bottom-anchored expandable sheet.
+   * Default state: closed (top: auto; bottom: 0; height: 3rem — just the
+   * header). Operator opens via a toolbar toggle (markup adjustment below).
+   * Expanded state: top: 5.5rem; height auto.
+   *
+   * Default closed; client toggles via aria-expanded attribute. */
+  [data-review-ui="longform"] .er-marginalia {
+    top: auto;
+    bottom: 3.5rem;  /* sits above the bottom-anchored scrapbook (also collapsed) */
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: 3rem;
+    overflow: hidden;
+    border-left: none;
+    border-top: var(--er-rule-thin);
+    box-shadow: 0 -4px 12px rgba(26,22,20,0.04);
+    transition: height 150ms ease;
+  }
+
+  [data-review-ui="longform"] .er-marginalia[aria-expanded="true"] {
+    height: 60vh;
+    overflow-y: auto;
+  }
+
+  /* Scrapbook drawer collapses similarly. Default: header-only at the
+   * bottom. Expanded: max-height: 50vh as before. */
+  [data-review-ui="longform"] .er-scrapbook-drawer {
+    width: 100%;
+    max-width: none;
+    max-height: 3rem;
+    transition: max-height 150ms ease;
+  }
+
+  [data-review-ui="longform"] .er-scrapbook-drawer[aria-expanded="true"] {
+    max-height: 50vh;
+  }
+
+  /* Strip elements drop to essentials: back link + state stamp + ? for
+   * shortcuts. Edit / filed / version slot all hide. */
+  [data-review-ui="longform"] .er-strip-galley,
+  [data-review-ui="longform"] .er-strip-versions,
+  [data-review-ui="longform"] .er-strip-right .er-edit-mode-label,
+  [data-review-ui="longform"] .er-pending-state,
+  [data-review-ui="longform"] .er-shortcut-chip {
+    display: none;
+  }
+
+  /* Article body takes the full viewport width minus minimal padding. The
+   * existing BlogLayout column is overridden via a higher-specificity rule. */
+  [data-review-ui="longform"] .er-review-shell .er-draft-frame,
+  [data-review-ui="longform"] .er-review-shell #draft-body {
+    margin-inline: var(--er-space-2);
+    max-width: none;
+  }
+
+  /* Body padding-top accounts only for the strip (now 1 row instead of
+   * potentially 2). */
+  body:has([data-review-ui="longform"] .er-strip) {
+    padding-top: 2.6rem;
+  }
+}
+
+/* TINY — below 30rem (480px) — most-aggressive collapse */
+@media (max-width: 30rem) {
+  /* Strip drops to back-link + state stamp only. ? shortcuts still
+   * available via the toggle button. */
+  [data-review-ui="longform"] .er-strip-back {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.4rem;
+  }
+
+  [data-review-ui="longform"] .er-stamp-big {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    transform: rotate(-1deg);  /* slightly less rotation at this scale */
+  }
+}
+```
+
+Markup adjustments for Issue 11:
+
+The mobile collapse pattern requires the marginalia + scrapbook drawers to be tappable. Add an `aria-expanded` attribute on each (default `false`) + a click handler that toggles it. The existing markup has these elements as `<aside>` containers — add the attribute + a click handler in the client (`editorial-review-client.ts`).
+
+The header inside each `<aside>` becomes the tap target:
+- `.er-marginalia-head` (already exists per CSS line 1177) gets `cursor: pointer` on small viewports.
+- `.er-scrapbook-drawer-head` similarly.
+
+Client wiring (in `editorial-review-client.ts`):
+
+```typescript
+// Mobile drawer toggle
+const isMobile = () => window.matchMedia('(max-width: 48rem)').matches;
+
+document.querySelectorAll<HTMLElement>('.er-marginalia, .er-scrapbook-drawer').forEach((aside) => {
+  const head = aside.querySelector<HTMLElement>('.er-marginalia-head, .er-scrapbook-drawer-head');
+  if (!head) return;
+  aside.setAttribute('aria-expanded', 'false');
+  head.addEventListener('click', () => {
+    if (!isMobile()) return;
+    const expanded = aside.getAttribute('aria-expanded') === 'true';
+    aside.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+  });
+});
+```
+
+This is additive — desktop behavior unchanged because `isMobile()` returns false at ≥48rem.
+
+The strip collapse and content-width fixes are CSS-only; no markup changes.
+
 ---
 
 ## Open design notes / things the operator should validate live
