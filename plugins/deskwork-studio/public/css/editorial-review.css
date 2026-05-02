@@ -2841,3 +2841,17 @@ body.er-focus-mode .er-outline-tab {
 [data-review-ui="longform"] .er-folio {
   display: none;
 }
+
+/* ISSUE 9 — leave room at the bottom of the right column for the
+ * scrapbook drawer. The marginalia previously extended all the way to
+ * the bottom of the viewport, occluding the top of the scrapbook
+ * drawer. Calculation: scrapbook is max-height 45vh; marginalia stops
+ * one --er-space-3 above the scrapbook's top edge.
+ *
+ * The scrapbook drawer's max-height matches the carved-out space; the
+ * two now share the right column without overlap. If the marginalia
+ * content overflows, its existing `overflow-y: auto` keeps it
+ * scrollable. */
+[data-review-ui="longform"] .er-marginalia {
+  bottom: calc(45vh + var(--er-space-3));
+}
