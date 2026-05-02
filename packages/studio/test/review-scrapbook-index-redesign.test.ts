@@ -186,4 +186,32 @@ describe('scrapbook index — Dispatch E phase 3: client wiring', () => {
     const client = readFileSync(CLIENT_PATH, 'utf8');
     expect(client).toMatch(/data-state="expanded"|dataset\.state\s*=\s*['"]expanded['"]/);
   });
+
+  it('client bootstraps initScrapbook at module load (was a latent gap)', () => {
+    // Pre-Dispatch-E the file exported initScrapbook but never invoked
+    // it — so the disclosure handler never bound and Dispatch E's new
+    // filter wiring would have been silently dead too. Assert the
+    // bootstrap is present so this can't regress.
+    const client = readFileSync(CLIENT_PATH, 'utf8');
+    expect(client).toMatch(/document\.readyState/);
+    expect(client).toMatch(/initScrapbook\(\)/);
+    expect(client).toMatch(/DOMContentLoaded/);
+  });
+
+  it('CSS gives each .scrapbook-item card chrome (border + flex column)', () => {
+    const css = readFileSync(CSS_PATH, 'utf8');
+    expect(css).toMatch(
+      /\.scrapbook-item\s*\{[^}]*flex-direction:\s*column/,
+    );
+    expect(css).toMatch(
+      /\.scrapbook-item\s*\{[^}]*border:\s*1px\s+solid/,
+    );
+  });
+
+  it('CSS hides the body slot when the card is collapsed', () => {
+    const css = readFileSync(CSS_PATH, 'utf8');
+    expect(css).toMatch(
+      /\.scrapbook-item:not\(\[data-state="expanded"\]\)\s*\.scrapbook-item-body\s*\{[^}]*display:\s*none/,
+    );
+  });
 });

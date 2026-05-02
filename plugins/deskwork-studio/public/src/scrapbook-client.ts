@@ -900,3 +900,18 @@ function msg(e: unknown): string { return e instanceof Error ? e.message : Strin
 // receives well-formed args — keeping the regex here means both sides
 // agree on the shape).
 void SLUG_RE;
+
+// Bootstrap. The studio's <script type="module"> tag imports this
+// file but doesn't invoke any function — without an explicit
+// top-level call the disclosure handlers (and Dispatch E's filter +
+// search wiring) never bind. Run on DOMContentLoaded if the document
+// hasn't parsed yet, otherwise immediately. This was a pre-existing
+// latent gap surfaced by #154 Dispatch E phase 3 (the filter wiring
+// would have been silently dead too without this bootstrap).
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => initScrapbook());
+  } else {
+    initScrapbook();
+  }
+}

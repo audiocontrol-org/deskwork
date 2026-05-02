@@ -952,3 +952,70 @@ a.er-calendar-meta-scrapbook:hover .scrapbook-chip-arrow {
 .scrapbook-item:focus-within .scrapbook-toolbar {
   opacity: 1;
 }
+
+/* ---------- Dispatch E (#154) — card chrome ---------- */
+/* Cards in the grid stack vertically: header row, optional toolbar,
+ * peek block, optional expanded body. The pre-Dispatch-E surface
+ * laid these out horizontally as a table-like row; the grid cell is
+ * 15rem wide minimum, so a horizontal layout truncates badly. The
+ * scrapbook-item-header was already using grid-template-columns; the
+ * overrides below collapse it to a tighter vertical stack inside
+ * each card, while preserving the existing data-state="deleting"
+ * + scrapbook-confirm-bar flows. */
+.scrapbook-item {
+  background: var(--er-paper);
+  border: 1px solid var(--er-faded-2);
+  border-radius: 2px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+.scrapbook-item-header {
+  /* Override the existing table-like grid columns inside the card so
+   * the kind chip, filename, and timestamp sit on a single line at
+   * 15rem width without wrapping. */
+  display: grid !important;
+  grid-template-columns: auto auto 1fr auto auto !important;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.5rem 0.7rem;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--er-faded-2);
+  cursor: pointer;
+  width: 100%;
+}
+.scrapbook-item-header .scrapbook-filename {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.78rem;
+  min-width: 0;
+}
+.scrapbook-item-header .scrapbook-mtime {
+  font-size: 0.62rem;
+  color: var(--er-faded);
+  white-space: nowrap;
+}
+.scrapbook-item-header .scrapbook-seq {
+  font-size: 0.6rem;
+  color: var(--er-faded);
+  letter-spacing: 0.06em;
+}
+.scrapbook-toolbar {
+  padding: 0.25rem 0.5rem;
+  border-bottom: 1px dashed var(--er-faded-2);
+  gap: 0.4rem;
+  font-size: 0.65rem;
+}
+.scrapbook-perforation {
+  display: none;
+}
+/* The body slot only takes flow space when the card is expanded — when
+ * collapsed, hide it so the peek + header alone determine the card
+ * height. */
+.scrapbook-item:not([data-state="expanded"]) .scrapbook-item-body {
+  display: none;
+}
