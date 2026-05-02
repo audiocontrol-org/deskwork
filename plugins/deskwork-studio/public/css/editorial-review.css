@@ -2715,102 +2715,188 @@ body.er-focus-mode .er-outline-tab {
 .er-error p { margin: 0 0 var(--er-space-2); font-size: 1rem; line-height: 1.5; }
 .er-error code { font-size: 0.85em; }
 
-/* ---------- Scrapbook drawer (Phase 16c) ----------
-   The longform review surface gets a per-entry scrapbook drawer
-   docked to the right edge below the marginalia panel. Read-only —
-   mutations stay on the standalone scrapbook viewer. The drawer
-   reuses scrap-row.css for the row visuals; this block styles the
-   surrounding chrome only. */
+/* ---------- Dispatch D (#154) — real bottom scrapbook drawer ----------
+ * Replaces the previous right-edge fixed aside (issue #154 concern 3:
+ * the chrome looked like a drawer but the primary action navigated
+ * away). The drawer is now a true drawer — bottom-anchored, full-width,
+ * expands in place via body[data-drawer="open"] (toggled by the client).
+ *
+ * The drawer body still uses the existing scrap-row visuals (the card
+ * abstraction from the mockup is reserved for Dispatch E — scrapbook
+ * index rewrite — to avoid a multi-surface refactor inside this dispatch).
+ */
+
+:root {
+  --er-drawer-h:   4rem;     /* collapsed handle height */
+  --er-drawer-h-x: 22rem;    /* expanded total height */
+}
 
 .er-scrapbook-drawer {
   position: fixed;
+  left: 0;
   right: 0;
   bottom: 0;
-  width: var(--er-marg-width, 320px);
-  max-width: 36vw;
-  max-height: 45vh;
   background: var(--er-paper);
-  border-left: var(--er-rule-thin);
-  border-top: var(--er-rule-thin);
-  box-shadow: -2px -2px 0 rgba(26, 22, 20, 0.04);
+  border-top: var(--er-rule-med);
+  box-shadow: 0 -8px 18px -4px rgba(26, 22, 20, 0.12);
+  z-index: 55;
+  height: var(--er-drawer-h);
+  transition: height 240ms cubic-bezier(.2, .7, .2, 1);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   font-family: var(--er-font-body);
-  z-index: 5;
+}
+body[data-drawer="open"] .er-scrapbook-drawer {
+  height: var(--er-drawer-h-x);
 }
 
-.er-scrapbook-drawer-head {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 12px;
-  align-items: baseline;
-  padding: 10px 14px 8px;
-  border-bottom: 1px dashed var(--er-faded-2);
+.er-scrapbook-drawer-handle {
+  height: var(--er-drawer-h);
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--er-space-3);
+  padding: 0 var(--er-space-4);
+  cursor: pointer;
+  background: linear-gradient(to bottom, var(--er-paper) 80%, var(--er-paper-2) 100%);
+  border-bottom: 1px solid var(--er-paper-3);
+  user-select: none;
+}
+.er-scrapbook-drawer-handle:focus-visible {
+  outline: 2px solid var(--er-red-pencil);
+  outline-offset: -2px;
 }
 
 .er-scrapbook-drawer-kicker {
+  font-family: var(--er-font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  flex: 0 0 auto;
+}
+.er-scrapbook-drawer-kicker em {
   font-family: var(--er-font-display);
   font-style: italic;
-  font-size: 13px;
-  color: var(--er-ink-soft);
+  color: var(--er-red-pencil);
+  font-size: 1rem;
+  text-transform: none;
+  letter-spacing: 0;
+  margin-right: 0.2rem;
 }
 
 .er-scrapbook-drawer-count {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  color: var(--er-ink-soft);
+  font-size: 0.95rem;
+  flex: 0 0 auto;
+}
+
+.er-scrapbook-drawer-peek {
+  display: flex;
+  gap: var(--er-space-2);
+  align-items: center;
   font-family: var(--er-font-mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
+  font-size: 0.7rem;
   color: var(--er-faded);
-  text-transform: uppercase;
+  overflow: hidden;
+  white-space: nowrap;
+  flex: 1 1 auto;
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+.er-scrapbook-drawer-peek .sep { color: var(--er-faded-2); }
+body[data-drawer="open"] .er-scrapbook-drawer-peek { opacity: 0.4; }
+
+.er-scrapbook-drawer-peek-empty {
+  font-style: italic;
+  color: var(--er-faded);
 }
 
 .er-scrapbook-drawer-open {
   font-family: var(--er-font-mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--er-red-pencil);
+  color: var(--er-faded);
   text-decoration: none;
-  border-bottom: 1px solid transparent;
-  transition: border-color 0.14s ease;
+  border-bottom: 1px dotted var(--er-faded-2);
+  flex: 0 0 auto;
+}
+.er-scrapbook-drawer-open:hover,
+.er-scrapbook-drawer-open:focus-visible {
+  color: var(--er-proof-blue);
+  border-color: var(--er-proof-blue);
 }
 
-.er-scrapbook-drawer-open:hover,
-.er-scrapbook-drawer-open:focus {
-  border-bottom-color: var(--er-red-pencil);
-  outline: none;
+.er-scrapbook-drawer-toggle {
+  margin-left: auto;
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--er-ink-soft);
+  background: transparent;
+  border: 1px solid var(--er-faded-2);
+  padding: 0.3rem 0.7rem;
+  border-radius: 2px;
+  cursor: pointer;
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  flex: 0 0 auto;
 }
+.er-scrapbook-drawer-toggle:hover {
+  border-color: var(--er-red-pencil);
+  color: var(--er-red-pencil);
+}
+.er-scrapbook-drawer-toggle .chev { transition: transform 200ms; }
+body[data-drawer="open"] .er-scrapbook-drawer-toggle .chev { transform: rotate(180deg); }
 
 .er-scrapbook-drawer-body {
+  flex: 1 1 auto;
   overflow-y: auto;
-  padding: 6px 14px 14px;
+  padding: var(--er-space-3) var(--er-space-4);
+  background: var(--er-paper-2);
 }
 
 .er-scrapbook-drawer-secret {
-  margin-top: 14px;
-  padding-top: 10px;
+  margin-top: var(--er-space-3);
+  padding-top: var(--er-space-2);
   border-top: 1px dashed var(--er-faded-2);
 }
-
 .er-scrapbook-drawer-secret-head {
-  margin: 0 0 6px;
+  margin: 0 0 var(--er-space-1);
   font-family: var(--er-font-mono);
-  font-size: 9px;
+  font-size: 0.6rem;
   letter-spacing: 0.12em;
   color: var(--er-faded);
   text-transform: uppercase;
 }
 
+/* The scrap-row visuals work as-is inside the drawer body. The card
+ * layout from the mockup is reserved for Dispatch E (scrapbook index
+ * rewrite); the drawer keeps using the existing row component to avoid
+ * a multi-surface refactor inside this dispatch. */
 .er-scrapbook-drawer .scrap {
   border-bottom-color: var(--er-paper-2);
 }
 
-@media (max-width: 900px) {
-  /* On narrow screens the marginalia drawer already collapses; the
-     scrapbook drawer follows the same rule rather than fighting for
-     viewport space. Operators can still reach the standalone viewer
-     via the er-strip or page-link footer. */
-  .er-scrapbook-drawer {
-    display: none;
+/* The page must clear the drawer so the scrapbook handle never covers
+ * content. body padding-bottom adjusts based on drawer state. */
+body:has(.er-scrapbook-drawer) {
+  padding-bottom: calc(var(--er-drawer-h) + var(--er-space-2));
+}
+body[data-drawer="open"]:has(.er-scrapbook-drawer) {
+  padding-bottom: calc(var(--er-drawer-h-x) + var(--er-space-2));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .er-scrapbook-drawer,
+  .er-scrapbook-drawer-toggle .chev {
+    transition: none;
   }
 }
 
@@ -3121,18 +3207,15 @@ body.er-focus-mode .er-outline-tab {
    * for a follow-up dispatch (B) if we want to bring it back; the
    * single-column stack is the mobile experience for now. */
 
-  /* Scrapbook drawer collapses similarly. Default: header-only at the
-   * bottom. Expanded: max-height: 50vh as before. */
-  [data-review-ui="longform"] .er-scrapbook-drawer {
-    width: 100%;
-    max-width: none;
-    max-height: 3rem;
-    transition: max-height 150ms ease;
-  }
-
-  [data-review-ui="longform"] .er-scrapbook-drawer[aria-expanded="true"] {
-    max-height: 50vh;
-  }
+  /* Scrapbook drawer (Dispatch D): the bottom-anchored drawer is now
+   * the primary scrapbook surface and remains visible at narrow widths.
+   * The shared transition + height variables are defined in the main
+   * .er-scrapbook-drawer block; the peek line truncates via
+   * text-overflow: ellipsis when the viewport gets tight. The legacy
+   * mobile-specific aria-expanded override (max-height 3rem / 50vh) was
+   * removed because the new mechanism uses body[data-drawer], not
+   * aria-expanded on the aside, and the shared height transition is
+   * already viewport-friendly. */
 
   /* Strip elements drop to essentials: back link + state stamp + ? for
    * shortcuts. Edit / filed / version slot all hide. */

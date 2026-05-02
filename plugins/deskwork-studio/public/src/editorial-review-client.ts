@@ -1819,51 +1819,108 @@ export function initEditorialReview(): void {
   // The drawer is server-rendered, so we can bind on first boot and
   // skip re-binding (the drawer doesn't lazy-render new image rows).
   initScrapbookLightbox(document);
-  // Issue 11: at <48rem the marginalia + scrapbook drawers collapse to
-  // header-only and expand on tap. Initialize the toggle handlers; on
-  // wider viewports the click handler is a no-op so desktop behavior
-  // stays unchanged.
-  initMobileDrawerToggles();
+  // Issue #154 Dispatch D: the scrapbook drawer is a real bottom-
+  // anchored drawer. Click the handle (or focus + Enter/Space) to
+  // toggle body[data-drawer]; CSS owns the height transition.
+  initScrapbookDrawerToggle();
+  // Issue 11 marginalia mobile toggle still applies at <48rem — the
+  // scrapbook drawer's bottom-anchor mechanism replaces the legacy
+  // shared mobile pattern, so this handler now only wires marginalia.
+  initMobileMarginaliaToggle();
 }
 
 /**
- * Issue 11 mobile-drawer wiring.
+ * Issue #154 Dispatch D — scrapbook drawer toggle.
  *
- * At <48rem the longform review surface collapses the marginalia +
- * scrapbook-drawer asides to header-only. Tapping the header toggles
- * `aria-expanded` on the aside; CSS rules pick up the attribute and
- * animate the height. On wider viewports the click handler returns
- * early so desktop interactions (margin-note composer, scrapbook
- * scrolling) are unaffected.
+ * The drawer is collapsed by default; clicking the handle (or pressing
+ * Enter/Space when the header has focus) expands it. The state lives
+ * on `body[data-drawer]` so the CSS height transition (4rem ↔ 22rem)
+ * is the single source of truth for the visual state. The handle's
+ * `aria-expanded` and the toggle button's "Expand"/"Collapse" label
+ * are kept in sync for AT users.
  *
- * Additive — does not bind any new behavior outside of the mobile
- * breakpoint. The aria-expanded attribute is initialized to "false"
- * server-render-friendly via this client; CSS defaults the closed
- * state regardless.
+ * Edge case: the standalone-viewer link `a.er-scrapbook-drawer-open`
+ * lives inside the handle. Its inline `event.stopPropagation()`
+ * prevents the handle's click handler from firing when the operator
+ * clicks "open viewer ↗"; the same belt-and-braces guard checks the
+ * click target so descendant interactive controls (the toggle button,
+ * the link) handle their own behavior without double-firing.
  */
-function initMobileDrawerToggles(): void {
+function initScrapbookDrawerToggle(): void {
+  function setDrawerState(open: boolean): void {
+    document.body.dataset.drawer = open ? 'open' : 'closed';
+    const handle = document.querySelector<HTMLElement>(
+      '.er-scrapbook-drawer-handle[data-drawer-toggle]',
+    );
+    if (handle) handle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    const label = document.querySelector<HTMLElement>('[data-toggle-label]');
+    if (label) label.textContent = open ? 'Collapse' : 'Expand';
+  }
+
+  // Default closed — only initialize if not already set (allows future
+  // hydration paths to preserve a server-rendered open state).
+  if (document.body.dataset.drawer === undefined) {
+    document.body.dataset.drawer = 'closed';
+  }
+
+  const togglers = document.querySelectorAll<HTMLElement>('[data-drawer-toggle]');
+  togglers.forEach((el) => {
+    el.addEventListener('click', (ev) => {
+      // The header carries data-drawer-toggle AND wraps the toggle
+      // button + viewer link. Don't double-fire when the user clicked
+      // the inner button or link — they handle their own behavior.
+      if (
+        el.tagName === 'HEADER' &&
+        (ev.target as Element).closest(
+          '.er-scrapbook-drawer-toggle, .er-scrapbook-drawer-open',
+        )
+      ) {
+        return;
+      }
+      const next = document.body.dataset.drawer !== 'open';
+      setDrawerState(next);
+    });
+    if (el.tagName === 'HEADER') {
+      el.addEventListener('keydown', (ev) => {
+        const ke = ev as KeyboardEvent;
+        if (ke.key === 'Enter' || ke.key === ' ') {
+          ev.preventDefault();
+          const next = document.body.dataset.drawer !== 'open';
+          setDrawerState(next);
+        }
+      });
+    }
+  });
+}
+
+/**
+ * Issue 11 mobile marginalia wiring.
+ *
+ * At <48rem the longform review surface collapses the marginalia
+ * aside to header-only. Tapping the header toggles `aria-expanded`
+ * on the aside; CSS rules pick up the attribute and animate the
+ * height. On wider viewports the click handler returns early so
+ * desktop interactions (margin-note composer) are unaffected.
+ *
+ * Pre-Dispatch-D this also handled the scrapbook drawer; the new
+ * bottom-anchored drawer has its own toggle (initScrapbookDrawerToggle).
+ */
+function initMobileMarginaliaToggle(): void {
   const isMobile = (): boolean =>
     window.matchMedia('(max-width: 48rem)').matches;
 
-  const pairs: Array<{ aside: string; head: string }> = [
-    { aside: '.er-marginalia', head: '.er-marginalia-head' },
-    { aside: '.er-scrapbook-drawer', head: '.er-scrapbook-drawer-head' },
-  ];
-
-  for (const { aside: asideSel, head: headSel } of pairs) {
-    const aside = document.querySelector<HTMLElement>(asideSel);
-    if (!aside) continue;
-    if (!aside.hasAttribute('aria-expanded')) {
-      aside.setAttribute('aria-expanded', 'false');
-    }
-    const head = aside.querySelector<HTMLElement>(headSel);
-    if (!head) continue;
-    head.addEventListener('click', () => {
-      if (!isMobile()) return;
-      const expanded = aside.getAttribute('aria-expanded') === 'true';
-      aside.setAttribute('aria-expanded', expanded ? 'false' : 'true');
-    });
+  const aside = document.querySelector<HTMLElement>('.er-marginalia');
+  if (!aside) return;
+  if (!aside.hasAttribute('aria-expanded')) {
+    aside.setAttribute('aria-expanded', 'false');
   }
+  const head = aside.querySelector<HTMLElement>('.er-marginalia-head');
+  if (!head) return;
+  head.addEventListener('click', () => {
+    if (!isMobile()) return;
+    const expanded = aside.getAttribute('aria-expanded') === 'true';
+    aside.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+  });
 }
 
 initEditorialReview();

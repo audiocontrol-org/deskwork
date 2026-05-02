@@ -92,7 +92,8 @@ describe('review page — scrapbook drawer (Phase 16c)', () => {
 
     // Drawer chrome is present.
     expect(r.html).toContain('data-scrapbook-drawer');
-    expect(r.html).toContain('§ Scrapbook');
+    // Dispatch D wraps the § sigil in <em> for typographic emphasis.
+    expect(r.html).toContain('<em>§</em> Scrapbook');
     expect(r.html).toContain('2 items');
 
     // The standalone-viewer "open" link points at the right path.
@@ -137,7 +138,8 @@ describe('review page — scrapbook drawer (Phase 16c)', () => {
     expect(r.html).toContain(`href="/dev/scrapbook/wc/${slug}"`);
     // The drawer chrome still renders so the operator sees the
     // affordance for this node.
-    expect(r.html).toContain('§ Scrapbook');
+    // Dispatch D wraps the § sigil in <em> for typographic emphasis.
+    expect(r.html).toContain('<em>§</em> Scrapbook');
   });
 
   it('separates secret items into their own subsection', async () => {

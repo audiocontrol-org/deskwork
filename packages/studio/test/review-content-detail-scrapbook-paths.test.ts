@@ -175,7 +175,8 @@ describe('review + content-detail — scrapbook paths via content index (#34 fol
 
     // Drawer chrome present + reports the right count.
     expect(r.html).toContain('data-scrapbook-drawer');
-    expect(r.html).toContain('§ Scrapbook');
+    // Dispatch D wraps the § sigil in <em> for typographic emphasis.
+    expect(r.html).toContain('<em>§</em> Scrapbook');
     expect(r.html).toContain('2 items');
 
     // Item filenames appear in the drawer body.
