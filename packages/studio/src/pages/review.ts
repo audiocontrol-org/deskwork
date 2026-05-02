@@ -200,6 +200,25 @@ function pendingSkillCmd(workflow: DraftWorkflowItem): string {
   return '';
 }
 
+/**
+ * Wrap an action button in a `.er-shortcut-chip-wrap` span carrying a
+ * small chord chip beneath the button. The chord style mirrors the
+ * shortcuts modal's verbatim two-tap rendering (e.g. `<kbd>a</kbd>
+ * <kbd>a</kbd>` for approve) — the destructive-shortcut UX, post-#108,
+ * is bare-letter double-tap (no Cmd/Ctrl modifier; verified in the
+ * keybinding handler at editorial-review-client.ts).
+ *
+ * The chip is hidden on narrow viewports via the cross-surface CSS
+ * media query — the wrap stays in the markup at every breakpoint so
+ * the column flex it triggers (`.er-strip-right > *:has(.er-shortcut-chip)`)
+ * is consistent with the chip's visibility state.
+ *
+ * Issue 5 — keyboard-shortcut chips on action buttons.
+ */
+function shortcutChipWrap(buttonHtml: string, letter: 'a' | 'i' | 'r'): string {
+  return html`<span class="er-shortcut-chip-wrap">${unsafe(buttonHtml)}<small class="er-shortcut-chip"><kbd>${letter}</kbd><kbd>${letter}</kbd></small></span>`;
+}
+
 function renderControlsRight(workflow: DraftWorkflowItem): RawHtml {
   const isActive = workflow.state === 'open' || workflow.state === 'in-review';
   const isApproved = workflow.state === 'approved';
@@ -208,15 +227,36 @@ function renderControlsRight(workflow: DraftWorkflowItem): RawHtml {
   const buttons: string[] = [];
   buttons.push(html`<button class="er-btn er-btn-small" data-action="toggle-edit" type="button">Edit</button>`);
   if (isActive) {
-    buttons.push(html`<button class="er-btn er-btn-small er-btn-approve" data-action="approve" type="button">Approve</button>`);
-    buttons.push(html`<button class="er-btn er-btn-small" data-action="iterate" type="button">Iterate</button>`);
-    buttons.push(html`<button class="er-btn er-btn-small er-btn-reject" data-action="reject" type="button">Reject</button>`);
+    // Issue 5 — wrap each destructive action button with its chord chip.
+    buttons.push(
+      shortcutChipWrap(
+        html`<button class="er-btn er-btn-small er-btn-approve" data-action="approve" type="button">Approve</button>`,
+        'a',
+      ),
+    );
+    buttons.push(
+      shortcutChipWrap(
+        html`<button class="er-btn er-btn-small" data-action="iterate" type="button">Iterate</button>`,
+        'i',
+      ),
+    );
+    buttons.push(
+      shortcutChipWrap(
+        html`<button class="er-btn er-btn-small er-btn-reject" data-action="reject" type="button">Reject</button>`,
+        'r',
+      ),
+    );
   }
   if (isApproved) {
     const applyCmd = pendingSkillCmd(workflow);
     buttons.push(html`<span class="er-pending-state">awaiting apply…</span>`);
     buttons.push(html`<button class="er-btn er-btn-small" data-action="copy-cmd" data-cmd="${applyCmd}" title="Copy ${applyCmd} to clipboard" type="button">copy <code>/deskwork:approve</code></button>`);
-    buttons.push(html`<button class="er-btn er-btn-small er-btn-reject" data-action="reject" type="button">Reject</button>`);
+    buttons.push(
+      shortcutChipWrap(
+        html`<button class="er-btn er-btn-small er-btn-reject" data-action="reject" type="button">Reject</button>`,
+        'r',
+      ),
+    );
   }
   if (isIterating) {
     const iterateCmd = pendingSkillCmd(workflow);

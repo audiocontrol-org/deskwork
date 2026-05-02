@@ -399,3 +399,23 @@
 #draft-body[contenteditable='true']:focus-visible {
   outline: none;
 }
+
+/* ---------- Longform review refinement (Phase 2 follow-up — Issue 5) ---------- */
+/*
+ * Strip-local micro-spacing companion to the cross-surface chip rules
+ * in editorial-review.css. The shortcut chip lives inside a
+ * `.er-shortcut-chip-wrap` element added to the strip-right markup;
+ * make each wrapper a column flex so the chip stacks under its
+ * button rather than wrapping to an awkward sibling row.
+ */
+[data-review-ui="longform"] .er-strip-right > * {
+  align-self: center;
+}
+
+[data-review-ui="longform"] .er-strip-right > *:has(.er-shortcut-chip) {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--er-space-0);
+  margin-bottom: 0;
+}

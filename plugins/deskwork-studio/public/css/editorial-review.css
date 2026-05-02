@@ -3045,3 +3045,63 @@ body.er-focus-mode .er-outline-tab {
   font-weight: 500;
   margin-right: 0.1em;
 }
+
+/* ---------- Longform review refinement (Phase 2 follow-up — Issue 5) ---------- */
+/*
+ * ISSUE 5 — inline keyboard-shortcut chips on action buttons.
+ *
+ * The strip's `.er-strip-right` carries Approve/Iterate/Reject during
+ * non-terminal workflow states. Each gets a small kbd chip tucked
+ * beside (or beneath, when the strip-right wrap kicks in) the button.
+ * Reuses the existing `.er-strip-hint kbd` treatment — same monospace,
+ * same dim color — so the chips read as peripheral hints, not
+ * competing controls.
+ *
+ * IMPORTANT — chord style: the design doc speculated `⌘+A` chord style
+ * post-#108 fix. The actual #108 fix is a TWO-TAP bare letter sequence
+ * (`a a` within 500ms), confirmed by reading the keybinding handler:
+ * the listener bails on `metaKey || ctrlKey || altKey`, then matches
+ * bare `ev.key === 'a' | 'i' | 'r'`. The shortcuts modal already
+ * documents this verbatim as `<kbd>a</kbd> <kbd>a</kbd>` — chips
+ * mirror that style so the on-strip hint and the modal stay in sync.
+ *
+ * The chip lives in a `.er-shortcut-chip-wrap` wrapper; the markup
+ * adds it (see review.ts `renderControlsRight`). The companion
+ * micro-spacing rule in review-viewport.css turns each wrapper into a
+ * column flex so the chip stacks beneath the button cleanly.
+ */
+[data-review-ui="longform"] .er-shortcut-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--er-space-0);
+  margin-left: var(--er-space-0);
+  font-family: var(--er-font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  color: var(--er-faded);
+  white-space: nowrap;
+  text-transform: none;
+  vertical-align: middle;
+}
+
+[data-review-ui="longform"] .er-shortcut-chip kbd {
+  font-family: var(--er-font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.04em;
+  padding: 0.05rem 0.3rem;
+  border: 1px solid var(--er-paper-3);
+  border-radius: 2px;
+  color: var(--er-ink-soft);
+  background: var(--er-paper);
+  line-height: 1.2;
+  font-weight: 500;
+}
+
+@media (max-width: 60rem) {
+  /* On narrow viewports the strip already drops the inline hint
+   * (line 1090). Drop the per-button shortcut chips too — they
+   * crowd the button row. The shortcuts modal stays available. */
+  [data-review-ui="longform"] .er-shortcut-chip {
+    display: none;
+  }
+}
