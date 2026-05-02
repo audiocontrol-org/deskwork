@@ -2826,3 +2826,18 @@ body.er-focus-mode .er-outline-tab {
     transition: none;
   }
 }
+
+/* ---------- Longform review refinement (Issue 8) ---------- */
+/* ISSUE 8 — suppress the studio folio header on the longform review surface.
+ * The er-strip already provides back-to-studio + galley/slug/actions.
+ * Keeping both means two navigations stacking at the top of the viewport
+ * with the strip overlapping the folio by ~12px. Hide the folio so the
+ * strip is the canonical chrome on this surface (matching the existing
+ * pattern that suppresses the host site's .header-wrapper).
+ *
+ * Cross-surface navigation links (Index / Dashboard / Content / Shortform /
+ * Manual) remain reachable via the strip's `← studio` back-link → the
+ * dashboard's own folio. */
+[data-review-ui="longform"] .er-folio {
+  display: none;
+}
