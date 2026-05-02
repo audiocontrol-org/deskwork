@@ -3007,3 +3007,24 @@ body.er-focus-mode .er-outline-tab {
     transform: rotate(-1deg);  /* slightly less rotation at this scale */
   }
 }
+
+/* ---------- Longform review refinement (Phase 2 follow-up — Issue 1) ---------- */
+/*
+ * ISSUE 1 — decision strip: hide the redundant filed-applied echo.
+ *
+ * `.er-pending-state--filed` lives next to the action buttons and was
+ * designed to signal the post-completion state. But the big rubber
+ * stamp already says "applied" right beside it; the pill is pure echo
+ * in the steady state. Other variants (`.er-pending-state`,
+ * `.er-pending-state--iterating`, etc.) keep their job — they signal
+ * that an agent /deskwork:* invocation is still pending and the
+ * "copy /deskwork:..." button still applies. Only the post-skill,
+ * post-completion variant is muted.
+ *
+ * CSS-only path per the design doc — leaves the markup so the pill is
+ * still in the accessibility tree but visually hidden. No risk of
+ * regressing the iterating / approved variants.
+ */
+[data-review-ui="longform"] .er-pending-state--filed {
+  display: none;
+}
