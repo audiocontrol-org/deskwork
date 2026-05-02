@@ -361,24 +361,53 @@ function renderMarginalia(): RawHtml {
     </aside>`);
 }
 
-function renderEditMode(outlineHasContent: boolean): RawHtml {
+/**
+ * Issue #154 Dispatch C — the edit-mode chrome was previously a single
+ * `.er-edit-mode` block rendered inside `.er-draft-frame` (below
+ * `#draft-body`). With the page-grid in place, the natural layout is:
+ *
+ *   - the toolbar (Source/Split/Preview tabs + Outline/Focus/Save/
+ *     Cancel actions) sticks above `.er-page`, replacing the strip's
+ *     right-side action buttons;
+ *   - the source/preview panes take over the article column where
+ *     `#draft-body` was.
+ *
+ * `renderEditToolbar` emits the bar that lives ABOVE `.er-page`; the
+ * client toggles its `[hidden]` attribute on enter/exit. Keeps
+ * `data-edit-toolbar` on the wrapper so `editorial-review-client.ts`'s
+ * existing `q('[data-edit-toolbar]')` lookup keeps working.
+ */
+function renderEditToolbar(outlineHasContent: boolean): RawHtml {
   const outlineBtnAttrs = outlineHasContent ? '' : ' hidden';
   return unsafe(html`
-    <div class="er-edit-mode" data-edit-toolbar hidden>
-      <div class="er-edit-chrome">
-        <div class="er-edit-modes" role="tablist" aria-label="Editor mode">
-          <button class="er-edit-mode-btn" data-edit-view="source" type="button" aria-pressed="true">Source</button>
-          <button class="er-edit-mode-btn" data-edit-view="split" type="button" aria-pressed="false">Split</button>
-          <button class="er-edit-mode-btn" data-edit-view="preview" type="button" aria-pressed="false">Preview</button>
-        </div>
-        <div class="er-edit-actions">
-          <button class="er-btn er-btn-small" data-action="outline-drawer" type="button" title="Show the outline for reference (O)" aria-pressed="false"${unsafe(outlineBtnAttrs)}>Outline ↗</button>
-          <button class="er-btn er-btn-small" data-action="focus-mode" type="button" title="Distraction-free mode (Shift+F)" aria-pressed="false">Focus ⛶</button>
-          <button class="er-btn er-btn-primary" data-action="save-version" type="button">Save as new version</button>
-          <button class="er-btn" data-action="cancel-edit" type="button">Cancel</button>
-          <span class="er-edit-hint" data-edit-hint></span>
-        </div>
+    <div class="er-edit-toolbar" data-edit-toolbar hidden>
+      <div class="er-edit-modes" role="tablist" aria-label="Editor mode">
+        <button class="er-edit-mode-btn" data-edit-view="source" type="button" aria-pressed="true">Source</button>
+        <button class="er-edit-mode-btn" data-edit-view="split" type="button" aria-pressed="false">Split</button>
+        <button class="er-edit-mode-btn" data-edit-view="preview" type="button" aria-pressed="false">Preview</button>
       </div>
+      <div class="er-edit-actions">
+        <button class="er-btn er-btn-small" data-action="outline-drawer" type="button" title="Show the outline for reference (O)" aria-pressed="false"${unsafe(outlineBtnAttrs)}>Outline ↗</button>
+        <button class="er-btn er-btn-small" data-action="focus-mode" type="button" title="Distraction-free mode (Shift+F)" aria-pressed="false">Focus ⛶</button>
+        <button class="er-btn er-btn-primary" data-action="save-version" type="button">Save as new version</button>
+        <button class="er-btn" data-action="cancel-edit" type="button">Cancel</button>
+        <span class="er-edit-hint" data-edit-hint></span>
+      </div>
+    </div>`);
+}
+
+/**
+ * Issue #154 Dispatch C — the source/preview panes (and supporting
+ * focus-mode affordances + backing textarea) live inside the article
+ * column, replacing `#draft-body`. The wrapper keeps the
+ * `er-edit-mode` class so existing CSS (panes-host paper-2 background,
+ * focus-mode full-viewport canvas) cascades unchanged. Adds
+ * `data-edit-panes-host` so the client can flip `[hidden]` on the
+ * panes wrapper independently of the toolbar.
+ */
+function renderEditPanes(): RawHtml {
+  return unsafe(html`
+    <div class="er-edit-mode" data-edit-panes-host hidden>
       <div class="er-edit-panes" data-edit-panes data-view="source">
         <div class="er-edit-source" data-edit-source aria-label="Markdown source"></div>
         <div class="er-edit-preview" data-edit-preview aria-label="Rendered preview"></div>
@@ -568,13 +597,20 @@ export async function renderReviewPage(
   // workflow on shortform), so the page collapses to the draft frame
   // alone for that surface — keeping the same `.er-page` shell
   // preserves the desk metaphor across longform/shortform.
+  // Issue #154 Dispatch C — edit-mode panes-host lives inside the
+  // article column (in place of #draft-body when editing); the
+  // toolbar that drives it lives ABOVE `.er-page` (rendered below,
+  // outside the grid). Shortform never enters edit mode on this
+  // surface, so the panes-host is rendered but stays hidden — keeps
+  // the JS hooks present for forward compatibility without flipping
+  // any visible chrome.
   const pageGrid = isShortform
     ? html`
         <div class="er-page-grid">
           <div class="er-draft-frame">
             <div id="draft-body" data-draft-body
               title="Double-click to edit · select text to leave a margin note">${unsafe(bodyHtml)}</div>
-            ${renderEditMode(outlineHtml.length > 0)}
+            ${renderEditPanes()}
           </div>
         </div>`
     : html`
@@ -582,7 +618,7 @@ export async function renderReviewPage(
           <div class="er-draft-frame">
             <div id="draft-body" data-draft-body
               title="Double-click to edit · select text to leave a margin note">${unsafe(bodyHtml)}</div>
-            ${renderEditMode(outlineHtml.length > 0)}
+            ${renderEditPanes()}
           </div>
           <div class="er-page-gutter" aria-hidden="true"></div>
           ${renderMarginalia()}
@@ -607,6 +643,7 @@ export async function renderReviewPage(
           ${renderControlsRight(workflow)}
         </div>
       </div>
+      ${renderEditToolbar(outlineHtml.length > 0)}
       <article class="er-page">
         ${unsafe(pageGrid)}
       </article>

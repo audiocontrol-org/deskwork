@@ -118,7 +118,12 @@ export function initEditorialReview(): void {
 
   const draftBody = q<HTMLElement>('#draft-body');
   const draftEdit = q<HTMLTextAreaElement>('#draft-edit');
+  // Issue #154 Dispatch C — the edit chrome is now split into two
+  // wrappers so the toolbar can sit above `.er-page` while the panes
+  // continue to render inside the article column. Both flip [hidden]
+  // together on every enter/exit transition.
   const editToolbar = q<HTMLElement>('[data-edit-toolbar]');
+  const editPanesHost = q<HTMLElement>('[data-edit-panes-host]');
   const editHint = q<HTMLElement>('[data-edit-hint]');
   const addBtn = q<HTMLButtonElement>('[data-add-comment-btn]');
   const composer = q<HTMLElement>('[data-comment-composer]');
@@ -1063,6 +1068,7 @@ export function initEditorialReview(): void {
 
     draftEdit.value = sourceMarkdown;
     editToolbar.hidden = false;
+    editPanesHost.hidden = false;
     draftBody.classList.add('hidden');
     toggleBtn.textContent = 'View';
     // Issue 7 — flip the disclosure label to "source" while the source
@@ -1224,6 +1230,7 @@ export function initEditorialReview(): void {
     // "Outline ↗" button is tied to the edit chrome so it
     // naturally disappears with editToolbar.hidden = true above.
     editToolbar.hidden = true;
+    editPanesHost.hidden = true;
     draftBody.classList.remove('hidden');
     toggleBtn.textContent = 'Edit';
     // Issue 7 — flip the disclosure label back to "preview" alongside

@@ -1762,7 +1762,17 @@ body:has([data-review-ui="longform"]) .essay-header {
 /* Edit-mode shell — CodeMirror 6 source editor plus a live preview
  * pane, toggled via Source / Split / Preview. The mounted CM instance
  * is themed in the editor module (editorial-review-editor.ts); this
- * block wires the layout chrome around it. */
+ * block wires the layout chrome around it.
+ *
+ * Issue #154 Dispatch C reorganised the chrome:
+ *   - `.er-edit-toolbar` (the bar with Source/Split/Preview tabs +
+ *     action buttons) is rendered ABOVE `.er-page`, sticky under the
+ *     strip. It replaces the strip's right-side action buttons during
+ *     edit mode.
+ *   - `.er-edit-mode` is now strictly the panes-host (panes + the
+ *     focus-mode affordances), rendered inside `.er-draft-frame` in
+ *     place of `#draft-body`.
+ */
 
 .er-edit-mode {
   background: var(--er-paper-2);
@@ -1784,6 +1794,34 @@ body:has(.er-edit-mode:not([hidden])) .essay-body-wrap {
   grid-template-columns: 1fr !important;
 }
 body:has(.er-edit-mode:not([hidden])) .toc {
+  display: none;
+}
+
+/* ---------- Dispatch C (#154) — edit-mode toolbar above .er-page ---------- */
+/* Sit between the strip and the page, full-width within the page's
+ * outer container. Sticky so the toolbar stays visible while the
+ * source/preview panes scroll inside the article column. The strip is
+ * fixed at top:var(--er-folio-h) with ~3.2rem height (matching the
+ * body padding-top calc above), so the toolbar parks just below it. */
+.er-edit-toolbar {
+  position: sticky;
+  top: calc(var(--er-folio-h) + 3.2rem);
+  z-index: 35;
+  background: var(--er-paper-2);
+  border-bottom: 1px dashed var(--er-faded-2);
+  padding: var(--er-space-2) var(--er-space-3);
+  margin: 0 auto var(--er-space-2);
+  max-width: var(--er-page-max);
+  display: flex;
+  gap: var(--er-space-2);
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+/* Hide the strip's right-side action buttons while edit mode is
+ * active — the toolbar above the page replaces them. */
+body:has(.er-edit-toolbar:not([hidden])) .er-strip-right {
   display: none;
 }
 
@@ -2007,7 +2045,8 @@ body.er-focus-mode .header-wrapper,
 body.er-focus-mode .site-footer,
 body.er-focus-mode .essay-header,
 body.er-focus-mode .essay-hero-image,
-body.er-focus-mode .er-edit-chrome {
+body.er-focus-mode .er-edit-chrome,
+body.er-focus-mode .er-edit-toolbar {
   display: none !important;
 }
 
