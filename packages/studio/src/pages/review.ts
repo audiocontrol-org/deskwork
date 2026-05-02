@@ -520,17 +520,19 @@ export async function renderReviewPage(
         ${renderEditMode(outlineHtml.length > 0)}
       </div>
       <div class="er-strip">
-        <a class="er-strip-back" href="/dev/editorial-studio" title="Back to the editorial studio">← studio</a>
-        <span class="er-strip-galley">Galley <em>№ ${currentVersion.version}</em></span>
-        <span class="er-strip-slug">${workflow.site} / ${workflow.slug}</span>
-        ${renderVersionsStrip(versions, resolvedSite, contentKind, currentVersion)}
-        <span class="er-strip-center">
-          <span class="er-stamp er-stamp-big er-stamp-${workflow.state}" data-state-label>
-            ${stateLabel(workflow.state)}
+        <div class="er-strip-inner">
+          <a class="er-strip-back" href="/dev/editorial-studio" title="Back to the editorial studio">← studio</a>
+          <span class="er-strip-galley">Galley <em>№ ${currentVersion.version}</em></span>
+          <span class="er-strip-slug">${workflow.site} / ${workflow.slug}</span>
+          ${renderVersionsStrip(versions, resolvedSite, contentKind, currentVersion)}
+          <span class="er-strip-center">
+            <span class="er-stamp er-stamp-big er-stamp-${workflow.state}" data-state-label>
+              ${stateLabel(workflow.state)}
+            </span>
+            <span class="er-strip-hint" aria-hidden="true">select text to mark · double-click to edit · <kbd>?</kbd> for shortcuts</span>
           </span>
-          <span class="er-strip-hint" aria-hidden="true">select text to mark · double-click to edit · <kbd>?</kbd> for shortcuts</span>
-        </span>
-        ${renderControlsRight(workflow)}
+          ${renderControlsRight(workflow)}
+        </div>
       </div>
       ${renderMarginalia()}
       <button class="er-pencil-btn" data-add-comment-btn hidden type="button">Mark</button>

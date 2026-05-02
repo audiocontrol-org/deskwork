@@ -2855,3 +2855,32 @@ body.er-focus-mode .er-outline-tab {
 [data-review-ui="longform"] .er-marginalia {
   bottom: calc(45vh + var(--er-space-3));
 }
+
+/* ISSUE 10 — cap the strip's inner content width so elements don't
+ * float in awkward whitespace at wide viewports. The strip itself
+ * stays full-bleed (background spans the viewport, registration
+ * marks at the left edge); the inner flex container is capped at
+ * --er-container-wide and centered.
+ *
+ * The wrapper element (`.er-strip-inner`) is added by the strip
+ * renderer in packages/studio/src/pages/review.ts so the cap can be
+ * applied without altering the outer strip's full-bleed background +
+ * ::before registration mark. */
+[data-review-ui="longform"] .er-strip-inner {
+  max-width: var(--er-container-wide);
+  margin-inline: auto;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--er-space-3);
+  flex-wrap: wrap;
+}
+
+/* When strip-inner is missing (no markup adjustment yet), fall back
+ * to capping the strip's flex layout via a broader rule. Harmless
+ * if the wrapper is present. */
+@media (min-width: 90rem) {
+  [data-review-ui="longform"] .er-strip:not(:has(.er-strip-inner)) {
+    padding-inline: max(var(--er-space-3), calc((100% - var(--er-container-wide)) / 2));
+  }
+}
