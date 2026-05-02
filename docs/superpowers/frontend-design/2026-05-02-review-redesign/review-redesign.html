@@ -1,0 +1,1411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>review surface — redesign — deskwork</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..900,0..100;1,9..144,300..900,0..100&family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+/* ================================================================
+   review surface — redesign mockup
+   addresses issue #154 (1)–(5)
+   tokens mirror plugins/deskwork-studio/public/css/editorial-review.css
+   ================================================================ */
+
+:root {
+  /* paper & ink */
+  --er-paper:    #F5F1E8;
+  --er-paper-2:  #ECE6D4;
+  --er-paper-3:  #DFD7BF;
+  --er-paper-4:  #C9BFA3;
+  --er-ink:      #1A1614;
+  --er-ink-soft: #3A332E;
+  --er-faded:    #8A7F70;
+  --er-faded-2:  #B5AC9B;
+
+  /* marking pigments */
+  --er-red-pencil:     #B8362A;
+  --er-red-soft:       #D9867A;
+  --er-proof-blue:     #2A4B7C;
+  --er-proof-blue-soft:#6E8AAF;
+  --er-highlight:      #F4D58D;
+  --er-highlight-soft: #F9E8BE;
+  --er-stamp-green:    #2E5D45;
+  --er-stamp-purple:   #5A3E5F;
+
+  /* type */
+  --er-font-display: 'Fraunces', Georgia, serif;
+  --er-font-body:    'Newsreader', Georgia, serif;
+  --er-font-mono:    'JetBrains Mono', ui-monospace, monospace;
+
+  /* rhythm */
+  --er-space-0: 0.25rem;
+  --er-space-1: 0.5rem;
+  --er-space-2: 0.875rem;
+  --er-space-3: 1.25rem;
+  --er-space-4: 1.75rem;
+  --er-space-5: 2.5rem;
+  --er-space-6: 4rem;
+
+  --er-rule-thin:  0.5px solid var(--er-ink);
+  --er-rule-med:   1px solid var(--er-ink);
+  --er-rule-heavy: 3px solid var(--er-ink);
+
+  /* page composition (the redesign) */
+  --er-page-max:        78rem;     /* outer page frame */
+  --er-page-pad-x:      var(--er-space-6);
+  --er-page-pad-y:      var(--er-space-5);
+  --er-article-col:     minmax(28rem, 42rem);
+  --er-marginalia-col:  minmax(16rem, 19rem);
+  --er-page-gap:        var(--er-space-5);
+
+  --er-folio-h:    2.4rem;
+  --er-strip-h:    3.4rem;
+  --er-drawer-h:   4rem;     /* collapsed */
+  --er-drawer-h-x: 22rem;    /* expanded */
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--er-paper-2);
+  /* desk grain */
+  background-image:
+    radial-gradient(circle at 20% 10%, rgba(184,54,42,0.025), transparent 60%),
+    radial-gradient(circle at 80% 90%, rgba(42,75,124,0.02),  transparent 50%),
+    url("data:image/svg+xml;utf8,<svg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.05 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  color: var(--er-ink);
+  font-family: var(--er-font-body);
+  font-size: 17px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+a { color: var(--er-proof-blue); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+code, kbd { font-family: var(--er-font-mono); font-size: 0.85em; }
+kbd {
+  border: 1px solid var(--er-faded-2);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  padding: 0.05rem 0.32rem;
+  background: var(--er-paper);
+  color: var(--er-ink-soft);
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+/* ============ FOLIO (issue 5: missing global nav) ============ */
+.er-folio {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: var(--er-folio-h);
+  z-index: 60;
+  background: var(--er-paper);
+  border-bottom: var(--er-rule-thin);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--er-space-3);
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+}
+.er-folio-mark {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 36, "wght" 600;
+  font-style: italic;
+  text-transform: none;
+  letter-spacing: -0.01em;
+  color: var(--er-ink);
+  font-size: 0.95rem;
+  margin-right: var(--er-space-3);
+}
+.er-folio-mark::before {
+  content: '※ ';
+  color: var(--er-red-pencil);
+  font-style: normal;
+}
+.er-folio-spine {
+  color: var(--er-ink-soft);
+  font-style: normal;
+  font-family: var(--er-font-mono);
+  letter-spacing: 0.12em;
+  margin-right: auto;
+}
+.er-folio-nav { display: flex; gap: var(--er-space-3); margin-left: auto; }
+.er-folio-nav a {
+  color: var(--er-faded);
+  text-decoration: none;
+  padding: 0.2rem 0;
+  position: relative;
+}
+.er-folio-nav a:hover { color: var(--er-ink); }
+.er-folio-nav a.active {
+  color: var(--er-red-pencil);
+}
+.er-folio-nav a.active::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 -3px 0;
+  height: 2px;
+  background: var(--er-red-pencil);
+}
+
+/* ============ STRIP — galley/version/controls ============ */
+.er-strip {
+  position: fixed;
+  top: var(--er-folio-h);
+  left: 0; right: 0;
+  height: var(--er-strip-h);
+  z-index: 50;
+  background: var(--er-paper);
+  border-bottom: var(--er-rule-med);
+  box-shadow: 0 2px 10px rgba(26,22,20,0.06);
+  display: flex;
+  align-items: center;
+}
+.er-strip-inner {
+  width: 100%;
+  max-width: var(--er-page-max);
+  margin: 0 auto;
+  padding: 0 var(--er-space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--er-space-3);
+  font-family: var(--er-font-mono);
+  font-size: 0.78rem;
+}
+.er-strip-mark { color: var(--er-red-pencil); font-size: 1.1rem; line-height: 1; }
+.er-strip-back {
+  font-family: var(--er-font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--er-ink-soft);
+  text-decoration: none;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--er-faded-2);
+  border-radius: 2px;
+  background: transparent;
+}
+.er-strip-back:hover { color: var(--er-red-pencil); border-color: var(--er-red-pencil); }
+.er-strip-galley {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 36, "wght" 500;
+  font-size: 1.05rem;
+  letter-spacing: -0.005em;
+  color: var(--er-ink);
+}
+.er-strip-galley em {
+  font-style: italic;
+  color: var(--er-ink-soft);
+  font-variation-settings: "opsz" 14, "wght" 400, "SOFT" 60;
+  margin-left: 0.2rem;
+}
+.er-strip-slug {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+}
+.er-strip-versions {
+  display: inline-flex; gap: 0;
+  border: 1px solid var(--er-faded-2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.er-strip-versions a {
+  font-family: var(--er-font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  padding: 0.2rem 0.55rem;
+  color: var(--er-faded);
+  text-decoration: none;
+  border-right: 1px solid var(--er-faded-2);
+}
+.er-strip-versions a:last-child { border-right: 0; }
+.er-strip-versions a.active {
+  background: var(--er-ink);
+  color: var(--er-paper);
+}
+.er-strip-state {
+  margin-left: auto;
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-variation-settings: "opsz" 14, "wght" 500;
+  font-size: 0.9rem;
+  color: var(--er-ink-soft);
+  padding: 0.15rem 0.55rem;
+  border: 1px dashed var(--er-faded);
+  border-radius: 2px;
+  background: var(--er-paper-2);
+}
+.er-strip-state.in-review { color: var(--er-proof-blue); border-color: var(--er-proof-blue); }
+.er-strip-state.iterating { color: var(--er-stamp-purple); border-color: var(--er-stamp-purple); }
+.er-strip-state.approved  { color: var(--er-stamp-green); border-color: var(--er-stamp-green); }
+
+.er-strip-actions { display: flex; gap: var(--er-space-1); align-items: center; }
+.er-btn {
+  font-family: var(--er-font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.32rem 0.7rem;
+  border: 1px solid var(--er-ink);
+  background: var(--er-paper);
+  color: var(--er-ink);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background 120ms, color 120ms, border-color 120ms;
+}
+.er-btn:hover { background: var(--er-ink); color: var(--er-paper); }
+.er-btn-approve { border-color: var(--er-stamp-green); color: var(--er-stamp-green); }
+.er-btn-approve:hover { background: var(--er-stamp-green); color: var(--er-paper); }
+.er-btn-iterate { border-color: var(--er-stamp-purple); color: var(--er-stamp-purple); }
+.er-btn-iterate:hover { background: var(--er-stamp-purple); color: var(--er-paper); }
+.er-btn-reject  { border-color: var(--er-red-pencil); color: var(--er-red-pencil); }
+.er-btn-reject:hover  { background: var(--er-red-pencil); color: var(--er-paper); }
+.er-shortcut-chip-wrap { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; }
+.er-shortcut-chip { font-size: 0.55rem; color: var(--er-faded); display: inline-flex; gap: 1px; }
+
+/* ============ DESK + PAGE COMPOSITION ============ */
+.er-desk {
+  /* offset below fixed chrome and above fixed drawer */
+  padding-top: calc(var(--er-folio-h) + var(--er-strip-h) + var(--er-space-4));
+  padding-bottom: calc(var(--er-drawer-h) + var(--er-space-4));
+  display: flex;
+  justify-content: center;
+}
+body[data-drawer="open"] .er-desk {
+  padding-bottom: calc(var(--er-drawer-h-x) + var(--er-space-3));
+}
+
+.er-page {
+  /* THE PAGE — a tangible single composition holding article + marginalia */
+  width: 100%;
+  max-width: var(--er-page-max);
+  margin: 0 var(--er-space-4);
+  background: var(--er-paper);
+  border: 1px solid var(--er-paper-3);
+  border-radius: 2px;
+  box-shadow:
+    0 1px 0 var(--er-paper-3),
+    0 14px 28px -10px rgba(26,22,20,0.18),
+    0 4px 8px -2px rgba(26,22,20,0.06);
+  position: relative;
+  /* a faint binding edge on the left */
+}
+.er-page::before {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0; left: -1px;
+  width: 6px;
+  background: linear-gradient(to right, var(--er-paper-4) 0%, var(--er-paper-3) 50%, transparent 100%);
+  border-right: 1px solid var(--er-paper-4);
+  pointer-events: none;
+}
+.er-page::after {
+  /* corner registration mark — faint nod to the press-check */
+  content: '+';
+  position: absolute;
+  top: 0.6rem; right: 0.8rem;
+  font-family: var(--er-font-mono);
+  font-size: 0.75rem;
+  color: var(--er-red-pencil);
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.er-page-grid {
+  display: grid;
+  grid-template-columns: var(--er-article-col) 1px var(--er-marginalia-col);
+  gap: 0 var(--er-page-gap);
+  padding: var(--er-page-pad-y) var(--er-page-pad-x);
+  align-items: start;
+}
+
+/* the gutter rule between article and marginalia — a single thin
+ * vertical line that scales with the longer column.
+ * `subgrid` would be ideal but the support story is uneven; an
+ * absolutely-positioned ::before on the marginalia side is robust. */
+.er-page-gutter {
+  position: relative;
+}
+.er-page-gutter::before {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0; left: 0;
+  width: 1px;
+  background: var(--er-paper-3);
+}
+
+/* ============ ARTICLE COLUMN ============ */
+.er-article {
+  font-family: var(--er-font-body);
+  color: var(--er-ink);
+  font-size: 1.06rem;
+  line-height: 1.62;
+  min-width: 0; /* prevent grid blowout on long lines */
+}
+.er-article h1 {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 144, "wght" 600, "SOFT" 30;
+  font-weight: 600;
+  font-size: clamp(1.9rem, 3.4vw, 2.7rem);
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  margin: 0 0 var(--er-space-2);
+  color: var(--er-ink);
+}
+.er-article h1 em {
+  font-style: italic;
+  font-variation-settings: "opsz" 144, "wght" 500, "SOFT" 80;
+  color: var(--er-ink-soft);
+}
+.er-article-dek {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 24, "wght" 350;
+  font-size: 1.18rem;
+  font-style: italic;
+  line-height: 1.45;
+  color: var(--er-ink-soft);
+  margin: 0 0 var(--er-space-4);
+  border-bottom: var(--er-rule-thin);
+  padding-bottom: var(--er-space-3);
+}
+.er-article-meta {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  margin-bottom: var(--er-space-2);
+  display: flex;
+  gap: var(--er-space-2);
+  align-items: center;
+}
+.er-article-meta .by { color: var(--er-ink-soft); }
+.er-article h2 {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 36, "wght" 600;
+  font-size: 1.45rem;
+  line-height: 1.2;
+  letter-spacing: -0.005em;
+  margin: var(--er-space-5) 0 var(--er-space-2);
+  color: var(--er-ink);
+}
+.er-article h2 em {
+  font-style: italic;
+  color: var(--er-ink-soft);
+}
+.er-article p {
+  margin: 0 0 var(--er-space-2);
+  hyphens: auto;
+}
+.er-article p:has(+ p), .er-article p + p { text-indent: 0; }
+.er-article p:first-of-type { font-size: 1.08rem; }
+
+.er-article blockquote {
+  border-left: 3px solid var(--er-red-pencil);
+  padding: 0 0 0 var(--er-space-3);
+  margin: var(--er-space-3) 0;
+  font-style: italic;
+  color: var(--er-ink-soft);
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 14, "wght" 350;
+  font-size: 1.05rem;
+}
+.er-article code { background: var(--er-paper-2); padding: 0.1em 0.35em; border-radius: 2px; }
+.er-article ul { padding-left: 1.4rem; margin: 0 0 var(--er-space-2); }
+
+/* draft-comment-highlight — annotated text in the article */
+.er-mark {
+  background: var(--er-highlight-soft);
+  border-bottom: 1.5px solid var(--er-red-pencil);
+  padding: 0.05em 0.05em;
+  cursor: pointer;
+  transition: background 140ms, box-shadow 140ms;
+  border-radius: 1px;
+}
+.er-mark:hover, .er-mark.active {
+  background: var(--er-highlight);
+  box-shadow: 0 0 0 1px rgba(184,54,42,0.4);
+}
+
+/* ============ MARGINALIA (issue 2) — anchored to the page, not the viewport ============ */
+.er-marginalia {
+  font-family: var(--er-font-display);
+  position: relative;
+  padding-top: 0.2rem;
+}
+.er-marginalia-head {
+  font-family: var(--er-font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  border-bottom: 1px solid var(--er-red-pencil);
+  padding-bottom: var(--er-space-1);
+  margin: 0 0 var(--er-space-3);
+}
+.er-marginalia-head .count {
+  float: right;
+  color: var(--er-ink-soft);
+  letter-spacing: 0.1em;
+}
+
+.er-marginalia-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: var(--er-space-3); }
+
+.er-note {
+  position: relative;
+  padding: 0 0 var(--er-space-2) var(--er-space-2);
+  border-left: 2px solid var(--er-red-pencil);
+  cursor: pointer;
+  transition: transform 180ms cubic-bezier(.2,.7,.3,1.3), border-color 180ms;
+}
+/* slight rotation per note — handwritten variety */
+.er-note:nth-child(odd)  { transform: rotate(-0.35deg); }
+.er-note:nth-child(even) { transform: rotate(0.4deg); }
+.er-note:hover, .er-note.active {
+  transform: rotate(0deg) translateX(-2px);
+  border-color: var(--er-ink);
+}
+.er-note-cat {
+  font-family: var(--er-font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--er-red-pencil);
+  margin-bottom: 0.15rem;
+}
+.er-note-cat--structural    { color: var(--er-proof-blue); }
+.er-note-cat--saas-vocabulary { color: var(--er-stamp-purple); }
+.er-note-quote {
+  font-family: var(--er-font-mono);
+  font-size: 0.72rem;
+  color: var(--er-faded);
+  border-left: 1px solid var(--er-faded-2);
+  padding-left: 0.5rem;
+  margin: 0 0 var(--er-space-1);
+  font-style: normal;
+  line-height: 1.4;
+  /* ensure long quotes truncate gracefully */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.er-note-text {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 14, "wght" 400, "SOFT" 80;
+  font-style: italic;
+  font-size: 1rem;
+  line-height: 1.45;
+  color: var(--er-ink);
+  margin: 0;
+}
+.er-note-foot {
+  margin-top: var(--er-space-1);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: var(--er-font-mono);
+  font-size: 0.6rem;
+  color: var(--er-faded);
+  letter-spacing: 0.08em;
+}
+.er-note-actions { display: flex; gap: 0.4rem; }
+.er-note-actions button {
+  background: transparent;
+  border: 0;
+  color: var(--er-faded);
+  font-family: var(--er-font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 0;
+}
+.er-note-actions button:hover { color: var(--er-red-pencil); }
+
+.er-note--resolved { opacity: 0.55; border-left-color: var(--er-faded); }
+.er-note--resolved .er-note-text { text-decoration: line-through; text-decoration-color: var(--er-faded); }
+.er-note--resolved .er-note-cat::after { content: ' · resolved'; color: var(--er-faded); font-style: italic; }
+
+/* ============ MARGINALIA COMPOSER ============ */
+.er-marginalia-composer {
+  background: var(--er-paper-2);
+  border-left: 2px solid var(--er-proof-blue);
+  padding: var(--er-space-2);
+  margin-bottom: var(--er-space-3);
+}
+.er-marginalia-composer-head {
+  font-family: var(--er-font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--er-proof-blue);
+  margin: 0 0 var(--er-space-1);
+}
+.er-marginalia-composer-quote {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  border-left: 1px solid var(--er-faded);
+  padding-left: 0.5rem;
+  color: var(--er-ink-soft);
+  margin-bottom: var(--er-space-1);
+}
+.er-marginalia-composer textarea {
+  width: 100%;
+  min-height: 5rem;
+  border: 1px solid var(--er-faded-2);
+  background: var(--er-paper);
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-size: 1rem;
+  padding: 0.5rem;
+  color: var(--er-ink);
+}
+.er-marginalia-composer select {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  border: 1px solid var(--er-faded-2);
+  background: var(--er-paper);
+  padding: 0.2rem 0.4rem;
+  margin-bottom: var(--er-space-1);
+}
+.er-marginalia-composer-actions { display: flex; gap: var(--er-space-1); margin-top: var(--er-space-1); justify-content: flex-end; }
+
+/* ============ EDIT MODE (issue 1) ============ */
+/* edit mode swaps the article column for source/preview while keeping
+ * the marginalia gutter intact and moving the toolbar to a bar above
+ * the page (where the strip's right side previously displayed Edit) */
+body[data-mode="edit"] .er-strip-actions { display: none; }
+body[data-mode="edit"] .er-strip-state::after { content: ' · editing'; color: var(--er-stamp-purple); }
+body[data-mode="edit"] .er-article { display: none; }
+body[data-mode="edit"] .er-edit-pane { display: flex; }
+
+.er-edit-pane {
+  display: none;
+  flex-direction: column;
+  gap: var(--er-space-2);
+  font-family: var(--er-font-mono);
+  min-width: 0;
+}
+.er-edit-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--er-space-2);
+  padding-bottom: var(--er-space-2);
+  border-bottom: 1px dashed var(--er-faded-2);
+}
+.er-edit-modes {
+  display: inline-flex;
+  border: 1px solid var(--er-ink);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.er-edit-mode-btn {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.32rem 0.7rem;
+  background: var(--er-paper);
+  color: var(--er-ink);
+  border: 0;
+  border-right: 1px solid var(--er-ink);
+  cursor: pointer;
+}
+.er-edit-mode-btn:last-child { border-right: 0; }
+.er-edit-mode-btn[aria-pressed="true"] { background: var(--er-ink); color: var(--er-paper); }
+
+.er-edit-actions { display: flex; gap: var(--er-space-1); margin-left: auto; align-items: center; }
+.er-edit-hint {
+  font-family: var(--er-font-mono);
+  font-size: 0.65rem;
+  color: var(--er-faded);
+}
+
+.er-edit-source {
+  background: var(--er-paper-2);
+  border: 1px solid var(--er-paper-3);
+  border-radius: 2px;
+  padding: var(--er-space-2);
+  font-family: var(--er-font-mono);
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--er-ink);
+  min-height: 32rem;
+  white-space: pre-wrap;
+  tab-size: 2;
+  /* fixed-width problem solved: source pane respects the article column
+   * by default; in 'split' it splits inside the same column. */
+}
+.er-edit-source .tok-h1 { color: var(--er-red-pencil); font-weight: 600; }
+.er-edit-source .tok-h2 { color: var(--er-proof-blue); font-weight: 500; }
+.er-edit-source .tok-em { color: var(--er-stamp-purple); font-style: italic; }
+.er-edit-source .tok-link { color: var(--er-proof-blue); text-decoration: underline; }
+.er-edit-source .tok-code { color: var(--er-stamp-green); }
+
+/* split layout: source + preview side-by-side WITHIN the article column */
+.er-edit-pane[data-view="split"] .er-edit-panes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--er-space-2);
+}
+.er-edit-pane[data-view="source"]  .er-edit-preview { display: none; }
+.er-edit-pane[data-view="preview"] .er-edit-source  { display: none; }
+.er-edit-pane[data-view="split"]   .er-edit-preview,
+.er-edit-pane[data-view="split"]   .er-edit-source { display: block; }
+.er-edit-pane:not([data-view="split"]) .er-edit-panes { display: block; }
+
+.er-edit-preview {
+  background: var(--er-paper);
+  border: 1px solid var(--er-paper-3);
+  padding: var(--er-space-2);
+  font-family: var(--er-font-body);
+  min-height: 32rem;
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+/* ============ SCRAPBOOK DRAWER (issue 3) — real drawer, expands in place ============ */
+.er-scrapbook {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  background: var(--er-paper);
+  border-top: var(--er-rule-med);
+  box-shadow: 0 -8px 18px -4px rgba(26,22,20,0.12);
+  z-index: 55;
+  height: var(--er-drawer-h);
+  transition: height 240ms cubic-bezier(.2,.7,.2,1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+body[data-drawer="open"] .er-scrapbook { height: var(--er-drawer-h-x); }
+
+.er-scrapbook-handle {
+  height: var(--er-drawer-h);
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--er-space-3);
+  padding: 0 var(--er-space-4);
+  cursor: pointer;
+  background: linear-gradient(to bottom, var(--er-paper) 80%, var(--er-paper-2) 100%);
+  border-bottom: 1px solid var(--er-paper-3);
+  user-select: none;
+}
+.er-scrapbook-kicker {
+  font-family: var(--er-font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  flex: 0 0 auto;
+}
+.er-scrapbook-kicker em {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  color: var(--er-red-pencil);
+  font-size: 1rem;
+  text-transform: none;
+  letter-spacing: 0;
+  margin-right: 0.2rem;
+}
+.er-scrapbook-count {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  color: var(--er-ink-soft);
+  font-size: 0.95rem;
+  font-variation-settings: "opsz" 14, "wght" 500;
+}
+.er-scrapbook-peek {
+  display: flex;
+  gap: var(--er-space-2);
+  align-items: center;
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  color: var(--er-faded);
+  overflow: hidden;
+  white-space: nowrap;
+  flex: 1 1 auto;
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+.er-scrapbook-peek .sep { color: var(--er-faded-2); }
+body[data-drawer="open"] .er-scrapbook-peek { opacity: 0.4; }
+
+.er-scrapbook-toggle {
+  margin-left: auto;
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--er-ink-soft);
+  background: transparent;
+  border: 1px solid var(--er-faded-2);
+  padding: 0.3rem 0.7rem;
+  border-radius: 2px;
+  cursor: pointer;
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+.er-scrapbook-toggle:hover { border-color: var(--er-red-pencil); color: var(--er-red-pencil); }
+.er-scrapbook-toggle .chev { transition: transform 200ms; }
+body[data-drawer="open"] .er-scrapbook-toggle .chev { transform: rotate(180deg); }
+
+.er-scrapbook-open-link {
+  font-family: var(--er-font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--er-faded-2);
+}
+.er-scrapbook-open-link:hover { color: var(--er-proof-blue); border-color: var(--er-proof-blue); }
+
+.er-scrapbook-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: var(--er-space-3) var(--er-space-4);
+  background: var(--er-paper-2);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: var(--er-space-2);
+  align-content: start;
+}
+
+.er-scrap-card {
+  background: var(--er-paper);
+  border: 1px solid var(--er-paper-3);
+  border-radius: 2px;
+  padding: var(--er-space-2);
+  font-family: var(--er-font-body);
+  font-size: 0.88rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  cursor: pointer;
+  transition: border-color 140ms, transform 140ms;
+}
+.er-scrap-card:hover { border-color: var(--er-red-pencil); transform: translateY(-1px); }
+.er-scrap-card-head {
+  display: flex;
+  gap: 0.45rem;
+  align-items: baseline;
+  font-family: var(--er-font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+}
+.er-scrap-kind {
+  font-size: 0.55rem;
+  padding: 0.05rem 0.32rem;
+  border-radius: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  background: var(--er-ink);
+  color: var(--er-paper);
+  flex: 0 0 auto;
+}
+.er-scrap-kind--md  { background: var(--er-proof-blue); }
+.er-scrap-kind--img { background: var(--er-stamp-green); }
+.er-scrap-kind--json{ background: var(--er-stamp-purple); }
+.er-scrap-kind--txt { background: var(--er-faded); }
+.er-scrap-name {
+  flex: 1 1 auto;
+  color: var(--er-ink);
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.er-scrap-time {
+  color: var(--er-faded);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+}
+.er-scrap-preview {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 14, "wght" 350;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--er-ink-soft);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  border-top: 1px dotted var(--er-faded-2);
+  padding-top: 0.4rem;
+}
+.er-scrap-preview--mono {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  font-style: normal;
+}
+.er-scrap-preview-img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background-position: center;
+  background-size: cover;
+  background-color: var(--er-paper-3);
+  border-radius: 2px;
+}
+
+/* ============ SHORTCUTS / TOAST stubs (visual only) ============ */
+.er-toast {
+  position: fixed;
+  bottom: calc(var(--er-drawer-h) + 1rem);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--er-ink);
+  color: var(--er-paper);
+  font-family: var(--er-font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  padding: 0.5rem 0.9rem;
+  border-radius: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms;
+  z-index: 80;
+}
+.er-toast.show { opacity: 1; }
+
+/* ============ MODE-SWITCH FLOATER (mockup-only) ============ */
+.demo-float {
+  position: fixed;
+  top: calc(var(--er-folio-h) + var(--er-strip-h) + var(--er-space-2));
+  right: var(--er-space-3);
+  z-index: 90;
+  background: var(--er-ink);
+  color: var(--er-paper);
+  font-family: var(--er-font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.5rem 0.7rem;
+  border-radius: 3px;
+  box-shadow: 0 6px 14px -4px rgba(0,0,0,0.3);
+  display: flex; flex-direction: column; gap: 0.4rem;
+  min-width: 12rem;
+}
+.demo-float h6 { margin: 0; font-size: 0.6rem; color: var(--er-paper-3); letter-spacing: 0.18em; }
+.demo-float button {
+  background: var(--er-paper);
+  color: var(--er-ink);
+  border: 0;
+  padding: 0.32rem 0.5rem;
+  font-family: inherit;
+  font-size: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+  border-radius: 2px;
+}
+.demo-float button:hover { background: var(--er-red-pencil); color: var(--er-paper); }
+
+/* ============ RESPONSIVE — stack at narrow widths ============ */
+@media (max-width: 64rem) {
+  :root {
+    --er-page-pad-x: var(--er-space-3);
+    --er-page-gap: var(--er-space-3);
+  }
+  .er-page-grid {
+    grid-template-columns: 1fr;
+  }
+  .er-page-gutter { display: none; }
+  .er-marginalia {
+    border-top: 1px dashed var(--er-faded-2);
+    padding-top: var(--er-space-3);
+    margin-top: var(--er-space-3);
+  }
+  .er-folio-spine { display: none; }
+  .er-strip-slug { display: none; }
+}
+@media (max-width: 40rem) {
+  :root {
+    --er-page-pad-x: var(--er-space-2);
+    --er-page-pad-y: var(--er-space-3);
+  }
+  .er-page { margin: 0 var(--er-space-1); }
+  .er-folio-nav { gap: var(--er-space-1); font-size: 0.6rem; }
+  .er-strip-galley { font-size: 0.95rem; }
+  .er-strip-versions { display: none; }
+  .er-scrapbook-peek { display: none; }
+}
+</style>
+</head>
+
+<body data-mode="read" data-drawer="closed">
+
+  <!-- (5) FOLIO — global nav now appears on the review surface -->
+  <div class="er-folio" role="banner">
+    <span class="er-folio-mark">deskwork</span>
+    <span class="er-folio-spine">longform · the-press-check-problem</span>
+    <nav class="er-folio-nav" aria-label="studio">
+      <a href="#">desk</a>
+      <a href="#">content</a>
+      <a href="#">shortform</a>
+      <a href="#">scrapbook</a>
+      <a href="#" class="active" aria-current="page">galley</a>
+      <a href="#">manual</a>
+    </nav>
+  </div>
+
+  <!-- STRIP — galley + version + state + actions -->
+  <div class="er-strip" role="region" aria-label="galley controls">
+    <div class="er-strip-inner">
+      <a href="#" class="er-strip-back">← studio</a>
+      <span class="er-strip-mark" aria-hidden="true">+</span>
+      <span class="er-strip-galley">Galley <em>№ 3</em></span>
+      <span class="er-strip-slug">audiocontrol / the-press-check-problem</span>
+      <span class="er-strip-versions" role="tablist" aria-label="versions">
+        <a href="#">v1</a>
+        <a href="#">v2</a>
+        <a href="#" class="active" aria-current="true">v3</a>
+      </span>
+      <span class="er-strip-state in-review" data-state-label>in review</span>
+      <span class="er-strip-actions">
+        <button class="er-btn" data-action="toggle-edit" type="button">Edit ⇄</button>
+        <span class="er-shortcut-chip-wrap">
+          <button class="er-btn er-btn-approve" type="button">Approve</button>
+          <small class="er-shortcut-chip"><kbd>a</kbd> <kbd>a</kbd></small>
+        </span>
+        <span class="er-shortcut-chip-wrap">
+          <button class="er-btn er-btn-iterate" type="button">Iterate</button>
+          <small class="er-shortcut-chip"><kbd>i</kbd> <kbd>i</kbd></small>
+        </span>
+        <span class="er-shortcut-chip-wrap">
+          <button class="er-btn er-btn-reject" type="button">Reject</button>
+          <small class="er-shortcut-chip"><kbd>r</kbd> <kbd>r</kbd></small>
+        </span>
+        <button class="er-btn" type="button" aria-label="shortcuts">?</button>
+      </span>
+    </div>
+  </div>
+
+  <!-- DESK + PAGE -->
+  <main class="er-desk">
+    <article class="er-page">
+      <div class="er-page-grid">
+
+        <!-- ARTICLE COLUMN — read mode -->
+        <section class="er-article" aria-label="draft">
+          <div class="er-article-meta">
+            <span>longform</span>
+            <span>·</span>
+            <span class="by">by the resident editorial-control researcher</span>
+            <span>·</span>
+            <span>2026-05-02</span>
+            <span>·</span>
+            <span>≈ 1,820 words</span>
+          </div>
+
+          <h1>The press-check <em>problem</em></h1>
+          <p class="er-article-dek">
+            Reviewers don't read drafts. They mark them. The interface
+            should reflect that — and most don't.
+          </p>
+
+          <p>
+            A galley is a particular kind of physical artifact. It is a
+            full-resolution proof, identical in width and column-rule to
+            the eventual broadsheet, presented on paper one weight heavier
+            than the final stock. The reviewer's job is not to read it;
+            their job is to <em>find what is wrong before the run</em>.
+            The medium tells them so. The wide right margin is empty by
+            design — it is where the
+            <span class="er-mark active">red pencil goes</span>.
+          </p>
+
+          <p>
+            What we call a "review surface" is rarely a galley. It is
+            usually a reading view with affordances bolted on: a sidebar
+            of comments two viewports away from the prose they
+            <span class="er-mark">annotate</span>, a button labeled
+            <em>Reviewer Mode</em> that pops a chrome bar at the top,
+            an emoji-laden thread that reads more like Slack than like
+            ink. None of that is wrong, exactly. None of it is right.
+          </p>
+
+          <h2>What a galley actually <em>is</em></h2>
+
+          <p>
+            The press-check tradition has very old conventions. The
+            galley sits on a desk under a pool of light. The reviewer
+            holds a red pencil — actual red, actual pencil, soft enough
+            to mark, hard enough not to smear. Marks are in the margin,
+            not on the type. The glyph for "delete" is a ⌐, the glyph
+            for "transpose" looks like a stylized infinity sign, and
+            so on for every mark of the proofreading craft. None of
+            this matters in software except as scaffolding for an
+            argument: <strong>marginalia must be physically next to
+            the type it annotates</strong>, or the metaphor evaporates.
+          </p>
+
+          <blockquote>
+            "If your reader has to look across the room to see what you
+            wrote about a paragraph, you have not built a press-check
+            tool. You have built a comment thread."
+          </blockquote>
+
+          <p>
+            Today's review surface centers a 700px column of text on
+            a 1440px viewport, leaves the entire left half empty, and
+            anchors a marginalia panel to the
+            <span class="er-mark">far right edge of the screen</span>.
+            The result is a column of prose floating in nothing, a
+            cramped strip of notes anchored to the chrome of the
+            window itself, and — at the bottom — a "scrapbook drawer"
+            that looks like a drawer but actually navigates to a
+            different page. Three architectural mistakes layered on
+            top of each other.
+          </p>
+
+          <h2>The fix is composition, not <em>polish</em></h2>
+
+          <p>
+            The redesign you are reading right now is the corrected
+            composition: a single page object centered on the desk,
+            holding both the article column AND the marginalia within
+            its own bounds. The thin gutter rule between them is the
+            same rule a typesetter would draw with a brass straightedge.
+            Every margin note is a few centimeters from the prose it
+            annotates, not a few hundred pixels.
+          </p>
+
+          <ul>
+            <li>The page is the unit, not the viewport.</li>
+            <li>The marginalia gutter is part of the page.</li>
+            <li>The desk is below the page; the chrome is above it.</li>
+            <li>The scrapbook is a drawer that opens in place.</li>
+          </ul>
+
+          <p>
+            None of this is novel. Every codex in human history has
+            arranged itself this way. We just stopped doing it when
+            the scroll wheel arrived.
+          </p>
+        </section>
+
+        <!-- EDIT MODE PANE — only visible when body[data-mode="edit"] -->
+        <section class="er-edit-pane" data-view="split" aria-label="editor">
+          <div class="er-edit-toolbar">
+            <div class="er-edit-modes" role="tablist">
+              <button class="er-edit-mode-btn" type="button" aria-pressed="false" data-view="source">Source</button>
+              <button class="er-edit-mode-btn" type="button" aria-pressed="true"  data-view="split">Split</button>
+              <button class="er-edit-mode-btn" type="button" aria-pressed="false" data-view="preview">Preview</button>
+            </div>
+            <div class="er-edit-actions">
+              <button class="er-btn" type="button">Outline ↗</button>
+              <button class="er-btn" type="button">Focus ⛶</button>
+              <button class="er-btn er-btn-approve" type="button">Save as v4</button>
+              <button class="er-btn" type="button" data-action="cancel-edit">Cancel</button>
+              <span class="er-edit-hint">⌘S to save · esc to cancel</span>
+            </div>
+          </div>
+          <div class="er-edit-panes">
+            <pre class="er-edit-source"><span class="tok-h1"># The press-check problem</span>
+
+A galley is a particular kind of physical artifact. It is a
+full-resolution proof, identical in width and column-rule to
+the eventual broadsheet, presented on paper one weight heavier
+than the final stock. The reviewer's job is not to read it;
+their job is to *find what is wrong before the run*. The
+medium tells them so. The wide right margin is empty by
+design — it is where the <span class="tok-em">red pencil goes</span>.
+
+What we call a "review surface" is rarely a galley. It is
+usually a reading view with affordances bolted on: a sidebar
+of comments two viewports away from the prose they annotate,
+a button labeled *Reviewer Mode* that pops a chrome bar at
+the top, an emoji-laden thread that reads more like Slack
+than like ink.
+
+<span class="tok-h2">## What a galley actually *is*</span>
+
+The press-check tradition has very old conventions. The
+galley sits on a desk under a pool of light. The reviewer
+holds a red pencil — actual red, actual pencil…
+
+<span class="tok-link">[earlier draft]</span>(./drafts/v1.md)
+            </pre>
+            <div class="er-edit-preview">
+              <h2 style="margin-top:0; font-family:var(--er-font-display); font-size:1.6rem;">The press-check problem</h2>
+              <p>A galley is a particular kind of physical artifact. It
+              is a full-resolution proof, identical in width and
+              column-rule to the eventual broadsheet…</p>
+              <p>What we call a "review surface" is rarely a galley.
+              It is usually a reading view with affordances bolted on…</p>
+              <h3 style="font-family:var(--er-font-display);">What a galley actually <em>is</em></h3>
+              <p>The press-check tradition has very old conventions.
+              The galley sits on a desk under a pool of light…</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- gutter rule -->
+        <div class="er-page-gutter" aria-hidden="true"></div>
+
+        <!-- MARGINALIA COLUMN -->
+        <aside class="er-marginalia" aria-label="margin notes">
+          <p class="er-marginalia-head">
+            Margin notes
+            <span class="count">3 · 1 resolved</span>
+          </p>
+
+          <!-- composer (visible because a selection exists) -->
+          <section class="er-marginalia-composer" aria-label="new mark">
+            <p class="er-marginalia-composer-head">New mark</p>
+            <p class="er-marginalia-composer-quote">"red pencil goes"</p>
+            <select aria-label="category">
+              <option>other</option>
+              <option selected>voice-drift</option>
+              <option>structural</option>
+              <option>missing-receipt</option>
+              <option>tutorial-framing</option>
+            </select>
+            <textarea placeholder="What needs attention here?"></textarea>
+            <div class="er-marginalia-composer-actions">
+              <button class="er-btn" type="button">Cancel</button>
+              <button class="er-btn er-btn-iterate" type="button">Leave mark</button>
+            </div>
+          </section>
+
+          <ol class="er-marginalia-list">
+            <li class="er-note active">
+              <p class="er-note-cat">voice-drift</p>
+              <p class="er-note-quote">"red pencil goes"</p>
+              <p class="er-note-text">
+                "Goes" reads light here — the verb's doing real work
+                and should land. <em>Lives</em> or <em>marks</em>?
+              </p>
+              <p class="er-note-foot">
+                <span>v3 · 4m</span>
+                <span class="er-note-actions">
+                  <button type="button">resolve</button>
+                  <button type="button">defer</button>
+                </span>
+              </p>
+            </li>
+            <li class="er-note">
+              <p class="er-note-cat er-note-cat--structural">structural</p>
+              <p class="er-note-quote">"annotate / button labeled Reviewer Mode"</p>
+              <p class="er-note-text">
+                The two examples land too quickly. One per beat would
+                let the reader breathe. Consider splitting after
+                "comment thread".
+              </p>
+              <p class="er-note-foot">
+                <span>v3 · 18m</span>
+                <span class="er-note-actions">
+                  <button type="button">resolve</button>
+                  <button type="button">defer</button>
+                </span>
+              </p>
+            </li>
+            <li class="er-note er-note--resolved">
+              <p class="er-note-cat er-note-cat--saas-vocabulary">saas-vocabulary</p>
+              <p class="er-note-quote">"far right edge of the screen"</p>
+              <p class="er-note-text">
+                "screen" is fine; "viewport" is jargon. Kept "screen".
+              </p>
+              <p class="er-note-foot">
+                <span>v2 · 2h</span>
+                <span class="er-note-actions">
+                  <button type="button">reopen</button>
+                </span>
+              </p>
+            </li>
+          </ol>
+        </aside>
+
+      </div>
+    </article>
+  </main>
+
+  <!-- (3) SCRAPBOOK DRAWER — real drawer, expands in place -->
+  <aside class="er-scrapbook" aria-label="scrapbook">
+    <header class="er-scrapbook-handle" data-drawer-toggle role="button" tabindex="0" aria-expanded="false">
+      <span class="er-scrapbook-kicker"><em>§</em> Scrapbook</span>
+      <span class="er-scrapbook-count">4 items</span>
+      <span class="er-scrapbook-peek">
+        <span>note-on-galleys.md</span>
+        <span class="sep">·</span>
+        <span>composing-room-1953.jpg</span>
+        <span class="sep">·</span>
+        <span>red-pencil-stock.json</span>
+        <span class="sep">·</span>
+        <span>+ 1 more</span>
+      </span>
+      <a class="er-scrapbook-open-link" href="#" title="open standalone scrapbook viewer">open viewer ↗</a>
+      <button class="er-scrapbook-toggle" type="button" data-drawer-toggle aria-controls="scrap-body">
+        <span data-toggle-label>Expand</span>
+        <span class="chev" aria-hidden="true">▾</span>
+      </button>
+    </header>
+    <div class="er-scrapbook-body" id="scrap-body" role="region" aria-label="scrapbook items">
+
+      <article class="er-scrap-card" tabindex="0">
+        <div class="er-scrap-card-head">
+          <span class="er-scrap-kind er-scrap-kind--md">md</span>
+          <span class="er-scrap-name">note-on-galleys.md</span>
+          <span class="er-scrap-time">12m ago</span>
+        </div>
+        <p class="er-scrap-preview">
+          The galley sits on a desk under a pool of light. The
+          reviewer holds a red pencil — actual red, actual
+          pencil, soft enough to mark, hard enough not to smear…
+        </p>
+      </article>
+
+      <article class="er-scrap-card" tabindex="0">
+        <div class="er-scrap-card-head">
+          <span class="er-scrap-kind er-scrap-kind--img">img</span>
+          <span class="er-scrap-name">composing-room-1953.jpg</span>
+          <span class="er-scrap-time">2h ago</span>
+        </div>
+        <div class="er-scrap-preview-img" style="background-image: linear-gradient(135deg, #c9bfa3, #8a7f70 60%, #3a332e); background-size: 200% 200%;"></div>
+      </article>
+
+      <article class="er-scrap-card" tabindex="0">
+        <div class="er-scrap-card-head">
+          <span class="er-scrap-kind er-scrap-kind--json">json</span>
+          <span class="er-scrap-name">red-pencil-stock.json</span>
+          <span class="er-scrap-time">yesterday</span>
+        </div>
+        <pre class="er-scrap-preview er-scrap-preview--mono" style="margin:0; white-space: pre-wrap;">{
+  "brand": "Sanford Verithin",
+  "color": "747-ruby red",
+  "lead": 2.0,
+  "sourced_from": "an old desk drawer"
+}</pre>
+      </article>
+
+      <article class="er-scrap-card" tabindex="0">
+        <div class="er-scrap-card-head">
+          <span class="er-scrap-kind er-scrap-kind--txt">txt</span>
+          <span class="er-scrap-name">desk-arrangement.txt</span>
+          <span class="er-scrap-time">3d ago</span>
+        </div>
+        <p class="er-scrap-preview">
+          Light slightly behind the left shoulder. Galley centered;
+          reference column to the right. Pencil case at 45°.
+        </p>
+      </article>
+
+    </div>
+  </aside>
+
+  <!-- mockup-only mode/drawer toggles (NOT part of integration; demonstration only) -->
+  <div class="demo-float" aria-label="mockup demo controls">
+    <h6>Mockup demo</h6>
+    <button type="button" id="toggle-mode">Toggle read ⇄ edit</button>
+    <button type="button" id="toggle-drawer">Toggle drawer</button>
+    <button type="button" id="cycle-edit-view">Cycle Source / Split / Preview</button>
+  </div>
+
+  <div class="er-toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+  // mockup-only interactivity. integration ships a real client.
+  const body = document.body;
+  const toast = document.getElementById('toast');
+  function flash(msg) {
+    toast.textContent = msg;
+    toast.classList.add('show');
+    clearTimeout(flash._t);
+    flash._t = setTimeout(() => toast.classList.remove('show'), 1400);
+  }
+
+  // mode toggle
+  document.getElementById('toggle-mode').addEventListener('click', () => {
+    const next = body.dataset.mode === 'edit' ? 'read' : 'edit';
+    body.dataset.mode = next;
+    flash('mode → ' + next);
+  });
+  // also wire the strip Edit ⇄ button
+  document.querySelectorAll('[data-action="toggle-edit"], [data-action="cancel-edit"]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const next = body.dataset.mode === 'edit' ? 'read' : 'edit';
+      body.dataset.mode = next;
+      flash('mode → ' + next);
+    });
+  });
+
+  // drawer toggle
+  function setDrawer(state) {
+    body.dataset.drawer = state;
+    const handle = document.querySelector('[data-drawer-toggle][role="button"]');
+    if (handle) handle.setAttribute('aria-expanded', state === 'open' ? 'true' : 'false');
+    const label = document.querySelector('[data-toggle-label]');
+    if (label) label.textContent = state === 'open' ? 'Collapse' : 'Expand';
+  }
+  document.querySelectorAll('[data-drawer-toggle]').forEach((el) => {
+    el.addEventListener('click', () => {
+      setDrawer(body.dataset.drawer === 'open' ? 'closed' : 'open');
+    });
+    if (el.tagName === 'HEADER') {
+      el.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          setDrawer(body.dataset.drawer === 'open' ? 'closed' : 'open');
+        }
+      });
+    }
+  });
+  document.getElementById('toggle-drawer').addEventListener('click', () => {
+    setDrawer(body.dataset.drawer === 'open' ? 'closed' : 'open');
+  });
+
+  // edit-pane view cycle
+  document.getElementById('cycle-edit-view').addEventListener('click', () => {
+    const pane = document.querySelector('.er-edit-pane');
+    const order = ['source', 'split', 'preview'];
+    const cur = pane.dataset.view || 'split';
+    const next = order[(order.indexOf(cur) + 1) % order.length];
+    pane.dataset.view = next;
+    pane.querySelectorAll('.er-edit-mode-btn').forEach((b) => {
+      b.setAttribute('aria-pressed', b.dataset.view === next ? 'true' : 'false');
+    });
+    flash('editor view → ' + next);
+  });
+  // also wire the in-pane buttons
+  document.querySelectorAll('.er-edit-mode-btn').forEach((b) => {
+    b.addEventListener('click', () => {
+      const pane = document.querySelector('.er-edit-pane');
+      pane.dataset.view = b.dataset.view;
+      pane.querySelectorAll('.er-edit-mode-btn').forEach((bb) => {
+        bb.setAttribute('aria-pressed', bb === b ? 'true' : 'false');
+      });
+    });
+  });
+
+  // note ↔ mark cross-highlighting
+  document.querySelectorAll('.er-note').forEach((note, i) => {
+    note.addEventListener('mouseenter', () => {
+      document.querySelectorAll('.er-note').forEach((n) => n.classList.remove('active'));
+      note.classList.add('active');
+      // active highlight in article (only for first 2)
+      const marks = document.querySelectorAll('.er-mark');
+      marks.forEach((m, j) => m.classList.toggle('active', j === i));
+    });
+  });
+
+  // expanded peek hide when open is intuitive
+</script>
+</body>
+</html>
