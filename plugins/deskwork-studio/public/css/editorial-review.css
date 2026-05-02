@@ -1799,13 +1799,14 @@ body:has(.er-edit-mode:not([hidden])) .toc {
 
 /* ---------- Dispatch C (#154) — edit-mode toolbar above .er-page ---------- */
 /* Sit between the strip and the page, full-width within the page's
- * outer container. Sticky so the toolbar stays visible while the
- * source/preview panes scroll inside the article column. The strip is
- * fixed at top:var(--er-folio-h) with ~3.2rem height (matching the
- * body padding-top calc above), so the toolbar parks just below it. */
+ * outer container. The strip is `position: fixed` at the top of the
+ * viewport and overlaps the body's reserved padding-top space; we
+ * keep the toolbar in normal flow (relative) rather than sticky so
+ * it never collides with the strip when the strip wraps to two
+ * rows. The body padding-top calc reserves room for the strip so
+ * the toolbar still lands BELOW the strip on initial render. */
 .er-edit-toolbar {
-  position: sticky;
-  top: calc(var(--er-folio-h) + 3.2rem);
+  position: relative;
   z-index: 35;
   background: var(--er-paper-2);
   border-bottom: 1px dashed var(--er-faded-2);

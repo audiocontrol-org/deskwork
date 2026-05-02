@@ -190,7 +190,7 @@ describe('edit-mode toolbar relocation (Issue #154 Dispatch C)', () => {
     expect(rule, 'expected strip-right hide rule keyed on toolbar visibility').not.toBeNull();
   });
 
-  it('CSS defines the .er-edit-toolbar layout (sticky under the strip)', () => {
+  it('CSS defines the .er-edit-toolbar layout above the page', () => {
     const css = readFileSync(CSS_PATH, 'utf8');
     // Find the standalone toolbar block (not the ancestor cascade
     // rules above).
@@ -198,11 +198,15 @@ describe('edit-mode toolbar relocation (Issue #154 Dispatch C)', () => {
     expect(blockStart, '.er-edit-toolbar rule should exist').toBeGreaterThan(0);
     const blockEnd = css.indexOf('}', blockStart);
     const block = css.slice(blockStart, blockEnd + 1);
-    // Sticky under the strip.
-    expect(block).toMatch(/position:\s*sticky/);
-    expect(block).toMatch(/top:\s*calc\(var\(--er-folio-h\)/);
-    // Flex toolbar that wraps if narrow (matching the mockup).
+    // Lives above the page, capped at the page's max width.
+    expect(block).toMatch(/max-width:\s*var\(--er-page-max\)/);
+    // Paper-2 background + dashed bottom rule (matching the mockup).
+    expect(block).toMatch(/background:\s*var\(--er-paper-2\)/);
+    expect(block).toMatch(/border-bottom:\s*1px dashed/);
+    // Flex toolbar with wrap + space-between (mode tabs left,
+    // actions right).
     expect(block).toMatch(/display:\s*flex/);
     expect(block).toMatch(/justify-content:\s*space-between/);
+    expect(block).toMatch(/flex-wrap:\s*wrap/);
   });
 });
