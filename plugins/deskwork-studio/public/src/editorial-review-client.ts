@@ -322,6 +322,34 @@ export function initEditorialReview(): void {
     if (item) item.classList.toggle('active', active);
   }
 
+  // Mark -> note cross-highlight: hovering an article-side annotation
+  // lights up the corresponding sidebar item. Reuses setActiveHighlight
+  // (which toggles .active on BOTH mark and <li>); the note->mark
+  // direction is already wired via the sidebar's mouseenter/mouseleave
+  // handlers above. Delegated on draftBody because the marks are
+  // re-rendered on iteration changes — binding per-mark would leak.
+  draftBody.addEventListener('pointerover', (ev) => {
+    const target = (ev.target as Element | null)?.closest<HTMLElement>(
+      'mark[data-annotation-id]',
+    );
+    if (!target) return;
+    const id = target.dataset.annotationId;
+    if (id) setActiveHighlight(id, true);
+  });
+  draftBody.addEventListener('pointerout', (ev) => {
+    const target = (ev.target as Element | null)?.closest<HTMLElement>(
+      'mark[data-annotation-id]',
+    );
+    if (!target) return;
+    // pointerout fires when the cursor moves between text nodes inside
+    // the same <mark>; guard with relatedTarget so we don't flash off
+    // mid-mark.
+    const next = (ev as PointerEvent).relatedTarget as Element | null;
+    if (next && target.contains(next)) return;
+    const id = target.dataset.annotationId;
+    if (id) setActiveHighlight(id, false);
+  });
+
   // ---- Selection -> Add button ----
 
   document.addEventListener('selectionchange', () => {
