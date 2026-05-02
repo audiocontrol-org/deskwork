@@ -13,6 +13,39 @@ Populating this file is a step in `/session-end`. If a session didn't exercise t
 
 ---
 
+## 2026-05-02 (planning): scrapbook redesign Dispatch E (visual) — diagnostic playwright drive surfaces the function-vs-composition gap; planning-only session with one operator-caught design-discipline gap on the plan itself
+
+**Surface exercised (usage side):** dev-mode `deskwork-studio` (`npm run dev`) on `127.0.0.1:47321`. Single playwright drive of `/dev/scrapbook/deskwork-internal/source-shipped-deskwork-plan` at 1440×900 to verify whether the prior session's Dispatch E shipped what the mockup proposed. After the diagnostic, the session was infrastructure-only — spec + plan written; no further plugin/studio interaction.
+
+### **insight.** A diagnostic playwright drive validated the new `ui-verification.md` rule end-to-end
+
+The operator asked a sharp question: *"Did we implement the scrapbook redesign? if so, why does it look nothing like the mockup?"* Per the new rule, the answer required driving the EXACT surface the operator referenced and measuring. Captured (1) `pageGridCols: "806.406px 288px"` showing aside-on-RIGHT, (2) `itemsGridCols: "259.469px 259.469px 259.469px"` showing the auto-fill grid IS in place, (3) `firstItemBg: "rgb(245, 241, 232)"` confirming press-check tokens, (4) `firstItemFontFamily: "Newsreader"` confirming serif. The data settled the question cleanly: function shipped, composition didn't. Without the playwright drive, the answer would have been speculation; with it, the answer was a measurement table the operator could re-verify in 30 seconds. **The new rule was the difference between "I think it doesn't match" and "here are the exact pixel measurements proving it doesn't match."**
+
+### **friction.** Initial plan didn't require `/frontend-design` at code-shipping moments
+
+After writing a 5-dispatch plan for Dispatch E (visual), the operator asked: *"Does the implementation plan require the use of the frontend-design plugin during implementation and again after to review and sign off on the implementation?"* The honest answer was no — `/frontend-design` was invoked once during planning to produce the spec, then the plan assumed the spec + mockup were enough for an executor. The plan had inherited the mistake from how I'd treated the rule: I'd taken `affordance-placement.md`'s "find the existing pattern" as a one-time check at the start, not a continuous discipline applied at every visual decision.
+
+### **fix.** Plan amended to mandate `/frontend-design` at four explicit gates plus parallel verification
+
+Added to the plan (commit `031f8e5`):
+- **Design-review gates G1–G4** — non-negotiable pre-implementation reviews before F1.4 (CSS rewrite), F2.2 (preview refinement), F5.2 (drop zone + secret section), and as Dispatch F6 (final sign-off).
+- **Verification mandate** — every dispatch's verification step now requires BOTH playwright AND `/frontend-design`. Playwright proves it works; `/frontend-design` proves it looks right.
+- **Audit trail** — two new artifact files captured during execution: `2026-05-02-scrapbook-redesign-design-reviews.md` (per-gate responses) and `2026-05-02-scrapbook-redesign-final-walkthrough.md` (F6's section-by-section output).
+
+### **insight.** The amendment validated the rule itself
+
+`affordance-placement.md` says "find the existing pattern and reference it before writing code." The amendment specifies that `/frontend-design` is the design-judgment authority that ratifies whether the implementation matches that pattern. Rule + gate together close the loop: rule says *what good looks like*, gate says *how and when to verify against the standard*. The next plan that touches design should include G-prefix gates by default — the operator shouldn't have to ask "does this require X" to get them.
+
+### **insight.** Rules aren't self-enforcing; plans encode the *when* and *how*
+
+The new `affordance-placement.md` and `ui-verification.md` rules are durable, but they describe principles. They don't tell an executor at which task in which dispatch to invoke `/frontend-design`. That's the layer the plan amendment added. Operator's framing — *"don't 'just for now' it and be lazy. That just creates more work for us to cleanup the garbage turds you leave lying around"* — applies as much to plans as to code: a plan that depends on judgment-call discipline at runtime is the planning-time version of the same laziness.
+
+### Note: this session was planning-only beyond the diagnostic
+
+Other than the single playwright drive to settle the function-vs-composition question, the studio wasn't exercised. Per the journal's guidance: this would normally be a "skip and reflect" entry. The reflection is captured above — the diagnostic itself is a usage data point (playwright as the verification rule's load-bearing tool) and the plan amendment is process-discipline carry-forward (rules → plan-encoded gates).
+
+---
+
 ## 2026-05-02 (post-walkthrough): operator walks the just-shipped #154 redesign + drives six rounds of corrective oversight on agent verification habits
 
 **Surface exercised (usage side):** dev-mode `deskwork-studio` (`npm run dev`) on `127.0.0.1:47321`. The operator walked the longform review surface at multiple URLs (`/dev/editorial-review/<entry-uuid>` for `1c3bfe8f-...`, `9845c268-...`, `c68dc297-...`) plus the manual page (`/dev/editorial-help`) and the scrapbook viewer (`/dev/scrapbook/deskwork-internal/source-shipped-deskwork-plan`) at 1440×900. The surface walked is the redesign that landed in the prior session as Dispatches A–E; this session is the operator's first real walk-through of it.

@@ -1599,6 +1599,25 @@ Each phase reached a stable checkpoint, reviewed and committed.
 - [ ] #155 / #156 / #157 follow-ups — separate from #154 closure.
 - [ ] Issue #154 closure pending operator visual review.
 
+### Phase 33++: Scrapbook Dispatch E (visual) — spec + 6-dispatch plan with `/frontend-design` gates (#161) — 2026-05-02 (planning)
+
+Planning-only session. No code shipped. Spec + plan written for the scrapbook redesign visual composition that the prior session's "Dispatch E shipped" claim missed.
+
+- [x] Diagnose the gap: function vs visual composition. Verified at `/dev/scrapbook/deskwork-internal/source-shipped-deskwork-plan` at 1440×900 — function shipped (auto-fill grid, filter chips, search, peeks, expand-in-place, press-check tokens) but visual NOT shipped (aside on right not left, no per-kind ribbons, cards lack mockup's vertical chrome).
+- [x] Write the spec ([`2026-05-02-scrapbook-redesign-impl-spec.md`](../../superpowers/specs/2026-05-02-scrapbook-redesign-impl-spec.md)) — 13 sections covering aesthetic direction, composition refinements (single-expanded model, dock-style drop zone, expanded-state aside binding), markup tree, migration approach (replace not morph), data-state model, aside cross-link architecture, dispatch decomposition F1–F5, affordance compliance audit, verification protocol, constraints, what's deliberately out of scope (folio nav extension, drag-to-reorder, multi-select, edit-in-place redesign).
+- [x] Write the plan ([`2026-05-02-scrapbook-redesign-dispatch-e-visual.md`](../../superpowers/plans/2026-05-02-scrapbook-redesign-dispatch-e-visual.md)) — initial 5-dispatch decomposition with bite-sized tasks per writing-plans skill convention (commit `3c186a4`).
+- [x] Operator-caught gap on design discipline: initial plan didn't require `/frontend-design` during implementation or for final sign-off. Amended plan to mandate `/frontend-design` at four non-negotiable gates (G1: pre-CSS review before F1.4; G2: pre-preview-refinement before F2.2; G3: pre-secret/drop-zone before F5.2; G4: final integrated sign-off as new Dispatch F6). Extended every dispatch's verification to require BOTH playwright AND `/frontend-design` (commit `031f8e5`). Plan grew from ~1900 to ~2400 lines.
+- [x] Update issue #161 with plan-link comment + amendment comment.
+
+**Deferred:**
+
+- [ ] Execute the plan — F1 through F6. Operator decision pending: subagent-driven (recommended per writing-plans skill) or inline execution.
+
+**Notes:**
+
+- The amendment was the second time this week's sessions surfaced a design-discipline gap that the operator had to catch. First was the marginalia-toggle iterating-as-toolbar-button before the operator forced the on-component design conversation; second was this plan's missing `/frontend-design` gates. Both got encoded into durable rules — the first as `affordance-placement.md`, the second as the plan's mandatory G1–G4 gates. Pattern: durable rules accumulate from the session-level corrections.
+- The plan amendment validated the new `affordance-placement.md` rule: the rule says "find the existing pattern and reference it before writing code." The amendment specifies that `/frontend-design` is the design-judgment authority that ratifies whether the implementation matches that pattern. Rule + gate together close the loop.
+
 ### Phase 33+: Post-walkthrough polish + UI verification rules (#155, #159, #160) — 2026-05-02 (post-walkthrough)
 
 The operator's walkthrough of the just-shipped #154 redesign surfaced six follow-up bugs and one design-discipline gap. Six commits this session plus two new project rule files. See README status table row "Phase 33+" and the DEVELOPMENT-NOTES entry "2026-05-02 (post-walkthrough)".

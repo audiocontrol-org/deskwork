@@ -4,6 +4,55 @@ Session journal for `deskwork`. Each entry records what was tried, what worked, 
 
 ---
 
+## 2026-05-02 (planning): scrapbook Dispatch E (visual) — spec + 6-dispatch plan with `/frontend-design` gates (#161)
+
+### Feature: deskwork-plugin
+### Worktree: deskwork-plugin
+
+**Goal:** address operator-filed [#161](https://github.com/audiocontrol-org/deskwork/issues/161) — "Scrapbook UI/UX: Make it look and work like the mockup." Operator framing: *"it's not just a visual touch up — there's a bunch of functionality missing."* Operator requirement: use `/frontend-design` properly during the design phase; *"don't 'just for now' it and be lazy. That just creates more work for us to cleanup the garbage turds you leave lying around."* This session is plan-only — no code shipped.
+
+**Accomplished:**
+
+- **Diagnosed the gap.** Drove `/dev/scrapbook/deskwork-internal/source-shipped-deskwork-plan` at 1440×900 in playwright. Verified the prior session's "Dispatch E shipped" claim was true for FUNCTION (auto-fill grid `repeat(auto-fill, minmax(15rem, 1fr))`, filter chips with kind counts, search with `/` shortcut, expand-in-place via `data-state="expanded"`, peeks, press-check tokens) but NOT for visual COMPOSITION: aside on RIGHT (live `1fr 14–18rem`) not LEFT (mockup `17rem 1fr`); no per-kind colored top-edge ribbons (`md=blue, img=green, json=purple, txt=faded`); cards lack mockup's vertical chrome (kicker / name / time row + meta row + dominant preview body + foot toolbar); class vocabulary differs (`.scrapbook-*` long-form vs mockup's `.scrap-*` short-form).
+- **`3c186a4` — wrote spec + 5-dispatch plan.** Spec at `docs/superpowers/specs/2026-05-02-scrapbook-redesign-impl-spec.md` covers 13 sections: aesthetic direction (locked, mirrors existing system), composition (mockup confirmed with 3 refinements: single-expanded card invariant, expanded-state aside binding, dock-style drop zone), markup tree, migration approach (replace not morph; no compat shims; per the operator's "no garbage turds" framing), data-state model, aside cross-link architecture, folio nav extension scoped OUT (separate concern; project-wide impact), 5-dispatch decomposition F1–F5, affordance compliance audit against `affordance-placement.md`, verification protocol per `ui-verification.md`, constraints + risks, deliberately-out-of-scope. Plan at `docs/superpowers/plans/2026-05-02-scrapbook-redesign-dispatch-e-visual.md` decomposes into bite-sized tasks per the writing-plans skill convention (~1900 lines). Used `/frontend-design` as the design phase per operator's requirement; produced grounded measurements + section-by-section markup specifications.
+- **`031f8e5` — operator-caught gap: amended plan to mandate `/frontend-design` at four design-review gates plus parallel verification.** Operator's question: *"Does the implementation plan require the use of the frontend-design plugin during implementation and again after to review and sign off on the implementation?"* Honest answer: NO, the initial plan used `/frontend-design` only during planning, not during implementation or for sign-off. Amendments: (1) new "Design-review gates" header section documents G1–G4 as non-negotiable with a table mapping trigger → input → required output; (2) new "Verification mandate" section extends `ui-verification.md`'s playwright protocol to require `/frontend-design` in parallel — playwright proves it works, `/frontend-design` proves it looks right; (3) new pre-implementation tasks F1.3.5 (G1: pre-CSS review), F2.1.5 (G2: pre-preview-refinement), F5.1.5 (G3: pre-secret/drop-zone) — each invokes `/frontend-design` with a specific brief BEFORE code-shipping tasks; (4) every existing verification step (F1.6, F2.3, F3.3, F4.3, F5.4) extended to include a `/frontend-design` post-dispatch review with structured deviations-or-sign-off output; (5) new Dispatch F6 — final integrated design sign-off, no code by default — produces a walkthrough document + the #161 fix-landed comment; F6 cannot sign off until `/frontend-design` returns "INTEGRATION VERIFIED" (or with-follow-ups variant). Plan grew from ~1900 to ~2400 lines.
+- **Issue #161 updated** with [plan-link comment](https://github.com/audiocontrol-org/deskwork/issues/161#issuecomment-4364478610) and [amendment comment](https://github.com/audiocontrol-org/deskwork/issues/161#issuecomment-4364496518).
+
+**Didn't Work:**
+
+- **Initial plan version (`3c186a4`) had a design-discipline gap.** I used `/frontend-design` once during planning to produce the spec, then assumed the spec + mockup were enough for an executor. They're not — the spec is the design contract, but visual choices made during implementation (exact line-clamp values, exact aspect-ratio decisions, dragover state styling that the mockup doesn't show) need ongoing design judgment. The operator's earlier framing — *"use the /frontend-design plugin properly... don't 'just for now' it"* — meant exactly this: design discipline at every step where visual choices get made, not just the planning step. I treated the planning invocation as sufficient when it wasn't. Operator caught the gap with a sharp question; I amended the plan in `031f8e5`.
+
+**Course Corrections:**
+
+- **[PROCESS]** First plan version didn't require `/frontend-design` during implementation OR for sign-off. Operator question — *"Does the implementation plan require the use of the frontend-design plugin during implementation and again after to review and sign off on the implementation?"* — caught the gap. Recovery: amended the plan to mandate `/frontend-design` at four gates + parallel verification + new Dispatch F6 sign-off. Lesson: when a project rule says "use X" (here `affordance-placement.md` requires referencing existing patterns + `ui-verification.md` requires playwright drive), the rule alone doesn't enforce continuous discipline — the implementation plan has to encode WHEN and HOW the discipline applies, not just say "follow the rule." This is the second time this week a design-discipline gap was caught at the operator level (first was the marginalia toggle's three-iteration shape-convergence). Both gaps got encoded into durable artifacts — the first as `affordance-placement.md`, the second as the plan's G1–G4 gates.
+
+**Quantitative:**
+
+- Messages from operator: ~6 (mostly directive / specifying scope; one substantive correction question that drove the amendment).
+- Commits to feature branch: **2** (`3c186a4` initial spec + plan; `031f8e5` amendment) plus this session-end docs commit.
+- Tests: unchanged (no code shipped).
+- Documents created: 2 (spec + plan). Documents amended: 1 (plan after operator gap-catch).
+- Issue activity: 2 comments posted on #161 (plan-link, amendment).
+- Files touched: `docs/superpowers/specs/2026-05-02-scrapbook-redesign-impl-spec.md` (new, ~410 lines), `docs/superpowers/plans/2026-05-02-scrapbook-redesign-dispatch-e-visual.md` (new ~1900 → amended ~2400 lines).
+- Course corrections: **1** ([PROCESS] design-discipline gap caught at planning).
+
+**Insights:**
+
+- **Rules aren't self-enforcing; plans encode the WHEN and HOW.** The new `affordance-placement.md` and `ui-verification.md` rules are durable, but they describe principles ("component-attached over toolbar-attached," "drive the live surface"). They don't tell an executor at which task in which dispatch to invoke `/frontend-design`. The operator's amendment instruction made this explicit: the plan must encode the gates. That's the missing layer — rules describe the *what*; plans encode the *when*. Future plans for design-touching work should include G-prefix gates by default, not require operator intervention.
+- **Two gap-catches in one week is a pattern.** First (this week's prior arc) the marginalia toggle's wrong-shape iterations; second (this session) the plan's missing `/frontend-design` gates. Both surface the same root cause: I default to "do the work, then check" instead of "design-review-then-do-the-work." The new gate model inverts that — `/frontend-design` is invoked BEFORE code-shipping tasks, not just after. If the plan executor follows the gates, design questions are resolved before they become deviations.
+- **Plan size grew from ~1900 to ~2400 lines after the amendment.** That's 500 lines of inline gate-and-verification machinery. Cost: more verbose plan to read. Benefit: explicit when-and-how that doesn't depend on the executor remembering to invoke `/frontend-design` at the right moments. Worth it; the alternative (tighter plan that depends on judgment-call discipline) is exactly what failed when the marginalia toggle iterated three times before reaching the right shape.
+- **The amendment validates the rule itself.** `affordance-placement.md` says "find the existing pattern and reference it before writing code." The amendment specifies that `/frontend-design` is the design-judgment authority that ratifies whether the implementation matches that pattern. Rule + gate together close the loop: rule says what good looks like, gate says how/when to verify against the standard.
+- **Carried forward as next session's work:** execute the plan F1–F6. Operator decision still pending: subagent-driven (recommended per writing-plans skill — fresh subagent per task with two-stage review) vs inline execution (single session with checkpoints). Either way, the gates apply.
+
+**Next session:**
+
+- Operator decision on execution mode (subagent-driven vs inline).
+- F1 ships first: rebuild scrapbook.ts + scrapbook.css + scrapbook-client.ts + tests from scratch matching mockup. Includes G1 gate (pre-CSS review) before F1.4.
+- F2–F5 incrementally add per-kind preview refinement, aside numbered list, aside cross-linking, drop zone + secret section. Each preceded by its gate (G2, G3 where applicable) and followed by `/frontend-design` post-dispatch verification.
+- F6 ships the final integrated sign-off — no code by default; produces walkthrough doc + #161 fix-landed comment.
+
+---
+
 ## 2026-05-02 (post-walkthrough): #154 polish, edit-mode UX, affordance redesign, verification-discipline rules
 
 ### Feature: deskwork-plugin
