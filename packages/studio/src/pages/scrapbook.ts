@@ -17,16 +17,78 @@
  * similar otherwise.
  */
 
+import { readFileSync } from 'node:fs';
 import {
   formatRelativeTime,
   formatSize,
   listScrapbook,
+  scrapbookFilePath,
   type ScrapbookItem,
 } from '@deskwork/core/scrapbook';
 import type { StudioContext } from '../routes/api.ts';
 import { html, unsafe, type RawHtml } from './html.ts';
 import { layout } from './layout.ts';
 import { renderEditorialFolio } from './chrome.ts';
+
+/**
+ * Server-rendered "peek" beneath each card: a small always-on preview
+ * so operators see what's in the slip without expanding it. Image
+ * cards get a thumbnail; markdown/text/json cards get a 4–6 line
+ * truncated excerpt. Other kinds get nothing — the kind chip in the
+ * header is enough.
+ *
+ * The peek hides via CSS when the card expands (data-state="expanded"),
+ * letting the existing lazy-loaded body-content take over.
+ */
+function renderItemPeek(
+  ctx: StudioContext,
+  site: string,
+  path: string,
+  item: ScrapbookItem,
+  opts: { secret?: boolean } = {},
+): RawHtml {
+  const { secret = false } = opts;
+  if (item.kind === 'img') {
+    const params = new URLSearchParams({
+      site,
+      path,
+      name: item.name,
+    });
+    if (secret) params.set('secret', '1');
+    const url = `/api/dev/scrapbook-file?${params.toString()}`;
+    return unsafe(html`
+      <div class="scrapbook-item-peek scrapbook-item-peek--img"
+        style="background-image: url(&quot;${url}&quot;);"
+        aria-hidden="true"></div>`);
+  }
+  if (item.kind === 'md' || item.kind === 'txt' || item.kind === 'json') {
+    try {
+      const fullPath = scrapbookFilePath(
+        ctx.projectRoot,
+        ctx.config,
+        site,
+        path,
+        item.name,
+        secret ? { secret: true } : {},
+      );
+      const buf = readFileSync(fullPath);
+      const text = buf
+        .subarray(0, Math.min(buf.byteLength, 600))
+        .toString('utf-8');
+      const trimmed = text.split('\n').slice(0, 6).join('\n').slice(0, 400);
+      const klass =
+        item.kind === 'json'
+          ? 'scrapbook-item-peek--mono'
+          : 'scrapbook-item-peek--prose';
+      return unsafe(html`
+        <pre class="scrapbook-item-peek ${klass}" aria-hidden="true">${trimmed}</pre>`);
+    } catch {
+      // File not readable as text — fall through to no peek.
+      return unsafe('');
+    }
+  }
+  return unsafe('');
+}
 
 interface RenderItemRowOptions {
   /** Mark the row visually as belonging to the secret section. */
@@ -43,6 +105,9 @@ interface RenderItemRowOptions {
 }
 
 function renderItemRow(
+  ctx: StudioContext,
+  site: string,
+  path: string,
   item: ScrapbookItem,
   index: number,
   opts: RenderItemRowOptions = {},
@@ -80,6 +145,7 @@ function renderItemRow(
         <span class="scrapbook-disclosure" aria-hidden="true">▸</span>
       </button>
       ${toolbar}
+      ${renderItemPeek(ctx, site, path, item, { secret })}
       <div class="scrapbook-perforation" aria-hidden="true"></div>
       <div class="scrapbook-item-body" data-body>
         <div data-body-content></div>
@@ -196,7 +262,12 @@ function renderFiltersAndSearch(items: readonly ScrapbookItem[]): RawHtml {
     </div>`);
 }
 
-function renderReadingPanel(items: readonly ScrapbookItem[]): RawHtml {
+function renderReadingPanel(
+  ctx: StudioContext,
+  site: string,
+  path: string,
+  items: readonly ScrapbookItem[],
+): RawHtml {
   return unsafe(html`
     <section class="scrapbook-reading">
       ${renderFiltersAndSearch(items)}
@@ -222,7 +293,7 @@ function renderReadingPanel(items: readonly ScrapbookItem[]): RawHtml {
         </div>
       </form>
       <ol class="scrapbook-items" data-scrapbook-items>
-        ${items.map((item, i) => renderItemRow(item, i))}
+        ${items.map((item, i) => renderItemRow(ctx, site, path, item, i))}
       </ol>
       <div class="scrapbook-drop" data-scrapbook-drop role="button" tabindex="0"
         aria-label="upload a file to the scrapbook">
@@ -245,7 +316,12 @@ function renderReadingPanel(items: readonly ScrapbookItem[]): RawHtml {
  * badge gives unmistakable visual differentiation from the public
  * items above.
  */
-function renderSecretSection(items: readonly ScrapbookItem[]): RawHtml {
+function renderSecretSection(
+  ctx: StudioContext,
+  site: string,
+  path: string,
+  items: readonly ScrapbookItem[],
+): RawHtml {
   return unsafe(html`
     <section class="scrapbook-secret" data-scrapbook-secret>
       <header class="scrapbook-secret-header">
@@ -264,7 +340,7 @@ function renderSecretSection(items: readonly ScrapbookItem[]): RawHtml {
       </p>
       <ol class="scrapbook-items scrapbook-items--secret">
         ${items.map((item, i) =>
-          renderItemRow(item, i, { secret: true, withTools: true }),
+          renderItemRow(ctx, site, path, item, i, { secret: true, withTools: true }),
         )}
       </ol>
     </section>`);
@@ -288,9 +364,13 @@ export function renderScrapbookPage(
   const publicBlock =
     items.length === 0
       ? renderEmpty().__raw
-      : renderReadingPanel(items).__raw + renderIndexSidebar(items, site, path).__raw;
+      : renderReadingPanel(ctx, site, path, items).__raw +
+        renderIndexSidebar(items, site, path).__raw;
 
-  const secretBlock = secretItems.length > 0 ? renderSecretSection(secretItems).__raw : '';
+  const secretBlock =
+    secretItems.length > 0
+      ? renderSecretSection(ctx, site, path, secretItems).__raw
+      : '';
 
   const body = html`
     ${renderEditorialFolio('content', `scrapbook · ${site}/${path}`)}

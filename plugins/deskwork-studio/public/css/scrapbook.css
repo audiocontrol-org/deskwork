@@ -886,3 +886,69 @@ a.er-calendar-meta-scrapbook:hover .scrapbook-chip-arrow {
 @media (prefers-reduced-motion: reduce) {
   .scrapbook-filter-chip { transition: none; }
 }
+
+/* ---------- Dispatch E (#154) — always-on peeks + sticky aside ---------- */
+
+.scrapbook-item-peek {
+  margin: 0;
+  padding: var(--er-space-2);
+  background: var(--er-paper-2);
+  border-top: 1px dashed var(--er-paper-3);
+  font-family: var(--er-font-body);
+  font-size: 0.78rem;
+  color: var(--er-ink-soft);
+  line-height: 1.45;
+  max-height: 6rem;
+  overflow: hidden;
+  position: relative;
+}
+.scrapbook-item-peek--mono {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  white-space: pre-wrap;
+  tab-size: 2;
+}
+.scrapbook-item-peek--img {
+  height: 8rem;
+  background-color: var(--er-paper-3);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  border-top: 0;
+  padding: 0;
+}
+/* fade tail to suggest more content */
+.scrapbook-item-peek--prose::after,
+.scrapbook-item-peek--mono::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 1.5rem;
+  background: linear-gradient(to top, var(--er-paper-2), transparent);
+  pointer-events: none;
+}
+
+/* Hide the peek when the card is expanded — the full body-content takes over */
+.scrapbook-item[data-state="expanded"] .scrapbook-item-peek {
+  display: none;
+}
+
+/* Sticky aside — only sticky on viewports tall enough */
+@media (min-width: 64rem) and (min-height: 50rem) {
+  .scrapbook-index {
+    position: sticky;
+    top: calc(var(--er-folio-h, 2.4rem) + 2rem);
+    align-self: start;
+  }
+}
+
+/* Visible tools bar (no longer hover-conditional) — subdued styling */
+.scrapbook-toolbar {
+  display: flex !important;
+  opacity: 0.7;
+  transition: opacity 120ms;
+}
+.scrapbook-item:hover .scrapbook-toolbar,
+.scrapbook-item:focus-within .scrapbook-toolbar {
+  opacity: 1;
+}

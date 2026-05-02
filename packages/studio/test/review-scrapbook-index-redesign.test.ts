@@ -117,3 +117,55 @@ describe('scrapbook index — Dispatch E phase 1: grid + filters + search', () =
     }
   });
 });
+
+describe('scrapbook index — Dispatch E phase 2: peeks + sticky aside', () => {
+  it('CSS defines .scrapbook-item-peek with the kind variants', () => {
+    const css = readFileSync(CSS_PATH, 'utf8');
+    expect(css).toMatch(/\.scrapbook-item-peek\s*\{/);
+    expect(css).toMatch(/\.scrapbook-item-peek--img\s*\{/);
+    expect(css).toMatch(/\.scrapbook-item-peek--prose/);
+    expect(css).toMatch(/\.scrapbook-item-peek--mono/);
+  });
+
+  it('CSS hides .scrapbook-item-peek when the card is expanded', () => {
+    const css = readFileSync(CSS_PATH, 'utf8');
+    expect(css).toMatch(
+      /\.scrapbook-item\[data-state="expanded"\]\s*\.scrapbook-item-peek\s*\{[^}]*display:\s*none/,
+    );
+  });
+
+  it('CSS makes the .scrapbook-index aside sticky on tall enough viewports', () => {
+    const css = readFileSync(CSS_PATH, 'utf8');
+    expect(css).toMatch(
+      /@media\s*\(min-width:\s*64rem\)\s*and\s*\(min-height:\s*50rem\)\s*\{[\s\S]*?\.scrapbook-index\s*\{[^}]*position:\s*sticky/,
+    );
+  });
+
+  it('renders a prose peek for markdown items at server-render time', () => {
+    const body = '# Hello\n\nFirst line.\nSecond line.\nThird line.\n';
+    const fx = makeFixture([{ name: 'a-note.md', body }]);
+    try {
+      const html = renderScrapbookPage(fx.ctx, fx.site, fx.path);
+      expect(html).toContain('class="scrapbook-item-peek scrapbook-item-peek--prose"');
+      // The peek text should contain content from the file body
+      expect(html).toContain('First line.');
+    } finally {
+      fx.cleanup();
+    }
+  });
+
+  it('renders an image peek as a background-image div for img items', () => {
+    // PNG magic bytes — not a valid full PNG, but classify() just looks
+    // at the extension, so this exercises the kind=img code path.
+    const fx = makeFixture([{ name: 'shot.png', body: 'pngbytes' }]);
+    try {
+      const html = renderScrapbookPage(fx.ctx, fx.site, fx.path);
+      expect(html).toContain('scrapbook-item-peek scrapbook-item-peek--img');
+      expect(html).toMatch(
+        /background-image:\s*url\(&quot;\/api\/dev\/scrapbook-file\?[^"]*name=shot\.png[^"]*&quot;\)/,
+      );
+    } finally {
+      fx.cleanup();
+    }
+  });
+});
