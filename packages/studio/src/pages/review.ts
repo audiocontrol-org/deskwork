@@ -39,7 +39,7 @@ import type { StudioContext } from '../routes/api.ts';
 import { html, unsafe, type RawHtml } from './html.ts';
 import { layout } from './layout.ts';
 import { renderEditorialFolio } from './chrome.ts';
-import { escapeHtml } from './html.ts';
+import { escapeHtml, gloss } from './html.ts';
 import { renderScrapbookDrawer } from './review-scrapbook-drawer.ts';
 import { existsSync } from 'node:fs';
 import { resolveCalendarPath } from '@deskwork/core/paths';
@@ -566,14 +566,14 @@ export async function renderReviewPage(
       <div class="er-strip">
         <div class="er-strip-inner">
           <a class="er-strip-back" href="/dev/editorial-studio" title="Back to the editorial studio">← studio</a>
-          <span class="er-strip-galley">Galley <em>№ ${currentVersion.version}</em></span>
+          <span class="er-strip-galley">${gloss('galley')} <em>№ ${currentVersion.version}</em></span>
           <span class="er-strip-slug">${workflow.site} / ${workflow.slug}</span>
           ${renderVersionsStrip(versions, resolvedSite, contentKind, currentVersion)}
           <span class="er-strip-center">
             <span class="er-stamp er-stamp-big er-stamp-${workflow.state}" data-state-label>
               ${stateLabel(workflow.state)}
             </span>
-            <span class="er-strip-hint" aria-hidden="true">select text to mark · double-click to edit · <kbd>?</kbd> for shortcuts</span>
+            <span class="er-strip-hint">select text to <span class="er-gloss" data-term="marginalia" tabindex="0" role="button" aria-describedby="glossary-marginalia">mark</span> · double-click to edit · <kbd>?</kbd> for shortcuts</span>
           </span>
           ${renderControlsRight(workflow)}
         </div>
