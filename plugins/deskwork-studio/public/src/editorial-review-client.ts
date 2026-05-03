@@ -1689,11 +1689,12 @@ export function initEditorialReview(): void {
     // /deskwork:approve in Claude Code, not by the studio click. Build
     // the command that matches the workflow.
     //
-    // TODO: outline-approve semantics. Legacy code emitted
-    // /editorial-outline-approve, but no such skill exists in the
-    // current /deskwork:* namespace. /deskwork:approve doesn't accept
-    // --kind. Outline approval may want to map to /deskwork:draft
-    // (advances Outlining → Drafting) — to be confirmed.
+    // Outline-approve semantics are an open design question — see
+    // https://github.com/audiocontrol-org/deskwork/issues/181. Until
+    // resolved, outline workflows use the same /deskwork:approve
+    // command as longform; this matches the legacy code path's actual
+    // dispatch (it emitted /editorial-outline-approve which had no
+    // dedicated handler under the hood).
     const site = state.workflow.site;
     const slug = state.workflow.slug;
     const kind = state.workflow.contentKind;

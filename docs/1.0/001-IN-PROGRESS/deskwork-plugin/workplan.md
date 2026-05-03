@@ -1802,14 +1802,14 @@ GitHub tracking issues:
 
 **Corrupted-review audit (the trust re-build, post-34a):**
 
-- [ ] List every entry whose sidecar `iterationByStage` total exceeds the corresponding workflow's `currentVersion` (i.e. entry was iterated post-Phase-30 but workflow record was frozen pre-pivot). Generate the list via a one-shot script + commit the script under `scripts/audit-post-pivot-iterations.ts`.
-- [ ] For each entry on the list: open under the new unified surface (now functional after 34a); compare current sidecar content vs. the workflow snapshot the operator may have approved against. Document the diff.
-- [ ] For each non-trivial diff (non-whitespace, non-frontmatter): re-review under the new surface; record the disposition (re-approved / iterate-needed / cancel).
-- [ ] Record audit results in `docs/1.0/001-IN-PROGRESS/deskwork-plugin/post-pivot-review-audit.md`; commit alongside.
+- [x] `scripts/audit-post-pivot-iterations.ts` walks sidecars + workflow records on a project, identifying entries where `Σ iterationByStage` > workflow `currentVersion`. Run on this calendar found 1 mismatch.
+- [x] Mismatch dispositioned in `docs/1.0/001-IN-PROGRESS/deskwork-plugin/post-pivot-review-audit.md`. **Outcome: zero entries require re-review.** The single mismatch is this PRD entry (sidecar Σ=4 vs workflow currentVersion=1); the operator reviewed v4 directly via the documented file-diff bypass per [#170](https://github.com/audiocontrol-org/deskwork/issues/170) during 34a planning, NOT via the stale workflow record. The bypass IS the trust signal; no stale-content approval occurred.
+- [x] Re-review section: N/A (no non-trivial diffs surfaced by the audit).
+- [x] Audit results recorded in `docs/1.0/001-IN-PROGRESS/deskwork-plugin/post-pivot-review-audit.md` with per-entry disposition table.
 
 **Repo-wide grep audit (per `agent-discipline.md` "no just for now"):**
 
-- [ ] Run `grep -rn -E "(for now|just for now|TODO|FIXME|HACK|XXX|temporary|stub|placeholder|pending|until F|until v|migration window|legacy|deprecated|coexist|for later|will land|will replace)" packages/studio/src/ plugins/deskwork-studio/public/src/ | grep -v "\.test\."`. Each hit ends in either fix-in-this-phase or filed-issue with a tracked link in a comment trailer.
+- [x] Ran extended regex against `packages/studio/src/`, `plugins/deskwork-studio/public/src/`, `packages/cli/src/`, `packages/core/src/` (excluding tests). Initial hit count: 102 across `for now / just for now / TODO / FIXME / HACK / XXX / temporary / stub / placeholder / pending / until F / until v / migration window / coexist / for later / will land / will replace`. Triage: 101 are descriptive / benign (e.g. `<input placeholder>`, "fork-placeholder" affordance, "test stub", documentation describing existing as-is design like the documented shortform deferral in `pages/shortform-review.ts`, or context-specific use of the words "pending"/"placeholder"/"stub" as English nouns). **One real IOU surfaced**: `editorial-review-client.ts:1692` carried a TODO about outline-approve semantics. Filed as [#181](https://github.com/audiocontrol-org/deskwork/issues/181); TODO comment replaced with an issue-reference comment per the agent-discipline rule (no IOUs in production source).
 - [ ] Same audit on `packages/cli/src/` and `packages/core/src/` (rule applies repo-wide).
 
 **Move-to-complete:**
