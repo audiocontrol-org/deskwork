@@ -394,3 +394,22 @@ Sign-off as drafted. Card-id namespacing (`secret-item-N` vs `item-N`) is essent
 > All 3 G3 amendments (focus-visible, dragover dashed→solid, deep-link to secret) verified live. Drop zone matches mockup with editorial restraint preserved. Secret section chrome matches mockup verbatim. Secret cards inherit section semantics with no per-card diff. Section order public → drop → secret as ratified. Aside totals reflect real secretCount.
 > Test count 344 → 348 passing (+4 F5 tests). 0 failed. 11 skipped. No regression from F4.
 
+---
+
+## G4 — F6 final integrated sign-off (2026-05-02)
+
+**Trigger:** after F1+F2+F3+F4+F5 all shipped.
+**Inputs:** integrated live page driven at 4 viewports (1440 / 1024 / 768 / 390) with rich multi-kind + secret fixture; full audit per F6.2 brief.
+
+Walkthrough captured in dedicated doc: [`2026-05-02-scrapbook-redesign-final-walkthrough.md`](./2026-05-02-scrapbook-redesign-final-walkthrough.md). This entry is the audit-trail pointer; the walkthrough doc carries the section-by-section breakdown.
+
+### Sign-off
+
+> **INTEGRATION VERIFIED — issue #161 ready for operator review and closure.**
+>
+> All 15 sections of the mockup MATCH the live integrated implementation across 4 viewports. Affordance compliance ✓. Verification compliance ✓ (every dispatch shipped with falsifiable measurements + post-implementation `/frontend-design` review). Tests 330 → 348 (+18). 0 failed. 11 skipped (all pre-existing intentional).
+>
+> Per the project's "issue closure requires verification in a formally-installed release" rule, this sign-off MARKS THE FIX AS LANDED but does NOT close the issue. Closure stays pending operator verification post-release. The agent posts evidence; the operator decides.
+>
+> **3 non-blocking follow-ups disclosed in the walkthrough doc** (JPEG/WebP/GIF dims, expanded-secret continuity, aside ellipsis). None block #161 closure.
+
