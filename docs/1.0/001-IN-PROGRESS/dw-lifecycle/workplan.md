@@ -3263,9 +3263,9 @@ This section was appended on 2026-05-03 after the implementation audit in `2026-
 
 ### Task 51: Close the deskwork-coupled convention gap for session/doc defaults
 
-- [ ] Implement the smallest useful override seam for session-start/session-end so the published defaults stop being unavoidably deskwork-specific.
-- [ ] Define the next-step boundary for feature-doc template portability (#123): either land the first slice now or explicitly document the remaining gap as deferred after the session override seam exists.
-- [ ] Keep the override mechanism consistent with the design's architecture: lifecycle orchestration stays in dw-lifecycle, project conventions move behind explicit project overrides.
+- [x] Implement the smallest useful override seam for session-start/session-end so the published defaults stop being unavoidably deskwork-specific.
+- [x] Define the next-step boundary for feature-doc template portability (#123): either land the first slice now or explicitly document the remaining gap as deferred after the session override seam exists.
+- [x] Keep the override mechanism consistent with the design's architecture: lifecycle orchestration stays in dw-lifecycle, project conventions move behind explicit project overrides.
 
 **Acceptance Criteria:**
 - The portability story improves in code, not just in issue prose.

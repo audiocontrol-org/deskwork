@@ -67,3 +67,4 @@ Close the audit gaps that currently keep `dw-lifecycle` from fully matching its 
 - `branchExists` only checks local refs; remote-only `origin/feature/<slug>` collision still creates a tracking branch.
 - `TEMPLATES_DIR` resolution via `import.meta.url` works under tsx but would break if a `dist/` build is added.
 - `parentIssue: ''` placeholder renders as empty trailing in the README template until `dw-lifecycle issues` runs.
+- The journal-entry override seam is the first portability slice. Broader feature-doc template/file-layout customization remains deferred under [#123](https://github.com/audiocontrol-org/deskwork/issues/123).

@@ -12,7 +12,10 @@ Wrap up a session. Append a structured journal entry, update feature docs, commi
 1. Identify active feature.
 2. Update `<feature-dir>/README.md` status table (check off completed acceptance criteria, update phase status).
 3. Update `<feature-dir>/workplan.md` (check off completed task steps).
-4. Compose journal entry following the canonical format:
+4. Determine the journal-entry template path:
+   - use `.dw-lifecycle/templates/journal-entry.md` if the project customized it
+   - otherwise use the bundled default copied by `/dw-lifecycle:customize templates journal-entry`
+5. Compose the journal entry from that template. The bundled default is intentionally generic:
 
 ```markdown
 ## YYYY-MM-DD: [Session Title]
@@ -21,27 +24,25 @@ Wrap up a session. Append a structured journal entry, update feature docs, commi
 
 **Goal:** ...
 **Accomplished:** ...
-**Didn't Work:** ...
-**Course Corrections:** ...
-**Quantitative:** ...
-**Insights:** ...
+
+[Add, remove, or rename sections to match this project's journaling style.]
 ```
 
-5. Append the entry via the helper:
+6. Append the entry via the helper:
 
 ```
 dw-lifecycle journal-append --file <entry.md>
 ```
 
-6. Read `config.session.end.preamble` and display any project-specific wrap-up text.
-7. Commit all documentation changes:
+7. Read `config.session.end.preamble` and display any project-specific wrap-up text.
+8. Commit all documentation changes:
 
 ```
 git add <feature-dir> DEVELOPMENT-NOTES.md
 git commit -m "docs: session-end <YYYY-MM-DD> [<slug>]"
 ```
 
-8. Report: commit hash, files changed, journal-entry summary.
+9. Report: commit hash, files changed, journal-entry summary.
 
 ## Error handling
 

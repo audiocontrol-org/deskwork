@@ -12,9 +12,12 @@ Bootstrap a session. Reads the active feature's workplan, last journal entry, an
 1. Identify the active feature from worktree name + branch.
 2. Read `config.session.start.preamble` from `.dw-lifecycle/config.json` (project-specific bootstrap text — e.g., "check the Grafana dashboard before coding"). Display it.
 3. Read the feature's `README.md` (status table, current phase) and `workplan.md` (next unchecked task).
-4. Read the latest entry from `DEVELOPMENT-NOTES.md` referencing this slug.
-5. Run `gh issue list --state open --search <slug>` to surface relevant issues.
-6. Report context to the operator. Do NOT start work until they confirm the session goal.
+4. Determine the journal-entry template path:
+   - use `.dw-lifecycle/templates/journal-entry.md` if the project customized it
+   - otherwise use the bundled default copied by `/dw-lifecycle:customize templates journal-entry`
+5. Read the latest entry from `DEVELOPMENT-NOTES.md` referencing this slug. Summarize it according to the sections that actually exist in the project's journal template; do not assume deskwork's detailed taxonomy if the project uses a different shape.
+6. Run `gh issue list --state open --search <slug>` to surface relevant issues.
+7. Report context to the operator. Do NOT start work until they confirm the session goal.
 
 ## Error handling
 
