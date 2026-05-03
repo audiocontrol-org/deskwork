@@ -92,9 +92,17 @@
       "types": "./dist/iterate/iterate.d.ts",
       "default": "./dist/iterate/iterate.js"
     },
+    "./iterate/history": {
+      "types": "./dist/iterate/history.d.ts",
+      "default": "./dist/iterate/history.js"
+    },
     "./calendar/regenerate": {
       "types": "./dist/calendar/regenerate.d.ts",
       "default": "./dist/calendar/regenerate.js"
+    },
+    "./entry/annotations": {
+      "types": "./dist/entry/annotations.d.ts",
+      "default": "./dist/entry/annotations.js"
     },
     "./entry/approve": {
       "types": "./dist/entry/approve.d.ts",

@@ -7,6 +7,14 @@
  * Mirrors the audiocontrol Astro routes byte-for-byte so the existing
  * client code (editorial-review-client.ts, editorial-studio-client.ts)
  * keeps working without changes.
+ *
+ * Phase 34 split contract: endpoints under `/entry/:entryId/*` are the
+ * canonical longform surface and operate on entry UUIDs. Bare
+ * workflow-keyed endpoints (`/annotate`, `/annotations`, `/decision`,
+ * `/workflow`, `/version`, `/start-shortform`) remain for shortform
+ * pending its own migration phase. The two surfaces do not interoperate
+ * — workflow-keyed annotations are NOT visible from entry-keyed
+ * endpoints, and vice versa.
  */
 
 import { Hono } from 'hono';
@@ -24,9 +32,18 @@ import { approveEntryStage } from '@deskwork/core/entry/approve';
 import { blockEntry } from '@deskwork/core/entry/block';
 import { cancelEntry } from '@deskwork/core/entry/cancel';
 import { inductEntry } from '@deskwork/core/entry/induct';
+import {
+  addEntryAnnotation,
+  listEntryAnnotations,
+  mintEntryAnnotation,
+} from '@deskwork/core/entry/annotations';
+import { readSidecar } from '@deskwork/core/sidecar';
+import { iterateEntry } from '@deskwork/core/iterate';
 import type { Stage } from '@deskwork/core/schema/entry';
 import type { DeskworkConfig } from '@deskwork/core/config';
 import type { OverrideResolver } from '@deskwork/core/overrides';
+import type { DraftAnnotation } from '@deskwork/core/review/types';
+import { parseEntryAnnotationBody } from './entry-annotation-body.ts';
 
 const VALID_STAGES = new Set<Stage>([
   'Ideas', 'Planned', 'Outlining', 'Drafting', 'Final', 'Published',
@@ -34,6 +51,10 @@ const VALID_STAGES = new Set<Stage>([
 
 function isStage(value: unknown): value is Stage {
   return typeof value === 'string' && VALID_STAGES.has(value as Stage);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /**
@@ -292,6 +313,109 @@ export function createApiRouter(ctx: StudioContext): Hono {
       return c.json(r);
     } catch (err) {
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+    }
+  });
+
+  // Phase 34a entry-keyed longform endpoints (#170 / #171).
+  // These nest under the same `/entry/:entryId/` prefix as the stage
+  // actions above; together they form the canonical longform surface.
+
+  // POST /api/dev/editorial-review/entry/:entryId/annotate
+  app.post('/entry/:entryId/annotate', async (c) => {
+    const entryId = c.req.param('entryId');
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'invalid JSON body' }, 400);
+    }
+    const parsed = parseEntryAnnotationBody(body);
+    if (parsed.kind === 'err') {
+      return c.json({ error: parsed.message }, parsed.status);
+    }
+    try {
+      await readSidecar(ctx.projectRoot, entryId);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const status = msg.startsWith('sidecar not found') ? 404 : 500;
+      return c.json({ error: `unknown entry: ${entryId}` }, status);
+    }
+    const minted: DraftAnnotation = mintEntryAnnotation(parsed.draft);
+    await addEntryAnnotation(ctx.projectRoot, entryId, minted);
+    return c.json({ annotation: minted });
+  });
+
+  // GET /api/dev/editorial-review/entry/:entryId/annotations
+  app.get('/entry/:entryId/annotations', async (c) => {
+    const entryId = c.req.param('entryId');
+    const annotations = await listEntryAnnotations(ctx.projectRoot, entryId);
+    return c.json({ annotations });
+  });
+
+  // POST /api/dev/editorial-review/entry/:entryId/decision
+  // Accepts the stage-changing decisions only: approve, block, cancel.
+  // Other decision values are explicitly rejected with 400 — see
+  // https://github.com/audiocontrol-org/deskwork/issues/171 (Phase 34a
+  // umbrella) for the contract scope.
+  app.post('/entry/:entryId/decision', async (c) => {
+    const entryId = c.req.param('entryId');
+    let parsed: unknown;
+    try {
+      parsed = await c.req.json();
+    } catch {
+      return c.json({ error: 'invalid JSON body' }, 400);
+    }
+    if (!isRecord(parsed)) {
+      return c.json({ error: 'expected JSON object body' }, 400);
+    }
+    const decision = parsed.decision;
+    if (typeof decision !== 'string') {
+      return c.json({ error: "decision is required (one of 'approve' | 'block' | 'cancel')" }, 400);
+    }
+    const reason = typeof parsed.reason === 'string' ? parsed.reason : undefined;
+    try {
+      switch (decision) {
+        case 'approve': {
+          const r = await approveEntryStage(ctx.projectRoot, { uuid: entryId });
+          return c.json(r);
+        }
+        case 'block': {
+          const r = await blockEntry(ctx.projectRoot, {
+            uuid: entryId,
+            ...(reason !== undefined ? { reason } : {}),
+          });
+          return c.json(r);
+        }
+        case 'cancel': {
+          const r = await cancelEntry(ctx.projectRoot, {
+            uuid: entryId,
+            ...(reason !== undefined ? { reason } : {}),
+          });
+          return c.json(r);
+        }
+        default:
+          return c.json(
+            { error: `decision '${decision}' is not supported on this endpoint (valid: approve | block | cancel)` },
+            400,
+          );
+      }
+    } catch (err) {
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 400);
+    }
+  });
+
+  // POST /api/dev/editorial-review/entry/:entryId/version
+  // Records a new iteration of the on-disk artifact for the entry's
+  // current stage. Returns the IterateResult shape directly.
+  app.post('/entry/:entryId/version', async (c) => {
+    const entryId = c.req.param('entryId');
+    try {
+      const r = await iterateEntry(ctx.projectRoot, { uuid: entryId });
+      return c.json(r);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const status = msg.startsWith('sidecar not found') ? 404 : 400;
+      return c.json({ error: msg }, status);
     }
   });
 
