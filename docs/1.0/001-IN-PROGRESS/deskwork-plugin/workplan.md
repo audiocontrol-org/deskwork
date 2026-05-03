@@ -1687,16 +1687,19 @@ GitHub tracking issues:
 
 - [ ] Read entry state from `.deskwork/entries/<uuid>.json` sidecar (already entry-centric)
 - [ ] Read iteration content from `.deskwork/review-journal/history/<timestamp>-<event>.json` events (the `iterateEntry` path)
-- [ ] Read annotations from a NEW entry-keyed annotation store (current annotations are workflow-keyed; design + implement entry-keyed equivalent OR migrate workflow annotations to entry annotations as part of 34a)
-- [ ] All API endpoints (`/api/dev/editorial-review/*`) that today take workflow IDs accept entry UUIDs; contract documented
+- [ ] Design + implement an entry-keyed annotation store. Two options to evaluate at 34a kickoff: (i) brand-new store keyed on `entryId` (clean break, ignores existing workflow-keyed annotations); (ii) one-shot migration script that copies workflow-keyed annotations onto matching entries by joining on the workflow's content/slug. Option (i) is simpler; option (ii) preserves prior margin notes. Operator decides at kickoff.
+- [ ] Add new entry-keyed annotation + decision endpoints under the existing `/entry/:entryId/...` pattern (mirrors `routes/api.ts:222-225`): `POST /api/dev/editorial-review/entry/:entryId/annotate`, `GET /api/dev/editorial-review/entry/:entryId/annotations`, `POST /api/dev/editorial-review/entry/:entryId/decision`, `POST /api/dev/editorial-review/entry/:entryId/version`. The longform unified surface uses these.
+- [ ] **Existing workflow-keyed endpoints stay untouched** for shortform: `POST /annotate`, `GET /annotations`, `POST /decision`, `GET /workflow`, `POST /version`, `POST /start-shortform`. They are not re-pointed to entry UUIDs in 34a — that migration follows shortform's own retirement phase.
+- [ ] Document the split contract in `routes/api.ts` header comments: "Entry-keyed endpoints under `/entry/:entryId/*` are the canonical longform surface. Bare workflow-keyed endpoints remain for shortform pending its own migration phase."
 
 **Delete legacy code paths:**
 
-- [ ] **Delete `packages/studio/src/pages/review.ts` entirely** (710 lines). Not move-to-deprecated. Delete.
-- [ ] Delete legacy routes in `server.ts:347-417` (workflow-id branch + entry-id legacy branch + slug catch-all). Replace with: bare `/dev/editorial-review/<uuid>` 301-redirects to `/dev/editorial-review/entry/<uuid>` for in-flight bookmarks.
-- [ ] **File new issue (and link in workplan):** retire the bare-UUID 301 redirect in the next phase. The redirect is itself a backwards-compat shim with an explicit retirement issue, not a "for later" code comment.
-- [ ] Delete `renderReviewPage`, `prepareRender`, `lookupReviewEntry`, `errorFromBody`, `pickContentKind`, `pickSite`, `stringField`, `stateLabel`, `pendingSkillCmd`, `shortcutChipWrap` (move to entry-review where still needed), `renderError`, `renderShortcutsOverlay`, `renderMarginaliaTab`, `renderMarginalia`, `renderEditToolbar`, `renderEditPanes`, `renderOutlineDrawer` (relocate to entry-review).
-- [ ] Delete the workflow-id resolution code paths kept alive only because legacy longform/outline routes read them. `readWorkflow`, `readVersions`, `appendVersion`, `transitionState` for longform/outline. **Shortform paths stay** (operator-confirmed deferral; tracked in a new dedicated issue with explicit acceptance criteria for "shortform migrates to entry-centric," not a code comment).
+- [ ] **Extract the shortform-rendering subset of `pages/review.ts` into a new `packages/studio/src/pages/shortform-review.ts`** — only what the workflow-keyed shortform path actually needs. The slim file likely retains: `renderReviewPage` (renamed `renderShortformReviewPage` or similar) restricted to the `kind: 'workflow'` branch + the helpers it depends on (`prepareRender`, `errorFromBody`, `pickContentKind`, `pickSite`, `stringField`, `stateLabel`, `renderError`).
+- [ ] **Delete `packages/studio/src/pages/review.ts` entirely** (710 lines). All longform/outline rendering moves into `pages/entry-review.ts`. The shortform extraction is the only escape hatch.
+- [ ] Restructure routes in `server.ts:347-417`. The bare-UUID `:id` route becomes: try workflow-id resolution (renders shortform via the new `pages/shortform-review.ts`); if no workflow record matches, 301-redirect to `/dev/editorial-review/entry/<uuid>`. Delete the entry-id legacy fallback (lines 402-415) and the `:slug` catch-all (line 428+).
+- [ ] **File new issue (and link in workplan):** retire the bare-UUID 301 redirect AND retire `pages/shortform-review.ts` in the shortform-migration phase. Both are backwards-compat shims with explicit retirement issues, not "for later" code comments.
+- [ ] Move into `pages/entry-review.ts` (relocate, not duplicate): `renderShortcutsOverlay`, `renderMarginaliaTab`, `renderMarginalia`, `renderEditToolbar`, `renderEditPanes`, `renderOutlineDrawer`, `pendingSkillCmd`, `shortcutChipWrap`. These are longform-specific.
+- [ ] Delete the longform-only callers of `readWorkflow`, `readVersions`, `appendVersion`, `transitionState`. **Shortform callers stay** (operator-confirmed deferral; tracked in a new dedicated issue with explicit acceptance criteria for "shortform migrates to entry-centric," not a code comment).
 - [ ] Delete the *"intentionally minimal"* / *"styling will land once the affordance set stabilizes"* self-comments at `entry-review.ts:14-18`.
 - [ ] Delete the *"DEPRECATED (pipeline-redesign Task 35)"* / *"both coexist during the migration window"* / *"this route is removed once every dashboard surface and operator skill points at the entry route"* comments at `server.ts:332-355`.
 - [ ] Delete the entry-first-short-circuit-was-a-regression explainer comment at `server.ts:373-384` (no longer relevant once the legacy paths are gone).
@@ -1713,28 +1716,19 @@ GitHub tracking issues:
 - [ ] `packages/studio/src/routes/api.ts:66` (`reviewUrl` field)
 - [ ] Operator-facing skill prose: `/feature-extend`, `/feature-setup`, any other skill that surfaces a review URL
 - [ ] `packages/cli/` URL printers (e.g. `deskwork iterate` reports a `state: in-review` JSON; verify that any URL it prints is entry-keyed)
+- [ ] `plugins/deskwork-studio/public/src/editorial-studio-client.ts:178` — post-`start-longform` redirect emits `/dev/editorial-review/${slug}`; switch to entry-keyed once the longform start handler returns the entry uuid
 
-**Audit corrupted reviews (the trust re-build):**
-
-- [ ] List every entry whose sidecar `iterationByStage` total exceeds the corresponding workflow's `currentVersion` (i.e. entry was iterated post-Phase-30 but workflow record was frozen pre-pivot). Generate the list via a one-shot script + commit the script under `scripts/audit-post-pivot-iterations.ts`.
-- [ ] For each entry on the list: open under the new unified surface; compare current sidecar content vs. the workflow snapshot the operator may have approved against. Document the diff.
-- [ ] For each non-trivial diff (non-whitespace, non-frontmatter): re-review under the new surface; record the disposition (re-approved / iterate-needed / cancel).
-- [ ] Record audit results in `docs/1.0/001-IN-PROGRESS/deskwork-plugin/post-pivot-review-audit.md`; commit alongside.
-
-**Delete-comments grep audit:**
-
-- [ ] Run `grep -rn -E "(for now|just for now|TODO|FIXME|HACK|XXX|temporary|stub|placeholder|pending|until F|until v|migration window|legacy|deprecated|coexist|for later|will land|will replace)" packages/studio/src/ plugins/deskwork-studio/public/src/ | grep -v "\.test\."`. Each hit ends in either fix-in-this-phase or filed-issue with a tracked link in a comment trailer. No code-comment IOUs allowed.
-- [ ] Same audit on `packages/cli/src/` and `packages/core/src/` (the agent-discipline rule applies repo-wide, not just to studio).
+**Audit work — moved out of 34a's acceptance gate.** Both audits below depend on 34a having shipped (no working unified surface = no place to re-review against; no clean baseline = grep results are noisy). They run as part of 34e's verification + closure phase, NOT as 34a-blocking criteria. See 34e for the corrupted-review audit + the repo-wide grep audit. This split keeps 34a's structural fix shippable as a single coherent PR; the audits ship in their own PR(s) once 34a is on a release.
 
 **Verification:**
 
 - [ ] `pages/review.ts` does not exist (`test ! -f packages/studio/src/pages/review.ts`)
-- [ ] `git grep -i 'legacy' packages/studio/` returns zero hits
-- [ ] `git grep -E '(workflow-keyed|migration window|coexist during|will land later|stylings? will land|intentionally minimal)' packages/studio/src/` returns zero hits
+- [ ] `git grep -i 'legacy' packages/studio/src/` returns zero hits except in the new `pages/shortform-review.ts` header comment (which explicitly names shortform's deliberate deferral)
+- [ ] `git grep -E '(migration window|coexist during|will land later|stylings? will land|intentionally minimal)' packages/studio/src/` returns zero hits (note: "workflow-keyed" is permitted in `routes/api.ts` and `pages/shortform-review.ts` where it documents the shortform-deferral split contract per line 1693 above)
 - [ ] Live: dashboard click on any Drafting entry lands on `/dev/editorial-review/entry/<uuid>`; the page renders the press-check chrome (folio + version strip + edit toolbar + outline drawer + marginalia + scrapbook drawer); margin-note authoring works; the displayed content matches the file on disk.
 - [ ] Live: clicking Iterate on the studio + running `deskwork iterate` snapshots the current file content as the next version; the unified surface re-renders with the new version.
 - [ ] **The Phase 34 PRD review can be completed end-to-end via the studio UI alone.** This acceptance criterion is the structural inverse of the trigger: until the PRD-under-review can itself be reviewed via the studio, 34a is not done.
-- [ ] Studio test count increases by at least 30 across 34a (component tests for the merged surface, route tests for the deleted legacy routes returning 301, audit-script tests, annotation-store tests).
+- [ ] Studio test count increases by at least 25 across 34a (component tests for the merged entry-review surface, route tests for the bare-UUID route's workflow-id-then-301 behavior, route tests asserting the deleted slug catch-all returns 404, annotation-store tests, entry-keyed endpoint tests). The audit-script tests and grep-audit tests live in 34e.
 
 **Acceptance:** 34a closes when all the bullets above check off + at least one new release has shipped to npm + marketplace + the operator has run `/plugin marketplace update deskwork` and successfully reviewed a real entry end-to-end via the dashboard's link.
 
@@ -1776,24 +1770,40 @@ GitHub tracking issues:
 
 **Acceptance:** 34d closes when #151 and #153 are fix-landed in a release + #158 has been split into 3+ specific child issues with this phase closing the umbrella + #152 is verified closed by 34a's work.
 
-#### 34e — v0.13.0 verification + issue closures
+#### 34e — v0.13.0 verification + issue closures + post-34a audits
 
-(Was 34d.) Cannot run until at least one tranche has shipped to release (typically 34a).
+(Was 34d.) Cannot run until at least one tranche has shipped to release (typically 34a). Picks up the corrupted-review audit + the repo-wide grep audit that were demoted out of 34a's acceptance gate (both depend on 34a having shipped).
+
+**Marketplace verification (per `agent-discipline.md` "Issue closure requires verification in a formally-installed release"):**
 
 - [ ] Boot marketplace v0.13.0 install in a clean Claude Code session (`/plugin marketplace update deskwork`) on a fresh terminal — explicitly NOT through the workspace dev-bin
 - [ ] Walk F1–F6 scrapbook surfaces at 4 viewports (1440 / 1024 / 768 / 390); verify all 15 mockup sections still match per the F6 walkthrough doc
 - [ ] Walk longform-review redesign surfaces (#154 dispatches A–E acceptance) at desktop / tablet / phone — using the new unified surface from 34a
-- [ ] Verify fixes for #155 / #159 / #160 against the released artifact (per `agent-discipline.md` "Issue closure requires verification in a formally-installed release")
+- [ ] Verify fixes for #155 / #159 / #160 against the released artifact
 - [ ] Post staged fix-landed comments on #154, #155, #159, #160, #161; close each issue
-- [ ] Run the agent-discipline grep audit on the entire studio (`for now` / `just for now` / `TODO` / `FIXME` / etc.); each hit becomes fix-in-this-phase or filed-issue
+
+**Corrupted-review audit (the trust re-build, post-34a):**
+
+- [ ] List every entry whose sidecar `iterationByStage` total exceeds the corresponding workflow's `currentVersion` (i.e. entry was iterated post-Phase-30 but workflow record was frozen pre-pivot). Generate the list via a one-shot script + commit the script under `scripts/audit-post-pivot-iterations.ts`.
+- [ ] For each entry on the list: open under the new unified surface (now functional after 34a); compare current sidecar content vs. the workflow snapshot the operator may have approved against. Document the diff.
+- [ ] For each non-trivial diff (non-whitespace, non-frontmatter): re-review under the new surface; record the disposition (re-approved / iterate-needed / cancel).
+- [ ] Record audit results in `docs/1.0/001-IN-PROGRESS/deskwork-plugin/post-pivot-review-audit.md`; commit alongside.
+
+**Repo-wide grep audit (per `agent-discipline.md` "no just for now"):**
+
+- [ ] Run `grep -rn -E "(for now|just for now|TODO|FIXME|HACK|XXX|temporary|stub|placeholder|pending|until F|until v|migration window|legacy|deprecated|coexist|for later|will land|will replace)" packages/studio/src/ plugins/deskwork-studio/public/src/ | grep -v "\.test\."`. Each hit ends in either fix-in-this-phase or filed-issue with a tracked link in a comment trailer.
+- [ ] Same audit on `packages/cli/src/` and `packages/core/src/` (rule applies repo-wide).
+
+**Move-to-complete:**
+
 - [ ] Move feature docs to `003-COMPLETE/` only when ALL sub-phases (34a, 34b, 34c, 34d) have closed-or-decision dispositions
 
-**Acceptance:** 34e closes when issues #154, #155, #159, #160, #161 are CLOSED on GitHub + the grep audit returns zero unexplained hits.
+**Acceptance:** 34e closes when issues #154, #155, #159, #160, #161 are CLOSED on GitHub + the corrupted-review audit doc is committed with every listed entry having a recorded disposition + the repo-wide grep audit returns zero unexplained hits.
 
 **Notes:**
 
 - 34a is the first proof-of-work for the new `agent-discipline.md` "no just for now" rule (commit `42eb837`). The legacy review surface is the textbook example of the failure mode; deleting it is the rule's first victory.
-- The audit-corrupted-reviews task is non-optional. Past trust failures are exactly the cost of letting "for now" stay around — the trust must be rebuilt by re-reviewing the affected entries against current state. Skipping the audit because "the file is on disk so the work is probably fine" is the same shape failure: a code-comment IOU about correctness instead of a verified disposition.
+- The audit-corrupted-reviews task is non-optional and lives in 34e (it can only run once 34a's structural fix has shipped — there's no working unified surface to re-review against until then). Past trust failures are exactly the cost of letting "for now" stay around; the trust must be rebuilt by re-reviewing the affected entries against current state. Skipping the audit because "the file is on disk so the work is probably fine" is the same shape failure: a code-comment IOU about correctness instead of a verified disposition.
 - Dispatch order: 34a → 34b → 34c → 34d → 34e. None of the others can start until 34a ships, because every other sub-phase's verification depends on a working studio review surface.
 - This phase ships across multiple PRs and likely multiple release versions. 34a alone is large enough that it may need its own internal task breakdown — that breakdown happens at the start of 34a implementation, not during this PRD review.
 - The pattern of "filed during dogfood" follow-ups remains the signal: if 34a surfaces new issues during implementation (likely it will — porting 710 lines of chrome will turn over rocks), they get filed in real time per `agent-discipline.md`, not bundled into a future "Phase 35" pre-emptively.
