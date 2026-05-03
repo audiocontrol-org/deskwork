@@ -56,6 +56,8 @@ Verification at landing: 63/63 vitest tests pass, tsc clean, plugin manifest val
 
 The reopened remediation arc is complete. The follow-up audit now finds the feature substantially aligned with its PRD/design, and the remaining items are narrow hardening or deferred portability backlog rather than blockers for this feature.
 
+Merge prep is complete and PR [#172](https://github.com/audiocontrol-org/deskwork/pull/172) is open against `main`.
+
 ## Open follow-ups (non-blockers)
 
 - `targetVersion` arg not validated at the CLI boundary (slug is). Path traversal via `--target ../../etc` would still escape the docs tree; same fix pattern as slug.

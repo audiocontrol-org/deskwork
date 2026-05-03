@@ -1151,3 +1151,50 @@ Phase 20 (outline-as-scrapbook + sandbox migration) is the natural follow-up —
 **Next session:**
 
 Phase 4 (dogfood) is manual validation work the user should drive: install the plugin in `~/work/audiocontrol.org`, run `/deskwork:install` to produce a real config, then add/plan/draft/publish against the live calendar and compare with the old `/editorial-*` skills. No new code until Phase 4 surfaces any gaps.
+
+---
+
+## 2026-05-03: dw-lifecycle reopened remediation arc closeout + PR ship
+
+### Feature: dw-lifecycle
+### Worktree: deskwork-dw-lifecycle
+
+**Goal:** Finish the reopened `dw-lifecycle` remediation arc from the 2026-05-03 implementation audit, close the PRD-conformance gaps in code, rerun the audit, and prepare the long-running branch for merge without using `feature-complete`.
+
+**Accomplished:**
+
+- Removed deskwork-plugin dogfooding gates from the repo's `/feature-*` skill family so implementation approval is based on direct in-repo PRD/workplan review instead of unstable deskwork workflow state.
+- Closed the Phase 9 remediation tasks in `plugins/dw-lifecycle`:
+  - real peer-plugin detection in `doctor`
+  - install probing / `--dry-run` / unknown-flag rejection
+  - PRD-first `setup` with `deskwork.id`
+  - real cross-version retargeting with `--from-target`
+  - journal-entry template override seam plus `customize templates journal-entry`
+- Wrote the follow-up conformance audit at `docs/1.0/001-IN-PROGRESS/dw-lifecycle/2026-05-03-post-remediation-audit.md`.
+- Updated the feature README/workplan to mark Phases 7-9 complete and record PR [#172](https://github.com/audiocontrol-org/deskwork/pull/172).
+- Ran `feature-ship`, pushed the branch, and opened PR #172 against `main`.
+
+**Didn't Work:**
+
+- The GitHub connector could not create the PR on `audiocontrol-org/deskwork` (`403 Resource not accessible by integration`). I had to fall back to `gh pr create`.
+- Full-suite green status is still blocked in this sandbox by `tsx` IPC pipe failures in `plugins/dw-lifecycle/src/__tests__/cli.test.ts`. The CLI dispatcher assertions themselves are not what failed; the spawned `tsx` runtime could not open its pipe.
+
+**Course Corrections:**
+
+- [PROCESS] Stopped treating `feature-complete` as mandatory for this branch shape. The branch is long-running and reuses `feature-extend`, so the right ship state here is "PR open, docs stay in `001-IN-PROGRESS`" rather than forcing a `003-COMPLETE` move.
+- [DOCUMENTATION] The first pass at the Task 52 closeout duplicated the Phase 7 status row in the feature README. Corrected immediately before commit.
+- [PROCESS] The reopened workplan still contains historical unchecked items from obsolete release-gate steps and dummy examples. For ship readiness I treated the active remediation section, not raw unchecked-box count, as the source of truth.
+
+**Quantitative:**
+
+- Messages: ~10
+- Commits: 7 (`543f20e`, `c4bdaaf`, `712339b`, `c0057ac`, `eab09bc`, `4bd18d6`, `eec8eed`)
+- Corrections: 2
+- Files changed: 23
+
+**Insights:**
+
+- The biggest blocker in the `/feature-*` family was not "missing deskwork discipline"; it was unstable dogfooding against a workflow layer that was not yet trustworthy enough to gate real work. Direct PRD/workplan approval is the right local contract until the deskwork lifecycle stabilizes.
+- The reopened audit pattern worked. The first audit was specific enough to become an executable remediation list, and the second audit gave a crisp stop condition for the arc instead of letting "conformance" stay vague.
+- The remaining `cli.test.ts` failures are a good example of why environment-caused red tests should be documented precisely rather than hand-waved as "flaky." The error is deterministic here: `tsx` IPC pipe creation gets `EPERM` in this sandbox.
+- Long-running feature branches need a different closeout posture than one-shot branches. Keeping the docs in `001-IN-PROGRESS` while still running `feature-ship` preserved history and avoided a fake "done forever" signal.

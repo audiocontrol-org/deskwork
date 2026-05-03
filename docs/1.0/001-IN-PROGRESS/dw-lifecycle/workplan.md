@@ -3279,3 +3279,8 @@ This section was appended on 2026-05-03 after the implementation audit in `2026-
 
 **Acceptance Criteria:**
 - The new audit can honestly describe `dw-lifecycle` as substantially conformant to its PRD/design, or it clearly enumerates the remaining blockers.
+
+**Ship note (2026-05-03):**
+- `feature-ship` completed for the reopened arc.
+- PR opened: [#172](https://github.com/audiocontrol-org/deskwork/pull/172)
+- Validation at ship time: `npx tsc --noEmit -p plugins/dw-lifecycle/tsconfig.json` passed; `npm test --workspace plugins/dw-lifecycle` remained blocked only by sandbox-only `tsx` IPC failures in `src/__tests__/cli.test.ts`.

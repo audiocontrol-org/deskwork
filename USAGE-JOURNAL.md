@@ -943,3 +943,36 @@ The fix that landed makes dw-lifecycle's CLI surface match deskwork's and deskwo
 **GG. Closing five obsolete Phase-23-era issues was clarifying.** The issue list shrunk from 30 open to 26 open, and the remaining 26 are honestly active. Stale issues are noise that mask the real signal. Audit-and-close is cheap; the cost of leaving them open is paid every time someone reads the issue list.
 
 **HH. dw-lifecycle's parallel-branch landing was clean.** 42 commits, fast-forward, no conflicts. Both branches advanced from the same shared base (`b24fe77` chore-release commit) without diverging. The trunk-based "merge from main into feature, push to main" pattern worked exactly as the (newly-documented) RELEASING.md "Branch model: trunk-based" section describes. Two parallel agent sessions composed cleanly.
+
+---
+
+## 2026-05-03: dw-lifecycle reopened remediation arc + feature workflow dogfood correction
+
+### Surface exercised
+
+- repo-local `/feature-*` Codex workflow
+- `plugins/dw-lifecycle` helper/test surface
+- `feature-ship` PR-prep path on a long-running branch
+
+### What was exercised
+
+- `feature-implement` across the reopened remediation tasks
+- `feature-ship` without `feature-complete`
+- full plugin test/typecheck validation as the merge gate
+- PR creation after the remediation audit closed the conformance loop
+
+### Friction
+
+- The repo's `/feature-*` family was still trying to dogfood deskwork workflow state that is currently too unstable to be a reliable gate. In practice this blocked straightforward implementation with false negatives around PRD readiness.
+- The GitHub connector could not create the PR on this repo, so PR creation had to fall back to `gh`.
+- `npm test --workspace plugins/dw-lifecycle` still produces red `cli.test.ts` results in this sandbox because spawned `tsx` processes cannot create their IPC pipe.
+
+### Outcome
+
+- Removing the dogfooding gate made the feature workflow usable again: PRD/workplan approval is now checked directly in repo state.
+- The reopened remediation arc then moved cleanly through implementation, audit, and PR creation.
+- PR opened: [#172](https://github.com/audiocontrol-org/deskwork/pull/172)
+
+### Insight
+
+- A workflow plugin should not be allowed to block real work based on another workflow layer that is itself still in flux. Temporary direct-state checks are better than recursively dogfooding an unstable gate.
