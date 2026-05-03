@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "plugins": {
+    "superpowers@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/Users/test/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.7",
+        "version": "5.0.7"
+      }
+    ],
+    "frontend-design@claude-plugins-official": [
+      {
+        "scope": "project",
+        "projectPath": "/Users/test/work/sample-project",
+        "installPath": "/Users/test/.claude/plugins/cache/claude-plugins-official/frontend-design/unknown",
+        "version": "unknown"
+      }
+    ]
+  }
+}

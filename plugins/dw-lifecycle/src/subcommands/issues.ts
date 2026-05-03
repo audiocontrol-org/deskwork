@@ -4,7 +4,7 @@ import { loadConfig } from '../config.js';
 import { resolveFeaturePath } from '../docs.js';
 import { repoRoot } from '../repo.js';
 import { createParentIssue, createPhaseIssues } from '../tracking-github.js';
-import { validateSlug } from '../slug.js';
+import { validateSlug, validateTargetVersion } from '../slug.js';
 
 interface IssuesArgs {
   slug: string;
@@ -66,6 +66,9 @@ function extractPhases(workplan: string): Array<{ name: string; body: string }> 
 export async function issues(parsedArgs: string[]): Promise<void> {
   const { slug, targetVersion, repo } = parseArgs(parsedArgs);
   validateSlug(slug);
+  if (targetVersion) {
+    validateTargetVersion(targetVersion);
+  }
 
   const root = repoRoot();
   const cfg = loadConfig(root);

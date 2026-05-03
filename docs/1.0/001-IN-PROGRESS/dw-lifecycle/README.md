@@ -3,7 +3,7 @@ slug: dw-lifecycle
 targetVersion: "1.0"
 date: 2026-04-29
 branch: feature/deskwork-dw-lifecycle
-parentIssue:
+parentIssue: 134
 ---
 
 # Feature: dw-lifecycle
@@ -20,6 +20,9 @@ Project lifecycle orchestration plugin for Claude Code. Composes `superpowers` (
 | 4 | Tracking + transitions + journal (`journal-append`, `transition`, `issues`) | Complete |
 | 5 | Skills (15 SKILL.md content rewrites) | Complete |
 | 6 | Release prep (README, smoke, audit) | Complete |
+| 7 | Post-ship bug fixes (`setup` / `define` / install-path follow-up) | Complete |
+| 8 | Customize hooks / tailoring seam | Complete |
+| 9 | PRD conformance hardening (audit-driven remediation) | Complete |
 
 ## Key Links
 
@@ -28,7 +31,13 @@ Project lifecycle orchestration plugin for Claude Code. Composes `superpowers` (
 - Workplan: `workplan.md`
 - Plugin source: `plugins/dw-lifecycle/`
 - Local smoke: `scripts/smoke-dw-lifecycle.sh`
-- Parent Issue: <parentIssue>
+- Parent Issue: #134
+
+## Reopened Follow-Up
+
+`dw-lifecycle` originally shipped on `main` at v0.9.6, but the feature has since been reopened for post-ship follow-up work under [#134](https://github.com/audiocontrol-org/deskwork/issues/134), with Phase 7 tracked in [#135](https://github.com/audiocontrol-org/deskwork/issues/135) and Phase 8 tracked in [#136](https://github.com/audiocontrol-org/deskwork/issues/136).
+
+This directory has been moved back to `001-IN-PROGRESS` so the documentation state matches the active issue state and branch intent.
 
 ## Release status
 
@@ -38,9 +47,20 @@ T46 workplan steps 4–6 (per-plugin tag, PR open, operator-merge) are obsolete 
 
 Verification at landing: 63/63 vitest tests pass, tsc clean, plugin manifest validates, local smoke (`scripts/smoke-dw-lifecycle.sh`) passes against a fresh tmp repo, bin shim's first-run npm install verified.
 
+## Audit
+
+- 2026-05-03 implementation audit: `2026-05-03-implementation-audit.md`
+- 2026-05-03 post-remediation audit: `2026-05-03-post-remediation-audit.md`
+- 2026-05-03 independent PRD conformance audit: `2026-05-03-prd-conformance-audit.md`
+
+## Current status
+
+The reopened remediation arc is complete. The follow-up audit now finds the feature substantially aligned with its PRD/design, and the remaining items are narrow hardening or deferred portability backlog rather than blockers for this feature.
+
+Merge prep is complete and PR [#172](https://github.com/audiocontrol-org/deskwork/pull/172) is open against `main`.
+
 ## Open follow-ups (non-blockers)
 
-- `targetVersion` arg not validated at the CLI boundary (slug is). Path traversal via `--target ../../etc` would still escape the docs tree; same fix pattern as slug.
 - `branchExists` only checks local refs; remote-only `origin/feature/<slug>` collision still creates a tracking branch.
 - `TEMPLATES_DIR` resolution via `import.meta.url` works under tsx but would break if a `dist/` build is added.
-- `parentIssue: ''` placeholder renders as empty trailing in the README template until `dw-lifecycle issues` runs.
+- The journal-entry override seam is the first portability slice. Broader feature-doc template/file-layout customization remains deferred under [#123](https://github.com/audiocontrol-org/deskwork/issues/123).

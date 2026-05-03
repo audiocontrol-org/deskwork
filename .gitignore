@@ -39,6 +39,9 @@ yarn-error.log*
 .claude/settings.local.json
 .claude/settings.local.json~
 .claude/worktrees/
+
+## Codex local
+.agents/.tmp/
 ## Agent memory belongs in ~/.claude/projects/, never committed
 /memory/
 

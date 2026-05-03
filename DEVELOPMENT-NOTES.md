@@ -37,6 +37,56 @@ Session journal for `deskwork`. Each entry records what was tried, what worked, 
 
 - **[PROCESS] Verification-skipping on the studio URL claim.** I told the operator "you should now see v3" without curling the URL myself. Per `.claude/rules/ui-verification.md`, that's the exact pattern the rule forbids. Operator's "Did you check?" was the corrective. The grounded check then surfaced the broader duality.
 
+## 2026-04-29: dw-lifecycle dogfood arc on deskwork — 8 issues filed, feature → 003-COMPLETE
+
+### Feature: dw-lifecycle (post-ship dogfood)
+### Worktree: deskwork-dw-lifecycle
+
+**Goal:** End-to-end dogfood of the published dw-lifecycle plugin against the deskwork project itself. Walk the lifecycle skills (`help`, `install`, `complete`) through the public install path, file every friction point as it surfaced, and finalize the dw-lifecycle feature in 003-COMPLETE/.
+
+**Accomplished:**
+
+- **/dw-lifecycle:help** — surfaced two friction signals: (a) skill silently runs without warning when `.dw-lifecycle/config.json` is missing, even though its error-handling stanza explicitly says to suggest `/dw-lifecycle:install`; (b) Step 3's "list dw-lifecycle-related issues" predicate is unspecified, producing inconsistent results between runs. Filed as #115 (bug) and #116 (enhancement).
+- **/dw-lifecycle:install pre-flight blocker** — registry/disk path mismatch: `installed_plugins.json` claimed cache paths at `~/.claude/plugins/cache/deskwork/{deskwork,deskwork-studio,dw-lifecycle}/0.9.7/` that did not exist on disk; actual plugin source lived at the marketplace clone path. Added evidence comment to existing #89, with new framing: this happens to fresh installs of new plugins (dw-lifecycle never had a relative-path source), falsifying #89's "fresh adopters never hit this / no release blocker" conclusion. Out-of-session, v0.9.8 shipped a `deskwork repair-install` subcommand as the adopter-side mitigation. Ran the documented recovery flow: `/plugin marketplace update deskwork` → `deskwork repair-install` (pruned 10 stale entries) → `/plugin install` for each lost plugin → `/reload-plugins`. PATH restored.
+- **/dw-lifecycle:install proper run** — three more friction signals filed: #118 (`--help` consumed as positional `<project-root>`, no help text), #119 (`--dry-run` silently ignored, file written anyway), #120 (`docs.knownVersions: []` written even though `docs/1.0/` exists on disk; probe didn't seed). Manually patched `knownVersions` to `["1.0"]`.
+- **/dw-lifecycle:install Step 6 doctor run** — surfaced false-negative on `superpowers` peer-plugin check (#121); after `/plugin install feature-dev@claude-plugins-official` to clear the recommended warning, doctor STILL reported feature-dev not installed — same bug fires for both peers, not just superpowers. Added evidence comment to #121 raising priority (the rule has 0/2 hit rate on real installs).
+- **/dw-lifecycle:complete dw-lifecycle** — first feature-completion run on this repo. Helper transitioned `docs/1.0/001-IN-PROGRESS/dw-lifecycle/` → `docs/1.0/003-COMPLETE/dw-lifecycle/` cleanly. ROADMAP step skipped (no ROADMAP.md). Issue-close step skipped (parentIssue empty — `/dw-lifecycle:issues` was never run for this feature). Commit `d263b77`. No new friction signals from the complete skill itself.
+- **Design-gap issues** — operator pushed back on running `/dw-lifecycle:session-end` next: *"I don't think session-end belongs in dw-lifecycle yet. It needs to be tailorable per project and it isn't yet."* Filed #122 (session-start/session-end project-coupled). Operator extended: *"Every project will likely have their own standards for documentation and we don't want to be opinionated about that."* Filed #123 (feature-doc format and file layout project-coupled). Both propose mirroring deskwork's customize-hook pattern; the published defaults should be generic skeletons, with deskwork's specifics living in this project's `.dw-lifecycle/templates/` overrides.
+
+**Didn't Work:**
+
+- **First attempt to run `repair-install` from the marketplace clone path** — the marketplace clone was at v0.9.7, didn't have the subcommand yet. Operator caught this: *"Don't we need to install the latest version of the plugin first?"* Correct flow: `/plugin marketplace update deskwork` first (fast-forwards the marketplace clone to v0.9.8), then `repair-install` exists.
+- **`dw-lifecycle install --dry-run` to preview before commit** — `--dry-run` is silently consumed (filed as #119). The helper has only commit-mode; no preview. Result: I wrote the config before confirming with the operator, against the SKILL.md's explicit *"Do NOT silently use defaults that might be wrong"* guidance. Course-corrected by reporting what got written, having the operator approve the values, then patching the one wrong value (`knownVersions`) in place.
+
+**Course Corrections:**
+
+- [PROCESS] *"Don't we need to install the latest version of the plugin first?"* — I had attempted to invoke the v0.9.8 `repair-install` subcommand without first running `/plugin marketplace update`. The marketplace clone was still at v0.9.7. Right call: always run the marketplace update before trying a newly-shipped subcommand.
+- [DOCUMENTATION] *"I don't think session-end belongs in dw-lifecycle yet. It needs to be tailorable per project and it isn't yet."* — corrected my assumption that `/dw-lifecycle:session-end` was a valid next step. The skill bakes in deskwork-specific journal conventions (DEVELOPMENT-NOTES.md format, Course Corrections taxonomy, Quantitative block sections). Filed #122. Saved a project memory so I don't propose them again until tailoring lands.
+- [DOCUMENTATION] *"we should also file a similar issue about the feature documentation format and file layout"* — operator extended the design pattern from #122 to the broader feature-doc layer. Filed #123 covering directory shape, status taxonomy, file set, frontmatter schema, and section structure within each file.
+
+**Quantitative:**
+
+- Messages from operator: ~22 (session-start confirmations, /dw-lifecycle:help and :install invocations, multiple "do it" / "file it" directives, marketplace-update correction, design-feedback exchanges, /session-end)
+- Commits: 1 prior to this session-end (`d263b77`); +1 for session-end docs = 2 total this session
+- GitHub issues filed: 8 (#115, #116, #118, #119, #120, #121, #122, #123)
+- GitHub issue comments: 2 (#89 — registry/disk mismatch evidence; #121 — false-negative not just superpowers)
+- Sub-agent dispatches: 0 — friction-finding is single-thread observation work; delegating would have hidden the friction
+- Corrections from operator: 3 substantive (marketplace-update sequencing; session-end design-coupling; feature-doc design-coupling)
+
+**Insights:**
+
+- **Dogfood-as-you-go is the right pattern.** Two slash-command invocations (`/dw-lifecycle:help` + `/dw-lifecycle:install`) produced 7 of the 8 issues filed this session; `/dw-lifecycle:complete` produced 0 new bugs but the design conversation produced 2 more. Reasoning ABOUT the plugin from outside would have surfaced none of these — they only show up when an agent is actually trying to get a real task done with the public-channel install.
+- **The privileged-shortcut discipline pays off mid-arc.** When `/dw-lifecycle:install` Step 5's `dw-lifecycle install <project-root>` was unreachable (PATH wired against a non-existent cache path), the temptation was `tsx ~/.claude/plugins/marketplaces/deskwork/plugins/dw-lifecycle/src/cli.ts install $(pwd)` — which would have worked but would have silently invalidated the dogfood signal. Stopping and reporting "the public path is broken; fix that" produced the v0.9.8 `repair-install` shipment as the adopter-side mitigation. Two failure modes were avoided: hiding the bug, and shipping a plugin that requires hand-rolled tsx invocations to bootstrap.
+- **Customize hooks are emerging as dw-lifecycle's biggest design debt.** Two issues filed today (#122, #123) reduce to the same pattern: dw-lifecycle ships deskwork's specific conventions (journal format, doc layout) as the published defaults with no override path. The fix shape is consistent — mirror deskwork's existing `customize` mechanism for templates/doctor rules. Once that pattern lands once, applying it to session-* skills, feature-doc templates, and frontmatter schemas is mechanical. Without it, dw-lifecycle is structurally incompatible with adopters whose conventions aren't deskwork's.
+- **The `--dry-run` / `--help` flag-handling defects are tiny but corrosive.** Both were silent-consumption bugs on unknown flags (#118, #119). The cumulative effect: the agent's only way to verify behavior before commit is to read the source. SKILL.md's explicit *"confirm with the operator"* contract becomes unenforceable. A 10-line argv-parser fix in the bin wrapper closes a class of "agent ran the helper before checking" failure modes.
+- **Issue #121's universal false-negative scaling matters.** With superpowers + feature-dev both reporting as not-installed when both ARE installed, the doctor's peer-plugins rule has zero true-positive coverage on real-world peer registrations. Adopters who trust the "Required peer plugin not installed" error will install plugins they already have, then doubt their own setup when nothing changes. The rule needs to read `installed_plugins.json` rather than whatever it's checking today.
+
+**Open follow-ups (not blockers for this session):**
+
+- The 8 issues filed this session need triage; #89 may want to be reframed (or split) given the new evidence.
+- `.dw-lifecycle/config.json` was committed as part of session-end; if the operator decides this project shouldn't track its config, easy revert.
+- The next dogfood arc should exercise `/dw-lifecycle:setup` against a real new feature on this repo, to surface the feature-doc-format coupling concretely (i.e., #123) under conditions where it actually matters.
+
 - **[COMPLEXITY] First Phase 34 draft was a "for now" pattern in disguise.** Treating #152 as a "data + content bug" in 34c was a way to avoid the structural fix. The new agent-discipline rule had been committed 90 minutes prior; the next planning task immediately violated it. Operator forced the correct framing: *"This is another instance of the 'just for now' bullshit yielding broken, unusable code."* The reframe folded #152 into 34a and made 34a blocking.
 
 - **[PROCESS] Recognized but didn't act fast enough on the chicken-and-egg with `/feature-extend`'s gate.** The skill says "PRD must be applied via studio review" before issues can be filed; the studio review surface is itself broken (the trigger for 34a). I wrote up the bypass logic but should have surfaced it earlier in the planning conversation rather than after restructuring. Pattern: when a skill's gate references a system that's known to be broken, name the conflict immediately, don't try to thread it.
@@ -1291,6 +1341,48 @@ The cascade fix demonstrates the value of the post-implementation verification m
 - The bin shim has no concurrency lock on first-run install. Two parallel invocations could race the npm install. Acceptable for now (dw-lifecycle unlikely to be invoked in parallel during first-run); revisit if real adopters hit it.
 - The `~/work/deskwork` main worktree at `b24fe77` needs `git pull` once the operator's `.claude/CLAUDE.md` edits are committed or stashed, to catch up to `a54e5d8`.
 
+---
+
+## 2026-05-03: Codex skill-loader repair after invalid frontmatter port
+
+### Feature: dw-lifecycle (repo-local Codex guidance follow-up)
+### Worktree: deskwork-dw-lifecycle
+
+**Goal:** Repair the newly ported Codex skill layer after the operator reported that Codex was skipping `.agents` skills due to invalid `SKILL.md` YAML frontmatter.
+
+**Accomplished:**
+
+- Confirmed the immediate breakage was parser-level, not execution-level: Codex reported two skipped skills, `feature-setup` and `release`, both failing YAML parse on the `description:` line.
+- Inspected the Codex skill port and found the broader pattern: every `.agents/skills/*/SKILL.md` file used unquoted YAML `description` values, and the two failing files included an additional colon in the scalar text.
+- Repaired the frontmatter across the full Codex skill set by quoting every `description` string, not just the two already failing files. This removed the immediate loader break and closed the same future-edit footgun across all 15 local skills.
+- Verified the repair with a parser-level check (`YAML.safe_load` over every `.agents/skills/*/SKILL.md` frontmatter block). All 15 now parse cleanly.
+- Committed and pushed the fix as `ab87719` (`fix(codex): repair skill frontmatter yaml`).
+
+**Didn't Work:**
+
+- The original skill port was treated as "present on disk" rather than "loadable by the host." That missed the distinction between markdown that looks fine in a diff and markdown whose frontmatter can actually be parsed by the skill loader.
+- I initially framed the broken-skill problem as workflow drift, but the operator's concrete error made clear the first failure mode was simpler and more fundamental: invalid YAML.
+
+**Course Corrections:**
+
+- [DOCUMENTATION] Operator: *"it's broken yaml"* — corrected my initial focus. The right first move was to fix the frontmatter syntax and prove the loader could parse it, not to start by debating skill semantics.
+- [PROCESS] Normalized the fix across the entire `.agents/skills/` tree instead of patching only the two already-broken files. The repeated unquoted-scalar pattern was an obvious source of repeat failure.
+
+**Quantitative:**
+
+- Messages from operator: 2 (`"yikes. You need to fix the broken skills"`, then the concrete YAML parser output)
+- Files changed: 15 `.agents/skills/*/SKILL.md` files
+- Commits: 1 (`ab87719`)
+- Pushes: 1
+- Parser failures before fix: 2 reported by Codex
+- Parser failures after fix: 0 across 15 validated skill files
+
+**Insights:**
+
+- **For skill ports, loadability is the first acceptance criterion.** A skill that exists on disk but cannot be parsed is equivalent to a missing skill. Frontmatter validation should be part of the port workflow, not an afterthought.
+- **Broad mechanical normalization is often safer than a narrow patch.** Once the pattern was visible, quoting every `description` field was the lowest-risk way to eliminate the whole class instead of chasing individual failures.
+- **The semantic drift in the Codex skill bodies is still real, but it is a second-order problem.** The loader has to accept the skill before the workflow quality matters. That audit remains a follow-up task, separate from this parser repair.
+
 **Next session:**
 
 dw-lifecycle is shipped. Natural follow-up arcs in priority order:
@@ -2282,3 +2374,91 @@ Phase 20 (outline-as-scrapbook + sandbox migration) is the natural follow-up —
 **Next session:**
 
 Phase 4 (dogfood) is manual validation work the user should drive: install the plugin in `~/work/audiocontrol.org`, run `/deskwork:install` to produce a real config, then add/plan/draft/publish against the live calendar and compare with the old `/editorial-*` skills. No new code until Phase 4 surfaces any gaps.
+
+---
+
+## 2026-05-03: dw-lifecycle reopened remediation arc closeout + PR ship
+
+### Feature: dw-lifecycle
+### Worktree: deskwork-dw-lifecycle
+
+**Goal:** Finish the reopened `dw-lifecycle` remediation arc from the 2026-05-03 implementation audit, close the PRD-conformance gaps in code, rerun the audit, and prepare the long-running branch for merge without using `feature-complete`.
+
+**Accomplished:**
+
+- Removed deskwork-plugin dogfooding gates from the repo's `/feature-*` skill family so implementation approval is based on direct in-repo PRD/workplan review instead of unstable deskwork workflow state.
+- Closed the Phase 9 remediation tasks in `plugins/dw-lifecycle`:
+  - real peer-plugin detection in `doctor`
+  - install probing / `--dry-run` / unknown-flag rejection
+  - PRD-first `setup` with `deskwork.id`
+  - real cross-version retargeting with `--from-target`
+  - journal-entry template override seam plus `customize templates journal-entry`
+- Wrote the follow-up conformance audit at `docs/1.0/001-IN-PROGRESS/dw-lifecycle/2026-05-03-post-remediation-audit.md`.
+- Updated the feature README/workplan to mark Phases 7-9 complete and record PR [#172](https://github.com/audiocontrol-org/deskwork/pull/172).
+- Ran `feature-ship`, pushed the branch, and opened PR #172 against `main`.
+
+**Didn't Work:**
+
+- The GitHub connector could not create the PR on `audiocontrol-org/deskwork` (`403 Resource not accessible by integration`). I had to fall back to `gh pr create`.
+- Full-suite green status is still blocked in this sandbox by `tsx` IPC pipe failures in `plugins/dw-lifecycle/src/__tests__/cli.test.ts`. The CLI dispatcher assertions themselves are not what failed; the spawned `tsx` runtime could not open its pipe.
+
+**Course Corrections:**
+
+- [PROCESS] Stopped treating `feature-complete` as mandatory for this branch shape. The branch is long-running and reuses `feature-extend`, so the right ship state here is "PR open, docs stay in `001-IN-PROGRESS`" rather than forcing a `003-COMPLETE` move.
+- [DOCUMENTATION] The first pass at the Task 52 closeout duplicated the Phase 7 status row in the feature README. Corrected immediately before commit.
+- [PROCESS] The reopened workplan still contains historical unchecked items from obsolete release-gate steps and dummy examples. For ship readiness I treated the active remediation section, not raw unchecked-box count, as the source of truth.
+
+**Quantitative:**
+
+- Messages: ~10
+- Commits: 7 (`543f20e`, `c4bdaaf`, `712339b`, `c0057ac`, `eab09bc`, `4bd18d6`, `eec8eed`)
+- Corrections: 2
+- Files changed: 23
+
+**Insights:**
+
+- The biggest blocker in the `/feature-*` family was not "missing deskwork discipline"; it was unstable dogfooding against a workflow layer that was not yet trustworthy enough to gate real work. Direct PRD/workplan approval is the right local contract until the deskwork lifecycle stabilizes.
+- The reopened audit pattern worked. The first audit was specific enough to become an executable remediation list, and the second audit gave a crisp stop condition for the arc instead of letting "conformance" stay vague.
+- The remaining `cli.test.ts` failures are a good example of why environment-caused red tests should be documented precisely rather than hand-waved as "flaky." The error is deterministic here: `tsx` IPC pipe creation gets `EPERM` in this sandbox.
+- Long-running feature branches need a different closeout posture than one-shot branches. Keeping the docs in `001-IN-PROGRESS` while still running `feature-ship` preserved history and avoided a fake "done forever" signal.
+
+---
+
+## 2026-05-03: dw-lifecycle final hardening follow-up + independent audit landing
+
+### Feature: dw-lifecycle
+### Worktree: deskwork-dw-lifecycle
+
+**Goal:** Land the small but important fixes surfaced by the independent PRD-conformance audit, add that audit to the branch, and leave PR #172 merge-ready.
+
+**Accomplished:**
+
+- Added `validateTargetVersion` and enforced it at the CLI boundaries that accept `--target` / `--from-target` (`setup`, `transition`, `issues`).
+- Added test coverage for valid/invalid target versions and for rejecting `--target ../../etc` before worktree creation.
+- Trimmed remaining skill/helper drift:
+  - `doctor` now only claims the two rules that actually ship
+  - `install` now describes the docs-version-shape probe and `--dry-run` preview that actually exist
+  - `extend` no longer mentions a non-existent `--retarget` flag
+- Removed the now-fixed `targetVersion` follow-up from the feature README.
+- Added the independent audit file `2026-05-03-prd-conformance-audit.md` and linked it from the feature README.
+
+**Didn't Work:**
+
+- `git add` on the new audit file behaved oddly on the first status read and left the file appearing untracked until a second explicit status check. No data loss, just one extra verification step before commit.
+
+**Course Corrections:**
+
+- [DOCUMENTATION] The independent audit initially described findings that were already fixed on the branch by the time we chose to commit it. I updated the audit text before committing so it reflects current branch state instead of preserving stale open items as if they were still active.
+- [PROCESS] Kept the audit commit separate from the code hardening commit so the PR history still distinguishes "fix the issue" from "check in the review artifact."
+
+**Quantitative:**
+
+- Messages: ~4
+- Commits: 2 (`7c13224`, `7e2cbe3`)
+- Corrections: 1
+- Files changed: 12
+
+**Insights:**
+
+- The highest-signal post-audit fixes were exactly the small symmetric ones: if `slug` gets a traversal guard, `targetVersion` should too. Those are the cheapest fixes with the best risk-reduction payoff.
+- Independent audits are most useful when they are checked in as living artifacts, not frozen transcripts. If the branch changes before the audit lands, update the audit so it remains trustworthy.

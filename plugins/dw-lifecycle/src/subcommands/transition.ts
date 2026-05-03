@@ -2,13 +2,14 @@ import { loadConfig } from '../config.js';
 import { repoRoot } from '../repo.js';
 import { transitionFeature } from '../transitions.js';
 import { isStage, type Stage } from '../docs.js';
-import { validateSlug } from '../slug.js';
+import { validateSlug, validateTargetVersion } from '../slug.js';
 
 export async function transition(args: string[]): Promise<void> {
   let slug: string | undefined;
   let from: Stage | undefined;
   let to: Stage | undefined;
   let targetVersion: string | undefined;
+  let fromTargetVersion: string | undefined;
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -23,6 +24,8 @@ export async function transition(args: string[]): Promise<void> {
       to = v;
     } else if (a === '--target') {
       targetVersion = args[++i];
+    } else if (a === '--from-target') {
+      fromTargetVersion = args[++i];
     } else if (!slug && !a.startsWith('--')) {
       slug = a;
     }
@@ -30,16 +33,22 @@ export async function transition(args: string[]): Promise<void> {
 
   if (!slug || !from || !to) {
     throw new Error(
-      'Usage: dw-lifecycle transition <slug> --from <stage> --to <stage> [--target <version>]'
+      'Usage: dw-lifecycle transition <slug> --from <stage> --to <stage> [--target <version>] [--from-target <version>]'
     );
   }
 
   validateSlug(slug);
+  if (targetVersion) {
+    validateTargetVersion(targetVersion);
+  }
+  if (fromTargetVersion) {
+    validateTargetVersion(fromTargetVersion);
+  }
 
   const root = repoRoot();
   const cfg = loadConfig(root);
   const target = targetVersion ?? cfg.docs.defaultTargetVersion;
 
-  transitionFeature(cfg, root, slug, { from, to, targetVersion: target });
-  console.log(JSON.stringify({ slug, from, to, targetVersion: target, ok: true }));
+  transitionFeature(cfg, root, slug, { from, to, targetVersion: target, fromTargetVersion });
+  console.log(JSON.stringify({ slug, from, to, fromTargetVersion, targetVersion: target, ok: true }));
 }

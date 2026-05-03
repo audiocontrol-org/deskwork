@@ -80,6 +80,7 @@ All commands are under the `/dw-lifecycle:` namespace. Grouped by lifecycle stag
 | `pickup` | Read workplan + check issue status + report next action — for resuming a feature mid-stream |
 | `session-start` | Bootstrap a session: read workplan, latest journal entry, open issues; report context |
 | `session-end` | Append a journal entry, update feature docs, commit documentation changes |
+| `customize` | Copy a built-in markdown template into `.dw-lifecycle/templates/` for project-local tailoring |
 | `teardown` | Remove branch + worktree (infrastructure-only; no opinion on feature status) |
 | `help` | Render the lifecycle diagram + current state of active features |
 
@@ -89,7 +90,7 @@ All commands are under the `/dw-lifecycle:` namespace. Grouped by lifecycle stag
 |---|---|
 | `doctor` | Audit binding between calendar/journal/docs/issues; opt-in `--fix=<rule>` for repair |
 
-Fifteen commands total. Each is a single, composable action — UNIX-style — never a monolithic guided flow. See [`design.md` §3](../../docs/1.0/001-IN-PROGRESS/dw-lifecycle/design.md) for the full integration map (per-command Layer 2 / Layer 1 invocations).
+Sixteen commands total. Each is a single, composable action — UNIX-style — never a monolithic guided flow. See [`design.md` §3](../../docs/1.0/001-IN-PROGRESS/dw-lifecycle/design.md) for the full integration map (per-command Layer 2 / Layer 1 invocations).
 
 ## Boundary contract
 
@@ -132,7 +133,9 @@ Top-level keys:
 | `tracking` | Issue-tracker integration; v1 supports `github` only; configurable parent and per-phase labels |
 | `session` | Optional project-specific preamble text for `/dw-lifecycle:session-start` and `:session-end` |
 
-What stays opinionated and **is not** configurable: the lifecycle stages themselves, the workplan-driven implementation pattern, the stop-at-PR rule in `/dw-lifecycle:ship`, the boundary contract with `superpowers` / `feature-dev`, the journal entry template (path is configurable; format is not), and the PRD / workplan / README templates. Adopters who want a different shape fork the plugin.
+What stays opinionated and **is not** configurable: the lifecycle stages themselves, the workplan-driven implementation pattern, the stop-at-PR rule in `/dw-lifecycle:ship`, the boundary contract with `superpowers` / `feature-dev`, and the PRD / workplan / README templates. The journal entry template is now the smallest supported customization seam: `/dw-lifecycle:customize templates journal-entry` copies the bundled markdown skeleton into `.dw-lifecycle/templates/journal-entry.md`, and the session skills use the project override automatically.
+
+Broader feature-doc portability remains deferred. The larger `#123` scope — customizable PRD/workplan/README file sets, frontmatter schemas, and alternate status taxonomies — is not part of the journal-entry override slice.
 
 See [`design.md` §4 — Parameterization & config schema](../../docs/1.0/001-IN-PROGRESS/dw-lifecycle/design.md) for the full schema, version-sensitive path resolution rules, and the doctor rule list.
 
