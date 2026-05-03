@@ -551,3 +551,54 @@ The first canonical run is the post-release walk against the v(N+1) shipped afte
 - **Not a replacement for dogfood-as-development discipline** (`agent-discipline.md` *"Stay in agent-as-user dogfood mode"*). The walk is post-release verification; it doesn't substitute for using the plugin on real work during development.
 - **Not the dw-lifecycle-native version.** This is the stop-gap that lives inside the deskwork plugin until dw-lifecycle ships customizable lifecycle stages. The migration into dw-lifecycle is forward-marching once that capability lands; the file paths chosen in Phase 29 are explicitly ephemeral.
 
+---
+
+## Extension: Phase 34 — Retire the legacy review surface; complete the Phase-30 migration; pay down v0.13.0 IOUs (post-v0.13.0)
+
+Added after v0.13.0 ship. The triggering finding: **the longform editorial review surface is currently broken end-to-end.** A live audit during the Phase 34 PRD review demonstrated that the dashboard's per-row link routes to a legacy `pages/review.ts` surface that reads from pre-Phase-30 workflow records, while `iterateEntry` (the entry-centric writer) updates only sidecars + the history journal. Result: the studio shows frozen pre-2026-05-01 content for any entry that's been iterated since the Phase 30 pivot. The press-check chrome looks right; the data is silently stale. Every post-Phase-30 longform editorial review that used the dashboard's link is suspect.
+
+### Why now
+
+The studio's longform review path is currently 100% unusable — not unstyled, not buggy, **structurally lying about what the operator is approving.** This blocks the project's own dogfood loop (the same loop that's reviewing this PRD). Phase 34's first sub-phase has to be the structural fix; everything else lines up behind it.
+
+The deeper problem is named directly in the source code:
+
+- `packages/studio/src/pages/entry-review.ts:14-18`: *"Rendering is intentionally minimal — the goal of Task 35 is the route shape + affordance plumbing, not a fully-styled UI. Styling will land once the affordance set stabilizes against real entries."*
+- `packages/studio/src/server.ts:351-355`: *"DEPRECATED (pipeline-redesign Task 35): this route is workflow-uuid + calendar-entry keyed; the entry-centric replacement lives at `/dev/editorial-review/entry/<uuid>`. Both coexist during the migration window; this route is removed once every dashboard surface and operator skill points at the entry route."*
+- `packages/studio/src/server.ts:373-384`: explains why #146's entry-first short-circuit was reverted (entry-review surface lost margin notes, rendered preview, and decision strip).
+
+These are textbook *"just for now"* code comments, written into the source as if the comment itself constitutes a tracked plan. Per the new `.claude/rules/agent-discipline.md` rule "No 'just for now' shortcuts" (commit `42eb837`) and the project's own system-prompt guidance (*"No half-finished implementations either"* / *"Avoid backwards-compatibility hacks"* / *"Don't use feature flags or backwards-compatibility shims when you can just change the code"*), there should be no legacy code, no migration window, no "two surfaces coexist." The fact that we have all three is exactly the failure mode those rules forbid.
+
+The convention canon trap activated immediately: 3 days after Phase 30 shipped, the legacy surface IS the review surface (because the dashboard links to it) and the entry-review surface IS the broken stub (because nobody finished it). Every additional session that lands without 34a will fork more code paths against one surface or the other and double the eventual cleanup cost.
+
+### Scope
+
+Phase 34 has five sub-phases. **34a is blocking** — until it ships, the studio review loop stays broken and no other sub-phase has a working dogfood path.
+
+- **34a — Retire the legacy review surface; complete the Phase-30 migration; audit corrupted reviews.** This is the structural fix.
+  - Port the press-check chrome from `pages/review.ts` to `pages/entry-review.ts`: folio + version strip + edit toolbar + outline drawer + marginalia column + scrapbook drawer + margin-note authoring + rendered markdown preview + decision strip with chord chips + shortcut overlay.
+  - Source the entry-review's data from sidecars + history journal (already entry-centric via `iterateEntry`); the merged surface uses the existing `getAffordances(entry)` for stage-aware buttons.
+  - **Delete `packages/studio/src/pages/review.ts` entirely.** Not move-to-deprecated. Delete.
+  - Delete the legacy routes in `packages/studio/src/server.ts` (the `:id` UUID branch and the `:slug` branch). Replace with: bare `/dev/editorial-review/<uuid>` 301-redirects to `/dev/editorial-review/entry/<uuid>` for in-flight bookmarks, AND that redirect is itself filed as a follow-up to delete in the next phase (the redirect is a backwards-compat shim; it has an explicit retirement issue, not a "for later" comment).
+  - Audit + delete every workflow-record code path that was kept alive only because the legacy longform/outline surface read it. Workflow records remain only for shortform (operator-confirmed deferral; tracked under a new dedicated issue with explicit acceptance criteria, not a code comment).
+  - Update every link emitter to use `/dev/editorial-review/entry/<uuid>`: `pages/dashboard/affordances.ts:60`, `pages/content.ts:353`, `pages/content-detail.ts:280`, `pages/index.ts:115`, `pages/help.ts:262,283,391,426`, plus operator-facing skill prose (`/feature-extend`, `/feature-setup`, etc.).
+  - Delete the *"intentionally minimal"* / *"styling will land once the affordance set stabilizes"* self-comments in `entry-review.ts:14-18`, the *"DEPRECATED"* / *"migration window"* comments in `server.ts`, and any sibling deferral comments uncovered during the work.
+  - Run the agent-discipline grep audit on the entire studio (`for now`, `just for now`, `TODO`, `FIXME`, `HACK`, `XXX`, `temporary`, `stub`, `placeholder`, `pending`, `until F`, `until v`, `migration window`, `legacy`, `deprecated`, `coexist`, `for later`). Every hit ends in either fix-now or filed-issue.
+  - **Audit corrupted reviews.** Enumerate every entry whose sidecar shows an iteration post-2026-05-01 (`iterationByStage` count higher than the workflow record's `currentVersion` for the same entry). For each mismatch: re-review against the actual current content under the new unified surface; record the disposition (re-approved / iterated / blocked / cancelled). The audit list lives in workplan 34a; entries are checked off individually.
+
+- **34b — Pay down F1–F6 IOUs.** (Was 34a in the prior draft.) [#166](https://github.com/audiocontrol-org/deskwork/issues/166) (composer regression + sibling rejection-reason regression + full audit of `window.prompt`/`confirm`/`alert` in studio client), [#163](https://github.com/audiocontrol-org/deskwork/issues/163) (JPEG/WebP/GIF dimensions; F3 deferred), [#164](https://github.com/audiocontrol-org/deskwork/issues/164) (expanded-secret-card visual continuity; G3 deferred), edit-toolbar Source/Split/Preview + Focus discoverability (operator-noted but not yet filed; file as part of 34b kickoff). Cannot start until 34a ships — verifying any composer fix without a working review surface is meaningless.
+
+- **34c — Studio dev mode + interaction bugs.** (Was 34b.) [#165](https://github.com/audiocontrol-org/deskwork/issues/165) (DESKWORK_DEV=1 binds Tailscale by default), [#156](https://github.com/audiocontrol-org/deskwork/issues/156) (client `init*` function audit), [#157](https://github.com/audiocontrol-org/deskwork/issues/157) (dashboard → scrapbook viewer cross-links).
+
+- **34d — Studio data + content bugs.** (Was 34c, minus #152 which is folded into 34a.) [#151](https://github.com/audiocontrol-org/deskwork/issues/151) (`deskwork publish` writes `publishedDate` to the sidecar), [#153](https://github.com/audiocontrol-org/deskwork/issues/153) (per-skill LLM model defaults), [#158](https://github.com/audiocontrol-org/deskwork/issues/158) (split umbrella into specifics; close umbrella with the inventory). Note: #152 (entry-review CSS) is no longer here because 34a's port-the-chrome work is the actual fix; #152 closes when 34a ships.
+
+- **34e — v0.13.0 verification + issue closures.** (Was 34d.) Boot marketplace v0.13.0 install in a clean session, walk F1–F6 + #154 longform-review surfaces, post fix-landed comments + close #154 / #155 / #159 / #160 / #161 per the `agent-discipline.md` formally-installed-release rule. Note: this verification only becomes possible after 34a ships, because the marketplace surfaces it covers depend on the entry-review surface being functional.
+
+### What this is not
+
+- **Not a coexistence plan.** No "migration window," no "legacy and entry-keyed both supported," no "this route is deprecated, will retire later." 34a's commit deletes the legacy paths atomically. The 301 redirect on the bare-UUID URL is the only concession to in-flight bookmarks, and it has its own follow-up retirement issue.
+- **Not a partial port.** Margin notes, rendered preview, decision strip, chord shortcuts, outline drawer, marginalia column, scrapbook drawer — all of it ports. If a feature can't be ported in 34a, that feature gets filed as a new blocking issue, not left as a missing-feature regression.
+- **Not a shortform retirement.** Workflow records and the legacy shortform pipeline (`pages/shortform.ts`, `runShortformIterate`) stay for now — explicitly. The deferral is operator-confirmed and gets a tracked issue with acceptance criteria for *"shortform migrates to entry-centric"*, not a code-comment IOU. Once that issue lands, workflow records leave the codebase entirely.
+- **Not blocked on Phase 34's other sub-phases.** 34a ships first as a standalone PR; once merged + released, 34b through 34e proceed.
+- **Not a redesign.** The visual treatment of the unified surface IS the existing legacy chrome (margin notes, paper-grain background, press-check controls). The change is structural — entry-keyed data flow, unified codepath, deleted legacy. No new design work. No new aesthetic decisions.
+

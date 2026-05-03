@@ -1652,3 +1652,148 @@ The operator's walkthrough of the just-shipped #154 redesign surfaced six follow
 - Dispatch E surfaced [#156](https://github.com/audiocontrol-org/deskwork/issues/156) — `scrapbook-client.ts initScrapbook` was never bootstrapped at module load. Pre-existing latent bug; pattern may exist in other client files. Pattern hygiene audit recommended.
 - Sub-agent dispatch reliability: 1 stream-idle timeout (Dispatch B first attempt produced no commits in ~72 minutes elapsed). Re-dispatched with a tighter "write each phase to disk before the next" directive; second attempt completed in ~3 minutes. Pattern: dispatches that imply a long sequential plan benefit from explicit "commit early, commit often" framing in the prompt.
 - All five dispatches respected the scope-guard rule (no auto-fixing of out-of-scope friction). Three follow-up issues filed in real time per the project's rule that "out of scope but worth flagging" notes must become real GitHub issues, not dispatch-report disclosures.
+
+---
+
+### Phase 34: Retire the legacy review surface; complete Phase-30 migration; pay down v0.13.0 IOUs (post-v0.13.0)
+
+Umbrella phase. **34a is structural and blocking.** The studio's longform editorial review surface is currently 100% unusable: the dashboard's per-row link routes to a legacy `pages/review.ts` that reads from pre-Phase-30 workflow records, while `iterateEntry` writes only to sidecars + history journal. Result: the studio shows frozen pre-2026-05-01 content for any entry iterated since the Phase 30 pivot. Press-check chrome looks right; data is silently stale. Every post-Phase-30 longform editorial review that used the dashboard's link is suspect. PRD extension at `prd.md` "Phase 34 — Retire the legacy review surface; complete the Phase-30 migration; pay down v0.13.0 IOUs (post-v0.13.0)".
+
+GitHub tracking issues:
+- Umbrella: [#170](https://github.com/audiocontrol-org/deskwork/issues/170) — Feature: Phase 34
+- 34a (structural): [#171](https://github.com/audiocontrol-org/deskwork/issues/171) — retire legacy review surface; complete Phase-30 migration
+- 34b–34e: track underlying issues (#166, #163, #164, #165, #156, #157, #151, #153, #158, #154, #155, #159, #160, #161); no separate per-phase issues (each existing issue IS its own tracker)
+- Filed under one-time operator bypass of the `/feature-extend` "PRD applied" gate (the gate runs through the broken studio review surface 34a fixes; bypass documented in #170).
+
+#### 34a — Retire the legacy review surface; complete the Phase-30 migration; audit corrupted reviews
+
+**Blocking sub-phase.** No other sub-phase has a working dogfood path until 34a ships. The PRD review for Phase 34 itself is happening via `git diff` because the studio is broken — that disqualifies any "studio walk-through" verification claim until 34a ships.
+
+**Port the press-check chrome from `pages/review.ts` (710 lines) to `pages/entry-review.ts` (185 lines):**
+
+- [ ] Folio header (`renderEditorialFolio('longform', ...)`)
+- [ ] Version strip (`renderVersionsStrip` → entry-keyed: list iterations from history journal; clicking a version shows historical content read-only)
+- [ ] Edit toolbar (`renderEditToolbar` — Source / Split / Preview + Focus mode)
+- [ ] Edit panes (`renderEditPanes` — source textarea + rendered preview + split-pane gutter)
+- [ ] Outline drawer (`renderOutlineDrawer`) when entry has outline content
+- [ ] Marginalia column (`renderMarginalia`) + marginalia stow chevron + edge pull tab (`renderMarginaliaTab`) per the affordance-placement rule
+- [ ] Margin-note authoring: select-text → annotation composer → save annotation; client integration via `editorial-review-client.ts`
+- [ ] Rendered markdown preview (replaces today's empty `<section class="er-entry-artifact">`)
+- [ ] Decision strip with chord chips (Approve `a`, Iterate `i`, Reject `r`) + "?" shortcuts overlay (`renderShortcutsOverlay`)
+- [ ] Stage-aware affordances via existing `getAffordances(entry)` (so e.g. Ideas-stage entries show appropriate buttons; Drafting shows Save/Iterate/Approve/Reject; Published shows read-only view)
+- [ ] Scrapbook drawer (per the F1–F6 work; bottom-anchored expandable drawer)
+
+**Source data from sidecars + history journal (NOT workflow records):**
+
+- [ ] Read entry state from `.deskwork/entries/<uuid>.json` sidecar (already entry-centric)
+- [ ] Read iteration content from `.deskwork/review-journal/history/<timestamp>-<event>.json` events (the `iterateEntry` path)
+- [ ] Read annotations from a NEW entry-keyed annotation store (current annotations are workflow-keyed; design + implement entry-keyed equivalent OR migrate workflow annotations to entry annotations as part of 34a)
+- [ ] All API endpoints (`/api/dev/editorial-review/*`) that today take workflow IDs accept entry UUIDs; contract documented
+
+**Delete legacy code paths:**
+
+- [ ] **Delete `packages/studio/src/pages/review.ts` entirely** (710 lines). Not move-to-deprecated. Delete.
+- [ ] Delete legacy routes in `server.ts:347-417` (workflow-id branch + entry-id legacy branch + slug catch-all). Replace with: bare `/dev/editorial-review/<uuid>` 301-redirects to `/dev/editorial-review/entry/<uuid>` for in-flight bookmarks.
+- [ ] **File new issue (and link in workplan):** retire the bare-UUID 301 redirect in the next phase. The redirect is itself a backwards-compat shim with an explicit retirement issue, not a "for later" code comment.
+- [ ] Delete `renderReviewPage`, `prepareRender`, `lookupReviewEntry`, `errorFromBody`, `pickContentKind`, `pickSite`, `stringField`, `stateLabel`, `pendingSkillCmd`, `shortcutChipWrap` (move to entry-review where still needed), `renderError`, `renderShortcutsOverlay`, `renderMarginaliaTab`, `renderMarginalia`, `renderEditToolbar`, `renderEditPanes`, `renderOutlineDrawer` (relocate to entry-review).
+- [ ] Delete the workflow-id resolution code paths kept alive only because legacy longform/outline routes read them. `readWorkflow`, `readVersions`, `appendVersion`, `transitionState` for longform/outline. **Shortform paths stay** (operator-confirmed deferral; tracked in a new dedicated issue with explicit acceptance criteria for "shortform migrates to entry-centric," not a code comment).
+- [ ] Delete the *"intentionally minimal"* / *"styling will land once the affordance set stabilizes"* self-comments at `entry-review.ts:14-18`.
+- [ ] Delete the *"DEPRECATED (pipeline-redesign Task 35)"* / *"both coexist during the migration window"* / *"this route is removed once every dashboard surface and operator skill points at the entry route"* comments at `server.ts:332-355`.
+- [ ] Delete the entry-first-short-circuit-was-a-regression explainer comment at `server.ts:373-384` (no longer relevant once the legacy paths are gone).
+- [ ] Delete the F6 walkthrough's *"non-blocking follow-ups"* references where they pointed at this dual-surface model.
+
+**Update every link emitter to use `/dev/editorial-review/entry/<uuid>`:**
+
+- [ ] `packages/studio/src/pages/dashboard/affordances.ts:60` (`reviewLink`)
+- [ ] `packages/studio/src/pages/content.ts:353` (`reviewHref`)
+- [ ] `packages/studio/src/pages/content-detail.ts:280` (`reviewHref`)
+- [ ] `packages/studio/src/pages/index.ts:115` (`longformDefaultEntry` link)
+- [ ] `packages/studio/src/pages/help.ts:262, 283, 391, 426` (manual references)
+- [ ] `packages/studio/src/server.ts:224` (whatever construct emits the URL)
+- [ ] `packages/studio/src/routes/api.ts:66` (`reviewUrl` field)
+- [ ] Operator-facing skill prose: `/feature-extend`, `/feature-setup`, any other skill that surfaces a review URL
+- [ ] `packages/cli/` URL printers (e.g. `deskwork iterate` reports a `state: in-review` JSON; verify that any URL it prints is entry-keyed)
+
+**Audit corrupted reviews (the trust re-build):**
+
+- [ ] List every entry whose sidecar `iterationByStage` total exceeds the corresponding workflow's `currentVersion` (i.e. entry was iterated post-Phase-30 but workflow record was frozen pre-pivot). Generate the list via a one-shot script + commit the script under `scripts/audit-post-pivot-iterations.ts`.
+- [ ] For each entry on the list: open under the new unified surface; compare current sidecar content vs. the workflow snapshot the operator may have approved against. Document the diff.
+- [ ] For each non-trivial diff (non-whitespace, non-frontmatter): re-review under the new surface; record the disposition (re-approved / iterate-needed / cancel).
+- [ ] Record audit results in `docs/1.0/001-IN-PROGRESS/deskwork-plugin/post-pivot-review-audit.md`; commit alongside.
+
+**Delete-comments grep audit:**
+
+- [ ] Run `grep -rn -E "(for now|just for now|TODO|FIXME|HACK|XXX|temporary|stub|placeholder|pending|until F|until v|migration window|legacy|deprecated|coexist|for later|will land|will replace)" packages/studio/src/ plugins/deskwork-studio/public/src/ | grep -v "\.test\."`. Each hit ends in either fix-in-this-phase or filed-issue with a tracked link in a comment trailer. No code-comment IOUs allowed.
+- [ ] Same audit on `packages/cli/src/` and `packages/core/src/` (the agent-discipline rule applies repo-wide, not just to studio).
+
+**Verification:**
+
+- [ ] `pages/review.ts` does not exist (`test ! -f packages/studio/src/pages/review.ts`)
+- [ ] `git grep -i 'legacy' packages/studio/` returns zero hits
+- [ ] `git grep -E '(workflow-keyed|migration window|coexist during|will land later|stylings? will land|intentionally minimal)' packages/studio/src/` returns zero hits
+- [ ] Live: dashboard click on any Drafting entry lands on `/dev/editorial-review/entry/<uuid>`; the page renders the press-check chrome (folio + version strip + edit toolbar + outline drawer + marginalia + scrapbook drawer); margin-note authoring works; the displayed content matches the file on disk.
+- [ ] Live: clicking Iterate on the studio + running `deskwork iterate` snapshots the current file content as the next version; the unified surface re-renders with the new version.
+- [ ] **The Phase 34 PRD review can be completed end-to-end via the studio UI alone.** This acceptance criterion is the structural inverse of the trigger: until the PRD-under-review can itself be reviewed via the studio, 34a is not done.
+- [ ] Studio test count increases by at least 30 across 34a (component tests for the merged surface, route tests for the deleted legacy routes returning 301, audit-script tests, annotation-store tests).
+
+**Acceptance:** 34a closes when all the bullets above check off + at least one new release has shipped to npm + marketplace + the operator has run `/plugin marketplace update deskwork` and successfully reviewed a real entry end-to-end via the dashboard's link.
+
+#### 34b — Pay down F1–F6 IOUs
+
+(Was 34a in the prior draft.) **Cannot start until 34a ships** — verifying any composer fix without a working review surface is meaningless.
+
+- [ ] [#166](https://github.com/audiocontrol-org/deskwork/issues/166) — restore inline composer for scrapbook `+ NEW NOTE` button (parity with pre-F1 implementation at `44094ee^:plugins/deskwork-studio/public/src/scrapbook-client.ts:703-779`)
+- [ ] [#166](https://github.com/audiocontrol-org/deskwork/issues/166) — fix sibling regression in `plugins/deskwork-studio/public/src/editorial-review-client.ts:1651` (rejection-reason flow uses `window.prompt`)
+- [ ] [#166](https://github.com/audiocontrol-org/deskwork/issues/166) — full audit: `grep -rn -E 'window\.(prompt|confirm|alert)' plugins/deskwork-studio/public/src/ packages/studio/src/` returns zero matches in production code
+- [ ] [#163](https://github.com/audiocontrol-org/deskwork/issues/163) — extend `readImageDimensions` in `packages/studio/src/scrapbook.ts` to JPEG / WebP / GIF
+- [ ] [#164](https://github.com/audiocontrol-org/deskwork/issues/164) — expanded-secret-card visual continuity (G3-recommended `⚿` glyph next to `.scrap-name` on `data-secret="true"` cards)
+- [ ] File a new issue + fix: edit-toolbar Source/Split/Preview + Focus button discoverability (operator-noted but not yet filed); component-attached affordance per `affordance-placement.md`
+- [ ] `/frontend-design` review for the inline-composer treatment **before** implementation, per the `affordance-placement.md` pre-implementation gate
+- [ ] Live verification per `ui-verification.md` step 7
+- [ ] Regression tests for each fix (composer, secret-glyph, image-dimensions); studio test count must increase by at least 5 across 34b
+
+**Acceptance:** 34b closes when all listed checkboxes pass + the `window.prompt|confirm|alert` grep returns zero hits in production code + the operator walks the surfaces against the next release and signs off.
+
+#### 34c — Studio dev mode + interaction bugs
+
+(Was 34b.)
+
+- [ ] [#165](https://github.com/audiocontrol-org/deskwork/issues/165) — DESKWORK_DEV=1 binds Tailscale by default. Refactor `bootstrapStudio` in `server.ts` so the dev-mode listener reuses the same `bindAddresses` array + `listenWithAutoIncrement` path as production; only the in-process esbuild step is conditionally skipped on `DESKWORK_DEV=1`. Boot banner prints loopback + Tailscale IP + magic-DNS URLs in dev mode just like production.
+- [ ] [#156](https://github.com/audiocontrol-org/deskwork/issues/156) — client `init*` function audit. For every `plugins/deskwork-studio/public/src/*.ts` module that exports an `init*` function, verify it is actually invoked at module load. File a follow-up issue for any other dead bootstraps surfaced.
+- [ ] [#157](https://github.com/audiocontrol-org/deskwork/issues/157) — dashboard cross-links to scrapbook viewers from per-row chrome.
+- [ ] Live verification per `ui-verification.md` for each fix.
+
+**Acceptance:** 34c closes when all three issues are fix-landed in a release + the operator confirms `npm run dev` prints all three URLs (loopback + Tailscale IP + magic-DNS) on boot.
+
+#### 34d — Studio data + content bugs
+
+(Was 34c, minus #152 which is folded into 34a.)
+
+- [ ] [#151](https://github.com/audiocontrol-org/deskwork/issues/151) — `deskwork publish` writes `publishedDate` to the sidecar (currently null even though `datePublished` is computed and reported). Trace the gap, fix at the persistence boundary, regression-test.
+- [ ] [#153](https://github.com/audiocontrol-org/deskwork/issues/153) — per-skill LLM model defaults (enhancement; design needed before implementation — propose a config-schema extension; surface for `/frontend-design` or operator review BEFORE implementation).
+- [ ] [#158](https://github.com/audiocontrol-org/deskwork/issues/158) — **NOT direct implementation.** 34d's task is to walk every studio surface, name each layout inconsistency, file each as a separate child issue, then close #158 with the inventory.
+- [ ] **Verify #152 closed in 34a.** The "entry-review page CSS" issue is satisfied by 34a's port-the-chrome work; 34d confirms the closure as part of its acceptance gate.
+
+**Acceptance:** 34d closes when #151 and #153 are fix-landed in a release + #158 has been split into 3+ specific child issues with this phase closing the umbrella + #152 is verified closed by 34a's work.
+
+#### 34e — v0.13.0 verification + issue closures
+
+(Was 34d.) Cannot run until at least one tranche has shipped to release (typically 34a).
+
+- [ ] Boot marketplace v0.13.0 install in a clean Claude Code session (`/plugin marketplace update deskwork`) on a fresh terminal — explicitly NOT through the workspace dev-bin
+- [ ] Walk F1–F6 scrapbook surfaces at 4 viewports (1440 / 1024 / 768 / 390); verify all 15 mockup sections still match per the F6 walkthrough doc
+- [ ] Walk longform-review redesign surfaces (#154 dispatches A–E acceptance) at desktop / tablet / phone — using the new unified surface from 34a
+- [ ] Verify fixes for #155 / #159 / #160 against the released artifact (per `agent-discipline.md` "Issue closure requires verification in a formally-installed release")
+- [ ] Post staged fix-landed comments on #154, #155, #159, #160, #161; close each issue
+- [ ] Run the agent-discipline grep audit on the entire studio (`for now` / `just for now` / `TODO` / `FIXME` / etc.); each hit becomes fix-in-this-phase or filed-issue
+- [ ] Move feature docs to `003-COMPLETE/` only when ALL sub-phases (34a, 34b, 34c, 34d) have closed-or-decision dispositions
+
+**Acceptance:** 34e closes when issues #154, #155, #159, #160, #161 are CLOSED on GitHub + the grep audit returns zero unexplained hits.
+
+**Notes:**
+
+- 34a is the first proof-of-work for the new `agent-discipline.md` "no just for now" rule (commit `42eb837`). The legacy review surface is the textbook example of the failure mode; deleting it is the rule's first victory.
+- The audit-corrupted-reviews task is non-optional. Past trust failures are exactly the cost of letting "for now" stay around — the trust must be rebuilt by re-reviewing the affected entries against current state. Skipping the audit because "the file is on disk so the work is probably fine" is the same shape failure: a code-comment IOU about correctness instead of a verified disposition.
+- Dispatch order: 34a → 34b → 34c → 34d → 34e. None of the others can start until 34a ships, because every other sub-phase's verification depends on a working studio review surface.
+- This phase ships across multiple PRs and likely multiple release versions. 34a alone is large enough that it may need its own internal task breakdown — that breakdown happens at the start of 34a implementation, not during this PRD review.
+- The pattern of "filed during dogfood" follow-ups remains the signal: if 34a surfaces new issues during implementation (likely it will — porting 710 lines of chrome will turn over rocks), they get filed in real time per `agent-discipline.md`, not bundled into a future "Phase 35" pre-emptively.

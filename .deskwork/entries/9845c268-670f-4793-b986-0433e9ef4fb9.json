@@ -9,12 +9,11 @@
     "internal-doc"
   ],
   "source": "manual",
-  "currentStage": "Drafting",
+  "currentStage": "Final",
   "iterationByStage": {
-    "Drafting": 2
+    "Drafting": 4
   },
+  "artifactPath": "docs/1.0/001-IN-PROGRESS/deskwork-plugin/prd.md",
   "createdAt": "2026-05-01T00:17:31.525Z",
-  "updatedAt": "2026-05-01T04:08:23.605Z",
-  "reviewState": "approved",
-  "artifactPath": "docs/1.0/001-IN-PROGRESS/deskwork-plugin/prd.md"
+  "updatedAt": "2026-05-03T18:18:46.400Z"
 }
