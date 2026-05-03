@@ -3253,9 +3253,9 @@ This section was appended on 2026-05-03 after the implementation audit in `2026-
 
 ### Task 50: Implement real version retargeting
 
-- [ ] Replace the current same-stage transition claim with actual cross-version retarget support.
-- [ ] Ensure retargeting can move a feature from `docs/<old-version>/<stage>/<slug>/` to `docs/<new-version>/<stage>/<slug>/` without losing tracked metadata.
-- [ ] Update the `extend` skill so its documented helper call matches the real implementation.
+- [x] Replace the current same-stage transition claim with actual cross-version retarget support.
+- [x] Ensure retargeting can move a feature from `docs/<old-version>/<stage>/<slug>/` to `docs/<new-version>/<stage>/<slug>/` without losing tracked metadata.
+- [x] Update the `extend` skill so its documented helper call matches the real implementation.
 
 **Acceptance Criteria:**
 - The skill layer and helper layer agree on retarget behavior.
