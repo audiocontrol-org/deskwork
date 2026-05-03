@@ -3,7 +3,7 @@ slug: dw-lifecycle
 targetVersion: "1.0"
 date: 2026-04-29
 branch: feature/deskwork-dw-lifecycle
-parentIssue:
+parentIssue: 134
 ---
 
 # Feature: dw-lifecycle
@@ -20,6 +20,8 @@ Project lifecycle orchestration plugin for Claude Code. Composes `superpowers` (
 | 4 | Tracking + transitions + journal (`journal-append`, `transition`, `issues`) | Complete |
 | 5 | Skills (15 SKILL.md content rewrites) | Complete |
 | 6 | Release prep (README, smoke, audit) | Complete |
+| 7 | Post-ship bug fixes (`setup` / `define` / install-path follow-up) | In Progress |
+| 8 | Customize hooks / tailoring seam | In Progress |
 
 ## Key Links
 
@@ -28,7 +30,13 @@ Project lifecycle orchestration plugin for Claude Code. Composes `superpowers` (
 - Workplan: `workplan.md`
 - Plugin source: `plugins/dw-lifecycle/`
 - Local smoke: `scripts/smoke-dw-lifecycle.sh`
-- Parent Issue: <parentIssue>
+- Parent Issue: #134
+
+## Reopened Follow-Up
+
+`dw-lifecycle` originally shipped on `main` at v0.9.6, but the feature has since been reopened for post-ship follow-up work under [#134](https://github.com/audiocontrol-org/deskwork/issues/134), with Phase 7 tracked in [#135](https://github.com/audiocontrol-org/deskwork/issues/135) and Phase 8 tracked in [#136](https://github.com/audiocontrol-org/deskwork/issues/136).
+
+This directory has been moved back to `001-IN-PROGRESS` so the documentation state matches the active issue state and branch intent.
 
 ## Release status
 
@@ -37,6 +45,10 @@ Project lifecycle orchestration plugin for Claude Code. Composes `superpowers` (
 T46 workplan steps 4–6 (per-plugin tag, PR open, operator-merge) are obsolete artifacts of the original plan. The feature landed via direct fast-forward push to `origin/main` per the trunk-based release model.
 
 Verification at landing: 63/63 vitest tests pass, tsc clean, plugin manifest validates, local smoke (`scripts/smoke-dw-lifecycle.sh`) passes against a fresh tmp repo, bin shim's first-run npm install verified.
+
+## Audit
+
+- 2026-05-03 implementation audit: `2026-05-03-implementation-audit.md`
 
 ## Open follow-ups (non-blockers)
 

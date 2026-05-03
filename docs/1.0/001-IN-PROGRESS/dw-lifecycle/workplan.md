@@ -1,5 +1,7 @@
 # dw-lifecycle Implementation Plan
 
+> **State note (2026-05-03):** This feature was previously moved to `003-COMPLETE` after the initial ship, but it has now been returned to `001-IN-PROGRESS` to match the reopened follow-up arc tracked in #134 / #135 / #136 and the implementation audit captured in `2026-05-03-implementation-audit.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build the v0.1.0 release of the `dw-lifecycle` plugin — a Claude Code plugin that orchestrates managed-project feature lifecycles by composing `superpowers` (process disciplines) and `feature-dev` (specialist agents) instead of duplicating their practices.
