@@ -391,6 +391,22 @@ export async function toggleSecret(ctx: Ctx, card: HTMLElement): Promise<void> {
 // ---------------------------------------------------------------------------
 
 /**
+ * Today's date as `YYYY-MM-DD` in the operator's LOCAL time zone (not
+ * UTC). Filenames are persistent user-visible content, so an operator
+ * working at 5pm Pacific on May 3 must get `note-2026-05-03.md`, not
+ * `note-2026-05-04.md` (which is what `toISOString().slice(0,10)`
+ * would produce because UTC is already the next day). Built from
+ * Date getters directly to avoid locale-dependent format surprises.
+ */
+function todayLocalIso(): string {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+/**
  * Reveal the inline composer markup that's server-rendered hidden in
  * `pages/scrapbook.ts::renderComposer`. Pre-fills the filename field
  * with today-dated default (`note-YYYY-MM-DD.md`) when empty so the
@@ -402,7 +418,7 @@ export function showComposer(ctx: Ctx): void {
   form.hidden = false;
   const filename = form.querySelector<HTMLInputElement>('[data-composer-filename]');
   if (filename && !filename.value) {
-    filename.value = `note-${new Date().toISOString().slice(0, 10)}.md`;
+    filename.value = `note-${todayLocalIso()}.md`;
   }
   form.scrollIntoView({ behavior: 'smooth', block: 'start' });
   form.querySelector<HTMLTextAreaElement>('[data-composer-body]')?.focus();
@@ -429,7 +445,7 @@ async function submitComposer(ctx: Ctx): Promise<void> {
   if (!filenameInput || !bodyInput) return;
 
   let filename = filenameInput.value.trim();
-  if (!filename) filename = `note-${new Date().toISOString().slice(0, 10)}.md`;
+  if (!filename) filename = `note-${todayLocalIso()}.md`;
   if (!filename.endsWith('.md')) filename += '.md';
   if (!FILENAME_RE.test(filename)) {
     flashError(ctx.page, `invalid filename: ${filename}`);
@@ -464,15 +480,22 @@ async function submitComposer(ctx: Ctx): Promise<void> {
  * Wire the composer's cancel/save/keyboard handlers to its form
  * markup. Idempotent on the form element — safe to call once during
  * client init.
+ *
+ * Cmd/Ctrl+S submits and Esc cancels from BOTH the filename input
+ * and the body textarea (#175-adjacent fix per 34b audit) — the
+ * pre-F1 reference only listened on the body, which left keyboard-
+ * driven operators stranded if focus was still in the filename field.
  */
 export function wireComposer(ctx: Ctx): void {
   const form = ctx.page.querySelector<HTMLFormElement>('[data-scrap-composer]');
   if (!form) return;
   const cancelBtn = form.querySelector<HTMLButtonElement>('[data-action="composer-cancel"]');
+  const filenameInput = form.querySelector<HTMLInputElement>('[data-composer-filename]');
   const bodyInput = form.querySelector<HTMLTextAreaElement>('[data-composer-body]');
 
   cancelBtn?.addEventListener('click', () => hideComposer(ctx));
-  bodyInput?.addEventListener('keydown', (ev) => {
+
+  function onKeyDown(ev: KeyboardEvent): void {
     if ((ev.metaKey || ev.ctrlKey) && ev.key === 's') {
       ev.preventDefault();
       void submitComposer(ctx);
@@ -482,7 +505,10 @@ export function wireComposer(ctx: Ctx): void {
       ev.preventDefault();
       hideComposer(ctx);
     }
-  });
+  }
+  filenameInput?.addEventListener('keydown', onKeyDown);
+  bodyInput?.addEventListener('keydown', onKeyDown);
+
   form.addEventListener('submit', (ev) => {
     ev.preventDefault();
     void submitComposer(ctx);
