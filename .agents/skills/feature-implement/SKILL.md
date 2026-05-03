@@ -1,6 +1,6 @@
 ---
 name: feature-implement
-description: "Drive the implementation loop by selecting the next workplan task, verifying the PRD gate, doing the work, and updating progress."
+description: "Drive the implementation loop by selecting the next workplan task, verifying PRD/workplan approval, doing the work, and updating progress."
 ---
 
 # Feature Implement
@@ -10,9 +10,9 @@ description: "Drive the implementation loop by selecting the next workplan task,
 Before implementation:
 
 1. Identify the feature slug.
-2. Read the PRD and extract `deskwork.id`.
-3. Verify the PRD's deskwork workflow is `applied`.
-4. If not, refuse to proceed.
+2. Read the PRD and workplan.
+3. Verify the PRD/workplan have been explicitly approved for implementation.
+4. If approval is missing or ambiguous, refuse to proceed and ask for confirmation instead of routing through deskwork-plugin dogfooding.
 
 ## Loop
 

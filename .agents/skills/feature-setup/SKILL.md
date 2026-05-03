@@ -1,6 +1,6 @@
 ---
 name: feature-setup
-description: "Create feature infrastructure: branch, worktree, docs files, and deskwork PRD registration from a prior feature-definition draft."
+description: "Create feature infrastructure: branch, worktree, and docs files from a prior feature-definition draft."
 ---
 
 # Feature Setup
@@ -9,10 +9,9 @@ description: "Create feature infrastructure: branch, worktree, docs files, and d
 2. Create the branch and worktree.
 3. Create `docs/1.0/001-IN-PROGRESS/<slug>/`.
 4. Create:
-   - `prd.md` with `deskwork.id` frontmatter
+   - `prd.md`
    - `workplan.md`
    - `README.md`
    - `implementation-summary.md`
-5. Register the PRD with deskwork using the project's configured collection/site.
-6. Start the deskwork review workflow and capture the review URL.
-7. Report the created paths and the next required operator action: PRD review until `applied`.
+5. Seed the PRD and workplan from the approved feature-definition draft.
+6. Report the created paths and the next required operator action: review and approve the PRD/workplan in-repo before `feature-issues` or `feature-implement`.

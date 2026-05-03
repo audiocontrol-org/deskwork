@@ -50,15 +50,15 @@ Use `.agents/skills/session-end/`.
 ## Feature Lifecycle
 
 1. `feature-define` — interview and write a feature definition draft under `.agents/.tmp/feature-definition-<slug>.md`
-2. `feature-setup` — create branch, worktree, docs, and register the PRD with deskwork
-3. Operator iterates the PRD through deskwork until the workflow is `applied`
+2. `feature-setup` — create branch, worktree, and feature docs from the approved definition draft
+3. Operator reviews and approves the PRD/workplan directly in the repo before implementation begins
 4. `feature-issues` — file GitHub issues from the stable workplan
 5. `feature-implement` — implementation begins only after PRD approval
-6. `feature-extend` — add phases mid-implementation, then re-iterate the PRD
+6. `feature-extend` — add phases mid-implementation, then get PRD/workplan approval again before filing new issues
 7. `feature-review` / `feature-ship`
 8. `feature-complete` — move docs to `003-COMPLETE` before merge
 
-The PRD review gate is strict. No bypass flag.
+The PRD/workplan approval gate is strict. Do not treat deskwork-plugin workflow state as a prerequisite for `/feature-*` skills.
 
 For non-feature documents, use the deskwork lifecycle directly.
 

@@ -9,7 +9,7 @@ Report the lifecycle:
 
 1. `feature-define`
 2. `feature-setup`
-3. operator PRD review through deskwork
+3. operator PRD/workplan review in-repo
 4. `feature-issues`
 5. `feature-implement`
 6. `feature-review`
