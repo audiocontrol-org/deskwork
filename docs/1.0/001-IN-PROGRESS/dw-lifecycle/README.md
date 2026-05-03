@@ -20,9 +20,9 @@ Project lifecycle orchestration plugin for Claude Code. Composes `superpowers` (
 | 4 | Tracking + transitions + journal (`journal-append`, `transition`, `issues`) | Complete |
 | 5 | Skills (15 SKILL.md content rewrites) | Complete |
 | 6 | Release prep (README, smoke, audit) | Complete |
-| 7 | Post-ship bug fixes (`setup` / `define` / install-path follow-up) | In Progress |
-| 8 | Customize hooks / tailoring seam | In Progress |
-| 9 | PRD conformance hardening (audit-driven remediation) | In Progress |
+| 7 | Post-ship bug fixes (`setup` / `define` / install-path follow-up) | Complete |
+| 8 | Customize hooks / tailoring seam | Complete |
+| 9 | PRD conformance hardening (audit-driven remediation) | Complete |
 
 ## Key Links
 
@@ -50,21 +50,15 @@ Verification at landing: 63/63 vitest tests pass, tsc clean, plugin manifest val
 ## Audit
 
 - 2026-05-03 implementation audit: `2026-05-03-implementation-audit.md`
+- 2026-05-03 post-remediation audit: `2026-05-03-post-remediation-audit.md`
 
-## Current goal
+## Current status
 
-Close the audit gaps that currently keep `dw-lifecycle` from fully matching its own PRD/design:
-
-- trustworthy peer-plugin enforcement
-- bootstrap fidelity
-- PRD-first setup fidelity
-- real version-retarget support
-- reduced deskwork-coupling in the published defaults
+The reopened remediation arc is complete. The follow-up audit now finds the feature substantially aligned with its PRD/design, and the remaining items are narrow hardening or deferred portability backlog rather than blockers for this feature.
 
 ## Open follow-ups (non-blockers)
 
 - `targetVersion` arg not validated at the CLI boundary (slug is). Path traversal via `--target ../../etc` would still escape the docs tree; same fix pattern as slug.
 - `branchExists` only checks local refs; remote-only `origin/feature/<slug>` collision still creates a tracking branch.
 - `TEMPLATES_DIR` resolution via `import.meta.url` works under tsx but would break if a `dist/` build is added.
-- `parentIssue: ''` placeholder renders as empty trailing in the README template until `dw-lifecycle issues` runs.
 - The journal-entry override seam is the first portability slice. Broader feature-doc template/file-layout customization remains deferred under [#123](https://github.com/audiocontrol-org/deskwork/issues/123).

@@ -3273,9 +3273,9 @@ This section was appended on 2026-05-03 after the implementation audit in `2026-
 
 ### Task 52: Re-run implementation audit against the remediated feature
 
-- [ ] Re-run a PRD-conformance audit after Tasks 47–51 land.
-- [ ] Write a new datestamped audit document in the feature directory.
-- [ ] Confirm whether the reopened arc can return to `003-COMPLETE` or whether additional follow-up phases are still required.
+- [x] Re-run a PRD-conformance audit after Tasks 47–51 land.
+- [x] Write a new datestamped audit document in the feature directory.
+- [x] Confirm whether the reopened arc can return to `003-COMPLETE` or whether additional follow-up phases are still required.
 
 **Acceptance Criteria:**
 - The new audit can honestly describe `dw-lifecycle` as substantially conformant to its PRD/design, or it clearly enumerates the remaining blockers.
