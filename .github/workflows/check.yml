@@ -25,6 +25,18 @@ jobs:
       - name: Install
         run: npm install
 
+      # Build dist/ across all workspaces. Tests in @deskwork/cli invoke
+      # node_modules/.bin/deskwork via spawnSync, which symlinks to
+      # packages/cli/dist/cli.js — without dist, the bin exits non-zero
+      # and tests fail with empty stderr. Locally this works because dist
+      # is warm from dev work; CI starts cold.
+      # Build infrastructure ≠ test infrastructure (which the project
+      # rule at .claude/rules/agent-discipline.md forbids in CI). This
+      # step is the prerequisite that makes the existing test
+      # infrastructure actually function in a cold environment.
+      - name: Build workspaces
+        run: npm run build
+
       # --if-present skips workspaces without a 'test' script. Plugin
       # shells (plugins/deskwork, plugins/deskwork-studio) ship metadata
       # + bash wrappers + source only — no tests.
