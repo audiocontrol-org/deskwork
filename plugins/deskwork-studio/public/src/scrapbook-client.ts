@@ -30,6 +30,7 @@ import {
   pickAndUpload,
   renderExpandedBody,
   toggleSecret,
+  uploadFile,
   type Ctx,
 } from './scrapbook-mutations.ts';
 
@@ -51,6 +52,7 @@ function init(): void {
   wireCards(ctx);
   wireAsideLinks(ctx);
   wireAsideActions(ctx);
+  wireDropZone(ctx);
   initScrapbookLightbox(page);
   // F4: restore expanded state from #item-N hash on page load.
   restoreFromHash(ctx);
@@ -238,6 +240,41 @@ function wireAsideActions(ctx: Ctx): void {
     const action = btn.dataset.action;
     if (action === 'new-note') { ev.preventDefault(); void newNote(ctx); }
     if (action === 'upload') { ev.preventDefault(); void pickAndUpload(ctx); }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Drop zone (F5)
+// ---------------------------------------------------------------------------
+
+function wireDropZone(ctx: Ctx): void {
+  const drop = ctx.page.querySelector<HTMLElement>('.scrap-drop');
+  if (!drop) return;
+
+  // Click + keyboard delegate to the existing file picker. The drop zone
+  // is a `role="button" tabindex="0"` so Enter/Space activate it like any
+  // other button.
+  drop.addEventListener('click', () => void pickAndUpload(ctx));
+  drop.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Enter' && ev.key !== ' ') return;
+    ev.preventDefault();
+    void pickAndUpload(ctx);
+  });
+
+  // Drag-and-drop. dragover MUST preventDefault to allow the drop event
+  // to fire; without it the browser handles the file (navigates away).
+  drop.addEventListener('dragover', (ev) => {
+    ev.preventDefault();
+    drop.dataset.dragover = 'true';
+  });
+  drop.addEventListener('dragleave', () => {
+    delete drop.dataset.dragover;
+  });
+  drop.addEventListener('drop', (ev) => {
+    ev.preventDefault();
+    delete drop.dataset.dragover;
+    const file = ev.dataTransfer?.files?.[0];
+    if (file) void uploadFile(ctx, file);
   });
 }
 

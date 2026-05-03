@@ -312,6 +312,46 @@ describe('scrapbook redesign — per-kind preview rendering (Issue #161, dispatc
     expect(otherCard).not.toMatch(/<span>·<\/span>/);
   });
 
+  it('renders the drop zone after the cards grid (F5)', async () => {
+    const r = await fetchScrapbook(app, 'd', 'folder');
+    // The drop zone follows the </ol> closing the .scrap-cards grid.
+    expect(r.html).toMatch(/<\/ol>\s*<div class="scrap-drop"/);
+    expect(r.html).toMatch(/role="button"/);
+    expect(r.html).toMatch(/data-action="upload"/);
+    expect(r.html).toMatch(/drop a file here/i);
+  });
+
+  it('omits the secret section when there are no secret items (F5)', async () => {
+    const r = await fetchScrapbook(app, 'd', 'folder');
+    expect(r.html).not.toMatch(/<section class="scrap-secret"/);
+  });
+
+  it('renders the secret section when secret items exist (F5)', async () => {
+    const dir = join(root, 'docs/folder/scrapbook/secret');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'private-note.md'), '---\ntitle: Private\n---\n\nClassified.\n');
+    const r = await fetchScrapbook(app, 'd', 'folder');
+    expect(r.html).toMatch(/<section class="scrap-secret"/);
+    expect(r.html).toMatch(/scrap-secret-mark/);
+    expect(r.html).toMatch(/<h2 class="scrap-secret-title">Secret<\/h2>/);
+    expect(r.html).toMatch(/scrap-secret-badge/);
+    expect(r.html).toMatch(/private-note\.md/);
+    // The secret card's mark-secret button label flips to "mark public".
+    expect(r.html).toMatch(/data-action="mark-secret"[^>]*>mark public</);
+    // Aside totals reflect the secret count.
+    expect(r.html).toMatch(/<strong>1<\/strong>\s*secret/);
+  });
+
+  it('emits secret-* ids on secret cards to avoid collision with public ids (F5)', async () => {
+    const dir = join(root, 'docs/folder/scrapbook/secret');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'private-note.md'), '---\ntitle: Private\n---\n\nClassified.\n');
+    const r = await fetchScrapbook(app, 'd', 'folder');
+    // Public ids are item-1, item-2, ...; secret ids are secret-item-1, ... so
+    // restoreFromHash + aside cross-link can disambiguate.
+    expect(r.html).toMatch(/<li class="scrap-card"[^>]*id="secret-item-1"/);
+  });
+
   it('every aside <a> href matches a card id (F4 cross-link contract)', async () => {
     const r = await fetchScrapbook(app, 'd', 'folder');
     const asideHrefs = Array.from(

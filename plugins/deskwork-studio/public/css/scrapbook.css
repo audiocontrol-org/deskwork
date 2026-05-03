@@ -419,6 +419,75 @@
 .scrap-card[data-filtered-out="true"] { display: none; }
 .scrap-card[data-search-out="true"] { display: none; }
 
+/* ============ DROP ZONE (F5) ============ */
+.scrap-drop {
+  margin-top: var(--er-space-4);
+  border: 2px dashed var(--er-faded-2);
+  background: var(--er-paper);
+  padding: var(--er-space-4);
+  text-align: center;
+  font-family: var(--er-font-mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  border-radius: 2px;
+  cursor: pointer;
+}
+.scrap-drop:hover {
+  border-color: var(--er-red-pencil);
+  color: var(--er-red-pencil);
+}
+.scrap-drop:focus-visible {
+  outline: 1px dotted var(--er-red-pencil);
+  outline-offset: 2px;
+  border-color: var(--er-red-pencil);
+  color: var(--er-red-pencil);
+}
+/* G3 amendment: dashed-becomes-solid + paper-2 bg signals "commitment imminent"
+   while a file is being dragged over the zone. No animation — editorial paper
+   aesthetic prefers static state changes. */
+.scrap-drop[data-dragover="true"] {
+  border-style: solid;
+  border-color: var(--er-red-pencil);
+  background: var(--er-paper-2);
+  color: var(--er-red-pencil);
+}
+
+/* ============ SECRET SECTION (F5) ============ */
+.scrap-secret {
+  margin-top: var(--er-space-5);
+  padding-top: var(--er-space-3);
+  border-top: 2px solid var(--er-paper-4);
+}
+.scrap-secret-head {
+  display: flex;
+  gap: var(--er-space-2);
+  align-items: baseline;
+  margin-bottom: var(--er-space-2);
+}
+.scrap-secret-mark {
+  color: var(--er-stamp-purple);
+  font-size: 1rem;
+}
+.scrap-secret-title {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 36, "wght" 500;
+  font-size: 1.2rem;
+  margin: 0;
+  color: var(--er-stamp-purple);
+}
+.scrap-secret-badge {
+  font-family: var(--er-font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--er-stamp-purple);
+  border: 1px dashed var(--er-stamp-purple);
+  padding: 0.1rem 0.4rem;
+  border-radius: 2px;
+}
+
 /* ============ REDUCED MOTION ============ */
 @media (prefers-reduced-motion: reduce) {
   .scrap-card,

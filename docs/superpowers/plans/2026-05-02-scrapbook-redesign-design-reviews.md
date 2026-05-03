@@ -337,3 +337,60 @@ Active-state computed color: `rgb(184, 54, 42)` = `--er-red-pencil`. Matches moc
 > Single-expanded + aside cross-link active + URL hash sync all work as designed. Mockup only specifies static state; F4 ships the dynamic behavior the mockup implies. Implementation choices match the press-check editorial-print mental model.
 > Test count 343 → 344 passing (+1 F4 markup-contract regression). 0 failed. 11 skipped. No regression from F3.
 
+---
+
+## G3 — drop zone + secret section design review (2026-05-02)
+
+**Trigger:** before Task F5.2 (server impl of drop zone + secret section).
+**Inputs:** post-F4 live page screenshot at 1440×900 with multi-kind fixture (3 public cards) + mockup CSS lines 472-518 + mockup markup lines 763-803.
+
+### Drop zone composition
+
+Sign-off on planned composition with one polish addition: `:focus-visible` rule mirroring F1's `1px dotted var(--er-red-pencil)` outline pattern (offset 2px). Without it, `tabindex="0"` keyboard users have no focus indicator.
+
+### Design questions resolved
+
+| Q | Answer | Rationale |
+|---|---|---|
+| Q1: Section order | public → drop → secret (mockup order) | Drop adjacent to public matches "where new items land"; secret as separate fenced region matches "and by the way, also some private stuff" |
+| Q2: Dragover state | red-pencil border + paper-2 bg + red-pencil text + **`border-style: solid`** (dashed→solid signals "commitment imminent") | No animations — static state changes match the editorial paper aesthetic. Solid border-flip is the editorial flourish |
+| Q3: Per-card secret diff | None — rely on section header alone | Russian-doll principle: cards inside `.scrap-secret` inherit section meaning. Per-card duplication dilutes header signal. If expanded-far-from-header friction surfaces, file as follow-up |
+| Q4: Empty state | Drop zone IS the empty state | Mono-caps "── drop a file here, or pick one ──" already says "this is empty AND here's how to fill it." No separate "no items yet" copy |
+| Q5: Drop zone visibility when expanded | Always visible (no special-case hide) | Expanded card pushes drop zone below fold naturally; operator scrolling back finds it. Special-case hide solves no real problem |
+
+### Secret section composition
+
+Sign-off as drafted. Card-id namespacing (`secret-item-N` vs `item-N`) is essential for restoreFromHash + aside cross-link disambiguation. **Aside list contract: public items only** — secret cards reachable but not indexed (matches "folder index = public; secret = sealed envelope at the back" metaphor).
+
+### F5.2/F5.3 amendments to bake in
+
+1. Add `:focus-visible` rule to `.scrap-drop` (G3.1)
+2. Add `border-style: solid;` to the `[data-dragover="true"]` block (G3.2)
+3. Confirm in F5.4 testing that `restoreFromHash` works for `#secret-item-N` AND `syncAsideActive` correctly leaves all aside links inactive when expanded card is secret (G3.3)
+
+### Sign-off
+
+> **F5.2 may proceed as drafted with the three amendments above.**
+> Mockup translation faithful; design questions resolved with restraint.
+
+---
+
+## F5 post-implementation visual review (2026-05-02)
+
+**Trigger:** after F5.2 (server) + CSS additions + F5.3 (client wireDropZone).
+**Inputs:** post-F5 live page at 1440×900 with multi-kind fixture (3 public + 1 secret); 3 behavioral measurements; screenshot at `.playwright-mcp/scrapbook-after-f5-1440.png`.
+
+### Live behavioral verification
+
+| Test | Result | Verdict |
+|---|---|---|
+| Initial load | Drop zone exists (role=button, tabindex=0, dashed border `rgb(181,172,155)`, faded text, margin-top 28px = `--er-space-4`); secret section exists (purple `⚿` mark `rgb(90,62,95)` = `--er-stamp-purple`, Fraunces italic title, dashed-purple badge); secret card id="secret-item-1", button label "mark public"; aside totals "3 public · 1 secret · 11.0 KB" | ✓ |
+| Synthetic dragover dispatch | dataset.dragover="true"; border-style flips dashed→**solid**; border-color → red-pencil; bg → paper-2; color → red-pencil; event.defaultPrevented=true (drop will fire). Dragleave clears: dragover removed, border returns to dashed | ✓ G3.2 amendment verified |
+| Deep link `#secret-item-1` | restoreFromHash auto-expanded the secret card; **asideActiveCount=0** (no public aside link wrongly activated — preserves "folder index = public only" contract); expanded card has red-pencil border; lazy-loaded markdown body rendered | ✓ G3.3 amendment verified |
+
+### Sign-off
+
+> **F5 verified — proceed to F6 final sign-off.**
+> All 3 G3 amendments (focus-visible, dragover dashed→solid, deep-link to secret) verified live. Drop zone matches mockup with editorial restraint preserved. Secret section chrome matches mockup verbatim. Secret cards inherit section semantics with no per-card diff. Section order public → drop → secret as ratified. Aside totals reflect real secretCount.
+> Test count 344 → 348 passing (+4 F5 tests). 0 failed. 11 skipped. No regression from F4.
+

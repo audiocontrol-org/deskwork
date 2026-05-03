@@ -288,10 +288,10 @@ function renderAside(
   items: readonly ScrapbookItem[],
   totalSize: number,
   lastModified: string | null,
+  secretCount: number,
 ): RawHtml {
   const lastModifiedLabel = lastModified ? formatRelativeTime(lastModified) : '—';
   const publicCount = items.length;
-  const secretCount = 0;
   const sizeLabel = formatSize(totalSize);
   const folderLabel = path.split('/').filter(Boolean).pop() ?? path;
   const fullPath = `${site}/${path}/scrapbook/`;
@@ -330,14 +330,16 @@ function renderCard(
   path: string,
   item: ScrapbookItem,
   index: number,
+  opts: { secret?: boolean } = {},
 ): RawHtml {
+  const { secret = false } = opts;
   const seq = String(index + 1).padStart(2, '0');
   const kindLabel = KIND_LABEL[item.kind];
   const kindClass = item.kind === 'other' ? '' : `scrap-kind--${item.kind}`;
   const time = item.mtime
     ? html`<time class="scrap-time" datetime="${item.mtime}">${formatRelativeTime(item.mtime)}</time>`
     : '';
-  const preview = renderPreview(ctx, site, path, item);
+  const preview = renderPreview(ctx, site, path, item, { secret });
   const kindMeta = computeKindMeta(ctx, site, path, item);
   const kindMetaHtml: RawHtml = kindMeta
     ? unsafe(html`<span>·</span><span>${kindMeta}</span>`)
@@ -345,8 +347,15 @@ function renderCard(
   const editBtn = item.kind === 'img'
     ? unsafe('')
     : unsafe(html`<button class="scrap-tool" type="button" data-action="edit">edit</button>`);
+  // Secret cards get id="secret-item-N" to disambiguate from public ids in
+  // restoreFromHash + aside cross-link lookups (F4 contract); the
+  // mark-secret action toggle reads "mark public" since clicking it moves
+  // the card OUT of the secret section.
+  const id = secret ? `secret-item-${index + 1}` : `item-${index + 1}`;
+  const markSecretLabel = secret ? 'mark public' : 'mark secret';
+  const dataSecretAttr = secret ? ' data-secret="true"' : '';
   return unsafe(html`
-    <li class="scrap-card" data-kind="${item.kind}" data-state="closed" id="item-${index + 1}">
+    <li class="scrap-card" data-kind="${item.kind}" data-state="closed" id="${id}"${unsafe(dataSecretAttr)}>
       <div class="scrap-card-head">
         <span class="scrap-seq">N° ${seq}</span>
         <span class="scrap-name" data-action="open">${item.name}</span>
@@ -362,11 +371,40 @@ function renderCard(
         <button class="scrap-tool scrap-tool--primary" type="button" data-action="open">open</button>
         ${editBtn}
         <button class="scrap-tool" type="button" data-action="rename">rename</button>
-        <button class="scrap-tool" type="button" data-action="mark-secret">mark secret</button>
+        <button class="scrap-tool" type="button" data-action="mark-secret">${markSecretLabel}</button>
         <span class="spacer"></span>
         <button class="scrap-tool scrap-tool--delete" type="button" data-action="delete">delete</button>
       </div>
     </li>`);
+}
+
+function renderDropZone(): RawHtml {
+  return unsafe(html`
+    <div class="scrap-drop" role="button" tabindex="0" data-action="upload"
+         aria-label="Drop a file here, or press Enter to pick one">
+      ── drop a file here, or pick one ──
+    </div>`);
+}
+
+function renderSecretSection(
+  ctx: StudioContext,
+  site: string,
+  path: string,
+  secretItems: readonly ScrapbookItem[],
+): RawHtml {
+  if (secretItems.length === 0) return unsafe('');
+  const cards = secretItems.map((item, i) => renderCard(ctx, site, path, item, i, { secret: true }));
+  return unsafe(html`
+    <section class="scrap-secret" aria-label="secret items">
+      <header class="scrap-secret-head">
+        <span class="scrap-secret-mark" aria-hidden="true">⚿</span>
+        <h2 class="scrap-secret-title">Secret</h2>
+        <span class="scrap-secret-badge">private — never published</span>
+      </header>
+      <ol class="scrap-cards">
+        ${cards}
+      </ol>
+    </section>`);
 }
 
 export function renderScrapbookPage(
@@ -386,6 +424,7 @@ export function renderScrapbookPage(
   // failures, FS permission issues) propagate to the studio's error handler.
   const result = listScrapbook(ctx.projectRoot, ctx.config, site, path);
   const items = result.items;
+  const secretItems = result.secretItems;
   const totalSize = items.reduce((s, i) => s + i.size, 0);
   const lastModified = items.reduce<string | null>((acc, i) => {
     if (!i.mtime) return acc;
@@ -399,7 +438,7 @@ export function renderScrapbookPage(
   const body = html`
     ${renderEditorialFolio('content', `scrapbook · ${site}/${path}`)}
     <main class="scrap-page" data-site="${site}" data-path="${path}">
-      ${renderAside(site, path, items, totalSize, lastModified)}
+      ${renderAside(site, path, items, totalSize, lastModified, secretItems.length)}
       <section class="scrap-main">
         <header class="scrap-main-header">
           ${renderBreadcrumb(site, path)}
@@ -409,7 +448,8 @@ export function renderScrapbookPage(
         <ol class="scrap-cards" id="cards" data-scrap-cards>
           ${unsafe(cardsHtml)}
         </ol>
-        ${unsafe('<!-- F5: drop zone + secret section -->')}
+        ${renderDropZone()}
+        ${renderSecretSection(ctx, site, path, secretItems)}
       </section>
     </main>`;
   return layout({

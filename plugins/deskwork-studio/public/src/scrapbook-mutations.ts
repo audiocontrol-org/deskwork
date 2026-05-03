@@ -428,7 +428,7 @@ export async function pickAndUpload(ctx: Ctx): Promise<void> {
   });
 }
 
-async function uploadFile(ctx: Ctx, file: File): Promise<void> {
+export async function uploadFile(ctx: Ctx, file: File): Promise<void> {
   try {
     const fd = new FormData();
     fd.append('site', ctx.site);
