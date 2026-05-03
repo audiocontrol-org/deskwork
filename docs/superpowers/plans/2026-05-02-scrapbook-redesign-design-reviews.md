@@ -145,12 +145,124 @@ All sections of the F1 scope MATCH the mockup at 1440×900: folio (with caveat �
 
 ### Outstanding work for F1 to complete
 
-The F1 implementation is in a clean uncommitted state at session-end. Next session must:
+F1 shipped as commit `44094ee` (2026-05-02). Spec-compliance and code-quality reviews ran via `superpowers:subagent-driven-development`; spec passed clean (3 small adaptive deviations all justified by live API surface), code-quality returned APPROVED WITH MINOR FIXES with 3 important fixes applied inline before commit (10 type-cast violations replaced via `parseErrorBody`/`parseSavedItem` type-guards + `instanceof Element` narrowing; 2 silent `catch{}` fallbacks in `scrapbook.ts` removed/narrowed; `readCtx` rewritten to read `data-site`/`data-path` attrs from `.scrap-page` instead of parsing display text). Tests 330 → 331 passing. Pushed to origin.
 
-1. **Dispatch the spec compliance reviewer subagent** (`superpowers:subagent-driven-development` skill's `spec-reviewer-prompt.md` template) — read the actual F1.4 + F1.5 implementation against the plan's spec; report ✅ or ❌ with file:line refs.
-2. **Dispatch the code quality reviewer subagent** (`superpowers:subagent-driven-development` skill's `code-quality-reviewer-prompt.md`) — focus areas: the 4-module client split (`scrapbook-client.ts` orchestrator + `scrapbook-mutations.ts` + `scrapbook-markdown.ts` + `scrapbook-toast.ts`), the 2-3 `as Element` / `as { error?: string }` casts (controller noted these match sibling-client patterns; reviewer should confirm), file-size discipline (all files under 500 lines), error handling on the lazy-load fetch path.
-3. **Commit F1 implementation** as a single commit with falsifiable measurements in the message (per `.claude/rules/ui-verification.md`):
-   - Files: `packages/studio/src/pages/scrapbook.ts`, `packages/studio/test/review-scrapbook-index-redesign.test.ts`, `packages/studio/test/api.test.ts` (3 tests updated), `plugins/deskwork-studio/public/css/scrapbook.css`, `plugins/deskwork-studio/public/css/editorial-nav.css` (G1.1 padding-top), `plugins/deskwork-studio/public/css/editorial-review.css` (G1.1 body bg), `plugins/deskwork-studio/public/src/scrapbook-client.ts`, `plugins/deskwork-studio/public/src/scrapbook-mutations.ts` (NEW), `plugins/deskwork-studio/public/src/scrapbook-markdown.ts` (NEW), `plugins/deskwork-studio/public/src/scrapbook-toast.ts` (NEW).
-   - Message body must include the live measurements above + multi-viewport verification + test count delta (348 baseline → 341 due to 7 retired old tests + 1 F5-skipped) + reference to issue #161 + reference to spec/plan paths.
-   - Use the in-tree `.git-commit-msg.tmp` per the project's file-handling rule.
+---
+
+## G2 — pre-preview-refinement design review (2026-05-02)
+
+**Trigger:** before Task F2.2 (refining `renderPreview` per-kind).
+**Inputs:** post-F1 live page screenshot at 1440×900 with multi-kind fixture (md/img/json/txt cards) at `.playwright-mcp/scrapbook-f2-pre-multi-1440.png` + the planned F2.2 implementation (plan lines 1591-1662) + mockup CSS (`scrapbook-redesign.html` lines 380-448 preview CSS, 595-720 per-kind card markup).
+**Live URL:** http://127.0.0.1:47321/dev/scrapbook/deskwork-internal/source-shipped-deskwork-plan (with 3 temporary fixture files alongside the existing md card)
+**Live measurements (4 cards visible):**
+| Card | Kind | Preview class | Length | Box height | Issue |
+|---|---|---|---|---|---|
+| #1 | img | `scrap-preview scrap-preview--img` | 16ch (mostly markup) | 321px | none — bg-frame correct |
+| #2 | txt | `scrap-preview scrap-preview--mono` | 375ch | 296px | none — line-clamped correctly |
+| #3 | json | `scrap-preview scrap-preview--mono` | 166ch | 124px | content cut off mid-`"value"` (byte cap sliced through) |
+| #4 | md | `scrap-preview scrap-preview-md` | 263ch | 149px | frontmatter LEAKS — yaml/jargon overflows the body |
+
+### Per-kind sign-off
+
+| Kind | F1 status | F2 action |
+|---|---|---|
+| md | frontmatter leaks | Strip leading `---\n...\n---\n` block. Plan's `stripFrontmatter` rule is correct. |
+| img | matches mockup | none — no F2 changes |
+| json | byte cap slices content mid-line | Replace plan's "expand byte cap" with parse-then-stringify (indent 2), fall back to raw text on parse error |
+| txt | mono pre (mockup uses italic display flourish) | Stay with mono pre. Mockup's italic-display txt is an editorial flourish the renderer cannot replicate per-file. |
+
+### Implementation details
+
+| Item | Value | Rationale |
+|---|---|---|
+| `-webkit-line-clamp` (closed) | **5** | Matches mockup CSS line 401; F1 already correct |
+| Frontmatter-strip rule | **Leading `---\n...\n---\n` ONLY** | Body-level `---` separators (Setext H2, thematic break) preserved. Plan's rule correct. |
+| NUL-byte detection | **`text.indexOf('\0') >= 0`** after UTF-8 decode of first 2400 bytes | Real text almost never has NUL; binary files have it within first KB. **Plan typo fix**: `text.indexOf(' ')` → `text.indexOf('\0')`. |
+
+### Edge cases
+
+| Case | Recommendation |
+|---|---|
+| Empty file (0 bytes) | Omit preview block entirely — `previewExcerpt` returns null when result is empty/whitespace-only |
+| Frontmatter-only file (no body) | Same as empty after strip — return null |
+| Long single line (minified JSON) | Parse-then-stringify makes it multi-line; for txt, `white-space: pre-wrap` (already F1 CSS) wraps gracefully |
+| Tiny image at 4:3 frame | Keep `cover` for closed (zoom acceptable in thumbnail context); expanded state already switches to `contain + aspect-ratio: auto + min-height: 20rem` |
+
+### F2.2 amendments to bake in
+
+1. **Fix the plan's NUL-byte typo**: `text.indexOf(' ')` → `text.indexOf('\0')`.
+2. **JSON: parse-then-stringify with indent 2** (option b, NOT plan's option a). Fall back to raw content on `JSON.parse` error.
+3. **Empty-result short-circuit**: `previewExcerpt` returns `null` when post-strip text is empty/whitespace-only, so caller emits no preview block (matches "other" kind behavior, prevents 6rem min-height void).
+
+### Sign-off
+
+> **F2.2 may proceed as drafted with the three amendments above.**
+> All other plan elements (frontmatter strip rule, line-clamp 5, mono pre for json/txt, img cover/contain split, ENOENT-only catch carried from F1) are correct as drafted. No additional CSS changes needed — F1's preview CSS already implements the visual contract. F2 is server-side-only refinement.
+
+---
+
+## F2 post-implementation visual review (2026-05-02)
+
+**Trigger:** after F2.2 + F2.1 landed (renderPreview rewrite + 5+1 new tests).
+**Inputs:** post-F2 live page + screenshots at multiple viewports + inner-element computed-style measurements + per-card preview text inspection.
+
+### Live measurements at 1440×900 (post-F2)
+
+| Card | Kind | Preview length | Box height (px) | First 80ch of preview text |
+|---|---|---|---|---|
+| #1 | img | 16 | 321 | (empty — bg-image) |
+| #2 | txt | 375 | 296 | `F2 G2 live screenshot fixture (issue #161)\n=========================...` |
+| #3 | json | 141 | 124 | `{\n  "purpose": "F2 G2 live screenshot fixture (issue #161)",\n  "kind": "json",\n  "nested": {\n    "key": "value"...` |
+| #4 | md | 452 | 149 | `# Plan-review surface — UX audit for the comment + iterate workflow\n\n## P0 — Same packaging defect, same effects \`http://localhost:47323/static/dist/editorial-review-client.js → 404\`...` |
+
+**The before/after diff for the md card is the proof point:** pre-F2 showed `--- deskwork: parentId: c68dc297... title: Plan-review surface UX audit ...` (frontmatter leak); post-F2 shows the actual body content (frontmatter stripped). Verified live, not just by test.
+
+### Multi-viewport responsive collapse (post-F2)
+
+| Viewport | pageGridCols | cardsGridCols | aside position |
+|---|---|---|---|
+| 1440×900 | `272px 880px` | `auto-fill 20rem` (2-col) | sticky |
+| 1024×768 | `968px` (single) | `474px × 2` | static |
+| 390×844 | `334px` (single) | `334px` (single) | static |
+
+No layout regression from F1.
+
+### Inner-element typography (computed)
+
+| Selector | font-family | font-style | Verdict |
+|---|---|---|---|
+| `.scrap-preview-md` | `Fraunces, ...` | `normal` | matches mockup CSS lines 380-391 |
+| `.scrap-preview--mono` | `"JetBrains Mono", ...` | `normal` | matches mockup CSS lines 411-420 |
+
+The G2 brief said "italic Newsreader" for md — wording miss; mockup CSS specifies upright Fraunces. Live state matches the actual mockup, not the brief wording. No action.
+
+### Card-expand path verified
+
+Clicking `.scrap-card[data-kind="md"] .scrap-name` flips `data-state="expanded"` + `grid-column: 1/-1` + lazy-loads the markdown body via fetch. `firstHeadingText` returned `"Plan-review surface — UX audit for the comment + iterate workflow"` — proving the parsed-markdown path (separate from the closed-state escaped-text preview) still works.
+
+### Acknowledged design choice (NOT a deviation)
+
+The closed-state md preview renders the markdown SOURCE (escapeHtml'd), so heading marks (`#`, `##`) and other markdown syntax appear as literal characters. The mockup's item-1 example uses prose-only content (no markdown syntax), so the mockup makes the closed preview look like "italic prose universally." In reality:
+
+- **Closed state:** plain-text excerpt (escaped). Markdown syntax visible literally.
+- **Expanded state:** lazy-loads + parses markdown via the client's `renderMarkdown`. Real h1/h2/p elements render.
+
+This split is the right architectural call — server-side markdown rendering on every page load (every card) has marginal benefit. F1 already shipped this behavior; F2 only added frontmatter-strip on top.
+
+### Edge cases
+
+| Case | Coverage | Verdict |
+|---|---|---|
+| Binary masquerading as .txt | `binary.txt` test fixture (NUL bytes) | ✓ no preview block, no crash |
+| Empty file (0 bytes) | NEW test `omits the preview block entirely for empty / frontmatter-only files` | ✓ no preview block |
+| Frontmatter-only md file | Same NEW test | ✓ no preview block |
+| Invalid JSON | Try/catch falls through to raw text | ✓ no crash, raw shown |
+| Long single line (txt) | `white-space: pre-wrap` (F1 CSS) wraps gracefully | ✓ no horizontal scroll |
+| Tiny image at 4:3 frame | apple-touch-icon live fixture renders zoomed; expanded view → contain | ✓ acceptable trade-off |
+
+### Sign-off
+
+> **F2 verified — proceed to F3.**
+> Frontmatter strip works on the project's real markdown fixture (the only md card in the live scrapbook went from yaml-leak to body-content). JSON parse-then-stringify ratified by dedicated minified-input test. Binary-as-text + empty/frontmatter-only short-circuit both have explicit regression tests. Multi-viewport collapse holds; cascade-fix from F1 unaffected. Card-expand path with parsed markdown verified live.
+> Test count 331 → 338 passing (+6 F2.1 tests + 1 NEW empty/fm-only short-circuit regression). 0 failed. 11 skipped.
 

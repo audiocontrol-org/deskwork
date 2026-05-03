@@ -43,12 +43,54 @@ function escapeHtml(s: string): string {
 }
 
 /**
- * Server-side preview for the closed-state card. Img → bg-frame URL;
- * md → plain-text excerpt of first paragraphs; json/txt → mono pre.
- * Other → no preview block.
+ * Strip a YAML frontmatter block from the top of an md file. Only strips
+ * the leading `---\n...\n---\n` block; body-level `---` separators (Setext
+ * H2 underline, thematic break) are preserved because the function only
+ * looks at the first 4 chars for the opener.
+ */
+function stripFrontmatter(text: string): string {
+  if (!text.startsWith('---\n')) return text;
+  const closeIdx = text.indexOf('\n---\n', 4);
+  if (closeIdx < 0) return text;
+  return text.slice(closeIdx + 5).replace(/^\n+/, '');
+}
+
+/**
+ * Build the closed-state preview excerpt for md/json/txt. Returns null
+ * when there's nothing useful to render — empty file, frontmatter-only
+ * file, or binary masquerading as text — so the caller can omit the
+ * preview block entirely (matches "other" kind treatment, avoids the
+ * 6rem min-height void).
  *
- * F1 emits the basic shape; F2 refines per-kind details (line clamping,
- * frontmatter strip, mono pre clamping).
+ * For json: pretty-print via JSON.parse + JSON.stringify(_, null, 2) so
+ * minified single-line files still render multi-line. Falls back to raw
+ * content on parse error (bad JSON is still readable as text).
+ *
+ * Binary detection: NUL byte presence after UTF-8 decode. Real text
+ * almost never has NUL; binary files have it within the first KB.
+ */
+function previewExcerpt(buf: Buffer, kind: 'md' | 'json' | 'txt'): string | null {
+  let text = buf.subarray(0, Math.min(buf.byteLength, 2400)).toString('utf-8');
+  if (text.indexOf('\0') >= 0) return null;
+  if (kind === 'md') text = stripFrontmatter(text);
+  if (kind === 'json') {
+    try {
+      const fullText = buf.toString('utf-8');
+      text = JSON.stringify(JSON.parse(fullText), null, 2);
+    } catch {
+      // Invalid JSON — fall through to the raw-text excerpt below.
+    }
+  }
+  const excerpt = text.split('\n').slice(0, 8).join('\n').slice(0, 600);
+  if (excerpt.trim() === '') return null;
+  return excerpt;
+}
+
+/**
+ * Server-side preview for the closed-state card. Img → bg-frame URL;
+ * md → italic Newsreader excerpt with frontmatter stripped; json → mono
+ * pre with parse-then-stringify pretty-print; txt → mono pre raw excerpt.
+ * Other / empty / binary-as-text → no preview block.
  */
 function renderPreview(
   ctx: StudioContext,
@@ -67,41 +109,38 @@ function renderPreview(
         <div class="scrap-preview--img-frame" style="background-image: url(&quot;${url}&quot;);"></div>
       </div>`);
   }
-  if (item.kind === 'md' || item.kind === 'txt' || item.kind === 'json') {
-    try {
-      const fullPath = scrapbookFilePath(
-        ctx.projectRoot,
-        ctx.config,
-        site,
-        path,
-        item.name,
-        secret ? { secret: true } : {},
-      );
-      const buf = readFileSync(fullPath);
-      const text = buf
-        .subarray(0, Math.min(buf.byteLength, 1200))
-        .toString('utf-8');
-      const lines = text.split('\n');
-      const excerpt = lines.slice(0, 8).join('\n').slice(0, 600);
-      const safe = escapeHtml(excerpt);
-      if (item.kind === 'json' || item.kind === 'txt') {
-        return unsafe(html`
-          <pre class="scrap-preview scrap-preview--mono" aria-hidden="true">${unsafe(safe)}</pre>`);
-      }
-      return unsafe(html`
-        <div class="scrap-preview scrap-preview-md" aria-hidden="true"><p>${unsafe(safe)}</p></div>`);
-    } catch (e) {
-      // ENOENT = file disappeared between listScrapbook and this read (race
-      // window with delete); rendering an empty preview is the right call.
-      // Anything else (EACCES, EISDIR, encoding bugs) propagates so the
-      // operator sees a real error instead of a silently-broken page.
-      if (e instanceof Error && 'code' in e && e.code === 'ENOENT') {
-        return unsafe('');
-      }
-      throw e;
-    }
+  if (item.kind !== 'md' && item.kind !== 'txt' && item.kind !== 'json') {
+    return unsafe('');
   }
-  return unsafe('');
+  try {
+    const fullPath = scrapbookFilePath(
+      ctx.projectRoot,
+      ctx.config,
+      site,
+      path,
+      item.name,
+      secret ? { secret: true } : {},
+    );
+    const buf = readFileSync(fullPath);
+    const excerpt = previewExcerpt(buf, item.kind);
+    if (excerpt === null) return unsafe('');
+    const safe = escapeHtml(excerpt);
+    if (item.kind === 'json' || item.kind === 'txt') {
+      return unsafe(html`
+        <pre class="scrap-preview scrap-preview--mono" aria-hidden="true">${unsafe(safe)}</pre>`);
+    }
+    return unsafe(html`
+      <div class="scrap-preview scrap-preview-md" aria-hidden="true"><p>${unsafe(safe)}</p></div>`);
+  } catch (e) {
+    // ENOENT = file disappeared between listScrapbook and this read (race
+    // window with delete); rendering an empty preview is the right call.
+    // Anything else (EACCES, EISDIR, encoding bugs) propagates so the
+    // operator sees a real error instead of a silently-broken page.
+    if (e instanceof Error && 'code' in e && e.code === 'ENOENT') {
+      return unsafe('');
+    }
+    throw e;
+  }
 }
 
 interface KindCounts {

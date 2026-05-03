@@ -177,3 +177,111 @@ describe('scrapbook redesign — structural contract (Issue #161)', () => {
     expect(css).not.toMatch(/\.scrapbook-item\s*\{/);
   });
 });
+
+describe('scrapbook redesign — per-kind preview rendering (Issue #161, dispatch F2)', () => {
+  let root: string;
+  let app: ReturnType<typeof createApp>;
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'deskwork-scrapbook-f2-'));
+    const cfg = makeConfig();
+    const cal: EditorialCalendar = { entries: [], distributions: [] };
+    mkdirSync(join(root, '.deskwork'), { recursive: true });
+    writeCalendar(join(root, cfg.sites.d.calendarPath), cal);
+    const dir = join(root, 'docs/folder/scrapbook');
+    mkdirSync(dir, { recursive: true });
+    // md with frontmatter + body
+    writeFileSync(
+      join(dir, 'note.md'),
+      '---\ntitle: Test\nauthor: Operator\n---\n\nFirst paragraph after frontmatter.\n\nSecond paragraph.\n',
+    );
+    // json with parseable content
+    writeFileSync(
+      join(dir, 'config.json'),
+      '{\n  "key": "value",\n  "nested": { "a": 1 }\n}\n',
+    );
+    // txt with simple content
+    writeFileSync(join(dir, 'log.txt'), 'line one\nline two\nline three\n');
+    // small "image" (just bytes; we test the URL emission, not actual rendering)
+    writeFileSync(join(dir, 'pic.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+    app = createApp({ projectRoot: root, config: cfg });
+  });
+
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('md preview strips frontmatter and emits italic Newsreader excerpt', async () => {
+    const r = await fetchScrapbook(app, 'd', 'folder');
+    // The frontmatter (--- ... ---) MUST NOT appear in the preview HTML.
+    expect(r.html).not.toMatch(/<div class="scrap-preview scrap-preview-md"[^>]*>[^<]*<p>---/);
+    // The body content does appear.
+    expect(r.html).toMatch(/<div class="scrap-preview scrap-preview-md"[^>]*>[\s\S]*First paragraph after frontmatter/);
+  });
+
+  it('img preview emits the .scrap-preview--img-frame with background-image URL', async () => {
+    const r = await fetchScrapbook(app, 'd', 'folder');
+    expect(r.html).toMatch(/<div class="scrap-preview scrap-preview--img"[^>]*>[\s\S]*<div class="scrap-preview--img-frame" style="background-image:[^"]*scrapbook-file/);
+  });
+
+  it('json preview emits a mono <pre> with parsed-as-text content', async () => {
+    const r = await fetchScrapbook(app, 'd', 'folder');
+    // Content is escapeHtml'd so quotes render as &quot; (XSS-safe). The
+    // regex matches the escaped form. F2.2 also pretty-prints via
+    // JSON.parse + JSON.stringify(_, null, 2) — verified separately by
+    // the multi-line-after-parse assertion below.
+    expect(r.html).toMatch(/<pre class="scrap-preview scrap-preview--mono"[^>]*>[\s\S]*&quot;key&quot;:\s*&quot;value&quot;/);
+  });
+
+  it('json preview pretty-prints minified JSON (parse-then-stringify)', async () => {
+    // Replace the seeded multi-line config.json with a one-liner; the F2
+    // refinement parses + re-stringifies with indent 2 so it still renders
+    // multi-line. (Tests the "minified JSON" edge case from the G2 brief.)
+    const dir = join(root, 'docs/folder/scrapbook');
+    writeFileSync(join(dir, 'config.json'), '{"key":"value","nested":{"a":1},"list":["x","y"]}');
+    const r = await fetchScrapbook(app, 'd', 'folder');
+    // After parse + stringify with indent 2, the output contains a newline
+    // between `{` and the first key — i.e. `{\n  &quot;key&quot;`.
+    expect(r.html).toMatch(/<pre class="scrap-preview scrap-preview--mono"[^>]*>\{\n {2}&quot;key&quot;/);
+  });
+
+  it('txt preview emits a mono <pre>', async () => {
+    const r = await fetchScrapbook(app, 'd', 'folder');
+    expect(r.html).toMatch(/<pre class="scrap-preview scrap-preview--mono"[^>]*>[\s\S]*line one/);
+  });
+
+  it('renders without throwing on a binary-as-text file (graceful fallback to no preview)', async () => {
+    // Add a binary file masquerading as .txt (UTF-8 invalid + NUL bytes — both
+    // signal binary; renderPreview must return an empty preview, not crash).
+    const dir = join(root, 'docs/folder/scrapbook');
+    writeFileSync(join(dir, 'binary.txt'), Buffer.from([0xff, 0xfe, 0x00, 0x00, 0xff, 0xfe]));
+    const r = await fetchScrapbook(app, 'd', 'folder');
+    expect(r.status).toBe(200);
+    // The card for binary.txt is rendered, just possibly with empty preview text.
+    expect(r.html).toMatch(/binary\.txt/);
+  });
+
+  it('omits the preview block entirely for empty / frontmatter-only files', async () => {
+    // Per the G2 amendment, previewExcerpt returns null when the post-strip
+    // text is empty/whitespace-only — caller emits no preview block at all
+    // (matches "other" kind treatment, prevents the 6rem min-height void).
+    const dir = join(root, 'docs/folder/scrapbook');
+    writeFileSync(join(dir, 'empty.md'), '');
+    writeFileSync(join(dir, 'fm-only.md'), '---\ntitle: Just metadata\n---\n');
+    const r = await fetchScrapbook(app, 'd', 'folder');
+    expect(r.status).toBe(200);
+    // Both cards are rendered (name + meta + foot toolbar) but neither has a
+    // .scrap-preview-md or .scrap-preview--mono inside its card body. The
+    // inverse-match is anchored to the card's id to scope the assertion.
+    const emptyCard = r.html.match(/<li class="scrap-card"[^>]*id="item-\d+"[^>]*>[\s\S]*?<\/li>/g)
+      ?.find((s) => s.includes('empty.md'));
+    const fmOnlyCard = r.html.match(/<li class="scrap-card"[^>]*id="item-\d+"[^>]*>[\s\S]*?<\/li>/g)
+      ?.find((s) => s.includes('fm-only.md'));
+    expect(emptyCard).toBeDefined();
+    expect(fmOnlyCard).toBeDefined();
+    expect(emptyCard).not.toMatch(/scrap-preview-md/);
+    expect(emptyCard).not.toMatch(/scrap-preview--mono/);
+    expect(fmOnlyCard).not.toMatch(/scrap-preview-md/);
+    expect(fmOnlyCard).not.toMatch(/scrap-preview--mono/);
+  });
+});
