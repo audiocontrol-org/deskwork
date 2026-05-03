@@ -121,4 +121,21 @@ Parse the definition headings and map them into scaffold templates.
     expect(workplan).toContain('- [ ] PRD contains the imported problem text');
     expect(workplan).not.toContain('<!-- Definition imported from:');
   });
+
+  it('rejects invalid target versions before creating a worktree', async () => {
+    await install([tmpRoot]);
+
+    const origCwd = process.cwd();
+    process.chdir(tmpRoot);
+    try {
+      await expect(setup(['test-feature', '--target', '../../etc', '--title', 'Test'])).rejects.toThrow(
+        /Invalid target version/
+      );
+    } finally {
+      process.chdir(origCwd);
+    }
+
+    worktreePath = join(dirname(tmpRoot), `${basename(tmpRoot)}-test-feature`);
+    expect(existsSync(worktreePath)).toBe(false);
+  });
 });

@@ -60,7 +60,6 @@ Merge prep is complete and PR [#172](https://github.com/audiocontrol-org/deskwor
 
 ## Open follow-ups (non-blockers)
 
-- `targetVersion` arg not validated at the CLI boundary (slug is). Path traversal via `--target ../../etc` would still escape the docs tree; same fix pattern as slug.
 - `branchExists` only checks local refs; remote-only `origin/feature/<slug>` collision still creates a tracking branch.
 - `TEMPLATES_DIR` resolution via `import.meta.url` works under tsx but would break if a `dist/` build is added.
 - The journal-entry override seam is the first portability slice. Broader feature-doc template/file-layout customization remains deferred under [#123](https://github.com/audiocontrol-org/deskwork/issues/123).

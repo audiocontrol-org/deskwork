@@ -2,7 +2,7 @@ import { loadConfig } from '../config.js';
 import { repoRoot } from '../repo.js';
 import { transitionFeature } from '../transitions.js';
 import { isStage, type Stage } from '../docs.js';
-import { validateSlug } from '../slug.js';
+import { validateSlug, validateTargetVersion } from '../slug.js';
 
 export async function transition(args: string[]): Promise<void> {
   let slug: string | undefined;
@@ -38,6 +38,12 @@ export async function transition(args: string[]): Promise<void> {
   }
 
   validateSlug(slug);
+  if (targetVersion) {
+    validateTargetVersion(targetVersion);
+  }
+  if (fromTargetVersion) {
+    validateTargetVersion(fromTargetVersion);
+  }
 
   const root = repoRoot();
   const cfg = loadConfig(root);

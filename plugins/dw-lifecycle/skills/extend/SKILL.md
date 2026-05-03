@@ -19,7 +19,7 @@ gh issue create --title "<phase title>" --body "Part of #<parent>" --label enhan
 ```
 
 5. Update the PRD's "Implementation Phases" section to reflect the addition.
-6. Optionally record `--retarget <new-version>` to move the feature directory to a different version target. Helper usage:
+6. Optionally retarget the feature directory to a different version target. Helper usage:
 
 ```
 dw-lifecycle transition <slug> --from inProgress --to inProgress --from-target <old-version> --target <new-version>

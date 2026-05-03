@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { CONFIG_RELATIVE_PATH, defaultConfig, validateConfig } from '../config.js';
+import { defaultConfig, validateConfig } from '../config.js';
 import { repoRoot } from '../repo.js';
 
 interface ParsedInstallArgs {
