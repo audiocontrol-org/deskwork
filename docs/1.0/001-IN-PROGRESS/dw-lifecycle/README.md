@@ -51,6 +51,7 @@ Verification at landing: 63/63 vitest tests pass, tsc clean, plugin manifest val
 
 - 2026-05-03 implementation audit: `2026-05-03-implementation-audit.md`
 - 2026-05-03 post-remediation audit: `2026-05-03-post-remediation-audit.md`
+- 2026-05-03 independent PRD conformance audit: `2026-05-03-prd-conformance-audit.md`
 
 ## Current status
 

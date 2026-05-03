@@ -976,3 +976,29 @@ The fix that landed makes dw-lifecycle's CLI surface match deskwork's and deskwo
 ### Insight
 
 - A workflow plugin should not be allowed to block real work based on another workflow layer that is itself still in flux. Temporary direct-state checks are better than recursively dogfooding an unstable gate.
+
+---
+
+## 2026-05-03: dw-lifecycle independent-audit follow-through
+
+### Surface exercised
+
+- repo-local `/feature-*` workflow closeout
+- `plugins/dw-lifecycle` CLI boundary hardening
+- audit-to-fix loop on a live PR branch
+
+### What was exercised
+
+- turning an independent audit finding into a targeted follow-up patch
+- keeping skill prose aligned with helper reality on the same branch
+- checking in the audit itself as a maintained artifact rather than a stale snapshot
+
+### Outcome
+
+- `--target` / `--from-target` now have the same style of traversal guard as `slug`
+- the shipped skill docs no longer over-promise beyond the helper surface in the areas the audit called out
+- the independent PRD-conformance audit now lives in the feature docs directory and matches current branch state
+
+### Insight
+
+- The useful unit of follow-up after a good audit is usually not "another phase"; it is a tiny patch set that removes the highest-leverage mismatch immediately while context is still warm.

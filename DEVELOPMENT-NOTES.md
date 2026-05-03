@@ -1198,3 +1198,44 @@ Phase 4 (dogfood) is manual validation work the user should drive: install the p
 - The reopened audit pattern worked. The first audit was specific enough to become an executable remediation list, and the second audit gave a crisp stop condition for the arc instead of letting "conformance" stay vague.
 - The remaining `cli.test.ts` failures are a good example of why environment-caused red tests should be documented precisely rather than hand-waved as "flaky." The error is deterministic here: `tsx` IPC pipe creation gets `EPERM` in this sandbox.
 - Long-running feature branches need a different closeout posture than one-shot branches. Keeping the docs in `001-IN-PROGRESS` while still running `feature-ship` preserved history and avoided a fake "done forever" signal.
+
+---
+
+## 2026-05-03: dw-lifecycle final hardening follow-up + independent audit landing
+
+### Feature: dw-lifecycle
+### Worktree: deskwork-dw-lifecycle
+
+**Goal:** Land the small but important fixes surfaced by the independent PRD-conformance audit, add that audit to the branch, and leave PR #172 merge-ready.
+
+**Accomplished:**
+
+- Added `validateTargetVersion` and enforced it at the CLI boundaries that accept `--target` / `--from-target` (`setup`, `transition`, `issues`).
+- Added test coverage for valid/invalid target versions and for rejecting `--target ../../etc` before worktree creation.
+- Trimmed remaining skill/helper drift:
+  - `doctor` now only claims the two rules that actually ship
+  - `install` now describes the docs-version-shape probe and `--dry-run` preview that actually exist
+  - `extend` no longer mentions a non-existent `--retarget` flag
+- Removed the now-fixed `targetVersion` follow-up from the feature README.
+- Added the independent audit file `2026-05-03-prd-conformance-audit.md` and linked it from the feature README.
+
+**Didn't Work:**
+
+- `git add` on the new audit file behaved oddly on the first status read and left the file appearing untracked until a second explicit status check. No data loss, just one extra verification step before commit.
+
+**Course Corrections:**
+
+- [DOCUMENTATION] The independent audit initially described findings that were already fixed on the branch by the time we chose to commit it. I updated the audit text before committing so it reflects current branch state instead of preserving stale open items as if they were still active.
+- [PROCESS] Kept the audit commit separate from the code hardening commit so the PR history still distinguishes "fix the issue" from "check in the review artifact."
+
+**Quantitative:**
+
+- Messages: ~4
+- Commits: 2 (`7c13224`, `7e2cbe3`)
+- Corrections: 1
+- Files changed: 12
+
+**Insights:**
+
+- The highest-signal post-audit fixes were exactly the small symmetric ones: if `slug` gets a traversal guard, `targetVersion` should too. Those are the cheapest fixes with the best risk-reduction payoff.
+- Independent audits are most useful when they are checked in as living artifacts, not frozen transcripts. If the branch changes before the audit lands, update the audit so it remains trustworthy.
