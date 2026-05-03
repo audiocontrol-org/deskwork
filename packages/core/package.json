@@ -1,6 +1,6 @@
 {
   "name": "@deskwork/core",
-  "version": "0.12.1",
+  "version": "0.13.0",
   "type": "module",
   "description": "Editorial calendar + review pipeline library — shared by @deskwork/cli and @deskwork/studio",
   "homepage": "https://github.com/audiocontrol-org/deskwork#readme",

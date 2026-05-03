@@ -1,6 +1,6 @@
 {
   "name": "@deskwork/studio",
-  "version": "0.12.1",
+  "version": "0.13.0",
   "type": "module",
   "description": "Editorial review studio — local web UI for the deskwork plugin",
   "homepage": "https://github.com/audiocontrol-org/deskwork#readme",
@@ -46,7 +46,7 @@
     "@codemirror/language": "^6.12.3",
     "@codemirror/state": "^6.6.0",
     "@codemirror/view": "^6.41.1",
-    "@deskwork/core": "0.12.1",
+    "@deskwork/core": "0.13.0",
     "@hono/node-server": "^1.13.7",
     "@lezer/highlight": "^1.2.3",
     "esbuild": "^0.28.0",
