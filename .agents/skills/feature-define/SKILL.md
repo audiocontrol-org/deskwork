@@ -1,6 +1,6 @@
 ---
 name: feature-define
-description: Interview the user to define a feature, then write a structured feature-definition draft under `.agents/.tmp/` for later setup.
+description: "Interview the user to define a feature, then write a structured feature-definition draft under `.agents/.tmp/` for later setup."
 ---
 
 # Feature Define

@@ -1,6 +1,6 @@
 ---
 name: feature-review
-description: Review recent feature changes for bugs, regressions, and missing tests, then report findings without fixing them.
+description: "Review recent feature changes for bugs, regressions, and missing tests, then report findings without fixing them."
 ---
 
 # Feature Review

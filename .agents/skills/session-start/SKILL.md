@@ -1,6 +1,6 @@
 ---
 name: session-start
-description: Bootstrap a session by reading the current feature docs, the latest journal entry, and open issues, then summarize the state before implementation begins.
+description: "Bootstrap a session by reading the current feature docs, the latest journal entry, and open issues, then summarize the state before implementation begins."
 ---
 
 # Session Start

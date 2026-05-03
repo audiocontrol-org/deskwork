@@ -1,6 +1,6 @@
 ---
 name: feature-teardown
-description: Remove local feature infrastructure by deleting the worktree and local branch after verifying it is safe to do so.
+description: "Remove local feature infrastructure by deleting the worktree and local branch after verifying it is safe to do so."
 ---
 
 # Feature Teardown

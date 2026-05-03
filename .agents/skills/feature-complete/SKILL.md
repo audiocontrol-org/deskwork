@@ -1,6 +1,6 @@
 ---
 name: feature-complete
-description: Mark a feature complete by moving its docs to `003-COMPLETE`, updating tracking docs, and closing related issues before merge.
+description: "Mark a feature complete by moving its docs to `003-COMPLETE`, updating tracking docs, and closing related issues before merge."
 ---
 
 # Feature Complete

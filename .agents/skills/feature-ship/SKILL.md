@@ -1,6 +1,6 @@
 ---
 name: feature-ship
-description: Prepare a feature for merge by verifying completion, running tests and review, pushing the branch, and opening a PR without merging it.
+description: "Prepare a feature for merge by verifying completion, running tests and review, pushing the branch, and opening a PR without merging it."
 ---
 
 # Feature Ship

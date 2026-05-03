@@ -1,6 +1,6 @@
 ---
 name: feature-extend
-description: Extend an in-progress feature by appending scope and new phases, then re-run the PRD review loop before filing new issues.
+description: "Extend an in-progress feature by appending scope and new phases, then re-run the PRD review loop before filing new issues."
 ---
 
 # Feature Extend

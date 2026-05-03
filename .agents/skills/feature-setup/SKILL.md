@@ -1,6 +1,6 @@
 ---
 name: feature-setup
-description: Create feature infrastructure: branch, worktree, docs files, and deskwork PRD registration from a prior feature-definition draft.
+description: "Create feature infrastructure: branch, worktree, docs files, and deskwork PRD registration from a prior feature-definition draft."
 ---
 
 # Feature Setup

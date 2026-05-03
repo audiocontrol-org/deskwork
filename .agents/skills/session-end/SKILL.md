@@ -1,6 +1,6 @@
 ---
 name: session-end
-description: Wrap up a session by updating feature docs, writing journal entries, and recording adopter-experience notes when the tools were exercised.
+description: "Wrap up a session by updating feature docs, writing journal entries, and recording adopter-experience notes when the tools were exercised."
 ---
 
 # Session End

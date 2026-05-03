@@ -1,6 +1,6 @@
 ---
 name: release
-description: Run the hard-gated deskwork monorepo release flow: preconditions, version bump, operator-side publish, smoke, tag, and atomic push.
+description: "Run the hard-gated deskwork monorepo release flow: preconditions, version bump, operator-side publish, smoke, tag, and atomic push."
 ---
 
 # Release

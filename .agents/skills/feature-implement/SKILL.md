@@ -1,6 +1,6 @@
 ---
 name: feature-implement
-description: Drive the implementation loop by selecting the next workplan task, verifying the PRD gate, doing the work, and updating progress.
+description: "Drive the implementation loop by selecting the next workplan task, verifying the PRD gate, doing the work, and updating progress."
 ---
 
 # Feature Implement

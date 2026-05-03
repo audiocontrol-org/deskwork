@@ -1,6 +1,6 @@
 ---
 name: feature-help
-description: Show the canonical feature lifecycle and summarize the current state of in-progress features without starting work.
+description: "Show the canonical feature lifecycle and summarize the current state of in-progress features without starting work."
 ---
 
 # Feature Help

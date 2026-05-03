@@ -1,6 +1,6 @@
 ---
 name: analyze-session
-description: Analyze recent `DEVELOPMENT-NOTES.md` entries, summarize correction patterns, and report recurring process or quality issues.
+description: "Analyze recent `DEVELOPMENT-NOTES.md` entries, summarize correction patterns, and report recurring process or quality issues."
 ---
 
 # Analyze Session

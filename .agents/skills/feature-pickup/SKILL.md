@@ -1,6 +1,6 @@
 ---
 name: feature-pickup
-description: Resume a feature by reading its docs, issue state, and last session notes, then propose the next step without starting implementation.
+description: "Resume a feature by reading its docs, issue state, and last session notes, then propose the next step without starting implementation."
 ---
 
 # Feature Pickup
