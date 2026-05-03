@@ -13,6 +13,40 @@ Populating this file is a step in `/session-end`. If a session didn't exercise t
 
 ---
 
+## 2026-05-02 (F2-F6 + merge + CI rescue): finishing the redesign arc surfaces a 6-month-stale broken CI as merge-blocker
+
+**Arc:** F1 commit + F2-F6 dispatches + PR #162 merge to main + CI infrastructure rescue. Operator was off-keyboard during execution; dispatched fully via auto-mode with periodic "continue" / "do it" / "what's next" framing.
+
+### What the dogfood surfaced
+
+- **friction** — **CI on `feature/deskwork-plugin` had been red since Phase 26 (~6 months) and no session noticed.** The branch CI test job has been failing on every commit since `36724ef` (the npm-publish architecture pivot). Locally `npm test --workspace @deskwork/studio` passes; the cli workspace tests need `node_modules/.bin/deskwork` which symlinks to `packages/cli/dist/cli.js` — without dist + executable bit + bin symlink, every cli test that spawns the bin fails with `code: -1` and empty stderr. Local environments accumulated all three (dist warm from dev work, executable bit set by old npm versions, bin symlinks set up at some prior point); CI cold-installs lacked all three. **The agent didn't notice across multiple prior sessions** because (a) studio tests pass locally; (b) prior sessions ended via `/session-end` doc commits that don't touch the failing path; (c) the `/release` skill has its own build step so released artifacts are correct. CI red became "advisory CI nobody checks" gradually. The PR-opening flow this session forced `gh pr checks` and surfaced the gap.
+
+- **fix** — **Three commits to fix the gap:** (1) `c1b13a9` added a `Build workspaces` step before the `Run all tests` step in `.github/workflows/check.yml`. Initially thought sufficient — wasn't. (2) `292a9c7` added `chmod +x dist/cli.js` and `chmod +x dist/server.js` to the cli/studio build scripts (tsc emits files mode 644). Still not sufficient — bin spawn returned `code: -1`. (3) `cc39363` added `scripts/link-workspace-bins.sh` chained into the root build script (npm 10.9 doesn't auto-create root `node_modules/.bin/<bin>` symlinks for workspace packages, even when listed as devDependencies — verified empirically with multiple install variants). After all three: CI green at `cc39363`. Cold-cycle local verification: 1043 passing / 0 failed / 40 skipped across all 4 workspaces.
+
+- **insight** — **Opening a PR creates accountability the direct-push-to-main pattern doesn't.** The release procedure (`/release` skill atomic-pushes `HEAD:main HEAD:refs/heads/<branch>`) lets development happen entirely on `feature/deskwork-plugin` with main as a dumb mirror. CI on PRs is the only gate-enforced check the project has. Without PR opens, CI red never becomes load-bearing. **Lesson:** even when the direct-push-to-main release pattern works for the work-shape, opening a PR per substantive arc (this session: 63 commits / 5 fix-landed issues — clearly substantive) creates a checkpoint that catches infrastructure rot.
+
+- **insight** — **G1-G4 design-review gates + post-implementation `/frontend-design` reviews held discipline across 6 dispatches.** Every gate caught design-judgment issues before code was written; every post-implementation review caught implementation deviations. F1 cascade-ordering bug (gate compared mockup-vs-plan, both had the bug — only post-impl `getComputedStyle()` caught it). F2 G2 amendments (typo fix, JSON option-b parse-then-stringify, empty short-circuit). F5 G3 amendments (focus-visible, dragover dashed→solid, secret-deep-link semantics). G4 final integrated sign-off. The gate model isn't optional — every gate produced amendments the implementation actually needed.
+
+- **insight** — **The "do the least dumb thing" framing forces honest scope.** Three times this session the agent prepared multiple options (CI failure → "merge anyway / fix in CI / defer"; smoke-before-bump misunderstanding; CI fix iteration). Each time, terse operator framing collapsed the analysis paralysis into a committed action the operator could correct if wrong. More efficient than option-shopping; the agent's "let me give you 3 options" pattern is often agent-uncertainty leaking out. When the agent sees the right answer clearly, just do it.
+
+- **friction** — **Smoke-before-bump misunderstanding.** Initially offered to run `bash scripts/smoke-marketplace.sh` post-merge as a sanity check; reading the script header carefully revealed it tests against the **published** npm registry version pinned in `plugin.json`. Without bumping + publishing v0.12.2 first, smoke would either validate v0.12.1 (already-shipped, doesn't have F1-F6) or fail pre-flight. Caught by re-reading rather than running.
+
+- **insight** — **Studio dev mode (Vite + tsx --watch + HMR) makes `/frontend-design`-driven implementation tractable.** 9 `/frontend-design` invocations this session (G1 + post-F1 + G2 + post-F2 + post-F3 + post-F4 + G3 + post-F5 + G4); each preceded or followed by 5+ playwright drives. With HMR, each iteration is <1s rebuild + immediate visible change in the live page. Without HMR, every cycle would have been ~15s of friction × dozens of cycles = the design-driven implementation would have been impractical. Phase 31's dev workflow is load-bearing for this kind of work.
+
+- **friction (process)** — **Posting issue comments + filing follow-up GitHub issues requires operator authorization.** Comments for #154 / #155 / #159 / #160 / #161 are prepared as `.github-issue-*-comment.md` files in the working tree (intentionally untracked). Walkthrough doc disclosed 3 non-blocking follow-ups; per `agent-discipline.md` "Don't let sub-agent 'out of scope' notes stand as dispositions" these need to be real GitHub issues, not just doc lines — issue body files prepared at `.github-issue-followup-*-body.md` for operator to post from a browser-capable computer.
+
+### Operator quotes preserved
+
+> "do the least dumb thing"
+
+Forced commit to fix-the-actual-gap rather than option-shopping when CI failed. Carries forward as anti-analysis-paralysis pattern.
+
+> "I'm not in front of a computer that can effect a release. Is there something *should* (not could) do before I'm actually able to launch a release"
+
+The "should not could" framing cuts to high-value preparatory work vs busywork. Doc updates + follow-up issue prep + comment artifacts are SHOULD; running smoke without bump is COULD-but-pointless.
+
+---
+
 ## 2026-05-02 (F1 implementation): scrapbook redesign — driving the studio in subagent-driven mode surfaces the cascade-ordering bug that escaped the design-review gate
 
 **Arc:** Execute the prior session's 6-dispatch plan for Issue #161 in subagent-driven mode (operator-confirmed). Two `typescript-pro` dispatches (server-side first, then CSS+client) bracketed around a `/frontend-design` G1 design gate. After F1.5 landed in the working tree, ran the verification mandate (BOTH playwright AND `/frontend-design`) at four viewports.

@@ -4,6 +4,91 @@ Session journal for `deskwork`. Each entry records what was tried, what worked, 
 
 ---
 
+## 2026-05-02 (F2-F6 + merge + CI rescue): scrapbook redesign F2-F6 ships, PR #162 merges to main, CI rescued from 6-month-stale broken state (#161, #162)
+
+### Feature: deskwork-plugin
+### Worktree: deskwork-plugin
+
+**Goal:** finish F1 (committed in this session) → execute F2-F6 → merge PR to main → leave the project release-ready for operator's `/release` invocation.
+
+**Accomplished:**
+
+- **F1 shipped** ([`44094ee`](https://github.com/audiocontrol-org/deskwork/commit/44094ee)) — committed prior session's working-tree state after running spec-compliance + code-quality reviewers per `superpowers:subagent-driven-development`. Spec passed clean (3 small adaptive deviations all justified by live API surface). Code-quality returned APPROVED WITH MINOR FIXES; **3 important fixes applied inline before commit**: 10 `as Type` cast violations replaced with `parseErrorBody`/`parseSavedItem` type-guard helpers + `instanceof Element` narrowing in client (matches sibling `entry-review-client.ts:65-66` pattern); 2 silent `catch{}` fallbacks fixed in `scrapbook.ts` (removed dead try/catch around `listScrapbook` since it returns `{items: []}` for missing dirs; narrowed `renderPreview` catch to ENOENT-only with re-throw for other errors); `readCtx` rewritten to read `data-site` / `data-path` attrs from `.scrap-page` instead of parsing display text from `.scrap-aside-path` (server now emits the attrs; new test locks the contract). 330 → 331 tests.
+
+- **F2 shipped** ([`94ba7e9`](https://github.com/audiocontrol-org/deskwork/commit/94ba7e9)) — per-kind preview refinement. New `stripFrontmatter()` + `previewExcerpt()` helpers in `scrapbook.ts`. Three G2 amendments baked in: (1) NUL-byte detection typo `text.indexOf(' ')` → `text.indexOf('\0')`; (2) JSON option-b parse-then-stringify (NOT plan's option-a expand-byte-cap) with raw-text fallback on parse error; (3) empty-result short-circuit returns null so caller omits preview block (matches "other" kind treatment, prevents 6rem void). 5 + 1 new tests; 331 → 338. Pre-F2 → post-F2 measurements showed real ux-audit.md preview went from `--- deskwork: parentId: ...` (frontmatter leak) to `# Plan-review surface — UX audit ...` (body content).
+
+- **F3 shipped** ([`6c5466d`](https://github.com/audiocontrol-org/deskwork/commit/6c5466d)) — per-kind extra meta in `.scrap-card-meta`. New `countLines` (md/txt), `countJsonKeys` (top-level objects only — returns null for arrays / primitives / parse errors), `readImageDimensions` (PNG only — 8-byte signature check + IHDR width/height parse). `computeKindMeta` dispatch with ENOENT-narrow catch; `renderCard` appends `<span>·</span><span>{meta}</span>` only when non-empty (no orphan dot). Live spans: `IMG · 1.5 KB · 180 × 180`; `TXT · 285 B · 9 LINES`; `JSON · 184 B · 5 KEYS`; `MD · 9.4 KB · 97 LINES`. CSS `text-transform: uppercase` from F1 handles the visual uppercasing; implementation emits semantic lowercase. JPEG/WebP/GIF deferred — graceful degradation, no orphan dot. 5 new tests; 338 → 343.
+
+- **F4 shipped** ([`a8282b8`](https://github.com/audiocontrol-org/deskwork/commit/a8282b8)) — client-side state coordination. `toggleCard` rewrite for single-expanded invariant (collapses any other expanded card before opening new one). New helpers: `syncAsideActive` (toggles `data-active="true"` on aside `<a>` whose href matches expanded card's id), `syncUrlHash` (history.replaceState — hash is mode within page, not navigation), `restoreFromHash` (bootstrap path for deep-links). `wireAsideLinks` clicks delegate to `toggleCard`. 4-state behavioral sequence verified live: initial → click card #1 → click aside link to #item-3 (verifies single-expanded + cross-link) → hard-reload `#item-2` (verifies restoreFromHash) → collapse via re-click (verifies hash-clear). 1 new markup-contract test; 343 → 344.
+
+- **F5 shipped** ([`457b0a4`](https://github.com/audiocontrol-org/deskwork/commit/457b0a4)) — drop zone + secret section. New `renderDropZone()` + `renderSecretSection()` server helpers. `renderCard` accepts `{ secret?: boolean }` opt: when secret=true, id becomes `secret-item-N` (vs public `item-N`) for restoreFromHash + aside cross-link disambiguation; mark-secret button label flips to "mark public"; `data-secret="true"` attribute. `renderScrapbookPage` now uses `result.secretItems` (was discarded by F1) + passes `secretCount` to `renderAside` (was hardcoded to 0). New CSS: `.scrap-drop` + hover + `:focus-visible` (G3 amendment 1) + `[data-dragover="true"]` with `border-style: solid` flip (G3 amendment 2 — editorial "commitment imminent" without animation); `.scrap-secret*` chrome (mockup verbatim). New client `wireDropZone` (drag+drop + click-to-pick + Enter/Space). Live verification: synthetic dragover dispatch flips border-style dashed→solid + bg paper→paper-2 + colors red-pencil; deep-link to `#secret-item-1` correctly leaves all public aside links inactive (G3 amendment 3 — "folder index = public; secret = sealed envelope" contract). 4 new tests; 344 → 348.
+
+- **F6 final walkthrough** ([`6ff6617`](https://github.com/audiocontrol-org/deskwork/commit/6ff6617)) — non-code dispatch. Drove integrated implementation at all 4 viewports (1440 / 1024 / 768 / 390) with rich multi-kind + secret fixture; invoked `/frontend-design` for G4 final integrated sign-off. **Sign-off: "INTEGRATION VERIFIED — issue #161 ready for operator review and closure."** All 15 mockup sections MATCH; affordance compliance ✓; verification compliance ✓. New audit doc `2026-05-02-scrapbook-redesign-final-walkthrough.md` (144 lines) captures section-by-section verdicts + multi-viewport collapse + 3 non-blocking follow-ups disclosed.
+
+- **PR #162 opened + merged** — comprehensive description with per-dispatch table for F1-F6 + verbatim G4 sign-off + non-blocking follow-ups + audit-trail links. 63 commits / 5 fix-landed issues (#154, #155, #159, #160, #161). Merged to main as [`779e9fe`](https://github.com/audiocontrol-org/deskwork/commit/779e9fe) via merge commit (preserved per-dispatch atomic structure). Local main + feature/deskwork-plugin both fast-forwarded to tip-of-main per `agent-discipline.md` "after each PR merges to main, sync `feature/deskwork-plugin`."
+
+- **CI infrastructure rescue (4 commits)** — discovered CI test job had been failing on `feature/deskwork-plugin` since Phase 26 (commit `36724ef`, 6 months ago) when the npm-publish architecture pivot replaced the source-shipped pattern. Cascade of issues + fixes: (1) [`c1b13a9`](https://github.com/audiocontrol-org/deskwork/commit/c1b13a9) — added `Build workspaces` step before `Run all tests` in `.github/workflows/check.yml` (CLI tests spawn `node_modules/.bin/deskwork` which symlinks to `packages/cli/dist/cli.js` — without dist the bin spawn fails with empty stderr). (2) [`292a9c7`](https://github.com/audiocontrol-org/deskwork/commit/292a9c7) — added `chmod +x dist/cli.js` and `chmod +x dist/server.js` to the cli/studio build scripts (tsc emits files mode 644; locally the executable bit accumulated from old npm versions and persisted; CI starts cold every run). (3) [`cc39363`](https://github.com/audiocontrol-org/deskwork/commit/cc39363) — added `scripts/link-workspace-bins.sh` chained into the root build script (npm 10.9 doesn't auto-create root `node_modules/.bin/<bin>` symlinks for workspace packages even when listed as devDependencies; verified empirically with multiple install variants). Cold-cycle verification: full clean (rm dist + tsbuildinfo + bins) → `npm run build` → bins exist with `-rwxr-xr-x` → `npm test` 1043 passing / 0 failed / 40 skipped across all 4 workspaces. CI green at `cc39363`; merge proceeded.
+
+**Didn't Work:**
+
+- **First CI fix attempt** (`c1b13a9` build step) was insufficient — tests still failed with `install failed:` empty stderr. Root cause analysis revealed the bin spawn was returning `-1` (executable not found / not executable). Took two more commits (`292a9c7` chmod + `cc39363` symlink script) to fully resolve.
+
+- **Tried adding `@deskwork/cli` + `@deskwork/studio` as root devDependencies with `*` version** to trigger npm's bin-link creation via the dependency graph. Tested in fresh `/tmp/ci-repro` clone with npm 10.9.3 — bin links still didn't get created. Reverted; went with explicit symlink script instead.
+
+- **Initial smoke-script suggestion was wrong.** Offered to run `bash scripts/smoke-marketplace.sh` after merge as if it were a generic pre-release sanity check; reading the script header carefully revealed it tests against the **published** npm registry version pinned in `plugin.json`. Without bumping + publishing v0.12.2 first, smoke would either validate v0.12.1 (already-shipped, doesn't have F1-F6 — useless signal) or fail pre-flight (v0.12.2 not on npm yet). Withdrew the offer, recommended operator drive `/release` skill instead.
+
+**Course Corrections:**
+
+- **[PROCESS] Smoke-before-bump misunderstanding caught by reading the script header.** Should have read `scripts/smoke-marketplace.sh` more carefully before offering to run it. Per the script's own header: "the version pinned in plugin.json MUST be published before this smoke can pass." The smoke is a post-publish, pre-tag gate, not a generic pre-merge check. Saved by re-reading rather than running.
+
+- **[PROCESS] CI red since Phase 26 — agent didn't notice across multiple sessions.** The branch CI has been failing since `36724ef` (~6 months ago), but no session noticed because (a) `npm test --workspace @deskwork/studio` passes locally, (b) local dist was always warm from earlier builds (executable bit + symlinks already there), (c) prior sessions ended with `/session-end` doc commits that don't touch the failing path. The `agent-discipline.md` rule "issue closure requires verification in a formally-installed release" exists for exactly this kind of blind spot — but CI red is a different blind spot (the agent's local environment masked the gap). Lesson: when opening a PR, gh pr checks status should be checked before declaring "ready to merge."
+
+- **[PROCESS] Operator framing "do the least dumb thing" was the right escalation.** The agent had prepared three options for the CI failure (merge anyway / fix in CI / defer); operator's terse response forced the agent to commit to the actually-correct path (fix the underlying gap in build infrastructure rather than papering over with options).
+
+- **[COMPLEXITY] Cascade-ordering CSS bug in F1 was caught at post-F1 review, not at G1 gate** — both the mockup AND the planner's CSS draft had the same cascade bug, so G1's compare-vs-mockup couldn't surface it. Only `getComputedStyle()` inspection on the live implementation revealed `position: "sticky"` at 1023px when it should have been `"static"`. Lesson reinforced: design-review gates that compare-vs-mockup are insufficient when the mockup itself has the bug; the post-implementation `/frontend-design` verification (mandate per the plan amendment) is the catch-all.
+
+- **[PROCESS] One CI failure → multiple root causes.** First fix (build step) revealed second issue (chmod). Second fix (chmod) revealed third issue (no bin link). Each fix was correct + necessary but not sufficient. Pattern to internalize: when CI starts passing tests partially after a fix, that's progress — keep digging, don't assume the original error message captured all failure modes.
+
+**Quantitative:**
+
+- Messages from operator: ~30 (mostly `continue` / `do it` / "what's next" — auto-mode let me drive)
+- Subagents dispatched: 2 (spec-compliance reviewer + code-quality reviewer for F1)
+- Skill invocations: 4 (`superpowers:subagent-driven-development`, `frontend-design:frontend-design` × 8 — G1 + post-F1 + G2 + post-F2 + post-F3 + post-F4 + G3 + post-F5 + G4 final), `session-end`
+- Commits to feature branch: **10** (F1 `44094ee`, F2 `94ba7e9`, F3 `6c5466d`, F4 `a8282b8`, F5 `457b0a4`, F6 `6ff6617`, CI fix-build `c1b13a9`, CI fix-chmod `292a9c7`, CI fix-binlinks `cc39363`, plus this session-end commit)
+- PRs: 1 opened + merged (#162; merge commit `779e9fe`)
+- Files modified: scrapbook.ts (~+200 lines net), scrapbook.css (~+90 lines net), scrapbook-client.ts (~+90 lines net), scrapbook-mutations.ts (~+30 lines net for type-guards + uploadFile export), review-scrapbook-index-redesign.test.ts (~+200 lines for 6+5+1+1+4 new tests across F2-F5), package.json (root + cli + studio for build chains), .github/workflows/check.yml (build step), scripts/link-workspace-bins.sh (NEW)
+- Tests: 330 → 348 in studio (+18); 1043 total across all workspaces in cold-cycle verification (459 core + 168 cli + 348 studio + 68 dw-lifecycle, with 40 intentional skips)
+- Documents created: `2026-05-02-scrapbook-redesign-final-walkthrough.md` (144 lines)
+- Documents updated: `2026-05-02-scrapbook-redesign-design-reviews.md` (G2 + post-F2 + post-F3 + post-F4 + G3 + post-F5 + G4 sections)
+- Issues touched: 5 fix-landed (#154, #155, #159, #160, #161) — all stay open pending operator verification post-release per `agent-discipline.md`
+- CI runs: 4 (3 red on `c1b13a9`/`292a9c7`/CI infrastructure-iteration commits, 1 green on `cc39363`)
+- Course corrections: 5 (4 [PROCESS], 1 [COMPLEXITY])
+
+**Insights:**
+
+- **The plan's gate model + verification mandate paid off across all 6 dispatches.** Every gate (G1, G2, G3) ratified design-judgment decisions before code was written; every post-implementation `/frontend-design` review caught what the gate's compare-vs-mockup couldn't see. Notable catches: F1 cascade-ordering bug (mockup + planner both had it), F4 `replaceState`-vs-`pushState` ratification, F5 dragover dashed→solid editorial signal, F5 G3 amendment 3 (deep-link-to-secret correctness around aside-active state). The gate cost was small; the design-coherence return was substantial.
+
+- **Subagent-driven for F1, inline for F2-F6.** F1 was a 4-file coherent rewrite that benefited from the two-implementer split (subagent A for tests + server, subagent B for CSS + client) with G1 gate between. F2-F5 were targeted refinements that fit comfortably in inline execution. Scaling rule: subagent split when a dispatch crosses 3+ files OR has a natural mid-dispatch design checkpoint; inline when scope is narrow + linear.
+
+- **The "do the least dumb thing" framing forces honest scope.** When the agent has multiple plausible options and asks the operator to pick, the operator can't see the real cost-benefit because the analysis is fragmented across the options. The terse forcing function ("least dumb thing") collapses analysis-paralysis into a single best-effort action that the operator can correct if wrong. More efficient than option-shopping.
+
+- **CI red for 6 months without a single session noticing is a real signal.** The `feature/deskwork-plugin` branch has been the de-facto release branch (per `agent-discipline.md`); main lags behind. Releases via `/release` push directly to main + tag; CI on the feature branch is "advisory" because the release process has its own build step. But "advisory CI" gradually became "broken CI nobody checks" — and this session was the first to notice + fix because opening a PR forced the gh pr checks read. Lesson: opening a PR (even if not strictly required for release) creates accountability the direct-push-to-main pattern doesn't.
+
+- **The walkthrough doc's "non-blocking follow-ups disclosed" section needs to become real GitHub issues, not just doc lines.** Per `agent-discipline.md` "Don't let sub-agent 'out of scope' notes stand as dispositions" — flagged items in the walkthrough are NOT dispositions. They're disclosures that need to become triageable issues. Filed as part of this session-end commit (see below).
+
+**Next session:**
+
+Operator drives `/release` skill from a computer that can effect the release:
+
+1. `/release` skill bumps version to v0.12.2 + builds dist (uses our new `chmod +x` + `link-workspace-bins.sh`)
+2. **Operator runs `make publish`** in their own terminal (3× npm OTP — agent's Bash can't accept 2FA)
+3. `/release` calls smoke against the now-published v0.12.2 (validates packaging end-to-end)
+4. `/release` tags + atomic-pushes `HEAD:main HEAD:refs/heads/feature/deskwork-plugin`
+5. Operator verifies via `/plugin marketplace update deskwork` from a fresh adopter session — walks the F1-F6 scrapbook surfaces
+6. Operator closes #154 / #155 / #159 / #160 / #161 — fix-landed comments are prepared for each (in `.github-issue-*-comment.md` files in working tree); operator posts via `gh issue comment <N> --body-file .github-issue-<N>-comment.md` then deletes the file
+
+---
+
 ## 2026-05-02 (F1 implementation): scrapbook Dispatch E (visual) — F1 page rebuild + G1 gate + post-F1 verification (#161)
 
 ### Feature: deskwork-plugin

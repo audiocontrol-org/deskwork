@@ -1611,7 +1611,7 @@ Planning-only session. No code shipped. Spec + plan written for the scrapbook re
 
 **Deferred:**
 
-- [ ] Execute the plan — F1 through F6. Operator decision pending: subagent-driven (recommended per writing-plans skill) or inline execution.
+- [x] Execute the plan — F1 through F6 shipped (subagent-driven for F1; inline for F2-F6 once the per-dispatch shape was established). All G1-G4 gates fired + post-implementation `/frontend-design` reviews after every code-shipping dispatch. **Merged to main as `779e9fe` via PR [#162](https://github.com/audiocontrol-org/deskwork/pull/162)**; release-pending — operator drives `/release` skill to publish v0.12.2. Commits: F1 `44094ee`, F2 `94ba7e9`, F3 `6c5466d`, F4 `a8282b8`, F5 `457b0a4`, F6 `6ff6617` (walkthrough doc). Plus CI infrastructure rescue (CI was red since Phase 26): `c1b13a9` (build before tests), `292a9c7` (chmod +x dist bins), `cc39363` (link workspace bins to root). Tests: 330 → 348 (+18 across F1-F5); CI cold-cycle 1043 passing / 0 failed / 40 skipped across all workspaces.
 
 **Notes:**
 
