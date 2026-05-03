@@ -118,6 +118,48 @@ Session journal for `deskwork`. Each entry records what was tried, what worked, 
 - The bin shim has no concurrency lock on first-run install. Two parallel invocations could race the npm install. Acceptable for now (dw-lifecycle unlikely to be invoked in parallel during first-run); revisit if real adopters hit it.
 - The `~/work/deskwork` main worktree at `b24fe77` needs `git pull` once the operator's `.claude/CLAUDE.md` edits are committed or stashed, to catch up to `a54e5d8`.
 
+---
+
+## 2026-05-03: Codex skill-loader repair after invalid frontmatter port
+
+### Feature: dw-lifecycle (repo-local Codex guidance follow-up)
+### Worktree: deskwork-dw-lifecycle
+
+**Goal:** Repair the newly ported Codex skill layer after the operator reported that Codex was skipping `.agents` skills due to invalid `SKILL.md` YAML frontmatter.
+
+**Accomplished:**
+
+- Confirmed the immediate breakage was parser-level, not execution-level: Codex reported two skipped skills, `feature-setup` and `release`, both failing YAML parse on the `description:` line.
+- Inspected the Codex skill port and found the broader pattern: every `.agents/skills/*/SKILL.md` file used unquoted YAML `description` values, and the two failing files included an additional colon in the scalar text.
+- Repaired the frontmatter across the full Codex skill set by quoting every `description` string, not just the two already failing files. This removed the immediate loader break and closed the same future-edit footgun across all 15 local skills.
+- Verified the repair with a parser-level check (`YAML.safe_load` over every `.agents/skills/*/SKILL.md` frontmatter block). All 15 now parse cleanly.
+- Committed and pushed the fix as `ab87719` (`fix(codex): repair skill frontmatter yaml`).
+
+**Didn't Work:**
+
+- The original skill port was treated as "present on disk" rather than "loadable by the host." That missed the distinction between markdown that looks fine in a diff and markdown whose frontmatter can actually be parsed by the skill loader.
+- I initially framed the broken-skill problem as workflow drift, but the operator's concrete error made clear the first failure mode was simpler and more fundamental: invalid YAML.
+
+**Course Corrections:**
+
+- [DOCUMENTATION] Operator: *"it's broken yaml"* — corrected my initial focus. The right first move was to fix the frontmatter syntax and prove the loader could parse it, not to start by debating skill semantics.
+- [PROCESS] Normalized the fix across the entire `.agents/skills/` tree instead of patching only the two already-broken files. The repeated unquoted-scalar pattern was an obvious source of repeat failure.
+
+**Quantitative:**
+
+- Messages from operator: 2 (`"yikes. You need to fix the broken skills"`, then the concrete YAML parser output)
+- Files changed: 15 `.agents/skills/*/SKILL.md` files
+- Commits: 1 (`ab87719`)
+- Pushes: 1
+- Parser failures before fix: 2 reported by Codex
+- Parser failures after fix: 0 across 15 validated skill files
+
+**Insights:**
+
+- **For skill ports, loadability is the first acceptance criterion.** A skill that exists on disk but cannot be parsed is equivalent to a missing skill. Frontmatter validation should be part of the port workflow, not an afterthought.
+- **Broad mechanical normalization is often safer than a narrow patch.** Once the pattern was visible, quoting every `description` field was the lowest-risk way to eliminate the whole class instead of chasing individual failures.
+- **The semantic drift in the Codex skill bodies is still real, but it is a second-order problem.** The loader has to accept the skill before the workflow quality matters. That audit remains a follow-up task, separate from this parser repair.
+
 **Next session:**
 
 dw-lifecycle is shipped. Natural follow-up arcs in priority order:
