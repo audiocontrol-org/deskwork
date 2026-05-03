@@ -339,7 +339,13 @@ export function createApp(ctx: StudioContext): Hono {
     '/dev/editorial-review/entry/:entryId{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}',
     async (c) => {
       const entryId = c.req.param('entryId');
-      const result = await renderEntryReviewPage(ctx.projectRoot, entryId);
+      const getIndex = (s: string) => getRequestContentIndex(c, ctx, s);
+      const result = await renderEntryReviewPage(
+        ctx,
+        entryId,
+        { version: c.req.query('v') ?? null },
+        getIndex,
+      );
       return c.html(result.html, result.status);
     },
   );

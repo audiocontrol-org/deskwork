@@ -1671,17 +1671,17 @@ GitHub tracking issues:
 
 **Port the press-check chrome from `pages/review.ts` (710 lines) to `pages/entry-review.ts` (185 lines):**
 
-- [ ] Folio header (`renderEditorialFolio('longform', ...)`)
-- [ ] Version strip (`renderVersionsStrip` → entry-keyed: list iterations from history journal; clicking a version shows historical content read-only)
-- [ ] Edit toolbar (`renderEditToolbar` — Source / Split / Preview + Focus mode)
-- [ ] Edit panes (`renderEditPanes` — source textarea + rendered preview + split-pane gutter)
-- [ ] Outline drawer (`renderOutlineDrawer`) when entry has outline content
-- [ ] Marginalia column (`renderMarginalia`) + marginalia stow chevron + edge pull tab (`renderMarginaliaTab`) per the affordance-placement rule
-- [ ] Margin-note authoring: select-text → annotation composer → save annotation; client integration via `editorial-review-client.ts`
-- [ ] Rendered markdown preview (replaces today's empty `<section class="er-entry-artifact">`)
-- [ ] Decision strip with chord chips (Approve `a`, Iterate `i`, Reject `r`) + "?" shortcuts overlay (`renderShortcutsOverlay`)
-- [ ] Stage-aware affordances via existing `getAffordances(entry)` (so e.g. Ideas-stage entries show appropriate buttons; Drafting shows Save/Iterate/Approve/Reject; Published shows read-only view)
-- [ ] Scrapbook drawer (per the F1–F6 work; bottom-anchored expandable drawer)
+- [x] Folio header (`renderEditorialFolio('longform', ...)`) — Layer 2.
+- [x] Version strip — Layer 2 ships `pages/entry-review/version-strip.ts`, backed by `listEntryIterations`. Click old version → `?v=N` query param renders historical view.
+- [x] Edit toolbar — Layer 2 ships `pages/entry-review/edit-toolbar.ts`. Save button DISABLED with tooltip linking [#174](https://github.com/audiocontrol-org/deskwork/issues/174) (entry-keyed save semantics undecided — operator decision pending).
+- [x] Edit panes — Layer 2 ships `pages/entry-review/edit-panes.ts` + client-side `entry-review/edit-mode.ts` (CodeMirror mount + preview render).
+- [x] Outline drawer — Layer 2 ships `pages/entry-review/outline-drawer.ts`.
+- [x] Marginalia column + stow + edge tab — Layer 2 ships `pages/entry-review/marginalia.ts` (server) + `entry-review/marginalia-toggle.ts` (client). On-component pattern per `affordance-placement.md`.
+- [x] Margin-note authoring — Layer 2 ships `entry-review/annotations.ts` (client). POSTs to `/api/dev/editorial-review/entry/:entryId/annotate`. `workflowId` populated as `entryId` per the operator-decided convention.
+- [x] Rendered markdown preview — Layer 2 ships via `pages/entry-review/edit-panes.ts` + `/api/dev/editorial-review/render` (existing endpoint).
+- [x] Decision strip — Layer 2 ships `pages/entry-review/decision-strip.ts` with chord chips (a/i/r). Reject button DISABLED with tooltip linking [#173](https://github.com/audiocontrol-org/deskwork/issues/173) (entry-keyed reject semantics undecided — operator decision pending).
+- [x] Stage-aware affordances via `getAffordances(entry)` — already wired in entry-review pre-Layer-2 since #146; Layer 2 surfaces returned controls in the decision strip.
+- [x] Scrapbook drawer — Layer 2 ships `entry-review/scrapbook-drawer.ts` (client). Bottom-anchored, expand/collapse.
 
 **Source data from sidecars + history journal (NOT workflow records):**
 

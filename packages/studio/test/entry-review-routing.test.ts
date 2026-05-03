@@ -1,12 +1,28 @@
 /**
- * Entry-uuid keyed review-route smoke (pipeline-redesign Task 35).
+ * Entry-uuid keyed review-route smoke (pipeline-redesign Task 35;
+ * Phase 34a Layer 2 expanded the surface to render the press-check
+ * chrome).
  *
  * Boots the studio app against a tmp project tree carrying a sidecar +
  * a markdown artifact, then drives the entry-review route via app.fetch
- * and asserts on response status + rendered affordance shape. The
+ * and asserts on response status + rendered chrome shape. The
  * affordance helper itself is tested separately in
  * stage-affordances.test.ts; this file covers the route + page render
  * boundary.
+ *
+ * Phase 34a Layer 2 changed the markup: the surface is no longer a
+ * minimal stage controller (`er-entry-shell` with `data-control="save|
+ * iterate|approve|reject"` buttons). It now renders the full press-
+ * check chrome (`er-review-shell` with `data-action="..."` buttons +
+ * version strip + edit toolbar + marginalia + scrapbook drawer +
+ * decision strip). The Reject button is rendered `disabled` with a
+ * tooltip pointing at issue #173 (entry-keyed reject semantics
+ * undefined). The Save button in the edit toolbar is similarly
+ * disabled pending #174.
+ *
+ * Read-only stages (Published / Blocked / Cancelled) still use the
+ * `er-entry-control--*` class family from the original entry-review
+ * surface — those affordances coexist with the relocated chrome.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -26,7 +42,6 @@ function makeConfig(): DeskworkConfig {
     sites: {
       a: {
         host: 'a.example',
-        // Aligned with seedArtifact() below which writes to projectRoot/docs/.
         contentDir: 'docs',
         calendarPath: 'docs/cal-a.md',
         blogFilenameTemplate: '{slug}.md',
@@ -73,7 +88,6 @@ describe('GET /dev/editorial-review/entry/:entryId', () => {
   beforeEach(async () => {
     projectRoot = await mkdtemp(join(tmpdir(), 'dw-entry-review-'));
     cfg = makeConfig();
-    // Persist the config to disk: entry-resolver reads it via getContentDir.
     await mkdir(join(projectRoot, '.deskwork'), { recursive: true });
     await writeFile(
       join(projectRoot, '.deskwork', 'config.json'),
@@ -85,7 +99,7 @@ describe('GET /dev/editorial-review/entry/:entryId', () => {
     await rm(projectRoot, { recursive: true, force: true });
   });
 
-  it('renders 200 + mutable controls for a Drafting entry', async () => {
+  it('renders the press-check chrome for a Drafting entry', async () => {
     const entry = makeEntry('Drafting');
     await writeSidecar(projectRoot, entry);
     await seedArtifact(projectRoot, 'hello-world', 'index', '# Hello World\n\nProse.\n');
@@ -96,18 +110,34 @@ describe('GET /dev/editorial-review/entry/:entryId', () => {
     );
     expect(res.status).toBe(200);
     const html = await res.text();
+    // Title + entry uuid attribute on the page-grid wrapper.
     expect(html).toContain('Hello World');
-    expect(html).toContain('data-entry-uuid="' + KNOWN_UUID + '"');
-    expect(html).toContain('data-stage="Drafting"');
-    // Mutable affordance: textarea + buttons
-    expect(html).toContain('<textarea');
-    expect(html).toContain('data-control="save"');
-    expect(html).toContain('data-control="iterate"');
-    expect(html).toContain('data-control="approve"');
-    expect(html).toContain('data-control="reject"');
+    expect(html).toContain(`data-entry-uuid="${KNOWN_UUID}"`);
+    // Press-check chrome: the longform shell + page-grid + draft body.
+    expect(html).toContain('class="er-review-shell"');
+    expect(html).toContain('data-review-ui="longform"');
+    expect(html).toContain('id="draft-body"');
+    expect(html).toContain('class="er-page-grid"');
+    // Decision strip: Approve / Iterate / Reject (Reject disabled).
+    expect(html).toContain('data-action="approve"');
+    expect(html).toContain('data-action="iterate"');
+    expect(html).toContain('data-action="reject"');
+    expect(html).toMatch(/data-action="reject"[^>]*disabled/);
+    expect(html).toContain('issues/173');
+    // Edit toolbar: Save button is disabled pending #174.
+    expect(html).toContain('data-action="save-version"');
+    expect(html).toMatch(/data-action="save-version"[^>]*disabled/);
+    expect(html).toContain('issues/174');
+    // Marginalia + scrapbook drawer + outline tab + shortcuts overlay.
+    expect(html).toContain('data-comments-sidebar');
+    expect(html).toContain('data-scrapbook-drawer');
+    expect(html).toContain('data-shortcuts-overlay');
+    // Embedded state JSON drives the client.
+    expect(html).toContain('id="entry-review-state"');
+    expect(html).toContain(`"entryId":"${KNOWN_UUID}"`);
   });
 
-  it('renders 200 + read-only artifact for a Published entry', async () => {
+  it('renders 200 + read-only affordances for a Published entry', async () => {
     const entry = makeEntry('Published');
     await writeSidecar(projectRoot, entry);
     await seedArtifact(projectRoot, 'hello-world', 'index', '# Hello World\n');
@@ -118,18 +148,19 @@ describe('GET /dev/editorial-review/entry/:entryId', () => {
     );
     expect(res.status).toBe(200);
     const html = await res.text();
+    // Read-only chrome: the decision strip emits the read-only +
+    // fork-placeholder pair from getAffordances('Published').
     expect(html).toContain('Read-only');
-    expect(html).toContain('data-mutable="false"');
     expect(html).toContain('Fork (coming)');
-    // No mutating buttons
-    expect(html).not.toContain('data-control="save"');
-    expect(html).not.toContain('data-control="iterate"');
+    expect(html).toContain('data-control="fork"');
+    // The Approve / Iterate / Reject mutation buttons are absent.
+    expect(html).not.toContain('data-action="approve"');
+    expect(html).not.toContain('data-action="iterate"');
   });
 
   it('renders 200 + induct stage picker for a Blocked entry', async () => {
     const entry = makeEntry('Blocked', { priorStage: 'Drafting' });
     await writeSidecar(projectRoot, entry);
-    // Blocked uses priorStage to locate the artifact.
     await seedArtifact(projectRoot, 'hello-world', 'index', '# Hello World\n');
 
     const app = createApp({ projectRoot, config: cfg });
@@ -138,15 +169,13 @@ describe('GET /dev/editorial-review/entry/:entryId', () => {
     );
     expect(res.status).toBe(200);
     const html = await res.text();
-    expect(html).toContain('data-stage="Blocked"');
-    expect(html).toContain('paused from Drafting');
+    // Blocked surfaces the induct-to picker (no mutation buttons).
     expect(html).toContain('name="induct-to"');
-    // The picker contains every linear pipeline stage.
     for (const stage of ['Ideas', 'Planned', 'Outlining', 'Drafting', 'Final']) {
       expect(html).toContain(`<option value="${stage}">`);
     }
-    // No mutating controls.
-    expect(html).not.toContain('data-control="save"');
+    expect(html).not.toContain('data-action="approve"');
+    expect(html).not.toContain('data-action="iterate"');
   });
 
   it('returns 404 when the entry uuid is not found', async () => {
