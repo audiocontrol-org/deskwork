@@ -365,6 +365,33 @@ describe('scrapbook redesign — per-kind preview rendering (Issue #161, dispatc
     asideHrefs.forEach((href) => expect(cardIds).toContain(href));
   });
 
+  it('renders the ⚿ glyph next to .scrap-name on secret cards (#164)', async () => {
+    // Phase 34b — secret cards carry an inline ⚿ marker so the visual
+    // cue persists when the card is expanded outside the grouped
+    // section. Public cards must NOT carry the marker.
+    const dir = join(root, 'docs/folder/scrapbook/secret');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'private.md'), '# private\n\nsecret prose\n');
+    const r = await fetchScrapbook(app, 'd', 'folder');
+    expect(r.status).toBe(200);
+    // Pull each .scrap-card block in source order and assert the
+    // mark only appears in secret-tagged cards.
+    const cards = r.html.match(
+      /<li class="scrap-card"[^>]*>[\s\S]*?<\/li>/g,
+    ) ?? [];
+    const secretCards = cards.filter((c) => /data-secret="true"/.test(c));
+    const publicCards = cards.filter((c) => !/data-secret="true"/.test(c));
+    expect(secretCards.length).toBeGreaterThan(0);
+    expect(publicCards.length).toBeGreaterThan(0);
+    secretCards.forEach((c) => {
+      expect(c).toContain('class="scrap-name-secret-mark"');
+      expect(c).toContain('⚿');
+    });
+    publicCards.forEach((c) => {
+      expect(c).not.toContain('scrap-name-secret-mark');
+    });
+  });
+
   it('renders the inline new-note composer hidden, with all required fields (#166)', async () => {
     // Phase 34b — the F1 `window.prompt()` regression is replaced with a
     // server-rendered inline composer that the client reveals on

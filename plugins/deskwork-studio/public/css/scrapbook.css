@@ -470,6 +470,21 @@
   color: var(--er-stamp-purple);
   font-size: 1rem;
 }
+
+/*
+ * #164 Phase 34b — inline secret glyph next to .scrap-name on cards
+ * carrying data-secret="true". Provides visual continuity for the
+ * secret marker once a card is expanded (where it grows beyond the
+ * grouped section's visual scope). Mirrors the section header's
+ * stamp-purple color but at a smaller scale so it doesn't compete
+ * with the filename for attention.
+ */
+.scrap-name-secret-mark {
+  color: var(--er-stamp-purple);
+  font-size: 0.85rem;
+  cursor: help;
+  user-select: none;
+}
 .scrap-secret-title {
   font-family: var(--er-font-display);
   font-variation-settings: "opsz" 36, "wght" 500;
