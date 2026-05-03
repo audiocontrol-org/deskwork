@@ -1731,7 +1731,32 @@ GitHub tracking issues:
 - [x] **The Phase 34 PRD review can now be completed end-to-end via the studio UI** — the PRD entry renders with full chrome at `/dev/editorial-review/entry/9845c268-670f-4793-b986-0433e9ef4fb9`; margin-note authoring round-trips through the new endpoint; data sourced from the PRD's sidecar (currentStage: Final, 4 Drafting iterations) instead of the frozen workflow record.
 - [x] Test additions across 34a: +51 NEW tests (Layer 1: +15 core +17 studio = +32; Layer 2: +12 studio; Layer 3: +7 routing). Net studio count -3 (348→345) due to 39 legacy review.ts test deletions, expected from the 700-line code deletion. Cumulative new-test additions exceed the 25-test target by 26 cases.
 
-**Acceptance:** 34a closes when all the bullets above check off + at least one new release has shipped to npm + marketplace + the operator has run `/plugin marketplace update deskwork` and successfully reviewed a real entry end-to-end via the dashboard's link.
+**Remediation — post-implementation audit (`docs/1.0/001-IN-PROGRESS/deskwork-plugin/2026-05-03-phase-34a-implementation-audit.md`).** The structural cutover landed cleanly, but a post-implementation audit surfaced two correctness gaps in historical-mode behavior. Both must close before 34a is acceptance-complete; both are small-shape fixes (~50–100 lines each + tests).
+
+- [ ] **F1 — Block live mutations when `historical` is true.** Today, `pages/entry-review/index.ts` correctly sets `historical: true` in the embedded state when `?v=<n>` resolves to a non-current iteration; `entry-review/edit-mode.ts` correctly blocks edit-mode entry; but `decision-strip.ts` + client-side `entry-review/decision.ts` + client-side `entry-review/annotations.ts` skip the check. Operator can Approve / Iterate / leave a margin note while looking at v3 of an entry that's actually at v5 — same "surface lying about content" failure mode 34a was meant to fix.
+  - Server: `decision-strip.ts` reads `data.historical` and renders Approve/Iterate buttons as `disabled` with a tooltip "viewing historical v<n> — switch to current to act" when historical.
+  - Client: `entry-review/decision.ts` short-circuits with a toast if a decision is invoked while `state.historical === true` (defense-in-depth — disabled buttons in markup are the primary block).
+  - Client: `entry-review/annotations.ts` short-circuits margin-note authoring when `state.historical === true` (don't open composer; toast explaining).
+  - Tests: assert all three when `?v=<old>` is in URL; assert all three available when `?v=<current>` or unset.
+
+- [ ] **F2 — Disambiguate historical version URLs by stage.** The version-strip URL contract is `?v=<n>` only; `loadEntryReviewData()` calls `getEntryIteration(projectRoot, entryId, requested)` without the optional `stage` argument. The history reader supports `stage` disambiguation (and `iterate-history.test.ts` proves first-chronological-match-wins without it). Entries with iterations across multiple stages (e.g. Ideas v1 + Drafting v1, which the implementation explicitly supports) silently render the wrong content.
+  - Extend version-strip emitted URLs from `?v=<n>` to `?v=<n>&stage=<Stage>` in `pages/entry-review/version-strip.ts`.
+  - Thread the `stage` query param through `pages/entry-review/index.ts` → `loadEntryReviewData()` → `getEntryIteration(projectRoot, entryId, version, stage)` in `pages/entry-review/data.ts`.
+  - Backwards compat: when `?v=` lands without `?stage=`, fall back to the current first-match behavior with a server-side console warn (single-stage entries are the common case; explicit stage qualification is for the multi-stage case).
+  - Tests: regression test for the multi-stage case using a synthetic two-stage fixture; assert the right content renders for each stage's v1.
+
+**Verification:**
+
+- [x] `pages/review.ts` does not exist (`test ! -f packages/studio/src/pages/review.ts` → exit 0).
+- [x] `git grep -i 'legacy' packages/studio/src/` returns only descriptive backward-looking references (e.g. "Replaces the legacy ...", "Differs from the legacy workflow-keyed strip"). No promissory IOUs. Per `documentation.md` rule, backward-looking statements about history are permitted.
+- [x] `git grep -E '(migration window|coexist during|will land later|stylings? will land|intentionally minimal)' packages/studio/src/` returns ZERO hits.
+- [x] Live: confirmed via curl probes against the booted studio — dashboard emits `/dev/editorial-review/entry/<uuid>` URLs; entry-keyed URL renders 200 with all 9 required anchors (`er-review-shell`, `er-folio`, `er-strip`, `er-marginalia`, decision data-actions, `id="entry-review-state"`, the entry UUID); bare-UUID 301-redirects; slug + hierarchical-slug 404; bogus UUID renders 404 entry-not-found shell with folio chrome; shortform desk + dashboard still 200.
+- [x] Live: entry-keyed annotation API round-trip — POST to `/api/dev/editorial-review/entry/:entryId/annotate` returns the minted annotation; GET reads it back. Verified end-to-end against the live PRD entry on this project's calendar.
+- [x] **The Phase 34 PRD review can now be completed end-to-end via the studio UI** — the PRD entry renders with full chrome at `/dev/editorial-review/entry/9845c268-670f-4793-b986-0433e9ef4fb9`; margin-note authoring round-trips through the new endpoint; data sourced from the PRD's sidecar (currentStage: Final, 4 Drafting iterations) instead of the frozen workflow record.
+- [x] Test additions across 34a: +51 NEW tests (Layer 1: +15 core +17 studio = +32; Layer 2: +12 studio; Layer 3: +7 routing). Net studio count -3 (348→345) due to 39 legacy review.ts test deletions, expected from the 700-line code deletion. Cumulative new-test additions exceed the 25-test target by 26 cases.
+- [ ] **F1 + F2 remediation tests pass.** Net new tests: ~6 (3 for historical-mode action blocking; 3 for stage-disambiguated history lookup including the multi-stage regression case).
+
+**Acceptance:** 34a closes when all the bullets above check off (including the F1 + F2 remediation tasks) + at least one new release has shipped to npm + marketplace + the operator has run `/plugin marketplace update deskwork` and successfully reviewed a real entry end-to-end via the dashboard's link.
 
 #### 34b — Pay down F1–F6 IOUs
 
