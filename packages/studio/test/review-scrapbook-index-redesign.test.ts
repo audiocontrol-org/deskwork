@@ -312,6 +312,19 @@ describe('scrapbook redesign — per-kind preview rendering (Issue #161, dispatc
     expect(otherCard).not.toMatch(/<span>·<\/span>/);
   });
 
+  it('every aside <a> href matches a card id (F4 cross-link contract)', async () => {
+    const r = await fetchScrapbook(app, 'd', 'folder');
+    const asideHrefs = Array.from(
+      r.html.matchAll(/<a href="#(item-\d+)" data-scrap-aside-link/g),
+    ).map((m) => m[1]);
+    const cardIds = Array.from(
+      r.html.matchAll(/<li class="scrap-card"[^>]*id="(item-\d+)"/g),
+    ).map((m) => m[1]);
+    expect(asideHrefs.length).toBeGreaterThan(0);
+    expect(asideHrefs.length).toBe(cardIds.length);
+    asideHrefs.forEach((href) => expect(cardIds).toContain(href));
+  });
+
   it('omits the preview block entirely for empty / frontmatter-only files', async () => {
     // Per the G2 amendment, previewExcerpt returns null when the post-strip
     // text is empty/whitespace-only — caller emits no preview block at all

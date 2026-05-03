@@ -303,3 +303,37 @@ Filed as future enhancement; will land as a focused `image-dimensions` helper mo
 > Per-kind extra meta correct for all 4 supported kinds (md/txt counts via `countLines`; json keys via `countJsonKeys`; img dims via PNG IHDR parse). Aside list still matches mockup. CSS uppercasing matches mockup's rendered appearance. Omit-when-empty contract correct.
 > Test count 338 → 343 passing (+5 F3 tests). 0 failed. 11 skipped. No regression from F2.
 
+---
+
+## F4 post-implementation visual review (2026-05-02)
+
+**Trigger:** after F4.1/F4.2 landed (single-expanded invariant + aside-active sync + URL hash sync + restoreFromHash).
+**Inputs:** post-F4 live page at 1440×900 with multi-kind fixture; 4-state behavioral verification + screenshot at `.playwright-mcp/scrapbook-after-f4-restored-1440.png` (page bootstrapped fresh with `#item-3` hash).
+
+### Live behavioral verification
+
+| Step | Action | hash | expanded | aside-active | Verdict |
+|---|---|---|---|---|---|
+| 1 | Initial load (no hash) | `""` | none | none | ✓ |
+| 2 | Click card #1 name | `#item-1` | item-1 | `#item-1` | ✓ syncAsideActive + syncUrlHash fire |
+| 3 | Click aside link to #item-3 | `#item-3` | item-3 only | `#item-3` | ✓ single-expanded invariant: item-1 closed |
+| 4 | Hard reload with `#item-2` | `#item-2` | item-2 | `#item-2` | ✓ restoreFromHash on bootstrap |
+| 5 | Click expanded card #2 to collapse | `""` | none | none | ✓ all state cleared |
+
+Active-state computed color: `rgb(184, 54, 42)` = `--er-red-pencil`. Matches mockup CSS line 201 (`.scrap-aside-list a.active`) translated to `[data-active="true"]` per F1's G1 D1 ratified deviation. The visual rhyme with the expanded card's red-pencil border is the right restraint — one pencil mark in two places.
+
+### Implementation choices ratified
+
+| Choice | Rationale | Verdict |
+|---|---|---|
+| Instant state swap (no fade transition) | Press-check metaphor: galleys are picked up and set down, not faded; reflow IS the transition | ✓ ship as-is |
+| Smooth-scroll on restoreFromHash | Deep links are state+visibility promises; `block: 'nearest'` only scrolls when needed; `behavior: 'smooth'` auto-falls-back via `prefers-reduced-motion` | ✓ keep smooth |
+| `history.replaceState` (not pushState) | Hash is mode within page, not navigation between pages; pushState would pollute back-button with one entry per click | ✓ correct trade-off |
+| `await renderExpandedBody(...)` then `scrollIntoView` order | Lazy-loaded body is in place by the time scroll completes | ✓ no jank |
+
+### Sign-off
+
+> **F4 verified — proceed to F5.**
+> Single-expanded + aside cross-link active + URL hash sync all work as designed. Mockup only specifies static state; F4 ships the dynamic behavior the mockup implies. Implementation choices match the press-check editorial-print mental model.
+> Test count 343 → 344 passing (+1 F4 markup-contract regression). 0 failed. 11 skipped. No regression from F3.
+

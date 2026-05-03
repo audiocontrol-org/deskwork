@@ -49,8 +49,11 @@ function init(): void {
   wireFilterChips(ctx);
   wireSearch(ctx);
   wireCards(ctx);
+  wireAsideLinks(ctx);
   wireAsideActions(ctx);
   initScrapbookLightbox(page);
+  // F4: restore expanded state from #item-N hash on page load.
+  restoreFromHash(ctx);
 }
 
 function readCtx(page: HTMLElement): Ctx | null {
@@ -160,14 +163,64 @@ function wireCard(ctx: Ctx, card: HTMLElement): void {
 }
 
 async function toggleCard(ctx: Ctx, card: HTMLElement): Promise<void> {
-  const nextState = card.dataset.state === 'expanded' ? 'closed' : 'expanded';
-  // F4 will collapse other expanded cards here (single-expanded invariant)
-  // and update the aside `data-active` flip + URL hash.
-  card.dataset.state = nextState;
-  if (nextState === 'expanded') {
+  const wasExpanded = card.dataset.state === 'expanded';
+  // F4 single-expanded invariant: collapse anything else first. The
+  // operator's mental model is "one slip on the desk under the lamp" —
+  // multiple expanded cards cause cascading reflow churn.
+  ctx.page.querySelectorAll<HTMLElement>('.scrap-card[data-state="expanded"]').forEach((other) => {
+    if (other !== card) other.dataset.state = 'closed';
+  });
+  card.dataset.state = wasExpanded ? 'closed' : 'expanded';
+  syncAsideActive(ctx);
+  syncUrlHash(ctx);
+  if (!wasExpanded) {
     await renderExpandedBody(ctx, card);
     card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
+}
+
+// ---------------------------------------------------------------------------
+// Aside cross-link binding (F4)
+// ---------------------------------------------------------------------------
+
+function wireAsideLinks(ctx: Ctx): void {
+  ctx.page.querySelectorAll<HTMLAnchorElement>('.scrap-aside-list a[data-scrap-aside-link]').forEach((a) => {
+    a.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      const id = (a.getAttribute('href') ?? '').replace(/^#/, '');
+      if (!id) return;
+      const card = ctx.page.querySelector<HTMLElement>(`.scrap-card#${CSS.escape(id)}`);
+      if (card) void toggleCard(ctx, card);
+    });
+  });
+}
+
+function syncAsideActive(ctx: Ctx): void {
+  const expanded = ctx.page.querySelector<HTMLElement>('.scrap-card[data-state="expanded"]');
+  ctx.page.querySelectorAll<HTMLAnchorElement>('.scrap-aside-list a[data-scrap-aside-link]').forEach((a) => {
+    if (expanded && a.getAttribute('href') === `#${expanded.id}`) {
+      a.setAttribute('data-active', 'true');
+    } else {
+      a.removeAttribute('data-active');
+    }
+  });
+}
+
+function syncUrlHash(ctx: Ctx): void {
+  const expanded = ctx.page.querySelector<HTMLElement>('.scrap-card[data-state="expanded"]');
+  const hash = expanded ? `#${expanded.id}` : '';
+  if (window.location.hash === hash) return;
+  // replaceState so back/forward isn't peppered with one entry per click.
+  const url = `${window.location.pathname}${window.location.search}${hash}`;
+  window.history.replaceState(null, '', url);
+}
+
+function restoreFromHash(ctx: Ctx): void {
+  const hash = window.location.hash;
+  if (!hash || hash.length < 2) return;
+  const id = hash.slice(1);
+  const card = ctx.page.querySelector<HTMLElement>(`.scrap-card#${CSS.escape(id)}`);
+  if (card) void toggleCard(ctx, card);
 }
 
 // ---------------------------------------------------------------------------
