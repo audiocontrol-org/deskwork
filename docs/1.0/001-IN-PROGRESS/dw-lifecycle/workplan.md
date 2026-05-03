@@ -3233,9 +3233,9 @@ This section was appended on 2026-05-03 after the implementation audit in `2026-
 
 ### Task 48: Implement install probe/confirm fidelity
 
-- [ ] Extend `src/subcommands/install.ts` so it can accept probed values instead of always writing `defaultConfig()`.
-- [ ] Either add a preview mode or explicit unknown-flag rejection so `--help` / `--dry-run` do not silently behave as positional arguments.
-- [ ] Align the helper behavior with the install skill's documented probe → confirm → write contract.
+- [x] Extend `src/subcommands/install.ts` so it can accept probed values instead of always writing `defaultConfig()`.
+- [x] Either add a preview mode or explicit unknown-flag rejection so `--help` / `--dry-run` do not silently behave as positional arguments.
+- [x] Align the helper behavior with the install skill's documented probe → confirm → write contract.
 
 **Acceptance Criteria:**
 - Install no longer silently writes an all-default config in cases where the host project shape can be detected.

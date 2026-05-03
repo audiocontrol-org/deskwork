@@ -23,6 +23,12 @@ This is a Phase-0 skill — every other dw-lifecycle skill assumes the config ex
 5. Invoke the helper:
 
 ```
+dw-lifecycle install <project-root> --dry-run
+```
+
+Review the emitted config JSON with the operator, then run:
+
+```
 dw-lifecycle install <project-root>
 ```
 
