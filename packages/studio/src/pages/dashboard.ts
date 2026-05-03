@@ -59,9 +59,10 @@ export async function renderDashboard(
   const data = await loadDashboardData(ctx.projectRoot);
   const now = ctx.now ? ctx.now() : new Date();
 
+  const defaultSite = ctx.config.defaultSite;
   const stageSections = DASHBOARD_STAGE_ORDER.map((stage) => {
     const bucket = data.byStage.get(stage) ?? [];
-    return renderStageSection(stage, bucket).__raw;
+    return renderStageSection(stage, bucket, defaultSite).__raw;
   }).join('\n');
 
   const body = html`

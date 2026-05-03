@@ -743,6 +743,12 @@ body[data-review-ui="scrapbook"] {
 .er-btn-approve { border-color: var(--er-stamp-green); color: var(--er-stamp-green); }
 .er-btn-approve:hover:not(:disabled) { background: var(--er-stamp-green); color: var(--er-paper); }
 
+/* #157 Phase 34c — scrapbook cross-link from dashboard rows. Subtle
+ * stamp-purple to align with the secret-mark + scrapbook-section
+ * vocabulary; doesn't compete with the primary "open / view" actions. */
+.er-btn-scrap { border-color: var(--er-stamp-purple); color: var(--er-stamp-purple); }
+.er-btn-scrap:hover:not(:disabled) { background: var(--er-stamp-purple); color: var(--er-paper); }
+
 .er-btn-reject { border-color: var(--er-red-pencil); color: var(--er-red-pencil); }
 .er-btn-reject:hover:not(:disabled) { background: var(--er-red-pencil); color: var(--er-paper); }
 

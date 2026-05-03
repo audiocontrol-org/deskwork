@@ -29,7 +29,7 @@
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
-import { listenWithAutoIncrement } from './listen.ts';
+import { listenWithAutoIncrement, type ServeImpl } from './listen.ts';
 import { existsSync, realpathSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -496,20 +496,23 @@ async function main(): Promise<void> {
     bindAddresses = tailscale === null ? [LOOPBACK] : [LOOPBACK, ...tailscale.ipv4];
   }
 
-  // Dev mode: spin up Vite middleware in front of the Hono fetch handler.
-  // We run a plain http.Server (not @hono/node-server's serve()) so we
-  // can chain Vite's connect-style middleware before Hono. Auto-increment
-  // + Tailscale binding are skipped in dev — the dev server is for local
-  // iteration only.
+  // Dev mode: build a Vite-wrapped serveImpl that constructs an
+  // http.Server per address with Vite's connect-style middleware
+  // chained in front of Hono. Then route through the same
+  // `listenWithAutoIncrement` + `bindAddresses` + `printBanner` path
+  // as production — only the in-process esbuild step is skipped on
+  // DESKWORK_DEV=1 (the conditional above main()'s networking
+  // section). Pre-fix #165, dev mode hardcoded loopback-only and
+  // emitted a custom banner; operators off-keyboard couldn't reach
+  // the dev studio via Tailscale magic-DNS even though the
+  // production-mode binary served them well.
+  let serveImpl: ServeImpl = serve;
   if (devMode) {
     const { createServer: createViteServer } = await import('vite');
     const { getRequestListener } = await import('@hono/node-server');
     const http = await import('node:http');
     const { join } = await import('node:path');
 
-    // Vite root is the plugin's public/ dir; client TS lives at public/src/.
-    // clientScriptTag emits /src/<name>.ts which maps to public/src/<name>.ts
-    // under this root.
     const viteRoot = join(pluginRoot(), 'public');
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -518,22 +521,18 @@ async function main(): Promise<void> {
     });
 
     const honoListener = getRequestListener(app.fetch);
-    const httpServer = http.createServer((req, res) => {
-      vite.middlewares(req, res, () => {
-        // Vite didn't handle — pass to Hono.
-        honoListener(req, res);
+    const viteServeImpl: ServeImpl = (options, listening) => {
+      const httpServer = http.createServer((req, res) => {
+        vite.middlewares(req, res, () => {
+          honoListener(req, res);
+        });
       });
-    });
-
-    httpServer.listen(port, LOOPBACK, () => {
-      process.stdout.write(
-        `deskwork-studio: dev listening on http://localhost:${port}/\n`,
-      );
-      process.stdout.write(`  vite root: ${viteRoot}\n`);
-      process.stdout.write(`  project:   ${projectRoot}\n`);
-      process.stdout.write(`  sites:     ${Object.keys(config.sites).join(', ')}\n`);
-    });
-    return;
+      httpServer.listen(options.port, options.hostname, () => {
+        listening({ port: options.port, address: options.hostname });
+      });
+      return httpServer;
+    };
+    serveImpl = viteServeImpl;
   }
 
   // Issue #43: bind every address with EADDRINUSE handling.
@@ -548,7 +547,7 @@ async function main(): Promise<void> {
         addresses: bindAddresses,
         explicitPort: portExplicit,
       },
-      serve,
+      serveImpl,
     );
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);

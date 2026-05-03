@@ -206,6 +206,44 @@ describe('studio dashboard — eight stage sections (Task 34)', () => {
     );
   });
 
+  it('every dashboard row carries a scrapbook link to the entry (#157)', async () => {
+    // Phase 34c — dashboard rows now expose a `scrapbook ↗` link
+    // pointing at /dev/scrapbook/<defaultSite>/<slug> for every
+    // stage. Pre-fix, there was no entry point from the dashboard to
+    // the per-entry scrapbook viewer.
+    await writeSidecar(root, makeEntry({
+      uuid: UUID_DRAFTING,
+      slug: 'in-flight',
+      title: 'In Flight',
+      currentStage: 'Drafting',
+      iterationByStage: { Drafting: 1 },
+      reviewState: 'in-review',
+    }));
+    await writeSidecar(root, makeEntry({
+      uuid: UUID_PUBLISHED,
+      slug: 'shipped',
+      title: 'Shipped',
+      currentStage: 'Published',
+      iterationByStage: { Drafting: 3, Final: 1 },
+      datePublished: '2026-04-29T12:00:00.000Z',
+    }));
+
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    // Active-stage row: scrapbook link present alongside the open
+    // affordance.
+    expect(r.html).toContain('href="/dev/scrapbook/d/in-flight"');
+    // Published row: scrapbook link present alongside the view
+    // affordance.
+    expect(r.html).toContain('href="/dev/scrapbook/d/shipped"');
+    // Both links carry the data-action="open-scrapbook" hook so the
+    // existing studio client (or future delegated handler) can
+    // distinguish them from review links.
+    expect(r.html).toMatch(
+      /href="\/dev\/scrapbook\/d\/in-flight"[^>]*data-action="open-scrapbook"/,
+    );
+  });
+
   it('does not crash on an empty calendar (no sidecars at all)', async () => {
     const r = await getHtml(app, '/dev/editorial-studio');
     expect(r.status).toBe(200);
