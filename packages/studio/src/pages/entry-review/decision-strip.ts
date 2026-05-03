@@ -30,6 +30,9 @@ const REJECT_ISSUE_URL =
   'https://github.com/audiocontrol-org/deskwork/issues/173';
 const REJECT_TOOLTIP = `reject semantics filed as #173 — see ${REJECT_ISSUE_URL}`;
 
+const HISTORICAL_TOOLTIP =
+  'viewing historical version (read-only) — switch back to current to act';
+
 const STAGE_PICKER_OPTIONS = [
   'Ideas',
   'Planned',
@@ -87,6 +90,11 @@ function renderShortcutsBtn(): string {
 
 interface MutableButtons {
   readonly entry: Entry;
+  /** When true, viewer is on a historical version — Approve/Iterate
+   *  shouldn't be invokable because they'd act against the live entry
+   *  (`approveEntryStage` / `iterateEntry` both read sidecar state,
+   *  not the historical snapshot). Render as disabled with tooltip. */
+  readonly historical: boolean;
 }
 
 /**
@@ -94,14 +102,23 @@ interface MutableButtons {
  * (disabled). Returned as a single concatenated HTML string so the
  * caller can wrap it in `.er-strip-right`.
  */
-function renderMutableButtons({ entry }: MutableButtons): string {
+function renderMutableButtons({ entry, historical }: MutableButtons): string {
   const buttons: string[] = [];
   buttons.push(renderEditToggle());
+
+  // Phase 34a F2 remediation — Approve/Iterate disabled when viewing a
+  // historical version. The endpoints act against live sidecar state,
+  // not the historical snapshot; allowing the click while showing
+  // historical content is the same "surface lying about content"
+  // failure mode 34a was meant to fix. Defense-in-depth: client-side
+  // also short-circuits in entry-review/decision.ts.
+  const histDisabled = historical ? ' disabled aria-disabled="true"' : '';
+  const histTitle = historical ? ` title="${HISTORICAL_TOOLTIP}"` : '';
 
   // Approve — wired to the entry-keyed decision endpoint.
   buttons.push(
     shortcutChipWrap(
-      html`<button class="er-btn er-btn-small er-btn-approve" data-action="approve" data-entry-uuid="${entry.uuid}" type="button">Approve</button>`,
+      html`<button class="er-btn er-btn-small er-btn-approve" data-action="approve" data-entry-uuid="${entry.uuid}" type="button"${unsafe(histDisabled)}${unsafe(histTitle)}>Approve</button>`,
       'a',
     ),
   );
@@ -109,7 +126,7 @@ function renderMutableButtons({ entry }: MutableButtons): string {
   // Iterate — wired to the entry-keyed version endpoint.
   buttons.push(
     shortcutChipWrap(
-      html`<button class="er-btn er-btn-small" data-action="iterate" data-entry-uuid="${entry.uuid}" type="button">Iterate</button>`,
+      html`<button class="er-btn er-btn-small" data-action="iterate" data-entry-uuid="${entry.uuid}" type="button"${unsafe(histDisabled)}${unsafe(histTitle)}>Iterate</button>`,
       'i',
     ),
   );
@@ -163,12 +180,16 @@ function renderReadOnlyButtons(entry: Entry, affordances: Affordances): string {
 interface DecisionStripOptions {
   readonly entry: Entry;
   readonly affordances: Affordances;
+  /** Whether the page is rendering a historical version (`?v=<n>`).
+   *  When true, mutation buttons (Approve / Iterate) render disabled
+   *  with a tooltip explaining the read-only state. */
+  readonly historical: boolean;
 }
 
 export function renderDecisionStrip(opts: DecisionStripOptions): RawHtml {
-  const { entry, affordances } = opts;
+  const { entry, affordances, historical } = opts;
   const inner = affordances.mutable
-    ? renderMutableButtons({ entry })
+    ? renderMutableButtons({ entry, historical })
     : renderReadOnlyButtons(entry, affordances);
   return unsafe(`<span class="er-strip-right">${inner}</span>`);
 }

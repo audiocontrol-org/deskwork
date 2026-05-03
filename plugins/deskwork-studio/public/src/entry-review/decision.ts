@@ -82,8 +82,25 @@ export function createDecisionController(
     return true;
   }
 
+  // Phase 34a F1 remediation — defense-in-depth against historical-
+  // mode mutations. The server already renders these buttons disabled
+  // when `state.historical === true`, but if anyone removes the
+  // disabled attribute via devtools or fires the keyboard shortcut,
+  // short-circuit with the same explainer so the action stays inert.
+  function refuseHistorical(label: string): boolean {
+    if (state.historical) {
+      showToast(
+        `${label} is disabled while viewing a historical version — switch back to current to act.`,
+        true,
+      );
+      return true;
+    }
+    return false;
+  }
+
   async function approve(): Promise<void> {
     if (!approveBtn) return;
+    if (refuseHistorical('Approve')) return;
     approveBtn.disabled = true;
     const ok = await postDecision('approve');
     if (!ok) {
@@ -96,6 +113,7 @@ export function createDecisionController(
 
   async function iterate(): Promise<void> {
     if (!iterateBtn) return;
+    if (refuseHistorical('Iterate')) return;
     iterateBtn.disabled = true;
     const ok = await postIterate();
     if (!ok) {

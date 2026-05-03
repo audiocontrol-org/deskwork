@@ -58,6 +58,11 @@ export interface EntryReviewQuery {
   /** `?v=<n>` from the request URL. When set + resolves, shows that
    *  iteration's historical content read-only. */
   readonly version?: string | null;
+  /** `?stage=<Stage>` from the request URL. Disambiguates historical
+   *  lookup when an entry has the same version number recorded under
+   *  multiple stages. Optional; omitted falls back to the first
+   *  chronological match (single-stage case). */
+  readonly stage?: string | null;
 }
 
 export interface EntryReviewResult {
@@ -176,6 +181,7 @@ export async function renderEntryReviewPage(
   try {
     data = await loadEntryReviewData(ctx, entryId, {
       version: query.version ?? null,
+      stage: query.stage ?? null,
     });
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
@@ -230,9 +236,14 @@ export async function renderEntryReviewPage(
     iterations: data.iterations,
     entry: data.entry,
     historicalVersion: data.historical?.versionNumber ?? null,
+    historicalStage: data.historical?.stage ?? null,
   });
 
-  const decisionStrip = renderDecisionStrip({ entry: data.entry, affordances });
+  const decisionStrip = renderDecisionStrip({
+    entry: data.entry,
+    affordances,
+    historical: data.historical !== null,
+  });
 
   const body = html`
     <div data-review-ui="longform" class="er-review-shell">

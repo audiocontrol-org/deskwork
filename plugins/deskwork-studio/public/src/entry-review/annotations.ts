@@ -132,6 +132,18 @@ export function createAnnotationsController(
 
   function openComposer(): void {
     if (!pendingRange) return;
+    // Phase 34a F1 remediation — refuse to open the composer in
+    // historical mode (defense-in-depth: the Mark pencil is also
+    // hidden in the selection handler above). Toast so the operator
+    // gets feedback if they reach this path via keyboard or programmatic
+    // dispatch.
+    if (state.historical) {
+      showToast(
+        'Margin notes are disabled while viewing a historical version — switch back to current to leave a mark.',
+        true,
+      );
+      return;
+    }
     composerQuote.textContent = extractQuote(draftBody, pendingRange);
     textArea.value = '';
     categorySel.value = 'other';
@@ -374,6 +386,15 @@ export function createAnnotationsController(
 
   document.addEventListener('selectionchange', () => {
     if (draftBody.classList.contains('hidden')) {
+      addBtn.hidden = true;
+      return;
+    }
+    // Phase 34a F1 remediation — never surface the Mark pencil in
+    // historical mode. Margin notes anchor by character offsets into
+    // the LIVE artifact body; an annotation authored against the
+    // historical body would be silently re-anchored to wrong content
+    // when the operator returns to the current view.
+    if (state.historical) {
       addBtn.hidden = true;
       return;
     }

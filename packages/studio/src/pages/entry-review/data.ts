@@ -32,7 +32,19 @@ import {
   type IterationContent,
 } from '@deskwork/core/iterate/history';
 import { listEntryAnnotations } from '@deskwork/core/entry/annotations';
-import type { Entry } from '@deskwork/core/schema/entry';
+import type { Entry, Stage } from '@deskwork/core/schema/entry';
+
+const VALID_STAGES: ReadonlySet<Stage> = new Set<Stage>([
+  'Ideas', 'Planned', 'Outlining', 'Drafting', 'Final', 'Published', 'Blocked', 'Cancelled',
+]);
+
+function parseStageParam(raw: string | null | undefined): Stage | undefined {
+  if (raw === null || raw === undefined) return undefined;
+  for (const stage of VALID_STAGES) {
+    if (stage === raw) return stage;
+  }
+  return undefined;
+}
 import type { CalendarEntry } from '@deskwork/core/types';
 import type { DraftAnnotation } from '@deskwork/core/review/types';
 
@@ -58,6 +70,11 @@ export interface EntryReviewData {
 export interface LoadOptions {
   /** Optional `?v=<n>` from the request URL. */
   readonly version?: string | null;
+  /** Optional `?stage=<Stage>` from the request URL. Disambiguates
+   *  historical lookup when an entry has the same version number
+   *  recorded under multiple stages (e.g. Ideas v1 + Drafting v1).
+   *  When omitted, falls back to first-chronological-match. */
+  readonly stage?: string | null;
 }
 
 /**
@@ -109,12 +126,30 @@ export async function loadEntryReviewData(
   const { site, calendarEntry } = findEntrySite(ctx, entryId);
 
   // Historical-version handling. Only swap the markdown when both the
-  // version param resolves and the journal has content for it.
+  // version param resolves and the journal has content for it. Stage
+  // qualification disambiguates the multi-stage case (Ideas v1 +
+  // Drafting v1); when missing, the reader falls back to the first
+  // chronological match (loud warn since this means the URL was
+  // emitted by something other than the current version-strip).
   let historical: IterationContent | null = null;
   let markdown = resolved.artifactBody;
   const requested = parseVersionParam(opts.version ?? null);
+  const requestedStage = parseStageParam(opts.stage ?? null);
   if (requested !== null) {
-    const found = await getEntryIteration(ctx.projectRoot, entryId, requested);
+    if (requestedStage === undefined && opts.stage !== null && opts.stage !== undefined) {
+      // Caller passed a non-empty ?stage= that didn't match any known
+      // stage — treat as a malformed query rather than silently
+      // dropping it.
+      console.warn(
+        `entry-review: ignoring unknown stage param "${opts.stage}" for entry ${entryId}`,
+      );
+    }
+    const found = await getEntryIteration(
+      ctx.projectRoot,
+      entryId,
+      requested,
+      requestedStage,
+    );
     if (found !== null) {
       historical = found;
       markdown = found.markdown;

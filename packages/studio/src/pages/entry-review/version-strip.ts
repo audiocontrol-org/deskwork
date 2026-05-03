@@ -24,8 +24,11 @@ import { html, unsafe, type RawHtml } from '../html.ts';
 interface VersionStripOptions {
   readonly iterations: readonly IterationListing[];
   readonly entry: Entry;
-  /** When set, this version's chip is highlighted as active (historical view). */
+  /** When set, this (version, stage) pair's chip is highlighted as
+   *  active (historical view). Stage qualification is required because
+   *  per-stage iteration counters can collide (e.g. Ideas v1 + Drafting v1). */
   readonly historicalVersion: number | null;
+  readonly historicalStage: string | null;
 }
 
 function currentStageVersion(entry: Entry): number | null {
@@ -65,7 +68,7 @@ function activeIteration(
 }
 
 export function renderVersionsStrip(opts: VersionStripOptions): RawHtml {
-  const { iterations, entry, historicalVersion } = opts;
+  const { iterations, entry, historicalVersion, historicalStage } = opts;
   if (iterations.length === 0) return unsafe('');
 
   const stagesSeen = uniqueStages(iterations);
@@ -73,18 +76,23 @@ export function renderVersionsStrip(opts: VersionStripOptions): RawHtml {
   const active = activeIteration(iterations, entry);
 
   const links = iterations.map((it) => {
-    const isHistorical = historicalVersion !== null && it.versionNumber === historicalVersion;
-    // When no historical version is requested, the active chip is the
-    // iteration matching what's on disk (per `activeIteration`'s
-    // fallback ladder). When historical IS requested, only that chip
-    // is active.
+    // A chip is the active historical chip only when BOTH version
+    // number and stage match. Without stage qualification, Ideas v1
+    // and Drafting v1 would both light up.
+    const isHistorical =
+      historicalVersion !== null &&
+      it.versionNumber === historicalVersion &&
+      historicalStage !== null &&
+      it.stage === historicalStage;
     const isActive = isHistorical ||
       (historicalVersion === null && active !== null &&
         it.stage === active.stage && it.versionNumber === active.versionNumber);
     const label = showStage
       ? `${it.stage[0]}·v${it.versionNumber}`
       : `v${it.versionNumber}`;
-    const href = `?v=${it.versionNumber}`;
+    // URL carries both ?v= and ?stage= so the loader can disambiguate
+    // when the same version number appears under multiple stages.
+    const href = `?v=${it.versionNumber}&stage=${encodeURIComponent(it.stage)}`;
     const cls = isActive ? 'active' : '';
     const title = `${it.stage} version ${it.versionNumber} (${it.timestamp})`;
     return html`<a href="${href}" class="${cls}" title="${title}">${label}</a>`;

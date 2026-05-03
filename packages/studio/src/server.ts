@@ -269,7 +269,10 @@ export function createApp(ctx: StudioContext): Hono {
       const result = await renderEntryReviewPage(
         ctx,
         entryId,
-        { version: c.req.query('v') ?? null },
+        {
+          version: c.req.query('v') ?? null,
+          stage: c.req.query('stage') ?? null,
+        },
         getIndex,
       );
       return c.html(result.html, result.status);
