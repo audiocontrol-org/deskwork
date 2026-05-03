@@ -492,3 +492,56 @@ The brainstorm followed the canonical six-section flow (architecture → integra
 - **Distribution shape pivot:** initial design assumed extraction from audiocontrol.org; user redirected to building inside the deskwork monorepo as a sibling plugin.
 - **Version-aware paths:** initial parameterization design treated `docs/1.0/` as a static convention; user clarified it's release-target-aware (`docs/1.0/`, `docs/1.1/`, etc.) and that the version travels with the feature.
 - **Worktree path correction:** initial worktree provisioning used `~/work/deskwork-work/<branch-tail>`; user clarified the deskwork pattern is `~/work/deskwork-work/deskwork-<slug>` (matching `deskwork-plugin`, `deskwork-triage`).
+
+---
+
+## 10. 2026-05-03 Audit-Driven Extension
+
+The implementation audit on 2026-05-03 found that `dw-lifecycle` only partially conforms to this design. The key issue is not that the architecture is wrong; it is that several user-visible behaviors remain at the "skill prose promise" layer instead of being backed by reliable deterministic substrate.
+
+### Gaps the extension is meant to close
+
+1. **Peer-plugin contract is not trustworthy in implementation.**
+   `superpowers` / `feature-dev` posture is foundational to the architecture, but doctor currently hardcodes peer absence instead of inspecting the real install state.
+
+2. **Bootstrap fidelity is below the portability bar.**
+   The install skill promises probe → confirm → write, but the helper currently writes `defaultConfig()` with no project-shape detection.
+
+3. **Setup fidelity is below the PRD/workflow bar.**
+   The setup helper does not write a `deskwork.id` into the PRD, and it appends the definition file to `workplan.md` instead of seeding `prd.md`.
+
+4. **Version-retargeting is promised but not implemented.**
+   The `extend` skill describes same-stage retarget behavior that the transition helper cannot actually perform.
+
+5. **Portability remains only partial because deskwork-specific conventions are still shipped as defaults.**
+   Session-* and feature-doc shapes remain tightly coupled to this repo's conventions.
+
+### Remediation approach
+
+The fix shape stays faithful to the original architecture:
+
+- **Do not** collapse the plugin back into deskwork-specific in-tree skills.
+- **Do not** add custom subagents.
+- **Do** strengthen the deterministic helper substrate where the PRD depends on reliability.
+- **Do** move project-coupled conventions behind explicit override seams.
+
+### New follow-up phase
+
+Add a new post-ship remediation phase after the original Phase 7 / 8 bug and customize-hook work:
+
+- **Phase 9 — PRD conformance hardening**
+  - real peer-plugin detection
+  - install probe/confirm implementation
+  - PRD-first setup flow (`deskwork.id`, definition import into PRD)
+  - actual retarget support across version directories
+  - end-to-end audit rerun against the updated implementation
+
+### Updated acceptance for this reopened arc
+
+The reopened feature should not be considered complete again until:
+
+- the high-severity audit gaps are closed in code
+- the skill layer and helper layer no longer materially contradict each other
+- one fresh adopter-shaped dogfood run can execute `define → setup → issues → implement/review/ship scaffolding` without manual repair of config or docs
+
+This extension intentionally preserves the original v0.1.0 design history while tightening the implementation to match the architecture it already claims.

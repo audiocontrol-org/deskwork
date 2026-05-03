@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { execSync } from 'node:child_process';
-import { mkdtempSync, rmSync, existsSync, readFileSync, realpathSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname, basename } from 'node:path';
 import { install } from '../subcommands/install.js';
@@ -19,6 +19,7 @@ describe('setup (smoke)', () => {
     // Tests must not depend on the host's git identity.
     execSync('git config user.email "test@test"', { cwd: tmpRoot });
     execSync('git config user.name "Test"', { cwd: tmpRoot });
+    execSync('git config commit.gpgsign false', { cwd: tmpRoot });
     execSync('git commit --allow-empty -m "init"', { cwd: tmpRoot });
   });
 
@@ -55,5 +56,86 @@ describe('setup (smoke)', () => {
 
     const prd = readFileSync(join(docsDir, 'prd.md'), 'utf8');
     expect(prd).toContain('test-feature');
+    expect(prd).toMatch(/deskwork:\n  id: [0-9a-f-]{36}/);
+  });
+
+  it('seeds the PRD and workplan from a feature definition file', async () => {
+    await install([tmpRoot]);
+
+    const definitionPath = join(tmpRoot, 'feature-definition.md');
+    writeFileSync(
+      definitionPath,
+      `# Feature Definition: Test Feature
+
+## Problem
+
+Current setup dumps definition content into the wrong file.
+
+## Goal
+
+Make the PRD the primary seeded document and keep the workplan derivative.
+
+## Scope
+
+**In:**
+- write deskwork.id to PRD frontmatter
+
+**Out:**
+- redesign the entire workplan format
+
+## Approach
+
+Parse the definition headings and map them into scaffold templates.
+
+## Tasks
+
+- [ ] Import problem and approach into prd.md
+- [ ] Seed workplan steps from the task checklist
+
+## Acceptance Criteria
+
+- [ ] PRD contains the imported problem text
+- [ ] Workplan contains imported task steps
+`,
+      'utf8'
+    );
+
+    const origCwd = process.cwd();
+    process.chdir(tmpRoot);
+    try {
+      await setup(['definition-seeded', '--target', '1.0', '--title', 'Definition Seeded', '--definition', definitionPath]);
+    } finally {
+      process.chdir(origCwd);
+    }
+
+    worktreePath = join(dirname(tmpRoot), `${basename(tmpRoot)}-definition-seeded`);
+    const docsDir = join(worktreePath, 'docs/1.0/001-IN-PROGRESS/definition-seeded');
+    const prd = readFileSync(join(docsDir, 'prd.md'), 'utf8');
+    const workplan = readFileSync(join(docsDir, 'workplan.md'), 'utf8');
+
+    expect(prd).toContain('Current setup dumps definition content into the wrong file.');
+    expect(prd).toContain('Parse the definition headings and map them into scaffold templates.');
+    expect(prd).toContain('- redesign the entire workplan format');
+    expect(workplan).toContain('**Goal:** Make the PRD the primary seeded document and keep the workplan derivative.');
+    expect(workplan).toContain('- [ ] Step 1: Import problem and approach into prd.md');
+    expect(workplan).toContain('- [ ] PRD contains the imported problem text');
+    expect(workplan).not.toContain('<!-- Definition imported from:');
+  });
+
+  it('rejects invalid target versions before creating a worktree', async () => {
+    await install([tmpRoot]);
+
+    const origCwd = process.cwd();
+    process.chdir(tmpRoot);
+    try {
+      await expect(setup(['test-feature', '--target', '../../etc', '--title', 'Test'])).rejects.toThrow(
+        /Invalid target version/
+      );
+    } finally {
+      process.chdir(origCwd);
+    }
+
+    worktreePath = join(dirname(tmpRoot), `${basename(tmpRoot)}-test-feature`);
+    expect(existsSync(worktreePath)).toBe(false);
   });
 });

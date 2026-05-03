@@ -4,6 +4,7 @@ import { doctor } from './subcommands/doctor.js';
 import { journalAppend } from './subcommands/journal-append.js';
 import { transition } from './subcommands/transition.js';
 import { issues } from './subcommands/issues.js';
+import { customize } from './subcommands/customize.js';
 
 const subcommand = process.argv[2];
 const args = process.argv.slice(3);
@@ -15,6 +16,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   transition,
   'journal-append': journalAppend,
   doctor,
+  customize,
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {

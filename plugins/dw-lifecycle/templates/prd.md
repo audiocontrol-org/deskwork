@@ -4,6 +4,8 @@ title: <title>
 targetVersion: "<targetVersion>"
 date: <date>
 parentIssue: <parentIssue>
+deskwork:
+  id: <deskworkId>
 ---
 
 # PRD: <title>

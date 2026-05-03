@@ -37,6 +37,7 @@ Show the lifecycle diagram and current state. Read-only; does not start any work
         |
         v
 /dw-lifecycle:teardown  Remove branch + worktree
+/dw-lifecycle:customize Copy a built-in markdown template into .dw-lifecycle/templates/
 ```
 
 2. Walk `docs/<version>/<inProgress>/*` and list active features with phase + last-touched dates.
