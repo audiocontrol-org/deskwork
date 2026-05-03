@@ -378,6 +378,40 @@ function renderCard(
     </li>`);
 }
 
+/**
+ * Inline new-note composer (Phase 34b — #166).
+ *
+ * Mirrors the pre-F1 inline composer (`44094ee^:scrapbook.ts:274-294`),
+ * adapted to the F1 `.scrap-*` design vocabulary. Hidden by default;
+ * the aside's `+ new note` button reveals it via the client wire-up.
+ *
+ * Per `.claude/rules/affordance-placement.md`: component-attached to
+ * the page (not a generic toolbar), placed where the resulting note
+ * will appear in sorted position. Direct manipulation: in-page form,
+ * filename + body + secret toggle visible inline, Cmd/Ctrl+S saves,
+ * Esc cancels. Replaces the F1 `window.prompt()` regression (#166).
+ */
+function renderComposer(): RawHtml {
+  return unsafe(html`
+    <form class="scrap-composer" data-scrap-composer hidden>
+      <header class="scrap-composer-head">
+        <span class="scrap-composer-glyph" aria-hidden="true">✎</span>
+        <span class="scrap-composer-kicker">NEW NOTE</span>
+        <input type="text" class="scrap-composer-filename" data-composer-filename
+          placeholder="note-name.md" aria-label="new note filename" />
+        <label class="scrap-composer-secret" title="save under scrapbook/secret/ — never published">
+          <input type="checkbox" data-composer-secret />
+          <span>secret</span>
+        </label>
+        <button class="scrap-tool" type="button" data-action="composer-cancel">cancel</button>
+        <button class="scrap-tool scrap-tool--primary" type="submit" data-action="composer-save">save →</button>
+      </header>
+      <textarea class="scrap-composer-body" data-composer-body
+        placeholder="Write the note in markdown. Cmd/Ctrl+S saves, Esc cancels."
+        aria-label="new note body" rows="8"></textarea>
+    </form>`);
+}
+
 function renderDropZone(): RawHtml {
   return unsafe(html`
     <div class="scrap-drop" role="button" tabindex="0" data-action="upload"
@@ -445,6 +479,7 @@ export function renderScrapbookPage(
           ${renderSearch()}
         </header>
         ${renderFilterChips(counts)}
+        ${renderComposer()}
         <ol class="scrap-cards" id="cards" data-scrap-cards>
           ${unsafe(cardsHtml)}
         </ol>

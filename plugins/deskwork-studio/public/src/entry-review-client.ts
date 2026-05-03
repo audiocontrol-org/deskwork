@@ -26,6 +26,26 @@ import { initShortcuts } from './entry-review/shortcuts.ts';
 
 const ENTRY_API = '/api/dev/editorial-review/entry';
 
+/**
+ * #166 Phase 34b — module-level error reporter that uses the page's
+ * `[data-toast]` element when present (entry-review surface always
+ * renders one) and falls back to `console.error` for surfaces that
+ * don't (avoids native `window.alert` which can't be styled / dismissed
+ * by keyboard / inspected). The press-check controller's own toast
+ * helper is preserved separately for in-controller messaging.
+ */
+function reportError(msg: string): void {
+  const toast = document.querySelector<HTMLElement>('[data-toast]');
+  if (toast) {
+    toast.textContent = msg;
+    toast.classList.add('error');
+    toast.hidden = false;
+    setTimeout(() => { toast.hidden = true; }, 4000);
+    return;
+  }
+  console.error(`entry-review: ${msg}`);
+}
+
 type EntryAction = 'approve' | 'block' | 'cancel';
 
 const CONTROL_TO_ACTION: Readonly<Record<string, EntryAction>> = {
@@ -61,7 +81,7 @@ function wireStageActions(): void {
       if (!res.ok) {
         const body: unknown = await res.json().catch(() => ({}));
         const reason = (body as { error?: string }).error ?? `HTTP ${res.status}`;
-        window.alert(`${action} failed: ${reason}`);
+        reportError(`${action} failed: ${reason}`);
         return;
       }
       window.location.reload();
@@ -89,7 +109,7 @@ function wireStageActions(): void {
     if (!res.ok) {
       const body: unknown = await res.json().catch(() => ({}));
       const reason = (body as { error?: string }).error ?? `HTTP ${res.status}`;
-      window.alert(`induct failed: ${reason}`);
+      reportError(`induct failed: ${reason}`);
       return;
     }
     window.location.reload();

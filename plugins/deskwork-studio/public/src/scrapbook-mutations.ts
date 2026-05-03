@@ -387,28 +387,106 @@ export async function toggleSecret(ctx: Ctx, card: HTMLElement): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// New note (prompt-based fallback; F5 will replace with composer)
+// New note — inline composer (#166, Phase 34b — restores pre-F1 UX)
 // ---------------------------------------------------------------------------
 
-export async function newNote(ctx: Ctx): Promise<void> {
-  const today = new Date().toISOString().slice(0, 10);
-  const suggested = `note-${today}.md`;
-  const raw = window.prompt('new note filename:', suggested);
-  if (raw === null) return;
-  let filename = raw.trim();
-  if (!filename) filename = suggested;
+/**
+ * Reveal the inline composer markup that's server-rendered hidden in
+ * `pages/scrapbook.ts::renderComposer`. Pre-fills the filename field
+ * with today-dated default (`note-YYYY-MM-DD.md`) when empty so the
+ * operator can hit save immediately.
+ */
+export function showComposer(ctx: Ctx): void {
+  const form = ctx.page.querySelector<HTMLFormElement>('[data-scrap-composer]');
+  if (!form) return;
+  form.hidden = false;
+  const filename = form.querySelector<HTMLInputElement>('[data-composer-filename]');
+  if (filename && !filename.value) {
+    filename.value = `note-${new Date().toISOString().slice(0, 10)}.md`;
+  }
+  form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  form.querySelector<HTMLTextAreaElement>('[data-composer-body]')?.focus();
+}
+
+function hideComposer(ctx: Ctx): void {
+  const form = ctx.page.querySelector<HTMLFormElement>('[data-scrap-composer]');
+  if (!form) return;
+  form.hidden = true;
+  const filename = form.querySelector<HTMLInputElement>('[data-composer-filename]');
+  const body = form.querySelector<HTMLTextAreaElement>('[data-composer-body]');
+  const secret = form.querySelector<HTMLInputElement>('[data-composer-secret]');
+  if (filename) filename.value = '';
+  if (body) body.value = '';
+  if (secret) secret.checked = false;
+}
+
+async function submitComposer(ctx: Ctx): Promise<void> {
+  const form = ctx.page.querySelector<HTMLFormElement>('[data-scrap-composer]');
+  if (!form) return;
+  const filenameInput = form.querySelector<HTMLInputElement>('[data-composer-filename]');
+  const bodyInput = form.querySelector<HTMLTextAreaElement>('[data-composer-body]');
+  const secretInput = form.querySelector<HTMLInputElement>('[data-composer-secret]');
+  if (!filenameInput || !bodyInput) return;
+
+  let filename = filenameInput.value.trim();
+  if (!filename) filename = `note-${new Date().toISOString().slice(0, 10)}.md`;
   if (!filename.endsWith('.md')) filename += '.md';
-  if (!FILENAME_RE.test(filename)) { flashError(ctx.page, `invalid filename: ${filename}`); return; }
+  if (!FILENAME_RE.test(filename)) {
+    flashError(ctx.page, `invalid filename: ${filename}`);
+    return;
+  }
+  const secret = secretInput?.checked === true;
   try {
     const res = await fetch('/api/dev/scrapbook/create', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ site: ctx.site, slug: ctx.path, filename, body: '' }),
+      body: JSON.stringify({
+        site: ctx.site,
+        slug: ctx.path,
+        filename,
+        body: bodyInput.value,
+        secret,
+      }),
     });
     if (!res.ok) throw new Error(parseErrorBody(await res.json()) ?? 'create failed');
-    flashInfo(ctx.page, `created ${filename}`);
+    flashInfo(ctx.page, secret ? `created secret/${filename}` : `created ${filename}`);
+    hideComposer(ctx);
+    // Page reload is the simplest way to land the new card in sorted
+    // position with the right seq numbers; the cards-grid keeps state
+    // server-side, so re-render is the source of truth.
     window.location.reload();
-  } catch (e) { flashError(ctx.page, `create failed: ${msg(e)}`); }
+  } catch (e) {
+    flashError(ctx.page, `create failed: ${msg(e)}`);
+  }
+}
+
+/**
+ * Wire the composer's cancel/save/keyboard handlers to its form
+ * markup. Idempotent on the form element — safe to call once during
+ * client init.
+ */
+export function wireComposer(ctx: Ctx): void {
+  const form = ctx.page.querySelector<HTMLFormElement>('[data-scrap-composer]');
+  if (!form) return;
+  const cancelBtn = form.querySelector<HTMLButtonElement>('[data-action="composer-cancel"]');
+  const bodyInput = form.querySelector<HTMLTextAreaElement>('[data-composer-body]');
+
+  cancelBtn?.addEventListener('click', () => hideComposer(ctx));
+  bodyInput?.addEventListener('keydown', (ev) => {
+    if ((ev.metaKey || ev.ctrlKey) && ev.key === 's') {
+      ev.preventDefault();
+      void submitComposer(ctx);
+      return;
+    }
+    if (ev.key === 'Escape') {
+      ev.preventDefault();
+      hideComposer(ctx);
+    }
+  });
+  form.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    void submitComposer(ctx);
+  });
 }
 
 // ---------------------------------------------------------------------------

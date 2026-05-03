@@ -23,6 +23,7 @@
  */
 
 import type { EntryReviewState } from './state.ts';
+import { inlineConfirm } from './inline-prompt.ts';
 
 const RENDER_API = '/api/dev/editorial-review/render';
 const SAVE_ISSUE_URL =
@@ -115,11 +116,22 @@ export function createEditModeController(
     return editing && draftEdit.value !== state.markdown;
   }
 
-  function confirmDiscard(reason: string): boolean {
+  /**
+   * #166 Phase 34b — async inline discard confirm replaces the legacy
+   * window.confirm. Renders a small dialog anchored to the edit
+   * toolbar (or appended to the body when no toolbar is mounted).
+   * Resolves true when the operator confirms discard, false when they
+   * cancel. Cmd/Ctrl+Enter confirms, Esc cancels.
+   */
+  async function confirmDiscard(reason: string): Promise<boolean> {
     if (!hasUnsavedChanges()) return true;
-    return window.confirm(
-      `You have unsaved changes. ${reason}\n\nUnsaved edits will be lost. Continue?`,
-    );
+    return inlineConfirm({
+      label: 'Unsaved changes',
+      message: `${reason} Unsaved edits will be lost.`,
+      confirm: 'Discard',
+      cancel: 'Keep editing',
+      anchor: toggleBtn ?? cancelEditBtn ?? document.body,
+    });
   }
 
   async function fetchRenderedHtml(markdown: string): Promise<string> {
@@ -272,16 +284,20 @@ export function createEditModeController(
   // ---- Toggle / Cancel ----
 
   toggleBtn?.addEventListener('click', () => {
-    if (editing) {
-      if (!confirmDiscard('Exiting the editor will discard them.')) return;
-      exitEdit();
-    } else {
-      void enterEdit();
-    }
+    void (async () => {
+      if (editing) {
+        if (!(await confirmDiscard('Exiting the editor will discard them.'))) return;
+        exitEdit();
+      } else {
+        await enterEdit();
+      }
+    })();
   });
   cancelEditBtn?.addEventListener('click', () => {
-    if (!confirmDiscard('Cancel will discard them.')) return;
-    exitEdit();
+    void (async () => {
+      if (!(await confirmDiscard('Cancel will discard them.'))) return;
+      exitEdit();
+    })();
   });
 
   window.addEventListener('beforeunload', (ev) => {

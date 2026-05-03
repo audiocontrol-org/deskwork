@@ -365,6 +365,26 @@ describe('scrapbook redesign — per-kind preview rendering (Issue #161, dispatc
     asideHrefs.forEach((href) => expect(cardIds).toContain(href));
   });
 
+  it('renders the inline new-note composer hidden, with all required fields (#166)', async () => {
+    // Phase 34b — the F1 `window.prompt()` regression is replaced with a
+    // server-rendered inline composer that the client reveals on
+    // `+ new note` click. Form must be present in markup AND hidden by
+    // default (so the page doesn't show it unless the operator triggers
+    // it). Required fields: filename, body textarea, secret toggle,
+    // cancel + save buttons.
+    const r = await fetchScrapbook(app, 'd', 'folder');
+    expect(r.status).toBe(200);
+    // Form is present + hidden + tagged for client lookup.
+    expect(r.html).toMatch(/<form[^>]*class="scrap-composer"[^>]*data-scrap-composer[^>]*hidden/);
+    // Filename input + body textarea + secret checkbox.
+    expect(r.html).toContain('data-composer-filename');
+    expect(r.html).toContain('data-composer-body');
+    expect(r.html).toContain('data-composer-secret');
+    // Cancel + save buttons (data-actions the client wires).
+    expect(r.html).toMatch(/data-action="composer-cancel"/);
+    expect(r.html).toMatch(/data-action="composer-save"/);
+  });
+
   it('omits the preview block entirely for empty / frontmatter-only files', async () => {
     // Per the G2 amendment, previewExcerpt returns null when the post-strip
     // text is empty/whitespace-only — caller emits no preview block at all

@@ -26,7 +26,8 @@ import {
   enterDeleteConfirm,
   enterEditMode,
   enterRenameMode,
-  newNote,
+  showComposer,
+  wireComposer,
   pickAndUpload,
   renderExpandedBody,
   toggleSecret,
@@ -53,6 +54,7 @@ function init(): void {
   wireAsideLinks(ctx);
   wireAsideActions(ctx);
   wireDropZone(ctx);
+  wireComposer(ctx);
   initScrapbookLightbox(page);
   // F4: restore expanded state from #item-N hash on page load.
   restoreFromHash(ctx);
@@ -238,7 +240,7 @@ function wireAsideActions(ctx: Ctx): void {
     const btn = target.closest<HTMLButtonElement>('[data-action]');
     if (!btn || !aside.contains(btn)) return;
     const action = btn.dataset.action;
-    if (action === 'new-note') { ev.preventDefault(); void newNote(ctx); }
+    if (action === 'new-note') { ev.preventDefault(); showComposer(ctx); }
     if (action === 'upload') { ev.preventDefault(); void pickAndUpload(ctx); }
   });
 }

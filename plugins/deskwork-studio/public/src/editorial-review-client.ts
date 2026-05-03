@@ -108,6 +108,89 @@ function qn<T extends Element = HTMLElement>(selector: string): T | null {
   return document.querySelector<T>(selector);
 }
 
+/**
+ * #166 Phase 34b — inline rejection-reason prompt that replaces the
+ * pre-existing `window.prompt('Optional reason for rejection:')`.
+ * Anchors a small composer (textarea + cancel + confirm) directly
+ * after the trigger button so the operator's eye doesn't have to
+ * leave the strip. Returns the reason string (possibly empty) on
+ * confirm, or `null` if the operator cancels (Esc or cancel button).
+ *
+ * The composer is built dynamically and removed on resolve so this
+ * helper has no server-side markup dependency. Cmd/Ctrl+Enter
+ * confirms, Esc cancels — same chord as the marginalia composer.
+ */
+function promptForRejectionReason(
+  anchor: HTMLElement,
+): Promise<string | null> {
+  // If a previous instance is still mounted (operator triggered the
+  // shortcut while the composer was already open), focus the existing
+  // textarea instead of stacking duplicates.
+  const existing = document.querySelector<HTMLDivElement>('[data-reject-reason]');
+  if (existing) {
+    existing.querySelector<HTMLTextAreaElement>('textarea')?.focus();
+    return Promise.resolve(null);
+  }
+  return new Promise((resolve) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'er-reject-reason';
+    wrap.dataset.rejectReason = 'true';
+    wrap.setAttribute('role', 'dialog');
+    wrap.setAttribute('aria-label', 'Rejection reason');
+
+    const label = document.createElement('p');
+    label.className = 'er-reject-reason-label';
+    label.textContent = 'Optional reason for rejection';
+
+    const textarea = document.createElement('textarea');
+    textarea.className = 'er-reject-reason-input';
+    textarea.rows = 3;
+    textarea.placeholder = 'leave blank to reject without explanation';
+    textarea.setAttribute('aria-label', 'Rejection reason');
+
+    const actions = document.createElement('div');
+    actions.className = 'er-reject-reason-actions';
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'er-btn er-btn-small';
+    cancel.textContent = 'Cancel';
+    const confirm = document.createElement('button');
+    confirm.type = 'button';
+    confirm.className = 'er-btn er-btn-small er-btn-reject';
+    confirm.textContent = 'Reject';
+    actions.appendChild(cancel);
+    actions.appendChild(confirm);
+
+    wrap.appendChild(label);
+    wrap.appendChild(textarea);
+    wrap.appendChild(actions);
+
+    // Anchor the composer immediately after the reject button so it
+    // renders in the same row of the strip when there's room and below
+    // when the strip wraps. Keeps the gesture spatially coherent.
+    anchor.insertAdjacentElement('afterend', wrap);
+    textarea.focus();
+
+    function close(value: string | null): void {
+      wrap.remove();
+      resolve(value);
+    }
+    cancel.addEventListener('click', () => close(null));
+    confirm.addEventListener('click', () => close(textarea.value.trim()));
+    textarea.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape') {
+        ev.preventDefault();
+        close(null);
+        return;
+      }
+      if ((ev.metaKey || ev.ctrlKey) && ev.key === 'Enter') {
+        ev.preventDefault();
+        close(textarea.value.trim());
+      }
+    });
+  });
+}
+
 export function initEditorialReview(): void {
   const stateEl = document.getElementById('draft-state');
   if (!stateEl) return;
@@ -1648,7 +1731,12 @@ export function initEditorialReview(): void {
   });
 
   rejectBtn?.addEventListener('click', async () => {
-    const reason = window.prompt('Optional reason for rejection:') || '';
+    // #166 Phase 34b — inline reason composer replaces the legacy
+    // `window.prompt()`. Renders an in-page form anchored to the
+    // reject button; cancel returns null, confirm returns the (possibly
+    // empty) reason. Same submit flow as the prior code path.
+    const reason = await promptForRejectionReason(rejectBtn);
+    if (reason === null) return; // operator cancelled
     rejectBtn.disabled = true;
     if (reason) await postRejectAnnotation(reason);
     const ok = await postDecision('cancelled');
