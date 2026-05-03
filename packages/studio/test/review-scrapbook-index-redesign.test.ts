@@ -261,6 +261,57 @@ describe('scrapbook redesign — per-kind preview rendering (Issue #161, dispatc
     expect(r.html).toMatch(/binary\.txt/);
   });
 
+  it('md card meta shows line count after the kind chip + size', async () => {
+    const r = await fetchScrapbook(app, 'd', 'folder');
+    // F3: per-kind extra meta — md/txt show "{N} lines" after the chip + size.
+    // Fixture's note.md has 8 newline characters (---, title, author, ---,
+    // blank, first-para, blank, second-para each terminated by \n).
+    expect(r.html).toMatch(/note\.md[\s\S]*?<span class="scrap-kind scrap-kind--md">MD<\/span>[\s\S]*?<span class="scrap-size">[^<]+<\/span>[\s\S]*?<span>·<\/span>[\s\S]*?<span>8 lines<\/span>/);
+  });
+
+  it('txt card meta shows line count', async () => {
+    const r = await fetchScrapbook(app, 'd', 'folder');
+    // log.txt has 3 lines.
+    expect(r.html).toMatch(/log\.txt[\s\S]*?<span class="scrap-kind scrap-kind--txt">TXT<\/span>[\s\S]*?<span>3 lines<\/span>/);
+  });
+
+  it('json card meta shows key count', async () => {
+    const r = await fetchScrapbook(app, 'd', 'folder');
+    // config.json has top-level keys: "key", "nested" → 2 keys.
+    expect(r.html).toMatch(/config\.json[\s\S]*?<span class="scrap-kind scrap-kind--json">JSON<\/span>[\s\S]*?<span>2 keys<\/span>/);
+  });
+
+  it('img card meta shows dimensions for a PNG', async () => {
+    // Replace the seeded fake-PNG (4 bytes) with a real PNG header so the
+    // dimension parser can read width + height. Build a minimal valid PNG
+    // header: 8-byte signature + 4-byte IHDR length + "IHDR" + width(BE) +
+    // height(BE) + ...
+    const dir = join(root, 'docs/folder/scrapbook');
+    const png = Buffer.alloc(24);
+    png.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0); // PNG sig
+    png.writeUInt32BE(13, 8);                                       // IHDR length
+    png.set([0x49, 0x48, 0x44, 0x52], 12);                          // "IHDR"
+    png.writeUInt32BE(2400, 16);                                    // width
+    png.writeUInt32BE(1600, 20);                                    // height
+    writeFileSync(join(dir, 'pic.png'), png);
+    const r = await fetchScrapbook(app, 'd', 'folder');
+    expect(r.html).toMatch(/pic\.png[\s\S]*?<span class="scrap-kind scrap-kind--img">IMG<\/span>[\s\S]*?<span>2400 × 1600<\/span>/);
+  });
+
+  it('omits per-kind meta when the kind has no extra info to show', async () => {
+    // An "other" kind file: no preview, no extra meta, just kind chip + size.
+    const dir = join(root, 'docs/folder/scrapbook');
+    writeFileSync(join(dir, 'archive.zip'), Buffer.from([0x50, 0x4b, 0x03, 0x04]));
+    const r = await fetchScrapbook(app, 'd', 'folder');
+    // The card is rendered (name + meta) but has no "·" separator + extra-meta
+    // span pair. The regex anchors the assertion to this card by id-region.
+    const otherCard = r.html.match(/<li class="scrap-card"[^>]*id="item-\d+"[^>]*>[\s\S]*?<\/li>/g)
+      ?.find((s) => s.includes('archive.zip'));
+    expect(otherCard).toBeDefined();
+    // No "<span>·</span><span>...</span>" inside this card's meta.
+    expect(otherCard).not.toMatch(/<span>·<\/span>/);
+  });
+
   it('omits the preview block entirely for empty / frontmatter-only files', async () => {
     // Per the G2 amendment, previewExcerpt returns null when the post-strip
     // text is empty/whitespace-only — caller emits no preview block at all

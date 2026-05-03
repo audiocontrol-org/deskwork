@@ -87,6 +87,87 @@ function previewExcerpt(buf: Buffer, kind: 'md' | 'json' | 'txt'): string | null
 }
 
 /**
+ * Count lines in a text file: number of `\n` bytes plus 1 if the last
+ * byte isn't `\n` (so a 3-line file whether or not it has a trailing
+ * newline reports 3).
+ */
+function countLines(buf: Buffer): number {
+  let count = 0;
+  for (const b of buf) if (b === 0x0a) count++;
+  if (buf.length > 0 && buf[buf.length - 1] !== 0x0a) count++;
+  return count;
+}
+
+/**
+ * Count top-level keys in a JSON object. Returns null if the file is not
+ * valid JSON or its root is not a plain object (arrays, primitives →
+ * null; caller renders no extra meta).
+ */
+function countJsonKeys(buf: Buffer): number | null {
+  try {
+    const obj: unknown = JSON.parse(buf.toString('utf-8'));
+    if (obj !== null && typeof obj === 'object' && !Array.isArray(obj)) {
+      return Object.keys(obj).length;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+interface ImageDimensions { readonly width: number; readonly height: number; }
+
+/**
+ * Read PNG dimensions from the IHDR chunk. Returns null for non-PNG or
+ * truncated files. JPEG/WebP/GIF support deferred — most deskwork
+ * scrapbook images are screenshots / icons (PNG) and the meta is purely
+ * informational, so the empty-string fallback is acceptable for other
+ * formats.
+ */
+function readImageDimensions(buf: Buffer): ImageDimensions | null {
+  if (buf.length < 24) return null;
+  if (buf[0] !== 0x89 || buf[1] !== 0x50 || buf[2] !== 0x4e || buf[3] !== 0x47) return null;
+  return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+}
+
+/**
+ * Compute the per-kind extra meta string shown after the kind chip + size:
+ *   md / txt → "{N} lines"
+ *   json     → "{N} keys" (root must be a plain object; otherwise empty)
+ *   img      → "{W} × {H}" (PNG only; other formats → empty)
+ *   other    → empty
+ *
+ * ENOENT (race-window with delete) returns empty so the card still
+ * renders; other errors propagate to the page renderer.
+ */
+function computeKindMeta(
+  ctx: StudioContext,
+  site: string,
+  path: string,
+  item: ScrapbookItem,
+): string {
+  if (item.kind !== 'md' && item.kind !== 'txt' && item.kind !== 'json' && item.kind !== 'img') {
+    return '';
+  }
+  let buf: Buffer;
+  try {
+    const fullPath = scrapbookFilePath(ctx.projectRoot, ctx.config, site, path, item.name);
+    buf = readFileSync(fullPath);
+  } catch (e) {
+    if (e instanceof Error && 'code' in e && e.code === 'ENOENT') return '';
+    throw e;
+  }
+  if (item.kind === 'md' || item.kind === 'txt') return `${countLines(buf)} lines`;
+  if (item.kind === 'json') {
+    const keys = countJsonKeys(buf);
+    return keys !== null ? `${keys} keys` : '';
+  }
+  // img
+  const dims = readImageDimensions(buf);
+  return dims ? `${dims.width} × ${dims.height}` : '';
+}
+
+/**
  * Server-side preview for the closed-state card. Img → bg-frame URL;
  * md → italic Newsreader excerpt with frontmatter stripped; json → mono
  * pre with parse-then-stringify pretty-print; txt → mono pre raw excerpt.
@@ -257,6 +338,10 @@ function renderCard(
     ? html`<time class="scrap-time" datetime="${item.mtime}">${formatRelativeTime(item.mtime)}</time>`
     : '';
   const preview = renderPreview(ctx, site, path, item);
+  const kindMeta = computeKindMeta(ctx, site, path, item);
+  const kindMetaHtml: RawHtml = kindMeta
+    ? unsafe(html`<span>·</span><span>${kindMeta}</span>`)
+    : unsafe('');
   const editBtn = item.kind === 'img'
     ? unsafe('')
     : unsafe(html`<button class="scrap-tool" type="button" data-action="edit">edit</button>`);
@@ -270,6 +355,7 @@ function renderCard(
       <div class="scrap-card-meta">
         <span class="scrap-kind ${kindClass}">${kindLabel}</span>
         <span class="scrap-size">${formatSize(item.size)}</span>
+        ${kindMetaHtml}
       </div>
       ${preview}
       <div class="scrap-card-foot">

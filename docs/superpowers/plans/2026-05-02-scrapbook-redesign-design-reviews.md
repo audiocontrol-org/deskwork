@@ -266,3 +266,40 @@ This split is the right architectural call — server-side markdown rendering on
 > Frontmatter strip works on the project's real markdown fixture (the only md card in the live scrapbook went from yaml-leak to body-content). JSON parse-then-stringify ratified by dedicated minified-input test. Binary-as-text + empty/frontmatter-only short-circuit both have explicit regression tests. Multi-viewport collapse holds; cascade-fix from F1 unaffected. Card-expand path with parsed markdown verified live.
 > Test count 331 → 338 passing (+6 F2.1 tests + 1 NEW empty/fm-only short-circuit regression). 0 failed. 11 skipped.
 
+---
+
+## F3 post-implementation visual review (2026-05-02)
+
+**Trigger:** after F3.1/F3.2 landed (server-side per-kind extra meta + 5 new tests).
+**Inputs:** post-F3 live page at 1440×900 with multi-kind fixture (md/img/json/txt cards) at `.playwright-mcp/scrapbook-after-f3-1440.png` + mockup CSS lines 364-387 + per-kind card markup lines 595-720.
+
+### Per-kind extra meta — live measurements
+
+| Card | Kind | meta spans (live) | Mockup pattern | Match |
+|---|---|---|---|---|
+| #1 | img | `[IMG, 1.5 KB, ·, 180 × 180]` | `[IMG, 412 KB, ·, 2400 × 1600]` | ✓ format identical |
+| #2 | txt | `[TXT, 285 B, ·, 9 lines]` (uppercased to "9 LINES") | `[TXT, 540 B, ·, 14 lines]` | ✓ identical |
+| #3 | json | `[JSON, 184 B, ·, 5 keys]` | `[JSON, 312 B, ·, 5 keys]` | ✓ identical |
+| #4 | md | `[MD, 9.4 KB, ·, 97 lines]` | `[MD, 2.4 KB, ·, 72 lines]` | ✓ identical |
+
+CSS `.scrap-card-meta { text-transform: uppercase }` (mockup line 372) handles the visual uppercasing — implementation emits semantic lowercase strings ("lines"/"keys") and CSS controls presentation. Right separation. Middle-dot separator placed correctly between size and extra-meta (matches mockup item-1 line 605). For kinds with no extra info (other / json-non-object / non-PNG image), the separator + meta-span pair are correctly omitted (no orphan dot — verified by `omits per-kind meta when the kind has no extra info to show` test).
+
+### Aside list (already F1; F3 didn't change)
+
+Post-F3, still matches mockup: 2-digit padded mono numbering, mono filenames at 0.72rem, F1's G1 D2 ellipsis improvement (`text-overflow: ellipsis` on `.scrap-aside-list a`) preserved, hover red-pencil + dotted underline present, scrollability rule (`max-height: 16rem; overflow-y: auto`) in place. Active state via `[data-active="true"]` (F1 G1 D1 deviation) — will be exercised in F4.
+
+### JPEG/WebP/GIF deferred — acceptable
+
+F3 only handles PNG dimensions (8-byte sig + IHDR width/height parse). Non-PNG images render `[CHIP] [SIZE]` with no extra meta and no orphan dot — graceful degradation, not a bug. Reasoning:
+- Deskwork content is overwhelmingly PNG (screenshots, icons, exported figures).
+- JPEG SOF marker scan is ~20 lines, WebP RIFF parsing is more.
+- Non-PNG fallback is visually clean; only the dimensions line is missing.
+
+Filed as future enhancement; will land as a focused `image-dimensions` helper module when an adopter surfaces a real need.
+
+### Sign-off
+
+> **F3 verified — proceed to F4.**
+> Per-kind extra meta correct for all 4 supported kinds (md/txt counts via `countLines`; json keys via `countJsonKeys`; img dims via PNG IHDR parse). Aside list still matches mockup. CSS uppercasing matches mockup's rendered appearance. Omit-when-empty contract correct.
+> Test count 338 → 343 passing (+5 F3 tests). 0 failed. 11 skipped. No regression from F2.
+
