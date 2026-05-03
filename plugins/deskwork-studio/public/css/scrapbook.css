@@ -120,6 +120,23 @@
 .scrap-aside-list a:hover { color: var(--er-red-pencil); border-bottom-color: var(--er-red-pencil); }
 .scrap-aside-list a[data-active="true"] { color: var(--er-red-pencil); border-bottom-color: var(--er-red-pencil); }
 
+/* #168 Phase 34 ship-pass — "back to review" link in the aside head
+ * when this scrapbook belongs to a tracked entry. Pre-fix the only
+ * nav affordance was the breadcrumb's site link, which lands on the
+ * content tree, not the entry-review surface the operator typically
+ * came from. */
+.scrap-aside-back {
+  font-family: var(--er-font-mono);
+  font-size: 0.75rem;
+  margin: 0 0 var(--er-space-2);
+}
+.scrap-aside-back a {
+  color: var(--er-red-pencil);
+  text-decoration: none;
+  border-bottom: 1px dashed transparent;
+}
+.scrap-aside-back a:hover { border-bottom-color: var(--er-red-pencil); }
+
 .scrap-aside-actions { display: flex; flex-direction: column; gap: 0.4rem; }
 .scrap-aside-btn {
   font-family: var(--er-font-mono);

@@ -249,7 +249,11 @@ describe('studio dashboard — eight stage sections (Task 34)', () => {
     expect(r.status).toBe(200);
     // Page still has a head + footer scaffold.
     expect(r.html).toContain('<!DOCTYPE html>');
-    expect(r.html).toContain('Editorial Studio');
+    // #178 Phase 34 ship-pass — dashboard heading is "Press-Check"
+    // (was "Editorial Studio", which clashed with the index page's
+    // identical heading and made the two surfaces look like duplicates
+    // of the same function).
+    expect(r.html).toContain('Press-');
   });
 
   it('groups multiple entries into the right stage sections', async () => {

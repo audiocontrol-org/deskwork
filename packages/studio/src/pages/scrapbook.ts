@@ -10,7 +10,10 @@
  * Spec:   docs/superpowers/specs/2026-05-02-scrapbook-redesign-impl-spec.md
  */
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { readCalendar } from '@deskwork/core/calendar';
+import { findEntry } from '@deskwork/core/calendar-mutations';
+import { resolveCalendarPath } from '@deskwork/core/paths';
 import {
   formatRelativeTime,
   formatSize,
@@ -402,14 +405,25 @@ function renderAside(
   totalSize: number,
   lastModified: string | null,
   secretCount: number,
+  reviewLink: string | null,
 ): RawHtml {
   const lastModifiedLabel = lastModified ? formatRelativeTime(lastModified) : '—';
   const publicCount = items.length;
   const sizeLabel = formatSize(totalSize);
   const folderLabel = path.split('/').filter(Boolean).pop() ?? path;
   const fullPath = `${site}/${path}/scrapbook/`;
+  // #168 Phase 34 ship-pass — when this scrapbook belongs to a tracked
+  // calendar entry, expose a "← back to review" link so the operator
+  // who arrived from the entry-review surface (or via the dashboard's
+  // scrapbook chip) has an obvious path back. Pre-fix the only nav
+  // affordance was the breadcrumb's site link, which lands on the
+  // content tree, not the entry-review.
+  const backLink: RawHtml = reviewLink !== null
+    ? unsafe(html`<p class="scrap-aside-back"><a href="${reviewLink}">← back to review</a></p><hr />`)
+    : unsafe('');
   return unsafe(html`
     <aside class="scrap-aside">
+      ${backLink}
       <p class="scrap-aside-kicker"><em>§</em> The folder</p>
       <h1 class="scrap-aside-title">${folderLabel}</h1>
       <p class="scrap-aside-meta">${site}</p>
@@ -562,6 +576,34 @@ function renderSecretSection(
     </section>`);
 }
 
+/**
+ * #168 Phase 34 ship-pass — when the scrapbook path matches a tracked
+ * calendar entry with a stamped UUID, return the entry-keyed review
+ * URL so the aside can render a "← back to review" link. Returns null
+ * when no entry matches (organizational subdirs, ad-hoc paths, or
+ * pre-doctor entries lacking an id) — the link is then omitted.
+ *
+ * Failures (calendar absent, parse error) fall through to null so a
+ * transient calendar issue never blocks the scrapbook render.
+ */
+function lookupEntryReviewLink(
+  ctx: StudioContext,
+  site: string,
+  path: string,
+): string | null {
+  if (!(site in ctx.config.sites)) return null;
+  try {
+    const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
+    if (!existsSync(calendarPath)) return null;
+    const cal = readCalendar(calendarPath);
+    const entry = findEntry(cal, path);
+    if (!entry || !entry.id) return null;
+    return `/dev/editorial-review/entry/${entry.id}`;
+  } catch {
+    return null;
+  }
+}
+
 export function renderScrapbookPage(
   ctx: StudioContext,
   site: string,
@@ -590,10 +632,11 @@ export function renderScrapbookPage(
   const folderLabel = path.split('/').filter(Boolean).pop() ?? path;
   const cards = items.map((item, i) => renderCard(ctx, site, path, item, i));
   const cardsHtml = cards.map((c) => c.__raw).join('');
+  const reviewLink = lookupEntryReviewLink(ctx, site, path);
   const body = html`
     ${renderEditorialFolio('content', `scrapbook · ${site}/${path}`)}
     <main class="scrap-page" data-site="${site}" data-path="${path}">
-      ${renderAside(site, path, items, totalSize, lastModified, secretItems.length)}
+      ${renderAside(site, path, items, totalSize, lastModified, secretItems.length, reviewLink)}
       <section class="scrap-main">
         <header class="scrap-main-header">
           ${renderBreadcrumb(site, path)}

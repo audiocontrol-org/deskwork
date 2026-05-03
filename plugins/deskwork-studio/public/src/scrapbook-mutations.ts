@@ -156,8 +156,27 @@ async function renderBody(
 export async function enterEditMode(ctx: Ctx, card: HTMLElement): Promise<void> {
   const filename = readCardFilename(card);
   if (!filename) return;
-  const preview = card.querySelector<HTMLElement>('.scrap-preview');
-  if (!preview) return;
+  // #167 Phase 34 ship-pass — newly-created empty notes have no
+  // .scrap-preview element (renderPreview returns empty when
+  // previewExcerpt finds no extractable content, per the F2 amendment
+  // that suppresses 6rem-void placeholders). Pre-fix, enterEditMode
+  // bailed silently because there was no mount point. Now we
+  // synthesize a placeholder .scrap-preview div as the mount point
+  // when one doesn't already exist; the editor replaces its contents
+  // verbatim, so the placeholder vanishes on first character typed.
+  let preview = card.querySelector<HTMLElement>('.scrap-preview');
+  if (!preview) {
+    preview = document.createElement('div');
+    preview.className = 'scrap-preview';
+    // Insert after .scrap-card-meta so the edit pane lands in the
+    // same vertical slot the (absent) preview would have occupied.
+    const meta = card.querySelector<HTMLElement>('.scrap-card-meta');
+    if (meta && meta.parentElement) {
+      meta.insertAdjacentElement('afterend', preview);
+    } else {
+      card.appendChild(preview);
+    }
+  }
   if (card.dataset.state !== 'expanded') {
     card.dataset.state = 'expanded';
     card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });

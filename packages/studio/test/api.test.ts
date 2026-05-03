@@ -242,8 +242,11 @@ describe('studio pages', () => {
   it('GET /dev/editorial-studio renders the dashboard', async () => {
     const r = await getText(app, '/dev/editorial-studio');
     expect(r.status).toBe(200);
-    expect(r.text).toContain('<title>Editorial Studio');
-    expect(r.text).toContain('Editorial <em>Studio</em>');
+    // #178 Phase 34 ship-pass — dashboard heading renamed from
+    // "Editorial Studio" to "Press-Check" to disambiguate from the
+    // index page which keeps the "Editorial Studio" heading.
+    expect(r.text).toContain('<title>Press-Check');
+    expect(r.text).toContain('<em>Press-</em>Check');
     expect(r.text).toContain('/static/css/editorial-review.css');
     expect(r.text).toContain('/static/css/editorial-studio.css');
     expect(r.text).toContain('/static/dist/editorial-studio-client.js');

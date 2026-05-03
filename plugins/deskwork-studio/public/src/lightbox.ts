@@ -1,26 +1,19 @@
 /*
- * lightbox.ts — click-to-view image viewer.
+ * lightbox.ts — click-to-view image viewer for studio scrapbook surfaces.
  *
- * Two consumers:
+ * `initScrapbookLightbox()` binds clicks on:
+ *   - `.scrap[data-kind="img"] .scrap__thumb-link` (read-only
+ *     drawer / content-view detail panel rows)
+ *   - `.scrapbook-item[data-kind="img"] .scrapbook-body-img img`
+ *     (standalone viewer's expanded image body)
+ * ESC closes the overlay; ← / → cycle through adjacent image-kind
+ * items in the same scrapbook collection.
  *
- *   1. `initLightbox()` — published-site BlogLayout figures. Finds
- *      `figure.blog-figure img` inside the rendered essay body and
- *      attaches a click listener that opens an overlay showing the
- *      image at natural size. Ported from audiocontrol; backwards-
- *      compatible.
+ * Editorial-print aesthetic (cream-tinted backdrop, thin gold-leaf
+ * rule around the image, mono caption).
  *
- *   2. `initScrapbookLightbox()` — studio scrapbook surfaces (#29).
- *      Binds clicks on:
- *        - `.scrap[data-kind="img"] .scrap__thumb-link` (read-only
- *          drawer / content-view detail panel rows)
- *        - `.scrapbook-item[data-kind="img"] .scrapbook-body-img img`
- *          (standalone viewer's expanded image body)
- *      ESC closes the overlay; ← / → cycle through adjacent image
- *      kind items in the same scrapbook collection.
- *
- * Both surfaces share one overlay element, one keyboard listener,
- * and the same editorial-print aesthetic (cream-tinted backdrop,
- * thin gold-leaf rule around the image, mono caption).
+ * (A second `initLightbox()` for published-site BlogLayout figures
+ * was removed in #176 — it had no consumer in the deskwork tree.)
  */
 
 interface LightboxItem {
@@ -151,51 +144,6 @@ function onKeydown(ev: KeyboardEvent): void {
 // ---------------------------------------------------------------------------
 // Published-site BlogLayout figures (existing consumer)
 // ---------------------------------------------------------------------------
-
-/**
- * Attach click handlers to every `figure.blog-figure img` inside
- * the essay body. Idempotent — repeated calls (e.g. during Astro
- * client-side nav) skip figures that already carry the marker
- * attribute.
- */
-export function initLightbox(): void {
-  const figures = document.querySelectorAll<HTMLElement>(
-    '.essay-body figure.blog-figure, .blog-article figure.blog-figure',
-  );
-  if (figures.length === 0) return;
-  // Build a set of items so prev/next cycle through every figure on
-  // the page in document order.
-  const items: LightboxItem[] = [];
-  const figureFor = new Map<HTMLElement, number>();
-  for (const fig of figures) {
-    const img = fig.querySelector<HTMLImageElement>('img');
-    if (!img) continue;
-    const cap = fig.querySelector<HTMLElement>('figcaption');
-    items.push({
-      src: img.currentSrc || img.src,
-      alt: img.alt,
-      caption: cap?.textContent?.trim() ?? '',
-    });
-    figureFor.set(fig, items.length - 1);
-  }
-  for (const [fig, idx] of figureFor.entries()) {
-    if (fig.dataset.lightboxReady === 'true') continue;
-    const img = fig.querySelector<HTMLImageElement>('img');
-    if (!img) continue;
-    img.style.cursor = 'zoom-in';
-    img.addEventListener('click', () => {
-      // Refresh the snapshot at click time — currentSrc may have
-      // updated post-load.
-      items[idx] = {
-        src: img.currentSrc || img.src,
-        alt: img.alt,
-        caption: items[idx].caption,
-      };
-      open(items, idx);
-    });
-    fig.dataset.lightboxReady = 'true';
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Studio scrapbook lightbox (#29)

@@ -81,7 +81,7 @@ export async function renderDashboard(
   <div class="er-poll-indicator" data-poll>auto-refresh · 10s</div>`;
 
   return layout({
-    title: 'Editorial Studio — dev',
+    title: 'Press-Check — dev',
     cssHrefs: [
       '/static/css/editorial-review.css',
       '/static/css/editorial-nav.css',

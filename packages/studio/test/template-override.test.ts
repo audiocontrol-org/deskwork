@@ -67,8 +67,11 @@ describe('template override — dashboard', () => {
     );
     expect(res.status).toBe(200);
     const html = await res.text();
-    // Default dashboard always emits the masthead title.
-    expect(html).toContain('Editorial');
+    // Default dashboard always emits the masthead title. Post-#178
+    // the dashboard heading is "Press-Check" (was "Editorial Studio");
+    // the assertion's intent is "the default rendered, not the
+    // override stub," so match the current heading.
+    expect(html).toContain('Press-');
     expect(html).not.toContain(STUB_MARKER);
   });
 
