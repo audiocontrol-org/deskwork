@@ -13,7 +13,7 @@
  * The server reads .deskwork/config.json from the project root, then
  * exposes:
  *   - GET  /dev/editorial-studio                — dashboard
- *   - GET  /dev/editorial-review/<slug>         — per-post review page
+ *   - GET  /dev/editorial-review/entry/<uuid>   — per-entry review page
  *   - GET  /dev/editorial-review-shortform      — shortform review
  *   - POST /api/dev/editorial-review/*          — 6 mutation endpoints
  *   - GET  /api/dev/editorial-review/*          — 2 read endpoints
@@ -34,15 +34,13 @@ import { existsSync, realpathSync } from 'node:fs';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readConfig } from '@deskwork/core/config';
-import { readCalendar } from '@deskwork/core/calendar';
-import { resolveCalendarPath } from '@deskwork/core/paths';
 import { readWorkflow } from '@deskwork/core/review/pipeline';
 import { createApiRouter, type StudioContext } from './routes/api.ts';
 import { serveScrapbookFile } from './routes/scrapbook-file.ts';
 import { createScrapbookMutationsRouter } from './routes/scrapbook-mutations.ts';
 import { buildClientAssets } from './build-client-assets.ts';
 import { renderDashboard } from './pages/dashboard.ts';
-import { renderReviewPage, type ReviewLookup } from './pages/review.ts';
+import { renderShortformReviewPage } from './pages/shortform-review.ts';
 import { renderEntryReviewPage } from './pages/entry-review.ts';
 import { renderShortformPage } from './pages/shortform.ts';
 import { renderHelpPage } from './pages/help.ts';
@@ -156,75 +154,6 @@ function usage(error: string | null): never {
 }
 
 /**
- * Resolve a UUID `id` against the calendar for `site` and return a
- * `ReviewLookup` carrying both the id and the entry's display slug.
- * Returns null when the id doesn't match any calendar entry — the
- * caller then renders a "no galley to review" error page.
- */
-function resolveEntryById(
-  ctx: StudioContext,
-  site: string,
-  id: string,
-): ReviewLookup | null {
-  if (!(site in ctx.config.sites)) return null;
-  try {
-    const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
-    if (!existsSync(calendarPath)) return null;
-    const cal = readCalendar(calendarPath);
-    const entry = cal.entries.find((e) => e.id === id);
-    if (!entry || entry.id === undefined) return null;
-    return { kind: 'id', entryId: entry.id, slug: entry.slug };
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Resolve a slug to either:
- *   - `{ kind: 'id', entryId, slug }` when the entry has a stable id
- *     stamped — caller 302-redirects to the canonical id URL.
- *   - `{ kind: 'slug', slug }` when the entry exists but has no id
- *     (pre-doctor migration state) — caller renders directly.
- *   - `null` when no entry matches the slug — caller renders 404.
- *   - `'unknown-site'` when the site param isn't configured.
- */
-function resolveEntryBySlug(
-  ctx: StudioContext,
-  site: string,
-  slug: string,
-): ReviewLookup | null | 'unknown-site' {
-  if (!(site in ctx.config.sites)) return 'unknown-site';
-  try {
-    const calendarPath = resolveCalendarPath(ctx.projectRoot, ctx.config, site);
-    if (!existsSync(calendarPath)) return null;
-    const cal = readCalendar(calendarPath);
-    const entry = cal.entries.find((e) => e.slug === slug);
-    if (!entry) return null;
-    if (entry.id) return { kind: 'id', entryId: entry.id, slug: entry.slug };
-    return { kind: 'slug', slug: entry.slug };
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Build the canonical id-based redirect URL while preserving the
- * original request's query string (site, version, kind, etc.). The
- * input URL is the absolute request URL (Hono's `c.req.url`); we
- * extract just the search portion and graft it onto the new path.
- */
-function buildReviewRedirectUrl(entryId: string, requestUrl: string): string {
-  let search = '';
-  try {
-    const u = new URL(requestUrl);
-    search = u.search;
-  } catch {
-    search = '';
-  }
-  return `/dev/editorial-review/${entryId}${search}`;
-}
-
-/**
  * Resolve the plugin tree root (`plugins/deskwork-studio/`) at runtime.
  *
  * Three runtime layouts (Phase 23 source-shipped re-architecture):
@@ -328,13 +257,10 @@ export function createApp(ctx: StudioContext): Hono {
   app.get('/dev/editorial-review-shortform', (c) =>
     c.html(renderShortformPage(ctx)),
   );
-  // Pipeline-redesign Task 35: entry-uuid keyed review surface. The
-  // path `/dev/editorial-review/entry/<uuid>` distinguishes this sibling
-  // route from the legacy workflow-uuid + calendar-entry routes below.
-  // The handler resolves the uuid to a sidecar via `resolveEntry()` and
-  // renders the eight-stage entry view with stage-aware affordances.
-  // Registered FIRST so the literal "entry" segment is matched before
-  // the slug catch-all below has a chance to swallow it.
+  // Entry-uuid keyed review surface. The handler renders the
+  // press-check chrome backed by sidecars + history journal. Registered
+  // before the bare-UUID route so the literal "entry" path segment
+  // matches first.
   app.get(
     '/dev/editorial-review/entry/:entryId{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}',
     async (c) => {
@@ -349,120 +275,43 @@ export function createApp(ctx: StudioContext): Hono {
       return c.html(result.html, result.status);
     },
   );
-  // Phase 19d: id-based canonical review URL. Strict UUID-shape regex
-  // matched FIRST so it wins over the legacy `:slug{.+}` route below.
-  // Hono evaluates routes in registration order; first match wins.
+  // Bare-UUID review URL. Phase 34a (#171): the legacy longform/outline
+  // halves of `pages/review.ts` were retired. This route now serves
+  // shortform's workflow-keyed surface (operator-confirmed deferral —
+  // shortform stays workflow-keyed until its own migration phase) and
+  // 301-redirects every other UUID to the canonical entry-keyed
+  // `/dev/editorial-review/entry/<uuid>`.
   //
-  // DEPRECATED (pipeline-redesign Task 35): this route is workflow-uuid
-  // + calendar-entry keyed; the entry-centric replacement lives at
-  // `/dev/editorial-review/entry/<uuid>` (registered above). Both
-  // coexist during the migration window; this route is removed once
-  // every dashboard surface and operator skill points at the entry
-  // route.
-  //
-  // Phase 21c added a workflow-id branch: the dashboard's shortform
-  // matrix (and any other surface that knows a workflow id) deep-links
-  // straight to a workflow record. We try workflow-id resolution first
-  // because workflow journals are smaller than the calendar; entry-id
-  // is the existing canonical longform/outline path and stays the
-  // fallback when the id doesn't match a workflow.
+  // The redirect is a backwards-compat shim for in-flight bookmarks +
+  // any link emitter not yet updated; it has its own retirement issue
+  // filed alongside the shortform-migration phase.
   app.get(
     '/dev/editorial-review/:id{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}',
     async (c) => {
       const id = c.req.param('id');
-      const siteParam = c.req.query('site') ?? ctx.config.defaultSite;
-      const getIndex = (s: string) => getRequestContentIndex(c, ctx, s);
-      const reviewQuery = {
-        site: c.req.query('site') ?? null,
-        version: c.req.query('v') ?? null,
-        kind: c.req.query('kind') ?? null,
-      };
-
-      // The entry-review-first short-circuit added by #146 was a regression:
-      // it routed every dashboard click (every row links here per #110) to
-      // the minimal entry-review surface, which is a stage-controller, not a
-      // press-check review surface. Operators lost margin-note authoring,
-      // rendered preview, and the decision strip. Restore the status quo
-      // ante: fall straight through to the workflow / entry-id resolution
-      // paths (renderReviewPage) so the dashboard's UUID links land on the
-      // working review surface. The minimal entry-review surface remains
-      // reachable via the explicit `/dev/editorial-review/entry/<uuid>`
-      // route registered above.
-
-      // 1. Workflow-id branch — phase 21c.
       const wf = readWorkflow(ctx.projectRoot, ctx.config, id);
-      if (wf !== null) {
-        const lookup: ReviewLookup = { kind: 'workflow', workflowId: id };
+      // Only shortform workflow records render via the slim
+      // shortform-review surface. Legacy longform/outline workflows
+      // and missing-workflow uuids both redirect to the canonical
+      // entry-keyed URL.
+      if (wf !== null && wf.contentKind === 'shortform') {
         const overridden = await runTemplateOverride(ctx, 'review', [
           ctx,
-          lookup,
-          reviewQuery,
-          getIndex,
+          id,
+          { version: c.req.query('v') ?? null },
         ]);
         if (overridden !== null) return c.html(overridden);
         return c.html(
-          await renderReviewPage(ctx, lookup, reviewQuery, getIndex),
+          await renderShortformReviewPage(ctx, id, {
+            version: c.req.query('v') ?? null,
+          }),
         );
       }
-
-      // 2. Entry-id branch — the legacy canonical longform/outline URL.
-      const lookup = resolveEntryById(ctx, siteParam, id);
-      const effectiveLookup: ReviewLookup =
-        lookup ?? { kind: 'id', entryId: id, slug: id };
-      const overridden = await runTemplateOverride(ctx, 'review', [
-        ctx,
-        effectiveLookup,
-        reviewQuery,
-        getIndex,
-      ]);
-      if (overridden !== null) return c.html(overridden);
-      return c.html(
-        await renderReviewPage(ctx, effectiveLookup, reviewQuery, getIndex),
-      );
+      const queryIdx = c.req.url.indexOf('?');
+      const search = queryIdx >= 0 ? c.req.url.slice(queryIdx) : '';
+      return c.redirect(`/dev/editorial-review/entry/${id}${search}`, 301);
     },
   );
-  // Legacy slug route. `:slug{.+}` captures hierarchical slugs
-  // (`/`-separated kebab-case segments). Resolution order:
-  //   1. Calendar entry exists with id → 302-redirect to canonical id URL.
-  //   2. Calendar entry exists without id (pre-doctor) → render via
-  //      legacy slug-keyed workflow join (no redirect).
-  //   3. No calendar entry → fall through to slug-keyed render anyway:
-  //      a workflow may exist independently (test fixtures, ad-hoc
-  //      drafts not on the calendar). The renderer's renderError path
-  //      handles "no workflow either" with a 200 explainer page.
-  // Only reachable when the path doesn't match the UUID route above.
-  app.get('/dev/editorial-review/:slug{.+}', async (c) => {
-    const slug = decodeURIComponent(c.req.param('slug'));
-    const siteParam = c.req.query('site') ?? ctx.config.defaultSite;
-    const found = resolveEntryBySlug(ctx, siteParam, slug);
-    if (found === 'unknown-site') {
-      return c.notFound();
-    }
-    if (found !== null && found.kind === 'id') {
-      const url = buildReviewRedirectUrl(found.entryId, c.req.url);
-      return c.redirect(url, 302);
-    }
-    // `found === null` (no calendar entry) OR `kind: 'slug'` (entry
-    // present, no id). Both render through the slug-keyed legacy path.
-    const lookup: ReviewLookup =
-      found !== null ? found : { kind: 'slug', slug };
-    const getIndex = (s: string) => getRequestContentIndex(c, ctx, s);
-    const reviewQuery = {
-      site: c.req.query('site') ?? null,
-      version: c.req.query('v') ?? null,
-      kind: c.req.query('kind') ?? null,
-    };
-    const overridden = await runTemplateOverride(ctx, 'review', [
-      ctx,
-      lookup,
-      reviewQuery,
-      getIndex,
-    ]);
-    if (overridden !== null) return c.html(overridden);
-    return c.html(
-      await renderReviewPage(ctx, lookup, reviewQuery, getIndex),
-    );
-  });
   // Wildcard path — `:site` is a single segment, the trailing path
   // captures arbitrarily-deep hierarchical addresses (e.g.
   // `the-outbound/characters/strivers`). Hono's `:path{.+}` regex

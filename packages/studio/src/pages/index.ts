@@ -102,14 +102,10 @@ async function buildSections(ctx: StudioContext): Promise<readonly IndexSection[
     }
   })();
   const longformDefaultEntry = pickDefaultLongformEntry(entries);
-  // Issue #107 / pipeline-redesign Task 36: III links to the
-  // most-recent in-review (or iterating) longform entry when one
-  // exists, else falls back to the dashboard's Review section anchor
-  // (`#stage-review`, mounted in sub-phase D). The visual template
-  // hint stays alongside the link so adopters still see the URL
-  // shape — `<slug>` placeholder shown in red-pencil italic. The
-  // link target is the entry-uuid keyed review route added in
-  // Task 35 (`/dev/editorial-review/entry/<uuid>`).
+  // Issue #107: III links to the most-recent in-review (or iterating)
+  // longform entry when one exists, else falls back to the dashboard's
+  // Review section anchor (`#stage-review`). The link target is the
+  // entry-keyed review route `/dev/editorial-review/entry/<uuid>`.
   const longformLinkHref =
     longformDefaultEntry !== null
       ? `/dev/editorial-review/entry/${longformDefaultEntry.uuid}`
@@ -146,9 +142,9 @@ async function buildSections(ctx: StudioContext): Promise<readonly IndexSection[
           numeral: 'III',
           titleHtml: 'Longform reviews',
           titleText: 'Longform reviews',
-          route: '/dev/editorial-review/<slug>',
+          route: '/dev/editorial-review/entry/<uuid>',
           linkHref: longformLinkHref,
-          template: { prefix: '/dev/editorial-review/', placeholder: '<slug>' },
+          template: { prefix: '/dev/editorial-review/entry/', placeholder: '<uuid>' },
           desc: 'Per-entry margin notes, decisions, iterate flow.',
           hint: 'entry-by-entry',
           postHint:

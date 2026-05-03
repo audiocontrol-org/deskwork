@@ -194,7 +194,7 @@ describe('content view — drilldown', () => {
     // first write), so the canonical URL is id-based. Match the UUID
     // shape rather than a hard-coded id (parseCalendar mints them).
     expect(r.html).toMatch(
-      /href="\/dev\/editorial-review\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\?site=wc"/,
+      /href="\/dev\/editorial-review\/entry\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\?site=wc"/,
     );
     // Inline scrapbook link on the row that has scrapbook items.
     expect(r.html).toContain(

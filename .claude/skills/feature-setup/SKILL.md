@@ -45,7 +45,7 @@ user_invocable: true
    - Read `.deskwork/config.json` to determine the site/collection slug for the project's content collection.
    - Run `deskwork ingest --site <site-slug> docs/1.0/001-IN-PROGRESS/<feature-slug>/prd.md` — backfills the calendar with this PRD as a Drafting-state entry. Ingest is the right shape because the file already exists with `deskwork.id` frontmatter.
    - Run `deskwork review-start --site <site-slug> <feature-slug>` to enqueue the PRD for editorial review. The slug deskwork uses is the feature slug (matching the docs directory name).
-   - Capture the studio review URL from the helper's output (`/dev/editorial-review/<workflow-id>`).
+   - Capture the studio review URL: post-Phase-34a, longform PRD review lives at `/dev/editorial-review/entry/<entry-uuid>` (entry-keyed; the PRD's `deskwork.id` from frontmatter).
 
 6. **Report results:**
    - Branch name, worktree path, docs path, files created

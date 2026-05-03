@@ -57,7 +57,7 @@ export function iterationForCurrentStage(entry: Entry): number {
 export function renderRowActions(entry: Entry): RawHtml {
   const buttons: string[] = [];
   const stage = entry.currentStage;
-  const reviewLink = `/dev/editorial-review/${entry.uuid}`;
+  const reviewLink = `/dev/editorial-review/entry/${entry.uuid}`;
 
   if (isLinearActiveStage(stage)) {
     buttons.push(html`<a class="er-btn er-btn-small" href="${reviewLink}"

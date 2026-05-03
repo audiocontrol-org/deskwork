@@ -270,14 +270,15 @@ export async function renderNodeDetail(
 ): Promise<RawHtml> {
   const detail = loadDetailRender(ctx, site, node, index);
   const fmCount = Object.keys(detail.frontmatter).length;
-  // Phase 19d: prefer the entry's stable id for the canonical review
-  // URL — refactor-proof, survives slug renames. Falls back to the
-  // entry slug (or the node's path) when the entry has no id stamped.
+  // Phase 34a: review URL is entry-keyed. Entries without an id stamped
+  // (legacy migration state) have no working review URL after the slug
+  // catch-all retirement; renderTreeRowActions guards on `entry !== null`,
+  // and modern entries carry ids via the doctor enforcement.
   const reviewKey =
     node.entry !== null && node.entry.id !== undefined && node.entry.id !== ''
       ? node.entry.id
       : (node.slug ?? node.path);
-  const reviewHref = `/dev/editorial-review/${encodeURI(reviewKey)}?site=${site}`;
+  const reviewHref = `/dev/editorial-review/entry/${encodeURI(reviewKey)}?site=${site}`;
   // Scrapbook viewer addresses by fs path — every node has a
   // deterministic on-disk scrapbook location at `<path>/scrapbook/`.
   const scrapHref = scrapbookViewerUrl({ site, path: node.path });

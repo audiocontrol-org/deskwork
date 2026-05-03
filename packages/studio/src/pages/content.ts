@@ -341,16 +341,14 @@ function renderTreeRowMeta(node: ContentNode): RawHtml {
 }
 
 function renderTreeRowActions(node: ContentNode, site: string): RawHtml {
-  // Phase 19d: when an entry is overlaid, prefer its stable id for
-  // the canonical review URL (refactor-proof — survives slug renames).
-  // Fall back to the entry's slug (or the node's path for organizational
-  // nodes) when no id is stamped — that's the legacy migration shape;
-  // server.ts 302-redirects it to the canonical URL.
+  // Phase 34a: review URL is entry-keyed. The slug catch-all is retired;
+  // entries without an id stamped (legacy migration state) have no
+  // working review URL. Modern entries carry ids via the doctor.
   const reviewKey =
     node.entry !== null && node.entry.id !== undefined && node.entry.id !== ''
       ? node.entry.id
       : (node.slug ?? node.path);
-  const reviewHref = `/dev/editorial-review/${encodeURI(reviewKey)}?site=${site}`;
+  const reviewHref = `/dev/editorial-review/entry/${encodeURI(reviewKey)}?site=${site}`;
   // Scrapbook addressing uses fs path — every node, tracked or not,
   // has a deterministic on-disk scrapbook location at `<path>/scrapbook/`.
   const scrapHref = scrapbookViewerUrl({ site, path: node.path });

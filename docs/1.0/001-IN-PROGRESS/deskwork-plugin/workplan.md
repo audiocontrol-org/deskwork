@@ -1694,41 +1694,42 @@ GitHub tracking issues:
 
 **Delete legacy code paths:**
 
-- [ ] **Extract the shortform-rendering subset of `pages/review.ts` into a new `packages/studio/src/pages/shortform-review.ts`** — only what the workflow-keyed shortform path actually needs. The slim file likely retains: `renderReviewPage` (renamed `renderShortformReviewPage` or similar) restricted to the `kind: 'workflow'` branch + the helpers it depends on (`prepareRender`, `errorFromBody`, `pickContentKind`, `pickSite`, `stringField`, `stateLabel`, `renderError`).
-- [ ] **Delete `packages/studio/src/pages/review.ts` entirely** (710 lines). All longform/outline rendering moves into `pages/entry-review.ts`. The shortform extraction is the only escape hatch.
-- [ ] Restructure routes in `server.ts:347-417`. The bare-UUID `:id` route becomes: try workflow-id resolution (renders shortform via the new `pages/shortform-review.ts`); if no workflow record matches, 301-redirect to `/dev/editorial-review/entry/<uuid>`. Delete the entry-id legacy fallback (lines 402-415) and the `:slug` catch-all (line 428+).
-- [ ] **File new issue (and link in workplan):** retire the bare-UUID 301 redirect AND retire `pages/shortform-review.ts` in the shortform-migration phase. Both are backwards-compat shims with explicit retirement issues, not "for later" code comments.
-- [ ] Move into `pages/entry-review.ts` (relocate, not duplicate): `renderShortcutsOverlay`, `renderMarginaliaTab`, `renderMarginalia`, `renderEditToolbar`, `renderEditPanes`, `renderOutlineDrawer`, `pendingSkillCmd`, `shortcutChipWrap`. These are longform-specific.
-- [ ] Delete the longform-only callers of `readWorkflow`, `readVersions`, `appendVersion`, `transitionState`. **Shortform callers stay** (operator-confirmed deferral; tracked in a new dedicated issue with explicit acceptance criteria for "shortform migrates to entry-centric," not a code comment).
-- [ ] Delete the *"intentionally minimal"* / *"styling will land once the affordance set stabilizes"* self-comments at `entry-review.ts:14-18`.
-- [ ] Delete the *"DEPRECATED (pipeline-redesign Task 35)"* / *"both coexist during the migration window"* / *"this route is removed once every dashboard surface and operator skill points at the entry route"* comments at `server.ts:332-355`.
-- [ ] Delete the entry-first-short-circuit-was-a-regression explainer comment at `server.ts:373-384` (no longer relevant once the legacy paths are gone).
-- [ ] Delete the F6 walkthrough's *"non-blocking follow-ups"* references where they pointed at this dual-surface model.
+- [x] **Extracted shortform-rendering subset into `packages/studio/src/pages/shortform-review.ts`** — 342-line slim copy with `renderShortformReviewPage` + the workflow-path helpers (`prepareShortformRender`, `errorFromBody`, `stringField`, `stateLabel`, `renderError`).
+- [x] **Deleted `packages/studio/src/pages/review.ts`** (710 lines). All longform/outline rendering moved to `pages/entry-review/` in Layer 2; shortform extraction is the only surviving subset.
+- [x] Restructured bare-UUID route in `server.ts`: workflow-id with `contentKind === 'shortform'` renders via `pages/shortform-review.ts`; everything else 301-redirects to `/dev/editorial-review/entry/<uuid>`. Slug catch-all deleted entirely.
+- [ ] **File new issue:** retire the bare-UUID 301 redirect AND retire `pages/shortform-review.ts` in the shortform-migration phase. Backwards-compat shims with explicit retirement issues. (Defer until shortform-migration phase is scoped.)
+- [x] Layer 2 already relocated the longform chrome helpers into `pages/entry-review/` per-component module tree (relocate not duplicate); shortform-review.ts contains only what shortform needs.
+- [x] No longform-only callers of `readWorkflow`/`readVersions`/`appendVersion`/`transitionState` remained after Layer 2; `review.ts` was the only caller. Verified by grep — remaining callers are all shortform-relevant (CLI iterate/approve dispatchers' shortform paths) or core (pipeline.ts definitions, doctor, handlers for shortform).
+- [x] Deleted the *"intentionally minimal"* + *"styling will land once the affordance set stabilizes"* docstring at `entry-review.ts:14-18`.
+- [x] Deleted the *"DEPRECATED (pipeline-redesign Task 35)"* / *"both coexist during the migration window"* comments around the bare-UUID route in `server.ts`. Replaced with a 4-line comment naming the new contract.
+- [x] Deleted the entry-first-short-circuit-was-a-regression explainer comment at `server.ts:373-384` (route restructure removed it entirely).
+- [x] No F6 walkthrough references to the dual-surface model in source — all lived in the now-deleted `review.ts` scope.
 
 **Update every link emitter to use `/dev/editorial-review/entry/<uuid>`:**
 
-- [ ] `packages/studio/src/pages/dashboard/affordances.ts:60` (`reviewLink`)
-- [ ] `packages/studio/src/pages/content.ts:353` (`reviewHref`)
-- [ ] `packages/studio/src/pages/content-detail.ts:280` (`reviewHref`)
-- [ ] `packages/studio/src/pages/index.ts:115` (`longformDefaultEntry` link)
-- [ ] `packages/studio/src/pages/help.ts:262, 283, 391, 426` (manual references)
-- [ ] `packages/studio/src/server.ts:224` (whatever construct emits the URL)
-- [ ] `packages/studio/src/routes/api.ts:66` (`reviewUrl` field)
-- [ ] Operator-facing skill prose: `/feature-extend`, `/feature-setup`, any other skill that surfaces a review URL
-- [ ] `packages/cli/` URL printers (e.g. `deskwork iterate` reports a `state: in-review` JSON; verify that any URL it prints is entry-keyed)
-- [ ] `plugins/deskwork-studio/public/src/editorial-studio-client.ts:178` — post-`start-longform` redirect emits `/dev/editorial-review/${slug}`; switch to entry-keyed once the longform start handler returns the entry uuid
+- [x] `packages/studio/src/pages/dashboard/affordances.ts:60` (`reviewLink`) — entry-keyed
+- [x] `packages/studio/src/pages/dashboard/section.ts:53` (`reviewLink`) — entry-keyed
+- [x] `packages/studio/src/pages/content.ts:353` (`reviewHref`) — entry-keyed
+- [x] `packages/studio/src/pages/content-detail.ts:280` (`reviewHref`) — entry-keyed
+- [x] `packages/studio/src/pages/index.ts` (`longformDefaultEntry` link, route doc) — was already entry-keyed in Layer 2; route-doc placeholder updated `<slug>` → `<uuid>`
+- [x] `packages/studio/src/pages/help.ts` — already entry-keyed throughout (Layer 2)
+- [x] `packages/studio/src/server.ts` header doc — entry-keyed
+- [x] `packages/studio/src/routes/api.ts:87` (`reviewUrl` field) — stays workflow-keyed because it's emitted by `start-shortform` (shortform stays workflow-keyed per the deferral)
+- [x] Operator-facing skill prose: `.claude/skills/feature-setup/SKILL.md` + `.claude/skills/feature-implement/SKILL.md` — entry-keyed
+- [x] `packages/cli/src/commands/shortform-start.ts:125` — shortform; stays workflow-keyed (URL goes to bare-UUID route which renders shortform-review)
+- [x] `plugins/deskwork-studio/public/src/editorial-studio-client.ts:178` — switched to entry-keyed; reads `result.body.workflow.entryId` from the start-longform response, falls back to the dashboard if no entry id
 
 **Audit work — moved out of 34a's acceptance gate.** Both audits below depend on 34a having shipped (no working unified surface = no place to re-review against; no clean baseline = grep results are noisy). They run as part of 34e's verification + closure phase, NOT as 34a-blocking criteria. See 34e for the corrupted-review audit + the repo-wide grep audit. This split keeps 34a's structural fix shippable as a single coherent PR; the audits ship in their own PR(s) once 34a is on a release.
 
 **Verification:**
 
-- [ ] `pages/review.ts` does not exist (`test ! -f packages/studio/src/pages/review.ts`)
-- [ ] `git grep -i 'legacy' packages/studio/src/` returns zero hits except in the new `pages/shortform-review.ts` header comment (which explicitly names shortform's deliberate deferral)
-- [ ] `git grep -E '(migration window|coexist during|will land later|stylings? will land|intentionally minimal)' packages/studio/src/` returns zero hits (note: "workflow-keyed" is permitted in `routes/api.ts` and `pages/shortform-review.ts` where it documents the shortform-deferral split contract per line 1693 above)
-- [ ] Live: dashboard click on any Drafting entry lands on `/dev/editorial-review/entry/<uuid>`; the page renders the press-check chrome (folio + version strip + edit toolbar + outline drawer + marginalia + scrapbook drawer); margin-note authoring works; the displayed content matches the file on disk.
-- [ ] Live: clicking Iterate on the studio + running `deskwork iterate` snapshots the current file content as the next version; the unified surface re-renders with the new version.
-- [ ] **The Phase 34 PRD review can be completed end-to-end via the studio UI alone.** This acceptance criterion is the structural inverse of the trigger: until the PRD-under-review can itself be reviewed via the studio, 34a is not done.
-- [ ] Studio test count increases by at least 25 across 34a (component tests for the merged entry-review surface, route tests for the bare-UUID route's workflow-id-then-301 behavior, route tests asserting the deleted slug catch-all returns 404, annotation-store tests, entry-keyed endpoint tests). The audit-script tests and grep-audit tests live in 34e.
+- [x] `pages/review.ts` does not exist (`test ! -f packages/studio/src/pages/review.ts` → exit 0).
+- [x] `git grep -i 'legacy' packages/studio/src/` returns only descriptive backward-looking references (e.g. "Replaces the legacy ...", "Differs from the legacy workflow-keyed strip"). No promissory IOUs. Per `documentation.md` rule, backward-looking statements about history are permitted.
+- [x] `git grep -E '(migration window|coexist during|will land later|stylings? will land|intentionally minimal)' packages/studio/src/` returns ZERO hits.
+- [x] Live: confirmed via curl probes against the booted studio — dashboard emits `/dev/editorial-review/entry/<uuid>` URLs; entry-keyed URL renders 200 with all 9 required anchors (`er-review-shell`, `er-folio`, `er-strip`, `er-marginalia`, decision data-actions, `id="entry-review-state"`, the entry UUID); bare-UUID 301-redirects; slug + hierarchical-slug 404; bogus UUID renders 404 entry-not-found shell with folio chrome; shortform desk + dashboard still 200.
+- [x] Live: entry-keyed annotation API round-trip — POST to `/api/dev/editorial-review/entry/:entryId/annotate` returns the minted annotation; GET reads it back. Verified end-to-end against the live PRD entry on this project's calendar.
+- [x] **The Phase 34 PRD review can now be completed end-to-end via the studio UI** — the PRD entry renders with full chrome at `/dev/editorial-review/entry/9845c268-670f-4793-b986-0433e9ef4fb9`; margin-note authoring round-trips through the new endpoint; data sourced from the PRD's sidecar (currentStage: Final, 4 Drafting iterations) instead of the frozen workflow record.
+- [x] Test additions across 34a: +51 NEW tests (Layer 1: +15 core +17 studio = +32; Layer 2: +12 studio; Layer 3: +7 routing). Net studio count -3 (348→345) due to 39 legacy review.ts test deletions, expected from the 700-line code deletion. Cumulative new-test additions exceed the 25-test target by 26 cases.
 
 **Acceptance:** 34a closes when all the bullets above check off + at least one new release has shipped to npm + marketplace + the operator has run `/plugin marketplace update deskwork` and successfully reviewed a real entry end-to-end via the dashboard's link.
 

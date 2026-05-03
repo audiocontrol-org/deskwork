@@ -50,7 +50,7 @@ const STAGE_EMPTY_MESSAGES: Record<Stage, string> = {
  */
 export function renderRow(entry: Entry, index: number): RawHtml {
   const iteration = iterationForCurrentStage(entry);
-  const reviewLink = `/dev/editorial-review/${entry.uuid}`;
+  const reviewLink = `/dev/editorial-review/entry/${entry.uuid}`;
   const search = [entry.slug, entry.title, entry.keywords.join(' ')].join(' ').toLowerCase();
   // Hierarchical entries (slugs containing `/`) get a visual indent
   // marker the CSS layer reads. Storage stays flat; this is display-only.

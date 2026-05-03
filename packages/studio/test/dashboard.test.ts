@@ -202,7 +202,7 @@ describe('studio dashboard — eight stage sections (Task 34)', () => {
     const r = await getHtml(app, '/dev/editorial-studio');
     expect(r.status).toBe(200);
     expect(r.html).toMatch(
-      new RegExp(`href="/dev/editorial-review/${UUID_PUBLISHED}"[^>]*[^<]*view`),
+      new RegExp(`href="/dev/editorial-review/entry/${UUID_PUBLISHED}"[^>]*[^<]*view`),
     );
   });
 
@@ -324,7 +324,7 @@ describe('studio dashboard — eight stage sections (Task 34)', () => {
     expect(r.status).toBe(200);
     expect(r.html).toMatch(
       new RegExp(
-        `<a href="/dev/editorial-review/${UUID_DRAFTING}"[^>]*class="er-stamp-link"[^>]*><span class="er-stamp er-stamp-in-review"`,
+        `<a href="/dev/editorial-review/entry/${UUID_DRAFTING}"[^>]*class="er-stamp-link"[^>]*><span class="er-stamp er-stamp-in-review"`,
       ),
     );
   });

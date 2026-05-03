@@ -109,8 +109,8 @@ describe('studio index — sensible link defaults (#107)', () => {
       /<a class="er-toc-entry__title" href="\/dev\/editorial-studio#stage-review">\s*Longform reviews\s*<\/a>/,
     );
     // URL template hint preserved alongside.
-    expect(r.html).toContain('/dev/editorial-review/');
-    expect(r.html).toContain('&lt;slug&gt;');
+    expect(r.html).toContain('/dev/editorial-review/entry/');
+    expect(r.html).toContain('&lt;uuid&gt;');
     // postHint nudges adopter to populate the deep-link.
     expect(r.html).toContain('Defaults to the dashboard');
   });
