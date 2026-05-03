@@ -3210,3 +3210,72 @@ Plan complete and saved to `docs/1.0/001-IN-PROGRESS/dw-lifecycle/workplan.md`. 
 2. **Inline Execution** — Execute tasks in this session using `superpowers:executing-plans`, batch execution with checkpoints.
 
 Which approach?
+
+---
+
+## Reopened follow-up arc — audit-driven remediation
+
+This section was appended on 2026-05-03 after the implementation audit in `2026-05-03-implementation-audit.md` determined that `dw-lifecycle` only partially conforms to its PRD/design. The original v0.1.0 ship remains part of the feature history; the tasks below are the concrete gap-closing plan for the reopened arc.
+
+## Phase 9 — PRD conformance hardening
+
+**Deliverable:** The deterministic helper layer and the skill layer agree on the lifecycle's core contracts, and the highest-severity audit gaps are closed in code.
+
+### Task 47: Real peer-plugin detection in doctor
+
+- [ ] Implement actual peer-plugin detection in `src/subcommands/doctor.ts` against the real Claude install state instead of `detectPeerPlugin: () => false`.
+- [ ] Add unit coverage for required-peer present, recommended-peer absent, and both-present cases using realistic fixture data rather than pure stub success/failure.
+- [ ] Verify the implementation matches the design's required/recommended peer posture and closes the false-negative class captured in #121.
+
+**Acceptance Criteria:**
+- `dw-lifecycle doctor` no longer reports `superpowers` / `feature-dev` missing when they are actually installed.
+- The design acceptance item "doctor flags missing peer plugins correctly" is true in code, not just in prose.
+
+### Task 48: Implement install probe/confirm fidelity
+
+- [ ] Extend `src/subcommands/install.ts` so it can accept probed values instead of always writing `defaultConfig()`.
+- [ ] Either add a preview mode or explicit unknown-flag rejection so `--help` / `--dry-run` do not silently behave as positional arguments.
+- [ ] Align the helper behavior with the install skill's documented probe → confirm → write contract.
+
+**Acceptance Criteria:**
+- Install no longer silently writes an all-default config in cases where the host project shape can be detected.
+- The helper layer no longer materially contradicts `skills/install/SKILL.md`.
+
+### Task 49: Make setup PRD-first and write `deskwork.id`
+
+- [ ] Update `src/subcommands/setup.ts` so the PRD, not the workplan, is the primary target for imported feature-definition content.
+- [ ] Write a `deskwork.id` UUID into the PRD frontmatter during setup.
+- [ ] Keep workplan generation as a derivative artifact of the definition, not the definition sink itself.
+
+**Acceptance Criteria:**
+- A freshly scaffolded feature has a PRD with `deskwork.id`.
+- `--definition <path>` seeds the PRD appropriately and no longer leaves the PRD effectively blank while stuffing the definition into `workplan.md`.
+
+### Task 50: Implement real version retargeting
+
+- [ ] Replace the current same-stage transition claim with actual cross-version retarget support.
+- [ ] Ensure retargeting can move a feature from `docs/<old-version>/<stage>/<slug>/` to `docs/<new-version>/<stage>/<slug>/` without losing tracked metadata.
+- [ ] Update the `extend` skill so its documented helper call matches the real implementation.
+
+**Acceptance Criteria:**
+- The skill layer and helper layer agree on retarget behavior.
+- Version-aware document travel, as promised by the PRD, exists in code.
+
+### Task 51: Close the deskwork-coupled convention gap for session/doc defaults
+
+- [ ] Implement the smallest useful override seam for session-start/session-end so the published defaults stop being unavoidably deskwork-specific.
+- [ ] Define the next-step boundary for feature-doc template portability (#123): either land the first slice now or explicitly document the remaining gap as deferred after the session override seam exists.
+- [ ] Keep the override mechanism consistent with the design's architecture: lifecycle orchestration stays in dw-lifecycle, project conventions move behind explicit project overrides.
+
+**Acceptance Criteria:**
+- The portability story improves in code, not just in issue prose.
+- The shipped defaults are less tightly coupled to deskwork's exact journal/process shape.
+
+### Task 52: Re-run implementation audit against the remediated feature
+
+- [ ] Re-run a PRD-conformance audit after Tasks 47–51 land.
+- [ ] Write a new datestamped audit document in the feature directory.
+- [ ] Confirm whether the reopened arc can return to `003-COMPLETE` or whether additional follow-up phases are still required.
+
+**Acceptance Criteria:**
+- The new audit can honestly describe `dw-lifecycle` as substantially conformant to its PRD/design, or it clearly enumerates the remaining blockers.

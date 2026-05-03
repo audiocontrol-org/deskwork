@@ -22,6 +22,7 @@ Project lifecycle orchestration plugin for Claude Code. Composes `superpowers` (
 | 6 | Release prep (README, smoke, audit) | Complete |
 | 7 | Post-ship bug fixes (`setup` / `define` / install-path follow-up) | In Progress |
 | 8 | Customize hooks / tailoring seam | In Progress |
+| 9 | PRD conformance hardening (audit-driven remediation) | In Progress |
 
 ## Key Links
 
@@ -49,6 +50,16 @@ Verification at landing: 63/63 vitest tests pass, tsc clean, plugin manifest val
 ## Audit
 
 - 2026-05-03 implementation audit: `2026-05-03-implementation-audit.md`
+
+## Current goal
+
+Close the audit gaps that currently keep `dw-lifecycle` from fully matching its own PRD/design:
+
+- trustworthy peer-plugin enforcement
+- bootstrap fidelity
+- PRD-first setup fidelity
+- real version-retarget support
+- reduced deskwork-coupling in the published defaults
 
 ## Open follow-ups (non-blockers)
 
