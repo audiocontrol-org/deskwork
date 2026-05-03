@@ -70,6 +70,21 @@
    * raw `78rem` / `56rem` / `1280px` sprinkled through the stylesheets. */
   --er-container-wide: 78rem;
   --er-container-narrow: 56rem;
+
+  /* Issue #154 Dispatch A — page-grid composition tokens.
+   *
+   * The review surface composes a single tangible page object on the
+   * desk, holding both the article column AND the marginalia column
+   * inside its own bounds. Each column is a CSS Grid track on
+   * `.er-page-grid`; marginalia is `position: relative` inside its own
+   * column rather than `position: fixed` on the viewport. These tokens
+   * are the layout contract — see `.er-page` / `.er-page-grid` below. */
+  --er-page-max:        var(--er-container-wide);   /* 78rem outer page frame */
+  --er-page-pad-x:      var(--er-space-6);
+  --er-page-pad-y:      var(--er-space-5);
+  --er-article-col:     minmax(28rem, 42rem);
+  --er-marginalia-col:  minmax(16rem, 19rem);
+  --er-page-gap:        var(--er-space-5);
 }
 
 /* ---------- Scoped reset + page chrome ---------- */
@@ -103,9 +118,11 @@
   color: var(--er-ink-soft);
 }
 
-/* Full-page variants (studio + shortform own html/body) */
+/* Full-page variants (studio + shortform + entry-review own html/body) */
 body[data-review-ui="studio"],
-body[data-review-ui="shortform"] {
+body[data-review-ui="shortform"],
+body[data-review-ui="entry-review"],
+body[data-review-ui="scrapbook"] {
   margin: 0;
   background-color: var(--er-paper);
   background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.05 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
@@ -976,8 +993,19 @@ body[data-review-ui="shortform"] {
 }
 
 [data-review-ui="longform"] .er-strip {
-  position: fixed;
-  top: 0;
+  /* Sticky so the strip occupies its actual rendered height in
+   * document flow (eliminating the body-padding hack that has to
+   * guess the strip height up front). When unscrolled the strip
+   * sits naturally at body-padding-top (= folio bottom); on scroll
+   * it sticks to `top: var(--er-folio-h)` so the global folio
+   * remains uneclipsed. Issue #155 / #154 polish: the prior
+   * `position: fixed` + `body padding-top: calc(folio + 3.2rem)`
+   * combo undersized when `.er-strip-inner` wraps to 2 rows at
+   * desktop widths (rendered ~109px / 6.85rem at 1440px), and the
+   * marginalia head landed underneath the strip. Sticky is
+   * self-sizing; no recalculation required when content changes. */
+  position: sticky;
+  top: var(--er-folio-h);
   left: 0;
   right: 0;
   z-index: 40;
@@ -993,10 +1021,13 @@ body[data-review-ui="shortform"] {
   backdrop-filter: blur(6px);
 }
 
-/* Push the page content down so it doesn't hide behind the fixed strip.
- * Applied only on the longform route via a body-level rule injected by
- * the chrome wrapper. */
-body:has([data-review-ui="longform"] .er-strip) { padding-top: 3.2rem; }
+/* The longform body only has to clear the fixed folio; the strip is
+ * sticky and takes its own height in document flow, so it cannot
+ * eclipse the article or marginalia regardless of how many rows
+ * `.er-strip-inner` wraps to. */
+body:has([data-review-ui="longform"] .er-strip) {
+  padding-top: var(--er-folio-h);
+}
 
 /* Suppress the host site's sticky header + footer on longform review
  * pages. The review chrome (press-check strip, margin-notes sidebar)
@@ -1157,23 +1188,214 @@ body:has([data-review-ui="longform"]) .site-footer {
   border-radius: 2px;
 }
 
-/* Margin notes (marginalia sidebar) */
-.er-marginalia {
-  position: fixed;
-  right: var(--er-space-3);
-  top: 5.5rem;
-  bottom: var(--er-space-3);
-  width: 18rem;
-  overflow-y: auto;
-  padding: var(--er-space-3);
-  font-family: var(--er-font-body);
-  z-index: 30;
+/* ---- Page composition (Issue #154 Dispatch A) ---------------------- *
+ *
+ * The longform review surface composes one tangible page on the desk:
+ * `.er-page` is the page itself (max-width capped at `--er-page-max`,
+ * centered, with a uniform faint border + drop shadow that reads as a
+ * loose galley proof on the desk). `.er-page-grid` is the three-track
+ * grid inside it — article column, 1px gutter, and marginalia column.
+ * The middle "column" is just the gutter rule.
+ *
+ * Marginalia previously anchored to the viewport's right edge with
+ * `position: fixed`, which (a) cramped edit mode (Save / Focus
+ * collided with the rail), and (b) left a huge whitespace pool on the
+ * left of the article in read mode. The grid composition resolves both
+ * — marginalia now sits inside the page next to the prose it
+ * annotates, scrolling with the page rather than pinned to the
+ * viewport. See issue #154 for the full diagnosis.
+ *
+ * Edge treatment: the page is a galley proof under review (loose
+ * sheet on a desk), not a bound codex page. So both vertical edges
+ * carry the same paper-3 hairline + symmetric drop shadow rather
+ * than asymmetric binding chrome on the left.
+ */
+
+.er-page {
+  width: 100%;
+  max-width: var(--er-page-max);
+  margin: 0 auto;
   background: var(--er-paper);
-  border-left: var(--er-rule-thin);
-  box-shadow: -4px 0 12px rgba(26,22,20,0.04);
+  border: 1px solid var(--er-paper-3);
+  border-radius: 2px;
+  box-shadow:
+    0 1px 0 var(--er-paper-3),
+    0 14px 28px -10px rgba(26, 22, 20, 0.18),
+    0 4px 8px -2px rgba(26, 22, 20, 0.06);
+  position: relative;
+}
+
+.er-page-grid {
+  display: grid;
+  grid-template-columns: var(--er-article-col) 1px var(--er-marginalia-col);
+  gap: 0 var(--er-page-gap);
+  padding: var(--er-page-pad-y) var(--er-page-pad-x);
+  align-items: start;
+}
+
+/* Single thin gutter rule between article and marginalia columns.
+ * `subgrid` would be the textbook tool but support is uneven; a 1px
+ * grid track with an absolutely-positioned background is robust. */
+.er-page-gutter {
+  position: relative;
+}
+.er-page-gutter::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  background: var(--er-paper-3);
+}
+
+/* Stack at narrow widths — marginalia drops below the article rather
+ * than competing for the same row. The gutter rule disappears (it
+ * would be a meaningless 1px track in a single-column layout) and
+ * the marginalia gets a dashed top rule to signal the column break. */
+@media (max-width: 64rem) {
+  .er-page-grid {
+    grid-template-columns: 1fr;
+    padding: var(--er-page-pad-y) var(--er-space-3);
+  }
+  .er-page-gutter { display: none; }
+  .er-marginalia {
+    border-top: 1px dashed var(--er-faded-2);
+    padding-top: var(--er-space-3);
+    margin-top: var(--er-space-3);
+  }
+}
+
+@media (max-width: 40rem) {
+  .er-page-grid {
+    padding: var(--er-space-3) var(--er-space-2);
+  }
+  .er-page { margin: 0 var(--er-space-1); }
+}
+
+/* Issue #159 — operator-driven marginalia visibility toggle. The
+ * affordances live ON the marginalia component, mirroring the
+ * outline-drawer's pull-tab pattern:
+ *
+ *   - `.er-marginalia-stow` — chevron in the head row, visible when
+ *     marginalia is visible (head is inside `.er-marginalia`, which
+ *     is `display: none` when stowed, so this naturally disappears).
+ *   - `.er-marginalia-tab` — pull tab on the right edge of the
+ *     viewport, visible ONLY when marginalia is stowed.
+ *   - Both + `Shift+M` dispatch through `toggleMarginalia` in
+ *     `editorial-review-client.ts`.
+ *
+ * When `body[data-marginalia="hidden"]` is set, collapse the
+ * `.er-page-grid` to a single article column and hide the marginalia +
+ * gutter tracks entirely. Independent of focus mode. */
+body[data-marginalia="hidden"] .er-page-grid {
+  grid-template-columns: 1fr;
+}
+body[data-marginalia="hidden"] .er-marginalia,
+body[data-marginalia="hidden"] .er-page-gutter {
+  display: none;
+}
+
+/* Stow chevron — small button in the marginalia head. */
+.er-marginalia-stow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  padding: 0;
+  border: 1px solid var(--er-faded-2);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--er-faded);
+  font-family: var(--er-font-mono);
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+.er-marginalia-stow:hover {
+  color: var(--er-red-pencil);
+  border-color: var(--er-red-pencil);
+  background: var(--er-paper);
+}
+.er-marginalia-stow:focus-visible {
+  outline: 2px solid var(--er-red-pencil);
+  outline-offset: 1px;
+}
+
+/* Pull tab on the right edge of the viewport — mirrors `.er-outline-tab`
+ * (left edge) so the project's affordance vocabulary is consistent.
+ * Hidden by default; revealed when marginalia is stowed. */
+.er-marginalia-tab {
+  display: none;
+  position: fixed;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  z-index: 50;
+  background: var(--er-paper);
+  border: 1px solid var(--er-red-pencil);
+  border-right: 0;
+  border-radius: 3px 0 0 3px;
+  padding: var(--er-space-2) 0.45rem;
+  cursor: pointer;
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--er-red-pencil);
+  transition: background 150ms ease, padding-right 200ms ease;
+  box-shadow: -2px 0 6px rgba(26, 22, 20, 0.08);
+  /* Stack glyph above label vertically. */
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+body[data-marginalia="hidden"] .er-marginalia-tab {
+  display: flex;
+}
+.er-marginalia-tab:hover {
+  background: var(--er-paper-2);
+  padding-right: 0.7rem;
+}
+.er-marginalia-tab:focus-visible {
+  outline: 2px solid var(--er-red-pencil);
+  outline-offset: 2px;
+}
+.er-marginalia-tab-glyph {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+.er-marginalia-tab-label {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+/* Don't intrude in focus mode — the editor owns the canvas. */
+body.er-focus-mode .er-marginalia-tab {
+  display: none;
+}
+
+/* Margin notes (marginalia column inside the page) */
+.er-marginalia {
+  position: relative;
+  padding: var(--er-space-1) 0 0;
+  font-family: var(--er-font-body);
+  /* Allow long words / quotes to wrap inside the column instead of
+   * blowing out the grid track. */
+  min-width: 0;
 }
 
 .er-marginalia-head {
+  /* Flex row: stow chevron + label. The chevron sits on the LEFT
+   * because the marginalia column lives on the right side of the
+   * page — clicking ›-pointing-left "pushes" the column off-stage,
+   * matching the spatial mental model. (When stowed, the
+   * `.er-marginalia-tab` on the right edge of the viewport carries
+   * a ‹-pointing-left chevron to "pull" the column back.) */
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
   font-family: var(--er-font-mono);
   font-size: 0.68rem;
   letter-spacing: 0.18em;
@@ -1222,6 +1444,41 @@ body:has([data-review-ui="longform"]) .site-footer {
 }
 .er-marginalia-item:hover, .er-marginalia-item.active {
   background: var(--er-highlight-soft);
+}
+
+/* ---------- Dispatch B (#154) — handwritten rotation + reduced-motion ----------
+ *
+ * Each saved note rotates a hair off-axis so the marginalia column
+ * reads as physically pinned slips rather than a flat list. Hover /
+ * active straightens the slip and slides it 2px left — a subtle "I'm
+ * picking this one up" gesture that pairs with the cross-highlight
+ * wired in editorial-review-client.ts. Reduced-motion users get the
+ * neutral state with no rotation and no transition.
+ *
+ * The transform here cascades AFTER the existing
+ * `.er-marginalia-item:hover, .er-marginalia-item.active` rule above
+ * (which sets `background: var(--er-highlight-soft)` and is otherwise
+ * untouched), so the hover/active background still applies while the
+ * straightening transform wins on transform property alone. */
+.er-marginalia-item {
+  transition:
+    transform 180ms cubic-bezier(0.2, 0.7, 0.3, 1.3),
+    background 120ms ease,
+    border-color 180ms;
+}
+.er-marginalia-item:nth-child(odd)  { transform: rotate(-0.35deg); }
+.er-marginalia-item:nth-child(even) { transform: rotate(0.4deg); }
+.er-marginalia-item:hover,
+.er-marginalia-item.active {
+  transform: rotate(0deg) translateX(-2px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .er-marginalia-item,
+  .er-marginalia-item:hover,
+  .er-marginalia-item.active {
+    transform: none;
+    transition: none;
+  }
 }
 .er-marginalia-item .cat {
   font-family: var(--er-font-mono);
@@ -1442,9 +1699,14 @@ body:has([data-review-ui="longform"]) .essay-header {
   text-decoration-thickness: 1px;
 }
 
-/* Draft body wrapper within BlogLayout */
+/* Draft body wrapper within BlogLayout. `min-width: 0` is required
+ * because `.er-draft-frame` is a CSS Grid item (Issue #154 Dispatch A
+ * — the page-grid lays out draft + marginalia side-by-side); without
+ * it, BlogLayout's `.essay`/`.essay-body` content can blow out the
+ * grid track at narrow viewports, producing horizontal scroll. */
 .er-draft-frame {
   position: relative;
+  min-width: 0;
 }
 
 /* Per-row site badge. Two letters (AC / EC) so the operator can scan a
@@ -1603,7 +1865,17 @@ body:has([data-review-ui="longform"]) .essay-header {
 /* Edit-mode shell — CodeMirror 6 source editor plus a live preview
  * pane, toggled via Source / Split / Preview. The mounted CM instance
  * is themed in the editor module (editorial-review-editor.ts); this
- * block wires the layout chrome around it. */
+ * block wires the layout chrome around it.
+ *
+ * Issue #154 Dispatch C reorganised the chrome:
+ *   - `.er-edit-toolbar` (the bar with Source/Split/Preview tabs +
+ *     action buttons) is rendered ABOVE `.er-page`, sticky under the
+ *     strip. It replaces the strip's right-side action buttons during
+ *     edit mode.
+ *   - `.er-edit-mode` is now strictly the panes-host (panes + the
+ *     focus-mode affordances), rendered inside `.er-draft-frame` in
+ *     place of `#draft-body`.
+ */
 
 .er-edit-mode {
   background: var(--er-paper-2);
@@ -1613,30 +1885,56 @@ body:has([data-review-ui="longform"]) .essay-header {
   scroll-margin-top: 5rem;
 }
 
-/* When the edit mode is active, widen BlogLayout's host column
- * AND collapse its reserved TOC slot so the source/preview panes
- * can use the full width. BlogLayout uses
- *   .essay-body-wrap { grid-template-columns: 1fr 14rem }
- * to reserve space for a TOC on the right. In edit mode we don't
- * need the TOC column; flattening it frees up 17rem. Also widen
- * .essay (66rem cap) and .essay-body (34rem cap). Specificity via
- * :has() + body beats the component-scoped Astro rules without
- * reaching into BlogLayout internals. 19rem reserved for the
- * fixed margin rail. */
-body:has(.er-edit-mode:not([hidden])) .essay,
-body:has(.er-edit-mode:not([hidden])) .essay-body {
-  max-width: calc(100vw - 19rem);
-  /* Left-align in edit mode so the content doesn't center under the
-   * fixed margin rail (18rem wide) on the right. The .essay's
-   * `margin: 0 auto` would otherwise split the viewport-minus-rail
-   * remainder on both sides, pulling the preview pane under the rail. */
-  margin-left: 0;
-  margin-right: auto;
-}
+/* In edit mode, collapse BlogLayout's reserved TOC slot so the
+ * source/preview panes can use the full article column. BlogLayout
+ * uses `.essay-body-wrap { grid-template-columns: 1fr 14rem }` to
+ * reserve a TOC track on the right; flattening it returns that 14rem
+ * to the source/preview panes. We no longer need to chase
+ * viewport-minus-marginalia for `.essay` widths — the page-grid owns
+ * the marginalia gutter now (Issue #154 Dispatch A), so widths fall
+ * out of the article column track automatically. */
 body:has(.er-edit-mode:not([hidden])) .essay-body-wrap {
   grid-template-columns: 1fr !important;
 }
 body:has(.er-edit-mode:not([hidden])) .toc {
+  display: none;
+}
+
+/* ---------- Dispatch C (#154) — edit-mode toolbar above .er-page ---------- */
+/* Sit between the strip and the page, full-width within the page's
+ * outer container. The strip is `position: fixed` at the top of the
+ * viewport and overlaps the body's reserved padding-top space; we
+ * keep the toolbar in normal flow (relative) rather than sticky so
+ * it never collides with the strip when the strip wraps to two
+ * rows. The body padding-top calc reserves room for the strip so
+ * the toolbar still lands BELOW the strip on initial render. */
+.er-edit-toolbar {
+  position: relative;
+  z-index: 35;
+  background: var(--er-paper-2);
+  border-bottom: 1px dashed var(--er-faded-2);
+  padding: var(--er-space-2) var(--er-space-3);
+  margin: 0 auto var(--er-space-2);
+  max-width: var(--er-page-max);
+  display: flex;
+  gap: var(--er-space-2);
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+/* Hide the strip's right-side action buttons while edit mode is
+ * active — the toolbar above the page replaces them.
+ *
+ * Also hide `.er-strip-center` (the wrapping "APPLIED" stamp + hint
+ * row): the strip's flex-wrap layout pushes that row to a second
+ * line at this column count, which then occludes the toolbar
+ * underneath the fixed strip. The toolbar already communicates
+ * edit-state via the `[data-edit-hint]` span — the strip-center row
+ * is purely a read-mode affordance ("select text to mark · double-
+ * click to edit"). */
+body:has(.er-edit-toolbar:not([hidden])) .er-strip-right,
+body:has(.er-edit-toolbar:not([hidden])) .er-strip-center {
   display: none;
 }
 
@@ -1860,7 +2158,8 @@ body.er-focus-mode .header-wrapper,
 body.er-focus-mode .site-footer,
 body.er-focus-mode .essay-header,
 body.er-focus-mode .essay-hero-image,
-body.er-focus-mode .er-edit-chrome {
+body.er-focus-mode .er-edit-chrome,
+body.er-focus-mode .er-edit-toolbar {
   display: none !important;
 }
 
@@ -2519,101 +2818,734 @@ body.er-focus-mode .er-outline-tab {
 .er-error p { margin: 0 0 var(--er-space-2); font-size: 1rem; line-height: 1.5; }
 .er-error code { font-size: 0.85em; }
 
-/* ---------- Scrapbook drawer (Phase 16c) ----------
-   The longform review surface gets a per-entry scrapbook drawer
-   docked to the right edge below the marginalia panel. Read-only —
-   mutations stay on the standalone scrapbook viewer. The drawer
-   reuses scrap-row.css for the row visuals; this block styles the
-   surrounding chrome only. */
+/* ---------- Dispatch D (#154) — real bottom scrapbook drawer ----------
+ * Replaces the previous right-edge fixed aside (issue #154 concern 3:
+ * the chrome looked like a drawer but the primary action navigated
+ * away). The drawer is now a true drawer — bottom-anchored, full-width,
+ * expands in place via body[data-drawer="open"] (toggled by the client).
+ *
+ * The drawer body still uses the existing scrap-row visuals (the card
+ * abstraction from the mockup is reserved for Dispatch E — scrapbook
+ * index rewrite — to avoid a multi-surface refactor inside this dispatch).
+ */
+
+:root {
+  --er-drawer-h:   4rem;     /* collapsed handle height */
+  --er-drawer-h-x: 22rem;    /* expanded total height */
+}
 
 .er-scrapbook-drawer {
   position: fixed;
+  left: 0;
   right: 0;
   bottom: 0;
-  width: var(--er-marg-width, 320px);
-  max-width: 36vw;
-  max-height: 45vh;
   background: var(--er-paper);
-  border-left: var(--er-rule-thin);
-  border-top: var(--er-rule-thin);
-  box-shadow: -2px -2px 0 rgba(26, 22, 20, 0.04);
+  border-top: var(--er-rule-med);
+  box-shadow: 0 -8px 18px -4px rgba(26, 22, 20, 0.12);
+  z-index: 55;
+  height: var(--er-drawer-h);
+  transition: height 240ms cubic-bezier(.2, .7, .2, 1);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   font-family: var(--er-font-body);
-  z-index: 5;
+}
+body[data-drawer="open"] .er-scrapbook-drawer {
+  height: var(--er-drawer-h-x);
 }
 
-.er-scrapbook-drawer-head {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 12px;
-  align-items: baseline;
-  padding: 10px 14px 8px;
-  border-bottom: 1px dashed var(--er-faded-2);
+.er-scrapbook-drawer-handle {
+  height: var(--er-drawer-h);
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--er-space-3);
+  padding: 0 var(--er-space-4);
+  cursor: pointer;
+  background: linear-gradient(to bottom, var(--er-paper) 80%, var(--er-paper-2) 100%);
+  border-bottom: 1px solid var(--er-paper-3);
+  user-select: none;
+}
+.er-scrapbook-drawer-handle:focus-visible {
+  outline: 2px solid var(--er-red-pencil);
+  outline-offset: -2px;
 }
 
 .er-scrapbook-drawer-kicker {
+  font-family: var(--er-font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  flex: 0 0 auto;
+}
+.er-scrapbook-drawer-kicker em {
   font-family: var(--er-font-display);
   font-style: italic;
-  font-size: 13px;
-  color: var(--er-ink-soft);
+  color: var(--er-red-pencil);
+  font-size: 1rem;
+  text-transform: none;
+  letter-spacing: 0;
+  margin-right: 0.2rem;
 }
 
 .er-scrapbook-drawer-count {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  color: var(--er-ink-soft);
+  font-size: 0.95rem;
+  flex: 0 0 auto;
+}
+
+.er-scrapbook-drawer-peek {
+  display: flex;
+  gap: var(--er-space-2);
+  align-items: center;
   font-family: var(--er-font-mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
+  font-size: 0.7rem;
   color: var(--er-faded);
-  text-transform: uppercase;
+  overflow: hidden;
+  white-space: nowrap;
+  flex: 1 1 auto;
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+.er-scrapbook-drawer-peek .sep { color: var(--er-faded-2); }
+body[data-drawer="open"] .er-scrapbook-drawer-peek { opacity: 0.4; }
+
+.er-scrapbook-drawer-peek-empty {
+  font-style: italic;
+  color: var(--er-faded);
 }
 
 .er-scrapbook-drawer-open {
   font-family: var(--er-font-mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--er-red-pencil);
+  color: var(--er-faded);
   text-decoration: none;
-  border-bottom: 1px solid transparent;
-  transition: border-color 0.14s ease;
+  border-bottom: 1px dotted var(--er-faded-2);
+  flex: 0 0 auto;
+}
+.er-scrapbook-drawer-open:hover,
+.er-scrapbook-drawer-open:focus-visible {
+  color: var(--er-proof-blue);
+  border-color: var(--er-proof-blue);
 }
 
-.er-scrapbook-drawer-open:hover,
-.er-scrapbook-drawer-open:focus {
-  border-bottom-color: var(--er-red-pencil);
-  outline: none;
+.er-scrapbook-drawer-toggle {
+  margin-left: auto;
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--er-ink-soft);
+  background: transparent;
+  border: 1px solid var(--er-faded-2);
+  padding: 0.3rem 0.7rem;
+  border-radius: 2px;
+  cursor: pointer;
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  flex: 0 0 auto;
 }
+.er-scrapbook-drawer-toggle:hover {
+  border-color: var(--er-red-pencil);
+  color: var(--er-red-pencil);
+}
+.er-scrapbook-drawer-toggle .chev { transition: transform 200ms; }
+body[data-drawer="open"] .er-scrapbook-drawer-toggle .chev { transform: rotate(180deg); }
 
 .er-scrapbook-drawer-body {
+  flex: 1 1 auto;
   overflow-y: auto;
-  padding: 6px 14px 14px;
+  padding: var(--er-space-3) var(--er-space-4);
+  background: var(--er-paper-2);
 }
 
 .er-scrapbook-drawer-secret {
-  margin-top: 14px;
-  padding-top: 10px;
+  margin-top: var(--er-space-3);
+  padding-top: var(--er-space-2);
   border-top: 1px dashed var(--er-faded-2);
 }
-
 .er-scrapbook-drawer-secret-head {
-  margin: 0 0 6px;
+  margin: 0 0 var(--er-space-1);
   font-family: var(--er-font-mono);
-  font-size: 9px;
+  font-size: 0.6rem;
   letter-spacing: 0.12em;
   color: var(--er-faded);
   text-transform: uppercase;
 }
 
+/* The scrap-row visuals work as-is inside the drawer body. The card
+ * layout from the mockup is reserved for Dispatch E (scrapbook index
+ * rewrite); the drawer keeps using the existing row component to avoid
+ * a multi-surface refactor inside this dispatch. */
 .er-scrapbook-drawer .scrap {
   border-bottom-color: var(--er-paper-2);
 }
 
-@media (max-width: 900px) {
-  /* On narrow screens the marginalia drawer already collapses; the
-     scrapbook drawer follows the same rule rather than fighting for
-     viewport space. Operators can still reach the standalone viewer
-     via the er-strip or page-link footer. */
-  .er-scrapbook-drawer {
+/* The page must clear the drawer so the scrapbook handle never covers
+ * content. body padding-bottom adjusts based on drawer state. */
+body:has(.er-scrapbook-drawer) {
+  padding-bottom: calc(var(--er-drawer-h) + var(--er-space-2));
+}
+body[data-drawer="open"]:has(.er-scrapbook-drawer) {
+  padding-bottom: calc(var(--er-drawer-h-x) + var(--er-space-2));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .er-scrapbook-drawer,
+  .er-scrapbook-drawer-toggle .chev {
+    transition: none;
+  }
+}
+
+/* ---------- Glossary tooltip (#114, §3) ---------- */
+/*
+ * Cross-surface glossary mechanism. Inline term spans get a fine dotted
+ * underline (typesetter's "footnote needed" mark); on hover/focus, a margin
+ * annotation card shows the gloss + optional see-also chips.
+ *
+ * The card is appended to <body> by the client, NOT nested inside er-gloss,
+ * so [data-review-ui] still scopes correctly because [data-review-ui] is on
+ * the <body> element itself.
+ *
+ * Owner: glossary-tooltip.ts (client) + glossary-helper.ts (server gloss()).
+ */
+
+[data-review-ui] .er-gloss {
+  border-bottom: 1px dotted var(--er-faded);
+  cursor: help;
+  color: inherit;
+  padding-bottom: 1px;
+  text-decoration: none;
+  transition: border-color 120ms ease, border-style 120ms ease;
+}
+
+[data-review-ui] .er-gloss:hover,
+[data-review-ui] .er-gloss[aria-expanded="true"] {
+  border-bottom-color: var(--er-proof-blue);
+  border-bottom-style: solid;
+}
+
+[data-review-ui] .er-gloss:focus-visible {
+  outline: 2px solid var(--er-proof-blue);
+  outline-offset: 2px;
+  border-radius: 1px;
+  border-bottom-color: var(--er-proof-blue);
+  border-bottom-style: solid;
+}
+
+/* The tooltip card itself — a margin annotation clipped to the proof */
+
+[data-review-ui] .er-gloss-tip {
+  position: absolute;
+  z-index: 100;
+  max-width: 22rem;
+  min-width: 14rem;
+  padding: var(--er-space-2) var(--er-space-3);
+  background-color: var(--er-paper-2);
+  background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.04 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  border: 1.5px solid var(--er-ink);
+  border-radius: 2px;
+  box-shadow: 2px 2px 0 rgba(26, 22, 20, 0.08);
+  transform: rotate(-0.4deg);
+  pointer-events: auto;
+  animation: er-gloss-appear 120ms ease-out;
+}
+
+[data-review-ui] .er-gloss-tip[data-position="below"] {
+  transform: rotate(0.4deg);
+  animation-name: er-gloss-appear-below;
+}
+
+[data-review-ui] .er-gloss-tip[hidden] {
+  display: none;
+}
+
+@keyframes er-gloss-appear {
+  from { opacity: 0; transform: translateY(-2px) rotate(-0.4deg); }
+  to   { opacity: 1; transform: translateY(0) rotate(-0.4deg); }
+}
+
+@keyframes er-gloss-appear-below {
+  from { opacity: 0; transform: translateY(2px) rotate(0.4deg); }
+  to   { opacity: 1; transform: translateY(0) rotate(0.4deg); }
+}
+
+/* Pointer triangle — two stacked borders so the card outline stays crisp */
+
+[data-review-ui] .er-gloss-tip::before,
+[data-review-ui] .er-gloss-tip::after {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+[data-review-ui] .er-gloss-tip::before {
+  left: var(--er-space-3);
+  bottom: -8px;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-top: 8px solid var(--er-ink);
+}
+
+[data-review-ui] .er-gloss-tip::after {
+  left: calc(var(--er-space-3) + 2px);
+  bottom: -5px;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid var(--er-paper-2);
+}
+
+[data-review-ui] .er-gloss-tip[data-position="below"]::before {
+  bottom: auto;
+  top: -8px;
+  border-top: none;
+  border-bottom: 8px solid var(--er-ink);
+}
+
+[data-review-ui] .er-gloss-tip[data-position="below"]::after {
+  bottom: auto;
+  top: -5px;
+  border-top: none;
+  border-bottom: 6px solid var(--er-paper-2);
+}
+
+/* Tooltip content — kicker, gloss, see-also row */
+
+[data-review-ui] .er-gloss-tip-kicker {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 12, "wght" 600;
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  margin: 0 0 var(--er-space-1) 0;
+  line-height: 1.3;
+}
+
+[data-review-ui] .er-gloss-tip-kicker-term {
+  color: var(--er-ink-soft);
+  font-variation-settings: "opsz" 12, "wght" 700;
+}
+
+[data-review-ui] .er-gloss-tip-gloss {
+  font-family: var(--er-font-body);
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: var(--er-ink);
+  margin: 0;
+}
+
+[data-review-ui] .er-gloss-tip-see-also {
+  margin: var(--er-space-2) 0 0 0;
+  padding: var(--er-space-1) 0 0 0;
+  border-top: 1px dotted var(--er-paper-3);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--er-space-1);
+  align-items: center;
+}
+
+[data-review-ui] .er-gloss-tip-see-also-label {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 12, "wght" 500;
+  font-size: 0.6rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  margin-right: var(--er-space-0);
+}
+
+[data-review-ui] .er-gloss-tip-chip {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 12, "wght" 500;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  padding: 0.1rem 0.4rem;
+  border: 1px solid var(--er-proof-blue);
+  border-radius: 2px;
+  color: var(--er-proof-blue);
+  text-decoration: none;
+  background: transparent;
+  transition: background 120ms ease, color 120ms ease;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+[data-review-ui] .er-gloss-tip-chip:hover,
+[data-review-ui] .er-gloss-tip-chip:focus-visible {
+  background: var(--er-proof-blue);
+  color: var(--er-paper);
+  outline: none;
+}
+
+[data-review-ui] .er-gloss-tip-chip:focus-visible {
+  outline: 2px solid var(--er-proof-blue);
+  outline-offset: 2px;
+}
+
+/* Mobile / small viewport — drop the rotation, max-width relaxes */
+
+@media (max-width: 28rem) {
+  [data-review-ui] .er-gloss-tip,
+  [data-review-ui] .er-gloss-tip[data-position="below"] {
+    transform: none;
+    max-width: calc(100vw - var(--er-space-3) * 2);
+  }
+}
+
+/* Reduced motion — skip the animation */
+
+@media (prefers-reduced-motion: reduce) {
+  [data-review-ui] .er-gloss-tip {
+    animation: none;
+  }
+  [data-review-ui] .er-gloss {
+    transition: none;
+  }
+}
+
+/* ---------- Longform review refinement (Issue 8) ---------- */
+/*
+ * The earlier Issue 8 rule hid `.er-folio` on the longform review
+ * surface (display: none) because the strip and folio stacked
+ * awkwardly. Issue #154's folio half (Dispatch A, commit 4c558f7)
+ * resolves that overlap by stacking the strip below the folio at
+ * `top: var(--er-folio-h)`. The folio is now the canonical
+ * cross-surface nav on every studio surface, including longform,
+ * and the strip's `← studio` back-link is the per-galley back path.
+ * Hiding the folio is no longer necessary; the rule has been
+ * removed.
+ */
+
+/* Issue 9's bottom-offset rule (obsolete since #154 Dispatch A).
+ *
+ * The original rule (`[data-review-ui="longform"] .er-marginalia
+ * { bottom: calc(45vh + var(--er-space-3)) }`) was load-bearing when
+ * marginalia was `position: fixed` on the viewport — it carved a gap
+ * for the scrapbook drawer at the bottom. With marginalia now
+ * `position: relative` inside the page-grid (Dispatch A), `bottom`
+ * still shifts the box upward, leaving an empty 45vh strip at the
+ * end of the column. The page composition no longer overlaps the
+ * scrapbook drawer (the drawer is fixed at the viewport's bottom and
+ * the page scrolls behind it), so the offset is not needed.
+ */
+
+/* ISSUE 10 — cap the strip's inner content width so elements don't
+ * float in awkward whitespace at wide viewports. The strip itself
+ * stays full-bleed (background spans the viewport, registration
+ * marks at the left edge); the inner flex container is capped at
+ * --er-container-wide and centered.
+ *
+ * The wrapper element (`.er-strip-inner`) is added by the strip
+ * renderer in packages/studio/src/pages/review.ts so the cap can be
+ * applied without altering the outer strip's full-bleed background +
+ * ::before registration mark. */
+[data-review-ui="longform"] .er-strip-inner {
+  max-width: var(--er-container-wide);
+  margin-inline: auto;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--er-space-3);
+  flex-wrap: wrap;
+}
+
+/* When strip-inner is missing (no markup adjustment yet), fall back
+ * to capping the strip's flex layout via a broader rule. Harmless
+ * if the wrapper is present. */
+@media (min-width: 90rem) {
+  [data-review-ui="longform"] .er-strip:not(:has(.er-strip-inner)) {
+    padding-inline: max(var(--er-space-3), calc((100% - var(--er-container-wide)) / 2));
+  }
+}
+
+/* ---------- Longform review responsive layout (Issue 11) ---------- */
+/*
+ * The press-check surface is desktop-native — galley column + margin-notes
+ * sidebar + scrapbook drawer all assume >=1280px. Below that, the panels
+ * occlude the article body and the strip clips off action buttons.
+ *
+ * Three breakpoints:
+ *   - >=80rem (1280px): full desktop layout — strip + marginalia + scrapbook all visible.
+ *   - >=48rem (768px): tablet — marginalia narrows; scrapbook moves to bottom; strip wraps gracefully.
+ *   - <48rem (mobile): single-column reading; marginalia + scrapbook collapse to header-only at the bottom; article body takes full width.
+ *
+ * The principle: never lose the article body's column to chrome. At every
+ * breakpoint the prose is the full-bleed primary content; chrome adapts
+ * around it.
+ */
+
+/* TABLET — 48rem to 80rem */
+@media (max-width: 80rem) {
+  /* Pre-Dispatch-A: this rule narrowed marginalia from 18rem to 14rem
+   * because marginalia was a fixed-width viewport rail. The page-grid
+   * now sizes the column via `--er-marginalia-col` (Issue #154
+   * Dispatch A); the override is obsolete and was removed. */
+
+  /* Strip elements wrap cleanly. Hide secondary chrome (kbd shortcut chips
+   * already hidden at 60rem; here we also hide the slug breadcrumb to free
+   * row space). */
+  [data-review-ui="longform"] .er-strip-slug {
     display: none;
   }
+
+  /* The strip's full-bleed background stays; the inner cap from Issue 10
+   * keeps centered alignment. */
+}
+
+/* MOBILE — below 48rem (768px) */
+@media (max-width: 48rem) {
+  /* Pre-Dispatch-A: marginalia at this breakpoint became a fixed-bottom
+   * collapsible sheet because the desktop layout pinned marginalia to
+   * the viewport. With the page-grid (Issue #154 Dispatch A), the
+   * 64rem media query already collapses marginalia to a single column
+   * stacked below the article. The bottom-sheet treatment is reserved
+   * for a follow-up dispatch (B) if we want to bring it back; the
+   * single-column stack is the mobile experience for now. */
+
+  /* Scrapbook drawer (Dispatch D): the bottom-anchored drawer is now
+   * the primary scrapbook surface and remains visible at narrow widths.
+   * The shared transition + height variables are defined in the main
+   * .er-scrapbook-drawer block; the peek line truncates via
+   * text-overflow: ellipsis when the viewport gets tight. The legacy
+   * mobile-specific aria-expanded override (max-height 3rem / 50vh) was
+   * removed because the new mechanism uses body[data-drawer], not
+   * aria-expanded on the aside, and the shared height transition is
+   * already viewport-friendly. */
+
+  /* Strip elements drop to essentials: back link + state stamp + ? for
+   * shortcuts. Edit / filed / version slot all hide. */
+  [data-review-ui="longform"] .er-strip-galley,
+  [data-review-ui="longform"] .er-strip-versions,
+  [data-review-ui="longform"] .er-strip-right .er-edit-mode-label,
+  [data-review-ui="longform"] .er-pending-state,
+  [data-review-ui="longform"] .er-shortcut-chip {
+    display: none;
+  }
+
+  /* Article body takes the full viewport width minus minimal padding. The
+   * existing BlogLayout column is overridden via a higher-specificity rule. */
+  [data-review-ui="longform"] .er-review-shell .er-draft-frame,
+  [data-review-ui="longform"] .er-review-shell #draft-body {
+    margin-inline: var(--er-space-2);
+    max-width: none;
+  }
+
+  /* Body padding-top accounts only for the strip (now 1 row instead of
+   * potentially 2). */
+  body:has([data-review-ui="longform"] .er-strip) {
+    padding-top: 2.6rem;
+  }
+
+  /* Mobile drawer header tap targets: surface that the headers are
+   * interactive at this breakpoint. */
+  [data-review-ui="longform"] .er-marginalia .er-marginalia-head,
+  [data-review-ui="longform"] .er-scrapbook-drawer .er-scrapbook-drawer-head {
+    cursor: pointer;
+  }
+}
+
+/* TINY — below 30rem (480px) — most-aggressive collapse */
+@media (max-width: 30rem) {
+  /* Strip drops to back-link + state stamp only. ? shortcuts still
+   * available via the toggle button. */
+  [data-review-ui="longform"] .er-strip-back {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.4rem;
+  }
+
+  [data-review-ui="longform"] .er-stamp-big {
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    transform: rotate(-1deg);  /* slightly less rotation at this scale */
+  }
+}
+
+/* ---------- Longform review refinement (Phase 2 follow-up — Issue 1) ---------- */
+/*
+ * ISSUE 1 — decision strip: hide the redundant filed-applied echo.
+ *
+ * `.er-pending-state--filed` lives next to the action buttons and was
+ * designed to signal the post-completion state. But the big rubber
+ * stamp already says "applied" right beside it; the pill is pure echo
+ * in the steady state. Other variants (`.er-pending-state`,
+ * `.er-pending-state--iterating`, etc.) keep their job — they signal
+ * that an agent /deskwork:* invocation is still pending and the
+ * "copy /deskwork:..." button still applies. Only the post-skill,
+ * post-completion variant is muted.
+ *
+ * CSS-only path per the design doc — leaves the markup so the pill is
+ * still in the accessibility tree but visually hidden. No risk of
+ * regressing the iterating / approved variants.
+ */
+[data-review-ui="longform"] .er-pending-state--filed {
+  display: none;
+}
+
+/* ---------- Longform review refinement (Phase 2 follow-up — Issue 2) ---------- */
+/*
+ * ISSUE 2 — Edit button visual parity with Mark pencil.
+ *
+ * Both are pencil-family controls (Edit toggles source view; Mark
+ * annotates). The Mark button has `::before { content: '✎ ' }` — Edit
+ * gets a `⇄` glyph to signal "toggle" not "annotate". Same visual
+ * weight, different verb. The class hook is the existing
+ * `data-action="toggle-edit"` attribute on the button.
+ */
+[data-review-ui="longform"] .er-strip-right .er-btn-small[data-action="toggle-edit"]::before {
+  content: '⇄ ';
+  font-family: var(--er-font-mono);
+  font-weight: 500;
+  margin-right: 0.1em;
+}
+
+/* ---------- Longform review refinement (Phase 2 follow-up — Issue 5) ---------- */
+/*
+ * ISSUE 5 — inline keyboard-shortcut chips on action buttons.
+ *
+ * The strip's `.er-strip-right` carries Approve/Iterate/Reject during
+ * non-terminal workflow states. Each gets a small kbd chip tucked
+ * beside (or beneath, when the strip-right wrap kicks in) the button.
+ * Reuses the existing `.er-strip-hint kbd` treatment — same monospace,
+ * same dim color — so the chips read as peripheral hints, not
+ * competing controls.
+ *
+ * IMPORTANT — chord style: the design doc speculated `⌘+A` chord style
+ * post-#108 fix. The actual #108 fix is a TWO-TAP bare letter sequence
+ * (`a a` within 500ms), confirmed by reading the keybinding handler:
+ * the listener bails on `metaKey || ctrlKey || altKey`, then matches
+ * bare `ev.key === 'a' | 'i' | 'r'`. The shortcuts modal already
+ * documents this verbatim as `<kbd>a</kbd> <kbd>a</kbd>` — chips
+ * mirror that style so the on-strip hint and the modal stay in sync.
+ *
+ * The chip lives in a `.er-shortcut-chip-wrap` wrapper; the markup
+ * adds it (see review.ts `renderControlsRight`). The companion
+ * micro-spacing rule in review-viewport.css turns each wrapper into a
+ * column flex so the chip stacks beneath the button cleanly.
+ */
+[data-review-ui="longform"] .er-shortcut-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--er-space-0);
+  margin-left: var(--er-space-0);
+  font-family: var(--er-font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  color: var(--er-faded);
+  white-space: nowrap;
+  text-transform: none;
+  vertical-align: middle;
+}
+
+[data-review-ui="longform"] .er-shortcut-chip kbd {
+  font-family: var(--er-font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.04em;
+  padding: 0.05rem 0.3rem;
+  border: 1px solid var(--er-paper-3);
+  border-radius: 2px;
+  color: var(--er-ink-soft);
+  background: var(--er-paper);
+  line-height: 1.2;
+  font-weight: 500;
+}
+
+@media (max-width: 60rem) {
+  /* On narrow viewports the strip already drops the inline hint
+   * (line 1090). Drop the per-button shortcut chips too — they
+   * crowd the button row. The shortcuts modal stays available. */
+  [data-review-ui="longform"] .er-shortcut-chip {
+    display: none;
+  }
+}
+
+/* ---------- Longform review refinement (Phase 2 follow-up — Issue 7) ---------- */
+/*
+ * ISSUE 7 — Edit-mode disclosure label.
+ *
+ * The Edit button toggles between Preview and Source panes. Previously
+ * the operator had no signal of which pane was active until they
+ * clicked. A small uppercase tag next to the button shows the current
+ * mode so the toggle's effect is legible.
+ *
+ * The label sits inline with the button (er-strip-right is a flex row).
+ * Class is `.er-edit-mode-label`. Two data-mode values: 'preview' and
+ * 'source'. CSS picks the right color/border via attribute selector;
+ * the client flips both attribute and inner text on each toggle.
+ */
+[data-review-ui="longform"] .er-edit-mode-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--er-space-0);
+  font-family: var(--er-font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  margin-left: calc(-1 * var(--er-space-0));
+  padding: 0.1rem 0.4rem;
+  border: 1px dashed var(--er-paper-3);
+  border-radius: 2px;
+  background: transparent;
+  user-select: none;
+}
+
+[data-review-ui="longform"] .er-edit-mode-label[data-mode="source"] {
+  color: var(--er-proof-blue);
+  border-color: var(--er-proof-blue-soft);
+  border-style: solid;
+}
+
+[data-review-ui="longform"] .er-edit-mode-label::before {
+  content: '⇄';
+  font-family: var(--er-font-mono);
+  margin-right: 0.15em;
+  font-size: 0.85em;
+  opacity: 0.7;
+}
+
+/* ===========================================================================
+ * Issue 6 — empty-state polish
+ * ---------------------------------------------------------------------------
+ * Two empty-state surfaces on the longform review page got tightened:
+ *
+ *   1. Marginalia ("no margin notes") — shrunk from a multi-clause
+ *      instructional paragraph to a single short sentence. The shorter
+ *      copy lives in review.ts; this rule keeps the typographic
+ *      treatment (italic, faded, small) consistent with the existing
+ *      `.er-marginalia-empty` declaration above. No new selectors
+ *      needed — copy change alone carries Issue 6 for marginalia.
+ *
+ *   2. Scrapbook drawer ("no scrapbook items") — replaced with an
+ *      action-prompting variant: "No items yet. Drop research notes →"
+ *      that links to the per-entry scrapbook viewer. The base styling
+ *      lives in scrap-row.css under `.scrap--empty` /
+ *      `.scrap__empty-text`; the link adornment is local to the
+ *      review surface.
+ * =========================================================================== */
+
+.scrap--empty .scrap__empty-link {
+  /* Keep the link visually subordinate so the copy reads as a single
+   * faded line, not a button. The arrow glyph carries the action
+   * affordance. */
+  margin-left: 0.25em;
+  color: var(--er-pencil);
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 0.18em;
+  font-style: normal;
+  transition: color 120ms ease, text-decoration-style 120ms ease;
+}
+
+.scrap--empty .scrap__empty-link:hover,
+.scrap--empty .scrap__empty-link:focus-visible {
+  color: var(--er-ink);
+  text-decoration-style: solid;
 }

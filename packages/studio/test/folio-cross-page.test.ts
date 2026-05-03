@@ -1,10 +1,14 @@
 /**
  * Cross-page integration tests for the Phase 17 editorial folio strip.
  *
- * For each of the 6 studio surfaces, assert:
+ * For each of the 7 studio surfaces, assert:
  *   1. The rendered HTML includes the er-folio markup.
- *   2. The correct nav link is marked active for the current surface.
+ *   2. The correct nav link is marked active for the current surface
+ *      (or, for the longform review surface, that NO nav link is
+ *      marked active — Issue 4).
  *   3. All 5 nav links are present, each pointing at the right route.
+ *      (The shortform desk anchor is labelled "Shortform" — Issue 4
+ *      renamed it from "Reviews".)
  *   4. The editorial-nav stylesheet is loaded.
  *
  * The longform review has two render paths (error + main); we exercise
@@ -16,11 +20,12 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   mkdtempSync,
   mkdirSync,
+  readFileSync,
   writeFileSync,
   rmSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import type { DeskworkConfig } from '@deskwork/core/config';
 import { writeCalendar } from '@deskwork/core/calendar';
 import type { EditorialCalendar } from '@deskwork/core/types';
@@ -70,10 +75,25 @@ interface SurfaceCase {
   name: string;
   /** Route to fetch. */
   path: string;
-  /** Which folio nav link should carry `class="active"`. */
-  expectedActive: 'index' | 'dashboard' | 'content' | 'reviews' | 'manual';
-  /** The label of the active nav anchor (matches the link text). */
-  activeLabel: string;
+  /**
+   * Which folio nav link should carry `class="active"`. `'longform'` is
+   * the special "no nav match" key — Issue 4 made longform review
+   * surfaces leave every nav-item un-highlighted because no nav-item
+   * represents the longform desk.
+   */
+  expectedActive:
+    | 'index'
+    | 'dashboard'
+    | 'content'
+    | 'shortform'
+    | 'manual'
+    | 'longform';
+  /**
+   * The label of the active nav anchor (matches the link text). `null`
+   * when `expectedActive === 'longform'` — no nav-item is active for
+   * the longform review surface.
+   */
+  activeLabel: string | null;
   /** Status that the route returns. */
   expectedStatus: number;
 }
@@ -103,8 +123,8 @@ const SURFACES: readonly SurfaceCase[] = [
   {
     name: '/dev/editorial-review-shortform (shortform desk)',
     path: '/dev/editorial-review-shortform',
-    expectedActive: 'reviews',
-    activeLabel: 'Reviews',
+    expectedActive: 'shortform',
+    activeLabel: 'Shortform',
     expectedStatus: 200,
   },
   {
@@ -125,10 +145,14 @@ const SURFACES: readonly SurfaceCase[] = [
     // The longform review with no workflow renders the error variant —
     // this is the surface every reachable longform URL falls back to
     // before a draft has been started, and it's the simplest fixture.
+    // Issue 4: the longform review surface MUST NOT highlight any
+    // nav-item — there is no "Longform" desk in the nav, and the
+    // pre-Issue-4 behaviour of highlighting "Reviews" (now "Shortform")
+    // was actively misleading.
     name: '/dev/editorial-review/<unknown> (longform, error path)',
     path: '/dev/editorial-review/no-such-slug?site=wc',
-    expectedActive: 'reviews',
-    activeLabel: 'Reviews',
+    expectedActive: 'longform',
+    activeLabel: null,
     expectedStatus: 200,
   },
 ];
@@ -158,19 +182,35 @@ describe('editorial folio — cross-page', () => {
       it('renders the er-folio strip', async () => {
         const r = await getHtml(app, surface.path);
         expect(r.html).toContain('class="er-folio"');
-        expect(r.html).toContain('class="er-folio-inner"');
-        // Wordmark.
-        expect(r.html).toContain('deskwork <em>STUDIO</em>');
+        // Wordmark — italic Fraunces, ※ proof-mark applied via CSS ::before.
+        expect(r.html).toContain('class="er-folio-mark">deskwork');
+        // Spine sits between the wordmark and the nav.
+        expect(r.html).toMatch(/class="er-folio-spine"/);
+        // Nav lives in its own <nav> element labelled "Studio sections".
+        expect(r.html).toContain('class="er-folio-nav"');
       });
 
-      it(`marks ${surface.activeLabel} as the active nav link`, async () => {
-        const r = await getHtml(app, surface.path);
-        // Pattern: <a class="active" href="<route>">Label</a>
-        const re = new RegExp(
-          `class="active"\\s+href="[^"]+"\\s*>\\s*${surface.activeLabel}\\s*<`,
-        );
-        expect(r.html).toMatch(re);
-      });
+      const activeLabelCase = surface.activeLabel;
+      if (activeLabelCase !== null) {
+        it(`marks ${activeLabelCase} as the active nav link`, async () => {
+          const r = await getHtml(app, surface.path);
+          // Pattern: <a class="active" href="<route>">Label</a>
+          // chrome.ts emits aria-current="page" alongside class="active".
+          const re = new RegExp(
+            `class="active"\\s+href="[^"]+"\\s+aria-current="page"\\s*>\\s*${activeLabelCase}\\s*<`,
+          );
+          expect(r.html).toMatch(re);
+        });
+      } else {
+        it('marks no nav link as active (longform has no nav-item)', async () => {
+          const r = await getHtml(app, surface.path);
+          const folioStart = r.html.indexOf('er-folio-nav');
+          const folioEnd = r.html.indexOf('</nav>', folioStart);
+          const folioBlock = r.html.slice(folioStart, folioEnd);
+          const folioActives = folioBlock.match(/class="active"/g) ?? [];
+          expect(folioActives.length).toBe(0);
+        });
+      }
 
       it('contains all 5 nav links pointing at the right routes', async () => {
         const r = await getHtml(app, surface.path);
@@ -181,7 +221,7 @@ describe('editorial folio — cross-page', () => {
         );
         expect(r.html).toMatch(/href="\/dev\/content"[^>]*>\s*Content\s*</);
         expect(r.html).toMatch(
-          /href="\/dev\/editorial-review-shortform"[^>]*>\s*Reviews\s*</,
+          /href="\/dev\/editorial-review-shortform"[^>]*>\s*Shortform\s*</,
         );
         expect(r.html).toMatch(
           /href="\/dev\/editorial-help"[^>]*>\s*Manual\s*</,
@@ -195,19 +235,47 @@ describe('editorial folio — cross-page', () => {
 
       it('marks at most one nav link active', async () => {
         const r = await getHtml(app, surface.path);
-        const matches = r.html.match(/class="active"/g) ?? [];
-        // The folio has one active link. The page body may carry other
-        // `.active` classes (filter chips on the dashboard, etc.) — so
-        // we only assert that the folio contributes exactly one `class="active"`
-        // ANCHOR within the er-folio-nav block.
+        // The folio has at most one active link. The page body may
+        // carry other `.active` classes (filter chips on the dashboard,
+        // etc.) — so we only assert that the folio contributes
+        // 0 or 1 `class="active"` ANCHOR within the er-folio-nav block.
+        // (Longform review pages contribute zero — Issue 4.)
         const folioStart = r.html.indexOf('er-folio-nav');
         const folioEnd = r.html.indexOf('</nav>', folioStart);
         const folioBlock = r.html.slice(folioStart, folioEnd);
         const folioActives = folioBlock.match(/class="active"/g) ?? [];
-        expect(folioActives.length).toBe(1);
-        // Sanity: the page rendered something.
-        expect(matches.length).toBeGreaterThanOrEqual(1);
+        const expected = surface.activeLabel === null ? 0 : 1;
+        expect(folioActives.length).toBe(expected);
       });
     });
   }
+
+  // The fixed `.er-folio` (height var(--er-folio-h), z-index 60) eclipses
+  // the top of any surface whose body lacks `padding-top: var(--er-folio-h)`
+  // — content slides directly under the folio on initial render, and any
+  // scroll exposes the eclipse immediately. Studio / shortform / entry-review
+  // / manual all own their full body, so all four belong in the
+  // padding-top selector group. Longform mounts inside the host BlogLayout
+  // and uses its own combined folio + strip rule in editorial-review.css;
+  // not in scope for this assertion.
+  it("editorial-nav.css pads the body for every surface that owns it", () => {
+    const navCss = readFileSync(
+      resolve(
+        __dirname,
+        '../../../plugins/deskwork-studio/public/css/editorial-nav.css',
+      ),
+      'utf8',
+    );
+    const ruleStart = navCss.search(
+      /^body\[data-review-ui="studio"\]/m,
+    );
+    expect(ruleStart, 'body padding-top selector group should exist').toBeGreaterThan(0);
+    const ruleEnd = navCss.indexOf('}', ruleStart);
+    const block = navCss.slice(ruleStart, ruleEnd + 1);
+    expect(block).toMatch(/data-review-ui="studio"/);
+    expect(block).toMatch(/data-review-ui="shortform"/);
+    expect(block).toMatch(/data-review-ui="entry-review"/);
+    expect(block).toMatch(/data-review-ui="manual"/);
+    expect(block).toMatch(/padding-top:\s*var\(--er-folio-h\)/);
+  });
 });

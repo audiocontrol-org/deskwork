@@ -65,11 +65,13 @@ const pressCheckHighlight = HighlightStyle.define([
   { tag: tags.processingInstruction, color: 'var(--er-faded)', fontFamily: 'var(--er-font-mono)', fontWeight: 500 },
   { tag: tags.meta, color: 'var(--er-faded-2)' },
 
-  // Headings — scale up + weight via h1/h2/h3/h4 tags.
-  { tag: tags.heading1, color: 'var(--er-ink)', fontSize: '1.6rem', fontWeight: 700, fontFamily: 'var(--er-font-display)', lineHeight: '1.25' },
-  { tag: tags.heading2, color: 'var(--er-ink)', fontSize: '1.3rem', fontWeight: 600, fontFamily: 'var(--er-font-display)', lineHeight: '1.3' },
-  { tag: tags.heading3, color: 'var(--er-ink)', fontSize: '1.1rem', fontWeight: 600, fontFamily: 'var(--er-font-display)' },
-  { tag: tags.heading4, color: 'var(--er-ink)', fontSize: '1rem', fontWeight: 600, fontFamily: 'var(--er-font-display)' },
+  // Headings — display font for typographer's-proof affect; scale
+  // moderate against the 0.875rem mono baseline so they read as
+  // headings without dominating frontmatter or paragraph blocks.
+  { tag: tags.heading1, color: 'var(--er-ink)', fontSize: '1.35rem', fontWeight: 600, fontFamily: 'var(--er-font-display)', lineHeight: '1.25' },
+  { tag: tags.heading2, color: 'var(--er-ink)', fontSize: '1.15rem', fontWeight: 600, fontFamily: 'var(--er-font-display)', lineHeight: '1.3' },
+  { tag: tags.heading3, color: 'var(--er-ink)', fontSize: '1rem',    fontWeight: 600, fontFamily: 'var(--er-font-display)' },
+  { tag: tags.heading4, color: 'var(--er-ink)', fontSize: '0.95rem', fontWeight: 600, fontFamily: 'var(--er-font-display)' },
 
   // Emphasis renders inline so the source feels like prose.
   { tag: tags.strong, color: 'var(--er-ink)', fontWeight: 700 },
@@ -99,16 +101,27 @@ const pressCheckHighlight = HighlightStyle.define([
  */
 const pressCheckTheme = EditorView.theme(
   {
+    /* Editor body — mono, code-editor scale.
+     *
+     * Markdown source is column-sensitive (lists indent by spaces,
+     * code fences align by columns, tables use pipes), so a
+     * proportional serif body face misaligns columns and makes
+     * indentation read as arbitrary. JetBrains Mono at 0.875rem /
+     * 1.5 lh hits the code-editor sweet spot — frontmatter reads
+     * as metadata, prose lines stay legible, and tagged tokens
+     * (headings via display font, strong inline bold, etc.) keep
+     * their typographer's-proof affect without shouting. Issue
+     * #160 / operator post-Dispatch-E walkthrough. */
     '&': {
-      fontFamily: 'var(--er-font-body)',
-      fontSize: '1rem',
-      lineHeight: '1.55',
+      fontFamily: 'var(--er-font-mono)',
+      fontSize: '0.875rem',
+      lineHeight: '1.5',
       color: 'var(--er-ink)',
       backgroundColor: 'var(--er-paper)',
       height: '100%',
     },
     '.cm-scroller': {
-      fontFamily: 'var(--er-font-body)',
+      fontFamily: 'var(--er-font-mono)',
       overflow: 'auto',
       padding: 'var(--er-space-2) 0',
     },
@@ -145,7 +158,19 @@ export function mountEditor(opts: MountOptions): EditorHandle {
       lineNumbers(),
       history(),
       highlightActiveLine(),
-      markdown({ base: markdownLanguage, codeLanguages: [] }),
+      // Strip the Setext-heading rule from the markdown parser. YAML
+      // frontmatter (between `---` markers at the top of the file) was
+      // mistagged as a Setext H2 because the closing `---` line is
+      // syntactically identical to a Setext underline — every YAML
+      // key/value got rendered with the heading2 style (Fraunces 1.15rem
+      // 600), making frontmatter look like a section header instead of
+      // metadata. ATX-only (`# `, `## `, ...) is the project's heading
+      // convention anyway. Issue #160 / operator post-Dispatch-E walk.
+      markdown({
+        base: markdownLanguage,
+        codeLanguages: [],
+        extensions: [{ remove: ['SetextHeading'] }],
+      }),
       syntaxHighlighting(pressCheckHighlight),
       pressCheckTheme,
       EditorView.lineWrapping,

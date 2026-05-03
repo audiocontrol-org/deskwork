@@ -118,7 +118,12 @@ export function initEditorialReview(): void {
 
   const draftBody = q<HTMLElement>('#draft-body');
   const draftEdit = q<HTMLTextAreaElement>('#draft-edit');
+  // Issue #154 Dispatch C — the edit chrome is now split into two
+  // wrappers so the toolbar can sit above `.er-page` while the panes
+  // continue to render inside the article column. Both flip [hidden]
+  // together on every enter/exit transition.
   const editToolbar = q<HTMLElement>('[data-edit-toolbar]');
+  const editPanesHost = q<HTMLElement>('[data-edit-panes-host]');
   const editHint = q<HTMLElement>('[data-edit-hint]');
   const addBtn = q<HTMLButtonElement>('[data-add-comment-btn]');
   const composer = q<HTMLElement>('[data-comment-composer]');
@@ -321,6 +326,34 @@ export function initEditorialReview(): void {
     const item = sidebarIndex.get(annotationId);
     if (item) item.classList.toggle('active', active);
   }
+
+  // Mark -> note cross-highlight: hovering an article-side annotation
+  // lights up the corresponding sidebar item. Reuses setActiveHighlight
+  // (which toggles .active on BOTH mark and <li>); the note->mark
+  // direction is already wired via the sidebar's mouseenter/mouseleave
+  // handlers above. Delegated on draftBody because the marks are
+  // re-rendered on iteration changes — binding per-mark would leak.
+  draftBody.addEventListener('pointerover', (ev) => {
+    const target = (ev.target as Element | null)?.closest<HTMLElement>(
+      'mark[data-annotation-id]',
+    );
+    if (!target) return;
+    const id = target.dataset.annotationId;
+    if (id) setActiveHighlight(id, true);
+  });
+  draftBody.addEventListener('pointerout', (ev) => {
+    const target = (ev.target as Element | null)?.closest<HTMLElement>(
+      'mark[data-annotation-id]',
+    );
+    if (!target) return;
+    // pointerout fires when the cursor moves between text nodes inside
+    // the same <mark>; guard with relatedTarget so we don't flash off
+    // mid-mark.
+    const next = (ev as PointerEvent).relatedTarget as Element | null;
+    if (next && target.contains(next)) return;
+    const id = target.dataset.annotationId;
+    if (id) setActiveHighlight(id, false);
+  });
 
   // ---- Selection -> Add button ----
 
@@ -798,6 +831,19 @@ export function initEditorialReview(): void {
   const editModeBtns = Array.from(
     document.querySelectorAll<HTMLButtonElement>('[data-edit-view]'),
   );
+  // Issue 7: edit-mode disclosure label sits next to the Edit button in
+  // the strip (server-rendered with data-mode="preview" + text "preview"
+  // matching the surface's initial state). Both the attribute and the
+  // inner text flip on enterEdit / exitEdit so the operator sees which
+  // pane the button will reveal next. Optional in DOM — querySelector
+  // returns null on surfaces that don't render the strip (e.g. error
+  // page); the helper is a no-op when the element is absent.
+  const editModeLabel = document.querySelector<HTMLElement>('.er-edit-mode-label');
+  function setEditModeLabel(mode: 'preview' | 'source'): void {
+    if (!editModeLabel) return;
+    editModeLabel.dataset.mode = mode;
+    editModeLabel.textContent = mode;
+  }
   let editing = false;
   let editorHandle: import('./editorial-review-editor').EditorHandle | null = null;
   let previewDebounce: number | null = null;
@@ -1022,8 +1068,14 @@ export function initEditorialReview(): void {
 
     draftEdit.value = sourceMarkdown;
     editToolbar.hidden = false;
+    editPanesHost.hidden = false;
     draftBody.classList.add('hidden');
     toggleBtn.textContent = 'View';
+    // Issue 7 — flip the disclosure label to "source" while the source
+    // pane is the active mode. The button label says "View" (because
+    // clicking returns the operator to preview); the disclosure label
+    // says "source" (because that's what they're currently looking at).
+    setEditModeLabel('source');
     editing = true;
     // Lazy-import the editor module so the CodeMirror bundle only
     // loads when the operator actually enters edit mode.
@@ -1178,8 +1230,13 @@ export function initEditorialReview(): void {
     // "Outline ↗" button is tied to the edit chrome so it
     // naturally disappears with editToolbar.hidden = true above.
     editToolbar.hidden = true;
+    editPanesHost.hidden = true;
     draftBody.classList.remove('hidden');
     toggleBtn.textContent = 'Edit';
+    // Issue 7 — flip the disclosure label back to "preview" alongside
+    // the button reverting to "Edit". Two-way: every transition
+    // through this code path keeps both views consistent.
+    setEditModeLabel('preview');
     editing = false;
     stashedOutline = '';
     if (editorHandle) {
@@ -1289,6 +1346,63 @@ export function initEditorialReview(): void {
     else enterFocus();
   });
   exitFocusBtn?.addEventListener('click', exitFocus);
+
+  // ---- Marginalia visibility toggle (Issue #159) ----
+  //
+  // Affordances live ON the marginalia component (mirrors the
+  // outline-drawer pull-tab pattern):
+  //
+  //   - `.er-marginalia-stow` chevron in the marginalia head — visible
+  //     when marginalia is visible (it's inside `.er-marginalia`, which
+  //     is `display: none` when stowed, so it disappears with the
+  //     column).
+  //   - `.er-marginalia-tab` pull tab on the right edge of the
+  //     viewport — visible only when marginalia is stowed.
+  //   - `Shift+M` keyboard shortcut.
+  //
+  // All three carry `data-action="toggle-marginalia"` and are wired
+  // here. Both buttons reflect aria-pressed in lockstep with body
+  // [data-marginalia]. Identical placement across read and edit modes
+  // (the toggle is on the marginalia, not in either toolbar). The
+  // toolbar-button shape from earlier iterations is retired —
+  // affordances belong on the components they affect, not in generic
+  // chrome rows.
+
+  const MARGINALIA_HIDDEN_KEY = 'deskwork:review:marginalia-hidden';
+  const marginaliaToggleBtns = Array.from(
+    document.querySelectorAll<HTMLButtonElement>('[data-action="toggle-marginalia"]'),
+  );
+
+  function applyMarginaliaState(hidden: boolean): void {
+    if (hidden) document.body.setAttribute('data-marginalia', 'hidden');
+    else document.body.removeAttribute('data-marginalia');
+    for (const btn of marginaliaToggleBtns) {
+      btn.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+    }
+  }
+
+  function toggleMarginalia(): void {
+    const hidden = document.body.getAttribute('data-marginalia') !== 'hidden';
+    applyMarginaliaState(hidden);
+    try {
+      window.localStorage.setItem(MARGINALIA_HIDDEN_KEY, hidden ? '1' : '0');
+    } catch {
+      // localStorage unavailable (private mode / cookie-blocked) — toggle still works in-memory.
+    }
+  }
+
+  // Initial state: read the persisted preference and apply.
+  try {
+    if (window.localStorage.getItem(MARGINALIA_HIDDEN_KEY) === '1') {
+      applyMarginaliaState(true);
+    }
+  } catch {
+    // localStorage read failure is non-fatal — default to visible.
+  }
+
+  for (const btn of marginaliaToggleBtns) {
+    btn.addEventListener('click', toggleMarginalia);
+  }
 
   // Double-click anywhere in the rendered draft enters edit mode. This
   // mirrors the comment gesture (select → Mark) with its own shape so
@@ -1683,6 +1797,15 @@ export function initEditorialReview(): void {
       if (focusMode) exitFocus(); else enterFocus();
       return;
     }
+    // Shift+M toggles the marginalia visibility (Issue #159). Works
+    // in both read and edit modes; complements the strip's ⊟ Notes
+    // button. Independent of focus mode — a marginalia-hidden state
+    // persists across focus toggles via localStorage.
+    if (ev.shiftKey && ev.key === 'M') {
+      ev.preventDefault();
+      toggleMarginalia();
+      return;
+    }
     if (ev.key === 'o' && outlineDrawerAvailable()) {
       ev.preventDefault();
       toggleOutlineDrawer();
@@ -1762,6 +1885,108 @@ export function initEditorialReview(): void {
   // The drawer is server-rendered, so we can bind on first boot and
   // skip re-binding (the drawer doesn't lazy-render new image rows).
   initScrapbookLightbox(document);
+  // Issue #154 Dispatch D: the scrapbook drawer is a real bottom-
+  // anchored drawer. Click the handle (or focus + Enter/Space) to
+  // toggle body[data-drawer]; CSS owns the height transition.
+  initScrapbookDrawerToggle();
+  // Issue 11 marginalia mobile toggle still applies at <48rem — the
+  // scrapbook drawer's bottom-anchor mechanism replaces the legacy
+  // shared mobile pattern, so this handler now only wires marginalia.
+  initMobileMarginaliaToggle();
+}
+
+/**
+ * Issue #154 Dispatch D — scrapbook drawer toggle.
+ *
+ * The drawer is collapsed by default; clicking the handle (or pressing
+ * Enter/Space when the header has focus) expands it. The state lives
+ * on `body[data-drawer]` so the CSS height transition (4rem ↔ 22rem)
+ * is the single source of truth for the visual state. The handle's
+ * `aria-expanded` and the toggle button's "Expand"/"Collapse" label
+ * are kept in sync for AT users.
+ *
+ * Edge case: the standalone-viewer link `a.er-scrapbook-drawer-open`
+ * lives inside the handle. Its inline `event.stopPropagation()`
+ * prevents the handle's click handler from firing when the operator
+ * clicks "open viewer ↗"; the same belt-and-braces guard checks the
+ * click target so descendant interactive controls (the toggle button,
+ * the link) handle their own behavior without double-firing.
+ */
+function initScrapbookDrawerToggle(): void {
+  function setDrawerState(open: boolean): void {
+    document.body.dataset.drawer = open ? 'open' : 'closed';
+    const handle = document.querySelector<HTMLElement>(
+      '.er-scrapbook-drawer-handle[data-drawer-toggle]',
+    );
+    if (handle) handle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    const label = document.querySelector<HTMLElement>('[data-toggle-label]');
+    if (label) label.textContent = open ? 'Collapse' : 'Expand';
+  }
+
+  // Default closed — only initialize if not already set (allows future
+  // hydration paths to preserve a server-rendered open state).
+  if (document.body.dataset.drawer === undefined) {
+    document.body.dataset.drawer = 'closed';
+  }
+
+  const togglers = document.querySelectorAll<HTMLElement>('[data-drawer-toggle]');
+  togglers.forEach((el) => {
+    el.addEventListener('click', (ev) => {
+      // The header carries data-drawer-toggle AND wraps the toggle
+      // button + viewer link. Don't double-fire when the user clicked
+      // the inner button or link — they handle their own behavior.
+      if (
+        el.tagName === 'HEADER' &&
+        (ev.target as Element).closest(
+          '.er-scrapbook-drawer-toggle, .er-scrapbook-drawer-open',
+        )
+      ) {
+        return;
+      }
+      const next = document.body.dataset.drawer !== 'open';
+      setDrawerState(next);
+    });
+    if (el.tagName === 'HEADER') {
+      el.addEventListener('keydown', (ev) => {
+        const ke = ev as KeyboardEvent;
+        if (ke.key === 'Enter' || ke.key === ' ') {
+          ev.preventDefault();
+          const next = document.body.dataset.drawer !== 'open';
+          setDrawerState(next);
+        }
+      });
+    }
+  });
+}
+
+/**
+ * Issue 11 mobile marginalia wiring.
+ *
+ * At <48rem the longform review surface collapses the marginalia
+ * aside to header-only. Tapping the header toggles `aria-expanded`
+ * on the aside; CSS rules pick up the attribute and animate the
+ * height. On wider viewports the click handler returns early so
+ * desktop interactions (margin-note composer) are unaffected.
+ *
+ * Pre-Dispatch-D this also handled the scrapbook drawer; the new
+ * bottom-anchored drawer has its own toggle (initScrapbookDrawerToggle).
+ */
+function initMobileMarginaliaToggle(): void {
+  const isMobile = (): boolean =>
+    window.matchMedia('(max-width: 48rem)').matches;
+
+  const aside = document.querySelector<HTMLElement>('.er-marginalia');
+  if (!aside) return;
+  if (!aside.hasAttribute('aria-expanded')) {
+    aside.setAttribute('aria-expanded', 'false');
+  }
+  const head = aside.querySelector<HTMLElement>('.er-marginalia-head');
+  if (!head) return;
+  head.addEventListener('click', () => {
+    if (!isMobile()) return;
+    const expanded = aside.getAttribute('aria-expanded') === 'true';
+    aside.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+  });
 }
 
 initEditorialReview();

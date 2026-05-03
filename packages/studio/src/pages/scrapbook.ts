@@ -1,243 +1,408 @@
 /**
- * Scrapbook viewer — `/dev/scrapbook/:site/<path>` (path may include `/`).
+ * Scrapbook viewer — `/dev/scrapbook/:site/<path>`.
  *
- * Reads the scrapbook directory at the given path and lists every
- * file with type chips + relative timestamps, plus secret items
- * (inside `scrapbook/secret/`) in a quiet second section. Empty
- * scrapbooks render an empty state with quick-add affordances.
+ * Issue #161 redesign: aside-left folder card with numbered item list,
+ * vertical card grid with per-kind colored ribbons + always-visible foot
+ * toolbar + per-kind preview rendering, drop zone, secret section,
+ * single-expanded card invariant, aside cross-linking.
  *
- * The `path` argument is the hierarchical address of the scrapbook —
- * any slash-separated kebab-case identifier under the site's
- * contentDir. It does not need to correspond to a calendar entry;
- * organizational nodes (e.g. `the-outbound/characters` with no
- * own README) can host their own scrapbooks too.
- *
- * Port of `pages/dev/scrapbook/[site]/[slug].astro`. Layout swap
- * (Astro `<Layout>` → studio shell) and CSS link added; structurally
- * similar otherwise.
+ * Mockup: docs/superpowers/frontend-design/2026-05-02-review-redesign/scrapbook-redesign.html
+ * Spec:   docs/superpowers/specs/2026-05-02-scrapbook-redesign-impl-spec.md
  */
 
+import { readFileSync } from 'node:fs';
 import {
   formatRelativeTime,
   formatSize,
   listScrapbook,
+  scrapbookFilePath,
   type ScrapbookItem,
+  type ScrapbookItemKind,
 } from '@deskwork/core/scrapbook';
 import type { StudioContext } from '../routes/api.ts';
 import { html, unsafe, type RawHtml } from './html.ts';
 import { layout } from './layout.ts';
 import { renderEditorialFolio } from './chrome.ts';
 
-interface RenderItemRowOptions {
-  /** Mark the row visually as belonging to the secret section. */
-  secret?: boolean;
-  /**
-   * When true, render disclosure controls + toolbar. Both public AND
-   * secret rows now ship the toolbar (#28); the per-section tools
-   * include a "Mark secret" / "Mark public" toggle that the client
-   * resolves into a cross-section rename. Pre-#28 secret rows were
-   * read-only — that decision is reversed here so operators have full
-   * CRUD over secret/ items from the standalone viewer.
-   */
-  withTools?: boolean;
+const KIND_LABEL: Record<ScrapbookItemKind, string> = {
+  md: 'MD',
+  img: 'IMG',
+  json: 'JSON',
+  js: 'JS',
+  txt: 'TXT',
+  other: '·',
+};
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
-function renderItemRow(
+/**
+ * Strip a YAML frontmatter block from the top of an md file. Only strips
+ * the leading `---\n...\n---\n` block; body-level `---` separators (Setext
+ * H2 underline, thematic break) are preserved because the function only
+ * looks at the first 4 chars for the opener.
+ */
+function stripFrontmatter(text: string): string {
+  if (!text.startsWith('---\n')) return text;
+  const closeIdx = text.indexOf('\n---\n', 4);
+  if (closeIdx < 0) return text;
+  return text.slice(closeIdx + 5).replace(/^\n+/, '');
+}
+
+/**
+ * Build the closed-state preview excerpt for md/json/txt. Returns null
+ * when there's nothing useful to render — empty file, frontmatter-only
+ * file, or binary masquerading as text — so the caller can omit the
+ * preview block entirely (matches "other" kind treatment, avoids the
+ * 6rem min-height void).
+ *
+ * For json: pretty-print via JSON.parse + JSON.stringify(_, null, 2) so
+ * minified single-line files still render multi-line. Falls back to raw
+ * content on parse error (bad JSON is still readable as text).
+ *
+ * Binary detection: NUL byte presence after UTF-8 decode. Real text
+ * almost never has NUL; binary files have it within the first KB.
+ */
+function previewExcerpt(buf: Buffer, kind: 'md' | 'json' | 'txt'): string | null {
+  let text = buf.subarray(0, Math.min(buf.byteLength, 2400)).toString('utf-8');
+  if (text.indexOf('\0') >= 0) return null;
+  if (kind === 'md') text = stripFrontmatter(text);
+  if (kind === 'json') {
+    try {
+      const fullText = buf.toString('utf-8');
+      text = JSON.stringify(JSON.parse(fullText), null, 2);
+    } catch {
+      // Invalid JSON — fall through to the raw-text excerpt below.
+    }
+  }
+  const excerpt = text.split('\n').slice(0, 8).join('\n').slice(0, 600);
+  if (excerpt.trim() === '') return null;
+  return excerpt;
+}
+
+/**
+ * Count lines in a text file: number of `\n` bytes plus 1 if the last
+ * byte isn't `\n` (so a 3-line file whether or not it has a trailing
+ * newline reports 3).
+ */
+function countLines(buf: Buffer): number {
+  let count = 0;
+  for (const b of buf) if (b === 0x0a) count++;
+  if (buf.length > 0 && buf[buf.length - 1] !== 0x0a) count++;
+  return count;
+}
+
+/**
+ * Count top-level keys in a JSON object. Returns null if the file is not
+ * valid JSON or its root is not a plain object (arrays, primitives →
+ * null; caller renders no extra meta).
+ */
+function countJsonKeys(buf: Buffer): number | null {
+  try {
+    const obj: unknown = JSON.parse(buf.toString('utf-8'));
+    if (obj !== null && typeof obj === 'object' && !Array.isArray(obj)) {
+      return Object.keys(obj).length;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+interface ImageDimensions { readonly width: number; readonly height: number; }
+
+/**
+ * Read PNG dimensions from the IHDR chunk. Returns null for non-PNG or
+ * truncated files. JPEG/WebP/GIF support deferred — most deskwork
+ * scrapbook images are screenshots / icons (PNG) and the meta is purely
+ * informational, so the empty-string fallback is acceptable for other
+ * formats.
+ */
+function readImageDimensions(buf: Buffer): ImageDimensions | null {
+  if (buf.length < 24) return null;
+  if (buf[0] !== 0x89 || buf[1] !== 0x50 || buf[2] !== 0x4e || buf[3] !== 0x47) return null;
+  return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+}
+
+/**
+ * Compute the per-kind extra meta string shown after the kind chip + size:
+ *   md / txt → "{N} lines"
+ *   json     → "{N} keys" (root must be a plain object; otherwise empty)
+ *   img      → "{W} × {H}" (PNG only; other formats → empty)
+ *   other    → empty
+ *
+ * ENOENT (race-window with delete) returns empty so the card still
+ * renders; other errors propagate to the page renderer.
+ */
+function computeKindMeta(
+  ctx: StudioContext,
+  site: string,
+  path: string,
+  item: ScrapbookItem,
+): string {
+  if (item.kind !== 'md' && item.kind !== 'txt' && item.kind !== 'json' && item.kind !== 'img') {
+    return '';
+  }
+  let buf: Buffer;
+  try {
+    const fullPath = scrapbookFilePath(ctx.projectRoot, ctx.config, site, path, item.name);
+    buf = readFileSync(fullPath);
+  } catch (e) {
+    if (e instanceof Error && 'code' in e && e.code === 'ENOENT') return '';
+    throw e;
+  }
+  if (item.kind === 'md' || item.kind === 'txt') return `${countLines(buf)} lines`;
+  if (item.kind === 'json') {
+    const keys = countJsonKeys(buf);
+    return keys !== null ? `${keys} keys` : '';
+  }
+  // img
+  const dims = readImageDimensions(buf);
+  return dims ? `${dims.width} × ${dims.height}` : '';
+}
+
+/**
+ * Server-side preview for the closed-state card. Img → bg-frame URL;
+ * md → italic Newsreader excerpt with frontmatter stripped; json → mono
+ * pre with parse-then-stringify pretty-print; txt → mono pre raw excerpt.
+ * Other / empty / binary-as-text → no preview block.
+ */
+function renderPreview(
+  ctx: StudioContext,
+  site: string,
+  path: string,
+  item: ScrapbookItem,
+  opts: { secret?: boolean } = {},
+): RawHtml {
+  const { secret = false } = opts;
+  if (item.kind === 'img') {
+    const params = new URLSearchParams({ site, path, name: item.name });
+    if (secret) params.set('secret', '1');
+    const url = `/api/dev/scrapbook-file?${params.toString()}`;
+    return unsafe(html`
+      <div class="scrap-preview scrap-preview--img" aria-hidden="true">
+        <div class="scrap-preview--img-frame" style="background-image: url(&quot;${url}&quot;);"></div>
+      </div>`);
+  }
+  if (item.kind !== 'md' && item.kind !== 'txt' && item.kind !== 'json') {
+    return unsafe('');
+  }
+  try {
+    const fullPath = scrapbookFilePath(
+      ctx.projectRoot,
+      ctx.config,
+      site,
+      path,
+      item.name,
+      secret ? { secret: true } : {},
+    );
+    const buf = readFileSync(fullPath);
+    const excerpt = previewExcerpt(buf, item.kind);
+    if (excerpt === null) return unsafe('');
+    const safe = escapeHtml(excerpt);
+    if (item.kind === 'json' || item.kind === 'txt') {
+      return unsafe(html`
+        <pre class="scrap-preview scrap-preview--mono" aria-hidden="true">${unsafe(safe)}</pre>`);
+    }
+    return unsafe(html`
+      <div class="scrap-preview scrap-preview-md" aria-hidden="true"><p>${unsafe(safe)}</p></div>`);
+  } catch (e) {
+    // ENOENT = file disappeared between listScrapbook and this read (race
+    // window with delete); rendering an empty preview is the right call.
+    // Anything else (EACCES, EISDIR, encoding bugs) propagates so the
+    // operator sees a real error instead of a silently-broken page.
+    if (e instanceof Error && 'code' in e && e.code === 'ENOENT') {
+      return unsafe('');
+    }
+    throw e;
+  }
+}
+
+interface KindCounts {
+  all: number;
+  md: number;
+  img: number;
+  json: number;
+  js: number;
+  txt: number;
+  other: number;
+}
+
+function countByKind(items: readonly ScrapbookItem[]): KindCounts {
+  const counts: KindCounts = {
+    all: items.length,
+    md: 0,
+    img: 0,
+    json: 0,
+    js: 0,
+    txt: 0,
+    other: 0,
+  };
+  for (const i of items) counts[i.kind]++;
+  return counts;
+}
+
+function renderFilterChips(counts: KindCounts): RawHtml {
+  const chip = (kind: keyof KindCounts, label: string, isAll = false): RawHtml =>
+    unsafe(html`
+    <button class="scrap-filter" type="button" data-filter="${kind}"
+      aria-pressed="${isAll ? 'true' : 'false'}">${label} · ${counts[kind]}</button>`);
+  return unsafe(html`
+    <div class="scrap-filters" role="toolbar" aria-label="filter by kind">
+      ${chip('all', 'all', true)}
+      ${chip('md', 'md')}
+      ${chip('img', 'img')}
+      ${chip('json', 'json')}
+      ${chip('txt', 'txt')}
+      ${chip('other', 'other')}
+    </div>`);
+}
+
+function renderSearch(): RawHtml {
+  return unsafe(html`
+    <div class="scrap-search">
+      <input type="search" placeholder="filter by name or content" aria-label="filter scrapbook" data-scrap-search />
+      <span class="scrap-search-kbd">/</span>
+    </div>`);
+}
+
+function renderBreadcrumb(site: string, path: string): RawHtml {
+  const segments = path.split('/').filter(Boolean);
+  const last = segments[segments.length - 1] ?? path;
+  return unsafe(html`
+    <nav class="scrap-breadcrumb" aria-label="hierarchy">
+      <a href="/dev/content/${site}">${site}</a><span class="sep">›</span>
+      <b>${last}</b>
+    </nav>`);
+}
+
+function renderAside(
+  site: string,
+  path: string,
+  items: readonly ScrapbookItem[],
+  totalSize: number,
+  lastModified: string | null,
+  secretCount: number,
+): RawHtml {
+  const lastModifiedLabel = lastModified ? formatRelativeTime(lastModified) : '—';
+  const publicCount = items.length;
+  const sizeLabel = formatSize(totalSize);
+  const folderLabel = path.split('/').filter(Boolean).pop() ?? path;
+  const fullPath = `${site}/${path}/scrapbook/`;
+  return unsafe(html`
+    <aside class="scrap-aside">
+      <p class="scrap-aside-kicker"><em>§</em> The folder</p>
+      <h1 class="scrap-aside-title">${folderLabel}</h1>
+      <p class="scrap-aside-meta">${site}</p>
+      <hr />
+      <p class="scrap-aside-totals">
+        <strong>${publicCount}</strong> public ·
+        <strong>${secretCount}</strong> secret ·
+        <em>${sizeLabel}</em>
+      </p>
+      <p class="scrap-aside-meta">last modified ${lastModifiedLabel}</p>
+      <hr />
+      <ol class="scrap-aside-list" data-scrap-aside-list>
+        ${items.map((item, i) => {
+          const seq = String(i + 1).padStart(2, '0');
+          return unsafe(html`<li><span class="num">${seq}</span><a href="#item-${i + 1}" data-scrap-aside-link>${item.name}</a></li>`);
+        })}
+      </ol>
+      <hr />
+      <div class="scrap-aside-actions">
+        <button class="scrap-aside-btn scrap-aside-btn--primary" type="button" data-action="new-note">+ new note</button>
+        <button class="scrap-aside-btn" type="button" data-action="upload">+ upload file</button>
+      </div>
+      <hr />
+      <p class="scrap-aside-path">${fullPath}</p>
+    </aside>`);
+}
+
+function renderCard(
+  ctx: StudioContext,
+  site: string,
+  path: string,
   item: ScrapbookItem,
   index: number,
-  opts: RenderItemRowOptions = {},
+  opts: { secret?: boolean } = {},
 ): RawHtml {
-  const { secret = false, withTools = true } = opts;
-  const editBtn =
-    withTools && item.kind === 'md'
-      ? unsafe(html`<button type="button" class="scrapbook-tool" data-action="edit">edit</button>`)
-      : '';
+  const { secret = false } = opts;
   const seq = String(index + 1).padStart(2, '0');
-  const kindLabel = item.kind === 'other' ? '·' : item.kind.toUpperCase();
-  const idPrefix = secret ? 'secret-' : '';
-  const dataSecret = secret ? ' data-secret="true"' : '';
-  // The "mark secret/public" toggle is the cross-section rename
-  // affordance. The button label flips with the source section.
-  const sectionToggleLabel = secret ? 'mark public' : 'mark secret';
-  const toolbar = withTools
-    ? unsafe(html`<div class="scrapbook-toolbar" data-toolbar>
-        ${editBtn}
-        <button type="button" class="scrapbook-tool" data-action="rename">rename</button>
-        <button type="button" class="scrapbook-tool" data-action="toggle-secret">${sectionToggleLabel}</button>
-        <button type="button" class="scrapbook-tool scrapbook-tool--delete" data-action="delete">delete</button>
-      </div>`)
+  const kindLabel = KIND_LABEL[item.kind];
+  const kindClass = item.kind === 'other' ? '' : `scrap-kind--${item.kind}`;
+  const time = item.mtime
+    ? html`<time class="scrap-time" datetime="${item.mtime}">${formatRelativeTime(item.mtime)}</time>`
     : '';
+  const preview = renderPreview(ctx, site, path, item, { secret });
+  const kindMeta = computeKindMeta(ctx, site, path, item);
+  const kindMetaHtml: RawHtml = kindMeta
+    ? unsafe(html`<span>·</span><span>${kindMeta}</span>`)
+    : unsafe('');
+  const editBtn = item.kind === 'img'
+    ? unsafe('')
+    : unsafe(html`<button class="scrap-tool" type="button" data-action="edit">edit</button>`);
+  // Secret cards get id="secret-item-N" to disambiguate from public ids in
+  // restoreFromHash + aside cross-link lookups (F4 contract); the
+  // mark-secret action toggle reads "mark public" since clicking it moves
+  // the card OUT of the secret section.
+  const id = secret ? `secret-item-${index + 1}` : `item-${index + 1}`;
+  const markSecretLabel = secret ? 'mark public' : 'mark secret';
+  const dataSecretAttr = secret ? ' data-secret="true"' : '';
   return unsafe(html`
-    <li class="scrapbook-item${secret ? ' scrapbook-item--secret' : ''}" data-state="closed" data-open="false"
-      data-filename="${item.name}" data-kind="${item.kind}"
-      data-size="${item.size}" data-mtime="${item.mtime}"${unsafe(dataSecret)}
-      id="${idPrefix}item-${encodeURIComponent(item.name)}">
-      <button type="button" class="scrapbook-item-header" aria-expanded="false">
-        <span class="scrapbook-seq" aria-hidden="true">§ ${seq}</span>
-        <span class="scrapbook-kind scrapbook-kind--${item.kind}" aria-hidden="true">${kindLabel}</span>
-        <span class="scrapbook-filename" data-filename-cell>${item.name}</span>
-        <time class="scrapbook-mtime" datetime="${item.mtime}">${formatRelativeTime(item.mtime)}</time>
-        <span class="scrapbook-disclosure" aria-hidden="true">▸</span>
-      </button>
-      ${toolbar}
-      <div class="scrapbook-perforation" aria-hidden="true"></div>
-      <div class="scrapbook-item-body" data-body>
-        <div data-body-content></div>
+    <li class="scrap-card" data-kind="${item.kind}" data-state="closed" id="${id}"${unsafe(dataSecretAttr)}>
+      <div class="scrap-card-head">
+        <span class="scrap-seq">N° ${seq}</span>
+        <span class="scrap-name" data-action="open">${item.name}</span>
+        ${unsafe(time)}
+      </div>
+      <div class="scrap-card-meta">
+        <span class="scrap-kind ${kindClass}">${kindLabel}</span>
+        <span class="scrap-size">${formatSize(item.size)}</span>
+        ${kindMetaHtml}
+      </div>
+      ${preview}
+      <div class="scrap-card-foot">
+        <button class="scrap-tool scrap-tool--primary" type="button" data-action="open">open</button>
+        ${editBtn}
+        <button class="scrap-tool" type="button" data-action="rename">rename</button>
+        <button class="scrap-tool" type="button" data-action="mark-secret">${markSecretLabel}</button>
+        <span class="spacer"></span>
+        <button class="scrap-tool scrap-tool--delete" type="button" data-action="delete">delete</button>
       </div>
     </li>`);
 }
 
-/**
- * Build a hierarchical breadcrumb from the path. Each segment links to
- * the scrapbook view for its prefix. The root segment (site) just
- * goes back to the editorial dashboard.
- */
-function renderBreadcrumb(site: string, path: string): RawHtml {
-  const segments = path.split('/');
-  const links: string[] = [];
-  for (let i = 0; i < segments.length; i++) {
-    const prefix = segments.slice(0, i + 1).join('/');
-    const isLast = i === segments.length - 1;
-    if (isLast) {
-      links.push(html`<span class="scrapbook-breadcrumb-current">${segments[i]}</span>`);
-    } else {
-      links.push(
-        html`<a class="scrapbook-breadcrumb-link" href="/dev/scrapbook/${site}/${prefix}">${segments[i]}</a>`,
-      );
-    }
-  }
-  const sep = '<span class="scrapbook-breadcrumb-sep" aria-hidden="true">›</span>';
-  const joined = links.join(`\n${sep}\n`);
+function renderDropZone(): RawHtml {
   return unsafe(html`
-    <nav class="scrapbook-breadcrumb" aria-label="scrapbook hierarchy">
-      <a class="scrapbook-breadcrumb-link" href="/dev/editorial-studio">${site}</a>
-      <span class="scrapbook-breadcrumb-sep" aria-hidden="true">›</span>
-      ${unsafe(joined)}
-    </nav>`);
+    <div class="scrap-drop" role="button" tabindex="0" data-action="upload"
+         aria-label="Drop a file here, or press Enter to pick one">
+      ── drop a file here, or pick one ──
+    </div>`);
 }
 
-function renderIndexSidebar(items: readonly ScrapbookItem[], site: string, path: string): RawHtml {
-  const totalBytes = items.reduce((acc, item) => acc + item.size, 0);
-  const lastModified =
-    items.length > 0
-      ? items.reduce((a, b) => (a.mtime > b.mtime ? a : b)).mtime
-      : null;
+function renderSecretSection(
+  ctx: StudioContext,
+  site: string,
+  path: string,
+  secretItems: readonly ScrapbookItem[],
+): RawHtml {
+  if (secretItems.length === 0) return unsafe('');
+  const cards = secretItems.map((item, i) => renderCard(ctx, site, path, item, i, { secret: true }));
   return unsafe(html`
-    <aside class="scrapbook-index">
-      <p class="scrapbook-index-kicker">
-        <span aria-hidden="true">§</span> The folder
-      </p>
-      <p class="scrapbook-index-meta">${path}</p>
-      <p class="scrapbook-index-meta">${site}</p>
-      <hr />
-      <ol class="scrapbook-index-list" data-scrapbook-index>
-        ${items.map(
-          (item, i) => unsafe(html`<li data-index-for="${item.name}">
-            <span class="scrapbook-index-num">No. ${String(i + 1).padStart(2, '0')}</span>
-            <a href="#item-${encodeURIComponent(item.name)}">${item.name}</a>
-          </li>`),
-        )}
-      </ol>
-      <hr />
-      <p class="scrapbook-index-totals">${items.length} ${items.length === 1 ? 'item' : 'items'} · ${formatSize(totalBytes)}</p>
-      ${
-        lastModified
-          ? unsafe(html`<p class="scrapbook-index-subtotal">last modified ${formatRelativeTime(lastModified)}</p>`)
-          : ''
-      }
-      <hr />
-      <div class="scrapbook-index-actions">
-        <button type="button" class="scrapbook-index-btn" data-action="new-note">+ new note</button>
-        <button type="button" class="scrapbook-index-btn" data-action="upload">+ upload file</button>
-      </div>
-      <hr />
-      <p class="scrapbook-index-path">${site}/${path}/scrapbook/</p>
-    </aside>`);
-}
-
-function renderEmpty(): RawHtml {
-  return unsafe(html`
-    <section class="scrapbook-empty">
-      <p>
-        This scrapbook is empty. Write the first note, or drop a file
-        anywhere on this page.
-      </p>
-      <div class="scrapbook-empty-actions">
-        <button type="button" class="scrapbook-index-btn" data-action="new-note">+ new note</button>
-        <button type="button" class="scrapbook-index-btn" data-action="upload">+ upload file</button>
-      </div>
-    </section>`);
-}
-
-function renderReadingPanel(items: readonly ScrapbookItem[]): RawHtml {
-  return unsafe(html`
-    <section class="scrapbook-reading">
-      <form class="scrapbook-composer" data-scrapbook-composer hidden>
-        <div class="scrapbook-composer-header">
-          <span class="scrapbook-composer-seq" aria-hidden="true">✎</span>
-          <span class="scrapbook-composer-kind">NEW</span>
-          <input type="text" class="scrapbook-composer-filename" data-composer-filename
-            placeholder="note-name.md" aria-label="new note filename" />
-          <div class="scrapbook-editor-footer scrapbook-composer-actions">
-            <label class="scrapbook-secret-toggle" title="save under scrapbook/secret/ — never published">
-              <input type="checkbox" data-composer-secret />
-              <span>secret</span>
-            </label>
-            <button type="button" class="scrapbook-tool" data-action="composer-cancel">cancel</button>
-            <button type="submit" class="scrapbook-tool scrapbook-tool--primary" data-action="composer-save">save →</button>
-          </div>
-        </div>
-        <div class="scrapbook-composer-body">
-          <textarea data-composer-body
-            placeholder="Write the note in markdown. Cmd/Ctrl+S saves."
-            aria-label="new note body"></textarea>
-        </div>
-      </form>
-      <ol class="scrapbook-items" data-scrapbook-items>
-        ${items.map((item, i) => renderItemRow(item, i))}
-      </ol>
-      <div class="scrapbook-drop" data-scrapbook-drop role="button" tabindex="0"
-        aria-label="upload a file to the scrapbook">
-        <span class="scrapbook-drop-label">── drop a file here, or pick one ──</span>
-        <input type="file" data-scrapbook-file-input
-          accept="image/*,application/json,text/plain,text/markdown,.md,.json,.txt" />
-        <label class="scrapbook-secret-toggle scrapbook-secret-toggle--upload"
-          title="save the upload under scrapbook/secret/ — never published">
-          <input type="checkbox" data-upload-secret />
-          <span>upload as secret</span>
-        </label>
-      </div>
-    </section>`);
-}
-
-/**
- * Quiet second section listing items inside `scrapbook/secret/`. Read-
- * only in v1 — operators populate the directory by hand or via the
- * core API; the studio surface just shows what's there. The "private"
- * badge gives unmistakable visual differentiation from the public
- * items above.
- */
-function renderSecretSection(items: readonly ScrapbookItem[]): RawHtml {
-  return unsafe(html`
-    <section class="scrapbook-secret" data-scrapbook-secret>
-      <header class="scrapbook-secret-header">
-        <span class="scrapbook-secret-mark" aria-hidden="true">⚿</span>
-        <h2 class="scrapbook-secret-title">Secret</h2>
-        <span class="scrapbook-secret-badge" aria-label="private — never published">
-          private
-        </span>
-        <span class="scrapbook-secret-count">
-          ${items.length} ${items.length === 1 ? 'item' : 'items'}
-        </span>
+    <section class="scrap-secret" aria-label="secret items">
+      <header class="scrap-secret-head">
+        <span class="scrap-secret-mark" aria-hidden="true">⚿</span>
+        <h2 class="scrap-secret-title">Secret</h2>
+        <span class="scrap-secret-badge">private — never published</span>
       </header>
-      <p class="scrapbook-secret-help">
-        Items inside <code>scrapbook/secret/</code>. Excluded from the
-        public site by the host's content-collection patterns.
-      </p>
-      <ol class="scrapbook-items scrapbook-items--secret">
-        ${items.map((item, i) =>
-          renderItemRow(item, i, { secret: true, withTools: true }),
-        )}
+      <ol class="scrap-cards">
+        ${cards}
       </ol>
     </section>`);
 }
@@ -253,46 +418,49 @@ export function renderScrapbookPage(
   if (!(site in ctx.config.sites)) {
     throw new Error(`unknown site: ${site}`);
   }
-  const summary = listScrapbook(ctx.projectRoot, ctx.config, site, path);
-  const items = summary.items;
-  const secretItems = summary.secretItems;
-
-  const publicBlock =
-    items.length === 0
-      ? renderEmpty().__raw
-      : renderReadingPanel(items).__raw + renderIndexSidebar(items, site, path).__raw;
-
-  const secretBlock = secretItems.length > 0 ? renderSecretSection(secretItems).__raw : '';
-
+  // listScrapbook returns { exists: false, items: [] } for missing dirs
+  // (packages/core/src/scrapbook.ts:337-339), so an empty scrapbook is not
+  // an error path. Real errors (slug validation, scrapbookDir resolution
+  // failures, FS permission issues) propagate to the studio's error handler.
+  const result = listScrapbook(ctx.projectRoot, ctx.config, site, path);
+  const items = result.items;
+  const secretItems = result.secretItems;
+  const totalSize = items.reduce((s, i) => s + i.size, 0);
+  const lastModified = items.reduce<string | null>((acc, i) => {
+    if (!i.mtime) return acc;
+    if (!acc || i.mtime > acc) return i.mtime;
+    return acc;
+  }, null);
+  const counts = countByKind(items);
+  const folderLabel = path.split('/').filter(Boolean).pop() ?? path;
+  const cards = items.map((item, i) => renderCard(ctx, site, path, item, i));
+  const cardsHtml = cards.map((c) => c.__raw).join('');
   const body = html`
     ${renderEditorialFolio('content', `scrapbook · ${site}/${path}`)}
-    <main class="scrapbook-page" data-site="${site}" data-slug="${path}" data-scrapbook-root>
-      <header class="er-pagehead er-pagehead--compact scrapbook-header">
-        ${renderBreadcrumb(site, path)}
-        <p class="er-pagehead__kicker scrapbook-kicker">
-          <span class="scrapbook-kicker-mark" aria-hidden="true">§</span>
-          Scrapbook
-        </p>
-        <h1 class="er-pagehead__title scrapbook-title">${path}</h1>
-        <a class="scrapbook-back" href="/dev/editorial-studio">← back to the desk</a>
-      </header>
-      <div class="scrapbook-status" data-scrapbook-status hidden></div>
-      ${unsafe(publicBlock)}
-      ${unsafe(secretBlock)}
-      <div class="scrapbook-drop-overlay" data-scrapbook-overlay aria-hidden="true">
-        <span class="scrapbook-drop-overlay-text">drop to add to the scrapbook ◇</span>
-      </div>
+    <main class="scrap-page" data-site="${site}" data-path="${path}">
+      ${renderAside(site, path, items, totalSize, lastModified, secretItems.length)}
+      <section class="scrap-main">
+        <header class="scrap-main-header">
+          ${renderBreadcrumb(site, path)}
+          ${renderSearch()}
+        </header>
+        ${renderFilterChips(counts)}
+        <ol class="scrap-cards" id="cards" data-scrap-cards>
+          ${unsafe(cardsHtml)}
+        </ol>
+        ${renderDropZone()}
+        ${renderSecretSection(ctx, site, path, secretItems)}
+      </section>
     </main>`;
-
   return layout({
-    title: `scrapbook · ${path} — dev`,
+    title: `scrapbook · ${folderLabel} — dev`,
     cssHrefs: [
       '/static/css/editorial-review.css',
       '/static/css/editorial-nav.css',
       '/static/css/scrapbook.css',
       '/static/css/blog-figure.css',
     ],
-    bodyAttrs: 'data-review-ui="studio"',
+    bodyAttrs: 'data-review-ui="scrapbook"',
     bodyHtml: body,
     scriptModules: ['scrapbook-client'],
   });

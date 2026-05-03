@@ -1,792 +1,502 @@
-/*
- * Scrapbook viewer + studio chip styles.
- * Implements docs/design/scrapbook-phase-19a-design.md.
+/* scrapbook.css — page styling for /dev/scrapbook/<site>/<path>.
  *
- * Color, font, and motion tokens all come from the existing
- * editorialcontrol palette (hsl(var(--*))) — no new tokens.
+ * Issue #161 redesign — aside-left folder card + vertical scrap-card grid
+ * with per-kind ribbons + always-visible foot toolbar + per-kind preview.
+ * Mirrors the approved mockup at
+ * docs/superpowers/frontend-design/2026-05-02-review-redesign/scrapbook-redesign.html
+ *
+ * Tokens (--er-paper, --er-ink, --er-red-pencil, etc.) come from editorial-review.css
+ * and editorial-nav.css; this file does not redeclare them.
  */
 
-/* ---- Page grid ---- */
-
-.scrapbook-page {
+/* ============ PAGE GRID — aside-left + main-right ============ */
+.scrap-page {
+  max-width: var(--er-page-max);
+  margin: var(--er-space-4) auto var(--er-space-6);
+  padding: 0 var(--er-space-4);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(14rem, 18rem);
-  gap: clamp(2rem, 4vw, 4.5rem);
+  grid-template-columns: 17rem 1fr;
+  gap: var(--er-space-5);
   align-items: start;
-  /* CSF-7: shared container width with the rest of the studio. */
-  max-width: var(--er-container-wide);
-  padding: var(--er-space-5) clamp(1.5rem, 4vw, 3rem) var(--er-space-6);
-  margin: 0 auto;
-  color: hsl(var(--foreground));
 }
-.scrapbook-reading { min-width: 0; }
-.scrapbook-index {
+
+/* ============ ASIDE — folder card, sticky on left ============ */
+.scrap-aside {
   position: sticky;
-  top: 5rem;
-  align-self: start;
-  padding-left: 1.25rem;
-  border-left: 1px solid hsl(var(--border));
+  top: calc(var(--er-folio-h) + var(--er-space-3));
+  font-family: var(--er-font-display);
+  background: var(--er-paper);
+  border: 1px solid var(--er-paper-3);
+  border-radius: 2px;
+  padding: var(--er-space-3);
+  box-shadow: 0 6px 14px -8px rgba(26, 22, 20, 0.15);
 }
 
-@media (max-width: 820px) {
-  .scrapbook-page { grid-template-columns: 1fr; }
-  .scrapbook-index {
-    position: static;
-    padding-left: 0;
-    padding-top: 1rem;
-    border-left: 0;
-    border-top: 1px solid hsl(var(--border));
-  }
-}
-
-/* ---- Header ---- */
-
-.scrapbook-header { grid-column: 1 / -1; margin-bottom: 1.5rem; }
-.scrapbook-kicker {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: hsl(var(--primary));
-  margin: 0 0 0.6rem 0;
-}
-.scrapbook-kicker-mark { color: hsl(var(--muted-foreground)); margin-right: 0.35rem; }
-.scrapbook-title {
-  font-family: var(--font-display);
-  font-style: italic;
-  font-variation-settings: 'opsz' 48, 'wght' 500;
-  font-size: clamp(2rem, 4vw, 3rem);
-  line-height: 1.05;
-  margin: 0 0 0.5rem 0;
-  color: hsl(var(--foreground));
-}
-.scrapbook-title a { color: inherit; text-decoration: none; border-bottom: 1px solid transparent; transition: border-color 0.15s ease; }
-.scrapbook-title a:hover { border-bottom-color: hsl(var(--primary)); }
-.scrapbook-meta {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
-  color: hsl(var(--muted-foreground));
-  margin: 0 0 0.6rem 0;
-}
-.scrapbook-back {
-  display: inline-block;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: hsl(var(--primary));
-  text-decoration: none;
-  border-bottom: 1px solid transparent;
-  transition: border-color 0.15s ease;
-}
-.scrapbook-back:hover { border-bottom-color: hsl(var(--primary) / 0.5); }
-.scrapbook-header hr {
-  border: 0;
-  border-top: 1px solid hsl(var(--border));
-  margin: 1.25rem 0 0 0;
-}
-
-/* ---- Item list ---- */
-
-.scrapbook-items {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-.scrapbook-item {
-  border-top: 1px solid hsl(var(--border));
-  transition: background 0.15s ease;
-}
-.scrapbook-item:first-child { border-top: 0; }
-.scrapbook-item[data-state="deleting"] {
-  border-left: 3px solid var(--er-red-pencil, #BC3F32);
-  padding-left: 0;
-}
-
-.scrapbook-item-header {
-  display: grid;
-  grid-template-columns: 3rem 3.5rem 1fr auto auto;
-  gap: 1rem;
-  align-items: baseline;
-  padding: 0.9rem 0.25rem;
-  cursor: pointer;
-  background: transparent;
-  border: 0;
-  width: 100%;
-  text-align: left;
-  color: inherit;
-  font: inherit;
-  transition: background 0.12s ease;
-}
-.scrapbook-item-header:hover { background: hsl(var(--card-hover) / 0.28); }
-.scrapbook-item-header:focus-visible {
-  outline: 2px solid hsl(var(--primary));
-  outline-offset: 2px;
-}
-
-.scrapbook-seq {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
-  color: hsl(var(--primary));
-  font-variant-numeric: tabular-nums;
-}
-.scrapbook-kind {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  line-height: 1;
-}
-.scrapbook-kind--md    { color: hsl(var(--foreground)); }
-.scrapbook-kind--json  { color: hsl(var(--accent)); }
-.scrapbook-kind--js    { color: hsl(var(--primary)); }
-.scrapbook-kind--img   { color: hsl(var(--accent)); }
-.scrapbook-kind--txt   { color: hsl(var(--muted-foreground)); }
-.scrapbook-kind--other { color: hsl(var(--muted-foreground)); }
-
-.scrapbook-filename {
-  font-family: var(--font-mono);
-  font-size: 0.9rem;
-  letter-spacing: 0.02em;
-  color: hsl(var(--foreground));
-  word-break: break-all;
-}
-.scrapbook-mtime {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
-  color: hsl(var(--muted-foreground));
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.scrapbook-disclosure {
-  font-family: var(--font-mono);
-  font-size: 1rem;
-  color: hsl(var(--muted-foreground));
-  transition: transform 0.15s ease;
-}
-.scrapbook-item[data-open="true"] .scrapbook-disclosure {
-  transform: rotate(90deg);
-}
-
-/* ---- Item toolbar ---- */
-
-.scrapbook-toolbar {
-  grid-column: 1 / -1;
-  display: flex;
-  gap: 0.5rem;
-  justify-content: flex-end;
-  padding: 0 0.25rem 0.5rem 0.25rem;
-  opacity: 0;
-  max-height: 0;
-  overflow: hidden;
-  transition: opacity 0.12s ease, max-height 0.12s ease;
-}
-.scrapbook-item:hover .scrapbook-toolbar,
-.scrapbook-item:focus-within .scrapbook-toolbar,
-.scrapbook-item[data-open="true"] .scrapbook-toolbar {
-  opacity: 1;
-  max-height: 3rem;
-}
-.scrapbook-tool {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: hsl(var(--muted-foreground));
-  background: transparent;
-  border: 1px solid transparent;
-  padding: 0.2rem 0.55rem;
-  cursor: pointer;
-  transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
-}
-.scrapbook-tool:hover {
-  color: hsl(var(--primary));
-  border-color: hsl(var(--primary) / 0.5);
-}
-.scrapbook-tool--delete:hover {
-  color: var(--er-red-pencil, #BC3F32);
-  border-color: var(--er-red-pencil, #BC3F32);
-}
-.scrapbook-tool--primary {
-  color: hsl(var(--primary));
-  border-color: hsl(var(--primary) / 0.5);
-}
-.scrapbook-tool--primary:hover {
-  background: hsl(var(--primary));
-  color: hsl(var(--background));
-}
-
-/* ---- Item body ---- */
-
-.scrapbook-item-body {
-  display: none;
-  position: relative;
-  padding: 0 1rem 1.5rem 6.5rem;
-}
-.scrapbook-item[data-open="true"] .scrapbook-item-body {
-  display: block;
-  animation: scrapbook-expand 180ms ease-out;
-}
-@keyframes scrapbook-expand {
-  from { opacity: 0; transform: translateY(-4px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.scrapbook-perforation {
-  height: 3px;
-  margin: 0 1rem 1rem 6.5rem;
-  background: repeating-linear-gradient(
-    90deg,
-    var(--er-red-pencil, #BC3F32) 0 6px,
-    transparent 6px 10px
-  );
-  display: none;
-}
-.scrapbook-item[data-open="true"] .scrapbook-perforation { display: block; }
-
-/* Body content by kind */
-.scrapbook-body-md {
-  max-width: 44rem;
-  font-family: var(--font-body);
-  font-size: 1rem;
-  line-height: 1.6;
-  color: hsl(var(--foreground));
-}
-.scrapbook-body-md h1,
-.scrapbook-body-md h2,
-.scrapbook-body-md h3 {
-  font-family: var(--font-display);
-  font-style: italic;
-  font-weight: 500;
-  color: hsl(var(--foreground));
-  margin: 1.5rem 0 0.6rem;
-}
-.scrapbook-body-md h1 { font-size: 1.5rem; }
-.scrapbook-body-md h2 { font-size: 1.2rem; }
-.scrapbook-body-md h3 { font-size: 1.05rem; }
-.scrapbook-body-md p { margin: 0 0 0.9rem; }
-.scrapbook-body-md code {
-  font-family: var(--font-mono);
-  font-size: 0.88em;
-  background: hsl(var(--card));
-  padding: 0.1em 0.4em;
-  border: 1px solid hsl(var(--border));
-  color: hsl(var(--primary));
-}
-.scrapbook-body-md pre {
-  font-family: var(--font-mono);
-  font-size: 0.82rem;
-  line-height: 1.55;
-  background: hsl(var(--card));
-  padding: 1rem;
-  overflow-x: auto;
-  border: 1px solid hsl(var(--border));
-  margin: 1rem 0;
-}
-.scrapbook-body-md pre code { background: none; border: 0; padding: 0; color: hsl(var(--foreground)); }
-.scrapbook-body-md a {
-  color: hsl(var(--primary));
-  text-decoration: none;
-  border-bottom: 1px solid hsl(var(--primary) / 0.4);
-}
-.scrapbook-body-md a:hover { border-bottom-color: hsl(var(--primary)); }
-.scrapbook-body-md ul,
-.scrapbook-body-md ol { margin: 0 0 1rem 1.5rem; padding: 0; }
-.scrapbook-body-md li { margin-bottom: 0.3rem; }
-.scrapbook-body-md blockquote {
-  border-left: 2px solid hsl(var(--primary));
-  padding-left: 1rem;
-  margin: 1rem 0;
-  font-style: italic;
-  color: hsl(var(--muted-foreground));
-}
-.scrapbook-body-md table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 0 0 1.1rem;
-  font-size: 0.92rem;
-  font-variant-numeric: tabular-nums;
-}
-.scrapbook-body-md th,
-.scrapbook-body-md td {
-  text-align: left;
-  padding: 0.45rem 0.7rem;
-  border-bottom: 1px solid hsl(var(--border));
-  vertical-align: top;
-}
-.scrapbook-body-md th {
-  font-weight: 600;
-  font-size: 0.78rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: hsl(var(--muted-foreground));
-  border-bottom-color: hsl(var(--foreground) / 0.35);
-}
-.scrapbook-body-md tbody tr:last-child td {
-  border-bottom: 0;
-}
-
-.scrapbook-body-code {
-  font-family: var(--font-mono);
-  font-size: 0.82rem;
-  line-height: 1.55;
-  background: hsl(var(--card));
-  padding: 1rem;
-  overflow-x: auto;
-  border: 1px solid hsl(var(--border));
-  color: hsl(var(--foreground));
-  white-space: pre;
-  max-height: 28rem;
-  overflow-y: auto;
-}
-
-.scrapbook-body-img {
-  max-width: 100%;
-}
-.scrapbook-body-img img {
-  max-width: 100%;
-  height: auto;
-  display: block;
-  border: 1px solid hsl(var(--border));
-}
-.scrapbook-body-img-meta {
-  margin-top: 0.5rem;
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  color: hsl(var(--muted-foreground));
-  letter-spacing: 0.06em;
-}
-.scrapbook-body-other {
-  font-family: var(--font-mono);
-  font-size: 0.82rem;
-  color: hsl(var(--muted-foreground));
-  padding: 0.5rem 0;
-}
-.scrapbook-body-other a { color: hsl(var(--primary)); text-decoration: none; border-bottom: 1px solid hsl(var(--primary) / 0.4); }
-
-/* ---- Inline editors (edit / rename / create) ---- */
-
-.scrapbook-editor-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  margin-top: 0.6rem;
-}
-.scrapbook-editor textarea {
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
-  line-height: 1.6;
-  background: hsl(var(--card));
-  border: 1px solid hsl(var(--border));
-  color: hsl(var(--foreground));
-  padding: 1rem;
-  width: 100%;
-  box-sizing: border-box;
-  min-height: 12rem;
-  resize: vertical;
-  border-radius: 0;
-  letter-spacing: 0;
-}
-.scrapbook-editor textarea:focus {
-  outline: none;
-  border-color: hsl(var(--primary));
-  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.2);
-}
-
-.scrapbook-rename-input {
-  font-family: var(--font-mono);
-  font-size: 0.9rem;
-  color: hsl(var(--foreground));
-  background: transparent;
-  border: 0;
-  border-bottom: 1px dashed hsl(var(--border));
-  padding: 0 0 2px 0;
-  width: 100%;
-  outline: none;
-  letter-spacing: 0.02em;
-}
-.scrapbook-rename-input:focus { border-bottom-color: hsl(var(--primary)); border-bottom-style: solid; }
-.scrapbook-rename-input[data-invalid="true"] { border-bottom-color: var(--er-red-pencil, #BC3F32); border-bottom-style: solid; }
-.scrapbook-rename-hint {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
-  color: var(--er-red-pencil, #BC3F32);
-  margin: 0.2rem 0 0 0;
-}
-
-/* ---- Create-note composer ---- */
-
-.scrapbook-composer {
-  border-top: 1px solid hsl(var(--border));
-  border-bottom: 1px solid hsl(var(--border));
-  padding: 0.9rem 0.25rem 1rem 0.25rem;
-  background: hsl(var(--card) / 0.35);
-  animation: scrapbook-composer-in 200ms ease-out;
-}
-@keyframes scrapbook-composer-in {
-  from { opacity: 0; transform: translateY(-8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.scrapbook-composer[hidden] { display: none; }
-.scrapbook-composer-header {
-  display: grid;
-  grid-template-columns: 3rem 3.5rem 1fr auto;
-  gap: 1rem;
-  align-items: baseline;
-  margin-bottom: 0.75rem;
-}
-.scrapbook-composer-seq {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
-  color: hsl(var(--primary));
-}
-.scrapbook-composer-kind {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: hsl(var(--accent));
-}
-.scrapbook-composer-filename {
-  font-family: var(--font-mono);
-  font-size: 0.9rem;
-  background: transparent;
-  border: 0;
-  border-bottom: 1px dashed hsl(var(--border));
-  color: hsl(var(--foreground));
-  padding: 0 0 2px 0;
-  outline: none;
-  letter-spacing: 0.02em;
-}
-.scrapbook-composer-filename:focus { border-bottom-color: hsl(var(--primary)); border-bottom-style: solid; }
-.scrapbook-composer-body {
-  padding-left: 6.5rem;
-}
-.scrapbook-composer textarea {
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
-  line-height: 1.6;
-  background: hsl(var(--card));
-  border: 1px solid hsl(var(--border));
-  color: hsl(var(--foreground));
-  padding: 1rem;
-  width: 100%;
-  box-sizing: border-box;
-  min-height: 10rem;
-  resize: vertical;
-  border-radius: 0;
-}
-.scrapbook-composer textarea:focus {
-  outline: none;
-  border-color: hsl(var(--primary));
-  box-shadow: 0 0 0 2px hsl(var(--primary) / 0.2);
-}
-
-/* ---- Delete confirm state ---- */
-
-.scrapbook-confirm-bar {
-  position: relative;
-  height: 2px;
-  margin: 0 0 0.5rem 0;
-  background: transparent;
-}
-.scrapbook-confirm-bar::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: var(--er-red-pencil, #BC3F32);
-  transform-origin: right center;
-  animation: scrapbook-countdown 4000ms linear forwards;
-}
-@keyframes scrapbook-countdown {
-  from { transform: scaleX(1); }
-  to   { transform: scaleX(0); }
-}
-
-/* ---- Drop zone ---- */
-
-.scrapbook-drop {
-  margin-top: 2rem;
-  padding: 2rem 1rem;
-  border: 1px dashed hsl(var(--border));
-  text-align: center;
-  cursor: pointer;
-  transition: border-color 0.12s ease, background 0.12s ease;
-}
-.scrapbook-drop:hover,
-.scrapbook-drop[data-hover="true"] {
-  border-color: hsl(var(--primary));
-  background: hsl(var(--primary) / 0.06);
-}
-.scrapbook-drop-label {
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: hsl(var(--muted-foreground));
-}
-.scrapbook-drop input[type="file"] {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-  width: 0;
-  height: 0;
-}
-
-/* ---- Full-page drop overlay ---- */
-
-.scrapbook-drop-overlay {
-  position: fixed;
-  inset: 0;
-  background: hsl(var(--background) / 0.92);
-  z-index: 500;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-  animation: scrapbook-overlay-in 120ms ease-out;
-}
-.scrapbook-drop-overlay[data-active="true"] { display: flex; }
-.scrapbook-drop-overlay::before {
-  content: '';
-  position: absolute;
-  inset: 12px;
-  border: 2px dashed hsl(var(--primary));
-}
-.scrapbook-drop-overlay-text {
-  font-family: var(--font-display);
-  font-style: italic;
-  font-size: 2.5rem;
-  font-weight: 500;
-  color: hsl(var(--primary));
-  letter-spacing: -0.01em;
-}
-@keyframes scrapbook-overlay-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-/* ---- Marginalia index rail ---- */
-
-.scrapbook-index-kicker {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: hsl(var(--primary));
-  margin: 0 0 0.4rem 0;
-}
-.scrapbook-index-meta {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: hsl(var(--muted-foreground));
-  letter-spacing: 0.04em;
-  margin: 0 0 0.25rem 0;
-  word-break: break-all;
-}
-.scrapbook-index hr {
-  border: 0;
-  border-top: 1px solid hsl(var(--border));
-  margin: 0.9rem 0;
-}
-.scrapbook-index-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  font-variant-numeric: tabular-nums;
-}
-.scrapbook-index-list li {
-  margin: 0 0 0.4rem 0;
-  display: grid;
-  grid-template-columns: 3rem 1fr;
-  gap: 0.5rem;
-  align-items: baseline;
-}
-.scrapbook-index-list li a {
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
-  color: hsl(var(--foreground));
-  text-decoration: none;
-  border-bottom: 1px solid transparent;
-  word-break: break-all;
-  transition: color 0.1s ease, border-color 0.1s ease;
-}
-.scrapbook-index-list li a:hover { color: hsl(var(--primary)); border-bottom-color: hsl(var(--primary) / 0.4); }
-.scrapbook-index-list li[data-active="true"] {
-  border-left: 2px solid hsl(var(--primary));
-  padding-left: 0.4rem;
-  margin-left: -0.4rem;
-}
-.scrapbook-index-num {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  color: hsl(var(--primary));
-  letter-spacing: 0.04em;
-}
-.scrapbook-index-totals {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: hsl(var(--accent));
-  letter-spacing: 0.04em;
-  margin: 0 0 0.25rem 0;
-}
-.scrapbook-index-subtotal {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  color: hsl(var(--muted-foreground));
-  letter-spacing: 0.04em;
-  margin: 0;
-}
-.scrapbook-index-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-.scrapbook-index-btn {
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: hsl(var(--primary));
-  background: transparent;
-  border: 1px solid hsl(var(--primary) / 0.4);
-  padding: 0.55rem 0.75rem;
-  cursor: pointer;
-  text-align: left;
-  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
-}
-.scrapbook-index-btn:hover {
-  background: hsl(var(--primary));
-  color: hsl(var(--background));
-  border-color: hsl(var(--primary));
-}
-.scrapbook-index-path {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  color: hsl(var(--muted-foreground));
-  letter-spacing: 0.04em;
-  word-break: break-all;
-  margin: 0;
-}
-
-/* ---- Empty state ---- */
-
-.scrapbook-empty {
-  grid-column: 1 / -1;
-  text-align: center;
-  padding: 3rem 1rem;
-}
-.scrapbook-empty p {
-  font-family: var(--font-display);
-  font-style: italic;
-  font-size: 1.1rem;
-  color: hsl(var(--muted-foreground));
-  max-width: 36rem;
-  margin: 0 auto 1.5rem;
-}
-.scrapbook-empty-actions {
-  display: inline-flex;
-  gap: 0.75rem;
-}
-
-/* ---- Secret toggle (#28) ---- */
-
-.scrapbook-secret-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
+/* Responsive collapse override — placed AFTER the .scrap-aside base rule
+   so `position: static` correctly overrides `position: sticky` at <=64rem.
+   (Without this ordering, the later base rule would override the earlier
+   media-query rule and the aside would remain sticky on tablet/mobile,
+   pinning to viewport top while main scrolls beneath. Caught at G1.6 in
+   docs/superpowers/plans/2026-05-02-scrapbook-redesign-design-reviews.md.) */
+@media (max-width: 64rem) {
+  .scrap-page { grid-template-columns: 1fr; gap: var(--er-space-3); }
+  .scrap-aside { position: static; }
+}
+.scrap-aside-kicker {
   font-family: var(--er-font-mono);
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--er-faded);
-  cursor: pointer;
-  user-select: none;
+  margin: 0 0 var(--er-space-1);
 }
-.scrapbook-secret-toggle input[type="checkbox"] {
+.scrap-aside-kicker em {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  color: var(--er-red-pencil);
+  font-size: 1rem;
+  text-transform: none;
+  letter-spacing: 0;
+  margin-right: 0.25rem;
+}
+.scrap-aside-title {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 144, "wght" 600, "SOFT" 30;
+  font-size: 1.6rem;
+  line-height: 1.1;
+  margin: 0 0 var(--er-space-1);
+  letter-spacing: -0.01em;
+  word-break: break-all;
+}
+.scrap-aside-meta {
+  font-family: var(--er-font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  margin: 0 0 var(--er-space-1);
+}
+.scrap-aside-totals {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  color: var(--er-ink-soft);
+  font-size: 0.95rem;
+  margin: var(--er-space-1) 0;
+}
+.scrap-aside hr {
+  border: 0;
+  border-top: 1px dashed var(--er-faded-2);
+  margin: var(--er-space-2) 0;
+}
+.scrap-aside-list {
+  list-style: none;
+  padding: 0;
   margin: 0;
-  accent-color: var(--er-red-pencil);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  max-height: 16rem;
+  overflow-y: auto;
+}
+.scrap-aside-list li { display: flex; gap: 0.5rem; align-items: baseline; }
+.scrap-aside-list .num {
+  font-family: var(--er-font-mono);
+  font-size: 0.6rem;
+  color: var(--er-faded);
+  letter-spacing: 0.1em;
+}
+.scrap-aside-list a {
+  font-family: var(--er-font-mono);
+  font-size: 0.72rem;
+  color: var(--er-ink-soft);
+  text-decoration: none;
+  border-bottom: 1px dotted transparent;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.scrap-aside-list a:hover { color: var(--er-red-pencil); border-bottom-color: var(--er-red-pencil); }
+.scrap-aside-list a[data-active="true"] { color: var(--er-red-pencil); border-bottom-color: var(--er-red-pencil); }
+
+.scrap-aside-actions { display: flex; flex-direction: column; gap: 0.4rem; }
+.scrap-aside-btn {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--er-paper-2);
+  border: 1px solid var(--er-faded-2);
+  color: var(--er-ink);
+  padding: 0.4rem 0.7rem;
+  border-radius: 2px;
+  text-align: center;
   cursor: pointer;
 }
-.scrapbook-secret-toggle:hover {
+.scrap-aside-btn:hover { background: var(--er-ink); color: var(--er-paper); border-color: var(--er-ink); }
+.scrap-aside-btn--primary { background: var(--er-red-pencil); color: var(--er-paper); border-color: var(--er-red-pencil); }
+.scrap-aside-btn--primary:hover { background: var(--er-ink); border-color: var(--er-ink); }
+
+.scrap-aside-path {
+  font-family: var(--er-font-mono);
+  font-size: 0.62rem;
+  color: var(--er-faded);
+  margin: 0;
+  word-break: break-all;
+}
+
+/* ============ MAIN — header + cards grid ============ */
+.scrap-main { min-width: 0; }
+.scrap-main-header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--er-space-3);
+  margin-bottom: var(--er-space-3);
+  flex-wrap: wrap;
+}
+.scrap-breadcrumb {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+}
+.scrap-breadcrumb a { color: var(--er-faded); text-decoration: none; }
+.scrap-breadcrumb a:hover { color: var(--er-ink); }
+.scrap-breadcrumb .sep { color: var(--er-faded-2); margin: 0 0.4em; }
+.scrap-breadcrumb b { color: var(--er-ink); font-weight: 500; }
+
+.scrap-search {
+  margin-left: auto;
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  font-family: var(--er-font-mono);
+}
+.scrap-search input {
+  font-family: var(--er-font-mono);
+  font-size: 0.75rem;
+  border: 1px solid var(--er-faded-2);
+  background: var(--er-paper);
+  padding: 0.3rem 0.5rem;
+  width: 14rem;
+  border-radius: 2px;
+}
+.scrap-search input::placeholder { color: var(--er-faded); }
+.scrap-search-kbd {
+  font-family: var(--er-font-mono);
+  font-size: 0.6rem;
+  border: 1px solid var(--er-faded-2);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  padding: 0.05rem 0.3rem;
+  background: var(--er-paper);
+  color: var(--er-faded);
+}
+
+.scrap-filters { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: var(--er-space-3); }
+.scrap-filter {
+  font-family: var(--er-font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: transparent;
+  border: 1px solid var(--er-faded-2);
+  color: var(--er-faded);
+  padding: 0.25rem 0.5rem;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.scrap-filter[aria-pressed="true"] { background: var(--er-ink); color: var(--er-paper); border-color: var(--er-ink); }
+
+/* ============ CARDS GRID ============ */
+.scrap-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+  gap: var(--er-space-3);
+}
+@media (min-width: 80rem) {
+  .scrap-cards { grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr)); }
+}
+
+/* ============ CARD CHROME ============ */
+.scrap-card {
+  background: var(--er-paper);
+  border: 1px solid var(--er-paper-3);
+  border-radius: 2px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  transition: border-color 160ms, transform 160ms, box-shadow 160ms;
+}
+.scrap-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: var(--er-faded-2);
+  border-radius: 2px 2px 0 0;
+}
+.scrap-card[data-kind="md"]::before   { background: var(--er-proof-blue); }
+.scrap-card[data-kind="img"]::before  { background: var(--er-stamp-green); }
+.scrap-card[data-kind="json"]::before { background: var(--er-stamp-purple); }
+.scrap-card[data-kind="txt"]::before  { background: var(--er-faded); }
+.scrap-card:hover {
+  border-color: var(--er-red-pencil);
+  transform: translateY(-2px);
+  box-shadow:
+    0 10px 22px -10px rgba(26, 22, 20, 0.18),
+    0 2px 6px -2px rgba(184, 54, 42, 0.18);
+}
+
+.scrap-card-head {
+  padding: var(--er-space-2);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.6rem;
+  align-items: baseline;
+  border-bottom: 1px dotted var(--er-paper-3);
+}
+.scrap-seq {
+  font-family: var(--er-font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  color: var(--er-faded);
+}
+.scrap-name {
+  font-family: var(--er-font-mono);
+  font-size: 0.85rem;
+  color: var(--er-ink);
+  word-break: break-word;
+  cursor: pointer;
+  border-bottom: 1px dotted transparent;
+}
+.scrap-name:hover { color: var(--er-red-pencil); border-bottom-color: var(--er-red-pencil); }
+.scrap-time {
+  font-family: var(--er-font-mono);
+  font-size: 0.62rem;
+  color: var(--er-faded);
+  letter-spacing: 0.08em;
+}
+
+.scrap-card-meta {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  font-family: var(--er-font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  padding: 0.4rem var(--er-space-2);
+  border-bottom: 1px dotted var(--er-paper-3);
+}
+.scrap-kind {
+  font-size: 0.55rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  background: var(--er-faded);
+  color: var(--er-paper);
+}
+.scrap-kind--md   { background: var(--er-proof-blue); }
+.scrap-kind--img  { background: var(--er-stamp-green); }
+.scrap-kind--json { background: var(--er-stamp-purple); }
+.scrap-kind--txt  { background: var(--er-faded); }
+.scrap-size { color: var(--er-ink-soft); }
+
+/* ============ PREVIEW SURFACE ============ */
+.scrap-preview {
+  padding: var(--er-space-2);
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 14, "wght" 350;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--er-ink-soft);
+  flex: 1 1 auto;
+  min-height: 6rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.scrap-preview--mono {
+  font-family: var(--er-font-mono);
+  font-style: normal;
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+  color: var(--er-ink);
+  background: var(--er-paper-2);
+  border-top: 1px solid var(--er-paper-3);
+  border-bottom: 1px solid var(--er-paper-3);
+}
+.scrap-preview--img {
+  padding: 0;
+  min-height: 0;
+  display: block;
+  overflow: hidden;
+}
+.scrap-preview--img-frame {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background-position: center;
+  background-size: cover;
+  background-color: var(--er-paper-3);
+}
+.scrap-preview-md p:first-child { margin-top: 0; }
+.scrap-preview-md em { color: var(--er-stamp-purple); }
+
+/* ============ CARD FOOT — always-visible toolbar ============ */
+.scrap-card-foot {
+  display: flex;
+  gap: 0.3rem;
+  padding: var(--er-space-1) var(--er-space-2);
+  border-top: 1px dotted var(--er-paper-3);
+  background: var(--er-paper-2);
+  font-family: var(--er-font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.scrap-tool {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--er-faded);
+  padding: 0.2rem 0.4rem;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.scrap-tool:hover { color: var(--er-ink); border-color: var(--er-faded-2); }
+.scrap-tool--delete:hover { color: var(--er-red-pencil); border-color: var(--er-red-pencil); }
+.scrap-tool--primary { color: var(--er-stamp-green); border-color: transparent; }
+.scrap-tool--primary:hover { background: var(--er-stamp-green); color: var(--er-paper); border-color: var(--er-stamp-green); }
+.scrap-card-foot .spacer { flex: 1 1 auto; }
+
+/* ============ EXPANDED STATE ============ */
+.scrap-card[data-state="expanded"] {
+  grid-column: 1 / -1;
+  border-color: var(--er-red-pencil);
+}
+.scrap-card[data-state="expanded"] .scrap-preview {
+  -webkit-line-clamp: unset;
+  display: block;
+  min-height: 14rem;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+.scrap-card[data-state="expanded"] .scrap-preview--mono {
+  font-size: 0.85rem;
+  max-height: none;
+  overflow: auto;
+}
+.scrap-card[data-state="expanded"] .scrap-preview--img-frame {
+  aspect-ratio: auto;
+  min-height: 20rem;
+  background-size: contain;
+  background-repeat: no-repeat;
+}
+
+/* ============ KEYBOARD AFFORDANCES ============ */
+.scrap-filter:focus-visible,
+.scrap-aside-btn:focus-visible,
+.scrap-tool:focus-visible,
+.scrap-name:focus-visible,
+.scrap-aside-list a:focus-visible,
+.scrap-search input:focus-visible,
+.scrap-card[data-state="expanded"]:focus-visible {
+  outline: 1px dotted var(--er-red-pencil);
+  outline-offset: 2px;
+}
+.scrap-card:focus-within { border-color: var(--er-faded); }
+.scrap-card[data-state="expanded"]:focus-within { border-color: var(--er-red-pencil); }
+
+/* ============ FILTERED-OUT STATE ============ */
+.scrap-card[data-filtered-out="true"] { display: none; }
+.scrap-card[data-search-out="true"] { display: none; }
+
+/* ============ DROP ZONE (F5) ============ */
+.scrap-drop {
+  margin-top: var(--er-space-4);
+  border: 2px dashed var(--er-faded-2);
+  background: var(--er-paper);
+  padding: var(--er-space-4);
+  text-align: center;
+  font-family: var(--er-font-mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  border-radius: 2px;
+  cursor: pointer;
+}
+.scrap-drop:hover {
+  border-color: var(--er-red-pencil);
   color: var(--er-red-pencil);
 }
-.scrapbook-secret-toggle--upload {
-  display: inline-flex;
-  margin-top: var(--er-space-1);
+.scrap-drop:focus-visible {
+  outline: 1px dotted var(--er-red-pencil);
+  outline-offset: 2px;
+  border-color: var(--er-red-pencil);
+  color: var(--er-red-pencil);
+}
+/* G3 amendment: dashed-becomes-solid + paper-2 bg signals "commitment imminent"
+   while a file is being dragged over the zone. No animation — editorial paper
+   aesthetic prefers static state changes. */
+.scrap-drop[data-dragover="true"] {
+  border-style: solid;
+  border-color: var(--er-red-pencil);
+  background: var(--er-paper-2);
+  color: var(--er-red-pencil);
 }
 
-.scrapbook-composer-actions {
+/* ============ SECRET SECTION (F5) ============ */
+.scrap-secret {
+  margin-top: var(--er-space-5);
+  padding-top: var(--er-space-3);
+  border-top: 2px solid var(--er-paper-4);
+}
+.scrap-secret-head {
   display: flex;
   gap: var(--er-space-2);
-  align-items: center;
-  justify-content: flex-end;
+  align-items: baseline;
+  margin-bottom: var(--er-space-2);
 }
-
-/* ---- Status strip (banner at top for errors / confirmations) ---- */
-
-.scrapbook-status {
-  grid-column: 1 / -1;
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
-  letter-spacing: 0.06em;
-  padding: 0.55rem 0.75rem;
-  margin-bottom: 1rem;
-  border-left: 3px solid hsl(var(--primary));
-  background: hsl(var(--primary) / 0.08);
-  color: hsl(var(--foreground));
+.scrap-secret-mark {
+  color: var(--er-stamp-purple);
+  font-size: 1rem;
 }
-.scrapbook-status[data-kind="error"] {
-  border-left-color: var(--er-red-pencil, #BC3F32);
-  background: rgba(188, 63, 50, 0.12);
+.scrap-secret-title {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 36, "wght" 500;
+  font-size: 1.2rem;
+  margin: 0;
+  color: var(--er-stamp-purple);
 }
-.scrapbook-status[hidden] { display: none; }
-
-/* ---- Studio chip ---- */
-
-a.er-calendar-meta-scrapbook {
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.04em;
-  text-transform: lowercase;
-  color: hsl(var(--muted-foreground));
-  text-decoration: none;
-  padding: 0.1em 0.45em;
+.scrap-secret-badge {
+  font-family: var(--er-font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--er-stamp-purple);
+  border: 1px dashed var(--er-stamp-purple);
+  padding: 0.1rem 0.4rem;
   border-radius: 2px;
-  transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
-}
-a.er-calendar-meta-scrapbook .scrapbook-chip-count {
-  color: hsl(var(--primary));
-  font-variant-numeric: tabular-nums;
-  padding: 0 0.15em;
-}
-a.er-calendar-meta-scrapbook .scrapbook-chip-arrow {
-  display: inline-block;
-  transition: transform 0.12s ease;
-  color: hsl(var(--muted-foreground));
-}
-a.er-calendar-meta-scrapbook:hover {
-  color: hsl(var(--primary));
-  background: hsl(var(--primary) / 0.08);
-  box-shadow: 0 0 0 1px hsl(var(--primary) / 0.3);
-}
-a.er-calendar-meta-scrapbook:hover .scrapbook-chip-arrow {
-  transform: translateX(2px);
-  color: hsl(var(--primary));
 }
 
-/* ---- Reduced motion ---- */
-
+/* ============ REDUCED MOTION ============ */
 @media (prefers-reduced-motion: reduce) {
-  .scrapbook-item-body,
-  .scrapbook-composer,
-  .scrapbook-drop-overlay {
-    animation: none;
+  .scrap-card,
+  .scrap-card:hover {
+    transition: none;
+    transform: none;
   }
-  .scrapbook-confirm-bar::after { animation-duration: 8000ms; }
-  .scrapbook-disclosure { transition: none; }
+  .scrap-aside-list,
+  .scrap-aside-list * {
+    scroll-behavior: auto;
+  }
 }

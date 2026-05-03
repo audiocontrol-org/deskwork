@@ -164,7 +164,7 @@ function renderScrapbookList(
   loader: InlineTextLoader,
 ): RawHtml {
   if (!summary || (summary.items.length === 0 && summary.secretItems.length === 0)) {
-    return renderEmptyScrapbookRow();
+    return renderEmptyScrapbookRow({ site, path: slug });
   }
   const itemRows = summary.items.map((item) =>
     renderReadOnlyScrapbookRow({ site, path: slug }, item, {

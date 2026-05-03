@@ -1,824 +1,291 @@
 /**
- * Scrapbook viewer client. Binds all the interactive behavior the
- * design brief specifies: expand/collapse slips, lazy body-render on
- * first expand, inline edit/rename/delete, create-note composer,
- * drag-drop upload + full-page overlay, index-rail jump + scroll
- * sync, localStorage persistence.
+ * Scrapbook viewer client — `/dev/scrapbook/<site>/<path>`.
  *
- * v0.6.0 (#29) wires the scrapbook lightbox: image-kind items now
- * open in an in-context overlay instead of full-window nav.
+ * Issue #161 redesign — wires the new .scrap-* markup tree:
+ *   - filter chips (.scrap-filter): toggle data-filtered-out on cards
+ *   - search input (.scrap-search input[data-scrap-search]): filter cards by
+ *     name; '/' focuses the input from anywhere outside another text field
+ *   - card open/close (.scrap-name + [data-action="open"]): toggle data-state
+ *   - foot toolbar buttons: rename / edit / mark-secret / delete
+ *   - aside actions: new-note / upload
  *
- * See docs/design/scrapbook-phase-19a-design.md for the contract.
+ * F1 ships filter / search / open-close / mutations. F4 will refine
+ * single-expanded invariant + aside cross-linking + URL hash sync. F5
+ * will add the drop zone and secret section.
+ *
+ * Mutation handlers (rename/edit/delete/mark-secret/new-note/upload)
+ * preserve the rich UX of the prior client and live in
+ * `./scrapbook-mutations.ts`. Markdown rendering and the toast helper
+ * live in `./scrapbook-markdown.ts` and `./scrapbook-toast.ts`. This
+ * file is the orchestration shell that wires the markup tree to those
+ * handlers.
  */
 
 import { initScrapbookLightbox } from './lightbox.ts';
+import {
+  enterDeleteConfirm,
+  enterEditMode,
+  enterRenameMode,
+  newNote,
+  pickAndUpload,
+  renderExpandedBody,
+  toggleSecret,
+  uploadFile,
+  type Ctx,
+} from './scrapbook-mutations.ts';
 
-type Kind = 'md' | 'json' | 'js' | 'img' | 'txt' | 'other';
+const FILTER_KEYS = ['all', 'md', 'img', 'json', 'txt', 'other'] as const;
+type FilterKey = (typeof FILTER_KEYS)[number];
 
-interface Ctx {
-  root: HTMLElement;
-  site: string;
-  slug: string;
-  statusEl: HTMLElement | null;
-}
+// ---------------------------------------------------------------------------
+// Bootstrap
+// ---------------------------------------------------------------------------
 
-/**
- * Read whether a scrapbook item lives in the secret/ section.
- * Items rendered server-side carry `data-secret="true"` when they
- * came from `<scrapbook>/secret/`.
- */
-function itemIsSecret(item: HTMLLIElement): boolean {
-  return item.dataset.secret === 'true';
-}
+function init(): void {
+  const page = document.querySelector<HTMLElement>('.scrap-page');
+  if (!page) return;
+  const ctx = readCtx(page);
+  if (!ctx) return;
 
-const SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
-const FILENAME_RE = /^[a-zA-Z0-9._-][a-zA-Z0-9._ -]*$/;
-
-export function initScrapbook(): void {
-  const root = document.querySelector<HTMLElement>('[data-scrapbook-root]');
-  if (!root) return;
-  const site = root.dataset.site ?? '';
-  const slug = root.dataset.slug ?? '';
-  const statusEl = root.querySelector<HTMLElement>('[data-scrapbook-status]');
-  const ctx: Ctx = { root, site, slug, statusEl };
-
-  wireItems(ctx);
-  wireComposer(ctx);
-  wireIndexButtons(ctx);
+  wireFilterChips(ctx);
+  wireSearch(ctx);
+  wireCards(ctx);
+  wireAsideLinks(ctx);
+  wireAsideActions(ctx);
   wireDropZone(ctx);
-  wireOverlay(ctx);
-  wireIndexScrollSync(ctx);
-  restoreOpenStates(ctx);
-  // #29: bind clicks on image thumbnails (and on expanded image
-  // bodies once they render) to the in-context lightbox overlay.
-  initScrapbookLightbox(ctx.root);
+  initScrapbookLightbox(page);
+  // F4: restore expanded state from #item-N hash on page load.
+  restoreFromHash(ctx);
+}
+
+function readCtx(page: HTMLElement): Ctx | null {
+  // Server emits data-site / data-path on .scrap-page (scrapbook.ts). The
+  // client reads them directly — parsing a display string would silently
+  // break the moment the path display format changes.
+  const site = page.dataset.site;
+  const path = page.dataset.path;
+  if (!site || !path) return null;
+  return { page, site, path };
 }
 
 // ---------------------------------------------------------------------------
-// Items
+// Filter chips
 // ---------------------------------------------------------------------------
 
-function wireItems(ctx: Ctx): void {
-  const items = ctx.root.querySelectorAll<HTMLLIElement>('.scrapbook-item');
-  items.forEach((item) => wireItem(ctx, item));
+function isFilterKey(v: string): v is FilterKey {
+  return (FILTER_KEYS as readonly string[]).includes(v);
 }
 
-function wireItem(ctx: Ctx, item: HTMLLIElement): void {
-  const header = item.querySelector<HTMLButtonElement>('.scrapbook-item-header');
-  const toolbar = item.querySelector<HTMLElement>('[data-toolbar]');
-  header?.addEventListener('click', (ev) => {
-    // Avoid re-firing when a toolbar button was clicked (they're
-    // children of the item but not the header button itself).
-    if ((ev.target as Element).closest('[data-toolbar]')) return;
-    toggleItem(ctx, item);
-  });
-
-  toolbar?.addEventListener('click', (ev) => {
-    const btn = (ev.target as Element).closest<HTMLButtonElement>('[data-action]');
-    if (!btn) return;
-    ev.stopPropagation();
-    const action = btn.dataset.action;
-    switch (action) {
-      case 'edit':
-        enterEditMode(ctx, item);
-        break;
-      case 'rename':
-        enterRenameMode(ctx, item);
-        break;
-      case 'delete':
-        enterDeleteConfirm(ctx, item);
-        break;
-      case 'toggle-secret':
-        // #28: cross-section move. Preserve the filename; just flip
-        // which directory the file lives in. The server route
-        // handles the rename across sections atomically.
-        void toggleSecret(ctx, item);
-        break;
-    }
-  });
-}
-
-/**
- * Move a scrapbook item between `scrapbook/` and `scrapbook/secret/`.
- * The page reloads on success so the item lands in the right section
- * with the right counts and section headers (#28).
- */
-async function toggleSecret(ctx: Ctx, item: HTMLLIElement): Promise<void> {
-  const filename = item.dataset.filename;
-  if (!filename) return;
-  const fromSecret = itemIsSecret(item);
-  const toSecret = !fromSecret;
-  try {
-    const res = await fetch('/api/dev/scrapbook/rename', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        site: ctx.site,
-        slug: ctx.slug,
-        oldName: filename,
-        newName: filename,
-        secret: fromSecret,
-        toSecret,
-      }),
+function wireFilterChips(ctx: Ctx): void {
+  const chips = ctx.page.querySelectorAll<HTMLButtonElement>('.scrap-filter');
+  chips.forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const raw = chip.dataset.filter ?? 'all';
+      const filter: FilterKey = isFilterKey(raw) ? raw : 'all';
+      chips.forEach((c) => c.setAttribute('aria-pressed', c === chip ? 'true' : 'false'));
+      applyFilter(ctx, filter);
     });
-    if (!res.ok) {
-      throw new Error((await res.json() as { error?: string }).error ?? 'move failed');
-    }
-    flashInfo(ctx, toSecret ? `marked secret: ${filename}` : `marked public: ${filename}`);
-    // Page reload — section headers / counts update server-side.
-    window.location.reload();
-  } catch (e) {
-    flashError(ctx, `move failed: ${msg(e)}`);
-  }
-}
-
-function toggleItem(ctx: Ctx, item: HTMLLIElement): void {
-  const open = item.dataset.open === 'true';
-  if (open) collapseItem(item);
-  else expandItem(ctx, item);
-}
-
-async function expandItem(ctx: Ctx, item: HTMLLIElement): Promise<void> {
-  item.dataset.open = 'true';
-  item.querySelector('.scrapbook-item-header')?.setAttribute('aria-expanded', 'true');
-  persistOpenState(ctx, item, true);
-  const bodyContent = item.querySelector<HTMLElement>('[data-body-content]');
-  if (!bodyContent || bodyContent.dataset.loaded === 'true') return;
-  const filename = item.dataset.filename ?? '';
-  const kind = (item.dataset.kind as Kind) ?? 'other';
-  try {
-    await renderBody(ctx, bodyContent, kind, filename);
-    bodyContent.dataset.loaded = 'true';
-    // #29: image bodies are injected lazily; re-bind the lightbox
-    // so the new <img> becomes clickable. Idempotent — items already
-    // bound carry data-lightbox-ready and are skipped.
-    if (kind === 'img') initScrapbookLightbox(ctx.root);
-  } catch (e) {
-    flashError(ctx, `couldn't read ${filename}: ${msg(e)}`);
-  }
-}
-
-function collapseItem(item: HTMLLIElement): void {
-  item.dataset.open = 'false';
-  item.querySelector('.scrapbook-item-header')?.setAttribute('aria-expanded', 'false');
-  const site = item.closest<HTMLElement>('[data-scrapbook-root]')?.dataset.site;
-  const slug = item.closest<HTMLElement>('[data-scrapbook-root]')?.dataset.slug;
-  if (site && slug && item.dataset.filename) {
-    try {
-      localStorage.removeItem(openKey(site, slug, item.dataset.filename));
-    } catch { /* noop */ }
-  }
-}
-
-function persistOpenState(ctx: Ctx, item: HTMLLIElement, open: boolean): void {
-  if (!item.dataset.filename) return;
-  try {
-    if (open) localStorage.setItem(openKey(ctx.site, ctx.slug, item.dataset.filename), '1');
-    else localStorage.removeItem(openKey(ctx.site, ctx.slug, item.dataset.filename));
-  } catch { /* noop */ }
-}
-
-function restoreOpenStates(ctx: Ctx): void {
-  const items = ctx.root.querySelectorAll<HTMLLIElement>('.scrapbook-item');
-  items.forEach((item) => {
-    const filename = item.dataset.filename;
-    if (!filename) return;
-    try {
-      if (localStorage.getItem(openKey(ctx.site, ctx.slug, filename)) === '1') {
-        void expandItem(ctx, item);
-      }
-    } catch { /* noop */ }
   });
 }
 
-function openKey(site: string, slug: string, filename: string, secret = false): string {
-  return secret
-    ? `scrapbook:${site}:${slug}:secret:${filename}`
-    : `scrapbook:${site}:${slug}:${filename}`;
-}
-
-// ---------------------------------------------------------------------------
-// Body render by kind
-// ---------------------------------------------------------------------------
-
-async function renderBody(
-  ctx: Ctx,
-  target: HTMLElement,
-  kind: Kind,
-  filename: string,
-): Promise<void> {
-  target.textContent = '';
-  // Read-only file URL — same endpoint the bird's-eye content view
-  // and the review-page scrapbook drawer use. The standalone viewer
-  // gets the consistent in-browser preview behavior here too.
-  const fileUrl = `/api/dev/scrapbook-file?site=${encodeURIComponent(ctx.site)}&path=${encodeURIComponent(ctx.slug)}&name=${encodeURIComponent(filename)}`;
-
-  if (kind === 'img') {
-    const img = document.createElement('img');
-    img.src = fileUrl;
-    img.alt = '';
-    const wrap = document.createElement('div');
-    wrap.className = 'scrapbook-body-img';
-    wrap.appendChild(img);
-    const meta = document.createElement('p');
-    meta.className = 'scrapbook-body-img-meta';
-    img.addEventListener('load', () => {
-      meta.textContent = `${img.naturalWidth} × ${img.naturalHeight}`;
-    });
-    wrap.appendChild(meta);
-    target.appendChild(wrap);
-    return;
-  }
-
-  const res = await fetch(fileUrl);
-  if (!res.ok) throw new Error(await res.text());
-  // The new endpoint returns raw bytes, not JSON-wrapped content.
-  // Decode to a string for the text/json/markdown branches below.
-  const content = await res.text();
-
-  if (kind === 'md') {
-    const wrap = document.createElement('div');
-    wrap.className = 'scrapbook-body-md';
-    wrap.innerHTML = renderMarkdown(content);
-    target.appendChild(wrap);
-    return;
-  }
-  if (kind === 'json') {
-    const pre = document.createElement('pre');
-    pre.className = 'scrapbook-body-code';
-    try {
-      pre.textContent = JSON.stringify(JSON.parse(content), null, 2);
-    } catch {
-      pre.textContent = content;
-    }
-    target.appendChild(pre);
-    return;
-  }
-  if (kind === 'js' || kind === 'txt') {
-    const pre = document.createElement('pre');
-    pre.className = 'scrapbook-body-code';
-    pre.textContent = content;
-    target.appendChild(pre);
-    return;
-  }
-  // other: just link to download
-  const wrap = document.createElement('div');
-  wrap.className = 'scrapbook-body-other';
-  const a = document.createElement('a');
-  a.href = `/api/dev/scrapbook-file?site=${encodeURIComponent(ctx.site)}&path=${encodeURIComponent(ctx.slug)}&name=${encodeURIComponent(filename)}`;
-  a.textContent = `download ${filename} →`;
-  wrap.appendChild(a);
-  target.appendChild(wrap);
-}
-
-// Tiny markdown renderer — handles headings, paragraphs, emphasis,
-// links, code blocks (fenced), inline code, lists, blockquotes.
-// Enough for note-shaped content; not a full CommonMark impl.
-function renderMarkdown(src: string): string {
-  const lines = src.split('\n');
-  const out: string[] = [];
-  let inCode: string | null = null;
-  let listBuf: string[] = [];
-  let listOrdered = false;
-  let paraBuf: string[] = [];
-  let quoteBuf: string[] = [];
-
-  const flushList = () => {
-    if (listBuf.length === 0) return;
-    const tag = listOrdered ? 'ol' : 'ul';
-    out.push(`<${tag}>${listBuf.map((l) => `<li>${inline(l)}</li>`).join('')}</${tag}>`);
-    listBuf = [];
-  };
-  const flushPara = () => {
-    if (paraBuf.length === 0) return;
-    out.push(`<p>${inline(paraBuf.join(' '))}</p>`);
-    paraBuf = [];
-  };
-  const flushQuote = () => {
-    if (quoteBuf.length === 0) return;
-    out.push(`<blockquote>${inline(quoteBuf.join(' '))}</blockquote>`);
-    quoteBuf = [];
-  };
-  const flushAll = () => { flushList(); flushPara(); flushQuote(); };
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    // Fenced code block
-    const fence = line.match(/^```(\w+)?\s*$/);
-    if (fence) {
-      if (inCode === null) {
-        flushAll();
-        inCode = '';
-      } else {
-        out.push(`<pre><code>${escapeHtml(inCode)}</code></pre>`);
-        inCode = null;
-      }
-      continue;
-    }
-    if (inCode !== null) { inCode += line + '\n'; continue; }
-
-    // GFM pipe table: header row, then |---|---| separator, then body rows
-    if (line.includes('|') && i + 1 < lines.length && isTableSeparator(lines[i + 1])) {
-      flushAll();
-      const header = splitTableRow(line);
-      const bodyRows: string[][] = [];
-      let j = i + 2;
-      while (j < lines.length && lines[j].includes('|') && lines[j].trim() !== '') {
-        bodyRows.push(splitTableRow(lines[j]));
-        j++;
-      }
-      out.push(renderTable(header, bodyRows));
-      i = j - 1;
-      continue;
-    }
-
-    // Headings
-    const h = line.match(/^(#{1,6})\s+(.*)$/);
-    if (h) { flushAll(); const lvl = h[1].length; out.push(`<h${lvl}>${inline(h[2])}</h${lvl}>`); continue; }
-
-    // Blockquote
-    const q = line.match(/^>\s?(.*)$/);
-    if (q) { flushList(); flushPara(); quoteBuf.push(q[1]); continue; }
-
-    // Unordered list
-    const ul = line.match(/^[-*+]\s+(.*)$/);
-    if (ul) { flushPara(); flushQuote(); if (!listOrdered && listBuf.length) flushList(); listOrdered = false; listBuf.push(ul[1]); continue; }
-
-    // Ordered list
-    const ol = line.match(/^\d+\.\s+(.*)$/);
-    if (ol) { flushPara(); flushQuote(); if (listOrdered === false && listBuf.length) flushList(); listOrdered = true; listBuf.push(ol[1]); continue; }
-
-    // Horizontal rule
-    if (/^\s*---+\s*$/.test(line)) { flushAll(); out.push('<hr />'); continue; }
-
-    // Blank
-    if (line.trim() === '') { flushAll(); continue; }
-
-    // Paragraph accumulator
-    flushList(); flushQuote();
-    paraBuf.push(line);
-  }
-  flushAll();
-  if (inCode !== null) out.push(`<pre><code>${escapeHtml(inCode)}</code></pre>`);
-  return out.join('\n');
-}
-
-function isTableSeparator(line: string): boolean {
-  const trimmed = line.trim();
-  if (!trimmed.includes('|')) return false;
-  // A separator row is only pipes, dashes, colons, and whitespace, with
-  // at least one dash.
-  return /^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(trimmed);
-}
-
-function splitTableRow(line: string): string[] {
-  // Strip leading/trailing pipe then split. Trim each cell.
-  let t = line.trim();
-  if (t.startsWith('|')) t = t.slice(1);
-  if (t.endsWith('|')) t = t.slice(0, -1);
-  return t.split('|').map((c) => c.trim());
-}
-
-function renderTable(header: string[], rows: string[][]): string {
-  const thead = `<thead><tr>${header.map((h) => `<th>${inline(h)}</th>`).join('')}</tr></thead>`;
-  const tbody = rows.length
-    ? `<tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${inline(c)}</td>`).join('')}</tr>`).join('')}</tbody>`
-    : '';
-  return `<table>${thead}${tbody}</table>`;
-}
-
-function inline(text: string): string {
-  // Order matters: code first (so code contents don't get re-processed).
-  let t = escapeHtml(text);
-  t = t.replace(/`([^`]+)`/g, (_m, c) => `<code>${c}</code>`);
-  t = t.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-  t = t.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-  t = t.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
-  return t;
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c] ?? c);
-}
-
-// ---------------------------------------------------------------------------
-// Edit mode (markdown)
-// ---------------------------------------------------------------------------
-
-async function enterEditMode(ctx: Ctx, item: HTMLLIElement): Promise<void> {
-  const filename = item.dataset.filename ?? '';
-  const bodyContent = item.querySelector<HTMLElement>('[data-body-content]');
-  if (!bodyContent) return;
-  await expandItem(ctx, item);
-
-  // Fetch raw content via the read-only binary endpoint. Decode as
-  // text — the edit-mode path is only reached for markdown items.
-  // The `secret=1` query lets the read endpoint pull from
-  // `scrapbook/secret/` when the item is a secret one (#28).
-  let raw = '';
-  try {
-    const secretQ = itemIsSecret(item) ? '&secret=1' : '';
-    const res = await fetch(`/api/dev/scrapbook-file?site=${encodeURIComponent(ctx.site)}&path=${encodeURIComponent(ctx.slug)}&name=${encodeURIComponent(filename)}${secretQ}`);
-    if (!res.ok) throw new Error(await res.text());
-    raw = await res.text();
-  } catch (e) { flashError(ctx, `read failed: ${msg(e)}`); return; }
-
-  bodyContent.textContent = '';
-  const wrap = document.createElement('div');
-  wrap.className = 'scrapbook-editor';
-  const ta = document.createElement('textarea');
-  ta.value = raw;
-  ta.setAttribute('aria-label', `edit ${filename}`);
-  const footer = document.createElement('div');
-  footer.className = 'scrapbook-editor-footer';
-  const cancel = document.createElement('button');
-  cancel.type = 'button';
-  cancel.className = 'scrapbook-tool';
-  cancel.textContent = 'cancel';
-  const save = document.createElement('button');
-  save.type = 'button';
-  save.className = 'scrapbook-tool scrapbook-tool--primary';
-  save.textContent = 'save →';
-  footer.append(cancel, save);
-  wrap.append(ta, footer);
-  bodyContent.appendChild(wrap);
-  ta.focus();
-
-  const restoreRender = async () => {
-    bodyContent.dataset.loaded = 'false';
-    await renderBody(ctx, bodyContent, (item.dataset.kind as Kind) ?? 'md', filename);
-    bodyContent.dataset.loaded = 'true';
-  };
-
-  cancel.addEventListener('click', () => { void restoreRender(); });
-  const commit = async () => {
-    try {
-      const res = await fetch('/api/dev/scrapbook/save', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          site: ctx.site,
-          slug: ctx.slug,
-          filename,
-          body: ta.value,
-          secret: itemIsSecret(item),
-        }),
-      });
-      if (!res.ok) throw new Error((await res.json() as { error?: string }).error ?? 'save failed');
-      const { item: updated } = (await res.json()) as { item: { mtime: string; size: number } };
-      item.dataset.mtime = updated.mtime;
-      item.dataset.size = String(updated.size);
-      const mtimeEl = item.querySelector<HTMLTimeElement>('.scrapbook-mtime');
-      if (mtimeEl) { mtimeEl.dateTime = updated.mtime; mtimeEl.textContent = 'just now'; }
-      flashInfo(ctx, `saved ${filename}`);
-      await restoreRender();
-    } catch (e) { flashError(ctx, `save failed: ${msg(e)}`); }
-  };
-  save.addEventListener('click', () => { void commit(); });
-  ta.addEventListener('keydown', (ev) => {
-    if ((ev.metaKey || ev.ctrlKey) && ev.key === 's') { ev.preventDefault(); void commit(); }
-    if (ev.key === 'Escape') { ev.preventDefault(); void restoreRender(); }
+function applyFilter(ctx: Ctx, filter: FilterKey): void {
+  ctx.page.querySelectorAll<HTMLElement>('.scrap-card').forEach((card) => {
+    const kind = card.dataset.kind ?? 'other';
+    const match = filter === 'all' || filter === kind;
+    if (match) card.removeAttribute('data-filtered-out');
+    else card.setAttribute('data-filtered-out', 'true');
   });
 }
 
 // ---------------------------------------------------------------------------
-// Rename
+// Search
 // ---------------------------------------------------------------------------
 
-function enterRenameMode(ctx: Ctx, item: HTMLLIElement): void {
-  const cell = item.querySelector<HTMLElement>('[data-filename-cell]');
-  const oldName = item.dataset.filename ?? '';
-  if (!cell) return;
-  cell.textContent = '';
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.className = 'scrapbook-rename-input';
-  input.value = oldName;
-  input.setAttribute('aria-label', `rename ${oldName}`);
-  cell.appendChild(input);
-  // Position cursor before extension
-  const dotIdx = oldName.lastIndexOf('.');
-  if (dotIdx > 0) { input.setSelectionRange(0, dotIdx); }
-  input.focus();
-  const hint = document.createElement('p');
-  hint.className = 'scrapbook-rename-hint';
-  cell.appendChild(hint);
-
-  const restore = () => { cell.textContent = oldName; item.dataset.filename = oldName; };
-
-  const validate = (name: string): string | null => {
-    if (!name) return 'required';
-    if (!FILENAME_RE.test(name)) return 'use [A-Za-z0-9._ -]';
-    if (name.startsWith('.')) return 'no leading dot';
-    return null;
-  };
-
-  input.addEventListener('input', () => {
-    const err = validate(input.value.trim());
-    if (err) { input.dataset.invalid = 'true'; hint.textContent = err; }
-    else { input.removeAttribute('data-invalid'); hint.textContent = ''; }
-  });
-
-  input.addEventListener('keydown', async (ev) => {
-    if (ev.key === 'Escape') { ev.preventDefault(); restore(); return; }
-    if (ev.key !== 'Enter') return;
+function wireSearch(ctx: Ctx): void {
+  const input = ctx.page.querySelector<HTMLInputElement>('.scrap-search input[data-scrap-search]');
+  if (!input) return;
+  input.addEventListener('input', () => applySearch(ctx, input.value));
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key !== '/') return;
+    const tgt = ev.target;
+    if (tgt instanceof HTMLInputElement || tgt instanceof HTMLTextAreaElement) return;
     ev.preventDefault();
-    const newName = input.value.trim();
-    if (newName === oldName) { restore(); return; }
-    const err = validate(newName);
-    if (err) { input.dataset.invalid = 'true'; hint.textContent = err; return; }
-    try {
-      const res = await fetch('/api/dev/scrapbook/rename', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          site: ctx.site,
-          slug: ctx.slug,
-          oldName,
-          newName,
-          secret: itemIsSecret(item),
-        }),
-      });
-      if (!res.ok) throw new Error((await res.json() as { error?: string }).error ?? 'rename failed');
-      item.dataset.filename = newName;
-      const id = `item-${encodeURIComponent(newName)}`;
-      item.id = id;
-      cell.textContent = newName;
-      // Update the index rail link to match
-      const idxLink = ctx.root.querySelector<HTMLAnchorElement>(`[data-index-for="${oldName}"] a`);
-      if (idxLink) { idxLink.textContent = newName; idxLink.setAttribute('href', `#${id}`); }
-      const idxLi = ctx.root.querySelector<HTMLElement>(`[data-index-for="${oldName}"]`);
-      if (idxLi) idxLi.setAttribute('data-index-for', newName);
-      flashInfo(ctx, `renamed to ${newName}`);
-    } catch (e) { flashError(ctx, `rename failed: ${msg(e)}`); restore(); }
+    input.focus();
+    input.select();
+  });
+}
+
+function applySearch(ctx: Ctx, query: string): void {
+  const q = query.trim().toLowerCase();
+  ctx.page.querySelectorAll<HTMLElement>('.scrap-card').forEach((card) => {
+    const name = card.querySelector<HTMLElement>('.scrap-name')?.textContent?.toLowerCase() ?? '';
+    const match = q === '' || name.includes(q);
+    if (match) card.removeAttribute('data-search-out');
+    else card.setAttribute('data-search-out', 'true');
   });
 }
 
 // ---------------------------------------------------------------------------
-// Delete (two-step inline confirm)
+// Cards (open/close + toolbar wiring)
 // ---------------------------------------------------------------------------
 
-function enterDeleteConfirm(ctx: Ctx, item: HTMLLIElement): void {
-  if (item.dataset.state === 'deleting') return;
-  item.dataset.state = 'deleting';
-  const toolbar = item.querySelector<HTMLElement>('[data-toolbar]');
-  if (!toolbar) return;
-  const prevHtml = toolbar.innerHTML;
+function wireCards(ctx: Ctx): void {
+  ctx.page.querySelectorAll<HTMLElement>('.scrap-card').forEach((card) => wireCard(ctx, card));
+}
 
-  toolbar.innerHTML = '';
-  const bar = document.createElement('div');
-  bar.className = 'scrapbook-confirm-bar';
-  const cancelBtn = document.createElement('button');
-  cancelBtn.type = 'button';
-  cancelBtn.className = 'scrapbook-tool';
-  cancelBtn.textContent = 'cancel';
-  const confirmBtn = document.createElement('button');
-  confirmBtn.type = 'button';
-  confirmBtn.className = 'scrapbook-tool scrapbook-tool--delete';
-  confirmBtn.textContent = 'confirm delete';
-  toolbar.append(cancelBtn, confirmBtn);
-  // Bar at the bottom of the item (placed under the toolbar)
-  item.appendChild(bar);
-
-  const revert = () => {
-    bar.remove();
-    toolbar.innerHTML = prevHtml;
-    item.dataset.state = 'closed';
-    wireItem(ctx, item); // rewire toolbar buttons
-  };
-
-  const timeout = setTimeout(revert, 4000);
-  cancelBtn.addEventListener('click', (ev) => { ev.stopPropagation(); clearTimeout(timeout); revert(); });
-  confirmBtn.addEventListener('click', async (ev) => {
+function wireCard(ctx: Ctx, card: HTMLElement): void {
+  card.querySelectorAll<HTMLElement>('.scrap-name, .scrap-card-foot [data-action="open"]').forEach((el) => {
+    el.addEventListener('click', (ev) => {
+      // Edit / rename / etc. live in the same foot toolbar; let those
+      // buttons' own handlers fire without the open toggle riding along.
+      const target = ev.target;
+      if (!(target instanceof Element)) return;
+      if (target.closest('[data-action="edit"], [data-action="rename"], [data-action="delete"], [data-action="mark-secret"]')) return;
+      ev.preventDefault();
+      void toggleCard(ctx, card);
+    });
+  });
+  const foot = card.querySelector<HTMLElement>('.scrap-card-foot');
+  if (!foot) return;
+  foot.addEventListener('click', (ev) => {
+    const target = ev.target;
+    if (!(target instanceof Element)) return;
+    const btn = target.closest<HTMLButtonElement>('[data-action]');
+    if (!btn || !foot.contains(btn)) return;
+    const action = btn.dataset.action;
+    if (action === 'open' || action === undefined) return;
     ev.stopPropagation();
-    clearTimeout(timeout);
-    try {
-      const res = await fetch('/api/dev/scrapbook/delete', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          site: ctx.site,
-          slug: ctx.slug,
-          filename: item.dataset.filename,
-          secret: itemIsSecret(item),
-        }),
-      });
-      if (!res.ok) throw new Error((await res.json() as { error?: string }).error ?? 'delete failed');
-      // Slide out
-      item.style.transition = 'opacity 180ms ease-in, transform 180ms ease-in';
-      item.style.transform = 'translateX(-12px)';
-      item.style.opacity = '0';
-      setTimeout(() => {
-        const filename = item.dataset.filename;
-        item.remove();
-        if (filename) {
-          const idxLi = ctx.root.querySelector<HTMLElement>(`[data-index-for="${filename}"]`);
-          idxLi?.remove();
-        }
-        flashInfo(ctx, `deleted`);
-      }, 200);
-    } catch (e) { flashError(ctx, `delete failed: ${msg(e)}`); revert(); }
+    switch (action) {
+      case 'edit': void enterEditMode(ctx, card); break;
+      case 'rename': enterRenameMode(ctx, card); break;
+      case 'delete': enterDeleteConfirm(ctx, card, (c) => wireCard(ctx, c)); break;
+      case 'mark-secret': void toggleSecret(ctx, card); break;
+    }
   });
 }
 
-// ---------------------------------------------------------------------------
-// Composer (new note)
-// ---------------------------------------------------------------------------
-
-function wireComposer(ctx: Ctx): void {
-  const form = ctx.root.querySelector<HTMLFormElement>('[data-scrapbook-composer]');
-  if (!form) return;
-  const filenameInput = form.querySelector<HTMLInputElement>('[data-composer-filename]');
-  const bodyInput = form.querySelector<HTMLTextAreaElement>('[data-composer-body]');
-  const cancelBtn = form.querySelector<HTMLButtonElement>('[data-action="composer-cancel"]');
-  const saveBtn = form.querySelector<HTMLButtonElement>('[data-action="composer-save"]');
-  if (!filenameInput || !bodyInput || !cancelBtn || !saveBtn) return;
-
-  cancelBtn.addEventListener('click', () => hideComposer(ctx));
-  bodyInput.addEventListener('keydown', (ev) => {
-    if ((ev.metaKey || ev.ctrlKey) && ev.key === 's') { ev.preventDefault(); void submit(); }
-    if (ev.key === 'Escape') { ev.preventDefault(); hideComposer(ctx); }
+async function toggleCard(ctx: Ctx, card: HTMLElement): Promise<void> {
+  const wasExpanded = card.dataset.state === 'expanded';
+  // F4 single-expanded invariant: collapse anything else first. The
+  // operator's mental model is "one slip on the desk under the lamp" —
+  // multiple expanded cards cause cascading reflow churn.
+  ctx.page.querySelectorAll<HTMLElement>('.scrap-card[data-state="expanded"]').forEach((other) => {
+    if (other !== card) other.dataset.state = 'closed';
   });
-  form.addEventListener('submit', (ev) => { ev.preventDefault(); void submit(); });
-
-  async function submit(): Promise<void> {
-    let filename = filenameInput!.value.trim();
-    if (!filename) {
-      const now = new Date();
-      filename = `note-${now.toISOString().slice(0, 10)}.md`;
-    }
-    if (!filename.endsWith('.md')) filename += '.md';
-    if (!FILENAME_RE.test(filename)) { flashError(ctx, `invalid filename: ${filename}`); return; }
-    const secret = ctx.root
-      .querySelector<HTMLInputElement>('[data-composer-secret]')?.checked === true;
-    try {
-      const res = await fetch('/api/dev/scrapbook/create', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          site: ctx.site,
-          slug: ctx.slug,
-          filename,
-          body: bodyInput!.value,
-          secret,
-        }),
-      });
-      if (!res.ok) throw new Error((await res.json() as { error?: string }).error ?? 'create failed');
-      flashInfo(ctx, secret ? `created secret/${filename}` : `created ${filename}`);
-      hideComposer(ctx);
-      // Simplest refresh — reload the page so the new slip appears
-      // in sorted position with the right seq numbers.
-      window.location.reload();
-    } catch (e) { flashError(ctx, `create failed: ${msg(e)}`); }
+  card.dataset.state = wasExpanded ? 'closed' : 'expanded';
+  syncAsideActive(ctx);
+  syncUrlHash(ctx);
+  if (!wasExpanded) {
+    await renderExpandedBody(ctx, card);
+    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 }
 
-function showComposer(ctx: Ctx): void {
-  const form = ctx.root.querySelector<HTMLFormElement>('[data-scrapbook-composer]');
-  if (!form) return;
-  form.hidden = false;
-  form.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  form.querySelector<HTMLTextAreaElement>('[data-composer-body]')?.focus();
-}
-
-function hideComposer(ctx: Ctx): void {
-  const form = ctx.root.querySelector<HTMLFormElement>('[data-scrapbook-composer]');
-  if (!form) return;
-  form.hidden = true;
-  form.querySelector<HTMLInputElement>('[data-composer-filename]')!.value = '';
-  form.querySelector<HTMLTextAreaElement>('[data-composer-body]')!.value = '';
-}
-
 // ---------------------------------------------------------------------------
-// Index rail + actions
+// Aside cross-link binding (F4)
 // ---------------------------------------------------------------------------
 
-function wireIndexButtons(ctx: Ctx): void {
-  ctx.root.addEventListener('click', (ev) => {
-    const btn = (ev.target as Element).closest<HTMLButtonElement>('[data-action]');
-    if (!btn || !ctx.root.contains(btn)) return;
-    const action = btn.dataset.action;
-    if (action === 'new-note') { ev.preventDefault(); showComposer(ctx); }
-    if (action === 'upload') {
+function wireAsideLinks(ctx: Ctx): void {
+  ctx.page.querySelectorAll<HTMLAnchorElement>('.scrap-aside-list a[data-scrap-aside-link]').forEach((a) => {
+    a.addEventListener('click', (ev) => {
       ev.preventDefault();
-      ctx.root.querySelector<HTMLInputElement>('[data-scrapbook-file-input]')?.click();
+      const id = (a.getAttribute('href') ?? '').replace(/^#/, '');
+      if (!id) return;
+      const card = ctx.page.querySelector<HTMLElement>(`.scrap-card#${CSS.escape(id)}`);
+      if (card) void toggleCard(ctx, card);
+    });
+  });
+}
+
+function syncAsideActive(ctx: Ctx): void {
+  const expanded = ctx.page.querySelector<HTMLElement>('.scrap-card[data-state="expanded"]');
+  ctx.page.querySelectorAll<HTMLAnchorElement>('.scrap-aside-list a[data-scrap-aside-link]').forEach((a) => {
+    if (expanded && a.getAttribute('href') === `#${expanded.id}`) {
+      a.setAttribute('data-active', 'true');
+    } else {
+      a.removeAttribute('data-active');
     }
   });
 }
 
-function wireIndexScrollSync(ctx: Ctx): void {
-  const items = ctx.root.querySelectorAll<HTMLElement>('.scrapbook-item');
-  if (items.length === 0) return;
-  const observer = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (!entry.isIntersecting) return;
-        const filename = (entry.target as HTMLElement).dataset.filename;
-        if (!filename) return;
-        ctx.root
-          .querySelectorAll<HTMLElement>('[data-index-for]')
-          .forEach((li) => li.removeAttribute('data-active'));
-        const active = ctx.root.querySelector<HTMLElement>(`[data-index-for="${filename}"]`);
-        active?.setAttribute('data-active', 'true');
-      });
-    },
-    { rootMargin: '-80px 0px -70% 0px', threshold: 0 },
-  );
-  items.forEach((item) => observer.observe(item));
+function syncUrlHash(ctx: Ctx): void {
+  const expanded = ctx.page.querySelector<HTMLElement>('.scrap-card[data-state="expanded"]');
+  const hash = expanded ? `#${expanded.id}` : '';
+  if (window.location.hash === hash) return;
+  // replaceState so back/forward isn't peppered with one entry per click.
+  const url = `${window.location.pathname}${window.location.search}${hash}`;
+  window.history.replaceState(null, '', url);
+}
+
+function restoreFromHash(ctx: Ctx): void {
+  const hash = window.location.hash;
+  if (!hash || hash.length < 2) return;
+  const id = hash.slice(1);
+  const card = ctx.page.querySelector<HTMLElement>(`.scrap-card#${CSS.escape(id)}`);
+  if (card) void toggleCard(ctx, card);
 }
 
 // ---------------------------------------------------------------------------
-// Upload + drop zone
+// Aside actions (new note + upload)
+// ---------------------------------------------------------------------------
+
+function wireAsideActions(ctx: Ctx): void {
+  const aside = ctx.page.querySelector<HTMLElement>('.scrap-aside');
+  if (!aside) return;
+  aside.addEventListener('click', (ev) => {
+    const target = ev.target;
+    if (!(target instanceof Element)) return;
+    const btn = target.closest<HTMLButtonElement>('[data-action]');
+    if (!btn || !aside.contains(btn)) return;
+    const action = btn.dataset.action;
+    if (action === 'new-note') { ev.preventDefault(); void newNote(ctx); }
+    if (action === 'upload') { ev.preventDefault(); void pickAndUpload(ctx); }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Drop zone (F5)
 // ---------------------------------------------------------------------------
 
 function wireDropZone(ctx: Ctx): void {
-  const zone = ctx.root.querySelector<HTMLElement>('[data-scrapbook-drop]');
-  const input = ctx.root.querySelector<HTMLInputElement>('[data-scrapbook-file-input]');
-  if (!zone || !input) return;
+  const drop = ctx.page.querySelector<HTMLElement>('.scrap-drop');
+  if (!drop) return;
 
-  zone.addEventListener('click', (ev) => {
-    if ((ev.target as Element).tagName !== 'INPUT') input.click();
-  });
-  zone.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); input.click(); }
-  });
-
-  zone.addEventListener('dragover', (ev) => { ev.preventDefault(); zone.dataset.hover = 'true'; });
-  zone.addEventListener('dragleave', () => { zone.removeAttribute('data-hover'); });
-  zone.addEventListener('drop', (ev) => {
+  // Click + keyboard delegate to the existing file picker. The drop zone
+  // is a `role="button" tabindex="0"` so Enter/Space activate it like any
+  // other button.
+  drop.addEventListener('click', () => void pickAndUpload(ctx));
+  drop.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Enter' && ev.key !== ' ') return;
     ev.preventDefault();
-    zone.removeAttribute('data-hover');
-    const files = ev.dataTransfer?.files;
-    if (files && files.length > 0) void uploadFile(ctx, files[0]);
+    void pickAndUpload(ctx);
   });
 
-  input.addEventListener('change', () => {
-    const file = input.files?.[0];
+  // Drag-and-drop. dragover MUST preventDefault to allow the drop event
+  // to fire; without it the browser handles the file (navigates away).
+  drop.addEventListener('dragover', (ev) => {
+    ev.preventDefault();
+    drop.dataset.dragover = 'true';
+  });
+  drop.addEventListener('dragleave', () => {
+    delete drop.dataset.dragover;
+  });
+  drop.addEventListener('drop', (ev) => {
+    ev.preventDefault();
+    delete drop.dataset.dragover;
+    const file = ev.dataTransfer?.files?.[0];
     if (file) void uploadFile(ctx, file);
-    input.value = '';
   });
-}
-
-function wireOverlay(ctx: Ctx): void {
-  const overlay = ctx.root.querySelector<HTMLElement>('[data-scrapbook-overlay]');
-  if (!overlay) return;
-  let depth = 0;
-  document.body.addEventListener('dragenter', (ev) => {
-    if (!ev.dataTransfer?.types.includes('Files')) return;
-    depth++;
-    overlay.dataset.active = 'true';
-  });
-  document.body.addEventListener('dragleave', () => {
-    depth = Math.max(0, depth - 1);
-    if (depth === 0) overlay.removeAttribute('data-active');
-  });
-  document.body.addEventListener('drop', (ev) => {
-    depth = 0;
-    overlay.removeAttribute('data-active');
-    if (!ev.dataTransfer?.files || ev.dataTransfer.files.length === 0) return;
-    // If the drop target wasn't the in-page drop zone, route the file
-    // to the scrapbook explicitly. Otherwise the drop zone handler
-    // already caught it.
-    if (!(ev.target as Element).closest('[data-scrapbook-drop]')) {
-      ev.preventDefault();
-      void uploadFile(ctx, ev.dataTransfer.files[0]);
-    }
-  });
-}
-
-async function uploadFile(ctx: Ctx, file: File): Promise<void> {
-  try {
-    const secret = ctx.root
-      .querySelector<HTMLInputElement>('[data-upload-secret]')?.checked === true;
-    const fd = new FormData();
-    fd.append('site', ctx.site);
-    fd.append('slug', ctx.slug);
-    fd.append('file', file);
-    if (secret) fd.append('secret', 'true');
-    const res = await fetch('/api/dev/scrapbook/upload', { method: 'POST', body: fd });
-    if (!res.ok) throw new Error((await res.json() as { error?: string }).error ?? 'upload failed');
-    flashInfo(ctx, secret ? `uploaded to secret: ${file.name}` : `uploaded ${file.name}`);
-    window.location.reload();
-  } catch (e) { flashError(ctx, `upload failed: ${msg(e)}`); }
 }
 
 // ---------------------------------------------------------------------------
-// Status banner
+// Bootstrap
 // ---------------------------------------------------------------------------
 
-function flashInfo(ctx: Ctx, text: string): void { flash(ctx, text, 'info'); }
-function flashError(ctx: Ctx, text: string): void { flash(ctx, text, 'error'); }
-function flash(ctx: Ctx, text: string, kind: 'info' | 'error'): void {
-  if (!ctx.statusEl) return;
-  ctx.statusEl.textContent = text;
-  ctx.statusEl.dataset.kind = kind;
-  ctx.statusEl.hidden = false;
-  window.setTimeout(() => { if (ctx.statusEl) ctx.statusEl.hidden = true; }, 3200);
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => init());
+  } else {
+    init();
+  }
 }
-
-function msg(e: unknown): string { return e instanceof Error ? e.message : String(e); }
-
-// Mark SLUG_RE as used (client-side validation ensures the server
-// receives well-formed args — keeping the regex here means both sides
-// agree on the shape).
-void SLUG_RE;

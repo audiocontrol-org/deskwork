@@ -5,6 +5,7 @@
 
 import { escapeHtml } from './html.ts';
 import { clientScriptTag, viteClientTag } from '../lib/client-script.ts';
+import glossary from '../data/glossary.json' with { type: 'json' };
 
 export interface EmbeddedJson {
   /** `id` attribute of the `<script type="application/json">` tag. */
@@ -62,10 +63,15 @@ export function layout(options: LayoutOptions): string {
     })
     .join('\n');
 
+  // Inline glossary data into every page so the tooltip client can access it.
+  const glossaryInline = `<script>window.__GLOSSARY__ = ${JSON.stringify(glossary).replace(/</g, '\\u003c')};</script>`;
+
   const hmrTag = viteClientTag();
+  const glossaryClientTag = clientScriptTag('glossary-tooltip');
   const scriptTags = [
     ...(hmrTag ? [`    ${hmrTag}`] : []),
     ...scriptModules.map((name) => `    ${clientScriptTag(name)}`),
+    `    ${glossaryClientTag}`,
   ].join('\n');
 
   const bodyOpen = bodyAttrs ? `<body ${bodyAttrs}>` : '<body>';
@@ -78,6 +84,7 @@ export function layout(options: LayoutOptions): string {
     <meta name="robots" content="noindex">
     <title>${escapeHtml(title)}</title>
 ${cssTags}
+    ${glossaryInline}
   </head>
   ${bodyOpen}
 ${bodyHtml}

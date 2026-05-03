@@ -64,14 +64,17 @@ describe('studio index page', () => {
   it('renders the cross-page folio strip', async () => {
     const r = await getHtml(app, '/dev/');
     expect(r.html).toContain('class="er-folio"');
-    expect(r.html).toContain('class="er-folio-inner"');
-    expect(r.html).toContain('deskwork <em>STUDIO</em>');
+    expect(r.html).toContain('class="er-folio-mark">deskwork');
+    expect(r.html).toContain('class="er-folio-nav"');
   });
 
   it('marks the Index nav link active', async () => {
     const r = await getHtml(app, '/dev/');
     // Active link has class="active" and points at /dev/.
-    expect(r.html).toMatch(/class="active"\s+href="\/dev\/"\s*>\s*Index\s*</);
+    // aria-current is now also emitted alongside class="active".
+    expect(r.html).toMatch(
+      /class="active"\s+href="\/dev\/"\s+aria-current="page"\s*>\s*Index\s*</,
+    );
   });
 
   it('renders all 5 nav links pointing at the right routes', async () => {
@@ -80,7 +83,7 @@ describe('studio index page', () => {
     expect(r.html).toContain('href="/dev/editorial-studio">Dashboard</a>');
     expect(r.html).toContain('href="/dev/content">Content</a>');
     expect(r.html).toContain(
-      'href="/dev/editorial-review-shortform">Reviews</a>',
+      'href="/dev/editorial-review-shortform">Shortform</a>',
     );
     expect(r.html).toContain('href="/dev/editorial-help">Manual</a>');
   });
