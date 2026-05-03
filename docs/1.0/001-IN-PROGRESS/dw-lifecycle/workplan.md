@@ -3243,9 +3243,9 @@ This section was appended on 2026-05-03 after the implementation audit in `2026-
 
 ### Task 49: Make setup PRD-first and write `deskwork.id`
 
-- [ ] Update `src/subcommands/setup.ts` so the PRD, not the workplan, is the primary target for imported feature-definition content.
-- [ ] Write a `deskwork.id` UUID into the PRD frontmatter during setup.
-- [ ] Keep workplan generation as a derivative artifact of the definition, not the definition sink itself.
+- [x] Update `src/subcommands/setup.ts` so the PRD, not the workplan, is the primary target for imported feature-definition content.
+- [x] Write a `deskwork.id` UUID into the PRD frontmatter during setup.
+- [x] Keep workplan generation as a derivative artifact of the definition, not the definition sink itself.
 
 **Acceptance Criteria:**
 - A freshly scaffolded feature has a PRD with `deskwork.id`.

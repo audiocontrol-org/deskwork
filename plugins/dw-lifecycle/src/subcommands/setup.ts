@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,6 +17,15 @@ interface SetupArgs {
   targetVersion?: string;
   title?: string;
   definitionFile?: string;
+}
+
+interface FeatureDefinitionSections {
+  problem?: string;
+  goal?: string;
+  scope?: string;
+  approach?: string;
+  tasks?: string;
+  acceptanceCriteria?: string;
 }
 
 function nextArg(args: string[], i: number): string {
@@ -57,6 +67,166 @@ function parseArgs(args: string[]): SetupArgs {
 
 function renderTemplate(template: string, vars: Record<string, string>): string {
   return template.replace(/<(\w+)>/g, (m, key) => vars[key] ?? m);
+}
+
+function extractSections(markdown: string): Record<string, string> {
+  const sections: Record<string, string> = {};
+  let currentHeading: string | undefined;
+  let currentLines: string[] = [];
+
+  const flush = () => {
+    if (!currentHeading) {
+      return;
+    }
+    sections[currentHeading] = currentLines.join('\n').trim();
+  };
+
+  for (const line of markdown.split('\n')) {
+    if (line.startsWith('## ')) {
+      flush();
+      currentHeading = line.slice(3).trim();
+      currentLines = [];
+      continue;
+    }
+    if (currentHeading) {
+      currentLines.push(line);
+    }
+  }
+
+  flush();
+  return sections;
+}
+
+function parseFeatureDefinition(markdown: string): FeatureDefinitionSections {
+  const sections = extractSections(markdown);
+  return {
+    problem: sections.Problem,
+    goal: sections.Goal,
+    scope: sections.Scope,
+    approach: sections.Approach,
+    tasks: sections.Tasks,
+    acceptanceCriteria: sections['Acceptance Criteria'],
+  };
+}
+
+function extractScopeList(scope: string | undefined, label: 'In' | 'Out'): string[] {
+  if (!scope) {
+    return [];
+  }
+
+  const lines = scope.split('\n');
+  const items: string[] = [];
+  let collecting = false;
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (line === `**${label}:**`) {
+      collecting = true;
+      continue;
+    }
+    if (line === '**In:**' || line === '**Out:**') {
+      collecting = false;
+      continue;
+    }
+    if (!collecting) {
+      continue;
+    }
+    if (line.startsWith('- ')) {
+      items.push(line.replace(/^- /, '').trim());
+    }
+  }
+
+  return items.filter(Boolean);
+}
+
+function extractCheckboxItems(section: string | undefined): string[] {
+  if (!section) {
+    return [];
+  }
+
+  return section
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => /^- \[[ xX]\] /.test(line))
+    .map((line) => line.replace(/^- \[[ xX]\] /, '').trim())
+    .filter(Boolean);
+}
+
+function sentenceOrFallback(text: string | undefined, fallback: string): string {
+  if (!text) {
+    return fallback;
+  }
+
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  return normalized || fallback;
+}
+
+function seedPrdFromDefinition(prd: string, definition: FeatureDefinitionSections): string {
+  const goal = sentenceOrFallback(
+    definition.goal,
+    '[Describe the proposed solution at a high level. What changes for the user? What is the shape of the deliverable? Again, one or two paragraphs — leave specifics for the Technical Approach section.]'
+  );
+  const problem = sentenceOrFallback(
+    definition.problem,
+    '[Describe the problem this feature solves. Who experiences friction today? What is the cost of the status quo? Keep this to one or two paragraphs of plain prose — no implementation detail yet.]'
+  );
+  const approach = sentenceOrFallback(
+    definition.approach,
+    '[Describe the high-level technical strategy. Identify major architectural decisions, key dependencies, and any new components or interfaces. This section should give a reader enough context to start the workplan without prescribing line-level implementation.]'
+  );
+
+  const acceptanceItems = extractCheckboxItems(definition.acceptanceCriteria);
+  const acceptanceBlock =
+    acceptanceItems.length > 0
+      ? acceptanceItems.map((item) => `- [ ] ${item}`).join('\n')
+      : '- [ ] [First user-visible criterion that must hold for this feature to be considered complete]';
+
+  const outOfScopeItems = extractScopeList(definition.scope, 'Out');
+  const outOfScopeBlock =
+    outOfScopeItems.length > 0
+      ? outOfScopeItems.map((item) => `- ${item}`).join('\n')
+      : '- [Capability or change that is explicitly NOT part of this feature]';
+
+  return prd
+    .replace(
+      /## Problem Statement\n\n[\s\S]*?(?=\n## Solution)/,
+      `## Problem Statement\n\n${problem}\n`
+    )
+    .replace(/## Solution\n\n[\s\S]*?(?=\n## Acceptance Criteria)/, `## Solution\n\n${goal}\n`)
+    .replace(
+      /## Acceptance Criteria\n\n[\s\S]*?(?=\n## Out of Scope)/,
+      `## Acceptance Criteria\n\n${acceptanceBlock}\n`
+    )
+    .replace(/## Out of Scope\n\n[\s\S]*?(?=\n## Technical Approach)/, `## Out of Scope\n\n${outOfScopeBlock}\n`)
+    .replace(/## Technical Approach\n\n[\s\S]*$/, `## Technical Approach\n\n${approach}\n`);
+}
+
+function seedWorkplanFromDefinition(workplan: string, definition: FeatureDefinitionSections): string {
+  const goal = sentenceOrFallback(
+    definition.goal,
+    '[Describe the deliverable for this feature in one sentence.]'
+  );
+  const taskItems = extractCheckboxItems(definition.tasks);
+  const stepBlock =
+    taskItems.length > 0
+      ? taskItems.map((item, index) => `- [ ] Step ${index + 1}: ${item}`).join('\n')
+      : '- [ ] Step 1: [step description]\n- [ ] Step 2: [step description]';
+  const acceptanceItems = extractCheckboxItems(definition.acceptanceCriteria);
+  const acceptanceBlock =
+    acceptanceItems.length > 0
+      ? acceptanceItems.map((item) => `- [ ] ${item}`).join('\n')
+      : '- [ ] [criterion]';
+
+  return workplan
+    .replace(
+      '**Goal:** [Describe the deliverable for this feature in one sentence.]',
+      `**Goal:** ${goal}`
+    )
+    .replace(
+      /### Task 1: \[task name\]\n\n[\s\S]*?(?=\n\*\*Acceptance Criteria:\*\*)/,
+      `### Task 1: Initial implementation slice\n\n${stepBlock}\n`
+    )
+    .replace(/\*\*Acceptance Criteria:\*\*\n[\s\S]*$/, `**Acceptance Criteria:**\n${acceptanceBlock}\n`);
 }
 
 function branchExists(root: string, branchName: string): boolean {
@@ -126,6 +296,7 @@ export async function setup(args: string[]): Promise<void> {
       date: today,
       branch: branchName,
       parentIssue: '',
+      deskworkId: randomUUID(),
     };
 
     for (const filename of ['prd.md', 'workplan.md', 'readme.md']) {
@@ -135,17 +306,16 @@ export async function setup(args: string[]): Promise<void> {
       writeFileSync(targetPath, out, 'utf8');
     }
 
-    // Optionally seed workplan content from a feature-definition.md file. The
-    // existence check above guarantees this read won't ENOENT.
+    // Optionally seed PRD/workplan content from a feature-definition.md file.
     if (definitionFile) {
       const defContent = readFileSync(definitionFile, 'utf8');
+      const definition = parseFeatureDefinition(defContent);
+      const prdPath = join(docsDir, 'prd.md');
       const wpPath = join(docsDir, 'workplan.md');
+      const prd = readFileSync(prdPath, 'utf8');
       const wp = readFileSync(wpPath, 'utf8');
-      writeFileSync(
-        wpPath,
-        wp + '\n<!-- Definition imported from: ' + definitionFile + ' -->\n' + defContent + '\n',
-        'utf8'
-      );
+      writeFileSync(prdPath, seedPrdFromDefinition(prd, definition), 'utf8');
+      writeFileSync(wpPath, seedWorkplanFromDefinition(wp, definition), 'utf8');
     }
 
     console.log(
