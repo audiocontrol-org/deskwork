@@ -92,7 +92,14 @@ function write(rel: string, contents: string): string {
   return abs;
 }
 
-describe('review-start resolves UUID-bound file at non-template path (Issue #67)', () => {
+// SKIPPED: Pipeline-redesign Phase 4 (Tasks 21+22) retired the
+// `review-start` verb. The CLI dispatcher gate now exits 1 with a
+// stable retirement message. The Issue #67 fix (UUID-bound file
+// resolution at non-template paths) is preserved on the new
+// universal-verb path through `resolveEntryFilePath`; re-target these
+// regression tests against `/deskwork:iterate` once the new flow is
+// dogfood-tested.
+describe.skip('review-start resolves UUID-bound file at non-template path (Issue #67)', () => {
   it('finds the file via the content index, not the slug template', () => {
     // Lay down a markdown file at a non-slug-template path with a
     // deskwork.id binding.

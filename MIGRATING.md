@@ -1,3 +1,218 @@
+## Migrating to v0.12.0 (post-v0.11.1 dogfood fixes)
+
+v0.12.0 is a corrective release that fixes a cluster of issues surfaced by dogfooding v0.11.1's entry-centric redesign on real calendars. **No breaking changes**; everything below is upgrade housekeeping.
+
+### TL;DR
+
+- After upgrading, re-run `deskwork doctor --fix=all` (or wipe `.deskwork/entries/` and re-run; both work). The migration now reads the legacy ingest journal's `sourceFile` into a new `Entry.artifactPath` field, and pulls iteration counts + review state from the legacy pipeline-workflow records instead of leaving them empty.
+- The studio's per-entry review surface (`/dev/editorial-review/<entry-uuid>`) now exposes the entry-stage universal verbs — Approve, Block, Cancel, Induct — as buttons that POST to `/api/dev/editorial-review/entry/<uuid>/<action>`. Previously the URL fell through to the legacy workflow renderer with no entry-stage actions.
+- The CLI's `deskwork --help` now matches the Phase 30 verb structure: retired verbs are no longer listed in the active surface; the new universal verbs (`block`, `cancel`, `induct`, `status`) are flagged as skill-only.
+- The 9 retired-verb source files are deleted from the CLI tree. The retirement gate at `commands/retired.ts` still prints the migration message for any operator who tries them.
+- `scripts/repair-install.sh` no longer enumerates plugin versions from `$PATH`, and filters registry walks by `scope`/`projectPath` so other-project installs don't bleed into the current cwd.
+- A local dev workflow lands: `npm run dev --workspace @deskwork/studio` boots the studio with Vite-mounted-in-Hono and HMR. See `packages/studio/README.md#local-development`.
+
+### Adopter actions
+
+After upgrading the marketplace install:
+
+```bash
+deskwork doctor --fix=all
+```
+
+Doctor walks the legacy `.deskwork/review-journal/ingest/*.json` and `pipeline/*.json` records and patches entry sidecars in-place. If the migration found stale ingest paths (the source file was moved after ingest), doctor reports a `file-presence` failure with the recorded path — update either the file location or the sidecar's `artifactPath` field.
+
+### Issues closed in v0.12.0
+
+- [#137](https://github.com/audiocontrol-org/deskwork/issues/137) — `repair-install.sh` re-restored orphan caches when PATH was stale.
+- [#138](https://github.com/audiocontrol-org/deskwork/issues/138) — `repair-install.sh` restored project-scope entries from other projects.
+- [#139](https://github.com/audiocontrol-org/deskwork/issues/139) — `deskwork --help` listed retired verbs, omitted universals.
+- [#140](https://github.com/audiocontrol-org/deskwork/issues/140) — Migration derived sidecar paths from a slug heuristic, ignoring real path in ingest journal.
+- [#141](https://github.com/audiocontrol-org/deskwork/issues/141) — Migration didn't carry over review-workflow state.
+- [#146](https://github.com/audiocontrol-org/deskwork/issues/146) — Studio per-entry review surface used the legacy renderer; no entry-stage actions.
+
+---
+
+## Migrating to v0.11.0 (entry-centric pipeline redesign)
+
+> **Version note:** `v0.11.0` is a placeholder used throughout this section. The actual release version is set at tag time — check the [GitHub releases page](https://github.com/audiocontrol-org/deskwork/releases) for the canonical version string and substitute it where you see `v0.11.0` below.
+
+The Phase 30 redesign reshapes deskwork's editorial calendar around a single eight-stage state machine per entry, retires nine per-stage skills in favor of universal verbs, and moves source-of-truth from `calendar.md` plus a separate review-workflow store onto per-entry sidecar JSON files. This release is a major version bump because adopter calendars need a one-shot schema migration, several skill names have changed, and the review-surface URL shape has changed.
+
+### TL;DR
+
+- One-shot schema migration: `deskwork doctor --check` to dry-run, then `deskwork doctor --fix=all` to apply.
+- Nine skills retired; their behavior moves into nine universal verbs. See the verb mapping table below.
+- The review surface moved from `/dev/editorial-review/<workflow-uuid>` to `/dev/editorial-review/entry/<entry-uuid>`. The legacy workflow-uuid path still resolves during the migration window.
+- Frontmatter fields deskwork writes are now nested under a `deskwork:` namespace (`deskwork.id`, `deskwork.stage`, `deskwork.iteration`).
+- Pinned installs of v0.10.x and earlier continue to work unchanged. Move forward on your own schedule.
+
+### What changed under the hood
+
+#### Eight-stage entry-centric pipeline
+
+Before, the calendar tracked seven stages and a separate review-workflow store carried review state. The two stores could disagree — an approved+applied workflow would still render its entry as `Drafting` because the calendar stage didn't reflect workflow events. The `Review` stage was unreachable in practice, and `Paused` was treated as a process flag rather than a stage.
+
+After, every entry has exactly one stage from a single state machine:
+
+- **Linear pipeline:** Ideas → Planned → Outlining → Drafting → Final → Published
+- **Off-pipeline:** Blocked (resumable interruption) and Cancelled (abandoned, rare resume)
+
+Source-of-truth is the per-entry sidecar at `.deskwork/entries/<uuid>.json`. The `calendar.md` file is regenerated from sidecars by `deskwork doctor` and is purely a human-readable projection — editing it directly is no longer the supported flow.
+
+#### Universal verbs replace per-stage skills
+
+Nine skills are retired:
+
+`/deskwork:plan`, `/deskwork:outline`, `/deskwork:draft`, `/deskwork:pause`, `/deskwork:resume`, `/deskwork:review-start`, `/deskwork:review-cancel`, `/deskwork:review-help`, `/deskwork:review-report`.
+
+Their behavior is consolidated into universal verbs that work at every stage:
+
+- `/deskwork:add` — create a new Ideas entry (rewritten on the new schema; same name and surface).
+- `/deskwork:iterate` — within-stage edit cycle (snapshot → journal entry → sidecar update). The first iterate at Planned auto-scaffolds `plan.md`; the first at Outlining auto-scaffolds `outline.md`; the first at Drafting auto-scaffolds `index.md`.
+- `/deskwork:approve` — graduate to the next stage. Universal across the pipeline: Ideas → Planned, Planned → Outlining, Outlining → Drafting, Drafting → Final.
+- `/deskwork:publish` — Final → Published. The only graduation event from Final.
+- `/deskwork:block` — move an entry off-pipeline (replaces pause). Resumable.
+- `/deskwork:cancel` — abandon an entry (rare). Resumable but expected to be infrequent.
+- `/deskwork:induct` — universal teleport that replaces resume. Brings an entry back into the pipeline from Blocked, Cancelled, or a revoked Final.
+- `/deskwork:status` — per-entry state summary (replaces `review-help` and the per-entry view of `review-report`).
+- `/deskwork:doctor` — orchestrates helper validation and dispatches LLM-as-judge sub-agents for content checks.
+
+#### Verb mapping (old → new)
+
+| Old skill | New verb |
+|---|---|
+| `/deskwork:plan` | first `/deskwork:iterate` at Planned (auto-scaffolds `plan.md`) followed by `/deskwork:approve` |
+| `/deskwork:outline` | first `/deskwork:iterate` at Outlining (auto-scaffolds `outline.md`) |
+| `/deskwork:draft` | first `/deskwork:iterate` at Drafting (auto-scaffolds `index.md`) |
+| `/deskwork:pause` | `/deskwork:block` |
+| `/deskwork:resume` | `/deskwork:induct` |
+| `/deskwork:review-start` | first `/deskwork:iterate` at any stage |
+| `/deskwork:review-cancel` | `/deskwork:cancel` (or `/deskwork:induct` to retract back to a prior stage) |
+| `/deskwork:review-help` | `/deskwork:status` |
+| `/deskwork:review-report` | `/deskwork:status` (per-entry view) |
+
+If you accidentally invoke a retired CLI subcommand, the retired-verb gate in `deskwork doctor` prints a stable migration message pointing at the new verb.
+
+#### URL changes
+
+The studio's review surface changed key:
+
+- **Before:** `/dev/editorial-review/<workflow-uuid>` (workflow-uuid keyed)
+- **After:** `/dev/editorial-review/entry/<entry-uuid>` (entry-uuid keyed; namespaced under `entry/` to avoid path collision with the legacy route)
+
+The legacy workflow-uuid path still resolves during the migration window so existing bookmarks and dashboard links keep working. New links generated by the studio use the entry-uuid form.
+
+#### Frontmatter changes
+
+Frontmatter fields deskwork writes into adopter-owned markdown are now nested under a `deskwork:` namespace:
+
+```yaml
+---
+title: My post
+deskwork:
+  id: 01943c00-7e9d-7c00-9b5a-1234567890ab
+  stage: Drafting
+  iteration: 3
+---
+```
+
+The doctor's frontmatter-sidecar validator catches drift between artifact frontmatter and the sidecar. If your content-collection schema rejected the new shape, permit it with `deskwork: z.object({...}).passthrough()` (or top-level `.passthrough()`).
+
+### Adopter checklist
+
+#### 1. Update the marketplace
+
+```
+/plugin marketplace update deskwork
+/reload-plugins
+```
+
+#### 2. Read this section end-to-end
+
+The migration is non-destructive (a sidecar-write + calendar regeneration), but the verb-rename surface affects every project-internal skill or documentation page that mentions retired verbs. Read this section before running the migration so you know what to update.
+
+#### 3. Dry-run the schema migration
+
+From the project root:
+
+```bash
+deskwork doctor --check
+```
+
+The dry-run reports legacy schema detection and prints the number of entries that would be migrated. Nothing is written to disk in `--check` mode.
+
+#### 4. Run the schema migration
+
+```bash
+deskwork doctor --fix=all
+```
+
+This:
+
+- Writes per-entry sidecars to `.deskwork/entries/<uuid>.json`.
+- Regenerates `.deskwork/calendar.md` from the sidecars.
+- Appends `entry-created` journal events for the migrated entries.
+
+The migration is idempotent — re-running on an already-migrated tree is a no-op.
+
+#### 5. Verify post-migration
+
+```bash
+deskwork doctor
+```
+
+A clean migration reports `clean (no findings...)`. If `doctor` surfaces findings, follow its recommended fixes (each finding includes a `--fix=<rule>` suggestion).
+
+#### 6. Commit the migration
+
+```bash
+git add .deskwork/
+git commit -m "chore: migrate calendar to entry-centric schema"
+```
+
+The sidecars are tracked in git alongside the existing `.deskwork/` artifacts.
+
+#### 7. Update custom skill prose
+
+Any project-internal skills (`.claude/skills/<name>/SKILL.md`) that reference retired verbs need updating. Use the verb mapping table above. Common patterns:
+
+- A skill that ran `/deskwork:plan` after creating a new entry now runs `/deskwork:iterate` and then `/deskwork:approve` to graduate from Planned to Outlining.
+- A skill that paused work via `/deskwork:pause` now uses `/deskwork:block`.
+- A skill that resumed paused work via `/deskwork:resume` now uses `/deskwork:induct`.
+- Help / status output that mentioned `/deskwork:review-help` or `/deskwork:review-report` should point at `/deskwork:status`.
+
+The retired-verb gate prints a stable migration message that you can also surface in your own automation if you want to defer the rename.
+
+#### 8. Update content-collection schemas if needed
+
+If your renderer (Astro, Next, etc.) validates frontmatter against a schema, ensure it permits the `deskwork:` namespace. Either:
+
+```ts
+deskwork: z.object({}).passthrough()
+```
+
+…or mark the whole frontmatter object `.passthrough()` to allow any deskwork-namespaced fields without explicit declaration.
+
+### What did NOT change
+
+- `.deskwork/config.json` is untouched. No config migration.
+- `deskwork.id` UUIDs on existing entries are preserved across the migration.
+- Frontmatter fields you (the adopter) own — title, date, tags, slug, etc. — are not touched.
+- The marketplace install path, the bin shim mechanism, and the studio boot path are unchanged from v0.10.x.
+- Pinned installs to v0.10.x or earlier still work; they continue to use the seven-stage architecture.
+
+### Where to file issues
+
+If migration fails or produces unexpected results, open an issue at <https://github.com/audiocontrol-org/deskwork/issues> with:
+
+- Your prior version (the one you're upgrading from).
+- Output of `deskwork doctor --check` from before migration.
+- Output of `deskwork doctor --fix=all` from the migration attempt.
+- The shape of your `.deskwork/calendar.md` (the legacy form, before the migration regenerates it).
+- Any project-internal skills that reference retired verbs, if the breakage is on the skill side rather than the schema side.
+
+---
+
 ## Migrating to v0.9.3+ (marketplace.json source-shape change)
 
 v0.9.3 changed each plugin's `marketplace.json` `source` field from a relative path (`./plugins/deskwork`) to a `git-subdir` source pinned at the release tag — necessary so adopters install the materialized-vendor commit (Issue [#88](https://github.com/audiocontrol-org/deskwork/issues/88)). For most adopters the change is invisible: `/plugin marketplace update deskwork` followed by `/plugin install deskwork@deskwork` works as expected.

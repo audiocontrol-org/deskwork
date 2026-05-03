@@ -1,0 +1,18 @@
+{
+  "id": "2cd90083-0327-429a-bee2-954570be1a4d",
+  "timestamp": "2026-04-30T20:21:17.544Z",
+  "entry": {
+    "kind": "annotation",
+    "at": "2026-04-30T20:21:17.544Z",
+    "annotation": {
+      "type": "address",
+      "workflowId": "970aa75d-f586-47f0-bc89-4481830a7676",
+      "commentId": "817b08e1-5de8-4771-aa3e-cf41f4087565",
+      "version": 2,
+      "disposition": "addressed",
+      "reason": "Added a new top-level 'Stop-gap status — migrates into dw-lifecycle when ready' section right under Status/Source. Status line at the top now reads '... — stop-gap, migrates into dw-lifecycle when ready (see Stop-gap status below).' explicitly framing the whole feature as stop-gap scaffolding that lives in the deskwork plugin only because dw-lifecycle doesn't yet expose customizable/overridable lifecycle stages.",
+      "id": "2cd90083-0327-429a-bee2-954570be1a4d",
+      "createdAt": "2026-04-30T20:21:17.544Z"
+    }
+  }
+}

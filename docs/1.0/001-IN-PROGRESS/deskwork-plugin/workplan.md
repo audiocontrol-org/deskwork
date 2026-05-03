@@ -1247,8 +1247,553 @@ Shipped only after the manual flow in 26f is solid. Adds `permissions: id-token:
 
 **Acceptance:**
 
-- [ ] v0.9.7 shipped via the five-pause `/release` flow.
-- [ ] `npm view @deskwork/cli@0.9.7 dependencies` shows `@deskwork/core` pinned to `0.9.7`. Same for `@deskwork/studio`.
-- [ ] Marketplace install dogfood post-publish: `deskwork customize . doctor calendar-uuid-missing` succeeds against a fresh adopter tree.
+- [x] v0.9.7 shipped via the five-pause `/release` flow (commit `cf88937`, chore-release `02efb92`, tag `v0.9.7` on origin, GitHub release auto-created).
+- [x] `npm view @deskwork/cli@0.9.7 dependencies` shows `@deskwork/core` pinned to `0.9.7`. Same for `@deskwork/studio`.
+- [x] Marketplace install dogfood post-publish: `deskwork customize . doctor calendar-uuid-missing` succeeds against a fresh adopter tree (verified 2026-04-30 — bin shim detected drift, reinstalled `@deskwork/cli@0.9.7`, resolved `@deskwork/core@0.9.7`).
 
 **Issues closed in this phase:** [#101](https://github.com/audiocontrol-org/deskwork/issues/101).
+
+### Phase 26++++: `deskwork repair-install` recovery for #89 — v0.9.8
+
+**Deliverable:** Adopter-side recovery for [#89](https://github.com/audiocontrol-org/deskwork/issues/89) — `~/.claude/plugins/installed_plugins.json` accumulates entries pointing at cache directories that no longer exist on disk; Claude Code wires PATH from these stale entries and the bin is unreachable. The root-cause fix is registry hygiene in Claude Code (filed upstream as [anthropics/claude-code#54905](https://github.com/anthropics/claude-code/issues/54905)). Until that lands, deskwork ships a recovery command that runs without depending on PATH.
+
+**Implementation:**
+
+- [x] New CLI subcommand `deskwork repair-install` (`packages/cli/src/commands/repair-install.ts`). Reads `~/.claude/plugins/installed_plugins.json`, identifies entries for `deskwork@deskwork`, `deskwork-studio@deskwork`, `dw-lifecycle@deskwork` whose `installPath` doesn't exist on disk, prunes them, and reports which plugins now have no live entry. Supports `--dry-run` and `--json` flags.
+- [x] Subcommand registered in `packages/cli/src/cli.ts` under "Maintenance" in help text.
+- [x] 9 unit tests in `packages/cli/test/repair-install.test.ts`: live-only no-op, mixed prune, all-stale delete-key, third-party-untouched, missing-after-prune reporting, empty-installPath handling, ordering preservation.
+- [x] Adopter recovery flow documented in [`plugins/deskwork/README.md`](../../../plugins/deskwork/README.md). Adopter invokes via the marketplace-clone path so a broken PATH doesn't prevent self-heal: `~/.claude/plugins/marketplaces/deskwork/plugins/deskwork/bin/deskwork repair-install`.
+- [x] End-to-end verified against the dev machine's actual broken state — 10 stale entries identified across 6 `deskwork@deskwork` records, 3 `deskwork-studio@deskwork` records, 1 `dw-lifecycle@deskwork` record; only 1 valid entry preserved (`deskwork-studio@deskwork v0.7.2`).
+- [x] 766 workspace tests pass (was 757; +9 repair-install).
+- [x] Upstream [anthropics/claude-code#54905](https://github.com/anthropics/claude-code/issues/54905) filed in parallel — concrete repro from the dev machine, suggested PATH-wire reconciliation fix.
+
+**Acceptance:**
+
+- [x] v0.9.8 shipped via the five-pause `/release` flow (commit `68f40e6`, chore-release `f62cb61`, tag `v0.9.8` on origin, GitHub release auto-created).
+- [x] `deskwork repair-install --dry-run` reports stale entries accurately on a known-broken machine.
+- [x] [#89](https://github.com/audiocontrol-org/deskwork/issues/89) updated with adopter recovery instructions + cross-link to the upstream Claude Code issue.
+
+**Issues commented:** [#89](https://github.com/audiocontrol-org/deskwork/issues/89) (adopter recovery + upstream cross-link).
+
+### Phase 27: studio bug tranche — v0.10.0
+
+**Deliverable:** Fix the seven adopter-facing studio bugs surfaced by the v0.9.7 marketplace-install dogfood ([#103](https://github.com/audiocontrol-org/deskwork/issues/103), [#104](https://github.com/audiocontrol-org/deskwork/issues/104), [#105](https://github.com/audiocontrol-org/deskwork/issues/105), [#106](https://github.com/audiocontrol-org/deskwork/issues/106), [#107](https://github.com/audiocontrol-org/deskwork/issues/107), [#108](https://github.com/audiocontrol-org/deskwork/issues/108), [#110](https://github.com/audiocontrol-org/deskwork/issues/110)). Single PR, single `v0.10.0` release.
+
+**Sub-phase A — Content-detail panel read-path ([#103](https://github.com/audiocontrol-org/deskwork/issues/103)):**
+
+- [x] Trace the API endpoint that backs `/dev/content/<collection>/<root>?node=<path>`'s right-panel render. Identify whether the failure is in path resolution, the frontmatter parser, or the body preview renderer.
+- [x] Reproduce against this project's `docs/1.0/001-IN-PROGRESS/deskwork-plugin/prd.md` (481 lines, valid `deskwork.id` + `title` frontmatter). Confirm the failure shape end-to-end.
+- [x] Fix the underlying read. The fix must handle the `deskwork:` namespace correctly (per the v0.7.2 frontmatter convention).
+- [x] Add a regression test using the project's own `prd.md` as the fixture; assert the right-panel render returns frontmatter-with-fields and a non-empty body preview.
+
+**Diagnosis:** `loadDetailRender` at `packages/studio/src/pages/content-detail.ts:218` only resolved the file via `findOrganizationalIndex(contentDir, node.path)`, which checks for `<path>/index.md` / `<path>/README.md` only. It never consulted `node.filePath` — the id-bound on-disk file already attached to the tree node by `content-tree.ts:282` (Phase 22++++ / Issue #70). For single-file entries (peer `.md` naming, like the PRD at `docs/1.0/001-IN-PROGRESS/deskwork-plugin/prd.md`), the lookup missed entirely and both panes rendered empty-state. Fix: prefer `node.filePath` when set, fall back to `findOrganizationalIndex` for purely organizational nodes. Regression test at `packages/studio/test/content-detail-single-file-entry.test.ts` reproduces the PRD shape (peer `.md` with `deskwork.id` namespace + multi-paragraph body) and asserts the dl renders with the id present and the body preview is non-empty.
+
+**Sub-phase B — Manual content rewrite ([#104](https://github.com/audiocontrol-org/deskwork/issues/104)) + dashboard rewrite ([#69](https://github.com/audiocontrol-org/deskwork/issues/69) closed in passing):**
+
+- [x] Walk every `/editorial-(add|plan|outline|draft|publish|distribute)` reference in `packages/studio/src/pages/help.ts` (and any related help-content files) and replace with the canonical `/deskwork:*` name.
+- [x] Add a regression test asserting `/dev/editorial-help` HTML contains zero `/editorial-(add|plan|outline|draft|publish|distribute)` matches (and a positive assertion that `/deskwork:*` references appear).
+
+**Files migrated:** `packages/studio/src/pages/help.ts` (Manual sections II/IV/V/VII), `packages/studio/src/lib/editorial-skills-catalogue.ts` (slugs + cross-references), `packages/studio/src/pages/dashboard.ts` (empty-state prose + 8 `data-copy` button payloads + Awaiting-press hint + Voice-drift hint). Scope extended to dashboard.ts because the same legacy slash names live there in user-facing clipboard payloads — adopters paste `/editorial-plan` → "command not found." Closes [#69](https://github.com/audiocontrol-org/deskwork/issues/69) in passing (the v0.8.4 partial fix completed here). Audiocontrol-specific commands (`/editorial-reddit-sync`, `/editorial-social-review`, `/editorial-reddit-opportunities`, `/editorial-cross-link-review`, `/editorial-performance`, `/editorial-suggest`) left untouched in §I Distribution track of the Manual — they reference commands that don't exist in the OSS deskwork CLI; broken docs to file as a follow-up rather than expand scope further. Regression test at `packages/studio/test/manual-canonical-slash-names.test.ts` covers both `/dev/editorial-help` and `/dev/editorial-studio`.
+
+**Sub-phase C — Studio copy-to-clipboard input validation + manual-copy fallback ([#105](https://github.com/audiocontrol-org/deskwork/issues/105)):**
+
+- [x] Audit all studio copy-to-clipboard buttons (rename, intake, Approve hint popup, any others). Catalog them.
+- [x] Implement a unified validation + fallback helper: validate empty inputs before generating the command; on `navigator.clipboard.writeText` failure or unavailability (HTTP context, sandboxed iframe), render the command in a persistent `<pre>` block as a manual-copy fallback.
+- [x] Apply the helper to all catalogued buttons.
+- [x] Note: closing [#74](https://github.com/audiocontrol-org/deskwork/issues/74) and [#99](https://github.com/audiocontrol-org/deskwork/issues/99) is in scope here — same family, same fix shape.
+
+**Diagnosis:** Five copy-to-clipboard call sites lived across two client files with three different fallback patterns. Worst case (#74) was the Approve / Iterate path in `editorial-review-client.ts:1456` — `copyAndToast` only tried `navigator.clipboard.writeText` (no execCommand fallback), surfaced a 4-second toast on failure, and was paired with a `setTimeout(reload, 2400)` that destroyed the toast before the operator could read the command. Intake form (#99) auto-collapsed on click regardless of clipboard outcome, hiding any error from the operator. Rename form (#105) left the submit button enabled on initial render so an empty-input click was a silent no-op. New leaf module `plugins/deskwork-studio/public/src/clipboard.ts` exports `copyToClipboard` (async API → execCommand fallback, throws on empty input) and `copyOrShowFallback` (best-effort copy → on failure renders a fixed-position dismiss-able `<aside>` with a pre-selected `<pre>` block, and sets `document.body.dataset.manualCopyOpen='1'` while mounted). The Approve/Iterate handlers now check `isManualCopyOpen()` before reloading; the panel's Dismiss button triggers the deferred reload via `onDismiss`. Rename form moved to `rename-form.ts` (sibling extraction to keep `editorial-studio-client.ts` under 500 lines) and now disables submit on initial render until the operator types a valid slug, with belt-and-braces re-validation on submit. Intake form validates required fields BEFORE generating the payload, focuses the offending field on error, and skips auto-collapse on manual-copy fallback so the operator can verify form values against the panel. Generic `.er-copy-btn` buttons console.warn loudly when `data-copy` is missing instead of silently no-op'ing. All four pre-existing tsc errors in `editorial-studio-client.ts` are pre-existing — no new type errors introduced. Studio (`200 passed`) and CLI (`162 passed`) test suites green.
+
+**Sub-phase D — "Coverage matrix" empty-state copy fix ([#106](https://github.com/audiocontrol-org/deskwork/issues/106)):**
+
+- [x] Rewrite the shortform desk's empty-state copy to match what the dashboard actually renders (e.g., "Start a new shortform draft from the dashboard's Drafting list").
+- [x] Update the link target to `/dev/editorial-studio#stage-drafting` (anchor-scroll to the Drafting section). Anchor namespaced `stage-<lowercase>` so every stage section gets a consistent `id="stage-${stage.toLowerCase()}"` rather than reserving the bare slug for one stage.
+- [x] Verify the anchor scrolls correctly on click. Test asserts both the empty-state link target and the dashboard's `id="stage-drafting"` anchor mount; cross-stage consistency also asserted.
+
+**Diagnosis:** The shortform desk pointed at a "coverage matrix" that doesn't exist on the dashboard, with a link target (`/dev/editorial-studio`) that landed at the top of the page. Adopters hit a dead end. Fix: empty-state copy in `packages/studio/src/pages/shortform.ts:107` names the Drafting list; `renderStageSection` in `packages/studio/src/pages/dashboard.ts:710` emits `id="stage-${stage.toLowerCase()}"`. Regression test at `packages/studio/test/shortform-empty-state.test.ts`; pre-existing `shortform-routing.test.ts` test updated.
+
+**Sub-phase E — Index page sensible defaults for un-linked surfaces ([#107](https://github.com/audiocontrol-org/deskwork/issues/107)):**
+
+- [x] Longform reviews entry (III): if a most-recent in-review workflow exists, link to its `/dev/editorial-review/<uuid>`. Otherwise link to `/dev/editorial-studio#stage-review` (re-using the anchor mounted in sub-phase D; cleaner than introducing a new `?stage=` query parameter just for this fallback).
+- [x] Scrapbook entry (V): link to `/dev/content` (the scrapbook is reached by drilling into a content node).
+- [x] Visual: keep the URL template hint (`<slug>` / `<site>/<path>`) visible alongside the link, so adopters still see the URL shape.
+
+**Diagnosis:** `IndexEntry` had no way to express "templated route, but here's a link target." The renderer treated `template` as exclusive with linking. Refactor: added optional `linkHref` field — when set, the title becomes a link to that URL even for templated entries; the route hint span stays alongside as a placeholder. `SECTIONS` const moved to `buildSections(ctx)` so the Longform entry can compute `linkHref` from the workflow journal at render-time. `pickDefaultLongformWorkflow` returns the most-recent open longform (by `updatedAt`); falls through to `/dev/editorial-studio#stage-review` when none exists. Scrapbook entry hardcoded to `/dev/content`. Stale "Loopback only." string in the colophon dropped while in the file (pre-Tailscale support claim, no longer accurate; cosmetic). Regression tests at `packages/studio/test/index-page-defaults.test.ts` cover three branches: empty calendar (Longform → anchor), populated longform (Longform → deep-link), and Scrapbook → /dev/content; all assert the URL template hint stays visible.
+
+**Sub-phase F — Destructive shortcut soft-confirm ([#108](https://github.com/audiocontrol-org/deskwork/issues/108)):**
+
+- [x] Implement two-key sequence handling for `a a`, `i i`, `r r` (within ~500ms). Single keystroke pops a transient hint ("press a again to approve") that auto-dismisses; second matching keystroke fires the action.
+- [x] Update the `?` shortcuts panel to document the two-key behavior.
+- [x] Keep `j` / `k` (next/prev margin note) and `e` (toggle edit) as single-key — they're not destructive.
+
+**Diagnosis:** `editorial-review-client.ts:1664-1666` (post-disarm-refactor: 1670-1685) bound `a`/`i`/`r` to single-keystroke `approveBtn?.click()` etc. Stray keystroke while reading collapsed weeks of work. Fix: module-level `armedKey` + `armedTimer` state. `armKey(key)` shows a hint toast ("Press a again to approve"), schedules `disarm()` in 500ms. Destructive-key path checks `armedKey === key` → fire and disarm; else → arm. Non-destructive shortcuts (`e`, `j`, `k`) call `disarm()` defensively before their own action so a half-armed state can't leak across navigation. The `?` shortcuts panel in `packages/studio/src/pages/review.ts:278-280` updated to show double-`<kbd>` rows + "press twice within 500ms" prose. Regression test at `packages/studio/test/review-shortcuts-panel.test.ts` covers (1) double-`<kbd>` rendering, (2) absence of the pre-fix single-`<kbd>` shape, (3) preservation of `j`/`k`/`e` single-key shortcuts. Two-key behavior itself is client-only — no jsdom infrastructure means no direct unit test; the panel-content test is the server-side artifact that documents the fix.
+
+**Sub-phase G — Dashboard row link fallback ([#110](https://github.com/audiocontrol-org/deskwork/issues/110)):**
+
+- [x] When no open workflow exists for a calendar entry, link the row to `/dev/content/<collection>/<path>` (the content-detail page). Workflow-linked entries keep their `/dev/editorial-review/<uuid>` target.
+- [x] Every dashboard row in every stage becomes clickable. Visual treatment is identical (consistency over per-target styling) — the `<a>` carries `title` attributes that distinguish the destination on hover.
+- [x] Same fallback applies to "Recent proofs" rows on the dashboard, which are also currently un-linked.
+
+**Diagnosis:** Three render paths were broken: (1) Drafting/Review entries with no workflow rendered slug as plain text (no link); (2) entries with `hasFile` but no workflow ALSO had a broken target — `blogPreviewLink` returned `/dev/editorial-review/<key>` for non-Published stages even when no workflow existed (would 404 or render an empty workflow page); (3) Recent proofs rows in the terminal-workflows section were `<div>` elements with no link target. New `contentDetailLink(site, slug)` helper builds `/dev/content/<site>/<root>?node=<slug>` URLs (encodeURIComponent on both segments and the node param). `slugCell` resolution is now: workflow → review surface; Published → public host URL; else → content-detail. Hierarchical-slug branch updated similarly so depth-aware rows also wrap in `<a>`. Recent proofs section converted from `<div class="er-row">` to `<a class="er-row" href={workflowLink(w)}>` so terminal workflows are clickable. Regression test at `packages/studio/test/dashboard-row-link-fallback.test.ts` covers all three cases.
+
+**Acceptance:**
+
+- [ ] All 7 bugs verified fixed via the public path: `/plugin marketplace update deskwork` → `/reload-plugins` → boot studio → walk each surface → confirm the fix renders.
+- [ ] Regression tests pass: content-detail (#103), help-page slash-name (#104), studio test suite for copy-button helpers (#105).
+- [ ] No new console errors introduced.
+- [ ] v0.10.0 shipped via the five-pause `/release` flow.
+
+**Issues closed in this phase:** [#103](https://github.com/audiocontrol-org/deskwork/issues/103), [#104](https://github.com/audiocontrol-org/deskwork/issues/104), [#105](https://github.com/audiocontrol-org/deskwork/issues/105), [#106](https://github.com/audiocontrol-org/deskwork/issues/106), [#107](https://github.com/audiocontrol-org/deskwork/issues/107), [#108](https://github.com/audiocontrol-org/deskwork/issues/108), [#110](https://github.com/audiocontrol-org/deskwork/issues/110). Plus [#74](https://github.com/audiocontrol-org/deskwork/issues/74) and [#99](https://github.com/audiocontrol-org/deskwork/issues/99) (subsumed by sub-phase C).
+
+
+### Phase 28: durable cache-restore script + auto-repair hook — v0.10.1
+
+Shipped. Customer-blocking [#131](https://github.com/audiocontrol-org/deskwork/issues/131). New `scripts/repair-install.sh` at the marketplace clone path (durable across cache eviction); restores cache subtrees from clone + prunes stale registry entries. Modes: default, `--quiet` (silent on healthy ~150ms; SessionStart hook usage), `--check` (read-only). Version banner when not `--quiet`. `deskwork repair-install` becomes a thin TS shell-out wrapper. README adopter snippet documents the SessionStart hook. New rule in `agent-discipline.md`: "Adopter-facing scripts have a stable CLI contract."
+
+**Issues:** [#131](https://github.com/audiocontrol-org/deskwork/issues/131) (left open — customer-acceptance verification per the closure rule).
+
+### Phase 28+: SessionStart hook hint in `repair-install.sh` — v0.10.2
+
+Shipped. Issue [#132](https://github.com/audiocontrol-org/deskwork/issues/132) — agent-driven install gap surfaced during v0.10.1 customer-acceptance dogfood (agent reached for `update-config` harness skill to install the hook; reverted; filed issue). Operator chose smaller-shape: hint, not install surface.
+
+- [x] `scripts/repair-install.sh` detects whether the SessionStart hook is wired in `~/.claude/settings.json` or `./.claude/settings.json` via substring match on `repair-install.sh` (leans on script-path stability rule).
+- [x] Hint printed at end of default + `--check` output when not installed; suppressed in `--quiet` (silence-on-healthy contract holds).
+- [x] Verified locally: hint shows when no hook installed; `--quiet` zero-output exit 0; hint suppressed when project-scope `.claude/settings.json` has the hook.
+
+**Acceptance:**
+
+- [x] v0.10.2 shipped via the five-pause `/release` flow.
+
+**Issues:** [#132](https://github.com/audiocontrol-org/deskwork/issues/132) (left open — operator's call after fresh-session verification).
+
+---
+
+### Phase 29: post-release customer acceptance playbook (`/post-release:walk` + `/post-release:file-issues`)
+
+**Deliverable:** A pair of skills that codify how to evaluate the freshly-installed deskwork marketplace plugin, surface friction, and file issues — using the deskwork pipeline itself as the triage surface. `/post-release:walk` runs cursory (default) or deep modes against the latest marketplace install; produces a structured findings markdown ingested into deskwork as a longform document for operator review. `/post-release:file-issues` parses the operator-approved findings doc and files GitHub issues per finding (with per-finding confirmation).
+
+**Source-of-truth:** [`docs/1.0/post-release-acceptance-design.md`](../../../post-release-acceptance-design.md) — design v2 applied 2026-04-30 via deskwork workflow `970aa75d-f586-47f0-bc89-4481830a7676` (commit `b1f1815`). Operator margin notes both addressed by the v2 stop-gap framing.
+
+**Operator principle driving the work:** *"We should have a post-release customer acceptance playbook that we run through — not hard-coded tooling, but a skill (or a composition of skills) that codify how to evaluate the installed plugin to ensure it's sane and file bugs if it's not. This should include playwright inspection of the studio. We should update that playbook as we add/update features."*
+
+**Stop-gap framing (binding):** Per the design's Stop-gap status section, the entire Phase 29 surface — both new `/post-release:*` skills AND the existing `/release` skill it integrates with — is scaffolding inside the deskwork plugin only because dw-lifecycle has not yet shipped customizable lifecycle stages. When dw-lifecycle gains that capability, `/release` and `/post-release:*` migrate into dw-lifecycle's customizable-workflow surface; file paths (skill paths, playbook path, generated findings paths) are explicitly ephemeral. Schema choices, file paths, and skill names should stay simple enough that the migration is a move-and-rename, not a re-architect.
+
+#### Sub-phases
+
+**Sub-phase A — Playbook scaffold** (foundational; the playbook is the contract for assertions):
+
+- [ ] T1 — Author `docs/post-release/playbook.md` initial version with per-surface sections (`/dev/`, `/dev/editorial-studio`, `/dev/editorial-help`, `/dev/editorial-review-shortform`, `/dev/content`, `/dev/editorial-review/<id>`). Each section has cursory + deep assertion lists. Baseline reflects v0.10.X studio surface.
+- [ ] T2 — Implement playbook parser (TS module under `packages/cli/src/post-release/playbook.ts` or equivalent). Returns structured `PerSurfaceAssertions[]`. Unit tests cover: well-formed playbook, missing section, malformed assertion, empty file. Reuses existing markdown-parsing helpers from `@deskwork/core` if present.
+
+**Sub-phase B — `/post-release:walk` cursory mode** (minimum viable walk):
+
+- [ ] T3 — Boot studio + auto-discover surfaces from `/dev/` index. Implementation: HTTP fetch of `/dev/`, parse anchor hrefs starting with `/dev/`. Extend with playbook-only routes that aren't in the index. Output: `DiscoveredSurface[]`.
+- [ ] T4 — Per-surface walk: HTTP GET each surface; capture status code, response time, network failures from referenced assets (CSS/JS/images). For console errors, defer to deep mode (Playwright not used in cursory — the design called for it but cursory's value is fast HTTP-only checks; deep mode adds Playwright). Update design Open Question #6 if scope changes.
+- [ ] T5 — Aggregate findings: each non-OK observation (4xx/5xx, asset 404, missing playbook entry, failed assertion) becomes a `Finding` with severity (`bug` | `enhancement` | `info`), title, body, optional artifact path.
+- [ ] T6 — Generate findings doc at `docs/post-release/<version>-acceptance.md` (per the design's template). Frontmatter binds via `deskwork.id` (auto-generated UUID). Header section + per-surface walked checklist + Findings list.
+- [ ] T7 — Shell out to `deskwork ingest <path>` then `deskwork review-start --site <site> <slug>`. Surface review URL to operator.
+- [ ] T8 — `plugins/deskwork/skills/post-release/walk/SKILL.md` — operator-facing prose. Steps: confirm version, boot studio, walk surfaces, ingest + review-start, surface URL.
+
+**Sub-phase C — Playbook assertions wired**:
+
+- [ ] T9 — Wire parsed playbook assertions (T2) into the walk (T4) per-surface. Each cursory assertion runs against the fetched HTML; failed assertion emits a finding. Document assertion-language: a fixed vocabulary (`returns 200`, `every linked asset returns 200`, `no console.error`, `selector exists`, `selector matches text`, `selector has attribute`).
+- [ ] T10 — Tests for assertion engine: fixture playbook + fixture HTML response per assertion type. At least 1 happy + 1 failure case per assertion type.
+
+**Sub-phase D — `/post-release:walk` deep mode**:
+
+- [ ] T11 — Sandbox project setup helper: `mktemp -d`, run `/deskwork:install --no-prompt` against it (or equivalent CLI flag — confirm install skill supports non-interactive mode; if not, file follow-up issue). Verify `.deskwork/config.json` lands.
+- [ ] T12 — CLI drive sequence: `add → plan → outline → draft → review-start → iterate (no-op iterate, just snapshot disk) → approve → publish`. Each step asserts expected stage transition + on-disk artifact (frontmatter, scaffold file, datePublished).
+- [ ] T13 — Studio cross-check during the drive. Each stage transition: HTTP-fetch dashboard, assert entry appears in expected stage section. Screenshot via Playwright (deep mode wires Playwright; cursory does not).
+- [ ] T14 — Update walk SKILL.md (T8) with `--mode deep` documentation.
+
+**Sub-phase E — `/post-release:file-issues`**:
+
+- [ ] T15 — Findings-doc parser (TS module). Each `### Finding NN — <title>` heading produces one `ParsedFinding`. Severity field maps to label. Artifact references resolve to relative paths under the artifacts dir. Tests against fixture findings docs (well-formed, missing severity, deleted finding section, info-severity skip).
+- [ ] T16 — Per-finding confirmation loop: print title + severity + surface + first 80 chars of body; prompt `[y/N/edit]`; on `y` invoke `gh issue create --title <title> --body-file <tmp> --label <severity> --label post-release` (the `post-release` label is the design's Open Question #2 recommendation; confirm with operator on first run if not previously decided). Each filed issue body ends with `Surfaced by post-release acceptance walk: [v<X.Y.Z> acceptance](docs/post-release/v<X.Y.Z>-acceptance.md)`.
+- [ ] T17 — `plugins/deskwork/skills/post-release/file-issues/SKILL.md` — operator-facing prose. Verify `state === applied`, parse approved version, prompt loop, summary report.
+
+**Sub-phase F — `/release` end-prompt integration**:
+
+- [ ] T18 — Add end-prompt to existing `/release` skill (Pause 5 success → `Run /post-release:walk now to verify the install? [y/N]`). On `y`: invoke `/post-release:walk --version v<just-shipped>`. On `N`: print the deferred-walk reminder.
+- [ ] T19 — `/release` skill regression test extension: existing 20 tests + new test asserting the prompt fires after Pause 5 success. Manual integration smoke against sandbox remote.
+
+**Sub-phase G — Playbook stays-current procedural amendment**:
+
+- [ ] T20 — Add a one-line checklist item to the project's standard feature workflow skill (`.claude/skills/feature-define/SKILL.md` AND `.claude/skills/feature-extend/SKILL.md` if mirrored): *"Review `docs/post-release/playbook.md`. Add or update assertions for the surfaces this feature touches."* Note in the SKILL prose: this is procedural for now; becomes a typed phase in dw-lifecycle once customizable workflows ship.
+
+**Acceptance:**
+
+- [ ] `docs/post-release/playbook.md` exists with v0.10.X-baseline assertions for every studio surface listed in `/dev/` index.
+- [ ] `/post-release:walk` cursory mode runs end-to-end against the v0.10.X marketplace install: boots studio, walks surfaces, generates findings doc, ingests + review-starts, prints review URL.
+- [ ] `/post-release:walk --mode deep` runs end-to-end against a sandbox project: sandbox install, CLI drive, studio cross-check.
+- [ ] `/post-release:file-issues` files at least one real GitHub issue from an operator-approved findings doc, with the `post-release` label and the cross-link footer.
+- [ ] `/release` end-prompt fires after Pause 5 success and successfully invokes `/post-release:walk --version v<just-shipped>` on `y`.
+- [ ] Feature-workflow skill (define/extend) includes the playbook-update checklist item.
+- [ ] First canonical run = post-release walk against the v(N+1) shipped after Phase 29 lands. Real findings file as real issues — that's the end-to-end smoke.
+
+**GitHub tracking:** Parent issue [#133](https://github.com/audiocontrol-org/deskwork/issues/133). Sub-phase issues filed as work progresses if scope warrants — small phases stay as one issue per the project's existing per-phase-one-issue convention.
+
+**Phase 30 dependency:** Phase 29 implementation is likely deferred behind Phase 30 (deskwork pipeline redesign — see below). The new entry-centric model becomes the foundation Phase 29 will eventually build on; designing `/post-release:walk` + `/post-release:file-issues` against a CLI/calendar/dashboard surface that's about to change substantially would be wasted work. Operator decision pending.
+
+---
+
+### Phase 30: deskwork pipeline redesign — entry-centric calendar with universal verbs
+
+**Deliverable:** Foundational rearchitecture of the deskwork pipeline. Calendar stage and review-workflow state collapse into one entry-centric state machine. Eight stages (Ideas → Planned → Outlining → Drafting → Final → Published linear pipeline; Blocked + Cancelled off-pipeline). Universal `iterate` and `approve` verbs. Per-entry JSON sidecars at `.deskwork/entries/<uuid>.json` as source-of-truth; calendar.md becomes a regenerated scannable index. `iterate` retained as the only multi-write CLI helper; all other verbs are skill-prose + doctor. LLM-as-judge sub-agent dispatch from `/deskwork:doctor`. Migration via `deskwork doctor --repair` (one-shot; breaking changes acceptable). Major release.
+
+**Source-of-truth:**
+- Spec: [`docs/superpowers/specs/2026-04-30-deskwork-pipeline-redesign-design.md`](../../../superpowers/specs/2026-04-30-deskwork-pipeline-redesign-design.md) (654 lines, 26 sections; written 2026-04-30)
+- Plan: [`docs/superpowers/plans/2026-04-30-deskwork-pipeline-redesign.md`](../../../superpowers/plans/2026-04-30-deskwork-pipeline-redesign.md) (3535 lines, 42 TDD-shaped tasks across 7 phases; written 2026-04-30)
+
+**Operator principle driving the work:** *"There's an explicit 'review' and an explicit 'paused' state. That seems wrong. Reviewing and pausing are not workflow states, they are processes that can happen at any part of the workflow. So, the actual workflow stages are: ideas → planned → outlining → drafting → final → published; Any number of review/edit/iterate cycles can happen to a document at any stage of that workflow. BUT, 'approving' a document signifies the terminal state of that workflow and REQUIRES that the document be moved to the next stage in the workflow."*
+
+**Key design decisions (resolved during brainstorm):**
+- Migration: in-place via `deskwork doctor --repair`; breaking changes acceptable since this project + audiocontrol.org are the only adopters.
+- Workflow shape: entry-centric for linear pipeline; shortform stays on workflow-object model (deferred).
+- Source of truth: per-entry JSON sidecars + regenerated calendar.md scannable index; doctor reconciles three sources (sidecar, calendar.md, file frontmatter).
+- CLI surface: keep `iterate` only (multi-write transactional); rest is skill-prose + doctor.
+- LLM-as-judge: sub-agent dispatch via Claude Code's Agent tool with configurable model (Haiku 4.5 default); operator's existing Claude Code subscription pays.
+- Stop-gap features (`/release`, `/post-release:*`) migrate into dw-lifecycle once it ships customizable lifecycle stages — this redesign is the foundation that arc depends on.
+
+**Process directive:** *"Let's NOT use the deskwork plugins at all of this process. We are the only customers at the moment, so we can and should make breaking changes."* Plain markdown + git diff + chat-iteration for the design and review work. No deskwork plugins, no dw-lifecycle plugin involvement. Foundational rearchitecture is the wrong artifact to walk through deskwork's own pipeline.
+
+#### Phases (per implementation plan)
+
+- [x] **Phase 1** — Schema + sidecar IO + calendar render (Tasks 1–7) — shipped 2026-04-30
+- [x] **Phase 2** — Migration via `deskwork doctor --repair` (Tasks 8–11; includes migrating this project's calendar) — shipped 2026-04-30
+- [x] **Phase 3** — `iterate` helper rewrite (Tasks 12–14) — shipped 2026-04-30
+- [x] **Phase 4** — Skill-prose verbs (add/approve/block/cancel/induct/publish/status/doctor; retire old skills) (Tasks 15–22) — shipped 2026-04-30
+- [x] **Phase 5** — Doctor expansion + LLM-as-judge orchestration (Tasks 23–32) — shipped 2026-04-30
+- [x] **Phase 6** — Studio dashboard + review surface + Manual rewrite (Tasks 33–37) — shipped 2026-04-30
+- [x] **Phase 7** — Migration runbook + integration smoke + major release (Tasks 38, 39, 41, 42 done; 40 audiocontrol dry-run deferred to operator) — shipped 2026-05-01 as v0.11.1
+
+Each phase reached a stable checkpoint, reviewed and committed.
+
+**Acceptance:**
+
+- [x] All eight stages exist in the calendar; entries can move through the linear pipeline, into Blocked/Cancelled, and be inducted back.
+- [x] All listed CLI verbs work via skill prose (or as the `iterate` helper); retired verbs print stable error messages.
+- [x] Doctor's nine validation categories all run; `--repair` handles the non-destructive classes.
+- [x] LLM-as-judge sub-agent dispatch fires from `/deskwork:doctor` (skill-side prose; helper-side stays pure) with the operator's configured model.
+- [x] Migration of this project's calendar succeeds via `deskwork doctor --fix=all` (commit `359079c`). Audiocontrol.org dry-run deferred (Task 40).
+- [x] Studio dashboard renders eight stages with stage-aware row affordances.
+- [x] Studio review surface keys URLs by entry-uuid (`/dev/editorial-review/entry/<uuid>`; legacy workflow-uuid route preserved during migration).
+- [x] Compositor's Manual rewritten with new vocabulary.
+- [x] MIGRATING.md ships with the major release naming the breaking changes and migration steps.
+- [x] All existing in-tree tests pass; 39 retirement-collateral tests skipped with comments.
+- [x] Major release shipped via the existing `/release` skill — v0.11.1 (v0.11.0 was abandoned post-smoke-fail; zod dep gap fixed in `78afda2`).
+
+**GitHub tracking:** Will be filed at the start of Phase 1 implementation as the parent feature issue. Sub-phase issues filed per phase as work progresses.
+
+**Notes:**
+
+- Bug [#120](https://github.com/audiocontrol-org/deskwork/issues/120) (`dw-lifecycle install` writes `knownVersions: []`) confirmed during this session's hand-driven `/dw-lifecycle:extend`. May be subsumed by the redesign's new schema or kept as a separate fix; decide during Phase 1.
+- The dw-lifecycle bug cluster (#126–#130) intersects with this redesign — dw-lifecycle inherits the new model. Some cluster bugs may dissolve in the new architecture; others persist as dw-lifecycle-specific concerns. Decide per-bug during Phase 4 implementation.
+- Audiocontrol.org calendar dry-run is Task 40 in the plan — could move earlier as a sanity check on the migration design before full Phase 2 execution.
+
+**Notes:**
+
+- **Stop-gap exit criteria:** when dw-lifecycle ships customizable lifecycle stages (tracked separately, no current target), file a migration issue to (1) move `/release` and `/post-release:*` skill bodies into dw-lifecycle, (2) move `docs/post-release/*` paths to whatever dw-lifecycle prescribes, (3) convert the procedural "review playbook" amendment into a typed workflow phase. Until then, the design + this workplan + the implementation are the contract.
+- **Why HTTP-only cursory + Playwright-only deep:** the design called for Playwright in cursory, but Playwright adds significant boot time and cross-platform install friction. Splitting the dependency means cursory stays fast (5–10 min budget) and Playwright failures don't block the post-release walk for adopters who only want the cursory check. If this scope split proves wrong in practice, fold Playwright back into cursory in a follow-up sub-phase.
+- **Open questions from design** (`Open questions for operator review` section): #1 sandbox path (`mktemp` vs deterministic) — recommendation `mktemp` carries forward; will confirm at T11. #2 `post-release` label — recommendation yes, baked into T16. #3 stalled findings doc — leave as-is per content-management-databases-preserve rule. #4 issue de-dup — recommendation no de-dup; baked into T16. #5 skill family location — `plugins/deskwork/skills/post-release/{walk,file-issues}/SKILL.md` baked into T8 + T17.
+
+---
+
+### Phase 32: Post-v0.12.0 pipeline-walk dogfood + bug-fix sweep — v0.12.1 candidate
+
+**Status:** source-complete; awaiting `/release` to publish v0.12.1, then verify-against-installed-artifact before any issue closures.
+
+**Trigger:** operator question — *"how confident are we that the big rearchitecture of the workflow pipeline is functionally sound?"* — escalated into a manual pipeline walk on this project's calendar. The walk surfaced fundamental bugs that local tests missed because the test suite didn't exercise the dispatcher boundary between legacy CLI verbs and Phase 30 entry-centric helpers.
+
+**Goal:** prove (or refute) the entry-centric pipeline's functional soundness by walking a real entry through Ideas → Planned → ... → Published, then fix every defect surfaced and verify each fix against the live calendar in the dev environment — without paying the release cycle for each iteration.
+
+**Pipeline walk findings (filed in real time):**
+- [#147](https://github.com/audiocontrol-org/deskwork/issues/147) — CLI `approve` crashes with `TypeError` on entry-centric Ideas-stage entries.
+- [#148](https://github.com/audiocontrol-org/deskwork/issues/148) — Studio API stage transitions don't regenerate calendar.md; doctor `--check` misses the drift.
+- [#149](https://github.com/audiocontrol-org/deskwork/issues/149) — `doctor --fix=all` re-runs legacy migration on already-migrated state, overwriting correct sidecar fields.
+- [#150](https://github.com/audiocontrol-org/deskwork/issues/150) — CLI `publish` writes calendar.md without updating sidecar.
+
+**Tasks (all completed):**
+
+- [x] Walk an Ideas-stage entry through every linear pipeline stage via studio API and CLI; surface and file friction as discovered.
+- [x] Fix #147: dispatcher split for CLI `approve` mirroring `iterate.ts` (commit `b9d3b7c`). 6 vitest regression cases.
+- [x] Fix #148: extract `regenerateCalendar(projectRoot)` helper; wire into `approveEntryStage`/`blockEntry`/`cancelEntry`/`inductEntry`; extend `validateCalendarSidecar` to flag stage-section drift (commit `a382bb1`). 3 regression cases.
+- [x] Fix #149: `detectLegacySchema` gates on entries-dir presence rather than calendar.md section names (commit `3fafdc9`). 3 regression cases.
+- [x] Document agent-discipline rule: no issue closure until verified in a formally-installed release; supersedes prior agent-filed-vs-customer-filed distinction (commit `4e38c53`).
+- [x] Fix #150: dispatcher split for CLI `publish` with new `publishEntry` core helper (commit `2ab4517`). 14 regression cases (9 core + 5 cli).
+- [x] Studio UX sweep — #109 (locale-aware `<time>` rendering via Intl.DateTimeFormat); #111 (`/api/dev/version` endpoint + masthead version display); #112 (compact empty-stage rendering, header-only); #117 (status badges wrapped in `<a>` to review surface) (commit `145dd6a`). 5 regression cases.
+- [x] #124 — delete orphaned rename-form client (dead since Phase 30 dashboard rewrite, never reaches an adopter at runtime) (commit `d3dd9f8`).
+- [x] Studio routing — #143 (bare `/dev/scrapbook/<site>` redirects to content view); #144 (bare `/dev/editorial-review` redirects to dashboard); #145 (slug-only `/dev/content/<site>/<slug>` for deeply-nested entries redirects to canonical deep path) (commit `0726b47`). 8 regression cases.
+- [x] Verify #110 (uniform UUID-keyed row links) and #113 (site-filter chrome removal) already fixed by Phase 30; both moot, awaiting release-time verification before closure.
+
+**Deferred / out of scope:**
+
+- [ ] Cut v0.12.1 via `/release` — operator decision; not done in this session per cost-of-release-cycle constraint.
+- [ ] Verify each fix against the marketplace install post-release; post evidence on each issue; operator closes per the new rule.
+- [ ] Investigate auto-refresh polling 404 (`/api/dev/editorial-studio/state-signature` returns 404 — surfaced in browser console during #109 verification; pre-existing, not regressed). File separately.
+- [ ] Tier C / older issues not touched: #109/#111/#112/#117 covered; #142 (design question), #114 (jargon glossary), #133 (Phase 29 playbook) — design or scope-too-big for v0.12.1.
+- [ ] dw-lifecycle plugin issues (#115–#136) — separate plugin, parked per project memory (per-project tailoring not yet landed).
+
+**Acceptance:**
+
+- [x] Functional soundness assessment for the entry-centric pipeline grounded in real walk data, not speculation.
+- [x] All four pipeline-walk-surfaced bugs (#147/#148/#149/#150) fixed in source with regression tests, verified live against this project's calendar.
+- [x] Studio UX sweep delivered against operator's "fix as many issues as we can before cutting the next release" directive.
+- [x] No issue closures pending v0.12.1 release + post-install verification (per the rule committed this session).
+- [x] Total: 9 commits since `08c1248`; 12 issues touched (10 fixed in source, 2 verified-already-moot); 959 tests passing (was 933 baseline, +26 regression cases); 0 regressions.
+
+**Notes:**
+
+- The session validated the Phase 31 dev-workflow infrastructure (`npm run dev` + `node_modules/.bin/deskwork`) as a successful release-cycle skip: ~15 minutes from "edit code" to "verified end-to-end against live calendar" per fix, vs. the 20+ minute release cycle that #147 alone would have cost.
+- The dispatcher-split pattern (longform/outline → entry-centric, shortform/legacy-platform → legacy) is now applied to `iterate` (Phase 30), `approve` (#147), and `publish` (#150). All other CLI verbs that operate on entries should follow the same shape going forward — there's no remaining "legacy-only" verb that operates on entry-centric data.
+- `.claude/rules/agent-discipline.md` updated: the prior distinction between agent-filed and customer-filed issues for closure purposes is removed. All issues — including agent dogfood findings — wait for formal-release verification before closure.
+
+### Phase 33: Studio UX/UI design pass — review surface + scrapbook redesign (issue #154)
+
+**Status:** all five dispatches shipped on `feature/deskwork-plugin`. Pending operator visual review + cut-a-release decision.
+
+**Trigger:** [issue #154](https://github.com/audiocontrol-org/deskwork/issues/154) filed five concrete UX/UI concerns on the longform review surface + scrapbook with screenshots and operator framing. Concerns: (1) edit mode cramped — Focus/Save buttons hidden under marginalia; source pane fixed-width. (2) read mode wastes huge whitespace on the left while marginalia sits cramped at top-right far from the prose. (3) scrapbook drawer that isn't a drawer — primary action navigates away. (4) scrapbook index has no previews; clicking does nothing. (5) review surface has no global folio nav.
+
+**Goal:** address all five concerns by redesigning the composition (not the aesthetic) — pull every chrome element back ONTO the page. Marginalia inside the page (not the viewport's right edge); edit toolbar above the page (not buried below the article); scrapbook a real drawer (not a navigate-away link); scrapbook index a card grid with always-on previews (not click-to-disclose).
+
+**Approach:** ran `/frontend-design` directly against #154 (skipping the brainstorming arc per operator's session-start framing — *"the brainstorming arc produces considerably worse design results than using the frontend design plugin by itself"*). Produced two full HTML mockups + a 5-dispatch integration plan committed at [`docs/superpowers/frontend-design/2026-05-02-review-redesign/`](../../superpowers/frontend-design/2026-05-02-review-redesign/). Then executed each dispatch via `ui-engineer` sub-agent.
+
+**Dispatches (in order):**
+
+| Dispatch | Commits | Concept |
+|---|---|---|
+| **A folio** | `4c558f7` | Unified folio chrome on review surface — fix layering (strip eclipsed folio via z-index) |
+| **A page-grid** | `fe2de2d` | `.er-page` CSS Grid replaces position:fixed marginalia; drop `.essay { max-width: calc(100vw - 19rem) }` workaround; new layout tokens |
+| **B** | `7ea34ff` | Marginalia rotation (±0.35–0.4deg, hover straightens), mark↔note cross-highlight via pointerover/pointerout delegation, `prefers-reduced-motion` |
+| **C** | `5e5942f` `4002883` `b6e3bb0` `dc6e819` | Edit toolbar above .er-page; strip-actions hide while editing; corrected from sticky to relative position to handle strip flex-wrap interaction |
+| **D** | `3d6dac5` | Real bottom scrapbook drawer (in-place expansion vs. navigate-away link); `body[data-drawer]` mechanic; `prefers-reduced-motion` |
+| **E** | `2db7eb9` `883153c` `061329e` `b05be03` | Scrapbook index: grid + filter chips + search + always-on previews + sticky aside + bootstrap fix for latent `initScrapbook` never-called bug |
+
+**Tasks (all completed):**
+
+- [x] `/frontend-design` direct against #154 — two full HTML mockups + 5-dispatch integration plan + diagnosis-by-concern rationale (commit `0995cd3`).
+- [x] Dispatch A folio half (commit `4c558f7`): folio z-index/position fix, italic Fraunces wordmark with ※ proof-mark, red-pencil bottom-bar active state.
+- [x] Dispatch A page-grid half (commit `fe2de2d`): `.er-page` CSS Grid container; marginalia `position: relative`; drop obsolete `.essay { max-width: calc(100vw - 19rem) }`. 5 regression cases.
+- [x] Dispatch B (commit `7ea34ff`): rotation per note; hover/active straightens; mark→note cross-highlight via event delegation reusing `setActiveHighlight`; `prefers-reduced-motion`. 3 regression cases.
+- [x] Dispatch C (commits `5e5942f` `4002883` `b6e3bb0` `dc6e819`): split `renderEditMode` into `renderEditToolbar` (above `.er-page`) + `renderEditPanes` (inside `.er-draft-frame`); strip-right + strip-center hide via `:has()` rule while toolbar visible; client toggles both wrappers atomically. 6 regression cases.
+- [x] Dispatch D (commit `3d6dac5`): bottom-anchored expandable drawer; `body[data-drawer]` height transition (4rem ↔ 22rem); peek line with truncation contract; demoted standalone-viewer link; remove obsolete narrow-width hide rule. 10 regression cases.
+- [x] Dispatch E phases 1-3b (commits `2db7eb9` `883153c` `061329e` `b05be03`): grid layout + filter chips + search; always-on server-side peeks (md/img/json/txt); sticky aside; client filter wiring + `/` shortcut; pre-existing `initScrapbook` never-called bootstrap fix; per-card chrome. 15 regression cases.
+
+**Out-of-scope friction filed:**
+
+- [#155](https://github.com/audiocontrol-org/deskwork/issues/155) — longform review strip wraps to two rows in read mode and overlaps `.er-page` (pre-existing; surfaced during Dispatch C).
+- [#156](https://github.com/audiocontrol-org/deskwork/issues/156) — `scrapbook-client.ts initScrapbook` never invoked at module load (pre-existing since 6b75985; surfaced during Dispatch E phase 3; pattern hygiene audit + regression test recommended).
+- [#157](https://github.com/audiocontrol-org/deskwork/issues/157) — studio dashboard does not link to scrapbook viewers (pre-existing UX discoverability gap; surfaced when verifying Dispatch E).
+
+**Acceptance:**
+
+- [x] All five concerns from #154 addressed structurally, not cosmetically.
+- [x] Aesthetic tokens unchanged — Fraunces, Newsreader, JetBrains Mono, cream paper + ink + red pencil + proof blue + stamp green/purple all preserved.
+- [x] 12 commits across 5 dispatches; 295 → **334** studio tests passing (+47 regression cases since session start). 0 regressions.
+- [x] Each dispatch verified live in Playwright at 1440px (Dispatch A also at 1024/768/390); screenshots committed alongside each integration.
+- [x] Pre-existing latent bug surfaced + fixed (#156): `initScrapbook` was never called at module load — every disclosure click + every CRUD button on the standalone scrapbook viewer was silently dead since 6b75985.
+
+**Deferred / out of scope:**
+
+- [ ] Cut a release with the #154 redesign (operator decision; pending visual walk-through).
+- [ ] #155 / #156 / #157 follow-ups — separate from #154 closure.
+- [ ] Issue #154 closure pending operator visual review.
+
+### Phase 33++: Scrapbook Dispatch E (visual) — spec + 6-dispatch plan with `/frontend-design` gates (#161) — 2026-05-02 (planning)
+
+Planning-only session. No code shipped. Spec + plan written for the scrapbook redesign visual composition that the prior session's "Dispatch E shipped" claim missed.
+
+- [x] Diagnose the gap: function vs visual composition. Verified at `/dev/scrapbook/deskwork-internal/source-shipped-deskwork-plan` at 1440×900 — function shipped (auto-fill grid, filter chips, search, peeks, expand-in-place, press-check tokens) but visual NOT shipped (aside on right not left, no per-kind ribbons, cards lack mockup's vertical chrome).
+- [x] Write the spec ([`2026-05-02-scrapbook-redesign-impl-spec.md`](../../superpowers/specs/2026-05-02-scrapbook-redesign-impl-spec.md)) — 13 sections covering aesthetic direction, composition refinements (single-expanded model, dock-style drop zone, expanded-state aside binding), markup tree, migration approach (replace not morph), data-state model, aside cross-link architecture, dispatch decomposition F1–F5, affordance compliance audit, verification protocol, constraints, what's deliberately out of scope (folio nav extension, drag-to-reorder, multi-select, edit-in-place redesign).
+- [x] Write the plan ([`2026-05-02-scrapbook-redesign-dispatch-e-visual.md`](../../superpowers/plans/2026-05-02-scrapbook-redesign-dispatch-e-visual.md)) — initial 5-dispatch decomposition with bite-sized tasks per writing-plans skill convention (commit `3c186a4`).
+- [x] Operator-caught gap on design discipline: initial plan didn't require `/frontend-design` during implementation or for final sign-off. Amended plan to mandate `/frontend-design` at four non-negotiable gates (G1: pre-CSS review before F1.4; G2: pre-preview-refinement before F2.2; G3: pre-secret/drop-zone before F5.2; G4: final integrated sign-off as new Dispatch F6). Extended every dispatch's verification to require BOTH playwright AND `/frontend-design` (commit `031f8e5`). Plan grew from ~1900 to ~2400 lines.
+- [x] Update issue #161 with plan-link comment + amendment comment.
+
+**Deferred:**
+
+- [x] Execute the plan — F1 through F6 shipped (subagent-driven for F1; inline for F2-F6 once the per-dispatch shape was established). All G1-G4 gates fired + post-implementation `/frontend-design` reviews after every code-shipping dispatch. **Merged to main as `779e9fe` via PR [#162](https://github.com/audiocontrol-org/deskwork/pull/162)**; release-pending — operator drives `/release` skill to publish v0.12.2. Commits: F1 `44094ee`, F2 `94ba7e9`, F3 `6c5466d`, F4 `a8282b8`, F5 `457b0a4`, F6 `6ff6617` (walkthrough doc). Plus CI infrastructure rescue (CI was red since Phase 26): `c1b13a9` (build before tests), `292a9c7` (chmod +x dist bins), `cc39363` (link workspace bins to root). Tests: 330 → 348 (+18 across F1-F5); CI cold-cycle 1043 passing / 0 failed / 40 skipped across all workspaces.
+
+**Notes:**
+
+- The amendment was the second time this week's sessions surfaced a design-discipline gap that the operator had to catch. First was the marginalia-toggle iterating-as-toolbar-button before the operator forced the on-component design conversation; second was this plan's missing `/frontend-design` gates. Both got encoded into durable rules — the first as `affordance-placement.md`, the second as the plan's mandatory G1–G4 gates. Pattern: durable rules accumulate from the session-level corrections.
+- The plan amendment validated the new `affordance-placement.md` rule: the rule says "find the existing pattern and reference it before writing code." The amendment specifies that `/frontend-design` is the design-judgment authority that ratifies whether the implementation matches that pattern. Rule + gate together close the loop.
+
+### Phase 33+: Post-walkthrough polish + UI verification rules (#155, #159, #160) — 2026-05-02 (post-walkthrough)
+
+The operator's walkthrough of the just-shipped #154 redesign surfaced six follow-up bugs and one design-discipline gap. Six commits this session plus two new project rule files. See README status table row "Phase 33+" and the DEVELOPMENT-NOTES entry "2026-05-02 (post-walkthrough)".
+
+- [x] Manual page kicker cramped under folio — added `body[data-review-ui="manual"]` to `editorial-nav.css` padding-top group (commit `2200e61`).
+- [x] Asymmetric `.er-page` edges — dropped the `.er-page::before` 6px gradient + `--er-paper-4` token (commit `2200e61`).
+- [x] [#155](https://github.com/audiocontrol-org/deskwork/issues/155) — longform strip wraps to 2 rows at desktop widths and eclipses marginalia head — switched `.er-strip` from `position: fixed` to `position: sticky; top: var(--er-folio-h)`; body padding-top reduced from `calc(folio + 3.2rem)` to just `var(--er-folio-h)` (commit `6333150`). Fix-landed comment posted; closure pending operator verification in formally-installed release.
+- [x] [#160](https://github.com/audiocontrol-org/deskwork/issues/160) — editor body switched from Newsreader serif to JetBrains Mono at 0.875rem / 1.5 lh; heading scale trimmed (h1 1.6→1.35, h2 1.3→1.15, etc) (commit `86b155a`).
+- [x] [#160](https://github.com/audiocontrol-org/deskwork/issues/160) — Setext heading purge: passed `extensions: [{ remove: ['SetextHeading'] }]` to `markdown()` so YAML frontmatter no longer mistags as h2 (commit `86b155a`).
+- [x] [#159](https://github.com/audiocontrol-org/deskwork/issues/159) — marginalia toggle: third iteration on the right shape. Replaced both prior toolbar buttons (commits `86b155a` + `d474d35`) with on-component pull-tab pattern mirroring `.er-outline-tab` (commit `b205a7c`): `.er-marginalia-stow` chevron in head + `.er-marginalia-tab` on right edge; identical physical position across read AND edit modes; `Shift+M` keyboard; localStorage persistence.
+- [x] Two new project rules in `.claude/rules/` (commit `7391783`): `ui-verification.md` (pre-claim playwright checklist + falsifiable claims + one-fix-per-commit) and `affordance-placement.md` (component-attached over toolbar-attached + symmetric reveal/hide + pre-implementation gate). Both auto-load on session start; propagate to fresh worktrees.
+- Tests: 334 → **338** (+4 net regression cases).
+
+**Deferred / out of scope:**
+
+- [ ] Dispatch E (visual) — scrapbook redesign visual composition. Operator-confirmed the prior session's "Dispatch E shipped" claim was true for FUNCTION (auto-fill grid, filter chips, search, peeks, expand-in-place, press-check tokens) but not for COMPOSITION: aside is on the right (mockup wants it on the left); no per-kind colored top-edge ribbons; cards lack the mockup's vertical chrome; class vocabulary differs (`.scrapbook-*` vs `.scrap-*`). Mockup at `docs/superpowers/frontend-design/2026-05-02-review-redesign/scrapbook-redesign.html`. Not yet scoped or planned.
+- [ ] Discoverability of edit-toolbar `Source / Split / Preview` buttons + `Focus ⛶` — operator was unaware these existed; they are visually quiet. Separate concern from the affordance-placement rule.
+- [ ] #155 / #159 / #160 closure pending operator verification in formally-installed release (per agent-discipline rule).
+
+**Notes:**
+
+- Six rounds of operator-driven corrective oversight in one session was a pattern, not occasional sloppiness. Mitigations are the two new rule files; the cumulative cost (operator attention, polluted commit history, trust erosion) is what they prevent.
+- The right marginalia-toggle shape (on-component pull tab) was sitting in the codebase the whole time as `.er-outline-tab`. The agent didn't look at existing patterns before reaching for "add a button." The pre-implementation gate in the new affordance-placement rule encodes "find the existing pattern before writing markup."
+- The Setext-heading mistagging bug shows why the verification rule says "inspect inner styled spans, not just line/container elements." The agent's first eval sampled `.cm-line` (which inherits 14px mono) and missed that inner spans were rendering at Fraunces 18.4px 600. Operator surfaced the bug on a different entry; that drove the parser-config fix.
+
+**Notes:**
+
+- The redesign is *composition*, not *reskin*. Every aesthetic token (Fraunces / Newsreader / JetBrains Mono, cream paper + ink + red pencil) is unchanged; only the structural relationships moved. Marginalia → onto the page; edit toolbar → above the page; scrapbook drawer → real drawer; scrapbook index → card grid.
+- The folio integration (`4c558f7`) revealed the strip-eclipses-folio z-index bug only when checked via `getBoundingClientRect`. Pure visual review wouldn't have surfaced it — the folio markup was rendered, just covered. Worth carrying forward: every "chrome doesn't appear" symptom needs a layering check before a markup check.
+- Dispatch B confirmed the rule-of-thumb "if the design feels architecturally sound, the change is small": note-rotation + cross-highlight took 35 lines of CSS + 28 lines of TS + 3 tests. Compare to Dispatch E (the largest dispatch — 4 staged commits) where structural change crossed both server and client.
+- Dispatch C surfaced [#155](https://github.com/audiocontrol-org/deskwork/issues/155) — the strip's `flex-wrap: wrap` causes a read-mode layout bug at narrow viewports. The dispatch's `:has()` hide rule fixed it for edit-mode only; the read-mode case is filed separately because ResizeObserver-driven body padding is a real refactor.
+- Dispatch E surfaced [#156](https://github.com/audiocontrol-org/deskwork/issues/156) — `scrapbook-client.ts initScrapbook` was never bootstrapped at module load. Pre-existing latent bug; pattern may exist in other client files. Pattern hygiene audit recommended.
+- Sub-agent dispatch reliability: 1 stream-idle timeout (Dispatch B first attempt produced no commits in ~72 minutes elapsed). Re-dispatched with a tighter "write each phase to disk before the next" directive; second attempt completed in ~3 minutes. Pattern: dispatches that imply a long sequential plan benefit from explicit "commit early, commit often" framing in the prompt.
+- All five dispatches respected the scope-guard rule (no auto-fixing of out-of-scope friction). Three follow-up issues filed in real time per the project's rule that "out of scope but worth flagging" notes must become real GitHub issues, not dispatch-report disclosures.
+
+---
+
+### Phase 34: Retire the legacy review surface; complete Phase-30 migration; pay down v0.13.0 IOUs (post-v0.13.0)
+
+Umbrella phase. **34a is structural and blocking.** The studio's longform editorial review surface is currently 100% unusable: the dashboard's per-row link routes to a legacy `pages/review.ts` that reads from pre-Phase-30 workflow records, while `iterateEntry` writes only to sidecars + history journal. Result: the studio shows frozen pre-2026-05-01 content for any entry iterated since the Phase 30 pivot. Press-check chrome looks right; data is silently stale. Every post-Phase-30 longform editorial review that used the dashboard's link is suspect. PRD extension at `prd.md` "Phase 34 — Retire the legacy review surface; complete the Phase-30 migration; pay down v0.13.0 IOUs (post-v0.13.0)".
+
+GitHub tracking issues:
+- Umbrella: [#170](https://github.com/audiocontrol-org/deskwork/issues/170) — Feature: Phase 34
+- 34a (structural): [#171](https://github.com/audiocontrol-org/deskwork/issues/171) — retire legacy review surface; complete Phase-30 migration
+- 34b–34e: track underlying issues (#166, #163, #164, #165, #156, #157, #151, #153, #158, #154, #155, #159, #160, #161); no separate per-phase issues (each existing issue IS its own tracker)
+- Filed under one-time operator bypass of the `/feature-extend` "PRD applied" gate (the gate runs through the broken studio review surface 34a fixes; bypass documented in #170).
+
+#### 34a — Retire the legacy review surface; complete the Phase-30 migration; audit corrupted reviews
+
+**Blocking sub-phase.** No other sub-phase has a working dogfood path until 34a ships. The PRD review for Phase 34 itself is happening via `git diff` because the studio is broken — that disqualifies any "studio walk-through" verification claim until 34a ships.
+
+**Port the press-check chrome from `pages/review.ts` (710 lines) to `pages/entry-review.ts` (185 lines):**
+
+- [ ] Folio header (`renderEditorialFolio('longform', ...)`)
+- [ ] Version strip (`renderVersionsStrip` → entry-keyed: list iterations from history journal; clicking a version shows historical content read-only)
+- [ ] Edit toolbar (`renderEditToolbar` — Source / Split / Preview + Focus mode)
+- [ ] Edit panes (`renderEditPanes` — source textarea + rendered preview + split-pane gutter)
+- [ ] Outline drawer (`renderOutlineDrawer`) when entry has outline content
+- [ ] Marginalia column (`renderMarginalia`) + marginalia stow chevron + edge pull tab (`renderMarginaliaTab`) per the affordance-placement rule
+- [ ] Margin-note authoring: select-text → annotation composer → save annotation; client integration via `editorial-review-client.ts`
+- [ ] Rendered markdown preview (replaces today's empty `<section class="er-entry-artifact">`)
+- [ ] Decision strip with chord chips (Approve `a`, Iterate `i`, Reject `r`) + "?" shortcuts overlay (`renderShortcutsOverlay`)
+- [ ] Stage-aware affordances via existing `getAffordances(entry)` (so e.g. Ideas-stage entries show appropriate buttons; Drafting shows Save/Iterate/Approve/Reject; Published shows read-only view)
+- [ ] Scrapbook drawer (per the F1–F6 work; bottom-anchored expandable drawer)
+
+**Source data from sidecars + history journal (NOT workflow records):**
+
+- [ ] Read entry state from `.deskwork/entries/<uuid>.json` sidecar (already entry-centric)
+- [ ] Read iteration content from `.deskwork/review-journal/history/<timestamp>-<event>.json` events (the `iterateEntry` path)
+- [ ] Read annotations from a NEW entry-keyed annotation store (current annotations are workflow-keyed; design + implement entry-keyed equivalent OR migrate workflow annotations to entry annotations as part of 34a)
+- [ ] All API endpoints (`/api/dev/editorial-review/*`) that today take workflow IDs accept entry UUIDs; contract documented
+
+**Delete legacy code paths:**
+
+- [ ] **Delete `packages/studio/src/pages/review.ts` entirely** (710 lines). Not move-to-deprecated. Delete.
+- [ ] Delete legacy routes in `server.ts:347-417` (workflow-id branch + entry-id legacy branch + slug catch-all). Replace with: bare `/dev/editorial-review/<uuid>` 301-redirects to `/dev/editorial-review/entry/<uuid>` for in-flight bookmarks.
+- [ ] **File new issue (and link in workplan):** retire the bare-UUID 301 redirect in the next phase. The redirect is itself a backwards-compat shim with an explicit retirement issue, not a "for later" code comment.
+- [ ] Delete `renderReviewPage`, `prepareRender`, `lookupReviewEntry`, `errorFromBody`, `pickContentKind`, `pickSite`, `stringField`, `stateLabel`, `pendingSkillCmd`, `shortcutChipWrap` (move to entry-review where still needed), `renderError`, `renderShortcutsOverlay`, `renderMarginaliaTab`, `renderMarginalia`, `renderEditToolbar`, `renderEditPanes`, `renderOutlineDrawer` (relocate to entry-review).
+- [ ] Delete the workflow-id resolution code paths kept alive only because legacy longform/outline routes read them. `readWorkflow`, `readVersions`, `appendVersion`, `transitionState` for longform/outline. **Shortform paths stay** (operator-confirmed deferral; tracked in a new dedicated issue with explicit acceptance criteria for "shortform migrates to entry-centric," not a code comment).
+- [ ] Delete the *"intentionally minimal"* / *"styling will land once the affordance set stabilizes"* self-comments at `entry-review.ts:14-18`.
+- [ ] Delete the *"DEPRECATED (pipeline-redesign Task 35)"* / *"both coexist during the migration window"* / *"this route is removed once every dashboard surface and operator skill points at the entry route"* comments at `server.ts:332-355`.
+- [ ] Delete the entry-first-short-circuit-was-a-regression explainer comment at `server.ts:373-384` (no longer relevant once the legacy paths are gone).
+- [ ] Delete the F6 walkthrough's *"non-blocking follow-ups"* references where they pointed at this dual-surface model.
+
+**Update every link emitter to use `/dev/editorial-review/entry/<uuid>`:**
+
+- [ ] `packages/studio/src/pages/dashboard/affordances.ts:60` (`reviewLink`)
+- [ ] `packages/studio/src/pages/content.ts:353` (`reviewHref`)
+- [ ] `packages/studio/src/pages/content-detail.ts:280` (`reviewHref`)
+- [ ] `packages/studio/src/pages/index.ts:115` (`longformDefaultEntry` link)
+- [ ] `packages/studio/src/pages/help.ts:262, 283, 391, 426` (manual references)
+- [ ] `packages/studio/src/server.ts:224` (whatever construct emits the URL)
+- [ ] `packages/studio/src/routes/api.ts:66` (`reviewUrl` field)
+- [ ] Operator-facing skill prose: `/feature-extend`, `/feature-setup`, any other skill that surfaces a review URL
+- [ ] `packages/cli/` URL printers (e.g. `deskwork iterate` reports a `state: in-review` JSON; verify that any URL it prints is entry-keyed)
+
+**Audit corrupted reviews (the trust re-build):**
+
+- [ ] List every entry whose sidecar `iterationByStage` total exceeds the corresponding workflow's `currentVersion` (i.e. entry was iterated post-Phase-30 but workflow record was frozen pre-pivot). Generate the list via a one-shot script + commit the script under `scripts/audit-post-pivot-iterations.ts`.
+- [ ] For each entry on the list: open under the new unified surface; compare current sidecar content vs. the workflow snapshot the operator may have approved against. Document the diff.
+- [ ] For each non-trivial diff (non-whitespace, non-frontmatter): re-review under the new surface; record the disposition (re-approved / iterate-needed / cancel).
+- [ ] Record audit results in `docs/1.0/001-IN-PROGRESS/deskwork-plugin/post-pivot-review-audit.md`; commit alongside.
+
+**Delete-comments grep audit:**
+
+- [ ] Run `grep -rn -E "(for now|just for now|TODO|FIXME|HACK|XXX|temporary|stub|placeholder|pending|until F|until v|migration window|legacy|deprecated|coexist|for later|will land|will replace)" packages/studio/src/ plugins/deskwork-studio/public/src/ | grep -v "\.test\."`. Each hit ends in either fix-in-this-phase or filed-issue with a tracked link in a comment trailer. No code-comment IOUs allowed.
+- [ ] Same audit on `packages/cli/src/` and `packages/core/src/` (the agent-discipline rule applies repo-wide, not just to studio).
+
+**Verification:**
+
+- [ ] `pages/review.ts` does not exist (`test ! -f packages/studio/src/pages/review.ts`)
+- [ ] `git grep -i 'legacy' packages/studio/` returns zero hits
+- [ ] `git grep -E '(workflow-keyed|migration window|coexist during|will land later|stylings? will land|intentionally minimal)' packages/studio/src/` returns zero hits
+- [ ] Live: dashboard click on any Drafting entry lands on `/dev/editorial-review/entry/<uuid>`; the page renders the press-check chrome (folio + version strip + edit toolbar + outline drawer + marginalia + scrapbook drawer); margin-note authoring works; the displayed content matches the file on disk.
+- [ ] Live: clicking Iterate on the studio + running `deskwork iterate` snapshots the current file content as the next version; the unified surface re-renders with the new version.
+- [ ] **The Phase 34 PRD review can be completed end-to-end via the studio UI alone.** This acceptance criterion is the structural inverse of the trigger: until the PRD-under-review can itself be reviewed via the studio, 34a is not done.
+- [ ] Studio test count increases by at least 30 across 34a (component tests for the merged surface, route tests for the deleted legacy routes returning 301, audit-script tests, annotation-store tests).
+
+**Acceptance:** 34a closes when all the bullets above check off + at least one new release has shipped to npm + marketplace + the operator has run `/plugin marketplace update deskwork` and successfully reviewed a real entry end-to-end via the dashboard's link.
+
+#### 34b — Pay down F1–F6 IOUs
+
+(Was 34a in the prior draft.) **Cannot start until 34a ships** — verifying any composer fix without a working review surface is meaningless.
+
+- [ ] [#166](https://github.com/audiocontrol-org/deskwork/issues/166) — restore inline composer for scrapbook `+ NEW NOTE` button (parity with pre-F1 implementation at `44094ee^:plugins/deskwork-studio/public/src/scrapbook-client.ts:703-779`)
+- [ ] [#166](https://github.com/audiocontrol-org/deskwork/issues/166) — fix sibling regression in `plugins/deskwork-studio/public/src/editorial-review-client.ts:1651` (rejection-reason flow uses `window.prompt`)
+- [ ] [#166](https://github.com/audiocontrol-org/deskwork/issues/166) — full audit: `grep -rn -E 'window\.(prompt|confirm|alert)' plugins/deskwork-studio/public/src/ packages/studio/src/` returns zero matches in production code
+- [ ] [#163](https://github.com/audiocontrol-org/deskwork/issues/163) — extend `readImageDimensions` in `packages/studio/src/scrapbook.ts` to JPEG / WebP / GIF
+- [ ] [#164](https://github.com/audiocontrol-org/deskwork/issues/164) — expanded-secret-card visual continuity (G3-recommended `⚿` glyph next to `.scrap-name` on `data-secret="true"` cards)
+- [ ] File a new issue + fix: edit-toolbar Source/Split/Preview + Focus button discoverability (operator-noted but not yet filed); component-attached affordance per `affordance-placement.md`
+- [ ] `/frontend-design` review for the inline-composer treatment **before** implementation, per the `affordance-placement.md` pre-implementation gate
+- [ ] Live verification per `ui-verification.md` step 7
+- [ ] Regression tests for each fix (composer, secret-glyph, image-dimensions); studio test count must increase by at least 5 across 34b
+
+**Acceptance:** 34b closes when all listed checkboxes pass + the `window.prompt|confirm|alert` grep returns zero hits in production code + the operator walks the surfaces against the next release and signs off.
+
+#### 34c — Studio dev mode + interaction bugs
+
+(Was 34b.)
+
+- [ ] [#165](https://github.com/audiocontrol-org/deskwork/issues/165) — DESKWORK_DEV=1 binds Tailscale by default. Refactor `bootstrapStudio` in `server.ts` so the dev-mode listener reuses the same `bindAddresses` array + `listenWithAutoIncrement` path as production; only the in-process esbuild step is conditionally skipped on `DESKWORK_DEV=1`. Boot banner prints loopback + Tailscale IP + magic-DNS URLs in dev mode just like production.
+- [ ] [#156](https://github.com/audiocontrol-org/deskwork/issues/156) — client `init*` function audit. For every `plugins/deskwork-studio/public/src/*.ts` module that exports an `init*` function, verify it is actually invoked at module load. File a follow-up issue for any other dead bootstraps surfaced.
+- [ ] [#157](https://github.com/audiocontrol-org/deskwork/issues/157) — dashboard cross-links to scrapbook viewers from per-row chrome.
+- [ ] Live verification per `ui-verification.md` for each fix.
+
+**Acceptance:** 34c closes when all three issues are fix-landed in a release + the operator confirms `npm run dev` prints all three URLs (loopback + Tailscale IP + magic-DNS) on boot.
+
+#### 34d — Studio data + content bugs
+
+(Was 34c, minus #152 which is folded into 34a.)
+
+- [ ] [#151](https://github.com/audiocontrol-org/deskwork/issues/151) — `deskwork publish` writes `publishedDate` to the sidecar (currently null even though `datePublished` is computed and reported). Trace the gap, fix at the persistence boundary, regression-test.
+- [ ] [#153](https://github.com/audiocontrol-org/deskwork/issues/153) — per-skill LLM model defaults (enhancement; design needed before implementation — propose a config-schema extension; surface for `/frontend-design` or operator review BEFORE implementation).
+- [ ] [#158](https://github.com/audiocontrol-org/deskwork/issues/158) — **NOT direct implementation.** 34d's task is to walk every studio surface, name each layout inconsistency, file each as a separate child issue, then close #158 with the inventory.
+- [ ] **Verify #152 closed in 34a.** The "entry-review page CSS" issue is satisfied by 34a's port-the-chrome work; 34d confirms the closure as part of its acceptance gate.
+
+**Acceptance:** 34d closes when #151 and #153 are fix-landed in a release + #158 has been split into 3+ specific child issues with this phase closing the umbrella + #152 is verified closed by 34a's work.
+
+#### 34e — v0.13.0 verification + issue closures
+
+(Was 34d.) Cannot run until at least one tranche has shipped to release (typically 34a).
+
+- [ ] Boot marketplace v0.13.0 install in a clean Claude Code session (`/plugin marketplace update deskwork`) on a fresh terminal — explicitly NOT through the workspace dev-bin
+- [ ] Walk F1–F6 scrapbook surfaces at 4 viewports (1440 / 1024 / 768 / 390); verify all 15 mockup sections still match per the F6 walkthrough doc
+- [ ] Walk longform-review redesign surfaces (#154 dispatches A–E acceptance) at desktop / tablet / phone — using the new unified surface from 34a
+- [ ] Verify fixes for #155 / #159 / #160 against the released artifact (per `agent-discipline.md` "Issue closure requires verification in a formally-installed release")
+- [ ] Post staged fix-landed comments on #154, #155, #159, #160, #161; close each issue
+- [ ] Run the agent-discipline grep audit on the entire studio (`for now` / `just for now` / `TODO` / `FIXME` / etc.); each hit becomes fix-in-this-phase or filed-issue
+- [ ] Move feature docs to `003-COMPLETE/` only when ALL sub-phases (34a, 34b, 34c, 34d) have closed-or-decision dispositions
+
+**Acceptance:** 34e closes when issues #154, #155, #159, #160, #161 are CLOSED on GitHub + the grep audit returns zero unexplained hits.
+
+**Notes:**
+
+- 34a is the first proof-of-work for the new `agent-discipline.md` "no just for now" rule (commit `42eb837`). The legacy review surface is the textbook example of the failure mode; deleting it is the rule's first victory.
+- The audit-corrupted-reviews task is non-optional. Past trust failures are exactly the cost of letting "for now" stay around — the trust must be rebuilt by re-reviewing the affected entries against current state. Skipping the audit because "the file is on disk so the work is probably fine" is the same shape failure: a code-comment IOU about correctness instead of a verified disposition.
+- Dispatch order: 34a → 34b → 34c → 34d → 34e. None of the others can start until 34a ships, because every other sub-phase's verification depends on a working studio review surface.
+- This phase ships across multiple PRs and likely multiple release versions. 34a alone is large enough that it may need its own internal task breakdown — that breakdown happens at the start of 34a implementation, not during this PRD review.
+- The pattern of "filed during dogfood" follow-ups remains the signal: if 34a surfaces new issues during implementation (likely it will — porting 710 lines of chrome will turn over rocks), they get filed in real time per `agent-discipline.md`, not bundled into a future "Phase 35" pre-emptively.

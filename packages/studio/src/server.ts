@@ -43,6 +43,7 @@ import { createScrapbookMutationsRouter } from './routes/scrapbook-mutations.ts'
 import { buildClientAssets } from './build-client-assets.ts';
 import { renderDashboard } from './pages/dashboard.ts';
 import { renderReviewPage, type ReviewLookup } from './pages/review.ts';
+import { renderEntryReviewPage } from './pages/entry-review.ts';
 import { renderShortformPage } from './pages/shortform.ts';
 import { renderHelpPage } from './pages/help.ts';
 import { renderScrapbookPage } from './pages/scrapbook.ts';
@@ -57,6 +58,7 @@ import {
   getRequestContentIndex,
 } from './request-context.ts';
 import { runTemplateOverride } from './lib/override-render.ts';
+import { getStudioVersion } from './lib/version.ts';
 import { createOverrideResolver } from '@deskwork/core/overrides';
 
 interface CliArgs {
@@ -291,9 +293,20 @@ export function createApp(ctx: StudioContext): Hono {
   // API routes
   app.route('/api/dev/editorial-review', createApiRouter(ctx));
 
+  // #111: version endpoint so adopters / scripts can verify which studio
+  // build is actually running. Surfaced in the dashboard masthead too.
+  app.get('/api/dev/version', (c) => c.json({ version: getStudioVersion() }));
+
+  // #144: bare `/dev/editorial-review` (no UUID, no slug) redirects to
+  // the dashboard. The Index page promised a meaningful default; the
+  // dashboard IS the canonical entry point for picking which entry to
+  // review.
+  app.get('/dev/editorial-review', (c) => c.redirect('/dev/editorial-studio'));
+  app.get('/dev/editorial-review/', (c) => c.redirect('/dev/editorial-studio'));
+
   // Page routes
-  app.get('/dev', (c) => c.html(renderStudioIndex(ctx)));
-  app.get('/dev/', (c) => c.html(renderStudioIndex(ctx)));
+  app.get('/dev', async (c) => c.html(await renderStudioIndex(ctx)));
+  app.get('/dev/', async (c) => c.html(await renderStudioIndex(ctx)));
   app.get('/dev/editorial-studio', async (c) => {
     const getIndex = (site: string) => getRequestContentIndex(c, ctx, site);
     // Phase 23f: per-project override check. The override module's
@@ -305,7 +318,7 @@ export function createApp(ctx: StudioContext): Hono {
       getIndex,
     ]);
     if (overridden !== null) return c.html(overridden);
-    return c.html(renderDashboard(ctx, getIndex));
+    return c.html(await renderDashboard(ctx, getIndex));
   });
   app.get('/dev/editorial-help', async (c) => {
     const overridden = await runTemplateOverride(ctx, 'help', [ctx]);
@@ -315,9 +328,31 @@ export function createApp(ctx: StudioContext): Hono {
   app.get('/dev/editorial-review-shortform', (c) =>
     c.html(renderShortformPage(ctx)),
   );
+  // Pipeline-redesign Task 35: entry-uuid keyed review surface. The
+  // path `/dev/editorial-review/entry/<uuid>` distinguishes this sibling
+  // route from the legacy workflow-uuid + calendar-entry routes below.
+  // The handler resolves the uuid to a sidecar via `resolveEntry()` and
+  // renders the eight-stage entry view with stage-aware affordances.
+  // Registered FIRST so the literal "entry" segment is matched before
+  // the slug catch-all below has a chance to swallow it.
+  app.get(
+    '/dev/editorial-review/entry/:entryId{[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}}',
+    async (c) => {
+      const entryId = c.req.param('entryId');
+      const result = await renderEntryReviewPage(ctx.projectRoot, entryId);
+      return c.html(result.html, result.status);
+    },
+  );
   // Phase 19d: id-based canonical review URL. Strict UUID-shape regex
   // matched FIRST so it wins over the legacy `:slug{.+}` route below.
   // Hono evaluates routes in registration order; first match wins.
+  //
+  // DEPRECATED (pipeline-redesign Task 35): this route is workflow-uuid
+  // + calendar-entry keyed; the entry-centric replacement lives at
+  // `/dev/editorial-review/entry/<uuid>` (registered above). Both
+  // coexist during the migration window; this route is removed once
+  // every dashboard surface and operator skill points at the entry
+  // route.
   //
   // Phase 21c added a workflow-id branch: the dashboard's shortform
   // matrix (and any other surface that knows a workflow id) deep-links
@@ -336,6 +371,17 @@ export function createApp(ctx: StudioContext): Hono {
         version: c.req.query('v') ?? null,
         kind: c.req.query('kind') ?? null,
       };
+
+      // The entry-review-first short-circuit added by #146 was a regression:
+      // it routed every dashboard click (every row links here per #110) to
+      // the minimal entry-review surface, which is a stage-controller, not a
+      // press-check review surface. Operators lost margin-note authoring,
+      // rendered preview, and the decision strip. Restore the status quo
+      // ante: fall straight through to the workflow / entry-id resolution
+      // paths (renderReviewPage) so the dashboard's UUID links land on the
+      // working review surface. The minimal entry-review surface remains
+      // reachable via the explicit `/dev/editorial-review/entry/<uuid>`
+      // route registered above.
 
       // 1. Workflow-id branch — phase 21c.
       const wf = readWorkflow(ctx.projectRoot, ctx.config, id);
@@ -415,6 +461,17 @@ export function createApp(ctx: StudioContext): Hono {
   // captures arbitrarily-deep hierarchical addresses (e.g.
   // `the-outbound/characters/strivers`). Hono's `:path{.+}` regex
   // matcher swallows everything after the site segment.
+  // #143: bare `/dev/scrapbook/<site>` (no path segment) is reachable
+  // from the Index page copy ("address directly") but had no route. The
+  // intended discovery path for scrapbook is the Content view's
+  // per-node drawer, so redirect to the site's content tree.
+  app.get('/dev/scrapbook/:site', (c) =>
+    c.redirect(`/dev/content/${c.req.param('site')}`),
+  );
+  app.get('/dev/scrapbook/:site/', (c) =>
+    c.redirect(`/dev/content/${c.req.param('site')}`),
+  );
+
   app.get('/dev/scrapbook/:site/:path{.+}', async (c) => {
     const site = c.req.param('site');
     const path = decodeURIComponent(c.req.param('path'));
@@ -525,21 +582,33 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  // Phase 23e: build client modules from source into the runtime cache
-  // BEFORE wiring routes (the `/static/dist/*` mount records its root
-  // at registration time and warns when the path doesn't exist yet).
-  // Failures abort startup — serving stale or missing JS would silently
-  // break the UI.
-  try {
-    const summary = await buildClientAssets({ pluginRoot: pluginRoot() });
+  // Dev mode (DESKWORK_DEV=1): skip the in-process esbuild step. The
+  // Vite middleware mounted later serves the TS source from
+  // <pluginRoot>/public/src/ directly, with HMR. See the dev-mode branch
+  // further down for the Vite + http.Server wiring.
+  const devMode = process.env.DESKWORK_DEV === '1';
+
+  if (!devMode) {
+    // Phase 23e: build client modules from source into the runtime cache
+    // BEFORE wiring routes (the `/static/dist/*` mount records its root
+    // at registration time and warns when the path doesn't exist yet).
+    // Failures abort startup — serving stale or missing JS would silently
+    // break the UI.
+    try {
+      const summary = await buildClientAssets({ pluginRoot: pluginRoot() });
+      process.stdout.write(
+        `deskwork-studio: built ${summary.entriesBuilt} client assets ` +
+          `(${summary.entriesCached} cached) -> ${summary.outDir}\n`,
+      );
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      process.stderr.write(`deskwork-studio: client asset build failed: ${reason}\n`);
+      process.exit(1);
+    }
+  } else {
     process.stdout.write(
-      `deskwork-studio: built ${summary.entriesBuilt} client assets ` +
-        `(${summary.entriesCached} cached) -> ${summary.outDir}\n`,
+      'deskwork-studio: dev mode (DESKWORK_DEV=1) — Vite middleware enabled, esbuild step skipped\n',
     );
-  } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
-    process.stderr.write(`deskwork-studio: client asset build failed: ${reason}\n`);
-    process.exit(1);
   }
 
   // Phase 23f: build the override resolver once at boot so every page
@@ -567,6 +636,46 @@ async function main(): Promise<void> {
   } else {
     tailscale = detectTailscale();
     bindAddresses = tailscale === null ? [LOOPBACK] : [LOOPBACK, ...tailscale.ipv4];
+  }
+
+  // Dev mode: spin up Vite middleware in front of the Hono fetch handler.
+  // We run a plain http.Server (not @hono/node-server's serve()) so we
+  // can chain Vite's connect-style middleware before Hono. Auto-increment
+  // + Tailscale binding are skipped in dev — the dev server is for local
+  // iteration only.
+  if (devMode) {
+    const { createServer: createViteServer } = await import('vite');
+    const { getRequestListener } = await import('@hono/node-server');
+    const http = await import('node:http');
+    const { join } = await import('node:path');
+
+    // Vite root is the plugin's public/ dir; client TS lives at public/src/.
+    // clientScriptTag emits /src/<name>.ts which maps to public/src/<name>.ts
+    // under this root.
+    const viteRoot = join(pluginRoot(), 'public');
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'custom',
+      root: viteRoot,
+    });
+
+    const honoListener = getRequestListener(app.fetch);
+    const httpServer = http.createServer((req, res) => {
+      vite.middlewares(req, res, () => {
+        // Vite didn't handle — pass to Hono.
+        honoListener(req, res);
+      });
+    });
+
+    httpServer.listen(port, LOOPBACK, () => {
+      process.stdout.write(
+        `deskwork-studio: dev listening on http://localhost:${port}/\n`,
+      );
+      process.stdout.write(`  vite root: ${viteRoot}\n`);
+      process.stdout.write(`  project:   ${projectRoot}\n`);
+      process.stdout.write(`  sites:     ${Object.keys(config.sites).join(', ')}\n`);
+    });
+    return;
   }
 
   // Issue #43: bind every address with EADDRINUSE handling.

@@ -1,19 +1,11 @@
 /**
- * Client-side behavior for the /dev/editorial-studio route.
- *
- * Loaded via a non-inline <script> tag in the Astro page. Each row and
- * action button carries its own `data-site` attribute, so the studio
- * can act on workflows from any site without a page-wide site marker.
- *
- * Responsibilities:
- *  - Toast for transient messages
- *  - Copy-to-clipboard buttons for Claude Code commands
- *  - Scaffold-draft button → POST /api/dev/editorial-calendar/draft (site from button)
- *  - Mark-published button → POST /api/dev/editorial-calendar/publish (site from button)
- *  - Text search + stage/site-chip filtering
- *  - Keyboard shortcuts (1-5 jump to stage columns)
- *  - Idle-polling via full-page reload
+ * Client-side behavior for the /dev/editorial-studio route. Each row
+ * and action button carries its own `data-site` attribute, so the
+ * studio can act on workflows from any site without a page-wide site
+ * marker. Clipboard helpers live in `./clipboard.ts`.
  */
+
+import { copyOrShowFallback } from './clipboard.ts';
 
 function siteFromButton(btn: HTMLButtonElement): string {
   const site = btn.dataset.site;
@@ -34,57 +26,29 @@ function showToast(msg: string, isError = false): void {
   setTimeout(() => { toastEl.hidden = true; }, 4000);
 }
 
-/**
- * Copy text across both secure and insecure contexts. The async
- * Clipboard API (navigator.clipboard.writeText) is gated on a
- * secure context — HTTPS or localhost. Dev access from another
- * machine on the LAN (http://orion-m4:4321/, etc.) isn't secure
- * in the browser's eyes, so the API throws. Fall back to the
- * legacy execCommand('copy') path on a hidden textarea, which
- * works in plain HTTP.
- */
-async function copyTextToClipboard(text: string): Promise<void> {
-  if (typeof navigator !== 'undefined' && navigator.clipboard && window.isSecureContext) {
-    await navigator.clipboard.writeText(text);
-    return;
-  }
-  const ta = document.createElement('textarea');
-  ta.value = text;
-  // Keep it off-screen but still focusable; some browsers skip
-  // copy if the element isn't in the layout tree.
-  ta.style.position = 'fixed';
-  ta.style.top = '-1000px';
-  ta.style.left = '-1000px';
-  ta.setAttribute('readonly', '');
-  document.body.appendChild(ta);
-  ta.select();
-  ta.setSelectionRange(0, text.length);
-  let ok = false;
-  try {
-    ok = document.execCommand('copy');
-  } finally {
-    document.body.removeChild(ta);
-  }
-  if (!ok) throw new Error('execCommand copy returned false');
-}
-
 function initCopyButtons(): void {
   document.querySelectorAll<HTMLButtonElement>('.er-copy-btn').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const text = btn.dataset.copy ?? '';
-      if (!text) return;
-      try {
-        await copyTextToClipboard(text);
-        const original = btn.textContent;
+      if (!text) {
+        // The button shouldn't have been rendered without a payload —
+        // surface this loudly instead of silently no-op'ing.
+        // eslint-disable-next-line no-console
+        console.warn('er-copy-btn: missing data-copy attribute', btn);
+        return;
+      }
+      const original = btn.textContent;
+      const ok = await copyOrShowFallback(text, {
+        successMessage: 'Copied to clipboard',
+        fallbackMessage: 'Clipboard unavailable — select and Cmd-C to copy this command, then paste it into Claude Code:',
+      });
+      if (ok) {
         btn.classList.add('copied');
         btn.textContent = 'copied ✓';
         setTimeout(() => {
           btn.classList.remove('copied');
           btn.textContent = original;
         }, 1500);
-      } catch (e) {
-        const message = e instanceof Error ? e.message : String(e);
-        showToast(`Clipboard unavailable (${message}) — copy manually: ${text}`, true);
       }
     });
   });
@@ -306,23 +270,9 @@ function initKeyboardShortcuts(): void {
 }
 
 /**
- * Poll the state-signature endpoint and reload only when the
- * signature changes. Replaces the old blunt 10-second reload that
- * caused a visible flicker even when nothing had moved on the
- * backend. The server endpoint compounds mtimes of calendar files,
- * workflow pipeline/history directories, and per-site content
- * directories into a short hash — any real change advances it;
- * idle time doesn't.
- *
- * Guards preserved from the prior polling:
- *   - search query active → skip (don't blow away the operator's
- *     filter)
- *   - intake form open → skip (don't nuke in-progress input)
- *   - a text field has focus → skip (same reason)
- *
- * If the endpoint is unreachable (dev server restart, network
- * glitch), we silently retry on the next tick rather than falling
- * back to a blind reload.
+ * Poll the state-signature endpoint; reload only when the signature
+ * changes. Skip-guards: search query active, intake form open, or a
+ * text field focused. Transient endpoint failures retry next tick.
  */
 function initPolling(): void {
   const searchInput = document.querySelector<HTMLInputElement>('[data-filter-input]');
@@ -404,43 +354,56 @@ function initIntakeForm(): void {
   form.querySelector('[data-action="intake-cancel"]')?.addEventListener('click', () => close());
 
   form.querySelector('[data-action="intake-copy"]')?.addEventListener('click', async () => {
-    const site = field<HTMLSelectElement>('site')?.value.trim() || '';
-    const title = field<HTMLInputElement>('title')?.value.trim() || '';
+    // #99 fix: validate inputs BEFORE generating any command. If a
+    // required field is empty, focus it and surface an inline error
+    // — never a silent collapse.
+    const siteInput = field<HTMLSelectElement>('site');
+    const titleInput = field<HTMLInputElement>('title');
+    const site = siteInput?.value.trim() || '';
+    const title = titleInput?.value.trim() || '';
     const description = field<HTMLTextAreaElement>('description')?.value.trim() || '';
     const contentType = field<HTMLSelectElement>('contentType')?.value.trim() || 'blog';
     const contentUrl = field<HTMLInputElement>('contentUrl')?.value.trim() || '';
-    if (!site || !title) {
-      showToast('Site and title are required', true);
+    if (!site) {
+      siteInput?.focus();
+      showToast('Site is required', true);
+      return;
+    }
+    if (!title) {
+      titleInput?.focus();
+      showToast('Title is required', true);
       return;
     }
     const lines = [
-      `Run /editorial-add --site ${site} to intake a new idea using these pre-filled values. Do NOT interactively re-prompt for any field below — use them verbatim.`,
+      `Run /deskwork:add --site ${site} to intake a new idea using these pre-filled values. Do NOT interactively re-prompt for any field below — use them verbatim.`,
       '',
       `- Site: ${site}`,
       `- Title: ${title}`,
       ...(description ? [`- Description: ${description}`] : [`- Description: (none — leave empty)`]),
       `- Content type: ${contentType}`,
       ...(contentType !== 'blog' && contentUrl ? [`- Content URL: ${contentUrl}`] : []),
-      ...(contentType !== 'blog' && !contentUrl ? [`- Content URL: (not yet published — skip; /editorial-publish will refuse until it's set)`] : []),
+      ...(contentType !== 'blog' && !contentUrl ? [`- Content URL: (not yet published — skip; /deskwork:publish will refuse until it's set)`] : []),
     ];
     const payload = lines.join('\n');
-    try {
-      await copyTextToClipboard(payload);
-      const btn = form.querySelector<HTMLButtonElement>('[data-action="intake-copy"]');
-      if (btn) {
-        const original = btn.textContent;
-        btn.classList.add('copied');
-        btn.textContent = 'copied ✓';
-        setTimeout(() => {
-          btn.classList.remove('copied');
-          btn.textContent = original;
-          close();
-        }, 900);
-      }
-    } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      showToast(`Clipboard unavailable (${message}) — copy manually: ${payload}`, true);
+    const btn = form.querySelector<HTMLButtonElement>('[data-action="intake-copy"]');
+    const original = btn?.textContent ?? null;
+    const ok = await copyOrShowFallback(payload, {
+      successMessage: 'Intake command copied — paste into Claude Code',
+      fallbackMessage: 'Clipboard unavailable — select and Cmd-C to copy this intake command, then paste it into Claude Code:',
+    });
+    if (ok && btn) {
+      btn.classList.add('copied');
+      btn.textContent = 'copied ✓';
+      setTimeout(() => {
+        btn.classList.remove('copied');
+        if (original !== null) btn.textContent = original;
+        close();
+      }, 900);
     }
+    // On manual-copy fallback, do NOT auto-collapse — the operator
+    // needs the form context AND the manual-copy panel both visible
+    // so they can verify the values they entered match what the
+    // panel shows.
   });
 
   // Cmd/Ctrl-Enter from anywhere in the form triggers copy.
@@ -448,182 +411,6 @@ function initIntakeForm(): void {
     if ((ev.metaKey || ev.ctrlKey) && ev.key === 'Enter') {
       ev.preventDefault();
       form.querySelector<HTMLButtonElement>('[data-action="intake-copy"]')?.click();
-    }
-  });
-}
-
-/**
- * Inline rename-slug form — one per blog row, rendered hidden under
- * the row. Clicking the row's "rename →" button expands the form in
- * place; the operator's eye stays on the row they're acting on (no
- * modal). Submit copies the `/editorial-rename-slug` command to the
- * clipboard and collapses. Validation mirrors the server-side rules
- * in scripts/lib/editorial/rename-slug.ts.
- */
-function initRenameForms(): void {
-  const SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
-
-  // Read the shared site → slugs list once. Fallback to empty if
-  // missing (the collision check will be bypassed server-side anyway
-  // by rename-slug.ts).
-  let slugsBySite: Record<string, string[]> = {};
-  const slugsScript = document.querySelector<HTMLScriptElement>('script[data-rename-slugs]');
-  if (slugsScript?.textContent) {
-    try {
-      slugsBySite = JSON.parse(slugsScript.textContent);
-    } catch {
-      slugsBySite = {};
-    }
-  }
-
-  type FormContext = {
-    form: HTMLFormElement;
-    input: HTMLInputElement;
-    hint: HTMLElement;
-    copyBtn: HTMLButtonElement;
-    site: string;
-    oldSlug: string;
-  };
-
-  function contextFor(form: HTMLFormElement): FormContext | null {
-    const input = form.querySelector<HTMLInputElement>('[data-rename-input]');
-    const hint = form.querySelector<HTMLElement>('[data-rename-hint]');
-    const copyBtn = form.querySelector<HTMLButtonElement>('[data-action="rename-copy"]');
-    const site = form.dataset.site ?? '';
-    const oldSlug = form.dataset.slug ?? '';
-    if (!input || !hint || !copyBtn || !site || !oldSlug) return null;
-    return { form, input, hint, copyBtn, site, oldSlug };
-  }
-
-  function validate(ctx: FormContext, next: string): string | null {
-    if (!next) return 'required';
-    if (!SLUG_RE.test(next)) return 'kebab-case only (a-z, 0-9, -)';
-    if (next === ctx.oldSlug) return 'same as current slug';
-    const taken = (slugsBySite[ctx.site] ?? []).some(
-      (s) => s === next && s !== ctx.oldSlug,
-    );
-    if (taken) return `already used on ${ctx.site}.org`;
-    return null;
-  }
-
-  function close(form: HTMLFormElement): void {
-    form.hidden = true;
-    const input = form.querySelector<HTMLInputElement>('[data-rename-input]');
-    if (input) input.value = '';
-    const hint = form.querySelector<HTMLElement>('[data-rename-hint]');
-    if (hint) {
-      hint.textContent = 'lowercase, digits, hyphens';
-      hint.removeAttribute('data-error');
-    }
-    const copyBtn = form.querySelector<HTMLButtonElement>('[data-action="rename-copy"]');
-    if (copyBtn) copyBtn.disabled = false;
-  }
-
-  function closeAllForms(except?: HTMLFormElement): void {
-    document
-      .querySelectorAll<HTMLFormElement>('form[data-rename-form]')
-      .forEach((f) => {
-        if (f !== except && !f.hidden) close(f);
-      });
-  }
-
-  function open(form: HTMLFormElement): void {
-    closeAllForms(form);
-    form.hidden = false;
-    const input = form.querySelector<HTMLInputElement>('[data-rename-input]');
-    // Next frame: focus after the form is visible.
-    setTimeout(() => input?.focus(), 0);
-  }
-
-  // Click delegation: "rename →" opens the form inside its row's wrap;
-  // "cancel" closes the form that contains the cancel button.
-  document.addEventListener('click', (ev) => {
-    const openBtn = (ev.target as Element | null)?.closest<HTMLButtonElement>(
-      'button[data-action="rename-open"]',
-    );
-    if (openBtn) {
-      const wrap = openBtn.closest<HTMLElement>('[data-row-wrap]');
-      const form = wrap?.querySelector<HTMLFormElement>('form[data-rename-form]') ?? null;
-      if (form) {
-        if (form.hidden) open(form); else close(form);
-      }
-      return;
-    }
-    const cancelBtn = (ev.target as Element | null)?.closest<HTMLButtonElement>(
-      'button[data-action="rename-cancel"]',
-    );
-    if (cancelBtn) {
-      ev.preventDefault();
-      const form = cancelBtn.closest<HTMLFormElement>('form[data-rename-form]');
-      if (form) close(form);
-    }
-  });
-
-  // Input validation on every keystroke inside any rename form.
-  document.addEventListener('input', (ev) => {
-    const input = (ev.target as Element | null)?.closest<HTMLInputElement>(
-      'input[data-rename-input]',
-    );
-    if (!input) return;
-    const form = input.closest<HTMLFormElement>('form[data-rename-form]');
-    if (!form) return;
-    const ctx = contextFor(form);
-    if (!ctx) return;
-    const err = validate(ctx, ctx.input.value.trim());
-    if (err) {
-      ctx.hint.textContent = err;
-      ctx.hint.setAttribute('data-error', 'true');
-      ctx.copyBtn.disabled = true;
-    } else {
-      ctx.hint.textContent = 'looks good — submit to copy';
-      ctx.hint.removeAttribute('data-error');
-      ctx.copyBtn.disabled = false;
-    }
-  });
-
-  // Esc key closes the currently-open form (if any). Keeps focus on
-  // the row so the next action is in-context.
-  document.addEventListener('keydown', (ev) => {
-    if (ev.key !== 'Escape') return;
-    const active = document.activeElement;
-    const form = active?.closest<HTMLFormElement>('form[data-rename-form]');
-    if (form && !form.hidden) {
-      ev.preventDefault();
-      close(form);
-    }
-  });
-
-  // Submit handler on every rename form.
-  document.addEventListener('submit', async (ev) => {
-    const form = (ev.target as Element | null)?.closest<HTMLFormElement>(
-      'form[data-rename-form]',
-    );
-    if (!form) return;
-    ev.preventDefault();
-    const ctx = contextFor(form);
-    if (!ctx) return;
-    const next = ctx.input.value.trim();
-    const err = validate(ctx, next);
-    if (err) {
-      ctx.hint.textContent = err;
-      ctx.hint.setAttribute('data-error', 'true');
-      ctx.copyBtn.disabled = true;
-      return;
-    }
-    const command = `/editorial-rename-slug --site ${ctx.site} ${ctx.oldSlug} ${next}`;
-    try {
-      await copyTextToClipboard(command);
-      const original = ctx.copyBtn.textContent;
-      ctx.copyBtn.classList.add('copied');
-      ctx.copyBtn.textContent = 'copied ✓';
-      setTimeout(() => {
-        ctx.copyBtn.classList.remove('copied');
-        if (original !== null) ctx.copyBtn.textContent = original;
-        close(form);
-      }, 900);
-    } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
-      showToast(`Clipboard unavailable (${message}) — copy manually: ${command}`, true);
     }
   });
 }
@@ -690,6 +477,27 @@ function initStartShortformButtons(): void {
     });
 }
 
+/**
+ * #109: render `<time data-format="date">` elements in the operator's
+ * locale instead of the server's UTC date slice. Falls back silently
+ * if `datetime` is missing or unparseable — the server-emitted UTC
+ * slice stays as the visible text.
+ */
+function initLocaleDates(): void {
+  const fmt = new Intl.DateTimeFormat(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+  });
+  document.querySelectorAll<HTMLTimeElement>('time[data-format="date"]').forEach((t) => {
+    const iso = t.dateTime || t.getAttribute('datetime');
+    if (!iso) return;
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return;
+    t.textContent = fmt.format(d);
+  });
+}
+
 function init(): void {
   initCopyButtons();
   initScaffoldButtons();
@@ -700,7 +508,7 @@ function init(): void {
   initKeyboardShortcuts();
   initPolling();
   initIntakeForm();
-  initRenameForms();
+  initLocaleDates();
 }
 
 init();

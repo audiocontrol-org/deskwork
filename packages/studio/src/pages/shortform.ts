@@ -111,7 +111,7 @@ function renderEmptyState(): RawHtml {
       No short-form galleys on the desk.<br />
       Supported platforms: <em>${platformList}</em>.<br />
       Start a new shortform draft from the dashboard's
-      <a href="/dev/editorial-studio">coverage matrix</a>.
+      <a href="/dev/editorial-studio#stage-drafting">Drafting list</a>.
     </div>`);
 }
 
@@ -128,7 +128,7 @@ export function renderShortformPage(ctx: StudioContext): string {
           .join('');
 
   const body = html`
-    ${renderEditorialFolio('reviews', 'shortform desk')}
+    ${renderEditorialFolio('shortform', 'shortform desk')}
     <header class="er-pagehead er-pagehead--centered">
       <p class="er-pagehead__kicker">All sites · short form</p>
       <h1 class="er-pagehead__title">The <em>compositor</em>'s desk</h1>
@@ -157,6 +157,6 @@ export function renderShortformPage(ctx: StudioContext): string {
     bodyAttrs: 'data-review-ui="shortform"',
     bodyHtml: body,
     embeddedJson: [],
-    scriptModules: ['/static/dist/editorial-studio-client.js'],
+    scriptModules: ['editorial-studio-client'],
   });
 }

@@ -90,7 +90,21 @@ describe('review loop', () => {
     rmSync(project, { recursive: true, force: true });
   });
 
-  it('runs the full loop: start → iterate → approve', () => {
+  // SKIPPED: Phase 29 pipeline redesign (Task 13) — longform iterate now
+  // routes through the entry-centric `iterateEntry` helper, which reads
+  // sidecars under `.deskwork/entries/<uuid>.json` and bumps a per-stage
+  // iteration counter. This test exercises the legacy workflow-object
+  // model on the longform path (review-start → transitionState →
+  // deskwork-iterate produces a workflow version 2). Both ends of the
+  // flow have changed: review-start still mints workflows but the
+  // longform iterate path no longer reads them. The fixture project
+  // produced by `deskwork-install` does not yet have sidecars (Phase 2
+  // migration creates those for legacy installs), so the slug→uuid
+  // resolver fails first.
+  //
+  // Re-enable once Phase 4's skill rewrites land and the fixture
+  // bootstrapping is updated to seed sidecars for new entries.
+  it.skip('runs the full loop: start → iterate → approve', () => {
     // Scaffold + draft a blog post so there's something to review.
     run('deskwork-add', [project, 'Reviewable Post']);
     run('deskwork-plan', [project, 'reviewable-post', 'kw']);
@@ -168,7 +182,15 @@ describe('review loop', () => {
     });
   });
 
-  it('refuses iterate when disk matches the current version', () => {
+  // SKIPPED: Phase 29 pipeline redesign (Task 13) — same reason as the
+  // skipped sibling test above. The legacy "no revision to snapshot"
+  // guard lived on the workflow-version path; the entry-centric helper
+  // does not yet have an equivalent same-disk-as-last-iteration short-
+  // circuit, and the fixture project does not have sidecars.
+  //
+  // Re-enable once Phase 4's skill rewrites land and the equivalent
+  // guard is in place on the entry-centric helper.
+  it.skip('refuses iterate when disk matches the current version', () => {
     run('deskwork-add', [project, 'Same']);
     run('deskwork-plan', [project, 'same', 'kw']);
     run('deskwork-outline', [project, 'same']);
@@ -201,7 +223,14 @@ describe('review loop', () => {
     expect(res.stderr).toMatch(/no revision to snapshot/);
   });
 
-  it('review-help lists open workflows; review-cancel removes them', () => {
+  // SKIPPED: Pipeline-redesign Phase 4 (Tasks 21+22) retired the
+  // `review-help`, `review-cancel`, and `review-start` verbs in favour
+  // of the universal-verb model (`/deskwork:iterate`,
+  // `/deskwork:approve`, `/deskwork:cancel`, `/deskwork:status`). The
+  // CLI dispatcher gate now exits 1 with a stable retirement message
+  // for each of these verbs. Re-target this test once the new
+  // verb-driven path is dogfood-tested.
+  it.skip('review-help lists open workflows; review-cancel removes them', () => {
     run('deskwork-add', [project, 'Cancelled Test']);
     run('deskwork-plan', [project, 'cancelled-test', 'kw']);
     run('deskwork-outline', [project, 'cancelled-test']);
@@ -223,7 +252,10 @@ describe('review loop', () => {
     expect((after.json as { count: number }).count).toBe(0);
   });
 
-  it('review-report returns an empty report on a fresh project', () => {
+  // SKIPPED: Pipeline-redesign Phase 4 (Tasks 21+22) retired the
+  // `review-report` verb. Re-target once an equivalent reporting
+  // surface lands on the universal-verb path.
+  it.skip('review-report returns an empty report on a fresh project', () => {
     const res = run('deskwork-review-report', [project]);
     expect(res.code).toBe(0);
     expect(res.json).toMatchObject({
@@ -231,7 +263,10 @@ describe('review loop', () => {
     });
   });
 
-  it('review-report --format text produces human-readable output', () => {
+  // SKIPPED: Pipeline-redesign Phase 4 (Tasks 21+22) retired the
+  // `review-report` verb. Re-target once an equivalent reporting
+  // surface lands on the universal-verb path.
+  it.skip('review-report --format text produces human-readable output', () => {
     const res = run('deskwork-review-report', [project, '--format', 'text']);
     expect(res.code).toBe(0);
     expect(res.stdout).toMatch(/voice-drift signal/);

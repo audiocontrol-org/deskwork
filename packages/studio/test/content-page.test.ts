@@ -241,6 +241,23 @@ describe('content view — drilldown', () => {
     expect(r.status).toBe(404);
     expect(r.html).toContain('unknown project: no-such-project on wc');
   });
+
+  // #145: a slug-only URL for a deeply-nested entry redirects to the
+  // canonical full path, instead of 404'ing because no top-level
+  // project has that rootSlug.
+  it('redirects slug-only URL to canonical deep path when entry is nested (#145)', async () => {
+    const r = await getHtml(app, '/dev/content/wc/strivers');
+    expect(r.status).toBe(200);
+    expect(r.html).toMatch(
+      /<meta http-equiv="refresh" content="0;url=\/dev\/content\/wc\/the-outbound\/characters\/strivers"/,
+    );
+  });
+
+  it('still 404s when the slug exists nowhere in the tree', async () => {
+    const r = await getHtml(app, '/dev/content/wc/totally-imaginary');
+    expect(r.status).toBe(404);
+    expect(r.html).toContain('unknown project: totally-imaginary on wc');
+  });
 });
 
 describe('content view — scrapbook-file binary endpoint', () => {

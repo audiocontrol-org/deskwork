@@ -92,7 +92,8 @@ describe('review page — scrapbook drawer (Phase 16c)', () => {
 
     // Drawer chrome is present.
     expect(r.html).toContain('data-scrapbook-drawer');
-    expect(r.html).toContain('§ Scrapbook');
+    // Dispatch D wraps the § sigil in <em> for typographic emphasis.
+    expect(r.html).toContain('<em>§</em> Scrapbook');
     expect(r.html).toContain('2 items');
 
     // The standalone-viewer "open" link points at the right path.
@@ -110,7 +111,7 @@ describe('review page — scrapbook drawer (Phase 16c)', () => {
     expect(r.html).not.toContain('data-action="delete"');
   });
 
-  it('renders the empty-state when the scrapbook directory has no items', async () => {
+  it('renders the empty-state when the scrapbook directory has no items (Issue 6)', async () => {
     const slug = 'flat-essay';
     startReview(slug);
 
@@ -118,20 +119,27 @@ describe('review page — scrapbook drawer (Phase 16c)', () => {
     expect(r.status).toBe(200);
     expect(r.html).toContain('data-scrapbook-drawer');
     expect(r.html).toContain('0 items');
-    expect(r.html).toContain('no scrapbook items');
+    // Issue 6: the empty-state copy now invites action and links to
+    // the per-entry scrapbook viewer.
+    expect(r.html).toContain('No items yet.');
+    expect(r.html).toContain('Drop research notes →');
+    expect(r.html).toContain(`href="/dev/scrapbook/wc/${slug}"`);
   });
 
-  it('renders the empty-state when the scrapbook dir does not exist', async () => {
+  it('renders the empty-state when the scrapbook dir does not exist (Issue 6)', async () => {
     const slug = 'no-scrapbook-here';
     startReview(slug);
     // No seedScrapbook call → directory simply isn't there.
 
     const r = await getHtml(app, `/dev/editorial-review/${slug}?site=wc`);
     expect(r.status).toBe(200);
-    expect(r.html).toContain('no scrapbook items');
+    expect(r.html).toContain('No items yet.');
+    expect(r.html).toContain('Drop research notes →');
+    expect(r.html).toContain(`href="/dev/scrapbook/wc/${slug}"`);
     // The drawer chrome still renders so the operator sees the
     // affordance for this node.
-    expect(r.html).toContain('§ Scrapbook');
+    // Dispatch D wraps the § sigil in <em> for typographic emphasis.
+    expect(r.html).toContain('<em>§</em> Scrapbook');
   });
 
   it('separates secret items into their own subsection', async () => {
@@ -148,5 +156,21 @@ describe('review page — scrapbook drawer (Phase 16c)', () => {
     expect(r.html).toContain('private.md');
     expect(r.html).toContain('er-scrapbook-drawer-secret');
     expect(r.html).toContain('2 items'); // public + secret count together
+  });
+
+  it('marginalia empty state — short, action-oriented copy (Issue 6)', async () => {
+    const slug = 'flat-essay';
+    startReview(slug);
+
+    const r = await getHtml(app, `/dev/editorial-review/${slug}?site=wc`);
+    expect(r.status).toBe(200);
+    // Issue 6: the marginalia empty-state copy was tightened to a
+    // single short sentence with "margin note" emphasized.
+    expect(r.html).toContain(
+      '<p class="er-marginalia-empty" data-sidebar-empty>Select text in the draft to leave a <em>margin note</em>.</p>',
+    );
+    // Defensive: the prior multi-clause copy is gone — no operator
+    // should ever see "click the floating Mark pencil" again.
+    expect(r.html).not.toContain('click the floating');
   });
 });

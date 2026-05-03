@@ -245,7 +245,7 @@ export function renderContentTopLevel(
     // #29: lightbox listener for image thumbnails in detail-panel
     // scrap rows. Idempotent — safe to load on the top-level page
     // too (no scrap rows there → no work).
-    scriptModules: ['/static/dist/content-view-client.js'],
+    scriptModules: ['content-view-client'],
   });
 }
 
@@ -454,6 +454,18 @@ export async function renderContentProject(
   const sp = loadProjectsForSite(ctx, site, getIndex);
   const project = sp.projects.find((p) => p.rootSlug === projectSlug);
   if (!project) {
+    // #145: a URL of the form `/dev/content/<site>/<slug>` may refer to
+    // an entry whose actual on-disk artifact lives DEEP in the tree
+    // (e.g. `<contentDir>/1.0/<slug>.md`). Such entries appear as
+    // sub-nodes under their root segment, not as top-level projects.
+    // Walk the assembled tree once for a node whose path's basename
+    // matches the requested slug; if found, redirect to the canonical
+    // deep URL instead of 404'ing.
+    const deepHit = findNodeBySlugBasename(sp.projects, projectSlug);
+    if (deepHit !== null) {
+      const target = `/dev/content/${site}/${encodeURI(deepHit)}`;
+      return { status: 200, html: redirectHtml(target) };
+    }
     return {
       status: 404,
       html: renderNotFound(`unknown project: ${projectSlug} on ${site}`),
@@ -503,9 +515,48 @@ export async function renderContentProject(
       bodyHtml: body,
       // #29: scrap rows in the detail panel have image thumbnails;
       // wire up the lightbox.
-      scriptModules: ['/static/dist/content-view-client.js'],
+      scriptModules: ['content-view-client'],
     }),
   };
+}
+
+/**
+ * #145: walk projects' trees in DFS order and return the first node
+ * whose path's last segment matches `slug`. Used to redirect
+ * slug-only URLs to their canonical deep path.
+ */
+function findNodeBySlugBasename(
+  projects: readonly ContentProject[],
+  slug: string,
+): string | null {
+  for (const project of projects) {
+    const found = walkForBasename(project.root, slug);
+    if (found !== null) return found;
+  }
+  return null;
+}
+
+function walkForBasename(node: ContentNode, slug: string): string | null {
+  const last = node.path.split('/').pop() ?? '';
+  if (last === slug) return node.path;
+  for (const child of node.children) {
+    const found = walkForBasename(child, slug);
+    if (found !== null) return found;
+  }
+  return null;
+}
+
+/**
+ * Server-side meta-refresh redirect. Used when we want to land the
+ * adopter at a different URL but can't issue a 302 from the page
+ * renderer (we return a result tuple, not a Response). Browsers honor
+ * the meta refresh; bots see a usable HTML body.
+ */
+function redirectHtml(target: string): string {
+  const escaped = target.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+  return `<!doctype html><meta http-equiv="refresh" content="0;url=${escaped}">` +
+    `<title>Redirecting…</title>` +
+    `<a href="${escaped}">Redirecting to ${escaped}</a>`;
 }
 
 function renderNotFound(message: string): string {

@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>scrapbook — redesign — deskwork</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..900,0..100;1,9..144,300..900,0..100&family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+/* ================================================================
+   scrapbook — redesign mockup
+   addresses issue #154 (4): "index has no preview · clicking does nothing"
+   ================================================================ */
+
+:root {
+  --er-paper:    #F5F1E8;
+  --er-paper-2:  #ECE6D4;
+  --er-paper-3:  #DFD7BF;
+  --er-paper-4:  #C9BFA3;
+  --er-ink:      #1A1614;
+  --er-ink-soft: #3A332E;
+  --er-faded:    #8A7F70;
+  --er-faded-2:  #B5AC9B;
+  --er-red-pencil: #B8362A;
+  --er-red-soft:   #D9867A;
+  --er-proof-blue: #2A4B7C;
+  --er-stamp-green:#2E5D45;
+  --er-stamp-purple:#5A3E5F;
+  --er-highlight:  #F4D58D;
+  --er-highlight-soft:#F9E8BE;
+
+  --er-font-display: 'Fraunces', Georgia, serif;
+  --er-font-body:    'Newsreader', Georgia, serif;
+  --er-font-mono:    'JetBrains Mono', ui-monospace, monospace;
+
+  --er-space-1: 0.5rem;
+  --er-space-2: 0.875rem;
+  --er-space-3: 1.25rem;
+  --er-space-4: 1.75rem;
+  --er-space-5: 2.5rem;
+  --er-space-6: 4rem;
+
+  --er-page-max: 78rem;
+  --er-folio-h:  2.4rem;
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--er-paper-2);
+  background-image:
+    radial-gradient(circle at 25% 5%, rgba(184,54,42,0.025), transparent 60%),
+    url("data:image/svg+xml;utf8,<svg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.05 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  color: var(--er-ink);
+  font-family: var(--er-font-body);
+  font-size: 17px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+a { color: var(--er-proof-blue); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+code, kbd { font-family: var(--er-font-mono); font-size: 0.85em; }
+button { font: inherit; cursor: pointer; }
+
+/* ============ FOLIO (matches review surface) ============ */
+.er-folio {
+  position: sticky;
+  top: 0;
+  height: var(--er-folio-h);
+  z-index: 60;
+  background: var(--er-paper);
+  border-bottom: 0.5px solid var(--er-ink);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--er-space-3);
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+}
+.er-folio-mark {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 36, "wght" 600;
+  font-style: italic;
+  text-transform: none;
+  letter-spacing: -0.01em;
+  color: var(--er-ink);
+  font-size: 0.95rem;
+  margin-right: var(--er-space-3);
+}
+.er-folio-mark::before { content: '※ '; color: var(--er-red-pencil); font-style: normal; }
+.er-folio-spine { color: var(--er-ink-soft); margin-right: auto; font-family: var(--er-font-mono); letter-spacing: 0.12em; }
+.er-folio-nav { display: flex; gap: var(--er-space-3); }
+.er-folio-nav a { color: var(--er-faded); text-decoration: none; padding: 0.2rem 0; position: relative; }
+.er-folio-nav a:hover { color: var(--er-ink); }
+.er-folio-nav a.active { color: var(--er-red-pencil); }
+.er-folio-nav a.active::after {
+  content: ''; position: absolute; inset: auto 0 -3px 0; height: 2px; background: var(--er-red-pencil);
+}
+
+/* ============ SCRAPBOOK PAGE GRID ============ */
+.scrap-page {
+  max-width: var(--er-page-max);
+  margin: var(--er-space-4) auto var(--er-space-6);
+  padding: 0 var(--er-space-4);
+  display: grid;
+  grid-template-columns: 17rem 1fr;
+  gap: var(--er-space-5);
+  align-items: start;
+}
+@media (max-width: 64rem) {
+  .scrap-page { grid-template-columns: 1fr; gap: var(--er-space-3); }
+  .scrap-aside { position: static; }
+}
+
+/* ============ ASIDE — index, totals, actions ============ */
+.scrap-aside {
+  position: sticky;
+  top: calc(var(--er-folio-h) + var(--er-space-3));
+  font-family: var(--er-font-display);
+  background: var(--er-paper);
+  border: 1px solid var(--er-paper-3);
+  border-radius: 2px;
+  padding: var(--er-space-3);
+  box-shadow: 0 6px 14px -8px rgba(26,22,20,0.15);
+}
+.scrap-aside-kicker {
+  font-family: var(--er-font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  margin: 0 0 var(--er-space-1);
+}
+.scrap-aside-kicker em {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  color: var(--er-red-pencil);
+  font-size: 1rem;
+  text-transform: none;
+  letter-spacing: 0;
+  margin-right: 0.25rem;
+}
+.scrap-aside-title {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 144, "wght" 600, "SOFT" 30;
+  font-size: 1.6rem;
+  line-height: 1.1;
+  margin: 0 0 var(--er-space-1);
+  letter-spacing: -0.01em;
+  word-break: break-all;
+}
+.scrap-aside-meta {
+  font-family: var(--er-font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  margin: 0 0 var(--er-space-1);
+}
+.scrap-aside-totals {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  color: var(--er-ink-soft);
+  font-size: 0.95rem;
+  margin: var(--er-space-1) 0;
+}
+.scrap-aside hr {
+  border: 0;
+  border-top: 1px dashed var(--er-faded-2);
+  margin: var(--er-space-2) 0;
+}
+.scrap-aside-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  max-height: 16rem;
+  overflow-y: auto;
+}
+.scrap-aside-list li { display: flex; gap: 0.5rem; align-items: baseline; }
+.scrap-aside-list .num {
+  font-family: var(--er-font-mono);
+  font-size: 0.6rem;
+  color: var(--er-faded);
+  letter-spacing: 0.1em;
+}
+.scrap-aside-list a {
+  font-family: var(--er-font-mono);
+  font-size: 0.72rem;
+  color: var(--er-ink-soft);
+  text-decoration: none;
+  border-bottom: 1px dotted transparent;
+}
+.scrap-aside-list a:hover { color: var(--er-red-pencil); border-bottom-color: var(--er-red-pencil); }
+.scrap-aside-list a.active { color: var(--er-red-pencil); border-bottom-color: var(--er-red-pencil); }
+
+.scrap-aside-actions { display: flex; flex-direction: column; gap: 0.4rem; }
+.scrap-aside-btn {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--er-paper-2);
+  border: 1px solid var(--er-faded-2);
+  color: var(--er-ink);
+  padding: 0.4rem 0.7rem;
+  border-radius: 2px;
+  text-align: center;
+  cursor: pointer;
+}
+.scrap-aside-btn:hover { background: var(--er-ink); color: var(--er-paper); border-color: var(--er-ink); }
+.scrap-aside-btn--primary { background: var(--er-red-pencil); color: var(--er-paper); border-color: var(--er-red-pencil); }
+.scrap-aside-btn--primary:hover { background: var(--er-ink); border-color: var(--er-ink); }
+
+.scrap-aside-path {
+  font-family: var(--er-font-mono);
+  font-size: 0.62rem;
+  color: var(--er-faded);
+  margin: 0;
+  word-break: break-all;
+}
+
+/* ============ MAIN — header + cards ============ */
+.scrap-main { min-width: 0; }
+.scrap-main-header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--er-space-3);
+  margin-bottom: var(--er-space-3);
+  flex-wrap: wrap;
+}
+.scrap-breadcrumb {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+}
+.scrap-breadcrumb a { color: var(--er-faded); text-decoration: none; }
+.scrap-breadcrumb a:hover { color: var(--er-ink); }
+.scrap-breadcrumb .sep { color: var(--er-faded-2); margin: 0 0.4em; }
+.scrap-breadcrumb b { color: var(--er-ink); font-weight: 500; }
+
+.scrap-search {
+  margin-left: auto;
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  font-family: var(--er-font-mono);
+}
+.scrap-search input {
+  font-family: var(--er-font-mono);
+  font-size: 0.75rem;
+  border: 1px solid var(--er-faded-2);
+  background: var(--er-paper);
+  padding: 0.3rem 0.5rem;
+  width: 14rem;
+  border-radius: 2px;
+}
+.scrap-search input::placeholder { color: var(--er-faded); }
+.scrap-search-kbd {
+  font-family: var(--er-font-mono);
+  font-size: 0.6rem;
+  border: 1px solid var(--er-faded-2);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  padding: 0.05rem 0.3rem;
+  background: var(--er-paper);
+  color: var(--er-faded);
+}
+
+.scrap-filters { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: var(--er-space-3); }
+.scrap-filter {
+  font-family: var(--er-font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: transparent;
+  border: 1px solid var(--er-faded-2);
+  color: var(--er-faded);
+  padding: 0.25rem 0.5rem;
+  border-radius: 2px;
+}
+.scrap-filter[aria-pressed="true"] { background: var(--er-ink); color: var(--er-paper); border-color: var(--er-ink); }
+
+/* ============ CARDS — every item gets a preview ============ */
+.scrap-cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+  gap: var(--er-space-3);
+}
+@media (min-width: 80rem) {
+  .scrap-cards { grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr)); }
+}
+
+.scrap-card {
+  background: var(--er-paper);
+  border: 1px solid var(--er-paper-3);
+  border-radius: 2px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  transition: border-color 160ms, transform 160ms, box-shadow 160ms;
+  /* a faint top edge gradient — like a tab on a folder */
+}
+.scrap-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: var(--er-faded-2);
+  border-radius: 2px 2px 0 0;
+}
+.scrap-card[data-kind="md"]::before   { background: var(--er-proof-blue); }
+.scrap-card[data-kind="img"]::before  { background: var(--er-stamp-green); }
+.scrap-card[data-kind="json"]::before { background: var(--er-stamp-purple); }
+.scrap-card[data-kind="txt"]::before  { background: var(--er-faded); }
+.scrap-card:hover {
+  border-color: var(--er-red-pencil);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px -10px rgba(26,22,20,0.18), 0 2px 6px -2px rgba(184,54,42,0.18);
+}
+
+.scrap-card-head {
+  padding: var(--er-space-2);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.6rem;
+  align-items: baseline;
+  border-bottom: 1px dotted var(--er-paper-3);
+}
+.scrap-seq {
+  font-family: var(--er-font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  color: var(--er-faded);
+}
+.scrap-name {
+  font-family: var(--er-font-mono);
+  font-size: 0.85rem;
+  color: var(--er-ink);
+  word-break: break-word;
+  cursor: pointer;
+  border-bottom: 1px dotted transparent;
+}
+.scrap-name:hover { color: var(--er-red-pencil); border-bottom-color: var(--er-red-pencil); }
+.scrap-time {
+  font-family: var(--er-font-mono);
+  font-size: 0.62rem;
+  color: var(--er-faded);
+  letter-spacing: 0.08em;
+}
+
+.scrap-card-meta {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  font-family: var(--er-font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  padding: 0.4rem var(--er-space-2);
+  border-bottom: 1px dotted var(--er-paper-3);
+}
+.scrap-kind {
+  font-size: 0.55rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  background: var(--er-faded);
+  color: var(--er-paper);
+}
+.scrap-kind--md   { background: var(--er-proof-blue); }
+.scrap-kind--img  { background: var(--er-stamp-green); }
+.scrap-kind--json { background: var(--er-stamp-purple); }
+.scrap-kind--txt  { background: var(--er-faded); }
+.scrap-size { color: var(--er-ink-soft); }
+
+/* preview surface — always visible (issue 4 fix) */
+.scrap-preview {
+  padding: var(--er-space-2);
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 14, "wght" 350;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--er-ink-soft);
+  flex: 1 1 auto;
+  min-height: 6rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.scrap-preview--mono {
+  font-family: var(--er-font-mono);
+  font-style: normal;
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+  color: var(--er-ink);
+  background: var(--er-paper-2);
+  border-top: 1px solid var(--er-paper-3);
+  border-bottom: 1px solid var(--er-paper-3);
+}
+.scrap-preview--img {
+  padding: 0;
+  min-height: 0;
+  display: block;
+  overflow: hidden;
+}
+.scrap-preview--img-frame {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background-position: center;
+  background-size: cover;
+  background-color: var(--er-paper-3);
+}
+.scrap-preview-md p:first-child { margin-top: 0; }
+.scrap-preview-md em { color: var(--er-stamp-purple); }
+
+/* card actions — hover or focus reveals */
+.scrap-card-foot {
+  display: flex;
+  gap: 0.3rem;
+  padding: var(--er-space-1) var(--er-space-2);
+  border-top: 1px dotted var(--er-paper-3);
+  background: var(--er-paper-2);
+  font-family: var(--er-font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.scrap-tool {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--er-faded);
+  padding: 0.2rem 0.4rem;
+  border-radius: 2px;
+}
+.scrap-tool:hover { color: var(--er-ink); border-color: var(--er-faded-2); }
+.scrap-tool--delete:hover { color: var(--er-red-pencil); border-color: var(--er-red-pencil); }
+.scrap-tool--primary { color: var(--er-stamp-green); border-color: transparent; }
+.scrap-tool--primary:hover { background: var(--er-stamp-green); color: var(--er-paper); border-color: var(--er-stamp-green); }
+.scrap-card-foot .spacer { flex: 1 1 auto; }
+
+/* expanded view — full detail in place */
+.scrap-card[data-state="expanded"] {
+  grid-column: 1 / -1;
+  border-color: var(--er-red-pencil);
+}
+.scrap-card[data-state="expanded"] .scrap-preview {
+  -webkit-line-clamp: unset;
+  display: block;
+  min-height: 14rem;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+.scrap-card[data-state="expanded"] .scrap-preview--mono {
+  font-size: 0.85rem;
+}
+
+/* drop zone */
+.scrap-drop {
+  margin-top: var(--er-space-4);
+  border: 2px dashed var(--er-faded-2);
+  background: var(--er-paper);
+  padding: var(--er-space-4);
+  text-align: center;
+  font-family: var(--er-font-mono);
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  border-radius: 2px;
+}
+.scrap-drop:hover { border-color: var(--er-red-pencil); color: var(--er-red-pencil); }
+
+/* secret section (existing concept; carry forward) */
+.scrap-secret {
+  margin-top: var(--er-space-5);
+  padding-top: var(--er-space-3);
+  border-top: 2px solid var(--er-paper-4);
+}
+.scrap-secret-head {
+  display: flex;
+  gap: var(--er-space-2);
+  align-items: baseline;
+  margin-bottom: var(--er-space-2);
+}
+.scrap-secret-mark { color: var(--er-stamp-purple); font-size: 1rem; }
+.scrap-secret-title {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 36, "wght" 500;
+  font-size: 1.2rem;
+  margin: 0;
+  color: var(--er-stamp-purple);
+}
+.scrap-secret-badge {
+  font-family: var(--er-font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--er-stamp-purple);
+  border: 1px dashed var(--er-stamp-purple);
+  padding: 0.1rem 0.4rem;
+  border-radius: 2px;
+}
+
+</style>
+</head>
+<body>
+
+  <!-- Folio nav (matches review surface) -->
+  <div class="er-folio" role="banner">
+    <span class="er-folio-mark">deskwork</span>
+    <span class="er-folio-spine">scrapbook · audiocontrol / the-press-check-problem</span>
+    <nav class="er-folio-nav" aria-label="studio">
+      <a href="#">desk</a>
+      <a href="#">content</a>
+      <a href="#">shortform</a>
+      <a href="#" class="active" aria-current="page">scrapbook</a>
+      <a href="#">galley</a>
+      <a href="#">manual</a>
+    </nav>
+  </div>
+
+  <main class="scrap-page">
+
+    <!-- ASIDE — folder card (left) -->
+    <aside class="scrap-aside">
+      <p class="scrap-aside-kicker"><em>§</em> The folder</p>
+      <h1 class="scrap-aside-title">the-press-check-problem</h1>
+      <p class="scrap-aside-meta">audiocontrol</p>
+      <hr />
+      <p class="scrap-aside-totals">
+        <strong>9</strong> public · <strong>2</strong> secret · <em>1.4 MB</em>
+      </p>
+      <p class="scrap-aside-meta">last modified 12m ago</p>
+      <hr />
+      <ol class="scrap-aside-list">
+        <li><span class="num">01</span><a href="#item-1" class="active">note-on-galleys.md</a></li>
+        <li><span class="num">02</span><a href="#item-2">composing-room-1953.jpg</a></li>
+        <li><span class="num">03</span><a href="#item-3">red-pencil-stock.json</a></li>
+        <li><span class="num">04</span><a href="#item-4">desk-arrangement.txt</a></li>
+        <li><span class="num">05</span><a href="#item-5">columns-and-rules.md</a></li>
+        <li><span class="num">06</span><a href="#item-6">stamp-glyphs.png</a></li>
+        <li><span class="num">07</span><a href="#item-7">linotype-history.md</a></li>
+        <li><span class="num">08</span><a href="#item-8">type-spec.json</a></li>
+        <li><span class="num">09</span><a href="#item-9">interview-with-rk.md</a></li>
+      </ol>
+      <hr />
+      <div class="scrap-aside-actions">
+        <button class="scrap-aside-btn scrap-aside-btn--primary" type="button">+ new note</button>
+        <button class="scrap-aside-btn" type="button">+ upload file</button>
+      </div>
+      <hr />
+      <p class="scrap-aside-path">
+        audiocontrol/the-press-check-problem/scrapbook/
+      </p>
+    </aside>
+
+    <!-- MAIN — cards grid -->
+    <section class="scrap-main">
+      <header class="scrap-main-header">
+        <nav class="scrap-breadcrumb" aria-label="hierarchy">
+          <a href="#">audiocontrol</a><span class="sep">›</span>
+          <b>the-press-check-problem</b>
+        </nav>
+        <div class="scrap-search">
+          <input type="search" placeholder="filter by name or content" aria-label="filter scrapbook" />
+          <span class="scrap-search-kbd">/</span>
+        </div>
+      </header>
+
+      <div class="scrap-filters" role="toolbar" aria-label="filter by kind">
+        <button class="scrap-filter" type="button" aria-pressed="true">all · 9</button>
+        <button class="scrap-filter" type="button" aria-pressed="false">md · 4</button>
+        <button class="scrap-filter" type="button" aria-pressed="false">img · 2</button>
+        <button class="scrap-filter" type="button" aria-pressed="false">json · 1</button>
+        <button class="scrap-filter" type="button" aria-pressed="false">txt · 1</button>
+        <button class="scrap-filter" type="button" aria-pressed="false">other · 1</button>
+      </div>
+
+      <ol class="scrap-cards" id="cards">
+
+        <li class="scrap-card" data-kind="md" data-state="closed" id="item-1">
+          <div class="scrap-card-head">
+            <span class="scrap-seq">N° 01</span>
+            <span class="scrap-name" data-action="open">note-on-galleys.md</span>
+            <time class="scrap-time" datetime="2026-05-02">12m ago</time>
+          </div>
+          <div class="scrap-card-meta">
+            <span class="scrap-kind scrap-kind--md">MD</span>
+            <span class="scrap-size">2.4 KB</span>
+            <span>·</span>
+            <span>72 lines</span>
+          </div>
+          <div class="scrap-preview scrap-preview-md">
+            <p>The galley sits on a desk under a pool of light. The
+            reviewer holds a red pencil — <em>actual</em> red, <em>actual</em>
+            pencil, soft enough to mark, hard enough not to smear. Marks
+            are in the margin, not on the type. The glyph for "delete"
+            is a ⌐, the glyph for "transpose" looks like a stylized
+            infinity sign, and so on for every mark of the proofreading
+            craft…</p>
+          </div>
+          <div class="scrap-card-foot">
+            <button class="scrap-tool scrap-tool--primary" data-action="open">open</button>
+            <button class="scrap-tool" data-action="edit">edit</button>
+            <button class="scrap-tool" data-action="rename">rename</button>
+            <button class="scrap-tool" data-action="mark-secret">mark secret</button>
+            <span class="spacer"></span>
+            <button class="scrap-tool scrap-tool--delete" data-action="delete">delete</button>
+          </div>
+        </li>
+
+        <li class="scrap-card" data-kind="img" data-state="closed" id="item-2">
+          <div class="scrap-card-head">
+            <span class="scrap-seq">N° 02</span>
+            <span class="scrap-name" data-action="open">composing-room-1953.jpg</span>
+            <time class="scrap-time">2h ago</time>
+          </div>
+          <div class="scrap-card-meta">
+            <span class="scrap-kind scrap-kind--img">IMG</span>
+            <span class="scrap-size">412 KB</span>
+            <span>·</span>
+            <span>2400 × 1600</span>
+          </div>
+          <div class="scrap-preview scrap-preview--img">
+            <div class="scrap-preview--img-frame" style="background-image: linear-gradient(135deg, #c9bfa3, #8a7f70 35%, #3a332e 70%, #1a1614); background-size: 200% 200%;"></div>
+          </div>
+          <div class="scrap-card-foot">
+            <button class="scrap-tool scrap-tool--primary" data-action="open">open</button>
+            <button class="scrap-tool" data-action="rename">rename</button>
+            <button class="scrap-tool" data-action="mark-secret">mark secret</button>
+            <span class="spacer"></span>
+            <button class="scrap-tool scrap-tool--delete" data-action="delete">delete</button>
+          </div>
+        </li>
+
+        <li class="scrap-card" data-kind="json" data-state="closed" id="item-3">
+          <div class="scrap-card-head">
+            <span class="scrap-seq">N° 03</span>
+            <span class="scrap-name" data-action="open">red-pencil-stock.json</span>
+            <time class="scrap-time">yesterday</time>
+          </div>
+          <div class="scrap-card-meta">
+            <span class="scrap-kind scrap-kind--json">JSON</span>
+            <span class="scrap-size">312 B</span>
+            <span>·</span>
+            <span>5 keys</span>
+          </div>
+          <pre class="scrap-preview scrap-preview--mono">{
+  "brand": "Sanford Verithin",
+  "color": "747-ruby red",
+  "lead": 2.0,
+  "sourced_from": "an old desk drawer",
+  "remaining": 11
+}</pre>
+          <div class="scrap-card-foot">
+            <button class="scrap-tool scrap-tool--primary" data-action="open">open</button>
+            <button class="scrap-tool" data-action="edit">edit</button>
+            <button class="scrap-tool" data-action="rename">rename</button>
+            <button class="scrap-tool" data-action="mark-secret">mark secret</button>
+            <span class="spacer"></span>
+            <button class="scrap-tool scrap-tool--delete" data-action="delete">delete</button>
+          </div>
+        </li>
+
+        <li class="scrap-card" data-kind="txt" data-state="closed" id="item-4">
+          <div class="scrap-card-head">
+            <span class="scrap-seq">N° 04</span>
+            <span class="scrap-name" data-action="open">desk-arrangement.txt</span>
+            <time class="scrap-time">3d ago</time>
+          </div>
+          <div class="scrap-card-meta">
+            <span class="scrap-kind scrap-kind--txt">TXT</span>
+            <span class="scrap-size">540 B</span>
+            <span>·</span>
+            <span>14 lines</span>
+          </div>
+          <div class="scrap-preview scrap-preview-md">
+            <p>Light slightly behind the left shoulder. Galley centered;
+            reference column to the right. Pencil case at 45°. Coffee
+            within reach but not on the same surface as the proofs.
+            One window — east-facing if possible — for the cool morning
+            light that matches the pressroom.</p>
+          </div>
+          <div class="scrap-card-foot">
+            <button class="scrap-tool scrap-tool--primary" data-action="open">open</button>
+            <button class="scrap-tool" data-action="edit">edit</button>
+            <button class="scrap-tool" data-action="rename">rename</button>
+            <button class="scrap-tool" data-action="mark-secret">mark secret</button>
+            <span class="spacer"></span>
+            <button class="scrap-tool scrap-tool--delete" data-action="delete">delete</button>
+          </div>
+        </li>
+
+        <li class="scrap-card" data-kind="md" data-state="closed" id="item-5">
+          <div class="scrap-card-head">
+            <span class="scrap-seq">N° 05</span>
+            <span class="scrap-name" data-action="open">columns-and-rules.md</span>
+            <time class="scrap-time">5d ago</time>
+          </div>
+          <div class="scrap-card-meta">
+            <span class="scrap-kind scrap-kind--md">MD</span>
+            <span class="scrap-size">5.1 KB</span>
+            <span>·</span>
+            <span>148 lines</span>
+          </div>
+          <div class="scrap-preview scrap-preview-md">
+            <p>A column-rule is the thin vertical line between two columns
+            of type. Letterpress rules were brass strips. Cold type
+            rules became thin black bars set into the form. In digital
+            typesetting they are CSS borders…</p>
+          </div>
+          <div class="scrap-card-foot">
+            <button class="scrap-tool scrap-tool--primary" data-action="open">open</button>
+            <button class="scrap-tool" data-action="edit">edit</button>
+            <button class="scrap-tool" data-action="rename">rename</button>
+            <button class="scrap-tool" data-action="mark-secret">mark secret</button>
+            <span class="spacer"></span>
+            <button class="scrap-tool scrap-tool--delete" data-action="delete">delete</button>
+          </div>
+        </li>
+
+        <li class="scrap-card" data-kind="img" data-state="closed" id="item-6">
+          <div class="scrap-card-head">
+            <span class="scrap-seq">N° 06</span>
+            <span class="scrap-name" data-action="open">stamp-glyphs.png</span>
+            <time class="scrap-time">5d ago</time>
+          </div>
+          <div class="scrap-card-meta">
+            <span class="scrap-kind scrap-kind--img">IMG</span>
+            <span class="scrap-size">88 KB</span>
+            <span>·</span>
+            <span>1200 × 800</span>
+          </div>
+          <div class="scrap-preview scrap-preview--img">
+            <div class="scrap-preview--img-frame" style="background: repeating-linear-gradient(45deg, #ECE6D4 0 18px, #DFD7BF 18px 22px), radial-gradient(circle at 30% 40%, rgba(184,54,42,0.3), transparent 40%);"></div>
+          </div>
+          <div class="scrap-card-foot">
+            <button class="scrap-tool scrap-tool--primary" data-action="open">open</button>
+            <button class="scrap-tool" data-action="rename">rename</button>
+            <button class="scrap-tool" data-action="mark-secret">mark secret</button>
+            <span class="spacer"></span>
+            <button class="scrap-tool scrap-tool--delete" data-action="delete">delete</button>
+          </div>
+        </li>
+
+      </ol>
+
+      <div class="scrap-drop" role="button" tabindex="0">
+        ── drop a file here, or pick one ──
+      </div>
+
+      <!-- secret section (existing concept) -->
+      <section class="scrap-secret" aria-label="secret items">
+        <header class="scrap-secret-head">
+          <span class="scrap-secret-mark" aria-hidden="true">⚿</span>
+          <h2 class="scrap-secret-title">Secret</h2>
+          <span class="scrap-secret-badge">private — never published</span>
+        </header>
+        <ol class="scrap-cards">
+          <li class="scrap-card" data-kind="md" data-state="closed">
+            <div class="scrap-card-head">
+              <span class="scrap-seq">N° 01</span>
+              <span class="scrap-name" data-action="open">interview-with-rk.md</span>
+              <time class="scrap-time">2w ago</time>
+            </div>
+            <div class="scrap-card-meta">
+              <span class="scrap-kind scrap-kind--md">MD</span>
+              <span class="scrap-size">14 KB</span>
+              <span>·</span>
+              <span>410 lines</span>
+            </div>
+            <div class="scrap-preview scrap-preview-md">
+              <p><em>Quiet during the editorial production. Off-record
+              comments from RK about the difference between page-mode
+              and proof-mode for review.</em> "The point of marginalia
+              is that it lives ON the page. Not next to it…"</p>
+            </div>
+            <div class="scrap-card-foot">
+              <button class="scrap-tool scrap-tool--primary" data-action="open">open</button>
+              <button class="scrap-tool" data-action="edit">edit</button>
+              <button class="scrap-tool" data-action="rename">rename</button>
+              <button class="scrap-tool" data-action="mark-secret">mark public</button>
+              <span class="spacer"></span>
+              <button class="scrap-tool scrap-tool--delete" data-action="delete">delete</button>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+    </section>
+  </main>
+
+<script>
+  // mockup-only: clicking a card name OR "open" toggles its expanded state.
+  // integration ships a real client; this demonstrates the affordance works.
+  document.querySelectorAll('.scrap-card').forEach((card) => {
+    const open = () => {
+      const next = card.dataset.state === 'expanded' ? 'closed' : 'expanded';
+      card.dataset.state = next;
+      // scroll into view when expanding
+      if (next === 'expanded') {
+        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    };
+    card.querySelectorAll('.scrap-name, [data-action="open"]').forEach((el) => {
+      el.addEventListener('click', (e) => { e.preventDefault(); open(); });
+    });
+  });
+
+  // filter chip toggling (visual only)
+  document.querySelectorAll('.scrap-filter').forEach((b) => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('.scrap-filter').forEach((x) => x.setAttribute('aria-pressed','false'));
+      b.setAttribute('aria-pressed','true');
+    });
+  });
+
+  // keyboard shortcut: '/' focuses the search
+  document.addEventListener('keydown', (e) => {
+    if (e.key === '/' && document.activeElement?.tagName !== 'INPUT') {
+      e.preventDefault();
+      document.querySelector('.scrap-search input').focus();
+    }
+  });
+</script>
+</body>
+</html>

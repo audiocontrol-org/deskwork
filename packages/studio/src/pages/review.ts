@@ -39,7 +39,7 @@ import type { StudioContext } from '../routes/api.ts';
 import { html, unsafe, type RawHtml } from './html.ts';
 import { layout } from './layout.ts';
 import { renderEditorialFolio } from './chrome.ts';
-import { escapeHtml } from './html.ts';
+import { escapeHtml, gloss } from './html.ts';
 import { renderScrapbookDrawer } from './review-scrapbook-drawer.ts';
 import { existsSync } from 'node:fs';
 import { resolveCalendarPath } from '@deskwork/core/paths';
@@ -200,23 +200,67 @@ function pendingSkillCmd(workflow: DraftWorkflowItem): string {
   return '';
 }
 
+/**
+ * Wrap an action button in a `.er-shortcut-chip-wrap` span carrying a
+ * small chord chip beneath the button. The chord style mirrors the
+ * shortcuts modal's verbatim two-tap rendering (e.g. `<kbd>a</kbd>
+ * <kbd>a</kbd>` for approve) — the destructive-shortcut UX, post-#108,
+ * is bare-letter double-tap (no Cmd/Ctrl modifier; verified in the
+ * keybinding handler at editorial-review-client.ts).
+ *
+ * The chip is hidden on narrow viewports via the cross-surface CSS
+ * media query — the wrap stays in the markup at every breakpoint so
+ * the column flex it triggers (`.er-strip-right > *:has(.er-shortcut-chip)`)
+ * is consistent with the chip's visibility state.
+ *
+ * Issue 5 — keyboard-shortcut chips on action buttons.
+ */
+function shortcutChipWrap(buttonHtml: string, letter: 'a' | 'i' | 'r'): string {
+  return html`<span class="er-shortcut-chip-wrap">${unsafe(buttonHtml)}<small class="er-shortcut-chip"><kbd>${letter}</kbd><kbd>${letter}</kbd></small></span>`;
+}
+
 function renderControlsRight(workflow: DraftWorkflowItem): RawHtml {
   const isActive = workflow.state === 'open' || workflow.state === 'in-review';
   const isApproved = workflow.state === 'approved';
   const isIterating = workflow.state === 'iterating';
   const isTerminal = workflow.state === 'applied' || workflow.state === 'cancelled';
   const buttons: string[] = [];
-  buttons.push(html`<button class="er-btn er-btn-small" data-action="toggle-edit" type="button">Edit</button>`);
+  // Issue 7 — emit the edit-mode disclosure label next to the Edit
+  // button. The client (editorial-review-client.ts) flips both the
+  // `data-mode` attribute AND inner text on each toggle. Initial state
+  // matches the surface's initial mode (preview).
+  buttons.push(html`<button class="er-btn er-btn-small" data-action="toggle-edit" type="button">Edit</button><span class="er-edit-mode-label" data-mode="preview">preview</span>`);
   if (isActive) {
-    buttons.push(html`<button class="er-btn er-btn-small er-btn-approve" data-action="approve" type="button">Approve</button>`);
-    buttons.push(html`<button class="er-btn er-btn-small" data-action="iterate" type="button">Iterate</button>`);
-    buttons.push(html`<button class="er-btn er-btn-small er-btn-reject" data-action="reject" type="button">Reject</button>`);
+    // Issue 5 — wrap each destructive action button with its chord chip.
+    buttons.push(
+      shortcutChipWrap(
+        html`<button class="er-btn er-btn-small er-btn-approve" data-action="approve" type="button">Approve</button>`,
+        'a',
+      ),
+    );
+    buttons.push(
+      shortcutChipWrap(
+        html`<button class="er-btn er-btn-small" data-action="iterate" type="button">Iterate</button>`,
+        'i',
+      ),
+    );
+    buttons.push(
+      shortcutChipWrap(
+        html`<button class="er-btn er-btn-small er-btn-reject" data-action="reject" type="button">Reject</button>`,
+        'r',
+      ),
+    );
   }
   if (isApproved) {
     const applyCmd = pendingSkillCmd(workflow);
     buttons.push(html`<span class="er-pending-state">awaiting apply…</span>`);
     buttons.push(html`<button class="er-btn er-btn-small" data-action="copy-cmd" data-cmd="${applyCmd}" title="Copy ${applyCmd} to clipboard" type="button">copy <code>/deskwork:approve</code></button>`);
-    buttons.push(html`<button class="er-btn er-btn-small er-btn-reject" data-action="reject" type="button">Reject</button>`);
+    buttons.push(
+      shortcutChipWrap(
+        html`<button class="er-btn er-btn-small er-btn-reject" data-action="reject" type="button">Reject</button>`,
+        'r',
+      ),
+    );
   }
   if (isIterating) {
     const iterateCmd = pendingSkillCmd(workflow);
@@ -244,7 +288,7 @@ function renderError(
         : `/deskwork:review-start --site ${site} ${slug}`;
   const body = html`
     <div data-review-ui="longform">
-      ${renderEditorialFolio('reviews', `longform · ${slug}`)}
+      ${renderEditorialFolio('longform', `longform · ${slug}`)}
       <div class="er-error">
         <h1>No galley to review.</h1>
         <p><strong>Slug:</strong> <code>${slug}</code></p>
@@ -275,10 +319,12 @@ function renderShortcutsOverlay(): RawHtml {
           <dt><kbd>e</kbd> / dbl-click</dt><dd>toggle edit mode</dd>
           <dt>select text</dt><dd>leave a margin note</dd>
           <dt><kbd>⌘</kbd><kbd>↵</kbd> / <kbd>ctrl</kbd><kbd>↵</kbd></dt><dd>save margin note (in composer)</dd>
-          <dt><kbd>a</kbd></dt><dd>approve</dd>
-          <dt><kbd>i</kbd></dt><dd>iterate</dd>
-          <dt><kbd>r</kbd></dt><dd>reject</dd>
+          <dt><kbd>a</kbd> <kbd>a</kbd></dt><dd>approve <em>— press twice within 500ms; first press arms, second fires</em></dd>
+          <dt><kbd>i</kbd> <kbd>i</kbd></dt><dd>iterate <em>— press twice within 500ms</em></dd>
+          <dt><kbd>r</kbd> <kbd>r</kbd></dt><dd>reject <em>— press twice within 500ms</em></dd>
           <dt><kbd>j</kbd> / <kbd>k</kbd></dt><dd>next / previous margin note</dd>
+          <dt><kbd>shift</kbd><kbd>F</kbd></dt><dd>focus mode <em>(edit mode only)</em></dd>
+          <dt><kbd>shift</kbd><kbd>M</kbd></dt><dd>show / hide margin notes column <em>— or click the chevron in the head when visible, or the pull tab on the right edge when stowed</em></dd>
           <dt><kbd>?</kbd></dt><dd>this panel</dd>
           <dt><kbd>esc</kbd></dt><dd>close / cancel composer</dd>
         </dl>
@@ -287,11 +333,45 @@ function renderShortcutsOverlay(): RawHtml {
     </div>`);
 }
 
+/* Issue #159 — marginalia stow affordance.
+ *
+ * The toggle for "show / hide the margin-notes column" lives ON the
+ * marginalia component, not in a generic toolbar. Two paired
+ * affordances drive the same state:
+ *
+ *   - `.er-marginalia-stow` — chevron button INSIDE the marginalia
+ *     head (next to "Margin notes" label). Clicking it stows the
+ *     column. Visible only when marginalia is visible (the head is
+ *     inside `.er-marginalia`, which is `display: none` when stowed).
+ *
+ *   - `.er-marginalia-tab` — pull tab on the right edge of the
+ *     viewport, mirroring `.er-outline-tab` on the left edge. Visible
+ *     ONLY when marginalia is stowed (CSS rule `body[data-marginalia=
+ *     "hidden"] .er-marginalia-tab { display: block }`). Clicking it
+ *     unstows.
+ *
+ * Both affordances + Shift+M dispatch through the same client-side
+ * toggleMarginalia handler. Mirrors the outline-drawer's pull-tab
+ * pattern so the project's affordance vocabulary stays consistent.
+ */
+function renderMarginaliaTab(): RawHtml {
+  return unsafe(html`
+    <button class="er-marginalia-tab" data-action="toggle-marginalia" type="button" aria-pressed="true" aria-label="Show margin notes (Shift+M)" title="Show margin notes (Shift+M)">
+      <span class="er-marginalia-tab-glyph" aria-hidden="true">‹</span>
+      <span class="er-marginalia-tab-label">Notes</span>
+    </button>`);
+}
+
 function renderMarginalia(): RawHtml {
   return unsafe(html`
     <aside class="er-marginalia" data-comments-sidebar aria-label="Margin notes">
-      <p class="er-marginalia-head">Margin notes</p>
-      <p class="er-marginalia-empty" data-sidebar-empty>Select text in the draft, then either click the floating <em>Mark</em> pencil above your selection — or click anywhere here in the margin to open the note.</p>
+      <p class="er-marginalia-head">
+        <button class="er-marginalia-stow" data-action="toggle-marginalia" type="button" aria-pressed="false" aria-label="Hide margin notes (Shift+M)" title="Hide margin notes (Shift+M)">
+          <span aria-hidden="true">›</span>
+        </button>
+        <span class="er-marginalia-head-label">Margin notes</span>
+      </p>
+      <p class="er-marginalia-empty" data-sidebar-empty>Select text in the draft to leave a <em>margin note</em>.</p>
       <section class="er-marginalia-composer" data-comment-composer hidden aria-label="New margin note">
         <p class="er-marginalia-composer-head">New mark</p>
         <div class="er-marginalia-composer-quote" data-composer-quote></div>
@@ -317,24 +397,53 @@ function renderMarginalia(): RawHtml {
     </aside>`);
 }
 
-function renderEditMode(outlineHasContent: boolean): RawHtml {
+/**
+ * Issue #154 Dispatch C — the edit-mode chrome was previously a single
+ * `.er-edit-mode` block rendered inside `.er-draft-frame` (below
+ * `#draft-body`). With the page-grid in place, the natural layout is:
+ *
+ *   - the toolbar (Source/Split/Preview tabs + Outline/Focus/Save/
+ *     Cancel actions) sticks above `.er-page`, replacing the strip's
+ *     right-side action buttons;
+ *   - the source/preview panes take over the article column where
+ *     `#draft-body` was.
+ *
+ * `renderEditToolbar` emits the bar that lives ABOVE `.er-page`; the
+ * client toggles its `[hidden]` attribute on enter/exit. Keeps
+ * `data-edit-toolbar` on the wrapper so `editorial-review-client.ts`'s
+ * existing `q('[data-edit-toolbar]')` lookup keeps working.
+ */
+function renderEditToolbar(outlineHasContent: boolean): RawHtml {
   const outlineBtnAttrs = outlineHasContent ? '' : ' hidden';
   return unsafe(html`
-    <div class="er-edit-mode" data-edit-toolbar hidden>
-      <div class="er-edit-chrome">
-        <div class="er-edit-modes" role="tablist" aria-label="Editor mode">
-          <button class="er-edit-mode-btn" data-edit-view="source" type="button" aria-pressed="true">Source</button>
-          <button class="er-edit-mode-btn" data-edit-view="split" type="button" aria-pressed="false">Split</button>
-          <button class="er-edit-mode-btn" data-edit-view="preview" type="button" aria-pressed="false">Preview</button>
-        </div>
-        <div class="er-edit-actions">
-          <button class="er-btn er-btn-small" data-action="outline-drawer" type="button" title="Show the outline for reference (O)" aria-pressed="false"${unsafe(outlineBtnAttrs)}>Outline ↗</button>
-          <button class="er-btn er-btn-small" data-action="focus-mode" type="button" title="Distraction-free mode (Shift+F)" aria-pressed="false">Focus ⛶</button>
-          <button class="er-btn er-btn-primary" data-action="save-version" type="button">Save as new version</button>
-          <button class="er-btn" data-action="cancel-edit" type="button">Cancel</button>
-          <span class="er-edit-hint" data-edit-hint></span>
-        </div>
+    <div class="er-edit-toolbar" data-edit-toolbar hidden>
+      <div class="er-edit-modes" role="tablist" aria-label="Editor mode">
+        <button class="er-edit-mode-btn" data-edit-view="source" type="button" aria-pressed="true">Source</button>
+        <button class="er-edit-mode-btn" data-edit-view="split" type="button" aria-pressed="false">Split</button>
+        <button class="er-edit-mode-btn" data-edit-view="preview" type="button" aria-pressed="false">Preview</button>
       </div>
+      <div class="er-edit-actions">
+        <button class="er-btn er-btn-small" data-action="outline-drawer" type="button" title="Show the outline for reference (O)" aria-pressed="false"${unsafe(outlineBtnAttrs)}>Outline ↗</button>
+        <button class="er-btn er-btn-small" data-action="focus-mode" type="button" title="Distraction-free mode (Shift+F)" aria-pressed="false">Focus ⛶</button>
+        <button class="er-btn er-btn-primary" data-action="save-version" type="button">Save as new version</button>
+        <button class="er-btn" data-action="cancel-edit" type="button">Cancel</button>
+        <span class="er-edit-hint" data-edit-hint></span>
+      </div>
+    </div>`);
+}
+
+/**
+ * Issue #154 Dispatch C — the source/preview panes (and supporting
+ * focus-mode affordances + backing textarea) live inside the article
+ * column, replacing `#draft-body`. The wrapper keeps the
+ * `er-edit-mode` class so existing CSS (panes-host paper-2 background,
+ * focus-mode full-viewport canvas) cascades unchanged. Adds
+ * `data-edit-panes-host` so the client can flip `[hidden]` on the
+ * panes wrapper independently of the toolbar.
+ */
+function renderEditPanes(): RawHtml {
+  return unsafe(html`
+    <div class="er-edit-mode" data-edit-panes-host hidden>
       <div class="er-edit-panes" data-edit-panes data-view="source">
         <div class="er-edit-source" data-edit-source aria-label="Markdown source"></div>
         <div class="er-edit-preview" data-edit-preview aria-label="Rendered preview"></div>
@@ -509,30 +618,72 @@ export async function renderReviewPage(
   const folioSpine = isShortform
     ? `shortform · ${workflow.platform ?? '?'}${workflow.channel ? ` · ${workflow.channel}` : ''} · ${slug}`
     : `longform · ${slug}`;
+  // Issue 4 — shortform reviews highlight the "Shortform" nav item;
+  // longform reviews don't match any nav-item (no longform desk
+  // exists). Pre-Issue-4, longform mistakenly highlighted shortform
+  // because the chrome treated all review surfaces as 'reviews'.
+  const folioActive: 'shortform' | 'longform' = isShortform
+    ? 'shortform'
+    : 'longform';
+
+  // Issue #154 Dispatch A — `.er-page` wraps the draft frame +
+  // marginalia inside a CSS Grid composition so marginalia sits next
+  // to the prose it annotates rather than pinned to the viewport.
+  // Shortform reviews skip the marginalia column (no margin-note
+  // workflow on shortform), so the page collapses to the draft frame
+  // alone for that surface — keeping the same `.er-page` shell
+  // preserves the desk metaphor across longform/shortform.
+  // Issue #154 Dispatch C — edit-mode panes-host lives inside the
+  // article column (in place of #draft-body when editing); the
+  // toolbar that drives it lives ABOVE `.er-page` (rendered below,
+  // outside the grid). Shortform never enters edit mode on this
+  // surface, so the panes-host is rendered but stays hidden — keeps
+  // the JS hooks present for forward compatibility without flipping
+  // any visible chrome.
+  const pageGrid = isShortform
+    ? html`
+        <div class="er-page-grid">
+          <div class="er-draft-frame">
+            <div id="draft-body" data-draft-body
+              title="Double-click to edit · select text to leave a margin note">${unsafe(bodyHtml)}</div>
+            ${renderEditPanes()}
+          </div>
+        </div>`
+    : html`
+        <div class="er-page-grid">
+          <div class="er-draft-frame">
+            <div id="draft-body" data-draft-body
+              title="Double-click to edit · select text to leave a margin note">${unsafe(bodyHtml)}</div>
+            ${renderEditPanes()}
+          </div>
+          <div class="er-page-gutter" aria-hidden="true"></div>
+          ${renderMarginalia()}
+        </div>`;
 
   const body = html`
     <div data-review-ui="${reviewUiAttr}" class="er-review-shell">
-      ${renderEditorialFolio('reviews', folioSpine)}
+      ${renderEditorialFolio(folioActive, folioSpine)}
       ${shortformMeta}
-      <div class="er-draft-frame">
-        <div id="draft-body" data-draft-body
-          title="Double-click to edit · select text to leave a margin note">${unsafe(bodyHtml)}</div>
-        ${renderEditMode(outlineHtml.length > 0)}
-      </div>
       <div class="er-strip">
-        <a class="er-strip-back" href="/dev/editorial-studio" title="Back to the editorial studio">← studio</a>
-        <span class="er-strip-galley">Galley <em>№ ${currentVersion.version}</em></span>
-        <span class="er-strip-slug">${workflow.site} / ${workflow.slug}</span>
-        ${renderVersionsStrip(versions, resolvedSite, contentKind, currentVersion)}
-        <span class="er-strip-center">
-          <span class="er-stamp er-stamp-big er-stamp-${workflow.state}" data-state-label>
-            ${stateLabel(workflow.state)}
+        <div class="er-strip-inner">
+          <a class="er-strip-back" href="/dev/editorial-studio" title="Back to the editorial studio">← studio</a>
+          <span class="er-strip-galley">${gloss('galley')} <em>№ ${currentVersion.version}</em></span>
+          <span class="er-strip-slug">${workflow.site} / ${workflow.slug}</span>
+          ${renderVersionsStrip(versions, resolvedSite, contentKind, currentVersion)}
+          <span class="er-strip-center">
+            <span class="er-stamp er-stamp-big er-stamp-${workflow.state}" data-state-label>
+              ${stateLabel(workflow.state)}
+            </span>
+            <span class="er-strip-hint">select text to <span class="er-gloss" data-term="marginalia" tabindex="0" role="button" aria-describedby="glossary-marginalia">mark</span> · double-click to edit · <kbd>?</kbd> for shortcuts</span>
           </span>
-          <span class="er-strip-hint" aria-hidden="true">select text to mark · double-click to edit · <kbd>?</kbd> for shortcuts</span>
-        </span>
-        ${renderControlsRight(workflow)}
+          ${renderControlsRight(workflow)}
+        </div>
       </div>
-      ${renderMarginalia()}
+      ${renderEditToolbar(outlineHtml.length > 0)}
+      <article class="er-page">
+        ${unsafe(pageGrid)}
+      </article>
+      ${isShortform ? unsafe('') : renderMarginaliaTab()}
       <button class="er-pencil-btn" data-add-comment-btn hidden type="button">Mark</button>
       ${isShortform ? unsafe('') : renderOutlineDrawer(outlineHtml)}
       ${isShortform
@@ -554,6 +705,6 @@ export async function renderReviewPage(
     ],
     bodyHtml: body,
     embeddedJson: [{ id: 'draft-state', data: draftState }],
-    scriptModules: ['/static/dist/editorial-review-client.js'],
+    scriptModules: ['editorial-review-client'],
   });
 }

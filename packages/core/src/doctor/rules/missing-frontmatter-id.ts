@@ -37,7 +37,12 @@ import type {
 const RULE_ID = 'missing-frontmatter-id';
 
 const MARKDOWN_EXTENSIONS = new Set(['.md', '.mdx', '.markdown']);
-const SKIP_DIRS = new Set(['scrapbook', 'node_modules', 'dist', '.git']);
+
+// Phase 30 places stage artifacts at <slug>/scrapbook/{idea,plan,outline}.md
+// — those need to be reachable as candidates so the rule can bind frontmatter
+// ids on them. Only `scrapbook/secret/` stays excluded (editorially-private
+// notes that are NOT tracked entry artifacts).
+const SKIP_DIRS = new Set(['node_modules', 'dist', '.git']);
 
 interface CandidateFile {
   /** Absolute path to the candidate. */
@@ -46,9 +51,12 @@ interface CandidateFile {
   matchReason: 'template-path' | 'title-match' | 'basename-match';
 }
 
-function shouldSkipDir(name: string): boolean {
+function shouldSkipDir(name: string, parentDirName: string): boolean {
   if (name.startsWith('.')) return true;
-  return SKIP_DIRS.has(name.toLowerCase());
+  if (SKIP_DIRS.has(name.toLowerCase())) return true;
+  // Path-aware: skip `scrapbook/secret/` but allow `scrapbook/` itself.
+  if (name === 'secret' && parentDirName === 'scrapbook') return true;
+  return false;
 }
 
 function collectMarkdownFiles(dir: string): string[] {
@@ -73,7 +81,7 @@ function collectMarkdownFiles(dir: string): string[] {
         continue;
       }
       if (st.isDirectory()) {
-        if (shouldSkipDir(name)) continue;
+        if (shouldSkipDir(name, basename(currentDir))) continue;
         visit(abs);
         continue;
       }

@@ -76,7 +76,17 @@ export function readHistory(
   const envelopes = readJournal<JournaledHistoryEntry>(
     historyPath(projectRoot, config),
   );
-  return envelopes.map(unwrap);
+  // Phase 30 introduced new event kinds (e.g. `entry-created`) written with
+  // a flat shape that bypasses the legacy envelope (no `id` / `timestamp`
+  // at top level; the top-level object IS the event). The legacy `unwrap()`
+  // returns `env.entry`, which for those flat records points at the entry
+  // sidecar (not a DraftHistoryEntry), causing `entry.kind` to be undefined
+  // downstream. Filter out anything that doesn't look like a legacy envelope
+  // before unwrapping so legacy callers (review surface, etc.) only see the
+  // workflow / version / annotation / state events they expect.
+  return envelopes
+    .filter((env) => env != null && typeof env === 'object' && 'entry' in env && env.entry != null && typeof (env as JournaledHistoryEntry).entry === 'object' && 'kind' in (env as JournaledHistoryEntry).entry)
+    .map(unwrap);
 }
 
 export function readWorkflow(

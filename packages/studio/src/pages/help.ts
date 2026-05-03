@@ -2,7 +2,7 @@
  * The Compositor's Manual — `/dev/editorial-help`.
  *
  * Static (read-only) operator manual. Renders six sections:
- *   I    — the working model (calendar stages + review states diagrams)
+ *   I    — the working model (eight-stage pipeline + universal verbs)
  *   II   — three tracks (longform / shortform / distribution)
  *   III  — the skill catalogue (specimen grid)
  *   IV   — the studio surfaces, described
@@ -14,10 +14,15 @@
  * `editorial-skills-catalogue.ts` so a single edit shows up here, in
  * any future docs generator, and in any CLI inventory.
  *
- * Ported from `editorial-help.astro`. The audiocontrol original
- * referenced the two hardcoded sites (`audiocontrol.org ·
- * editorialcontrol.org`) in the cover imprint; here we render the
- * configured site hosts instead.
+ * Pipeline-redesign vocabulary (Phase 6, Task 37): the longform model
+ * is the entry-centric eight-stage pipeline (Ideas → Planned →
+ * Outlining → Drafting → Final → Published; Blocked / Cancelled
+ * off-pipeline) operated by universal verbs (`/deskwork:add`,
+ * `/deskwork:iterate`, `/deskwork:approve`, `/deskwork:publish`,
+ * `/deskwork:block`, `/deskwork:cancel`, `/deskwork:induct`). The
+ * stage-named skills of the prior model (`plan`, `outline`, `draft`,
+ * `pause`, `resume`, `review-start`, `review-cancel`) are retired.
+ * Shortform + distribution still use the workflow-object model.
  */
 
 import {
@@ -46,20 +51,20 @@ function renderCover(ctx: StudioContext, now: Date): RawHtml {
   return unsafe(html`
     <header class="er-pagehead er-pagehead--centered eh-cover">
       <p class="er-pagehead__kicker eh-cover-kicker">
-        Vol. 01 <span class="dot">·</span> Manual <span class="dot">·</span> Internal — for operators
+        Vol. 02 <span class="dot">·</span> Manual <span class="dot">·</span> Internal — for operators
       </p>
       <h1 class="er-pagehead__title eh-cover-title">
         The Compositor's <em>Manual</em>
       </h1>
       <p class="er-pagehead__deck eh-cover-dek">
-        Everything you need to move a thought from notebook to published dispatch without asking a colleague. The editorial calendar, the review pipelines, the skills that drive them, and the desk where you watch the whole thing happen.
+        Everything you need to move a thought from notebook to published dispatch without asking a colleague. The eight-stage pipeline, the universal verbs, the entry sidecar that holds the truth, and the desk where you watch the whole thing happen.
       </p>
       <p class="er-pagehead__imprint eh-imprint">
         <strong>Sites</strong><span>${sitesInline || ctx.projectRoot}</span>
         <span class="sep">§</span>
         <strong>Issued</strong><span>${formatIssueDate(now)}</span>
         <span class="sep">§</span>
-        <strong>Revision</strong><span>1.0</span>
+        <strong>Revision</strong><span>2.0</span>
         <span class="sep">§</span>
         <strong>Desk</strong><a href="/dev/editorial-studio">/dev/editorial-studio</a>
       </p>
@@ -67,7 +72,7 @@ function renderCover(ctx: StudioContext, now: Date): RawHtml {
 }
 
 const TOC_ENTRIES = [
-  { id: 'sec-model',      num: '§ I',   title: 'The working model — stages and states', page: 'p. 01' },
+  { id: 'sec-model',      num: '§ I',   title: 'The working model — pipeline and verbs', page: 'p. 01' },
   { id: 'sec-tracks',     num: '§ II',  title: 'Three tracks — longform, shortform, distribution', page: 'p. 02' },
   { id: 'sec-catalogue',  num: '§ III', title: 'The skills, alphabetised',           page: 'p. 03' },
   { id: 'sec-studio',     num: '§ IV',  title: 'The Editorial Studio, described',    page: 'p. 08' },
@@ -91,42 +96,53 @@ function renderModelSection(): RawHtml {
       <header class="eh-section-head">
         <span class="eh-section-num">§ I</span>
         <h2 class="eh-section-title">The working model</h2>
-        <span class="eh-section-sig">Stages · States</span>
+        <span class="eh-section-sig">Pipeline · Verbs · Sidecar</span>
       </header>
       <p class="eh-lead">
-        Two state machines run in parallel. The <em>calendar stage</em> tracks where a piece of content lives in its lifecycle. The <em>review pipeline</em> tracks whether a specific draft version has been annotated, revised, and approved. They are orthogonal — a piece in <em>Drafting</em> may have three review workflows open against three different draft files, and a piece can reach <em>Published</em> without ever having been through review.
+        One state machine, six stages on the line, two off the line. Each entry has a sidecar JSON file at <code>.deskwork/entries/&lt;uuid&gt;.json</code> that holds its current stage, its per-stage iteration counter, and its history. The calendar markdown (<code>calendar.md</code>) is regenerated from sidecars — the sidecar is the source of truth, the markdown is the rendered view.
       </p>
-      <div class="eh-state-diagram" aria-label="Calendar stages">
-        <span class="eh-state-label">Fig. 1 — Calendar stages</span>
+      <div class="eh-state-diagram" aria-label="Eight-stage pipeline">
+        <span class="eh-state-label">Fig. 1 — On-pipeline stages (forward-only)</span>
         <div class="eh-stage-chain">
-          <div class="eh-stage-box"><span class="num">01</span><div class="ornament">◇</div><div class="name">Ideas</div><div class="hint">captured</div></div>
+          <div class="eh-stage-box"><span class="num">01</span><div class="ornament">◇</div><div class="name">Ideas</div><div class="hint">idea.md</div></div>
           <div class="eh-stage-arrow">→</div>
-          <div class="eh-stage-box"><span class="num">02</span><div class="ornament">§</div><div class="name">Planned</div><div class="hint">keywords</div></div>
+          <div class="eh-stage-box"><span class="num">02</span><div class="ornament">§</div><div class="name">Planned</div><div class="hint">plan.md</div></div>
           <div class="eh-stage-arrow">→</div>
-          <div class="eh-stage-box"><span class="num">03</span><div class="ornament">✎</div><div class="name">Drafting</div><div class="hint">writing</div></div>
+          <div class="eh-stage-box"><span class="num">03</span><div class="ornament">✎</div><div class="name">Outlining</div><div class="hint">outline.md</div></div>
           <div class="eh-stage-arrow">→</div>
-          <div class="eh-stage-box"><span class="num">04</span><div class="ornament">※</div><div class="name">Review</div><div class="hint">iteration</div></div>
+          <div class="eh-stage-box"><span class="num">04</span><div class="ornament">¶</div><div class="name">Drafting</div><div class="hint">index.md</div></div>
           <div class="eh-stage-arrow">→</div>
-          <div class="eh-stage-box"><span class="num">05</span><div class="ornament">✓</div><div class="name">Published</div><div class="hint">live</div></div>
+          <div class="eh-stage-box"><span class="num">05</span><div class="ornament">※</div><div class="name">Final</div><div class="hint">index.md</div></div>
+          <div class="eh-stage-arrow">→</div>
+          <div class="eh-stage-box"><span class="num">06</span><div class="ornament">✓</div><div class="name">Published</div><div class="hint">live</div></div>
         </div>
-        <p class="eh-state-caption">Forward-only. An entry can be paused at any stage but does not walk backwards.</p>
+        <p class="eh-state-caption">Forward-only on the pipeline. Each stage has one primary artifact; <code>/deskwork:approve</code> graduates the entry by exactly one stage and seeds the next-stage file from the just-approved one.</p>
       </div>
-      <div class="eh-state-diagram" aria-label="Review pipeline states">
-        <span class="eh-state-label">Fig. 2 — Review pipeline (per draft, orthogonal)</span>
-        <div class="eh-review-loop">
-          <div class="loop-node">open</div>
-          <div class="loop-arrow">→</div>
-          <div class="loop-node">in-review</div>
-          <div class="loop-arrow">⇄</div>
-          <div class="loop-node">iterating</div>
-          <div class="loop-arrow" style="grid-column: 3;">↓</div>
-          <div class="loop-node terminal-ok" style="grid-column: 4;">approved</div>
-          <div class="loop-arrow" style="grid-column: 5;">→</div>
-          <div class="loop-node terminal-ok" style="grid-row: 3; grid-column: 1;">applied</div>
-          <div class="loop-arrow" style="grid-row: 3; grid-column: 2;">←</div>
-          <div class="loop-node terminal-x" style="grid-row: 3; grid-column: 3 / span 3;">cancelled (any state → here)</div>
+      <div class="eh-state-diagram" aria-label="Off-pipeline stages">
+        <span class="eh-state-label">Fig. 2 — Off-pipeline (parking lots)</span>
+        <div class="eh-stage-chain">
+          <div class="eh-stage-box"><span class="num">⊘</span><div class="ornament">∥</div><div class="name">Blocked</div><div class="hint">resumable</div></div>
+          <div class="eh-stage-arrow">⇄</div>
+          <div class="eh-stage-box"><span class="num">×</span><div class="ornament">⊗</div><div class="name">Cancelled</div><div class="hint">abandoned</div></div>
         </div>
-        <p class="eh-state-caption">Every transition is validated by the pipeline's <code>VALID_TRANSITIONS</code>. <em>applied</em> means the draft has been written to its destination file; <em>cancelled</em> means the workflow was abandoned with the source untouched.</p>
+        <p class="eh-state-caption"><em>Blocked</em> is a process flag: out of pipeline, work paused, resumable. <em>Cancelled</em> is a semantic flag: intent abandoned, rare resume. Both record <code>priorStage</code> so <code>/deskwork:induct</code> can return the entry where it left off, with iteration counters preserved.</p>
+      </div>
+      <div class="eh-state-diagram" aria-label="Universal verbs">
+        <span class="eh-state-label">Fig. 3 — The universal verbs</span>
+        <div class="eh-review-loop">
+          <div class="loop-node">/deskwork:add</div>
+          <div class="loop-arrow">→</div>
+          <div class="loop-node">/deskwork:iterate</div>
+          <div class="loop-arrow">⇄</div>
+          <div class="loop-node">operator review</div>
+          <div class="loop-arrow" style="grid-column: 3;">↓</div>
+          <div class="loop-node terminal-ok" style="grid-column: 4;">/deskwork:approve</div>
+          <div class="loop-arrow" style="grid-column: 5;">→</div>
+          <div class="loop-node terminal-ok" style="grid-row: 3; grid-column: 1;">/deskwork:publish</div>
+          <div class="loop-arrow" style="grid-row: 3; grid-column: 2;">←</div>
+          <div class="loop-node terminal-x" style="grid-row: 3; grid-column: 3 / span 3;">/deskwork:block · /deskwork:cancel · /deskwork:induct</div>
+        </div>
+        <p class="eh-state-caption">Same verbs at every stage. <code>iterate</code> revises the current-stage artifact. <code>approve</code> advances by exactly one stage — there is no “approve but stay.” <code>block</code> and <code>cancel</code> step off the line; <code>induct</code> returns an entry to the pipeline (defaults: <em>Blocked/Cancelled</em> → <code>priorStage</code>; <em>Final</em> → <em>Drafting</em>; any other on-pipeline stage requires explicit <code>--to</code>).</p>
       </div>
     </section>`);
 }
@@ -139,31 +155,30 @@ function renderTracksSection(): RawHtml {
         <h2 class="eh-section-title">Three tracks</h2>
         <span class="eh-section-sig">Longform · Shortform · Distribution</span>
       </header>
-      <p>Each track is a canonical run order for its kind of content. The studio surfaces the next move per track and per entry; these lists are for when you are driving Claude Code directly.</p>
+      <p>Each track is a canonical run order for its kind of content. The studio surfaces the next move per entry; these lists are for when you are driving Claude Code directly.</p>
       <div class="eh-tracks">
         <div class="eh-track">
           <p class="eh-track-title">Longform</p>
-          <p class="eh-track-sub">Blog posts · dispatches</p>
+          <p class="eh-track-sub">Blog posts · dispatches · docs</p>
           <ol class="eh-track-steps">
-            <li>Capture the idea.<code>/editorial-add "Title"</code></li>
-            <li>Promote and set keywords.<code>/editorial-plan &lt;slug&gt;</code></li>
-            <li>Scaffold the draft file.<code>/editorial-draft &lt;slug&gt;</code><span class="note">or click "scaffold" in the studio.</span></li>
-            <li>Write the prose. No skill; this is the human doing the work.</li>
-            <li>Open a review workflow.<code>/editorial-draft-review &lt;slug&gt;</code></li>
-            <li>Annotate in the browser, then iterate.<code>/editorial-iterate</code></li>
-            <li>Approve — writes to the destination file.<code>/editorial-approve</code></li>
-            <li>Mark published. Then commit + push by hand.<code>/editorial-publish &lt;slug&gt;</code></li>
+            <li>Capture the idea — mints sidecar + idea.md.<code>/deskwork:add "Title"</code></li>
+            <li>Iterate the idea until it has shape.<code>/deskwork:iterate &lt;uuid&gt;</code></li>
+            <li>Approve to graduate Ideas → Planned. Seeds plan.md.<code>/deskwork:approve &lt;uuid&gt;</code></li>
+            <li>Iterate the plan; approve when set. Seeds outline.md.<code>/deskwork:iterate · /deskwork:approve</code></li>
+            <li>Iterate the outline; approve when set. Seeds index.md (Drafting).<code>/deskwork:iterate · /deskwork:approve</code></li>
+            <li>Iterate the draft; approve when set. Stage becomes Final.<code>/deskwork:iterate · /deskwork:approve</code></li>
+            <li>Approve again to publish. Stamps datePublished.<code>/deskwork:publish &lt;uuid&gt;</code><span class="note">Then commit + push by hand.</span></li>
           </ol>
         </div>
         <div class="eh-track">
           <p class="eh-track-title">Shortform</p>
           <p class="eh-track-sub">Social copy · cross-posts</p>
           <ol class="eh-track-steps">
-            <li>Draft per platform.<code>/editorial-shortform-draft &lt;slug&gt; &lt;platform&gt;</code><span class="note">Reddit, YouTube, LinkedIn, newsletter.</span></li>
+            <li>Draft per platform.<code>/deskwork:shortform-start &lt;slug&gt; &lt;platform&gt;</code><span class="note">Reddit, YouTube, LinkedIn, newsletter.</span></li>
             <li>Review the same way as longform (same page, shortform mode).<span class="note">/dev/editorial-review-shortform</span></li>
-            <li>Iterate or approve as with longform.<code>/editorial-iterate · /editorial-approve</code></li>
+            <li>Iterate or approve as with longform.<code>/deskwork:iterate · /deskwork:approve</code></li>
             <li>Post the copy yourself to the platform.</li>
-            <li>Record the distribution.<code>/editorial-distribute &lt;slug&gt; &lt;platform&gt; &lt;url&gt;</code></li>
+            <li>Record the distribution.<code>/deskwork:distribute &lt;slug&gt; &lt;platform&gt; &lt;url&gt;</code></li>
           </ol>
         </div>
         <div class="eh-track">
@@ -233,24 +248,24 @@ function renderStudioSection(): RawHtml {
         <div class="eh-panel">
           <p class="eh-panel-head">Primary surfaces</p>
           <h4>Calendar panels</h4>
-          <p>Five columns: <em>Ideas · Planned · Drafting · Review · Published</em>. Each row shows slug, title, stage-specific metadata (keywords for Planned; dates for Published), a file-present dot, and the active review workflow stamp when one exists.</p>
+          <p>Six on-pipeline columns: <em>Ideas · Planned · Outlining · Drafting · Final · Published</em>, plus parking-lot panels for <em>Blocked</em> and <em>Cancelled</em>. Each row shows slug, title, the per-stage iteration counter (<code>iterationByStage</code>), a file-present dot for the current stage's primary artifact, and any review state.</p>
           <h4>Next-move column</h4>
-          <p>Per row, the studio surfaces either a copy-to-clipboard command (for cognitive work that lives in Claude Code) or a one-click button (for mechanical transitions). <code>scaffold →</code> calls <code>/editorial-draft</code>. <code>publish →</code> calls <code>/editorial-publish</code>.</p>
+          <p>Per row, the studio surfaces either a copy-to-clipboard command (for cognitive work that lives in Claude Code) or a one-click button (for mechanical transitions). <code>approve →</code> calls <code>/deskwork:approve</code>. <code>publish →</code> calls <code>/deskwork:publish</code>. <code>block</code> / <code>cancel</code> / <code>induct</code> appear contextually.</p>
           <h4>Shortform coverage matrix</h4>
-          <p>For each <em>Published</em> blog, a row of platform cells (reddit, linkedin, youtube, instagram). Shaded cells are covered by a DistributionRecord; empty cells surface the exact <code>/editorial-shortform-draft</code> command to copy.</p>
+          <p>For each <em>Published</em> entry, a row of platform cells (reddit, linkedin, youtube, instagram). Shaded cells are covered by a DistributionRecord; empty cells surface the exact <code>/deskwork:shortform-start</code> command to copy.</p>
           <h4>Voice-drift signal</h4>
-          <p>A small panel on the right, backed by <code>/editorial-review-report</code>. Names the two voice-skill categories that are producing the most operator corrections. Shows once you have at least five terminal workflows on record.</p>
+          <p>A small panel on the right. Names the two voice-skill categories that are producing the most operator corrections. Shows once you have at least five terminal workflows on record.</p>
         </div>
         <div class="eh-panel">
           <p class="eh-panel-head">Secondary surfaces</p>
-          <h4>Longform review</h4>
-          <p><code>/dev/editorial-review/&lt;slug&gt;</code>. The draft renders inside the review surface. Select text for a margin note; double-click anywhere to edit the markdown in place; approve, iterate, or reject from the fixed strip.</p>
+          <h4>Entry review</h4>
+          <p><code>/dev/editorial-review/entry/&lt;uuid&gt;</code>. The current-stage artifact (idea.md, plan.md, outline.md, or index.md) renders inside the review surface. Select text for a margin note; double-click anywhere to edit the markdown in place; approve, iterate, block, or cancel from the fixed strip. The review is keyed by entry uuid, not workflow id.</p>
           <h4>Shortform review</h4>
           <p><code>/dev/editorial-review-shortform</code>. Cards grouped by platform. Each card has a version header, an editable textarea, and save · approve · iterate · reject controls.</p>
           <h4>Keyboard</h4>
-          <p>In the studio: <kbd>1</kbd>–<kbd>5</kbd> jump to stage columns. In a longform review: <kbd>e</kbd> / double-click toggles edit mode; <kbd>a</kbd> approves; <kbd>i</kbd> iterates; <kbd>r</kbd> rejects; <kbd>j</kbd>/<kbd>k</kbd> step through margin notes; <kbd>?</kbd> shows a full shortcuts overlay.</p>
+          <p>In the studio: <kbd>1</kbd>–<kbd>6</kbd> jump to on-pipeline columns. In an entry review: <kbd>e</kbd> / double-click toggles edit mode; <kbd>a</kbd> approves (graduates by one stage); <kbd>i</kbd> iterates; <kbd>b</kbd> blocks; <kbd>j</kbd>/<kbd>k</kbd> step through margin notes; <kbd>?</kbd> shows a full shortcuts overlay.</p>
           <h4>Polling</h4>
-          <p>Both routes poll every 8–10 seconds when idle. If the agent runs <code>/editorial-iterate</code> in Claude Code, a new draft version shows up in the browser without a reload.</p>
+          <p>Both routes poll every 8–10 seconds when idle. If the agent runs <code>/deskwork:iterate</code> in Claude Code, a new version of the current-stage artifact shows up in the browser without a reload.</p>
         </div>
       </div>
     </section>`);
@@ -260,42 +275,32 @@ const RUNTHROUGH_STEPS: ReadonlyArray<{ title: string; op: string; body: RawHtml
   {
     title: 'Capture an idea',
     op: 'terminal',
-    body: unsafe('<p>You have a title in mind. Run <code>/editorial-add "Your Title"</code>. A row lands in <em>Ideas</em>. Slug is generated; calendar is committed-able.</p>'),
+    body: unsafe('<p>You have a title in mind. Run <code>/deskwork:add "Your Title"</code>. The sidecar lands at <code>.deskwork/entries/&lt;uuid&gt;.json</code> with stage <em>Ideas</em>; <code>idea.md</code> is initialised; <code>calendar.md</code> regenerates from sidecars.</p>'),
   },
   {
-    title: 'Promote to Planned',
-    op: 'terminal',
-    body: unsafe('<p>The idea has shape. Run <code>/editorial-plan &lt;slug&gt;</code>. You are prompted for target keywords and topic tags; they land on the calendar row. The studio\'s Planned column now shows it with a tag strip.</p>'),
-  },
-  {
-    title: 'Scaffold the draft',
-    op: 'studio or terminal',
-    body: unsafe('<p>Click the <code>scaffold →</code> button on the row, or run <code>/editorial-draft --site &lt;site&gt; &lt;slug&gt;</code>. The blog file appears with frontmatter filled in, and the entry moves to <em>Drafting</em>.</p>'),
-  },
-  {
-    title: 'Write the prose',
-    op: 'editor',
-    body: unsafe('<p>This is the human half. Open the scaffolded file and write the dispatch. The voice skill is not invoked yet — it comes in at review time.</p>'),
-  },
-  {
-    title: 'Open the review workflow',
-    op: 'terminal',
-    body: unsafe('<p><code>/editorial-draft-review &lt;slug&gt;</code> prints the dev URL: <code>/dev/editorial-review/&lt;slug&gt;</code>. The draft renders inside the review chrome. State: <em>open</em>.</p>'),
-  },
-  {
-    title: 'Annotate in the browser',
-    op: 'browser',
-    body: unsafe('<p>Select text → the <code>Mark</code> pencil appears → category dropdown → type a note → <em>Leave mark</em>. Repeat for each correction. The state flips to <em>in-review</em> on your first action.</p>'),
-  },
-  {
-    title: 'Iterate',
+    title: 'Iterate the idea',
     op: 'browser then terminal',
-    body: unsafe('<p>Click <em>Iterate</em>. State becomes <em>iterating</em>. Back in Claude Code, run <code>/editorial-iterate</code>. The agent revises using the site voice skill, writes v2 to the journal, flips back to <em>in-review</em>. Polling surfaces v2 in the browser without a reload.</p>'),
+    body: unsafe('<p>Open <code>/dev/editorial-review/entry/&lt;uuid&gt;</code>. Leave margin notes on <code>idea.md</code>. Click <em>Iterate</em>; back in Claude Code run <code>/deskwork:iterate &lt;uuid&gt;</code>. The agent revises using the site voice, writes the next version, bumps <code>iterationByStage.Ideas</code>.</p>'),
   },
   {
-    title: 'Approve and write',
+    title: 'Approve into Planned',
+    op: 'browser or terminal',
+    body: unsafe('<p>Click <em>Approve</em> on the review surface or run <code>/deskwork:approve &lt;uuid&gt;</code>. Stage graduates to <em>Planned</em>. <code>plan.md</code> is seeded from <code>idea.md</code>; <code>iterationByStage.Planned</code> starts at 0.</p>'),
+  },
+  {
+    title: 'Plan, then outline, then draft',
     op: 'browser then terminal',
-    body: unsafe('<p>Click <em>Approve</em>. State becomes <em>approved</em>. Run <code>/editorial-approve</code>. The approved version is written to the blog file on disk; state becomes <em>applied</em>.</p>'),
+    body: unsafe('<p>Same loop at each stage. <code>/deskwork:iterate</code> revises the current-stage artifact (<code>plan.md</code>, then <code>outline.md</code>, then <code>index.md</code>). <code>/deskwork:approve</code> graduates by exactly one stage. There is no “approve but stay.”</p>'),
+  },
+  {
+    title: 'Approve into Final',
+    op: 'browser or terminal',
+    body: unsafe('<p>When the Drafting <code>index.md</code> is good, approve once more. Stage becomes <em>Final</em>. The same <code>index.md</code> is the artifact at Final — Final is the “ready to publish” stage, not a separate file.</p>'),
+  },
+  {
+    title: 'Publish',
+    op: 'browser or terminal',
+    body: unsafe('<p>Click <code>publish →</code> on the Final row, or run <code>/deskwork:publish &lt;uuid&gt;</code>. Stage becomes <em>Published</em>; today\'s date is stamped as <code>datePublished</code>; <code>calendar.md</code> regenerates.</p>'),
   },
   {
     title: 'Commit by hand',
@@ -303,19 +308,24 @@ const RUNTHROUGH_STEPS: ReadonlyArray<{ title: string; op: string; body: RawHtml
     body: unsafe('<p>The UI does not commit. Review the diff, commit and push when ready. This is deliberate — the operator holds the pen.</p>'),
   },
   {
-    title: 'Mark published',
-    op: 'studio or terminal',
-    body: unsafe('<p>Click <code>publish →</code> on the Drafting or Review row, or run <code>/editorial-publish &lt;slug&gt;</code>. The entry moves to <em>Published</em>; today\'s date is stamped as <code>datePublished</code>.</p>'),
+    title: 'Park or abandon, when needed',
+    op: 'terminal',
+    body: unsafe('<p>Stuck on a source or a decision? <code>/deskwork:block &lt;uuid&gt; --reason "waiting on source"</code> moves the entry to <em>Blocked</em> with <code>priorStage</code> recorded. Done with it for good? <code>/deskwork:cancel &lt;uuid&gt;</code>. Both preserve the sidecar and history; nothing is deleted.</p>'),
+  },
+  {
+    title: 'Induct back into the pipeline',
+    op: 'terminal',
+    body: unsafe('<p><code>/deskwork:induct &lt;uuid&gt;</code> brings the entry back. From <em>Blocked</em> or <em>Cancelled</em>, the default destination is <code>priorStage</code>. From <em>Final</em>, the default is <em>Drafting</em>. From any other on-pipeline stage, you must pass <code>--to &lt;stage&gt;</code> explicitly. <code>iterationByStage</code> is preserved — pick up where you left off.</p>'),
   },
   {
     title: 'Cross-post',
     op: 'terminal × platform',
-    body: unsafe('<p>For each platform worth posting to: <code>/editorial-shortform-draft &lt;slug&gt; &lt;platform&gt;</code>. Review it exactly like a longform workflow. Approve, then post it yourself. Record the URL with <code>/editorial-distribute &lt;slug&gt; &lt;platform&gt; &lt;url&gt;</code>.</p>'),
+    body: unsafe('<p>For each platform worth posting to: <code>/deskwork:shortform-start &lt;slug&gt; &lt;platform&gt;</code>. Review it exactly like a longform workflow. Approve, then post it yourself. Record the URL with <code>/deskwork:distribute &lt;slug&gt; &lt;platform&gt; &lt;url&gt;</code>.</p>'),
   },
   {
     title: 'Reconcile and reflect',
     op: 'cadence',
-    body: unsafe('<p><code>/editorial-reddit-sync</code> to pull external state; <code>/editorial-social-review</code> to see the coverage matrix; <code>/editorial-review-report</code> to see which voice-skill principles are drifting. Feed the observations back into the voice skills. The cycle compounds.</p>'),
+    body: unsafe('<p><code>/deskwork:doctor</code> reports drift between sidecar truth and rendered <code>calendar.md</code>; <code>/deskwork:status</code> gives a compact roll-call. Feed comment-annotation observations back into the voice skills. The cycle compounds.</p>'),
   },
 ];
 
@@ -351,13 +361,13 @@ function renderReferenceSection(): RawHtml {
       </header>
       <div class="eh-reference">
         <div class="eh-ref-block">
-          <h4>Keyboard — longform review</h4>
+          <h4>Keyboard — entry review</h4>
           <dl>
             <dt><kbd>e</kbd> / dbl-click</dt><dd>toggle edit mode</dd>
             <dt>select text</dt><dd>leave a margin note</dd>
-            <dt><kbd>a</kbd></dt><dd>approve the draft</dd>
+            <dt><kbd>a</kbd></dt><dd>approve — graduates by one stage</dd>
             <dt><kbd>i</kbd></dt><dd>iterate (hand off to Claude Code)</dd>
-            <dt><kbd>r</kbd></dt><dd>reject — cancels the workflow</dd>
+            <dt><kbd>b</kbd></dt><dd>block — out of pipeline, resumable</dd>
             <dt><kbd>j</kbd> / <kbd>k</kbd></dt><dd>step through margin notes</dd>
             <dt><kbd>?</kbd></dt><dd>shortcuts overlay</dd>
             <dt><kbd>esc</kbd></dt><dd>close overlay or cancel comment</dd>
@@ -368,50 +378,54 @@ function renderReferenceSection(): RawHtml {
           <dl>
             <dt><kbd>1</kbd></dt><dd>jump to Ideas column</dd>
             <dt><kbd>2</kbd></dt><dd>jump to Planned</dd>
-            <dt><kbd>3</kbd></dt><dd>jump to Drafting</dd>
-            <dt><kbd>4</kbd></dt><dd>jump to Review</dd>
-            <dt><kbd>5</kbd></dt><dd>jump to Published</dd>
+            <dt><kbd>3</kbd></dt><dd>jump to Outlining</dd>
+            <dt><kbd>4</kbd></dt><dd>jump to Drafting</dd>
+            <dt><kbd>5</kbd></dt><dd>jump to Final</dd>
+            <dt><kbd>6</kbd></dt><dd>jump to Published</dd>
           </dl>
         </div>
         <div class="eh-ref-block eh-ref-block--stacked">
           <h4>URL patterns</h4>
           <dl>
             <dt>/dev/editorial-studio</dt><dd>calendar desk</dd>
-            <dt>/dev/editorial-review/&lt;slug&gt;</dt><dd>longform review</dd>
+            <dt>/dev/editorial-review/entry/&lt;uuid&gt;</dt><dd>entry review (current-stage artifact)</dd>
             <dt>/dev/editorial-review-shortform</dt><dd>shortform cards</dd>
             <dt>/dev/editorial-help</dt><dd>this manual</dd>
           </dl>
         </div>
         <div class="eh-ref-block">
-          <h4>Review state transitions</h4>
+          <h4>Stage transitions</h4>
           <table class="eh-transitions">
-            <thead><tr><th>from</th><th>to</th></tr></thead>
+            <thead><tr><th>verb</th><th>effect</th></tr></thead>
             <tbody>
-              <tr><td>open</td><td class="arrow">→ in-review, cancelled</td></tr>
-              <tr><td>in-review</td><td class="arrow">→ iterating, approved, cancelled</td></tr>
-              <tr><td>iterating</td><td class="arrow">→ in-review, cancelled</td></tr>
-              <tr><td>approved</td><td class="arrow">→ applied, cancelled</td></tr>
-              <tr><td>applied</td><td>— terminal</td></tr>
-              <tr><td>cancelled</td><td>— terminal</td></tr>
+              <tr><td>add</td><td class="arrow">→ Ideas (mints sidecar + idea.md)</td></tr>
+              <tr><td>iterate</td><td class="arrow">→ same stage, next iteration</td></tr>
+              <tr><td>approve</td><td class="arrow">→ next stage by exactly one</td></tr>
+              <tr><td>publish</td><td class="arrow">Final → Published (stamps datePublished)</td></tr>
+              <tr><td>block</td><td class="arrow">→ Blocked (records priorStage)</td></tr>
+              <tr><td>cancel</td><td class="arrow">→ Cancelled (records priorStage)</td></tr>
+              <tr><td>induct</td><td class="arrow">Blocked/Cancelled → priorStage; Final → Drafting; otherwise --to &lt;stage&gt;</td></tr>
             </tbody>
           </table>
         </div>
         <div class="eh-ref-block eh-ref-block--stacked">
           <h4>File locations</h4>
           <dl>
-            <dt>(per-site calendar — see config)</dt><dd>the single calendar file per site</dd>
-            <dt>.deskwork/review-journal/pipeline/</dt><dd>per-workflow review state, one JSON per id</dd>
-            <dt>.deskwork/review-journal/history/</dt><dd>every event (versions, states, comments)</dd>
-            <dt>(blog content dir — see config)</dt><dd>blog post source directory</dd>
-            <dt>plugins/&lt;plugin&gt;/skills/&lt;name&gt;/</dt><dd>one skill = one directory</dd>
+            <dt>.deskwork/entries/&lt;uuid&gt;.json</dt><dd>entry sidecar — source of truth (stage, history, iterationByStage)</dd>
+            <dt>(per-site calendar — see config)</dt><dd>calendar.md — regenerated from sidecars; never edit by hand</dd>
+            <dt>(per-entry workspace — see config)</dt><dd>idea.md · plan.md · outline.md · index.md (one per stage)</dd>
+            <dt>.deskwork/review-journal/pipeline/</dt><dd>shortform workflow state, one JSON per id</dd>
+            <dt>.deskwork/review-journal/history/</dt><dd>shortform events (versions, states, comments)</dd>
+            <dt>.deskwork/{templates,prompts,doctor}/</dt><dd>per-project overrides — see <code>/deskwork:customize</code></dd>
           </dl>
         </div>
         <div class="eh-ref-block">
           <h4>First-run tripwires</h4>
           <dl>
-            <dt>404 on /dev/*</dt><dd>the dev routes only run when <code>deskwork-studio</code> is up. Start it: <code>npx tsx packages/studio/src/server.ts</code>.</dd>
-            <dt>no galley to review</dt><dd>start one with <code>/editorial-draft-review --site &lt;site&gt; &lt;slug&gt;</code>.</dd>
-            <dt>iterate doesn't trigger</dt><dd>the agent has to run <code>/editorial-iterate</code>. The browser button just marks the workflow; Claude does the writing.</dd>
+            <dt>404 on /dev/*</dt><dd>the dev routes only run when <code>deskwork-studio</code> is up. Start it with the documented launch command.</dd>
+            <dt>nothing to review</dt><dd>capture an entry first: <code>/deskwork:add "Title"</code>, then visit <code>/dev/editorial-review/entry/&lt;uuid&gt;</code>.</dd>
+            <dt>iterate doesn't trigger</dt><dd>the agent has to run <code>/deskwork:iterate</code>. The browser button just marks the workflow; Claude does the writing.</dd>
+            <dt>calendar.md drift</dt><dd>run <code>/deskwork:doctor</code>. The sidecar is truth — calendar.md is regenerated from it.</dd>
           </dl>
         </div>
       </div>
@@ -421,7 +435,7 @@ function renderReferenceSection(): RawHtml {
 function renderColophon(): RawHtml {
   return unsafe(html`
     <footer class="eh-colophon">
-      <span>End of manual</span><span>·</span><span>revision 1.0</span><span>·</span><em>The cycle compounds.</em><span>·</span>
+      <span>End of manual</span><span>·</span><span>revision 2.0</span><span>·</span><em>The cycle compounds.</em><span>·</span>
       <a href="/dev/editorial-studio" style="color: inherit;">back to the studio</a>
     </footer>`);
 }

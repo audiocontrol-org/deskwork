@@ -6,7 +6,8 @@
  * on a clean tree or 1 if anything was reported. `--fix=<rule>` (or
  * `--fix=all`) engages repair mode; `--yes` makes repairs non-
  * interactive (skipping ambiguous cases). `--json` produces machine-
- * readable output that composes with `jq`.
+ * readable output that composes with `jq`. `--check` previews the
+ * legacy-schema migration (dry run) without applying it.
  *
  * Argv shape (after the dispatcher injects projectRoot when needed):
  *
@@ -17,6 +18,11 @@
  *   --fix <rule|all>      Engage repair mode for the named rule(s).
  *   --yes                 Non-interactive repair (skip ambiguous).
  *   --json                Emit JSON instead of human-readable text.
+ *   --check               Dry-run preview of the entry-centric
+ *                         migration. Reports what would change without
+ *                         touching the calendar / sidecar tree. Has no
+ *                         effect when the project is already on the
+ *                         entry-centric schema.
  *
  * Exit codes (Issue #44, Phase 22):
  *   0  Audit clean. OR --fix succeeded for every applicable finding.
@@ -28,7 +34,8 @@
  *      follow-ups: ambiguous cases requiring interactive resolution,
  *      schema rejections needing the operator to patch the host
  *      schema, editorial decisions, operator declines, or hard
- *      apply-failures.
+ *      apply-failures. ALSO: legacy-schema detected without --fix, or
+ *      --check preview emitted.
  *   2  Usage / config error.
  */
 
@@ -49,16 +56,19 @@ import {
   type RepairResult,
   type SkipReason,
 } from '@deskwork/core/doctor';
+import { validateAll } from '@deskwork/core/doctor/validate';
+import { repairAll } from '@deskwork/core/doctor/repair';
+import { maybeMigrate } from './doctor-migrate-gate.ts';
 
 const KNOWN_FLAGS = ['site', 'fix'] as const;
-const BOOLEAN_FLAGS = ['yes', 'json'] as const;
+const BOOLEAN_FLAGS = ['yes', 'json', 'check'] as const;
 
 export async function run(argv: string[]): Promise<void> {
   const { positional, flags, booleans } = parseInput(argv);
 
   if (positional.length < 1) {
     fail(
-      'Usage: deskwork doctor <project-root> [--site <slug>] [--fix <rule|all>] [--yes] [--json]',
+      'Usage: deskwork doctor <project-root> [--site <slug>] [--fix <rule|all>] [--yes] [--json] [--check]',
       2,
     );
   }
@@ -72,6 +82,17 @@ export async function run(argv: string[]): Promise<void> {
   } catch (err) {
     fail(err instanceof Error ? err.message : String(err), 2);
   }
+
+  // Phase 29: legacy-schema detection runs BEFORE the rule loop. The
+  // entry-centric redesign moved calendar shape from "Review/Paused
+  // sections" to per-stage sections + .deskwork/entries/ sidecars.
+  // Pre-redesign trees can't be audited by the rule loop without an
+  // up-front migration; this gate routes to migrateCalendar() in
+  // --fix mode and prints a how-to-fix hint in audit-only mode.
+  const check = booleans.has('check');
+  const repairMode = flags.fix !== undefined;
+  const migrateResult = await maybeMigrate(projectRoot, repairMode, check);
+  if (migrateResult.handled) process.exit(migrateResult.exitCode);
 
   if (flags.site !== undefined && !(flags.site in config.sites)) {
     fail(
@@ -99,7 +120,6 @@ export async function run(argv: string[]): Promise<void> {
 
   const json = booleans.has('json');
   const yes = booleans.has('yes');
-  const repairMode = flags.fix !== undefined;
 
   const opts = {
     projectRoot,
@@ -109,6 +129,7 @@ export async function run(argv: string[]): Promise<void> {
   };
 
   let report: DoctorReport;
+  let legacyExitCode: number;
 
   if (!repairMode) {
     // Audit-only — interaction is unused but the type insists on a
@@ -116,35 +137,67 @@ export async function run(argv: string[]): Promise<void> {
     // in this mode).
     report = await runAudit(opts, yesInteraction);
     emitReport(report, { json, repairMode: false });
-    process.exit(report.findings.length === 0 ? 0 : 1);
+    legacyExitCode = report.findings.length === 0 ? 0 : 1;
+  } else {
+    if (yes) {
+      report = await runRepair(opts, yesInteraction);
+    } else {
+      const adapter = interactiveAdapter();
+      try {
+        report = await runRepair(opts, adapter.interaction);
+      } finally {
+        adapter.close();
+      }
+    }
+    emitReport(report, { json, repairMode: true });
+
+    // Exit-code logic (Issue #44):
+    //   - applied → success.
+    //   - skipped because the prerequisite isn't met (e.g. no body file
+    //     yet for missing-frontmatter-id) → success. The operator's
+    //     next action is `/deskwork:outline`, not "look at doctor."
+    //   - skipped because the operator chose "leave as-is" on an orphan
+    //     prompt → success. The operator made a choice; respect it.
+    //   - everything else (ambiguous, schema-rejected, editorial-
+    //     decision, operator-declined, apply-failed) → exit 1. These
+    //     are real follow-ups doctor can't auto-resolve.
+    const realFollowUps = report.repairs.filter(
+      (r) => !r.applied && !isExpectedSkip(r.skipReason),
+    ).length;
+    legacyExitCode = realFollowUps === 0 ? 0 : 1;
   }
 
-  if (yes) {
-    report = await runRepair(opts, yesInteraction);
-  } else {
-    const adapter = interactiveAdapter();
-    try {
-      report = await runRepair(opts, adapter.interaction);
-    } finally {
-      adapter.close();
+  // Phase 30 (Task 32): entry-centric validation pass. Runs after the
+  // legacy rule-based audit/repair so both schemas are covered during
+  // the migration window. Output is appended to the existing stream;
+  // exit code is the OR of legacy + new failures.
+  const newValidation = await validateAll(projectRoot);
+  if (newValidation.failures.length > 0) {
+    process.stderr.write(
+      `\nEntry-centric validation: ${newValidation.failures.length} failure(s)\n`,
+    );
+    for (const f of newValidation.failures) {
+      const loc = f.path !== undefined ? ` (${f.path})` : '';
+      const eid = f.entryId !== undefined ? ` [entry=${f.entryId}]` : '';
+      process.stderr.write(`  ${f.category}${eid}: ${f.message}${loc}\n`);
     }
   }
-  emitReport(report, { json, repairMode: true });
 
-  // Exit-code logic (Issue #44):
-  //   - applied → success.
-  //   - skipped because the prerequisite isn't met (e.g. no body file
-  //     yet for missing-frontmatter-id) → success. The operator's
-  //     next action is `/deskwork:outline`, not "look at doctor."
-  //   - skipped because the operator chose "leave as-is" on an orphan
-  //     prompt → success. The operator made a choice; respect it.
-  //   - everything else (ambiguous, schema-rejected, editorial-
-  //     decision, operator-declined, apply-failed) → exit 1. These
-  //     are real follow-ups doctor can't auto-resolve.
-  const realFollowUps = report.repairs.filter(
-    (r) => !r.applied && !isExpectedSkip(r.skipReason),
-  ).length;
-  process.exit(realFollowUps === 0 ? 0 : 1);
+  if (repairMode) {
+    const newRepair = await repairAll(projectRoot, { destructive: false });
+    for (const a of newRepair.applied) {
+      process.stdout.write(`Entry-centric repair applied: ${a}\n`);
+    }
+    for (const p of newRepair.pendingDestructive) {
+      process.stdout.write(
+        `Entry-centric repair pending (destructive — re-run with explicit confirmation): ${p}\n`,
+      );
+    }
+  }
+
+  const newFailureCount = newValidation.failures.length;
+  const exitCode = legacyExitCode === 0 && newFailureCount === 0 ? 0 : 1;
+  process.exit(exitCode);
 }
 
 /**

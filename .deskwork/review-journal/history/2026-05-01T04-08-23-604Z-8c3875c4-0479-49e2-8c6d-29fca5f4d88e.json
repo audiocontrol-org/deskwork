@@ -1,0 +1,17 @@
+{
+  "kind": "entry-created",
+  "at": "2026-05-01T04:08:23.604Z",
+  "entryId": "1c3bfe8f-e9c2-4133-ab88-2aa08d9fa702",
+  "entry": {
+    "uuid": "1c3bfe8f-e9c2-4133-ab88-2aa08d9fa702",
+    "slug": "post-release-acceptance-design",
+    "title": "Post-release customer acceptance playbook",
+    "keywords": [],
+    "source": "manual",
+    "currentStage": "Ideas",
+    "iterationByStage": {},
+    "createdAt": "2026-05-01T00:17:31.524Z",
+    "updatedAt": "2026-05-01T00:17:31.524Z",
+    "description": "A pair of skills that codify how to evaluate the freshly-installed deskwork marketplace plugin, surface friction, and file issues — using the deskwork pipeline itself as the triage surface."
+  }
+}

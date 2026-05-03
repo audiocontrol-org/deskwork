@@ -479,3 +479,126 @@ Eight sub-phases (A–H), single PR, single `v0.10.0` release:
 - Not an absorption of [#91](https://github.com/audiocontrol-org/deskwork/issues/91) (smoke alignment). PR #91 closes unmerged; the smoke gets rewritten as part of Phase 26 F (the install path it tests against changes substantially).
 - Not an absorption of the studio bug sweep ([#68](https://github.com/audiocontrol-org/deskwork/issues/68), [#69](https://github.com/audiocontrol-org/deskwork/issues/69), [#74](https://github.com/audiocontrol-org/deskwork/issues/74), [#75](https://github.com/audiocontrol-org/deskwork/issues/75)) or the `/deskwork:*` skill UX work ([#58](https://github.com/audiocontrol-org/deskwork/issues/58), [#62](https://github.com/audiocontrol-org/deskwork/issues/62), [#64](https://github.com/audiocontrol-org/deskwork/issues/64)). Those defer.
 
+---
+
+## Extension: studio bug tranche — v0.10.0 (Phase 27)
+
+Added 2026-04-30 after a v0.9.7 marketplace-install dogfood walked the studio surfaces (dashboard, content tree, longform review, shortform desk, help, index) and catalogued 12 distinct findings. Five Tier-A bugs ([#103](https://github.com/audiocontrol-org/deskwork/issues/103), [#104](https://github.com/audiocontrol-org/deskwork/issues/104), [#105](https://github.com/audiocontrol-org/deskwork/issues/105), [#106](https://github.com/audiocontrol-org/deskwork/issues/106), [#107](https://github.com/audiocontrol-org/deskwork/issues/107)) plus two Tier-B bug-class items ([#108](https://github.com/audiocontrol-org/deskwork/issues/108), [#110](https://github.com/audiocontrol-org/deskwork/issues/110)) form this tranche. The remaining five Tier-B quality items ([#109](https://github.com/audiocontrol-org/deskwork/issues/109), [#111](https://github.com/audiocontrol-org/deskwork/issues/111), [#112](https://github.com/audiocontrol-org/deskwork/issues/112), [#113](https://github.com/audiocontrol-org/deskwork/issues/113), [#114](https://github.com/audiocontrol-org/deskwork/issues/114)) defer to v0.10.x or get picked up opportunistically.
+
+### Why this lands now
+
+The operator named the constraint directly: *"There are a bunch of UX problems with the studio that I want to address before we design new features."* The dogfood arc is the cheapest way to surface them — running the studio against this project's own collection through the public path (the v0.9.7 marketplace install) produced 12 findings in a single ~30-minute walk. Two of the seven bugs in this tranche are particularly costly:
+
+- [#103](https://github.com/audiocontrol-org/deskwork/issues/103) — content-detail panel reports "no frontmatter / no body" for a real, populated file (`docs/1.0/001-IN-PROGRESS/deskwork-plugin/prd.md`, 481 lines, valid `deskwork.id` + `title` frontmatter). The panel's stated promise ("Select a node to read its head matter, preview its body...") fails. Adopters seeing this conclude their file is broken.
+- [#104](https://github.com/audiocontrol-org/deskwork/issues/104) — The Compositor's Manual contains 8+ legacy `/editorial-*` slash references and zero `/deskwork:*` references. The primary onboarding doc is teaching adopters the wrong vocabulary. Distinct from [#69](https://github.com/audiocontrol-org/deskwork/issues/69) (which only covers dashboard empty-state copy).
+
+The other five (#105 silent-no-op rename, #106 dead-link "coverage matrix", #107 unlinked Index surfaces, #108 destructive single-letter shortcuts, #110 dashboard rows have no link target without a workflow) are mid-task friction the operator hits during normal use. Each has a sketched fix in its issue body.
+
+### Scope of Phase 27
+
+Single PR, single `v0.10.0` release.
+
+- **A** — Content-detail panel read-path fix ([#103](https://github.com/audiocontrol-org/deskwork/issues/103)). Trace the API endpoint that backs `/dev/content/<collection>/<root>?node=<path>`'s right-panel render. Probe the failure mode (frontmatter parser silently mishandling `deskwork:` namespace? path resolution reading wrong file? hierarchical-path encoding bug?). Fix the underlying read; add a regression test using the project's own `prd.md` as the fixture.
+- **B** — Manual content rewrite ([#104](https://github.com/audiocontrol-org/deskwork/issues/104)). Walk every `/editorial-*` reference in `packages/studio/src/pages/help.ts` and replace with the canonical `/deskwork:*` name. Add a regression test asserting `/dev/editorial-help` HTML contains zero `/editorial-(add|plan|outline|draft|publish|distribute)` matches.
+- **C** — Studio copy-to-clipboard input validation + manual-copy fallback ([#105](https://github.com/audiocontrol-org/deskwork/issues/105); related: [#74](https://github.com/audiocontrol-org/deskwork/issues/74), [#99](https://github.com/audiocontrol-org/deskwork/issues/99)). Validate empty inputs before generating the command; on `navigator.clipboard.writeText` failure or unavailability (HTTP context), render the command in a persistent `<pre>` block. Unify across all studio copy buttons.
+- **D** — "Coverage matrix" empty-state copy fix ([#106](https://github.com/audiocontrol-org/deskwork/issues/106)). Either rename to match the dashboard's actual section names + anchor-link to `/dev/editorial-studio#drafting`, or add a real `start shortform →` button to dashboard rows. Cheapest path is option 1.
+- **E** — Index page sensible defaults for un-linked surfaces ([#107](https://github.com/audiocontrol-org/deskwork/issues/107)). Longform reviews → link to most recent in-review workflow (or `/dev/editorial-studio?stage=review`). Scrapbook → link to `/dev/content`.
+- **F** — Destructive shortcut soft-confirm ([#108](https://github.com/audiocontrol-org/deskwork/issues/108)). Two-key sequence (`a` `a` within 500ms to fire approve; same for `i` `i` and `r` `r`). Single keystrokes pop a transient hint that auto-dismisses. Update the `?` panel to document the new behavior.
+- **G** — Dashboard row link fallback ([#110](https://github.com/audiocontrol-org/deskwork/issues/110)). When no open workflow exists for a calendar entry, link the row to the content-detail page (`/dev/content/<collection>/<path>`). Workflow-linked entries keep their `/dev/editorial-review/<uuid>` target. Every dashboard row becomes clickable.
+
+### What Phase 27 is not
+
+- Not the full UX dogfood backlog. The five Tier-B quality items ([#109](https://github.com/audiocontrol-org/deskwork/issues/109), [#111](https://github.com/audiocontrol-org/deskwork/issues/111), [#112](https://github.com/audiocontrol-org/deskwork/issues/112), [#113](https://github.com/audiocontrol-org/deskwork/issues/113), [#114](https://github.com/audiocontrol-org/deskwork/issues/114)) defer. Tight tranche; ship; reassess.
+- Not a Phase 24 implementation. Content-collections vocabulary rename (`sites` → `collections`) still defers; this tranche keeps the legacy term in the affected files and migrates them in Phase 24.
+- Not an absorption of the longstanding studio backlog ([#54](https://github.com/audiocontrol-org/deskwork/issues/54), [#61](https://github.com/audiocontrol-org/deskwork/issues/61), [#73](https://github.com/audiocontrol-org/deskwork/issues/73), [#84](https://github.com/audiocontrol-org/deskwork/issues/84)). Those are larger features (margin-note replies, calendar/workflow auto-advance, TOC view, agent-path documentation) and warrant their own scoping.
+
+## Extension: post-release customer acceptance playbook (Phase 29)
+
+Added 2026-04-30 from operator framing during recursive dogfood: *"We should have a post-release customer acceptance playbook that we run through — not hard-coded tooling, but a skill (or a composition of skills) that codify how to evaluate the installed plugin to ensure it's sane and file bugs if it's not. This should include playwright inspection of the studio. We should update that playbook as we add/update features."*
+
+The walk has been the highest-yield bug-finding mechanism this project has — every Phase 27 issue came from running the v0.9.7 marketplace install, none from auditing source. Phase 29 codifies the walk as a skill so it can't drift, and routes the findings through deskwork's own review pipeline so triage is structured rather than ad-hoc.
+
+**Source-of-truth for design reasoning:** [`docs/1.0/post-release-acceptance-design.md`](../../post-release-acceptance-design.md) — design v2 applied 2026-04-30 via deskwork workflow `970aa75d-f586-47f0-bc89-4481830a7676` (commit `b1f1815`). Both operator margin notes addressed by the v2 stop-gap framing.
+
+### Stop-gap status (binding)
+
+Per the design's Stop-gap status section, the entire Phase 29 surface — both new `/post-release:walk` + `/post-release:file-issues` skills AND the existing `/release` skill it integrates with — is **stop-gap scaffolding** that lives inside the deskwork plugin only because dw-lifecycle has not yet shipped the capability to customize or override lifecycle stages. When dw-lifecycle gains that capability:
+
+- `/release` and `/post-release:*` migrate into dw-lifecycle's customizable-workflow surface.
+- The path of the design doc itself, the playbook (`docs/post-release/playbook.md`), and per-version findings docs (`docs/post-release/<version>-acceptance.md`) all change to whatever dw-lifecycle prescribes.
+- Procedural amendments (the playbook-update checklist line we'll add to feature-define / feature-extend in sub-phase G) become typed phases in dw-lifecycle's customizable workflow surface.
+
+This framing is binding on Phase 29 design choices: schema, file paths, and skill names should stay simple enough that the migration is a move-and-rename rather than a re-architect.
+
+### Scope of Phase 29
+
+Seven sub-phases (A–G), shipped in order:
+
+- **A** — Playbook scaffold (`docs/post-release/playbook.md` + parser TS module).
+- **B** — `/post-release:walk` cursory mode (HTTP-only): boot studio, auto-discover surfaces from `/dev/`, per-surface walk, aggregate findings, generate findings doc, ingest + review-start.
+- **C** — Playbook assertions wired into the cursory walk.
+- **D** — `/post-release:walk --mode deep`: sandbox project + CLI drive (add → plan → outline → draft → review-start → iterate → approve → publish) + studio cross-check via Playwright.
+- **E** — `/post-release:file-issues`: parse approved findings doc, per-finding `gh issue create` with confirmation prompt + cross-link footer.
+- **F** — `/release` end-prompt integration (Pause 5 success → "Run /post-release:walk now? [y/N]" → invoke walk).
+- **G** — Procedural amendment: add a one-line "Review/update playbook" checklist item to `feature-define` and `feature-extend` skills.
+
+The first canonical run is the post-release walk against the v(N+1) shipped after Phase 29 lands. Real findings file as real issues — that's the end-to-end smoke.
+
+### What Phase 29 is not
+
+- **Not gated CI.** The walk involves a real marketplace install + a deskwork review cycle that takes operator time. CI conflicts with the project's "No test infrastructure in CI" rule.
+- **Not a security review.** The studio is dev-only with no auth. The walk verifies functional surface, not threat-model surface.
+- **Not a replacement for dogfood-as-development discipline** (`agent-discipline.md` *"Stay in agent-as-user dogfood mode"*). The walk is post-release verification; it doesn't substitute for using the plugin on real work during development.
+- **Not the dw-lifecycle-native version.** This is the stop-gap that lives inside the deskwork plugin until dw-lifecycle ships customizable lifecycle stages. The migration into dw-lifecycle is forward-marching once that capability lands; the file paths chosen in Phase 29 are explicitly ephemeral.
+
+---
+
+## Extension: Phase 34 — Retire the legacy review surface; complete the Phase-30 migration; pay down v0.13.0 IOUs (post-v0.13.0)
+
+Added after v0.13.0 ship. The triggering finding: **the longform editorial review surface is currently broken end-to-end.** A live audit during the Phase 34 PRD review demonstrated that the dashboard's per-row link routes to a legacy `pages/review.ts` surface that reads from pre-Phase-30 workflow records, while `iterateEntry` (the entry-centric writer) updates only sidecars + the history journal. Result: the studio shows frozen pre-2026-05-01 content for any entry that's been iterated since the Phase 30 pivot. The press-check chrome looks right; the data is silently stale. Every post-Phase-30 longform editorial review that used the dashboard's link is suspect.
+
+### Why now
+
+The studio's longform review path is currently 100% unusable — not unstyled, not buggy, **structurally lying about what the operator is approving.** This blocks the project's own dogfood loop (the same loop that's reviewing this PRD). Phase 34's first sub-phase has to be the structural fix; everything else lines up behind it.
+
+The deeper problem is named directly in the source code:
+
+- `packages/studio/src/pages/entry-review.ts:14-18`: *"Rendering is intentionally minimal — the goal of Task 35 is the route shape + affordance plumbing, not a fully-styled UI. Styling will land once the affordance set stabilizes against real entries."*
+- `packages/studio/src/server.ts:351-355`: *"DEPRECATED (pipeline-redesign Task 35): this route is workflow-uuid + calendar-entry keyed; the entry-centric replacement lives at `/dev/editorial-review/entry/<uuid>`. Both coexist during the migration window; this route is removed once every dashboard surface and operator skill points at the entry route."*
+- `packages/studio/src/server.ts:373-384`: explains why #146's entry-first short-circuit was reverted (entry-review surface lost margin notes, rendered preview, and decision strip).
+
+These are textbook *"just for now"* code comments, written into the source as if the comment itself constitutes a tracked plan. Per the new `.claude/rules/agent-discipline.md` rule "No 'just for now' shortcuts" (commit `42eb837`) and the project's own system-prompt guidance (*"No half-finished implementations either"* / *"Avoid backwards-compatibility hacks"* / *"Don't use feature flags or backwards-compatibility shims when you can just change the code"*), there should be no legacy code, no migration window, no "two surfaces coexist." The fact that we have all three is exactly the failure mode those rules forbid.
+
+The convention canon trap activated immediately: 3 days after Phase 30 shipped, the legacy surface IS the review surface (because the dashboard links to it) and the entry-review surface IS the broken stub (because nobody finished it). Every additional session that lands without 34a will fork more code paths against one surface or the other and double the eventual cleanup cost.
+
+### Scope
+
+Phase 34 has five sub-phases. **34a is blocking** — until it ships, the studio review loop stays broken and no other sub-phase has a working dogfood path.
+
+- **34a — Retire the legacy review surface; complete the Phase-30 migration; audit corrupted reviews.** This is the structural fix.
+  - Port the press-check chrome from `pages/review.ts` to `pages/entry-review.ts`: folio + version strip + edit toolbar + outline drawer + marginalia column + scrapbook drawer + margin-note authoring + rendered markdown preview + decision strip with chord chips + shortcut overlay.
+  - Source the entry-review's data from sidecars + history journal (already entry-centric via `iterateEntry`); the merged surface uses the existing `getAffordances(entry)` for stage-aware buttons.
+  - **Delete `packages/studio/src/pages/review.ts` entirely.** Not move-to-deprecated. Delete.
+  - Delete the legacy routes in `packages/studio/src/server.ts` (the `:id` UUID branch and the `:slug` branch). Replace with: bare `/dev/editorial-review/<uuid>` 301-redirects to `/dev/editorial-review/entry/<uuid>` for in-flight bookmarks, AND that redirect is itself filed as a follow-up to delete in the next phase (the redirect is a backwards-compat shim; it has an explicit retirement issue, not a "for later" comment).
+  - Audit + delete every workflow-record code path that was kept alive only because the legacy longform/outline surface read it. Workflow records remain only for shortform (operator-confirmed deferral; tracked under a new dedicated issue with explicit acceptance criteria, not a code comment).
+  - Update every link emitter to use `/dev/editorial-review/entry/<uuid>`: `pages/dashboard/affordances.ts:60`, `pages/content.ts:353`, `pages/content-detail.ts:280`, `pages/index.ts:115`, `pages/help.ts:262,283,391,426`, plus operator-facing skill prose (`/feature-extend`, `/feature-setup`, etc.).
+  - Delete the *"intentionally minimal"* / *"styling will land once the affordance set stabilizes"* self-comments in `entry-review.ts:14-18`, the *"DEPRECATED"* / *"migration window"* comments in `server.ts`, and any sibling deferral comments uncovered during the work.
+  - Run the agent-discipline grep audit on the entire studio (`for now`, `just for now`, `TODO`, `FIXME`, `HACK`, `XXX`, `temporary`, `stub`, `placeholder`, `pending`, `until F`, `until v`, `migration window`, `legacy`, `deprecated`, `coexist`, `for later`). Every hit ends in either fix-now or filed-issue.
+  - **Audit corrupted reviews.** Enumerate every entry whose sidecar shows an iteration post-2026-05-01 (`iterationByStage` count higher than the workflow record's `currentVersion` for the same entry). For each mismatch: re-review against the actual current content under the new unified surface; record the disposition (re-approved / iterated / blocked / cancelled). The audit list lives in workplan 34a; entries are checked off individually.
+
+- **34b — Pay down F1–F6 IOUs.** (Was 34a in the prior draft.) [#166](https://github.com/audiocontrol-org/deskwork/issues/166) (composer regression + sibling rejection-reason regression + full audit of `window.prompt`/`confirm`/`alert` in studio client), [#163](https://github.com/audiocontrol-org/deskwork/issues/163) (JPEG/WebP/GIF dimensions; F3 deferred), [#164](https://github.com/audiocontrol-org/deskwork/issues/164) (expanded-secret-card visual continuity; G3 deferred), edit-toolbar Source/Split/Preview + Focus discoverability (operator-noted but not yet filed; file as part of 34b kickoff). Cannot start until 34a ships — verifying any composer fix without a working review surface is meaningless.
+
+- **34c — Studio dev mode + interaction bugs.** (Was 34b.) [#165](https://github.com/audiocontrol-org/deskwork/issues/165) (DESKWORK_DEV=1 binds Tailscale by default), [#156](https://github.com/audiocontrol-org/deskwork/issues/156) (client `init*` function audit), [#157](https://github.com/audiocontrol-org/deskwork/issues/157) (dashboard → scrapbook viewer cross-links).
+
+- **34d — Studio data + content bugs.** (Was 34c, minus #152 which is folded into 34a.) [#151](https://github.com/audiocontrol-org/deskwork/issues/151) (`deskwork publish` writes `publishedDate` to the sidecar), [#153](https://github.com/audiocontrol-org/deskwork/issues/153) (per-skill LLM model defaults), [#158](https://github.com/audiocontrol-org/deskwork/issues/158) (split umbrella into specifics; close umbrella with the inventory). Note: #152 (entry-review CSS) is no longer here because 34a's port-the-chrome work is the actual fix; #152 closes when 34a ships.
+
+- **34e — v0.13.0 verification + issue closures.** (Was 34d.) Boot marketplace v0.13.0 install in a clean session, walk F1–F6 + #154 longform-review surfaces, post fix-landed comments + close #154 / #155 / #159 / #160 / #161 per the `agent-discipline.md` formally-installed-release rule. Note: this verification only becomes possible after 34a ships, because the marketplace surfaces it covers depend on the entry-review surface being functional.
+
+### What this is not
+
+- **Not a coexistence plan.** No "migration window," no "legacy and entry-keyed both supported," no "this route is deprecated, will retire later." 34a's commit deletes the legacy paths atomically. The 301 redirect on the bare-UUID URL is the only concession to in-flight bookmarks, and it has its own follow-up retirement issue.
+- **Not a partial port.** Margin notes, rendered preview, decision strip, chord shortcuts, outline drawer, marginalia column, scrapbook drawer — all of it ports. If a feature can't be ported in 34a, that feature gets filed as a new blocking issue, not left as a missing-feature regression.
+- **Not a shortform retirement.** Workflow records and the legacy shortform pipeline (`pages/shortform.ts`, `runShortformIterate`) stay for now — explicitly. The deferral is operator-confirmed and gets a tracked issue with acceptance criteria for *"shortform migrates to entry-centric"*, not a code-comment IOU. Once that issue lands, workflow records leave the codebase entirely.
+- **Not blocked on Phase 34's other sub-phases.** 34a ships first as a standalone PR; once merged + released, 34b through 34e proceed.
+- **Not a redesign.** The visual treatment of the unified surface IS the existing legacy chrome (margin notes, paper-grain background, press-check controls). The change is structural — entry-keyed data flow, unified codepath, deleted legacy. No new design work. No new aesthetic decisions.
+

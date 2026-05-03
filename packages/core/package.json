@@ -1,6 +1,6 @@
 {
   "name": "@deskwork/core",
-  "version": "0.9.7",
+  "version": "0.13.0",
   "type": "module",
   "description": "Editorial calendar + review pipeline library — shared by @deskwork/cli and @deskwork/studio",
   "homepage": "https://github.com/audiocontrol-org/deskwork#readme",
@@ -60,6 +60,18 @@
       "types": "./dist/doctor/index.d.ts",
       "default": "./dist/doctor/index.js"
     },
+    "./doctor/migrate": {
+      "types": "./dist/doctor/migrate.d.ts",
+      "default": "./dist/doctor/migrate.js"
+    },
+    "./doctor/validate": {
+      "types": "./dist/doctor/validate.d.ts",
+      "default": "./dist/doctor/validate.js"
+    },
+    "./doctor/repair": {
+      "types": "./dist/doctor/repair.d.ts",
+      "default": "./dist/doctor/repair.js"
+    },
     "./frontmatter": {
       "types": "./dist/frontmatter.d.ts",
       "default": "./dist/frontmatter.js"
@@ -75,6 +87,34 @@
     "./ingest-paths": {
       "types": "./dist/ingest-paths.d.ts",
       "default": "./dist/ingest-paths.js"
+    },
+    "./iterate": {
+      "types": "./dist/iterate/iterate.d.ts",
+      "default": "./dist/iterate/iterate.js"
+    },
+    "./calendar/regenerate": {
+      "types": "./dist/calendar/regenerate.d.ts",
+      "default": "./dist/calendar/regenerate.js"
+    },
+    "./entry/approve": {
+      "types": "./dist/entry/approve.d.ts",
+      "default": "./dist/entry/approve.js"
+    },
+    "./entry/block": {
+      "types": "./dist/entry/block.d.ts",
+      "default": "./dist/entry/block.js"
+    },
+    "./entry/cancel": {
+      "types": "./dist/entry/cancel.d.ts",
+      "default": "./dist/entry/cancel.js"
+    },
+    "./entry/induct": {
+      "types": "./dist/entry/induct.d.ts",
+      "default": "./dist/entry/induct.js"
+    },
+    "./entry/publish": {
+      "types": "./dist/entry/publish.d.ts",
+      "default": "./dist/entry/publish.js"
     },
     "./journal": {
       "types": "./dist/journal.d.ts",
@@ -128,9 +168,17 @@
       "types": "./dist/scaffold.d.ts",
       "default": "./dist/scaffold.js"
     },
+    "./schema/entry": {
+      "types": "./dist/schema/entry.d.ts",
+      "default": "./dist/schema/entry.js"
+    },
     "./scrapbook": {
       "types": "./dist/scrapbook.d.ts",
       "default": "./dist/scrapbook.js"
+    },
+    "./sidecar": {
+      "types": "./dist/sidecar/index.d.ts",
+      "default": "./dist/sidecar/index.js"
     },
     "./types": {
       "types": "./dist/types.d.ts",
@@ -140,6 +188,7 @@
   "scripts": {
     "build": "tsc -b tsconfig.build.json && cp src/*.mjs dist/ && mkdir -p dist/doctor/rules && cp src/doctor/rules/*.ts dist/doctor/rules/",
     "prepack": "tsc -b tsconfig.build.json && cp src/*.mjs dist/ && mkdir -p dist/doctor/rules && cp src/doctor/rules/*.ts dist/doctor/rules/",
+    "dev": "npm run build && tsc -b tsconfig.build.json --watch",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
@@ -149,7 +198,8 @@
     "remark-parse": "^11.0.0",
     "remark-rehype": "^11.1.0",
     "unified": "^11.0.5",
-    "yaml": "^2.8.0"
+    "yaml": "^2.8.0",
+    "zod": "^3.24.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

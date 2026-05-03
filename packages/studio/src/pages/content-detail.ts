@@ -164,7 +164,7 @@ function renderScrapbookList(
   loader: InlineTextLoader,
 ): RawHtml {
   if (!summary || (summary.items.length === 0 && summary.secretItems.length === 0)) {
-    return renderEmptyScrapbookRow();
+    return renderEmptyScrapbookRow({ site, path: slug });
   }
   const itemRows = summary.items.map((item) =>
     renderReadOnlyScrapbookRow({ site, path: slug }, item, {
@@ -226,34 +226,24 @@ function loadDetailRender(
   let bodyPreview = '';
   let scrapbook: ScrapbookSummary | null = null;
 
-  // Phase 19c: detail-panel file lookup uses the node's fs `path` —
-  // the structural key. Whether the node is a tracked entry or
-  // organizational, the file lookup walks `<contentDir>/<path>/`
-  // for an index/README. (Phase 19d will additionally consult the
-  // per-request content index for tracked entries to handle the case
-  // where the host's template differs from the file's actual path.)
-  const idxFile = findOrganizationalIndex(contentDir, node.path);
-  if (idxFile !== null) {
-    const raw = safeReadFile(idxFile);
+  // Issue #103 fix: prefer the id-bound on-disk file when one is
+  // attached to the node (set by content-tree.ts via `idBoundFile`).
+  // This is the canonical resolution for tracked entries — it handles
+  // single-file entries (e.g. `prd.md` next to peer files) where
+  // `node.path` is a slug rather than a directory, and host templates
+  // that put the file outside the `<path>/index.md` shape. Falls back
+  // to the directory-index lookup for purely organizational nodes
+  // (#24, v0.6.0) whose canonical content is a README/index.md.
+  const targetFile =
+    node.filePath !== undefined
+      ? node.filePath
+      : findOrganizationalIndex(contentDir, node.path);
+  if (targetFile !== null) {
+    const raw = safeReadFile(targetFile);
     if (raw !== null) {
       const parsed = parseFrontmatter(raw);
       frontmatter = parsed.data as Record<string, unknown>;
       bodyPreview = parsed.body;
-    }
-  } else if (node.hasFsDir && node.hasOwnIndex) {
-    // Organizational node (#24, v0.6.0): no calendar entry, but the
-    // fs walk found a directory with an index/README. Read that file
-    // for the detail panel so the operator sees the structural prose
-    // (e.g. "These are the characters in The Outbound") even though
-    // nothing about this node ships through the lifecycle pipeline.
-    const abs = findOrganizationalIndex(contentDir, node.path);
-    if (abs !== null) {
-      const raw = safeReadFile(abs);
-      if (raw !== null) {
-        const parsed = parseFrontmatter(raw);
-        frontmatter = parsed.data as Record<string, unknown>;
-        bodyPreview = parsed.body;
-      }
     }
   }
 

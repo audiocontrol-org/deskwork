@@ -1,24 +1,17 @@
 /**
  * deskwork-iterate — snapshot the agent's revised content file as a new
- * workflow version and transition back to in-review.
+ * workflow version (legacy shortform) or a new entry-stage iteration
+ * (entry-centric longform/outline).
  *
- * Call this AFTER the agent has rewritten the markdown on disk based on
- * operator comments. The helper does the mechanical persist-and-transition
- * step:
+ * Phase 29 / pipeline redesign: longform + outline iterate now go through
+ * the entry-centric helper (`iterateEntry`) which mutates the per-entry
+ * sidecar and emits journal events. The workflow-object model remains in
+ * place for shortform — that path is preserved as `runShortformIterate`
+ * intact, including its dispositions, annotations, and pipeline
+ * transitions.
  *
- *   1. Read the workflow (must be in state `iterating`).
- *   2. If disk differs from the workflow's current version, append a
- *      new version (originatedBy='agent') — this is the SSOT flow:
- *      disk is canonical, the journal captures snapshots.
- *   3. Optionally read a dispositions JSON and emit address annotations
- *      (one per commentId) that the studio sidebar renders as badges.
- *   4. Transition the workflow back to in-review.
- *
- * Phase 21a: `--kind shortform` is accepted alongside longform/outline.
- * The mutation is kind-agnostic — it reads the workflow's on-disk file
- * (longform: `<contentDir>/<slug>.md`; shortform:
- * `<contentDir>/<slug>/scrapbook/shortform/<platform>[-<channel>].md`)
- * and snapshots its body as the new version.
+ * Dispatcher: `--kind shortform` → legacy path; otherwise (longform /
+ * outline / unset) → entry-centric path.
  *
  * Usage:
  *   deskwork-iterate <project-root> [--site <slug>]
@@ -26,8 +19,8 @@
  *                    [--platform <p>] [--channel <c>]
  *                    [--dispositions <path>] <slug>
  *
- * The dispositions file (optional) is a JSON object mapping commentId to
- * { disposition: 'addressed'|'deferred'|'wontfix', reason?: string }.
+ * The dispositions file (optional, shortform only) is a JSON object mapping
+ * commentId to { disposition: 'addressed'|'deferred'|'wontfix', reason?: string }.
  */
 
 import { existsSync, readFileSync } from 'node:fs';
@@ -48,20 +41,22 @@ import {
 } from '@deskwork/core/review/pipeline';
 import { isPlatform } from '@deskwork/core/types';
 import { absolutize, emit, fail, parseArgs } from '@deskwork/core/cli-args';
+import { iterateEntry } from '@deskwork/core/iterate';
+import { resolveEntryUuid } from '@deskwork/core/sidecar';
+
+const KNOWN_FLAGS = ['site', 'kind', 'platform', 'channel', 'dispositions'] as const;
+const VALID_KINDS = ['longform', 'outline', 'shortform'] as const;
+type Kind = (typeof VALID_KINDS)[number];
 
 export async function run(argv: string[]): Promise<void> {
-  const KNOWN_FLAGS = ['site', 'kind', 'platform', 'channel', 'dispositions'] as const;
-  const DISPOSITIONS = new Set(['addressed', 'deferred', 'wontfix'] as const);
-  const VALID_KINDS = ['longform', 'outline', 'shortform'] as const;
-  type Kind = (typeof VALID_KINDS)[number];
-  type Disposition = 'addressed' | 'deferred' | 'wontfix';
-
-  interface DispositionEntry {
-    disposition: Disposition;
-    reason?: string;
+  let parsed;
+  try {
+    parsed = parseArgs(argv, KNOWN_FLAGS);
+  } catch (err) {
+    fail(err instanceof Error ? err.message : String(err), 2);
   }
 
-  const { positional, flags } = parse();
+  const { positional, flags } = parsed;
 
   if (positional.length < 2) {
     fail(
@@ -71,9 +66,6 @@ export async function run(argv: string[]): Promise<void> {
       2,
     );
   }
-
-  const [rootArg, slug] = positional;
-  const projectRoot = absolutize(rootArg);
 
   if (
     flags.kind !== undefined &&
@@ -90,14 +82,99 @@ export async function run(argv: string[]): Promise<void> {
   })();
 
   if (kind === 'shortform') {
-    if (flags.platform === undefined) {
-      fail('--platform is required when --kind=shortform.');
-    }
-    if (!isPlatform(flags.platform)) {
-      fail(`Invalid --platform "${flags.platform}".`);
-    }
-  } else if (flags.platform !== undefined || flags.channel !== undefined) {
+    await runShortformIterate(positional, flags, kind);
+    return;
+  }
+
+  // longform / outline → entry-centric path
+  if (flags.platform !== undefined || flags.channel !== undefined) {
     fail('--platform / --channel are only valid with --kind=shortform.');
+  }
+  if (flags.dispositions !== undefined) {
+    fail('--dispositions is currently only supported with --kind=shortform.');
+  }
+
+  await runLongformIterate(positional, flags);
+}
+
+/**
+ * Entry-centric iterate (longform / outline). Resolves the slug to a
+ * sidecar UUID and delegates to `iterateEntry`, which:
+ *   - reads the disk artifact at the stage's conventional path,
+ *   - appends an iteration event to the per-entry journal,
+ *   - bumps the iteration counter on the sidecar,
+ *   - flips reviewState to 'in-review'.
+ */
+async function runLongformIterate(
+  positional: string[],
+  flags: Record<string, string>,
+): Promise<void> {
+  const [rootArg, slug] = positional;
+  const projectRoot = absolutize(rootArg);
+
+  let config;
+  try {
+    config = readConfig(projectRoot);
+  } catch (err) {
+    fail(err instanceof Error ? err.message : String(err));
+  }
+
+  // Validate --site if passed; the helper itself doesn't currently take
+  // a site param (entries are project-global), but failing on a bogus
+  // site keeps the CLI's error shape consistent with the legacy command.
+  const site = resolveSite(config, flags.site);
+
+  let uuid: string;
+  try {
+    uuid = await resolveEntryUuid(projectRoot, slug);
+  } catch (err) {
+    fail(err instanceof Error ? err.message : String(err));
+  }
+
+  let result;
+  try {
+    result = await iterateEntry(projectRoot, { uuid });
+  } catch (err) {
+    fail(err instanceof Error ? err.message : String(err));
+  }
+
+  emit({
+    entryId: result.entryId,
+    site,
+    slug,
+    stage: result.stage,
+    state: result.reviewState,
+    version: result.version,
+  });
+}
+
+/**
+ * Legacy shortform iterate (workflow-object model). Preserved intact
+ * across the Phase 29 pipeline redesign — shortform's workflow-object
+ * model migration is deferred. Every line of the original `run(argv)`
+ * shortform behavior is reproduced here verbatim.
+ */
+async function runShortformIterate(
+  positional: string[],
+  flags: Record<string, string>,
+  kind: Kind,
+): Promise<void> {
+  const DISPOSITIONS = new Set(['addressed', 'deferred', 'wontfix'] as const);
+  type Disposition = 'addressed' | 'deferred' | 'wontfix';
+
+  interface DispositionEntry {
+    disposition: Disposition;
+    reason?: string;
+  }
+
+  const [rootArg, slug] = positional;
+  const projectRoot = absolutize(rootArg);
+
+  if (flags.platform === undefined) {
+    fail('--platform is required when --kind=shortform.');
+  }
+  if (!isPlatform(flags.platform)) {
+    fail(`Invalid --platform "${flags.platform}".`);
   }
 
   let config;
@@ -193,18 +270,18 @@ export async function run(argv: string[]): Promise<void> {
     if (!existsSync(path)) {
       fail(`--dispositions file not found: ${path}`);
     }
-    let parsed: unknown;
+    let parsedDisp: unknown;
     try {
-      parsed = JSON.parse(readFileSync(path, 'utf8'));
+      parsedDisp = JSON.parse(readFileSync(path, 'utf8'));
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       fail(`--dispositions: invalid JSON at ${path}: ${reason}`);
     }
-    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    if (parsedDisp === null || typeof parsedDisp !== 'object' || Array.isArray(parsedDisp)) {
       fail(`--dispositions: expected JSON object at ${path}`);
     }
     dispositions = {};
-    for (const [commentId, raw] of Object.entries(parsed as Record<string, unknown>)) {
+    for (const [commentId, raw] of Object.entries(parsedDisp as Record<string, unknown>)) {
       if (typeof raw !== 'object' || raw === null) {
         fail(`--dispositions[${commentId}]: must be an object`);
       }
@@ -265,12 +342,4 @@ export async function run(argv: string[]): Promise<void> {
     version: newVersion.version,
     addressedComments: addressed,
   });
-
-  function parse() {
-    try {
-      return parseArgs(argv, KNOWN_FLAGS);
-    } catch (err) {
-      fail(err instanceof Error ? err.message : String(err), 2);
-    }
-  }
 }

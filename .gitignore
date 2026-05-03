@@ -30,6 +30,10 @@ yarn-error.log*
 *.swp
 *.swo
 
+## Worktree-local commit-message scratch file (per .claude/rules/file-handling.md).
+## Subagents write multi-line commit messages here, then 'git commit -F' from it.
+.git-commit-msg.tmp
+
 ## Claude Code local
 .claude/settings.json
 .claude/settings.local.json
@@ -44,6 +48,9 @@ yarn-error.log*
 ## Playwright MCP local scratch (screenshots, console logs, page snapshots
 ## generated during dogfood UX sessions). Never committed.
 .playwright-mcp/
+
+## Superpowers brainstorming companion mockups (visual session content).
+.superpowers/
 
 ## Local dogfood sandbox — a clone of audiocontrol.org used to drive the
 ## editorial-calendar lifecycle end-to-end against a real-shaped project

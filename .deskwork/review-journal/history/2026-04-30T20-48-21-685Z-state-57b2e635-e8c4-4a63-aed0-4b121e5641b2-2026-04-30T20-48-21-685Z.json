@@ -1,0 +1,11 @@
+{
+  "id": "state-57b2e635-e8c4-4a63-aed0-4b121e5641b2-2026-04-30T20-48-21-685Z",
+  "timestamp": "2026-04-30T20:48:21.685Z",
+  "entry": {
+    "kind": "workflow-state",
+    "at": "2026-04-30T20:48:21.685Z",
+    "workflowId": "57b2e635-e8c4-4a63-aed0-4b121e5641b2",
+    "from": "in-review",
+    "to": "approved"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "kind": "entry-created",
+  "at": "2026-05-01T04:09:12.315Z",
+  "entryId": "3c5481cf-d3d3-4aa5-b926-f6e3f70c58fe",
+  "entry": {
+    "uuid": "3c5481cf-d3d3-4aa5-b926-f6e3f70c58fe",
+    "slug": "release-skill-design",
+    "title": "Release Skill Design",
+    "keywords": [],
+    "source": "manual",
+    "currentStage": "Drafting",
+    "iterationByStage": {
+      "Drafting": 2
+    },
+    "createdAt": "2026-05-01T00:17:31.526Z",
+    "updatedAt": "2026-05-01T04:08:23.606Z",
+    "reviewState": "approved",
+    "artifactPath": "docs/superpowers/specs/2026-04-29-release-skill-design.md"
+  }
+}

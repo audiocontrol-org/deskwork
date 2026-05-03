@@ -14,138 +14,153 @@
  */
 
 /* ============================================================
-   FOLIO — running-head strip atop every studio page
+   FOLIO — global studio nav, fixed at top of every page
    ============================================================
-   Reads like the top edge of a printed magazine page: publication
-   name at left, sections in the middle, volume/folio at the right.
+   Reads like the top edge of a bound proof: italic Fraunces
+   wordmark with a red proof-mark prefix, page-specific spine
+   in mono, section nav at the right.
 
-   Active state: red-pencil tick mark above the link — like an
-   editor circled where you are. NOT a UI selected state, an
-   editorial mark. The tick is irregular (skewed transform) so
-   it doesn't read as a generic underline.
+   Layout invariant: the folio is `position: fixed; top: 0;
+   height: var(--er-folio-h); z-index: 60`. Other fixed chrome
+   (e.g. the review surface's `.er-strip`) sits BELOW it at
+   `top: var(--er-folio-h)`. The earlier `position: sticky` +
+   z-index 10 left the folio eclipsed by the strip on review
+   pages — the global nav was invisible there.
+
+   Single component, every surface. Visual treatment lives
+   here; markup lives in `packages/studio/src/pages/chrome.ts`
+   `renderEditorialFolio()`.
    ============================================================ */
 
-[data-review-ui] .er-folio {
-  border-bottom: var(--er-rule-double);
-  background: var(--er-paper);
-  position: sticky;
-  top: 0;
-  z-index: 10;
+:root {
+  --er-folio-h: 2.4rem;
 }
 
-[data-review-ui] .er-folio-inner {
-  max-width: var(--er-container-wide);
-  margin: 0 auto;
-  padding: var(--er-space-1) var(--er-space-4);
-  display: grid;
-  grid-template-columns: auto 1fr auto;
+[data-review-ui] .er-folio {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--er-folio-h);
+  z-index: 60;
+  background: var(--er-paper);
+  border-bottom: var(--er-rule-thin);
+  display: flex;
   align-items: center;
   gap: var(--er-space-3);
-  min-height: 2.4rem;
-}
-
-[data-review-ui] .er-folio-name {
+  padding: 0 var(--er-space-3);
   font-family: var(--er-font-mono);
-  font-size: 0.65rem;
-  letter-spacing: 0.24em;
+  font-size: 0.7rem;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--er-ink);
-  font-weight: 600;
-  white-space: nowrap;
+  color: var(--er-faded);
 }
 
-[data-review-ui] .er-folio-name em {
-  font-style: normal;
+/* Pad page content down so it isn't hidden under the fixed folio.
+ * Surface-specific chrome that adds more fixed bars (e.g. the
+ * longform `.er-strip`) extends this offset further; see
+ * editorial-review.css. */
+body[data-review-ui="studio"],
+body[data-review-ui="shortform"],
+body[data-review-ui="entry-review"],
+body[data-review-ui="manual"],
+body[data-review-ui="scrapbook"] {
+  padding-top: var(--er-folio-h);
+}
+
+[data-review-ui] .er-folio-mark {
+  font-family: var(--er-font-display);
+  font-variation-settings: "opsz" 36, "wght" 600;
+  font-style: italic;
+  font-size: 0.95rem;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  color: var(--er-ink);
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+[data-review-ui] .er-folio-mark::before {
+  content: '※ ';
   color: var(--er-red-pencil);
-  letter-spacing: 0.32em;
-  font-weight: 600;
+  font-style: normal;
+  font-family: var(--er-font-display);
 }
 
 [data-review-ui] .er-folio-spine {
   font-family: var(--er-font-mono);
-  font-size: 0.6rem;
-  letter-spacing: 0.18em;
-  text-transform: lowercase;
-  color: var(--er-faded);
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
+  text-transform: none;
+  color: var(--er-ink-soft);
   white-space: nowrap;
-  font-feature-settings: "tnum";
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 [data-review-ui] .er-folio-spine b {
   font-weight: 500;
-  color: var(--er-ink-soft);
+  color: var(--er-ink);
 }
 
 [data-review-ui] .er-folio-nav {
   display: flex;
-  justify-content: center;
-  gap: 0;
-  align-items: baseline;
+  gap: var(--er-space-3);
+  align-items: center;
+  flex: 0 0 auto;
+  margin-left: auto;
 }
 
 [data-review-ui] .er-folio-nav a {
-  font-family: var(--er-font-display);
-  font-variation-settings: "opsz" 28, "wght" 400, "SOFT" 30;
-  font-size: 0.95rem;
-  color: var(--er-ink);
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--er-faded);
   text-decoration: none;
-  padding: 0.3rem 0.85rem;
-  letter-spacing: 0.005em;
+  padding: 0.4rem 0;
   position: relative;
-  transition: color 0.16s ease;
+  transition: color 0.14s ease;
 }
 
 [data-review-ui] .er-folio-nav a:hover {
-  color: var(--er-red-pencil);
+  color: var(--er-ink);
 }
 
-/* Leader dots between nav items — the typeset way to separate
-   contents-list entries on a printed page. */
-[data-review-ui] .er-folio-nav a:not(:last-child)::after {
-  content: '·';
-  position: absolute;
-  right: -0.15rem;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--er-faded-2);
-  font-size: 1rem;
-  pointer-events: none;
-}
-
-/* Active link: red-pencil tick mark drawn above. The mark is a
-   short irregular curve (rendered via ::before with a skewed
-   border) — reads like an editor circled where you are. */
+/* Active link: red-pencil bottom rule. Reads as a marked entry
+   on a contents page rather than a generic UI underline. */
 [data-review-ui] .er-folio-nav a.active {
   color: var(--er-red-pencil);
-  font-variation-settings: "opsz" 28, "wght" 500, "SOFT" 30;
 }
 
-[data-review-ui] .er-folio-nav a.active::before {
+[data-review-ui] .er-folio-nav a.active::after {
   content: '';
   position: absolute;
-  left: 0.85rem;
-  right: 0.85rem;
-  top: -0.1rem;
-  height: 4px;
-  border-bottom: 1.5px solid var(--er-red-pencil);
-  border-right: 1.5px solid var(--er-red-pencil);
-  transform: skewX(-12deg) rotate(-1deg);
-  border-bottom-right-radius: 60% 90%;
-  border-bottom-left-radius: 30% 80%;
+  inset: auto 0 -1px 0;
+  height: 2px;
+  background: var(--er-red-pencil);
   pointer-events: none;
-  opacity: 0.85;
 }
 
-/* On narrow viewports, collapse the spine and condense */
-@media (max-width: 720px) {
-  [data-review-ui] .er-folio-inner {
-    grid-template-columns: auto 1fr;
-    padding: var(--er-space-1) var(--er-space-2);
-  }
+/* Tablet: tighten the nav gap so all five labels stay on one row.
+ * Spine still visible — tablets have plenty of horizontal room. */
+@media (max-width: 64rem) {
+  [data-review-ui] .er-folio-nav { gap: var(--er-space-2); }
+  [data-review-ui] .er-folio-nav a { letter-spacing: 0.1em; font-size: 0.66rem; }
+}
+
+/* Phone: drop the spine entirely (the wordmark + active nav-item
+ * carry the page identity) and shrink padding. */
+@media (max-width: 48rem) {
+  [data-review-ui] .er-folio { padding: 0 var(--er-space-2); gap: var(--er-space-2); }
   [data-review-ui] .er-folio-spine { display: none; }
+  [data-review-ui] .er-folio-nav { gap: var(--er-space-1); }
   [data-review-ui] .er-folio-nav a {
-    padding: 0.3rem 0.5rem;
-    font-size: 0.85rem;
+    padding: 0.4rem 0.15rem;
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
   }
 }
 
