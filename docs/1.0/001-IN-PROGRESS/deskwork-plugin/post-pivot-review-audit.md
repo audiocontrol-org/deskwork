@@ -60,7 +60,7 @@ No re-review needed.
 - The entry's content lives at `docs/source-shipped-deskwork-plan/index.md` per the slug convention.
 - Spot-checked: this is a planning doc that was iterated to v2 then never updated. The current file is what was approved in v2.
 
-No re-review needed; the gap is a sidecar-schema artifact (older entry predates the `artifactPath` field). Filing as non-blocking improvement: backfill `artifactPath` on entries that don't have one via `deskwork doctor --fix=all`. (Already a doctor capability; not a 34e blocker.)
+No re-review needed; the gap is a sidecar-schema artifact (older entry predates the `artifactPath` field added in #140 / Phase 31). The doctor currently backfills `artifactPath` only during the one-shot legacy → entry-centric migration (`packages/core/src/doctor/migrate.ts`); there's no path for entries that already exist in entry-centric form but lack the field. Filed as [#182](https://github.com/audiocontrol-org/deskwork/issues/182) for a doctor rule to backfill it. Not a 34e blocker — the runtime path (`artifactPathForStage` heuristic) still resolves the file at request time.
 
 ## Summary
 
