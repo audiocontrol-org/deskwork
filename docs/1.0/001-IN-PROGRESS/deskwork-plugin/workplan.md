@@ -1802,15 +1802,15 @@ GitHub tracking issues:
 
 **Corrupted-review audit (the trust re-build, post-34a):**
 
-- [x] `scripts/audit-post-pivot-iterations.ts` walks sidecars + workflow records on a project, identifying entries where `Σ iterationByStage` > workflow `currentVersion`. Run on this calendar found 1 mismatch.
-- [x] Mismatch dispositioned in `docs/1.0/001-IN-PROGRESS/deskwork-plugin/post-pivot-review-audit.md`. **Outcome: zero entries require re-review.** The single mismatch is this PRD entry (sidecar Σ=4 vs workflow currentVersion=1); the operator reviewed v4 directly via the documented file-diff bypass per [#170](https://github.com/audiocontrol-org/deskwork/issues/170) during 34a planning, NOT via the stale workflow record. The bypass IS the trust signal; no stale-content approval occurred.
-- [x] Re-review section: N/A (no non-trivial diffs surfaced by the audit).
-- [x] Audit results recorded in `docs/1.0/001-IN-PROGRESS/deskwork-plugin/post-pivot-review-audit.md` with per-entry disposition table.
+- [x] `scripts/audit-post-pivot-iterations.ts` (v2 — rewritten per the Phase 34e audit's F1+F2 findings) iterates every applied longform/outline workflow record, joins to the matching sidecar, loads the workflow's `currentVersion` snapshot from the per-version history-journal event, and computes a content diff vs. on-disk content. Run on this calendar considered 7 (entry, applied workflow) pairs.
+- [x] Mismatch dispositioned in `docs/1.0/001-IN-PROGRESS/deskwork-plugin/post-pivot-review-audit.md`. **Outcome: zero entries require re-review.** Audit summary: 4 non-trivial diffs (all the PRD entry across 4 separate `/feature-extend` cycles — each is a valid review of THAT cycle's snapshot, not stale-content corruption), 2 byte-identical (`release-skill-design`, `post-release-acceptance-design`), 1 incomplete (`source-shipped-deskwork-plan` — sidecar has no `artifactPath`; manual inspection confirms not corrupted, gap is sidecar-schema artifact predating the field).
+- [x] Re-review section: per-pair disposition table in the audit doc (PRD diffs are receipts of valid re-extension cycles; identical/incomplete pairs need no action).
+- [x] Audit results recorded in `docs/1.0/001-IN-PROGRESS/deskwork-plugin/post-pivot-review-audit.md` with per-pair disposition + provenance section explaining v1 vs. v2 differences.
 
 **Repo-wide grep audit (per `agent-discipline.md` "no just for now"):**
 
 - [x] Ran extended regex against `packages/studio/src/`, `plugins/deskwork-studio/public/src/`, `packages/cli/src/`, `packages/core/src/` (excluding tests). Initial hit count: 102 across `for now / just for now / TODO / FIXME / HACK / XXX / temporary / stub / placeholder / pending / until F / until v / migration window / coexist / for later / will land / will replace`. Triage: 101 are descriptive / benign (e.g. `<input placeholder>`, "fork-placeholder" affordance, "test stub", documentation describing existing as-is design like the documented shortform deferral in `pages/shortform-review.ts`, or context-specific use of the words "pending"/"placeholder"/"stub" as English nouns). **One real IOU surfaced**: `editorial-review-client.ts:1692` carried a TODO about outline-approve semantics. Filed as [#181](https://github.com/audiocontrol-org/deskwork/issues/181); TODO comment replaced with an issue-reference comment per the agent-discipline rule (no IOUs in production source).
-- [ ] Same audit on `packages/cli/src/` and `packages/core/src/` (rule applies repo-wide).
+- [x] Same audit on `packages/cli/src/` and `packages/core/src/` — covered by the bullet above (the `grep -rn` invocation passed all 4 source dirs as one ripgrep target). Re-verified post-Phase-34e-audit: only 2 hits in cli/core (`customize.ts:26` "`prompts` for now" describing the documented "reserved for future use" exit-code 2 behavior; `doctor.ts:172` "the migration window" describing the legitimate dual-validation behavior during the legacy → entry-centric pipeline migration). Both benign / descriptive; neither is an IOU.
 
 **Move-to-complete:**
 

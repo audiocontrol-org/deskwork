@@ -2,25 +2,40 @@
 /**
  * Phase 34e — corrupted-review trust rebuild.
  *
- * Walks the project's `.deskwork/entries/` sidecars and the
- * `.deskwork/review-journal/pipeline/` workflow records. For each
- * entry that has BOTH a sidecar and a workflow record (joined on
- * `entryId`), report when the sidecar's total iteration count
- * (Σ iterationByStage values) exceeds the workflow's `currentVersion`.
+ * For each applied longform / outline workflow record on a project,
+ * compute a CONTENT diff between:
+ *   - what the operator approved (the workflow's `currentVersion`
+ *     snapshot, sourced from the per-version history-journal event), and
+ *   - what's on disk now (the entry's `artifactPath`).
  *
- * That mismatch indicates the entry was iterated post-Phase-30 (which
- * writes to the sidecar + history journal) while the legacy workflow
- * record stayed frozen. Pre-34a, the studio's dashboard linked to the
- * legacy review surface, so any approve/reject the operator did
- * during that window could have been against stale workflow content.
+ * Pre-Phase-34a, the studio dashboard linked to the legacy review
+ * surface, which read frozen workflow records. The risk is that an
+ * operator approved against version-N content while the entry was
+ * subsequently iterated post-pivot via the entry-centric path —
+ * leaving the workflow record's "applied" stamp paired with stale
+ * content the operator never re-reviewed.
+ *
+ * Audit semantics:
+ *   - Only `state === 'applied'` records matter. Non-applied workflows
+ *     never produced an approval click.
+ *   - Only `contentKind` of `longform` or `outline` matter. Shortform
+ *     stays workflow-keyed by design (per Phase 34a's deferral); its
+ *     records aren't pre-Phase-30 corruption suspects.
+ *   - For each remaining record, compute the diff. Trivial diffs
+ *     (whitespace-only, frontmatter-only) don't warrant re-review.
+ *     Non-trivial diffs do.
+ *
+ * Audit script previously [v1] only computed iteration-count delta
+ * and chose the comparison record by directory order. Rewritten to
+ * fix two findings from the Phase 34e audit (F1: wrong workflow
+ * selection; F2: missing content diff).
  *
  * Usage:
  *   tsx scripts/audit-post-pivot-iterations.ts [<projectRoot>]
  *
- * Defaults `projectRoot` to the repo root (the calendar this script
- * is committed alongside).
+ * Defaults `projectRoot` to the repo root.
  *
- * Exit code: 0 always (audit is informational; no automatic remediation).
+ * Exit code: 0 always (audit is informational; no auto-remediation).
  */
 
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
@@ -31,6 +46,7 @@ interface Sidecar {
   slug: string;
   title: string;
   currentStage: string;
+  artifactPath?: string;
   iterationByStage?: Record<string, number>;
 }
 
@@ -39,8 +55,19 @@ interface WorkflowRecord {
   site: string;
   slug: string;
   state: string;
+  contentKind?: string;
   currentVersion: number;
+  createdAt: string;
+  updatedAt: string;
   entryId?: string;
+}
+
+interface VersionHistoryEvent {
+  entry?: {
+    kind?: string;
+    workflowId?: string;
+    version?: { version: number; markdown: string };
+  };
 }
 
 function readJsonDir<T>(dir: string): T[] {
@@ -54,97 +81,238 @@ function readJsonDir<T>(dir: string): T[] {
   return out;
 }
 
-function totalIterations(entry: Sidecar): number {
-  const counts = entry.iterationByStage ?? {};
-  let total = 0;
-  for (const v of Object.values(counts)) total += v;
-  return total;
+/**
+ * Strip a YAML frontmatter block from the top of a markdown file.
+ * Frontmatter changes (e.g. updatedAt timestamps) are not content
+ * differences for review-correctness purposes.
+ */
+function stripFrontmatter(text: string): string {
+  if (!text.startsWith('---\n')) return text;
+  const close = text.indexOf('\n---\n', 4);
+  if (close < 0) return text;
+  return text.slice(close + 5).replace(/^\n+/, '');
 }
 
-interface Mismatch {
+/**
+ * Normalize content for diff comparison: strip frontmatter, collapse
+ * runs of whitespace into single spaces, trim. Equal normalized
+ * content = trivially-different content = no re-review needed.
+ */
+function normalizeForDiff(text: string): string {
+  return stripFrontmatter(text).replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Locate the per-version history-journal event for a given workflow.
+ * The legacy pipeline emitted one event per `appendVersion` call:
+ * `<timestamp>-version-<workflowId>-v<n>.json`.
+ */
+function readWorkflowVersion(
+  historyDir: string,
+  workflowId: string,
+  version: number,
+): string | null {
+  if (!existsSync(historyDir)) return null;
+  const suffix = `-version-${workflowId}-v${version}.json`;
+  for (const name of readdirSync(historyDir)) {
+    if (!name.endsWith(suffix)) continue;
+    try {
+      const raw = readFileSync(join(historyDir, name), 'utf8');
+      const event = JSON.parse(raw) as VersionHistoryEvent;
+      const md = event.entry?.version?.markdown;
+      if (typeof md === 'string') return md;
+    } catch {
+      // Malformed event — keep looking.
+      continue;
+    }
+  }
+  return null;
+}
+
+interface ReviewPair {
   entryId: string;
   slug: string;
   title: string;
-  currentStage: string;
-  sidecarTotalIterations: number;
-  workflowCurrentVersion: number;
-  workflowState: string;
-  delta: number;
+  workflowId: string;
+  workflowVersion: number;
+  workflowUpdatedAt: string;
+  approvedMarkdown: string | null;
+  currentMarkdown: string | null;
+  currentArtifactPath: string | null;
 }
 
-function findMismatches(
+function buildReviewPairs(
+  projectRoot: string,
   sidecars: Sidecar[],
   workflows: WorkflowRecord[],
-): Mismatch[] {
-  // Index workflows by entryId. An entry can have multiple workflow
-  // records (longform + outline + shortform variants); join on
-  // contentKind=longform when present, else first match.
-  const wfsByEntry = new Map<string, WorkflowRecord[]>();
-  for (const wf of workflows) {
-    if (wf.entryId === undefined) continue;
-    const list = wfsByEntry.get(wf.entryId) ?? [];
-    list.push(wf);
-    wfsByEntry.set(wf.entryId, list);
-  }
+): ReviewPair[] {
+  const sidecarsByEntry = new Map<string, Sidecar>();
+  for (const s of sidecars) sidecarsByEntry.set(s.uuid, s);
 
-  const mismatches: Mismatch[] = [];
-  for (const sidecar of sidecars) {
-    const wfs = wfsByEntry.get(sidecar.uuid);
-    if (!wfs || wfs.length === 0) continue;
-    // Take the longform workflow if present (the one that backs the
-    // legacy review surface that 34a retired); else the first.
-    const wf = wfs[0];
-    if (!wf) continue;
-    const sidecarTotal = totalIterations(sidecar);
-    if (sidecarTotal > wf.currentVersion) {
-      mismatches.push({
-        entryId: sidecar.uuid,
-        slug: sidecar.slug,
-        title: sidecar.title,
-        currentStage: sidecar.currentStage,
-        sidecarTotalIterations: sidecarTotal,
-        workflowCurrentVersion: wf.currentVersion,
-        workflowState: wf.state,
-        delta: sidecarTotal - wf.currentVersion,
-      });
+  const historyDir = join(projectRoot, '.deskwork/review-journal/history');
+  const pairs: ReviewPair[] = [];
+  for (const wf of workflows) {
+    if (wf.state !== 'applied') continue;
+    if (wf.contentKind !== 'longform' && wf.contentKind !== 'outline') continue;
+    if (wf.entryId === undefined) continue;
+    const sidecar = sidecarsByEntry.get(wf.entryId);
+    if (sidecar === undefined) continue;
+    const approvedMarkdown = readWorkflowVersion(
+      historyDir,
+      wf.id,
+      wf.currentVersion,
+    );
+    let currentMarkdown: string | null = null;
+    let currentArtifactPath: string | null = null;
+    if (sidecar.artifactPath !== undefined) {
+      const abs = join(projectRoot, sidecar.artifactPath);
+      currentArtifactPath = sidecar.artifactPath;
+      if (existsSync(abs)) {
+        try {
+          currentMarkdown = readFileSync(abs, 'utf8');
+        } catch {
+          currentMarkdown = null;
+        }
+      }
     }
+    pairs.push({
+      entryId: wf.entryId,
+      slug: sidecar.slug,
+      title: sidecar.title,
+      workflowId: wf.id,
+      workflowVersion: wf.currentVersion,
+      workflowUpdatedAt: wf.updatedAt,
+      approvedMarkdown,
+      currentMarkdown,
+      currentArtifactPath,
+    });
   }
-  return mismatches;
+  return pairs;
+}
+
+interface Diagnosis {
+  pair: ReviewPair;
+  status:
+    | 'identical'
+    | 'whitespace-only'
+    | 'frontmatter-only'
+    | 'non-trivial'
+    | 'approved-snapshot-missing'
+    | 'current-content-missing';
+  detail: string;
+}
+
+function diagnose(pair: ReviewPair): Diagnosis {
+  if (pair.approvedMarkdown === null) {
+    return {
+      pair,
+      status: 'approved-snapshot-missing',
+      detail: `no version-${pair.workflowVersion} event for workflow ${pair.workflowId}`,
+    };
+  }
+  if (pair.currentMarkdown === null) {
+    return {
+      pair,
+      status: 'current-content-missing',
+      detail: `no on-disk content at ${pair.currentArtifactPath ?? '(no artifactPath on sidecar)'}`,
+    };
+  }
+  if (pair.approvedMarkdown === pair.currentMarkdown) {
+    return { pair, status: 'identical', detail: 'byte-identical' };
+  }
+  const approvedNorm = normalizeForDiff(pair.approvedMarkdown);
+  const currentNorm = normalizeForDiff(pair.currentMarkdown);
+  if (approvedNorm === currentNorm) {
+    // Bodies match after frontmatter strip + whitespace normalize.
+    // Still want to distinguish whitespace-only from frontmatter-only
+    // because the disposition hint differs (whitespace = pure noise;
+    // frontmatter = metadata churn that's also noise but worth naming).
+    if (
+      stripFrontmatter(pair.approvedMarkdown) ===
+      stripFrontmatter(pair.currentMarkdown)
+    ) {
+      return { pair, status: 'whitespace-only', detail: 'differs only in inter-line whitespace' };
+    }
+    return {
+      pair,
+      status: 'frontmatter-only',
+      detail: 'body identical; frontmatter changed',
+    };
+  }
+  const approvedLines = pair.approvedMarkdown.split('\n').length;
+  const currentLines = pair.currentMarkdown.split('\n').length;
+  return {
+    pair,
+    status: 'non-trivial',
+    detail: `approved was ${approvedLines} lines; current is ${currentLines} lines`,
+  };
 }
 
 function main(): void {
   const projectRoot = resolve(process.argv[2] ?? process.cwd());
-  const entriesDir = join(projectRoot, '.deskwork/entries');
-  const pipelineDir = join(projectRoot, '.deskwork/review-journal/pipeline');
-
-  const sidecars = readJsonDir<Sidecar>(entriesDir);
-  const workflows = readJsonDir<WorkflowRecord>(pipelineDir);
-  const mismatches = findMismatches(sidecars, workflows);
+  const sidecars = readJsonDir<Sidecar>(join(projectRoot, '.deskwork/entries'));
+  const workflows = readJsonDir<WorkflowRecord>(
+    join(projectRoot, '.deskwork/review-journal/pipeline'),
+  );
 
   process.stdout.write(
     `Audit: ${sidecars.length} sidecars × ${workflows.length} workflow records\n`,
   );
   process.stdout.write(`Project: ${projectRoot}\n\n`);
 
-  if (mismatches.length === 0) {
-    process.stdout.write(
-      'No mismatches. Every entry with a workflow record has its sidecar iteration count <= the workflow currentVersion.\n',
-    );
-    return;
-  }
+  const pairs = buildReviewPairs(projectRoot, sidecars, workflows);
+  process.stdout.write(
+    `Considered ${pairs.length} (entry, applied longform/outline workflow) pairs.\n\n`,
+  );
+
+  const diagnoses = pairs.map(diagnose);
+  const nonTrivial = diagnoses.filter((d) => d.status === 'non-trivial');
+  const trivial = diagnoses.filter(
+    (d) =>
+      d.status === 'identical' ||
+      d.status === 'whitespace-only' ||
+      d.status === 'frontmatter-only',
+  );
+  const incomplete = diagnoses.filter(
+    (d) =>
+      d.status === 'approved-snapshot-missing' ||
+      d.status === 'current-content-missing',
+  );
 
   process.stdout.write(
-    `Found ${mismatches.length} entries where sidecar iteration count exceeds the legacy workflow currentVersion:\n\n`,
+    `Summary: ${nonTrivial.length} non-trivial diff(s), ${trivial.length} trivial-or-identical, ${incomplete.length} incomplete (missing snapshot or current content).\n\n`,
   );
-  for (const m of mismatches) {
-    process.stdout.write(
-      `  - ${m.slug} (${m.entryId})\n` +
-        `      title: ${m.title}\n` +
-        `      currentStage: ${m.currentStage}\n` +
-        `      sidecar Σ iterations: ${m.sidecarTotalIterations}\n` +
-        `      workflow currentVersion: ${m.workflowCurrentVersion} (state=${m.workflowState})\n` +
-        `      delta: +${m.delta} iteration(s) recorded post-pivot\n\n`,
-    );
+
+  if (nonTrivial.length > 0) {
+    process.stdout.write('Non-trivial content diffs (re-review recommended):\n\n');
+    for (const d of nonTrivial) {
+      process.stdout.write(
+        `  - ${d.pair.slug} (entry ${d.pair.entryId})\n` +
+          `      title: ${d.pair.title}\n` +
+          `      workflow: ${d.pair.workflowId} v${d.pair.workflowVersion} applied at ${d.pair.workflowUpdatedAt}\n` +
+          `      diff: ${d.detail}\n\n`,
+      );
+    }
+  }
+
+  if (trivial.length > 0) {
+    process.stdout.write('Trivial-or-identical (no re-review needed):\n\n');
+    for (const d of trivial) {
+      process.stdout.write(
+        `  - ${d.pair.slug} v${d.pair.workflowVersion} workflow ${d.pair.workflowId.slice(0, 8)}: ${d.status} (${d.detail})\n`,
+      );
+    }
+    process.stdout.write('\n');
+  }
+
+  if (incomplete.length > 0) {
+    process.stdout.write('Incomplete pairs (manual inspection needed):\n\n');
+    for (const d of incomplete) {
+      process.stdout.write(
+        `  - ${d.pair.slug} v${d.pair.workflowVersion} workflow ${d.pair.workflowId.slice(0, 8)}: ${d.status} — ${d.detail}\n`,
+      );
+    }
+    process.stdout.write('\n');
   }
 }
 
