@@ -4,6 +4,45 @@ Session journal for `deskwork`. Each entry records what was tried, what worked, 
 
 ---
 
+## 2026-05-03 (pre-release studio walkthrough): operator-driven studio review surfaces DESKWORK_DEV loopback-only gap; folio chrome design-system conformance check
+
+### Feature: deskwork-plugin
+### Worktree: deskwork-plugin
+
+**Goal:** operator wanted to review the studio against F1-F6 before driving the release. Bring the studio up at a tailnet-accessible URL + walk the redesign.
+
+**Accomplished:**
+
+- **Discovered DESKWORK_DEV=1 dev mode is loopback-only.** Initial `npm run dev --workspace @deskwork/studio` invocation booted on `http://localhost:47321/` only — no Tailscale magic-DNS URL. Reading `packages/studio/src/server.ts:585-678` confirmed the dev branch hardcodes `LOOPBACK` binding and skips the Tailscale auto-detection path used by the production listener. Per `.claude/rules/agent-discipline.md` "Always surface the magic-DNS URL" — operator off-keyboard expects tailnet-accessible URLs by default.
+- **Switched to production studio path** via `node_modules/.bin/deskwork-studio --project-root .` (the npm-publish-shape bin via the workspace symlink, freshly built from this session's cold-cycle verification). Output: `http://orion-m4.tail8254f4.ts.net:47321/` (Tailscale magic-DNS) + `http://100.65.31.54:47321/` (Tailscale IP) + loopback. Operator now has a URL they can hit from any device on the tailnet.
+- **`/frontend-design` design-system conformance check** on a folio chrome crop: confirmed the spec-vs-implementation match. The `.er-folio-spine` (`editorial-nav.css:90-101`) explicitly uses `text-transform: none` — lowercase IS the intentional design contrast against the uppercase `.er-folio-nav` links and the italic display `.er-folio-mark`. Three distinct treatments in 2.4rem of vertical chrome: italic display for identity, lowercase mono for context, uppercase mono for navigation.
+
+**Didn't Work:**
+
+- **Dev mode skipping Tailscale wasted ~1 minute of restart friction.** The DESKWORK_DEV=1 branch was originally added to skip the in-process esbuild step (Phase 31 dev workflow); it incidentally also skipped the Tailscale binding because both live in different branches of `bootstrapStudio`. Worth filing as a follow-up: dev mode should still bind to Tailscale + print magic-DNS URL by default. Loopback-only should be opt-in via explicit `--no-tailscale`, mirroring the production path's contract.
+
+**Course Corrections:**
+
+- **[PROCESS] Should have launched production studio path from the start, not dev mode.** The user's stated goal was a visual review, not code iteration — HMR wasn't needed. Production studio (with Tailscale + magic-DNS) was the right tool. The dev-mode reflex was wrong here. Lesson: when the operator says "review" or "walkthrough," the goal is *experiencing* the surface, not iterating on it; default to the production-shape bin.
+
+**Quantitative:**
+
+- Messages from operator: ~3 (review request + folio chrome image + /session-end)
+- Skill invocations: 2 (`frontend-design:frontend-design` for the folio conformance check + this `session-end`)
+- Commits: 1 (this doc update)
+- Course corrections: 1 ([PROCESS] dev-vs-production studio path for review work)
+
+**Insights:**
+
+- **The DESKWORK_DEV-loopback-only gap is a real follow-up.** Dev mode optimizes for code-iteration (HMR) but discards the Tailscale convention adopters rely on for off-keyboard review. The right fix: the dev-mode listener should call the same `listenWithAutoIncrement` path the production listener uses (with Tailscale auto-detection), and only the esbuild step should be conditionally skipped on `DESKWORK_DEV=1`. Estimated ~30 lines of refactor in `server.ts` to merge the two listening branches. **Filed as `.github-issue-followup-dev-studio-tailscale-body.md`** for operator to `gh issue create` from a release-capable computer.
+- **Folio chrome lowercase-spine reads as a typo to people calibrated on uppercase nav conventions.** The user's question ("does this conform") was the right reflex — the visual contrast of lowercase-vs-uppercase is intentional but unconventional. Worth keeping the spec comment in `editorial-nav.css:94` (`text-transform: none`) explicit so future contributors don't "fix" it.
+
+**Next session:**
+
+Same as the prior entry's next-session — operator drives `/release` skill from a release-capable computer. The dev-studio Tailscale follow-up is non-blocking; file alongside the other 2 follow-ups when posting.
+
+---
+
 ## 2026-05-02 (F2-F6 + merge + CI rescue): scrapbook redesign F2-F6 ships, PR #162 merges to main, CI rescued from 6-month-stale broken state (#161, #162)
 
 ### Feature: deskwork-plugin

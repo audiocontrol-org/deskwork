@@ -13,6 +13,30 @@ Populating this file is a step in `/session-end`. If a session didn't exercise t
 
 ---
 
+## 2026-05-03 (pre-release studio walkthrough): operator-driven studio review surfaces dev-mode loopback-only gap
+
+**Arc:** Operator wanted to review the studio against F1-F6 before driving the release. Bring it up at a tailnet-accessible URL + walk the redesign + spot-check folio chrome conformance.
+
+### What the dogfood surfaced
+
+- **friction** — **DESKWORK_DEV=1 dev mode is loopback-only.** First instinct (`npm run dev --workspace @deskwork/studio`) booted on `http://localhost:47321/` only. Reading `packages/studio/src/server.ts:585-678` confirmed the dev branch hardcodes `LOOPBACK` binding and skips the Tailscale auto-detection that the production listener uses. For an off-keyboard operator who needs to review from a different device, dev mode is unusable without restart. **Filed as follow-up** (`.github-issue-followup-dev-studio-tailscale-body.md`): dev-mode listener should call the same `listenWithAutoIncrement` path the production listener uses; only the esbuild step should be conditional on `DESKWORK_DEV=1`. Estimated ~30 lines of refactor.
+
+- **fix** — **Switched to production studio path:** `node_modules/.bin/deskwork-studio --project-root .` (the npm-publish-shape bin via the workspace symlink, freshly built). Output: `http://orion-m4.tail8254f4.ts.net:47321/` (Tailscale magic-DNS) + `http://100.65.31.54:47321/` (Tailscale IP) + loopback. Operator now had a URL hittable from any tailnet device.
+
+- **insight** — **Reflex check: when the operator says "review" or "walkthrough," default to the production-shape bin, not dev mode.** HMR is a developer-iteration tool; review work doesn't need it. The dev-mode reflex for studio start was wrong here. Pattern to internalize: "review" + "walkthrough" → production bin. "Iterate" + "implement" → dev mode.
+
+- **insight** — **`/frontend-design` design-system conformance check is a useful spot-check tool.** Operator sent a folio chrome crop ("does this conform to design system standards") asking about the lowercase mono spine text. Reading `editorial-nav.css:90-101` confirmed `text-transform: none` is explicit — lowercase IS the intentional contrast against the uppercase `.er-folio-nav` links. Three distinct treatments in 2.4rem of vertical chrome (italic display for identity, lowercase mono for context, uppercase mono for navigation) — characterful, not generic.
+
+- **insight** — **Lowercase mono spine reads as a typo to people calibrated on uppercase nav conventions.** The "is this right" reflex was correct caution. The CSS comment on the rule (`text-transform: none`) is the deliberate disambiguation — worth keeping explicit so future contributors don't "fix" it.
+
+### Operator quote preserved
+
+> "I'd like to review the studio before we release"
+
+The pre-release operator-driven visual walkthrough is the analog of the post-release "verify in formally-installed release" gate from `agent-discipline.md`. Both are operator-only by design. This one happens to land before tag, which is unusual but legitimate when the operator wants confidence in the merged state before publishing.
+
+---
+
 ## 2026-05-02 (F2-F6 + merge + CI rescue): finishing the redesign arc surfaces a 6-month-stale broken CI as merge-blocker
 
 **Arc:** F1 commit + F2-F6 dispatches + PR #162 merge to main + CI infrastructure rescue. Operator was off-keyboard during execution; dispatched fully via auto-mode with periodic "continue" / "do it" / "what's next" framing.
