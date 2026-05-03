@@ -3223,9 +3223,9 @@ This section was appended on 2026-05-03 after the implementation audit in `2026-
 
 ### Task 47: Real peer-plugin detection in doctor
 
-- [ ] Implement actual peer-plugin detection in `src/subcommands/doctor.ts` against the real Claude install state instead of `detectPeerPlugin: () => false`.
-- [ ] Add unit coverage for required-peer present, recommended-peer absent, and both-present cases using realistic fixture data rather than pure stub success/failure.
-- [ ] Verify the implementation matches the design's required/recommended peer posture and closes the false-negative class captured in #121.
+- [x] Implement actual peer-plugin detection in `src/subcommands/doctor.ts` against the real Claude install state instead of `detectPeerPlugin: () => false`.
+- [x] Add unit coverage for required-peer present, recommended-peer absent, and both-present cases using realistic fixture data rather than pure stub success/failure.
+- [x] Verify the implementation matches the design's required/recommended peer posture and closes the false-negative class captured in #121.
 
 **Acceptance Criteria:**
 - `dw-lifecycle doctor` no longer reports `superpowers` / `feature-dev` missing when they are actually installed.

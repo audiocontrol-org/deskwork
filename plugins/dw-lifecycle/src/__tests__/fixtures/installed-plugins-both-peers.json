@@ -1,0 +1,27 @@
+{
+  "version": 2,
+  "plugins": {
+    "superpowers@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/Users/test/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.7",
+        "version": "5.0.7"
+      }
+    ],
+    "feature-dev@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/Users/test/.claude/plugins/cache/claude-plugins-official/feature-dev/unknown",
+        "version": "unknown"
+      }
+    ],
+    "frontend-design@claude-plugins-official": [
+      {
+        "scope": "project",
+        "projectPath": "/Users/test/work/other-project",
+        "installPath": "/Users/test/.claude/plugins/cache/claude-plugins-official/frontend-design/unknown",
+        "version": "unknown"
+      }
+    ]
+  }
+}
