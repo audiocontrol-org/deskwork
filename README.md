@@ -71,7 +71,13 @@ The release procedure is documented in [`RELEASING.md`](./RELEASING.md) for cont
 
 ### Migrating from earlier versions
 
-If you're upgrading from v0.8.x or earlier, see [`MIGRATING.md`](./MIGRATING.md) for the one-time first-run install behavior, the customization-layer migration path (replacing local `bundle/` monkeypatches), and other adopter-facing notes for the source-shipped re-architecture.
+The current shape (v0.10.0+) ships `@deskwork/{core,cli,studio}` as npm
+packages; plugin shells `npm install --omit=dev` on first invocation. See
+[`MIGRATING.md`](./MIGRATING.md) for version-by-version upgrade notes —
+the v0.10.0 npm pivot superseded the v0.9.x source-shipped vendor/symlink
+architecture, so historical sections in that file describing
+`vendor/`, `materialize-vendor.sh`, or pinned `source.ref` describe earlier
+versions, not current shape.
 
 ### Repository layout
 

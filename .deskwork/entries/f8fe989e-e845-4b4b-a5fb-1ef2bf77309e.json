@@ -1,0 +1,13 @@
+{
+  "uuid": "f8fe989e-e845-4b4b-a5fb-1ef2bf77309e",
+  "slug": "thesis",
+  "title": "Deskwork architectural thesis",
+  "description": "The architectural commitments deskwork is built around — agent-as-primary-tool, skills do the work, operator extends via their agent. Read before touching any deskwork code.",
+  "keywords": [],
+  "source": "manual",
+  "currentStage": "Ideas",
+  "iterationByStage": {},
+  "artifactPath": "THESIS.md",
+  "createdAt": "2026-05-04T06:17:29.959Z",
+  "updatedAt": "2026-05-04T06:17:29.959Z"
+}

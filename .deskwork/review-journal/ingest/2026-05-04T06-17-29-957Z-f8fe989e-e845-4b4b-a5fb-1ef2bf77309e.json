@@ -1,0 +1,23 @@
+{
+  "id": "f8fe989e-e845-4b4b-a5fb-1ef2bf77309e",
+  "timestamp": "2026-05-04T06:17:29.957Z",
+  "event": "ingest",
+  "slug": "thesis",
+  "entryId": "f8fe989e-e845-4b4b-a5fb-1ef2bf77309e",
+  "site": "deskwork-internal",
+  "stage": "Ideas",
+  "sourceFile": "THESIS.md",
+  "frontmatterSnapshot": {
+    "title": "Deskwork architectural thesis",
+    "description": "The architectural commitments deskwork is built around — agent-as-primary-tool, skills do the work, operator extends via their agent. Read before touching any deskwork code.",
+    "deskwork": {
+      "doc": "thesis",
+      "status": "load-bearing"
+    }
+  },
+  "derivation": {
+    "slug": "explicit",
+    "state": "default",
+    "date": "mtime"
+  }
+}

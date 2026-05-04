@@ -11,6 +11,28 @@ author: Orion Letizi
 
 # Source-shipped deskwork plugins (drop the bundles)
 
+> **SUPERSEDED 2026-04-29 by Phase 26 (npm-publish pivot).** This plan was
+> the Phase 23 architecture (v0.9.0): retire bundles, ship pure source via
+> in-tree symlinked vendor directories. Three install-blockers in three
+> v0.9.x releases (#88 dangling vendor symlinks, the husky walk-up at
+> commit `7f6961f`, and #93 `tsx`-can't-resolve-`@deskwork/core`) all
+> rooted in the same place: Claude Code's marketplace install path
+> doesn't survive workspace dep resolution. Phase 26 (PRD §444+) pivoted
+> to publishing `@deskwork/{core,cli,studio}` as npm packages; plugin
+> shells `npm install --omit=dev @deskwork/<pkg>@<version>` on first
+> invocation. The vendor/symlink, `materialize-vendor.sh`, and
+> `marketplace.json source.ref`-pin machinery from this plan is all
+> retired. The customization seam (project-local overrides under
+> `<projectRoot>/.deskwork/`, `/deskwork:customize` skill) and the
+> collection-vs-website data-model reframe both **carried forward** and
+> remain current commitments — see `THESIS.md` Consequence 3 for the
+> active state of the override-seam work.
+>
+> Read this document as historical context for *why* the architecture
+> moved away from in-repo bundles, not as a description of the current
+> shape. Don't extend it; don't reference its phase numbering as
+> current.
+
 ## Context
 
 **The trigger.** A UX evaluation of the LinkedIn shortform review surface at `http://localhost:47322/dev/editorial-review/5691b1d0-...` revealed that every studio client JS bundle returns 404 in the v0.8.1 marketplace install. The shortform editor is non-interactive: Edit / Approve / Iterate / Reject / margin-note creation / mark-on-selection — all dead. Console reports `editorial-review-client.js 404`. Same defect across every studio page (dashboard, content, scrapbook), and every release tag back to at least v0.6.0.

@@ -6,6 +6,7 @@
 |------|------|------|------|------|------|
 | 1c3bfe8f-e9c2-4133-ab88-2aa08d9fa702 | post-release-acceptance-design | Post-release customer acceptance playbook | A pair of skills that codify how to evaluate the freshly-installed deskwork marketplace plugin, surface friction, and file issues — using the deskwork pipeline itself as the triage surface. |  | manual |
 | 36a268a4-c7ac-4802-8992-20319a08fa92 | deskwork-plugin/issue-158-ux-audit | Issue 158 Ux Audit |  |  | manual |
+| f8fe989e-e845-4b4b-a5fb-1ef2bf77309e | thesis | Deskwork architectural thesis | The architectural commitments deskwork is built around — agent-as-primary-tool, skills do the work, operator extends via their agent. Read before touching any deskwork code. |  | manual |
 
 ## Planned
 

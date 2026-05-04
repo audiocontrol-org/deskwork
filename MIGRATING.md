@@ -213,6 +213,8 @@ If migration fails or produces unexpected results, open an issue at <https://git
 
 ---
 
+> **Sections below describe historical migrations on the v0.9.x vendor/symlink architecture.** That architecture was retired in v0.10.0 by the Phase 26 npm pivot — see the PRD §444 "Extension: npm-publish architecture pivot" for the rationale (three install-blockers in three releases all rooted in workspace-dep resolution against Claude Code's marketplace install path). Current architecture: plugin shells `npm install --omit=dev @deskwork/<pkg>@<version>` on first invocation; `vendor/`, `materialize-vendor.sh`, and `marketplace.json source.ref` pinning are all retired. Read the historical sections below as version-specific upgrade notes, not as descriptions of current shape.
+
 ## Migrating to v0.9.3+ (marketplace.json source-shape change)
 
 v0.9.3 changed each plugin's `marketplace.json` `source` field from a relative path (`./plugins/deskwork`) to a `git-subdir` source pinned at the release tag — necessary so adopters install the materialized-vendor commit (Issue [#88](https://github.com/audiocontrol-org/deskwork/issues/88)). For most adopters the change is invisible: `/plugin marketplace update deskwork` followed by `/plugin install deskwork@deskwork` works as expected.
