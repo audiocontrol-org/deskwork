@@ -1388,6 +1388,27 @@ body[data-marginalia="hidden"] .er-page-gutter {
   display: none;
 }
 
+/* #187: stowing marginalia must actually widen the reading surface — not
+ * just center it. The page-grid above expands the article column to 1fr,
+ * but BlogLayout's `.essay { max-width: 576px }` keeps the visible body
+ * narrow, so the operator sees the same line-width with more cream-paper
+ * around it (the issue's "just moves to the center"). Relax that cap on
+ * the longform review surface specifically (BlogLayout's site rendering
+ * is unaffected — these selectors only fire under `data-review-ui="longform"`
+ * which only the studio sets). 64rem ≈ 1024px is comfortably wider than
+ * the default 36rem essay while still keeping line-length humane for
+ * narrative prose; tables and code blocks (which want every pixel
+ * available) get the full article track via the explicit overrides
+ * further down. */
+body[data-marginalia="hidden"] [data-review-ui="longform"] .essay,
+body[data-marginalia="hidden"] [data-review-ui="longform"] .essay-body,
+body[data-marginalia="hidden"] [data-review-ui="longform"] #draft-body {
+  /* `!important` so the longform-default rule (max-width: 42rem) above
+   * doesn't tie this on specificity. Stowed mode wins by intent — the
+   * operator explicitly asked for more room when stowing marginalia. */
+  max-width: 64rem !important;
+}
+
 /* Stow chevron — small button in the marginalia head. */
 .er-marginalia-stow {
   display: inline-flex;
@@ -3641,3 +3662,144 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
   color: var(--er-ink);
   text-decoration-style: solid;
 }
+
+/* ===========================================================================
+ * GFM tables on the longform review surface
+ *
+ * Audit docs, comparison matrices, schema tables — operator-authored
+ * markdown routinely uses tables that don't fit the essay's narrow
+ * reading column. Default browser table styling is generic-sans and
+ * doesn't match the press-check aesthetic; without scoping, BlogLayout's
+ * `.essay-body` styles spill onto cells (sans body font, no rule lines).
+ *
+ * Treatment:
+ *   - Tables break out of `.essay`'s narrow text column and consume the
+ *     full article track, the way magazine pull-outs do.
+ *   - When too wide for the article track, scroll horizontally inside
+ *     their own envelope (display: block + overflow-x: auto). Inner
+ *     children are display: revert so table semantics still hold.
+ *   - Editorial typography: JetBrains Mono uppercase kicker for headers,
+ *     Newsreader for prose cells, JetBrains Mono no-wrap for `<code>` —
+ *     so multi-token class names like `er-pagehead--centered` stay on
+ *     one line (the audit screenshot's mid-token wrapping was the
+ *     original visual defect).
+ *   - Hairline rules + paper-2 header band match the project's existing
+ *     row chrome.
+ *
+ * Scoped under `[data-review-ui="longform"] #draft-body` so BlogLayout's
+ * site rendering is unaffected.
+ * =========================================================================== */
+
+/* The default `.essay { max-width: 576px }` from BlogLayout is sized for
+ * narrative magazine prose — too narrow for technical drafts that lean
+ * on tables, code blocks, and class-name catalogues. Bump it up to match
+ * the article column cap (42rem ≈ 672px) on the longform review surface
+ * specifically. The host site's published rendering is unaffected. */
+[data-review-ui="longform"] .essay,
+[data-review-ui="longform"] .essay-body,
+[data-review-ui="longform"] #draft-body {
+  max-width: 42rem;
+}
+
+[data-review-ui="longform"] #draft-body table {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  margin: var(--er-space-3) 0;
+  font-family: var(--er-font-body);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--er-ink);
+  background: var(--er-paper);
+  border-top: var(--er-rule-thin);
+  border-bottom: var(--er-rule-thin);
+  border-collapse: collapse;
+}
+
+/* Re-establish table semantics inside the block-displayed `<table>` so
+ * <thead>/<tbody>/<tr>/<th>/<td> still arrange as a real table. */
+[data-review-ui="longform"] #draft-body table > * {
+  font: inherit;
+  color: inherit;
+}
+[data-review-ui="longform"] #draft-body table thead {
+  display: table-header-group;
+}
+[data-review-ui="longform"] #draft-body table tbody {
+  display: table-row-group;
+}
+[data-review-ui="longform"] #draft-body table tr {
+  display: table-row;
+}
+[data-review-ui="longform"] #draft-body table th,
+[data-review-ui="longform"] #draft-body table td {
+  display: table-cell;
+}
+
+/* The actual table sizing — once `display: block` made the outer
+ * element scrollable, an inner pseudo-table needs to lay out. We use
+ * the children directly via `display: table-*` above; here we ensure
+ * the inner cells get reasonable width. `width: max-content` on tbody
+ * via tr would force horizontal scroll for any table over container
+ * width without forcing it on smaller tables. */
+
+[data-review-ui="longform"] #draft-body th {
+  padding: 0.55rem 0.75rem;
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--er-ink-soft);
+  text-align: left;
+  font-weight: 500;
+  background: var(--er-paper-2);
+  border-bottom: var(--er-rule-thin);
+  vertical-align: bottom;
+  white-space: nowrap;
+}
+
+[data-review-ui="longform"] #draft-body td {
+  padding: 0.55rem 0.75rem;
+  vertical-align: top;
+  border-bottom: 1px dotted var(--er-paper-3);
+  /* `break-word` only breaks long unbreakable strings (URLs, hashes);
+   * common words like "compositor's" stay intact. `anywhere` was too
+   * aggressive — it broke "compositor's" into "composi\ntor's" when
+   * the column got narrow. */
+  overflow-wrap: break-word;
+}
+
+[data-review-ui="longform"] #draft-body tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* Code in cells — no-wrap so multi-token classnames like
+ * `er-pagehead--centered` stay on one line. The cell will widen and the
+ * outer `<table>`'s overflow-x picks up any spillover. */
+[data-review-ui="longform"] #draft-body td code,
+[data-review-ui="longform"] #draft-body th code {
+  font-family: var(--er-font-mono);
+  font-size: 0.78em;
+  background: var(--er-paper-2);
+  padding: 0.08em 0.32em;
+  border-radius: 2px;
+  color: var(--er-ink-soft);
+  white-space: nowrap;
+}
+
+/* Tables interact with paragraphs that wrap their cells — strip the
+ * default p margin so cells don't ship a tower of vertical padding when
+ * a single cell holds wrapped prose. */
+[data-review-ui="longform"] #draft-body td p {
+  margin: 0;
+}
+[data-review-ui="longform"] #draft-body td p + p {
+  margin-top: 0.4em;
+}
+
+/* Scroll-shadow trick removed — it overrode the table's solid paper bg
+ * and produced a faded rectangle. Plain `background: var(--er-paper)`
+ * declared in the main `<table>` rule keeps the surface clean.
+ * If a horizontal-scroll affordance is ever wanted, it should live on
+ * a wrapping element (added via rehype) rather than on `<table>`. */

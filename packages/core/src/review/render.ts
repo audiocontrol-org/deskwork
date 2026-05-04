@@ -17,6 +17,7 @@
 
 import { unified } from 'unified';
 import remarkParse from 'remark-parse';
+import remarkGfm from 'remark-gfm';
 import remarkRehype from 'remark-rehype';
 import rehypeStringify from 'rehype-stringify';
 import { parseFrontmatter } from '../frontmatter.ts';
@@ -40,8 +41,14 @@ export function parseDraftFrontmatter(markdown: string): ParsedDraft {
 
 /** Render a markdown string as HTML. */
 export async function renderMarkdownToHtml(markdown: string): Promise<string> {
+  // remark-gfm adds GitHub Flavored Markdown — tables, strikethrough,
+  // task lists, footnotes, autolinks. Operator-authored content
+  // routinely uses tables (audit docs, comparison matrices); without
+  // gfm those rendered as raw `| col | col |` text on the review
+  // surface.
   const result = await unified()
     .use(remarkParse)
+    .use(remarkGfm)
     .use(remarkStripFirstH1)
     .use(remarkImageFigure)
     .use(remarkRehype)
