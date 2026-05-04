@@ -479,6 +479,19 @@ export function initEditorialReview(): void {
    */
   function openComposer(): void {
     if (!pendingRange) return;
+    // #188: opening the composer is an implicit ask to see the marginalia.
+    // If the operator has the column stowed, unhide it (and persist) so the
+    // new note is actually visible. The saved preference flips to visible —
+    // they can re-stow with Shift+M after if they want it gone again.
+    if (document.body.getAttribute('data-marginalia') === 'hidden') {
+      applyMarginaliaState(false);
+      try {
+        window.localStorage.setItem(MARGINALIA_HIDDEN_KEY, '0');
+      } catch {
+        // localStorage unavailable (private mode); the state still flipped
+        // in-memory which is enough for the current session.
+      }
+    }
     composerQuote.textContent = extractQuote(pendingRange);
     textArea.value = '';
     categorySel.value = 'other';
