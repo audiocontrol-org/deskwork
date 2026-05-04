@@ -142,6 +142,18 @@ Any frontmatter, config, or other metadata deskwork embeds into operator-owned f
 - Schema docs: tell operators to permit `deskwork: z.object({...}).passthrough()` (or top-level `.passthrough()`) in their content-collection schemas — not a top-level `id:` field.
 - Future deskwork metadata fields go in the same namespace by default. Only deviate with explicit operator approval.
 
+## Never pollute the global slash-command namespace from a deskwork plugin
+
+Every slash command, skill, agent, hook, MCP server, or other surface a deskwork plugin exposes MUST live under the plugin's namespace (`/<plugin>:<name>`). Bare `/<name>` registrations from a plugin into the operator's global namespace are unacceptable.
+
+**Why:** the operator's framing, verbatim: *"I would be absolutely FURIOUS if I installed a plugin and it polluted my global command namespace. THERE BETTER NOT BE GLOBAL dw-lifecycle TURDS IN THE GLOBAL NAMESPACE."* An adopter installs a plugin to get its capabilities, not to have their global keyspace squatted on by names like `/setup`, `/install`, `/help`, `/doctor` that conflict with built-ins, project-locals, or other plugins. The deskwork plugin set has skill names that are exactly the kind of generic words most likely to collide (`install`, `help`, `doctor`, `customize`, `setup`, `review`, `complete`). Bare registration would be a near-guaranteed collision and a permanent annoyance for adopters. Same principle as the existing *"Namespace deskwork-owned metadata in user-supplied documents"* rule, applied to the slash-command surface instead of frontmatter.
+
+**How to apply:**
+- All `commands/<name>.md` and `skills/<name>/SKILL.md` shipped from a deskwork plugin must register under `/<plugin>:<name>` only. If a fix or workaround would cause bare `/<name>` registration as a side effect, that fix is unacceptable and a different approach is required.
+- When experimenting with packaging changes (e.g. probes against an install bug, A/B testing skill registration shapes), check the global skills inventory immediately after the change and abort/revert if any plugin name appears bare in the global namespace. Do not wait for adopter pushback.
+- The same constraint applies to bin-shim names exposed on PATH, hook event names, MCP server names — anything that becomes user-typeable. If the surface is invokable by the operator, its name must carry the plugin namespace.
+- A plugin whose only working invocation form is bare-namespace is a packaging defect, not a feature. Per *"Packaging is UX,"* fix the packaging — do not paper over the bare-namespace anti-pattern by documenting it as the recommended invocation.
+
 ## Project workflow conventions
 
 ### Stay on `feature/deskwork-plugin` for ongoing work
