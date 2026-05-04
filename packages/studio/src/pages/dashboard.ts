@@ -35,6 +35,7 @@ import {
   renderDistributionPlaceholder,
 } from './dashboard/section.ts';
 import { renderHeader, renderFilterStrip } from './dashboard/header.ts';
+import { renderPressQueue } from './dashboard/press-queue.ts';
 import type { ContentIndex } from '@deskwork/core/content-index';
 
 /**
@@ -75,6 +76,7 @@ export async function renderDashboard(
         ${unsafe(stageSections)}
         ${renderDistributionPlaceholder()}
       </div>
+      ${renderPressQueue(data.entries, defaultSite, now)}
     </div>
   </main>
   <div class="er-toast" data-toast hidden></div>

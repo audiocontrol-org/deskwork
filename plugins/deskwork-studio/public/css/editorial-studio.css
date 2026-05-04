@@ -208,3 +208,198 @@ a.er-calendar-meta-link:focus-visible {
   margin-left: 1rem;
 }
 
+/* ---------------------------------------------------------------------
+ * Press queue — dashboard right column.
+ *
+ * Fills the long-empty second column of `.er-layout` (the dashboard's
+ * `2fr 1fr` grid). Surfaces every entry currently in active review so
+ * "press-check" gravity matches "what needs my eyes right now."
+ * Editorial chrome pulled from the existing `--er-*` tokens — no new
+ * colors, fonts, or spacing scales introduced.
+ * ------------------------------------------------------------------- */
+
+.er-press-queue {
+  position: sticky;
+  top: calc(var(--er-folio-h, 2.4rem) + var(--er-space-3));
+  align-self: start;            /* don't stretch in the parent grid */
+  padding: var(--er-space-3) var(--er-space-3) var(--er-space-4);
+  background:
+    linear-gradient(180deg, rgba(245, 241, 232, 0.92), rgba(245, 241, 232, 0.6)),
+    var(--er-paper);
+  border: var(--er-rule-thin);
+  border-radius: 2px;
+  box-shadow: 0 1px 0 rgba(26, 22, 20, 0.04);
+  font-family: var(--er-font-body);
+  color: var(--er-ink);
+  max-height: calc(100vh - var(--er-folio-h, 2.4rem) - var(--er-space-5));
+  overflow-y: auto;
+}
+
+.er-press-queue__head {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "kicker count"
+    "title  count";
+  align-items: baseline;
+  column-gap: var(--er-space-2);
+  padding-bottom: var(--er-space-2);
+  border-bottom: var(--er-rule-thin);
+  margin-bottom: var(--er-space-3);
+}
+.er-press-queue__kicker {
+  grid-area: kicker;
+  margin: 0;
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+}
+.er-press-queue__title {
+  grid-area: title;
+  margin: 0;
+  font-family: var(--er-font-display, 'Fraunces'), 'Newsreader', Georgia, serif;
+  font-weight: 500;
+  font-size: 1.4rem;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: var(--er-ink);
+}
+.er-press-queue__title em {
+  font-style: italic;
+  color: var(--er-red-pencil);
+}
+.er-press-queue__count {
+  grid-area: count;
+  margin: 0;
+  align-self: center;
+  font-family: var(--er-font-mono);
+  font-size: 0.78rem;
+  color: var(--er-faded);
+  letter-spacing: 0.04em;
+}
+
+.er-press-queue__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--er-space-1);
+}
+.er-press-queue__item + .er-press-queue__item {
+  border-top: 1px dotted var(--er-paper-3);
+  padding-top: var(--er-space-1);
+}
+
+.er-press-queue__link {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  column-gap: var(--er-space-2);
+  padding: var(--er-space-1) calc(var(--er-space-1) / 2);
+  border-radius: 2px;
+  color: inherit;
+  text-decoration: none;
+  transition: background-color 120ms ease, transform 120ms ease;
+}
+.er-press-queue__link:hover {
+  background: rgba(184, 54, 42, 0.05);
+}
+.er-press-queue__link:focus-visible {
+  outline: 2px solid var(--er-red-pencil);
+  outline-offset: 2px;
+}
+
+.er-press-queue__ornament {
+  font-family: var(--er-font-display, 'Fraunces'), serif;
+  font-size: 1.05rem;
+  line-height: 1;
+  color: var(--er-red-pencil);
+  width: 1.25rem;
+  text-align: center;
+}
+
+.er-press-queue__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.er-press-queue__slug {
+  font-family: var(--er-font-mono);
+  font-size: 0.85rem;
+  color: var(--er-ink);
+  overflow-wrap: anywhere;
+  line-height: 1.3;
+}
+.er-press-queue__link:hover .er-press-queue__slug {
+  text-decoration: underline;
+  text-decoration-color: var(--er-red-pencil);
+  text-underline-offset: 2px;
+}
+
+.er-press-queue__meta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  color: var(--er-faded);
+  letter-spacing: 0.04em;
+}
+.er-press-queue__stage {
+  text-transform: uppercase;
+}
+.er-press-queue__sep {
+  color: var(--er-faded-2);
+}
+
+/* Empty state — quiet, deliberate. The press IS the metaphor; lean in. */
+.er-press-queue--empty {
+  /* slightly fainter background so the "quiet" state reads as quiet */
+  background: var(--er-paper);
+}
+.er-press-queue__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: var(--er-space-3) var(--er-space-2);
+  gap: 0.4rem;
+}
+.er-press-queue__empty-mark {
+  font-family: var(--er-font-display, 'Fraunces'), serif;
+  font-size: 1.5rem;
+  color: var(--er-red-pencil);
+  opacity: 0.55;
+  line-height: 1;
+  margin-bottom: var(--er-space-1);
+}
+.er-press-queue__empty-line {
+  margin: 0;
+  font-family: var(--er-font-display, 'Fraunces'), serif;
+  font-style: italic;
+  font-size: 1rem;
+  color: var(--er-ink-soft);
+}
+.er-press-queue__empty-hint {
+  margin: 0;
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+}
+
+/* When the layout collapses to single column on small screens, the
+ * sidebar stacks below — drop the sticky behavior and the max-height. */
+@media (max-width: 60rem) {
+  .er-press-queue {
+    position: static;
+    max-height: none;
+  }
+}
+
