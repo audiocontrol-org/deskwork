@@ -170,12 +170,21 @@ function initEnqueueReviewButtons(): void {
           btn.textContent = originalText;
           return;
         }
-        // Navigate straight to the review surface — that's the whole
-        // point of the button. The start-longform handler is
-        // idempotent, so the review page will show whichever workflow
-        // is active (freshly-created or pre-existing).
-        const site = siteFromButton(btn);
-        window.location.href = `/dev/editorial-review/${slug}?site=${site}`;
+        // Navigate straight to the entry-keyed review surface. The
+        // start-longform handler is idempotent and returns the workflow
+        // record (with `entryId` populated for any calendar-tracked
+        // entry) so the client can land on the canonical entry-keyed
+        // URL without an extra round-trip.
+        const wf = (result.body as { workflow?: { entryId?: string } })
+          ?.workflow;
+        if (wf?.entryId) {
+          window.location.href = `/dev/editorial-review/entry/${wf.entryId}`;
+        } else {
+          // No entry id (ad-hoc draft, no calendar entry) — fall back
+          // to the dashboard. Bare-slug URLs no longer resolve after
+          // Phase 34a's slug catch-all retirement.
+          window.location.href = '/dev/editorial-studio';
+        }
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e);
         showToast(`Network error: ${message}`, true);

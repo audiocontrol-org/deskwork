@@ -38,7 +38,11 @@ function writeConfig(root: string, mutate?: (config: Config) => void): Config {
   return config;
 }
 
-function writeFeatureDocs(root: string, slug: string, options?: { includeWorkplan?: boolean; parentIssue?: string | number }): string {
+function writeFeatureDocs(
+  root: string,
+  slug: string,
+  options?: { includeWorkplan?: boolean; parentIssue?: string | number }
+): string {
   const docsDir = join(root, 'docs/1.0/001-IN-PROGRESS', slug);
   mkdirSync(docsDir, { recursive: true });
   const parentIssue = options?.parentIssue ?? '';
@@ -113,8 +117,7 @@ describe('doctor', () => {
     const findings = await runDoctor({
       projectRoot: root,
       pluginRegistry: loadFixture('installed-plugins-required-only.json'),
-      fileExists: (path) =>
-        path.includes('/superpowers/') ? false : fixtureAwareExists(path),
+      fileExists: (path) => (path.includes('/superpowers/') ? false : fixtureAwareExists(path)),
     });
 
     expect(findings).toContainEqual(

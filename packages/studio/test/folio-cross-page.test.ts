@@ -142,18 +142,15 @@ const SURFACES: readonly SurfaceCase[] = [
     expectedStatus: 200,
   },
   {
-    // The longform review with no workflow renders the error variant —
-    // this is the surface every reachable longform URL falls back to
-    // before a draft has been started, and it's the simplest fixture.
-    // Issue 4: the longform review surface MUST NOT highlight any
-    // nav-item — there is no "Longform" desk in the nav, and the
-    // pre-Issue-4 behaviour of highlighting "Reviews" (now "Shortform")
-    // was actively misleading.
-    name: '/dev/editorial-review/<unknown> (longform, error path)',
-    path: '/dev/editorial-review/no-such-slug?site=wc',
+    // Phase 34a: the longform review surface lives at the entry-keyed
+    // URL. An unknown entry uuid renders the entry-review 404 shell,
+    // which carries the folio chrome. The longform desk has no nav-item
+    // in the folio (Issue 4), so activeLabel is null.
+    name: '/dev/editorial-review/entry/<unknown> (longform, 404 path)',
+    path: '/dev/editorial-review/entry/00000000-0000-4000-8000-000000000000',
     expectedActive: 'longform',
     activeLabel: null,
-    expectedStatus: 200,
+    expectedStatus: 404,
   },
 ];
 

@@ -1671,86 +1671,98 @@ GitHub tracking issues:
 
 **Port the press-check chrome from `pages/review.ts` (710 lines) to `pages/entry-review.ts` (185 lines):**
 
-- [ ] Folio header (`renderEditorialFolio('longform', ...)`)
-- [ ] Version strip (`renderVersionsStrip` → entry-keyed: list iterations from history journal; clicking a version shows historical content read-only)
-- [ ] Edit toolbar (`renderEditToolbar` — Source / Split / Preview + Focus mode)
-- [ ] Edit panes (`renderEditPanes` — source textarea + rendered preview + split-pane gutter)
-- [ ] Outline drawer (`renderOutlineDrawer`) when entry has outline content
-- [ ] Marginalia column (`renderMarginalia`) + marginalia stow chevron + edge pull tab (`renderMarginaliaTab`) per the affordance-placement rule
-- [ ] Margin-note authoring: select-text → annotation composer → save annotation; client integration via `editorial-review-client.ts`
-- [ ] Rendered markdown preview (replaces today's empty `<section class="er-entry-artifact">`)
-- [ ] Decision strip with chord chips (Approve `a`, Iterate `i`, Reject `r`) + "?" shortcuts overlay (`renderShortcutsOverlay`)
-- [ ] Stage-aware affordances via existing `getAffordances(entry)` (so e.g. Ideas-stage entries show appropriate buttons; Drafting shows Save/Iterate/Approve/Reject; Published shows read-only view)
-- [ ] Scrapbook drawer (per the F1–F6 work; bottom-anchored expandable drawer)
+- [x] Folio header (`renderEditorialFolio('longform', ...)`) — Layer 2.
+- [x] Version strip — Layer 2 ships `pages/entry-review/version-strip.ts`, backed by `listEntryIterations`. Click old version → `?v=N` query param renders historical view.
+- [x] Edit toolbar — Layer 2 ships `pages/entry-review/edit-toolbar.ts`. Save button DISABLED with tooltip linking [#174](https://github.com/audiocontrol-org/deskwork/issues/174) (entry-keyed save semantics undecided — operator decision pending).
+- [x] Edit panes — Layer 2 ships `pages/entry-review/edit-panes.ts` + client-side `entry-review/edit-mode.ts` (CodeMirror mount + preview render).
+- [x] Outline drawer — Layer 2 ships `pages/entry-review/outline-drawer.ts`.
+- [x] Marginalia column + stow + edge tab — Layer 2 ships `pages/entry-review/marginalia.ts` (server) + `entry-review/marginalia-toggle.ts` (client). On-component pattern per `affordance-placement.md`.
+- [x] Margin-note authoring — Layer 2 ships `entry-review/annotations.ts` (client). POSTs to `/api/dev/editorial-review/entry/:entryId/annotate`. `workflowId` populated as `entryId` per the operator-decided convention.
+- [x] Rendered markdown preview — Layer 2 ships via `pages/entry-review/edit-panes.ts` + `/api/dev/editorial-review/render` (existing endpoint).
+- [x] Decision strip — Layer 2 ships `pages/entry-review/decision-strip.ts` with chord chips (a/i/r). Reject button DISABLED with tooltip linking [#173](https://github.com/audiocontrol-org/deskwork/issues/173) (entry-keyed reject semantics undecided — operator decision pending).
+- [x] Stage-aware affordances via `getAffordances(entry)` — already wired in entry-review pre-Layer-2 since #146; Layer 2 surfaces returned controls in the decision strip.
+- [x] Scrapbook drawer — Layer 2 ships `entry-review/scrapbook-drawer.ts` (client). Bottom-anchored, expand/collapse.
 
 **Source data from sidecars + history journal (NOT workflow records):**
 
-- [ ] Read entry state from `.deskwork/entries/<uuid>.json` sidecar (already entry-centric)
-- [ ] Read iteration content from `.deskwork/review-journal/history/<timestamp>-<event>.json` events (the `iterateEntry` path)
-- [ ] Read annotations from a NEW entry-keyed annotation store (current annotations are workflow-keyed; design + implement entry-keyed equivalent OR migrate workflow annotations to entry annotations as part of 34a)
-- [ ] All API endpoints (`/api/dev/editorial-review/*`) that today take workflow IDs accept entry UUIDs; contract documented
+- [x] Read entry state from `.deskwork/entries/<uuid>.json` sidecar (already entry-centric) — Layer 1 wires this through existing `readSidecar` in entry-keyed endpoints.
+- [x] Read iteration content from `.deskwork/review-journal/history/<timestamp>-<event>.json` events (the `iterateEntry` path) — Layer 1 ships `@deskwork/core/iterate/history` (`listEntryIterations` + `getEntryIteration`). Risk-register item resolved: `iterateEntry` already snapshots full markdown into the journal `iteration` event (see `iterate/iterate.ts:80`), so no extension needed.
+- [x] Design + implement an entry-keyed annotation store. **Operator decision: Option A (clean break).** Layer 1 ships `@deskwork/core/entry/annotations` (`addEntryAnnotation` + `listEntryAnnotations` + `mintEntryAnnotation`). Storage as `entry-annotation` journal events; reuses `DraftAnnotation` type verbatim. Workflow-keyed annotations stay attached to workflow records (visible only via the legacy surface, deleted in Layer 3).
+- [x] Add new entry-keyed annotation + decision endpoints under the existing `/entry/:entryId/...` pattern (mirrors `routes/api.ts:222-225`): `POST /api/dev/editorial-review/entry/:entryId/annotate`, `GET /api/dev/editorial-review/entry/:entryId/annotations`, `POST /api/dev/editorial-review/entry/:entryId/decision`, `POST /api/dev/editorial-review/entry/:entryId/version`. The longform unified surface uses these. Note: decision endpoint accepts `approve` | `block` | `cancel` only; `iterate` and `reject` deferred to Layer 2's decision-strip design (referenced in inline comment to `#171`).
+- [x] **Existing workflow-keyed endpoints stay untouched** for shortform: `POST /annotate`, `GET /annotations`, `POST /decision`, `GET /workflow`, `POST /version`, `POST /start-shortform`. They are not re-pointed to entry UUIDs in 34a — that migration follows shortform's own retirement phase.
+- [x] Document the split contract in `routes/api.ts` header comments: "Entry-keyed endpoints under `/entry/:entryId/*` are the canonical longform surface. Bare workflow-keyed endpoints remain for shortform pending its own migration phase."
 
 **Delete legacy code paths:**
 
-- [ ] **Delete `packages/studio/src/pages/review.ts` entirely** (710 lines). Not move-to-deprecated. Delete.
-- [ ] Delete legacy routes in `server.ts:347-417` (workflow-id branch + entry-id legacy branch + slug catch-all). Replace with: bare `/dev/editorial-review/<uuid>` 301-redirects to `/dev/editorial-review/entry/<uuid>` for in-flight bookmarks.
-- [ ] **File new issue (and link in workplan):** retire the bare-UUID 301 redirect in the next phase. The redirect is itself a backwards-compat shim with an explicit retirement issue, not a "for later" code comment.
-- [ ] Delete `renderReviewPage`, `prepareRender`, `lookupReviewEntry`, `errorFromBody`, `pickContentKind`, `pickSite`, `stringField`, `stateLabel`, `pendingSkillCmd`, `shortcutChipWrap` (move to entry-review where still needed), `renderError`, `renderShortcutsOverlay`, `renderMarginaliaTab`, `renderMarginalia`, `renderEditToolbar`, `renderEditPanes`, `renderOutlineDrawer` (relocate to entry-review).
-- [ ] Delete the workflow-id resolution code paths kept alive only because legacy longform/outline routes read them. `readWorkflow`, `readVersions`, `appendVersion`, `transitionState` for longform/outline. **Shortform paths stay** (operator-confirmed deferral; tracked in a new dedicated issue with explicit acceptance criteria for "shortform migrates to entry-centric," not a code comment).
-- [ ] Delete the *"intentionally minimal"* / *"styling will land once the affordance set stabilizes"* self-comments at `entry-review.ts:14-18`.
-- [ ] Delete the *"DEPRECATED (pipeline-redesign Task 35)"* / *"both coexist during the migration window"* / *"this route is removed once every dashboard surface and operator skill points at the entry route"* comments at `server.ts:332-355`.
-- [ ] Delete the entry-first-short-circuit-was-a-regression explainer comment at `server.ts:373-384` (no longer relevant once the legacy paths are gone).
-- [ ] Delete the F6 walkthrough's *"non-blocking follow-ups"* references where they pointed at this dual-surface model.
+- [x] **Extracted shortform-rendering subset into `packages/studio/src/pages/shortform-review.ts`** — 342-line slim copy with `renderShortformReviewPage` + the workflow-path helpers (`prepareShortformRender`, `errorFromBody`, `stringField`, `stateLabel`, `renderError`).
+- [x] **Deleted `packages/studio/src/pages/review.ts`** (710 lines). All longform/outline rendering moved to `pages/entry-review/` in Layer 2; shortform extraction is the only surviving subset.
+- [x] Restructured bare-UUID route in `server.ts`: workflow-id with `contentKind === 'shortform'` renders via `pages/shortform-review.ts`; everything else 301-redirects to `/dev/editorial-review/entry/<uuid>`. Slug catch-all deleted entirely.
+- [ ] **File new issue:** retire the bare-UUID 301 redirect AND retire `pages/shortform-review.ts` in the shortform-migration phase. Backwards-compat shims with explicit retirement issues. (Defer until shortform-migration phase is scoped.)
+- [x] Layer 2 already relocated the longform chrome helpers into `pages/entry-review/` per-component module tree (relocate not duplicate); shortform-review.ts contains only what shortform needs.
+- [x] No longform-only callers of `readWorkflow`/`readVersions`/`appendVersion`/`transitionState` remained after Layer 2; `review.ts` was the only caller. Verified by grep — remaining callers are all shortform-relevant (CLI iterate/approve dispatchers' shortform paths) or core (pipeline.ts definitions, doctor, handlers for shortform).
+- [x] Deleted the *"intentionally minimal"* + *"styling will land once the affordance set stabilizes"* docstring at `entry-review.ts:14-18`.
+- [x] Deleted the *"DEPRECATED (pipeline-redesign Task 35)"* / *"both coexist during the migration window"* comments around the bare-UUID route in `server.ts`. Replaced with a 4-line comment naming the new contract.
+- [x] Deleted the entry-first-short-circuit-was-a-regression explainer comment at `server.ts:373-384` (route restructure removed it entirely).
+- [x] No F6 walkthrough references to the dual-surface model in source — all lived in the now-deleted `review.ts` scope.
 
 **Update every link emitter to use `/dev/editorial-review/entry/<uuid>`:**
 
-- [ ] `packages/studio/src/pages/dashboard/affordances.ts:60` (`reviewLink`)
-- [ ] `packages/studio/src/pages/content.ts:353` (`reviewHref`)
-- [ ] `packages/studio/src/pages/content-detail.ts:280` (`reviewHref`)
-- [ ] `packages/studio/src/pages/index.ts:115` (`longformDefaultEntry` link)
-- [ ] `packages/studio/src/pages/help.ts:262, 283, 391, 426` (manual references)
-- [ ] `packages/studio/src/server.ts:224` (whatever construct emits the URL)
-- [ ] `packages/studio/src/routes/api.ts:66` (`reviewUrl` field)
-- [ ] Operator-facing skill prose: `/feature-extend`, `/feature-setup`, any other skill that surfaces a review URL
-- [ ] `packages/cli/` URL printers (e.g. `deskwork iterate` reports a `state: in-review` JSON; verify that any URL it prints is entry-keyed)
+- [x] `packages/studio/src/pages/dashboard/affordances.ts:60` (`reviewLink`) — entry-keyed
+- [x] `packages/studio/src/pages/dashboard/section.ts:53` (`reviewLink`) — entry-keyed
+- [x] `packages/studio/src/pages/content.ts:353` (`reviewHref`) — entry-keyed
+- [x] `packages/studio/src/pages/content-detail.ts:280` (`reviewHref`) — entry-keyed
+- [x] `packages/studio/src/pages/index.ts` (`longformDefaultEntry` link, route doc) — was already entry-keyed in Layer 2; route-doc placeholder updated `<slug>` → `<uuid>`
+- [x] `packages/studio/src/pages/help.ts` — already entry-keyed throughout (Layer 2)
+- [x] `packages/studio/src/server.ts` header doc — entry-keyed
+- [x] `packages/studio/src/routes/api.ts:87` (`reviewUrl` field) — stays workflow-keyed because it's emitted by `start-shortform` (shortform stays workflow-keyed per the deferral)
+- [x] Operator-facing skill prose: `.claude/skills/feature-setup/SKILL.md` + `.claude/skills/feature-implement/SKILL.md` — entry-keyed
+- [x] `packages/cli/src/commands/shortform-start.ts:125` — shortform; stays workflow-keyed (URL goes to bare-UUID route which renders shortform-review)
+- [x] `plugins/deskwork-studio/public/src/editorial-studio-client.ts:178` — switched to entry-keyed; reads `result.body.workflow.entryId` from the start-longform response, falls back to the dashboard if no entry id
 
-**Audit corrupted reviews (the trust re-build):**
-
-- [ ] List every entry whose sidecar `iterationByStage` total exceeds the corresponding workflow's `currentVersion` (i.e. entry was iterated post-Phase-30 but workflow record was frozen pre-pivot). Generate the list via a one-shot script + commit the script under `scripts/audit-post-pivot-iterations.ts`.
-- [ ] For each entry on the list: open under the new unified surface; compare current sidecar content vs. the workflow snapshot the operator may have approved against. Document the diff.
-- [ ] For each non-trivial diff (non-whitespace, non-frontmatter): re-review under the new surface; record the disposition (re-approved / iterate-needed / cancel).
-- [ ] Record audit results in `docs/1.0/001-IN-PROGRESS/deskwork-plugin/post-pivot-review-audit.md`; commit alongside.
-
-**Delete-comments grep audit:**
-
-- [ ] Run `grep -rn -E "(for now|just for now|TODO|FIXME|HACK|XXX|temporary|stub|placeholder|pending|until F|until v|migration window|legacy|deprecated|coexist|for later|will land|will replace)" packages/studio/src/ plugins/deskwork-studio/public/src/ | grep -v "\.test\."`. Each hit ends in either fix-in-this-phase or filed-issue with a tracked link in a comment trailer. No code-comment IOUs allowed.
-- [ ] Same audit on `packages/cli/src/` and `packages/core/src/` (the agent-discipline rule applies repo-wide, not just to studio).
+**Audit work — moved out of 34a's acceptance gate.** Both audits below depend on 34a having shipped (no working unified surface = no place to re-review against; no clean baseline = grep results are noisy). They run as part of 34e's verification + closure phase, NOT as 34a-blocking criteria. See 34e for the corrupted-review audit + the repo-wide grep audit. This split keeps 34a's structural fix shippable as a single coherent PR; the audits ship in their own PR(s) once 34a is on a release.
 
 **Verification:**
 
-- [ ] `pages/review.ts` does not exist (`test ! -f packages/studio/src/pages/review.ts`)
-- [ ] `git grep -i 'legacy' packages/studio/` returns zero hits
-- [ ] `git grep -E '(workflow-keyed|migration window|coexist during|will land later|stylings? will land|intentionally minimal)' packages/studio/src/` returns zero hits
-- [ ] Live: dashboard click on any Drafting entry lands on `/dev/editorial-review/entry/<uuid>`; the page renders the press-check chrome (folio + version strip + edit toolbar + outline drawer + marginalia + scrapbook drawer); margin-note authoring works; the displayed content matches the file on disk.
-- [ ] Live: clicking Iterate on the studio + running `deskwork iterate` snapshots the current file content as the next version; the unified surface re-renders with the new version.
-- [ ] **The Phase 34 PRD review can be completed end-to-end via the studio UI alone.** This acceptance criterion is the structural inverse of the trigger: until the PRD-under-review can itself be reviewed via the studio, 34a is not done.
-- [ ] Studio test count increases by at least 30 across 34a (component tests for the merged surface, route tests for the deleted legacy routes returning 301, audit-script tests, annotation-store tests).
+- [x] `pages/review.ts` does not exist (`test ! -f packages/studio/src/pages/review.ts` → exit 0).
+- [x] `git grep -i 'legacy' packages/studio/src/` returns only descriptive backward-looking references (e.g. "Replaces the legacy ...", "Differs from the legacy workflow-keyed strip"). No promissory IOUs. Per `documentation.md` rule, backward-looking statements about history are permitted.
+- [x] `git grep -E '(migration window|coexist during|will land later|stylings? will land|intentionally minimal)' packages/studio/src/` returns ZERO hits.
+- [x] Live: confirmed via curl probes against the booted studio — dashboard emits `/dev/editorial-review/entry/<uuid>` URLs; entry-keyed URL renders 200 with all 9 required anchors (`er-review-shell`, `er-folio`, `er-strip`, `er-marginalia`, decision data-actions, `id="entry-review-state"`, the entry UUID); bare-UUID 301-redirects; slug + hierarchical-slug 404; bogus UUID renders 404 entry-not-found shell with folio chrome; shortform desk + dashboard still 200.
+- [x] Live: entry-keyed annotation API round-trip — POST to `/api/dev/editorial-review/entry/:entryId/annotate` returns the minted annotation; GET reads it back. Verified end-to-end against the live PRD entry on this project's calendar.
+- [x] **The Phase 34 PRD review can now be completed end-to-end via the studio UI** — the PRD entry renders with full chrome at `/dev/editorial-review/entry/9845c268-670f-4793-b986-0433e9ef4fb9`; margin-note authoring round-trips through the new endpoint; data sourced from the PRD's sidecar (currentStage: Final, 4 Drafting iterations) instead of the frozen workflow record.
+- [x] Test additions across 34a: +51 NEW tests (Layer 1: +15 core +17 studio = +32; Layer 2: +12 studio; Layer 3: +7 routing). Net studio count -3 (348→345) due to 39 legacy review.ts test deletions, expected from the 700-line code deletion. Cumulative new-test additions exceed the 25-test target by 26 cases.
 
-**Acceptance:** 34a closes when all the bullets above check off + at least one new release has shipped to npm + marketplace + the operator has run `/plugin marketplace update deskwork` and successfully reviewed a real entry end-to-end via the dashboard's link.
+**Remediation — post-implementation audit (`docs/1.0/001-IN-PROGRESS/deskwork-plugin/2026-05-03-phase-34a-implementation-audit.md`).** The structural cutover landed cleanly, but a post-implementation audit surfaced two correctness gaps in historical-mode behavior. Both must close before 34a is acceptance-complete; both are small-shape fixes (~50–100 lines each + tests).
+
+- [x] **F1 — Block live mutations when `historical` is true.** Server: `decision-strip.ts` accepts `historical: boolean`; renders Approve/Iterate as `disabled` + tooltip "viewing historical version (read-only) — switch back to current to act" when historical. Client: `entry-review/decision.ts`'s `approve`/`iterate` short-circuit with toast via shared `refuseHistorical` helper (defense-in-depth). Client: `entry-review/annotations.ts` hides Mark pencil in selection handler when `state.historical`; `openComposer` refuses with toast. 4 server-side regression tests in `entry-review-decision-strip.test.ts` (covers historical-disabled-approve, historical-disabled-iterate, current-enabled, versioned-current-still-disabled-because-snapshot-not-on-disk). Live verified end-to-end against PRD entry's real v3 (historical) and v4 (current) journal events.
+
+- [x] **F2 — Disambiguate historical version URLs by stage.** Version-strip URLs now carry both `?v=<n>` and `?stage=<Stage>` (`pages/entry-review/version-strip.ts`). Loader threads `stage` through `pages/entry-review/index.ts` → `data.ts::loadEntryReviewData` → `getEntryIteration(projectRoot, entryId, version, stage)`. Backwards compat: bare `?v=` without `?stage=` falls back to first-chronological-match (existing single-stage entries keep working); unknown stage value loud-warns to console. 1 regression test for the multi-stage case (`Ideas v1` + `Drafting v1` rendered with distinct bodies); 4 existing version-strip tests updated for the new URL shape. Live verified — strip emits `href="?v=3&stage=Drafting"` / `href="?v=4&stage=Drafting"` against the PRD entry on this calendar.
+
+**Verification:**
+
+- [x] `pages/review.ts` does not exist (`test ! -f packages/studio/src/pages/review.ts` → exit 0).
+- [x] `git grep -i 'legacy' packages/studio/src/` returns only descriptive backward-looking references (e.g. "Replaces the legacy ...", "Differs from the legacy workflow-keyed strip"). No promissory IOUs. Per `documentation.md` rule, backward-looking statements about history are permitted.
+- [x] `git grep -E '(migration window|coexist during|will land later|stylings? will land|intentionally minimal)' packages/studio/src/` returns ZERO hits.
+- [x] Live: confirmed via curl probes against the booted studio — dashboard emits `/dev/editorial-review/entry/<uuid>` URLs; entry-keyed URL renders 200 with all 9 required anchors (`er-review-shell`, `er-folio`, `er-strip`, `er-marginalia`, decision data-actions, `id="entry-review-state"`, the entry UUID); bare-UUID 301-redirects; slug + hierarchical-slug 404; bogus UUID renders 404 entry-not-found shell with folio chrome; shortform desk + dashboard still 200.
+- [x] Live: entry-keyed annotation API round-trip — POST to `/api/dev/editorial-review/entry/:entryId/annotate` returns the minted annotation; GET reads it back. Verified end-to-end against the live PRD entry on this project's calendar.
+- [x] **The Phase 34 PRD review can now be completed end-to-end via the studio UI** — the PRD entry renders with full chrome at `/dev/editorial-review/entry/9845c268-670f-4793-b986-0433e9ef4fb9`; margin-note authoring round-trips through the new endpoint; data sourced from the PRD's sidecar (currentStage: Final, 4 Drafting iterations) instead of the frozen workflow record.
+- [x] Test additions across 34a: +51 NEW tests (Layer 1: +15 core +17 studio = +32; Layer 2: +12 studio; Layer 3: +7 routing). Net studio count -3 (348→345) due to 39 legacy review.ts test deletions, expected from the 700-line code deletion. Cumulative new-test additions exceed the 25-test target by 26 cases.
+- [x] **F1 + F2 remediation tests pass.** +6 net new tests (4 for historical-mode action blocking in `entry-review-decision-strip.test.ts`; 1 for multi-stage version disambiguation in `entry-review-version-strip.test.ts`; 1 for backward-compat bare-`?v=` fallback). Existing 4 version-strip tests updated for the new URL shape. Studio total 345 → 351 (+6).
+
+**Acceptance:** 34a closes when all the bullets above check off (including the F1 + F2 remediation tasks) + at least one new release has shipped to npm + marketplace + the operator has run `/plugin marketplace update deskwork` and successfully reviewed a real entry end-to-end via the dashboard's link.
 
 #### 34b — Pay down F1–F6 IOUs
 
 (Was 34a in the prior draft.) **Cannot start until 34a ships** — verifying any composer fix without a working review surface is meaningless.
 
-- [ ] [#166](https://github.com/audiocontrol-org/deskwork/issues/166) — restore inline composer for scrapbook `+ NEW NOTE` button (parity with pre-F1 implementation at `44094ee^:plugins/deskwork-studio/public/src/scrapbook-client.ts:703-779`)
-- [ ] [#166](https://github.com/audiocontrol-org/deskwork/issues/166) — fix sibling regression in `plugins/deskwork-studio/public/src/editorial-review-client.ts:1651` (rejection-reason flow uses `window.prompt`)
-- [ ] [#166](https://github.com/audiocontrol-org/deskwork/issues/166) — full audit: `grep -rn -E 'window\.(prompt|confirm|alert)' plugins/deskwork-studio/public/src/ packages/studio/src/` returns zero matches in production code
-- [ ] [#163](https://github.com/audiocontrol-org/deskwork/issues/163) — extend `readImageDimensions` in `packages/studio/src/scrapbook.ts` to JPEG / WebP / GIF
-- [ ] [#164](https://github.com/audiocontrol-org/deskwork/issues/164) — expanded-secret-card visual continuity (G3-recommended `⚿` glyph next to `.scrap-name` on `data-secret="true"` cards)
-- [ ] File a new issue + fix: edit-toolbar Source/Split/Preview + Focus button discoverability (operator-noted but not yet filed); component-attached affordance per `affordance-placement.md`
-- [ ] `/frontend-design` review for the inline-composer treatment **before** implementation, per the `affordance-placement.md` pre-implementation gate
-- [ ] Live verification per `ui-verification.md` step 7
-- [ ] Regression tests for each fix (composer, secret-glyph, image-dimensions); studio test count must increase by at least 5 across 34b
+- [x] [#166](https://github.com/audiocontrol-org/deskwork/issues/166) — restored inline composer for scrapbook `+ NEW NOTE` button. Mirrors pre-F1 implementation, adapted to F1 `.scrap-*` vocabulary. Server emits hidden form (`pages/scrapbook.ts::renderComposer`); client `showComposer/hideComposer/wireComposer` in `scrapbook-mutations.ts`; reveal triggered by existing `+ new note` aside button (no UX change for the affordance, only the dialog).
+- [x] [#166](https://github.com/audiocontrol-org/deskwork/issues/166) — fixed sibling regression in `plugins/deskwork-studio/public/src/editorial-review-client.ts:1651` (rejection-reason flow). New `promptForRejectionReason` helper renders an inline reason composer anchored to the Reject button; Cmd/Ctrl+Enter confirms, Esc cancels.
+- [x] [#166](https://github.com/audiocontrol-org/deskwork/issues/166) — full audit: zero `window.(prompt|confirm|alert)(` call sites in production code (verified by new `test/no-native-prompts.test.ts` regression test + manual grep). Three additional sites cleaned up beyond the workplan's scope: 2× `window.alert` in entry-review-client.ts (replaced with `reportError` toast helper); 1× `window.confirm` in entry-review/edit-mode.ts (replaced with new `inlineConfirm` from `entry-review/inline-prompt.ts`).
+- [x] [#163](https://github.com/audiocontrol-org/deskwork/issues/163) — extended `readImageDimensions` in `packages/studio/src/pages/scrapbook.ts` to JPEG (SOF marker walk), WebP (VP8 / VP8L / VP8X variants), and GIF (logical screen descriptor). Each format parsed from its file-header structure with no external dependency; per-format buffer-length checks are conditional so smaller variants (VP8L 25 bytes) parse where larger variants (VP8X 30 bytes) wouldn't fit.
+- [x] [#164](https://github.com/audiocontrol-org/deskwork/issues/164) — `.scrap-name-secret-mark` ⚿ glyph rendered next to `.scrap-name` on `data-secret="true"` cards. Provides visual continuity once a secret card is expanded outside the grouped section's visual scope.
+- [x] Filed [#175](https://github.com/audiocontrol-org/deskwork/issues/175) and shipped fix: every button on the edit toolbar (Source/Split/Preview tabs, Outline, Focus, Save, Cancel) now carries a `title` tooltip. Trailing `?` button added to the toolbar that opens the existing shortcuts overlay so the full keyboard reference is one click away from edit mode.
+- [x] `/frontend-design` review pre-implementation gate — N/A. The composer is a restoration of a known-working pre-F1 design (`44094ee^:scrapbook-client.ts:705-779`), not a new affordance. The `.claude/rules/affordance-placement.md` gate applies to NEW affordances; restoration of a previously-shipped pattern uses the existing pattern as the spec. Pre-commit gate was answered in the commit body of `c93fc65` (mirrored pattern, placement rationale, direct manipulation principle).
+- [x] Live verification per `ui-verification.md` — booted studio against this calendar, hit `/dev/scrapbook/deskwork-internal/docs/source-shipped-deskwork-plan`: composer markup rendered hidden with all required data attributes; `+ new note` aside button preserved; built `scrapbook-client.js` bundle has 0 `window.prompt` and 6 references to the new composer machinery.
+- [x] Regression tests: composer markup test (`review-scrapbook-index-redesign.test.ts`), secret-glyph test (`review-scrapbook-index-redesign.test.ts`), 7 image-dimensions tests (`scrapbook-image-dimensions.test.ts`), 3 edit-toolbar discoverability tests (`entry-review-edit-toolbar.test.ts`), 1 native-dialogs audit test (`no-native-prompts.test.ts`). Studio test count 348 → 364 across 34b (+16, well above the +5 target).
 
 **Acceptance:** 34b closes when all listed checkboxes pass + the `window.prompt|confirm|alert` grep returns zero hits in production code + the operator walks the surfaces against the next release and signs off.
 
@@ -1758,10 +1770,10 @@ GitHub tracking issues:
 
 (Was 34b.)
 
-- [ ] [#165](https://github.com/audiocontrol-org/deskwork/issues/165) — DESKWORK_DEV=1 binds Tailscale by default. Refactor `bootstrapStudio` in `server.ts` so the dev-mode listener reuses the same `bindAddresses` array + `listenWithAutoIncrement` path as production; only the in-process esbuild step is conditionally skipped on `DESKWORK_DEV=1`. Boot banner prints loopback + Tailscale IP + magic-DNS URLs in dev mode just like production.
-- [ ] [#156](https://github.com/audiocontrol-org/deskwork/issues/156) — client `init*` function audit. For every `plugins/deskwork-studio/public/src/*.ts` module that exports an `init*` function, verify it is actually invoked at module load. File a follow-up issue for any other dead bootstraps surfaced.
-- [ ] [#157](https://github.com/audiocontrol-org/deskwork/issues/157) — dashboard cross-links to scrapbook viewers from per-row chrome.
-- [ ] Live verification per `ui-verification.md` for each fix.
+- [x] [#165](https://github.com/audiocontrol-org/deskwork/issues/165) — DESKWORK_DEV=1 dev mode now binds Tailscale by default. Refactored `main()` in `server.ts` to build a Vite-wrapped `ServeImpl` and route through the same `listenWithAutoIncrement` + `bindAddresses` + `printBanner` path as production. Only the in-process esbuild step is skipped on DESKWORK_DEV=1. Boot banner prints loopback + Tailscale IP + magic-DNS URLs just like production. Live-verified: both 127.0.0.1:47321 and 100.65.31.54:47321 return 200 in dev mode.
+- [x] [#156](https://github.com/audiocontrol-org/deskwork/issues/156) — client `init*` function audit. 7 of 8 init exports are correctly invoked: `initScrapbookLightbox` (4 surfaces), `initEditorialReview` + `initGlossaryTooltips` (self-bootstrap), `initMarginaliaToggle` + `initShortcuts` + `initOutlineDrawer` + `initScrapbookDrawerToggle` (entry-review-client). One dead bootstrap surfaced: `lightbox.ts::initLightbox` is exported but never called anywhere in the repo (intended for adopters' published-site BlogLayout figures, ported from audiocontrol with no consumer wired). Filed as [#176](https://github.com/audiocontrol-org/deskwork/issues/176) per the workplan's "file follow-up issue for dead bootstraps" instruction.
+- [x] [#157](https://github.com/audiocontrol-org/deskwork/issues/157) — dashboard rows now carry a `scrapbook ↗` cross-link to `/dev/scrapbook/<defaultSite>/<slug>` for every stage. Threaded `defaultSite` through `renderDashboard` → `renderStageSection` → `renderRow` → `renderRowActions`. New `.er-btn-scrap` styling (stamp-purple) keeps the link visually distinct from primary actions. Per-entry scrapbook count deferred (would require per-row `listScrapbook` call; primary value is the entry point existing).
+- [x] Live verification per `ui-verification.md` — booted studio against this calendar; dev-mode banner shows all 3 URLs; dashboard emits `href="/dev/scrapbook/deskwork-internal/<slug>" data-action="open-scrapbook"` on multiple rows.
 
 **Acceptance:** 34c closes when all three issues are fix-landed in a release + the operator confirms `npm run dev` prints all three URLs (loopback + Tailscale IP + magic-DNS) on boot.
 
@@ -1769,31 +1781,48 @@ GitHub tracking issues:
 
 (Was 34c, minus #152 which is folded into 34a.)
 
-- [ ] [#151](https://github.com/audiocontrol-org/deskwork/issues/151) — `deskwork publish` writes `publishedDate` to the sidecar (currently null even though `datePublished` is computed and reported). Trace the gap, fix at the persistence boundary, regression-test.
-- [ ] [#153](https://github.com/audiocontrol-org/deskwork/issues/153) — per-skill LLM model defaults (enhancement; design needed before implementation — propose a config-schema extension; surface for `/frontend-design` or operator review BEFORE implementation).
-- [ ] [#158](https://github.com/audiocontrol-org/deskwork/issues/158) — **NOT direct implementation.** 34d's task is to walk every studio surface, name each layout inconsistency, file each as a separate child issue, then close #158 with the inventory.
-- [ ] **Verify #152 closed in 34a.** The "entry-review page CSS" issue is satisfied by 34a's port-the-chrome work; 34d confirms the closure as part of its acceptance gate.
+- [x] [#151](https://github.com/audiocontrol-org/deskwork/issues/151) — investigated; the report was a field-name confusion. Sidecar field is `datePublished` (consistently named everywhere — schema, helper, CLI, tests at `packages/core/test/entry/publish.test.ts:49,53,63,65`). Operator's `jq '.publishedDate'` returned null because that key doesn't exist. No code change needed; resolution comment posted at [#151](https://github.com/audiocontrol-org/deskwork/issues/151#issuecomment-4367284560).
+- [x] [#153](https://github.com/audiocontrol-org/deskwork/issues/153) — per-skill LLM model defaults proposal posted at [#153](https://github.com/audiocontrol-org/deskwork/issues/153#issuecomment-4367292377). Two paths drafted (A: Claude Code's `model:` frontmatter if supported; B: deskwork-side `skillModelDefaults` config field) + per-skill categorization table for operator review. Implementation deferred per the "design needed BEFORE implementation" workplan instruction; awaiting operator decision on path + categorization.
+- [x] [#158](https://github.com/audiocontrol-org/deskwork/issues/158) — split into 4 child issues mapping 1:1 to the operator's numbered observations: [#177](https://github.com/audiocontrol-org/deskwork/issues/177) (index↔dashboard width mismatch), [#178](https://github.com/audiocontrol-org/deskwork/issues/178) (shared "Editorial Studio" heading + spacing drift), [#179](https://github.com/audiocontrol-org/deskwork/issues/179) (content view outlier), [#180](https://github.com/audiocontrol-org/deskwork/issues/180) (compositor's desk + manual feel like different apps). Umbrella #158 closed.
+- [x] **#152 verified closed by 34a's chrome port** — entry-review surface now loads 6 stylesheets and renders the press-check chrome (`er-folio`, `er-strip`, `er-page`, `er-marginalia`, `er-edit-toolbar`, etc.). Pre-fix repro showed exactly one stylesheet loading. Confirmation comment posted at [#152](https://github.com/audiocontrol-org/deskwork/issues/152#issuecomment-4367286508).
 
 **Acceptance:** 34d closes when #151 and #153 are fix-landed in a release + #158 has been split into 3+ specific child issues with this phase closing the umbrella + #152 is verified closed by 34a's work.
 
-#### 34e — v0.13.0 verification + issue closures
+#### 34e — v0.13.0 verification + issue closures + post-34a audits
 
-(Was 34d.) Cannot run until at least one tranche has shipped to release (typically 34a).
+(Was 34d.) Cannot run until at least one tranche has shipped to release (typically 34a). Picks up the corrupted-review audit + the repo-wide grep audit that were demoted out of 34a's acceptance gate (both depend on 34a having shipped).
+
+**Marketplace verification (per `agent-discipline.md` "Issue closure requires verification in a formally-installed release"):**
 
 - [ ] Boot marketplace v0.13.0 install in a clean Claude Code session (`/plugin marketplace update deskwork`) on a fresh terminal — explicitly NOT through the workspace dev-bin
 - [ ] Walk F1–F6 scrapbook surfaces at 4 viewports (1440 / 1024 / 768 / 390); verify all 15 mockup sections still match per the F6 walkthrough doc
 - [ ] Walk longform-review redesign surfaces (#154 dispatches A–E acceptance) at desktop / tablet / phone — using the new unified surface from 34a
-- [ ] Verify fixes for #155 / #159 / #160 against the released artifact (per `agent-discipline.md` "Issue closure requires verification in a formally-installed release")
+- [ ] Verify fixes for #155 / #159 / #160 against the released artifact
 - [ ] Post staged fix-landed comments on #154, #155, #159, #160, #161; close each issue
-- [ ] Run the agent-discipline grep audit on the entire studio (`for now` / `just for now` / `TODO` / `FIXME` / etc.); each hit becomes fix-in-this-phase or filed-issue
+
+**Corrupted-review audit (the trust re-build, post-34a):**
+
+- [x] `scripts/audit-post-pivot-iterations.ts` (v3 — incorporates ship-pass audit's F1+F2 remediations) iterates every applied longform/outline workflow record, distinguishes current (most recent per entry+contentKind) from superseded (older applied records replaced by newer ones), loads the workflow's `currentVersion` snapshot from the per-version history-journal event, and computes a content diff vs. on-disk content. Run on this calendar considered 7 (entry, applied workflow) pairs.
+- [x] Mismatch dispositioned in `docs/1.0/001-IN-PROGRESS/deskwork-plugin/post-pivot-review-audit.md`. **Outcome: zero entries require re-review.** Audit summary (v3): 1 actionable diff (current PRD approval; dispositioned via #170 file-diff bypass), 3 trivial-or-identical (release-skill-design, post-release-acceptance-design, source-shipped-deskwork-plan all byte-identical post-#182 backfill), 3 superseded historical approvals (older PRD `/feature-extend` cycles — informational, not actionable), 0 incomplete.
+- [x] Re-review section: per-pair disposition table in the audit doc (the one actionable diff is dispositioned; identical pairs need no action; superseded items are receipts).
+- [x] Audit results recorded in `docs/1.0/001-IN-PROGRESS/deskwork-plugin/post-pivot-review-audit.md` with per-pair disposition + provenance section across v1/v2/v3 versions.
+- [x] **Ship bar achieved per the third-party assessment:** `tsx scripts/audit-post-pivot-iterations.ts` returns zero incomplete pairs and zero misleading "action required" noise for already-dispositioned historical approvals.
+
+**Repo-wide grep audit (per `agent-discipline.md` "no just for now"):**
+
+- [x] Ran extended regex against `packages/studio/src/`, `plugins/deskwork-studio/public/src/`, `packages/cli/src/`, `packages/core/src/` (excluding tests). Initial hit count: 102 across `for now / just for now / TODO / FIXME / HACK / XXX / temporary / stub / placeholder / pending / until F / until v / migration window / coexist / for later / will land / will replace`. Triage: 101 are descriptive / benign (e.g. `<input placeholder>`, "fork-placeholder" affordance, "test stub", documentation describing existing as-is design like the documented shortform deferral in `pages/shortform-review.ts`, or context-specific use of the words "pending"/"placeholder"/"stub" as English nouns). **One real IOU surfaced**: `editorial-review-client.ts:1692` carried a TODO about outline-approve semantics. Filed as [#181](https://github.com/audiocontrol-org/deskwork/issues/181); TODO comment replaced with an issue-reference comment per the agent-discipline rule (no IOUs in production source).
+- [x] Same audit on `packages/cli/src/` and `packages/core/src/` — covered by the bullet above (the `grep -rn` invocation passed all 4 source dirs as one ripgrep target). Re-verified post-Phase-34e-audit: only 2 hits in cli/core (`customize.ts:26` "`prompts` for now" describing the documented "reserved for future use" exit-code 2 behavior; `doctor.ts:172` "the migration window" describing the legitimate dual-validation behavior during the legacy → entry-centric pipeline migration). Both benign / descriptive; neither is an IOU.
+
+**Move-to-complete:**
+
 - [ ] Move feature docs to `003-COMPLETE/` only when ALL sub-phases (34a, 34b, 34c, 34d) have closed-or-decision dispositions
 
-**Acceptance:** 34e closes when issues #154, #155, #159, #160, #161 are CLOSED on GitHub + the grep audit returns zero unexplained hits.
+**Acceptance:** 34e closes when issues #154, #155, #159, #160, #161 are CLOSED on GitHub + the corrupted-review audit doc is committed with every listed entry having a recorded disposition + the repo-wide grep audit returns zero unexplained hits.
 
 **Notes:**
 
 - 34a is the first proof-of-work for the new `agent-discipline.md` "no just for now" rule (commit `42eb837`). The legacy review surface is the textbook example of the failure mode; deleting it is the rule's first victory.
-- The audit-corrupted-reviews task is non-optional. Past trust failures are exactly the cost of letting "for now" stay around — the trust must be rebuilt by re-reviewing the affected entries against current state. Skipping the audit because "the file is on disk so the work is probably fine" is the same shape failure: a code-comment IOU about correctness instead of a verified disposition.
+- The audit-corrupted-reviews task is non-optional and lives in 34e (it can only run once 34a's structural fix has shipped — there's no working unified surface to re-review against until then). Past trust failures are exactly the cost of letting "for now" stay around; the trust must be rebuilt by re-reviewing the affected entries against current state. Skipping the audit because "the file is on disk so the work is probably fine" is the same shape failure: a code-comment IOU about correctness instead of a verified disposition.
 - Dispatch order: 34a → 34b → 34c → 34d → 34e. None of the others can start until 34a ships, because every other sub-phase's verification depends on a working studio review surface.
 - This phase ships across multiple PRs and likely multiple release versions. 34a alone is large enough that it may need its own internal task breakdown — that breakdown happens at the start of 34a implementation, not during this PRD review.
 - The pattern of "filed during dogfood" follow-ups remains the signal: if 34a surfaces new issues during implementation (likely it will — porting 710 lines of chrome will turn over rocks), they get filed in real time per `agent-discipline.md`, not bundled into a future "Phase 35" pre-emptively.

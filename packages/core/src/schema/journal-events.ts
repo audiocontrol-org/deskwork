@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { EntrySchema } from './entry.ts';
 import { AnnotationSchema } from './annotation.ts';
+import { DraftAnnotationSchema } from './draft-annotation.ts';
 
 const StageEnum = z.enum(['Ideas', 'Planned', 'Outlining', 'Drafting', 'Final', 'Published', 'Blocked', 'Cancelled']);
 const ReviewStateEnum = z.enum(['in-review', 'iterating', 'approved']);
@@ -57,6 +58,22 @@ const StageTransitionEvent = z.object({
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
+/**
+ * Phase 34a: entry-keyed annotation event. Distinct from `AnnotationEvent`
+ * (which uses the lighter `AnnotationSchema` and is keyed on
+ * `(entryId, stage, version)`), this event carries the full
+ * `DraftAnnotation` shape used by the longform review surface, keyed
+ * on `entryId` only. The two stores intentionally do not interoperate
+ * — see `entry/annotations.ts` and the api.ts header for the split
+ * contract.
+ */
+const EntryAnnotationEvent = z.object({
+  kind: z.literal('entry-annotation'),
+  at: z.string().datetime(),
+  entryId: z.string().uuid(),
+  annotation: DraftAnnotationSchema,
+});
+
 export const JournalEventSchema = z.discriminatedUnion('kind', [
   EntryCreatedEvent,
   EntryIngestedEvent,
@@ -64,6 +81,7 @@ export const JournalEventSchema = z.discriminatedUnion('kind', [
   AnnotationEvent,
   ReviewStateChangeEvent,
   StageTransitionEvent,
+  EntryAnnotationEvent,
 ]);
 
 export type JournalEvent = z.infer<typeof JournalEventSchema>;

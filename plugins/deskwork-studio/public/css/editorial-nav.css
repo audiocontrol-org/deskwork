@@ -174,7 +174,13 @@ body[data-review-ui="scrapbook"] {
    ============================================================ */
 
 [data-review-ui] .er-toc-page {
-  max-width: var(--er-container-narrow);
+  /* #177 Phase 34 ship-pass — both index and dashboard use
+   * --er-container-wide for content-container max-width. Pre-fix the
+   * index used --er-container-narrow (56rem) while the dashboard used
+   * --er-container-wide (78rem); switching surfaces felt jarring per
+   * the operator's report. The TOC items render with more whitespace
+   * to the right at the wider width but no information density loss. */
+  max-width: var(--er-container-wide);
   margin: 0 auto;
   padding: var(--er-space-6) var(--er-space-4) var(--er-space-6);
 }

@@ -50,14 +50,25 @@ export function iterationForCurrentStage(entry: Entry): number {
  * - Published: "view →" (read-only review surface).
  * - Blocked / Cancelled: "induct →" copy-CLI to bring the entry back.
  *
+ * All non-terminal stages also get a `scrapbook ↗` link (#157) — the
+ * scrapbook viewer is the primary surface for entry-attached research
+ * notes / images / config / drafts and was previously unreachable
+ * from the dashboard.
+ *
  * Each button's behavior is parked behind a `data-copy` attribute so
  * the existing studio client (editorial-studio-client.ts) handles
  * clipboard wiring without new server handlers.
  */
-export function renderRowActions(entry: Entry): RawHtml {
+export function renderRowActions(entry: Entry, defaultSite: string): RawHtml {
   const buttons: string[] = [];
   const stage = entry.currentStage;
-  const reviewLink = `/dev/editorial-review/${entry.uuid}`;
+  const reviewLink = `/dev/editorial-review/entry/${entry.uuid}`;
+  // Scrapbook URL uses the project's defaultSite. Multi-site calendars
+  // would require a per-entry site lookup (out of scope for #157 — the
+  // primary value is the dashboard ↔ scrapbook entry point existing at
+  // all, and most projects have a single site). Slug already contains
+  // any hierarchical path segments.
+  const scrapLink = `/dev/scrapbook/${defaultSite}/${entry.slug}`;
 
   if (isLinearActiveStage(stage)) {
     buttons.push(html`<a class="er-btn er-btn-small" href="${reviewLink}"
@@ -80,6 +91,11 @@ export function renderRowActions(entry: Entry): RawHtml {
       data-copy="/deskwork:induct ${entry.slug}"
       title="bring this entry back into the pipeline">induct →</button>`);
   }
+
+  // Scrapbook link follows every stage's primary action.
+  buttons.push(html`<a class="er-btn er-btn-small er-btn-scrap"
+    href="${scrapLink}" data-action="open-scrapbook"
+    title="open the entry's scrapbook (research notes, drafts, etc.)">scrapbook ↗</a>`);
 
   return unsafe(`<span class="er-calendar-action">${buttons.join('')}</span>`);
 }

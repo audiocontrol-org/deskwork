@@ -132,8 +132,8 @@ describe('studio index page', () => {
     // Templated routes (longform reviews, scrapbook) render the
     // placeholder in red-pencil italic.
     expect(r.html).toContain('is-template');
-    expect(r.html).toContain('/dev/editorial-review/');
-    expect(r.html).toContain('<em>&lt;slug&gt;</em>');
+    expect(r.html).toContain('/dev/editorial-review/entry/');
+    expect(r.html).toContain('<em>&lt;uuid&gt;</em>');
     expect(r.html).toContain('/dev/scrapbook/');
     expect(r.html).toContain('<em>&lt;site&gt;/&lt;path&gt;</em>');
   });

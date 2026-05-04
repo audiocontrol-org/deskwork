@@ -20,7 +20,8 @@ export interface ValidationFailure {
     | 'file-presence'
     | 'stage-invariants'
     | 'cross-entry'
-    | 'migration';
+    | 'migration'
+    | 'missing-artifact-path';
   message: string;
   entryId?: string;
   path?: string;
@@ -349,6 +350,46 @@ async function validateIterationHistory(projectRoot: string): Promise<Validation
   return failures;
 }
 
+/**
+ * #182 Phase 34 ship-pass — surface entries that lack `artifactPath`
+ * but DO have a discoverable file via the slug+stage heuristic.
+ *
+ * Pre-fix, these entries worked at request time (via the
+ * `resolveArtifactPath` heuristic fallback) but the path was
+ * re-derived on every read. Stamping `artifactPath` into the sidecar
+ * makes the binding explicit + survives slug renames + lets the
+ * version-strip / scrapbook / audit layers stop guessing.
+ *
+ * Returns nothing for entries that:
+ *   - Already have artifactPath set (no gap).
+ *   - Have a stage with no on-disk artifact (Blocked / Cancelled).
+ *   - Have a heuristic path that doesn't exist on disk (file-presence
+ *     handles those — backfilling a non-existent path would be
+ *     misleading).
+ *
+ * Repair: write `artifactPath = <heuristic-relative-path>` into the
+ * sidecar.
+ */
+async function validateMissingArtifactPath(projectRoot: string): Promise<ValidationFailure[]> {
+  const failures: ValidationFailure[] = [];
+  const sidecars = await loadSidecars(projectRoot);
+  for (const { entry, path } of sidecars) {
+    if (entry.artifactPath !== undefined && entry.artifactPath !== '') continue;
+    const heuristic = artifactPathForStage(projectRoot, entry.slug, entry.currentStage);
+    if (!heuristic) continue;
+    if (!(await fileExists(heuristic))) continue;
+    // Sidecar lacks artifactPath; the heuristic resolves and the file
+    // exists — this is a backfillable case.
+    failures.push({
+      category: 'missing-artifact-path',
+      message: `sidecar lacks artifactPath; heuristic resolves to ${heuristic} (run with --fix=all to stamp)`,
+      entryId: entry.uuid,
+      path,
+    });
+  }
+  return failures;
+}
+
 async function validateFilePresence(projectRoot: string): Promise<ValidationFailure[]> {
   const failures: ValidationFailure[] = [];
   const sidecars = await loadSidecars(projectRoot);
@@ -479,6 +520,7 @@ export async function validateAll(projectRoot: string): Promise<ValidationResult
   failures.push(...(await validateJournalSidecar(projectRoot)));
   failures.push(...(await validateIterationHistory(projectRoot)));
   failures.push(...(await validateFilePresence(projectRoot)));
+  failures.push(...(await validateMissingArtifactPath(projectRoot)));
   failures.push(...(await validateStageInvariants(projectRoot)));
   failures.push(...(await validateCrossEntry(projectRoot)));
   return { failures };

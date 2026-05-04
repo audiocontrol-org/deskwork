@@ -120,6 +120,23 @@
 .scrap-aside-list a:hover { color: var(--er-red-pencil); border-bottom-color: var(--er-red-pencil); }
 .scrap-aside-list a[data-active="true"] { color: var(--er-red-pencil); border-bottom-color: var(--er-red-pencil); }
 
+/* #168 Phase 34 ship-pass — "back to review" link in the aside head
+ * when this scrapbook belongs to a tracked entry. Pre-fix the only
+ * nav affordance was the breadcrumb's site link, which lands on the
+ * content tree, not the entry-review surface the operator typically
+ * came from. */
+.scrap-aside-back {
+  font-family: var(--er-font-mono);
+  font-size: 0.75rem;
+  margin: 0 0 var(--er-space-2);
+}
+.scrap-aside-back a {
+  color: var(--er-red-pencil);
+  text-decoration: none;
+  border-bottom: 1px dashed transparent;
+}
+.scrap-aside-back a:hover { border-bottom-color: var(--er-red-pencil); }
+
 .scrap-aside-actions { display: flex; flex-direction: column; gap: 0.4rem; }
 .scrap-aside-btn {
   font-family: var(--er-font-mono);
@@ -470,6 +487,21 @@
   color: var(--er-stamp-purple);
   font-size: 1rem;
 }
+
+/*
+ * #164 Phase 34b — inline secret glyph next to .scrap-name on cards
+ * carrying data-secret="true". Provides visual continuity for the
+ * secret marker once a card is expanded (where it grows beyond the
+ * grouped section's visual scope). Mirrors the section header's
+ * stamp-purple color but at a smaller scale so it doesn't compete
+ * with the filename for attention.
+ */
+.scrap-name-secret-mark {
+  color: var(--er-stamp-purple);
+  font-size: 0.85rem;
+  cursor: help;
+  user-select: none;
+}
 .scrap-secret-title {
   font-family: var(--er-font-display);
   font-variation-settings: "opsz" 36, "wght" 500;
@@ -486,6 +518,96 @@
   border: 1px dashed var(--er-stamp-purple);
   padding: 0.1rem 0.4rem;
   border-radius: 2px;
+}
+
+/* ============ COMPOSER (#166 — Phase 34b) ============ */
+
+/*
+ * Inline new-note composer. Mirrors the pre-F1 inline form, adapted to
+ * the F1 .scrap-* vocabulary. Hidden by default; revealed when the
+ * aside's `+ new note` button dispatches `data-action="new-note"`.
+ *
+ * Design: paper-2 panel with a one-line header (glyph + kicker +
+ * filename input + secret toggle + cancel/save buttons) and a textarea
+ * body underneath. Sits between the filter chips and the cards grid so
+ * the resulting note appears in sorted position when the page reloads
+ * after save.
+ */
+.scrap-composer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--er-space-2);
+  background: var(--er-paper-2);
+  border: 1px solid var(--er-faded-2);
+  border-radius: 3px;
+  padding: var(--er-space-2);
+  margin-bottom: var(--er-space-3);
+}
+
+.scrap-composer[hidden] { display: none; }
+
+.scrap-composer-head {
+  display: flex;
+  align-items: center;
+  gap: var(--er-space-2);
+  flex-wrap: wrap;
+}
+
+.scrap-composer-glyph {
+  color: var(--er-red-pencil);
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.scrap-composer-kicker {
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+}
+
+.scrap-composer-filename {
+  flex: 1;
+  min-width: 12rem;
+  font-family: var(--er-font-mono);
+  font-size: 0.875rem;
+  background: var(--er-paper);
+  border: 1px solid var(--er-faded-2);
+  border-radius: 2px;
+  padding: 0.3rem 0.5rem;
+  color: var(--er-ink);
+}
+
+.scrap-composer-filename:focus,
+.scrap-composer-body:focus {
+  outline: 2px solid var(--er-red-pencil);
+  outline-offset: 1px;
+}
+
+.scrap-composer-secret {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: var(--er-font-mono);
+  font-size: 0.75rem;
+  color: var(--er-faded);
+  cursor: pointer;
+}
+
+.scrap-composer-secret input { cursor: pointer; }
+
+.scrap-composer-body {
+  font-family: var(--er-font-mono);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  background: var(--er-paper);
+  border: 1px solid var(--er-faded-2);
+  border-radius: 2px;
+  padding: var(--er-space-2);
+  color: var(--er-ink);
+  resize: vertical;
+  min-height: 8rem;
 }
 
 /* ============ REDUCED MOTION ============ */

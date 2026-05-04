@@ -242,8 +242,11 @@ describe('studio pages', () => {
   it('GET /dev/editorial-studio renders the dashboard', async () => {
     const r = await getText(app, '/dev/editorial-studio');
     expect(r.status).toBe(200);
-    expect(r.text).toContain('<title>Editorial Studio');
-    expect(r.text).toContain('Editorial <em>Studio</em>');
+    // #178 Phase 34 ship-pass — dashboard heading renamed from
+    // "Editorial Studio" to "Press-Check" to disambiguate from the
+    // index page which keeps the "Editorial Studio" heading.
+    expect(r.text).toContain('<title>Press-Check');
+    expect(r.text).toContain('<em>Press-</em>Check');
     expect(r.text).toContain('/static/css/editorial-review.css');
     expect(r.text).toContain('/static/css/editorial-studio.css');
     expect(r.text).toContain('/static/dist/editorial-studio-client.js');
@@ -460,23 +463,22 @@ describe('studio pages', () => {
     expect(r.text).not.toContain('class="scrapbook-secret-title"');
   });
 
-  it('GET /dev/editorial-review/:slug returns an error page for unknown slug', async () => {
+  it('GET /dev/editorial-review/<slug> returns 404 (Phase 34a — slug catch-all retired)', async () => {
     const r = await getText(app, '/dev/editorial-review/nonexistent?site=a');
-    expect(r.status).toBe(200);
-    expect(r.text).toContain('No galley to review');
-    expect(r.text).toContain('/static/css/editorial-review.css');
+    expect(r.status).toBe(404);
   });
 
-  it('GET /dev/editorial-review/:slug renders a real workflow', async () => {
+  it('GET /dev/editorial-review/<workflow-uuid> renders shortform workflow', async () => {
     const w = createWorkflow(root, cfg, {
       site: 'a',
-      slug: 'rendered',
-      contentKind: 'longform',
+      slug: 'a-tweet',
+      contentKind: 'shortform',
+      platform: 'linkedin',
       initialMarkdown: '---\ntitle: Hello World\ndescription: A dispatch.\n---\n\n# Hello World\n\nBody prose.\n',
     });
-    const r = await getText(app, `/dev/editorial-review/${w.slug}?site=a`);
+    const r = await getText(app, `/dev/editorial-review/${w.id}`);
     expect(r.status).toBe(200);
-    expect(r.text).toContain('Margin notes');
+    expect(r.text).toContain('data-review-ui="shortform"');
     expect(r.text).toContain('Hello World');
     expect(r.text).toContain('id="draft-state"');
     expect(r.text).toContain('/static/dist/editorial-review-client.js');

@@ -202,7 +202,45 @@ describe('studio dashboard — eight stage sections (Task 34)', () => {
     const r = await getHtml(app, '/dev/editorial-studio');
     expect(r.status).toBe(200);
     expect(r.html).toMatch(
-      new RegExp(`href="/dev/editorial-review/${UUID_PUBLISHED}"[^>]*[^<]*view`),
+      new RegExp(`href="/dev/editorial-review/entry/${UUID_PUBLISHED}"[^>]*[^<]*view`),
+    );
+  });
+
+  it('every dashboard row carries a scrapbook link to the entry (#157)', async () => {
+    // Phase 34c — dashboard rows now expose a `scrapbook ↗` link
+    // pointing at /dev/scrapbook/<defaultSite>/<slug> for every
+    // stage. Pre-fix, there was no entry point from the dashboard to
+    // the per-entry scrapbook viewer.
+    await writeSidecar(root, makeEntry({
+      uuid: UUID_DRAFTING,
+      slug: 'in-flight',
+      title: 'In Flight',
+      currentStage: 'Drafting',
+      iterationByStage: { Drafting: 1 },
+      reviewState: 'in-review',
+    }));
+    await writeSidecar(root, makeEntry({
+      uuid: UUID_PUBLISHED,
+      slug: 'shipped',
+      title: 'Shipped',
+      currentStage: 'Published',
+      iterationByStage: { Drafting: 3, Final: 1 },
+      datePublished: '2026-04-29T12:00:00.000Z',
+    }));
+
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    // Active-stage row: scrapbook link present alongside the open
+    // affordance.
+    expect(r.html).toContain('href="/dev/scrapbook/d/in-flight"');
+    // Published row: scrapbook link present alongside the view
+    // affordance.
+    expect(r.html).toContain('href="/dev/scrapbook/d/shipped"');
+    // Both links carry the data-action="open-scrapbook" hook so the
+    // existing studio client (or future delegated handler) can
+    // distinguish them from review links.
+    expect(r.html).toMatch(
+      /href="\/dev\/scrapbook\/d\/in-flight"[^>]*data-action="open-scrapbook"/,
     );
   });
 
@@ -211,7 +249,11 @@ describe('studio dashboard — eight stage sections (Task 34)', () => {
     expect(r.status).toBe(200);
     // Page still has a head + footer scaffold.
     expect(r.html).toContain('<!DOCTYPE html>');
-    expect(r.html).toContain('Editorial Studio');
+    // #178 Phase 34 ship-pass — dashboard heading is "Press-Check"
+    // (was "Editorial Studio", which clashed with the index page's
+    // identical heading and made the two surfaces look like duplicates
+    // of the same function).
+    expect(r.html).toContain('Press-');
   });
 
   it('groups multiple entries into the right stage sections', async () => {
@@ -324,7 +366,7 @@ describe('studio dashboard — eight stage sections (Task 34)', () => {
     expect(r.status).toBe(200);
     expect(r.html).toMatch(
       new RegExp(
-        `<a href="/dev/editorial-review/${UUID_DRAFTING}"[^>]*class="er-stamp-link"[^>]*><span class="er-stamp er-stamp-in-review"`,
+        `<a href="/dev/editorial-review/entry/${UUID_DRAFTING}"[^>]*class="er-stamp-link"[^>]*><span class="er-stamp er-stamp-in-review"`,
       ),
     );
   });

@@ -18,7 +18,9 @@ export interface DoctorOptions {
   fileExists?: (path: string) => boolean;
   checkConfig?: () => boolean;
   config?: Config;
-  resolveIssueState?: (issueNumber: number) => Promise<'OPEN' | 'CLOSED' | undefined> | 'OPEN' | 'CLOSED' | undefined;
+  resolveIssueState?:
+    | ((issueNumber: number) => Promise<'OPEN' | 'CLOSED' | undefined>)
+    | ((issueNumber: number) => 'OPEN' | 'CLOSED' | undefined);
 }
 
 const REQUIRED_PEERS = ['superpowers'];
@@ -74,9 +76,15 @@ function listConfiguredVersionDirs(cfg: Config, projectRoot: string): string[] {
     .sort();
 }
 
-function listFeatureDocRefs(cfg: Config, projectRoot: string, stage?: keyof Config['docs']['statusDirs']): FeatureDocRef[] {
+function listFeatureDocRefs(
+  cfg: Config,
+  projectRoot: string,
+  stage?: keyof Config['docs']['statusDirs']
+): FeatureDocRef[] {
   const docsRoot = join(projectRoot, cfg.docs.root);
-  const stageNames = stage ? [stage] : (Object.keys(cfg.docs.statusDirs) as Array<keyof Config['docs']['statusDirs']>);
+  const stageNames = stage
+    ? [stage]
+    : (Object.keys(cfg.docs.statusDirs) as Array<keyof Config['docs']['statusDirs']>);
   const refs: FeatureDocRef[] = [];
 
   if (cfg.docs.byVersion) {

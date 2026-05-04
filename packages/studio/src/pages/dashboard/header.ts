@@ -44,10 +44,10 @@ export function renderHeader(
   return unsafe(html`
   <header class="er-pagehead er-pagehead--centered">
     <p class="er-pagehead__kicker">
-      Vol. ${volume} &middot; № ${issueNum} &middot; Press-check
+      Vol. ${volume} &middot; № ${issueNum}
     </p>
     <h1 class="er-pagehead__title">
-      Editorial <em>Studio</em>
+      <em>Press-</em>Check
     </h1>
     <p class="er-pagehead__deck">
       Project: <code>${projectRoot}</code>

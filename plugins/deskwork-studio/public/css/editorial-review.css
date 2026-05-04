@@ -743,6 +743,12 @@ body[data-review-ui="scrapbook"] {
 .er-btn-approve { border-color: var(--er-stamp-green); color: var(--er-stamp-green); }
 .er-btn-approve:hover:not(:disabled) { background: var(--er-stamp-green); color: var(--er-paper); }
 
+/* #157 Phase 34c — scrapbook cross-link from dashboard rows. Subtle
+ * stamp-purple to align with the secret-mark + scrapbook-section
+ * vocabulary; doesn't compete with the primary "open / view" actions. */
+.er-btn-scrap { border-color: var(--er-stamp-purple); color: var(--er-stamp-purple); }
+.er-btn-scrap:hover:not(:disabled) { background: var(--er-stamp-purple); color: var(--er-paper); }
+
 .er-btn-reject { border-color: var(--er-red-pencil); color: var(--er-red-pencil); }
 .er-btn-reject:hover:not(:disabled) { background: var(--er-red-pencil); color: var(--er-paper); }
 
@@ -1120,6 +1126,92 @@ body:has([data-review-ui="longform"]) .site-footer {
   .er-strip-hint { display: none; }
 }
 .er-strip-right { margin-left: auto; display: flex; gap: var(--er-space-1); flex-wrap: wrap; align-items: center; }
+
+/*
+ * #166 Phase 34b — inline rejection-reason composer (replaces the
+ * legacy window.prompt). Built dynamically by promptForRejectionReason
+ * and inserted immediately after the Reject button so it sits
+ * adjacent to its trigger.
+ */
+.er-reject-reason {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: var(--er-space-2);
+  margin: var(--er-space-2) 0;
+  background: var(--er-paper-2);
+  border: 1px solid var(--er-red-pencil);
+  border-radius: 3px;
+  width: 100%;
+  flex-basis: 100%;
+}
+.er-reject-reason-label {
+  margin: 0;
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+}
+.er-reject-reason-input {
+  font-family: var(--er-font-mono);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  background: var(--er-paper);
+  border: 1px solid var(--er-faded-2);
+  border-radius: 2px;
+  padding: 0.4rem 0.5rem;
+  color: var(--er-ink);
+  resize: vertical;
+  min-height: 4rem;
+}
+.er-reject-reason-input:focus {
+  outline: 2px solid var(--er-red-pencil);
+  outline-offset: 1px;
+}
+.er-reject-reason-actions {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+
+/*
+ * #166 Phase 34b — generic inline confirm dialog (replaces window.confirm).
+ * Used by edit-mode's discard-changes flow and any future caller that
+ * needs a yes/no prompt anchored to a trigger.
+ */
+.er-inline-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: var(--er-space-2);
+  margin: var(--er-space-2) 0;
+  background: var(--er-paper-2);
+  border: 1px solid var(--er-faded-2);
+  border-radius: 3px;
+  width: 100%;
+  flex-basis: 100%;
+}
+.er-inline-prompt-label {
+  margin: 0;
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+}
+.er-inline-prompt-message {
+  margin: 0;
+  font-family: var(--er-font-display);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--er-ink);
+}
+.er-inline-prompt-actions {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
 
 /*
  * Pending-state label rendered inline with the action buttons when a

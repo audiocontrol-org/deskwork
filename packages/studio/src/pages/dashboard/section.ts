@@ -48,9 +48,9 @@ const STAGE_EMPTY_MESSAGES: Record<Stage, string> = {
  *   - updatedAt timestamp
  *   - per-stage action buttons
  */
-export function renderRow(entry: Entry, index: number): RawHtml {
+export function renderRow(entry: Entry, index: number, defaultSite: string): RawHtml {
   const iteration = iterationForCurrentStage(entry);
-  const reviewLink = `/dev/editorial-review/${entry.uuid}`;
+  const reviewLink = `/dev/editorial-review/entry/${entry.uuid}`;
   const search = [entry.slug, entry.title, entry.keywords.join(' ')].join(' ').toLowerCase();
   // Hierarchical entries (slugs containing `/`) get a visual indent
   // marker the CSS layer reads. Storage stays flat; this is display-only.
@@ -77,7 +77,7 @@ export function renderRow(entry: Entry, index: number): RawHtml {
         <span class="er-calendar-status"><a href="${reviewLink}"
           title="open the review surface for ${entry.slug}"
           class="er-stamp-link">${renderReviewStateBadge(entry.reviewState)}</a></span>
-        ${renderRowActions(entry)}
+        ${renderRowActions(entry, defaultSite)}
       </div>
     </div>`);
 }
@@ -91,7 +91,11 @@ export function renderRow(entry: Entry, index: number): RawHtml {
  * calendars (#112). The hover title still surfaces the stage's
  * "what to run next" hint when the operator points at the heading.
  */
-export function renderStageSection(stage: Stage, entries: readonly Entry[]): RawHtml {
+export function renderStageSection(
+  stage: Stage,
+  entries: readonly Entry[],
+  defaultSite: string,
+): RawHtml {
   if (entries.length === 0) {
     return unsafe(html`
       <section class="er-section er-section--empty"
@@ -106,7 +110,7 @@ export function renderStageSection(stage: Stage, entries: readonly Entry[]): Raw
       </section>`);
   }
 
-  const body = unsafe(entries.map((e, i) => renderRow(e, i).__raw).join(''));
+  const body = unsafe(entries.map((e, i) => renderRow(e, i, defaultSite).__raw).join(''));
 
   return unsafe(html`
     <section class="er-section" id="stage-${stage.toLowerCase()}" data-stage-section="${stage}">
