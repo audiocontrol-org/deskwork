@@ -57,13 +57,21 @@ function renderEditToggle(): string {
 }
 
 function renderInductPicker(entry: Entry): string {
-  const options = STAGE_PICKER_OPTIONS.map(
-    (s) => unsafe(html`<option value="${s}">${s}</option>`),
-  );
+  // #189: induct-to client handler builds `/deskwork:induct <slug> --to <Stage>`
+  // from the dataset; it needs the slug, not the uuid, for the skill command.
+  // First option is a blank placeholder so the operator's selection always
+  // produces a `change` event (selecting the already-selected option doesn't
+  // fire `change`).
+  const options = [
+    unsafe(html`<option value="">— pick a stage —</option>`),
+    ...STAGE_PICKER_OPTIONS.map(
+      (s) => unsafe(html`<option value="${s}">${s}</option>`),
+    ),
+  ];
   return html`
     <label class="er-entry-control er-entry-control--induct">
       <span class="er-entry-control-label">Induct to</span>
-      <select name="induct-to" data-entry-uuid="${entry.uuid}">
+      <select name="induct-to" data-entry-uuid="${entry.uuid}" data-entry-slug="${entry.slug}">
         ${options}
       </select>
     </label>`;

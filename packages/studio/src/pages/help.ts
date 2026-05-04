@@ -250,7 +250,7 @@ function renderStudioSection(): RawHtml {
           <h4>Calendar panels</h4>
           <p>Six on-pipeline columns: <em>Ideas · Planned · Outlining · Drafting · Final · Published</em>, plus parking-lot panels for <em>Blocked</em> and <em>Cancelled</em>. Each row shows slug, title, the per-stage iteration counter (<code>iterationByStage</code>), a file-present dot for the current stage's primary artifact, and any review state.</p>
           <h4>Next-move column</h4>
-          <p>Per row, the studio surfaces either a copy-to-clipboard command (for cognitive work that lives in Claude Code) or a one-click button (for mechanical transitions). <code>approve →</code> calls <code>/deskwork:approve</code>. <code>publish →</code> calls <code>/deskwork:publish</code>. <code>block</code> / <code>cancel</code> / <code>induct</code> appear contextually.</p>
+          <p>Per row, the studio surfaces a button that copies the corresponding skill command to your clipboard — paste into a Claude Code chat to run. <code>approve →</code> copies <code>/deskwork:approve &lt;slug&gt;</code>. <code>publish →</code> copies <code>/deskwork:publish &lt;slug&gt;</code>. <code>block</code> / <code>cancel</code> / <code>induct</code> appear contextually and copy their own commands. The state-machine work happens in the skill, not in the studio (see <code>THESIS.md</code> Consequence 2).</p>
           <h4>Shortform coverage matrix</h4>
           <p>For each <em>Published</em> entry, a row of platform cells (reddit, linkedin, youtube, instagram). Shaded cells are covered by a DistributionRecord; empty cells surface the exact <code>/deskwork:shortform-start</code> command to copy.</p>
           <h4>Voice-drift signal</h4>
@@ -259,13 +259,13 @@ function renderStudioSection(): RawHtml {
         <div class="eh-panel">
           <p class="eh-panel-head">Secondary surfaces</p>
           <h4>Entry review</h4>
-          <p><code>/dev/editorial-review/entry/&lt;uuid&gt;</code>. The current-stage artifact (idea.md, plan.md, outline.md, or index.md) renders inside the review surface. Select text for a margin note; double-click anywhere to edit the markdown in place; approve, iterate, block, or cancel from the fixed strip. The review is keyed by entry uuid, not workflow id.</p>
+          <p><code>/dev/editorial-review/entry/&lt;uuid&gt;</code>. The current-stage artifact (idea.md, plan.md, outline.md, or index.md) renders inside the review surface. Select text for a margin note; double-click anywhere to edit the markdown in place. The fixed strip's Approve / Iterate / (Reject — disabled, see <a href="https://github.com/audiocontrol-org/deskwork/issues/173">#173</a>) buttons COPY the corresponding skill command (<code>/deskwork:approve &lt;slug&gt;</code>, etc.) to your clipboard — paste into a Claude Code chat to run. The skill reads marginalia, applies editorial judgment, edits the file (when iterating), advances state. The review is keyed by entry uuid, not workflow id.</p>
           <h4>Shortform review</h4>
           <p><code>/dev/editorial-review-shortform</code>. Cards grouped by platform. Each card has a version header, an editable textarea, and save · approve · iterate · reject controls.</p>
           <h4>Keyboard</h4>
-          <p>In the studio: <kbd>1</kbd>–<kbd>6</kbd> jump to on-pipeline columns. In an entry review: <kbd>e</kbd> / double-click toggles edit mode; <kbd>a</kbd> approves (graduates by one stage); <kbd>i</kbd> iterates; <kbd>b</kbd> blocks; <kbd>j</kbd>/<kbd>k</kbd> step through margin notes; <kbd>?</kbd> shows a full shortcuts overlay.</p>
+          <p>In the studio: <kbd>1</kbd>–<kbd>6</kbd> jump to on-pipeline columns. In an entry review: <kbd>e</kbd> / double-click toggles edit mode; <kbd>a</kbd> <kbd>a</kbd> copies the approve command to clipboard; <kbd>i</kbd> <kbd>i</kbd> copies the iterate command; <kbd>j</kbd>/<kbd>k</kbd> step through margin notes; <kbd>?</kbd> shows a full shortcuts overlay.</p>
           <h4>Polling</h4>
-          <p>Both routes poll every 8–10 seconds when idle. If the agent runs <code>/deskwork:iterate</code> in Claude Code, a new version of the current-stage artifact shows up in the browser without a reload.</p>
+          <p>Both routes poll every 8–10 seconds when idle. After you paste the iterate command into Claude Code and the skill writes a new version, the new artifact shows up in the browser without a manual reload.</p>
         </div>
       </div>
     </section>`);
@@ -280,22 +280,22 @@ const RUNTHROUGH_STEPS: ReadonlyArray<{ title: string; op: string; body: RawHtml
   {
     title: 'Iterate the idea',
     op: 'browser then terminal',
-    body: unsafe('<p>Open <code>/dev/editorial-review/entry/&lt;uuid&gt;</code>. Leave margin notes on <code>idea.md</code>. Click <em>Iterate</em>; back in Claude Code run <code>/deskwork:iterate &lt;uuid&gt;</code>. The agent revises using the site voice, writes the next version, bumps <code>iterationByStage.Ideas</code>.</p>'),
+    body: unsafe('<p>Open <code>/dev/editorial-review/entry/&lt;uuid&gt;</code>. Leave margin notes on <code>idea.md</code>. Click <em>Iterate</em>; the studio copies <code>/deskwork:iterate &lt;slug&gt;</code> to your clipboard — paste into a Claude Code chat to run. The skill reads your marginalia, revises <code>idea.md</code> in the site voice, writes the next version, bumps <code>iterationByStage.Ideas</code>.</p>'),
   },
   {
     title: 'Approve into Planned',
     op: 'browser or terminal',
-    body: unsafe('<p>Click <em>Approve</em> on the review surface or run <code>/deskwork:approve &lt;uuid&gt;</code>. Stage graduates to <em>Planned</em>. <code>plan.md</code> is seeded from <code>idea.md</code>; <code>iterationByStage.Planned</code> starts at 0.</p>'),
+    body: unsafe('<p>Click <em>Approve</em> on the review surface — the studio copies <code>/deskwork:approve &lt;slug&gt;</code> to your clipboard. Paste into a Claude Code chat. The skill graduates the stage to <em>Planned</em>, seeds <code>plan.md</code> from <code>idea.md</code>, and starts <code>iterationByStage.Planned</code> at 0.</p>'),
   },
   {
     title: 'Plan, then outline, then draft',
     op: 'browser then terminal',
-    body: unsafe('<p>Same loop at each stage. <code>/deskwork:iterate</code> revises the current-stage artifact (<code>plan.md</code>, then <code>outline.md</code>, then <code>index.md</code>). <code>/deskwork:approve</code> graduates by exactly one stage. There is no “approve but stay.”</p>'),
+    body: unsafe('<p>Same loop at each stage. Click <em>Iterate</em> in the studio to copy the iterate command; the agent runs the skill, which revises the current-stage artifact (<code>plan.md</code>, then <code>outline.md</code>, then <code>index.md</code>). Click <em>Approve</em> to copy the approve command; the skill graduates by exactly one stage. There is no “approve but stay.”</p>'),
   },
   {
     title: 'Approve into Final',
     op: 'browser or terminal',
-    body: unsafe('<p>When the Drafting <code>index.md</code> is good, approve once more. Stage becomes <em>Final</em>. The same <code>index.md</code> is the artifact at Final — Final is the “ready to publish” stage, not a separate file.</p>'),
+    body: unsafe('<p>When the Drafting <code>index.md</code> is good, click <em>Approve</em> once more (copies the command; paste into Claude Code). Stage becomes <em>Final</em>. The same <code>index.md</code> is the artifact at Final — Final is the “ready to publish” stage, not a separate file.</p>'),
   },
   {
     title: 'Publish',
@@ -365,8 +365,8 @@ function renderReferenceSection(): RawHtml {
           <dl>
             <dt><kbd>e</kbd> / dbl-click</dt><dd>toggle edit mode</dd>
             <dt>select text</dt><dd>leave a margin note</dd>
-            <dt><kbd>a</kbd></dt><dd>approve — graduates by one stage</dd>
-            <dt><kbd>i</kbd></dt><dd>iterate (hand off to Claude Code)</dd>
+            <dt><kbd>a</kbd> <kbd>a</kbd></dt><dd>copy <code>/deskwork:approve &lt;slug&gt;</code> to clipboard</dd>
+            <dt><kbd>i</kbd> <kbd>i</kbd></dt><dd>copy <code>/deskwork:iterate &lt;slug&gt;</code> to clipboard</dd>
             <dt><kbd>b</kbd></dt><dd>block — out of pipeline, resumable</dd>
             <dt><kbd>j</kbd> / <kbd>k</kbd></dt><dd>step through margin notes</dd>
             <dt><kbd>?</kbd></dt><dd>shortcuts overlay</dd>
@@ -424,7 +424,7 @@ function renderReferenceSection(): RawHtml {
           <dl>
             <dt>404 on /dev/*</dt><dd>the dev routes only run when <code>deskwork-studio</code> is up. Start it with the documented launch command.</dd>
             <dt>nothing to review</dt><dd>capture an entry first: <code>/deskwork:add "Title"</code>, then visit <code>/dev/editorial-review/entry/&lt;uuid&gt;</code>.</dd>
-            <dt>iterate doesn't trigger</dt><dd>the agent has to run <code>/deskwork:iterate</code>. The browser button just marks the workflow; Claude does the writing.</dd>
+            <dt>iterate doesn't trigger</dt><dd>the studio's <em>Iterate</em> button copies <code>/deskwork:iterate &lt;slug&gt;</code> to your clipboard — paste into a Claude Code chat to run. The skill does the writing; the studio doesn't mutate state on its own.</dd>
             <dt>calendar.md drift</dt><dd>run <code>/deskwork:doctor</code>. The sidecar is truth — calendar.md is regenerated from it.</dd>
           </dl>
         </div>

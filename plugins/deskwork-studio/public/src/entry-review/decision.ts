@@ -1,12 +1,15 @@
 /**
- * Decision-strip wiring for the entry-keyed press-check client
- * (Phase 34a — T13).
+ * Decision-strip wiring for the entry-keyed press-check client (#189).
  *
- *   - `Approve` → POST `/api/dev/editorial-review/entry/<uuid>/decision`
- *     with `{decision: 'approve'}`. The endpoint calls `approveEntryStage`,
- *     which graduates the entry to the next stage in the linear pipeline.
- *   - `Iterate` → POST `/api/dev/editorial-review/entry/<uuid>/version`.
- *     The endpoint records a new iteration via `iterateEntry`.
+ * Per `THESIS.md` Consequence 2: the studio routes operator commands to
+ * skills, not to state-machine endpoints. Clicking Approve / Iterate
+ * copies the corresponding skill command to the clipboard; the operator
+ * pastes into a Claude Code chat where the skill runs and does the
+ * editorial work (reads marginalia, edits the file when iterating,
+ * advances state, writes the journal, regenerates the calendar).
+ *
+ *   - `Approve` → copy `/deskwork:approve <slug>` to clipboard.
+ *   - `Iterate` → copy `/deskwork:iterate <slug>` to clipboard.
  *   - `Reject` → DISABLED. The button carries `disabled` and a tooltip
  *     pointing to https://github.com/audiocontrol-org/deskwork/issues/173.
  *     The keyboard shortcut path (r r) similarly no-ops with a toast.
@@ -14,11 +17,18 @@
  * Keyboard shortcuts (#108) — bare-letter double-tap with no modifier,
  * arming for 500ms after the first press. Mirrors the legacy surface
  * verbatim so the operator's muscle memory transfers.
+ *
+ * What changed (#189): the previous implementation POSTed to
+ * `/api/dev/editorial-review/entry/<uuid>/{decision,version}` which
+ * called `approveEntryStage` / `iterateEntry` server-side, mutating
+ * sidecar state from a button click. That violated the thesis (skills
+ * do the work; the studio routes commands). The state-machine endpoints
+ * remain registered on the server for now but are unreached from this
+ * client; their retirement is a follow-up.
  */
 
+import { copyOrShowFallback } from '../clipboard.ts';
 import type { EntryReviewState } from './state.ts';
-
-const ENTRY_API = '/api/dev/editorial-review/entry';
 
 interface DecisionDom {
   approveBtn: HTMLButtonElement | null;
@@ -43,44 +53,6 @@ export function createDecisionController(
 ): DecisionController {
   const { state, dom, showToast } = opts;
   const { approveBtn, iterateBtn, rejectBtn } = dom;
-  const entryId = state.entryId;
-
-  function decisionUrl(): string {
-    return `${ENTRY_API}/${encodeURIComponent(entryId)}/decision`;
-  }
-  function versionUrl(): string {
-    return `${ENTRY_API}/${encodeURIComponent(entryId)}/version`;
-  }
-
-  async function postDecision(decision: 'approve'): Promise<boolean> {
-    const res = await fetch(decisionUrl(), {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ decision }),
-    });
-    if (!res.ok) {
-      const body: unknown = await res.json().catch(() => ({}));
-      const reason = (body as { error?: string }).error ?? `HTTP ${res.status}`;
-      showToast(`Decision failed: ${reason}`, true);
-      return false;
-    }
-    return true;
-  }
-
-  async function postIterate(): Promise<boolean> {
-    const res = await fetch(versionUrl(), {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({}),
-    });
-    if (!res.ok) {
-      const body: unknown = await res.json().catch(() => ({}));
-      const reason = (body as { error?: string }).error ?? `HTTP ${res.status}`;
-      showToast(`Iterate failed: ${reason}`, true);
-      return false;
-    }
-    return true;
-  }
 
   // Phase 34a F1 remediation — defense-in-depth against historical-
   // mode mutations. The server already renders these buttons disabled
@@ -98,30 +70,33 @@ export function createDecisionController(
     return false;
   }
 
+  /**
+   * Copy the given skill command to the clipboard with an editorial-
+   * voice toast on success and a manual-copy fallback panel on
+   * failure (e.g. non-secure-context). The button stays available
+   * after the copy — the operator may want to copy a second time if
+   * they pasted the wrong command, OR they may decide to abandon the
+   * action without the studio mutating any state.
+   */
+  async function copyCommand(verb: 'approve' | 'iterate'): Promise<void> {
+    const command = `/deskwork:${verb} ${state.slug}`;
+    await copyOrShowFallback(command, {
+      successMessage: `Copied — paste into a Claude Code chat to run \`${command}\`.`,
+      fallbackMessage:
+        `Clipboard unavailable on this origin. Copy this command and paste it into a Claude Code chat to run \`/deskwork:${verb}\`:`,
+    });
+  }
+
   async function approve(): Promise<void> {
     if (!approveBtn) return;
     if (refuseHistorical('Approve')) return;
-    approveBtn.disabled = true;
-    const ok = await postDecision('approve');
-    if (!ok) {
-      approveBtn.disabled = false;
-      return;
-    }
-    showToast(`Approved ${state.currentStage}; advancing to next stage.`);
-    setTimeout(() => window.location.reload(), 900);
+    await copyCommand('approve');
   }
 
   async function iterate(): Promise<void> {
     if (!iterateBtn) return;
     if (refuseHistorical('Iterate')) return;
-    iterateBtn.disabled = true;
-    const ok = await postIterate();
-    if (!ok) {
-      iterateBtn.disabled = false;
-      return;
-    }
-    showToast(`New iteration recorded for ${state.currentStage}.`);
-    setTimeout(() => window.location.reload(), 900);
+    await copyCommand('iterate');
   }
 
   function reject(): void {
