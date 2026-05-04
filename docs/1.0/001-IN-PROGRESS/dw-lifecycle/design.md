@@ -36,7 +36,7 @@ Translation: the canonical disciplines stay canonical; the lifecycle orchestrati
 - NOT a replacement for `superpowers`. dw-lifecycle declares it as a required peer.
 - NOT a replacement for `feature-dev`. dw-lifecycle dispatches its agents but covers a different scope (managed-project lifecycle vs. one-shot feature additions to unmanaged code).
 - NOT a content-pipeline plugin. That space is `deskwork`. The two are complementary siblings in the same marketplace.
-- NOT a forkable, opinion-by-opinion-configurable plugin. The lifecycle stages, workplan-driven implementation, stop-at-PR rule, journal format, and PRD/workplan templates are opinionated; only paths/branches/version-aware doc shape are config-driven.
+- NOT a kitchen-sink-configurable plugin. The lifecycle stages, workplan-driven implementation, stop-at-PR rule, journal format, and PRD/workplan templates ship as **opinionated defaults**; project-specific deviation flows through the override seam (see `THESIS.md` Consequence 3), not through forking. Paths / branches / version-aware doc shape are config-driven from the start.
 
 ---
 
@@ -211,16 +211,28 @@ When `docs.byVersion` is `true`:
 
 When `docs.byVersion` is `false`, the version segment is omitted: `docs/001-IN-PROGRESS/my-slug/`.
 
-### What stays opinionated (NOT configurable)
+### What stays opinionated (defaults, not absolutes)
 
-Hardcoded; adopters who want different shape fork the plugin:
+The following ship as opinionated defaults. Project-specific deviation
+flows through the **override seam** (see `THESIS.md` Consequence 3 —
+operator extends the plugin via their agent), NOT through forking the
+plugin. The override-seam scope is currently small; expanding it to cover
+each item below is a real build commitment, not a v2+ wishlist.
 
 - The lifecycle stages themselves
 - The workplan-driven implementation pattern
 - The stop-at-PR rule in `/dw-lifecycle:ship`
 - The boundary contract with superpowers and feature-dev
-- The journal entry template (path is configurable; format is not)
-- The PRD / workplan / README templates (configurable templates is a v2+ concern)
+- The journal entry template (path is configurable; format is not yet)
+- The PRD / workplan / README templates (configurable templates pending —
+  this is a thesis-level commitment, not a v2+ deferral)
+
+When a project needs different shape, the path is a project-local
+override under `<projectRoot>/.dw-lifecycle/<category>/<name>` (or
+equivalent path the override resolver registers), copied via
+`/dw-lifecycle:customize <category> <name>`. If the category doesn't yet
+exist in the override resolver, that's a defect against THESIS Consequence
+3 — file an issue, don't tell adopters to fork.
 
 ### Discovery (install)
 
