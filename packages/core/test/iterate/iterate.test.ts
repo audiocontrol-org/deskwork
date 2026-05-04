@@ -43,18 +43,20 @@ describe('iterateEntry', () => {
     return entry;
   }
 
-  it('refuses to iterate when on-disk content matches the last iteration journal entry', async () => {
+  it('iterates even when on-disk content is unchanged (operator may be pinning marginalia or off-file work)', async () => {
     await setupEntry('Ideas');
     const ideaPath = join(projectRoot, 'docs', slug, 'scrapbook', 'idea.md');
     const body = `---\ndeskwork:\n  id: ${uuid}\n---\n\n# unchanged\n`;
     await writeFile(ideaPath, body);
 
-    // First iterate succeeds and records v1.
+    // Iterate is the operator's explicit "pin this version" decision.
+    // The core helper records what was asked; the orchestrating skill
+    // (`/deskwork:iterate`) decides whether file edits are needed first.
     const r1 = await iterateEntry(projectRoot, { uuid });
     expect(r1.version).toBe(1);
 
-    // Second iterate without editing should refuse.
-    await expect(iterateEntry(projectRoot, { uuid })).rejects.toThrow(/unchanged/i);
+    const r2 = await iterateEntry(projectRoot, { uuid });
+    expect(r2.version).toBe(2);
   });
 
   it('produces v1 from iteration 0 (no prior iteration)', async () => {

@@ -3,7 +3,6 @@ import { join } from 'node:path';
 import { readSidecar } from '../sidecar/read.ts';
 import { writeSidecar } from '../sidecar/write.ts';
 import { appendJournalEvent } from '../journal/append.ts';
-import { readJournalEvents } from '../journal/read.ts';
 import { getContentDir } from '../config.ts';
 import type { Entry, Stage } from '../schema/entry.ts';
 
@@ -55,19 +54,16 @@ export async function iterateEntry(projectRoot: string, opts: IterateOptions): P
   }
   const markdown = await readFile(artifactPath, 'utf8');
 
-  // Guard: refuse to iterate when on-disk content matches the most recent
-  // iteration journal entry for this stage. Prevents no-op revision bumps
-  // (the operator forgot to actually edit the file).
-  const events = await readJournalEvents(projectRoot, { entryId: sidecar.uuid });
-  const lastIteration = events
-    .filter((e) => e.kind === 'iteration' && e.stage === sidecar.currentStage)
-    .at(-1);
-  if (lastIteration && lastIteration.kind === 'iteration' && lastIteration.markdown === markdown) {
-    throw new Error(
-      `Cannot iterate: ${artifactPath} content is unchanged since iteration v${lastIteration.version}. ` +
-        'Edit the file before iterating.',
-    );
-  }
+  // Iteration is the operator's explicit "pin a new version" decision;
+  // the core helper records what was asked, not what the helper thinks
+  // counts as "real change." A real iteration can be motivated by
+  // marginalia, scrapbook additions, decisions captured outside the
+  // file body, or any reason the operator hasn't communicated to the
+  // system. Gating on a content-diff check earlier here put a hard
+  // error in front of the operator's review-surface Iterate button
+  // when they had added marginalia but not edited the file body.
+  // Removed (#188-followup): the orchestrating skill (`/deskwork:iterate`)
+  // is the right place to decide whether the file needs editing first.
 
   const priorVersion = sidecar.iterationByStage[sidecar.currentStage] ?? 0;
   const newVersion = priorVersion + 1;

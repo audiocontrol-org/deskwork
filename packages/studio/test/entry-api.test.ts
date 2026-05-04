@@ -394,17 +394,19 @@ describe('POST /api/dev/editorial-review/entry/:entryId/version', () => {
     expect(status).toBe(404);
   });
 
-  it('returns 400 when the on-disk content is unchanged from the prior iteration', async () => {
+  it('iterates even when on-disk content is unchanged (the operator may be pinning marginalia or scrapbook additions, not file edits)', async () => {
     await writeSidecar(projectRoot, entry('Ideas'));
     const ideaPath = join(projectRoot, 'docs', 'foo', 'scrapbook', 'idea.md');
     await writeFile(ideaPath, `---\ndeskwork:\n  id: ${ENTRY_UUID}\n---\n\n# unchanged\n`);
     const app = createApp({ projectRoot, config: cfg });
-    // First call records v1.
     const r1 = await postJson(app, `/api/dev/editorial-review/entry/${ENTRY_UUID}/version`, {});
     expect(r1.status).toBe(200);
-    // Second call without disk change should refuse.
+    // Removed gate: the core iterate helper records what the operator
+    // asked for; the orchestrating skill decides whether the file
+    // needs editing first. Second call with unchanged content
+    // succeeds and bumps the iteration counter.
     const r2 = await postJson(app, `/api/dev/editorial-review/entry/${ENTRY_UUID}/version`, {});
-    expect(r2.status).toBe(400);
+    expect(r2.status).toBe(200);
   });
 
   // Sanity: the file written via the version endpoint is what later
