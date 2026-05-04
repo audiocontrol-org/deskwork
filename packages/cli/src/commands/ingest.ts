@@ -50,6 +50,8 @@ import { isStage, type CalendarEntry, type Stage } from '@deskwork/core/types';
 import { absolutize, fail, parseArgs } from '@deskwork/core/cli-args';
 import { appendJournal } from '@deskwork/core/journal';
 import { updateFrontmatter } from '@deskwork/core/frontmatter';
+import { writeSidecar } from '@deskwork/core/sidecar';
+import type { Entry, Stage as EntryStage, ReviewState } from '@deskwork/core/schema/entry';
 import {
   candidateToEntry,
   discoverIngestCandidates,
@@ -191,6 +193,10 @@ export async function run(argv: string[]): Promise<void> {
   // minted UUID into the source file's frontmatter under `deskwork.id`
   // so the calendar entry isn't orphaned at creation (doctor was
   // immediately flagging `missing-frontmatter-id` against every ingest).
+  // Issue #183: write the entry-centric sidecar at .deskwork/entries/<uuid>.json
+  // — Phase 30 made sidecars the SSOT, so an ingest that only updates
+  // calendar.md leaves the entry invisible on the studio dashboard and
+  // unreachable by deep-link.
   for (const { candidate, stage } of actionable) {
     const id = randomUUID();
     const entry: CalendarEntry = { id, ...candidateToEntry(candidate, stage) };
@@ -199,8 +205,75 @@ export async function run(argv: string[]): Promise<void> {
     if (writeFrontmatterBinding) {
       writeDeskworkIdToFile(candidate.filePath, id);
     }
+    await writeIngestSidecar(projectRoot, candidate, stage, id);
   }
   writeCalendar(calendarPath, calendar);
+}
+
+/**
+ * Map the discovery layer's legacy `Stage` (`Ideas | Planned | ... | Review | Paused | Published`)
+ * onto the entry-centric `Stage` (`Ideas | Planned | ... | Final | Blocked | Cancelled |
+ * Published`). Mirrors Phase 30's migration policy in
+ * `packages/core/src/calendar/parse.ts:LEGACY_STAGE_MAP`:
+ *   - `Paused`  → `Blocked` (paused stage retired; closest off-pipeline stage)
+ *   - `Review`  → `Drafting` + `reviewState: 'in-review'` (review is a
+ *                 state-of-being inside Drafting under the entry-centric model)
+ * Legacy values that already exist in the entry-centric set pass through.
+ */
+function mapStageToEntry(stage: Stage): {
+  currentStage: EntryStage;
+  reviewState?: ReviewState;
+} {
+  switch (stage) {
+    case 'Paused':
+      return { currentStage: 'Blocked' };
+    case 'Review':
+      return { currentStage: 'Drafting', reviewState: 'in-review' };
+    default:
+      return { currentStage: stage };
+  }
+}
+
+/**
+ * Write the entry-centric sidecar at `.deskwork/entries/<uuid>.json`
+ * for a freshly-ingested candidate. Phase 30's contract: every UUID
+ * in `calendar.md` must have a sidecar; doctor's `calendar-sidecar`
+ * validator flags drift in either direction.
+ *
+ * `artifactPath` is the file's path relative to the **project root**
+ * — that's the convention `doctor`'s `resolveArtifactPath` uses (it
+ * does `join(projectRoot, entry.artifactPath)`) and matches what the
+ * Phase 30 migration writes from the legacy ingest journal's
+ * `sourceFile` field. The studio's `entry-resolver` and the #182
+ * backfill capability consume the same shape.
+ */
+async function writeIngestSidecar(
+  projectRoot: string,
+  candidate: IngestCandidate,
+  stage: Stage,
+  uuid: string,
+): Promise<void> {
+  const at = new Date().toISOString();
+  const artifactPath = candidate.relativePath;
+  const { currentStage, reviewState } = mapStageToEntry(stage);
+  const sidecar: Entry = {
+    uuid,
+    slug: candidate.derivedSlug,
+    title: candidate.title,
+    ...(candidate.description ? { description: candidate.description } : {}),
+    keywords: [],
+    source: 'manual',
+    currentStage,
+    iterationByStage: {},
+    ...(reviewState !== undefined ? { reviewState } : {}),
+    artifactPath,
+    ...(currentStage === 'Published'
+      ? { datePublished: `${candidate.derivedDate}T00:00:00.000Z` }
+      : {}),
+    createdAt: at,
+    updatedAt: at,
+  };
+  await writeSidecar(projectRoot, sidecar);
 }
 
 /**
