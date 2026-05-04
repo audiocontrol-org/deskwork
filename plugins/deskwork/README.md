@@ -259,9 +259,14 @@ Local-dev installs hit path 1. Marketplace-install users hit path 3 once, then p
 
 Tracks the default branch of `audiocontrol-org/deskwork`. To pull the latest, run `/plugin marketplace update deskwork && /reload-plugins`. To pin to a stable release, install the marketplace with a tag: `/plugin marketplace add audiocontrol-org/deskwork#v0.1.0`. See the [root README](../../README.md#getting-updates) for the full update story.
 
-### Troubleshooting: bin not on PATH after install ([#89](https://github.com/audiocontrol-org/deskwork/issues/89), [#125](https://github.com/audiocontrol-org/deskwork/issues/125), [#131](https://github.com/audiocontrol-org/deskwork/issues/131))
+### Troubleshooting: cache eviction — `command not found` or `Unknown command: /<plugin>:<skill>` ([#89](https://github.com/audiocontrol-org/deskwork/issues/89), [#125](https://github.com/audiocontrol-org/deskwork/issues/125), [#131](https://github.com/audiocontrol-org/deskwork/issues/131), [#185](https://github.com/audiocontrol-org/deskwork/issues/185))
 
-If `command -v deskwork` returns empty (or `deskwork: not found`), Claude Code's plugin cache at `~/.claude/plugins/cache/deskwork/<plugin>/<version>/` has been evicted between sessions. The marketplace clone at `~/.claude/plugins/marketplaces/deskwork/` is durable; the cache layer isn't. PATH wired against the cache layer breaks after eviction.
+Two symptoms point at the same underlying cause:
+
+- **`command -v deskwork` returns empty** (or `deskwork: not found`) — the bin shim has gone missing from PATH.
+- **`/<plugin>:<skill>` returns `Unknown command`** — e.g. `/dw-lifecycle:help` resolves to nothing even though `installed_plugins.json` says the plugin is installed.
+
+Both indicate Claude Code's plugin cache at `~/.claude/plugins/cache/deskwork/<plugin>/<version>/` has been evicted between sessions, OR the registration was created without the cache layer ever being populated (observed across `/plugin marketplace update` cycles in 2.1.x). The marketplace clone at `~/.claude/plugins/marketplaces/deskwork/` is durable; the cache layer isn't. Anything wired against the cache (PATH bin shims, slash-command registrations, model-picker entries) breaks when the cache subtree disappears.
 
 deskwork ships a recovery script at the marketplace clone path that restores the cache subtrees from the clone. The script runs without depending on the deskwork CLI being on PATH — it lives in the durable layer, not the cache layer.
 
@@ -325,6 +330,17 @@ If any plugin reports unrecoverable, re-install it in Claude Code:
 /plugin install <plugin>@deskwork
 /reload-plugins
 ```
+
+**If `/plugin install` alone doesn't recover (cache dir still missing, slash command still "Unknown"):** observed in 2.1.x when `installed_plugins.json` carries a stale registration whose declared `installPath` never existed and `/plugin marketplace update` cycles bumped its `lastUpdated` timestamp without rebuilding the cache. The escalation path is a clean reinstall of the marketplace itself ([#185](https://github.com/audiocontrol-org/deskwork/issues/185)):
+
+```
+/plugin marketplace remove deskwork
+/plugin marketplace add audiocontrol-org/deskwork
+/plugin install <plugin>@deskwork    # repeat per plugin you use
+/reload-plugins
+```
+
+This drops the registrations for *every* deskwork plugin; you re-install only the ones you use afterward. Heavier than `repair-install.sh` but recovers from registry/cache desync that the script can't repair (it doesn't rewrite registrations, only restores cache subtrees referenced by them).
 
 **Note on running studio processes:** if `deskwork-studio` is already running when the cache gets wiped, its in-process state references files that no longer exist (404s on `/static/dist/*.js`). The repair script restores the static surface but can't repatch a long-running process. Stop and restart the studio after a recovery: `Ctrl-C` the running process and re-launch with `deskwork-studio`. The studio rebuilds its client-asset cache on each launch.
 
