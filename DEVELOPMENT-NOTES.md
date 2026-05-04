@@ -2462,3 +2462,57 @@ Phase 4 (dogfood) is manual validation work the user should drive: install the p
 
 - The highest-signal post-audit fixes were exactly the small symmetric ones: if `slug` gets a traversal guard, `targetVersion` should too. Those are the cheapest fixes with the best risk-reduction payoff.
 - Independent audits are most useful when they are checked in as living artifacts, not frozen transcripts. If the branch changes before the audit lands, update the audit so it remains trustworthy.
+
+## 2026-05-04: `/dw-lifecycle:help` "Unknown command" investigation — wrong diagnosis four times before finding a real one
+
+### Feature: dw-lifecycle (post-ship investigation)
+### Worktree: deskwork-dw-lifecycle
+
+**Goal:** Operator hit `Unknown command: /dw-lifecycle:help` in a session with `dw-lifecycle@deskwork` v0.14.1 marked installed. Find out why and fix it.
+
+**Accomplished:**
+
+- Filed [#185](https://github.com/audiocontrol-org/deskwork/issues/185) capturing the symptom + initial (wrong) diagnosis + proposed (wrong) fix.
+- Ran four probes against the marketplace clone and the runtime cache:
+  1. Removed `name:` from `skills/help/SKILL.md` frontmatter (test for `anthropics/claude-code#22063`) — no effect.
+  2. Added a `commands/help.md` shim (test for the user/reviewer-recommended workaround) — no effect.
+  3. `/plugin marketplace update deskwork` + `/reload-plugins` + session restart — no effect; observed that the existing `cache/deskwork/deskwork-studio/0.14.1/` directory was destroyed by the update without being rebuilt.
+  4. Clean-room reinstall: `/plugin marketplace remove deskwork` + `/plugin marketplace add audiocontrol-org/deskwork` + `/plugin install dw-lifecycle@deskwork` + `/reload-plugins` — fixed it; cache populated; all 16 dw-lifecycle skills surfaced as `dw-lifecycle:<name>`; `/dw-lifecycle:help` rendered correctly.
+- Identified the actual root cause: stale `installed_plugins.json` registrations whose declared `installPath` cache directories never existed; `/plugin marketplace update` was bumping `lastUpdated` timestamps without repairing the missing cache layer.
+- Added a new project rule to `.claude/rules/agent-discipline.md` codifying the *"never pollute the global slash-command namespace from a deskwork plugin"* constraint (commit `b789079`). Surfaced verbatim from the operator's reaction to probe 2: *"I would be absolutely FURIOUS if I installed a plugin and it polluted my global command namespace."*
+- Broadened the deskwork plugin's existing cache-eviction troubleshooting section in `plugins/deskwork/README.md` to recognize the slash-command failure shape (`/<plugin>:<skill>: Unknown command`) and added an escalation step for stale-registration desync that the existing `repair-install.sh` can't repair (commit `d632772`).
+- Verified `repair-install.sh --check` already detects the failure mode and recommends the `/plugin install <plugin>@deskwork` recovery — the README augmentation was symptom-recognition expansion + the heavier escalation, not a parallel new section.
+
+**Didn't Work:**
+
+- Probe 1 (remove `name:`) was based on third-party reviewer's #22063 hypothesis. Empirically zero effect.
+- Probe 2 (add `commands/help.md`) was based on the same reviewer's recovery workaround for #41842. Empirically zero effect.
+- Probe 3 (the documented `/plugin marketplace update`) actually made things *worse* — wiped the only deskwork plugin cache directory that existed without rebuilding any of them.
+- Initial issue-body diagnosis (*"SKILL.md alone doesn't auto-register as slash command in current shipped Claude Code"*) was wrong: skills DO auto-register when the plugin is properly cache-installed.
+- Initial proposed fix (30 `commands/<name>.md` shim files across two plugins) would have been wrong: the plugin source needs no changes.
+
+**Course Corrections:**
+
+- [FABRICATION] My first answer to the operator's question — *"why doesn't `/dw-lifecycle:help` work?"* — was reasoning from memory about Claude Code's plugin model. I should have invoked `claude-code-guide` (or equivalent doc-fetch) immediately rather than constructing a plausible-sounding explanation. The agent-discipline rule *"Read documentation before quoting commands"* applies forward to any explanation about external tooling, not just to commands the agent is about to type.
+- [PROCESS] Two outside reviewers separately pushed back on my proposed fix before I shipped it. Their substantive critique (*"don't add 30 shim files blindly; run a cheap probe first"*) was correct. The right move was to land the counter-analysis as a comment on #185 and then run the cheap probes — which I did. **The reviewer feedback loop saved 30 unnecessary files of churn.**
+- [PROCESS] I diagnosed the failure as *"Claude Code requires `commands/` shims; this is a packaging gap in dw-lifecycle"* before checking whether the existing `repair-install.sh` script — already documented in `plugins/deskwork/README.md` — would have fixed the failure mode. It would have. The agent-discipline rule *"Read documentation before quoting commands"* should generalize to *"Read documentation before diagnosing failure modes the project has already cataloged."*
+- [DOCUMENTATION] My initial #185 body claimed *"the docs page describes an aspirational state."* That framing was wrong; I should have said *"the docs describe an intended state that the runtime contradicts AND Anthropic dispositioned the corresponding bugs as `not_planned`."* The first formulation overgeneralizes from the specific bug evidence I had.
+- [PROCESS] Three layers in Claude Code's plugin model (marketplace clone, registration in `installed_plugins.json`, runtime cache subtree) were conflated in my initial mental model. Each is a distinct surface that can be in inconsistent state with the others. Future plugin-bug investigations should start by mapping which of the three layers shows the symptom and confirming what's at each.
+
+**Quantitative:**
+
+- Messages: ~16
+- Commits: 2 (`b789079`, `d632772`)
+- Issues filed: 1 (#185)
+- Issue comments: 5 (counter-analysis, plan, probe 1 result, probe 2/3 result, resolution)
+- Probes run: 4 (3 negative, 1 positive)
+- Files changed: 3 (`agent-discipline.md`, `plugins/deskwork/README.md`, this file + workplan + USAGE-JOURNAL)
+- Corrections: 5 (substantive)
+
+**Insights:**
+
+- **Reviewer feedback IS a development tool.** The two outside critiques on #185 prevented a 30-file churn commit by forcing a cheap probe before the proposed fix. The receiving-code-review skill's framing — *"don't perform agreement, verify the technical claim"* — held both ways: the reviewers were right about the diagnosis being premature, and verifying their probe proposals empirically gave a stronger answer than either side started with.
+- **A wrong diagnosis is recoverable as long as it's grounded in observable state.** Each #185 comment posted observable state (probe setup, results, what was reverted) so each subsequent comment could supersede the prior diagnosis cleanly. The audit trail is honest; the resolution is verifiable; the original wrong direction is preserved as evidence rather than memory-holed.
+- **The existing `repair-install.sh` already detects the failure mode I spent four probes diagnosing.** Running `repair-install.sh --check` would have output *"`Unrecoverable — no working bin for: dw-lifecycle. In Claude Code, run: /plugin install dw-lifecycle@deskwork`"* — exactly the recovery I eventually arrived at via probe 4. This project has already cataloged this failure shape; the docs-and-tools loop fired correctly, the agent didn't read the docs first.
+- **Three plugin layers, three failure modes.** Bin shim missing from PATH (#131), slash command unreachable (#185), studio static surface 404'd — all three are symptoms of the same cache-eviction class. The README's troubleshooting section now covers all three under one heading.
+- **Naming-pollution is operator-detectable in seconds and infuriating for years.** The operator's reaction to probe 2's pollution risk wasn't a hypothetical — it was a hard line. The new agent-discipline rule converts that hard line into a rule any agent on this codebase will read before shipping a packaging change. The rule exists because the lesson cost two probes to surface; future agents pay zero.

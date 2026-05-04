@@ -2046,3 +2046,80 @@ The studio behaved correctly across all 5 dispatches; no live-server bugs surfac
 ### Closing thought
 
 This session was the inverse of the "operator overrode the brainstorm-first instinct" pattern from this morning. Operator framing was minimal: *"press on with implementation"* and *"keep going"*. The dispatch arc proceeded autonomously across 5 dispatches + 3 follow-up issues + per-dispatch issue comments + this session-end documentation. **The agent-discipline rules + the dispatch-prompt patterns refined this morning carried the work through.** The redesign is fully integrated; pending operator visual review.
+
+---
+
+## 2026-05-04: Adopter dogfood — `/dw-lifecycle:help` returns "Unknown command" in apparently-installed plugin
+
+**Arc:** Operator hit a basic-looking adopter friction (*"is the plugin installed? why doesn't its help command work?"*) and asked the agent to diagnose. What followed was a 4-probe investigation that surfaced three deeper frictions in the deskwork install/cache layer, validated the existing `repair-install.sh` recovery script's failure-mode coverage, and exposed a Claude Code 2.1.x upstream bug that the deskwork plugin set is hitting structurally.
+
+### The trigger friction
+
+**friction.** Operator opened a Claude Code session with `dw-lifecycle@deskwork` v0.14.1 marked installed in `installed_plugins.json` (gitCommitSha at the v0.14.1 release commit, lastUpdated stamp from earlier the same day). Tried `/dw-lifecycle:help`. Got `Unknown command: /dw-lifecycle:help`. The operator's framing, conversational: *"why can't I use the /dw-lifecycle command?"* — adopter mental model expects an installed plugin to expose its commands; this one didn't.
+
+**friction.** The first agent answer was wrong. Agent reasoned from memory about Claude Code's plugin model (*"plugin name isn't a slash command; you need `commands/<name>.md` to register"*) without verifying against current docs. Operator pushed back with *"so the dw-plugin skills *are* namespaced?"* — that question pulled at the thread. Honest answer was *"I can't confirm from this session,"* which is the right answer to give before reaching for an explanation.
+
+**insight.** **Doc-research as a primary action, not a fallback.** When asked to explain a Claude Code mechanism, the agent should `WebFetch` / `claude-code-guide` the relevant docs page first and then answer, not the other way around. The session's wrong-then-right diagnosis pattern (offer explanation → operator pushes back → fetch docs → revise) is a real cost that compounds over many sessions.
+
+### Probe 1: `name:` strips the namespace? (testing #22063)
+
+Removed `name: help` from `~/.claude/plugins/marketplaces/deskwork/plugins/dw-lifecycle/skills/help/SKILL.md`. `/reload-plugins`. Tested `/help` (bare) and `/dw-lifecycle:help`.
+
+**friction.** The probe modified the marketplace clone, but the session's runtime read from a different path entirely. The probe couldn't have affected anything. The agent didn't realize this until after probe 2 also failed and a more targeted disk inspection revealed the cache layer.
+
+**insight.** **The marketplace clone, the registration in `installed_plugins.json`, and the runtime cache subtree are three distinct layers that can be in inconsistent state with each other.** When a plugin appears registered but its slash commands don't work, all three need to be inspected, not just the one closest to where the symptom shows up.
+
+### Probe 2: `commands/<name>.md` shim (testing the reviewer-recommended workaround)
+
+Added `~/.claude/plugins/marketplaces/deskwork/plugins/dw-lifecycle/commands/help.md`. Reload. Test.
+
+**fix.** The operator surfaced a hard constraint mid-probe: *"I would be absolutely FURIOUS if I installed a plugin and it polluted my global command namespace. THERE BETTER NOT BE GLOBAL dw-lifecycle TURDS IN THE GLOBAL NAMESPACE."* Verbatim. That reaction codified into a new project rule (`.claude/rules/agent-discipline.md` — *"Never pollute the global slash-command namespace from a deskwork plugin"*) so any future agent on the codebase reads it before shipping a packaging change.
+
+**friction.** The probe was again ineffective for the same wrong-path reason. Two probes in, the agent still hadn't checked the cache layer.
+
+### Probe 3: The documented `/plugin marketplace update deskwork`
+
+This is the path the deskwork plugin's existing README documents for getting updates: *"Tracks the default branch of `audiocontrol-org/deskwork`. To pull the latest, run `/plugin marketplace update deskwork && /reload-plugins`."*
+
+**friction.** **The documented update path actively destroyed working state.** Before the update: `~/.claude/plugins/cache/deskwork/deskwork-studio/0.14.1/` existed and was populated; the studio's slash command worked. After the update: that directory was gone; the cache for all three deskwork plugins was empty. `installed_plugins.json` still claimed all three were installed at paths that no longer existed. `lastUpdated` timestamps had been refreshed to the moment of the update.
+
+**insight.** **The deskwork README's update instruction can move adopters from *"some plugins working"* into *"all plugins broken"* — the failure mode this session is investigating.** Per the project's *"Packaging is UX"* discipline this is the kind of friction that justifies a release-bound fix, not a workaround. The README augmentation that landed (commit `d632772`) covers the symptom recognition and recovery path; the deeper fix is upstream in Claude Code's `/plugin marketplace update` implementation.
+
+### Probe 4: Clean-room reinstall
+
+`/plugin marketplace remove deskwork` → `/plugin marketplace add audiocontrol-org/deskwork` → `/plugin install dw-lifecycle@deskwork` → `/reload-plugins`.
+
+**fix.** `/dw-lifecycle:help` rendered. All 16 dw-lifecycle skills appeared in the model picker as `dw-lifecycle:<name>`. The cache directory `~/.claude/plugins/cache/deskwork/dw-lifecycle/0.14.1/` was created and populated with the full plugin tree. The plugin source was always correct; the cache install layer needed forcing.
+
+**insight.** **The clean-room sequence is heavier than `repair-install.sh` (which deskwork already ships) and drops registrations for *every* plugin from the marketplace, requiring per-plugin reinstall afterward.** It's the right escalation when registration/cache desync is genuine — the existing repair script doesn't rewrite registrations, only restores cache subtrees referenced by them. Different failure shapes need different recovery tools.
+
+### Validating against `repair-install.sh`
+
+After probe 4, ran `bash scripts/repair-install.sh --check` against the post-clean-room state to verify what the existing tooling reports. Output: *"Unrecoverable — no working bin for: deskwork-studio dw-lifecycle. In Claude Code, run: /plugin install deskwork-studio@deskwork; /plugin install dw-lifecycle@deskwork; /reload-plugins."*
+
+**insight.** **The existing `repair-install.sh` already detects this failure mode.** It can't trigger `/plugin install` itself (that's a Claude Code slash command, not a shell command), but it surfaces the recommendation that resolves the failure. **Running `repair-install.sh --check` should have been the first probe, not the fifth diagnostic.** The agent-discipline rule *"Read documentation before quoting commands"* should generalize forward to *"Read documentation before diagnosing failure modes the project has already cataloged."*
+
+**fix.** Augmented the deskwork plugin README's existing cache-eviction troubleshooting section (`plugins/deskwork/README.md` → *"Troubleshooting: cache eviction — `command not found` or `Unknown command: /<plugin>:<skill>`"*) to:
+- Recognize both symptom shapes (bin-on-PATH AND slash-command-unknown) as the same root cause
+- Reference issue #185 in the issue-list breadcrumb
+- Add the heavier marketplace-remove + add + install escalation when `/plugin install <plugin>@deskwork` after `repair-install.sh` doesn't recover
+
+### Behavior of `/plugin marketplace update` is the upstream issue
+
+**friction.** The documented `/plugin marketplace update <name>` flow:
+- Refreshes the marketplace clone (works)
+- Bumps `lastUpdated` timestamps in `installed_plugins.json` (works)
+- Does NOT detect or repair stale `installPath` entries whose target cache directories don't exist (broken)
+- Does NOT re-trigger install/cache-population for plugins whose cache went missing (broken — and in this session's case, actively destroyed the one cache directory that *was* present)
+
+**insight.** **This is a Claude Code 2.1.126 upstream bug, not a deskwork bug.** Filing upstream is the right next step (operator decision pending). The deskwork-side mitigations are: (a) the README update which landed; (b) the README now points adopters at the clean-room escalation when re-running `marketplace update` doesn't help.
+
+### Naming-pollution constraint as a project rule
+
+**fix.** New rule landed at `.claude/rules/agent-discipline.md` — *"Never pollute the global slash-command namespace from a deskwork plugin"* (commit `b789079`). The rule applies to commands, skills, hooks, MCP servers, agents, bin-shim names. Anything user-typeable from a deskwork plugin must carry the `<plugin>:<name>` namespace. Any packaging probe must check for bare-namespace pollution before shipping.
+
+**insight.** **An adopter-emotion reaction (*"I would be FURIOUS"*) is signal that codifies into rules.** Strong-affect operator framing was the same kind of signal the existing *"frontmatter must be `deskwork:`-namespaced"* rule emerged from (Issue #38 v0.7.2). The pattern of converting *"I will be furious if X"* into a project rule that prevents X from happening to future agents is becoming a repeatable lesson-capture pattern.
+
+### Closing thought
+
+The dogfood signal that started the session — *"why doesn't `/dw-lifecycle:help` work?"* — was the right kind of small, specific friction: easy to reproduce, hard to dismiss as one-off, exposed three deeper layers of friction once probed. The agent's first diagnosis was wrong; the operator's pushback + outside reviewer counter-analysis + empirical probes converged on a real diagnosis (Claude Code upstream cache-install bug); the recovery path was added to the existing troubleshooting section as augmentation rather than a parallel section; a new project rule landed for the namespace constraint. **The dogfood loop produced four artifacts: a filed issue, two commits, a project rule, and an upstream-bug-shaped suggestion** — all from a single *"this command should work and doesn't"* observation. Per the existing *"Stay in agent-as-user dogfood mode"* rule, this is the loop working.
