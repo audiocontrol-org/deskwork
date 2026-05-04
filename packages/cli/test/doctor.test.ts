@@ -99,6 +99,54 @@ function writeRaw(rel: string, contents: string): string {
   return abs;
 }
 
+/**
+ * Mirror of `addEntry`'s slugify so test fixtures can predict the slug
+ * `run('add', [..., title])` will mint without parsing stdout.
+ */
+function slugify(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+/**
+ * `run('add', ...)` plus the entry-centric scaffolds needed for doctor
+ * to pass on a freshly-minted Ideas-stage sidecar (#184): a stubbed
+ * `docs/<slug>/scrapbook/idea.md` (satisfies `file-presence`) and an
+ * `artifactPath` written into the sidecar (satisfies `missing-artifact-path`).
+ *
+ * Tests in this file exercise legacy validators (missing-frontmatter-id,
+ * legacy-top-level-id-migration, the exit-code matrix); both Phase 30
+ * entry-centric validators are orthogonal to those concerns and these
+ * stubs keep them quiet. Tests that DO want to exercise the entry-centric
+ * validators call `run('add', ...)` directly.
+ */
+function addWithIdeaStub(args: string[]): RunResult {
+  const result = run('add', args);
+  // Title is always args[1] (after the project root); none of these tests
+  // pass --slug, so slug derives from the title.
+  const slug = slugify(args[1]);
+  const ideaRelPath = join('docs', slug, 'scrapbook', 'idea.md');
+  writeRaw(ideaRelPath, '---\nstub: true\n---\n');
+  // Find the freshly-minted sidecar by reading the calendar to get the
+  // entry's UUID, then patch its artifactPath. The sidecar already
+  // exists post-`add` (#184).
+  const cal = readCalendarFile();
+  const entry = cal.entries.find((e) => e.slug === slug);
+  if (!entry || !entry.id) {
+    throw new Error(`addWithIdeaStub: no calendar entry for slug "${slug}"`);
+  }
+  const sidecarPath = join(project, '.deskwork', 'entries', `${entry.id}.json`);
+  const sidecar = JSON.parse(readFileSync(sidecarPath, 'utf-8')) as Record<
+    string,
+    unknown
+  >;
+  sidecar.artifactPath = ideaRelPath;
+  writeFileSync(sidecarPath, JSON.stringify(sidecar, null, 2), 'utf-8');
+  return result;
+}
+
 function readCalendarFile() {
   const raw = readFileSync(join(project, 'docs/calendar.md'), 'utf-8');
   return parseCalendar(raw);
@@ -158,7 +206,7 @@ describe('deskwork doctor — missing-frontmatter-id', () => {
   it('reports findings when calendar has an entry but no file carries the id', () => {
     // Add a calendar entry, then create a file at the slug-template path
     // WITHOUT an `id:` so it's a candidate but not yet bound.
-    run('add', [project, 'My Post']);
+    addWithIdeaStub([project, 'My Post']);
     writeContent(
       'my-post/index.md',
       '---\ntitle: My Post\n---\n\n# My Post\n',
@@ -170,7 +218,7 @@ describe('deskwork doctor — missing-frontmatter-id', () => {
   });
 
   it('--fix=missing-frontmatter-id --yes binds the id when there is exactly one candidate', () => {
-    run('add', [project, 'Single Candidate']);
+    addWithIdeaStub([project, 'Single Candidate']);
     writeContent(
       'single-candidate/index.md',
       '---\ntitle: Single Candidate\n---\n\n# Single\n',
@@ -196,7 +244,7 @@ describe('deskwork doctor — missing-frontmatter-id', () => {
   });
 
   it('--fix=... --yes skips when multiple candidates exist (ambiguous)', () => {
-    run('add', [project, 'Ambiguous']);
+    addWithIdeaStub([project, 'Ambiguous']);
     // Two candidate files: one at the slug-template path, one with a
     // matching title elsewhere.
     writeContent(
@@ -219,8 +267,9 @@ describe('deskwork doctor — missing-frontmatter-id', () => {
   });
 
   it('reports zero candidates explicitly when no matching file exists, exits 0 (Issue #44 — prerequisite-missing is not a real follow-up)', () => {
-    run('add', [project, 'Detached Entry']);
-    // No file at all under contentDir.
+    addWithIdeaStub([project, 'Detached Entry']);
+    // No file at all under contentDir. (The stub idea.md lives outside
+    // contentDir so missing-frontmatter-id still finds zero candidates.)
 
     const fix = run('doctor', [project, '--fix=missing-frontmatter-id', '--yes']);
     // Issue #44: prerequisite-missing skips do not warrant exit 1 in
@@ -582,7 +631,7 @@ describe('deskwork doctor — legacy-top-level-id-migration', () => {
   it('reports a file whose top-level id is a calendar UUID and has no deskwork.id', () => {
     // Add a calendar entry, then create a file with the legacy v0.7.0/v0.7.1
     // shape: top-level `id:` matching the calendar UUID, no deskwork block.
-    run('add', [project, 'Legacy Post']);
+    addWithIdeaStub([project, 'Legacy Post']);
     const cal = readCalendarFile();
     const entry = cal.entries.find((e) => e.slug === 'legacy-post');
     expect(entry).toBeDefined();
@@ -598,7 +647,7 @@ describe('deskwork doctor — legacy-top-level-id-migration', () => {
   });
 
   it('--fix --yes migrates the id to deskwork.id and removes the top-level field', () => {
-    run('add', [project, 'Migrate Me']);
+    addWithIdeaStub([project, 'Migrate Me']);
     const cal = readCalendarFile();
     const entry = cal.entries.find((e) => e.slug === 'migrate-me');
     expect(entry).toBeDefined();
@@ -631,7 +680,7 @@ describe('deskwork doctor — legacy-top-level-id-migration', () => {
   });
 
   it('is idempotent — second run finds nothing to migrate', () => {
-    run('add', [project, 'Already Migrated']);
+    addWithIdeaStub([project, 'Already Migrated']);
     const cal = readCalendarFile();
     const entry = cal.entries.find((e) => e.slug === 'already-migrated');
     expect(entry).toBeDefined();
@@ -688,7 +737,7 @@ describe('deskwork doctor — legacy-top-level-id-migration', () => {
 
   it('--fix=all migrates legacy ids in the same run', () => {
     // Verify the rule is in the all-set (acceptance criterion).
-    run('add', [project, 'All Mode']);
+    addWithIdeaStub([project, 'All Mode']);
     const cal = readCalendarFile();
     const entry = cal.entries.find((e) => e.slug === 'all-mode');
     expect(entry).toBeDefined();
@@ -744,7 +793,7 @@ describe('deskwork doctor — flag handling', () => {
 
 describe('deskwork doctor — exit-code matrix (Issue #44)', () => {
   it('audit on findings: exit 1 (unchanged)', () => {
-    run('add', [project, 'Audit Findings']);
+    addWithIdeaStub([project, 'Audit Findings']);
     writeContent(
       'audit-findings/index.md',
       '---\ntitle: Audit Findings\n---\n\n# A\n',
@@ -759,7 +808,7 @@ describe('deskwork doctor — exit-code matrix (Issue #44)', () => {
   });
 
   it('--fix with all-applied: exit 0', () => {
-    run('add', [project, 'All Applied']);
+    addWithIdeaStub([project, 'All Applied']);
     writeContent(
       'all-applied/index.md',
       '---\ntitle: All Applied\n---\n\n# AA\n',
@@ -775,8 +824,8 @@ describe('deskwork doctor — exit-code matrix (Issue #44)', () => {
 
   it('--fix with all-skipped-prerequisite: exit 0 (NEW behavior)', () => {
     // Calendar entry with no body file → prerequisite-missing → exit 0.
-    run('add', [project, 'Skip Pre One']);
-    run('add', [project, 'Skip Pre Two']);
+    addWithIdeaStub([project, 'Skip Pre One']);
+    addWithIdeaStub([project, 'Skip Pre Two']);
     const res = run('doctor', [
       project,
       '--fix=missing-frontmatter-id',
@@ -789,12 +838,12 @@ describe('deskwork doctor — exit-code matrix (Issue #44)', () => {
   it('--fix with mixed applied + prerequisite-skipped: exit 0 (NEW behavior)', () => {
     // One entry has a body file (will be applied); one doesn't (will
     // be skipped as prerequisite-missing). Mixed run still exits 0.
-    run('add', [project, 'Has Body']);
+    addWithIdeaStub([project, 'Has Body']);
     writeContent(
       'has-body/index.md',
       '---\ntitle: Has Body\n---\n\n# B\n',
     );
-    run('add', [project, 'No Body']);
+    addWithIdeaStub([project, 'No Body']);
     const res = run('doctor', [
       project,
       '--fix=missing-frontmatter-id',
@@ -807,7 +856,7 @@ describe('deskwork doctor — exit-code matrix (Issue #44)', () => {
 
   it('--fix with ambiguous case: exit 1 (operator must resolve)', () => {
     // Two candidate files for the same entry → ambiguous → exit 1.
-    run('add', [project, 'Ambiguous Case']);
+    addWithIdeaStub([project, 'Ambiguous Case']);
     writeContent(
       'ambiguous-case/index.md',
       '---\ntitle: Ambiguous Case\n---\n\n# A\n',
@@ -867,7 +916,7 @@ describe('deskwork doctor — exit-code matrix (Issue #44)', () => {
   });
 
   it('JSON output includes skipReason field (Issue #44)', () => {
-    run('add', [project, 'For Json']);
+    addWithIdeaStub([project, 'For Json']);
     const res = run('doctor', [
       project,
       '--fix=missing-frontmatter-id',
@@ -885,12 +934,12 @@ describe('deskwork doctor — exit-code matrix (Issue #44)', () => {
   });
 
   it('grouped output prints applied/skipped subgroups (Issue #44)', () => {
-    run('add', [project, 'Grouped Applied']);
+    addWithIdeaStub([project, 'Grouped Applied']);
     writeContent(
       'grouped-applied/index.md',
       '---\ntitle: Grouped Applied\n---\n\n# G\n',
     );
-    run('add', [project, 'Grouped Skipped']);
+    addWithIdeaStub([project, 'Grouped Skipped']);
     const res = run('doctor', [
       project,
       '--fix=missing-frontmatter-id',

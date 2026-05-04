@@ -50,8 +50,8 @@ import { isStage, type CalendarEntry, type Stage } from '@deskwork/core/types';
 import { absolutize, fail, parseArgs } from '@deskwork/core/cli-args';
 import { appendJournal } from '@deskwork/core/journal';
 import { updateFrontmatter } from '@deskwork/core/frontmatter';
-import { writeSidecar } from '@deskwork/core/sidecar';
-import type { Entry, Stage as EntryStage, ReviewState } from '@deskwork/core/schema/entry';
+import { createFreshEntrySidecar } from '@deskwork/core/entry/create';
+import type { Stage as EntryStage, ReviewState } from '@deskwork/core/schema/entry';
 import {
   candidateToEntry,
   discoverIngestCandidates,
@@ -205,7 +205,10 @@ export async function run(argv: string[]): Promise<void> {
     if (writeFrontmatterBinding) {
       writeDeskworkIdToFile(candidate.filePath, id);
     }
-    await writeIngestSidecar(projectRoot, candidate, stage, id);
+    await createFreshEntrySidecar(
+      projectRoot,
+      ingestCandidateToCreateParams(candidate, stage, id),
+    );
   }
   writeCalendar(calendarPath, calendar);
 }
@@ -235,45 +238,33 @@ function mapStageToEntry(stage: Stage): {
 }
 
 /**
- * Write the entry-centric sidecar at `.deskwork/entries/<uuid>.json`
- * for a freshly-ingested candidate. Phase 30's contract: every UUID
- * in `calendar.md` must have a sidecar; doctor's `calendar-sidecar`
- * validator flags drift in either direction.
- *
- * `artifactPath` is the file's path relative to the **project root**
- * — that's the convention `doctor`'s `resolveArtifactPath` uses (it
- * does `join(projectRoot, entry.artifactPath)`) and matches what the
- * Phase 30 migration writes from the legacy ingest journal's
- * `sourceFile` field. The studio's `entry-resolver` and the #182
- * backfill capability consume the same shape.
+ * Build the params for an ingest-minted Entry sidecar. `artifactPath`
+ * is the file's path relative to the **project root** — that's what
+ * doctor's `resolveArtifactPath` expects (`join(projectRoot,
+ * entry.artifactPath)`) and matches what the Phase 30 migration writes
+ * from the legacy ingest journal's `sourceFile` field. The actual
+ * sidecar write lives in `@deskwork/core/entry/create` so `add` and
+ * `ingest` share one source of truth for fresh-Entry shape.
  */
-async function writeIngestSidecar(
-  projectRoot: string,
+function ingestCandidateToCreateParams(
   candidate: IngestCandidate,
   stage: Stage,
   uuid: string,
-): Promise<void> {
-  const at = new Date().toISOString();
-  const artifactPath = candidate.relativePath;
+): Parameters<typeof createFreshEntrySidecar>[1] {
   const { currentStage, reviewState } = mapStageToEntry(stage);
-  const sidecar: Entry = {
+  return {
     uuid,
     slug: candidate.derivedSlug,
     title: candidate.title,
     ...(candidate.description ? { description: candidate.description } : {}),
-    keywords: [],
-    source: 'manual',
     currentStage,
-    iterationByStage: {},
+    source: 'manual',
     ...(reviewState !== undefined ? { reviewState } : {}),
-    artifactPath,
+    artifactPath: candidate.relativePath,
     ...(currentStage === 'Published'
-      ? { datePublished: `${candidate.derivedDate}T00:00:00.000Z` }
+      ? { datePublishedDate: candidate.derivedDate }
       : {}),
-    createdAt: at,
-    updatedAt: at,
   };
-  await writeSidecar(projectRoot, sidecar);
 }
 
 /**

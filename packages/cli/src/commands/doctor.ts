@@ -185,11 +185,18 @@ export async function run(argv: string[]): Promise<void> {
 
   if (repairMode) {
     const newRepair = await repairAll(projectRoot, { destructive: false });
+    // In --json mode, stdout MUST be a single parseable JSON document.
+    // The legacy report block already wrote that document; appending
+    // human-readable repair messages here pollutes it (#184 surfaced
+    // this when add+ingest started producing sidecars that always
+    // trigger calendar-regenerated). Route to stderr in --json mode so
+    // the operator still sees what happened without breaking parseability.
+    const stream = json ? process.stderr : process.stdout;
     for (const a of newRepair.applied) {
-      process.stdout.write(`Entry-centric repair applied: ${a}\n`);
+      stream.write(`Entry-centric repair applied: ${a}\n`);
     }
     for (const p of newRepair.pendingDestructive) {
-      process.stdout.write(
+      stream.write(
         `Entry-centric repair pending (destructive — re-run with explicit confirmation): ${p}\n`,
       );
     }

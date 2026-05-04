@@ -116,6 +116,10 @@
       "types": "./dist/entry/cancel.d.ts",
       "default": "./dist/entry/cancel.js"
     },
+    "./entry/create": {
+      "types": "./dist/entry/create.d.ts",
+      "default": "./dist/entry/create.js"
+    },
     "./entry/induct": {
       "types": "./dist/entry/induct.d.ts",
       "default": "./dist/entry/induct.js"

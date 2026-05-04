@@ -16,6 +16,7 @@ import { addEntry } from '@deskwork/core/calendar-mutations';
 import { resolveSite, resolveCalendarPath } from '@deskwork/core/paths';
 import { isContentType, type ContentType } from '@deskwork/core/types';
 import { absolutize, emit, fail, parseArgs } from '@deskwork/core/cli-args';
+import { createFreshEntrySidecar } from '@deskwork/core/entry/create';
 
 export async function run(argv: string[]): Promise<void> {
   const KNOWN_FLAGS = ['site', 'type', 'content-url', 'source', 'slug'] as const;
@@ -85,6 +86,26 @@ export async function run(argv: string[]): Promise<void> {
   }
 
   writeCalendar(calendarPath, calendar);
+
+  // #184: write the entry-centric sidecar so calendar.md and
+  // .deskwork/entries/<uuid>.json stay aligned per the Phase 30 SSOT
+  // contract. Shared with `deskwork ingest --apply` (#183) via
+  // createFreshEntrySidecar.
+  if (entry.id === undefined) {
+    // addEntry always mints a UUID (CalendarEntry.id is `string | undefined`
+    // only because pre-id legacy test fixtures need to compile — runtime
+    // adds always populate it). Fail loudly if that contract breaks
+    // rather than emitting a sidecar with an empty uuid.
+    fail('addEntry returned an entry without an id (programmer error)');
+  }
+  await createFreshEntrySidecar(projectRoot, {
+    uuid: entry.id,
+    slug: entry.slug,
+    title: entry.title,
+    ...(entry.description ? { description: entry.description } : {}),
+    currentStage: 'Ideas',
+    source,
+  });
 
   emit({
     slug: entry.slug,
