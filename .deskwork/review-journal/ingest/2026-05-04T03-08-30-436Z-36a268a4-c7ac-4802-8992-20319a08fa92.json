@@ -1,0 +1,31 @@
+{
+  "id": "36a268a4-c7ac-4802-8992-20319a08fa92",
+  "timestamp": "2026-05-04T03:08:30.436Z",
+  "event": "ingest",
+  "slug": "deskwork-plugin/issue-158-ux-audit",
+  "entryId": "36a268a4-c7ac-4802-8992-20319a08fa92",
+  "site": "deskwork-internal",
+  "stage": "Ideas",
+  "sourceFile": "docs/1.0/001-IN-PROGRESS/deskwork-plugin/2026-05-03-issue-158-ux-audit.md",
+  "frontmatterSnapshot": {
+    "deskwork": {
+      "audit": "issue-158-ux-consistency",
+      "date": "2026-05-03",
+      "surfaces": [
+        "/dev/",
+        "/dev/editorial-studio",
+        "/dev/content",
+        "/dev/editorial-review-shortform",
+        "/dev/editorial-help",
+        "/dev/scrapbook"
+      ],
+      "viewport": "1512x860",
+      "studio_version": "v0.14.0"
+    }
+  },
+  "derivation": {
+    "slug": "path",
+    "state": "default",
+    "date": "mtime"
+  }
+}
