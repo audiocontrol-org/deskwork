@@ -141,22 +141,63 @@ interface ReviewPair {
   currentArtifactPath: string | null;
 }
 
+interface BuiltPair extends ReviewPair {
+  /** True when this is the most recent applied workflow for the
+   *  (entry, contentKind) pair. Older applied records are
+   *  superseded — their content drift is a receipt of the past
+   *  approval cycle, not an actionable trust-rebuild concern. */
+  readonly isCurrent: boolean;
+  /** ContentKind of the workflow record (longform / outline).
+   *  Carried through so reporting can group + distinguish. */
+  readonly contentKind: string;
+}
+
 function buildReviewPairs(
   projectRoot: string,
   sidecars: Sidecar[],
   workflows: WorkflowRecord[],
-): ReviewPair[] {
+): BuiltPair[] {
   const sidecarsByEntry = new Map<string, Sidecar>();
   for (const s of sidecars) sidecarsByEntry.set(s.uuid, s);
 
-  const historyDir = join(projectRoot, '.deskwork/review-journal/history');
-  const pairs: ReviewPair[] = [];
+  // Pre-filter: applied + longform/outline + has entryId + sidecar
+  // exists. Then group by (entryId, contentKind) and pick the most
+  // recent (by updatedAt) as `isCurrent: true`. Earlier ones are
+  // `isCurrent: false` (superseded by the newer approval cycle).
+  interface WorkflowEntryPair {
+    wf: WorkflowRecord;
+    sidecar: Sidecar;
+  }
+  const eligible: WorkflowEntryPair[] = [];
   for (const wf of workflows) {
     if (wf.state !== 'applied') continue;
     if (wf.contentKind !== 'longform' && wf.contentKind !== 'outline') continue;
     if (wf.entryId === undefined) continue;
     const sidecar = sidecarsByEntry.get(wf.entryId);
     if (sidecar === undefined) continue;
+    eligible.push({ wf, sidecar });
+  }
+  // Identify the most-recent record per (entryId, contentKind).
+  const currentKey = (entryId: string, kind: string): string => `${entryId}:${kind}`;
+  const currentMap = new Map<string, string>(); // key → workflowId
+  for (const { wf } of eligible) {
+    if (wf.entryId === undefined || wf.contentKind === undefined) continue;
+    const key = currentKey(wf.entryId, wf.contentKind);
+    const incumbent = currentMap.get(key);
+    if (!incumbent) {
+      currentMap.set(key, wf.id);
+      continue;
+    }
+    const incumbentWf = eligible.find((p) => p.wf.id === incumbent)?.wf;
+    if (incumbentWf && wf.updatedAt > incumbentWf.updatedAt) {
+      currentMap.set(key, wf.id);
+    }
+  }
+
+  const historyDir = join(projectRoot, '.deskwork/review-journal/history');
+  const pairs: BuiltPair[] = [];
+  for (const { wf, sidecar } of eligible) {
+    if (wf.entryId === undefined || wf.contentKind === undefined) continue;
     const approvedMarkdown = readWorkflowVersion(
       historyDir,
       wf.id,
@@ -175,6 +216,7 @@ function buildReviewPairs(
         }
       }
     }
+    const isCurrent = currentMap.get(currentKey(wf.entryId, wf.contentKind)) === wf.id;
     pairs.push({
       entryId: wf.entryId,
       slug: sidecar.slug,
@@ -185,24 +227,41 @@ function buildReviewPairs(
       approvedMarkdown,
       currentMarkdown,
       currentArtifactPath,
+      isCurrent,
+      contentKind: wf.contentKind,
     });
   }
   return pairs;
 }
 
 interface Diagnosis {
-  pair: ReviewPair;
+  pair: BuiltPair;
   status:
     | 'identical'
     | 'whitespace-only'
     | 'frontmatter-only'
     | 'non-trivial'
+    | 'superseded'
     | 'approved-snapshot-missing'
     | 'current-content-missing';
   detail: string;
 }
 
-function diagnose(pair: ReviewPair): Diagnosis {
+function diagnose(pair: BuiltPair): Diagnosis {
+  // A non-trivial diff against a SUPERSEDED workflow record is just a
+  // receipt of a past approval cycle (the operator approved snapshot
+  // A; later approved a newer snapshot B; A's diff vs current is
+  // historical drift, not actionable trust-rebuild). Surface it as
+  // `superseded` so the operator's eye doesn't have to sort actionable
+  // from informational. Only the CURRENT workflow record's diff is a
+  // real "stale approval relied on" candidate.
+  if (!pair.isCurrent) {
+    return {
+      pair,
+      status: 'superseded',
+      detail: 'older applied workflow; superseded by a newer approval cycle for the same entry',
+    };
+  }
   if (pair.approvedMarkdown === null) {
     return {
       pair,
@@ -273,6 +332,7 @@ function main(): void {
       d.status === 'whitespace-only' ||
       d.status === 'frontmatter-only',
   );
+  const superseded = diagnoses.filter((d) => d.status === 'superseded');
   const incomplete = diagnoses.filter(
     (d) =>
       d.status === 'approved-snapshot-missing' ||
@@ -280,11 +340,11 @@ function main(): void {
   );
 
   process.stdout.write(
-    `Summary: ${nonTrivial.length} non-trivial diff(s), ${trivial.length} trivial-or-identical, ${incomplete.length} incomplete (missing snapshot or current content).\n\n`,
+    `Summary: ${nonTrivial.length} actionable diff(s), ${trivial.length} trivial-or-identical, ${superseded.length} superseded historical approval(s), ${incomplete.length} incomplete.\n\n`,
   );
 
   if (nonTrivial.length > 0) {
-    process.stdout.write('Non-trivial content diffs (re-review recommended):\n\n');
+    process.stdout.write('Actionable content diffs (current approval, content drifted — re-review recommended):\n\n');
     for (const d of nonTrivial) {
       process.stdout.write(
         `  - ${d.pair.slug} (entry ${d.pair.entryId})\n` +
@@ -300,6 +360,16 @@ function main(): void {
     for (const d of trivial) {
       process.stdout.write(
         `  - ${d.pair.slug} v${d.pair.workflowVersion} workflow ${d.pair.workflowId.slice(0, 8)}: ${d.status} (${d.detail})\n`,
+      );
+    }
+    process.stdout.write('\n');
+  }
+
+  if (superseded.length > 0) {
+    process.stdout.write('Superseded historical approvals (informational; receipts of past review cycles, no action needed):\n\n');
+    for (const d of superseded) {
+      process.stdout.write(
+        `  - ${d.pair.slug} v${d.pair.workflowVersion} workflow ${d.pair.workflowId.slice(0, 8)} (applied ${d.pair.workflowUpdatedAt})\n`,
       );
     }
     process.stdout.write('\n');

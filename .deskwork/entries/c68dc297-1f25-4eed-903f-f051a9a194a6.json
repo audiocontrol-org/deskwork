@@ -2,6 +2,7 @@
   "uuid": "c68dc297-1f25-4eed-903f-f051a9a194a6",
   "slug": "source-shipped-deskwork-plan",
   "title": "Source-shipped deskwork plugins (drop the bundles)",
+  "description": "Architectural plan to retire bundle/server.mjs + bundle/cli.mjs and ship deskwork plugins as source. Includes the collection-not-website data-model reframe. Discovered during the dogfood attempt to install deskwork in this monorepo.",
   "keywords": [
     "deskwork",
     "content-collections",
@@ -12,8 +13,8 @@
   "iterationByStage": {
     "Drafting": 2
   },
+  "reviewState": "approved",
   "createdAt": "2026-05-01T00:17:31.526Z",
   "updatedAt": "2026-05-01T04:08:23.606Z",
-  "description": "Architectural plan to retire bundle/server.mjs + bundle/cli.mjs and ship deskwork plugins as source. Includes the collection-not-website data-model reframe. Discovered during the dogfood attempt to install deskwork in this monorepo.",
-  "reviewState": "approved"
+  "artifactPath": "docs/source-shipped-deskwork-plan/index.md"
 }

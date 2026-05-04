@@ -1802,10 +1802,11 @@ GitHub tracking issues:
 
 **Corrupted-review audit (the trust re-build, post-34a):**
 
-- [x] `scripts/audit-post-pivot-iterations.ts` (v2 — rewritten per the Phase 34e audit's F1+F2 findings) iterates every applied longform/outline workflow record, joins to the matching sidecar, loads the workflow's `currentVersion` snapshot from the per-version history-journal event, and computes a content diff vs. on-disk content. Run on this calendar considered 7 (entry, applied workflow) pairs.
-- [x] Mismatch dispositioned in `docs/1.0/001-IN-PROGRESS/deskwork-plugin/post-pivot-review-audit.md`. **Outcome: zero entries require re-review.** Audit summary: 4 non-trivial diffs (all the PRD entry across 4 separate `/feature-extend` cycles — each is a valid review of THAT cycle's snapshot, not stale-content corruption), 2 byte-identical (`release-skill-design`, `post-release-acceptance-design`), 1 incomplete (`source-shipped-deskwork-plan` — sidecar has no `artifactPath`; manual inspection confirms not corrupted, gap is sidecar-schema artifact predating the field).
-- [x] Re-review section: per-pair disposition table in the audit doc (PRD diffs are receipts of valid re-extension cycles; identical/incomplete pairs need no action).
-- [x] Audit results recorded in `docs/1.0/001-IN-PROGRESS/deskwork-plugin/post-pivot-review-audit.md` with per-pair disposition + provenance section explaining v1 vs. v2 differences.
+- [x] `scripts/audit-post-pivot-iterations.ts` (v3 — incorporates ship-pass audit's F1+F2 remediations) iterates every applied longform/outline workflow record, distinguishes current (most recent per entry+contentKind) from superseded (older applied records replaced by newer ones), loads the workflow's `currentVersion` snapshot from the per-version history-journal event, and computes a content diff vs. on-disk content. Run on this calendar considered 7 (entry, applied workflow) pairs.
+- [x] Mismatch dispositioned in `docs/1.0/001-IN-PROGRESS/deskwork-plugin/post-pivot-review-audit.md`. **Outcome: zero entries require re-review.** Audit summary (v3): 1 actionable diff (current PRD approval; dispositioned via #170 file-diff bypass), 3 trivial-or-identical (release-skill-design, post-release-acceptance-design, source-shipped-deskwork-plan all byte-identical post-#182 backfill), 3 superseded historical approvals (older PRD `/feature-extend` cycles — informational, not actionable), 0 incomplete.
+- [x] Re-review section: per-pair disposition table in the audit doc (the one actionable diff is dispositioned; identical pairs need no action; superseded items are receipts).
+- [x] Audit results recorded in `docs/1.0/001-IN-PROGRESS/deskwork-plugin/post-pivot-review-audit.md` with per-pair disposition + provenance section across v1/v2/v3 versions.
+- [x] **Ship bar achieved per the third-party assessment:** `tsx scripts/audit-post-pivot-iterations.ts` returns zero incomplete pairs and zero misleading "action required" noise for already-dispositioned historical approvals.
 
 **Repo-wide grep audit (per `agent-discipline.md` "no just for now"):**
 
