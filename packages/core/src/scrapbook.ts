@@ -247,14 +247,38 @@ export function scrapbookFilePath(
   filename: string,
   opts: ScrapbookLocation = {},
 ): string {
+  return scrapbookFilePathAtDir(
+    scrapbookDir(projectRoot, config, site, slug),
+    filename,
+    opts,
+  );
+}
+
+/**
+ * Resolve a filename inside an already-resolved scrapbook directory.
+ * Mirrors `listScrapbookAtDir` — used by callers that have already
+ * resolved the on-disk dir via `scrapbookDirForEntry` (id-driven) or
+ * `scrapbookDirAtPath` (fs-path-driven) and don't want to re-derive
+ * through the slug template.
+ *
+ * Same security guards as `scrapbookFilePath`:
+ *   - `assertFilename` blocks dotfiles / `..` / absolute paths in the filename
+ *   - the `startsWith(dir + '/')` containment check blocks any traversal
+ *     that slipped through (so `secret/` always sits inside the top-level
+ *     scrapbook dir)
+ *
+ * The slug-shape validator is bypassed because the caller has already
+ * proven the directory exists in the content tree by other means.
+ */
+export function scrapbookFilePathAtDir(
+  scrapbookDirAbs: string,
+  filename: string,
+  opts: ScrapbookLocation = {},
+): string {
   assertFilename(filename);
-  const dir = scrapbookDir(projectRoot, config, site, slug);
-  const target = opts.secret ? join(dir, SECRET_SUBDIR) : dir;
+  const target = opts.secret ? join(scrapbookDirAbs, SECRET_SUBDIR) : scrapbookDirAbs;
   const abs = resolve(target, filename);
-  // Guard either against `..` escape from secret/ AND escape from the
-  // top-level scrapbook dir. The base of the containment check is the
-  // top-level dir so secret/ always sits inside it.
-  if (!abs.startsWith(dir + '/') && abs !== dir) {
+  if (!abs.startsWith(scrapbookDirAbs + '/') && abs !== scrapbookDirAbs) {
     throw new Error(
       `resolved path escapes scrapbook dir: "${filename}" → ${abs}`,
     );
@@ -486,7 +510,35 @@ export function readScrapbookFile(
   mtime: string;
   content: Buffer;
 } {
-  const abs = scrapbookFilePath(projectRoot, config, site, slug, filename, opts);
+  return readScrapbookFileAtDir(
+    scrapbookDir(projectRoot, config, site, slug),
+    filename,
+    opts,
+  );
+}
+
+/**
+ * Read a scrapbook file given the absolute scrapbook directory. Used
+ * by callers that have already resolved the on-disk dir via
+ * `scrapbookDirForEntry` (id-driven) or `scrapbookDirAtPath`
+ * (fs-path-driven) and don't want to re-derive through the slug
+ * template. Mirrors the listing-side primitive `listScrapbookAtDir`.
+ *
+ * Same security guards as `readScrapbookFile` (filename validation +
+ * path-traversal containment) via `scrapbookFilePathAtDir`.
+ */
+export function readScrapbookFileAtDir(
+  scrapbookDirAbs: string,
+  filename: string,
+  opts: ScrapbookLocation = {},
+): {
+  name: string;
+  kind: ScrapbookItemKind;
+  size: number;
+  mtime: string;
+  content: Buffer;
+} {
+  const abs = scrapbookFilePathAtDir(scrapbookDirAbs, filename, opts);
   if (!existsSync(abs)) throw new Error(`not found: ${filename}`);
   const st = statSync(abs);
   if (!st.isFile()) throw new Error(`not a file: ${filename}`);
@@ -498,6 +550,44 @@ export function readScrapbookFile(
     mtime: st.mtime.toISOString(),
     content,
   };
+}
+
+/**
+ * Read a scrapbook file for a tracked calendar entry. Mirrors
+ * `listScrapbookForEntry` / `countScrapbookForEntry` — id-driven
+ * resolution via `scrapbookDirForEntry`, slug fallback for pre-bound
+ * entries. Used by the studio's `/api/dev/scrapbook-file?entryId=...`
+ * variant so projects whose feature-doc layout doesn't match the
+ * kebab-case slug template (e.g. `docs/<version>/<status>/<feature>/`)
+ * can still serve scrapbook assets — `scrapbookDirAtPath`'s slug
+ * validator would otherwise reject any path with dots or uppercase
+ * segments.
+ *
+ * Same security guards as the slug-shape variant: `assertFilename`
+ * blocks dotfiles / `..` / absolute paths in the filename; the
+ * `startsWith(dir + '/')` containment check blocks any traversal that
+ * slipped through.
+ */
+export function readScrapbookFileForEntry(
+  projectRoot: string,
+  config: DeskworkConfig,
+  site: string,
+  entry: { id?: string; slug: string },
+  filename: string,
+  opts: ScrapbookLocation = {},
+  index?: ContentIndex,
+): {
+  name: string;
+  kind: ScrapbookItemKind;
+  size: number;
+  mtime: string;
+  content: Buffer;
+} {
+  return readScrapbookFileAtDir(
+    scrapbookDirForEntry(projectRoot, config, site, entry, index),
+    filename,
+    opts,
+  );
 }
 
 /**

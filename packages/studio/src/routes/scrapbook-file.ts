@@ -1,22 +1,34 @@
 /**
  * Read-only binary endpoint for scrapbook files.
  *
- * `GET /api/dev/scrapbook-file?site=<slug>&path=<scrapbook path>&name=<filename>[&secret=1]`
+ * Two addressing modes:
  *
- * Returns the raw bytes of a single scrapbook file with a sensible
- * Content-Type header. Read-only — no write/rename/delete here. The
- * shared scrapbook-item renderer uses this for image thumbnails,
- * PDF iframes, and download links on the review-drawer + content-view
- * surfaces.
+ *   `GET /api/dev/scrapbook-file?site=<slug>&path=<scrapbook path>&name=<filename>[&secret=1]`
+ *     — slug-shape addressing. `path` is the directory under `contentDir`
+ *     whose `scrapbook/` subdir holds the file. Validated through
+ *     `assertSlug` (kebab-case-only); rejects paths with dots / uppercase
+ *     / non-slug characters.
  *
- * Validation runs through `@deskwork/core/scrapbook`'s own
- * `assertSlug` / `assertFilename` (via `readScrapbookFile`), so path
- * traversal attempts are caught at the core boundary, not here.
+ *   `GET /api/dev/scrapbook-file?site=<slug>&entryId=<uuid>&name=<filename>[&secret=1]`
+ *     — entry-id addressing. The route reads the entry's sidecar to find
+ *     its on-disk artifactPath, derives the scrapbook dir from the
+ *     artifact's parent directory, and serves the file. No slug-shape
+ *     validation — works for projects whose feature-doc layout doesn't
+ *     match the kebab-case slug template (e.g. `docs/<version>/<status>/<feature>/`).
+ *
+ * Both modes return the raw bytes of a single scrapbook file with a
+ * sensible Content-Type header. Filename + path-traversal guards apply
+ * in both modes (via `assertFilename` + the containment check in
+ * `scrapbookFilePath` / `scrapbookFilePathAtDir`).
  */
 
 import type { Context } from 'hono';
 import { extname } from 'node:path';
-import { readScrapbookFile } from '@deskwork/core/scrapbook';
+import {
+  readScrapbookFile,
+  readScrapbookFileForEntry,
+} from '@deskwork/core/scrapbook';
+import { readSidecar } from '@deskwork/core/sidecar';
 import type { StudioContext } from './api.ts';
 
 const MIME_TYPES: Record<string, string> = {
@@ -47,12 +59,19 @@ export async function serveScrapbookFile(
 ): Promise<Response> {
   const site = c.req.query('site');
   const path = c.req.query('path');
+  const entryId = c.req.query('entryId');
   const name = c.req.query('name');
   const secret = c.req.query('secret') === '1';
 
-  if (!site || !path || !name) {
+  if (!site || !name) {
     return c.json(
-      { error: 'site, path, and name query params are required' },
+      { error: 'site and name query params are required' },
+      400,
+    );
+  }
+  if (!path && !entryId) {
+    return c.json(
+      { error: 'either path or entryId query param is required' },
       400,
     );
   }
@@ -62,9 +81,27 @@ export async function serveScrapbookFile(
 
   let result;
   try {
-    result = readScrapbookFile(ctx.projectRoot, ctx.config, site, path, name, {
-      secret,
-    });
+    if (entryId) {
+      // Entry-id mode: resolve the scrapbook dir via the entry's sidecar.
+      // Bypasses slug-shape validation so projects with non-kebab-case
+      // content layouts (dots, uppercase, etc.) can still serve assets.
+      const entry = await readSidecar(ctx.projectRoot, entryId);
+      result = readScrapbookFileForEntry(
+        ctx.projectRoot,
+        ctx.config,
+        site,
+        { id: entry.uuid, slug: entry.slug },
+        name,
+        { secret },
+      );
+    } else {
+      // Slug-shape mode: backwards-compatible with existing scrapbook-viewer
+      // callers. `path!` is non-null here because the early-return covered
+      // the both-missing case.
+      result = readScrapbookFile(ctx.projectRoot, ctx.config, site, path!, name, {
+        secret,
+      });
+    }
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     // The core helper throws on invalid slug / invalid filename / file
