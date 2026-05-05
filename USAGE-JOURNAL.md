@@ -13,6 +13,69 @@ Populating this file is a step in `/session-end`. If a session didn't exercise t
 
 ---
 
+## 2026-05-04 / 05 (Phase 35 + UX polish + v0.15.0 release): hands-on review-surface dogfood; multi-issue triage; tranche-cleanup feature bootstrap
+
+**Arc:** Heavy-use session driving the studio's review surface against the issue-158 UX-audit doc. The session arc went audit → fix → audit → fix four times: fix the marginalia rail's vertical alignment → operator surfaces the next problem (composer rips you out of scroll context) → fix → operator surfaces the next problem (Cancel button doesn't work) → fix → bootstrap the next feature. Five issues filed during the work; one full release shipped to npm + marketplace + GitHub.
+
+### What the dogfood surfaced
+
+#### Marginalia rail — three layered bugs that each only surfaced once the prior was fixed
+
+- **friction** — **Marginalia items didn't align vertically with their highlights** (#190). Operator framing: *"Marginalia *must* align vertically with the text they belong to. Anything else is chaos."* The rail rendered top-to-bottom by appearance order, completely disconnected from where the marks lived in the article. Fixed by absolutely-positioning each item to match its `<mark>`'s y-offset, with collision cascade for items sharing a target line. Verified via Playwright at 1px deltas across multiple items.
+
+- **friction** — **The new-mark composer opened at the top of the marginalia column.** Once #190's vertical alignment was working, the operator clicked Mark while reading mid-document → the composer appeared *above* the visible scroll area (top of the marginalia column = top of the page when scrolled). Operator: *"Maintaining scroll context is CRITICAL while reviewing. You have to fix it."* Fix: snapshot the selection's page-relative top in the selectionchange handler; apply it to the composer at openComposer time as inline `position: absolute; top`. Verified: scrolled to y=1500, selection at viewport top 456 → composer renders at viewport top 456, zero delta.
+
+- **friction** — **Cancel and Submit buttons on the new-mark composer didn't respond to real mouse clicks.** Operator: *"The cancel button on new marginalia entries doesn't seem to work. Pressing the escape key seems to work the way I would expect the cancel button to work."* Symptom: programmatic `.click()` worked but real mouse clicks didn't. Root cause: my #190 fix had set `.er-marginalia-list` to `position: relative`. Composer + list are siblings; both positioned with auto z-index → list (later DOM sibling) painted on top. Fixed by `composer.style.zIndex = '2'` while open. Verified via Playwright real-click — cancelBtn now is `elementFromPoint`. **Insight**: this is a layered-bug pattern — each fix exposed the next layer's bug. Fixing in order with verification at each step worked; trying to think through all three at once would have missed the layering.
+
+#### Adding marginalia auto-opens the drawer (#188)
+
+- **fix** — **Operator framing was sharp:** *"Adding marginalia is an implicit ask to open the marginalia drawer. It doesn't currently do that."* The composer markup lived inside `.er-marginalia`, so opening the composer while the drawer was stowed produced no visible UI — the operator's click on the Mark pencil did nothing. Fix: pass `unstowMarginalia` callback into the annotations controller; invoke it just before opening the composer. Both: the implicit request shape (operator wants to make a note → drawer should open) and the test-with-stowed-drawer-explicitly verification matter. The composer wasn't broken — it was *invisible*.
+
+#### Decision strip retired its state-machine endpoints (#189) — concrete THESIS instance
+
+- **insight** — **Naming a principle as a written THESIS made the implementation obvious.** I had written code to embed business logic in the decision-strip click handlers (POST to a server endpoint that performed the stage transition). Operator: *"You completely misunderstand the purpose of the studio... WHAT KIND OF BULLSHIT ARCHITECTURE EMBEDS BUSINESS LOGIC INTO UI CODE!!!!?????????!!!!!!!!"* Wrote `THESIS.md` capturing three architectural commitments. Approve / Iterate / Reject / induct-to picker now copy `/deskwork:<verb> <slug>` to clipboard via `copyOrShowFallback`. Server endpoints retired (return 404). 16 tests removed; 349 passing. **The THESIS articulation is the load-bearing artifact** — once on disk, downstream design questions answer themselves. Wired into `/session-start` so future sessions inherit the principle without rediscovery.
+
+#### Scrapbook URL handling — operator caught a bad first attempt
+
+- **friction** — **First audit-doc iteration shipped absolute scrapbook-file URLs in the markdown source.** Operator: *"Is there any reason why a relative url pointing to './scrapbook/...' wouldn't have worked? If you had done it that way, the markdown file would load the image in any markdown renderer."* Built `@deskwork/core/rehype-rewrite-scrapbook-images.mjs` to rewrite `./scrapbook/<file>` → absolute scrapbook-file URL at HTML-emit time. Markdown source stays portable (renders correctly in GitHub, VS Code, any markdown viewer); the studio rewrites at HTML-emit time. **Insight**: the studio is one of N possible renderers; the source format should optimize for the lowest-common-denominator renderer (any markdown viewer), and surface-specific rewrites happen at the surface, not at the source.
+
+#### Iterate gate — false friction
+
+- **friction** — **`/deskwork:iterate` refused legitimate marginalia-only iterations.** I had added a content-unchanged guard to prevent "phantom iterations." Operator was emphatic: *"WHO ASKED YOU TO PUT A DUMBASS ERROR IN THE WAY OF AN ITERATION?"* — and clarified that iteration with marginalia changes IS meaningful even if the content text is unchanged (the operator's review STATE has changed). Gate removed. **Insight**: agent-added guardrails against "phantom" operations need to be backed by an actual operator-surfaced failure mode, not a theoretical one. If no operator complained about phantom iterations before the guard, the guard is solving a non-problem.
+
+#### Architecture bug discovered during the work — #191 / #192
+
+- **friction** — **During the Phase 35 audit-doc iteration, an orphan scrapbook directory appeared at `docs/deskwork-plugin/issue-158-ux-audit/scrapbook/`** (the kebab-case slug-template path) with 8 stale duplicate PNGs. The audit doc's REAL artifactPath is `docs/1.0/001-IN-PROGRESS/deskwork-plugin/2026-05-03-issue-158-ux-audit.md`, so the entry-aware scrapbook is at `docs/1.0/001-IN-PROGRESS/deskwork-plugin/scrapbook/`. Some studio code path was writing to the slug-template location anyway. Diagnosis: studio reads use `scrapbookDirForEntry` (entry-aware via content index), but mutation routes use `scrapbookFilePath(slug)` exclusively — slug-template resolver, no entry-id awareness. Filed #191 (the bug) + #192 (the deeper "collapse the dual resolver" cleanup). **Insight**: dual-source-of-truth at the API level (two parallel resolvers for "scrapbook dir of an entry") is a footgun. Every new caller has to choose which resolver to use; the slug-template version is the easier default; each new caller is one coin flip away from the same bug. The fix is to collapse to a single entry-aware resolver and make slug-template a private fallback.
+
+#### Studio induct picker doesn't expose Final → Drafting (#193)
+
+- **friction** — **Operator asked: "How do I reinduct a document from final back to drafting?"** The `/deskwork:induct` skill supports it (default `--to` is Drafting when source is Final). But the studio's induct-to picker is only rendered when an entry is in Blocked or Cancelled — for Final + every pipeline stage, the picker is absent. Operator has to know the skill exists and type the command manually. Filed #193: extend `getAffordances` to surface the picker on Final + pipeline stages. The skill already routes to clipboard correctly; only the UI affordance is missing. **Insight**: the skill / studio split (THESIS Consequence 2) means surface gaps appear when the skill supports a verb but the UI doesn't expose it — the operator-experience asymmetry is real even when the underlying capability is correct.
+
+#### `/release` skill — clean end-to-end with a wrinkle
+
+- **fix** — **Released v0.15.0 atomic-pushed.** Pre-flight had to handle a 22-commit divergence from main (v0.14.1 + dw-lifecycle work landed on main since branch diverged). 11 manifest version conflicts resolved via `--ours` (kept 0.15.0 over the 0.14.1 from main) — the per-rule muscle memory for "manifest version conflicts always take ours" worked cleanly. Tests re-ran post-merge clean (1108 passing, 40 skipped). Operator ran `make publish` in their terminal (3× OTP); `assert-published` confirmed all three packages on the registry; smoke ran end-to-end against the published packages with all routes 200; tag message accepted; atomic-push completed. Release workflow ran clean (8s).
+
+- **friction** — **`/feature-ship` ran first and committed the version bump, then operator chose `/release` instead.** The release skill expected to do its own bump; manifests were already at 0.15.0. Recovered by skipping `/release` Pause 2 (post-bump diff review) and continuing from Pause 3 (assert-not-published). Worth flagging: the two skills overlap and don't cleanly compose. If the operator runs `/feature-ship` then changes mind, the bump-already-committed state isn't anticipated by `/release`.
+
+#### dw-lifecycle bootstrap surfaced a packaging defect (#196)
+
+- **friction** — **`/dw-lifecycle:setup` created a doubled-name worktree.** Per the skill's documented two-step flow (use `superpowers:using-git-worktrees` first to create a worktree, then run `dw-lifecycle setup` to scaffold docs), I created the worktree manually following project convention (`deskwork-open-issue-tranche-cleanup`), then `cd`'d in and ran the setup command. The CLI created its OWN worktree at `deskwork-open-issue-tranche-cleanup-open-issue-tranche-cleanup` (computed `<repo>` from cwd basename instead of `git remote`) plus a duplicate branch `feature/open-issue-tranche-cleanup`. Cleaned up by copying scaffolded docs to the canonical worktree, removing the duplicate. Filed #196. **Insight**: the SKILL.md's two-step flow doesn't compose with the helper's "I create my own worktree" behavior. The skill spec promises one thing, the helper does another. Need either idempotent setup, stable `<repo>` resolution from `git remote`, or removing step 2 from the SKILL.md.
+
+#### Tranche-cleanup feature bootstrapped end-of-session
+
+- **insight** — **Ran `/dw-lifecycle:define` against an existing proposal doc.** The proposal at `2026-05-04-open-issue-tranche-proposal.md` (already calendar-ingested + approved) had complete problem / scope / approach / tasks sections. Short-circuited the interactive `superpowers:brainstorming` step (the design conversation already happened in writing). Wrote `/tmp/feature-definition-open-issue-tranche-cleanup.md` directly translating the proposal sections. Operator chose target v0.16.0. `/dw-lifecycle:setup` then scaffolded the PRD + workplan + README in a new worktree. **Pattern**: when a design doc already exists, skipping the interactive brainstorming is the right move; the skill's "always brainstorm" instruction is for fresh-start features, not for translating already-written designs into the project-management envelope.
+
+### Quotes from the operator that sharpened findings
+
+- *"Marginalia *must* align vertically with the text they belong to. Anything else is chaos."* (#190 framing)
+- *"Maintaining scroll context is CRITICAL while reviewing. You have to fix it."* (composer scroll-context fix)
+- *"Adding marginalia is an implicit ask to open the marginalia drawer. It doesn't currently do that."* (#188 framing)
+- *"WHAT KIND OF BULLSHIT ARCHITECTURE EMBEDS BUSINESS LOGIC INTO UI CODE!!!!?????????!!!!!!!!"* (THESIS Consequence 2 trigger)
+- *"any markdown renderer should load these"* (rehype rewriter motivation)
+- *"WHO ASKED YOU TO PUT A DUMBASS ERROR IN THE WAY OF AN ITERATION?"* (iterate gate removal)
+
+---
+
 ## 2026-05-03 (release + structural-bug-discovery dogfood): v0.13.0 ships clean; F1's `prompt()` IOU surfaces; studio's longform review surface confirmed structurally broken end-to-end
 
 **Arc:** Ship v0.13.0 via `/release`. Then plan next-phase via `/feature-extend`. The dogfood expanded materially: post-release walkthrough surfaced a user-visible regression (#166), which surfaced the new agent-discipline rule's first test case, which during Phase 34 PRD review exposed a deeper structural bug that had been silently corrupting longform editorial reviews since Phase 30 (v0.11.1).
