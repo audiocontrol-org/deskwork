@@ -1,0 +1,16 @@
+{
+  "id": "818a5ef7-5ff8-444a-a01c-3fa31906d345",
+  "timestamp": "2026-05-05T02:47:08.033Z",
+  "event": "ingest",
+  "slug": "deskwork-plugin/open-issue-tranche-proposal",
+  "entryId": "818a5ef7-5ff8-444a-a01c-3fa31906d345",
+  "site": "deskwork-internal",
+  "stage": "Ideas",
+  "sourceFile": "docs/1.0/001-IN-PROGRESS/deskwork-plugin/2026-05-04-open-issue-tranche-proposal.md",
+  "frontmatterSnapshot": {},
+  "derivation": {
+    "slug": "path",
+    "state": "default",
+    "date": "mtime"
+  }
+}

@@ -1,3 +1,7 @@
+---
+deskwork:
+  id: 818a5ef7-5ff8-444a-a01c-3fa31906d345
+---
 # Open Issue Tranche Proposal
 
 Date: 2026-05-04
