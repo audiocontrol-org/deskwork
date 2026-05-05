@@ -20,7 +20,7 @@ Triage the open-issue tracker for the `deskwork`, `deskwork-studio`, and support
 | 4 | Verify + close #190 marginalia alignment (rolls up with Phase 1) | Not started |
 | 5 | Sweep moot/superseded/stale (Tranche 4 + 5); reframe #40, #53; triage #92 | Done |
 | 6 | Tracker audit — verify the open list reflects only currently-actionable work | Not started |
-| 7 | Fix marginalia edit + delete UX (#199) | Fix-landed (pending v0.16.0 verification); range UI deferred to #203 |
+| 7 | Fix marginalia edit + delete UX (#199) | Text-edit + delete fix-landed; category-edit pending; range-edit wontfix (#203 closing) |
 
 ## Key Links
 

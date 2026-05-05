@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-05T17:48:39.387Z",
+  "entryId": "998b8a29-e754-4114-8998-d1aebf6f39d3",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "998b8a29-e754-4114-8998-d1aebf6f39d3",
+    "version": 1,
+    "range": {
+      "start": 1686,
+      "end": 1716
+    },
+    "text": "I don't want to implement range-editing. That's not a standard UX and will confuse people. We should mark it as \"will not implement\" in the prd, workplan, and appropriate github issues. We *should* implement the category edit capability, so that needs to be tracked as part of this tranche of bug fixes in the prd, workplan, and gihub issue",
+    "category": "other",
+    "anchor": "drag-to-resize range behavior,",
+    "id": "8f741422-6aa9-4058-96c7-876a1995fa4d",
+    "createdAt": "2026-05-05T17:48:39.387Z"
+  }
+}

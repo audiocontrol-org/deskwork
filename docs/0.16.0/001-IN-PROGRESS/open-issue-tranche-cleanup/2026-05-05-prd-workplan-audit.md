@@ -38,23 +38,23 @@ Why this appears to have slipped through: the current tests cover the mutation A
 
 ### 2. Medium — [#199](https://github.com/audiocontrol-org/deskwork/issues/199) implementation matches the workplan/README, but not the PRD text
 
-The shipped client exposes text-only editing for marginalia comments. The PRD still promises text-and-range editing from the sidebar, including drag-to-resize range behavior, and its acceptance criteria still say the operator can edit comment text/range from the sidebar.
+**Status: resolved during audit-doc iteration v2** (operator scope decision). PRD/workplan/README updated; range editing → wontfix; category editing → in-scope.
 
-The workplan and feature README were updated to defer range UI to [#203](https://github.com/audiocontrol-org/deskwork/issues/203), but the PRD was not reconciled to that narrower implementation. As written, the branch does not satisfy the PRD literally even though it does satisfy the later-scoped workplan.
+The shipped client exposes text-only editing for marginalia comments. The PRD originally promised text-and-range editing from the sidebar, including drag-to-resize range behavior. The workplan + README were updated to defer range UI to [#203](https://github.com/audiocontrol-org/deskwork/issues/203), but the PRD was not reconciled to that narrower implementation, leaving an unresolved promise.
 
-Relevant PRD references:
+**Resolution:**
 
-- [prd.md](./prd.md) lines 61-78
+- **Range editing — wontfix.** [#203](https://github.com/audiocontrol-org/deskwork/issues/203) closed as not-planned. Operator's framing: drag-to-resize is not a standard UX and would confuse rather than help; the right path for a wrong-anchored comment is delete + re-create. Server's PATCH endpoint retains `range` in its envelope (defense-in-depth + schema consistency), no client UI surfaces it.
+- **Category editing — in-scope, tracked as [#204](https://github.com/audiocontrol-org/deskwork/issues/204).** Server already accepts `category` in the PATCH envelope (shipped as part of [#199](https://github.com/audiocontrol-org/deskwork/issues/199)); the work is purely client-side — extend the inline edit affordance with a category dropdown alongside the text textarea.
 
-Relevant workplan / README references:
+PRD §Phase 7 + acceptance criteria, workplan Task 3 + acceptance criteria, and feature README status table all updated to match.
 
-- [workplan.md](./workplan.md) lines 149-169
-- [README.md](./README.md) lines 17-23
+Relevant references (post-resolution):
 
-Relevant implementation references:
-
-- [plugins/deskwork-studio/public/src/entry-review/comment-edit-delete.ts](/Users/orion/work/deskwork-work/deskwork-open-issue-tranche-cleanup/plugins/deskwork-studio/public/src/entry-review/comment-edit-delete.ts:11)
-- [plugins/deskwork-studio/public/src/entry-review/comment-edit-delete.ts](/Users/orion/work/deskwork-work/deskwork-open-issue-tranche-cleanup/plugins/deskwork-studio/public/src/entry-review/comment-edit-delete.ts:18)
+- [prd.md](./prd.md) — Phase 7 prose updated (range wontfix; category in-scope)
+- [workplan.md](./workplan.md) — Task 3 + acceptance criteria updated
+- [README.md](./README.md) — status row updated
+- [plugins/deskwork-studio/public/src/entry-review/comment-edit-delete.ts](/Users/orion/work/deskwork-work/deskwork-open-issue-tranche-cleanup/plugins/deskwork-studio/public/src/entry-review/comment-edit-delete.ts) — current text-only client; category extension pending under #204
 
 ## Verification Notes
 
@@ -76,5 +76,6 @@ Phases 1, 4, 5, and 6 are still incomplete, but that is consistent with the curr
 |---|---|---|
 | [#191](https://github.com/audiocontrol-org/deskwork/issues/191) | studio scrapbook mutations write to slug-template path, orphaning entry-aware scrapbook | Finding 1 — mutation API fix-landed; read/navigate paths still slug/path-based |
 | [#192](https://github.com/audiocontrol-org/deskwork/issues/192) | collapse dual scrapbook resolvers — make `scrapbookDirForEntry` the only public entry point | Finding 1 — public resolver collapse landed; downstream UI integration is the remaining gap |
-| [#199](https://github.com/audiocontrol-org/deskwork/issues/199) | UX/UI: Marginalia can't be edited | Finding 2 — text-only editing shipped; range UI deferred |
-| [#203](https://github.com/audiocontrol-org/deskwork/issues/203) | marginalia: client UI for range + category edits (server side already in v0.16.0) | Finding 2 — tracker for the deferred range/category client UI |
+| [#199](https://github.com/audiocontrol-org/deskwork/issues/199) | UX/UI: Marginalia can't be edited | Finding 2 — text-edit + delete shipped; category-edit pending under #204; range-edit wontfix |
+| [#203](https://github.com/audiocontrol-org/deskwork/issues/203) | marginalia: client UI for range + category edits (server side already in v0.16.0) | Finding 2 — closed as wontfix during audit-doc iteration v2; range editing rejected as non-standard UX |
+| [#204](https://github.com/audiocontrol-org/deskwork/issues/204) | marginalia: client UI for category edits (server already in v0.16.0; range edit wontfix per #203) | Finding 2 — successor tracker for the in-scope category-edit affordance; server already accepts |
