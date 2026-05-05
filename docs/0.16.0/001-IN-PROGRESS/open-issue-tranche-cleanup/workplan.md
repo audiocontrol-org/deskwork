@@ -169,30 +169,30 @@ deskwork:
 
 ### Task 1: Server route accepts entryId
 
-- [ ] Extend `/dev/scrapbook/<site>/<path>` in `packages/studio/src/pages/scrapbook.ts` to accept `?entryId=<uuid>` (UUID-validated). When present, resolve the dir via `scrapbookDirForEntry(...)` and list via `listScrapbookForEntry(...)`. Slug/path fallback preserved.
-- [ ] Surface 404 when `entryId` is malformed (UUID regex) or doesn't match any sidecar, mirroring the scrapbook-mutation route's pattern.
+- [x] Extend `/dev/scrapbook/<site>/<path>` in `packages/studio/src/pages/scrapbook.ts` to accept `?entryId=<uuid>` (UUID-validated). When present, resolve the dir via `scrapbookDirForEntry(...)` and list via `listScrapbookForEntry(...)`. Slug/path fallback preserved. Implemented via `resolveListing` dispatch helper inside `scrapbook.ts`; `renderScrapbookPage` now async, accepts optional `{ entryId }` opts, returns 404/400 via typed `ScrapbookPageError` mapped at the route boundary in `server.ts`.
+- [x] Surface 404 when `entryId` is malformed (UUID regex) or doesn't match any sidecar, mirroring the scrapbook-mutation route's pattern. UUID regex reused from `scrapbook-mutation-envelope.ts#UUID_RE`; malformed → 400, missing sidecar → 404.
 
 ### Task 2: URL builders prefer entry-aware shape
 
-- [ ] `scrapbookViewerUrl(...)` in `packages/studio/src/components/scrapbook-item.ts` accepts an optional `entryId`; when present, append `?entryId=<uuid>`.
-- [ ] Update call sites: `packages/studio/src/pages/review-scrapbook-drawer.ts:169`, `packages/studio/src/pages/dashboard/affordances.ts:71`. Look up entry id (sidecar / calendar) and thread it into the URL builder.
-- [ ] Slug-only fallback preserved for callers without an entry id.
+- [x] `scrapbookViewerUrl(...)` in `packages/studio/src/components/scrapbook-item.ts` accepts an optional `entryId` (added to `ScrapbookAddress` interface); when present, appends `?entryId=<uuid>`. Same `entryId` field added to `scrapbookFileUrl(...)` so the file-fetch URL is entry-aware too.
+- [x] Updated call sites: `review-scrapbook-drawer.ts` threads `entry.id` into `scrapbookViewerUrl({ site, path: slug, entryId })` when the drawer renders for a tracked entry; `dashboard/affordances.ts` threads `entry.uuid` into the same builder for every dashboard row's `scrapbook ↗` link.
+- [x] Slug-only fallback preserved for callers without an entry id (verified by URL-builder regression tests).
 
 ### Task 3: Client URL builders for `/api/dev/scrapbook-file`
 
-- [ ] `plugins/deskwork-studio/public/src/scrapbook-mutations.ts:151,216` — read `ctx.entryId` (already plumbed post-#191) and send `entryId` in the URLSearchParams when present. Falls back to `path: ctx.path` otherwise.
+- [x] `plugins/deskwork-studio/public/src/scrapbook-mutations.ts:151,216` — added `fileFetchParams(ctx, filename)` helper (sibling of the existing `payload()` helper for JSON mutations) that prefers `entryId` when known, falling back to `path: ctx.path`. Both file-fetch sites (renderBody img/text load + enterEditMode raw load) now route through the helper.
 
 ### Task 4: Tests
 
-- [ ] Server-route: list-via-entryId returns items from the entry-aware scrapbook for a non-kebab-case entry; list-via-slug returns slug-template; missing-entry returns 404.
-- [ ] URL-builder: `scrapbookViewerUrl` with an entry argument produces entry-aware URL; without, slug-template.
-- [ ] Live walk: visit the standalone scrapbook viewer for the open-issue-tranche-cleanup PRD entry (non-kebab-case path); confirm contents come from `docs/0.16.0/001-IN-PROGRESS/open-issue-tranche-cleanup/scrapbook/` and not from `docs/open-issue-tranche-cleanup/prd/scrapbook/`.
+- [x] Server-route: list-via-entryId returns items from the entry-aware scrapbook for a non-kebab-case entry; list-via-slug returns slug-template; missing-entry returns 404 (`packages/studio/test/scrapbook-page-entryid.test.ts` — 7 tests covering all branches including malformed-UUID-400, missing-sidecar-404, unknown-site-404, slug-template fallback, empty-entryId fallback).
+- [x] URL-builder: `scrapbookViewerUrl` with an entry argument produces entry-aware URL; without, slug-template (`packages/studio/test/scrapbook-viewer-url.test.ts` — 9 tests covering both `scrapbookViewerUrl` and `scrapbookFileUrl`, including edge cases: empty entryId → fallback, entryId encoding, secret flag preserved in both modes).
+- [ ] Live walk: visit the standalone scrapbook viewer for the open-issue-tranche-cleanup PRD entry (non-kebab-case path); confirm contents come from `docs/0.16.0/001-IN-PROGRESS/open-issue-tranche-cleanup/scrapbook/` and not from `docs/open-issue-tranche-cleanup/prd/scrapbook/`. **Pending operator walk-through.**
 
 **Acceptance Criteria:**
 
-- [ ] No mismatch between scrapbook-write target and scrapbook-read target for entries whose on-disk location doesn't match the slug template.
+- [x] No mismatch between scrapbook-write target and scrapbook-read target for entries whose on-disk location doesn't match the slug template (server-route test pins this invariant).
 - [ ] [#205](https://github.com/audiocontrol-org/deskwork/issues/205) fix-landed comment posted; closure pending v0.16.0 marketplace-walk verification.
-- [ ] Slug-only addressing remains a working fallback (no behavior change for kebab-case-aligned entries).
+- [x] Slug-only addressing remains a working fallback (no behavior change for kebab-case-aligned entries) — pre-existing `dashboard.test.ts` + `api.test.ts` slug-mode assertions still pass; new fallback tests in both new test files lock the back-compat surface.
 
 ## Phase 7 — Fix marginalia edit + delete UX ([#199](https://github.com/audiocontrol-org/deskwork/issues/199))
 

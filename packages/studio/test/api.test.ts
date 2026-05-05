@@ -401,9 +401,11 @@ describe('studio pages', () => {
   it('GET /dev/scrapbook/:site/:slug rejects unknown site', async () => {
     // Site param must be one of the configured sites — otherwise the path
     // resolver would receive an undefined SiteConfig (path traversal vector
-    // and confusing errors for the operator).
+    // and confusing errors for the operator). Post-#205, the page route
+    // surfaces a typed `ScrapbookPageError` and the wrapper translates it
+    // to 404 (matching the rest of the read-side "unknown" responses).
     const r = await getText(app, '/dev/scrapbook/unknown-site/some-slug');
-    expect(r.status).toBe(500);
+    expect(r.status).toBe(404);
   });
 
   it('GET /dev/scrapbook/:site/<deep-path> renders a hierarchical scrapbook', async () => {

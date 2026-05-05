@@ -18,11 +18,16 @@ import {
   formatRelativeTime,
   formatSize,
   listScrapbook,
+  listScrapbookForEntry,
   scrapbookDirAtPath,
+  scrapbookDirForEntry,
   scrapbookFilePathAtDir,
   type ScrapbookItem,
   type ScrapbookItemKind,
+  type ScrapbookSummary,
 } from '@deskwork/core/scrapbook';
+import { readSidecar } from '@deskwork/core/sidecar';
+import { UUID_RE } from '../routes/scrapbook-mutation-envelope.ts';
 import type { StudioContext } from '../routes/api.ts';
 import { html, unsafe, type RawHtml } from './html.ts';
 import { layout } from './layout.ts';
@@ -248,6 +253,27 @@ function readWebpDimensions(buf: Buffer): ImageDimensions | null {
 }
 
 /**
+ * Per-render context for the scrapbook page. Carries a pre-resolved
+ * absolute scrapbook directory (used for filesystem reads in
+ * `computeKindMeta` / `renderPreview`) plus the addressing identifiers
+ * used in URL emission (`site`, `path`, optional `entryId`).
+ *
+ * #205 — the entryId is the load-bearing addition. When present, it
+ * threads into the file-fetch URL via `entryId=` so the read-only
+ * binary endpoint resolves through `scrapbookDirForEntry` (matching
+ * the entry-aware mutation API). When absent, slug-template addressing
+ * (`path=`) is the back-compat fallback.
+ */
+interface RenderCtx {
+  studio: StudioContext;
+  site: string;
+  path: string;
+  entryId?: string;
+  /** Absolute path of the scrapbook directory on disk. */
+  scrapbookDir: string;
+}
+
+/**
  * Compute the per-kind extra meta string shown after the kind chip + size:
  *   md / txt → "{N} lines"
  *   json     → "{N} keys" (root must be a plain object; otherwise empty)
@@ -258,18 +284,20 @@ function readWebpDimensions(buf: Buffer): ImageDimensions | null {
  * renders; other errors propagate to the page renderer.
  */
 function computeKindMeta(
-  ctx: StudioContext,
-  site: string,
-  path: string,
+  rctx: RenderCtx,
   item: ScrapbookItem,
+  opts: { secret?: boolean } = {},
 ): string {
   if (item.kind !== 'md' && item.kind !== 'txt' && item.kind !== 'json' && item.kind !== 'img') {
     return '';
   }
   let buf: Buffer;
   try {
-    const dir = scrapbookDirAtPath(ctx.projectRoot, ctx.config, site, path);
-    const fullPath = scrapbookFilePathAtDir(dir, item.name);
+    const fullPath = scrapbookFilePathAtDir(
+      rctx.scrapbookDir,
+      item.name,
+      opts.secret ? { secret: true } : {},
+    );
     buf = readFileSync(fullPath);
   } catch (e) {
     if (e instanceof Error && 'code' in e && e.code === 'ENOENT') return '';
@@ -286,23 +314,39 @@ function computeKindMeta(
 }
 
 /**
+ * Build the file-fetch URL for the read-only binary endpoint. Prefers
+ * entry-aware addressing when `rctx.entryId` is set (#205); falls back
+ * to slug-template addressing (`path=`) otherwise.
+ */
+function buildFileFetchUrl(
+  rctx: RenderCtx,
+  filename: string,
+  secret: boolean,
+): string {
+  const params = new URLSearchParams({ site: rctx.site, name: filename });
+  if (rctx.entryId !== undefined && rctx.entryId.length > 0) {
+    params.set('entryId', rctx.entryId);
+  } else {
+    params.set('path', rctx.path);
+  }
+  if (secret) params.set('secret', '1');
+  return `/api/dev/scrapbook-file?${params.toString()}`;
+}
+
+/**
  * Server-side preview for the closed-state card. Img → bg-frame URL;
  * md → italic Newsreader excerpt with frontmatter stripped; json → mono
  * pre with parse-then-stringify pretty-print; txt → mono pre raw excerpt.
  * Other / empty / binary-as-text → no preview block.
  */
 function renderPreview(
-  ctx: StudioContext,
-  site: string,
-  path: string,
+  rctx: RenderCtx,
   item: ScrapbookItem,
   opts: { secret?: boolean } = {},
 ): RawHtml {
   const { secret = false } = opts;
   if (item.kind === 'img') {
-    const params = new URLSearchParams({ site, path, name: item.name });
-    if (secret) params.set('secret', '1');
-    const url = `/api/dev/scrapbook-file?${params.toString()}`;
+    const url = buildFileFetchUrl(rctx, item.name, secret);
     return unsafe(html`
       <div class="scrap-preview scrap-preview--img" aria-hidden="true">
         <div class="scrap-preview--img-frame" style="background-image: url(&quot;${url}&quot;);"></div>
@@ -312,9 +356,8 @@ function renderPreview(
     return unsafe('');
   }
   try {
-    const dir = scrapbookDirAtPath(ctx.projectRoot, ctx.config, site, path);
     const fullPath = scrapbookFilePathAtDir(
-      dir,
+      rctx.scrapbookDir,
       item.name,
       secret ? { secret: true } : {},
     );
@@ -452,9 +495,7 @@ function renderAside(
 }
 
 function renderCard(
-  ctx: StudioContext,
-  site: string,
-  path: string,
+  rctx: RenderCtx,
   item: ScrapbookItem,
   index: number,
   opts: { secret?: boolean } = {},
@@ -466,8 +507,8 @@ function renderCard(
   const time = item.mtime
     ? html`<time class="scrap-time" datetime="${item.mtime}">${formatRelativeTime(item.mtime)}</time>`
     : '';
-  const preview = renderPreview(ctx, site, path, item, { secret });
-  const kindMeta = computeKindMeta(ctx, site, path, item);
+  const preview = renderPreview(rctx, item, { secret });
+  const kindMeta = computeKindMeta(rctx, item, { secret });
   const kindMetaHtml: RawHtml = kindMeta
     ? unsafe(html`<span>·</span><span>${kindMeta}</span>`)
     : unsafe('');
@@ -556,13 +597,11 @@ function renderDropZone(): RawHtml {
 }
 
 function renderSecretSection(
-  ctx: StudioContext,
-  site: string,
-  path: string,
+  rctx: RenderCtx,
   secretItems: readonly ScrapbookItem[],
 ): RawHtml {
   if (secretItems.length === 0) return unsafe('');
-  const cards = secretItems.map((item, i) => renderCard(ctx, site, path, item, i, { secret: true }));
+  const cards = secretItems.map((item, i) => renderCard(rctx, item, i, { secret: true }));
   return unsafe(html`
     <section class="scrap-secret" aria-label="secret items">
       <header class="scrap-secret-head">
@@ -606,22 +645,103 @@ function lookupEntryId(
   }
 }
 
-export function renderScrapbookPage(
+/**
+ * Error class surfaced by the page route to translate into HTTP status
+ * codes (`server.ts` maps these onto 400/404 responses).
+ */
+export class ScrapbookPageError extends Error {
+  readonly status: 400 | 404;
+  constructor(message: string, status: 400 | 404) {
+    super(message);
+    this.status = status;
+    this.name = 'ScrapbookPageError';
+  }
+}
+
+/**
+ * #205 — listing + dir-resolution dispatch. Two addressing modes:
+ *
+ *   - Entry-id mode: `entryId` is validated as a UUID, the sidecar is
+ *     read, and the listing resolves via `listScrapbookForEntry` so
+ *     non-kebab-case entries (feature-doc layouts, dotted version
+ *     segments, etc.) read items from the entry's artifact-parent
+ *     `scrapbook/` directory. Symmetric to the entry-aware mutation API.
+ *   - Slug mode: legacy / organizational paths under the site's content
+ *     dir. Resolves via `scrapbookDirAtPath` + `listScrapbook` (the
+ *     pre-#205 behavior).
+ *
+ * Returns the resolved `scrapbookDir` (absolute) plus the listing
+ * summary so the caller threads both through to render helpers.
+ */
+async function resolveListing(
   ctx: StudioContext,
   site: string,
   path: string,
-): string {
+  entryId: string | null,
+): Promise<{ scrapbookDir: string; result: ScrapbookSummary; resolvedEntryId: string | null }> {
+  if (entryId !== null) {
+    if (!UUID_RE.test(entryId)) {
+      throw new ScrapbookPageError(`invalid entryId`, 400);
+    }
+    let entry;
+    try {
+      entry = await readSidecar(ctx.projectRoot, entryId);
+    } catch (e) {
+      // readSidecar throws "sidecar not found" with ENOENT; map to 404.
+      const reason = e instanceof Error ? e.message : String(e);
+      if (/sidecar not found/i.test(reason)) {
+        throw new ScrapbookPageError(reason, 404);
+      }
+      throw e;
+    }
+    const scrapbookDir = scrapbookDirForEntry(
+      ctx.projectRoot,
+      ctx.config,
+      site,
+      { id: entry.uuid, slug: entry.slug },
+    );
+    const result = listScrapbookForEntry(
+      ctx.projectRoot,
+      ctx.config,
+      site,
+      { id: entry.uuid, slug: entry.slug },
+    );
+    return { scrapbookDir, result, resolvedEntryId: entry.uuid };
+  }
+  // Slug-mode: legacy back-compat. listScrapbook returns
+  // { exists: false, items: [] } for missing dirs, so an empty
+  // scrapbook is not an error path. Real errors (slug validation,
+  // scrapbookDir resolution failures, FS permission issues)
+  // propagate to the studio's error handler.
+  const scrapbookDir = scrapbookDirAtPath(ctx.projectRoot, ctx.config, site, path);
+  const result = listScrapbook(ctx.projectRoot, ctx.config, site, path);
+  // Best-effort lookup so the back-link to the review surface still
+  // renders for slug-template entries that happen to match a calendar
+  // entry by slug.
+  const resolvedEntryId = lookupEntryId(ctx, site, path);
+  return { scrapbookDir, result, resolvedEntryId };
+}
+
+export async function renderScrapbookPage(
+  ctx: StudioContext,
+  site: string,
+  path: string,
+  opts: { entryId?: string } = {},
+): Promise<string> {
   // Validate site against the project's configured site list. Without
   // this check, an unknown site key reaches the path resolver and
   // produces either an opaque error or a path traversal vector.
   if (!(site in ctx.config.sites)) {
-    throw new Error(`unknown site: ${site}`);
+    throw new ScrapbookPageError(`unknown site: ${site}`, 404);
   }
-  // listScrapbook returns { exists: false, items: [] } for missing dirs
-  // (packages/core/src/scrapbook.ts:337-339), so an empty scrapbook is not
-  // an error path. Real errors (slug validation, scrapbookDir resolution
-  // failures, FS permission issues) propagate to the studio's error handler.
-  const result = listScrapbook(ctx.projectRoot, ctx.config, site, path);
+  const requestedEntryId =
+    opts.entryId !== undefined && opts.entryId.length > 0 ? opts.entryId : null;
+  const { scrapbookDir, result, resolvedEntryId } = await resolveListing(
+    ctx,
+    site,
+    path,
+    requestedEntryId,
+  );
   const items = result.items;
   const secretItems = result.secretItems;
   const totalSize = items.reduce((s, i) => s + i.size, 0);
@@ -632,10 +752,19 @@ export function renderScrapbookPage(
   }, null);
   const counts = countByKind(items);
   const folderLabel = path.split('/').filter(Boolean).pop() ?? path;
-  const cards = items.map((item, i) => renderCard(ctx, site, path, item, i));
+  // Effective entryId for URL emission: prefer the request-supplied id
+  // (so the client's mutation requests round-trip through the same
+  // addressing mode) and fall back to the slug-mode lookup result.
+  const effectiveEntryId = requestedEntryId ?? resolvedEntryId;
+  const rctx: RenderCtx = effectiveEntryId !== null
+    ? { studio: ctx, site, path, entryId: effectiveEntryId, scrapbookDir }
+    : { studio: ctx, site, path, scrapbookDir };
+  const cards = items.map((item, i) => renderCard(rctx, item, i));
   const cardsHtml = cards.map((c) => c.__raw).join('');
-  const entryId = lookupEntryId(ctx, site, path);
-  const reviewLink = entryId !== null ? `/dev/editorial-review/entry/${entryId}` : null;
+  const reviewLink =
+    effectiveEntryId !== null
+      ? `/dev/editorial-review/entry/${effectiveEntryId}`
+      : null;
   // The data-entry-id attribute is consumed by scrapbook-client.ts —
   // when present, the client sends `entryId` on mutation requests so
   // writes resolve via `scrapbookDirForEntry` (#191). Falls back to
@@ -643,7 +772,10 @@ export function renderScrapbookPage(
   // entryId comes from a UUID lookup — already validated against the
   // calendar's CalendarEntry.id, so no escaping concern beyond the
   // belt-and-braces unsafe wrapping for the conditional attribute.
-  const entryIdAttr = entryId !== null ? unsafe(` data-entry-id="${entryId}"`) : unsafe('');
+  const entryIdAttr =
+    effectiveEntryId !== null
+      ? unsafe(` data-entry-id="${effectiveEntryId}"`)
+      : unsafe('');
   const body = html`
     ${renderEditorialFolio('content', `scrapbook · ${site}/${path}`)}
     <main class="scrap-page" data-site="${site}" data-path="${path}"${entryIdAttr}>
@@ -659,7 +791,7 @@ export function renderScrapbookPage(
           ${unsafe(cardsHtml)}
         </ol>
         ${renderDropZone()}
-        ${renderSecretSection(ctx, site, path, secretItems)}
+        ${renderSecretSection(rctx, secretItems)}
       </section>
     </main>`;
   return layout({

@@ -44,7 +44,7 @@ import { renderShortformReviewPage } from './pages/shortform-review.ts';
 import { renderEntryReviewPage } from './pages/entry-review.ts';
 import { renderShortformPage } from './pages/shortform.ts';
 import { renderHelpPage } from './pages/help.ts';
-import { renderScrapbookPage } from './pages/scrapbook.ts';
+import { renderScrapbookPage, ScrapbookPageError } from './pages/scrapbook.ts';
 import {
   renderContentTopLevel,
   renderContentProject,
@@ -333,13 +333,31 @@ export function createApp(ctx: StudioContext): Hono {
   app.get('/dev/scrapbook/:site/:path{.+}', async (c) => {
     const site = c.req.param('site');
     const path = decodeURIComponent(c.req.param('path'));
+    // #205: when the request carries `?entryId=<uuid>`, resolve the
+    // listing via `scrapbookDirForEntry` (matching the entry-aware
+    // mutation API). Slug-template addressing remains the fallback for
+    // legacy callers and ad-hoc paths.
+    const entryId = c.req.query('entryId');
     const overridden = await runTemplateOverride(ctx, 'scrapbook', [
       ctx,
       site,
       path,
     ]);
     if (overridden !== null) return c.html(overridden);
-    return c.html(renderScrapbookPage(ctx, site, path));
+    try {
+      const html = await renderScrapbookPage(
+        ctx,
+        site,
+        path,
+        entryId !== undefined && entryId.length > 0 ? { entryId } : {},
+      );
+      return c.html(html);
+    } catch (e) {
+      if (e instanceof ScrapbookPageError) {
+        return c.json({ error: e.message }, e.status);
+      }
+      throw e;
+    }
   });
 
   // Read-only binary endpoint for scrapbook files. Used by the

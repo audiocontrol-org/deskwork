@@ -63,6 +63,26 @@ function payload(ctx: Ctx, extra: Record<string, unknown>): Record<string, unkno
   return { ...base, ...extra };
 }
 
+/**
+ * Build the URLSearchParams for `/api/dev/scrapbook-file` requests
+ * (read-only binary endpoint). Same entryId-vs-slug discrimination as
+ * `payload()` for JSON mutations — sends `entryId` when known (#205,
+ * symmetric to #191 mutation paths); falls back to `path=<slug>`.
+ *
+ * The route at `packages/studio/src/routes/scrapbook-file.ts` already
+ * accepts both shapes since v0.15.0 (commit `14ffbe7`); this helper
+ * just makes the client honor the same priority.
+ */
+function fileFetchParams(ctx: Ctx, filename: string): URLSearchParams {
+  const params = new URLSearchParams({ site: ctx.site, name: filename });
+  if (ctx.entryId !== undefined) {
+    params.set('entryId', ctx.entryId);
+  } else {
+    params.set('path', ctx.path);
+  }
+  return params;
+}
+
 const FILENAME_RE = /^[a-zA-Z0-9._-][a-zA-Z0-9._ -]*$/;
 
 export function readCardFilename(card: HTMLElement): string {
@@ -148,7 +168,7 @@ async function renderBody(
   secret: boolean,
 ): Promise<void> {
   target.textContent = '';
-  const params = new URLSearchParams({ site: ctx.site, path: ctx.path, name: filename });
+  const params = fileFetchParams(ctx, filename);
   if (secret) params.set('secret', '1');
   const fileUrl = `/api/dev/scrapbook-file?${params.toString()}`;
   const res = await fetch(fileUrl);
@@ -213,7 +233,7 @@ export async function enterEditMode(ctx: Ctx, card: HTMLElement): Promise<void> 
     card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
-  const params = new URLSearchParams({ site: ctx.site, path: ctx.path, name: filename });
+  const params = fileFetchParams(ctx, filename);
   if (isCardSecret(card)) params.set('secret', '1');
   let raw = '';
   try {

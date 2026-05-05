@@ -156,6 +156,16 @@ export function renderScrapbookDrawer(
   const secretItems = summary?.secretItems ?? [];
   const total = items.length + secretItems.length;
   const loader = makeInlineTextLoader(ctx, site, entry, slug, index);
+  // #205: prefer entry-aware addressing for the "open viewer ↗" link
+  // when this drawer renders for a tracked calendar entry. The standalone
+  // viewer's server route resolves the listing via `scrapbookDirForEntry`
+  // when `entryId` is present, matching the entry-aware mutation API.
+  // Falls back to slug-template addressing when the entry has no id
+  // binding (pre-doctor entries, legacy / organizational paths).
+  const viewerAddress: { site: string; path: string; entryId?: string } =
+    entry !== null && entry.id !== undefined && entry.id !== ''
+      ? { site, path: slug, entryId: entry.id }
+      : { site, path: slug };
 
   return unsafe(html`
     <aside class="er-scrapbook-drawer" data-scrapbook-drawer aria-label="Scrapbook for this entry">
@@ -166,7 +176,7 @@ export function renderScrapbookDrawer(
         <span class="er-scrapbook-drawer-peek" aria-hidden="true">
           ${unsafe(renderPeek(items, secretItems))}
         </span>
-        <a class="er-scrapbook-drawer-open" href="${scrapbookViewerUrl({ site, path: slug })}"
+        <a class="er-scrapbook-drawer-open" href="${scrapbookViewerUrl(viewerAddress)}"
           title="Open the standalone scrapbook viewer"
           onclick="event.stopPropagation()">open viewer ↗</a>
         <button class="er-scrapbook-drawer-toggle" type="button" data-drawer-toggle
