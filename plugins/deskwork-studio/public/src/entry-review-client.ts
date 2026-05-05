@@ -20,6 +20,7 @@ import { createAnnotationsController } from './entry-review/annotations.ts';
 import { createDecisionController } from './entry-review/decision.ts';
 import { createEditModeController } from './entry-review/edit-mode.ts';
 import { initMarginaliaToggle } from './entry-review/marginalia-toggle.ts';
+import { wireMarginaliaPositioning } from './entry-review/marginalia-position.ts';
 import { initOutlineDrawer } from './entry-review/outline-drawer.ts';
 import { initScrapbookDrawerToggle } from './entry-review/scrapbook-drawer.ts';
 import { initShortcuts } from './entry-review/shortcuts.ts';
@@ -171,6 +172,8 @@ function initPressCheckSurface(): void {
     setTimeout(() => { toastEl.hidden = true; }, 4000);
   }
 
+  const marginaliaToggle = initMarginaliaToggle();
+
   const annotations = createAnnotationsController({
     state,
     showToast,
@@ -178,7 +181,17 @@ function initPressCheckSurface(): void {
       draftBody, addBtn, composer, composerQuote, categorySel,
       textArea, sidebarList, sidebarEmpty, sidebar, toastEl,
     },
+    // #188 — adding marginalia is an implicit ask to open the marginalia
+    // drawer. The annotations controller invokes this just before
+    // opening the composer.
+    unstowMarginalia: () => marginaliaToggle.applyState(false),
   });
+
+  // #190 — keep marginalia items vertically aligned with their marks
+  // in the article body. Self-maintaining via MutationObserver +
+  // ResizeObserver; no further wiring required at controller-mutation
+  // sites.
+  wireMarginaliaPositioning(draftBody, sidebarList);
 
   const decision = createDecisionController({
     state,
@@ -215,7 +228,6 @@ function initPressCheckSurface(): void {
     },
   });
 
-  const marginaliaToggle = initMarginaliaToggle();
   const outline = initOutlineDrawer();
   initScrapbookDrawerToggle();
   initScrapbookLightbox(document);

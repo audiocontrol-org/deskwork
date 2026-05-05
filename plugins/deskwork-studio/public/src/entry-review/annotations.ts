@@ -66,6 +66,11 @@ export interface AnnotationsControllerOptions {
   state: EntryReviewState;
   dom: DomHandles;
   showToast: (msg: string, isError?: boolean) => void;
+  /** #188 — adding marginalia is an implicit ask to open the marginalia
+   *  drawer. The composer markup lives INSIDE the drawer, so opening
+   *  the composer while the drawer is stowed produces no visible UI.
+   *  This callback unstows the drawer just before the composer opens. */
+  unstowMarginalia?: () => void;
 }
 
 interface AnnotationsController {
@@ -78,7 +83,7 @@ interface AnnotationsController {
 export function createAnnotationsController(
   opts: AnnotationsControllerOptions,
 ): AnnotationsController {
-  const { state, dom, showToast } = opts;
+  const { state, dom, showToast, unstowMarginalia } = opts;
   const { draftBody, addBtn, composer, composerQuote, categorySel, textArea, sidebarList, sidebarEmpty, sidebar } = dom;
   const entryId = state.entryId;
   const versionNum = state.currentVersion ?? 1;
@@ -144,6 +149,9 @@ export function createAnnotationsController(
       );
       return;
     }
+    // #188 — auto-unstow the marginalia drawer so the composer (which
+    // lives inside it) is visible when the operator clicks Mark.
+    unstowMarginalia?.();
     composerQuote.textContent = extractQuote(draftBody, pendingRange);
     textArea.value = '';
     categorySel.value = 'other';
