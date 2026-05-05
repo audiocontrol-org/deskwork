@@ -176,6 +176,13 @@ export function createAnnotationsController(
       composer.style.left = '0';
       composer.style.right = '0';
       composer.style.top = `${pendingRangePageTop - sidebarPageTop}px`;
+      // The marginalia list (position: relative since #190) is a
+      // later DOM sibling of the composer and so paints on top under
+      // the default auto z-index. Without this lift, the list's
+      // event hit-area covers the composer's Cancel/Submit buttons —
+      // programmatic clicks worked, real mouse clicks routed to the
+      // list. Lifting the composer above the list fixes that.
+      composer.style.zIndex = '2';
     }
     composer.classList.add('er-marginalia-composer--entering');
     void composer.offsetWidth;
@@ -190,6 +197,7 @@ export function createAnnotationsController(
     composer.style.top = '';
     composer.style.left = '';
     composer.style.right = '';
+    composer.style.zIndex = '';
     pendingRange = null;
     pendingRangePageTop = null;
   }
