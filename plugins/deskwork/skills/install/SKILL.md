@@ -98,7 +98,7 @@ If the helper exits non-zero, **do not retry blindly** — read the error, corre
 
 **Skip this step entirely for non-website collections** (no renderer detected in Step 1B). Only Astro's strict zod content-collection schemas reject unknown frontmatter; markdown files in a non-rendered collection have no schema gate to satisfy.
 
-Deskwork binds calendar entries to their content files via a UUID written under a `deskwork:` mapping in each markdown's frontmatter (i.e. `deskwork.id`). Astro content-collection schemas are strict by default and will reject any unknown frontmatter field — including the `deskwork:` namespace. After install, before the first `/deskwork:outline` (or `/deskwork:ingest`) writes a file with frontmatter, confirm that each collection's schema permits the namespace.
+Deskwork binds calendar entries to their content files via a UUID written under a `deskwork:` mapping in each markdown's frontmatter (i.e. `deskwork.id`). Astro content-collection schemas are strict by default and will reject any unknown frontmatter field — including the `deskwork:` namespace. After install, before the first `/deskwork:add` or `/deskwork:ingest` writes a file with frontmatter, confirm that each collection's schema permits the namespace.
 
 Pick one of these patches and apply it to every Astro collection schema (typically `src/content/config.ts` or `src/content.config.ts`):
 

@@ -93,25 +93,25 @@ date: 2026-05-05
 
 ### Task 1: Close moot/superseded
 
-- [ ] Close [#75](https://github.com/audiocontrol-org/deskwork/issues/75) (Publish button removed in Phase 30).
-- [ ] Close [#94](https://github.com/audiocontrol-org/deskwork/issues/94) (Phase 26 umbrella shipped in v0.9.5).
-- [ ] Close [#89](https://github.com/audiocontrol-org/deskwork/issues/89) (mitigated by `repair-install` + upstream-owned residual; comment with reference).
-- [ ] Close [#83](https://github.com/audiocontrol-org/deskwork/issues/83) (superseded by THESIS Consequence 2 — explicit-skill commands replaced auto-commits).
+- [x] Close [#75](https://github.com/audiocontrol-org/deskwork/issues/75) (Publish button removed in Phase 30).
+- [x] Close [#94](https://github.com/audiocontrol-org/deskwork/issues/94) (Phase 26 umbrella shipped in v0.9.5).
+- [x] Close [#89](https://github.com/audiocontrol-org/deskwork/issues/89) (mitigated by `repair-install` + upstream-owned residual; comment with reference).
+- [x] Close [#83](https://github.com/audiocontrol-org/deskwork/issues/83) (superseded by THESIS Consequence 2 — explicit-skill commands replaced auto-commits).
 
 ### Task 2: Reframe before acting
 
-- [ ] Rewrite [#40](https://github.com/audiocontrol-org/deskwork/issues/40) around current `scrapbook/outline.md` reality (likely partially absorbed; verify shipped behavior, then either close or rewrite as a narrower migration/documentation cleanup).
-- [ ] Rewrite [#53](https://github.com/audiocontrol-org/deskwork/issues/53) around the current command surface (drop retired `outline`/`draft` verb names; reproduce the underlying UX gap with current verbs).
+- [x] Rewrite [#40](https://github.com/audiocontrol-org/deskwork/issues/40) around current `scrapbook/outline.md` reality — verified Phase 20 shipped (outline content lives at `<contentDir>/<slug>/scrapbook/outline.md` per the iterate skill; the legacy `outline` subcommand is retired). Closed as completed.
+- [x] Rewrite [#53](https://github.com/audiocontrol-org/deskwork/issues/53) around the current command surface — retired `outline`/`draft` verbs noted; verified the underlying `scaffoldBlogPost` helper has only test callers (no production trigger for the original gap). Title + body updated; closed per the reframed body's recommendation. Bonus install SKILL.md drift (`/deskwork:outline` → `/deskwork:add` or `/deskwork:ingest`) fixed in-line during this sweep.
 
 ### Task 3: External tracker triage
 
-- [ ] Triage [#92](https://github.com/audiocontrol-org/deskwork/issues/92) (Claude Code platform bug — hyphenated namespace dispatch). Either close with upstream reference, or relabel as upstream-tracking if the team wants it visible.
+- [x] Triage [#92](https://github.com/audiocontrol-org/deskwork/issues/92) — relabeled `upstream-tracking`; status comment posted documenting today's intermittent-dispatch evidence and the deskwork-side recovery flow. Left open per the operator's "close vs visible" call.
 
 **Acceptance Criteria:**
 
-- [ ] #75, #94, #89, #83 closed with explanatory comments.
-- [ ] #40 and #53 either closed or reworded; never silently left in the original framing.
-- [ ] #92 disposition recorded.
+- [x] #75, #94, #89, #83 closed with explanatory comments.
+- [x] #40 and #53 either closed or reworded; never silently left in the original framing.
+- [x] #92 disposition recorded.
 
 ## Phase 6 — Tracker audit
 
