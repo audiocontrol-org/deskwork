@@ -58,6 +58,14 @@ Six phases, executed in order. Phases 2 and 3 are the only code-change phases; t
 
 **Approach:** run `gh issue list --state open` post-cleanup, group remaining open issues by implementation strategy (architecture / product features / backlog / external-tracking), update the feature `README.md` with the post-cleanup snapshot. Acceptance: no issue in the open list is in a "verify and close" or "moot" state.
 
+### Phase 7 — Fix marginalia edit + delete UX (#199)
+
+**Deliverable:** an operator can edit or delete a margin-note comment from the studio's marginalia sidebar, not just resolve it. Closes [#199](https://github.com/audiocontrol-org/deskwork/issues/199).
+
+**Why this is in scope:** the operator's framing is *"this is a blocking UX failure — I wouldn't use this product in this way."* Editing margin notes is a fundamental review-loop interaction; the current resolve-or-delete-and-recreate workflow is not a viable path for non-trivial review iterations. This belongs alongside the other dogfood-discovered bug fixes on this branch (#197 ingest, #198 iterate-dispositions), not on the deferred-feature backlog.
+
+**Approach:** extend the entry-keyed annotation model with two new annotation types — `edit-comment` (carries the new text/range) and `delete-comment` (tombstones the original). Server endpoints under `/api/dev/editorial-review/entry/:entryId/comments/:commentId` (PATCH for edit, DELETE for delete) accept the operator's mutation, mint the appropriate annotation, append it via `addEntryAnnotation`. The reader (`listEntryAnnotations`) folds the new types into the rendered comment list — an `edit-comment` replaces the original's text/range; a `delete-comment` filters it out. Client-side affordances on `plugins/deskwork-studio/public/src/entry-review/sidebar-render.ts` (or sibling): inline edit (click-to-edit text + drag-to-resize range) and an explicit delete button distinct from resolve. Append-only journal preserves the audit trail.
+
 ## Acceptance Criteria
 
 - [ ] All Tranche-1 verify-ready issues (#159, #160, #161, #163, #164, #165, #166, #183, #184, #188) closed with marketplace-install verification comments referencing the verifying build.
@@ -67,6 +75,7 @@ Six phases, executed in order. Phases 2 and 3 are the only code-change phases; t
 - [ ] Moot/superseded issues (#75, #94, #89, #83) closed with explanatory comments.
 - [ ] Stale-framing issues #40 and #53 either closed or rewritten around current command surface — never silently left in the original framing.
 - [ ] [#92](https://github.com/audiocontrol-org/deskwork/issues/92) (Claude Code platform bug) disposition recorded (closed-with-reference or relabeled upstream-tracking).
+- [ ] [#199](https://github.com/audiocontrol-org/deskwork/issues/199) (marginalia edit + delete) fix-landed; operator can edit margin-note text/range from the sidebar and delete a comment outright (separate from resolve).
 - [ ] Feature `README.md` status table updated with a post-cleanup snapshot of remaining open issues grouped by implementation strategy.
 
 ## Out of Scope

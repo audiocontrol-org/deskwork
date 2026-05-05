@@ -128,6 +128,44 @@ date: 2026-05-05
 - [ ] No issue in the open list is in a "verify and close" or "moot" state.
 - [ ] Remaining product features (#54, #84, #85, #82, #87, #86) and backlog (#18, #30, #33) are explicitly noted as out-of-scope for this feature.
 
+## Phase 7 — Fix marginalia edit + delete UX ([#199](https://github.com/audiocontrol-org/deskwork/issues/199))
+
+**Deliverable:** operator can edit margin-note text/range from the sidebar and delete a comment outright (separate from resolve). Operator's framing: blocking UX failure on the review loop, not a deferred polish item.
+
+### Task 1: Annotation model — edit + delete types
+
+- [ ] Add `edit-comment` annotation type to `packages/core/src/entry/annotations.ts` (carries `commentId`, new `text`, optional new `range`, optional new `category`/`anchor`).
+- [ ] Add `delete-comment` annotation type (carries `commentId`; tombstones the original).
+- [ ] Update `listEntryAnnotations` (or its rendering caller) to fold edits/deletes into the active comment list: an `edit-comment` replaces the named comment's text/range; a `delete-comment` filters the comment out.
+- [ ] Schema validation: both new types reject unknown commentIds (the comment must exist as a `comment`-typed annotation in the same entry's stream).
+
+### Task 2: Server endpoints
+
+- [ ] `PATCH /api/dev/editorial-review/entry/:entryId/comments/:commentId` — accept `{ text?, range?, category?, anchor? }`; mint an `edit-comment` annotation; append.
+- [ ] `DELETE /api/dev/editorial-review/entry/:entryId/comments/:commentId` — mint a `delete-comment` annotation; append.
+- [ ] Both endpoints validate `entryId` (UUID) + `commentId` (UUID) and surface `404` when the comment doesn't exist.
+- [ ] Wire endpoints in `packages/studio/src/routes/api.ts` alongside the existing annotation routes.
+
+### Task 3: Client UI
+
+- [ ] In `plugins/deskwork-studio/public/src/entry-review/sidebar-render.ts` (or sibling client module), add an "Edit" affordance on each `comment`-card (inline edit-in-place for the comment text; range can come in a follow-up if it's heavier work, but DON'T defer with a "for now" comment — file as a separate sub-issue if range editing has to slip).
+- [ ] Add a "Delete" affordance distinct from "Resolve" (different visual + different confirmation).
+- [ ] Both affordances POST/DELETE to the new endpoints; on success, re-render the sidebar from the updated annotation list.
+- [ ] Mirror the project's affordance-placement rule (`.claude/rules/affordance-placement.md`): the edit + delete affordances live on the comment card itself, not in a toolbar.
+
+### Task 4: Tests
+
+- [ ] Unit tests for the new annotation types' schema + folder logic in `packages/core/test/`.
+- [ ] Server-route tests for the new PATCH + DELETE endpoints in `packages/studio/test/`.
+- [ ] Live walk: edit a comment, save, reload, confirm the edit persisted; delete a comment, confirm it disappears from the sidebar AND the underlying journal carries the delete-annotation tombstone.
+
+**Acceptance Criteria:**
+
+- [ ] An operator can edit a margin-note's text directly from the sidebar (no delete-and-recreate).
+- [ ] An operator can delete a margin-note (tombstones via the journal, doesn't physically remove the original).
+- [ ] [#199](https://github.com/audiocontrol-org/deskwork/issues/199) fix-landed comment posted; closure pending v0.16.0 marketplace-walk verification per `agent-discipline.md`.
+- [ ] Append-only journal preserves the audit trail (every edit + delete is its own annotation, original `comment` annotation is never mutated in place).
+
 ## Out of scope (explicit)
 
 - Implementation of the Tranche 3 product-feature backlog (#54, #84, #85, #82, #87, #86) — those stay open as roadmap items.
