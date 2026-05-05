@@ -3284,3 +3284,28 @@ This section was appended on 2026-05-03 after the implementation audit in `2026-
 - `feature-ship` completed for the reopened arc.
 - PR opened: [#172](https://github.com/audiocontrol-org/deskwork/pull/172)
 - Validation at ship time: `npx tsc --noEmit -p plugins/dw-lifecycle/tsconfig.json` passed; `npm test --workspace plugins/dw-lifecycle` remained blocked only by sandbox-only `tsx` IPC failures in `src/__tests__/cli.test.ts`.
+
+## Phase 10 — Release hardening follow-up
+
+**Deliverable:** `dw-lifecycle doctor` fully covers the rule set still promised by the PRD/design, so the next plugin release does not ship another helper-vs-skill/doc mismatch.
+
+### Task 53: Implement the remaining doctor rules
+
+- [x] Add `version-shape-drift` to detect docs version directories present on disk but absent from `config.docs.knownVersions`.
+- [x] Add `orphan-feature-doc` to detect in-progress feature directories missing `workplan.md`.
+- [x] Add `stale-issue` to detect in-progress features whose parent issue is already closed.
+- [x] Add `journal-feature-mismatch` to detect configured journal feature headings whose slug has no matching feature doc directory.
+
+**Acceptance Criteria:**
+- [x] The helper implements the full initial doctor rule set still described in `design.md`.
+- [x] The remaining release-readiness concern from `2026-05-03-prd-conformance-audit.md` is closed in code.
+
+### Task 54: Realign tests and shipped skill prose with the completed doctor helper
+
+- [x] Expand `src/__tests__/doctor.test.ts` to cover the new rule set with real filesystem fixtures and injected issue-state checks.
+- [x] Update `plugins/dw-lifecycle/skills/doctor/SKILL.md` so it lists the full set of shipped rules instead of describing them as backlog.
+- [x] Update the feature README to record the release-hardening follow-up and remove the stale "PR is open" statement.
+
+**Acceptance Criteria:**
+- [x] The tests and shipped skill prose describe the same `doctor` behavior the helper actually implements.
+- [x] The feature docs accurately reflect the merged state of PR [#172](https://github.com/audiocontrol-org/deskwork/pull/172).

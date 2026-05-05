@@ -23,6 +23,7 @@ Project lifecycle orchestration plugin for Claude Code. Composes `superpowers` (
 | 7 | Post-ship bug fixes (`setup` / `define` / install-path follow-up) | Complete |
 | 8 | Customize hooks / tailoring seam | Complete |
 | 9 | PRD conformance hardening (audit-driven remediation) | Complete |
+| 10 | Release hardening (`doctor` rule completion) | Complete |
 
 ## Key Links
 
@@ -55,9 +56,9 @@ Verification at landing: 63/63 vitest tests pass, tsc clean, plugin manifest val
 
 ## Current status
 
-The reopened remediation arc is complete. The follow-up audit now finds the feature substantially aligned with its PRD/design, and the remaining items are narrow hardening or deferred portability backlog rather than blockers for this feature.
+The reopened remediation arc and its release-hardening follow-up are complete. The remaining items are narrow hardening or deferred portability backlog rather than blockers for the next `dw-lifecycle` plugin release.
 
-Merge prep is complete and PR [#172](https://github.com/audiocontrol-org/deskwork/pull/172) is open against `main`.
+PR [#172](https://github.com/audiocontrol-org/deskwork/pull/172) is merged.
 
 ## Open follow-ups (non-blockers)
 
