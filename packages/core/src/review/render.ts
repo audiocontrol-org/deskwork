@@ -25,6 +25,19 @@ import { parseFrontmatter } from '../frontmatter.ts';
 import remarkImageFigure from '../remark-image-figure.mjs';
 // @ts-expect-error — JS module without a .d.ts; the plugin is plain mdast traversal.
 import remarkStripFirstH1 from '../remark-strip-first-h1.mjs';
+// @ts-expect-error — JS module without a .d.ts; the plugin is a plain hast visitor.
+import rehypeRewriteScrapbookImages from '../rehype-rewrite-scrapbook-images.mjs';
+
+/** Optional rendering context. When the renderer is invoked from a
+ *  surface that has an entry binding (e.g. the studio's review surface),
+ *  pass `{ entryId, site }` to enable rewriting of relative
+ *  `./scrapbook/<file>` image URLs to the absolute scrapbook-file route
+ *  URL the studio serves. Other surfaces leave relative URLs alone so
+ *  the markdown source stays portable across renderers. */
+export interface RenderOptions {
+  readonly entryId?: string;
+  readonly site?: string;
+}
 
 export interface ParsedDraft {
   /** Frontmatter values. Values are whatever YAML parses them to. */
@@ -40,19 +53,36 @@ export function parseDraftFrontmatter(markdown: string): ParsedDraft {
 }
 
 /** Render a markdown string as HTML. */
-export async function renderMarkdownToHtml(markdown: string): Promise<string> {
+export async function renderMarkdownToHtml(
+  markdown: string,
+  options: RenderOptions = {},
+): Promise<string> {
   // remark-gfm adds GitHub Flavored Markdown — tables, strikethrough,
   // task lists, footnotes, autolinks. Operator-authored content
   // routinely uses tables (audit docs, comparison matrices); without
   // gfm those rendered as raw `| col | col |` text on the review
   // surface.
-  const result = await unified()
+  // Studio-surface scrapbook URL rewrite — only fires when both
+  // `entryId` and `site` are provided. The markdown source is expected
+  // to use portable relative URLs like `./scrapbook/<file>`; the
+  // rewrite produces the absolute scrapbook-file route URL that the
+  // studio serves at runtime. Other call sites (published-site
+  // rendering, tests with no entry binding) leave the relative URLs
+  // alone so the markdown stays renderable in GitHub / VS Code / any
+  // other markdown viewer.
+  const studioRewrite =
+    options.entryId && options.site
+      ? { entryId: options.entryId, site: options.site }
+      : null;
+  const base = unified()
     .use(remarkParse)
     .use(remarkGfm)
     .use(remarkStripFirstH1)
     .use(remarkImageFigure)
-    .use(remarkRehype)
-    .use(rehypeStringify)
-    .process(markdown);
+    .use(remarkRehype);
+  const withRewrite = studioRewrite
+    ? base.use(rehypeRewriteScrapbookImages, studioRewrite)
+    : base;
+  const result = await withRewrite.use(rehypeStringify).process(markdown);
   return String(result);
 }

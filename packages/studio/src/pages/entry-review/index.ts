@@ -86,12 +86,15 @@ function stringField(v: unknown): string | undefined {
  * contentKind switch — the entry-keyed surface is always longform-shaped
  * (shortform stays on its own retirement track).
  */
-async function prepareRender(markdown: string): Promise<PreparedRender> {
+async function prepareRender(
+  markdown: string,
+  renderCtx: { entryId: string; site: string },
+): Promise<PreparedRender> {
   const parsed = parseDraftFrontmatter(markdown);
   const fm = parsed.frontmatter;
 
   const split = splitOutline(parsed.body);
-  const bodyHtml = await renderMarkdownToHtml(split.body);
+  const bodyHtml = await renderMarkdownToHtml(split.body, renderCtx);
 
   // Inject the description as a dek after the body's first <h1>.
   const description = stringField(fm.description);
@@ -105,7 +108,7 @@ async function prepareRender(markdown: string): Promise<PreparedRender> {
       : dekHtml + bodyHtml;
 
   const outlineHtml = split.outline
-    ? await renderMarkdownToHtml(split.outline)
+    ? await renderMarkdownToHtml(split.outline, renderCtx)
     : '';
 
   return { fm, bodyHtml: renderedHtml, outlineHtml };
@@ -188,7 +191,10 @@ export async function renderEntryReviewPage(
     return { status: 404, html: renderEntryNotFound(entryId, reason) };
   }
 
-  const { fm, bodyHtml, outlineHtml } = await prepareRender(data.markdown);
+  const { fm, bodyHtml, outlineHtml } = await prepareRender(data.markdown, {
+    entryId: data.entry.uuid,
+    site: data.site,
+  });
   const affordances = getAffordances(data.entry);
   const state = buildState(data);
   const titleField = stringField(fm.title) ?? `Draft: ${data.entry.slug}`;

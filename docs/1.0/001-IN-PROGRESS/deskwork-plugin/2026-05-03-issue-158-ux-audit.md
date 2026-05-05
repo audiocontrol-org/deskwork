@@ -23,7 +23,7 @@ It is structured per child issue (#177 / #178 / #179 / #180) so a remediation en
 - Studio booted via `deskwork-studio --project-root /Users/orion/work/deskwork-work/deskwork-plugin` against this monorepo's `.deskwork/` (one site: `deskwork-internal`).
 - Browser viewport pinned to `1512×860` (matches the operator's screenshots in #158).
 - Per surface: `getComputedStyle()` on `main` / `.er-container` / `.er-pagehead` / typography elements; `getBoundingClientRect()` for x-positions and widths; full-page screenshots captured at the same viewport.
-- Screenshots saved to `2026-05-03-issue-158-screenshots/`.
+- Screenshots saved to the entry's scrapbook (`scrapbook/` adjacent to this file). Inline embeds use portable relative URLs (`./scrapbook/<filename>`) — these render correctly in any markdown viewer (GitHub, VS Code, IDE preview). The studio's review surface rewrites them at HTML-emit time to absolute scrapbook-file route URLs (`/api/dev/scrapbook-file?site=…&entryId=…&name=…`) so they also render against the served HTML page; that rewrite is invisible to the markdown source.
 
 ## Surface inventory at a glance
 
@@ -37,6 +37,34 @@ It is structured per child issue (#177 / #178 / #179 / #180) so a remediation en
 | `/dev/scrapbook/<site>/<path>` (baseline) | Content | (aside) "release-skill-design" | 25.6px | n/a (uses `.scrap-aside-title`) | n/a | 1248 / 132 (`scrap-page` grid: 272+880) | paper-grain |
 
 Five active pagehead shapes; one outlier surface (manual) that doesn't consume the shared container at all.
+
+### Each surface, captured
+
+The full-page screenshots below were captured at viewport `1512×860` against the dev studio when this audit was written. They sit alongside the inventory table so the reader can see what each surface actually looks like, not just read the measurements.
+
+**`/dev/` — Index** (centered TOC, h1 "Editorial Studio"):
+
+![Index page at 1512×860](./scrapbook/02-dev-index-1512.png)
+
+**`/dev/editorial-studio` — Dashboard** ("Press-Check"; pagehead extends edge-to-edge as a full-viewport band; left column holds stage sections, right column was empty at audit time):
+
+![Dashboard at 1512×860](./scrapbook/01-dev-editorial-studio-1512.png)
+
+**`/dev/content` — Content view** (the outlier — h1 "A shape of the work." at 41.6 px in a `--split --compact` pagehead; right pane is a literal blank olive-tinted block):
+
+![Content view at 1512×860](./scrapbook/03-dev-content-1512.png)
+
+**`/dev/editorial-review-shortform` — Compositor's Desk** (chrome consistent with Dashboard; bare body is the empty state, not a layout defect):
+
+![Compositor's desk at 1512×860](./scrapbook/04-dev-shortform-1512.png)
+
+**`/dev/editorial-help` — Compositor's Manual** (the manual's bespoke `eh-cover` system: 944 px container at `x=284`, transparent body bg, 70.4 px h1 — visibly a different application):
+
+![Compositor's manual at 1512×860](./scrapbook/05-dev-help-manual-1512.png)
+
+**`/dev/scrapbook/<site>/<path>` — Scrapbook viewer (the design baseline)** (post-Phase-33 redesign; aside-LEFT 272 px + main 880 px in `.scrap-page` grid; this is the visual vocabulary the rest of the studio should converge toward):
+
+![Scrapbook baseline at 1512×860](./scrapbook/06-dev-scrapbook-baseline-1512.png)
 
 ---
 
@@ -176,7 +204,7 @@ Visible at `1512×860`:
 
 - Left pane: `.site-card` for `deskwork-internal` showing 3 root entries (`1.0`, `Source-shipped...`, `superpowers`), at `x=189, w≈540`.
 - Right pane: a large olive-tinted block at approximately `x=730, y=300, w≈680, h≈360`. **It contains nothing.** No header, no message, no instruction. Just a color block.
-- See `2026-05-03-issue-158-screenshots/03-dev-content-1512.png`.
+- See `scrapbook/03-dev-content-1512.png`.
 
 The right pane appears to be a placeholder for a drilldown / detail view that is meant to populate when a node is clicked. In its empty state it has no affordance, no copy ("Click any node to read its head matter…"), no explanatory headline. The operator's framing — *"a split screen layout that doesn't appear to be FOR anything"* — is exactly correct. The split is not signaled, not justified by the empty-state rendering, and not visually anchored to anything the operator would expect to land in it.
 
@@ -368,16 +396,39 @@ If all five rows pass `mainW===1248`, `h1Size===88` (or have a documented except
 
 ---
 
+## Post-fix state (added v3, 2026-05-04)
+
+Several of this audit's findings have shipped fixes since v1 was written. Captures below show the current state so the reader can see what landed without flipping between branches.
+
+**Dashboard right column filled (closes #158's right-pane gap).** The `.er-layout` grid's previously-empty second column now hosts an editorial-chrome press-queue panel — sticky, paper-grain, Fraunces title with red-pencil accent. Empty-state ※ ornament when nothing is in review:
+
+![Dashboard with press-queue at 1512×860](./scrapbook/09-dashboard-with-press-queue-1512.png)
+
+**GFM tables now render as styled HTML tables on the review surface.** Pre-fix, this audit's surface-inventory table rendered as raw `| col | col |` text because `renderMarkdownToHtml` lacked `remark-gfm`. Post-fix, the same table renders with editorial chrome (JetBrains Mono uppercase headers on a paper-2 band; Newsreader cells; `<code>` chips with `white-space: nowrap` so multi-token classnames stay on one line):
+
+![Tables rendered with editorial chrome](./scrapbook/17-tables-final.png)
+
+**Stowing marginalia widens the article column (closes #187).** Pre-fix, hitting Shift+M / the pull tab moved the article body to center but didn't grant more horizontal real estate. Post-fix, `.essay`'s `max-width` relaxes from 42rem to 64rem when stowed, and tables get visibly more room (6 of 8 columns visible without horizontal scroll):
+
+![Stowed marginalia, widened article column](./scrapbook/19-tables-final-stowed.png)
+
+What's still outstanding from the original audit's remediation order: pagehead consolidation (#178 — 5 active variants need to collapse to a canonical shape), manual unification (#180 — `eh-` namespace still parallel to `er-`), content-view redesign (#179 — kicker, scrapbook-vocabulary port, justify-or-collapse the right pane). Those are the next tranche.
+
+---
+
 ## Appendix — Screenshots
 
 All captured at `1512×860` against this monorepo's `.deskwork/` (one site: `deskwork-internal`).
 
-- `2026-05-03-issue-158-screenshots/02-dev-index-1512.png` — `/dev/`
-- `2026-05-03-issue-158-screenshots/01-dev-editorial-studio-1512.png` — `/dev/editorial-studio`
-- `2026-05-03-issue-158-screenshots/03-dev-content-1512.png` — `/dev/content`
-- `2026-05-03-issue-158-screenshots/04-dev-shortform-1512.png` — `/dev/editorial-review-shortform`
-- `2026-05-03-issue-158-screenshots/05-dev-help-manual-1512.png` — `/dev/editorial-help`
-- `2026-05-03-issue-158-screenshots/06-dev-scrapbook-baseline-1512.png` — `/dev/scrapbook/deskwork-internal/release-skill-design` (design baseline)
+- `scrapbook/02-dev-index-1512.png` — `/dev/`
+- `scrapbook/01-dev-editorial-studio-1512.png` — `/dev/editorial-studio`
+- `scrapbook/03-dev-content-1512.png` — `/dev/content`
+- `scrapbook/04-dev-shortform-1512.png` — `/dev/editorial-review-shortform`
+- `scrapbook/05-dev-help-manual-1512.png` — `/dev/editorial-help`
+- `scrapbook/06-dev-scrapbook-baseline-1512.png` — `/dev/scrapbook/deskwork-internal/release-skill-design` (design baseline)
+- `scrapbook/09-dashboard-with-press-queue-1512.png` — dashboard with press-queue right column (post-fix)
+- `scrapbook/17-tables-final.png` — review surface tables rendered with editorial chrome (post-GFM fix)
+- `scrapbook/19-tables-final-stowed.png` — review surface with marginalia stowed and article widened (post-#187 fix)
 
 ## Appendix — Key file paths for the remediation engineer
 
