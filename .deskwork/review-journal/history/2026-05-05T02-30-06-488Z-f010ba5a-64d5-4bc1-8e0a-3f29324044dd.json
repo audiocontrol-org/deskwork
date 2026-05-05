@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-05T02:30:06.488Z",
+  "entryId": "36a268a4-c7ac-4802-8992-20319a08fa92",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "36a268a4-c7ac-4802-8992-20319a08fa92",
+    "version": 5,
+    "range": {
+      "start": 6292,
+      "end": 6384
+    },
+    "text": "This has since been fixed.",
+    "category": "other",
+    "anchor": "#178 — Index and dashboard both render \"Editorial Studio\" heading; confusing function signal",
+    "id": "e4a56927-f770-4230-92e3-03cb5bc0fb0f",
+    "createdAt": "2026-05-05T02:30:06.488Z"
+  }
+}

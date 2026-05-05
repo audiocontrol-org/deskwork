@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-05T02:28:19.658Z",
+  "entryId": "36a268a4-c7ac-4802-8992-20319a08fa92",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "36a268a4-c7ac-4802-8992-20319a08fa92",
+    "version": 5,
+    "range": {
+      "start": 0,
+      "end": 8
+    },
+    "text": "ffff",
+    "category": "other",
+    "anchor": "Operator",
+    "id": "ad97b404-0013-486a-91d2-0e92e5a0fa29",
+    "createdAt": "2026-05-05T02:28:19.658Z"
+  }
+}
