@@ -99,6 +99,60 @@ describe('comment card affordances (Phase 35 / issue #199)', () => {
     );
   });
 
+  // Phase 7 / issue #204 — category-edit dropdown lives inside the
+  // inline edit form ON the comment card (per affordance-placement.md
+  // — component-attached, not toolbar-attached).
+  it('renders a category <select> inside the inline edit form', () => {
+    const ts = readFileSync(COMMENT_EDIT_DELETE_PATH, 'utf8');
+    expect(ts).toMatch(/createElement\(['"]select['"]\)/);
+    expect(ts).toMatch(/categorySel\.dataset\.action\s*=\s*['"]edit-category['"]/);
+    expect(ts).toMatch(/er-marginalia-edit-category/);
+  });
+
+  it('appends the category <select> into the same edit form as the textarea', () => {
+    const ts = readFileSync(COMMENT_EDIT_DELETE_PATH, 'utf8');
+    // The dropdown is inside the form (component-attached), not in
+    // a sibling toolbar. Both controls land on `form` directly.
+    expect(ts).toMatch(/form\.appendChild\(categorySel\)/);
+    expect(ts).toMatch(/form\.appendChild\(ta\)/);
+  });
+
+  it('exports the canonical category value list mirroring the schema', () => {
+    const ts = readFileSync(COMMENT_EDIT_DELETE_PATH, 'utf8');
+    expect(ts).toMatch(/ANNOTATION_CATEGORIES/);
+    // All seven schema enum values are present in the source.
+    const required = [
+      'other',
+      'voice-drift',
+      'missing-receipt',
+      'tutorial-framing',
+      'saas-vocabulary',
+      'fake-authority',
+      'structural',
+    ];
+    for (const v of required) {
+      expect(ts).toContain(`'${v}'`);
+    }
+  });
+
+  it('CSS defines the edit-mode category dropdown style', () => {
+    const css = readFileSync(CSS_PATH, 'utf8');
+    expect(css).toMatch(/\.er-marginalia-edit-category\b/);
+  });
+
+  it('save handler sends a minimised patch (only changed fields)', () => {
+    const ts = readFileSync(COMMENT_EDIT_DELETE_PATH, 'utf8');
+    // The diff-and-PATCH-only-deltas path is what makes the new-no-op
+    // and category-only-and-text-only branches possible.
+    expect(ts).toMatch(/EditCommentPatch/);
+    expect(ts).toMatch(/if\s*\(\s*next\s*!==\s*initialText\s*\)/);
+    expect(ts).toMatch(/if\s*\(\s*nextCat\s*!==\s*initialCat\s*\)/);
+    // No-op short-circuit (no PATCH on no-change).
+    expect(ts).toMatch(
+      /patch\.text\s*===\s*undefined\s*&&\s*patch\.category\s*===\s*undefined/,
+    );
+  });
+
   it('does NOT introduce an Edit/Delete control in any toolbar', () => {
     // Affordance-placement.md: per-component affordances live ON the
     // component. We assert the new actions are NOT created in any of
@@ -124,6 +178,7 @@ describe('comment card affordances (Phase 35 / issue #199)', () => {
       // files.
       expect(src).not.toMatch(/data-action="edit-comment"/);
       expect(src).not.toMatch(/data-action="delete-comment"/);
+      expect(src).not.toMatch(/data-action="edit-category"/);
     }
   });
 });

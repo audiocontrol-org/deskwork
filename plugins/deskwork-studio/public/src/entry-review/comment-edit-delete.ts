@@ -8,17 +8,19 @@
  * toolbar-attached). Both round-trip the new endpoints under
  * `/api/dev/editorial-review/entry/:entryId/comments/:commentId`.
  *
- * Edit:    PATCH the endpoint with { text } once the operator hits
- *          Save; controller re-renders the card from the returned
- *          (folded) view.
+ * Edit:    PATCH the endpoint with { text?, category? } once the
+ *          operator hits Save; payload is minimised to only the fields
+ *          that actually changed (no-op edits don't fire a network
+ *          round-trip at all). Range / anchor edits remain server-side
+ *          only — see #203 (range-edit wontfix) and the schema's
+ *          defense-in-depth acceptance of those fields.
  * Delete:  DELETE the endpoint after an inline confirm. Controller
  *          removes the card from the live sidebar; the original
  *          `comment` annotation stays on disk as audit trail.
  *
- * Range / category / anchor edits are NOT exposed in this iteration —
- * those need richer interaction (drag-to-resize, category dropdown
- * inline) and are tracked separately. The PATCH endpoint accepts
- * those fields for future use; this module only wires text-edit.
+ * Phase 7 extension (issue #204): the inline edit form now exposes a
+ * category dropdown alongside the text textarea so the operator can
+ * re-categorise without delete-and-recreate.
  */
 
 import { inlineConfirm } from './inline-prompt.ts';
@@ -26,11 +28,36 @@ import type { CommentAnnotation } from './state.ts';
 
 const ENTRY_API = '/api/dev/editorial-review/entry';
 
+/**
+ * Annotation categories the comment composer + edit dropdown expose.
+ * Mirrors the server schema's `AnnotationCategoryEnum`
+ * (`packages/core/src/schema/draft-annotation.ts`) and the composer
+ * `<select>` rendered server-side in
+ * `packages/studio/src/pages/entry-review/marginalia.ts`. Keep the
+ * three in lockstep — the composer is the visual canon (`other` first,
+ * the rest in disclosure order).
+ */
+export const ANNOTATION_CATEGORIES: readonly string[] = [
+  'other',
+  'voice-drift',
+  'missing-receipt',
+  'tutorial-framing',
+  'saas-vocabulary',
+  'fake-authority',
+  'structural',
+];
+
+/** Editable subset of an `edit-comment` payload from the client. */
+export interface EditCommentPatch {
+  text?: string;
+  category?: string;
+}
+
 interface CommentEditApi {
-  /** Persist a text edit. Returns the minted edit-comment annotation
-   *  (with id + createdAt) on success, or null on failure (toast was
-   *  shown). */
-  saveEdit: (commentId: string, text: string) => Promise<boolean>;
+  /** Persist an edit. Empty `patch` is a no-op (returns true without
+   *  hitting the network). Returns true on success / no-op, or false
+   *  on failure (toast was shown). */
+  saveEdit: (commentId: string, patch: EditCommentPatch) => Promise<boolean>;
   /** Persist a delete. Returns true on success. */
   deleteComment: (commentId: string) => Promise<boolean>;
   /** Persist a resolve / re-open. Returns true on success. */
@@ -46,12 +73,23 @@ export function createCommentEditApi(
   const annotateUrl = (): string =>
     `${ENTRY_API}/${encodeURIComponent(entryId)}/annotate`;
 
-  async function saveEdit(commentId: string, text: string): Promise<boolean> {
+  async function saveEdit(
+    commentId: string,
+    patch: EditCommentPatch,
+  ): Promise<boolean> {
+    // No-op: nothing to send. Treat as success so the caller exits
+    // edit mode cleanly without a wasted server round-trip.
+    if (patch.text === undefined && patch.category === undefined) {
+      return true;
+    }
+    const payload: EditCommentPatch = {};
+    if (patch.text !== undefined) payload.text = patch.text;
+    if (patch.category !== undefined) payload.category = patch.category;
     try {
       const res = await fetch(commentUrl(commentId), {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const body: unknown = await res.json().catch(() => ({}));
@@ -127,20 +165,22 @@ export interface EnterEditModeArgs {
   noteEl: HTMLElement;
   /** Initial text (the un-edited value the textarea opens with). */
   initialText: string;
+  /** Initial category (drives the pre-selected dropdown option).
+   *  Comments minted before category was a required composer field
+   *  may have undefined here; the dropdown defaults to `other`. */
+  initialCategory?: string;
   /** Called when the operator clicks Save (or Cmd/Ctrl-Enters) with
-   *  the trimmed new text. */
-  onSave: (newText: string) => Promise<void>;
+   *  the diff payload. Empty patch indicates no change. */
+  onSave: (patch: EditCommentPatch) => Promise<void>;
 }
 
 /**
  * Replace the text paragraph inside a comment card with an inline
- * textarea + Save/Cancel buttons. Cmd/Ctrl-Enter saves; Esc cancels.
- *
- * Returns a function that exits edit mode without saving (used by the
- * Cancel button and the keyboard handler).
+ * textarea + category dropdown + Save/Cancel buttons. Cmd/Ctrl-Enter
+ * saves; Esc cancels.
  */
 export function enterEditMode(args: EnterEditModeArgs): void {
-  const { noteEl, initialText, onSave } = args;
+  const { noteEl, initialText, initialCategory, onSave } = args;
   // If a previous edit-mode is open in this card, bail — no stacking.
   const card = noteEl.parentElement;
   if (!card) return;
@@ -149,6 +189,23 @@ export function enterEditMode(args: EnterEditModeArgs): void {
   const form = document.createElement('div');
   form.className = 'er-marginalia-edit';
   form.dataset.commentEditForm = 'true';
+
+  // Category dropdown — Phase 7 / issue #204. Pinned ABOVE the
+  // textarea so the picker is visually adjacent to the existing
+  // category-pill at the top of the card (the operator's eye is
+  // already there when they decide to re-categorise).
+  const categorySel = document.createElement('select');
+  categorySel.className = 'er-marginalia-edit-category';
+  categorySel.dataset.action = 'edit-category';
+  categorySel.setAttribute('aria-label', 'Comment category');
+  const initialCat = normaliseCategory(initialCategory);
+  for (const value of ANNOTATION_CATEGORIES) {
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = value;
+    if (value === initialCat) opt.selected = true;
+    categorySel.appendChild(opt);
+  }
 
   const ta = document.createElement('textarea');
   ta.className = 'er-marginalia-edit-textarea';
@@ -170,6 +227,7 @@ export function enterEditMode(args: EnterEditModeArgs): void {
 
   actions.appendChild(cancel);
   actions.appendChild(save);
+  form.appendChild(categorySel);
   form.appendChild(ta);
   form.appendChild(actions);
 
@@ -186,14 +244,19 @@ export function enterEditMode(args: EnterEditModeArgs): void {
   async function commit(): Promise<void> {
     const next = ta.value.trim();
     if (!next) return;
-    if (next === initialText) {
+    const nextCat = categorySel.value;
+    const patch: EditCommentPatch = {};
+    if (next !== initialText) patch.text = next;
+    if (nextCat !== initialCat) patch.category = nextCat;
+    if (patch.text === undefined && patch.category === undefined) {
+      // No-op edit — exit cleanly without a network round-trip.
       exit();
       return;
     }
     save.disabled = true;
     cancel.disabled = true;
     try {
-      await onSave(next);
+      await onSave(patch);
     } finally {
       save.disabled = false;
       cancel.disabled = false;
@@ -254,21 +317,56 @@ function truncate(s: string, n: number): string {
 }
 
 /**
+ * Coerce an arbitrary string (or undefined) into one of the known
+ * categories. Unknown values fall back to `other` — same shape as the
+ * server-rendered composer's default.
+ */
+function normaliseCategory(value: string | undefined): string {
+  if (!value) return 'other';
+  return ANNOTATION_CATEGORIES.includes(value) ? value : 'other';
+}
+
+export interface ApplyEditPatchToCardArgs {
+  /** New comment text — undefined means "leave unchanged". */
+  text?: string;
+  /** New category — undefined means "leave unchanged". The card's
+   *  category pill is rendered as `cat.textContent`; we replace its
+   *  trailing token (after the last ` · `) so the version-prefix /
+   *  rebased-prefix is preserved. */
+  category?: string;
+}
+
+/**
  * Annotate a comment card by mutating its DOM in place after a
  * successful edit. Used by the controller after the PATCH round-trip
- * lands so we don't need a full sidebar re-render for a single text
- * change.
+ * lands so we don't need a full sidebar re-render for a single edit.
  */
-export function applyEditedTextToCard(
+export function applyEditPatchToCard(
   card: HTMLElement,
-  newText: string,
+  patch: ApplyEditPatchToCardArgs,
 ): void {
-  const note = card.querySelector<HTMLElement>('p.note');
-  if (!note) return;
-  note.textContent = newText;
-  note.hidden = false;
+  if (patch.text !== undefined) {
+    const note = card.querySelector<HTMLElement>('p.note');
+    if (note) {
+      note.textContent = patch.text;
+      note.hidden = false;
+    }
+  }
+  if (patch.category !== undefined) {
+    const cat = card.querySelector<HTMLElement>('.cat');
+    if (cat) {
+      const current = cat.textContent ?? '';
+      const sep = ' · ';
+      const idx = current.lastIndexOf(sep);
+      cat.textContent = idx >= 0
+        ? `${current.slice(0, idx + sep.length)}${patch.category}`
+        : patch.category;
+    }
+  }
   const form = card.querySelector<HTMLElement>('[data-comment-edit-form]');
   if (form) form.remove();
+  const note = card.querySelector<HTMLElement>('p.note');
+  if (note) note.hidden = false;
 }
 
 export interface EditDeleteHandlerDeps {
@@ -310,13 +408,15 @@ export function createEditDeleteHandlers(
       enterEditMode({
         noteEl,
         initialText: a.text,
-        onSave: async (next) => {
-          const ok = await deps.api.saveEdit(a.id, next);
+        ...(a.category !== undefined ? { initialCategory: a.category } : {}),
+        onSave: async (patch) => {
+          const ok = await deps.api.saveEdit(a.id, patch);
           if (!ok) return;
           // Mutate the in-memory annotation so a subsequent edit
-          // reads from the new value.
-          a.text = next;
-          applyEditedTextToCard(card, next);
+          // reads from the new values.
+          if (patch.text !== undefined) a.text = patch.text;
+          if (patch.category !== undefined) a.category = patch.category;
+          applyEditPatchToCard(card, patch);
           deps.showToast('Comment updated');
         },
       });

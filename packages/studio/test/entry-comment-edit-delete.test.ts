@@ -313,6 +313,75 @@ describe('PATCH /api/dev/editorial-review/entry/:entryId/comments/:commentId', (
     expect(status).toBe(400);
     expect(asObj(body).error).toMatch(/range/i);
   });
+
+  // Phase 7 / issue #204 — category-only edit. Mirrors the text-only
+  // and range-only cases above. The folded read should reflect the
+  // new category while preserving the original text + range.
+  it('accepts a category-only payload and the folded read reflects the new category', async () => {
+    const app = createApp({ projectRoot, config: cfg });
+    const commentId = await seedComment(app, 'leave-as-is');
+    const { status, body } = await patchJson(
+      app,
+      `/api/dev/editorial-review/entry/${ENTRY_UUID}/comments/${commentId}`,
+      { category: 'voice-drift' },
+    );
+    expect(status).toBe(200);
+    const ann = asObj(asObj(body).annotation);
+    expect(ann.type).toBe('edit-comment');
+    expect(ann.commentId).toBe(commentId);
+    expect(ann.category).toBe('voice-drift');
+    // text/range should not be on the edit-comment payload (no edit
+    // for those fields was sent).
+    expect(ann.text).toBeUndefined();
+    expect(ann.range).toBeUndefined();
+
+    const list = await getJson(
+      app,
+      `/api/dev/editorial-review/entry/${ENTRY_UUID}/annotations`,
+    );
+    const annotations = asObj(list.body).annotations;
+    if (!Array.isArray(annotations)) throw new Error('expected array');
+    expect(annotations).toHaveLength(1);
+    const c = asObj(annotations[0]);
+    expect(c.type).toBe('comment');
+    expect(c.text).toBe('leave-as-is');
+    expect(c.range).toEqual({ start: 0, end: 5 });
+    expect(c.category).toBe('voice-drift');
+  });
+
+  it('accepts a combined text + category payload and the folded read reflects both', async () => {
+    const app = createApp({ projectRoot, config: cfg });
+    const commentId = await seedComment(app, 'before');
+    const { status } = await patchJson(
+      app,
+      `/api/dev/editorial-review/entry/${ENTRY_UUID}/comments/${commentId}`,
+      { text: 'after', category: 'structural' },
+    );
+    expect(status).toBe(200);
+
+    const list = await getJson(
+      app,
+      `/api/dev/editorial-review/entry/${ENTRY_UUID}/annotations`,
+    );
+    const annotations = asObj(list.body).annotations;
+    if (!Array.isArray(annotations)) throw new Error('expected array');
+    const c = asObj(annotations[0]);
+    expect(c.text).toBe('after');
+    expect(c.category).toBe('structural');
+    expect(c.range).toEqual({ start: 0, end: 5 });
+  });
+
+  it('returns 400 when category is not in the known enum', async () => {
+    const app = createApp({ projectRoot, config: cfg });
+    const commentId = await seedComment(app);
+    const { status, body } = await patchJson(
+      app,
+      `/api/dev/editorial-review/entry/${ENTRY_UUID}/comments/${commentId}`,
+      { category: 'made-up-category' },
+    );
+    expect(status).toBe(400);
+    expect(asObj(body).error).toMatch(/category/i);
+  });
 });
 
 describe('DELETE /api/dev/editorial-review/entry/:entryId/comments/:commentId', () => {

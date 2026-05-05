@@ -1,0 +1,13 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-05T19:15:08.966Z",
+  "entryId": "b3f20364-969a-4004-87bd-278cd5992e3c",
+  "annotation": {
+    "type": "edit-comment",
+    "workflowId": "b3f20364-969a-4004-87bd-278cd5992e3c",
+    "commentId": "e24b171b-13c6-454a-8986-b8043018ab8e",
+    "category": "voice-drift",
+    "id": "4fd69406-978e-4968-bb76-c1329c7fc04e",
+    "createdAt": "2026-05-05T19:15:08.966Z"
+  }
+}

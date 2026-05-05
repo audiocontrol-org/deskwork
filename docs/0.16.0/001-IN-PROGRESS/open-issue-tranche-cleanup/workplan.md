@@ -215,7 +215,7 @@ deskwork:
 ### Task 3: Client UI
 
 - [x] In `plugins/deskwork-studio/public/src/entry-review/sidebar-render.ts` (or sibling client module), add an "Edit" affordance on each `comment`-card (inline edit-in-place for the comment text). **Range editing client UI** — closed as wontfix in [#203](https://github.com/audiocontrol-org/deskwork/issues/203); not a standard UX, would confuse operators. Server endpoint accepts range as defense-in-depth; no client surface.
-- [ ] **Category edit** ([#204](https://github.com/audiocontrol-org/deskwork/issues/204)) — extend the inline edit affordance to expose a category dropdown alongside the text textarea. Server endpoint already accepts `category` in the PATCH envelope.
+- [x] **Category edit** ([#204](https://github.com/audiocontrol-org/deskwork/issues/204)) — extend the inline edit affordance to expose a category dropdown alongside the text textarea. Server endpoint already accepts `category` in the PATCH envelope.
 - [x] Add a "Delete" affordance distinct from "Resolve" (different visual + different confirmation via `inlineConfirm`).
 - [x] Both affordances POST/DELETE to the new endpoints; on success, re-render the sidebar from the updated annotation list.
 - [x] Mirror the project's affordance-placement rule (`.claude/rules/affordance-placement.md`): the edit + delete affordances live on the comment card itself (in `er-marginalia-actions`), not in a toolbar.
@@ -230,7 +230,7 @@ deskwork:
 **Acceptance Criteria:**
 
 - [x] An operator can edit a margin-note's text directly from the sidebar (no delete-and-recreate).
-- [ ] An operator can edit a margin-note's **category** directly from the sidebar (re-categorize without delete-and-recreate).
+- [x] An operator can edit a margin-note's **category** directly from the sidebar (re-categorize without delete-and-recreate).
 - [x] An operator can delete a margin-note (tombstones via the journal, doesn't physically remove the original).
 - [x] [#199](https://github.com/audiocontrol-org/deskwork/issues/199) fix-landed comment posted; closure pending v0.16.0 marketplace-walk verification per `agent-discipline.md`.
 - [x] Append-only journal preserves the audit trail (every edit + delete is its own annotation, original `comment` annotation is never mutated in place).
