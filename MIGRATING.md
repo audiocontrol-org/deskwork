@@ -1,3 +1,28 @@
+## Migrating to v0.16.0 (open-issue tranche cleanup)
+
+v0.16.0 ships the open-issue-tranche-cleanup feature. The behavior change adopters should know about:
+
+### `/deskwork:ingest` defaults to `Drafting`, not `Ideas` ([#206](https://github.com/audiocontrol-org/deskwork/issues/206))
+
+Pre-v0.16.0, ingesting a markdown file whose frontmatter had no `state:` field landed it in **Ideas**. As of v0.16.0, the default is **Drafting**.
+
+Rationale: `/deskwork:ingest` is for backfilling existing content with body text already on disk. `/deskwork:add` is the path for capturing new ideas (no body text yet). Defaulting ingested files to Ideas conflated the two — ingested files are by definition past the "thought, no words yet" Ideas-stage shape and belong in Drafting.
+
+**Adopter impact:**
+
+- If your ingest workflows previously relied on the `Ideas` default and used `/deskwork:approve` cycles to advance entries to Drafting: the next ingest after upgrading lands in Drafting directly. The old default was the bug; the change is in the direction of correctness.
+- If you specifically want an ingested file in `Ideas`, pass `--state Ideas` explicitly, or set `state: ideas` in the file's frontmatter — both still win over the default.
+- Frontmatter state: anything → behavior unchanged (frontmatter still wins over the default).
+
+### `/deskwork:ingest` semantic distinction (companion clarification)
+
+- `/deskwork:add` — capture a new idea with no body text yet. Lands in Ideas.
+- `/deskwork:ingest` — backfill an existing markdown file (with body text). Defaults to Drafting; overridable per the rules above.
+
+If a file has no body text yet, the right path is `/deskwork:add`, not `/deskwork:ingest --state Ideas`. The ingest path is for content that already exists.
+
+---
+
 ## Migrating to v0.12.0 (post-v0.11.1 dogfood fixes)
 
 v0.12.0 is a corrective release that fixes a cluster of issues surfaced by dogfooding v0.11.1's entry-centric redesign on real calendars. **No breaking changes**; everything below is upgrade housekeeping.
