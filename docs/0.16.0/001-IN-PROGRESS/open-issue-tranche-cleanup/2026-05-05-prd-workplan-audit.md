@@ -3,6 +3,8 @@ title: PRD and Workplan Audit
 date: 2026-05-05
 auditedFeature: open-issue-tranche-cleanup
 branch: feature/deskwork-open-issue-tranche-cleanup
+deskwork:
+  id: 998b8a29-e754-4114-8998-d1aebf6f39d3
 ---
 
 # PRD and Workplan Audit
