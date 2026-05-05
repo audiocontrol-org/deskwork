@@ -1,0 +1,25 @@
+{
+  "id": "b3f20364-969a-4004-87bd-278cd5992e3c",
+  "timestamp": "2026-05-05T04:05:27.974Z",
+  "event": "ingest",
+  "slug": "open-issue-tranche-cleanup/prd",
+  "entryId": "b3f20364-969a-4004-87bd-278cd5992e3c",
+  "site": "deskwork-internal",
+  "stage": "Drafting",
+  "sourceFile": "docs/0.16.0/001-IN-PROGRESS/open-issue-tranche-cleanup/prd.md",
+  "frontmatterSnapshot": {
+    "slug": "open-issue-tranche-cleanup",
+    "title": "open-issue-tranche-cleanup",
+    "targetVersion": "0.16.0",
+    "date": "2026-05-05",
+    "parentIssue": null,
+    "deskwork": {
+      "id": "b3f20364-969a-4004-87bd-278cd5992e3c"
+    }
+  },
+  "derivation": {
+    "slug": "path",
+    "state": "explicit",
+    "date": "frontmatter"
+  }
+}

@@ -3,7 +3,7 @@ slug: open-issue-tranche-cleanup
 title: open-issue-tranche-cleanup
 targetVersion: "0.16.0"
 date: 2026-05-05
-parentIssue: 
+parentIssue:
 deskwork:
   id: b3f20364-969a-4004-87bd-278cd5992e3c
 ---
