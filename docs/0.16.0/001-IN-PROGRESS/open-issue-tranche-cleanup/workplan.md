@@ -128,6 +128,37 @@ date: 2026-05-05
 - [ ] No issue in the open list is in a "verify and close" or "moot" state.
 - [ ] Remaining product features (#54, #84, #85, #82, #87, #86) and backlog (#18, #30, #33) are explicitly noted as out-of-scope for this feature.
 
+## Phase 8 — Extend entry-aware addressing to studio scrapbook reads + link emitters ([#205](https://github.com/audiocontrol-org/deskwork/issues/205))
+
+**Deliverable:** the studio's scrapbook viewer + link emitters resolve via the entry-aware path for entries whose on-disk location doesn't match the slug template. Closes Finding 1 of the 2026-05-05 PRD/Workplan audit. Symmetric to Phase 2's mutation fix.
+
+### Task 1: Server route accepts entryId
+
+- [ ] Extend `/dev/scrapbook/<site>/<path>` in `packages/studio/src/pages/scrapbook.ts` to accept `?entryId=<uuid>` (UUID-validated). When present, resolve the dir via `scrapbookDirForEntry(...)` and list via `listScrapbookForEntry(...)`. Slug/path fallback preserved.
+- [ ] Surface 404 when `entryId` is malformed (UUID regex) or doesn't match any sidecar, mirroring the scrapbook-mutation route's pattern.
+
+### Task 2: URL builders prefer entry-aware shape
+
+- [ ] `scrapbookViewerUrl(...)` in `packages/studio/src/components/scrapbook-item.ts` accepts an optional `entryId`; when present, append `?entryId=<uuid>`.
+- [ ] Update call sites: `packages/studio/src/pages/review-scrapbook-drawer.ts:169`, `packages/studio/src/pages/dashboard/affordances.ts:71`. Look up entry id (sidecar / calendar) and thread it into the URL builder.
+- [ ] Slug-only fallback preserved for callers without an entry id.
+
+### Task 3: Client URL builders for `/api/dev/scrapbook-file`
+
+- [ ] `plugins/deskwork-studio/public/src/scrapbook-mutations.ts:151,216` — read `ctx.entryId` (already plumbed post-#191) and send `entryId` in the URLSearchParams when present. Falls back to `path: ctx.path` otherwise.
+
+### Task 4: Tests
+
+- [ ] Server-route: list-via-entryId returns items from the entry-aware scrapbook for a non-kebab-case entry; list-via-slug returns slug-template; missing-entry returns 404.
+- [ ] URL-builder: `scrapbookViewerUrl` with an entry argument produces entry-aware URL; without, slug-template.
+- [ ] Live walk: visit the standalone scrapbook viewer for the open-issue-tranche-cleanup PRD entry (non-kebab-case path); confirm contents come from `docs/0.16.0/001-IN-PROGRESS/open-issue-tranche-cleanup/scrapbook/` and not from `docs/open-issue-tranche-cleanup/prd/scrapbook/`.
+
+**Acceptance Criteria:**
+
+- [ ] No mismatch between scrapbook-write target and scrapbook-read target for entries whose on-disk location doesn't match the slug template.
+- [ ] [#205](https://github.com/audiocontrol-org/deskwork/issues/205) fix-landed comment posted; closure pending v0.16.0 marketplace-walk verification.
+- [ ] Slug-only addressing remains a working fallback (no behavior change for kebab-case-aligned entries).
+
 ## Phase 7 — Fix marginalia edit + delete UX ([#199](https://github.com/audiocontrol-org/deskwork/issues/199))
 
 **Deliverable:** operator can edit margin-note text/range from the sidebar and delete a comment outright (separate from resolve). Operator's framing: blocking UX failure on the review loop, not a deferred polish item.

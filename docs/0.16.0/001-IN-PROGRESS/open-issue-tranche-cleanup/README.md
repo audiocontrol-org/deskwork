@@ -21,6 +21,7 @@ Triage the open-issue tracker for the `deskwork`, `deskwork-studio`, and support
 | 5 | Sweep moot/superseded/stale (Tranche 4 + 5); reframe #40, #53; triage #92 | Done |
 | 6 | Tracker audit — verify the open list reflects only currently-actionable work | Not started |
 | 7 | Fix marginalia edit + delete UX (#199) | Text-edit + delete fix-landed; category-edit pending; range-edit wontfix (#203 closing) |
+| 8 | Extend entry-aware addressing to scrapbook viewer + link emitters (#205) | Not started (audit Finding 1) |
 
 ## Key Links
 

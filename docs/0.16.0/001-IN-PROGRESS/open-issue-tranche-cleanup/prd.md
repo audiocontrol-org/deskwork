@@ -58,6 +58,19 @@ Six phases, executed in order. Phases 2 and 3 are the only code-change phases; t
 
 **Approach:** run `gh issue list --state open` post-cleanup, group remaining open issues by implementation strategy (architecture / product features / backlog / external-tracking), update the feature `README.md` with the post-cleanup snapshot. Acceptance: no issue in the open list is in a "verify and close" or "moot" state.
 
+### Phase 8 — Extend entry-aware addressing to studio scrapbook reads + link emitters ([#205](https://github.com/audiocontrol-org/deskwork/issues/205))
+
+**Deliverable:** the studio's scrapbook viewer + link emitters resolve via the entry-aware path for entries whose on-disk location doesn't match the slug template. Closes Finding 1 of the [2026-05-05 PRD/Workplan audit](./2026-05-05-prd-workplan-audit.md).
+
+**Why this is in scope:** Phase 2's #191 fix landed entry-aware addressing on the **mutation** routes; reads + link emitters are still slug/path-based. For the same class of adopter-facing entries that motivated #191, this leaves a half-migrated surface — writes resolve correctly while the viewer + dashboard chip + drawer-open link navigate to a different, often-empty scrapbook directory. The PRD's downstream-deliverable claim about #191 ("prevents orphan scrapbook writes for adopters on non-kebab-case layouts") is not actually met until Phase 8 ships.
+
+**Approach:** symmetric to Phase 2's mutation fix.
+
+1. **Server route** (`packages/studio/src/pages/scrapbook.ts`): accept `?entryId=<uuid>` (UUID-validated) on the `/dev/scrapbook/<site>/<path>` route. When present, resolve the dir via `scrapbookDirForEntry(...)` and list via `listScrapbookForEntry(...)` (read-side primitive already exists post-#192's split). Slug/path fallback preserved.
+2. **URL builders** (`scrapbookViewerUrl` + the drawer + dashboard chip): when the caller has an entry's UUID, build the entry-aware URL with the `?entryId=` query param; otherwise fall back to the existing slug-template URL.
+3. **Client URL builders** for `/api/dev/scrapbook-file`: the route already accepts `entryId` post-v0.15.0; the client sends it when `data-entry-id` is present on the page (mirrors the post-#191 mutation client pattern).
+4. **Tests:** server-route regression on list-via-entryId; URL-builder regression for entry-aware vs slug-template branching; live walk against a non-kebab-case entry confirming the viewer shows the entry's actual scrapbook contents.
+
 ### Phase 7 — Fix marginalia edit + delete UX (#199)
 
 **Deliverable:** an operator can edit a margin-note's **text** and **category**, or delete it outright, from the studio's marginalia sidebar. Closes [#199](https://github.com/audiocontrol-org/deskwork/issues/199).
@@ -80,6 +93,7 @@ Six phases, executed in order. Phases 2 and 3 are the only code-change phases; t
 - [ ] Stale-framing issues #40 and #53 either closed or rewritten around current command surface — never silently left in the original framing.
 - [ ] [#92](https://github.com/audiocontrol-org/deskwork/issues/92) (Claude Code platform bug) disposition recorded (closed-with-reference or relabeled upstream-tracking).
 - [ ] [#199](https://github.com/audiocontrol-org/deskwork/issues/199) (marginalia edit + delete) fix-landed; operator can edit margin-note text **and category** from the sidebar and delete a comment outright (separate from resolve). Range editing is explicitly wontfix — see [#203](https://github.com/audiocontrol-org/deskwork/issues/203).
+- [ ] [#205](https://github.com/audiocontrol-org/deskwork/issues/205) (scrapbook viewer + link emitters use entry-aware addressing) fix-landed; viewer resolves via `?entryId=` when supplied; URL builders prefer entry-aware shape.
 - [ ] Feature `README.md` status table updated with a post-cleanup snapshot of remaining open issues grouped by implementation strategy.
 
 ## Out of Scope

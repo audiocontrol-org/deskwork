@@ -15,9 +15,19 @@ Scope: audit the implementation on `feature/deskwork-open-issue-tranche-cleanup`
 
 ### 1. High — [#191](https://github.com/audiocontrol-org/deskwork/issues/191) / [#192](https://github.com/audiocontrol-org/deskwork/issues/192) are not closed end-to-end on the standalone scrapbook surface
 
+**Status: integrated as Phase 8 (#205) on this branch during audit-doc iteration v3.**
+
 The branch fixes the mutation API to prefer `entryId`, but the scrapbook viewer and related scrapbook links still largely read and navigate by slug/path. For entries whose on-disk location does not match the slug template, this leaves a half-migrated state: writes resolve to the entry-aware scrapbook while parts of the UI still read or link to the slug-template location.
 
 This conflicts with the PRD's stated downstream deliverable that [#191](https://github.com/audiocontrol-org/deskwork/issues/191) prevents orphan scrapbook writes for adopters on non-kebab-case layouts, not just at the POST endpoint layer.
+
+**Resolution path** — filed as [#205](https://github.com/audiocontrol-org/deskwork/issues/205) and added as PRD §Phase 8 / workplan Phase 8 / README row 8. Symmetric to Phase 2's mutation fix:
+
+1. Server route accepts `?entryId=<uuid>` and resolves via `scrapbookDirForEntry` + `listScrapbookForEntry`.
+2. URL builders (`scrapbookViewerUrl` + drawer + dashboard chip) prefer entry-aware URLs when an entry id is available.
+3. Client URL builders for `/api/dev/scrapbook-file` send `entryId` (route already accepts it post-v0.15.0).
+
+Implementation pending; tracked under #205.
 
 Relevant PRD references:
 
@@ -79,3 +89,4 @@ Phases 1, 4, 5, and 6 are still incomplete, but that is consistent with the curr
 | [#199](https://github.com/audiocontrol-org/deskwork/issues/199) | UX/UI: Marginalia can't be edited | Finding 2 — text-edit + delete shipped; category-edit pending under #204; range-edit wontfix |
 | [#203](https://github.com/audiocontrol-org/deskwork/issues/203) | marginalia: client UI for range + category edits (server side already in v0.16.0) | Finding 2 — closed as wontfix during audit-doc iteration v2; range editing rejected as non-standard UX |
 | [#204](https://github.com/audiocontrol-org/deskwork/issues/204) | marginalia: client UI for category edits (server already in v0.16.0; range edit wontfix per #203) | Finding 2 — successor tracker for the in-scope category-edit affordance; server already accepts |
+| [#205](https://github.com/audiocontrol-org/deskwork/issues/205) | studio scrapbook viewer + link emitters still slug/path-based after #191/#192 — read/navigate asymmetry on non-kebab-case entries | Finding 1 — successor tracker; Phase 8 added to PRD/workplan/README |
