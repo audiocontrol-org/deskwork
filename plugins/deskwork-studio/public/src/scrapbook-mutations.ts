@@ -30,6 +30,37 @@ export interface Ctx {
   page: HTMLElement;
   site: string;
   path: string;
+  /**
+   * #191: when the standalone scrapbook viewer's path resolves to a
+   * tracked calendar entry, the server emits `data-entry-id` on
+   * `.scrap-page` and the boot wires this into Ctx. Mutation handlers
+   * prefer `entryId` over `slug` for write-target resolution — same
+   * code path the read endpoints use.
+   *
+   * Absent for organizational sub-paths or pre-doctor entries lacking a
+   * UUID — handlers fall back to slug-template addressing in those
+   * cases (back-compat during the deprecation window in #192).
+   */
+  entryId?: string;
+}
+
+/**
+ * Build the JSON-mutation payload for the current Ctx. Sends `entryId`
+ * when known (entry-aware addressing — the #191 fix); falls back to
+ * `slug` (the page's `data-path`, kebab-case) for organizational
+ * sub-paths and pre-doctor entries.
+ *
+ * Kept as a single helper so the entryId-vs-slug decision lives in one
+ * place, not duplicated across save / rename / delete / create / upload.
+ */
+function payload(ctx: Ctx, extra: Record<string, unknown>): Record<string, unknown> {
+  const base: Record<string, unknown> = { site: ctx.site };
+  if (ctx.entryId !== undefined) {
+    base.entryId = ctx.entryId;
+  } else {
+    base.slug = ctx.path;
+  }
+  return { ...base, ...extra };
 }
 
 const FILENAME_RE = /^[a-zA-Z0-9._-][a-zA-Z0-9._ -]*$/;
@@ -222,9 +253,9 @@ export async function enterEditMode(ctx: Ctx, card: HTMLElement): Promise<void> 
       const res = await fetch('/api/dev/scrapbook/save', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          site: ctx.site, slug: ctx.path, filename, body: ta.value, secret: isCardSecret(card),
-        }),
+        body: JSON.stringify(
+          payload(ctx, { filename, body: ta.value, secret: isCardSecret(card) }),
+        ),
       });
       if (!res.ok) throw new Error(parseErrorBody(await res.json()) ?? 'save failed');
       const updated = parseSavedItem(await res.json());
@@ -302,9 +333,9 @@ export function enterRenameMode(ctx: Ctx, card: HTMLElement): void {
         const res = await fetch('/api/dev/scrapbook/rename', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            site: ctx.site, slug: ctx.path, oldName, newName, secret: isCardSecret(card),
-          }),
+          body: JSON.stringify(
+            payload(ctx, { oldName, newName, secret: isCardSecret(card) }),
+          ),
         });
         if (!res.ok) throw new Error(parseErrorBody(await res.json()) ?? 'rename failed');
         nameEl.textContent = newName;
@@ -362,9 +393,9 @@ export function enterDeleteConfirm(
         const res = await fetch('/api/dev/scrapbook/delete', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            site: ctx.site, slug: ctx.path, filename, secret: isCardSecret(card),
-          }),
+          body: JSON.stringify(
+            payload(ctx, { filename, secret: isCardSecret(card) }),
+          ),
         });
         if (!res.ok) throw new Error(parseErrorBody(await res.json()) ?? 'delete failed');
         card.style.transition = 'opacity 180ms ease-in, transform 180ms ease-in';
@@ -392,10 +423,12 @@ export async function toggleSecret(ctx: Ctx, card: HTMLElement): Promise<void> {
     const res = await fetch('/api/dev/scrapbook/rename', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        site: ctx.site, slug: ctx.path, oldName: filename, newName: filename,
-        secret: fromSecret, toSecret,
-      }),
+      body: JSON.stringify(
+        payload(ctx, {
+          oldName: filename, newName: filename,
+          secret: fromSecret, toSecret,
+        }),
+      ),
     });
     if (!res.ok) throw new Error(parseErrorBody(await res.json()) ?? 'move failed');
     flashInfo(ctx.page, toSecret ? `marked secret: ${filename}` : `marked public: ${filename}`);
@@ -475,13 +508,9 @@ async function submitComposer(ctx: Ctx): Promise<void> {
     const res = await fetch('/api/dev/scrapbook/create', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        site: ctx.site,
-        slug: ctx.path,
-        filename,
-        body: bodyInput.value,
-        secret,
-      }),
+      body: JSON.stringify(
+        payload(ctx, { filename, body: bodyInput.value, secret }),
+      ),
     });
     if (!res.ok) throw new Error(parseErrorBody(await res.json()) ?? 'create failed');
     flashInfo(ctx.page, secret ? `created secret/${filename}` : `created ${filename}`);
@@ -555,7 +584,13 @@ export async function uploadFile(ctx: Ctx, file: File): Promise<void> {
   try {
     const fd = new FormData();
     fd.append('site', ctx.site);
-    fd.append('slug', ctx.path);
+    // Same entryId-vs-slug discrimination as the JSON mutation paths
+    // (see `payload()` above). Server accepts either.
+    if (ctx.entryId !== undefined) {
+      fd.append('entryId', ctx.entryId);
+    } else {
+      fd.append('slug', ctx.path);
+    }
     fd.append('file', file);
     const res = await fetch('/api/dev/scrapbook/upload', { method: 'POST', body: fd });
     if (!res.ok) throw new Error(parseErrorBody(await res.json()) ?? 'upload failed');

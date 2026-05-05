@@ -15,7 +15,7 @@ Triage the open-issue tracker for the `deskwork`, `deskwork-studio`, and support
 | Phase | Description | Status |
 |---|---|---|
 | 1 | Verify + close Tranche 1 (marketplace-install walk; ~10 issues) | Not started |
-| 2 | Implement #191 (entry-id mutation envelope) + tests | Not started |
+| 2 | Implement #191 (entry-id mutation envelope) + tests | Fix-landed (pending v0.16.0 verification) |
 | 3 | Implement #192 (collapse dual scrapbook resolvers) + tests | Not started |
 | 4 | Verify + close #190 marginalia alignment (rolls up with Phase 1) | Not started |
 | 5 | Sweep moot/superseded/stale (Tranche 4 + 5); reframe #40, #53; triage #92 | Not started |

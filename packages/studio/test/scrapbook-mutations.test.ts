@@ -7,6 +7,12 @@
  *
  * Issue #21 — closes the Phase 13 / Phase 16d gap where the client
  * had save/rename/delete/create/upload handlers but no server.
+ *
+ * Issue #191 — entry-id mutation envelope (regression suite at the
+ * bottom): when `entryId` is supplied, mutations must resolve via
+ * `scrapbookDirForEntry` (parent of the entry's artifact file) rather
+ * than the `<contentDir>/<slug>/scrapbook/` slug-template path. Slug
+ * mode remains as a deprecation-window fallback and stays covered above.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -19,8 +25,10 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import type { DeskworkConfig } from '@deskwork/core/config';
+import { writeSidecar } from '@deskwork/core/sidecar';
+import type { Entry } from '@deskwork/core/schema/entry';
 import { createApp } from '../src/server.ts';
 
 function makeConfig(): DeskworkConfig {
@@ -605,6 +613,291 @@ describe('scrapbook mutation API (#21)', () => {
         filename: 'archetypes.md',
       });
       expect(dl.status).toBe(200);
+    });
+  });
+
+  // -------------------------------------------------------------------
+  // #191 — entry-id mutation envelope
+  // -------------------------------------------------------------------
+  //
+  // Regression: the bug surfaces when an entry's artifact lives at a
+  // path that doesn't match `<contentDir>/<slug>/index.md` — e.g. a
+  // feature PRD at `docs/0.16.0/001-IN-PROGRESS/<slug>/prd.md`. Reads
+  // resolve via `scrapbookDirForEntry` (entry-aware); pre-fix mutations
+  // resolved via the slug template, orphaning writes into
+  // `<contentDir>/<slug>/scrapbook/` while reads kept returning the
+  // entry's real (empty) scrapbook elsewhere. Both paths must converge
+  // on the entry's artifact-parent directory.
+
+  describe('entry-id mutation envelope (#191)', () => {
+    const ENTRY_UUID = 'b3f20364-969a-4004-87bd-278cd5992e3c';
+
+    /**
+     * Seed a calendar entry whose artifact lives at a non-kebab-case
+     * path (the writingcontrol-shape failure mode the issue describes).
+     * `<contentDir>` here is `src/content/projects` from `makeConfig`;
+     * the artifact lands under it at a non-slug-template path so the
+     * slug template would resolve elsewhere if any helper used it.
+     */
+    async function seedEntryAtNonSlugPath(slug: string): Promise<{
+      artifactDir: string;
+      artifactPath: string;
+      slugTemplateScrapbookDir: string;
+    }> {
+      // Non-kebab-case path the slug template would NEVER produce — has
+      // a dotted version segment AND uppercase status segment.
+      const artifactRelDir = join(
+        'src/content/projects',
+        '0.16.0',
+        '001-IN-PROGRESS',
+        slug,
+      );
+      const artifactDir = join(root, artifactRelDir);
+      mkdirSync(artifactDir, { recursive: true });
+      const artifactPath = join(artifactDir, 'prd.md');
+      writeFileSync(
+        artifactPath,
+        `---\ndeskwork:\n  id: ${ENTRY_UUID}\n---\n\n# ${slug}\n`,
+      );
+      const entry: Entry = {
+        uuid: ENTRY_UUID,
+        slug,
+        title: slug,
+        keywords: [],
+        source: 'manual',
+        currentStage: 'Drafting',
+        iterationByStage: { Drafting: 1 },
+        createdAt: '2026-05-04T00:00:00.000Z',
+        updatedAt: '2026-05-04T00:00:00.000Z',
+      };
+      await writeSidecar(root, entry);
+      // What the slug-template would have resolved to (the orphan path).
+      const slugTemplateScrapbookDir = join(
+        root,
+        'src/content/projects',
+        slug,
+        'scrapbook',
+      );
+      return { artifactDir, artifactPath, slugTemplateScrapbookDir };
+    }
+
+    it('save with entryId writes to dirname(artifact)/scrapbook/, NOT slug-template path', async () => {
+      const slug = 'open-issue-tranche-cleanup';
+      const { artifactDir, slugTemplateScrapbookDir } =
+        await seedEntryAtNonSlugPath(slug);
+
+      const r = await postJson(app, '/api/dev/scrapbook/save', {
+        site: 'wc',
+        entryId: ENTRY_UUID,
+        filename: 'note.md',
+        body: '# entry-aware save\n',
+      });
+      expect(r.status).toBe(200);
+
+      // The file MUST land in the entry's artifact-parent directory.
+      const entryAwarePath = join(artifactDir, 'scrapbook', 'note.md');
+      expect(existsSync(entryAwarePath)).toBe(true);
+      expect(readFileSync(entryAwarePath, 'utf-8')).toBe('# entry-aware save\n');
+
+      // The slug-template orphan path MUST NOT have been written. This
+      // is the load-bearing check — the bug is not "write didn't land"
+      // but "write landed in two places" / "write landed in the wrong place".
+      expect(existsSync(slugTemplateScrapbookDir)).toBe(false);
+    });
+
+    it('create with entryId writes to dirname(artifact)/scrapbook/', async () => {
+      const slug = 'create-via-entry';
+      const { artifactDir, slugTemplateScrapbookDir } =
+        await seedEntryAtNonSlugPath(slug);
+
+      const r = await postJson(app, '/api/dev/scrapbook/create', {
+        site: 'wc',
+        entryId: ENTRY_UUID,
+        filename: 'fresh.md',
+        body: '# fresh entry-aware\n',
+      });
+      expect(r.status).toBe(200);
+
+      const entryAwarePath = join(artifactDir, 'scrapbook', 'fresh.md');
+      expect(existsSync(entryAwarePath)).toBe(true);
+      expect(existsSync(slugTemplateScrapbookDir)).toBe(false);
+    });
+
+    it('upload with entryId writes to dirname(artifact)/scrapbook/', async () => {
+      const slug = 'upload-via-entry';
+      const { artifactDir, slugTemplateScrapbookDir } =
+        await seedEntryAtNonSlugPath(slug);
+
+      const fd = new FormData();
+      fd.append('site', 'wc');
+      fd.append('entryId', ENTRY_UUID);
+      const bytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+      const ab = new ArrayBuffer(bytes.byteLength);
+      new Uint8Array(ab).set(bytes);
+      fd.append('file', new File([ab], 'pic.png', { type: 'image/png' }));
+      const res = await app.fetch(
+        new Request('http://x/api/dev/scrapbook/upload', {
+          method: 'POST',
+          body: fd,
+        }),
+      );
+      expect(res.status).toBe(200);
+
+      const entryAwarePath = join(artifactDir, 'scrapbook', 'pic.png');
+      expect(existsSync(entryAwarePath)).toBe(true);
+      const written = readFileSync(entryAwarePath);
+      expect(Array.from(written)).toEqual(Array.from(bytes));
+      expect(existsSync(slugTemplateScrapbookDir)).toBe(false);
+    });
+
+    it('rename with entryId operates inside dirname(artifact)/scrapbook/', async () => {
+      const slug = 'rename-via-entry';
+      const { artifactDir, slugTemplateScrapbookDir } =
+        await seedEntryAtNonSlugPath(slug);
+
+      // Seed a file in the entry-aware location first.
+      const entryScrapbook = join(artifactDir, 'scrapbook');
+      mkdirSync(entryScrapbook, { recursive: true });
+      writeFileSync(join(entryScrapbook, 'old.md'), '# x\n');
+
+      const r = await postJson(app, '/api/dev/scrapbook/rename', {
+        site: 'wc',
+        entryId: ENTRY_UUID,
+        oldName: 'old.md',
+        newName: 'new.md',
+      });
+      expect(r.status).toBe(200);
+      expect(existsSync(join(entryScrapbook, 'old.md'))).toBe(false);
+      expect(existsSync(join(entryScrapbook, 'new.md'))).toBe(true);
+      expect(existsSync(slugTemplateScrapbookDir)).toBe(false);
+    });
+
+    it('delete with entryId operates inside dirname(artifact)/scrapbook/', async () => {
+      const slug = 'delete-via-entry';
+      const { artifactDir, slugTemplateScrapbookDir } =
+        await seedEntryAtNonSlugPath(slug);
+
+      const entryScrapbook = join(artifactDir, 'scrapbook');
+      mkdirSync(entryScrapbook, { recursive: true });
+      writeFileSync(join(entryScrapbook, 'gone.md'), '# x\n');
+
+      const r = await postJson(app, '/api/dev/scrapbook/delete', {
+        site: 'wc',
+        entryId: ENTRY_UUID,
+        filename: 'gone.md',
+      });
+      expect(r.status).toBe(200);
+      expect(existsSync(join(entryScrapbook, 'gone.md'))).toBe(false);
+      expect(existsSync(slugTemplateScrapbookDir)).toBe(false);
+    });
+
+    it('rejects malformed entryId with 400 BEFORE filesystem access', async () => {
+      // No sidecar seeded — the UUID validation must fail first, before
+      // `readSidecar` would try to compose `<root>/.deskwork/entries/...`.
+      // Also tests the path-traversal probe vector that the scrapbook-file
+      // route guards against.
+      const r = await postJson(app, '/api/dev/scrapbook/save', {
+        site: 'wc',
+        entryId: '../../../etc/passwd',
+        filename: 'note.md',
+        body: 'x',
+      });
+      expect(r.status).toBe(400);
+      expect((r.body as { error: string }).error).toMatch(/invalid entryId/i);
+    });
+
+    it('returns 404 for an entryId with no sidecar on disk', async () => {
+      const r = await postJson(app, '/api/dev/scrapbook/save', {
+        site: 'wc',
+        entryId: '00000000-0000-0000-0000-000000000000',
+        filename: 'note.md',
+        body: 'x',
+      });
+      // readSidecar throws "sidecar not found" → statusForError → 404.
+      expect(r.status).toBe(404);
+    });
+
+    it('rejects requests missing both entryId and slug with 400', async () => {
+      const r = await postJson(app, '/api/dev/scrapbook/save', {
+        site: 'wc',
+        filename: 'note.md',
+        body: 'x',
+      });
+      expect(r.status).toBe(400);
+      expect((r.body as { error: string }).error).toMatch(/entryId or slug is required/i);
+    });
+
+    it('upload rejects malformed entryId multipart with 400', async () => {
+      const fd = new FormData();
+      fd.append('site', 'wc');
+      fd.append('entryId', 'not-a-uuid');
+      const ab = new ArrayBuffer(1);
+      fd.append('file', new File([ab], 'x.bin'));
+      const res = await app.fetch(
+        new Request('http://x/api/dev/scrapbook/upload', {
+          method: 'POST',
+          body: fd,
+        }),
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it('slug-only fallback still works when no entryId is supplied', async () => {
+      // Back-compat coverage: the deprecation-window slug path remains
+      // functional. Will be removed in #192.
+      const slug = 'legacy-slug-path';
+      const r = await postJson(app, '/api/dev/scrapbook/create', {
+        site: 'wc',
+        slug,
+        filename: 'note.md',
+        body: 'legacy',
+      });
+      expect(r.status).toBe(200);
+      expect(
+        existsSync(join(root, 'src/content/projects', slug, 'scrapbook', 'note.md')),
+      ).toBe(true);
+    });
+
+    it('entryId is preferred when both entryId and slug are sent', async () => {
+      // Defensive: when both fields land in the same payload (mid-
+      // migration client behavior), the server picks entryId. Ensures
+      // the addressing migration is monotonic — once a client starts
+      // sending entryId, the server stops using slug.
+      const slug = 'tied-prefer-entry';
+      const { artifactDir, slugTemplateScrapbookDir } =
+        await seedEntryAtNonSlugPath(slug);
+
+      const r = await postJson(app, '/api/dev/scrapbook/create', {
+        site: 'wc',
+        entryId: ENTRY_UUID,
+        slug, // server should ignore this when entryId is present
+        filename: 'choose.md',
+        body: 'entry-aware wins',
+      });
+      expect(r.status).toBe(200);
+      expect(existsSync(join(artifactDir, 'scrapbook', 'choose.md'))).toBe(true);
+      expect(existsSync(slugTemplateScrapbookDir)).toBe(false);
+    });
+
+    it('artifactDir / dirname round-trip matches the post-fix invariant', async () => {
+      // Single most-direct expression of the bug fix: dirname(artifactPath)
+      // + '/scrapbook/' is where the file MUST land. Read the artifact
+      // path off the filesystem rather than reconstructing it, so a
+      // future refactor of the path-template doesn't silently invalidate
+      // the test.
+      const slug = 'round-trip';
+      const { artifactPath } = await seedEntryAtNonSlugPath(slug);
+
+      const r = await postJson(app, '/api/dev/scrapbook/save', {
+        site: 'wc',
+        entryId: ENTRY_UUID,
+        filename: 'rt.md',
+        body: '# rt\n',
+      });
+      expect(r.status).toBe(200);
+      const expected = join(dirname(artifactPath), 'scrapbook', 'rt.md');
+      expect(existsSync(expected)).toBe(true);
+      expect(readFileSync(expected, 'utf-8')).toBe('# rt\n');
     });
   });
 });

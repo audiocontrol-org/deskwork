@@ -30,24 +30,24 @@ date: 2026-05-05
 
 ### Task 1: Switch mutation envelope to entryId
 
-- [ ] Change `packages/studio/src/routes/scrapbook-mutations.ts` request envelope from `{ site, slug, ... }` to `{ site, entryId, ... }` (or accept both during a deprecation window — `entryId` preferred, `slug` falls back to slug-template only when no `entryId` is provided, matching the scrapbook-file route post-Phase-35).
-- [ ] Resolve the dir via `scrapbookDirForEntry(projectRoot, config, site, entry, index)` after looking up the entry sidecar via `readSidecar(projectRoot, entryId)`.
-- [ ] Validate `entryId` against UUID regex before touching the filesystem (mirrors the scrapbook-file route's check landed in v0.15.0 commit `14ffbe7`).
+- [x] Change `packages/studio/src/routes/scrapbook-mutations.ts` request envelope from `{ site, slug, ... }` to `{ site, entryId, ... }` (or accept both during a deprecation window — `entryId` preferred, `slug` falls back to slug-template only when no `entryId` is provided, matching the scrapbook-file route post-Phase-35).
+- [x] Resolve the dir via `scrapbookDirForEntry(projectRoot, config, site, entry, index)` after looking up the entry sidecar via `readSidecar(projectRoot, entryId)`.
+- [x] Validate `entryId` against UUID regex before touching the filesystem (mirrors the scrapbook-file route's check landed in v0.15.0 commit `14ffbe7`).
 
 ### Task 2: Update studio client
 
-- [ ] Update `plugins/deskwork-studio/public/src/scrapbook-client.ts` to send `entryId` instead of (or alongside) `slug` for save/create/rename/delete/upload payloads.
+- [x] Update `plugins/deskwork-studio/public/src/scrapbook-client.ts` to send `entryId` instead of (or alongside) `slug` for save/create/rename/delete/upload payloads.
 
 ### Task 3: Tests
 
-- [ ] Add a regression case: ingest a markdown file whose path doesn't match the kebab-case slug template; trigger a save via the studio client; confirm the file lands in the entry-aware scrapbook (`dirname(artifactPath) + '/scrapbook/'`), not the slug-template path.
-- [ ] Run `npm test --workspaces`.
+- [x] Add a regression case: ingest a markdown file whose path doesn't match the kebab-case slug template; trigger a save via the studio client; confirm the file lands in the entry-aware scrapbook (`dirname(artifactPath) + '/scrapbook/'`), not the slug-template path.
+- [x] Run `npm test --workspaces`.
 
 **Acceptance Criteria:**
 
-- [ ] No orphan write to `<contentDir>/<slug>/scrapbook/` for entries whose artifact lives elsewhere.
-- [ ] Studio mutation routes resolve via the entry-aware resolver (parity with reads).
-- [ ] Issue #191 fix-landed comment posted; issue stays open until the marketplace-walk verification (Phase 1's pattern, post-release).
+- [x] No orphan write to `<contentDir>/<slug>/scrapbook/` for entries whose artifact lives elsewhere.
+- [x] Studio mutation routes resolve via the entry-aware resolver (parity with reads).
+- [x] Issue #191 fix-landed comment posted; issue stays open until the marketplace-walk verification (Phase 1's pattern, post-release).
 
 ## Phase 3 — Implement #192 (collapse dual scrapbook resolvers)
 

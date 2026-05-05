@@ -64,10 +64,20 @@ function readCtx(page: HTMLElement): Ctx | null {
   // Server emits data-site / data-path on .scrap-page (scrapbook.ts). The
   // client reads them directly — parsing a display string would silently
   // break the moment the path display format changes.
+  //
+  // #191: when the path resolves to a tracked calendar entry, the server
+  // also emits data-entry-id. The mutation client prefers entryId
+  // (entry-aware addressing — refactor-proof for non-kebab-case content
+  // layouts) and falls back to slug-template addressing when absent.
   const site = page.dataset.site;
   const path = page.dataset.path;
   if (!site || !path) return null;
-  return { page, site, path };
+  const entryId = page.dataset.entryId;
+  const ctx: Ctx = { page, site, path };
+  if (entryId !== undefined && entryId.length > 0) {
+    ctx.entryId = entryId;
+  }
+  return ctx;
 }
 
 // ---------------------------------------------------------------------------

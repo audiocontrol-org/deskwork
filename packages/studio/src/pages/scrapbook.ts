@@ -578,15 +578,17 @@ function renderSecretSection(
 
 /**
  * #168 Phase 34 ship-pass — when the scrapbook path matches a tracked
- * calendar entry with a stamped UUID, return the entry-keyed review
- * URL so the aside can render a "← back to review" link. Returns null
- * when no entry matches (organizational subdirs, ad-hoc paths, or
- * pre-doctor entries lacking an id) — the link is then omitted.
+ * calendar entry with a stamped UUID, return the entry's id so the aside
+ * can render a "← back to review" link AND the client can address
+ * mutations via `entryId` (#191 fix). Returns null when no entry matches
+ * (organizational subdirs, ad-hoc paths, or pre-doctor entries lacking
+ * an id) — the link is then omitted and mutations fall back to slug-
+ * template addressing.
  *
  * Failures (calendar absent, parse error) fall through to null so a
  * transient calendar issue never blocks the scrapbook render.
  */
-function lookupEntryReviewLink(
+function lookupEntryId(
   ctx: StudioContext,
   site: string,
   path: string,
@@ -598,7 +600,7 @@ function lookupEntryReviewLink(
     const cal = readCalendar(calendarPath);
     const entry = findEntry(cal, path);
     if (!entry || !entry.id) return null;
-    return `/dev/editorial-review/entry/${entry.id}`;
+    return entry.id;
   } catch {
     return null;
   }
@@ -632,10 +634,19 @@ export function renderScrapbookPage(
   const folderLabel = path.split('/').filter(Boolean).pop() ?? path;
   const cards = items.map((item, i) => renderCard(ctx, site, path, item, i));
   const cardsHtml = cards.map((c) => c.__raw).join('');
-  const reviewLink = lookupEntryReviewLink(ctx, site, path);
+  const entryId = lookupEntryId(ctx, site, path);
+  const reviewLink = entryId !== null ? `/dev/editorial-review/entry/${entryId}` : null;
+  // The data-entry-id attribute is consumed by scrapbook-client.ts —
+  // when present, the client sends `entryId` on mutation requests so
+  // writes resolve via `scrapbookDirForEntry` (#191). Falls back to
+  // `data-path` slug-template addressing when absent.
+  // entryId comes from a UUID lookup — already validated against the
+  // calendar's CalendarEntry.id, so no escaping concern beyond the
+  // belt-and-braces unsafe wrapping for the conditional attribute.
+  const entryIdAttr = entryId !== null ? unsafe(` data-entry-id="${entryId}"`) : unsafe('');
   const body = html`
     ${renderEditorialFolio('content', `scrapbook · ${site}/${path}`)}
-    <main class="scrap-page" data-site="${site}" data-path="${path}">
+    <main class="scrap-page" data-site="${site}" data-path="${path}"${entryIdAttr}>
       ${renderAside(site, path, items, totalSize, lastModified, secretItems.length, reviewLink)}
       <section class="scrap-main">
         <header class="scrap-main-header">

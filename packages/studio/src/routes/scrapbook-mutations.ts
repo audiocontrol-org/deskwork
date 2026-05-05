@@ -10,15 +10,29 @@
  * Phase 16d retrofitted only the read path. v0.4.1 closes the gap
  * (issue #21).
  *
+ * Two addressing modes (#191):
+ *   - **Entry-id mode** (preferred): `{ site, entryId, ... }` — looks up
+ *     the entry's sidecar, derives the scrapbook dir from the artifact's
+ *     parent directory via `scrapbookDirForEntry`, mutates there. Same
+ *     code path the read endpoints use; refactor-proof for projects whose
+ *     feature-doc layout doesn't match the kebab-case slug template.
+ *   - **Slug mode** (back-compat fallback): `{ site, slug, ... }` —
+ *     legacy slug-template addressing (`<contentDir>/<slug>/scrapbook/`).
+ *     Retained during a deprecation window so existing callers continue
+ *     working. To be collapsed in #192.
+ *
+ * Companion modules (#191 split, to keep this file under the project's
+ * 300–500 line cap):
+ *   - `scrapbook-mutation-envelope.ts` — JSON / form envelope parsing,
+ *     UUID validation, dir resolution.
+ *   - `scrapbook-mutation-dispatch.ts` — per-mode dispatch helpers
+ *     (entry-aware vs. slug-template), one per route verb.
+ *
  * Design notes:
  *   - Path resolution + traversal protection runs through
- *     `@deskwork/core/scrapbook` helpers (`scrapbookFilePath` etc.).
- *     Those throw on `..` sequences, absolute paths, and any filename
- *     that escapes the scrapbook dir; we surface those as 400.
- *   - The client speaks `{ site, slug, filename, body }` for save/create,
- *     `{ site, slug, oldName, newName }` for rename, `{ site, slug,
- *     filename }` for delete, multipart `{ site, slug, file }` for
- *     upload. Endpoints accept those exact field names.
+ *     `@deskwork/core/scrapbook` helpers. Those throw on `..` sequences,
+ *     absolute paths, and any filename that escapes the scrapbook dir;
+ *     we surface those as 400.
  *   - We never log file contents on save / upload (privacy). Logging
  *     filename + slug is fine but kept silent here — the studio's
  *     console is the operator's, not a server log.
@@ -30,62 +44,27 @@
 
 import { Hono } from 'hono';
 import type { Context } from 'hono';
-import {
-  classify,
-  createScrapbookMarkdown,
-  deleteScrapbookFile,
-  renameScrapbookFile,
-  saveScrapbookFile,
-  writeScrapbookUpload,
-  type ScrapbookItem,
-} from '@deskwork/core/scrapbook';
+import { classify, type ScrapbookItem } from '@deskwork/core/scrapbook';
 import { existsSync, mkdirSync, renameSync, statSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { scrapbookFilePath } from '@deskwork/core/scrapbook';
 import type { StudioContext } from './api.ts';
+import {
+  checkFormEnvelope,
+  checkJsonEnvelope,
+  isEnvelopeError,
+} from './scrapbook-mutation-envelope.ts';
+import {
+  createDispatch,
+  deleteDispatch,
+  renameInPlace,
+  resolveCrossSectionPaths,
+  saveDispatch,
+  uploadDispatch,
+} from './scrapbook-mutation-dispatch.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-interface ParsedPayload {
-  site: string;
-  slug: string;
-  /**
-   * When true, the operation targets `<scrapbook>/secret/<filename>`
-   * instead of the public scrapbook root. Defaults to false.
-   * Surfaced by the standalone viewer's secret-toggle UI (#28).
-   */
-  secret: boolean;
-}
-
-/**
- * Validate the common `{ site, slug, secret? }` envelope. Returns a
- * typed object or a 400/404 Response that the caller propagates
- * directly. The site existence check is here so every mutation 404s
- * on unknown sites the same way the read endpoint does.
- */
-function checkEnvelope(
-  ctx: StudioContext,
-  body: Record<string, unknown>,
-): ParsedPayload | { error: string; status: 400 | 404 } {
-  const site = body.site;
-  const slug = body.slug;
-  if (typeof site !== 'string' || site.length === 0) {
-    return { error: 'site is required', status: 400 };
-  }
-  if (typeof slug !== 'string' || slug.length === 0) {
-    return { error: 'slug is required', status: 400 };
-  }
-  if (!(site in ctx.config.sites)) {
-    return { error: `unknown site: ${site}`, status: 404 };
-  }
-  const secretRaw = body.secret;
-  if (secretRaw !== undefined && typeof secretRaw !== 'boolean') {
-    return { error: 'secret must be a boolean when provided', status: 400 };
-  }
-  return { site, slug, secret: secretRaw === true };
-}
 
 /**
  * Map a core-helper error message onto the right HTTP status. The core
@@ -136,15 +115,16 @@ export function createScrapbookMutationsRouter(ctx: StudioContext): Hono {
   const app = new Hono();
 
   // POST /api/dev/scrapbook/save
-  // Body: { site, slug, filename, body }
-  // Behavior: write `body` to <contentDir>/<slug>/scrapbook/<filename>.
-  // Creates the file if missing (delegates to create when absent so the
-  // operator's first save lands rather than 404'ing).
+  // Body (entry mode): { site, entryId, filename, body, secret? }
+  // Body (slug mode):  { site, slug, filename, body, secret? }
+  // Behavior: write `body` to <scrapbook-dir>/<filename>. Creates the
+  // file if missing (delegates to create when absent so the operator's
+  // first save lands rather than 404'ing).
   app.post('/save', async (c) => {
     const parsed = await readJson(c);
     if (!parsed.ok) return c.json({ error: parsed.error }, parsed.status);
-    const env = checkEnvelope(ctx, parsed.value);
-    if ('error' in env) return c.json({ error: env.error }, env.status);
+    const env = checkJsonEnvelope(ctx, parsed.value);
+    if (isEnvelopeError(env)) return c.json({ error: env.error }, env.status);
 
     const filename = parsed.value.filename;
     const bodyText = parsed.value.body;
@@ -157,51 +137,7 @@ export function createScrapbookMutationsRouter(ctx: StudioContext): Hono {
 
     let item: ScrapbookItem;
     try {
-      // Resolve to test for existence. If absent, create-then-return.
-      const abs = scrapbookFilePath(
-        ctx.projectRoot,
-        ctx.config,
-        env.site,
-        env.slug,
-        filename,
-        { secret: env.secret },
-      );
-      if (!existsSync(abs)) {
-        // Only `.md` files can be created by the create helper, but
-        // save's contract is "write whatever was sent". For non-md
-        // files that don't yet exist, fall through to upload semantics.
-        if (filename.endsWith('.md')) {
-          item = createScrapbookMarkdown(
-            ctx.projectRoot,
-            ctx.config,
-            env.site,
-            env.slug,
-            filename,
-            bodyText,
-            { secret: env.secret },
-          );
-        } else {
-          item = writeScrapbookUpload(
-            ctx.projectRoot,
-            ctx.config,
-            env.site,
-            env.slug,
-            filename,
-            Buffer.from(bodyText, 'utf-8'),
-            { secret: env.secret },
-          );
-        }
-      } else {
-        item = saveScrapbookFile(
-          ctx.projectRoot,
-          ctx.config,
-          env.site,
-          env.slug,
-          filename,
-          bodyText,
-          { secret: env.secret },
-        );
-      }
+      item = await saveDispatch(ctx, env, filename, bodyText);
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       return c.json({ error: reason }, statusForError(reason));
@@ -210,7 +146,8 @@ export function createScrapbookMutationsRouter(ctx: StudioContext): Hono {
   });
 
   // POST /api/dev/scrapbook/rename
-  // Body: { site, slug, oldName, newName, secret?, toSecret? }
+  // Body (entry mode): { site, entryId, oldName, newName, secret?, toSecret? }
+  // Body (slug mode):  { site, slug, oldName, newName, secret?, toSecret? }
   //
   // Two modes:
   //   - In-place rename: secret = source location (defaults to false);
@@ -226,8 +163,8 @@ export function createScrapbookMutationsRouter(ctx: StudioContext): Hono {
   app.post('/rename', async (c) => {
     const parsed = await readJson(c);
     if (!parsed.ok) return c.json({ error: parsed.error }, parsed.status);
-    const env = checkEnvelope(ctx, parsed.value);
-    if ('error' in env) return c.json({ error: env.error }, env.status);
+    const env = checkJsonEnvelope(ctx, parsed.value);
+    if (isEnvelopeError(env)) return c.json({ error: env.error }, env.status);
 
     const oldName = parsed.value.oldName;
     const newName = parsed.value.newName;
@@ -246,35 +183,17 @@ export function createScrapbookMutationsRouter(ctx: StudioContext): Hono {
     let item: ScrapbookItem;
     try {
       if (toSecret === env.secret) {
-        item = renameScrapbookFile(
-          ctx.projectRoot,
-          ctx.config,
-          env.site,
-          env.slug,
-          oldName,
-          newName,
-          { secret: env.secret },
-        );
+        item = await renameInPlace(ctx, env, oldName, newName);
       } else {
-        // Cross-section move. Use the path-resolver to compute the
-        // source and destination absolute paths under the right
-        // sub-roots (and let the resolver enforce traversal guards).
+        // Cross-section move. Resolve src + dst absolute paths under the
+        // right sub-roots and let the resolver enforce traversal guards.
         // Then physically rename across the two paths.
-        const srcAbs = scrapbookFilePath(
-          ctx.projectRoot,
-          ctx.config,
-          env.site,
-          env.slug,
+        const { srcAbs, dstAbs } = await resolveCrossSectionPaths(
+          ctx,
+          env,
           oldName,
-          { secret: env.secret },
-        );
-        const dstAbs = scrapbookFilePath(
-          ctx.projectRoot,
-          ctx.config,
-          env.site,
-          env.slug,
           newName,
-          { secret: toSecret },
+          toSecret,
         );
         if (!existsSync(srcAbs)) {
           return c.json({ error: `file not found: "${oldName}"` }, 404);
@@ -303,13 +222,14 @@ export function createScrapbookMutationsRouter(ctx: StudioContext): Hono {
   });
 
   // POST /api/dev/scrapbook/delete
-  // Body: { site, slug, filename }
+  // Body (entry mode): { site, entryId, filename, secret? }
+  // Body (slug mode):  { site, slug, filename, secret? }
   // Behavior: unlink the file. 404 if missing.
   app.post('/delete', async (c) => {
     const parsed = await readJson(c);
     if (!parsed.ok) return c.json({ error: parsed.error }, parsed.status);
-    const env = checkEnvelope(ctx, parsed.value);
-    if ('error' in env) return c.json({ error: env.error }, env.status);
+    const env = checkJsonEnvelope(ctx, parsed.value);
+    if (isEnvelopeError(env)) return c.json({ error: env.error }, env.status);
 
     const filename = parsed.value.filename;
     if (typeof filename !== 'string' || filename.length === 0) {
@@ -317,14 +237,7 @@ export function createScrapbookMutationsRouter(ctx: StudioContext): Hono {
     }
 
     try {
-      deleteScrapbookFile(
-        ctx.projectRoot,
-        ctx.config,
-        env.site,
-        env.slug,
-        filename,
-        { secret: env.secret },
-      );
+      await deleteDispatch(ctx, env, filename);
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       return c.json({ error: reason }, statusForError(reason));
@@ -333,13 +246,14 @@ export function createScrapbookMutationsRouter(ctx: StudioContext): Hono {
   });
 
   // POST /api/dev/scrapbook/create
-  // Body: { site, slug, filename, body? }
+  // Body (entry mode): { site, entryId, filename, body?, secret? }
+  // Body (slug mode):  { site, slug, filename, body?, secret? }
   // Behavior: create a new markdown file. 409 if it already exists.
   app.post('/create', async (c) => {
     const parsed = await readJson(c);
     if (!parsed.ok) return c.json({ error: parsed.error }, parsed.status);
-    const env = checkEnvelope(ctx, parsed.value);
-    if ('error' in env) return c.json({ error: env.error }, env.status);
+    const env = checkJsonEnvelope(ctx, parsed.value);
+    if (isEnvelopeError(env)) return c.json({ error: env.error }, env.status);
 
     const filename = parsed.value.filename;
     const bodyText = parsed.value.body ?? '';
@@ -352,15 +266,7 @@ export function createScrapbookMutationsRouter(ctx: StudioContext): Hono {
 
     let item: ScrapbookItem;
     try {
-      item = createScrapbookMarkdown(
-        ctx.projectRoot,
-        ctx.config,
-        env.site,
-        env.slug,
-        filename,
-        bodyText,
-        { secret: env.secret },
-      );
+      item = await createDispatch(ctx, env, filename, bodyText);
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       return c.json({ error: reason }, statusForError(reason));
@@ -369,12 +275,12 @@ export function createScrapbookMutationsRouter(ctx: StudioContext): Hono {
   });
 
   // POST /api/dev/scrapbook/upload
-  // Multipart body: { site, slug, file, secret? }
-  // Behavior: save the uploaded file (binary-safe) at
-  // <contentDir>/<slug>/scrapbook/<file.name>, or under
-  // `scrapbook/secret/` when the `secret` form field is the literal
-  // string "true". 409 if it already exists — operator must rename
-  // or delete first.
+  // Multipart body (entry mode): { site, entryId, file, secret? }
+  // Multipart body (slug mode):  { site, slug, file, secret? }
+  // Behavior: save the uploaded file (binary-safe) at the scrapbook dir,
+  // or under `scrapbook/secret/` when the `secret` form field is the
+  // literal string "true". 409 if it already exists — operator must
+  // rename or delete first.
   app.post('/upload', async (c) => {
     let form: FormData;
     try {
@@ -382,21 +288,10 @@ export function createScrapbookMutationsRouter(ctx: StudioContext): Hono {
     } catch {
       return c.json({ error: 'invalid multipart body' }, 400);
     }
-    const site = form.get('site');
-    const slug = form.get('slug');
+    const env = checkFormEnvelope(ctx, form);
+    if (isEnvelopeError(env)) return c.json({ error: env.error }, env.status);
+
     const file = form.get('file');
-    const secretField = form.get('secret');
-    const secret =
-      typeof secretField === 'string' && secretField === 'true';
-    if (typeof site !== 'string' || site.length === 0) {
-      return c.json({ error: 'site is required' }, 400);
-    }
-    if (typeof slug !== 'string' || slug.length === 0) {
-      return c.json({ error: 'slug is required' }, 400);
-    }
-    if (!(site in ctx.config.sites)) {
-      return c.json({ error: `unknown site: ${site}` }, 404);
-    }
     if (!(file instanceof File)) {
       return c.json({ error: 'file is required (multipart)' }, 400);
     }
@@ -408,15 +303,7 @@ export function createScrapbookMutationsRouter(ctx: StudioContext): Hono {
     let item: ScrapbookItem;
     try {
       const buf = Buffer.from(await file.arrayBuffer());
-      item = writeScrapbookUpload(
-        ctx.projectRoot,
-        ctx.config,
-        site,
-        slug,
-        filename,
-        buf,
-        { secret },
-      );
+      item = await uploadDispatch(ctx, env, filename, buf);
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err);
       return c.json({ error: reason }, statusForError(reason));
