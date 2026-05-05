@@ -9,7 +9,7 @@ Promote a Final-stage entry to Published. Operator runs this when the artifact i
 
 ### Prerequisite
 
-Entry must be at currentStage="Final" with reviewState="approved" or undefined (if no review cycle was needed at Final).
+Entry must be at currentStage="Final". The operator's `/deskwork:publish <slug>` invocation IS the publish event — per THESIS Consequence 2, the studio's Publish button is a clipboard-copy of this slash command and does NOT mutate sidecar state.
 
 ### Input
 

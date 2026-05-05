@@ -1,15 +1,13 @@
 ---
 name: approve
-description: Graduate an entry to the next pipeline stage; finalizes the operator's approval click in the studio
+description: Graduate an entry to the next pipeline stage. The operator's `/deskwork:approve <slug>` invocation IS the approval — the studio's Approve button is a clipboard-copy of this slash command per THESIS Consequence 2.
 ---
 
 ## Approve
 
 Graduate an entry from its current pipeline stage to the next. Approve IS the act of advancing — there is no "approve but stay."
 
-### Prerequisite
-
-The entry's sidecar must have `reviewState: "approved"` (set by the operator clicking Approve in the studio).
+The operator's `/deskwork:approve <slug>` invocation IS the approval. Per THESIS Consequence 2, the studio's Approve button is a clipboard-copy of this slash command — the studio does NOT mutate sidecar state; the skill does. There is therefore no "click Approve in the studio first" pre-step on the sidecar; the command's invocation is the click's downstream effect.
 
 ### Input
 
@@ -21,9 +19,8 @@ The entry's sidecar must have `reviewState: "approved"` (set by the operator cli
 
 1. Resolve `<slug>` → entry uuid via `.deskwork/entries/`.
 2. Read `.deskwork/entries/<uuid>.json` into sidecar.
-3. Validate gates:
-   - sidecar.reviewState === "approved". If not, refuse: "click Approve in the studio first."
-   - sidecar.currentStage in [Ideas, Planned, Outlining, Drafting]. If Final: refuse: "use /deskwork:publish for Final → Published." If Blocked/Cancelled: refuse with state-specific message.
+3. Validate stage gate:
+   - sidecar.currentStage in [Ideas, Planned, Outlining, Drafting]. If Final: refuse: "use /deskwork:publish for Final → Published." If Blocked/Cancelled: refuse with state-specific message. If Published: refuse: "Published entries are frozen."
 4. Compute nextStage from this map:
    - Ideas → Planned
    - Planned → Outlining
@@ -76,7 +73,6 @@ deskwork:
 
 ### Error handling
 
-- **reviewState not approved.** Refuse: "click Approve in the studio first; sidecar.reviewState=<actual>."
 - **Currently Final.** Refuse: "use /deskwork:publish for Final → Published."
 - **Currently Blocked/Cancelled.** Refuse: "entry is <stage>; use /deskwork:induct to bring it back first."
 - **Currently Published.** Refuse: "Published entries are frozen; future fork-on-edit model is deferred."

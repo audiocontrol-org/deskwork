@@ -16,7 +16,9 @@ The same review pipeline drives all three content kinds — the only difference 
 
 ### Prerequisite
 
-The workflow must be in state `iterating`. The operator clicks "Request iteration" in the studio to move a workflow from `in-review` → `iterating`. That's the signal the agent should start drafting.
+The operator's `/deskwork:iterate <slug>` invocation IS the request to iterate — per THESIS Consequence 2, the studio's "Request iteration" button is a clipboard-copy of this slash command and does NOT mutate workflow state. The skill itself reads margin notes, rewrites the file, and flips the workflow back to `in-review` after appending the new version (longform/outline path).
+
+For shortform (legacy workflow-object model): the underlying CLI requires the workflow to be in state `iterating` before snapshotting; that gate is enforced by the CLI itself, not by the skill prose.
 
 ### Input
 
@@ -72,8 +74,7 @@ The helper appends v(n+1) from disk, emits address annotations, and flips the wo
 
 ### Error handling
 
-- **No active workflow** — surface the helper's error. The operator must run `/deskwork:review-start` (longform) or `/deskwork:shortform-start` (shortform) first.
-- **Workflow not in `iterating`** — do NOT try to force the state. Operator clicks "Request iteration" in the studio.
+- **No active workflow** (shortform only) — for shortform, the workflow must be scaffolded first via `/deskwork:shortform-start`. The longform/outline entry-centric path does not require a separate review-start step; the first `/deskwork:iterate` invocation against an entry creates the workflow. (Note: `/deskwork:review-start` was retired with the entry-centric pipeline redesign — references to it in older docs are stale.)
 - **Disk identical to current version** — the helper refuses. The agent must actually rewrite the file, not just re-run iterate.
 - **Missing `--platform` for a shortform workflow** — helper refuses. Pass the same platform/channel the workflow was started with.
 
