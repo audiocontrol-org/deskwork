@@ -17,7 +17,7 @@ Triage the open-issue tracker for the `deskwork`, `deskwork-studio`, and support
 | 1 | Verify + close Tranche 1 (marketplace-install walk; ~10 issues) | Not started |
 | 2 | Implement #191 (entry-id mutation envelope) + tests | Fix-landed (pending v0.16.0 verification) |
 | 3 | Implement #192 (collapse dual scrapbook resolvers) + tests | Fix-landed (pending v0.16.0 verification); folded in #202 split |
-| 4 | Verify + close #190 marginalia alignment (rolls up with Phase 1) | Not started |
+| 4 | Verify + close #190 marginalia alignment (rolls up with Phase 1) | Done — operator-confirmed via workplan review |
 | 5 | Sweep moot/superseded/stale (Tranche 4 + 5); reframe #40, #53; triage #92 | Done |
 | 6 | Tracker audit — verify the open list reflects only currently-actionable work | Not started |
 | 7 | Fix marginalia edit + delete UX (#199) | Text-edit + delete fix-landed; category-edit pending; range-edit wontfix (#203 closing) |

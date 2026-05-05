@@ -5,8 +5,11 @@
   "keywords": [],
   "source": "manual",
   "currentStage": "Drafting",
-  "iterationByStage": {},
+  "iterationByStage": {
+    "Drafting": 1
+  },
   "artifactPath": "docs/0.16.0/001-IN-PROGRESS/open-issue-tranche-cleanup/workplan.md",
   "createdAt": "2026-05-05T18:17:47.969Z",
-  "updatedAt": "2026-05-05T18:17:47.969Z"
+  "updatedAt": "2026-05-05T18:25:46.424Z",
+  "reviewState": "in-review"
 }

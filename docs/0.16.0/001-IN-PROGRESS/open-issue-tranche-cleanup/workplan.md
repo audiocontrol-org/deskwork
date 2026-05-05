@@ -82,12 +82,12 @@ deskwork:
 
 ### Task 1: Walk the marginalia surface
 
-- [ ] In the test environment, navigate to a multi-comment review surface; confirm items align vertically with their `<mark>` elements (deltas within ~1px); confirm collision cascade works.
-- [ ] Post the verifying comment on #190; close.
+- [x] In the test environment, navigate to a multi-comment review surface; confirm items align vertically with their `<mark>` elements (deltas within ~1px); confirm collision cascade works. **Confirmed by operator on 2026-05-05 during the workplan review (margin note 2adcfb50): "Confirmed — this works."**
+- [x] Post the verifying comment on #190; close. (Issue was already closed; posted verification-confirmation comment.)
 
 **Acceptance Criteria:**
 
-- [ ] #190 closed.
+- [x] #190 closed.
 
 ## Phase 5 — Sweep moot/superseded/stale (Tranches 4 + 5)
 
@@ -107,7 +107,7 @@ deskwork:
 
 ### Task 3: External tracker triage
 
-- [x] Triage [#92](https://github.com/audiocontrol-org/deskwork/issues/92) — relabeled `upstream-tracking`; status comment posted documenting today's intermittent-dispatch evidence and the deskwork-side recovery flow. Left open per the operator's "close vs visible" call.
+- [x] Triage [#92](https://github.com/audiocontrol-org/deskwork/issues/92) — closed on 2026-05-05 per operator directive on the workplan review (margin note 4a9de719: "Close this issue. We've worked around this pathology in multiple ways."). Workarounds: `deskwork repair-install` + clean uninstall/reinstall + direct bin invocation. Upstream Claude Code defect remains real but not deskwork-actionable beyond existing mitigations.
 
 **Acceptance Criteria:**
 
