@@ -78,6 +78,14 @@ export async function serveScrapbookFile(
   if (!(site in ctx.config.sites)) {
     return c.json({ error: `unknown site: ${site}` }, 404);
   }
+  // Reject malformed entryId before it reaches the filesystem. `readSidecar`
+  // composes the path as `<projectRoot>/.deskwork/entries/<entryId>.json` —
+  // `node:path`'s join collapses `..` segments, so an unvalidated entryId
+  // can probe arbitrary on-disk locations even though no data is leaked
+  // (ENOENT becomes 404). Match the UUID schema enforced on entry creation.
+  if (entryId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(entryId)) {
+    return c.json({ error: 'invalid entryId' }, 400);
+  }
 
   let result;
   try {

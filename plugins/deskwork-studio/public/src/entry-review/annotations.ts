@@ -1,29 +1,16 @@
 /**
  * Margin-note authoring + load + render for the entry-keyed press-check
- * client (Phase 34a — T11).
- *
- * The composer markup + sidebar shell are server-rendered (see
+ * client. Composer markup + sidebar shell are server-rendered (see
  * `pages/entry-review/marginalia.ts`); this module wires the behavior:
+ * selection → Mark pencil → composer; submit → POST + DOM update;
+ * boot → GET + render by status (current / rebased / unresolved /
+ * resolved); per-comment Resolve / Re-open round-trip the same endpoint.
  *
- *   - Selection in the article body → reveal the floating Mark pencil.
- *   - Mark click (or click in the sidebar) → open the in-margin
- *     composer with the selected quote pre-populated.
- *   - Composer submit → POST to `/api/dev/editorial-review/entry/<uuid>/annotate`,
- *     wrap the range in a `<mark>` element + add a sidebar item.
- *   - Boot → GET `/api/dev/editorial-review/entry/<uuid>/annotations`, render
- *     existing comments by status (current / rebased / unresolved /
- *     resolved).
- *   - Per-comment Resolve / Re-open round-trips through the same endpoint
- *     with `type: 'resolve'`.
- *
- * The `workflowId` field on every persisted annotation is set to the
- * entry UUID. The field is structurally required by `DraftAnnotation`
- * for type compatibility; entry-keyed clients reuse the entry UUID as
- * a unique identifier — this convention is documented at the call site
- * where the client constructs the annotation body.
- *
- * Sidebar markup is built by helpers in `sidebar-render.ts`; this
- * module owns the controller wiring + state.
+ * `workflowId` on persisted annotations === entry UUID (structurally
+ * required by `DraftAnnotation`; entry-keyed surfaces reuse the UUID
+ * as a unique identifier). Sidebar markup lives in `sidebar-render.ts`;
+ * resolved-footer rendering lives in `resolved-footer.ts`; pure folds
+ * over the journal stream live in `annotation-folding.ts`.
  */
 
 import {
@@ -33,10 +20,15 @@ import {
   removeHighlight,
   wrapRange,
 } from './range-utils.ts';
+import { buildSidebarItem } from './sidebar-render.ts';
 import {
-  buildSidebarItem,
-  buildResolvedItem,
-} from './sidebar-render.ts';
+  renderResolvedFooter,
+  type ResolvedHistoryEntry,
+} from './resolved-footer.ts';
+import {
+  resolvedCommentIds,
+  latestAddressByCommentId,
+} from './annotation-folding.ts';
 import type {
   AnyAnnotation,
   AnnotationStatus,
@@ -88,7 +80,7 @@ export function createAnnotationsController(
   const entryId = state.entryId;
   const versionNum = state.currentVersion ?? 1;
   const sidebarIndex = new Map<string, HTMLElement>();
-  const resolvedHistory: { ann: CommentAnnotation; status: AnnotationStatus }[] = [];
+  const resolvedHistory: ResolvedHistoryEntry[] = [];
   const addressByCommentId = new Map<string, AddressAnnotation>();
   let pendingRange: DraftRange | null = null;
   /** Page-relative top of the user's selection captured when
@@ -248,24 +240,6 @@ export function createAnnotationsController(
 
   // ---- Loading ----
 
-  function computeResolvedSet(all: ResolveAnnotation[]): Set<string> {
-    const byCreatedAt = [...all].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-    const map = new Map<string, boolean>();
-    for (const r of byCreatedAt) map.set(r.commentId, r.resolved);
-    const resolved = new Set<string>();
-    for (const [commentId, isResolved] of map) {
-      if (isResolved) resolved.add(commentId);
-    }
-    return resolved;
-  }
-
-  function computeLatestAddresses(all: AddressAnnotation[]): Map<string, AddressAnnotation> {
-    const byCreatedAt = [...all].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-    const map = new Map<string, AddressAnnotation>();
-    for (const a of byCreatedAt) map.set(a.commentId, a);
-    return map;
-  }
-
   async function loadAnnotations(): Promise<void> {
     try {
       const res = await fetch(annotationsUrl());
@@ -278,9 +252,9 @@ export function createAnnotationsController(
       const comments = all.filter((a): a is CommentAnnotation => a.type === 'comment');
       const resolves = all.filter((a): a is ResolveAnnotation => a.type === 'resolve');
       const addresses = all.filter((a): a is AddressAnnotation => a.type === 'address');
-      const resolvedIds = computeResolvedSet(resolves);
+      const resolvedIds = resolvedCommentIds(resolves);
       addressByCommentId.clear();
-      for (const [id, ann] of computeLatestAddresses(addresses)) {
+      for (const [id, ann] of latestAddressByCommentId(addresses)) {
         addressByCommentId.set(id, ann);
       }
 
@@ -383,45 +357,13 @@ export function createAnnotationsController(
   }
 
   function updateResolvedFooter(): void {
-    let footer = sidebar.querySelector<HTMLElement>('[data-resolved-footer]');
-    if (resolvedHistory.length === 0) {
-      if (footer) footer.remove();
-      return;
-    }
-    if (!footer) {
-      footer = document.createElement('div');
-      footer.className = 'er-marginalia-resolved';
-      footer.dataset.resolvedFooter = '';
-      const header = document.createElement('button');
-      header.type = 'button';
-      header.className = 'er-marginalia-resolved-header';
-      header.dataset.resolvedToggle = '';
-      header.setAttribute('aria-expanded', 'false');
-      const list = document.createElement('ol');
-      list.className = 'er-marginalia-resolved-list';
-      list.dataset.resolvedList = '';
-      list.hidden = true;
-      footer.appendChild(header);
-      footer.appendChild(list);
-      sidebar.appendChild(footer);
-      header.addEventListener('click', () => {
-        const open = list.hidden;
-        list.hidden = !open;
-        header.setAttribute('aria-expanded', String(open));
-      });
-    }
-    const headerBtn = footer.querySelector<HTMLButtonElement>('[data-resolved-toggle]');
-    const list = footer.querySelector<HTMLElement>('[data-resolved-list]');
-    if (!headerBtn || !list) return;
-    headerBtn.textContent = `Resolved (${resolvedHistory.length}) ▾`;
-    list.innerHTML = '';
-    for (const { ann, status } of resolvedHistory) {
-      list.appendChild(buildResolvedItem(ann, status, {
-        draftBody,
-        addressByCommentId,
-        onReopen: (a, s) => { void reopenComment(a, s); },
-      }));
-    }
+    renderResolvedFooter({
+      sidebar,
+      draftBody,
+      addressByCommentId,
+      resolvedHistory,
+      onReopen: (a, s) => { void reopenComment(a, s); },
+    });
   }
 
   // ---- Selection -> Mark pencil ----
