@@ -11,60 +11,55 @@ deskwork:
 
 Scope: audit the implementation on `feature/deskwork-open-issue-tranche-cleanup` against this feature's `prd.md`, `workplan.md`, `README.md`, and the referenced GitHub issue contracts.
 
-## Findings
+## Current Findings
 
-### 1. High — [#191](https://github.com/audiocontrol-org/deskwork/issues/191) / [#192](https://github.com/audiocontrol-org/deskwork/issues/192) are not closed end-to-end on the standalone scrapbook surface
+### 1. Low — Phase 7 deliverable line in the workplan still says `text/range`, but the rest of the branch now consistently scopes `#199` as text + category with range-edit wontfix
 
-**Status: integrated as Phase 8 (#205) on this branch during audit-doc iteration v3.**
+This is now a documentation-only mismatch, not an implementation defect.
 
-The branch fixes the mutation API to prefer `entryId`, but the scrapbook viewer and related scrapbook links still largely read and navigate by slug/path. For entries whose on-disk location does not match the slug template, this leaves a half-migrated state: writes resolve to the entry-aware scrapbook while parts of the UI still read or link to the slug-template location.
+The current code, tests, PRD, and README all reflect the later scope decision:
 
-This conflicts with the PRD's stated downstream deliverable that [#191](https://github.com/audiocontrol-org/deskwork/issues/191) prevents orphan scrapbook writes for adopters on non-kebab-case layouts, not just at the POST endpoint layer.
+- range editing is explicitly wontfix under [#203](https://github.com/audiocontrol-org/deskwork/issues/203)
+- category editing is in scope under [#204](https://github.com/audiocontrol-org/deskwork/issues/204) and appears shipped
 
-**Resolution path** — filed as [#205](https://github.com/audiocontrol-org/deskwork/issues/205) and added as PRD §Phase 8 / workplan Phase 8 / README row 8. Symmetric to Phase 2's mutation fix:
+But the top-level Phase 7 deliverable sentence in the workplan still reads:
 
-1. Server route accepts `?entryId=<uuid>` and resolves via `scrapbookDirForEntry` + `listScrapbookForEntry`.
-2. URL builders (`scrapbookViewerUrl` + drawer + dashboard chip) prefer entry-aware URLs when an entry id is available.
-3. Client URL builders for `/api/dev/scrapbook-file` send `entryId` (route already accepts it post-v0.15.0).
+- [workplan.md](./workplan.md) line 199 — `operator can edit margin-note text/range from the sidebar`
 
-Implementation pending; tracked under #205.
+That conflicts with the more specific wording immediately below it:
 
-Relevant PRD references:
-
-- [prd.md](./prd.md) lines 17-19
-- [prd.md](./prd.md) lines 31-41
+- [workplan.md](./workplan.md) line 217 — range-edit client UI is wontfix
+- [workplan.md](./workplan.md) line 218 — category edit is in scope
+- [workplan.md](./workplan.md) line 237 — range editing wontfix
+- [prd.md](./prd.md) line 93 — range editing explicitly wontfix
+- [prd.md](./prd.md) line 95 — category editing in scope
+- [README.md](./README.md) line 23 — text-edit + delete fix-landed; category-edit fix-landed; range-edit wontfix
 
 Relevant implementation references:
 
-- [packages/studio/src/pages/scrapbook.ts](/Users/orion/work/deskwork-work/deskwork-open-issue-tranche-cleanup/packages/studio/src/pages/scrapbook.ts:624)
+- [plugins/deskwork-studio/public/src/entry-review/comment-edit-delete.ts](/Users/orion/work/deskwork-work/deskwork-open-issue-tranche-cleanup/plugins/deskwork-studio/public/src/entry-review/comment-edit-delete.ts:193)
+- [plugins/deskwork-studio/public/src/entry-review/comment-edit-delete.ts](/Users/orion/work/deskwork-work/deskwork-open-issue-tranche-cleanup/plugins/deskwork-studio/public/src/entry-review/comment-edit-delete.ts:247)
+- [packages/studio/test/entry-comment-edit-delete.test.ts](/Users/orion/work/deskwork-work/deskwork-open-issue-tranche-cleanup/packages/studio/test/entry-comment-edit-delete.test.ts:320)
+- [packages/studio/test/entry-review-edit-delete-affordances.test.ts](/Users/orion/work/deskwork-work/deskwork-open-issue-tranche-cleanup/packages/studio/test/entry-review-edit-delete-affordances.test.ts:105)
+
+## Resolved Findings
+
+### 1. Resolved — `#191/#192` read/write asymmetry on the standalone scrapbook surface
+
+The earlier finding about writes being entry-aware while reads and link emitters stayed slug/path-based is no longer accurate on the current branch. Phase 8 / [#205](https://github.com/audiocontrol-org/deskwork/issues/205) is now implemented in code and reflected in the workplan.
+
+Relevant current references:
+
+- [packages/studio/src/components/scrapbook-item.ts](/Users/orion/work/deskwork-work/deskwork-open-issue-tranche-cleanup/packages/studio/src/components/scrapbook-item.ts:107)
+- [packages/studio/src/components/scrapbook-item.ts](/Users/orion/work/deskwork-work/deskwork-open-issue-tranche-cleanup/packages/studio/src/components/scrapbook-item.ts:141)
+- [packages/studio/src/pages/review-scrapbook-drawer.ts](/Users/orion/work/deskwork-work/deskwork-open-issue-tranche-cleanup/packages/studio/src/pages/review-scrapbook-drawer.ts:151)
+- [packages/studio/src/pages/dashboard/affordances.ts](/Users/orion/work/deskwork-work/deskwork-open-issue-tranche-cleanup/packages/studio/src/pages/dashboard/affordances.ts:76)
+- [plugins/deskwork-studio/public/src/scrapbook-mutations.ts](/Users/orion/work/deskwork-work/deskwork-open-issue-tranche-cleanup/plugins/deskwork-studio/public/src/scrapbook-mutations.ts:64)
 - [packages/studio/src/pages/scrapbook.ts](/Users/orion/work/deskwork-work/deskwork-open-issue-tranche-cleanup/packages/studio/src/pages/scrapbook.ts:637)
-- [plugins/deskwork-studio/public/src/scrapbook-mutations.ts](/Users/orion/work/deskwork-work/deskwork-open-issue-tranche-cleanup/plugins/deskwork-studio/public/src/scrapbook-mutations.ts:151)
-- [plugins/deskwork-studio/public/src/scrapbook-mutations.ts](/Users/orion/work/deskwork-work/deskwork-open-issue-tranche-cleanup/plugins/deskwork-studio/public/src/scrapbook-mutations.ts:216)
-- [packages/studio/src/pages/review-scrapbook-drawer.ts](/Users/orion/work/deskwork-work/deskwork-open-issue-tranche-cleanup/packages/studio/src/pages/review-scrapbook-drawer.ts:169)
-- [packages/studio/src/components/scrapbook-item.ts](/Users/orion/work/deskwork-work/deskwork-open-issue-tranche-cleanup/packages/studio/src/components/scrapbook-item.ts:125)
-- [packages/studio/src/pages/dashboard/affordances.ts](/Users/orion/work/deskwork-work/deskwork-open-issue-tranche-cleanup/packages/studio/src/pages/dashboard/affordances.ts:71)
 
-Why this appears to have slipped through: the current tests cover the mutation API and resolver refactor, but not the full viewer/read/link integration path for a non-slug-template entry.
+### 2. Resolved — `#199` PRD mismatch around range editing
 
-### 2. Medium — [#199](https://github.com/audiocontrol-org/deskwork/issues/199) implementation matches the workplan/README, but not the PRD text
-
-**Status: resolved during audit-doc iteration v2** (operator scope decision). PRD/workplan/README updated; range editing → wontfix; category editing → in-scope.
-
-The shipped client exposes text-only editing for marginalia comments. The PRD originally promised text-and-range editing from the sidebar, including drag-to-resize range behavior. The workplan + README were updated to defer range UI to [#203](https://github.com/audiocontrol-org/deskwork/issues/203), but the PRD was not reconciled to that narrower implementation, leaving an unresolved promise.
-
-**Resolution:**
-
-- **Range editing — wontfix.** [#203](https://github.com/audiocontrol-org/deskwork/issues/203) closed as not-planned. Operator's framing: drag-to-resize is not a standard UX and would confuse rather than help; the right path for a wrong-anchored comment is delete + re-create. Server's PATCH endpoint retains `range` in its envelope (defense-in-depth + schema consistency), no client UI surfaces it.
-- **Category editing — in-scope, tracked as [#204](https://github.com/audiocontrol-org/deskwork/issues/204).** Server already accepts `category` in the PATCH envelope (shipped as part of [#199](https://github.com/audiocontrol-org/deskwork/issues/199)); the work is purely client-side — extend the inline edit affordance with a category dropdown alongside the text textarea.
-
-PRD §Phase 7 + acceptance criteria, workplan Task 3 + acceptance criteria, and feature README status table all updated to match.
-
-Relevant references (post-resolution):
-
-- [prd.md](./prd.md) — Phase 7 prose updated (range wontfix; category in-scope)
-- [workplan.md](./workplan.md) — Task 3 + acceptance criteria updated
-- [README.md](./README.md) — status row updated
-- [plugins/deskwork-studio/public/src/entry-review/comment-edit-delete.ts](/Users/orion/work/deskwork-work/deskwork-open-issue-tranche-cleanup/plugins/deskwork-studio/public/src/entry-review/comment-edit-delete.ts) — current text-only client; category extension pending under #204
+The earlier PRD/workplan mismatch finding is no longer live at the PRD level. The PRD, README, tests, and implementation now agree that range editing is wontfix and category editing is in scope/shipped. The only remaining residue is the single stale Phase 7 deliverable sentence called out above.
 
 ## Verification Notes
 

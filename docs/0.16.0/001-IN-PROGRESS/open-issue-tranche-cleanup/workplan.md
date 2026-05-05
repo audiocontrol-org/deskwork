@@ -196,7 +196,7 @@ deskwork:
 
 ## Phase 7 — Fix marginalia edit + delete UX ([#199](https://github.com/audiocontrol-org/deskwork/issues/199))
 
-**Deliverable:** operator can edit margin-note text/range from the sidebar and delete a comment outright (separate from resolve). Operator's framing: blocking UX failure on the review loop, not a deferred polish item.
+**Deliverable:** operator can edit margin-note text and category from the sidebar and delete a comment outright (separate from resolve). Range editing is wontfix per [#203](https://github.com/audiocontrol-org/deskwork/issues/203). Operator's framing: blocking UX failure on the review loop, not a deferred polish item.
 
 ### Task 1: Annotation model — edit + delete types
 
