@@ -91,6 +91,14 @@ export function createAnnotationsController(
   const resolvedHistory: { ann: CommentAnnotation; status: AnnotationStatus }[] = [];
   const addressByCommentId = new Map<string, AddressAnnotation>();
   let pendingRange: DraftRange | null = null;
+  /** Page-relative top of the user's selection captured when
+   *  `pendingRange` is set. Used by `openComposer` to anchor the
+   *  composer next to the selection so the operator stays in their
+   *  reading context (#190 follow-up — composer was opening at the
+   *  top of the marginalia column, ripping the operator out of scroll
+   *  context). Page-coords (rect.top + scrollY) survive scroll between
+   *  selection and Mark click. */
+  let pendingRangePageTop: number | null = null;
   let commentFocusIndex = -1;
 
   const annotationsUrl = (): string =>
@@ -156,6 +164,19 @@ export function createAnnotationsController(
     textArea.value = '';
     categorySel.value = 'other';
     composer.hidden = false;
+    // Anchor the composer next to the selection so the operator stays
+    // in their reading context. Without this the composer renders at
+    // the top of the marginalia column, which (when the column is
+    // scrolled with the page) lands far above where the operator was
+    // reading. Compute relative to the sidebar's page-coords so a
+    // scroll between selection and Mark click doesn't desync.
+    if (pendingRangePageTop !== null) {
+      const sidebarPageTop = sidebar.getBoundingClientRect().top + window.scrollY;
+      composer.style.position = 'absolute';
+      composer.style.left = '0';
+      composer.style.right = '0';
+      composer.style.top = `${pendingRangePageTop - sidebarPageTop}px`;
+    }
     composer.classList.add('er-marginalia-composer--entering');
     void composer.offsetWidth;
     composer.classList.remove('er-marginalia-composer--entering');
@@ -165,7 +186,12 @@ export function createAnnotationsController(
 
   function closeComposer(): void {
     composer.hidden = true;
+    composer.style.position = '';
+    composer.style.top = '';
+    composer.style.left = '';
+    composer.style.right = '';
     pendingRange = null;
+    pendingRangePageTop = null;
   }
 
   async function submitComment(): Promise<void> {
@@ -434,6 +460,7 @@ export function createAnnotationsController(
     addBtn.style.top = `${rect.top - parent.top - addBtn.offsetHeight - PENCIL_GAP}px`;
     addBtn.style.left = `${rect.left - parent.left + rect.width / 2}px`;
     pendingRange = offsets;
+    pendingRangePageTop = rect.top + window.scrollY;
   });
 
   addBtn.addEventListener('click', openComposer);
