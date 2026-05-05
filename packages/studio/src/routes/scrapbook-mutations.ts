@@ -10,16 +10,20 @@
  * Phase 16d retrofitted only the read path. v0.4.1 closes the gap
  * (issue #21).
  *
- * Two addressing modes (#191):
+ * Two addressing modes (#191, unified post-#192):
  *   - **Entry-id mode** (preferred): `{ site, entryId, ... }` — looks up
  *     the entry's sidecar, derives the scrapbook dir from the artifact's
  *     parent directory via `scrapbookDirForEntry`, mutates there. Same
  *     code path the read endpoints use; refactor-proof for projects whose
  *     feature-doc layout doesn't match the kebab-case slug template.
  *   - **Slug mode** (back-compat fallback): `{ site, slug, ... }` —
- *     legacy slug-template addressing (`<contentDir>/<slug>/scrapbook/`).
- *     Retained during a deprecation window so existing callers continue
- *     working. To be collapsed in #192.
+ *     accepted for back-compat with older clients. Post-#192, slug mode
+ *     also routes through `scrapbookDirForEntry`: passing `{ slug }`
+ *     without an id triggers the resolver's internal slug-template
+ *     fallback, so the public mutation surface is unified on the
+ *     entry-aware code path. The legacy `scrapbookDir(slug)` and the
+ *     slug-template CRUD primitives are no longer exported from
+ *     `@deskwork/core/scrapbook`.
  *
  * Companion modules (#191 split, to keep this file under the project's
  * 300–500 line cap):

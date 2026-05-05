@@ -51,28 +51,28 @@ date: 2026-05-05
 
 ## Phase 3 — Implement #192 (collapse dual scrapbook resolvers)
 
-**Deliverable:** `scrapbookDirForEntry` becomes the only public scrapbook-dir resolver; slug-template logic moves to a private fallback. Closes [#192](https://github.com/audiocontrol-org/deskwork/issues/192).
+**Deliverable:** `scrapbookDirForEntry` becomes the only public scrapbook-dir resolver; slug-template logic moves to a private fallback. Closes [#192](https://github.com/audiocontrol-org/deskwork/issues/192). Folded in [#202](https://github.com/audiocontrol-org/deskwork/issues/202)'s split of `packages/core/src/scrapbook.ts` (909 → 94-line barrel + 9 sibling modules).
 
 ### Task 1: Hide the slug-template resolver
 
-- [ ] Make `scrapbookDir(slug)` and `scrapbookFilePath(slug)` non-exported from `@deskwork/core/scrapbook`. Move them to `_scrapbookDirSlug` / `_scrapbookFilePathSlug` (or similar) inside the module as private helpers.
-- [ ] `scrapbookDirForEntry` is the single public API. When `entry.id` is missing, it falls back to the private slug-template helper internally (legacy / pre-sidecar callers).
+- [x] Make `scrapbookDir(slug)` and `scrapbookFilePath(slug)` non-exported from `@deskwork/core/scrapbook`. Move them to `_scrapbookDirSlug` / `_scrapbookFilePathSlug` (or similar) inside the module as private helpers.
+- [x] `scrapbookDirForEntry` is the single public API. When `entry.id` is missing, it falls back to the private slug-template helper internally (legacy / pre-sidecar callers).
 
 ### Task 2: Migrate remaining callers
 
-- [ ] Audit `packages/` and `plugins/` for any remaining direct calls to `scrapbookDir(...)` / `scrapbookFilePath(...)` and switch them to entry-aware lookups (CLI commands resolve via `findEntryBySlug` first, then call the entry-aware resolver).
-- [ ] Update tests in `packages/core/test/scrapbook.test.ts` to hit the new public surface.
+- [x] Audit `packages/` and `plugins/` for any remaining direct calls to `scrapbookDir(...)` / `scrapbookFilePath(...)` and switch them to entry-aware lookups (CLI commands resolve via `findEntryBySlug` first, then call the entry-aware resolver).
+- [x] Update tests in `packages/core/test/scrapbook.test.ts` to hit the new public surface.
 
 ### Task 3: Tests
 
-- [ ] Add coverage for the entry-aware path being the only one external callers touch.
-- [ ] Run `npm test --workspaces`.
+- [x] Add coverage for the entry-aware path being the only one external callers touch.
+- [x] Run `npm test --workspaces`.
 
 **Acceptance Criteria:**
 
-- [ ] `scrapbookDir` and `scrapbookFilePath` are no longer in the `@deskwork/core/scrapbook` public exports.
-- [ ] All studio + CLI callers use the entry-aware resolver.
-- [ ] Issue #192 fix-landed comment posted; closure post-marketplace-walk.
+- [x] `scrapbookDir` and `scrapbookFilePath` are no longer in the `@deskwork/core/scrapbook` public exports.
+- [x] All studio + CLI callers use the entry-aware resolver.
+- [x] Issue #192 fix-landed comment posted; closure post-marketplace-walk.
 
 ## Phase 4 — Verify + close #190 marginalia alignment
 

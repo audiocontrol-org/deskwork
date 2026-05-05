@@ -10,17 +10,18 @@
  *      (the scrapbook-file route's same pattern, landed in v0.15.0
  *      commit `14ffbe7`).
  *   3. Resolve the absolute scrapbook directory for whichever addressing
- *      mode the request used (entry-aware via `scrapbookDirForEntry`, or
- *      legacy slug-template via `scrapbookDir`).
+ *      mode the request used. Both modes route through
+ *      `scrapbookDirForEntry`: entry-id mode reads the sidecar to get
+ *      the bound `{ uuid, slug }`; slug mode synthesizes `{ slug }`
+ *      (no id) and lets the entry-aware resolver fall back to its
+ *      internal slug-template path. Post-#192 this is a single code
+ *      path with no public slug-template entry point.
  *
  * The envelope is a discriminated union (`mode: 'entry' | 'slug'`); call
  * sites narrow without `as` casts.
  */
 
-import {
-  scrapbookDir,
-  scrapbookDirForEntry,
-} from '@deskwork/core/scrapbook';
+import { scrapbookDirForEntry } from '@deskwork/core/scrapbook';
 import { readSidecar } from '@deskwork/core/sidecar';
 import type { StudioContext } from './api.ts';
 
@@ -178,9 +179,14 @@ export function checkFormEnvelope(
 // ---------------------------------------------------------------------------
 
 /**
- * Resolve the absolute scrapbook directory for a parsed envelope. Entry-
- * id mode looks up the sidecar and uses `scrapbookDirForEntry`; slug
- * mode falls back to the legacy slug-template path.
+ * Resolve the absolute scrapbook directory for a parsed envelope. Both
+ * modes go through `scrapbookDirForEntry`:
+ *   - entry-id mode reads the sidecar and passes `{ id, slug }` so the
+ *     resolver hits the index lookup (refactor-proof binding).
+ *   - slug mode passes `{ slug }` only; the resolver still goes through
+ *     `findEntryFile`, which falls back to its private slug-template
+ *     path when no id binding exists. Post-#192 this is the only code
+ *     path; the public `scrapbookDir(slug)` was retired.
  *
  * Throws on lookup / resolution failure; the caller maps the error
  * message onto the right HTTP status via `statusForError`.
@@ -198,5 +204,10 @@ export async function resolveScrapbookDir(
       { id: entry.uuid, slug: entry.slug },
     );
   }
-  return scrapbookDir(ctx.projectRoot, ctx.config, env.site, env.slug);
+  return scrapbookDirForEntry(
+    ctx.projectRoot,
+    ctx.config,
+    env.site,
+    { slug: env.slug },
+  );
 }

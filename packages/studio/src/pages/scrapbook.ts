@@ -18,7 +18,8 @@ import {
   formatRelativeTime,
   formatSize,
   listScrapbook,
-  scrapbookFilePath,
+  scrapbookDirAtPath,
+  scrapbookFilePathAtDir,
   type ScrapbookItem,
   type ScrapbookItemKind,
 } from '@deskwork/core/scrapbook';
@@ -267,7 +268,8 @@ function computeKindMeta(
   }
   let buf: Buffer;
   try {
-    const fullPath = scrapbookFilePath(ctx.projectRoot, ctx.config, site, path, item.name);
+    const dir = scrapbookDirAtPath(ctx.projectRoot, ctx.config, site, path);
+    const fullPath = scrapbookFilePathAtDir(dir, item.name);
     buf = readFileSync(fullPath);
   } catch (e) {
     if (e instanceof Error && 'code' in e && e.code === 'ENOENT') return '';
@@ -310,11 +312,9 @@ function renderPreview(
     return unsafe('');
   }
   try {
-    const fullPath = scrapbookFilePath(
-      ctx.projectRoot,
-      ctx.config,
-      site,
-      path,
+    const dir = scrapbookDirAtPath(ctx.projectRoot, ctx.config, site, path);
+    const fullPath = scrapbookFilePathAtDir(
+      dir,
       item.name,
       secret ? { secret: true } : {},
     );
