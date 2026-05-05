@@ -128,6 +128,39 @@ date: 2026-05-05
 - [ ] No issue in the open list is in a "verify and close" or "moot" state.
 - [ ] Remaining product features (#54, #84, #85, #82, #87, #86) and backlog (#18, #30, #33) are explicitly noted as out-of-scope for this feature.
 
+## Phase 9 — Ingest defaults to Drafting (per add/ingest semantic distinction) ([#206](https://github.com/audiocontrol-org/deskwork/issues/206))
+
+**Deliverable:** `/deskwork:ingest` defaults to **Drafting** stage when the source file's frontmatter has no `state:` field. Current default `Ideas` conflates `add` and `ingest` semantics; per operator framing, only `/deskwork:add` should put items in Ideas.
+
+### Task 1: Flip the default
+
+- [ ] In `packages/core/src/ingest-derive.ts:251`, change `return { value: 'Ideas', source: 'default' };` to `return { value: 'Drafting', source: 'default' };`.
+- [ ] In `packages/core/src/ingest-derive.ts:265`, same change for the `stateFrom='datePublished'` fallback site.
+- [ ] Update the inline comment that says "default to Ideas as the safest lane" — replace rationale with the add/ingest distinction.
+
+### Task 2: Skill prose
+
+- [ ] In `plugins/deskwork/skills/ingest/SKILL.md:148`, update: "Files without a `state:` field default to `Drafting` — `/deskwork:ingest` is for existing content; for new ideas use `/deskwork:add`."
+
+### Task 3: Tests
+
+- [ ] Update existing test asserting Ideas default for the no-state-field case (likely in `packages/core/test/ingest-derive.test.ts` or `packages/cli/test/ingest-*.test.ts` — find via `grep -rn "default.*Ideas" packages/core/test packages/cli/test`).
+- [ ] Add explicit regression test for the new Drafting default.
+- [ ] Add explicit regression test for `--state` flag still winning (e.g. `--state Ideas` overrides the new Drafting default).
+- [ ] Add explicit regression test for frontmatter `state:` still winning over the default.
+- [ ] Run `npm test --workspace @deskwork/core --workspace @deskwork/cli`.
+
+### Task 4: Release notes
+
+- [ ] Add a migration note for v0.16.0 release notes (or MIGRATING.md if that's where breaking-change notes live in this project) calling out the behavior change. Adopters who relied on Ideas-default get Drafting on the next ingest.
+
+**Acceptance Criteria:**
+
+- [ ] `deskwork ingest <file-without-state>` lands in Drafting.
+- [ ] `deskwork ingest <file> --state Ideas` still lands in Ideas (explicit override).
+- [ ] `deskwork ingest <file>` where file's frontmatter has `state: ideas` still lands in Ideas (frontmatter wins).
+- [ ] [#206](https://github.com/audiocontrol-org/deskwork/issues/206) fix-landed comment posted; closure pending v0.16.0 marketplace-walk verification.
+
 ## Phase 8 — Extend entry-aware addressing to studio scrapbook reads + link emitters ([#205](https://github.com/audiocontrol-org/deskwork/issues/205))
 
 **Deliverable:** the studio's scrapbook viewer + link emitters resolve via the entry-aware path for entries whose on-disk location doesn't match the slug template. Closes Finding 1 of the 2026-05-05 PRD/Workplan audit. Symmetric to Phase 2's mutation fix.

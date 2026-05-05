@@ -16,9 +16,7 @@
 
 ## Outlining
 
-| UUID | Slug | Title | Description | Keywords | Source | Updated |
-|------|------|------|------|------|------|------|
-| 998b8a29-e754-4114-8998-d1aebf6f39d3 | open-issue-tranche-cleanup/prd-workplan-audit | PRD and Workplan Audit |  |  | manual | 2026-05-05T18:00:56.328Z |
+*No entries.*
 
 ## Drafting
 
@@ -32,6 +30,7 @@
 | UUID | Slug | Title | Description | Keywords | Source | Updated |
 |------|------|------|------|------|------|------|
 | 9845c268-670f-4793-b986-0433e9ef4fb9 | deskwork-plugin/prd | Prd |  | deskwork-plugin, prd, feature-tracking, internal-doc | manual | 2026-05-03T18:18:46.400Z |
+| 998b8a29-e754-4114-8998-d1aebf6f39d3 | open-issue-tranche-cleanup/prd-workplan-audit | PRD and Workplan Audit |  |  | manual | 2026-05-05T18:08:28.297Z |
 | b3f20364-969a-4004-87bd-278cd5992e3c | open-issue-tranche-cleanup/prd | open-issue-tranche-cleanup |  |  | manual | 2026-05-05T05:57:08.343Z |
 
 ## Published

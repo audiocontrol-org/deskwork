@@ -58,6 +58,19 @@ Six phases, executed in order. Phases 2 and 3 are the only code-change phases; t
 
 **Approach:** run `gh issue list --state open` post-cleanup, group remaining open issues by implementation strategy (architecture / product features / backlog / external-tracking), update the feature `README.md` with the post-cleanup snapshot. Acceptance: no issue in the open list is in a "verify and close" or "moot" state.
 
+### Phase 9 — Ingest defaults to Drafting (per add/ingest semantic distinction) ([#206](https://github.com/audiocontrol-org/deskwork/issues/206))
+
+**Deliverable:** `/deskwork:ingest` defaults to **Drafting** stage when the source file's frontmatter has no `state:` field. The current default of **Ideas** conflates `/deskwork:ingest` with `/deskwork:add` — Ideas is for new captures with no body text; ingested files already have body text the operator wrote, so they belong in Drafting.
+
+**Why this is in scope:** dogfood evidence on this branch — three ingested docs (open-issue-tranche-proposal, this feature's PRD, the 2026-05-05 audit report) all landed in Ideas and required multiple `/deskwork:approve` cycles to reach where they actually belonged. None were ideas. Same-shape dogfood-discovered bug as the other Phase 7/8/9 items.
+
+**Approach:**
+
+1. Change the default at both fallback sites in `packages/core/src/ingest-derive.ts:251,265`: `Ideas` → `Drafting`.
+2. Update `plugins/deskwork/skills/ingest/SKILL.md:148` prose: "Files without a `state:` field default to `Drafting`."
+3. The `--state` flag and frontmatter `state:` field both continue to win — only the no-state-field default changes.
+4. Migration note in v0.16.0 release notes / MIGRATING.md: any adopter relying on the Ideas-default would now get Drafting; this is a behavior change in the direction of correctness.
+
 ### Phase 8 — Extend entry-aware addressing to studio scrapbook reads + link emitters ([#205](https://github.com/audiocontrol-org/deskwork/issues/205))
 
 **Deliverable:** the studio's scrapbook viewer + link emitters resolve via the entry-aware path for entries whose on-disk location doesn't match the slug template. Closes Finding 1 of the [2026-05-05 PRD/Workplan audit](./2026-05-05-prd-workplan-audit.md).
@@ -94,6 +107,7 @@ Six phases, executed in order. Phases 2 and 3 are the only code-change phases; t
 - [ ] [#92](https://github.com/audiocontrol-org/deskwork/issues/92) (Claude Code platform bug) disposition recorded (closed-with-reference or relabeled upstream-tracking).
 - [ ] [#199](https://github.com/audiocontrol-org/deskwork/issues/199) (marginalia edit + delete) fix-landed; operator can edit margin-note text **and category** from the sidebar and delete a comment outright (separate from resolve). Range editing is explicitly wontfix — see [#203](https://github.com/audiocontrol-org/deskwork/issues/203).
 - [ ] [#205](https://github.com/audiocontrol-org/deskwork/issues/205) (scrapbook viewer + link emitters use entry-aware addressing) fix-landed; viewer resolves via `?entryId=` when supplied; URL builders prefer entry-aware shape.
+- [ ] [#206](https://github.com/audiocontrol-org/deskwork/issues/206) (ingest defaults to Drafting) fix-landed; `/deskwork:ingest` no longer puts ingested docs in Ideas. Migration note added to v0.16.0 release notes.
 - [ ] Feature `README.md` status table updated with a post-cleanup snapshot of remaining open issues grouped by implementation strategy.
 
 ## Out of Scope

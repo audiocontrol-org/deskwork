@@ -22,6 +22,7 @@ Triage the open-issue tracker for the `deskwork`, `deskwork-studio`, and support
 | 6 | Tracker audit — verify the open list reflects only currently-actionable work | Not started |
 | 7 | Fix marginalia edit + delete UX (#199) | Text-edit + delete fix-landed; category-edit pending; range-edit wontfix (#203 closing) |
 | 8 | Extend entry-aware addressing to scrapbook viewer + link emitters (#205) | Not started (audit Finding 1) |
+| 9 | Ingest defaults to Drafting per add/ingest semantic distinction (#206) | Not started |
 
 ## Key Links
 
