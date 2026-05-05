@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-05T05:27:16.636Z",
+  "entryId": "b3f20364-969a-4004-87bd-278cd5992e3c",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "b3f20364-969a-4004-87bd-278cd5992e3c",
+    "version": 1,
+    "range": {
+      "start": 3629,
+      "end": 3635
+    },
+    "text": "lsdkfj",
+    "category": "other",
+    "anchor": "Phases",
+    "id": "43aaed60-19d7-4307-81eb-46e69dc63378",
+    "createdAt": "2026-05-05T05:27:16.636Z"
+  }
+}

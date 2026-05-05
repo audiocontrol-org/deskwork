@@ -5,8 +5,11 @@
   "keywords": [],
   "source": "manual",
   "currentStage": "Drafting",
-  "iterationByStage": {},
+  "iterationByStage": {
+    "Drafting": 2
+  },
+  "reviewState": "in-review",
   "artifactPath": "docs/0.16.0/001-IN-PROGRESS/open-issue-tranche-cleanup/prd.md",
   "createdAt": "2026-05-05T04:05:27.977Z",
-  "updatedAt": "2026-05-05T04:05:27.977Z"
+  "updatedAt": "2026-05-05T05:29:31.888Z"
 }

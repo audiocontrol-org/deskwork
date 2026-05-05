@@ -1,0 +1,13 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-05T05:23:54.210Z",
+  "entryId": "b3f20364-969a-4004-87bd-278cd5992e3c",
+  "annotation": {
+    "type": "resolve",
+    "workflowId": "b3f20364-969a-4004-87bd-278cd5992e3c",
+    "commentId": "5f1676d7-3ccc-48dd-b60d-f6f4bec5cf7e",
+    "resolved": true,
+    "id": "e066f122-968e-4aa7-b4f3-8b7484e2f6bd",
+    "createdAt": "2026-05-05T05:23:54.210Z"
+  }
+}

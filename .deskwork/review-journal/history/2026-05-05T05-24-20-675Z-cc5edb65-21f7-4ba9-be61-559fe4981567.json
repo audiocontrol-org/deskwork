@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-05T05:24:20.675Z",
+  "entryId": "b3f20364-969a-4004-87bd-278cd5992e3c",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "b3f20364-969a-4004-87bd-278cd5992e3c",
+    "version": 1,
+    "range": {
+      "start": 3629,
+      "end": 3635
+    },
+    "text": "THe phases section should go directly after the Solution section.",
+    "category": "other",
+    "anchor": "Phases",
+    "id": "36ff2f10-5dd1-4689-997b-0add34f31efb",
+    "createdAt": "2026-05-05T05:24:20.675Z"
+  }
+}
