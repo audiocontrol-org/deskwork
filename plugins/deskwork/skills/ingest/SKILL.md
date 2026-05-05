@@ -201,6 +201,16 @@ Re-running `ingest --apply` over the same paths is safe: candidates whose slug a
 - **Malformed frontmatter** — file is skipped with `frontmatter parse failed: <reason>`. The operator fixes the YAML and re-runs.
 - **Files under `<contentDir>/scrapbook/`** — skipped by default; ingest those explicitly when the operator wants them tracked.
 
+### Adjacent assets — surface a hint to consolidate into scrapbook
+
+When the dry-run plan includes a markdown file whose parent directory contains an asset directory (matching common patterns: `*-screenshots/`, `*-images/`, `assets/`, `figures/`, `media/`), surface a tip alongside the plan:
+
+> Heads up: `<doc>.md` has an adjacent asset directory at `<dir>/`. Per project convention, related assets belong in the entry's `scrapbook/` directory (adjacent to the content file) so the studio's scrapbook viewer + drawer can compose them with the entry. Consider moving them before `--apply`, or after — either works, but the move is mechanical and easier to reason about while the entry is being ingested for the first time.
+
+Do not auto-move. Operator decision; the agent flags the pattern.
+
+The reasoning: sibling asset directories don't go through the studio's existing scrapbook serving infrastructure (`/api/dev/scrapbook-file?site=…&entryId=…&name=…`), so any inline image references in the markdown will render as broken icons on the review surface. The scrapbook is the existing seam — using it avoids inventing new asset routes per audit doc. See `THESIS.md` Consequence 3.
+
 ### What this is not
 
 - **Not a migration tool for other editorial-calendar formats.** Source is markdown files on disk + their frontmatter. Importing from Notion / Airtable / a different calendar-markdown shape is out of scope.

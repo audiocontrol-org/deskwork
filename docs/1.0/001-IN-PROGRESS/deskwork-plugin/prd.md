@@ -600,3 +600,49 @@ Phase 34 has five sub-phases. **34a is blocking** — until it ships, the studio
 - **Not blocked on Phase 34's other sub-phases.** 34a ships first as a standalone PR; once merged + released, 34b through 34e proceed.
 - **Not a redesign.** The visual treatment of the unified surface IS the existing legacy chrome (margin notes, paper-grain background, press-check controls). The change is structural — entry-keyed data flow, unified codepath, deleted legacy. No new design work. No new aesthetic decisions.
 
+---
+
+## Extension: Phase 35 — Adjacent assets relocate to scrapbook; codify the pattern in skills + thesis
+
+Added 2026-05-04 from operator framing during the audit doc's first iteration cycle: the audit asked for inline screenshots so a reader could *"see the actual design/layout instead of just reading about it,"* and my v3 attempt embedded broken images because the studio's review surface doesn't serve content-tree-relative URLs. The fix is not new infrastructure (a new asset-serving route + rehype rewriter) — it's using the per-entry scrapbook that already exists, is already wired, and is already served by the studio at `/api/dev/scrapbook-file?site=…&path=…&name=…`. This phase relocates the audit's screenshots into the scrapbook, rewrites the inline image URLs, and codifies the pattern in the skills that scaffold or ingest entries plus the thesis itself, so future authors land at scrapbook on instinct rather than inventing sibling directories.
+
+This connects directly to `THESIS.md` Consequence 3 (operator extends the plugin via their agent — defaults inside, overrides under `<projectRoot>/.deskwork/`). The scrapbook IS one of the override-shaped seams the thesis names; using it is the test of whether the project trusts its own seams. The previous attempt did not.
+
+### Why this lands now
+
+Three reasons:
+
+- The audit doc's iteration ask is real and unaddressed in v3 (broken images on the review surface).
+- Phase 34's success surfaced that prose-only audit docs miss the visual evidence that motivated the audit in the first place; future audits will want the same inline-asset pattern.
+- The thesis articulation in the previous extension (which lands as Phase 35a — see Sub-phase note below) named "use the existing seam, not a new directory" as a load-bearing principle. The first concrete test of that principle was failing silently. Codifying the pattern in `/deskwork:add`, `/deskwork:ingest`, and `THESIS.md` Consequence 3 prevents future authors from reinventing the seam.
+
+### Scope of Phase 35
+
+Two sub-phases, plus a retroactive note on completed work:
+
+- **35a (already shipped, captured retroactively for the workplan record)** — `THESIS.md` authored, ingested, wired into `/session-start`; v0.9.x source-shipped honeypots cleaned (MIGRATING.md banner, README.md migration pointer, `docs/source-shipped-deskwork-plan/index.md` SUPERSEDED header, `docs/1.0/001-IN-PROGRESS/dw-lifecycle/design.md` fork-to-customize directive replaced with override-seam pointer); studio decision strip retired its state-machine endpoints + rewired Approve/Iterate/Induct to clipboard-copy (`copyOrShowFallback` of `/deskwork:<verb> <slug>`); manual rewritten to match. Commits `07be851`, `0782bbc`, `c21b8b9`. This sub-phase predates this PRD extension by hours; it's recorded here so the workplan ledger isn't lying about what shipped between Phase 34 and Phase 35b.
+
+- **35b — Audit doc's screenshots relocate to scrapbook**:
+  - Move all 9 PNGs from `docs/1.0/001-IN-PROGRESS/deskwork-plugin/2026-05-03-issue-158-screenshots/` to `docs/1.0/001-IN-PROGRESS/deskwork-plugin/scrapbook/`. Delete the now-empty source directory.
+  - Rewrite the audit doc's 9 inline `![](...)` paths and the appendix bullet list to use `/api/dev/scrapbook-file?site=deskwork-internal&path=1.0%2F001-IN-PROGRESS%2Fdeskwork-plugin&name=<filename>.png` (the studio's existing scrapbook-file route).
+  - Re-iterate the audit doc to v(n+1) via `/deskwork:iterate deskwork-plugin/issue-158-ux-audit` so the operator's `aeaf040f` margin note (the original "include screenshots so we can see the design") is actually addressed on the surface they review on.
+  - **Verification:** load `/dev/editorial-review/entry/36a268a4-...` and confirm `document.querySelectorAll('#draft-body img').length === 9` AND every img has `complete && naturalWidth > 0`.
+
+- **35c — Skill augmentation: codify "adjacent assets → scrapbook" as a general pattern**:
+  - `plugins/deskwork/skills/add/SKILL.md` gains a brief note on the scaffolded `idea.md` saying "drop research artifacts (screenshots, mockups, sources) under `<entry>/scrapbook/` — the plugin already serves them and the review surface composes them via the scrapbook drawer."
+  - `plugins/deskwork/skills/ingest/SKILL.md` gains a hint on the dry-run output: when an ingested doc has an adjacent asset directory, suggest consolidating into the entry's scrapbook before re-running `--apply`.
+  - `THESIS.md` Consequence 3 gains a one-paragraph "operator extension via scrapbook" pattern note — concrete example that codifies "use the existing seam, not a new directory" against the audit-doc-screenshots case study.
+
+### What Phase 35 is not
+
+- **Not a friendlier short-form URL** like `<scrap:filename>` resolved by a custom markdown renderer. The verbose `/api/dev/scrapbook-file?…` URLs work and are computable from the file's location. A custom resolver creates path-encoding bugs waiting to break and another override-seam dimension to maintain. (Operator decision, recorded so future sessions don't re-litigate.)
+- **Not a new asset-serving route on the studio.** A new `/api/dev/entry-asset/<entryId>/*` route + a rehype `<img src>` rewrite plugin would have served the same purpose, but the scrapbook already does the work. New infrastructure here would have been reinvention, in violation of THESIS Consequence 3.
+- **Not a refactor of the scrapbook's per-entry semantics.** The current convention (scrapbook = `dirname(artifactPath) + '/scrapbook/'`) means feature-doc directories with multiple tracked entries (PRD + workplan + audit + …) share one scrapbook. The operator has confirmed this is a feature, not a bug, for this project. If a future project needs per-entry isolation, that's a separate scope.
+
+### Acceptance
+
+Phase 35 closes when:
+
+- 35b: audit doc renders all 9 inline screenshots on the review surface (loaded: true; `<img>` elements have natural dimensions); the sibling `2026-05-03-issue-158-screenshots/` directory no longer exists; comment `aeaf040f` is recorded as `addressed`.
+- 35c: each of `/deskwork:add`, `/deskwork:ingest`, and `THESIS.md` Consequence 3 mentions the scrapbook-as-asset-home pattern with concrete language an agent can act on.
+

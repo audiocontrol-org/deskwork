@@ -5,8 +5,11 @@
   "keywords": [],
   "source": "manual",
   "currentStage": "Ideas",
-  "iterationByStage": {},
+  "iterationByStage": {
+    "Ideas": 5
+  },
+  "reviewState": "in-review",
   "artifactPath": "docs/1.0/001-IN-PROGRESS/deskwork-plugin/2026-05-03-issue-158-ux-audit.md",
   "createdAt": "2026-05-04T03:08:30.439Z",
-  "updatedAt": "2026-05-04T03:08:30.439Z"
+  "updatedAt": "2026-05-05T02:06:53.844Z"
 }

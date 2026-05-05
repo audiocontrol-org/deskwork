@@ -1826,3 +1826,39 @@ GitHub tracking issues:
 - Dispatch order: 34a → 34b → 34c → 34d → 34e. None of the others can start until 34a ships, because every other sub-phase's verification depends on a working studio review surface.
 - This phase ships across multiple PRs and likely multiple release versions. 34a alone is large enough that it may need its own internal task breakdown — that breakdown happens at the start of 34a implementation, not during this PRD review.
 - The pattern of "filed during dogfood" follow-ups remains the signal: if 34a surfaces new issues during implementation (likely it will — porting 710 lines of chrome will turn over rocks), they get filed in real time per `agent-discipline.md`, not bundled into a future "Phase 35" pre-emptively.
+
+---
+
+### Phase 35: Adjacent assets relocate to scrapbook; codify the pattern in skills + thesis
+
+**Trigger:** Operator's audit-doc iteration ask (*"so we can see the actual design/layout instead of just reading about it"*) and the broken-image v3 attempt that didn't address it. Source-of-truth: PRD §"Extension: Phase 35".
+
+**Sub-phase 35a — THESIS articulation, honeypot cleanup, decision-strip thesis-conformance** (already shipped — recorded retroactively):
+
+- [x] `THESIS.md` authored at repo root with three architectural consequences (distribution, skill/studio split, override seam). Commit `07be851`.
+- [x] `/session-start` skill wires THESIS.md as step 1. Commit `07be851`.
+- [x] Honeypots cleaned: `MIGRATING.md` v0.9.x section banner; `README.md` migration pointer; `docs/source-shipped-deskwork-plan/index.md` SUPERSEDED header; `docs/1.0/001-IN-PROGRESS/dw-lifecycle/design.md` fork-to-customize directive replaced with override-seam pointer. Commits `07be851`, `0782bbc`.
+- [x] Studio decision-strip + induct picker rewired from POST → `copyOrShowFallback` of `/deskwork:<verb> <slug>`. Server endpoints retired (returns 404). Manual rewritten. 16 retirement-collateral tests removed; 349 studio tests passing. Commit `c21b8b9`. Closes [#189](https://github.com/audiocontrol-org/deskwork/issues/189).
+
+**Sub-phase 35b — Audit doc's screenshots relocate to scrapbook**:
+
+- [ ] Move 9 PNGs from `docs/1.0/001-IN-PROGRESS/deskwork-plugin/2026-05-03-issue-158-screenshots/` → `docs/1.0/001-IN-PROGRESS/deskwork-plugin/scrapbook/`. Delete the now-empty source directory.
+- [ ] Rewrite the audit doc's 9 inline `![](...)` paths and the appendix bullet list to use `/api/dev/scrapbook-file?site=deskwork-internal&path=1.0%2F001-IN-PROGRESS%2Fdeskwork-plugin&name=<filename>.png`.
+- [ ] Re-iterate the audit doc via `/deskwork:iterate deskwork-plugin/issue-158-ux-audit` (snapshot v4).
+- [ ] Verify on `/dev/editorial-review/entry/36a268a4-c7ac-4802-8992-20319a08fa92`: `document.querySelectorAll('#draft-body img').length === 9` AND every `<img>` reports `complete && naturalWidth > 0`.
+
+**Sub-phase 35c — Skill augmentation: "adjacent assets → scrapbook" pattern**:
+
+- [ ] `plugins/deskwork/skills/add/SKILL.md` gains a note on the scaffolded `idea.md` saying drop research artifacts under `<entry>/scrapbook/`; the plugin serves them via `/api/dev/scrapbook-file` and the review surface composes them via the scrapbook drawer.
+- [ ] `plugins/deskwork/skills/ingest/SKILL.md` gains a hint on the dry-run plan: when an ingested doc has an adjacent asset directory, suggest consolidating into the entry's scrapbook before `--apply`.
+- [ ] `THESIS.md` Consequence 3 gains a one-paragraph "operator extension via scrapbook" pattern note — concrete example codifying "use the existing seam, not a new directory" against the audit-doc-screenshots case.
+
+**Acceptance:** see PRD §"Phase 35 — Acceptance".
+
+**Out of scope (operator decision):**
+
+- Friendlier short-form URLs like `<scrap:filename>` resolved by a custom markdown renderer (path-encoding bugs waiting to break; the verbose URLs work).
+- New asset-serving routes (the scrapbook already does the work).
+- Refactoring scrapbook's per-entry semantics (shared scrapbook for feature-doc directories is acceptable for this project).
+
+**GitHub tracking:** issues filed after the PRD's deskwork workflow reaches `applied`.

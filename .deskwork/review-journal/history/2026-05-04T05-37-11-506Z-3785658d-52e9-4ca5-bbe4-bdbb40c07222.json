@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-04T05:37:11.506Z",
+  "entryId": "36a268a4-c7ac-4802-8992-20319a08fa92",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "36a268a4-c7ac-4802-8992-20319a08fa92",
+    "version": 1,
+    "range": {
+      "start": 2602,
+      "end": 2709
+    },
+    "text": "We should have up-to-date screenshots in this document so we can see the actual design/layout instead of just reading about it.",
+    "category": "other",
+    "anchor": "Five active pagehead shapes; one outlier surface (manual) that doesn't consume the shared container at all.",
+    "id": "aeaf040f-d243-43f4-b7ec-0e33df8fee51",
+    "createdAt": "2026-05-04T05:37:11.506Z"
+  }
+}

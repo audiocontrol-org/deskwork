@@ -208,6 +208,20 @@ The current state of this consequence is the project's largest debt
 against the thesis. It's not a feature backlog — it's a build
 commitment that the project hasn't honored yet.
 
+### Pattern: adjacent assets belong in the entry's scrapbook (concrete example)
+
+When an entry has related assets — screenshots illustrating an audit, mockups for a design doc, source data for a spec, reference images for a draft — those belong in the entry's per-entry **scrapbook** directory (adjacent to the content file at `dirname(artifactPath) + '/scrapbook/'`), NOT in a sibling directory parallel to the doc. The plugin already serves them through the existing scrapbook infrastructure:
+
+- The scrapbook viewer at `/dev/scrapbook/<site>/<path>` renders per-kind cards.
+- The scrapbook drawer in the review surface composes them alongside the entry's body.
+- Binary files are reachable via `/api/dev/scrapbook-file?site=…&entryId=…&name=…` (entry-id mode — works for projects whose layout doesn't match the kebab-case slug template) or the slug-shape `?path=…&name=…` mode for projects that follow the simple-blog `<contentDir>/<slug>/index.md` convention.
+
+This pattern emerged from the issue-158 UX-audit case study: an audit doc was authored with screenshots in a sibling `2026-05-03-issue-158-screenshots/` directory. Inline image references rendered as broken icons on the review surface because the studio's review surface doesn't serve content-tree-relative URLs from arbitrary paths — and rightly so. The architecturally correct shape was to move the screenshots into the entry's scrapbook (where they're already served) and reference them via the scrapbook-file route. The wrong-but-tempting alternative was to invent a new entry-asset route + a rehype `<img src>` rewriter — pure reinvention of infrastructure that already exists.
+
+When the agent reaches for a sibling directory + new server route + custom URL rewriter, the question to ask first is *"is there already a place for this?"* For per-entry assets, the scrapbook is the answer.
+
+The `/deskwork:add` and `/deskwork:ingest` skills both surface this pattern in their prose (drop research artifacts in `<entry>/scrapbook/`; flag adjacent asset directories during ingest). The pattern shows up here in the thesis because it's a consequence of the broader principle: use the existing seam, not a new directory. New routes / new directories / new addressing modes should be the last resort, after asking whether the existing infrastructure can serve.
+
 ## The anti-patterns this thesis rejects
 
 | Anti-pattern | What it looks like | Why it violates the thesis |
