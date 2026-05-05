@@ -4,11 +4,11 @@
   "title": "PRD and Workplan Audit",
   "keywords": [],
   "source": "manual",
-  "currentStage": "Planned",
+  "currentStage": "Outlining",
   "iterationByStage": {
     "Ideas": 3
   },
   "artifactPath": "docs/0.16.0/001-IN-PROGRESS/open-issue-tranche-cleanup/2026-05-05-prd-workplan-audit.md",
   "createdAt": "2026-05-05T17:36:20.083Z",
-  "updatedAt": "2026-05-05T17:58:45.696Z"
+  "updatedAt": "2026-05-05T18:00:56.328Z"
 }

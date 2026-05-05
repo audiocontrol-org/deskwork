@@ -13,11 +13,12 @@
 |------|------|------|------|------|------|------|
 | 36a268a4-c7ac-4802-8992-20319a08fa92 | deskwork-plugin/issue-158-ux-audit | Issue 158 Ux Audit |  |  | manual | 2026-05-05T02:47:44.942Z |
 | 818a5ef7-5ff8-444a-a01c-3fa31906d345 | deskwork-plugin/open-issue-tranche-proposal | Open Issue Tranche Proposal |  |  | manual | 2026-05-05T02:50:05.857Z |
-| 998b8a29-e754-4114-8998-d1aebf6f39d3 | open-issue-tranche-cleanup/prd-workplan-audit | PRD and Workplan Audit |  |  | manual | 2026-05-05T17:58:45.696Z |
 
 ## Outlining
 
-*No entries.*
+| UUID | Slug | Title | Description | Keywords | Source | Updated |
+|------|------|------|------|------|------|------|
+| 998b8a29-e754-4114-8998-d1aebf6f39d3 | open-issue-tranche-cleanup/prd-workplan-audit | PRD and Workplan Audit |  |  | manual | 2026-05-05T18:00:56.328Z |
 
 ## Drafting
 
