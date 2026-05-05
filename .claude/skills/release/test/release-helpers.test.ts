@@ -252,7 +252,55 @@ describe('atomicPush', () => {
       // atomicPush should fail because origin/main moved.
       await expect(
         atomicPush({ tag: 'v0.0.1', branch: 'feature/test', cwd: rig.localPath }),
-      ).rejects.toThrow(/non-fast-forward|rejected/i);
+      ).rejects.toThrow(/non-fast-forward|rejected|atomic/i);
+      const { rmSync } = await import('node:fs');
+      rmSync(otherClone, { recursive: true, force: true });
+    } finally {
+      rig.cleanup();
+    }
+  });
+
+  it('atomicity: when one ref fails, no other ref is published to origin', async () => {
+    // With --atomic, a failed push of any one ref aborts the whole push.
+    // Without --atomic, the branch ref or tag could land on origin even
+    // when the main ref is rejected — that's the partial-push window
+    // issue #195's ref-pinning depends on closing.
+    const rig = createRig();
+    try {
+      // Move origin/main forward so HEAD:main will be rejected.
+      const otherClone = `${rig.localPath}-other`;
+      const { execSync } = await import('node:child_process');
+      execSync(`git clone "${rig.remotePath}" "${otherClone}"`, { stdio: 'pipe' });
+      execSync('git config user.email rig@example.com', { cwd: otherClone, stdio: 'pipe' });
+      execSync('git config user.name Rig', { cwd: otherClone, stdio: 'pipe' });
+      execSync('git checkout main', { cwd: otherClone, stdio: 'pipe' });
+      execSync('echo upstream > up.txt && git add up.txt && git commit -m up && git push', {
+        cwd: otherClone,
+        stdio: 'pipe',
+        shell: '/bin/bash',
+      });
+
+      // Capture origin's branch/tag state BEFORE the failed push.
+      const branchBefore = rig.sh('git ls-remote origin refs/heads/feature/test').trim();
+      const tagBefore = rig.sh('git ls-remote origin refs/tags/v0.0.1').trim();
+
+      // Local commit + tag, then attempt the atomic push.
+      rig.sh('echo r > r.txt && git add r.txt && git commit -m "chore: release v0.0.1"');
+      rig.sh('git tag -a v0.0.1 -m "test"');
+      const localBranchAhead = rig.sh('git rev-parse HEAD').trim();
+
+      await expect(
+        atomicPush({ tag: 'v0.0.1', branch: 'feature/test', cwd: rig.localPath }),
+      ).rejects.toThrow();
+
+      // Atomicity contract: origin's branch and tag are unchanged.
+      const branchAfter = rig.sh('git ls-remote origin refs/heads/feature/test').trim();
+      const tagAfter = rig.sh('git ls-remote origin refs/tags/v0.0.1').trim();
+      expect(branchAfter).toBe(branchBefore);
+      expect(tagAfter).toBe(tagBefore);
+      // Sanity: origin/feature/test does not point at our local HEAD.
+      expect(branchAfter).not.toMatch(new RegExp(`^${localBranchAhead}\\s`));
+
       const { rmSync } = await import('node:fs');
       rmSync(otherClone, { recursive: true, force: true });
     } finally {
