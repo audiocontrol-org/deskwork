@@ -16,13 +16,26 @@
  * entry-keyed here) intentionally do not interoperate — workflow
  * annotations are NOT visible from the entry-keyed listing, and vice
  * versa. See the `routes/api.ts` header for the split contract.
+ *
+ * Phase 35 (issue #199) — append-only edit + delete journal:
+ *   - `edit-comment` annotations replace a prior comment's text /
+ *     range / category / anchor in the FOLDED view.
+ *   - `delete-comment` annotations tombstone a prior comment in the
+ *     FOLDED view.
+ *
+ * `listEntryAnnotations` returns the FOLDED view by default. The raw
+ * unfolded stream (for audit views) is accessible via
+ * `listEntryAnnotationsRaw`.
  */
 
 import { randomUUID } from 'node:crypto';
 import { appendJournalEvent } from '../journal/append.ts';
 import { readJournalEvents } from '../journal/read.ts';
 import type { JournalEvent } from '../schema/journal-events.ts';
-import type { DraftAnnotation } from '../review/types.ts';
+import type {
+  CommentAnnotation,
+  DraftAnnotation,
+} from '../review/types.ts';
 
 /**
  * The Zod schema (`DraftAnnotationSchema`) infers each optional field
@@ -95,18 +108,53 @@ function toDraftAnnotation(stored: StoredAnnotation): DraftAnnotation {
         disposition: stored.disposition,
         ...(stored.reason !== undefined ? { reason: stored.reason } : {}),
       };
+    case 'edit-comment':
+      return {
+        ...base,
+        type: 'edit-comment',
+        commentId: stored.commentId,
+        ...(stored.text !== undefined ? { text: stored.text } : {}),
+        ...(stored.range !== undefined
+          ? { range: { start: stored.range.start, end: stored.range.end } }
+          : {}),
+        ...(stored.category !== undefined ? { category: stored.category } : {}),
+        ...(stored.anchor !== undefined ? { anchor: stored.anchor } : {}),
+      };
+    case 'delete-comment':
+      return {
+        ...base,
+        type: 'delete-comment',
+        commentId: stored.commentId,
+      };
   }
 }
 
 /**
  * Append an entry-keyed annotation. The annotation should already have
  * its `id` and `createdAt` minted (use `mintEntryAnnotation`).
+ *
+ * Phase 35: validates that `edit-comment` and `delete-comment`
+ * annotations reference an existing `comment` annotation in the same
+ * entry's stream. Throws when the referent is missing — preferable to
+ * silently persisting an orphan that the folder will skip over.
  */
 export async function addEntryAnnotation(
   projectRoot: string,
   entryId: string,
   annotation: DraftAnnotation,
 ): Promise<void> {
+  if (annotation.type === 'edit-comment' || annotation.type === 'delete-comment') {
+    const raw = await listEntryAnnotationsRaw(projectRoot, entryId);
+    const referent = raw.find(
+      (a): a is CommentAnnotation =>
+        a.type === 'comment' && a.id === annotation.commentId,
+    );
+    if (!referent) {
+      throw new Error(
+        `addEntryAnnotation refused: ${annotation.type} references unknown commentId ${annotation.commentId}`,
+      );
+    }
+  }
   await appendJournalEvent(projectRoot, {
     kind: 'entry-annotation',
     at: annotation.createdAt,
@@ -116,11 +164,38 @@ export async function addEntryAnnotation(
 }
 
 /**
- * List every entry-keyed annotation for `entryId`, in chronological
- * order. Returns an empty array when there are none — never throws,
- * never returns null.
+ * List the FOLDED active-comment view of every entry-keyed annotation
+ * for `entryId`, in chronological order:
+ *
+ *   - For each `comment`, apply every later `edit-comment` whose
+ *     `commentId` matches (in journal order). Missing fields preserve
+ *     the prior value.
+ *   - Drop any `comment` for which a `delete-comment` annotation
+ *     exists.
+ *
+ * Non-comment annotations (resolve / address / approve / reject / edit
+ * / orphaned edit-comment / delete-comment) pass through unchanged so
+ * the renderer can still see them. (Edit-comment / delete-comment that
+ * fail validation at write time can never reach this code — only ones
+ * whose target later disappeared via journal damage would surface.)
+ *
+ * Returns an empty array when there are none — never throws, never
+ * returns null.
  */
 export async function listEntryAnnotations(
+  projectRoot: string,
+  entryId: string,
+): Promise<DraftAnnotation[]> {
+  const raw = await listEntryAnnotationsRaw(projectRoot, entryId);
+  return foldAnnotations(raw);
+}
+
+/**
+ * List the RAW (unfolded) entry-keyed annotation stream — every
+ * `comment` / `edit-comment` / `delete-comment` / etc. as recorded on
+ * disk, in chronological order. Useful for audit views.
+ */
+export async function listEntryAnnotationsRaw(
   projectRoot: string,
   entryId: string,
 ): Promise<DraftAnnotation[]> {
@@ -131,6 +206,78 @@ export async function listEntryAnnotations(
       out.push(toDraftAnnotation(event.annotation));
     }
   }
+  return out;
+}
+
+/**
+ * Pure fold over the raw annotation stream. Single pass to gather
+ * edit + delete journals indexed by `commentId`, then one walk to emit
+ * either the (possibly-edited) comment or skip it (if deleted) — and
+ * pass non-comment annotations through unchanged.
+ *
+ * Chronological order is taken from the input array's order (callers
+ * must pass the journal-sorted stream from `readJournalEvents`).
+ */
+function foldAnnotations(raw: DraftAnnotation[]): DraftAnnotation[] {
+  const editsByCommentId = new Map<string, DraftAnnotation[]>();
+  const deletedCommentIds = new Set<string>();
+  for (const a of raw) {
+    if (a.type === 'edit-comment') {
+      const arr = editsByCommentId.get(a.commentId) ?? [];
+      arr.push(a);
+      editsByCommentId.set(a.commentId, arr);
+    } else if (a.type === 'delete-comment') {
+      deletedCommentIds.add(a.commentId);
+    }
+  }
+
+  const out: DraftAnnotation[] = [];
+  for (const a of raw) {
+    if (a.type === 'edit-comment' || a.type === 'delete-comment') {
+      // Fold-only events; not surfaced in the active view.
+      continue;
+    }
+    if (a.type === 'comment') {
+      if (deletedCommentIds.has(a.id)) continue;
+      const edits = editsByCommentId.get(a.id);
+      if (!edits || edits.length === 0) {
+        out.push(a);
+        continue;
+      }
+      out.push(applyEdits(a, edits));
+      continue;
+    }
+    out.push(a);
+  }
+  return out;
+}
+
+function applyEdits(
+  comment: CommentAnnotation,
+  edits: DraftAnnotation[],
+): CommentAnnotation {
+  let text = comment.text;
+  let range = comment.range;
+  let category = comment.category;
+  let anchor = comment.anchor;
+  for (const e of edits) {
+    if (e.type !== 'edit-comment') continue;
+    if (e.text !== undefined) text = e.text;
+    if (e.range !== undefined) range = { start: e.range.start, end: e.range.end };
+    if (e.category !== undefined) category = e.category;
+    if (e.anchor !== undefined) anchor = e.anchor;
+  }
+  const out: CommentAnnotation = {
+    id: comment.id,
+    workflowId: comment.workflowId,
+    createdAt: comment.createdAt,
+    type: 'comment',
+    version: comment.version,
+    range,
+    text,
+    ...(category !== undefined ? { category } : {}),
+    ...(anchor !== undefined ? { anchor } : {}),
+  };
   return out;
 }
 

@@ -37,7 +37,20 @@ import { readSidecar } from '@deskwork/core/sidecar';
 import type { DeskworkConfig } from '@deskwork/core/config';
 import type { OverrideResolver } from '@deskwork/core/overrides';
 import type { DraftAnnotation } from '@deskwork/core/review/types';
-import { parseEntryAnnotationBody } from './entry-annotation-body.ts';
+import {
+  parseEntryAnnotationBody,
+  parseEditCommentFields,
+} from './entry-annotation-body.ts';
+
+/**
+ * Mirrors the UUID regex enforced on entry creation and used by the
+ * scrapbook-* and entry-keyed page routes (commit `14ffbe7`). Reject
+ * malformed `entryId` / `commentId` before reaching the journal — both
+ * are persisted in `<projectRoot>/.deskwork/...` paths and an
+ * unvalidated id can probe arbitrary on-disk locations.
+ */
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Narrow a `HandlerResult.body` (typed as `unknown`) to extract the
@@ -253,7 +266,17 @@ export function createApiRouter(ctx: StudioContext): Hono {
       return c.json({ error: `unknown entry: ${entryId}` }, status);
     }
     const minted: DraftAnnotation = mintEntryAnnotation(parsed.draft);
-    await addEntryAnnotation(ctx.projectRoot, entryId, minted);
+    try {
+      await addEntryAnnotation(ctx.projectRoot, entryId, minted);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // edit-comment / delete-comment writes that reference an unknown
+      // commentId surface here as a 404; everything else is a 500.
+      if (msg.includes('unknown commentId')) {
+        return c.json({ error: msg }, 404);
+      }
+      return c.json({ error: msg }, 500);
+    }
     return c.json({ annotation: minted });
   });
 
@@ -262,6 +285,94 @@ export function createApiRouter(ctx: StudioContext): Hono {
     const entryId = c.req.param('entryId');
     const annotations = await listEntryAnnotations(ctx.projectRoot, entryId);
     return c.json({ annotations });
+  });
+
+  // Phase 35 (issue #199) — append-only edit + delete journal for
+  // marginalia comments. PATCH appends an `edit-comment` annotation;
+  // DELETE appends a `delete-comment` annotation. Both fold into the
+  // active-comment view returned by the GET above; the original
+  // `comment` annotation is preserved on disk as audit trail.
+
+  // PATCH /api/dev/editorial-review/entry/:entryId/comments/:commentId
+  app.patch('/entry/:entryId/comments/:commentId', async (c) => {
+    const entryId = c.req.param('entryId');
+    const commentId = c.req.param('commentId');
+    if (!UUID_RE.test(entryId)) {
+      return c.json({ error: `malformed entryId: ${entryId}` }, 400);
+    }
+    if (!UUID_RE.test(commentId)) {
+      return c.json({ error: `malformed commentId: ${commentId}` }, 400);
+    }
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'invalid JSON body' }, 400);
+    }
+    const parsed = parseEditCommentFields(body);
+    if (parsed.kind === 'err') {
+      return c.json({ error: parsed.message }, parsed.status);
+    }
+    try {
+      await readSidecar(ctx.projectRoot, entryId);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const status = msg.startsWith('sidecar not found') ? 404 : 500;
+      return c.json({ error: `unknown entry: ${entryId}` }, status);
+    }
+    const minted: DraftAnnotation = mintEntryAnnotation({
+      type: 'edit-comment',
+      workflowId: entryId,
+      commentId,
+      ...(parsed.fields.text !== undefined ? { text: parsed.fields.text } : {}),
+      ...(parsed.fields.range !== undefined ? { range: parsed.fields.range } : {}),
+      ...(parsed.fields.category !== undefined ? { category: parsed.fields.category } : {}),
+      ...(parsed.fields.anchor !== undefined ? { anchor: parsed.fields.anchor } : {}),
+    });
+    try {
+      await addEntryAnnotation(ctx.projectRoot, entryId, minted);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('unknown commentId')) {
+        return c.json({ error: msg }, 404);
+      }
+      return c.json({ error: msg }, 500);
+    }
+    return c.json({ annotation: minted });
+  });
+
+  // DELETE /api/dev/editorial-review/entry/:entryId/comments/:commentId
+  app.delete('/entry/:entryId/comments/:commentId', async (c) => {
+    const entryId = c.req.param('entryId');
+    const commentId = c.req.param('commentId');
+    if (!UUID_RE.test(entryId)) {
+      return c.json({ error: `malformed entryId: ${entryId}` }, 400);
+    }
+    if (!UUID_RE.test(commentId)) {
+      return c.json({ error: `malformed commentId: ${commentId}` }, 400);
+    }
+    try {
+      await readSidecar(ctx.projectRoot, entryId);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const status = msg.startsWith('sidecar not found') ? 404 : 500;
+      return c.json({ error: `unknown entry: ${entryId}` }, status);
+    }
+    const minted: DraftAnnotation = mintEntryAnnotation({
+      type: 'delete-comment',
+      workflowId: entryId,
+      commentId,
+    });
+    try {
+      await addEntryAnnotation(ctx.projectRoot, entryId, minted);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('unknown commentId')) {
+        return c.json({ error: msg }, 404);
+      }
+      return c.json({ error: msg }, 500);
+    }
+    return c.json({ annotation: minted });
   });
 
   // The entry-keyed `/entry/:entryId/decision` and `/entry/:entryId/version`

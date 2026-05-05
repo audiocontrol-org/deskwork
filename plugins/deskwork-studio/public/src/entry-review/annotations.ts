@@ -22,6 +22,10 @@ import {
 } from './range-utils.ts';
 import { buildSidebarItem } from './sidebar-render.ts';
 import {
+  createCommentEditApi,
+  createEditDeleteHandlers,
+} from './comment-edit-delete.ts';
+import {
   renderResolvedFooter,
   type ResolvedHistoryEntry,
 } from './resolved-footer.ts';
@@ -97,6 +101,17 @@ export function createAnnotationsController(
     `${ENTRY_API}/${encodeURIComponent(entryId)}/annotations`;
   const annotateUrl = (): string =>
     `${ENTRY_API}/${encodeURIComponent(entryId)}/annotate`;
+  const editApi = createCommentEditApi(entryId, showToast);
+  const editDeleteHandlers = createEditDeleteHandlers({
+    api: editApi,
+    showToast,
+    quoteFor: (a) => a.anchor ?? extractQuote(draftBody, a.range),
+    removeHighlight: (id) => removeHighlight(draftBody, id),
+    onCardRemoved: (id) => {
+      sidebarIndex.delete(id);
+      maybeShowEmpty();
+    },
+  });
 
   function maybeShowEmpty(): void {
     const anyLive = sidebarList.querySelector('.er-marginalia-item');
@@ -125,6 +140,8 @@ export function createAnnotationsController(
       draftBody,
       addressByCommentId,
       onResolve: (a, s) => { void resolveComment(a, s); },
+      onEdit: editDeleteHandlers.onEdit,
+      onDelete: editDeleteHandlers.onDelete,
       onHoverEnter: (id) => setActiveHighlight(id, true),
       onHoverLeave: (id) => setActiveHighlight(id, false),
       onScrollTo: (id) => scrollToHighlight(id),
@@ -300,35 +317,8 @@ export function createAnnotationsController(
 
   // ---- Resolve / re-open ----
 
-  async function postResolve(commentId: string, resolved: boolean): Promise<boolean> {
-    try {
-      const res = await fetch(annotateUrl(), {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          // Phase 34a: entry-keyed annotations reuse entryId as workflowId
-          // for type compatibility; field retired in shortform-migration phase.
-          type: 'resolve',
-          workflowId: entryId,
-          commentId,
-          resolved,
-        }),
-      });
-      if (!res.ok) {
-        const body: unknown = await res.json().catch(() => ({}));
-        const reason = (body as { error?: string }).error ?? `${res.status}`;
-        showToast(`Resolve failed: ${reason}`, true);
-        return false;
-      }
-      return true;
-    } catch (e) {
-      showToast(`Network error: ${e instanceof Error ? e.message : String(e)}`, true);
-      return false;
-    }
-  }
-
   async function resolveComment(annotation: CommentAnnotation, status: AnnotationStatus): Promise<void> {
-    const ok = await postResolve(annotation.id, true);
+    const ok = await editApi.postResolve(annotation.id, true);
     if (!ok) return;
     removeHighlight(draftBody, annotation.id);
     const item = sidebarIndex.get(annotation.id);
@@ -341,7 +331,7 @@ export function createAnnotationsController(
   }
 
   async function reopenComment(annotation: CommentAnnotation, status: AnnotationStatus): Promise<void> {
-    const ok = await postResolve(annotation.id, false);
+    const ok = await editApi.postResolve(annotation.id, false);
     if (!ok) return;
     const idx = resolvedHistory.findIndex((r) => r.ann.id === annotation.id);
     if (idx >= 0) resolvedHistory.splice(idx, 1);
