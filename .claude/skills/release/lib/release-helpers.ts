@@ -237,7 +237,18 @@ export interface AtomicPushOptions {
 
 /**
  * Atomic push: HEAD to origin/main + HEAD to feature branch + annotated
- * tag, all in one --follow-tags RPC.
+ * tag, all in one server-side transaction.
+ *
+ * `--atomic` makes the push fail-or-succeed as a single transaction
+ * server-side. Without it, partial success is possible (e.g., main
+ * accepted but the tag rejected, or the branch advanced while the tag
+ * was already taken). With ref-pinning per #195, atomicity is required:
+ * `marketplace.json` on main now references the new tag, so a window
+ * where main has advanced but the tag is missing would leave adopters
+ * pointing at a non-existent ref.
+ *
+ * `--follow-tags` opts the annotated tag into the push (it would be
+ * skipped by default). Independent of `--atomic`.
  *
  * DELIBERATE PRE-1.0 VELOCITY DECISION. Direct-to-main push (rather than
  * PR-merge) is intentional. Reasoning:
@@ -266,6 +277,7 @@ export async function atomicPush(opts: AtomicPushOptions): Promise<void> {
       'git',
       [
         'push',
+        '--atomic',
         '--follow-tags',
         'origin',
         'HEAD:main',

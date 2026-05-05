@@ -134,13 +134,21 @@ async function bumpFile(manifest: VersionedManifest, version: string): Promise<s
       const lines: string[] = [
         `  ${manifest.label} (metadata) ${String(beforeMeta)} -> ${version}`,
       ];
-      // Phase 26e (v0.9.5+): source.ref is no longer pinned per release.
-      // The vendor materialization that motivated the pin is gone — plugin
-      // shells now first-run-install @deskwork/<pkg>@<plugin-manifest-
-      // version> from npm, so the version coupling lives in the plugin
-      // shell's plugin.json, not in marketplace.json's git-subdir ref.
-      // git-subdir sources omit `ref` and resolve to the repository's
-      // default branch.
+      // Pin source.ref to the release tag (issue #195). Plugin shells
+      // (skills/, commands/, hooks/, agents/, bin shim) ship via the
+      // git-subdir source — without a ref pin, adopters who run
+      // `/plugin marketplace add audiocontrol-org/deskwork` (no @<ref>
+      // suffix) land on default-branch HEAD, so any post-release commit
+      // on main is silently shipped to anyone newly installing or
+      // running `marketplace update`. Pinning to `v<version>` locks
+      // adopters to the tagged release.
+      //
+      // Historical note: Phase 26e (v0.9.5) removed ref pinning on the
+      // grounds that npm-package coupling moved to plugin.json. That
+      // reasoning was scoped to npm-package coupling and didn't cover
+      // plugin-shell coupling (skills/, commands/, etc.) — which still
+      // ships via this git-subdir source and needs its own pin.
+      const tag = `v${version}`;
       for (const entry of plugins) {
         const before = entry.version;
         entry.version = version;
@@ -148,6 +156,14 @@ async function bumpFile(manifest: VersionedManifest, version: string): Promise<s
         lines.push(
           `  marketplace plugin ${name.padEnd(20)} ${String(before)} -> ${version}`,
         );
+        const source = entry.source as Record<string, unknown> | undefined;
+        if (source && typeof source === 'object' && source.source === 'git-subdir') {
+          const beforeRef = source.ref;
+          source.ref = tag;
+          lines.push(
+            `  marketplace plugin ${name.padEnd(20)} ref ${String(beforeRef ?? '(unset)')} -> ${tag}`,
+          );
+        }
       }
       await writeJson(abs, data);
       return lines.join('\n');

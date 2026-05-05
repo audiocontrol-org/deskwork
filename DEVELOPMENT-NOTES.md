@@ -4,6 +4,61 @@ Session journal for `deskwork`. Each entry records what was tried, what worked, 
 
 ---
 
+## 2026-05-04 / 05 (Phase 35 + UX polish + v0.15.0 release): marginalia rail rebuild, THESIS articulation, decision-strip skill routing, multi-issue triage; also bootstrapped a follow-on cleanup feature
+### Feature: deskwork-plugin
+### Worktree: deskwork-plugin
+
+**Goal:** ship the accumulated post-v0.14.0 work as v0.15.0 — Phase 35 (adjacent-assets-to-scrapbook + THESIS articulation + decision-strip skill routing) and the operator-driven UX polish arc (marginalia auto-unstow, vertical alignment, composer scroll-context, Cancel/Submit click fix) + the dashboard press-queue + GFM tables + scrapbook URL rewriter + CLI sidecar fixes.
+
+**Accomplished:**
+
+- **THESIS articulated.** Wrote `THESIS.md` at repo root with three architectural consequences (distribution must keep source agent-reachable; skills do the work + studio routes commands; operator extends via agent → defaults inside, overrides at `<projectRoot>/.deskwork/`). Wired into `/session-start` step 1. Operator framing was *"if you don't know where the thesis is, look for it then put it somewhere fucking obvious."*
+- **Decision strip retired its state-machine endpoints (#189).** Approve / Iterate / Reject / induct-to picker now copy `/deskwork:<verb> <slug>` to clipboard via `copyOrShowFallback`, matching Consequence 2. Server endpoints return 404. 16 retirement-collateral tests removed.
+- **Marginalia rail rebuilt.** New `marginalia-position.ts` absolutely-positions each `.er-marginalia-item` so its top aligns with its `<mark>`'s y-offset, with collision cascade + MutationObserver/ResizeObserver self-maintenance. Closes #190 (verified at 1px deltas). Adding marginalia auto-unstows the drawer via a callback through the annotations controller (#188). New-mark composer anchors to the selection's page-relative top so Mark-while-scrolled keeps the operator in their reading context. Composer lifted to `z-index: 2` while open so Cancel/Submit clicks land (the list paints over the composer post-#190 layout change otherwise).
+- **Scrapbook URL rewriter.** New `@deskwork/core/rehype-rewrite-scrapbook-images.mjs` lets markdown source use portable `./scrapbook/<file>` paths; the studio rewrites at HTML-emit time. Studio scrapbook-file route gained entry-id addressing mode for non-kebab-case content layouts.
+- **Dashboard press-queue sidebar (#158).** The empty right column now hosts a sticky press-queue.
+- **CLI sidecar fixes (#183, #184).** `add` and `ingest --apply` now write entry-centric sidecars via shared `createFreshEntrySidecar`.
+- **GFM tables + stowed-marginalia widening (#187).** Tables render correctly; stowed marginalia widens the article column.
+- **Iterate gate dropped.** `core/iterate` no longer refuses on content-unchanged; iteration with marginalia-only updates works.
+- **Released as v0.15.0.** Drove `/release` skill end-to-end. Resolved 22-commit + 11-manifest merge conflict against main (kept `--ours` for version strings — main had v0.14.1 + dw-lifecycle work since branch diverged). Atomic-pushed HEAD → main + branch + tag. Tag message: *"Phase 35 + UX polish — marginalia rail vertical alignment, composer scroll-context anchoring, decision-strip skill routing, THESIS articulation."* GitHub release at `v0.15.0` workflow ran clean (8s).
+- **Issues filed during the session for follow-up:** #191 (studio scrapbook mutations write to slug-template path — orphan-write bug), #192 (collapse dual scrapbook resolvers), #193 (surface induct-to picker on Final + pipeline stages, not just Blocked/Cancelled), #196 (dw-lifecycle setup creates doubled worktree+branch when invoked from existing feature worktree).
+- **Bootstrapped follow-on feature.** Operator ingested an open-issue tranche proposal (`2026-05-04-open-issue-tranche-proposal.md`), then ran `/dw-lifecycle:define` → `/dw-lifecycle:setup` to create `feature/deskwork-open-issue-tranche-cleanup` worktree with target v0.16.0. PRD + workplan + README scaffolded; 6-phase plan covering verify+close (~10 issues), implement #191 + #192, sweep moot/superseded, tracker audit.
+
+**Didn't Work:**
+
+- **First UX-audit iteration of the audit doc** went out with absolute scrapbook-file URLs in the markdown source. Operator pushed back: *"any markdown renderer should load these"* — switched to portable `./scrapbook/<file>` paths + rehype rewriter. Better ergonomics + survives non-studio rendering.
+- **Build-cache staleness** during the dev studio iteration: the studio's on-boot esbuild cache served pre-edit bytecode after rapid source changes. Required `rm -rf .runtime-cache/` + restart to force a fresh build. Worth filing as a friction issue (deferred — the marketplace install path doesn't have this).
+- **dw-lifecycle setup created a doubled worktree** when invoked from inside an already-set-up feature worktree (`<repo>` substituted from cwd basename, not from `git remote`). Cleaned up by copying the docs to the canonical worktree, removing the duplicate. Filed as #196.
+- **Iterate gate refused legitimate marginalia-only iterations** (the content-unchanged guard rejected updates that only touched annotations). Operator: *"WHO ASKED YOU TO PUT A DUMBASS ERROR IN THE WAY OF AN ITERATION?"* — gate removed.
+
+**Course Corrections:**
+
+- **[UX]** Composer was anchored to top of marginalia column (out of viewport when scrolled). Operator: *"Maintaining scroll context is CRITICAL while reviewing. You have to fix it."* → composer now anchors to the selection's page-relative top.
+- **[UX]** Cancel button on the composer didn't respond to real mouse clicks (programmatic .click() worked). Root cause: the marginalia list's `position: relative` (added during #190 fix) plus the auto z-index cascade meant the list painted over the composer's hit area. Fixed via composer `z-index: 2` while open.
+- **[FABRICATION]** Initial UX audit doc included absolute scrapbook-file URLs in the markdown source. Operator caught it: *"Is there any reason why a relative url pointing to './scrapbook/...' wouldn't have worked? If you had done it that way, the markdown file would load the image in *any* markdown renderer."* — built the rehype rewriter so source stays portable.
+- **[PROCESS]** Used "ours" branch and PR-based release flow before realizing operator wanted `/release` skill (atomic-push). PR #194 opened, then superseded by the atomic-push that did the conflict-resolution merge inline.
+- **[COMPLEXITY]** Code review flagged annotations.ts at 549 lines (49 over the 300–500 cap). Extracted `resolved-footer.ts` + `annotation-folding.ts`; back to 490 lines.
+- **[FABRICATION]** Code review flagged a stale-geometry concern with the composer anchoring (synchronous `getBoundingClientRect()` after `unstowMarginalia()`). I empirically refuted via Playwright: zero-delta verification confirmed the rect IS post-style-change because `getBoundingClientRect()` forces synchronous layout. Worth noting — the reviewer's claim was theoretically interesting but empirically wrong.
+- **[PROCESS]** When `/feature-ship` step ran first and committed the version bump, then the operator chose `/release`, the bump was already in place. Recovered by skipping `/release` Pause 2 and continuing from Pause 3 (assert-not-published). The skill flow doesn't anticipate this overlap; minor friction worth noting.
+
+**Quantitative:**
+
+- Messages: ~150 (heavy session)
+- Commits: 14 on `feature/deskwork-plugin` since previous session, plus 2 on the new `feature/deskwork-open-issue-tranche-cleanup`
+- Issues filed: 5 (#191, #192, #193, #196, plus the tranche-cleanup feature parent issue not yet filed via `/dw-lifecycle:issues`)
+- Tests: 1108 passing, 40 skipped across 4 workspaces (was 1043 / 40 in v0.14.0)
+- Files changed: ~101 (most concentrated in `plugins/deskwork-studio/public/src/entry-review/`, `packages/core/`, `packages/studio/`)
+
+**Insights:**
+
+- **Empirical refutation > debate** when reviewer concerns are testable. The composer-stale-geometry concern took 2 minutes to verify with Playwright; would have taken much longer to argue via spec interpretation.
+- **The marginalia rail's vertical alignment** turned out to be load-bearing for the entire reading experience — once it works, the surface reads as one cohesive press-check; once it doesn't, the operator's eye has to scan vertically to match comments to text. The collision cascade + observer-driven self-maintenance is one of those small things that disappears when working and is jarring when broken.
+- **THESIS articulation as a concrete artifact** had immediate downstream effect: writing the decision-strip retirement (#189) was much faster after THESIS Consequence 2 was on disk. Naming the principle made the implementation obvious.
+- **`/release` skill's pre-flight gates kept us safe** — the assert-not-published check would have caught a re-publish attempt; the smoke against the actual marketplace path verified what adopters get; the conflict-resolution discipline (`--ours` for manifest version strings only) is now muscle memory across releases.
+- **Worktree naming friction (#196)** is the kind of thing that surfaces only on the second feature; the first time you set up dw-lifecycle, you don't have a feature worktree to invoke it from. We hit it because we were trying to compose the SKILL.md's two-step flow.
+
+---
+
 ## 2026-05-03 (Phase 34 sweep + ship): all 5 sub-phases shipped, three audit-remediation rounds, v0.14.0 released
 
 ### Feature: deskwork-plugin

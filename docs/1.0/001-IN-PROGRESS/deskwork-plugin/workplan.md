@@ -1842,18 +1842,18 @@ GitHub tracking issues:
 
 **Sub-phase 35b — Audit doc's screenshots relocate to scrapbook**:
 
-- [ ] Move 9 PNGs from `docs/1.0/001-IN-PROGRESS/deskwork-plugin/2026-05-03-issue-158-screenshots/` → `docs/1.0/001-IN-PROGRESS/deskwork-plugin/scrapbook/`. Delete the now-empty source directory.
-- [ ] Rewrite the audit doc's 9 inline `![](...)` paths and the appendix bullet list to use `/api/dev/scrapbook-file?site=deskwork-internal&path=1.0%2F001-IN-PROGRESS%2Fdeskwork-plugin&name=<filename>.png`.
-- [ ] Re-iterate the audit doc via `/deskwork:iterate deskwork-plugin/issue-158-ux-audit` (snapshot v4).
-- [ ] Verify on `/dev/editorial-review/entry/36a268a4-c7ac-4802-8992-20319a08fa92`: `document.querySelectorAll('#draft-body img').length === 9` AND every `<img>` reports `complete && naturalWidth > 0`.
+- [x] Move 9 PNGs from `docs/1.0/001-IN-PROGRESS/deskwork-plugin/2026-05-03-issue-158-screenshots/` → `docs/1.0/001-IN-PROGRESS/deskwork-plugin/scrapbook/`. Source directory deleted.
+- [x] Audit-doc inline image paths rewritten to portable `./scrapbook/<file>` URLs. Operator pushed back on absolute-URL approach (*"any markdown renderer should load these"*) → built `@deskwork/core/rehype-rewrite-scrapbook-images.mjs` to rewrite at HTML-emit time on the studio surface (commit `519bb1a`); studio scrapbook-file route gained entry-id addressing mode (commit `9dfc213`). Markdown source stays portable across GitHub/VS Code/any renderer.
+- [x] Audit doc iterated to v5 (multiple operator iteration rounds during the session).
+- [x] Verified on `/dev/editorial-review/entry/36a268a4-…`: all inline images render via the rehype rewrite (live verification with 21 PNGs in scrapbook).
 
 **Sub-phase 35c — Skill augmentation: "adjacent assets → scrapbook" pattern**:
 
-- [ ] `plugins/deskwork/skills/add/SKILL.md` gains a note on the scaffolded `idea.md` saying drop research artifacts under `<entry>/scrapbook/`; the plugin serves them via `/api/dev/scrapbook-file` and the review surface composes them via the scrapbook drawer.
-- [ ] `plugins/deskwork/skills/ingest/SKILL.md` gains a hint on the dry-run plan: when an ingested doc has an adjacent asset directory, suggest consolidating into the entry's scrapbook before `--apply`.
-- [ ] `THESIS.md` Consequence 3 gains a one-paragraph "operator extension via scrapbook" pattern note — concrete example codifying "use the existing seam, not a new directory" against the audit-doc-screenshots case.
+- [x] `plugins/deskwork/skills/add/SKILL.md` gained "Adjacent assets — drop them in the entry's scrapbook" section (commit `11e4ab7`).
+- [x] `plugins/deskwork/skills/ingest/SKILL.md` gained "Adjacent assets — surface a hint to consolidate into scrapbook" section (commit `11e4ab7`).
+- [x] `THESIS.md` Consequence 3 gained "Pattern: adjacent assets belong in the entry's scrapbook" subsection (commit `11e4ab7`).
 
-**Acceptance:** see PRD §"Phase 35 — Acceptance".
+**Acceptance:** Phase 35 sub-phases all shipped in v0.15.0 (release commit `e8bb782`, tag `v0.15.0`). See README's status table row for the consolidated record.
 
 **Out of scope (operator decision):**
 

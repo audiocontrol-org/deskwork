@@ -30,8 +30,11 @@
 #       registry): the bin shim's `npm install` runs against the actual
 #       public registry. This requires the version pinned in the plugin
 #       shell's plugin.json to already be published.
-#     - source.ref pinning logic (retired with vendor): we no longer
-#       point marketplace entries at materialized tag commits.
+#     - source.ref pinning verification against the registry: ref is
+#       pinned per release (#195), but the smoke clones REPO_ROOT and
+#       sparse-checks-out HEAD of the local clone — it does not fetch
+#       the tag from origin. End-to-end ref-pin verification happens
+#       post-tag-push via an adopter `marketplace update`.
 #
 # Inputs:
 #   REPO_ROOT — set by the main smoke before sourcing.
@@ -197,9 +200,10 @@ phase_a_marketplace_read() {
 #   relative <path>
 #   git-subdir <url> <path> <ref>
 #
-# `<ref>` is `HEAD` when omitted from marketplace.json (Phase 26e: ref
-# is no longer pinned per release; defaults to the repo's default
-# branch).
+# `<ref>` is `HEAD` when omitted from marketplace.json. Per #195, ref
+# is now pinned per release to `v<version>`; the field should always
+# be present on `main`. The HEAD fallback exists only as a safety net
+# for historical or pre-release manifests.
 read_marketplace_source() {
   local plugin="$1"
   node -e "
