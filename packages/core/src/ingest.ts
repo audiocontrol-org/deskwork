@@ -43,6 +43,7 @@ import {
   deriveTitle,
   type DerivationSource,
 } from './ingest-derive.ts';
+import { readExistingDeskworkId } from './ingest-id.ts';
 
 export type { DerivationSource } from './ingest-derive.ts';
 
@@ -317,6 +318,30 @@ export function discoverIngestCandidates(
         reason: `calendar already has an entry with slug "${slug.value}" (use --force to override)`,
       });
       continue;
+    }
+
+    // Issue #197: if the source file's frontmatter already declares a
+    // valid `deskwork.id`, prefer that UUID over a freshly-minted one
+    // (the apply layer reads it back). However, if that UUID already
+    // belongs to a DIFFERENT calendar entry (different slug), do NOT
+    // silently re-bind — surface as a skip so the operator can resolve
+    // the collision intentionally. The duplicate-slug check above
+    // covers the same-slug case (it would skip first, so by the time
+    // we get here we know the slug is new).
+    const existingId = readExistingDeskworkId(parsed.data);
+    if (existingId !== null && options.calendar) {
+      const owner = options.calendar.entries.find((e) => e.id === existingId);
+      if (owner !== undefined && owner.slug !== slug.value) {
+        skips.push({
+          filePath,
+          relativePath: relPath,
+          slug: slug.value,
+          reason:
+            `frontmatter deskwork.id ${existingId} already belongs to ` +
+            `entry with slug "${owner.slug}"`,
+        });
+        continue;
+      }
     }
 
     const state = deriveState({

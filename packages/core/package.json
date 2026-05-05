@@ -80,6 +80,10 @@
       "types": "./dist/ingest.d.ts",
       "default": "./dist/ingest.js"
     },
+    "./ingest-id": {
+      "types": "./dist/ingest-id.d.ts",
+      "default": "./dist/ingest-id.js"
+    },
     "./ingest-derive": {
       "types": "./dist/ingest-derive.d.ts",
       "default": "./dist/ingest-derive.js"
