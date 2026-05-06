@@ -1,6 +1,6 @@
 {
   "name": "@deskwork/plugin",
-  "version": "0.17.0",
+  "version": "0.17.1",
   "private": true,
   "description": "Editorial calendar lifecycle plugin for Claude Code — thin shell pointing at @deskwork/cli",
   "license": "GPL-3.0-or-later",
@@ -13,6 +13,6 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@deskwork/cli": "0.17.0"
+    "@deskwork/cli": "0.17.1"
   }
 }
