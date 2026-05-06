@@ -58,6 +58,75 @@ Six phases, executed in order. Phases 2 and 3 are the only code-change phases; t
 
 **Approach:** run `gh issue list --state open` post-cleanup, group remaining open issues by implementation strategy (architecture / product features / backlog / external-tracking), update the feature `README.md` with the post-cleanup snapshot. Acceptance: no issue in the open list is in a "verify and close" or "moot" state.
 
+### Phase 11 — Tranche-organized burn-down of the remaining open bug + feature list
+
+**Deliverable:** every extant open issue assigned to a tranche; T1 (architectural blocker, [#222](https://github.com/audiocontrol-org/deskwork/issues/222)) shipped before any other tranche; remaining tranches burned down in least-dumb order.
+
+**Why T1 first:** [#222](https://github.com/audiocontrol-org/deskwork/issues/222) makes outlining impossible on the current studio review surface — `entry.artifactPath` reads a single static file, but the iterate CLI writes per-stage artifacts (`scrapbook/outline.md` at Outlining, `index.md` at Drafting). The two disagree, the operator can't see what they're reviewing during outline iteration. **Operator framing:** *"It's impossible to outline documents with the current state of the plugin."* This is the immediate blocker; everything else waits on it.
+
+**Why tranche the rest:** the open list spans 50 issues across many surfaces. Burning them down in filed-order is dumb; burning them down by similarity-of-fix-path lets one focused dispatch close several at once. The tranches below group issues whose fixes touch the same code path or share design context.
+
+#### T1 — Architectural blocker (must ship first)
+
+- [#222](https://github.com/audiocontrol-org/deskwork/issues/222) — single document evolves; scrapbook accumulates approved snapshots. Implements Option B + hybrid refinement: snapshot `index.md` → `scrapbook/<prior-stage>.md` on `/deskwork:approve`, leave `index.md` ready for the next stage's iterate to rewrite. Studio always renders `index.md`. Per-stage history journals stay correct.
+- [#181](https://github.com/audiocontrol-org/deskwork/issues/181) — outline-approve semantics in the entry-keyed model. Coupled to #222; resolves alongside it.
+- [#200](https://github.com/audiocontrol-org/deskwork/issues/200) — marginalia orphaned when document structure is reorganized. Anchor stability is part of the same review-surface architecture; resolves alongside #222 or as immediate follow-up.
+
+#### T2 — dw-lifecycle plugin UX cluster (9 issues, contained surface)
+
+Burn down as one focused dispatch since they all touch `plugins/dw-lifecycle/skills/` or its CLI:
+- [#185](https://github.com/audiocontrol-org/deskwork/issues/185) — slash-command unreachability of dw-lifecycle skills (likely related to upstream #92's hyphen-namespace family).
+- [#196](https://github.com/audiocontrol-org/deskwork/issues/196) — setup creates doubled worktree + extra branch.
+- [#209](https://github.com/audiocontrol-org/deskwork/issues/209) — setup aborts on existing branch; conflicts with `superpowers:using-git-worktrees`.
+- [#210](https://github.com/audiocontrol-org/deskwork/issues/210) — setup doesn't surface dw-lifecycle:install as prerequisite.
+- [#211](https://github.com/audiocontrol-org/deskwork/issues/211) — install: no override flags; statusDirs schema hardcoded.
+- [#212](https://github.com/audiocontrol-org/deskwork/issues/212) — setup: missing `--workplan` flag breaks brainstorming → writing-plans → setup chain.
+- [#213](https://github.com/audiocontrol-org/deskwork/issues/213) — issues: silent no-op when parentIssue placeholder doesn't match.
+- [#214](https://github.com/audiocontrol-org/deskwork/issues/214) — self-description over-narrows to literary content.
+- [#215](https://github.com/audiocontrol-org/deskwork/issues/215) — approve leaves journal/sidecar drift; calendar not updated to Final.
+
+#### T3 — doctor cleanup (3 issues, small)
+
+- [#182](https://github.com/audiocontrol-org/deskwork/issues/182) — backfill artifactPath for entries that lack the field.
+- [#218](https://github.com/audiocontrol-org/deskwork/issues/218) — doctor missing legacy-calendar-to-sidecars rule that `MIGRATING.md` says ships.
+- [#219](https://github.com/audiocontrol-org/deskwork/issues/219) — doctor's `missing-frontmatter-id` false-positives on Ideas-stage and non-blog entries.
+
+#### T4 — scrapbook UX cluster (3 issues)
+
+- [#167](https://github.com/audiocontrol-org/deskwork/issues/167) — scrapbook edit button non-functional.
+- [#168](https://github.com/audiocontrol-org/deskwork/issues/168) — scrapbook return-to-article path missing.
+- [#186](https://github.com/audiocontrol-org/deskwork/issues/186) — Add operations don't support adding multiple items at once.
+
+#### T5 — studio UX cluster (12 issues, varied)
+
+Cross-page UX issues. Probably needs a single design pass before code work — the surface-feel concerns (#179, #180, #178, #177) are coupled.
+- [#169](https://github.com/audiocontrol-org/deskwork/issues/169), [#173](https://github.com/audiocontrol-org/deskwork/issues/173), [#174](https://github.com/audiocontrol-org/deskwork/issues/174), [#175](https://github.com/audiocontrol-org/deskwork/issues/175), [#176](https://github.com/audiocontrol-org/deskwork/issues/176), [#177](https://github.com/audiocontrol-org/deskwork/issues/177), [#178](https://github.com/audiocontrol-org/deskwork/issues/178), [#179](https://github.com/audiocontrol-org/deskwork/issues/179), [#180](https://github.com/audiocontrol-org/deskwork/issues/180), [#193](https://github.com/audiocontrol-org/deskwork/issues/193), [#216](https://github.com/audiocontrol-org/deskwork/issues/216), [#217](https://github.com/audiocontrol-org/deskwork/issues/217).
+
+#### T6 — Phase 10 dogfood-captured items (6 issues)
+
+Already in the workplan as Phase 10 catchment; merge into the T-structure here for unified tracking:
+- [#220](https://github.com/audiocontrol-org/deskwork/issues/220), [#221](https://github.com/audiocontrol-org/deskwork/issues/221), [#223](https://github.com/audiocontrol-org/deskwork/issues/223), [#224](https://github.com/audiocontrol-org/deskwork/issues/224), [#225](https://github.com/audiocontrol-org/deskwork/issues/225), [#226](https://github.com/audiocontrol-org/deskwork/issues/226).
+
+#### T7 — marketplace-walk verifications (18 issues, operator-driven)
+
+The 18 fix-landed-pending-v0.16.0-verification issues from the walk script (`2026-05-05-v0.16.0-verification-walk.md`). Each closes via the documented walk + verifying-comment + close pattern. Can run in parallel with code-tranche work.
+
+#### Out-of-scope (deferred)
+
+- Tranche 3 product-feature backlog: [#54](https://github.com/audiocontrol-org/deskwork/issues/54), [#82](https://github.com/audiocontrol-org/deskwork/issues/82), [#84](https://github.com/audiocontrol-org/deskwork/issues/84), [#85](https://github.com/audiocontrol-org/deskwork/issues/85), [#86](https://github.com/audiocontrol-org/deskwork/issues/86), [#87](https://github.com/audiocontrol-org/deskwork/issues/87) — explicit roadmap items.
+- Background architecture: [#18](https://github.com/audiocontrol-org/deskwork/issues/18), [#30](https://github.com/audiocontrol-org/deskwork/issues/30), [#33](https://github.com/audiocontrol-org/deskwork/issues/33) — defer until after the architectural T1 ships.
+
+#### Burn-down order
+
+T1 first (architectural blocker). After T1, "least dumb" path is:
+
+1. **T6** — already partly scoped; smallest residual; quick wins (slug regex sanitize is ~30 lines; calendar regen alignment is mechanical).
+2. **T2** — 9 issues but contained to one plugin. One focused dispatch.
+3. **T3** — 3 doctor cleanups, small.
+4. **T4** — 3 scrapbook UX, small.
+5. **T5** — 12 studio UX. Needs a design pass first; sequence within after T1's review-surface work lands so the visual treatment isn't churning under us.
+6. **T7** — operator-driven walk; runs in parallel with code work; close as walk progresses.
+
 ### Phase 10 — Evaluate + fix dogfood-discovered bugs from the v0.16.0 verification walk
 
 **Deliverable:** evaluation pass over the new bugs surfaced after the v0.16.0 release; per-bug disposition (fix in-branch / defer / reframe / wontfix); fixes for the items that pass evaluation.

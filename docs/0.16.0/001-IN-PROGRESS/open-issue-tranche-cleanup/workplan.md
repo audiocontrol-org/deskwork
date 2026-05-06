@@ -130,6 +130,56 @@ deskwork:
 - [ ] No issue in the open list is in a "verify and close" or "moot" state.
 - [ ] Remaining product features (#54, #84, #85, #82, #87, #86) and backlog (#18, #30, #33) are explicitly noted as out-of-scope for this feature.
 
+## Phase 11 — Tranche-organized burn-down of remaining open issues
+
+**Deliverable:** every extant open issue (50 at filing time) assigned to a tranche; T1 ships first; remaining tranches burned down in least-dumb order. PRD §Phase 11 has the canonical tranche definitions.
+
+### Task 1 (T1) — Architectural blocker: single document evolves ([#222](https://github.com/audiocontrol-org/deskwork/issues/222))
+
+- [ ] Implement Option B + hybrid refinement per [#222](https://github.com/audiocontrol-org/deskwork/issues/222)'s body:
+  - On `/deskwork:approve` at a stage transition that produces a new artifact kind, atomically copy `index.md` → `scrapbook/<prior-stage>.md` (write-then-fsync the snapshot before any mutation of `index.md`).
+  - Leave `index.md` unchanged on approve. The first iterate at the new stage rewrites `index.md` from scratch (or transforms it).
+  - Update studio review surface to always read `index.md` (regardless of stage). Drop any stage-aware path-routing logic.
+  - Per-stage history journals stay correct (keyed on `(entryId, stage, version)`).
+- [ ] Resolve [#181](https://github.com/audiocontrol-org/deskwork/issues/181) (outline-approve semantics) alongside; the snapshot-on-approve pattern IS the answer to outline-approve.
+- [ ] Resolve [#200](https://github.com/audiocontrol-org/deskwork/issues/200) (marginalia anchor stability) alongside or as immediate follow-up; range-anchor stability under document evolution is the same architectural concern.
+- [ ] Add atomic-write tests + regression coverage for the snapshot path.
+- [ ] Live walk: re-walk the approval cycle on this project's audit doc / PRD; confirm the studio renders the right content at every stage.
+- [ ] Update `MIGRATING.md` for v0.17.0 (or whatever ships): per-stage `artifactPath` no longer used; explain the snapshot model; note any operator-side migration steps.
+
+### Task 2 (T6) — Phase 10 dogfood items
+
+(Folded into T6 in the PRD; tracked as the existing Phase 10 task block.) Burn down [#220](https://github.com/audiocontrol-org/deskwork/issues/220), [#221](https://github.com/audiocontrol-org/deskwork/issues/221), [#223](https://github.com/audiocontrol-org/deskwork/issues/223), [#224](https://github.com/audiocontrol-org/deskwork/issues/224), [#225](https://github.com/audiocontrol-org/deskwork/issues/225), [#226](https://github.com/audiocontrol-org/deskwork/issues/226). #221 + #225 are smallest (sanitize-before-validate + skill-prose edit); #220 may be upstream-only; #223–226 are mid-effort.
+
+### Task 3 (T2) — dw-lifecycle plugin UX cluster
+
+- [ ] Single dispatch covering [#185](https://github.com/audiocontrol-org/deskwork/issues/185), [#196](https://github.com/audiocontrol-org/deskwork/issues/196), [#209](https://github.com/audiocontrol-org/deskwork/issues/209), [#210](https://github.com/audiocontrol-org/deskwork/issues/210), [#211](https://github.com/audiocontrol-org/deskwork/issues/211), [#212](https://github.com/audiocontrol-org/deskwork/issues/212), [#213](https://github.com/audiocontrol-org/deskwork/issues/213), [#214](https://github.com/audiocontrol-org/deskwork/issues/214), [#215](https://github.com/audiocontrol-org/deskwork/issues/215). All touch `plugins/dw-lifecycle/` skills + helpers.
+- [ ] Per-issue evaluation + disposition; some may be wontfix or out-of-scope on closer reading.
+
+### Task 4 (T3) — doctor cleanup
+
+- [ ] [#182](https://github.com/audiocontrol-org/deskwork/issues/182) backfill artifactPath, [#218](https://github.com/audiocontrol-org/deskwork/issues/218) legacy-calendar-to-sidecars rule, [#219](https://github.com/audiocontrol-org/deskwork/issues/219) missing-frontmatter-id false-positive scope.
+
+### Task 5 (T4) — scrapbook UX cluster
+
+- [ ] [#167](https://github.com/audiocontrol-org/deskwork/issues/167) edit button non-functional, [#168](https://github.com/audiocontrol-org/deskwork/issues/168) return-to-article path, [#186](https://github.com/audiocontrol-org/deskwork/issues/186) multi-item add.
+
+### Task 6 (T5) — studio UX cluster (sequence after T1)
+
+- [ ] Design pass first — the cross-page UX concerns ([#177](https://github.com/audiocontrol-org/deskwork/issues/177), [#178](https://github.com/audiocontrol-org/deskwork/issues/178), [#179](https://github.com/audiocontrol-org/deskwork/issues/179), [#180](https://github.com/audiocontrol-org/deskwork/issues/180)) are coupled and shouldn't get N independent fixes.
+- [ ] Then implementation pass: [#169](https://github.com/audiocontrol-org/deskwork/issues/169), [#173](https://github.com/audiocontrol-org/deskwork/issues/173), [#174](https://github.com/audiocontrol-org/deskwork/issues/174), [#175](https://github.com/audiocontrol-org/deskwork/issues/175), [#176](https://github.com/audiocontrol-org/deskwork/issues/176), [#193](https://github.com/audiocontrol-org/deskwork/issues/193), [#216](https://github.com/audiocontrol-org/deskwork/issues/216), [#217](https://github.com/audiocontrol-org/deskwork/issues/217).
+
+### Task 7 (T7) — marketplace-walk verifications
+
+- [ ] Execute the walk script at `2026-05-05-v0.16.0-verification-walk.md`. 18 issues to verify-and-close. Operator-driven; runs in parallel with code-tranche work.
+
+**Acceptance Criteria (Phase 11):**
+
+- [ ] T1 (#222 + #181 + #200) shipped, fix-landed-pending-verification-in-the-next-release.
+- [ ] T2–T6 each have a clear disposition: shipped / deferred / wontfix / scoped to a follow-up release.
+- [ ] T7 walk closes all 18 issues against the v0.16.0 (or successor) install.
+- [ ] No issue from the open list is left without an explicit disposition (in this branch or scoped to a successor branch).
+
 ## Phase 10 — Evaluate + fix dogfood-discovered bugs from the v0.16.0 verification walk
 
 **Deliverable:** evaluation pass + per-bug disposition + fixes for in-scope items.

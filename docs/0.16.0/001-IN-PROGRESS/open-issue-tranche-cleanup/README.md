@@ -23,7 +23,8 @@ Triage the open-issue tracker for the `deskwork`, `deskwork-studio`, and support
 | 7 | Fix marginalia edit + delete UX (#199) | Text-edit + delete fix-landed; category-edit fix-landed (#204); range-edit wontfix (#203 closed) |
 | 8 | Extend entry-aware addressing to scrapbook viewer + link emitters (#205) | Fix-landed (pending v0.16.0 verification); #207 split fix-landed |
 | 9 | Ingest defaults to Drafting per add/ingest semantic distinction (#206) | Fix-landed (pending v0.16.0 verification) |
-| 10 | Evaluate + fix dogfood bugs from v0.16.0 walk (#220, #221, #223, #224, #225, #226) | Not started |
+| 10 | Evaluate + fix dogfood bugs from v0.16.0 walk (#220, #221, #223, #224, #225, #226) | Folded into Phase 11 / T6 |
+| 11 | Tranche-organized burn-down (T1: #222 first; then T6, T2, T3, T4, T5; T7 in parallel) | Not started |
 
 ## Key Links
 
