@@ -62,6 +62,8 @@ function writeSidecar(fix: SidecarFixture): void {
       source: 'manual',
       currentStage: fix.currentStage,
       iterationByStage: fix.iterationByStage ?? {},
+      // Post-T1 (Issue #222): artifactPath always points at index.md.
+      artifactPath: `docs/${fix.slug}/index.md`,
       createdAt: '2026-04-30T10:00:00.000Z',
       updatedAt: '2026-04-30T10:00:00.000Z',
     }),
@@ -69,16 +71,11 @@ function writeSidecar(fix: SidecarFixture): void {
   );
 }
 
-function writeStageArtifact(slug: string, stage: SidecarFixture['currentStage'], body: string): void {
-  // Mirrors STAGE_ARTIFACT_PATH in packages/core/src/iterate/iterate.ts.
-  const rel: Record<string, string> = {
-    Ideas: `docs/${slug}/scrapbook/idea.md`,
-    Planned: `docs/${slug}/scrapbook/plan.md`,
-    Outlining: `docs/${slug}/scrapbook/outline.md`,
-    Drafting: `docs/${slug}/index.md`,
-    Final: `docs/${slug}/index.md`,
-  };
-  const path = join(project, rel[stage]);
+function writeStageArtifact(slug: string, _stage: SidecarFixture['currentStage'], body: string): void {
+  // Post-T1 (Issue #222): single document evolves; iterate always reads
+  // index.md regardless of stage. Per-stage scrapbook files are frozen
+  // snapshots produced by approve, not iterate's read target.
+  const path = join(project, 'docs', slug, 'index.md');
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, body, 'utf-8');
 }

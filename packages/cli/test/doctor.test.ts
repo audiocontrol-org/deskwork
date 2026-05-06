@@ -127,8 +127,14 @@ function addWithIdeaStub(args: string[]): RunResult {
   // Title is always args[1] (after the project root); none of these tests
   // pass --slug, so slug derives from the title.
   const slug = slugify(args[1]);
+  // Post-T1 (Issue #222): the sidecar's artifactPath is index.md. The
+  // stub also creates a scrapbook/idea.md so legacy file-presence
+  // assumptions still pass — the legacy file is now a (synthetic)
+  // scrapbook snapshot, not the entry's primary file.
   const ideaRelPath = join('docs', slug, 'scrapbook', 'idea.md');
   writeRaw(ideaRelPath, '---\nstub: true\n---\n');
+  const indexRelPath = join('docs', slug, 'index.md');
+  writeRaw(indexRelPath, '---\nstub: true\n---\n');
   // Find the freshly-minted sidecar by reading the calendar to get the
   // entry's UUID, then patch its artifactPath. The sidecar already
   // exists post-`add` (#184).
@@ -142,7 +148,7 @@ function addWithIdeaStub(args: string[]): RunResult {
     string,
     unknown
   >;
-  sidecar.artifactPath = ideaRelPath;
+  sidecar.artifactPath = indexRelPath;
   writeFileSync(sidecarPath, JSON.stringify(sidecar, null, 2), 'utf-8');
   return result;
 }

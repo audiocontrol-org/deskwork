@@ -4,6 +4,12 @@
  * Drives `iterateEntry` to produce real iteration events on disk, then
  * verifies `listEntryIterations` / `getEntryIteration` project them
  * correctly. Mirrors the fixture setup in `iterate/iterate.test.ts`.
+ *
+ * Post-T1 (Issue #222): iterate always reads index.md regardless of
+ * stage; per-stage files (idea.md / plan.md / outline.md / drafting.md)
+ * are scrapbook snapshots produced by approveEntryStage, not iterate's
+ * read target. These tests write to index.md and rely on the snapshot
+ * machinery (in approveEntryStage) being separately tested.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -38,7 +44,7 @@ async function setupEntry(
   slug: string,
   stage: Entry['currentStage'],
 ): Promise<void> {
-  await mkdir(join(root, 'docs', slug, 'scrapbook'), { recursive: true });
+  await mkdir(join(root, 'docs', slug), { recursive: true });
   const e: Entry = {
     uuid,
     slug,
@@ -47,6 +53,8 @@ async function setupEntry(
     source: 'manual',
     currentStage: stage,
     iterationByStage: stage === 'Ideas' ? {} : { Ideas: 1 },
+    // T1 — index.md is the canonical artifact.
+    artifactPath: `docs/${slug}/index.md`,
     createdAt: '2026-04-30T10:00:00.000Z',
     updatedAt: '2026-04-30T10:00:00.000Z',
   };
@@ -81,15 +89,15 @@ describe('iterate history reader', () => {
 
   it('lists iterations for a multi-version entry in chronological order', async () => {
     await setupEntry(root, UUID_A, 'a', 'Ideas');
-    const ideaPath = join(root, 'docs', 'a', 'scrapbook', 'idea.md');
+    const indexPath = join(root, 'docs', 'a', 'index.md');
 
-    await writeFile(ideaPath, `---\ndeskwork:\n  id: ${UUID_A}\n---\n\n# v1 body\n`);
+    await writeFile(indexPath, `---\ndeskwork:\n  id: ${UUID_A}\n---\n\n# v1 body\n`);
     await iterateEntry(root, { uuid: UUID_A });
 
-    await writeFile(ideaPath, `---\ndeskwork:\n  id: ${UUID_A}\n---\n\n# v2 body\n`);
+    await writeFile(indexPath, `---\ndeskwork:\n  id: ${UUID_A}\n---\n\n# v2 body\n`);
     await iterateEntry(root, { uuid: UUID_A });
 
-    await writeFile(ideaPath, `---\ndeskwork:\n  id: ${UUID_A}\n---\n\n# v3 body\n`);
+    await writeFile(indexPath, `---\ndeskwork:\n  id: ${UUID_A}\n---\n\n# v3 body\n`);
     await iterateEntry(root, { uuid: UUID_A });
 
     const listing = await listEntryIterations(root, UUID_A);
@@ -105,8 +113,8 @@ describe('iterate history reader', () => {
   it('does not leak iterations across entries', async () => {
     await setupEntry(root, UUID_A, 'a', 'Ideas');
     await setupEntry(root, UUID_B, 'b', 'Ideas');
-    const aPath = join(root, 'docs', 'a', 'scrapbook', 'idea.md');
-    const bPath = join(root, 'docs', 'b', 'scrapbook', 'idea.md');
+    const aPath = join(root, 'docs', 'a', 'index.md');
+    const bPath = join(root, 'docs', 'b', 'index.md');
     await writeFile(aPath, `---\ndeskwork:\n  id: ${UUID_A}\n---\n\n# A body\n`);
     await iterateEntry(root, { uuid: UUID_A });
     await writeFile(bPath, `---\ndeskwork:\n  id: ${UUID_B}\n---\n\n# B body\n`);
@@ -120,13 +128,13 @@ describe('iterate history reader', () => {
 
   it('getEntryIteration returns the markdown captured at the requested version', async () => {
     await setupEntry(root, UUID_A, 'a', 'Ideas');
-    const ideaPath = join(root, 'docs', 'a', 'scrapbook', 'idea.md');
+    const indexPath = join(root, 'docs', 'a', 'index.md');
 
     const v1Body = `---\ndeskwork:\n  id: ${UUID_A}\n---\n\n# version one\n`;
     const v2Body = `---\ndeskwork:\n  id: ${UUID_A}\n---\n\n# version two\n`;
-    await writeFile(ideaPath, v1Body);
+    await writeFile(indexPath, v1Body);
     await iterateEntry(root, { uuid: UUID_A });
-    await writeFile(ideaPath, v2Body);
+    await writeFile(indexPath, v2Body);
     await iterateEntry(root, { uuid: UUID_A });
 
     const got1 = await getEntryIteration(root, UUID_A, 1);
@@ -142,8 +150,8 @@ describe('iterate history reader', () => {
 
   it('getEntryIteration returns null for an unknown version', async () => {
     await setupEntry(root, UUID_A, 'a', 'Ideas');
-    const ideaPath = join(root, 'docs', 'a', 'scrapbook', 'idea.md');
-    await writeFile(ideaPath, `---\ndeskwork:\n  id: ${UUID_A}\n---\n\n# only v1\n`);
+    const indexPath = join(root, 'docs', 'a', 'index.md');
+    await writeFile(indexPath, `---\ndeskwork:\n  id: ${UUID_A}\n---\n\n# only v1\n`);
     await iterateEntry(root, { uuid: UUID_A });
 
     const got = await getEntryIteration(root, UUID_A, 999);
@@ -158,23 +166,23 @@ describe('iterate history reader', () => {
   it('getEntryIteration disambiguates by stage when provided', async () => {
     // Build an entry with iteration v1 in two distinct stages by:
     //  - iterate at Ideas (writes v1)
-    //  - approve to Planned
+    //  - manually flip sidecar to Planned (avoid approveEntryStage
+    //    dependency — this test scopes to history.ts behavior)
     //  - iterate at Planned (writes v1 because Planned starts at 0)
     await setupEntry(root, UUID_A, 'a', 'Ideas');
-    const ideaPath = join(root, 'docs', 'a', 'scrapbook', 'idea.md');
-    const planPath = join(root, 'docs', 'a', 'scrapbook', 'plan.md');
+    const indexPath = join(root, 'docs', 'a', 'index.md');
 
-    await writeFile(ideaPath, `---\ndeskwork:\n  id: ${UUID_A}\n---\n\n# IDEAS body\n`);
+    await writeFile(indexPath, `---\ndeskwork:\n  id: ${UUID_A}\n---\n\n# IDEAS body\n`);
     await iterateEntry(root, { uuid: UUID_A });
 
-    // Manually update sidecar to Planned stage (avoiding approveEntryStage
-    // dependency — this test scopes to history.ts behavior, not the
-    // approve helper).
     const { readSidecar } = await import('@/sidecar/read');
     const s = await readSidecar(root, UUID_A);
     await writeSidecar(root, { ...s, currentStage: 'Planned' });
 
-    await writeFile(planPath, `---\ndeskwork:\n  id: ${UUID_A}\n---\n\n# PLANNED body\n`);
+    // Same index.md (single document evolves) — body changes between
+    // stages, but the file is the same. The journal records distinct
+    // versions per (entryId, stage) tuple.
+    await writeFile(indexPath, `---\ndeskwork:\n  id: ${UUID_A}\n---\n\n# PLANNED body\n`);
     await iterateEntry(root, { uuid: UUID_A });
 
     const allV1 = await listEntryIterations(root, UUID_A);

@@ -103,6 +103,13 @@ const DeleteCommentAnnotation = z.object({
   commentId: z.string(),
 });
 
+const ArchiveCommentAnnotation = z.object({
+  ...BaseFields,
+  type: z.literal('archive-comment'),
+  commentId: z.string(),
+  priorStage: z.string().optional(),
+});
+
 export const DraftAnnotationSchema = z.discriminatedUnion('type', [
   CommentAnnotation,
   EditAnnotation,
@@ -112,4 +119,5 @@ export const DraftAnnotationSchema = z.discriminatedUnion('type', [
   AddressAnnotation,
   EditCommentAnnotation,
   DeleteCommentAnnotation,
+  ArchiveCommentAnnotation,
 ]);

@@ -162,6 +162,26 @@ export interface DeleteCommentAnnotation extends AnnotationBase {
   commentId: string;
 }
 
+/**
+ * Archive a `comment` annotation as part of a stage transition (#200,
+ * Issue #222 hybrid refinement). Append-only: the original is left in
+ * place on disk; the folded view drops it from the active list. Distinct
+ * from `delete-comment` — archive captures "this comment was made
+ * against a prior stage's content; the document has since evolved, so
+ * range/anchor stability cannot be guaranteed against the new content."
+ *
+ * The optional `priorStage` field records which stage the comment was
+ * archived OUT OF — useful for audit views that group archived comments
+ * by stage of origin.
+ */
+export interface ArchiveCommentAnnotation extends AnnotationBase {
+  type: 'archive-comment';
+  /** The original `comment` annotation's id. */
+  commentId: string;
+  /** The stage the document was at when the comment was archived. */
+  priorStage?: string;
+}
+
 export type DraftAnnotation =
   | CommentAnnotation
   | EditAnnotation
@@ -170,7 +190,8 @@ export type DraftAnnotation =
   | ResolveAnnotation
   | AddressAnnotation
   | EditCommentAnnotation
-  | DeleteCommentAnnotation;
+  | DeleteCommentAnnotation
+  | ArchiveCommentAnnotation;
 
 export interface DraftVersion {
   /** 1-based version number; v1 is the initial draft. */

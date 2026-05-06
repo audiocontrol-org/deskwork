@@ -391,3 +391,110 @@ describe('entry-keyed edit-comment / delete-comment folding (issue #199)', () =>
     expect(folded.map((a) => a.type).sort()).toEqual(['comment', 'resolve']);
   });
 });
+
+// ----- T1 (Issue #200) — archive-comment fold behavior ---------------
+describe('entry-keyed archive-comment folding (issue #200)', () => {
+  let projectRoot: string;
+
+  beforeEach(async () => {
+    projectRoot = await mkdtemp(join(tmpdir(), 'dw-entry-annotations-archive-'));
+    await mkdir(join(projectRoot, '.deskwork', 'review-journal', 'history'), {
+      recursive: true,
+    });
+  });
+
+  afterEach(async () => {
+    await rm(projectRoot, { recursive: true, force: true });
+  });
+
+  it('an archive-comment drops the named comment from the folded view', async () => {
+    const comment: DraftAnnotation = {
+      ...commentDraft(ENTRY_A, 'prior-stage note'),
+      id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      createdAt: '2026-04-01T10:00:00.000Z',
+    };
+    const archive: DraftAnnotation = {
+      type: 'archive-comment',
+      workflowId: ENTRY_A,
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      commentId: comment.id,
+      priorStage: 'Outlining',
+      createdAt: '2026-04-01T11:00:00.000Z',
+    };
+    await addEntryAnnotation(projectRoot, ENTRY_A, comment);
+    await addEntryAnnotation(projectRoot, ENTRY_A, archive);
+    const folded = await listEntryAnnotations(projectRoot, ENTRY_A);
+    expect(folded).toHaveLength(0);
+    // Raw view preserves both events for the audit trail.
+    const raw = await listEntryAnnotationsRaw(projectRoot, ENTRY_A);
+    expect(raw.map((a) => a.type).sort()).toEqual(['archive-comment', 'comment']);
+  });
+
+  it('archive-comment also drops resolve / address annotations targeting the same comment', async () => {
+    const comment: DraftAnnotation = {
+      ...commentDraft(ENTRY_A, 'note'),
+      id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      createdAt: '2026-04-01T10:00:00.000Z',
+    };
+    const resolve: DraftAnnotation = {
+      type: 'resolve',
+      workflowId: ENTRY_A,
+      id: 'rrrrrrrr-rrrr-4rrr-8rrr-rrrrrrrrrrrr',
+      commentId: comment.id,
+      resolved: true,
+      createdAt: '2026-04-01T11:00:00.000Z',
+    };
+    const archive: DraftAnnotation = {
+      type: 'archive-comment',
+      workflowId: ENTRY_A,
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      commentId: comment.id,
+      priorStage: 'Outlining',
+      createdAt: '2026-04-01T12:00:00.000Z',
+    };
+    await addEntryAnnotation(projectRoot, ENTRY_A, comment);
+    await addEntryAnnotation(projectRoot, ENTRY_A, resolve);
+    await addEntryAnnotation(projectRoot, ENTRY_A, archive);
+    const folded = await listEntryAnnotations(projectRoot, ENTRY_A);
+    // Both the comment AND its companion resolve should be hidden from
+    // the active view.
+    expect(folded).toHaveLength(0);
+  });
+
+  it('rejects an archive-comment whose commentId does not reference an existing comment', async () => {
+    const orphan: DraftAnnotation = {
+      type: 'archive-comment',
+      workflowId: ENTRY_A,
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      commentId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      createdAt: '2026-04-01T11:00:00.000Z',
+    };
+    await expect(addEntryAnnotation(projectRoot, ENTRY_A, orphan)).rejects.toThrow(
+      /unknown commentId/,
+    );
+  });
+
+  it('priorStage on archive-comment is preserved on read', async () => {
+    const comment: DraftAnnotation = {
+      ...commentDraft(ENTRY_A, 'note'),
+      id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      createdAt: '2026-04-01T10:00:00.000Z',
+    };
+    const archive: DraftAnnotation = {
+      type: 'archive-comment',
+      workflowId: ENTRY_A,
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      commentId: comment.id,
+      priorStage: 'Drafting',
+      createdAt: '2026-04-01T11:00:00.000Z',
+    };
+    await addEntryAnnotation(projectRoot, ENTRY_A, comment);
+    await addEntryAnnotation(projectRoot, ENTRY_A, archive);
+    const raw = await listEntryAnnotationsRaw(projectRoot, ENTRY_A);
+    const arch = raw.find((a) => a.type === 'archive-comment');
+    expect(arch).toBeDefined();
+    if (arch && arch.type === 'archive-comment') {
+      expect(arch.priorStage).toBe('Drafting');
+    }
+  });
+});

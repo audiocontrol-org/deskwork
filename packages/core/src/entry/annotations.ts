@@ -126,6 +126,13 @@ function toDraftAnnotation(stored: StoredAnnotation): DraftAnnotation {
         type: 'delete-comment',
         commentId: stored.commentId,
       };
+    case 'archive-comment':
+      return {
+        ...base,
+        type: 'archive-comment',
+        commentId: stored.commentId,
+        ...(stored.priorStage !== undefined ? { priorStage: stored.priorStage } : {}),
+      };
   }
 }
 
@@ -143,7 +150,11 @@ export async function addEntryAnnotation(
   entryId: string,
   annotation: DraftAnnotation,
 ): Promise<void> {
-  if (annotation.type === 'edit-comment' || annotation.type === 'delete-comment') {
+  if (
+    annotation.type === 'edit-comment' ||
+    annotation.type === 'delete-comment' ||
+    annotation.type === 'archive-comment'
+  ) {
     const raw = await listEntryAnnotationsRaw(projectRoot, entryId);
     const referent = raw.find(
       (a): a is CommentAnnotation =>
@@ -221,6 +232,7 @@ export async function listEntryAnnotationsRaw(
 function foldAnnotations(raw: DraftAnnotation[]): DraftAnnotation[] {
   const editsByCommentId = new Map<string, DraftAnnotation[]>();
   const deletedCommentIds = new Set<string>();
+  const archivedCommentIds = new Set<string>();
   for (const a of raw) {
     if (a.type === 'edit-comment') {
       const arr = editsByCommentId.get(a.commentId) ?? [];
@@ -228,23 +240,40 @@ function foldAnnotations(raw: DraftAnnotation[]): DraftAnnotation[] {
       editsByCommentId.set(a.commentId, arr);
     } else if (a.type === 'delete-comment') {
       deletedCommentIds.add(a.commentId);
+    } else if (a.type === 'archive-comment') {
+      archivedCommentIds.add(a.commentId);
     }
   }
 
   const out: DraftAnnotation[] = [];
   for (const a of raw) {
-    if (a.type === 'edit-comment' || a.type === 'delete-comment') {
+    if (
+      a.type === 'edit-comment' ||
+      a.type === 'delete-comment' ||
+      a.type === 'archive-comment'
+    ) {
       // Fold-only events; not surfaced in the active view.
       continue;
     }
     if (a.type === 'comment') {
       if (deletedCommentIds.has(a.id)) continue;
+      if (archivedCommentIds.has(a.id)) continue;
       const edits = editsByCommentId.get(a.id);
       if (!edits || edits.length === 0) {
         out.push(a);
         continue;
       }
       out.push(applyEdits(a, edits));
+      continue;
+    }
+    // Drop resolve/address annotations whose target comment was archived
+    // — without this, the marginalia column would render an "address"
+    // badge or a "resolve" status against a comment that no longer
+    // appears in the active sidebar.
+    if (
+      (a.type === 'resolve' || a.type === 'address') &&
+      archivedCommentIds.has(a.commentId)
+    ) {
       continue;
     }
     out.push(a);
