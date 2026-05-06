@@ -68,6 +68,10 @@ Six phases, executed in order. Phases 2 and 3 are the only code-change phases; t
 
 - [#220](https://github.com/audiocontrol-org/deskwork/issues/220) — plugin cache subtree purged between sessions; deskwork bin lookups fail. Follow-up to [#89](https://github.com/audiocontrol-org/deskwork/issues/89)'s last-comment-promised-but-never-filed item. Possibly upstream-only (Claude Code plugin lifecycle); deskwork-side mitigations exist but may not be sufficient.
 - [#221](https://github.com/audiocontrol-org/deskwork/issues/221) — `deskwork ingest` rejects path-derived slugs containing `.` (e.g. `v0.16.0-…`); fix is sanitize-before-validate in `ingest-derive.ts`.
+- [#223](https://github.com/audiocontrol-org/deskwork/issues/223) — calendar.md regen inconsistency; ingest-side regen drops the `Updated` column, approve-side adds it. Flip-flop across commits.
+- [#224](https://github.com/audiocontrol-org/deskwork/issues/224) — deskwork-studio: SIGTERM-then-relaunch within ~30s auto-increments port due to TIME_WAIT. Cosmetic; consider `SO_REUSEADDR`.
+- [#225](https://github.com/audiocontrol-org/deskwork/issues/225) — `/deskwork:approve` skill prose's "scaffold next-stage artifact" step doesn't fit non-pipeline content (audit/finding docs ingested directly to Drafting+).
+- [#226](https://github.com/audiocontrol-org/deskwork/issues/226) — `deskwork iterate` could expose `--auto-dispositions=<value>` to skip the temp-file dance. Enhancement, not a defect.
 
 **Approach:** for each issue, evaluate fix scope vs. complexity; if in-scope-and-tractable, dispatch typescript-pro; if upstream-only or requires a separate design pass, file a fix-direction comment and defer.
 

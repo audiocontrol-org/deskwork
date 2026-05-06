@@ -149,9 +149,13 @@ deskwork:
 - [ ] Add regression tests: path-derived slug with dots → sanitized, ingested. Explicit `--slug v0.16.0-foo` → still rejected.
 - [ ] Live walk: re-run `deskwork ingest 2026-05-05-v0.16.0-verification-walk.md` (without `--slug`); confirm slug `v0-16-0-verification-walk` derived and ingested cleanly.
 
-### Task 3: Other newly-surfaced bugs
+### Task 3: Evaluate / fix other captured friction
 
-- [ ] If additional dogfood bugs surface during the v0.16.0 verification walk, file them and decide per-issue whether they roll into Phase 10 or get scoped to a follow-up release.
+- [ ] [#223](https://github.com/audiocontrol-org/deskwork/issues/223) — align calendar.md regen output between ingest-side and approve-side code paths. Add a regression test asserting byte-equal output across two consecutive regens. Pure churn-reduction; not blocking.
+- [ ] [#224](https://github.com/audiocontrol-org/deskwork/issues/224) — `SO_REUSEADDR` on the studio's listen socket; or accept the auto-increment as cosmetic friction and close.
+- [ ] [#225](https://github.com/audiocontrol-org/deskwork/issues/225) — skill-prose drift on `/deskwork:approve`'s scaffolding step. Same family as #201; SKILL.md edit, no CLI change.
+- [ ] [#226](https://github.com/audiocontrol-org/deskwork/issues/226) — `deskwork iterate --auto-dispositions=<value>` enhancement. Probably out-of-scope for v0.16.x; defer or implement if cheap.
+- [ ] If additional bugs surface during the v0.16.0 verification walk, file each immediately (capture-over-scope) and add to this task list.
 
 **Acceptance Criteria:**
 
