@@ -25,7 +25,7 @@
  * index.md). That routing has been retired — see Issue #222.
  */
 
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { readSidecar } from '@deskwork/core/sidecar';
@@ -38,7 +38,17 @@ interface ResolveResult {
   artifactPath: string;
 }
 
-function resolveIndexPath(projectRoot: string, entry: Entry): string {
+/**
+ * Resolve the canonical document path for an entry. Used by both the
+ * read path (`resolveEntry`) and the write path (the Save route's
+ * `writeEntryBody`) so both surfaces address the same file.
+ *
+ * Exported so the Save route (#174) can resolve the write target with
+ * the SAME rules the read path uses; duplicating the resolution
+ * silently couples the surfaces to two different code paths and lets
+ * them drift.
+ */
+export function resolveIndexPath(projectRoot: string, entry: Entry): string {
   if (entry.artifactPath) {
     const absArtifact = join(projectRoot, entry.artifactPath);
     // Strip the scrapbook segment for legacy `<dir>/scrapbook/<file>.md`
@@ -62,4 +72,34 @@ export async function resolveEntry(projectRoot: string, uuid: string): Promise<R
   const artifactPath = resolveIndexPath(projectRoot, entry);
   const artifactBody = await readFile(artifactPath, 'utf8');
   return { entry, artifactBody, artifactPath };
+}
+
+/**
+ * Atomically write `markdown` to the entry's canonical document path.
+ *
+ * Implements the Save semantics from issue #174 — the studio is the
+ * dumb file-write surface for in-browser edits. State-machine work
+ * (versioning, journal records, in-review flips) belongs to
+ * `/deskwork:iterate`, NOT to this function. Save and Iterate are
+ * orthogonal: an operator can Save many times before pinning a version.
+ *
+ * Atomic-write pattern (write-tmp + rename) mirrors `writeSidecar` and
+ * the snapshot helper. PID is embedded in the tmp filename so two
+ * concurrent writers don't clobber each other's tmp state.
+ *
+ * Returns the absolute path written so the caller can surface it to
+ * the operator (the Save route uses this for the response body).
+ */
+export async function writeEntryBody(
+  projectRoot: string,
+  uuid: string,
+  markdown: string,
+): Promise<{ writtenPath: string }> {
+  const entry = await readSidecar(projectRoot, uuid);
+  const writtenPath = resolveIndexPath(projectRoot, entry);
+  await mkdir(dirname(writtenPath), { recursive: true });
+  const tmpPath = `${writtenPath}.${process.pid}.tmp`;
+  await writeFile(tmpPath, markdown);
+  await rename(tmpPath, writtenPath);
+  return { writtenPath };
 }

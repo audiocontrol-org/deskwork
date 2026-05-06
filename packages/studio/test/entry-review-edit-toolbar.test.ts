@@ -118,4 +118,33 @@ describe('entry-review edit toolbar — discoverability (#175)', () => {
       /data-action="shortcuts"[^>]*title="[^"]+"/,
     );
   });
+
+  // Issue #174 — Save is a dumb file-write affordance. The button MUST
+  // render enabled, with a tooltip describing the action (no
+  // "pending design" prose, no `disabled` attribute, no `aria-disabled`).
+  it('Save button is rendered enabled with a real tooltip (#174)', async () => {
+    const app = createApp({ projectRoot, config: cfg });
+    const res = await app.fetch(
+      new Request(`http://x/dev/editorial-review/entry/${KNOWN_UUID}`),
+    );
+    const html = await res.text();
+    const toolbarMatch = html.match(
+      /<div class="er-edit-toolbar"[^>]*>[\s\S]*?<\/div>\s*<\/div>/,
+    );
+    expect(toolbarMatch).not.toBeNull();
+    const toolbar = toolbarMatch?.[0] ?? '';
+    // Save button is present.
+    expect(toolbar).toMatch(/data-action="save-version"/);
+    // No `disabled` attribute on the save button.
+    expect(toolbar).not.toMatch(/data-action="save-version"[^>]*disabled/);
+    // No `aria-disabled="true"` on the save button.
+    expect(toolbar).not.toMatch(
+      /data-action="save-version"[^>]*aria-disabled="true"/,
+    );
+    // The "pending design" tooltip is gone from the live markup.
+    expect(toolbar).not.toContain('pending design');
+    expect(toolbar).not.toContain('issues/174');
+    // The save button carries a meaningful tooltip naming the action.
+    expect(toolbar).toMatch(/data-action="save-version"[^>]*title="[^"]+"/);
+  });
 });

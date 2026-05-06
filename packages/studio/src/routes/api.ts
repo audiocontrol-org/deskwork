@@ -37,10 +37,12 @@ import { readSidecar } from '@deskwork/core/sidecar';
 import type { DeskworkConfig } from '@deskwork/core/config';
 import type { OverrideResolver } from '@deskwork/core/overrides';
 import type { DraftAnnotation } from '@deskwork/core/review/types';
+import { relative, isAbsolute } from 'node:path';
 import {
   parseEntryAnnotationBody,
   parseEditCommentFields,
 } from './entry-annotation-body.ts';
+import { writeEntryBody } from '../lib/entry-resolver.ts';
 
 /**
  * Mirrors the UUID regex enforced on entry creation and used by the
@@ -373,6 +375,69 @@ export function createApiRouter(ctx: StudioContext): Hono {
       return c.json({ error: msg }, 500);
     }
     return c.json({ annotation: minted });
+  });
+
+  // PUT /api/dev/editorial-review/entry/:entryId/body
+  //
+  // Issue #174 — Save = dumb file write to the entry's canonical
+  // document path. NO version bump, NO journal record, NO state-machine
+  // mutation. State-machine work (pinning a version, flipping
+  // in-review) stays with `/deskwork:iterate`; Save and Iterate are
+  // orthogonal. Per THESIS.md Consequence 2, file-body mutation is the
+  // ONE mutation the studio is allowed to perform on the operator's
+  // content tree.
+  //
+  // The write target resolves through the SAME `resolveIndexPath`
+  // helper the read path uses (`packages/studio/src/lib/entry-resolver.ts`)
+  // so Save addresses exactly the file the editor is showing.
+  app.put('/entry/:entryId/body', async (c) => {
+    const entryId = c.req.param('entryId');
+    if (!UUID_RE.test(entryId)) {
+      return c.json({ error: `malformed entryId: ${entryId}` }, 400);
+    }
+    const contentType = c.req.header('content-type') ?? '';
+    if (!contentType.toLowerCase().includes('application/json')) {
+      return c.json(
+        { error: 'expected content-type: application/json' },
+        400,
+      );
+    }
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'invalid JSON body' }, 400);
+    }
+    if (typeof body !== 'object' || body === null) {
+      return c.json({ error: 'expected JSON object body' }, 400);
+    }
+    const markdown = Reflect.get(body, 'markdown');
+    if (typeof markdown !== 'string') {
+      return c.json({ error: 'markdown (string) is required' }, 400);
+    }
+    try {
+      await readSidecar(ctx.projectRoot, entryId);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const status = msg.startsWith('sidecar not found') ? 404 : 500;
+      return c.json({ error: `unknown entry: ${entryId}` }, status);
+    }
+    try {
+      const result = await writeEntryBody(ctx.projectRoot, entryId, markdown);
+      // Surface the path relative to the project root when possible so
+      // the response doesn't leak absolute filesystem paths to the
+      // browser. Falls back to the absolute path for entries whose
+      // canonical document lives outside the project root (atypical).
+      const rel = relative(ctx.projectRoot, result.writtenPath);
+      const writtenPath =
+        rel.length > 0 && !rel.startsWith('..') && !isAbsolute(rel)
+          ? rel
+          : result.writtenPath;
+      return c.json({ ok: true, writtenPath });
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      return c.json({ error: `write failed: ${reason}` }, 500);
+    }
   });
 
   // The entry-keyed `/entry/:entryId/decision` and `/entry/:entryId/version`
