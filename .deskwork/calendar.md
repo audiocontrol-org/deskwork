@@ -25,6 +25,7 @@
 | 3c5481cf-d3d3-4aa5-b926-f6e3f70c58fe | release-skill-design | Release Skill Design |  |  | manual |
 | c68dc297-1f25-4eed-903f-f051a9a194a6 | source-shipped-deskwork-plan | Source-shipped deskwork plugins (drop the bundles) | Architectural plan to retire bundle/server.mjs + bundle/cli.mjs and ship deskwork plugins as source. Includes the collection-not-website data-model reframe. Discovered during the dogfood attempt to install deskwork in this monorepo. | deskwork, content-collections, source-shipped | manual |
 | d61642b3-614e-42c6-9e02-1f0a54137679 | open-issue-tranche-cleanup/workplan | Workplan |  |  | manual |
+| 35439a12-7b66-4563-a6d3-2ee33054dd45 | open-issue-tranche-cleanup/v016-verification-walk | v0.16.0 verification walk |  |  | manual |
 
 ## Review
 
