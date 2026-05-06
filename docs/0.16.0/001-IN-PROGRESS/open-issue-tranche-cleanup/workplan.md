@@ -130,6 +130,34 @@ deskwork:
 - [ ] No issue in the open list is in a "verify and close" or "moot" state.
 - [ ] Remaining product features (#54, #84, #85, #82, #87, #86) and backlog (#18, #30, #33) are explicitly noted as out-of-scope for this feature.
 
+## Phase 10 — Evaluate + fix dogfood-discovered bugs from the v0.16.0 verification walk
+
+**Deliverable:** evaluation pass + per-bug disposition + fixes for in-scope items.
+
+### Task 1: Evaluate [#220](https://github.com/audiocontrol-org/deskwork/issues/220) — plugin cache subtree purged between sessions
+
+- [ ] Reproduce the cache-purge condition (cross-session, or whatever boundary triggers it).
+- [ ] Determine whether the destruction is upstream Claude Code plugin lifecycle or something deskwork can prevent.
+- [ ] Decide: is the deskwork-side mitigation (bin shim self-heal on cache miss, or PATH wiring against the marketplace clone) tractable in this branch?
+- [ ] If yes — fix; if no — comment with the upstream link + close as upstream-tracking, OR leave open with `upstream-tracking` label.
+
+### Task 2: Fix [#221](https://github.com/audiocontrol-org/deskwork/issues/221) — ingest path-derived slug sanitization
+
+- [ ] In `packages/core/src/ingest-derive.ts` (`deriveSlug` function): when the slug source is `'path'`, sanitize the path-derived slug by replacing `.` with `-` before the kebab-case validation.
+- [ ] Keep the strict regex check for `--slug` explicit values (operator typed it; surface rejection cleanly).
+- [ ] Update SKILL.md prose to note the sanitization (or not — depends on whether it's a documented behavior or a quiet fix).
+- [ ] Add regression tests: path-derived slug with dots → sanitized, ingested. Explicit `--slug v0.16.0-foo` → still rejected.
+- [ ] Live walk: re-run `deskwork ingest 2026-05-05-v0.16.0-verification-walk.md` (without `--slug`); confirm slug `v0-16-0-verification-walk` derived and ingested cleanly.
+
+### Task 3: Other newly-surfaced bugs
+
+- [ ] If additional dogfood bugs surface during the v0.16.0 verification walk, file them and decide per-issue whether they roll into Phase 10 or get scoped to a follow-up release.
+
+**Acceptance Criteria:**
+
+- [ ] Each in-scope bug has a fix-landed-pending-verification commit OR an explicit defer/wontfix disposition.
+- [ ] No bug from the verification walk is left without a recorded disposition.
+
 ## Phase 9 — Ingest defaults to Drafting (per add/ingest semantic distinction) ([#206](https://github.com/audiocontrol-org/deskwork/issues/206))
 
 **Deliverable:** `/deskwork:ingest` defaults to **Drafting** stage when the source file's frontmatter has no `state:` field. Current default `Ideas` conflates `add` and `ingest` semantics; per operator framing, only `/deskwork:add` should put items in Ideas.

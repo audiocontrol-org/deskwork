@@ -58,6 +58,19 @@ Six phases, executed in order. Phases 2 and 3 are the only code-change phases; t
 
 **Approach:** run `gh issue list --state open` post-cleanup, group remaining open issues by implementation strategy (architecture / product features / backlog / external-tracking), update the feature `README.md` with the post-cleanup snapshot. Acceptance: no issue in the open list is in a "verify and close" or "moot" state.
 
+### Phase 10 — Evaluate + fix dogfood-discovered bugs from the v0.16.0 verification walk
+
+**Deliverable:** evaluation pass over the new bugs surfaced after the v0.16.0 release; per-bug disposition (fix in-branch / defer / reframe / wontfix); fixes for the items that pass evaluation.
+
+**Why this is in scope:** the v0.16.0 release shipped, and the verification walk surfaced new dogfood-driven bugs. Same pattern as the rest of this branch — find bugs through real use, fix the ones that fit the branch's scope, defer the rest with explicit dispositions.
+
+**Issues to evaluate:**
+
+- [#220](https://github.com/audiocontrol-org/deskwork/issues/220) — plugin cache subtree purged between sessions; deskwork bin lookups fail. Follow-up to [#89](https://github.com/audiocontrol-org/deskwork/issues/89)'s last-comment-promised-but-never-filed item. Possibly upstream-only (Claude Code plugin lifecycle); deskwork-side mitigations exist but may not be sufficient.
+- [#221](https://github.com/audiocontrol-org/deskwork/issues/221) — `deskwork ingest` rejects path-derived slugs containing `.` (e.g. `v0.16.0-…`); fix is sanitize-before-validate in `ingest-derive.ts`.
+
+**Approach:** for each issue, evaluate fix scope vs. complexity; if in-scope-and-tractable, dispatch typescript-pro; if upstream-only or requires a separate design pass, file a fix-direction comment and defer.
+
 ### Phase 9 — Ingest defaults to Drafting (per add/ingest semantic distinction) ([#206](https://github.com/audiocontrol-org/deskwork/issues/206))
 
 **Deliverable:** `/deskwork:ingest` defaults to **Drafting** stage when the source file's frontmatter has no `state:` field. The current default of **Ideas** conflates `/deskwork:ingest` with `/deskwork:add` — Ideas is for new captures with no body text; ingested files already have body text the operator wrote, so they belong in Drafting.
