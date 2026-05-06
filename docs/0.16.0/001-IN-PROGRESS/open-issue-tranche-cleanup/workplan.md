@@ -136,16 +136,18 @@ deskwork:
 
 ### Task 1 (T1) — Architectural blocker: single document evolves ([#222](https://github.com/audiocontrol-org/deskwork/issues/222))
 
-- [ ] Implement Option B + hybrid refinement per [#222](https://github.com/audiocontrol-org/deskwork/issues/222)'s body:
-  - On `/deskwork:approve` at a stage transition that produces a new artifact kind, atomically copy `index.md` → `scrapbook/<prior-stage>.md` (write-then-fsync the snapshot before any mutation of `index.md`).
+**Fix-landed (commit `fa30719`); pending v0.17.0 marketplace verification.**
+
+- [x] Implement Option B + hybrid refinement per [#222](https://github.com/audiocontrol-org/deskwork/issues/222)'s body:
+  - On `/deskwork:approve` at a stage transition that produces a new artifact kind, atomically copy `index.md` → `scrapbook/<prior-stage>.md` (write-then-rename atomic; mirrors writeSidecar). Snapshot fires BEFORE sidecar mutate.
   - Leave `index.md` unchanged on approve. The first iterate at the new stage rewrites `index.md` from scratch (or transforms it).
-  - Update studio review surface to always read `index.md` (regardless of stage). Drop any stage-aware path-routing logic.
+  - Update studio review surface to always read `index.md` (regardless of stage). Drop any stage-aware path-routing logic. Fallback to `artifactPath` when `<dir>/index.md` doesn't exist (supports shared-directory layouts like deskwork's own feature-docs).
   - Per-stage history journals stay correct (keyed on `(entryId, stage, version)`).
-- [ ] Resolve [#181](https://github.com/audiocontrol-org/deskwork/issues/181) (outline-approve semantics) alongside; the snapshot-on-approve pattern IS the answer to outline-approve.
-- [ ] Resolve [#200](https://github.com/audiocontrol-org/deskwork/issues/200) (marginalia anchor stability) alongside or as immediate follow-up; range-anchor stability under document evolution is the same architectural concern.
-- [ ] Add atomic-write tests + regression coverage for the snapshot path.
-- [ ] Live walk: re-walk the approval cycle on this project's audit doc / PRD; confirm the studio renders the right content at every stage.
-- [ ] Update `MIGRATING.md` for v0.17.0 (or whatever ships): per-stage `artifactPath` no longer used; explain the snapshot model; note any operator-side migration steps.
+- [x] Resolve [#181](https://github.com/audiocontrol-org/deskwork/issues/181) (outline-approve semantics) alongside; the snapshot-on-approve pattern IS the answer to outline-approve.
+- [x] Resolve [#200](https://github.com/audiocontrol-org/deskwork/issues/200) (marginalia anchor stability) via archive-on-approve: comments archive when the snapshot fires; new stage starts with a clean comment slate. Server-side only this iteration; "prior-stage comments archive view" UI deferred.
+- [x] Add atomic-write tests + regression coverage for the snapshot path.
+- [x] Live walk: re-walk the approval cycle on this project's audit doc / PRD; confirm the studio renders the right content at every stage. **Verified** end-to-end against b3f20364 (PRD), 998b8a29 (audit), 35439a12 (walk script) on the workspace dist; all three non-index.md entries render correctly via the fallback.
+- [x] Update `MIGRATING.md` for v0.17.0 (or whatever ships): per-stage `artifactPath` no longer used; explain the snapshot model; note any operator-side migration steps.
 
 ### Task 2 (T6) — Phase 10 dogfood items
 
