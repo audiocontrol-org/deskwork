@@ -258,9 +258,13 @@ function printBanner(b: BannerInput): void {
     );
   }
   // Mirror the studio banner shape so adopters / dogfood operators see
-  // the canonical Bridge: line in the same place.
+  // the canonical Bridge: line in the same place. The qualifier scopes to
+  // the /mcp endpoint specifically — request-time guard in mcp-server.ts
+  // rejects non-loopback hits — not the bind topology, which may include
+  // Tailscale interfaces or an explicit --host override (see exposure
+  // warning below).
   process.stdout.write(
-    `  Bridge: http://localhost:${b.port}/mcp (loopback-only)\n`,
+    `  Bridge MCP: http://localhost:${b.port}/mcp (MCP endpoint enforces loopback)\n`,
   );
   process.stdout.write(`  project: ${b.projectRoot}\n`);
   if (b.autoIncrementedFrom !== null) {

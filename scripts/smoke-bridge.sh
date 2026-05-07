@@ -239,8 +239,8 @@ if [ "${booted}" -ne 1 ]; then
 fi
 ok "studio booted (log: ${STUDIO_LOG})"
 
-# Confirm the bridge mounted (banner should mention `Bridge: ...`).
-if grep -q "Bridge: http" "${STUDIO_LOG}"; then
+# Confirm the bridge mounted (banner should mention `Bridge MCP: ...`).
+if grep -q "Bridge MCP: http" "${STUDIO_LOG}"; then
   ok "bridge endpoint advertised in startup banner"
 else
   fail "studio booted but the bridge banner line is missing — bridge did not mount"

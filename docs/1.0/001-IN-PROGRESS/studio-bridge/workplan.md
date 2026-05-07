@@ -584,6 +584,10 @@ Tasks (deferred):
 - **MCP single-agent invariant interaction.** If the studio restarts and the chat panel reconnects, does the sidecar's MCP slot still belong to the same CC session? Yes — MCP is server-process-scoped. The studio's HTTP+SSE side reconnects independently from MCP. Mitigation: document explicitly in design ADDENDUM.
 - **Port collision on second worktree.** Two worktrees both want :47321 → second one auto-increments. Each sidecar's descriptor is in its own worktree's `.deskwork/.bridge`. Studio finds its sidecar via the worktree-local descriptor. Should be fine; verify in tests.
 
+#### Phase 10 — Backlog
+
+- (Backlog, post-Phase-10c) Extract `listen.ts` + `tailscale.ts` to `@deskwork/core` to eliminate the bridge↔studio duplication introduced in 10b. The studio's `AUTO_INCREMENT_RANGE = 30` and the bridge's `101` should be parameterized at the call site. Tracked here, not in a separate GH issue, because the bridge is internal-only and dedicated-issue overhead isn't justified for tracking.
+
 ---
 
 ## Dependencies + parallelism

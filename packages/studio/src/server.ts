@@ -625,10 +625,11 @@ function printBanner(b: BannerInput): void {
     );
   }
   if (b.bridgeMounted) {
-    // Phase 3: MCP bridge endpoint. Loopback-only by construction —
-    // see bridge/mcp-server.ts for the guard.
+    // Phase 3: MCP bridge endpoint. The qualifier scopes to the /mcp
+    // endpoint specifically (enforced in bridge/mcp-server.ts), not the
+    // studio's bind topology — see exposure warning below for that.
     process.stdout.write(
-      `  Bridge: http://localhost:${b.port}/mcp (loopback-only)\n`,
+      `  Bridge MCP: http://localhost:${b.port}/mcp (MCP endpoint enforces loopback)\n`,
     );
   }
   process.stdout.write(`  project: ${b.projectRoot}\n`);

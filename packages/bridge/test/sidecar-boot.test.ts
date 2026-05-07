@@ -220,8 +220,8 @@ describe('deskwork-bridge: sidecar boot + descriptor', () => {
     expect(typeof desc.version).toBe('string');
     expect(desc.version.length).toBeGreaterThan(0);
 
-    // Banner shape: includes the canonical Bridge: line.
-    expect(s.stdoutBuf).toMatch(/Bridge: http:\/\/localhost:\d+\/mcp/);
+    // Banner shape: includes the canonical Bridge MCP: line.
+    expect(s.stdoutBuf).toMatch(/Bridge MCP: http:\/\/localhost:\d+\/mcp/);
   });
 
   it('refuses to boot when an existing live sidecar holds the descriptor', async () => {
