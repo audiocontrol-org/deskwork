@@ -478,6 +478,114 @@ These were captured during the diagnosis pass; new test artifacts (post-fix) sho
 
 ---
 
+### Phase 10: Long-lived bridge sidecar (process-lifecycle decoupling)
+
+**Origin.** Discovered during Phase 9 dogfood: every studio restart drops CC's MCP connection and forces a `/deskwork:listen` re-dispatch. The single-process consolidation (Phase 1) was correct for the MVP but doesn't survive the operator's actual edit-iterate-test loop on studio code. PRD § "Phase 10 — Long-lived bridge sidecar" captures the architectural rationale; this phase implements it.
+
+**Deliverable.** Bridge surface (BridgeQueue + ChatLog + MCP server + `/api/chat/*` routes) runs in its own long-lived process (`deskwork-bridge`). Studio process is transient; restarts don't touch the sidecar. CC's MCP listen loop survives studio restarts.
+
+**Operator-facing model:** two commands (`deskwork-bridge` + `deskwork-studio`), run separately. The sidecar binds the canonical port the phone hits; the studio binds a separate loopback-only port and is reverse-proxied through the sidecar for `/dev/*` and `/static/*`. The phone's URL doesn't change.
+
+**Internal-use only.** Per operator framing the bridge isn't headed for public release soon; this phase doesn't expand the adopter-facing contract. Adopter docs (sidecar install, launchd/systemd units, etc.) are deferred until a hardening pass.
+
+#### Phase 10a — Audit + design decision
+
+**Deliverable.** Concrete answers (with file:line evidence) to the open architectural questions before any source files move. Lands as an ADDENDUM to `design.md` or as a new `design-phase-10.md` next to it, NOT inline edits to phase-1 design prose.
+
+Tasks:
+
+- [ ] Audit current bridge surface in the studio and enumerate what moves to the sidecar vs what stays in studio. Cite file:line for each. Bridge candidates: `packages/studio/src/bridge/{queue,persistence,routes,mcp-server,mcp-tools,types}.ts`. Studio candidates: `packages/studio/src/pages/**`, `packages/studio/src/server.ts` boot orchestration, `packages/studio/src/build-client-assets.ts`.
+- [ ] Decide the package shape:
+  - **Option (a):** new package `packages/bridge/` (own `package.json`, own bin); `@deskwork/studio` keeps its bin and gains a runtime dependency on `@deskwork/bridge`'s exposed API for the studio's reverse-proxy to find the sidecar.
+  - **Option (b):** keep one package; add a new bin `@deskwork/studio/bin/deskwork-bridge` alongside the existing `deskwork-studio` bin. Single workspace, two entry points.
+  - Pick whichever has less mechanical churn given the existing layout. Document the choice + rationale.
+- [ ] Decide IPC mechanism between studio and sidecar (loopback HTTP is the obvious default; the studio's existing Hono app already speaks HTTP; no new IPC framework). Confirm and document.
+- [ ] Decide the discovery descriptor location and shape: `<projectRoot>/.deskwork/.bridge` (or similar). Schema: `{ port: number, pid: number, startedAt: ISO8601, version: string }`. Document stale-descriptor handling (pid dead + port free → studio boots a new sidecar; pid dead + port taken → surface error; pid alive but port differs → surface error).
+- [ ] Decide port allocation: sidecar binds a CLI-supplied port (default :47321 to match today's studio default), or auto-allocates if busy and writes the chosen port to the descriptor. Document.
+- [ ] Decide how the studio's `/dev/chat` page tells the in-browser chat panel which URL to hit for `/api/chat/*`. Probably: studio's chat-page HTML reads the descriptor at render time and inlines the sidecar URL into the page bootstrap. Alternative: studio reverse-proxies `/api/chat/*` (re-couples lifecycles — bad). Document.
+- [ ] Decide the smoke-test shape: extend `scripts/smoke-bridge.sh` to boot sidecar, then studio, connect MCP client, kill + restart studio while MCP client is connected, confirm MCP client survives.
+
+**Acceptance Criteria:**
+
+- [ ] An ADDENDUM design doc (`design-phase-10.md` or appended section in `design.md`) captures every decision above with rationale.
+- [ ] No source code moved or added in this sub-phase — pure design.
+- [ ] Operator reviews + approves the design before 10b starts (per project lifecycle convention; the PRD's `applied` gate). Iterate via `/deskwork:iterate` if the operator leaves margin notes.
+
+**Notes.** This sub-phase exists specifically to prevent the "started before the operator finished thinking" failure mode — the sidecar split touches enough of the existing surface that getting the design wrong would cascade. Do NOT begin 10b until the design ADDENDUM is `applied` in deskwork's review workflow.
+
+#### Phase 10b — Extract bridge surface into sidecar process
+
+**Deliverable.** A working `deskwork-bridge` bin (per 10a's package decision) that boots the sidecar process. Existing tests still pass. Studio still works in single-process mode (10c flips it).
+
+Tasks:
+
+- [ ] Per 10a's package decision, create the new package directory or new bin. Move `packages/studio/src/bridge/{queue,persistence,types}.ts` and the `/api/chat/*` routes' wiring into the new home (or re-export, depending on 10a's choice).
+- [ ] Add a sidecar entry point that boots a Hono app with: `/mcp` (existing handler), `/api/chat/{send,stream,state,history}` (existing handlers), no `/dev/*` (yet — 10c adds the reverse proxy).
+- [ ] Sidecar writes the descriptor to `<projectRoot>/.deskwork/.bridge` at boot. Removes it on graceful exit (SIGTERM / SIGINT). Stale descriptor on crash is handled by the studio's discovery logic in 10c.
+- [ ] `deskwork-bridge --help` documents the bin: project root, port, foreground vs background semantics. Foreground default (operator runs it in their own terminal; sees its logs). No daemonization in this phase.
+- [ ] Tests: `packages/<bridge>/test/sidecar-boot.test.ts` — boot sidecar against a fixture project, hit `/api/chat/state`, expect `{mcpConnected:false, listenModeOn:false, awaitingMessage:false}`. Boot a second sidecar against the SAME project; expect a clear error (not silent port-collision). Boot against a fixture with a stale descriptor (dead pid, free port); expect successful boot + descriptor overwrite.
+- [ ] Existing studio tests still pass. Existing smoke (`smoke-bridge.sh`) still passes.
+
+**Acceptance Criteria:**
+
+- [ ] `deskwork-bridge --project-root <fixture>` boots; `curl http://localhost:<port>/api/chat/state` returns the expected shape; `/mcp` POST initialize succeeds; `Bridge: ...` banner prints.
+- [ ] Descriptor file is written at boot, removed on graceful exit, overwrite-safe on stale-descriptor recovery.
+- [ ] Studio in single-process mode (pre-10c) still works unchanged. Tests pass on both surfaces.
+- [ ] No `--no-verify` on commits. No bypass of pre-commit hooks.
+
+#### Phase 10c — Studio binds separate port; reverse-proxies through sidecar
+
+**Deliverable.** Studio reads the sidecar descriptor at boot and binds its own loopback-only port. Sidecar's Hono app reverse-proxies `/dev/*` and `/static/*` to the studio's port. The phone's URL is unchanged (canonical port = sidecar port). Studio restart no longer drops MCP.
+
+Tasks:
+
+- [ ] Add to studio: descriptor reader at boot. If descriptor present + sidecar healthy (port responds + pid alive), bind a separate loopback-only port (e.g. start at :47322 + auto-increment). If descriptor absent, surface a clear error: *"Sidecar not running. Run `deskwork-bridge` first."* Operators MUST start the sidecar before the studio.
+- [ ] Add to sidecar: reverse-proxy handlers for `/dev/*` and `/static/*` that forward to the studio's loopback URL. Use Hono's `proxy` helper (or similar) for HTTP request forwarding. Stream responses (don't buffer; the studio serves SSE-y resources too in some places).
+- [ ] When the studio process exits, the sidecar's reverse proxy returns 502 for `/dev/*` requests with a friendly *"Studio restarting…"* page. MCP and `/api/chat/*` are unaffected. Document the failure-mode behavior.
+- [ ] Modify the chat panel's bootstrap so the panel's HTTP calls go to the canonical port (sidecar) — which it already does, since today's chat panel uses relative URLs and the chat page is served from the same host. The reverse proxy makes this transparent.
+- [ ] Tests: integration test that boots sidecar + studio, connects an in-process MCP client, kills the studio with SIGKILL while the MCP client is in `await_studio_message`, restarts studio, asserts MCP client's await is uninterrupted (the mocked operator message arrives and the await resolves AFTER the studio bounce).
+- [ ] Smoke: extend `scripts/smoke-bridge.sh` (or add `scripts/smoke-bridge-sidecar.sh`) for the studio-restart-survives-MCP property. Local-only (per `.claude/rules/agent-discipline.md` "No test infrastructure in CI").
+
+**Acceptance Criteria:**
+
+- [ ] After `deskwork-bridge` + `deskwork-studio` are running, the phone hits the canonical port and gets the chat panel + dev surfaces normally.
+- [ ] Killing + restarting `deskwork-studio` while CC's listen loop is active does NOT cause the listen loop to exit. Bridge state (queue + `listenModeOn` + `awaitingMessage`) is preserved. Operator does NOT need to re-dispatch `/deskwork:listen`.
+- [ ] During the studio restart window, `/dev/*` requests return 502 with a friendly message; `/api/chat/*` and `/mcp` are unaffected.
+- [ ] All Phase 1–9 acceptance criteria still hold.
+- [ ] Smoke script verifies the survives-restart property locally.
+
+#### Phase 10d — Adopter-facing wiring (DEFERRED, document only)
+
+Per operator framing the bridge is internal-only for the foreseeable future. This sub-phase's scope is captured here for whenever a hardening pass lands, but is NOT part of the active implementation.
+
+Tasks (deferred):
+
+- [ ] Document the two-process model in `plugins/deskwork-studio/README.md` "Bridge mode (experimental)" section.
+- [ ] Provide example launchd / systemd unit files for adopters who want a daily-driver sidecar.
+- [ ] Extend `/deskwork:install` to detect bridge mode and write the trust-chain settings (the chain we discovered the hard way during this dogfood: `.mcp.json` schema field is `type` not `transport`; `enabledMcpjsonServers` allowlist; `~/.claude.json` project entry with `hasTrustDialogAccepted: true`).
+
+**Acceptance Criteria (deferred):** N/A until the bridge is approved for public release.
+
+#### Phase 10 — Dependencies + sequencing
+
+| Sub-phase | Depends on | Required for the operator's daily use? |
+|---|---|---|
+| 10a (audit + design) | Phase 1–9 (the existing surface) | yes — gates 10b |
+| 10b (extract sidecar) | 10a `applied` | yes |
+| 10c (studio reverse-proxy) | 10b | yes |
+| 10d (adopter wiring) | 10c, AND security hardening pass | NO — deferred |
+
+`/dw-lifecycle:implement` should walk 10a → 10b → 10c. Stop after 10c; do NOT auto-walk into 10d (deferred).
+
+#### Phase 10 — Risks
+
+- **Reverse-proxy correctness for streaming responses.** The studio serves chunked / streaming responses for some `/dev/*` routes. Hono's proxy must stream, not buffer. Risk surfaces in the sidecar's `/dev/*` proxy implementation. Mitigation: cover with an integration test in 10c that asserts a long-running `/dev/*` request streams through the proxy correctly.
+- **Discovery race.** Studio boots before sidecar's descriptor is written → studio errors with "sidecar not running." Mitigation: surface a clear, actionable error (don't auto-spawn the sidecar — that re-couples lifecycles).
+- **MCP single-agent invariant interaction.** If the studio restarts and the chat panel reconnects, does the sidecar's MCP slot still belong to the same CC session? Yes — MCP is server-process-scoped. The studio's HTTP+SSE side reconnects independently from MCP. Mitigation: document explicitly in design ADDENDUM.
+- **Port collision on second worktree.** Two worktrees both want :47321 → second one auto-increments. Each sidecar's descriptor is in its own worktree's `.deskwork/.bridge`. Studio finds its sidecar via the worktree-local descriptor. Should be fine; verify in tests.
+
+---
+
 ## Dependencies + parallelism
 
 | Phase | Depends on |
@@ -491,6 +599,7 @@ These were captured during the diagnosis pass; new test artifacts (post-fix) sho
 | 7 | 4, 5, 6 |
 | 8 | 1–7 |
 | 9 | 8 (smoke-finding-driven) |
+| 10 | 9 (operator-iteration friction surfaced 10's need) |
 
 Parallelism windows:
 - After Phase 1: Phases 2, 3, 4 can proceed concurrently
@@ -499,6 +608,7 @@ Parallelism windows:
 - Phase 7 must wait for 4 + 5 + 6
 - Phase 8 must wait for everything
 - Phase 9 follows Phase 8 (it is the response to Phase 8's findings); 9a is required before 9b
+- Phase 10 follows Phase 9 (it is the architectural answer to operator-iteration friction surfaced during 9's dogfood); 10a gates 10b; 10b gates 10c; 10d is explicitly deferred
 
 ---
 

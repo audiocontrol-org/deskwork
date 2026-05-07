@@ -79,6 +79,43 @@ If those check, the next step is integration: review against `THESIS.md` consequ
 
 If they don't check — typically because the MCP-via-studio mechanism turns out to be fragile, or the phone UX falls short — the branch is preserved for reference and we explore an alternative shape (file-watch IPC fallback, or revisiting the agent-host model from the brainstorming session).
 
+### Phase 10 — Long-lived bridge sidecar (process-lifecycle decoupling)
+
+Phase 1's single-process consolidation (the studio hosts the MCP server in-process) was the right MVP shape but does not survive the operator's actual edit-iterate-test loop on studio code. Every studio restart kills the in-process MCP server, drops CC's MCP connection, and forces CC's listen loop to exit. The cost-per-restart includes re-dispatching `/deskwork:listen` and (until the trust-state is settled, which it now is on this worktree) re-walking the trust dance. During Phase 9's UX-fix iteration the operator named this as a real adoption blocker — so much so that they considered protocol-level alternatives (Unix sockets, named pipes, etc.). The honest answer is that no transport survives a server-process exit; the lever is **process lifecycle decoupling**, not protocol selection.
+
+Phase 10 splits the bridge's stateful surface out of the studio process into a long-lived sidecar so studio restarts don't drop CC.
+
+**Architectural shape:**
+
+- **`deskwork-bridge` (NEW long-lived process).** Owns the BridgeQueue (in-memory), the ChatLog (JSONL on disk), the MCP `/mcp` endpoint, and the four HTTP routes under `/api/chat/*`. Binds the canonical port the phone hits (the studio's existing port today). Single-agent invariant + loopback-only guard for `/mcp` + Tailscale-reachable for `/api/chat/*` — same security model as Phase 3.
+
+- **`deskwork-studio` (existing, modified, now transient).** Owns the `/dev/*` UI routes (dashboard, content tree, scrapbook, entry-review, chat-page HTML), the static assets, and the on-startup esbuild client-bundle. Binds a separate loopback-only port (different from the canonical phone-facing port). The chat panel JS fetches from the sidecar's URL via the canonical port; the studio's UI surfaces are reachable via the sidecar's reverse proxy at the canonical port.
+
+- **Front door is the sidecar.** The sidecar's Hono app routes `/mcp` and `/api/chat/*` directly; for `/dev/*` and `/static/*` it reverse-proxies to the studio's loopback port. When the studio process exits, the sidecar's `/dev/*` proxy returns 502 briefly; MCP + chat routes are unaffected. CC's listen loop survives.
+
+- **Discovery seam.** The sidecar writes a small descriptor to `<projectRoot>/.deskwork/.bridge` (port + pid + boot timestamp) at startup so the studio finds it on boot. Stale-descriptor handling: if the pid is dead and the port is free, the studio bootstraps a new sidecar; if the pid is dead but the port is taken, surface an error (no auto-kill of unknown processes).
+
+**Why post-Phase-9.** Phases 1–9 build the bridge AS-IF it were single-process and validate the experiment that way. Splitting earlier would have doubled the design surface during the build phases without proving the bridge mechanism itself worked. The sidecar split is the architectural answer to Phase-9-era operator feedback that the bridge's iterate-cost is too high to live with.
+
+**Why this stays consistent with the THESIS.** The thesis's Consequence 1 (distribution must keep source agent-reachable) is unaffected — both processes are open-source TypeScript with readable JS dist. Consequence 2 (skills do the work; the studio routes commands) is preserved; the sidecar just hosts the routing surface long-lived. The MCP endpoint's loopback-only guard + single-agent invariant + Origin allow-list all carry forward.
+
+**What changes for adopters (when this is no longer internal-only).** The published `@deskwork/studio` bin gains a `bridge` subcommand (or splits into a separate `@deskwork/bridge` package — TBD in 10a's audit). Adopter docs document the two-process model and how operators run the sidecar (probably via a launchd / systemd unit for daily use; manually in the foreground during development). The marketplace install path and the `/deskwork:install` skill grow steps that wire the sidecar PID file. Per the operator's framing the bridge is internal-use-only for the foreseeable future, so adopter docs are deferred until a hardening pass clears the security posture for public release; Phase 10 lands without expanding the public-adopter contract.
+
+**Acceptance criteria (extension of Phase 1–9 criteria).**
+
+- Studio process can restart while CC's MCP listen loop is active. After restart, the chat panel HTML resyncs (the panel reconnects to the sidecar's SSE stream); the listen loop is uninterrupted from CC's perspective.
+- Sidecar process restart still drops the MCP connection (expected — sidecar IS the MCP host).
+- Bridge state (queue, `listenModeOn`, `awaitingMessage`) is owned by the sidecar and survives studio restart.
+- All Phase 1–9 acceptance criteria still hold.
+- Smoke script extended to verify the studio-restart-survives-MCP property: boot sidecar + studio, connect MCP client, kill studio, restart studio, confirm MCP connection still up.
+
+**Out of scope for Phase 10 specifically** (still in the longer-term backlog):
+
+- Multi-worktree sidecar registry (each worktree runs its own sidecar; cross-worktree aggregation is still out per the v1 scope).
+- launchd / systemd unit files for adopter daily-driver use (deferred until adopter-facing hardening lands).
+- Sidecar HA / supervisor-restart on crash (deferred; today the sidecar is single-instance and the operator restarts manually if it dies).
+- Auto-spawn of sidecar from studio (re-couples lifecycles; defeats the purpose). Operators run the two processes deliberately.
+
 ### Implementation Phases
 
 See [`workplan.md`](./workplan.md) for the full phase breakdown with tasks and acceptance criteria.
@@ -92,3 +129,5 @@ At a high level:
 6. Listen skill + SessionStart hook + config schema
 7. Documentation + adopter wiring (MCP client config example)
 8. Local end-to-end smoke (against writingcontrol.org from a real phone)
+9. Phone UX fixes — Phase-8 smoke findings (stowable chat panel, sticky/overlay-at-medium-widths, soft-keyboard handling)
+10. Long-lived bridge sidecar — process-lifecycle decoupling so studio restart doesn't drop CC's MCP connection
