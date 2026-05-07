@@ -21,8 +21,11 @@ Read `<projectRoot>/.deskwork/config.json` once at start. Use `studioBridge.idle
 
 ### Loop
 
-1. **Announce.** Send one prose message so the chat panel shows the agent is alive:
-   `send_studio_response({ kind: 'prose', text: 'Listening. Type a message and I will handle it.' })`
+1. **Announce.** Send one prose message so the chat panel shows the agent is alive AND identifies which Claude Code session has claimed the bridge. Operators commonly run multiple CC sessions (one per worktree) — the prose should name this one:
+
+   `send_studio_response({ kind: 'prose', text: "Listening from <session-id>. Type a message and I'll handle it." })`
+
+   Substitute `<session-id>` with whatever stable identifier this CC session exposes (env var, MCP handshake metadata, etc.). If no stable identifier is available, prefer the form `"Listening from this Claude Code session. Type a message and I'll handle it."` over a generic message — the operator needs to know WHICH agent claimed the bridge, not just that A bridge is connected.
 
 2. **Await.** Call `await_studio_message({ timeoutSeconds: <idleTimeout> })`.
 
@@ -49,15 +52,17 @@ If the operator types at the terminal mid-await, Claude Code's runtime interrupt
 
 ### Stop conditions
 
-Exit the loop (do NOT re-enter `await_studio_message`) only when one of these happens:
+Exit the loop (do NOT re-enter `await_studio_message`) only when one of these happens, listed in order of preference:
 
-- **Explicit operator stop at the terminal** — the operator interrupts and types something whose intent is "stop listening" (e.g. "stop listening", "exit listen mode", "end the bridge"). Recognize the intent; reply at the terminal that the loop has ended; do not re-enter the await.
+1. **Operator interrupts at the terminal (Ctrl-C / ESC).** This is the deterministic v1 exit. Claude Code's runtime delivers the interrupt to the agent; the in-flight `await_studio_message` tool call cancels. Treat this as "exit gracefully": send a final prose status via `send_studio_response({ kind: 'prose', text: 'Listen loop ended.' })`, then exit without re-entering the await.
 
-- **MCP connection closes** — `await_studio_message` rejects with an abort/disconnect error. Per project rule "no fallbacks", surface this explicitly:
-  > Studio bridge disconnected. Listen loop ended.
-  Then exit the loop.
+2. **MCP connection closes** — the bridge is torn down or the studio process stops. `await_studio_message` rejects with an abort/disconnect-shaped error. Per project rule "no fallbacks", surface this explicitly:
+   > Studio bridge disconnected. Listen loop ended.
+   Then exit the loop.
 
-There is no `/deskwork:stop-listening` slash command in v1. Stop conditions are exit-via-terminal-interrupt or MCP-disconnect.
+3. **Soft intent recognition (fallback).** If the operator types something at the terminal whose intent is clearly "stop listening" (e.g. "stop listening", "exit listen mode", "end the bridge"), recognize the intent and exit. This is a soft signal — prefer Ctrl-C as the canonical exit; this branch exists for cases where Ctrl-C isn't natural (e.g. the agent is mid-compose on a long response).
+
+A `/deskwork:stop-listening` slash command is intentionally NOT shipped in v1. Ctrl-C is the deterministic exit.
 
 ### Tool-use cards: courtesy, not contract
 
