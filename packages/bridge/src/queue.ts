@@ -115,10 +115,18 @@ export class BridgeQueue {
     }
 
     if (this.waiter !== null) {
-      throw new Error(
-        'BridgeQueue: a second concurrent awaitNextOperatorMessage was attempted. ' +
-          'The single-agent invariant permits only one in-flight awaiter.',
-      );
+      // Issue #235 follow-up: a same-session reconnect after a network-
+      // level transport drop lands here — the old MCP transport silently
+      // died, so neither `transport.onclose` nor any abort signal fires
+      // to clear the parked waiter. Without this branch, every retry-on-
+      // drop attempt errors with "second concurrent" forever.
+      //
+      // Abort the existing waiter and replace it. The single-agent
+      // invariant becomes best-effort (matches the tracker-preemption
+      // relaxation in mcp-server.ts); deliberate concurrent awaiters
+      // see last-write-wins. Acceptable for the bridge's internal-only
+      // posture (PRD § "Phase 10").
+      this.abortPendingWaiter();
     }
 
     const head = this.inbox.shift();

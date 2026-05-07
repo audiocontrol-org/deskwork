@@ -176,13 +176,23 @@ describe('BridgeQueue — timeout and abort', () => {
   });
 });
 
-describe('BridgeQueue — single-awaiter invariant', () => {
-  it('second concurrent await throws synchronously', () => {
+describe('BridgeQueue — single-awaiter invariant (best-effort)', () => {
+  it('second concurrent await aborts the first and replaces it (issue #235)', async () => {
+    // Pre-fix behavior: throw synchronously on the second call.
+    // Post-fix behavior: abort the parked waiter and replace it. The
+    // single-agent invariant becomes best-effort, matching the tracker-
+    // preemption relaxation in mcp-server.ts. This is what makes the
+    // listen-skill retry-on-drop work for same-session reconnects after
+    // a network-level transport drop, where neither the queue's signal
+    // nor the sidecar's transport.onclose fires to clear the old waiter.
     const q = new BridgeQueue();
-    void q.awaitNextOperatorMessage(10_000);
-    expect(() => q.awaitNextOperatorMessage(10_000)).toThrow(
-      /single-agent invariant/,
-    );
+    const firstPromise = q.awaitNextOperatorMessage(10_000);
+    const secondPromise = q.awaitNextOperatorMessage(10_000);
+
+    await expect(firstPromise).rejects.toThrow(/aborted/);
+
+    q.enqueueOperatorMessage('hello');
+    await expect(secondPromise).resolves.toMatchObject({ text: 'hello' });
   });
 });
 
