@@ -15,11 +15,12 @@ Provision a new feature: branch, worktree, status-organized docs directory, and 
 
 1. Confirm `slug` (kebab-case) and target version (defaults to `config.docs.defaultTargetVersion`).
 2. *(Optional)* Invoke `superpowers:using-git-worktrees` for branch + worktree creation if the operator wants the worktree pre-created. The branch name MUST be `<config.branches.prefix><slug>` (default `feature/<slug>`); the helper detects and reuses an existing branch+worktree at this name. If you skip this step, the helper creates the branch+worktree itself at `dirname(<main-repo>)/<expanded-config.worktrees.naming>`.
-3. Invoke `superpowers:writing-plans` to generate the workplan content from the feature definition (if `--definition <path>` given) or from a fresh design conversation. The output is the body of `workplan.md`.
+3. Invoke `superpowers:writing-plans` to generate the workplan content from the feature definition (if `--definition <path>` given) or from a fresh design conversation. Use the Write tool to save the output to a temp file (e.g. `/tmp/workplan-<slug>.md`); pass that path to the helper via `--workplan` in the next step. The helper writes it as the body of `workplan.md` (frontmatter prepended).
 4. Shell out to the helper. Run from the main worktree OR from the pre-created feature worktree — the helper resolves config from the main worktree either way:
 
 ```
-dw-lifecycle setup <slug> [--target <version>] [--title <title>] [--definition <path>]
+dw-lifecycle setup <slug> [--target <version>] [--title <title>] \
+                          [--definition <path>] [--workplan <path>]
 ```
 
 The helper:
@@ -27,6 +28,8 @@ The helper:
    - Otherwise creates the branch + worktree itself.
    - Creates `docs/<version>/<status>/<slug>/` in the (resolved) worktree.
    - Renders templates (`prd.md`, `workplan.md`, `README.md`) with placeholder substitution.
+   - If `--definition` is supplied, seeds prd.md sections from the feature-definition's headings (Problem / Goal / Scope / Approach / Tasks / Acceptance Criteria) and seeds workplan.md's first task from Tasks.
+   - If `--workplan` is supplied, REPLACES workplan.md's body with the file's content (frontmatter prepended). This skips the rendered workplan template entirely — appropriate when you've used `superpowers:writing-plans` to generate a real workplan body already.
    - Records the target version in frontmatter so it travels with the feature.
 
 5. Report: branch name, worktree path, docs directory, files scaffolded.

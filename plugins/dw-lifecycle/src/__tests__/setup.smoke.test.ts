@@ -122,6 +122,86 @@ Parse the definition headings and map them into scaffold templates.
     expect(workplan).not.toContain('<!-- Definition imported from:');
   });
 
+  it('--workplan replaces the rendered template with a pre-authored body (#212)', async () => {
+    await install([tmpRoot]);
+
+    const workplanPath = join(tmpRoot, 'pre-authored-workplan.md');
+    writeFileSync(
+      workplanPath,
+      `# Workplan: Custom Plan
+
+**Goal:** Ship the custom thing.
+
+## Phase 1: First slice
+
+Real content from writing-plans output here.
+
+- [ ] Step 1: First step
+- [ ] Step 2: Second step
+`,
+      'utf8',
+    );
+
+    const origCwd = process.cwd();
+    process.chdir(tmpRoot);
+    try {
+      await setup([
+        'workplan-flag-feature',
+        '--target',
+        '1.0',
+        '--title',
+        'Workplan Flag',
+        '--workplan',
+        workplanPath,
+      ]);
+    } finally {
+      process.chdir(origCwd);
+    }
+
+    worktreePath = join(dirname(tmpRoot), `${basename(tmpRoot)}-workplan-flag-feature`);
+    const wpPath = join(
+      worktreePath,
+      'docs/1.0/001-IN-PROGRESS/workplan-flag-feature/workplan.md',
+    );
+    expect(existsSync(wpPath)).toBe(true);
+    const wp = readFileSync(wpPath, 'utf8');
+
+    // Pre-authored body landed.
+    expect(wp).toContain('Real content from writing-plans output here.');
+    expect(wp).toContain('Step 1: First step');
+
+    // Template stub did NOT land.
+    expect(wp).not.toContain('[Phase 1 name]');
+    expect(wp).not.toContain('[task name]');
+
+    // Standard frontmatter prepended.
+    expect(wp).toMatch(/^---\nslug: workplan-flag-feature\n/);
+    expect(wp).toContain('targetVersion: "1.0"');
+  });
+
+  it('rejects a missing --workplan file before creating the worktree', async () => {
+    await install([tmpRoot]);
+
+    const origCwd = process.cwd();
+    process.chdir(tmpRoot);
+    try {
+      await expect(
+        setup([
+          'missing-workplan-feature',
+          '--target',
+          '1.0',
+          '--workplan',
+          join(tmpRoot, 'does-not-exist.md'),
+        ]),
+      ).rejects.toThrow(/Workplan file not found/);
+    } finally {
+      process.chdir(origCwd);
+    }
+
+    worktreePath = join(dirname(tmpRoot), `${basename(tmpRoot)}-missing-workplan-feature`);
+    expect(existsSync(worktreePath)).toBe(false);
+  });
+
   it('reuses a pre-existing worktree+branch (#196 #209) instead of doubling or aborting', async () => {
     await install([tmpRoot]);
 

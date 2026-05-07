@@ -22,6 +22,7 @@ interface SetupArgs {
   targetVersion?: string;
   title?: string;
   definitionFile?: string;
+  workplanFile?: string;
 }
 
 interface FeatureDefinitionSections {
@@ -47,6 +48,7 @@ function parseArgs(args: string[]): SetupArgs {
   let targetVersion: string | undefined;
   let title: string | undefined;
   let definitionFile: string | undefined;
+  let workplanFile: string | undefined;
 
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
@@ -57,6 +59,8 @@ function parseArgs(args: string[]): SetupArgs {
       title = nextArg(args, ++i);
     } else if (a === '--definition') {
       definitionFile = nextArg(args, ++i);
+    } else if (a === '--workplan') {
+      workplanFile = nextArg(args, ++i);
     } else if (!slug && !a.startsWith('--')) {
       slug = a;
     }
@@ -64,10 +68,10 @@ function parseArgs(args: string[]): SetupArgs {
 
   if (!slug) {
     throw new Error(
-      'Usage: dw-lifecycle setup <slug> [--target <version>] [--title <title>] [--definition <path>]'
+      'Usage: dw-lifecycle setup <slug> [--target <version>] [--title <title>] [--definition <path>] [--workplan <path>]'
     );
   }
-  return { slug, targetVersion, title, definitionFile };
+  return { slug, targetVersion, title, definitionFile, workplanFile };
 }
 
 function renderTemplate(template: string, vars: Record<string, string>): string {
@@ -246,7 +250,7 @@ function branchExists(root: string, branchName: string): boolean {
 }
 
 export async function setup(args: string[]): Promise<void> {
-  const { slug, targetVersion, title, definitionFile } = parseArgs(args);
+  const { slug, targetVersion, title, definitionFile, workplanFile } = parseArgs(args);
   validateSlug(slug);
   if (targetVersion) {
     validateTargetVersion(targetVersion);
@@ -293,8 +297,13 @@ export async function setup(args: string[]): Promise<void> {
     if (existsSync(worktreePath)) {
       throw new Error(`Worktree path already exists: ${worktreePath}`);
     }
+    // Pre-flight: input file existence — before creating the worktree, so
+    // a typo doesn't strand the user with a worktree they need to clean up.
     if (definitionFile && !existsSync(definitionFile)) {
       throw new Error(`Definition file not found: ${definitionFile}`);
+    }
+    if (workplanFile && !existsSync(workplanFile)) {
+      throw new Error(`Workplan file not found: ${workplanFile}`);
     }
     execFileSync('git', ['-C', root, 'worktree', 'add', worktreePath, '-b', branchName, 'HEAD'], {
       stdio: 'inherit',
@@ -312,8 +321,13 @@ export async function setup(args: string[]): Promise<void> {
     throw new Error(`Feature directory already exists: ${dir}. Refusing to overwrite.`);
   }
 
+  // Re-check inputs after dir-existence; the reuse path skips the
+  // pre-creation block above, so this catches typos in that flow.
   if (definitionFile && !existsSync(definitionFile)) {
     throw new Error(`Definition file not found: ${definitionFile}`);
+  }
+  if (workplanFile && !existsSync(workplanFile)) {
+    throw new Error(`Workplan file not found: ${workplanFile}`);
   }
 
   // From this point on the worktree exists. If anything below fails, roll it back
@@ -354,6 +368,24 @@ export async function setup(args: string[]): Promise<void> {
       const wp = readFileSync(wpPath, 'utf8');
       writeFileSync(prdPath, seedPrdFromDefinition(prd, definition), 'utf8');
       writeFileSync(wpPath, seedWorkplanFromDefinition(wp, definition), 'utf8');
+    }
+
+    // Optionally replace workplan body with a pre-authored file (#212).
+    // The skill's chain (brainstorming → writing-plans → setup) produces
+    // a workplan body in a temp file; without this flag, the agent had
+    // to scaffold-then-overwrite manually. The file's content becomes
+    // the body; standard frontmatter (slug, targetVersion, date) gets
+    // prepended. If the file already includes a frontmatter block, it
+    // passes through unchanged.
+    if (workplanFile) {
+      const wpPath = join(docsDir, 'workplan.md');
+      const body = readFileSync(workplanFile, 'utf8');
+      const out = body.startsWith('---\n')
+        ? body
+        : `---\nslug: ${slug}\ntargetVersion: "${target}"\ndate: ${
+            new Date().toISOString().slice(0, 10)
+          }\n---\n\n${body.startsWith('\n') ? body.slice(1) : body}`;
+      writeFileSync(wpPath, out, 'utf8');
     }
 
     console.log(
