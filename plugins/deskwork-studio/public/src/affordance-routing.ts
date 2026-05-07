@@ -20,13 +20,6 @@ import {
   copyOrShowFallback,
   type CopyOrShowFallbackOptions,
 } from './clipboard.ts';
-import type { ChatPanel } from './chat-panel.ts';
-
-declare global {
-  interface Window {
-    deskworkChatPanel?: ChatPanel;
-  }
-}
 
 export interface AffordanceOptions {
   /**
@@ -79,13 +72,16 @@ export async function dispatchToAgent(
 }
 
 async function tryRouteToPanel(command: string): Promise<boolean> {
-  const panel = window.deskworkChatPanel;
-  if (!panel) return false;
+  if (!window.deskworkChatPanel) return false;
   const state = await fetchBridgeState();
   if (!state) return false;
   if (!(state.mcpConnected && state.listenModeOn)) return false;
-  panel.prefillInput(command);
-  return true;
+  // Re-read after the await: the panel may have been destroyed or
+  // swapped (SPA-style nav) while the bridge-state fetch was in
+  // flight. The freshly-read reference is what we hand the prefill.
+  const panel = window.deskworkChatPanel;
+  if (!panel) return false;
+  return panel.prefillInput(command);
 }
 
 async function fetchBridgeState(): Promise<ChatStateShape | null> {

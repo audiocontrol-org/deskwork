@@ -26,25 +26,6 @@ import { buildChatSkeleton, type ChatSkeleton } from './chat-skeleton.ts';
 const MOBILE_BREAKPOINT_PX = 600;
 const NEAR_BOTTOM_PX = 50;
 
-/**
- * Ambient declaration so `affordance-routing.ts` (and any other
- * consumer that needs to pre-fill the docked panel without import-
- * cycling through this module) can read `window.deskworkChatPanel`.
- *
- * Multi-mount contract: if multiple ChatPanel instances mount on the
- * same page (e.g. a docked drawer + a full-page modal), the LAST
- * mount wins — its constructor overwrites the global. When that
- * panel destroys, it clears the global only if the global still
- * points at itself, so an earlier panel that's still alive is not
- * observed in a stale slot.
- */
-declare global {
-  // eslint-disable-next-line no-var
-  interface Window {
-    deskworkChatPanel?: ChatPanel;
-  }
-}
-
 export interface ChatPanelOptions {
   readonly contextRef?: string;
   readonly fullPage?: boolean;
@@ -100,9 +81,15 @@ export class ChatPanel {
    * textarea -> set to `text`; non-empty -> existing + "\n\n" + `text`.
    * The append-with-newline contract avoids silently clobbering an
    * unsent draft when an affordance routes prefill text in.
+   *
+   * Returns `true` after a successful update, `false` if the panel is
+   * not mountable (already destroyed, or skeleton not yet built). The
+   * boolean lets dispatch callers detect a destroyed-mid-await race
+   * and fall through to clipboard rather than silently dropping the
+   * command into a panel the operator can no longer see.
    */
-  prefillInput(text: string): void {
-    if (!this.skel) return;
+  prefillInput(text: string): boolean {
+    if (this.destroyed || !this.skel) return false;
     const existing = this.skel.textarea.value;
     const next = existing.length === 0 ? text : `${existing}\n\n${text}`;
     this.skel.textarea.value = next;
@@ -112,6 +99,7 @@ export class ChatPanel {
     if (!this.fullPage) {
       this.skel.root.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
+    return true;
   }
 
   destroy(): void {

@@ -16,12 +16,10 @@ import { ChatPanel, type ChatPanelOptions } from './chat-panel.ts';
 function init(): void {
   const mounts = document.querySelectorAll<HTMLElement>('[data-chat-panel-mount]');
   for (const mount of mounts) {
-    const opts: ChatPanelOptions = {};
     const contextRef = mount.dataset.chatContextRef;
-    const next: ChatPanelOptions = contextRef && contextRef.length > 0
-      ? { ...opts, contextRef }
-      : opts;
-    new ChatPanel(mount, next);
+    const opts: ChatPanelOptions =
+      contextRef !== undefined && contextRef.length > 0 ? { contextRef } : {};
+    new ChatPanel(mount, opts);
   }
 }
 

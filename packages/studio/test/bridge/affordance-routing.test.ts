@@ -38,7 +38,7 @@ interface FakePanel {
 }
 
 function makeFakePanel(): FakePanel {
-  return { prefillInput: vi.fn() };
+  return { prefillInput: vi.fn(() => true) };
 }
 
 function setPanel(panel: FakePanel | undefined): void {
@@ -189,6 +189,24 @@ describe('dispatchToAgent — clipboard fallback paths', () => {
     const result = await dispatchToAgent(COMMAND, OPTS);
 
     expect(result).toEqual({ routed: 'clipboard', delivered: false });
+  });
+
+  it('falls through to clipboard when prefillInput returns false (panel destroyed mid-await)', async () => {
+    // The dispatch path captures the panel reference, awaits the
+    // bridge-state fetch, then calls prefillInput. If the panel is
+    // destroyed during the await its prefillInput returns false; the
+    // dispatcher must respect that and route to clipboard rather
+    // than report a successful panel delivery.
+    const panel: FakePanel = { prefillInput: vi.fn(() => false) };
+    setPanel(panel);
+    setFetch(async () => stateResponse({ mcpConnected: true, listenModeOn: true }));
+    vi.mocked(copyOrShowFallback).mockResolvedValueOnce(true);
+
+    const result = await dispatchToAgent(COMMAND, OPTS);
+
+    expect(result).toEqual({ routed: 'clipboard', delivered: true });
+    expect(panel.prefillInput).toHaveBeenCalledWith(COMMAND);
+    expect(copyOrShowFallback).toHaveBeenCalledWith(COMMAND, OPTS.clipboard);
   });
 });
 
