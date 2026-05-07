@@ -96,6 +96,41 @@ The session you're reading this from now is NOT loaded that way — it has the m
 
 Functionally, most deskwork skills are thin (they tell Claude to run `deskwork <verb>` with appropriate args). So `node_modules/.bin/deskwork <verb> ...` from the dev shell tests the same code path the skill would execute. The skill prose layer adds intent + arg-gathering only.
 
+## Bridge dev loop
+
+The studio bridge (`feature/studio-bridge` branch — see [`docs/1.0/001-IN-PROGRESS/studio-bridge/`](./docs/1.0/001-IN-PROGRESS/studio-bridge/)) adds a couple of moving parts beyond the standard CLI/studio loop: a loopback-only MCP endpoint, a chat panel UI, and a `/deskwork:listen` skill whose prose is what makes the loop work. Iterating on each of those has its own pattern.
+
+### Driving the chat panel
+
+`npm run dev` boots the studio with hot reload as usual. Open the magic-DNS URL plus `/dev/chat` for the full-page chat surface, or any `/dev/editorial-review/<id>` page for the docked panel. Edits to `plugins/deskwork-studio/public/src/chat-panel.ts`, `chat-renderer.ts`, or `chat-page.ts` Vite-HMR straight into the browser. Edits to `packages/studio/src/bridge/routes.ts` or `mcp-server.ts` restart the server (~1-2s).
+
+### Iterating on the listen skill prose
+
+The behavior of the listen loop is encoded entirely in `plugins/deskwork/skills/listen/SKILL.md` — there is no TS code that runs the loop. To iterate:
+
+1. Edit `SKILL.md`.
+2. Open a parallel CC session loaded with the workspace plugin: `claude --plugin-dir plugins/deskwork`.
+3. Restart that session after each edit (the skill is read on session boot).
+4. Run `/deskwork:listen` in the parallel session — it pulls in the freshly-edited prose.
+
+Drive operator messages from a browser at `/dev/chat`. Each round-trip exercises the skill's instructions end-to-end.
+
+### Testing the SessionStart hook locally
+
+The hook at `plugins/deskwork/hooks/bridge-autostart.mjs` reads the project's `.deskwork/config.json` and emits a SessionStart directive when `studioBridge.enabled === true`. To exercise it against a fixture project root:
+
+1. Write a fixture `.deskwork/config.json` somewhere with `"studioBridge": { "enabled": true }`.
+2. Open a CC session whose working directory is that fixture, with `claude --plugin-dir plugins/deskwork`.
+3. The hook fires on session start; the agent should auto-dispatch `/deskwork:listen`.
+
+Drop the flag (or set it to `false`) to verify the hook is silent — no listen dispatch, no banner.
+
+### Driving the bridge MCP endpoint without a real CC
+
+The canonical pattern is the in-process round-trip test at [`packages/studio/test/bridge/mcp-roundtrip.test.ts`](./packages/studio/test/bridge/mcp-roundtrip.test.ts). It pairs `InMemoryTransport`s on both client and server sides of the SDK, registers the same handlers `mcp-server.ts` does, and exercises `await_studio_message` + `send_studio_response` against a real `BridgeQueue`. Use it as the template for any new MCP-side test or local exploration of tool handler behavior — no real CC, no real network, no flake.
+
+For a live-network smoke (e.g. verifying the loopback guard from a Tailscale peer), boot the dev studio and `curl` the endpoint from a peer; expect 403. The Phase 8 smoke extensions in `scripts/smoke-marketplace.sh` (planned, not yet landed) automate this.
+
 ## Testing patterns
 
 Three test categories, in order of preference for verifying a fix:

@@ -87,6 +87,7 @@ All skills are under the `/deskwork:` namespace. Slugs accept `/`-separated keba
 | `review-report` | Voice-drift report across recent terminal workflows |
 | `customize` | Copy a built-in template or doctor rule into `.deskwork/<category>/<name>.ts` for in-project override |
 | `doctor` | Audit (and optionally repair) binding metadata across the calendar, content tree, and workflow store |
+| `listen` (experimental) | Drop the agent into bridge listen mode — process operator messages from the studio chat panel as turns. Requires the deskwork-studio bridge; see below |
 
 #### `doctor` — keep calendar, files, and workflows in sync
 
@@ -102,6 +103,15 @@ deskwork doctor --fix=all --yes                  # non-interactive repair (skips
 ```
 
 See [`skills/doctor/SKILL.md`](skills/doctor/SKILL.md) for the full rule-by-rule playbook.
+
+#### `listen` (experimental)
+
+Drops the agent into bridge listen mode — process operator messages from the studio chat panel as turns. Requires:
+
+- Studio bridge enabled in `.deskwork/config.json` (`"studioBridge": { "enabled": true }`)
+- The studio's `/mcp` endpoint registered as an MCP server with Claude Code
+
+See [`plugins/deskwork-studio/README.md`](../deskwork-studio/README.md#bridge-mode-experimental) for the full setup. Status: experimental, on the [`feature/studio-bridge`](https://github.com/audiocontrol-org/deskwork/tree/feature/studio-bridge) branch — not yet shipped via the marketplace install.
 
 ### Shortform / cross-platform posts
 
@@ -257,7 +267,7 @@ Local-dev installs hit path 1. Marketplace-install users hit path 3 once, then p
 
 ### Updates + pinning
 
-Tracks the default branch of `audiocontrol-org/deskwork`. To pull the latest, run `/plugin marketplace update deskwork && /reload-plugins`. To pin to a stable release, install the marketplace with a tag: `/plugin marketplace add audiocontrol-org/deskwork#v0.1.0`. See the [root README](../../README.md#getting-updates) for the full update story.
+Tracks the default branch of `audiocontrol-org/deskwork`. To pull the latest, run `/plugin marketplace update deskwork && /reload-plugins`. To pin to a stable release, install the marketplace with a tag: `/plugin marketplace add audiocontrol-org/deskwork#<tag>` — see the [GitHub releases page](https://github.com/audiocontrol-org/deskwork/releases) for tag names. See the [root README](../../README.md#getting-updates) for the full update story.
 
 ### Troubleshooting: bin not on PATH after install ([#89](https://github.com/audiocontrol-org/deskwork/issues/89), [#125](https://github.com/audiocontrol-org/deskwork/issues/125), [#131](https://github.com/audiocontrol-org/deskwork/issues/131))
 

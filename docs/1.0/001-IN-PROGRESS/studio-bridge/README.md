@@ -16,14 +16,14 @@ A control channel between the deskwork-studio web UI and the operator's locally-
 
 | Phase | Description | Status |
 |---|---|---|
-| 1 | Server-side bridge primitives (queue, persistence, types) | Not started |
-| 2 | HTTP routes (`/api/chat/*`) | Not started |
-| 3 | MCP server endpoint + loopback guard | Not started |
-| 4 | Studio chat panel UI (docked + full-page) | Not started |
-| 5 | Affordance routing helper + decision-strip integration | Not started |
-| 6 | `/deskwork:listen` skill + SessionStart hook + config schema | Not started |
-| 7 | Documentation + adopter wiring (MCP client config example) | Not started |
-| 8 | Local end-to-end smoke (validation gate) | Not started |
+| 1 | Server-side bridge primitives (queue, persistence, types) | Done — `b1de288`, `12ced39` |
+| 2 | HTTP routes (`/api/chat/*`) | Done — `4c63714`, `aae8c68`, `6cb94bf` |
+| 3 | MCP server endpoint + loopback guard | Done — `69c04c0`, `9d4ba26` |
+| 4 | Studio chat panel UI (docked + full-page) | Done — `890d56d`, `f8f4ce1` |
+| 5 | Affordance routing helper + decision-strip integration | Done — `912a892`, `13803f3` |
+| 6 | `/deskwork:listen` skill + SessionStart hook + config schema | Done — `8b58f95`, `06ab08f` |
+| 7 | Documentation + adopter wiring (MCP client config example) | In progress (this commit) |
+| 8 | Local end-to-end smoke (validation gate) | Pending |
 
 ### Worktree
 
