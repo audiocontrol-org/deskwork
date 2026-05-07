@@ -71,7 +71,13 @@ export class ChatPanel {
     listenModeOn: false,
     awaitingMessage: false,
   };
-  private knownSeqs = new Set<number>();
+  // Dedup key is `${seq}@${ts}`, not seq alone. Seq resets per
+  // sidecar process (per-day file), so a chat-log spanning multiple
+  // sidecar generations has duplicate seq values across distinct rows.
+  // Deduping by seq alone hid every row after the first generation
+  // (issue #235 dogfood: phone showed only the morning's prose, never
+  // current activity). Including ts uniquely identifies each row.
+  private knownRowKeys = new Set<string>();
   private pendingNewCount = 0;
   private collapseState: CollapseState = 'expanded';
   private wasPhoneWidth: boolean | null = null;
@@ -282,8 +288,9 @@ export class ChatPanel {
     if (!this.skel) return;
     const seq = rowSeq(row);
     if (seq !== null) {
-      if (this.knownSeqs.has(seq)) return;
-      this.knownSeqs.add(seq);
+      const key = `${seq}@${row.ts}`;
+      if (this.knownRowKeys.has(key)) return;
+      this.knownRowKeys.add(key);
     }
     const html = renderRow(row);
     if (html === '') return;
