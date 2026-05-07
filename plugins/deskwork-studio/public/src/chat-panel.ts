@@ -60,6 +60,7 @@ export class ChatPanel {
   private knownSeqs = new Set<number>();
   private pendingNewCount = 0;
   private collapseState: CollapseState = 'expanded';
+  private wasPhoneWidth: boolean | null = null;
   private destroyed = false;
 
   constructor(parent: HTMLElement, options?: ChatPanelOptions) {
@@ -374,13 +375,17 @@ export class ChatPanel {
   private applyMobileClass(): void {
     if (!this.skel || this.fullPage) return;
     const w = this.parent.clientWidth || window.innerWidth;
-    if (w < MOBILE_BREAKPOINT_PX) {
+    const isPhoneWidth = w < MOBILE_BREAKPOINT_PX;
+    if (isPhoneWidth) {
       this.skel.root.classList.add('chat-panel--mobile-full');
-      // First-time-on-phone: resolve from store (default collapsed).
-      // Subsequent resize events: the operator's existing choice is
-      // already applied; don't override it.
-      const initial = resolveInitialState(this.collapseStore);
-      this.setCollapseState(initial);
+      // Only resolve-from-store on the desktop->phone transition.
+      // Subsequent phone-width resize events (URL-bar reveal, soft
+      // keyboard show/hide) must NOT re-write the store with the same
+      // value — that's a redundant localStorage write.
+      if (this.wasPhoneWidth !== true) {
+        const initial = resolveInitialState(this.collapseStore);
+        this.setCollapseState(initial);
+      }
     } else {
       this.skel.root.classList.remove('chat-panel--mobile-full');
       // Desktop: clear collapsed state in-memory only. Don't write to
@@ -393,6 +398,7 @@ export class ChatPanel {
         stowToggle: this.skel.stowToggle,
       });
     }
+    this.wasPhoneWidth = isPhoneWidth;
   }
 }
 

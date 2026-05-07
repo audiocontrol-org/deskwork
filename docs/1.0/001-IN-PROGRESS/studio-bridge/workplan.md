@@ -358,6 +358,7 @@ Tasks:
 - [x] When a new operator message arrives via `await_studio_message` AND the panel is in `--collapsed` state on the operator's own message round-trip, briefly flash the strip (subtle 1s pulse on the chip) — but do NOT auto-expand. Operator stays in control of layout.
 - [x] When the bridge state changes (mcpConnected flips, listenModeOn flips), update the chip text inside the strip without expanding.
 - [x] Tests: vitest unit on the toggle handler (collapsed → expanded → collapsed) covering default state, paired-affordance click toggle, Shift+C / Esc shortcuts, localStorage round-trip across simulated refresh, desktop / fullPage opt-out, chip dual-update on bridge-state, prefillInput auto-expand. Playwright assertions left as operator-side smoke (no Playwright tests in CI per project rules).
+- (Note, post-implementation) `prefillInput` auto-expands a collapsed phone-width panel — judgment-call extension shipped in commit a123081 to make M3 a single-step interaction. Tested in chat-panel.test.ts.
 
 **Acceptance Criteria:**
 

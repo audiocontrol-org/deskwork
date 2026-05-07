@@ -11,7 +11,7 @@
  * implement EventSource and the constructor needs a stub to construct.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ChatPanel } from '../../../../plugins/deskwork-studio/public/src/chat-panel';
 import type { BridgeState } from '../../../../plugins/deskwork-studio/public/src/chat-renderer';
 
@@ -482,6 +482,23 @@ describe('ChatPanel — Phase 9a stowable collapse behavior', () => {
     expect(root.classList.contains('chat-panel--collapsed')).toBe(true);
     panel.prefillInput('approve foo');
     expect(root.classList.contains('chat-panel--collapsed')).toBe(false);
+    panel.destroy();
+  });
+
+  it('does not redundantly write localStorage on consecutive phone-width resizes', () => {
+    const { panel } = mountAtPhoneWidth('/tmp/project-resize-noop');
+    const key = 'chat-panel-stow:/tmp/project-resize-noop';
+    // Mount already wrote the resolved default ("collapsed") once.
+    expect(window.localStorage.getItem(key)).toBe('collapsed');
+    // Spy on setItem and fire two more phone-width resize events. The
+    // breakpoint state hasn't changed (already phone), so neither
+    // resize should re-write the store.
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
+    setViewportWidth(380);
+    setViewportWidth(360);
+    const writes = setItemSpy.mock.calls.filter(([k]) => k === key);
+    expect(writes.length).toBe(0);
+    setItemSpy.mockRestore();
     panel.destroy();
   });
 });
