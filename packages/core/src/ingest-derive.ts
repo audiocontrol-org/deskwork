@@ -198,7 +198,19 @@ function slugFromPath(filePath: string, root: string): SlugDerivation {
     }
   }
 
-  return { value: [...prefix, ...leafSegments].join('/'), source: 'path' };
+  // #221: sanitize dots in path-derived slug segments (`v0.16.0` →
+  // `v0-16-0`). Filenames carrying versions or dotted dates are common
+  // (`2026-05-05-v0.16.0-walk.md`) and otherwise trip the kebab-case
+  // validator at the ingest layer. The transform is intentionally
+  // path-only — the explicit `--slug` path keeps strict validation so
+  // operator-typed dots surface as the typo the operator probably
+  // intended to catch. Only `.` is touched; other invalid characters
+  // still fall through and surface validator errors of their own.
+  const sanitize = (s: string): string => s.replace(/\./g, '-');
+  const value = [...prefix.map(sanitize), ...leafSegments.map(sanitize)].join(
+    '/',
+  );
+  return { value, source: 'path' };
 }
 
 /**

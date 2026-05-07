@@ -44,7 +44,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { readConfig } from '@deskwork/core/config';
-import { readCalendar, writeCalendar } from '@deskwork/core/calendar';
+import { readCalendar } from '@deskwork/core/calendar';
+import { regenerateCalendar } from '@deskwork/core/calendar/regenerate';
 import { resolveSite, resolveCalendarPath, resolveContentDir } from '@deskwork/core/paths';
 import { isStage, type CalendarEntry, type Stage } from '@deskwork/core/types';
 import { absolutize, fail, parseArgs } from '@deskwork/core/cli-args';
@@ -198,7 +199,11 @@ export async function run(argv: string[]): Promise<void> {
   for (const { candidate, stage } of actionable) {
     const id = readExistingDeskworkId(candidate.frontmatter) ?? randomUUID();
     const entry: CalendarEntry = { id, ...candidateToEntry(candidate, stage) };
-    calendar.entries.push(entry);
+    // #223: the legacy in-memory calendar.push is no longer threaded
+    // through `writeCalendar` — the sidecar write below is the SSOT,
+    // and `regenerateCalendar` (called after the loop) reads sidecars
+    // to produce calendar.md. The journal record still records the
+    // entry shape for forensic traceability.
     writeIngestJournalEntry(projectRoot, config, site, candidate, entry);
     if (writeFrontmatterBinding) {
       writeDeskworkIdToFile(candidate.filePath, id);
@@ -208,7 +213,12 @@ export async function run(argv: string[]): Promise<void> {
       ingestCandidateToCreateParams(candidate, stage, id),
     );
   }
-  writeCalendar(calendarPath, calendar);
+  // #223: regenerate calendar.md from sidecars (the canonical SSOT) so
+  // ingest emits the same shape as the approve-side helpers. The
+  // legacy `writeCalendar` path emitted a column-set that drifted from
+  // `regenerateCalendar` (no `Updated` column), causing every commit
+  // that landed an ingest-or-approve to flip-flop the column.
+  await regenerateCalendar(projectRoot);
 }
 
 /**
