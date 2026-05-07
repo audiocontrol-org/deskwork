@@ -54,6 +54,92 @@
   background: rgba(0, 0, 0, 0.15);
 }
 
+.chat-header-chip {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Stow toggle (chevron-down) — sits in the panel's own header chrome
+ * when expanded. Mirrors `.er-marginalia-stow` geometry. Visible only
+ * on phone-width viewports; on desktop the panel is always expanded so
+ * the stow control would be redundant. */
+.chat-stow-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--chat-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--chat-fg);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.chat-stow-toggle:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--chat-fg);
+}
+
+.chat-stow-toggle:focus-visible {
+  outline: 2px solid var(--chat-state-listening);
+  outline-offset: 2px;
+}
+
+/* Bottom-edge strip row — the stowed-state affordance. Hidden by
+ * default; CSS at <600px reveals it when `.chat-panel--collapsed` is
+ * present. Chevron-up affordance on the right mirrors the chevron-down
+ * stow position so muscle memory transfers. */
+.chat-strip-row {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  height: 36px;
+  background: rgba(0, 0, 0, 0.25);
+  border-top: 1px solid var(--chat-border);
+}
+
+.chat-strip-chip {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+}
+
+.chat-collapse-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--chat-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--chat-fg);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.chat-collapse-toggle:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--chat-fg);
+}
+
+.chat-collapse-toggle:focus-visible {
+  outline: 2px solid var(--chat-state-listening);
+  outline-offset: 2px;
+}
+
 .chat-state-chip {
   display: inline-flex;
   align-items: center;
@@ -80,9 +166,23 @@
   animation: chat-pulse 1.4s ease-in-out infinite;
 }
 
+/* One-shot flash applied to the collapsed-strip chip when an operator
+ * message round-trips while the panel is collapsed. CSS animation runs
+ * once; chat-collapse.ts adds the class, then drops it after 1s so the
+ * flash can be re-triggered for the next arrival. */
+.chat-state-chip--flash {
+  animation: chat-strip-flash 1s ease-out 1;
+}
+
 @keyframes chat-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
+}
+
+@keyframes chat-strip-flash {
+  0% { background: var(--chat-bubble-op); transform: scale(1); }
+  20% { background: var(--chat-bubble-op); transform: scale(1.04); }
+  100% { background: rgba(255, 255, 255, 0.05); transform: scale(1); }
 }
 
 .chat-scroll {
@@ -304,6 +404,11 @@
   .chat-tool-body {
     max-height: 300px;
   }
+  /* Phone width: the stow toggle on the header is visible (chevron-
+   * down). Desktop hides it because the panel is always expanded. */
+  .chat-panel--mobile-full .chat-stow-toggle {
+    display: inline-flex;
+  }
   .chat-panel--mobile-full {
     position: fixed;
     inset: 0;
@@ -311,5 +416,30 @@
     border: none;
     max-height: none;
     z-index: 1000;
+  }
+  /* Collapsed state — bottom-edge strip. The strip row becomes the
+   * panel's only visible chrome; everything else is hidden. The strip
+   * pins to the bottom of the viewport so the entry surface above
+   * (article body, decision strip) remains reachable. */
+  .chat-panel--collapsed.chat-panel--mobile-full {
+    position: fixed;
+    inset: auto 0 0 0;
+    height: 36px;
+    min-height: 0;
+    max-height: 36px;
+    border-radius: 0;
+    border: none;
+    border-top: 1px solid var(--chat-border);
+    z-index: 1000;
+    overflow: hidden;
+  }
+  .chat-panel--collapsed .chat-strip-row {
+    display: flex;
+  }
+  .chat-panel--collapsed .chat-header,
+  .chat-panel--collapsed .chat-scroll,
+  .chat-panel--collapsed .chat-input,
+  .chat-panel--collapsed .chat-new-pill {
+    display: none;
   }
 }

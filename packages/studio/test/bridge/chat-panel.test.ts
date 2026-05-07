@@ -265,3 +265,223 @@ describe('ChatPanel — input-enable transitions on bridge-state', () => {
     panel.destroy();
   });
 });
+
+// Phase 9a — stowable chat panel. Verifies the collapsed-by-default
+// behavior at phone width, the toggle handlers (paired affordance:
+// chevron-up on the strip + chevron-down in the header), keyboard
+// shortcuts, and localStorage round-trip across simulated refresh.
+//
+// jsdom doesn't paint, so we drive viewport size via window.innerWidth
+// (the panel's applyMobileClass falls back to it when the parent has
+// clientWidth === 0, which is the case for an unattached/zero-layout
+// element in jsdom). resize events trigger re-evaluation.
+
+describe('ChatPanel — Phase 9a stowable collapse behavior', () => {
+  const originalInnerWidth = window.innerWidth;
+
+  function setViewportWidth(px: number): void {
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      writable: true,
+      value: px,
+    });
+    window.dispatchEvent(new Event('resize'));
+  }
+
+  function restoreViewportWidth(): void {
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      writable: true,
+      value: originalInnerWidth,
+    });
+  }
+
+  function findRoot(parent: HTMLElement): HTMLElement {
+    const el = parent.querySelector('[data-chat-panel]');
+    if (!(el instanceof HTMLElement)) throw new Error('expected chat-panel root');
+    return el;
+  }
+
+  function findCollapseToggle(parent: HTMLElement): HTMLButtonElement {
+    const el = parent.querySelector('button.chat-collapse-toggle');
+    if (!(el instanceof HTMLButtonElement)) throw new Error('expected collapse toggle');
+    return el;
+  }
+
+  function findStowToggle(parent: HTMLElement): HTMLButtonElement {
+    const el = parent.querySelector('button.chat-stow-toggle');
+    if (!(el instanceof HTMLButtonElement)) throw new Error('expected stow toggle');
+    return el;
+  }
+
+  function mountAtPhoneWidth(projectRoot: string): {
+    panel: ChatPanel;
+    parent: HTMLElement;
+  } {
+    setViewportWidth(390);
+    document.body.dataset.projectRoot = projectRoot;
+    const parent = document.createElement('div');
+    document.body.appendChild(parent);
+    const panel = new ChatPanel(parent);
+    return { panel, parent };
+  }
+
+  afterEach(() => {
+    restoreViewportWidth();
+  });
+
+  it('defaults to collapsed at phone width (<600px) on first visit', () => {
+    const { panel, parent } = mountAtPhoneWidth('/tmp/project-collapse-default');
+    const root = findRoot(parent);
+    expect(root.classList.contains('chat-panel--collapsed')).toBe(true);
+    expect(root.classList.contains('chat-panel--mobile-full')).toBe(true);
+    // localStorage should now reflect the resolved default so refresh
+    // restores the same state.
+    expect(window.localStorage.getItem('chat-panel-stow:/tmp/project-collapse-default'))
+      .toBe('collapsed');
+    panel.destroy();
+  });
+
+  it('chevron-up tap expands the panel; chevron-down tap collapses', () => {
+    const { panel, parent } = mountAtPhoneWidth('/tmp/project-toggle-clicks');
+    const root = findRoot(parent);
+    const collapseToggle = findCollapseToggle(parent);
+    const stowToggle = findStowToggle(parent);
+
+    expect(root.classList.contains('chat-panel--collapsed')).toBe(true);
+    expect(collapseToggle.getAttribute('aria-pressed')).toBe('false');
+
+    collapseToggle.click();
+    expect(root.classList.contains('chat-panel--collapsed')).toBe(false);
+    expect(collapseToggle.getAttribute('aria-pressed')).toBe('true');
+    expect(stowToggle.getAttribute('aria-pressed')).toBe('true');
+
+    stowToggle.click();
+    expect(root.classList.contains('chat-panel--collapsed')).toBe(true);
+    expect(collapseToggle.getAttribute('aria-pressed')).toBe('false');
+    expect(stowToggle.getAttribute('aria-pressed')).toBe('false');
+
+    panel.destroy();
+  });
+
+  it('Shift+C toggles the collapsed state', () => {
+    const { panel, parent } = mountAtPhoneWidth('/tmp/project-shiftc');
+    const root = findRoot(parent);
+    expect(root.classList.contains('chat-panel--collapsed')).toBe(true);
+
+    const ev1 = new KeyboardEvent('keydown', { key: 'C', shiftKey: true });
+    window.dispatchEvent(ev1);
+    expect(root.classList.contains('chat-panel--collapsed')).toBe(false);
+
+    const ev2 = new KeyboardEvent('keydown', { key: 'C', shiftKey: true });
+    window.dispatchEvent(ev2);
+    expect(root.classList.contains('chat-panel--collapsed')).toBe(true);
+
+    panel.destroy();
+  });
+
+  it('Esc collapses an expanded panel', () => {
+    const { panel, parent } = mountAtPhoneWidth('/tmp/project-esc');
+    const root = findRoot(parent);
+    const collapseToggle = findCollapseToggle(parent);
+    collapseToggle.click();
+    expect(root.classList.contains('chat-panel--collapsed')).toBe(false);
+
+    const ev = new KeyboardEvent('keydown', { key: 'Escape' });
+    window.dispatchEvent(ev);
+    expect(root.classList.contains('chat-panel--collapsed')).toBe(true);
+
+    panel.destroy();
+  });
+
+  it('Shift+C is ignored while typing in the textarea', () => {
+    const { panel, parent } = mountAtPhoneWidth('/tmp/project-shiftc-typing');
+    // Expand first, so the textarea is reachable in jsdom (it's
+    // display:none when collapsed via CSS, but jsdom doesn't apply CSS).
+    const collapseToggle = findCollapseToggle(parent);
+    collapseToggle.click();
+    const root = findRoot(parent);
+    expect(root.classList.contains('chat-panel--collapsed')).toBe(false);
+
+    const ta = parent.querySelector('textarea.chat-textarea');
+    if (!(ta instanceof HTMLTextAreaElement)) throw new Error('expected textarea');
+    ta.focus();
+    const ev = new KeyboardEvent('keydown', {
+      key: 'C',
+      shiftKey: true,
+      bubbles: true,
+    });
+    ta.dispatchEvent(ev);
+    expect(root.classList.contains('chat-panel--collapsed')).toBe(false);
+
+    panel.destroy();
+  });
+
+  it('localStorage round-trips state across simulated refresh', () => {
+    const root1 = mountAtPhoneWidth('/tmp/project-roundtrip');
+    findCollapseToggle(root1.parent).click();
+    expect(window.localStorage.getItem('chat-panel-stow:/tmp/project-roundtrip'))
+      .toBe('expanded');
+    root1.panel.destroy();
+    document.body.innerHTML = '';
+
+    // Simulated refresh: same project root, fresh mount, same width.
+    document.body.dataset.projectRoot = '/tmp/project-roundtrip';
+    const parent2 = document.createElement('div');
+    document.body.appendChild(parent2);
+    const panel2 = new ChatPanel(parent2);
+    const root = findRoot(parent2);
+    expect(root.classList.contains('chat-panel--collapsed')).toBe(false);
+    panel2.destroy();
+  });
+
+  it('does not add chat-panel--collapsed at desktop width', () => {
+    setViewportWidth(1024);
+    document.body.dataset.projectRoot = '/tmp/project-desktop';
+    const parent = document.createElement('div');
+    document.body.appendChild(parent);
+    const panel = new ChatPanel(parent);
+    const root = findRoot(parent);
+    expect(root.classList.contains('chat-panel--collapsed')).toBe(false);
+    expect(root.classList.contains('chat-panel--mobile-full')).toBe(false);
+    panel.destroy();
+  });
+
+  it('fullPage panels (/dev/chat) ignore the collapse model', () => {
+    setViewportWidth(390);
+    document.body.dataset.projectRoot = '/tmp/project-fullpage';
+    const parent = document.createElement('div');
+    document.body.appendChild(parent);
+    const panel = new ChatPanel(parent, { fullPage: true });
+    const root = findRoot(parent);
+    expect(root.classList.contains('chat-panel--collapsed')).toBe(false);
+    expect(root.classList.contains('chat-panel--full')).toBe(true);
+    // Shift+C must not toggle on a full-page surface.
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'C', shiftKey: true }));
+    expect(root.classList.contains('chat-panel--collapsed')).toBe(false);
+    panel.destroy();
+  });
+
+  it('updates both header chip and strip chip on bridge-state change', () => {
+    const { panel, parent } = mountAtPhoneWidth('/tmp/project-chip-update');
+    panel.applyBridgeState({
+      mcpConnected: true,
+      listenModeOn: true,
+      awaitingMessage: false,
+    });
+    const headerChip = parent.querySelector('.chat-header-chip');
+    const stripChip = parent.querySelector('.chat-strip-chip');
+    expect(headerChip?.querySelector('.chat-state-chip--listening')).toBeTruthy();
+    expect(stripChip?.querySelector('.chat-state-chip--listening')).toBeTruthy();
+    panel.destroy();
+  });
+
+  it('prefillInput auto-expands a collapsed phone-width panel', () => {
+    const { panel, parent } = mountAtPhoneWidth('/tmp/project-prefill-expand');
+    const root = findRoot(parent);
+    expect(root.classList.contains('chat-panel--collapsed')).toBe(true);
+    panel.prefillInput('approve foo');
+    expect(root.classList.contains('chat-panel--collapsed')).toBe(false);
+    panel.destroy();
+  });
+});

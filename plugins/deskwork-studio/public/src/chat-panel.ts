@@ -3,9 +3,10 @@
  *
  * Talks to /api/chat/{history,stream,send,state} via the transport
  * helper. Renders rows via chat-renderer (the trust boundary for
- * HTML escaping). Draft persistence lives in chat-draft; DOM skeleton
- * lives in chat-skeleton. Public interface:
- * `new ChatPanel(parent, options)`, `prefillInput(text)`, `destroy()`.
+ * HTML escaping). Draft persistence lives in chat-draft; collapse
+ * state lives in chat-collapse; DOM skeleton lives in chat-skeleton.
+ * Public interface: `new ChatPanel(parent, options)`,
+ * `prefillInput(text)`, `destroy()`.
  */
 
 import {
@@ -22,6 +23,15 @@ import {
 } from './chat-transport.ts';
 import { createChatDraftStore, type ChatDraftStore } from './chat-draft.ts';
 import { buildChatSkeleton, type ChatSkeleton } from './chat-skeleton.ts';
+import {
+  applyCollapseState,
+  createCollapseStore,
+  flashStripChip,
+  resolveInitialState,
+  toggleCollapseState,
+  type CollapseState,
+  type CollapseStore,
+} from './chat-collapse.ts';
 
 const MOBILE_BREAKPOINT_PX = 600;
 const NEAR_BOTTOM_PX = 50;
@@ -36,7 +46,9 @@ export class ChatPanel {
   private readonly contextRef: string | undefined;
   private readonly fullPage: boolean;
   private readonly draft: ChatDraftStore;
+  private readonly collapseStore: CollapseStore;
   private readonly resizeListener: () => void;
+  private readonly keydownListener: (ev: KeyboardEvent) => void;
 
   private skel: ChatSkeleton | null = null;
   private eventSource: EventSource | null = null;
@@ -47,6 +59,7 @@ export class ChatPanel {
   };
   private knownSeqs = new Set<number>();
   private pendingNewCount = 0;
+  private collapseState: CollapseState = 'expanded';
   private destroyed = false;
 
   constructor(parent: HTMLElement, options?: ChatPanelOptions) {
@@ -63,12 +76,18 @@ export class ChatPanel {
     this.contextRef = options?.contextRef;
     this.fullPage = options?.fullPage === true;
     this.draft = createChatDraftStore(`chat-draft:${projectRoot}`);
+    this.collapseStore = createCollapseStore({
+      storage: window.localStorage,
+      projectRoot,
+    });
     this.resizeListener = () => this.applyMobileClass();
+    this.keydownListener = (ev) => this.handleKeydown(ev);
 
     this.skel = buildChatSkeleton(this.state, this.fullPage);
     this.parent.appendChild(this.skel.root);
     this.wireEvents();
     window.addEventListener('resize', this.resizeListener);
+    window.addEventListener('keydown', this.keydownListener);
     this.applyMobileClass();
     this.applyInputEnabled();
     this.restoreDraft();
@@ -95,6 +114,12 @@ export class ChatPanel {
     this.skel.textarea.value = next;
     this.draft.writeNow(next);
     this.autoResize();
+    // Auto-expand the panel when prefill arrives — the operator just
+    // tapped Approve / Iterate / Reject and is about to type, they
+    // need the full input + Send button reachable.
+    if (this.collapseState === 'collapsed' && !this.fullPage) {
+      this.setCollapseState('expanded');
+    }
     this.skel.textarea.focus();
     if (!this.fullPage) {
       this.skel.root.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -110,6 +135,7 @@ export class ChatPanel {
       this.eventSource = null;
     }
     window.removeEventListener('resize', this.resizeListener);
+    window.removeEventListener('keydown', this.keydownListener);
     this.draft.cancel();
     if (this.skel && this.skel.root.parentNode) {
       this.skel.root.parentNode.removeChild(this.skel.root);
@@ -122,7 +148,8 @@ export class ChatPanel {
 
   private wireEvents(): void {
     if (!this.skel) return;
-    const { scroll, newPill, textarea, sendBtn } = this.skel;
+    const { scroll, newPill, textarea, sendBtn, collapseToggle, stowToggle } =
+      this.skel;
     scroll.addEventListener('scroll', () => {
       if (this.isNearBottom()) this.clearNewPill();
     });
@@ -140,6 +167,45 @@ export class ChatPanel {
     });
     sendBtn.addEventListener('click', () => {
       void this.send();
+    });
+    collapseToggle.addEventListener('click', () => this.toggleCollapse());
+    stowToggle.addEventListener('click', () => this.toggleCollapse());
+  }
+
+  private handleKeydown(ev: KeyboardEvent): void {
+    if (this.destroyed || !this.skel) return;
+    if (this.fullPage) return; // /dev/chat ignores collapse shortcuts
+    // Shift+C toggles. Letter is "C" with shift; some browsers report
+    // ev.key as "C" (uppercase) when shift is held. Match either.
+    if (ev.shiftKey && (ev.key === 'C' || ev.key === 'c')) {
+      // Don't fight typing in inputs/textareas — Shift+C in the
+      // textarea is a literal capital C the operator wants to type.
+      if (isTypingTarget(ev.target)) return;
+      ev.preventDefault();
+      this.toggleCollapse();
+      return;
+    }
+    // Esc collapses (only when expanded; let other handlers see Esc
+    // when already collapsed so they can dismiss their own surfaces).
+    if (ev.key === 'Escape' && this.collapseState === 'expanded') {
+      if (isTypingTarget(ev.target)) return;
+      ev.preventDefault();
+      this.setCollapseState('collapsed');
+    }
+  }
+
+  private toggleCollapse(): void {
+    this.setCollapseState(toggleCollapseState(this.collapseState));
+  }
+
+  private setCollapseState(next: CollapseState): void {
+    if (!this.skel) return;
+    this.collapseState = next;
+    this.collapseStore.write(next);
+    applyCollapseState(next, {
+      root: this.skel.root,
+      collapseToggle: this.skel.collapseToggle,
+      stowToggle: this.skel.stowToggle,
     });
   }
 
@@ -214,6 +280,18 @@ export class ChatPanel {
     this.skel.scroll.appendChild(node);
     if (opts.initial || wasNear) this.scrollToBottom();
     else this.bumpNewPill();
+    // One-shot pulse on the strip chip when a NEW operator message
+    // arrives while the panel is collapsed — operator round-tripped a
+    // message via the bridge and the strip should affirm it landed,
+    // without auto-expanding. Suppressed on the initial history
+    // replay so a refresh doesn't flash for every backfilled row.
+    if (
+      !opts.initial &&
+      this.collapseState === 'collapsed' &&
+      isOperatorRow(row)
+    ) {
+      flashStripChip(this.skel.stripChip);
+    }
   }
 
   /**
@@ -224,7 +302,11 @@ export class ChatPanel {
    */
   applyBridgeState(state: BridgeState): void {
     this.state = state;
-    if (this.skel) this.skel.header.innerHTML = renderBridgeState(state);
+    if (this.skel) {
+      const html = renderBridgeState(state);
+      this.skel.headerChip.innerHTML = html;
+      this.skel.stripChip.innerHTML = html;
+    }
     this.applyInputEnabled();
   }
 
@@ -294,8 +376,22 @@ export class ChatPanel {
     const w = this.parent.clientWidth || window.innerWidth;
     if (w < MOBILE_BREAKPOINT_PX) {
       this.skel.root.classList.add('chat-panel--mobile-full');
+      // First-time-on-phone: resolve from store (default collapsed).
+      // Subsequent resize events: the operator's existing choice is
+      // already applied; don't override it.
+      const initial = resolveInitialState(this.collapseStore);
+      this.setCollapseState(initial);
     } else {
       this.skel.root.classList.remove('chat-panel--mobile-full');
+      // Desktop: clear collapsed state in-memory only. Don't write to
+      // the store — preserve the operator's phone choice across a
+      // desktop->phone resize round-trip.
+      this.collapseState = 'expanded';
+      applyCollapseState('expanded', {
+        root: this.skel.root,
+        collapseToggle: this.skel.collapseToggle,
+        stowToggle: this.skel.stowToggle,
+      });
     }
   }
 }
@@ -304,4 +400,16 @@ function rowSeq(row: ChatLogRow): number | null {
   if ('role' in row) return row.seq;
   if (row.kind === 'tool-use' || row.kind === 'prose') return row.seq;
   return null;
+}
+
+function isOperatorRow(row: ChatLogRow): boolean {
+  return 'role' in row && row.role === 'operator';
+}
+
+function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+  if (target.isContentEditable) return true;
+  return false;
 }

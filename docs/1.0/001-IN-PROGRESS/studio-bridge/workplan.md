@@ -331,6 +331,134 @@ Tasks:
 
 ---
 
+### Phase 9: Phone UX fixes (Phase-8 smoke findings)
+
+**Origin.** Discovered during the Phase-8 manual smoke walk on 2026-05-07 — see [`phone-ux-findings.md`](./phone-ux-findings.md) for the full Playwright-driven analysis with screenshots. The chat-panel design that works on desktop is broken on phone: the docked panel auto-promotes to a fullscreen overlay at <600px width, has no stow affordance, and completely covers the entry-review surface — making M3 (affordance pre-fill on entry-review) impossible to exercise from a phone, which is the bridge's primary use case.
+
+This phase is bridge-blocking for any real phone use and must land before the integration PR. Operator clarified the bridge is internal-use only for the foreseeable future, so the audience for this fix is the operator's own daily-driver phone usage, not external adopters.
+
+**Deliverable.** Chat panel is usable from a phone in BOTH portrait and landscape. M3 (Approve / Iterate / Reject pre-fills the chat input) can be exercised end-to-end on a real iPhone. Subordinate fixes (F3–F5) land where cheap; expensive ones get filed as separate issues.
+
+#### Phase 9a — F1: Stowable chat panel with bottom-edge tab on phone (BLOCKER fix)
+
+**Pre-implementation gate.** Per `.claude/rules/affordance-placement.md`, write down answers to all three questions before any markup or CSS is touched. The answers below ARE the design contract for this sub-phase; deviation requires explicit operator approval.
+
+1. **Existing pattern mirrored.** `.er-marginalia-tab` and `.er-outline-tab` (right- and left-edge stowed-drawer pull tabs) — `editorial-review.css:2192` and adjacent rules. Pattern: stowed-state affordance is a thin pull tab on the edge the component vanished into; visible-state affordance is a chevron stow button in the component's own chrome; both controls dispatch through the same client-side handler and share `aria-pressed`. The chat panel mirrors this, with the tab on the **bottom edge** because the panel rises from the bottom when expanded.
+
+2. **Physical placement + why.** Stowed state: thin strip pinned at `position: fixed; bottom: 0; left: 0; right: 0`, ~36px tall, full viewport width, displaying the bridge-state chip ("Listening…", "bridge offline", etc.) on the left and a chevron-up affordance on the right. **Component-attached** to the chat panel — when the panel collapses it leaves this strip behind on the edge it vanished into. Expanded state: the existing `chat-panel--mobile-full` overlay, with a chevron-down stow control added to the chat panel header (sits in the panel's own `.chat-header` chrome, mirroring `.er-marginalia-stow`).
+
+3. **Direct-manipulation principle.** Chevron-up on the stowed strip = "open from below"; chevron-down inside the expanded panel header = "close back to below." Operator's spatial mental model: chat slides up from the bottom edge, slides back down to it. The bridge-state chip in the stowed strip continuously affirms what the bridge is doing without forcing an expand. Position of the expand-affordance mirrors position of the stow-affordance (both on the right side of their respective container) so muscle memory transfers.
+
+Tasks:
+
+- [x] Add a `chat-panel--collapsed` CSS class as the default state at viewport <600px when `!fullPage` (entry-review pages). Class renders the panel as a 36px-tall fixed strip at `bottom: 0`, displaying the existing `.chat-state-chip` (left) + a new `.chat-collapse-toggle` button (right) carrying a chevron-up icon and `aria-label="Expand chat (Shift+C)"`.
+- [x] In `chat-panel--full` / `chat-panel--mobile-full` state, render the existing `.chat-header` with a new `.chat-stow-toggle` button (chevron-down, `aria-label="Stow chat (Shift+C or Esc)"`) to the right of the state chip. Mirror the geometry of `.er-marginalia-stow`.
+- [x] Add expand/stow handlers in `chat-panel.ts` that toggle the `--collapsed` class. Both controls dispatch through the same handler. Persist the user's last choice in `localStorage` keyed on worktree path so refreshes restore intent (default for first-ever visit on phone: collapsed).
+- [x] Wire keyboard shortcut: `Shift+C` toggles, `Esc` from the expanded panel collapses (mirrors marginalia's `Shift+M` / outline's `O`/`Esc`).
+- [x] When a new operator message arrives via `await_studio_message` AND the panel is in `--collapsed` state on the operator's own message round-trip, briefly flash the strip (subtle 1s pulse on the chip) — but do NOT auto-expand. Operator stays in control of layout.
+- [x] When the bridge state changes (mcpConnected flips, listenModeOn flips), update the chip text inside the strip without expanding.
+- [x] Tests: vitest unit on the toggle handler (collapsed → expanded → collapsed) covering default state, paired-affordance click toggle, Shift+C / Esc shortcuts, localStorage round-trip across simulated refresh, desktop / fullPage opt-out, chip dual-update on bridge-state, prefillInput auto-expand. Playwright assertions left as operator-side smoke (no Playwright tests in CI per project rules).
+
+**Acceptance Criteria:**
+
+- [x] At `<600px` width on entry-review pages, the chat panel defaults to a 36px bottom strip; entry body, decision strip, and all existing review surfaces are visible.
+- [x] Tapping the strip's chevron-up expands the panel to fullscreen overlay; tapping the chevron-down in the expanded header collapses back.
+- [ ] `Shift+C` and `Esc` keyboard shortcuts work on a real iPhone (test via Bluetooth keyboard) — operator-side verification post-release.
+- [x] localStorage round-trips the collapsed/expanded state across refresh.
+- [ ] M3 of the smoke checklist now passes from the phone: tap Approve → chat input pre-fills → tap Send → CC dispatches — operator-side verification post-release.
+- [x] No regression on `/dev/chat` (full-page surface) — that surface ignores the collapsed/expanded flag.
+- [x] No regression on desktop (>=600px) — docked panel renders as before.
+- [x] Tests pass; vitest jsdom test added to `packages/studio/test/bridge/chat-panel.test.ts` (Playwright assertions are operator-side smoke, not CI tests, per project rules).
+
+**Notes.**
+
+- Bridge-state chip is the load-bearing UX of the collapsed strip — the operator must be able to glance at the bottom of any review page and confirm "the bridge is alive." Don't replace it with a generic "Chat" label.
+- The `chat-mount.ts` already finds the right placeholder; this phase only changes the panel's own state-machine + CSS, not the mount path.
+
+#### Phase 9b — F2: Docked panel sticky to viewport edge, not normal flow (HIGH)
+
+**Deliverable.** At ≥600px on entry-review pages, the docked panel stays pinned to the viewport edge (right column on wide screens, sliver-tab on narrow) instead of being pushed below 38000px of article body. This makes landscape-phone and small-tablet usage viable.
+
+Tasks:
+
+- [ ] Audit the editorial-review page's grid template: identify why the panel is in normal flow at smaller-but-not-mobile widths. Check `editorial-review.css` for the grid breakpoint that establishes the right column.
+- [ ] Add a `position: sticky; top: <header-height>` to the chat-panel column at the medium breakpoint (e.g. 600px ≤ width < 1024px) so the panel stays visible while the operator scrolls the article.
+- [ ] Decide whether the medium breakpoint should ALSO use the collapsed/expanded model from 9a. Probable answer: yes — share the affordance pattern, just with the strip on the right edge instead of the bottom for ≥600px.
+- [ ] Tests: Playwright at 844×390 (landscape phone) asserting panel `getBoundingClientRect().top` is within viewport (not 38628px down).
+
+**Acceptance Criteria:**
+
+- [ ] At 844×390, the chat panel is visible in the viewport without scrolling 30000px.
+- [ ] No horizontal-overflow regression on the entry-review article column at this width.
+
+#### Phase 9c — F3: Chat list bottom-aligns when sparse (LOW)
+
+**Deliverable.** `/dev/chat` with a small message count (1–3 rows) doesn't render with 430px of dead vertical space between the messages and the input. Either bottom-align the chat list (latest message touches the input area), or render an empty-state hint that fills the gap with content.
+
+Tasks:
+
+- [ ] Add `display: flex; flex-direction: column; justify-content: flex-end` (or equivalent) to `.chat-scroll` when message count is small.
+- [ ] Decide on visual treatment: bottom-aligned list vs. middle-aligned list with empty-state placeholder above. Default: bottom-aligned, latest-message-near-input.
+
+**Acceptance Criteria:**
+
+- [ ] At 390×844 with 1–3 messages, no >100px gap between the latest message bubble and the input area.
+
+**Notes.** Low priority — file as a follow-up issue if Phase 9a/9b run long.
+
+#### Phase 9d — F4: Top nav collapse on phone (LOW)
+
+**Deliverable.** Studio's horizontal nav (`INDEX | DASHBOARD | CONTENT | SHORTFORM | MANUAL`) is no longer clipped at phone width.
+
+Tasks:
+
+- [ ] At <600px, collapse the nav to a hamburger menu OR overflow-scroll horizontally with a fade-edge indicator.
+
+**Acceptance Criteria:**
+
+- [ ] At 390×844, the nav is fully reachable (either by tap-to-open menu or horizontal scroll).
+
+**Notes.** This is a project-wide nav fix, not bridge-specific. Probably belongs as its own GitHub issue rather than as a sub-phase of the bridge work; capture the issue link here when filed and let `/dw-lifecycle:implement` skip if scope-deferred.
+
+#### Phase 9e — F5: Visual viewport / `100dvh` for soft keyboard (LOW)
+
+**Deliverable.** When the soft keyboard pops up on a real phone, the chat input does not slide behind the keyboard.
+
+Tasks:
+
+- [ ] Replace `100vh` with `100dvh` (or equivalent) where the panel computes its height.
+- [ ] Listen for `window.visualViewport.resize` and adjust the panel's bottom padding so the input stays above the keyboard.
+- [ ] Manual smoke against a real iPhone (no Playwright proxy for soft-keyboard).
+
+**Acceptance Criteria:**
+
+- [ ] On a real iPhone, tapping the chat textarea does not hide the Send button under the keyboard.
+
+**Notes.** Cannot Playwright-test this. The acceptance is operator-driven on a real phone.
+
+#### Phase 9 — Dependencies + sequencing
+
+| Sub-phase | Depends on | Priority | Mandatory for integration PR? |
+|---|---|---|---|
+| 9a | — | BLOCKER | yes |
+| 9b | 9a (shares affordance pattern) | HIGH | yes |
+| 9c | — | LOW | no — file as issue if punted |
+| 9d | — | LOW | no — file as issue (project-wide nav fix) |
+| 9e | 9a (shares panel-height code paths) | LOW | yes for daily phone use |
+
+`/dw-lifecycle:implement` should walk 9a → 9b first; 9c–9e can be parallelized after.
+
+#### Phase 9 — Test artifacts (already on disk)
+
+- `phone-chat-page.png` — `/dev/chat` at 390×844 (showing the dead-space symptom).
+- `phone-entry-review-default.png` — entry-review at 390×844 (the F1 blocker, panel covers everything).
+- `phone-entry-review-landscape.png` — entry-review at 844×390 (the F2 high, panel buried at y=38628).
+- `phone-dashboard.png` — `/dev` at 390×844 (the F4 nav clip).
+
+These were captured during the diagnosis pass; new test artifacts (post-fix) should land beside them with `phone-*-fixed.png` filenames so the before/after delta is reviewable.
+
+---
+
 ## Dependencies + parallelism
 
 | Phase | Depends on |
@@ -343,6 +471,7 @@ Tasks:
 | 6 | 1, 3 (skill prose references the MCP tools) |
 | 7 | 4, 5, 6 |
 | 8 | 1–7 |
+| 9 | 8 (smoke-finding-driven) |
 
 Parallelism windows:
 - After Phase 1: Phases 2, 3, 4 can proceed concurrently
@@ -350,6 +479,7 @@ Parallelism windows:
 - Phase 5 must wait for Phase 4
 - Phase 7 must wait for 4 + 5 + 6
 - Phase 8 must wait for everything
+- Phase 9 follows Phase 8 (it is the response to Phase 8's findings); 9a is required before 9b
 
 ---
 
