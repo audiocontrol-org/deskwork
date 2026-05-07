@@ -271,6 +271,12 @@ describe('ChatPanel — input-enable transitions on bridge-state', () => {
 // chevron-up on the strip + chevron-down in the header), keyboard
 // shortcuts, and localStorage round-trip across simulated refresh.
 //
+// Phase 9b: the "phone-width" cutover was raised from 600px to 1024px
+// so landscape-phone and small-tablet widths (e.g. 844x390) also get
+// the fixed-overlay + bottom-edge strip model. The tests below cover
+// both <600 (portrait phone) and 600..1023 (landscape phone / tablet)
+// so the same state machine is exercised across the medium breakpoint.
+//
 // jsdom doesn't paint, so we drive viewport size via window.innerWidth
 // (the panel's applyMobileClass falls back to it when the parent has
 // clientWidth === 0, which is the case for an unattached/zero-layout
@@ -330,7 +336,7 @@ describe('ChatPanel — Phase 9a stowable collapse behavior', () => {
     restoreViewportWidth();
   });
 
-  it('defaults to collapsed at phone width (<600px) on first visit', () => {
+  it('defaults to collapsed at phone width (<1024px) on first visit', () => {
     const { panel, parent } = mountAtPhoneWidth('/tmp/project-collapse-default');
     const root = findRoot(parent);
     expect(root.classList.contains('chat-panel--collapsed')).toBe(true);
@@ -435,8 +441,8 @@ describe('ChatPanel — Phase 9a stowable collapse behavior', () => {
     panel2.destroy();
   });
 
-  it('does not add chat-panel--collapsed at desktop width', () => {
-    setViewportWidth(1024);
+  it('does not add chat-panel--collapsed at desktop width (>=1024px)', () => {
+    setViewportWidth(1280);
     document.body.dataset.projectRoot = '/tmp/project-desktop';
     const parent = document.createElement('div');
     document.body.appendChild(parent);
@@ -444,6 +450,52 @@ describe('ChatPanel — Phase 9a stowable collapse behavior', () => {
     const root = findRoot(parent);
     expect(root.classList.contains('chat-panel--collapsed')).toBe(false);
     expect(root.classList.contains('chat-panel--mobile-full')).toBe(false);
+    panel.destroy();
+  });
+
+  // Phase 9b — landscape-phone / small-tablet widths (600..1023) get
+  // the same fixed-overlay + collapsed-strip model as portrait phone.
+  // Previously the panel rendered docked-in-flow at these widths and
+  // fell below the article body — phone-ux-findings.md F2 measured
+  // panel rect.top at 38628px on 844x390. The mobile-full overlay
+  // pins the panel to the viewport edge regardless of article height.
+  it('Phase 9b: applies mobile-full overlay at 844x390 (landscape phone)', () => {
+    setViewportWidth(844);
+    document.body.dataset.projectRoot = '/tmp/project-landscape-844';
+    const parent = document.createElement('div');
+    document.body.appendChild(parent);
+    const panel = new ChatPanel(parent);
+    const root = findRoot(parent);
+    // The fixed-overlay class drives `position: fixed; inset: 0`
+    // (expanded) or `position: fixed; inset: auto 0 0 0; height: 36px`
+    // (collapsed) — either way the panel cannot fall to y=38628.
+    expect(root.classList.contains('chat-panel--mobile-full')).toBe(true);
+    // Default for first-ever visit is collapsed so the entry surface
+    // remains reachable; the operator expands deliberately.
+    expect(root.classList.contains('chat-panel--collapsed')).toBe(true);
+    panel.destroy();
+  });
+
+  it('Phase 9b: applies mobile-full overlay at 800px (tablet width)', () => {
+    setViewportWidth(800);
+    document.body.dataset.projectRoot = '/tmp/project-tablet-800';
+    const parent = document.createElement('div');
+    document.body.appendChild(parent);
+    const panel = new ChatPanel(parent);
+    const root = findRoot(parent);
+    expect(root.classList.contains('chat-panel--mobile-full')).toBe(true);
+    expect(root.classList.contains('chat-panel--collapsed')).toBe(true);
+    panel.destroy();
+  });
+
+  it('Phase 9b: width=1023 still hits the mobile-full breakpoint', () => {
+    setViewportWidth(1023);
+    document.body.dataset.projectRoot = '/tmp/project-edge-1023';
+    const parent = document.createElement('div');
+    document.body.appendChild(parent);
+    const panel = new ChatPanel(parent);
+    const root = findRoot(parent);
+    expect(root.classList.contains('chat-panel--mobile-full')).toBe(true);
     panel.destroy();
   });
 

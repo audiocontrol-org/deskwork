@@ -33,7 +33,21 @@ import {
   type CollapseStore,
 } from './chat-collapse.ts';
 
-const MOBILE_BREAKPOINT_PX = 600;
+// The "phone-width" cutover that triggers the fixed-overlay /
+// collapsed-strip model. Phase 9a originally pinned this at 600px so
+// the model only fired in portrait phone. Phase 9b raises it to 1024px
+// so landscape phones and small tablets ALSO get the fixed-overlay
+// model — at those widths the article column owns the full single-
+// column page-grid (see editorial-review.css `@media (max-width: 64rem)`)
+// and a docked panel in normal flow falls below the article body
+// (38628px down on a long entry per phone-ux-findings.md F2). The
+// fixed-overlay + bottom-edge strip mirrors 9a's affordance pattern at
+// the medium breakpoint without adding a new sidebar-style stow track.
+// Desktop (>=1024px) keeps the docked-in-flow rendering — the right-
+// rail real estate isn't competed-for at desktop widths and the
+// docked panel renders below the article only when the entry is
+// fully scrolled, which is the desktop expectation.
+const MOBILE_BREAKPOINT_PX = 1024;
 const NEAR_BOTTOM_PX = 50;
 
 export interface ChatPanelOptions {

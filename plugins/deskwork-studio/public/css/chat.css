@@ -400,12 +400,24 @@
   font-size: 12px;
 }
 
-@media (max-width: 600px) {
+/* Phase 9b: raise the breakpoint from 600px to 1023px so the fixed-
+ * overlay + collapsed-strip model also fires at landscape-phone and
+ * small-tablet widths (600..1023px). At those widths the editorial-
+ * review page-grid has already collapsed to a single article column
+ * (see editorial-review.css `@media (max-width: 64rem)` at line 1348);
+ * the docked chat panel sits in normal flow AFTER the article and
+ * falls thousands of pixels down on a long entry. Pinning the panel
+ * to the viewport edge with the same affordance pattern 9a uses on
+ * portrait phone keeps it reachable without competing for article
+ * width. Desktop (>=1024px) keeps the in-flow docked rendering —
+ * the right-rail real estate isn't competed-for at desktop widths. */
+@media (max-width: 1023px) {
   .chat-tool-body {
     max-height: 300px;
   }
-  /* Phone width: the stow toggle on the header is visible (chevron-
-   * down). Desktop hides it because the panel is always expanded. */
+  /* Stow toggle on the header is visible (chevron-down) when the
+   * fixed-overlay panel is expanded. Desktop hides it because the
+   * panel is always expanded. */
   .chat-panel--mobile-full .chat-stow-toggle {
     display: inline-flex;
   }

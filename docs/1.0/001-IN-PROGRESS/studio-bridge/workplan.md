@@ -382,15 +382,33 @@ Tasks:
 
 Tasks:
 
-- [ ] Audit the editorial-review page's grid template: identify why the panel is in normal flow at smaller-but-not-mobile widths. Check `editorial-review.css` for the grid breakpoint that establishes the right column.
-- [ ] Add a `position: sticky; top: <header-height>` to the chat-panel column at the medium breakpoint (e.g. 600px ≤ width < 1024px) so the panel stays visible while the operator scrolls the article.
-- [ ] Decide whether the medium breakpoint should ALSO use the collapsed/expanded model from 9a. Probable answer: yes — share the affordance pattern, just with the strip on the right edge instead of the bottom for ≥600px.
-- [ ] Tests: Playwright at 844×390 (landscape phone) asserting panel `getBoundingClientRect().top` is within viewport (not 38628px down).
+- [x] Audit the editorial-review page's grid template: identify why the panel is in normal flow at smaller-but-not-mobile widths. Check `editorial-review.css` for the grid breakpoint that establishes the right column.
+- [x] Add a `position: sticky; top: <header-height>` to the chat-panel column at the medium breakpoint (e.g. 600px ≤ width < 1024px) so the panel stays visible while the operator scrolls the article. *(Resolved differently: see audit note below — picked the simpler Path A' that extends 9a's fixed-overlay model up to 1023px instead of introducing a sidebar sticky column.)*
+- [x] Decide whether the medium breakpoint should ALSO use the collapsed/expanded model from 9a. Probable answer: yes — share the affordance pattern, just with the strip on the right edge instead of the bottom for ≥600px.
+- [x] Tests: vitest at 844×390 (landscape phone), 800×N (tablet), and edge-case 1023×N asserting the panel applies the fixed-overlay class at these widths. Playwright deferred to operator-side smoke per project rules (no Playwright in CI).
 
 **Acceptance Criteria:**
 
-- [ ] At 844×390, the chat panel is visible in the viewport without scrolling 30000px.
-- [ ] No horizontal-overflow regression on the entry-review article column at this width.
+- [x] At 844×390, the chat panel is visible in the viewport without scrolling 30000px. *(The fixed-overlay class drives `position: fixed; inset: 0` (expanded) or `position: fixed; inset: auto 0 0 0; height: 36px` (collapsed) — both pin the panel to the viewport regardless of article height. Tests assert the class is applied at 844, 800, and 1023.)*
+- [x] No horizontal-overflow regression on the entry-review article column at this width. *(The fixed-overlay panel does not occupy a grid column — the article column at 600..1023 already takes the full single-column page-grid track per `editorial-review.css:1348`. The panel overlays from the bottom edge when collapsed and from above when expanded; it doesn't compete for article width.)*
+
+**Audit findings + path chosen.**
+
+Two paths were considered:
+
+- **Path A** — make the docked panel column `position: sticky` at the medium breakpoint. Rejected: at 600..1023 the editorial-review page-grid has already collapsed to a single article column (`editorial-review.css:1348` `@media (max-width: 64rem)` switches `grid-template-columns` to `1fr` and stacks marginalia below the article). Adding a sticky chat column at the same width would require restructuring the grid into a 2-track layout AND re-introducing the same crowding the marginalia stack already escaped. The article column wants `minmax(28rem, 42rem)` (≥448px); a 19rem (304px) sticky chat column would leave ~524px article — workable but tighter than the design's existing decision.
+
+- **Path B** — add a right-edge strip variant of 9a's affordance pattern at the medium breakpoint. Considered but expensive: would require a parallel `@media` block, a separate CSS class hierarchy, and a separate state machine for "right-edge collapsed strip" vs "bottom-edge collapsed strip."
+
+- **Path A' (chosen)** — extend 9a's existing fixed-overlay + bottom-edge-strip model from `<600px` to `<1024px`. Single-line change in `chat-panel.ts` (`MOBILE_BREAKPOINT_PX = 600` → `1024`), single CSS-block change (`@media (max-width: 600px)` → `@media (max-width: 1023px)`). The state machine, affordances, keyboard shortcuts, localStorage persistence, and chip-update behavior all extend automatically. Honors the operator's "internal-use only, smallest fix" framing.
+
+The 9a affordance pattern is identical at landscape-phone width: bottom-edge strip with state-chip + chevron-up affordance when collapsed, full-viewport overlay with chevron-down stow when expanded. The only practical difference at 844×390 vs 390×844 is the wider strip — which is fine, the bridge-state chip just has more room.
+
+File:line evidence:
+- `plugins/deskwork-studio/public/src/chat-panel.ts:36` — `MOBILE_BREAKPOINT_PX` constant.
+- `plugins/deskwork-studio/public/css/chat.css:403` — the `@media` block governing the fixed-overlay + collapsed-strip styles.
+- `plugins/deskwork-studio/public/css/editorial-review.css:1348` — the existing `(max-width: 64rem)` page-grid collapse that informed the decision.
+- `packages/studio/src/pages/entry-review/index.ts:259-260` — the chat-panel-mount placeholder, sibling-after-`.er-page` (in normal flow on desktop, fixed-overlay on mobile/medium).
 
 #### Phase 9c — F3: Chat list bottom-aligns when sparse (LOW)
 
