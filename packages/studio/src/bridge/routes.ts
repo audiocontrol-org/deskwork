@@ -192,13 +192,34 @@ export function createChatRouter(bridge: BridgeDeps): Hono {
             limit: 1000,
           });
           for (const row of history) {
-            if (!isAgentEvent(row)) continue;
-            await stream.writeSSE({
-              id: String(row.seq),
-              event: 'agent-event',
-              data: JSON.stringify(row),
-            });
-            if (row.seq > lastReplayedSeq) lastReplayedSeq = row.seq;
+            if (isAgentEvent(row)) {
+              await stream.writeSSE({
+                id: String(row.seq),
+                event: 'agent-event',
+                data: JSON.stringify(row),
+              });
+              if (row.seq > lastReplayedSeq) lastReplayedSeq = row.seq;
+              continue;
+            }
+            // Operator messages and corruption markers are replayed via
+            // a distinct event so the live agent-event channel stays
+            // type-pure. Operator rows carry a seq (Last-Event-ID resume
+            // works); corruption markers do not, so the id is omitted.
+            if ('role' in row && row.role === 'operator') {
+              await stream.writeSSE({
+                id: String(row.seq),
+                event: 'history-row',
+                data: JSON.stringify(row),
+              });
+              if (row.seq > lastReplayedSeq) lastReplayedSeq = row.seq;
+              continue;
+            }
+            if ('kind' in row && row.kind === 'corruption-marker') {
+              await stream.writeSSE({
+                event: 'history-row',
+                data: JSON.stringify(row),
+              });
+            }
           }
         }
 

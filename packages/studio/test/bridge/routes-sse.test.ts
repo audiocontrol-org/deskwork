@@ -71,7 +71,7 @@ describe('GET /api/chat/stream (SSE)', () => {
     await opened.close();
   });
 
-  it('Last-Event-ID replays AgentEvent rows; filters operator messages', async () => {
+  it('Last-Event-ID replays AgentEvent rows on the agent-event channel', async () => {
     await fx.log.append({ seq: 1, ts: 100, role: 'operator', text: 'op-msg' });
     await fx.log.append({ kind: 'prose', seq: 2, ts: 200, text: 'agent-1' });
     await fx.log.append({
@@ -91,11 +91,11 @@ describe('GET /api/chat/stream (SSE)', () => {
       (s) => s.includes('"seq":2') && s.includes('"seq":3'),
       800,
     );
+    expect(buf).toContain('event: agent-event');
     expect(buf).toContain('id: 2');
     expect(buf).toContain('id: 3');
     expect(buf).toContain('"text":"agent-1"');
     expect(buf).toContain('"tool":"Bash"');
-    expect(buf).not.toContain('"text":"op-msg"');
     await opened.close();
   });
 
@@ -125,30 +125,43 @@ describe('GET /api/chat/stream (SSE)', () => {
     await opened.close();
   });
 
-  it('corruption-marker rows are filtered out of replay', async () => {
-    await fx.log.append({ kind: 'prose', seq: 1, ts: 100, text: 'first' });
-    // A corruption marker is a valid log row but not an AgentEvent; the
-    // SSE replay path filters via isAgentEvent so the marker MUST NOT
-    // appear in the stream output.
+  it('Last-Event-ID replay covers operator messages and corruption markers via history-row', async () => {
+    // Live SSE doesn't fan out operator messages (subscribe carries
+    // AgentEvent only), but reconnect needs full catch-up: operator
+    // rows posted via /send from another tab, and any corruption
+    // markers persisted by the log store, must be replayed too.
+    await fx.log.append({ seq: 1, ts: 100, role: 'operator', text: 'op-1' });
+    await fx.log.append({ kind: 'prose', seq: 2, ts: 200, text: 'agent-1' });
+    await fx.log.append({ seq: 3, ts: 300, role: 'operator', text: 'op-2' });
     await fx.log.append({
       kind: 'corruption-marker',
-      from: 1,
-      to: 3,
-      ts: 150,
+      from: 3,
+      to: 5,
+      ts: 350,
     });
-    await fx.log.append({ kind: 'prose', seq: 3, ts: 200, text: 'third' });
+    await fx.log.append({ kind: 'prose', seq: 5, ts: 500, text: 'agent-2' });
 
     const opened = await openSSE(fx.app, 'http://x/api/chat/stream', {
       'Last-Event-ID': '0',
     });
     const buf = await readSSEUntil(
       opened.response,
-      (s) => s.includes('"seq":3'),
+      (s) => s.includes('"text":"agent-2"'),
       800,
     );
-    expect(buf).toContain('"text":"first"');
-    expect(buf).toContain('"text":"third"');
-    expect(buf).not.toContain('corruption-marker');
+    // Both operator messages present on the history-row channel.
+    expect(buf).toContain('event: history-row');
+    expect(buf).toContain('"text":"op-1"');
+    expect(buf).toContain('"text":"op-2"');
+    expect(buf).toContain('id: 1');
+    expect(buf).toContain('id: 3');
+    // Both agent events present on the agent-event channel.
+    expect(buf).toContain('event: agent-event');
+    expect(buf).toContain('"text":"agent-1"');
+    expect(buf).toContain('"text":"agent-2"');
+    // Corruption marker present on history-row (no id; markers don't
+    // carry seq).
+    expect(buf).toContain('"kind":"corruption-marker"');
     await opened.close();
   });
 

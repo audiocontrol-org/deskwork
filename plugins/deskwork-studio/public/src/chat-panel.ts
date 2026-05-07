@@ -50,11 +50,19 @@ export class ChatPanel {
   private destroyed = false;
 
   constructor(parent: HTMLElement, options?: ChatPanelOptions) {
+    if (!(parent instanceof HTMLElement)) {
+      throw new Error('ChatPanel: parent must be an HTMLElement');
+    }
+    const projectRoot = document.body.dataset.projectRoot;
+    if (projectRoot === undefined || projectRoot === '') {
+      throw new Error(
+        'ChatPanel: <body data-project-root="..."> is required for draft persistence',
+      );
+    }
     this.parent = parent;
     this.contextRef = options?.contextRef;
     this.fullPage = options?.fullPage === true;
-    const root = document.body.dataset.projectRoot ?? 'unknown';
-    this.draft = createChatDraftStore(`chat-draft:${root}`);
+    this.draft = createChatDraftStore(`chat-draft:${projectRoot}`);
     this.resizeListener = () => this.applyMobileClass();
 
     this.skel = buildChatSkeleton(this.state, this.fullPage);
@@ -67,10 +75,18 @@ export class ChatPanel {
     void this.bootstrapHistoryAndStream();
   }
 
+  /**
+   * Append `text` to the textarea, preserving any existing draft. Empty
+   * textarea -> set to `text`; non-empty -> existing + "\n\n" + `text`.
+   * The append-with-newline contract avoids silently clobbering an
+   * unsent draft when an affordance routes prefill text in.
+   */
   prefillInput(text: string): void {
     if (!this.skel) return;
-    this.skel.textarea.value = text;
-    this.draft.writeNow(text);
+    const existing = this.skel.textarea.value;
+    const next = existing.length === 0 ? text : `${existing}\n\n${text}`;
+    this.skel.textarea.value = next;
+    this.draft.writeNow(next);
     this.autoResize();
     this.skel.textarea.focus();
     if (!this.fullPage) {
@@ -79,6 +95,7 @@ export class ChatPanel {
   }
 
   destroy(): void {
+    if (this.destroyed) return;
     this.destroyed = true;
     if (this.eventSource) {
       this.eventSource.close();
@@ -133,6 +150,7 @@ export class ChatPanel {
     this.eventSource = openStream({
       onAgentEvent: (e) => this.appendRow(e, { initial: false }),
       onBridgeState: (s) => this.applyBridgeState(s),
+      onHistoryRow: (r) => this.appendRow(r, { initial: false }),
     });
   }
 
@@ -187,7 +205,13 @@ export class ChatPanel {
     else this.bumpNewPill();
   }
 
-  private applyBridgeState(state: BridgeState): void {
+  /**
+   * Apply a bridge-state update to the header chip and input enable
+   * state. Public so jsdom unit tests can drive the four enable
+   * transitions deterministically without an EventSource. Production
+   * callers reach this only through the SSE bridge-state event.
+   */
+  applyBridgeState(state: BridgeState): void {
     this.state = state;
     if (this.skel) this.skel.header.innerHTML = renderBridgeState(state);
     this.applyInputEnabled();
@@ -198,8 +222,18 @@ export class ChatPanel {
     const enabled = this.state.mcpConnected && this.state.listenModeOn;
     this.skel.sendBtn.disabled = !enabled;
     this.skel.textarea.disabled = !enabled;
-    if (enabled) this.skel.root.removeAttribute('data-bridge-offline');
-    else this.skel.root.setAttribute('data-bridge-offline', '');
+    if (enabled) {
+      this.skel.root.removeAttribute('data-bridge-offline');
+      this.skel.sendBtn.removeAttribute('title');
+      this.skel.textarea.removeAttribute('title');
+      return;
+    }
+    this.skel.root.setAttribute('data-bridge-offline', '');
+    const reason = !this.state.mcpConnected
+      ? 'Bridge offline — no agent connected'
+      : 'Agent connected but not listening — run /deskwork:listen in Claude Code';
+    this.skel.sendBtn.title = reason;
+    this.skel.textarea.title = reason;
   }
 
   private async send(): Promise<void> {

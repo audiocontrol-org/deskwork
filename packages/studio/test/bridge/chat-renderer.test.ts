@@ -158,6 +158,16 @@ describe('renderRow — XSS regression', () => {
     expect(html).toContain('&lt;svg');
     expect(html).toContain('&lt;x&gt;');
   });
+
+  it('escapes raw <script> in agent prose markdown', () => {
+    // Pin the assumption that the markdown renderer escapes raw HTML.
+    // If a future markdown change removes escape, this test fails — and
+    // the chat-renderer file header documents agent prose as the trust
+    // boundary, so a regression here is a security signal.
+    const html = renderRow(prose({ text: '<script>alert(1)</script>' }));
+    expect(html).not.toContain('<script>alert(1)</script>');
+    expect(html).toContain('&lt;script&gt;');
+  });
 });
 
 describe('renderBridgeState', () => {

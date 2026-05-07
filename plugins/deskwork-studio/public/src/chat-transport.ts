@@ -11,6 +11,7 @@ import type { AgentEvent, BridgeState, ChatLogRow } from './chat-renderer.ts';
 export interface ChatStreamHandlers {
   readonly onAgentEvent: (event: AgentEvent) => void;
   readonly onBridgeState: (state: BridgeState) => void;
+  readonly onHistoryRow: (row: ChatLogRow) => void;
 }
 
 export interface SendResult {
@@ -67,36 +68,39 @@ function asAgentEvent(value: unknown): AgentEvent | null {
   return null;
 }
 
+function asChatLogRow(value: unknown): ChatLogRow | null {
+  if (!isRecord(value)) return null;
+  if (value.role === 'operator') {
+    if (
+      typeof value.seq === 'number' &&
+      typeof value.ts === 'number' &&
+      typeof value.text === 'string'
+    ) {
+      return typeof value.contextRef === 'string'
+        ? { seq: value.seq, ts: value.ts, role: 'operator', text: value.text, contextRef: value.contextRef }
+        : { seq: value.seq, ts: value.ts, role: 'operator', text: value.text };
+    }
+    return null;
+  }
+  if (value.kind === 'corruption-marker') {
+    if (
+      typeof value.from === 'number' &&
+      typeof value.to === 'number' &&
+      typeof value.ts === 'number'
+    ) {
+      return { kind: 'corruption-marker', from: value.from, to: value.to, ts: value.ts };
+    }
+    return null;
+  }
+  return asAgentEvent(value);
+}
+
 function asChatLogRows(value: unknown): ChatLogRow[] {
   if (!isRecord(value) || !Array.isArray(value.rows)) return [];
   const out: ChatLogRow[] = [];
   for (const row of value.rows) {
-    if (!isRecord(row)) continue;
-    if (row.role === 'operator') {
-      if (
-        typeof row.seq === 'number' &&
-        typeof row.ts === 'number' &&
-        typeof row.text === 'string'
-      ) {
-        const op: ChatLogRow = typeof row.contextRef === 'string'
-          ? { seq: row.seq, ts: row.ts, role: 'operator', text: row.text, contextRef: row.contextRef }
-          : { seq: row.seq, ts: row.ts, role: 'operator', text: row.text };
-        out.push(op);
-      }
-      continue;
-    }
-    if (row.kind === 'corruption-marker') {
-      if (
-        typeof row.from === 'number' &&
-        typeof row.to === 'number' &&
-        typeof row.ts === 'number'
-      ) {
-        out.push({ kind: 'corruption-marker', from: row.from, to: row.to, ts: row.ts });
-      }
-      continue;
-    }
-    const event = asAgentEvent(row);
-    if (event) out.push(event);
+    const parsed = asChatLogRow(row);
+    if (parsed !== null) out.push(parsed);
   }
   return out;
 }
@@ -131,6 +135,18 @@ export function openStream(handlers: ChatStreamHandlers): EventSource {
       if (state) handlers.onBridgeState(state);
     } catch {
       // Ignore malformed state events.
+    }
+  });
+  // history-row carries operator messages and corruption markers
+  // emitted by the server during Last-Event-ID replay only. Live
+  // operator messages and live markers do not flow over SSE.
+  es.addEventListener('history-row', (ev) => {
+    if (!(ev instanceof MessageEvent)) return;
+    try {
+      const row = asChatLogRow(JSON.parse(ev.data));
+      if (row !== null) handlers.onHistoryRow(row);
+    } catch {
+      // Malformed payloads are tested at the server contract layer.
     }
   });
   // Browser auto-reconnects on its own; nothing to do on 'error'.
