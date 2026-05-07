@@ -1,5 +1,25 @@
 #!/usr/bin/env bash
 #
+# RETIRED in Phase 10c. The in-process bridge mode this script tested
+# (single studio process, /mcp + /api/chat/* mounted on the studio's
+# Hono app) no longer exists. Phase 10c split the bridge into a
+# long-lived sidecar (`deskwork-bridge`) that owns /mcp + /api/chat/*,
+# with the studio reverse-proxied for /dev/* + /static/*.
+#
+# Use scripts/smoke-bridge-sidecar.sh instead — it covers the post-10c
+# two-process smoke (sidecar + studio, MCP listen-loop survives studio
+# restart, /dev/* 502 during studio restart window, /api/chat/state
+# stays 200 throughout).
+#
+# This file is preserved (not deleted) so future readers can see what
+# the in-process smoke exercised before the split. Running it exits 2
+# immediately to avoid producing misleading PASS output against the
+# new architecture.
+echo "scripts/smoke-bridge.sh is RETIRED — use scripts/smoke-bridge-sidecar.sh instead" >&2
+echo "(Phase 10c split the bridge into a long-lived sidecar; see comments at top of this file.)" >&2
+exit 2
+
+# ----- Below: historical contents preserved for reference --------------
 # smoke-bridge.sh — local-only Phase 8 automated smoke for the
 # studio-bridge feature (feature/studio-bridge branch).
 #

@@ -589,6 +589,7 @@ Tasks (deferred):
 #### Phase 10 — Backlog
 
 - (Backlog, post-Phase-10c) Extract `listen.ts` + `tailscale.ts` to `@deskwork/core` to eliminate the bridge↔studio duplication introduced in 10b. The studio's `AUTO_INCREMENT_RANGE = 30` and the bridge's `101` should be parameterized at the call site. Tracked here, not in a separate GH issue, because the bridge is internal-only and dedicated-issue overhead isn't justified for tracking.
+- (Backlog, post-Phase-10c) `sidecar-discovery.ts` case (e): single 250ms retry on transient non-2xx from `/api/chat/state` before declaring sidecar unresponsive. Hardens against sidecar warm-up window. Per design "no loop" — single retry only.
 
 ---
 

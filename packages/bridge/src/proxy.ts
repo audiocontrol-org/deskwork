@@ -65,12 +65,32 @@ export function createProxyHandler(
     const incomingUrl = new URL(c.req.url);
     const upstream = `http://127.0.0.1:${desc.port}${incomingUrl.pathname}${incomingUrl.search}`;
     try {
+      // Pass `raw: c.req.raw` (the underlying `Request`) explicitly to
+      // hono's `proxy()`. The proxy helper extracts method + body +
+      // signal from the `raw` Request via `buildRequestInitFromRequest()`.
+      //
+      // Note: the alternate `{...c.req}` spread shape (shown in hono's
+      // own docs example) also works in current hono — `raw` is an own
+      // enumerable property on HonoRequest, so it ends up in the spread
+      // output and `proxy()` destructures it correctly. But the explicit
+      // `raw:` key documents intent and removes the dependency on
+      // HonoRequest's internal property layout: any future hono refactor
+      // that turns `raw` into a getter (the same shape `method` / `body`
+      // / `headers` already use) would silently break the spread.
+      //
+      // See: node_modules/hono/dist/helper/proxy/index.js (proxy()) and
+      // node_modules/hono/dist/types/helper/proxy/index.d.ts.
       return await proxy(upstream, {
-        ...c.req,
+        raw: c.req.raw,
         headers: {
           ...c.req.header(),
           'X-Forwarded-For': '127.0.0.1',
-          'X-Forwarded-Host': c.req.header('host'),
+          // Guard against undefined: hono's `preprocessRequestInit`
+          // deletes header keys whose value is `== null`, so an
+          // undefined here is actually handled correctly today. The
+          // `?? ''` makes the contract explicit at the call site
+          // rather than relying on hono's internal null-handling.
+          'X-Forwarded-Host': c.req.header('host') ?? '',
           'X-Forwarded-Proto': 'http',
         },
       });
