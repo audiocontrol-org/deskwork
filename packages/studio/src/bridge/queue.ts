@@ -26,7 +26,7 @@ import type {
   OperatorMessage,
 } from './types.ts';
 
-interface PublishToolUseInput {
+export interface PublishToolUseInput {
   readonly tool: string;
   readonly args: unknown;
   readonly status?: AgentEventStatus;
@@ -181,12 +181,12 @@ export class BridgeQueue {
     };
   }
 
-  // Allocates seq+ts and synchronously fans out a tool-use event. The
-  // returned event is what the caller should persist to the chat-log so
-  // SSE Last-Event-ID replay sees the same row the live subscribers
-  // already received. Sharing the operator-message seq counter keeps the
-  // SSE stream globally monotonic.
-  publishToolUse(input: PublishToolUseInput): AgentToolUseEvent {
+  // Allocate-only: assigns seq+ts and builds the event WITHOUT calling
+  // publishAgentEvent. Used by callers that must persist before fanout
+  // (mirror of the allocate→append→deliver pattern on operator messages).
+  // Sharing the operator-message seq counter keeps the SSE stream
+  // globally monotonic.
+  allocateToolUseEvent(input: PublishToolUseInput): AgentToolUseEvent {
     const seq = this.nextSeq;
     this.nextSeq += 1;
     const base = {
@@ -202,24 +202,40 @@ export class BridgeQueue {
       input.status === undefined
         ? withResult
         : { ...withResult, status: input.status };
-    this.publishAgentEvent(event);
     return event;
   }
 
-  publishProse(text: string): AgentProseEvent {
+  allocateProseEvent(text: string): AgentProseEvent {
     const seq = this.nextSeq;
     this.nextSeq += 1;
-    const event: AgentProseEvent = {
+    return {
       kind: 'prose',
       seq,
       ts: Date.now(),
       text,
     };
+  }
+
+  // Allocates seq+ts and synchronously fans out a tool-use event. The
+  // returned event is what the caller should persist to the chat-log so
+  // SSE Last-Event-ID replay sees the same row the live subscribers
+  // already received. Callers that need persist-before-publish should
+  // use allocateToolUseEvent + log.append + publishAgentEvent instead.
+  publishToolUse(input: PublishToolUseInput): AgentToolUseEvent {
+    const event = this.allocateToolUseEvent(input);
     this.publishAgentEvent(event);
     return event;
   }
 
-  // Subscriber re-entrancy: callbacks must NOT synchronously call enqueueOperatorMessage.
+  publishProse(text: string): AgentProseEvent {
+    const event = this.allocateProseEvent(text);
+    this.publishAgentEvent(event);
+    return event;
+  }
+
+  // Subscriber re-entrancy: callbacks must NOT synchronously call any of
+  // enqueueOperatorMessage / publishToolUse / publishProse /
+  // publishAgentEvent — re-entry corrupts the in-flight fanout.
   publishAgentEvent(event: AgentEvent): void {
     const snapshot = this.eventListeners.slice();
     for (let i = 0; i < snapshot.length; i += 1) {

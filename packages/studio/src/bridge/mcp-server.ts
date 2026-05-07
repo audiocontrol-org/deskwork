@@ -1,15 +1,12 @@
 /**
  * MCP server endpoint for the studio ↔ Claude Code bridge.
  *
- * Mounted at `/mcp` on the same Hono app. Exposes two tools:
- *   - `await_studio_message`  — block until operator sends a message
- *   - `send_studio_response`  — publish + persist an agent event
- *
- * Three invariants:
+ * Mounted at `/mcp`. Invariants:
  *   1. Loopback-only (403 for non-loopback peers).
- *   2. Single-agent (409 for a second concurrent connection).
- *   3. State coupling — first await flips listenModeOn; disconnect
- *      resets all three state bits.
+ *   2. Origin allow-list (403 for cross-site Origin to prevent CSRF /
+ *      DNS-rebinding from a browser tab).
+ *   3. Single-agent (409 for a second concurrent connection).
+ *   4. Disconnect resets mcpConnected/listenModeOn/awaitingMessage.
  *
  * Tool-handler logic + helpers live in `mcp-tools.ts`.
  */
@@ -23,11 +20,13 @@ import {
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import type { Context } from 'hono';
+import type { BridgeQueue } from './queue.ts';
 import {
   approximatePayloadSize,
   awaitStudioMessageHandler,
   combineSignals,
   isLoopbackAddress,
+  isOriginAllowed,
   MAX_PAYLOAD_BYTES,
   sendStudioResponseHandler,
   sendStudioResponseInputSchema,
@@ -40,6 +39,7 @@ export {
   awaitStudioMessageHandler,
   sendStudioResponseHandler,
   isLoopbackAddress,
+  isOriginAllowed,
 } from './mcp-tools.ts';
 
 export interface McpHandler {
@@ -56,13 +56,9 @@ interface ConnectionTracker {
   active: ConnectionRecord | null;
 }
 
-interface RemoteAddrLookup {
-  (c: Context): string | undefined;
-}
-
 interface CreateMcpHandlerOptions {
   /** Override remote-address lookup for tests. */
-  readonly remoteAddrLookup?: RemoteAddrLookup;
+  readonly remoteAddrLookup?: (c: Context) => string | undefined;
 }
 
 function buildMcpServer(
@@ -164,6 +160,14 @@ export function createMcpHandler(
       );
     }
 
+    const origin = c.req.header('origin');
+    if (!isOriginAllowed(origin)) {
+      return c.json(
+        { error: 'invalid-origin', message: 'Origin not allowed for /mcp' },
+        403,
+      );
+    }
+
     const sessionId = c.req.header('mcp-session-id');
     const method = c.req.method;
 
@@ -171,10 +175,7 @@ export function createMcpHandler(
       const active = tracker.active;
       if (active === null || active.transport.sessionId !== sessionId) {
         return c.json(
-          {
-            error: 'unknown-session',
-            message: 'Session ID does not match the active MCP session',
-          },
+          { error: 'unknown-session', message: 'Session ID does not match the active MCP session' },
           404,
         );
       }
@@ -183,10 +184,7 @@ export function createMcpHandler(
 
     if (method !== 'POST') {
       return c.json(
-        {
-          error: 'session-required',
-          message: 'mcp-session-id header is required for non-POST requests',
-        },
+        { error: 'session-required', message: 'mcp-session-id header is required for non-POST requests' },
         400,
       );
     }
@@ -196,18 +194,14 @@ export function createMcpHandler(
     try {
       parsedBody = bodyText.length === 0 ? undefined : JSON.parse(bodyText);
     } catch {
-      return c.json(
-        { error: 'invalid-json', message: 'Request body is not valid JSON' },
-        400,
-      );
+      return c.json({ error: 'invalid-json', message: 'Request body is not valid JSON' }, 400);
     }
 
     if (!isInitializeRequest(parsedBody)) {
       return c.json(
         {
           error: 'session-required',
-          message:
-            'Non-initialization request without mcp-session-id; send an initialize request first',
+          message: 'Non-initialization request without mcp-session-id; send an initialize request first',
         },
         400,
       );
@@ -215,10 +209,7 @@ export function createMcpHandler(
 
     if (tracker.active !== null) {
       return c.json(
-        {
-          error: 'bridge-busy',
-          message: 'Another agent is already connected to this studio',
-        },
+        { error: 'bridge-busy', message: 'Another agent is already connected to this studio' },
         409,
       );
     }
@@ -237,14 +228,7 @@ export function createMcpHandler(
     bridge.queue.setMcpConnected(true);
 
     transport.onclose = (): void => {
-      if (tracker.active === record) {
-        tracker.active = null;
-        bridge.queue.setListenModeOn(false);
-        bridge.queue.setAwaitingMessage(false);
-        bridge.queue.setMcpConnected(false);
-      }
-      abortRef.current?.abort();
-      abortRef.current = null;
+      cleanupConnection(tracker, record, bridge.queue, abortRef);
     };
 
     try {
@@ -256,14 +240,7 @@ export function createMcpHandler(
       });
       return transport.handleRequest(requestForTransport, { parsedBody });
     } catch (err) {
-      if (tracker.active === record) {
-        tracker.active = null;
-        bridge.queue.setListenModeOn(false);
-        bridge.queue.setAwaitingMessage(false);
-        bridge.queue.setMcpConnected(false);
-      }
-      abortRef.current?.abort();
-      abortRef.current = null;
+      cleanupConnection(tracker, record, bridge.queue, abortRef);
       const reason = err instanceof Error ? err.message : String(err);
       return c.json({ error: 'mcp-init-failed', message: reason }, 500);
     }
@@ -275,22 +252,48 @@ export function createMcpHandler(
   };
 }
 
+function cleanupConnection(
+  tracker: ConnectionTracker,
+  record: ConnectionRecord,
+  queue: BridgeQueue,
+  abortRef: { current: AbortController | null },
+): void {
+  if (tracker.active === record) {
+    tracker.active = null;
+    queue.setListenModeOn(false);
+    queue.setAwaitingMessage(false);
+    queue.setMcpConnected(false);
+  }
+  abortRef.current?.abort();
+  abortRef.current = null;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+let warnedRemoteAddrMissing = false;
+
+// @hono/node-server attaches the underlying Node IncomingMessage (with
+// `.socket.remoteAddress`) under `c.env.incoming`. We avoid the
+// hono/conninfo helper here so tests can inject through opts.remoteAddrLookup.
 function defaultRemoteAddrLookup(c: Context): string | undefined {
-  // @hono/node-server attaches the underlying Node IncomingMessage
-  // (with `.socket.remoteAddress`) under `c.env.incoming`. We avoid the
-  // hono/conninfo helper here so tests can inject the address through
-  // `opts.remoteAddrLookup` without faking a node socket.
   const env: unknown = c.env;
-  if (!isRecord(env)) return undefined;
-  const incoming = env['incoming'];
-  if (!isRecord(incoming)) return undefined;
-  const socket = incoming['socket'];
-  if (!isRecord(socket)) return undefined;
-  const remote = socket['remoteAddress'];
-  if (typeof remote !== 'string') return undefined;
-  return remote;
+  if (isRecord(env)) {
+    const incoming = env['incoming'];
+    if (isRecord(incoming)) {
+      const socket = incoming['socket'];
+      if (isRecord(socket)) {
+        const remote = socket['remoteAddress'];
+        if (typeof remote === 'string') return remote;
+      }
+    }
+  }
+  if (!warnedRemoteAddrMissing) {
+    warnedRemoteAddrMissing = true;
+    console.warn(
+      'deskwork-studio: MCP remote-address lookup found no socket; loopback guard will reject all requests',
+    );
+  }
+  return undefined;
 }

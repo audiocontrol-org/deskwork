@@ -11,13 +11,9 @@
  */
 
 import { z } from 'zod';
-import type { BridgeQueue } from './queue.ts';
+import type { BridgeQueue, PublishToolUseInput } from './queue.ts';
 import type { ChatLogStore } from './persistence.ts';
-import type {
-  AgentEvent,
-  AgentEventStatus,
-  OperatorMessage,
-} from './types.ts';
+import type { AgentEvent, OperatorMessage } from './types.ts';
 
 export interface BridgeDeps {
   readonly queue: BridgeQueue;
@@ -67,32 +63,31 @@ export async function awaitStudioMessageHandler(
   }
 }
 
+// Persist-before-publish: allocate the seq+ts via the queue (without
+// fanning out), persist to the chat log, only then publishAgentEvent.
+// If log.append rejects, no subscriber sees a phantom event without a
+// log row, so SSE Last-Event-ID replay never produces a spurious gap
+// for this seq. The seq is still consumed (gaps in the seq counter are
+// legitimate; the corruption-detection layer tolerates them).
 export async function sendStudioResponseHandler(
   bridge: BridgeDeps,
   input: SendStudioResponseInput,
 ): Promise<AgentEvent> {
   let event: AgentEvent;
   if (input.kind === 'prose') {
-    event = bridge.queue.publishProse(input.text);
+    event = bridge.queue.allocateProseEvent(input.text);
   } else {
-    const base = { tool: input.tool, args: input.args };
-    const withResult =
-      input.result === undefined ? base : { ...base, result: input.result };
-    const fullInput: ToolUseInput =
-      input.status === undefined
-        ? withResult
-        : { ...withResult, status: input.status };
-    event = bridge.queue.publishToolUse(fullInput);
+    const base: PublishToolUseInput = {
+      tool: input.tool,
+      args: input.args,
+      ...(input.result === undefined ? {} : { result: input.result }),
+      ...(input.status === undefined ? {} : { status: input.status }),
+    };
+    event = bridge.queue.allocateToolUseEvent(base);
   }
   await bridge.log.append(event);
+  bridge.queue.publishAgentEvent(event);
   return event;
-}
-
-interface ToolUseInput {
-  readonly tool: string;
-  readonly args: unknown;
-  readonly status?: AgentEventStatus;
-  readonly result?: unknown;
 }
 
 export function serializeAwaitResult(r: AwaitResult): Record<string, unknown> {
@@ -143,4 +138,29 @@ const LOOPBACK_ADDRS = new Set<string>([
 export function isLoopbackAddress(addr: string | undefined): boolean {
   if (addr === undefined || addr === '') return false;
   return LOOPBACK_ADDRS.has(addr);
+}
+
+const LOOPBACK_ORIGIN_HOSTS = new Set<string>(['localhost', '127.0.0.1', '[::1]']);
+
+// Defends the loopback-bound MCP endpoint against DNS-rebinding / CSRF
+// from an attacker page in the operator's browser. The TCP peer is
+// always loopback (the browser); only Origin tells us which web origin
+// scripted the request.
+//
+// Allowed:
+//   - undefined  (server-to-server clients like Claude Code don't send Origin)
+//   - "null"     (file:// pages, sandboxed iframes)
+//   - http://localhost:<port>, http://127.0.0.1:<port>, http://[::1]:<port>
+// Rejected: anything else.
+export function isOriginAllowed(origin: string | undefined): boolean {
+  if (origin === undefined) return true;
+  if (origin === 'null') return true;
+  let url: URL;
+  try {
+    url = new URL(origin);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== 'http:') return false;
+  return LOOPBACK_ORIGIN_HOSTS.has(url.hostname.toLowerCase());
 }
