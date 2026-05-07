@@ -38,6 +38,8 @@ import type { DeskworkConfig } from '@deskwork/core/config';
 import type { OverrideResolver } from '@deskwork/core/overrides';
 import type { DraftAnnotation } from '@deskwork/core/review/types';
 import { parseEntryAnnotationBody } from './entry-annotation-body.ts';
+import type { BridgeQueue } from '../bridge/queue.ts';
+import type { ChatLog } from '../bridge/persistence.ts';
 
 /**
  * Narrow a `HandlerResult.body` (typed as `unknown`) to extract the
@@ -90,6 +92,15 @@ export interface StudioContext {
    * once and threads it through.
    */
   resolver?: OverrideResolver;
+  /**
+   * Studio ↔ Claude Code bridge. When present, `createApp` mounts
+   * `/api/chat/*`. When absent, the bridge routes are not mounted —
+   * existing tests build `ctx` without it.
+   */
+  bridge?: {
+    queue: BridgeQueue;
+    log: ChatLog;
+  };
 }
 
 export function createApiRouter(ctx: StudioContext): Hono {

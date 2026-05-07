@@ -38,6 +38,9 @@ import { readWorkflow } from '@deskwork/core/review/pipeline';
 import { createApiRouter, type StudioContext } from './routes/api.ts';
 import { serveScrapbookFile } from './routes/scrapbook-file.ts';
 import { createScrapbookMutationsRouter } from './routes/scrapbook-mutations.ts';
+import { createChatRouter } from './bridge/routes.ts';
+import { BridgeQueue } from './bridge/queue.ts';
+import { ChatLog } from './bridge/persistence.ts';
 import { buildClientAssets } from './build-client-assets.ts';
 import { renderDashboard } from './pages/dashboard.ts';
 import { renderShortformReviewPage } from './pages/shortform-review.ts';
@@ -221,6 +224,12 @@ export function createApp(ctx: StudioContext): Hono {
 
   // API routes
   app.route('/api/dev/editorial-review', createApiRouter(ctx));
+
+  // Bridge routes — opt-in. Only mounted when production boot (or a test)
+  // constructed a BridgeQueue + ChatLog and threaded them through ctx.
+  if (ctx.bridge !== undefined) {
+    app.route('/api/chat', createChatRouter(ctx.bridge));
+  }
 
   // #111: version endpoint so adopters / scripts can verify which studio
   // build is actually running. Surfaced in the dashboard masthead too.
@@ -473,7 +482,11 @@ async function main(): Promise<void> {
   // request reuses the same instance. The resolver itself is cheap, but
   // threading it through `ctx` makes the dependency explicit.
   const resolver = createOverrideResolver(projectRoot);
-  const ctx: StudioContext = { projectRoot, config, resolver };
+  const bridge = {
+    queue: new BridgeQueue(),
+    log: new ChatLog({ projectRoot }),
+  };
+  const ctx: StudioContext = { projectRoot, config, resolver, bridge };
   const app = createApp(ctx);
 
   // Networking policy:
