@@ -1,0 +1,262 @@
+/**
+ * Vanilla-TS docked chat panel for the studio.
+ *
+ * Talks to /api/chat/{history,stream,send,state} via the transport
+ * helper. Renders rows via chat-renderer (the trust boundary for
+ * HTML escaping). Draft persistence lives in chat-draft; DOM skeleton
+ * lives in chat-skeleton. Public interface:
+ * `new ChatPanel(parent, options)`, `prefillInput(text)`, `destroy()`.
+ */
+
+import {
+  renderRow,
+  renderBridgeState,
+  type BridgeState,
+  type ChatLogRow,
+} from './chat-renderer.ts';
+import {
+  loadHistory,
+  loadState,
+  openStream,
+  sendMessage,
+} from './chat-transport.ts';
+import { createChatDraftStore, type ChatDraftStore } from './chat-draft.ts';
+import { buildChatSkeleton, type ChatSkeleton } from './chat-skeleton.ts';
+
+const MOBILE_BREAKPOINT_PX = 600;
+const NEAR_BOTTOM_PX = 50;
+
+export interface ChatPanelOptions {
+  readonly contextRef?: string;
+  readonly fullPage?: boolean;
+}
+
+export class ChatPanel {
+  private readonly parent: HTMLElement;
+  private readonly contextRef: string | undefined;
+  private readonly fullPage: boolean;
+  private readonly draft: ChatDraftStore;
+  private readonly resizeListener: () => void;
+
+  private skel: ChatSkeleton | null = null;
+  private eventSource: EventSource | null = null;
+  private state: BridgeState = {
+    mcpConnected: false,
+    listenModeOn: false,
+    awaitingMessage: false,
+  };
+  private knownSeqs = new Set<number>();
+  private pendingNewCount = 0;
+  private destroyed = false;
+
+  constructor(parent: HTMLElement, options?: ChatPanelOptions) {
+    this.parent = parent;
+    this.contextRef = options?.contextRef;
+    this.fullPage = options?.fullPage === true;
+    const root = document.body.dataset.projectRoot ?? 'unknown';
+    this.draft = createChatDraftStore(`chat-draft:${root}`);
+    this.resizeListener = () => this.applyMobileClass();
+
+    this.skel = buildChatSkeleton(this.state, this.fullPage);
+    this.parent.appendChild(this.skel.root);
+    this.wireEvents();
+    window.addEventListener('resize', this.resizeListener);
+    this.applyMobileClass();
+    this.applyInputEnabled();
+    this.restoreDraft();
+    void this.bootstrapHistoryAndStream();
+  }
+
+  prefillInput(text: string): void {
+    if (!this.skel) return;
+    this.skel.textarea.value = text;
+    this.draft.writeNow(text);
+    this.autoResize();
+    this.skel.textarea.focus();
+    if (!this.fullPage) {
+      this.skel.root.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }
+
+  destroy(): void {
+    this.destroyed = true;
+    if (this.eventSource) {
+      this.eventSource.close();
+      this.eventSource = null;
+    }
+    window.removeEventListener('resize', this.resizeListener);
+    this.draft.cancel();
+    if (this.skel && this.skel.root.parentNode) {
+      this.skel.root.parentNode.removeChild(this.skel.root);
+    }
+    this.skel = null;
+  }
+
+  private wireEvents(): void {
+    if (!this.skel) return;
+    const { scroll, newPill, textarea, sendBtn } = this.skel;
+    scroll.addEventListener('scroll', () => {
+      if (this.isNearBottom()) this.clearNewPill();
+    });
+    newPill.addEventListener('click', () => this.scrollToBottom());
+    textarea.addEventListener('input', () => {
+      this.autoResize();
+      this.draft.scheduleWrite(textarea.value);
+    });
+    textarea.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'Enter') return;
+      if (ev.metaKey || ev.ctrlKey) {
+        ev.preventDefault();
+        void this.send();
+      }
+    });
+    sendBtn.addEventListener('click', () => {
+      void this.send();
+    });
+  }
+
+  private async bootstrapHistoryAndStream(): Promise<void> {
+    try {
+      const rows = await loadHistory(200);
+      for (const row of rows) this.appendRow(row, { initial: true });
+      this.scrollToBottom();
+    } catch {
+      // History errors are non-fatal — SSE will catch up.
+    }
+    try {
+      const state = await loadState();
+      if (state) this.applyBridgeState(state);
+    } catch {
+      // SSE will deliver state updates.
+    }
+    if (this.destroyed) return;
+    this.eventSource = openStream({
+      onAgentEvent: (e) => this.appendRow(e, { initial: false }),
+      onBridgeState: (s) => this.applyBridgeState(s),
+    });
+  }
+
+  private autoResize(): void {
+    if (!this.skel) return;
+    const ta = this.skel.textarea;
+    ta.style.height = 'auto';
+    const max = 20 * 6 + 12;
+    ta.style.height = `${Math.min(ta.scrollHeight, max)}px`;
+  }
+
+  private isNearBottom(): boolean {
+    if (!this.skel) return true;
+    const el = this.skel.scroll;
+    return el.scrollHeight - el.scrollTop - el.clientHeight < NEAR_BOTTOM_PX;
+  }
+
+  private scrollToBottom(): void {
+    if (!this.skel) return;
+    this.skel.scroll.scrollTop = this.skel.scroll.scrollHeight;
+    this.clearNewPill();
+  }
+
+  private clearNewPill(): void {
+    this.pendingNewCount = 0;
+    if (this.skel) this.skel.newPill.hidden = true;
+  }
+
+  private bumpNewPill(): void {
+    if (!this.skel) return;
+    this.pendingNewCount += 1;
+    this.skel.newPill.textContent = `↓ ${this.pendingNewCount} new`;
+    this.skel.newPill.hidden = false;
+  }
+
+  private appendRow(row: ChatLogRow, opts: { initial: boolean }): void {
+    if (!this.skel) return;
+    const seq = rowSeq(row);
+    if (seq !== null) {
+      if (this.knownSeqs.has(seq)) return;
+      this.knownSeqs.add(seq);
+    }
+    const html = renderRow(row);
+    if (html === '') return;
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html;
+    const node = wrapper.firstElementChild;
+    if (!node) return;
+    const wasNear = this.isNearBottom();
+    this.skel.scroll.appendChild(node);
+    if (opts.initial || wasNear) this.scrollToBottom();
+    else this.bumpNewPill();
+  }
+
+  private applyBridgeState(state: BridgeState): void {
+    this.state = state;
+    if (this.skel) this.skel.header.innerHTML = renderBridgeState(state);
+    this.applyInputEnabled();
+  }
+
+  private applyInputEnabled(): void {
+    if (!this.skel) return;
+    const enabled = this.state.mcpConnected && this.state.listenModeOn;
+    this.skel.sendBtn.disabled = !enabled;
+    this.skel.textarea.disabled = !enabled;
+    if (enabled) this.skel.root.removeAttribute('data-bridge-offline');
+    else this.skel.root.setAttribute('data-bridge-offline', '');
+  }
+
+  private async send(): Promise<void> {
+    if (!this.skel) return;
+    const ta = this.skel.textarea;
+    const text = ta.value.trim();
+    if (text.length === 0) return;
+    this.hideErr();
+    const result = await sendMessage(text, this.contextRef);
+    if (!result.ok) {
+      if (result.error === 'bridge-offline') {
+        this.showErr('Bridge offline. Start /deskwork:listen in Claude Code.');
+      } else if (result.error) {
+        this.showErr(`Send failed: ${result.error}`);
+      } else {
+        this.showErr(`Send failed (${result.status}).`);
+      }
+      return;
+    }
+    ta.value = '';
+    this.autoResize();
+    this.draft.writeNow('');
+  }
+
+  private showErr(msg: string): void {
+    if (!this.skel) return;
+    this.skel.inputErr.textContent = msg;
+    this.skel.inputErr.hidden = false;
+  }
+
+  private hideErr(): void {
+    if (!this.skel) return;
+    this.skel.inputErr.hidden = true;
+    this.skel.inputErr.textContent = '';
+  }
+
+  private restoreDraft(): void {
+    if (!this.skel) return;
+    const text = this.draft.read();
+    if (text.length === 0) return;
+    this.skel.textarea.value = text;
+    this.autoResize();
+  }
+
+  private applyMobileClass(): void {
+    if (!this.skel || this.fullPage) return;
+    const w = this.parent.clientWidth || window.innerWidth;
+    if (w < MOBILE_BREAKPOINT_PX) {
+      this.skel.root.classList.add('chat-panel--mobile-full');
+    } else {
+      this.skel.root.classList.remove('chat-panel--mobile-full');
+    }
+  }
+}
+
+function rowSeq(row: ChatLogRow): number | null {
+  if ('role' in row) return row.seq;
+  if (row.kind === 'tool-use' || row.kind === 'prose') return row.seq;
+  return null;
+}

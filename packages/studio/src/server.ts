@@ -43,6 +43,7 @@ import { createMcpHandler } from './bridge/mcp-server.ts';
 import { BridgeQueue } from './bridge/queue.ts';
 import { ChatLog } from './bridge/persistence.ts';
 import { buildClientAssets } from './build-client-assets.ts';
+import { renderChatPage } from './pages/chat.ts';
 import { renderDashboard } from './pages/dashboard.ts';
 import { renderShortformReviewPage } from './pages/shortform-review.ts';
 import { renderEntryReviewPage } from './pages/entry-review.ts';
@@ -234,6 +235,10 @@ export function createApp(ctx: StudioContext): Hono {
     // counter is shared across requests.
     const mcp = createMcpHandler(ctx.bridge);
     app.all('/mcp', (c) => mcp.handler(c));
+    // Phase 4: full-page chat surface. Conditional on bridge being
+    // wired so a non-bridge ctx (legacy tests) doesn't expose a route
+    // that would 500 on the missing /api/chat/* endpoints.
+    app.get('/dev/chat', (c) => c.html(renderChatPage(ctx)));
   }
 
   // #111: version endpoint so adopters / scripts can verify which studio
