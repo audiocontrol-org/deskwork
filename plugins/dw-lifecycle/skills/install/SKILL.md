@@ -23,15 +23,35 @@ This is a Phase-0 skill — every other dw-lifecycle skill assumes the config ex
 dw-lifecycle install <project-root> --dry-run
 ```
 
-Review the emitted config JSON with the operator, then run:
+Review the emitted config JSON with the operator. If the probed defaults don't match the host project's conventions (different status-directory names, different known-version list, custom worktree naming, etc.), pass `--config-overlay <path>` with a JSON file whose fields are deep-merged onto the probed config:
+
+```jsonc
+// /tmp/dw-overlay.json
+{
+  "docs": {
+    "statusDirs": { "waiting": "002-BLOCKED" },
+    "knownVersions": ["1.0", "2.0"]
+  },
+  "worktrees": { "naming": "<repo>-feat-<slug>" }
+}
+```
+
+```
+dw-lifecycle install <project-root> --config-overlay /tmp/dw-overlay.json --dry-run
+dw-lifecycle install <project-root> --config-overlay /tmp/dw-overlay.json
+```
+
+The overlay's plain-object keys recurse; arrays and primitives replace wholesale. The merged config is then validated like any other input.
+
+If no overlay is needed, run:
 
 ```
 dw-lifecycle install <project-root>
 ```
 
-The helper writes `.dw-lifecycle/config.json` with the previewed values.
+The helper writes `.dw-lifecycle/config.json` with the resolved values.
 
-6. Report: config path, which fields were detected vs. defaulted, peer-plugin status (run `dw-lifecycle doctor` to surface).
+6. Report: config path, which fields were detected vs. defaulted vs. overlaid, peer-plugin status (run `dw-lifecycle doctor` to surface).
 
 ## Error handling
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, existsSync, readFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execSync } from 'node:child_process';
@@ -47,6 +47,56 @@ describe('install (smoke)', () => {
 
   it('rejects unknown flags instead of treating them as positional args', () => {
     expect(() => parseInstallArgs(['--banana'])).toThrow(/Unknown flag: --banana/);
+  });
+
+  it('--config-overlay deep-merges JSON onto the probed config (#211)', async () => {
+    mkdirSync(join(tmp, 'docs/1.0/001-IN-PROGRESS/example'), { recursive: true });
+    mkdirSync(join(tmp, 'docs/1.0/002-BLOCKED'), { recursive: true });
+
+    const overlayPath = join(tmp, 'overlay.json');
+    writeFileSync(
+      overlayPath,
+      JSON.stringify(
+        {
+          docs: {
+            statusDirs: { waiting: '002-BLOCKED' },
+            knownVersions: ['1.0', '2.0'],
+          },
+          worktrees: { naming: '<repo>-feat-<slug>' },
+        },
+        null,
+        2,
+      ),
+      'utf8',
+    );
+
+    await install([tmp, '--config-overlay', overlayPath]);
+
+    const cfg = JSON.parse(readFileSync(join(tmp, '.dw-lifecycle/config.json'), 'utf8'));
+    // Overlay overrides win.
+    expect(cfg.docs.statusDirs.waiting).toBe('002-BLOCKED');
+    expect(cfg.docs.knownVersions).toEqual(['1.0', '2.0']);
+    expect(cfg.worktrees.naming).toBe('<repo>-feat-<slug>');
+    // Non-overridden fields preserved from the probed defaults.
+    expect(cfg.docs.statusDirs.inProgress).toBe('001-IN-PROGRESS');
+    expect(cfg.docs.statusDirs.complete).toBe('003-COMPLETE');
+    expect(cfg.tracking.platform).toBe('github');
+    expect(cfg.branches.prefix).toBe('feature/');
+  });
+
+  it('--config-overlay rejects a missing file', async () => {
+    await expect(install([tmp, '--config-overlay', join(tmp, 'no-such.json')])).rejects.toThrow(
+      /Config overlay file not found/,
+    );
+    expect(existsSync(join(tmp, '.dw-lifecycle/config.json'))).toBe(false);
+  });
+
+  it('--config-overlay rejects malformed JSON', async () => {
+    const overlayPath = join(tmp, 'bad.json');
+    writeFileSync(overlayPath, '{not valid json', 'utf8');
+    await expect(install([tmp, '--config-overlay', overlayPath])).rejects.toThrow(
+      /Config overlay parse failed/,
+    );
   });
 
   it('prints help without requiring a git repo or writing config', async () => {
