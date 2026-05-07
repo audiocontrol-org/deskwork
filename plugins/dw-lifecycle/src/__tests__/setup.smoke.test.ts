@@ -122,6 +122,45 @@ Parse the definition headings and map them into scaffold templates.
     expect(workplan).not.toContain('<!-- Definition imported from:');
   });
 
+  it('reuses a pre-existing worktree+branch (#196 #209) instead of doubling or aborting', async () => {
+    await install([tmpRoot]);
+
+    // Simulate `superpowers:using-git-worktrees` having created the
+    // branch + worktree before the helper runs (the skill's documented
+    // step 2). The branch name MUST match the helper's computed name
+    // (`<branchPrefix><slug>`) so the helper recognizes it as the
+    // pre-created target.
+    const branchName = 'feature/preexisting-feature';
+    const preCreated = join(dirname(tmpRoot), `${basename(tmpRoot)}-different-layout`);
+    execSync(`git -C "${tmpRoot}" worktree add "${preCreated}" -b ${branchName} HEAD`);
+    worktreePath = preCreated;
+
+    const origCwd = process.cwd();
+    process.chdir(preCreated);
+    try {
+      await setup(['preexisting-feature', '--target', '1.0', '--title', 'Pre-existing']);
+    } finally {
+      process.chdir(origCwd);
+    }
+
+    // Helper should NOT have created a doubled-name worktree.
+    const doubledPath = join(
+      dirname(tmpRoot),
+      `${basename(tmpRoot)}-preexisting-feature-preexisting-feature`,
+    );
+    expect(existsSync(doubledPath)).toBe(false);
+
+    // Helper should have scaffolded into the pre-existing worktree.
+    const docsDir = join(preCreated, 'docs/1.0/001-IN-PROGRESS/preexisting-feature');
+    expect(existsSync(join(docsDir, 'prd.md'))).toBe(true);
+    expect(existsSync(join(docsDir, 'README.md'))).toBe(true);
+
+    // Helper should NOT have created a second branch.
+    const branches = execSync(`git -C "${tmpRoot}" branch --list`, { encoding: 'utf8' });
+    const matches = branches.split('\n').filter((b) => b.includes(branchName));
+    expect(matches.length).toBe(1);
+  });
+
   it('rejects invalid target versions before creating a worktree', async () => {
     await install([tmpRoot]);
 

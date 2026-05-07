@@ -5,7 +5,12 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from '../config.js';
 import { resolveFeatureDir } from '../docs.js';
-import { repoRoot, expandWorktreeName } from '../repo.js';
+import {
+  repoRoot,
+  expandWorktreeName,
+  findWorktreeForBranch,
+  mainWorktreePath,
+} from '../repo.js';
 import { validateSlug, validateTargetVersion } from '../slug.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -246,7 +251,13 @@ export async function setup(args: string[]): Promise<void> {
   if (targetVersion) {
     validateTargetVersion(targetVersion);
   }
-  const root = repoRoot();
+  // `root` is the MAIN worktree path (where `.dw-lifecycle/config.json`
+  // lives). When the helper is invoked from a sibling feature worktree
+  // (per the skill's documented step 2), the current worktree's
+  // `git rev-parse --show-toplevel` returns the SIBLING path; config
+  // would not be found there. Always resolve config from the main
+  // worktree.
+  const root = mainWorktreePath();
   const cfg = loadConfig(root);
   const target = targetVersion ?? cfg.docs.defaultTargetVersion;
 
@@ -254,32 +265,56 @@ export async function setup(args: string[]): Promise<void> {
     throw new Error(`Templates dir not found: ${TEMPLATES_DIR}`);
   }
 
-  const dir = resolveFeatureDir(cfg, root, slug, { stage: 'inProgress', targetVersion: target });
+  // The skill's documented flow invokes `superpowers:using-git-worktrees`
+  // before this helper (see plugins/dw-lifecycle/skills/setup/SKILL.md
+  // step 2). When that pre-creation has happened, we must NOT re-create
+  // the branch+worktree — both #196 (doubled worktree) and #209 (abort
+  // on existing branch) trace back to the helper assuming it owns
+  // creation exclusively. Detect the pre-created case and reuse it.
+  const branchName = `${cfg.branches.prefix}${slug}`;
+  const canonicalWorktreePath = join(
+    dirname(root),
+    expandWorktreeName(cfg.worktrees.naming, slug, root),
+  );
+  let worktreePath = canonicalWorktreePath;
+  let createdWorktree = false;
+
+  if (branchExists(root, branchName)) {
+    const existing = findWorktreeForBranch(root, branchName);
+    if (!existing) {
+      throw new Error(
+        `Branch ${branchName} exists but no worktree is checked out for it. ` +
+          `Either remove the branch (\`git branch -D ${branchName}\`) and re-run, ` +
+          `or check it out in a worktree first.`,
+      );
+    }
+    worktreePath = existing;
+  } else {
+    if (existsSync(worktreePath)) {
+      throw new Error(`Worktree path already exists: ${worktreePath}`);
+    }
+    if (definitionFile && !existsSync(definitionFile)) {
+      throw new Error(`Definition file not found: ${definitionFile}`);
+    }
+    execFileSync('git', ['-C', root, 'worktree', 'add', worktreePath, '-b', branchName, 'HEAD'], {
+      stdio: 'inherit',
+    });
+    createdWorktree = true;
+  }
+
+  // Existence check for the feature dir runs against the resolved
+  // worktreePath (where the docs will land), not against `root`.
+  const dir = resolveFeatureDir(cfg, worktreePath, slug, {
+    stage: 'inProgress',
+    targetVersion: target,
+  });
   if (existsSync(dir)) {
     throw new Error(`Feature directory already exists: ${dir}. Refusing to overwrite.`);
   }
 
-  // Pre-flight: branch + worktree path collisions
-  const branchName = `${cfg.branches.prefix}${slug}`;
-  if (branchExists(root, branchName)) {
-    throw new Error(`Branch already exists: ${branchName}`);
-  }
-
-  const worktreePath = join(dirname(root), expandWorktreeName(cfg.worktrees.naming, slug, root));
-  if (existsSync(worktreePath)) {
-    throw new Error(`Worktree path already exists: ${worktreePath}`);
-  }
-
-  // Pre-flight: definition file must exist before we create the worktree, so a typo
-  // doesn't strand the user with a worktree they need to clean up.
   if (definitionFile && !existsSync(definitionFile)) {
     throw new Error(`Definition file not found: ${definitionFile}`);
   }
-
-  // Create branch + worktree off the current HEAD (avoids hardcoding "main").
-  execFileSync('git', ['-C', root, 'worktree', 'add', worktreePath, '-b', branchName, 'HEAD'], {
-    stdio: 'inherit',
-  });
 
   // From this point on the worktree exists. If anything below fails, roll it back
   // so the user isn't left with a half-scaffolded feature directory.
@@ -326,6 +361,13 @@ export async function setup(args: string[]): Promise<void> {
     );
   } catch (err) {
     const origMessage = err instanceof Error ? err.message : String(err);
+    if (!createdWorktree) {
+      // Reused a pre-existing worktree+branch — operator (or
+      // superpowers:using-git-worktrees) created it before we ran. Do
+      // NOT remove it; that would destroy state we don't own. Surface
+      // the scaffolding failure as-is.
+      throw new Error(`Setup failed during scaffolding: ${origMessage}.`);
+    }
     let rollbackOk = true;
     try {
       execFileSync('git', ['-C', root, 'worktree', 'remove', '--force', worktreePath], {
