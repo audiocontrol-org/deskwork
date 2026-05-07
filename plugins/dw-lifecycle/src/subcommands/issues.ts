@@ -104,11 +104,68 @@ export async function issues(parsedArgs: string[]): Promise<void> {
     labels: cfg.tracking.phaseLabels,
   });
 
-  if (existsSync(readmePath)) {
-    const readme = readFileSync(readmePath, 'utf8');
-    const updatedReadme = readme.replace(/<parentIssue>/g, `#${parent.number}`);
-    writeFileSync(readmePath, updatedReadme, 'utf8');
+  // Back-fill parentIssue across the doc set. #213: the prior implementation
+  // matched only the literal `<parentIssue>` template token, which is the
+  // pre-render form. Hand-scaffolded files (the workaround for #209) and
+  // templates that have been through the renderer carry one of:
+  //   parentIssue: TBD
+  //   parentIssue: <parentIssue>
+  //   parentIssue:
+  //   parentIssue: null
+  // None of those matched; the helper silently no-op'd. Now matches the
+  // YAML frontmatter `parentIssue:` line directly so any value form is
+  // overwritten. Surfaces a warning when the placeholder is absent.
+  const prdPath = resolveFeaturePath(cfg, root, slug, 'prd.md', {
+    stage: 'inProgress',
+    targetVersion: target,
+  });
+  const filledPaths: string[] = [];
+  const skippedPaths: string[] = [];
+  for (const docPath of [readmePath, prdPath]) {
+    if (!existsSync(docPath)) continue;
+    const original = readFileSync(docPath, 'utf8');
+    const updated = backfillParentIssue(original, parent.number);
+    if (updated !== original) {
+      writeFileSync(docPath, updated, 'utf8');
+      filledPaths.push(docPath);
+    } else {
+      skippedPaths.push(docPath);
+    }
   }
 
-  console.log(JSON.stringify({ parent, phases: phaseRefs }, null, 2));
+  for (const skipped of skippedPaths) {
+    process.stderr.write(
+      `WARNING: could not back-fill parentIssue in ${skipped}; ` +
+        `expected pattern not found. Set manually to #${parent.number}.\n`,
+    );
+  }
+
+  console.log(
+    JSON.stringify({ parent, phases: phaseRefs, filled: filledPaths }, null, 2),
+  );
+}
+
+/**
+ * Replace the `parentIssue:` value in a markdown file's frontmatter with
+ * the given issue number. Matches any value form — empty, `TBD`, `null`,
+ * `<parentIssue>` (template-source), or a quoted string. Returns the
+ * input unchanged when no `parentIssue:` line exists in the frontmatter
+ * block; the caller surfaces that as a warning.
+ *
+ * Only the first frontmatter block (between the opening `---` and the
+ * next `---`) is touched. A `parentIssue:` line in body content
+ * (extremely unlikely) is left alone.
+ */
+export function backfillParentIssue(content: string, parentNumber: number): string {
+  // Only operate on a leading frontmatter block.
+  const fmStart = content.indexOf('---\n');
+  if (fmStart !== 0) return content;
+  const fmEnd = content.indexOf('\n---\n', 4);
+  if (fmEnd < 0) return content;
+  const frontmatter = content.slice(0, fmEnd);
+  const body = content.slice(fmEnd);
+  const re = /^(parentIssue:)([ \t]*[^\n]*)$/m;
+  if (!re.test(frontmatter)) return content;
+  const updated = frontmatter.replace(re, `$1 "#${parentNumber}"`);
+  return updated + body;
 }
