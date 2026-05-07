@@ -2607,3 +2607,62 @@ Phase 4 (dogfood) is manual validation work the user should drive: install the p
 
 - The highest-signal post-audit fixes were exactly the small symmetric ones: if `slug` gets a traversal guard, `targetVersion` should too. Those are the cheapest fixes with the best risk-reduction payoff.
 - Independent audits are most useful when they are checked in as living artifacts, not frozen transcripts. If the branch changes before the audit lands, update the audit so it remains trustworthy.
+
+---
+
+## 2026-05-07: studio-bridge Phases 1–8 in one auto-mode session
+
+### Feature: studio-bridge
+### Worktree: studio-bridge
+
+**Goal:** Build the studio ↔ Claude Code bridge end-to-end through all 8 phases of the workplan: server-side primitives, HTTP routes, MCP server, chat panel UI, affordance routing, listen skill, docs, and Phase 8 smoke gate. Run subagent-driven-development with two-stage review (spec compliance + code quality) on every phase, fix findings before moving on.
+
+**Accomplished:**
+
+- 15 commits, 54 files changed, +8346/-249 lines. All 8 workplan phases shipped:
+  - **Phase 1** (`b1de288`, `12ced39`): `BridgeQueue` + `ChatLog` + types. Single-awaiter invariant; disconnect-clears-awaiter; subscriber-error isolation; corruption-marker injection between bad rows; per-message JSONL append serialized through a writeChain.
+  - **Phase 2** (`4c63714`, `aae8c68`, `6cb94bf`): four `/api/chat/*` HTTP routes. Persist-before-deliver in `POST /send`. SSE subscribe-before-replay with seq dedup. `Last-Event-ID` resume. Test monolith split into fixture + 3 per-surface files.
+  - **Phase 3** (`69c04c0`, `9d4ba26`): `/mcp` streamable-HTTP endpoint with two tools, loopback guard, single-agent invariant, Origin/CSRF guard. Pulled in `@modelcontextprotocol/sdk@^1.29.0` + `zod@^3.25.76`. Test file split into 4 per-area files.
+  - **Phase 4** (`890d56d`, `f8f4ce1`): chat panel UI — `chat-renderer`, `chat-panel`, `chat-transport`, `chat-skeleton`, `chat-draft`, `chat-page`, `chat-mount`. SSE `event: history-row` for operator-row reconnect replay. localStorage draft persistence keyed on worktree path. XSS hygiene with regression test pinning agent-prose markdown rendering.
+  - **Phase 5** (`912a892`, `13803f3`): `dispatchToAgent()` — pre-fills chat panel via `window.deskworkChatPanel` when bridge is live; falls through to `copyOrShowFallback` when not. Migrated 7 affordance call sites across 4 client files. `prefillInput` returns boolean to close the destroyed-mid-await silent-failure window. Ambient `Window` augmentation consolidated into `chat-globals.d.ts`.
+  - **Phase 6** (`8b58f95`, `06ab08f`): `/deskwork:listen` SKILL.md with Ctrl-C as primary stop + session-id-named announce prose. SessionStart hook at `plugins/deskwork/hooks/bridge-autostart.mjs` + `hooks/hooks.json` (auto-discovery shape verified against `claude-plugins-official` precedent). `studioBridge?: { enabled?, idleTimeout? }` config schema; `parseSiteConfig` + `SiteConfig` factored out into `config-site.ts` to keep `config.ts` under 300.
+  - **Phase 7** (`76a084f`): adopter-facing "Bridge mode (experimental)" section in `plugins/deskwork-studio/README.md`; brief `/deskwork:listen` mention in `plugins/deskwork/README.md`; "Bridge dev loop" in `DEVELOPMENT.md`.
+  - **Phase 8** (`450505f`): `scripts/smoke-bridge.sh` — workspace-built studio + 5 automated assertions (default state, `/send` 503 when offline, MCP initialize round-trip, GET `/mcp` 400 session-required, non-loopback 403). All pass on this machine. Manual smoke checklist M1–M10 documented in feature README for operator phone walkthrough.
+- **1293 tests passing** (496 core + 511 studio + 181 cli + 105 dw-lifecycle). Baseline at session start was ~376 studio tests; the bridge added 38 (Phase 1) + 30 (Phase 2) + 31 (Phase 3) + 23 (Phase 4) + 8 (Phase 5) + 19 (Phase 6 config + hook) = 149 net new tests.
+- 1 fix-up commit per phase that had reviewable changes (Phases 1–6). Each fix-up commit address the spec/quality reviewer's findings before the phase was marked done.
+
+**Didn't Work:**
+
+- The first sub-agent dispatch for Phase 7 (`documentation-engineer` subagent) doesn't have `Bash` in its toolkit, so it wrote the four updated files but couldn't `git commit`. Recovered by reading the prepared `.git-commit-msg.tmp` and committing from the parent thread. Worth flagging the dispatch shape next time — if a docs subagent needs to land a commit, either give it Bash or always commit from the parent.
+- Phase 3's first implementer mid-flight produced `mcp-server.test.ts` at 763 lines — 50% over the project's 500-line hard cap. Caught at the code-quality review step; fix-up commit split it into 4 per-area test files. The same pattern (oversized monolith) had hit Phase 2 a phase earlier (`routes.test.ts` 665 lines → split into fixture + 3 files); the dispatch prompts now explicitly call out the cap, but the implementer still produced the monolith first. Treat the cap as a hard pre-flight constraint in future dispatches.
+- The implementer of Phase 6 produced an initial `dcbc2e9` commit with the wrong commit message (the heredoc-write workflow ate the message file content). They amended in-place to `06ab08f` with the right message. Trapped before push, but it's a soft signal that `git commit -F <mktemp>` has its own footguns when the temp file write is racy.
+
+**Course Corrections:**
+
+- [PROCESS] Phase 3's first sub-agent claimed "Future Phase 7 cleanup can split" for the 665-line `routes.test.ts`. That's the exact "just for now" pattern `agent-discipline.md` rejects — deferred test debt that compounds. Caught in the review-and-fix loop and split immediately. The lesson: review-step is the real backstop against deferred-debt language; the dispatch alone doesn't prevent it.
+- [COMPLEXITY] Several phases produced files over the 300-line soft target. `queue.ts` ended at 320, `chat-panel.ts` peaked at 319 before settling at 307, `config.ts` peaked at 448 before being split to 275 + 194. Each one needed an explicit fix-up step. Future dispatches should size-budget the files explicitly in the prompt and ask the subagent to flag mid-build if approaching the cap.
+- [PROCESS] First Phase 4 review surfaced a real correctness bug: `sendStudioResponseHandler` published-then-persisted (opposite of Phase 2's discipline). Symptom only manifests on `log.append` failure. The two-stage review (spec compliance + code quality) caught the bug at code-quality stage, not spec-stage — spec-compliance reviewer didn't have the cross-phase invariant context. Lesson: code-quality reviewers do better when given the architectural-invariants context up front, not just the per-phase contract.
+- [DOCUMENTATION] First Phase 7 docs draft hardcoded `audiocontrol-org/deskwork#v0.1.0` examples, then the documentation-engineer caught it themselves and replaced with `<tag>` placeholders + a releases-page link per `.claude/rules/documentation.md`. Pre-existing rot in those files; would have been a small project-rule violation if shipped.
+- [PROCESS] The user/linter reset the workplan.md checkboxes mid-session (system-reminder confirmed it was intentional). I had been Phase-marking the workplan with `- [x]` after each phase shipped; the reset wiped that. I'm leaving the workplan as the user wants it and relying on the feature README's phase-status table for status tracking.
+
+**Quantitative:**
+
+- Messages from operator: ~4 (session-start, /dw-lifecycle:implement, the workplan reset note, this /session-end)
+- Sub-agent dispatches: ~30 (8 implementers + 8 spec-reviewers + 8 code-quality-reviewers + 6 fix-up implementers + 2 supplementary)
+- Commits: 15 on `feature/studio-bridge` past `c231e66`
+- Files changed: 54 (+8346/-249 lines)
+- Test files: 13 new under `packages/studio/test/bridge/` + 1 new in `packages/core/test/` + the smoke script
+- Net new tests: ~149 across the bridge surfaces
+
+**Insights:**
+
+- The two-stage review (spec compliance, then code quality) was load-bearing. Spec-compliance kept implementers honest about what they built vs. what was asked for; code-quality caught real correctness bugs (Phase 4's publish-before-persist, Phase 5's silent-failure window) that a single pass would have missed. Total review-loop overhead per phase: ~2× the implementer cost, but caught issues before they accumulated.
+- Subagent-driven development at this scale (8 sequential phases, parallel reviews per phase) compresses very well in auto-mode. The bottleneck became sub-agent context-priming — the dispatch prompts grew steadily as more "the previous phase did X, the constraint is Y" context accumulated. By Phase 6 the dispatch prompts were ~150 lines each; by Phase 8 ~200. Worth thinking about whether a shared "studio-bridge architecture" doc (read by every implementer) would shorten dispatches without losing context.
+- The MCP SDK at v1.29.0 ships `WebStandardStreamableHTTPServerTransport` which fits Hono's `app.fetch` model cleanly — no transport-shim layer needed. The `await_studio_message` (blocking) + `send_studio_response` (fire-and-persist) split is a clean MCP idiom, easier to reason about than a single `chat_turn`-style tool.
+- The `event: history-row` SSE event type for operator-row reconnect replay was a subtle find — initial Phase 4 review caught that operator messages would silently disappear on reconnect because the routes filter to `isAgentEvent` only. The fix (a third event type for replay-only rows, dedup on the client) is small but the cost of missing it would have been a phone-only "where did my message go?" UX bug that's miserable to debug.
+- The Phase 8 smoke script's auto-detection of a non-loopback IP (via `ifconfig` BSD or `ip` Linux) is a small piece of infra that lets A5 (loopback guard 403) be automated rather than manual. On hosts with no non-loopback IP it gracefully skips. Worth pattern-stealing for any future test that needs a "request from outside loopback."
+- This was an infrastructure-only session — built the bridge but didn't dogfood it on a real editorial collection. The Phase 8 manual smoke (M1–M10) is the gate that validates whether the architecture survives contact with a real phone-driven session. Until that runs, "Phase 8 done" means "automated smoke passes," not "the experiment succeeded."
+
+**Next session:**
+
+Operator runs the Phase 8 manual smoke (M1–M10) against `writingcontrol.org` from a phone. Pass-or-fail decision determines whether the integration PR (folding the bridge into mainline `@deskwork/studio` + `plugins/deskwork-studio` + `plugins/deskwork`) is the next step, or whether something architectural needs revisiting first.
