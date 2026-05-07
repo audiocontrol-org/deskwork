@@ -4,6 +4,70 @@ Session journal for `deskwork`. Each entry records what was tried, what worked, 
 
 ---
 
+## 2026-05-06 (studio-bridge brainstorming + feature bootstrap): design a phone-first control channel from deskwork-studio to the local Claude Code session
+### Feature: studio-bridge (NEW exploratory feature, branched from deskwork-plugin)
+### Worktree: deskwork-plugin (this session) + studio-bridge (newly created at end-of-session)
+
+**Goal:** explore whether the deskwork-studio web UI can host a chat-shaped control channel back to the operator's locally-running Claude Code session — so the operator can dispatch skill commands, git operations, and prescribed actions from a phone or iPad without resorting to a terminal. Motivating use case: writingcontrol.org creative-writing flow on phone.
+
+**Accomplished:**
+
+- **Brainstormed end-to-end via `superpowers:brainstorming`** — followed the skill's gated checklist (context exploration → clarifying questions one-at-a-time → 2-3 approaches → design sections with per-section approval → spec doc → self-review → user review → transition). The skill's HARD-GATE held cleanly; no implementation snuck in.
+- **Converged on a single-process consolidation** — initial brainstorm proposed two options (file-watch IPC vs separate MCP daemon). Operator's reframe collapsed both: *"the studio server could also be the mcp server."* Final shape: `@deskwork/studio` gains a loopback-only `/mcp` endpoint + four new HTTP routes (`/api/chat/{send,stream,state,history}`) on the existing Hono app. One process, one queue, one source of truth. File-IPC race conditions sidestepped entirely by virtue of the in-process queue.
+- **Captured 13 explicit decisions** with rationale in the design spec's "Decisions log" table — process model, entry mode, terminal-interrupt behavior, tool-use visibility, surface placement, context-passing, affordance routing, persistence, generality, auth, network-split, failure mode, bridge scope. Each decision was a one-at-a-time multiple-choice question; operator's selections drove the table.
+- **Wrote the design spec** (`docs/1.0/001-IN-PROGRESS/studio-bridge/design.md`, 267 lines) — architecture diagram, components table, data flow walkthrough, error handling, testing strategy, out-of-scope list, decisions log, open questions / future work.
+- **Self-review found one ambiguity**: I'd conflated `agentListening` (currently in `await_studio_message`) with "available to receive" — meant mid-processing operator messages would have been wrongly 503'd. Split into `listenModeOn` (true across processing) + `awaitingMessage` (true only inside the await call); rejection rule keys on `listenModeOn`, mid-processing messages queue normally.
+- **Bootstrapped `studio-bridge` as a new exploratory feature** — operator's call: don't fold this into deskwork-plugin's tracked work unless it proves out. Created branch `feature/studio-bridge` + worktree `~/work/deskwork-work/studio-bridge/`. Wrote PRD + workplan + README + moved design spec into the new feature dir (526 lines total across the four docs). Skipped the canonical `deskwork ingest` + `review-start` step — experiment status doesn't warrant calendar coupling.
+- **Cleaned up the parent feature branch**: removed the design spec from `feature/deskwork-plugin`'s docs dir (now lives only on `feature/studio-bridge`); added a Phase 37 row to deskwork-plugin's README pointing at the new feature.
+- **Workplan structured for parallelism**: 8 phases with explicit dependency graph. Phase 1 (server primitives) unblocks Phases 2/3/4 to run concurrently; Phase 5 waits on 4; Phase 6 can start after 1+3; Phase 7 waits on 4+5+6; Phase 8 (validation gate against writingcontrol from a real phone) waits on everything. Each phase has tasks + acceptance criteria + file-size discipline notes.
+
+**Didn't Work:**
+
+- **First proposal of "soft interleave" for the terminal-vs-bridge question.** I'd offered a 30-second-timeout-loop approach so the bridge could yield to terminal input. Operator's actual workflow (different worktrees for desktop dev vs phone creative writing) made the question moot — the conflict between surfaces is rare in practice. Settled on (i) terminal turns are normal CC interactions; bridge stays on; agent re-enters await loop afterward. Simpler, fewer corner cases.
+- **First framing of context-passing.** I proposed three options (heavy auto-context / lightweight pointer / no context) optimized for a chat-with-Claude-about-prose workflow. Operator's reframe blew that up entirely: chat is for prescribed commands (skill invocations + git + free-form prescribed actions), NOT prose-discussion. Q4e essentially answered itself once the workflow was clear; locked in lightweight pointer for the free-form case but most messages carry their context in the command itself.
+- **Initial architecture had MCP exposed on Tailscale alongside web routes.** Operator caught it: *"the mcp service should be localhost only, no? the browser doesn't need talk to the mcp service."* Real architectural correction with a security implication — without the loopback split, anyone on the tailnet could connect their own Claude Code session to the studio's MCP and impersonate the agent. Updated design with the binding split + 403 guard + smoke test for it.
+- **Optimistic queue-while-offline model.** I'd designed for the bridge accepting messages while offline and draining when reconnected, with a 50-message backpressure cap. Operator preferred pessimistic: *"If the bridge is down, we don't accept new messages from the browser."* Plus *"I care **much** more about not losing any text I write than I do about preserving the conversation"* — added localStorage draft buffering so unsent typed text survives tab close / refresh. Removed the queue-while-offline complexity entirely.
+
+**Course Corrections:**
+
+- [PROCESS] Operator: *"the mcp service should be localhost only, no? the browser doesn't need talk to the mcp service, afaict"* — caught a thesis-and-security-relevant misdesign in the architecture diagram. The browser talks to HTTP routes; only the local CC needs MCP. Loopback-bind on `/mcp` + 403 guard for non-loopback closes the impersonation hole I'd left open. Updated the spec; added a smoke check.
+- [COMPLEXITY] Operator: *"I want to be able to edit documents using the studio edit interfaces on my phone. I won't be writing by telling claude code what text to add. Most of what I'll be asking claude code to do is plugin commands from the studio affordances pasted into the chat or other fairly prescribed actions like git commit and push or other skill invocations"* — major scope sharpening. Reframed the chat from "discuss prose with the agent" to "remote command interface for prescribed actions." Document save / scrapbook upload / margin-note APIs are explicitly out of scope (existing studio routes unchanged). Affordance routing pre-fills chat input but never auto-dispatches.
+- [PROCESS] Operator: *"the bridge doesn't handle document save operations. That's already built into the web app. The bridge is *only* a control channel to talk to claude via mcp"* — explicit scope boundary I should have stated more sharply earlier. Added "Out of scope" sections to both the design spec and the PRD to make this load-bearing distinction unmissable to future readers.
+- [PROCESS] Operator: *"We should be pessimistic about bridge failure. If the bridge is down, we don't accept new messages from the browser. ... I care **much** more about not losing any text I write than I do about preserving the conversation"* — corrected my optimistic-enqueue overengineering. Bridge offline → 503 + browser disables Send + localStorage drafts. Filesystem + git is the durability story; no reassembly heroics.
+- [PROCESS] Operator's instruction: *"write the prd & the workplan, but this is a new feature that will be developed in its own branch and worktree--especially since this is just exploratory at this point"* — overrode the brainstorming skill's default terminal state (`superpowers:writing-plans`) in favor of a feature-bootstrap path. Branched off, scaffolded the new feature dir with PRD + workplan + README + moved design spec, skipped the deskwork-ingest step (exploratory status doesn't warrant calendar coupling). Aligned with `agent-discipline.md`'s "operator owns scope decisions" rule — separating studio-bridge from deskwork-plugin is a scope call I shouldn't have pre-decided.
+
+**Quantitative:**
+
+- Messages from operator: ~16
+- Skill invocations: 4 (`/dw-lifecycle:extend`, `superpowers:brainstorming`, `/session-start`, this `/session-end`)
+- Sub-agent dispatches: 0 (single-thread design conversation; delegating would have hidden the back-and-forth)
+- Commits: 3
+  - `ff6dc1b` (feature/deskwork-plugin): provisional design-spec commit during brainstorming
+  - `c231e66` (feature/studio-bridge): bootstrap exploratory feature — moves spec, adds prd/workplan/README
+  - `fcd8ab7` (feature/deskwork-plugin): cleanup — removes the moved spec from the parent feature dir
+- New branches: 1 (`feature/studio-bridge`)
+- New worktrees: 1 (`~/work/deskwork-work/studio-bridge/`)
+- New feature: 1 (studio-bridge — exploratory; 8-phase workplan; validation gate at Phase 8)
+- Course corrections: 5 substantive (1 [PROCESS] security, 1 [COMPLEXITY] reframe, 3 [PROCESS] scope/error-model)
+- GitHub issues filed: 0 (design session, no shipped code)
+- Files changed across the session: 5 (design spec, prd.md, workplan.md, README.md (new), README.md (parent feature edit))
+
+**Insights:**
+
+- **The studio-as-MCP-server consolidation is a thesis-aligned upgrade I wouldn't have proposed without the operator's reframe.** I had been building toward a separate MCP daemon (Flavor A2 in my A1/A2 split) because that's what felt "official." The operator's offhand observation collapsed two roles into one daemon, sidestepped a class of file-IPC bugs, and made the architecture meaningfully simpler. Lesson: the cleanest design often emerges from the operator's framing of *what the existing thing already is*, not from the agent's framing of *what should be added*.
+- **Brainstorming's HARD-GATE earned its discipline this time.** Three different points in the conversation, I had impulses to start sketching code or jumping to writing-plans. The gate kept me asking questions instead. The 13-decision table at the bottom of the spec is the artifact that proves the gate was load-bearing — every decision is operator-grounded, not author-decided.
+- **Pessimistic-on-failure was the right call but I had to be told.** My instinct was to design for graceful degradation (queue while offline, drain when back, cap at N to prevent runaway). Operator's framing (*"don't lose text I write"* > *"preserve the conversation"*) inverted the priority. The right design carried localStorage draft persistence on the client, 503 on the server, no reassembly. Simpler AND safer. Lesson: when I'm tempted to add an "intelligent" recovery path, ask what the operator's actual priority is first — recovery often isn't it.
+- **Bridge scope discipline matters more than I initially treated it.** I had subtly hand-waved "the agent can do anything via tools" without sharply distinguishing the bridge contract from existing studio mutation routes. Operator's pushback (*"the bridge is *only* a control channel"*) is exactly the kind of scope hardening that prevents the bridge from accumulating responsibilities later. The "Out of scope" section now in both the design spec and PRD codifies this — future agents reading the spec will see the boundary as load-bearing, not aspirational.
+- **The "exploratory feature on its own branch" pattern is the right shape for design experiments.** Trying to fold this into deskwork-plugin's mainline as Phase 36+ would have created pressure to ship even if the validation gate (Phase 8) showed the design isn't right. The branch isolation gives Phase 8 honest agency: succeed → integrate; fail → preserve and explore alternatives. The cost of the isolation is small (one worktree, minor doc duplication); the cost of NOT isolating an unproven design idea is much larger.
+
+**Open follow-ups (not blockers):**
+
+- Phase 1 of studio-bridge can start any time. No dependencies; touches only `packages/studio/src/bridge/` (new dir). Single-thread or a `typescript-pro` dispatch — the work is pure TS.
+- Studio-bridge's `feature/studio-bridge` branch has its own DEVELOPMENT-NOTES.md fork point (this entry won't be visible there). When future studio-bridge sessions run, they'll write to the studio-bridge branch's DEVELOPMENT-NOTES.md; the journal will diverge from this branch's. If the experiment integrates, the merge will need to interleave the two histories.
+- The new `/deskwork:listen` skill's prose is the load-bearing piece that makes the listen loop work. It's prose, not code — needs careful authoring in Phase 6 to ensure the agent actually loops correctly and re-enters await after terminal-side interruptions. Worth a dedicated dispatch to `documentation-engineer` to draft + test against a real CC session.
+
+---
+
 ## 2026-05-04 / 05 (Phase 35 + UX polish + v0.15.0 release): marginalia rail rebuild, THESIS articulation, decision-strip skill routing, multi-issue triage; also bootstrapped a follow-on cleanup feature
 ### Feature: deskwork-plugin
 ### Worktree: deskwork-plugin
