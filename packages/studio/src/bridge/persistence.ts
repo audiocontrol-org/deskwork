@@ -23,9 +23,19 @@ interface ChatLogOptions {
   readonly dateProvider?: () => Date;
 }
 
-interface LoadHistoryOptions {
+export interface LoadHistoryOptions {
   readonly sinceSeq?: number;
   readonly limit?: number;
+}
+
+/**
+ * Public surface of `ChatLog` consumed by the bridge routes. Exposed as
+ * an interface so test code can compose a wrapper (persist-failure
+ * stub) without subclassing or `as`-casting.
+ */
+export interface ChatLogStore {
+  append(row: ChatLogRow): Promise<void>;
+  loadHistory(opts?: LoadHistoryOptions): Promise<ChatLogRow[]>;
 }
 
 const DEFAULT_LIMIT = 100;

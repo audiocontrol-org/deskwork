@@ -15,15 +15,18 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import type { BridgeQueue } from './queue.ts';
-import type { ChatLog } from './persistence.ts';
+import type { ChatLogStore } from './persistence.ts';
 import type { AgentEvent, ChatLogRow } from './types.ts';
 
 interface BridgeDeps {
   readonly queue: BridgeQueue;
-  readonly log: ChatLog;
+  readonly log: ChatLogStore;
 }
 
-const MAX_TEXT_BYTES = 32768;
+// Compared against `text.length` (UTF-16 code units), not bytes —
+// 32k code units is plenty for chat input and avoids the byte-counting
+// complexity multi-byte characters would introduce.
+const MAX_TEXT_LENGTH = 32768;
 
 interface ParsedSendBody {
   readonly text: string;
@@ -48,7 +51,7 @@ function parseSendBody(raw: unknown): SendBodyResult {
   if (typeof text !== 'string' || text.length === 0) {
     return { kind: 'invalid-body' };
   }
-  if (text.length > MAX_TEXT_BYTES) {
+  if (text.length > MAX_TEXT_LENGTH) {
     return { kind: 'too-large' };
   }
   if (contextRef !== undefined && typeof contextRef !== 'string') {
@@ -62,6 +65,25 @@ function parseSendBody(raw: unknown): SendBodyResult {
 
 function isAgentEvent(row: ChatLogRow): row is AgentEvent {
   return 'kind' in row && (row.kind === 'tool-use' || row.kind === 'prose');
+}
+
+// Empty string and whitespace-only values are treated as "not supplied"
+// so `?since=` and `?limit=` (no value) fall back to defaults instead of
+// coercing to 0 via `Number('')`.
+function parseOptionalNonNegativeInt(raw: string | undefined): number | null | 'invalid' {
+  if (raw === undefined) return null;
+  if (raw === '') return null;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 0) return 'invalid';
+  return n;
+}
+
+function parseOptionalPositiveInt(raw: string | undefined): number | null | 'invalid' {
+  if (raw === undefined) return null;
+  if (raw === '') return null;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1) return 'invalid';
+  return n;
 }
 
 export function createChatRouter(bridge: BridgeDeps): Hono {
@@ -80,20 +102,24 @@ export function createChatRouter(bridge: BridgeDeps): Hono {
       return c.json({ error: 'invalid-body' }, 400);
     }
     if (parsed.kind === 'too-large') {
-      return c.json({ error: 'payload-too-large', max: MAX_TEXT_BYTES }, 413);
+      return c.json({ error: 'payload-too-large', max: MAX_TEXT_LENGTH }, 413);
     }
     const state = bridge.queue.currentState();
     if (!state.mcpConnected || !state.listenModeOn) {
       return c.json({ error: 'bridge-offline', state }, 503);
     }
+    // Persist-before-publish: allocate the message (assigns seq+ts but
+    // doesn't push to inbox or resolve waiters), persist it, only then
+    // deliver. If `log.append` rejects, no agent ever sees the message.
     const message =
       parsed.value.contextRef === undefined
-        ? bridge.queue.enqueueOperatorMessage(parsed.value.text)
-        : bridge.queue.enqueueOperatorMessage(
+        ? bridge.queue.allocateOperatorMessage(parsed.value.text)
+        : bridge.queue.allocateOperatorMessage(
             parsed.value.text,
             parsed.value.contextRef,
           );
     await bridge.log.append(message);
+    bridge.queue.deliverOperatorMessage(message);
     return c.json({ seq: message.seq, ts: message.ts });
   });
 
@@ -102,26 +128,17 @@ export function createChatRouter(bridge: BridgeDeps): Hono {
 
   // GET /history
   app.get('/history', async (c) => {
-    const sinceRaw = c.req.query('since');
-    const limitRaw = c.req.query('limit');
-
-    let sinceSeq = 0;
-    if (sinceRaw !== undefined) {
-      const n = Number(sinceRaw);
-      if (!Number.isInteger(n) || n < 0) {
-        return c.json({ error: 'invalid-since' }, 400);
-      }
-      sinceSeq = n;
+    const sinceParsed = parseOptionalNonNegativeInt(c.req.query('since'));
+    if (sinceParsed === 'invalid') {
+      return c.json({ error: 'invalid-since' }, 400);
+    }
+    const limitParsed = parseOptionalPositiveInt(c.req.query('limit'));
+    if (limitParsed === 'invalid') {
+      return c.json({ error: 'invalid-limit' }, 400);
     }
 
-    let limit = 100;
-    if (limitRaw !== undefined) {
-      const n = Number(limitRaw);
-      if (!Number.isInteger(n) || n < 1) {
-        return c.json({ error: 'invalid-limit' }, 400);
-      }
-      limit = n;
-    }
+    const sinceSeq = sinceParsed ?? 0;
+    const limit = limitParsed ?? 100;
 
     const rows = await bridge.log.loadHistory({ sinceSeq, limit });
     return c.json({ rows });
@@ -129,36 +146,32 @@ export function createChatRouter(bridge: BridgeDeps): Hono {
 
   // GET /stream — SSE
   app.get('/stream', (c) => {
-    // X-Accel-Buffering: no tells nginx-style proxies not to buffer SSE;
-    // streamSSE itself sets Cache-Control + Content-Type + Connection.
+    // X-Accel-Buffering: no tells nginx-style proxies not to buffer SSE.
     c.header('X-Accel-Buffering', 'no');
 
     const lastEventIdHeader = c.req.header('Last-Event-ID');
     let resumeFromSeq: number | null = null;
-    if (lastEventIdHeader !== undefined) {
-      const n = Number.parseInt(lastEventIdHeader, 10);
+    if (lastEventIdHeader !== undefined && lastEventIdHeader !== '') {
+      const n = Number(lastEventIdHeader);
       if (Number.isInteger(n) && n >= 0) {
         resumeFromSeq = n;
       }
     }
 
     return streamSSE(c, async (stream) => {
-      if (resumeFromSeq !== null) {
-        const history = await bridge.log.loadHistory({
-          sinceSeq: resumeFromSeq,
-          limit: 1000,
-        });
-        for (const row of history) {
-          if (!isAgentEvent(row)) continue;
-          await stream.writeSSE({
-            id: String(row.seq),
-            event: 'agent-event',
-            data: JSON.stringify(row),
-          });
-        }
-      }
+      // Subscribe-before-replay: register listeners FIRST and buffer
+      // their events while history replay is in flight. After replay
+      // completes, drain the buffer skipping any seq the replay already
+      // covered. Closes the subscribe-after-replay window-of-loss.
+      const buffer: AgentEvent[] = [];
+      let draining = true;
+      let lastReplayedSeq = resumeFromSeq ?? -1;
 
       const unsubEvent = bridge.queue.subscribe((event) => {
+        if (draining) {
+          buffer.push(event);
+          return;
+        }
         void stream.writeSSE({
           id: String(event.seq),
           event: 'agent-event',
@@ -172,22 +185,55 @@ export function createChatRouter(bridge: BridgeDeps): Hono {
         });
       });
 
-      // Keep the callback pending until the client disconnects.
-      // streamSSE closes the stream when this promise resolves; we resolve
-      // it from the abort listener so subscriptions get cleaned up exactly
-      // once per connection.
-      await new Promise<void>((resolve) => {
-        if (stream.aborted || stream.closed) {
-          resolve();
-          return;
+      try {
+        if (resumeFromSeq !== null) {
+          const history = await bridge.log.loadHistory({
+            sinceSeq: resumeFromSeq,
+            limit: 1000,
+          });
+          for (const row of history) {
+            if (!isAgentEvent(row)) continue;
+            await stream.writeSSE({
+              id: String(row.seq),
+              event: 'agent-event',
+              data: JSON.stringify(row),
+            });
+            if (row.seq > lastReplayedSeq) lastReplayedSeq = row.seq;
+          }
         }
-        stream.onAbort(() => {
-          resolve();
-        });
-      });
 
-      unsubEvent();
-      unsubState();
+        // Drain buffered live events; both replay and live publish are
+        // seqd from the same BridgeQueue counter, so `seq > lastReplayedSeq`
+        // dedupes against history exactly.
+        draining = false;
+        for (const event of buffer) {
+          if (event.seq > lastReplayedSeq) {
+            await stream.writeSSE({
+              id: String(event.seq),
+              event: 'agent-event',
+              data: JSON.stringify(event),
+            });
+          }
+        }
+        buffer.length = 0;
+
+        // Keep the callback pending until the client disconnects.
+        // streamSSE closes the stream when this promise resolves; we
+        // resolve it from the abort listener so subscriptions get cleaned
+        // up exactly once per connection.
+        await new Promise<void>((resolve) => {
+          if (stream.aborted || stream.closed) {
+            resolve();
+            return;
+          }
+          stream.onAbort(() => {
+            resolve();
+          });
+        });
+      } finally {
+        unsubEvent();
+        unsubState();
+      }
     });
   });
 

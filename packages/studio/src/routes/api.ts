@@ -39,7 +39,7 @@ import type { OverrideResolver } from '@deskwork/core/overrides';
 import type { DraftAnnotation } from '@deskwork/core/review/types';
 import { parseEntryAnnotationBody } from './entry-annotation-body.ts';
 import type { BridgeQueue } from '../bridge/queue.ts';
-import type { ChatLog } from '../bridge/persistence.ts';
+import type { ChatLogStore } from '../bridge/persistence.ts';
 
 /**
  * Narrow a `HandlerResult.body` (typed as `unknown`) to extract the
@@ -99,7 +99,7 @@ export interface StudioContext {
    */
   bridge?: {
     queue: BridgeQueue;
-    log: ChatLog;
+    log: ChatLogStore;
   };
 }
 

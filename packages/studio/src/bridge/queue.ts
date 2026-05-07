@@ -50,7 +50,13 @@ export class BridgeQueue {
     awaitingMessage: false,
   };
 
-  enqueueOperatorMessage(text: string, contextRef?: string): OperatorMessage {
+  // Allocates seq + ts + builds the OperatorMessage WITHOUT pushing it
+  // onto the inbox or resolving any waiter. The route layer uses this to
+  // persist-then-deliver: if persistence rejects, no agent ever sees the
+  // message. Subsequent enqueues still consume monotonically; gaps from
+  // failed writes are legitimate (the corruption-detection layer also
+  // tolerates gaps from restart behavior).
+  allocateOperatorMessage(text: string, contextRef?: string): OperatorMessage {
     const message: OperatorMessage =
       contextRef === undefined
         ? {
@@ -67,16 +73,23 @@ export class BridgeQueue {
             contextRef,
           };
     this.nextSeq += 1;
+    return message;
+  }
 
+  deliverOperatorMessage(message: OperatorMessage): void {
     if (this.waiter !== null) {
       const w = this.waiter;
       this.waiter = null;
       this.clearWaiterResources(w);
       w.resolve(message);
-      return message;
+      return;
     }
-
     this.inbox.push(message);
+  }
+
+  enqueueOperatorMessage(text: string, contextRef?: string): OperatorMessage {
+    const message = this.allocateOperatorMessage(text, contextRef);
+    this.deliverOperatorMessage(message);
     return message;
   }
 

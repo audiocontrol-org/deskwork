@@ -41,28 +41,21 @@ export async function readSSEUntil(
   if (reader === undefined) throw new Error('expected SSE body');
   const decoder = new TextDecoder();
   let buf = '';
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    const r = await Promise.race([
-      reader.read().then((x) =>
-        x.done
-          ? ({ done: true } as const)
-          : ({ done: false, chunk: decoder.decode(x.value) } as const),
-      ),
-      new Promise<{ done: true }>((resolve) =>
-        setTimeout(() => resolve({ done: true } as const), 50),
-      ),
-    ]);
-    if (r.done) {
+  // Single-loop with cancel-on-timer: the outstanding `read()` returns
+  // `done: true` when `reader.cancel()` fires, so the loop exits cleanly
+  // without a Promise.race that could drop a chunk that arrived just
+  // after the timer won.
+  const timer = setTimeout(() => {
+    void reader.cancel();
+  }, timeoutMs);
+  try {
+    while (true) {
+      const r = await reader.read();
+      if (r.done) return buf;
+      buf += decoder.decode(r.value, { stream: true });
       if (predicate(buf)) return buf;
-      continue;
     }
-    buf += r.chunk;
-    if (predicate(buf)) {
-      void reader.cancel();
-      return buf;
-    }
+  } finally {
+    clearTimeout(timer);
   }
-  void reader.cancel();
-  return buf;
 }

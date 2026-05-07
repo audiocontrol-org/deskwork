@@ -12,6 +12,7 @@ import type { DeskworkConfig } from '@deskwork/core/config';
 import { createApp } from '@/server.ts';
 import { BridgeQueue } from '@/bridge/queue.ts';
 import { ChatLog } from '@/bridge/persistence.ts';
+import type { ChatLogStore, LoadHistoryOptions } from '@/bridge/persistence.ts';
 import type { AgentEvent, ChatLogRow } from '@/bridge/types.ts';
 import { openSSE, readSSEUntil } from './sse-helpers.ts';
 
@@ -232,6 +233,52 @@ describe('POST /api/chat/send', () => {
     const r = await postJson('/api/chat/send', { text: exact });
     expect(r.status).toBe(200);
   });
+
+  it('persistence failure: agent never sees the message and operator gets non-2xx', async () => {
+    // Wrapper around the real ChatLog whose `append` rejects. Composition,
+    // not inheritance — `ChatLogStore` is a structural interface so this
+    // typechecks without `as`. The route must persist-then-deliver, so a
+    // rejected append leaves the queue's waiter unresolved.
+    const root = mkdtempSync(join(tmpdir(), 'studio-bridge-routes-fail-'));
+    try {
+      const realLog = new ChatLog({ projectRoot: root });
+      const failingLog: ChatLogStore = {
+        append: () => Promise.reject(new Error('disk-full')),
+        loadHistory: (opts?: LoadHistoryOptions) =>
+          realLog.loadHistory(opts ?? {}),
+      };
+      const queue = new BridgeQueue();
+      const app = createApp({
+        projectRoot: root,
+        config: makeConfig(),
+        bridge: { queue, log: failingLog },
+      });
+      queue.setMcpConnected(true);
+      queue.setListenModeOn(true);
+
+      // Concurrent awaiter: if the route delivered before persisting, this
+      // would resolve with the message. Persist-before-deliver means the
+      // awaiter must time out (resolve null) instead.
+      const awaiter = queue.awaitNextOperatorMessage(50);
+
+      const res = await app.fetch(
+        new Request('http://x/api/chat/send', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ text: 'never-delivered' }),
+        }),
+      );
+      // Hono surfaces a thrown handler as a 500 by default; the exact body
+      // shape isn't asserted (Hono's choice), only the non-2xx status.
+      expect(res.status).toBeGreaterThanOrEqual(500);
+
+      const got = await awaiter;
+      expect(got).toBeNull();
+      expect(queue.currentState().awaitingMessage).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('GET /api/chat/state', () => {
@@ -342,6 +389,21 @@ describe('GET /api/chat/history', () => {
     const r = await getJson('/api/chat/history?limit=foo');
     expect(r.status).toBe(400);
   });
+
+  it('empty ?since= falls back to default (treated as if not supplied)', async () => {
+    await fx.log.append({ seq: 1, ts: 100, role: 'operator', text: 'one' });
+    await fx.log.append({ seq: 2, ts: 200, role: 'operator', text: 'two' });
+    const r = await getJson('/api/chat/history?since=');
+    expect(r.status).toBe(200);
+    expect(rowsOf(r.body).length).toBe(2);
+  });
+
+  it('empty ?limit= falls back to default (treated as if not supplied)', async () => {
+    await fx.log.append({ seq: 1, ts: 100, role: 'operator', text: 'one' });
+    const r = await getJson('/api/chat/history?limit=');
+    expect(r.status).toBe(200);
+    expect(rowsOf(r.body).length).toBe(1);
+  });
 });
 
 describe('GET /api/chat/stream (SSE)', () => {
@@ -422,6 +484,165 @@ describe('GET /api/chat/stream (SSE)', () => {
     const buf = await readSSEUntil(opened.response, () => false, 100);
     expect(buf).not.toContain('should-not-replay');
     await opened.close();
+  });
+
+  it('decimal Last-Event-ID is rejected (no replay)', async () => {
+    await fx.log.append({ kind: 'prose', seq: 1, ts: 100, text: 'first' });
+    await fx.log.append({ kind: 'prose', seq: 2, ts: 200, text: 'second' });
+    const opened = await openSSE(fx.app, 'http://x/api/chat/stream', {
+      'Last-Event-ID': '1.5',
+    });
+    expect(opened.response.status).toBe(200);
+    const buf = await readSSEUntil(opened.response, () => false, 100);
+    expect(buf).not.toContain('id: 1');
+    expect(buf).not.toContain('id: 2');
+    expect(buf).not.toContain('"text":"first"');
+    expect(buf).not.toContain('"text":"second"');
+    await opened.close();
+  });
+
+  it('corruption-marker rows are filtered out of replay', async () => {
+    await fx.log.append({ kind: 'prose', seq: 1, ts: 100, text: 'first' });
+    // A corruption marker is a valid log row but not an AgentEvent; the
+    // SSE replay path filters via isAgentEvent so the marker MUST NOT
+    // appear in the stream output.
+    await fx.log.append({
+      kind: 'corruption-marker',
+      from: 1,
+      to: 3,
+      ts: 150,
+    });
+    await fx.log.append({ kind: 'prose', seq: 3, ts: 200, text: 'third' });
+
+    const opened = await openSSE(fx.app, 'http://x/api/chat/stream', {
+      'Last-Event-ID': '0',
+    });
+    const buf = await readSSEUntil(
+      opened.response,
+      (s) => s.includes('"seq":3'),
+      800,
+    );
+    expect(buf).toContain('"text":"first"');
+    expect(buf).toContain('"text":"third"');
+    expect(buf).not.toContain('corruption-marker');
+    await opened.close();
+  });
+
+  it('subscribe-before-replay: live event published during replay is delivered exactly once (no dedup miss)', async () => {
+    // Construct an app whose loadHistory we control via a deferred
+    // promise: the SSE handler calls loadHistory and awaits it; while
+    // it's awaiting, we publish a live event whose seq exceeds the
+    // history's last seq. After we resolve loadHistory, the buffered
+    // live event must be drained and delivered exactly once.
+    const root = mkdtempSync(join(tmpdir(), 'studio-bridge-routes-dedup-'));
+    try {
+      let resolveHistory: ((rows: ChatLogRow[]) => void) | null = null;
+      const historyPromise = new Promise<ChatLogRow[]>((resolve) => {
+        resolveHistory = resolve;
+      });
+      const queue = new BridgeQueue();
+      const controlledLog: ChatLogStore = {
+        append: () => Promise.resolve(),
+        loadHistory: () => historyPromise,
+      };
+      const app = createApp({
+        projectRoot: root,
+        config: makeConfig(),
+        bridge: { queue, log: controlledLog },
+      });
+
+      const opened = await openSSE(app, 'http://x/api/chat/stream', {
+        'Last-Event-ID': '1',
+      });
+
+      // Publish a live event BEFORE history resolves. The handler is
+      // currently blocked on loadHistory(); the buffered event has seq=4,
+      // which will exceed lastReplayedSeq=3 after replay finishes.
+      await new Promise((r) => setTimeout(r, 20));
+      queue.publishAgentEvent({
+        kind: 'prose',
+        seq: 4,
+        ts: 400,
+        text: 'live',
+      });
+
+      // Resolve the replay with seq 2 + 3.
+      if (resolveHistory === null) throw new Error('resolveHistory not set');
+      resolveHistory([
+        { kind: 'prose', seq: 2, ts: 200, text: 'replay-2' },
+        { kind: 'prose', seq: 3, ts: 300, text: 'replay-3' },
+      ]);
+
+      const buf = await readSSEUntil(
+        opened.response,
+        (s) => s.includes('"seq":4'),
+        800,
+      );
+      expect(buf).toContain('"text":"replay-2"');
+      expect(buf).toContain('"text":"replay-3"');
+      expect(buf).toContain('"text":"live"');
+      // seq=4 must appear EXACTLY once.
+      const matches = buf.match(/"seq":4/g);
+      expect(matches?.length).toBe(1);
+      await opened.close();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('subscribe-before-replay: live event with seq <= lastReplayedSeq is deduped (covered by history)', async () => {
+    // Live event seq=2 published during replay; replay covers seq 2 + 3.
+    // The buffered live event must be SKIPPED because lastReplayedSeq=3
+    // already covers it.
+    const root = mkdtempSync(join(tmpdir(), 'studio-bridge-routes-dedup2-'));
+    try {
+      let resolveHistory: ((rows: ChatLogRow[]) => void) | null = null;
+      const historyPromise = new Promise<ChatLogRow[]>((resolve) => {
+        resolveHistory = resolve;
+      });
+      const queue = new BridgeQueue();
+      const controlledLog: ChatLogStore = {
+        append: () => Promise.resolve(),
+        loadHistory: () => historyPromise,
+      };
+      const app = createApp({
+        projectRoot: root,
+        config: makeConfig(),
+        bridge: { queue, log: controlledLog },
+      });
+
+      const opened = await openSSE(app, 'http://x/api/chat/stream', {
+        'Last-Event-ID': '1',
+      });
+
+      await new Promise((r) => setTimeout(r, 20));
+      // This event would already be in the replay set; the dedup must
+      // prevent a second copy from getting written when the buffer drains.
+      queue.publishAgentEvent({
+        kind: 'prose',
+        seq: 2,
+        ts: 250,
+        text: 'duplicate',
+      });
+
+      if (resolveHistory === null) throw new Error('resolveHistory not set');
+      resolveHistory([
+        { kind: 'prose', seq: 2, ts: 200, text: 'replay-2' },
+        { kind: 'prose', seq: 3, ts: 300, text: 'replay-3' },
+      ]);
+
+      // Read until the timeout fires — this drains everything the
+      // server is going to emit (replay rows + any drained-buffer live
+      // events). The dedup logic runs synchronously after replay
+      // completes; if it fired correctly, "duplicate" never appears.
+      const buf = await readSSEUntil(opened.response, () => false, 400);
+      expect(buf).toContain('"text":"replay-2"');
+      expect(buf).toContain('"text":"replay-3"');
+      expect(buf).not.toContain('"text":"duplicate"');
+      await opened.close();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 
