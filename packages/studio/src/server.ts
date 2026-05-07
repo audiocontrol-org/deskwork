@@ -39,6 +39,7 @@ import { createApiRouter, type StudioContext } from './routes/api.ts';
 import { serveScrapbookFile } from './routes/scrapbook-file.ts';
 import { createScrapbookMutationsRouter } from './routes/scrapbook-mutations.ts';
 import { createChatRouter } from './bridge/routes.ts';
+import { createMcpHandler } from './bridge/mcp-server.ts';
 import { BridgeQueue } from './bridge/queue.ts';
 import { ChatLog } from './bridge/persistence.ts';
 import { buildClientAssets } from './build-client-assets.ts';
@@ -229,6 +230,10 @@ export function createApp(ctx: StudioContext): Hono {
   // constructed a BridgeQueue + ChatLog and threaded them through ctx.
   if (ctx.bridge !== undefined) {
     app.route('/api/chat', createChatRouter(ctx.bridge));
+    // MCP endpoint. Single handler instance per mount so the connection
+    // counter is shared across requests.
+    const mcp = createMcpHandler(ctx.bridge);
+    app.all('/mcp', (c) => mcp.handler(c));
   }
 
   // #111: version endpoint so adopters / scripts can verify which studio
@@ -582,6 +587,7 @@ async function main(): Promise<void> {
     port: result.port,
     override: hostOverride,
     autoIncrementedFrom: result.autoIncremented ? port : null,
+    bridgeMounted: ctx.bridge !== undefined,
   });
 }
 
@@ -598,6 +604,7 @@ interface BannerInput {
    * the requested port (no auto-increment happened).
    */
   readonly autoIncrementedFrom: number | null;
+  readonly bridgeMounted: boolean;
 }
 
 function printBanner(b: BannerInput): void {
@@ -608,6 +615,13 @@ function printBanner(b: BannerInput): void {
   if (b.tailscale && b.tailscale.magicDnsName) {
     process.stdout.write(
       `  http://${b.tailscale.magicDnsName}:${b.port}/    (Tailscale magic-DNS)\n`,
+    );
+  }
+  if (b.bridgeMounted) {
+    // Phase 3: MCP bridge endpoint. Loopback-only by construction —
+    // see bridge/mcp-server.ts for the guard.
+    process.stdout.write(
+      `  Bridge: http://localhost:${b.port}/mcp (loopback-only)\n`,
     );
   }
   process.stdout.write(`  project: ${b.projectRoot}\n`);

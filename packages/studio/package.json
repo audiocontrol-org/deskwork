@@ -49,8 +49,10 @@
     "@deskwork/core": "0.15.0",
     "@hono/node-server": "^1.13.7",
     "@lezer/highlight": "^1.2.3",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "esbuild": "^0.28.0",
-    "hono": "^4.6.0"
+    "hono": "^4.6.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

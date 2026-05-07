@@ -18,10 +18,20 @@
 import type {
   AgentEvent,
   AgentEventListener,
+  AgentEventStatus,
+  AgentProseEvent,
+  AgentToolUseEvent,
   BridgeState,
   BridgeStateListener,
   OperatorMessage,
 } from './types.ts';
+
+interface PublishToolUseInput {
+  readonly tool: string;
+  readonly args: unknown;
+  readonly status?: AgentEventStatus;
+  readonly result?: unknown;
+}
 
 interface Waiter {
   readonly resolve: (msg: OperatorMessage | null) => void;
@@ -169,6 +179,44 @@ export class BridgeQueue {
         this.eventListeners.splice(idx, 1);
       }
     };
+  }
+
+  // Allocates seq+ts and synchronously fans out a tool-use event. The
+  // returned event is what the caller should persist to the chat-log so
+  // SSE Last-Event-ID replay sees the same row the live subscribers
+  // already received. Sharing the operator-message seq counter keeps the
+  // SSE stream globally monotonic.
+  publishToolUse(input: PublishToolUseInput): AgentToolUseEvent {
+    const seq = this.nextSeq;
+    this.nextSeq += 1;
+    const base = {
+      kind: 'tool-use' as const,
+      seq,
+      ts: Date.now(),
+      tool: input.tool,
+      args: input.args,
+    };
+    const withResult =
+      input.result === undefined ? base : { ...base, result: input.result };
+    const event: AgentToolUseEvent =
+      input.status === undefined
+        ? withResult
+        : { ...withResult, status: input.status };
+    this.publishAgentEvent(event);
+    return event;
+  }
+
+  publishProse(text: string): AgentProseEvent {
+    const seq = this.nextSeq;
+    this.nextSeq += 1;
+    const event: AgentProseEvent = {
+      kind: 'prose',
+      seq,
+      ts: Date.now(),
+      text,
+    };
+    this.publishAgentEvent(event);
+    return event;
   }
 
   // Subscriber re-entrancy: callbacks must NOT synchronously call enqueueOperatorMessage.
