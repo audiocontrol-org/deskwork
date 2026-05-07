@@ -98,6 +98,7 @@ export async function approveEntryStage(
 
   // 3. Strip reviewState on stage transition. exactOptionalPropertyTypes
   //    requires us to omit the key entirely rather than set undefined.
+  const priorReviewState = sidecar.reviewState ?? null;
   const { reviewState: _drop, ...rest } = sidecar;
   void _drop;
   const updated: Entry = {
@@ -106,6 +107,24 @@ export async function approveEntryStage(
     updatedAt: at,
   };
   await writeSidecar(projectRoot, updated);
+
+  // 3a. Emit a `review-state-change.to=null` event when the stage
+  //     transition implicitly clears a non-null prior review state
+  //     (#215 issue 1). Without this event, the doctor's
+  //     `journal-sidecar` rule reads the LATEST review-state-change
+  //     (the iterate-side `to=in-review`) and reports drift against
+  //     the now-cleared sidecar. Recording the clear keeps the audit
+  //     trail honest and the validator green.
+  if (priorReviewState !== null) {
+    await appendJournalEvent(projectRoot, {
+      kind: 'review-state-change',
+      at,
+      entryId: sidecar.uuid,
+      stage: from,
+      from: priorReviewState,
+      to: null,
+    });
+  }
   await appendJournalEvent(projectRoot, {
     kind: 'stage-transition',
     at,

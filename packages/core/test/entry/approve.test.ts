@@ -64,6 +64,28 @@ describe('approveEntryStage', () => {
     expect(sidecar.reviewState).toBeUndefined();
   });
 
+  it('emits review-state-change.to=null when clearing a non-null reviewState (#215)', async () => {
+    await setupEntry({ currentStage: 'Drafting', reviewState: 'in-review' });
+    await approveEntryStage(projectRoot, { uuid });
+    const events = await readJournalEvents(projectRoot, { entryId: uuid });
+    const reviewChanges = events.filter((e) => e.kind === 'review-state-change');
+    const latestReviewChange = reviewChanges.at(-1);
+    expect(latestReviewChange).toBeDefined();
+    if (latestReviewChange && latestReviewChange.kind === 'review-state-change') {
+      expect(latestReviewChange.from).toBe('in-review');
+      expect(latestReviewChange.to).toBeNull();
+      expect(latestReviewChange.stage).toBe('Drafting');
+    }
+  });
+
+  it('does NOT emit a redundant review-state-change when reviewState was already null', async () => {
+    await setupEntry({ currentStage: 'Ideas' });
+    await approveEntryStage(projectRoot, { uuid });
+    const events = await readJournalEvents(projectRoot, { entryId: uuid });
+    const reviewChanges = events.filter((e) => e.kind === 'review-state-change');
+    expect(reviewChanges.length).toBe(0);
+  });
+
   it('emits a stage-transition journal event', async () => {
     await setupEntry({ currentStage: 'Ideas' });
     await approveEntryStage(projectRoot, { uuid });
