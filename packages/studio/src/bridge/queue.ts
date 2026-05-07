@@ -84,6 +84,13 @@ export class BridgeQueue {
     timeoutMs: number,
     signal?: AbortSignal,
   ): Promise<OperatorMessage | null> {
+    // Non-blocking poll fast-path: timeoutMs <= 0 with empty inbox returns
+    // null synchronously without registering a waiter, so back-to-back polls
+    // never trip the single-awaiter invariant.
+    if (timeoutMs <= 0 && this.inbox.length === 0) {
+      return Promise.resolve(null);
+    }
+
     if (this.waiter !== null) {
       throw new Error(
         'BridgeQueue: a second concurrent awaitNextOperatorMessage was attempted. ' +
@@ -151,9 +158,11 @@ export class BridgeQueue {
     };
   }
 
+  // Subscriber re-entrancy: callbacks must NOT synchronously call enqueueOperatorMessage.
   publishAgentEvent(event: AgentEvent): void {
-    for (let i = 0; i < this.eventListeners.length; i += 1) {
-      const listener = this.eventListeners[i];
+    const snapshot = this.eventListeners.slice();
+    for (let i = 0; i < snapshot.length; i += 1) {
+      const listener = snapshot[i];
       if (listener === undefined) continue;
       try {
         listener(event);
@@ -220,8 +229,9 @@ export class BridgeQueue {
 
   private fanOutState(): void {
     const snapshot = this.currentState();
-    for (let i = 0; i < this.stateListeners.length; i += 1) {
-      const listener = this.stateListeners[i];
+    const listenersSnapshot = this.stateListeners.slice();
+    for (let i = 0; i < listenersSnapshot.length; i += 1) {
+      const listener = listenersSnapshot[i];
       if (listener === undefined) continue;
       try {
         listener(snapshot);

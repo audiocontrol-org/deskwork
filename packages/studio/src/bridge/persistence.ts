@@ -47,6 +47,7 @@ export class ChatLog {
   private readonly dateProvider: () => Date;
   private currentDate: string | null = null;
   private directoryEnsured = false;
+  private writeChain: Promise<void> = Promise.resolve();
 
   constructor(opts: ChatLogOptions) {
     this.projectRoot = opts.projectRoot;
@@ -54,15 +55,48 @@ export class ChatLog {
   }
 
   async append(row: ChatLogRow): Promise<void> {
-    // Per-message append uses appendFile with flag 'a'. Day rotation
-    // is internal bookkeeping — the new day's file is created lazily
-    // by the first appendFile call against its path.
+    // Serialize through writeChain so concurrent appends can't race the
+    // day-rotation bookkeeping (currentDate / directoryEnsured + mkdir).
+    const link = this.writeChain.then(
+      () => this.appendInternal(row),
+      () => this.appendInternal(row),
+    );
+    this.writeChain = link.then(
+      () => undefined,
+      () => undefined,
+    );
+    return link;
+  }
+
+  private async appendInternal(row: ChatLogRow): Promise<void> {
     const path = await this.resolveAndEnsurePath();
     const line = `${JSON.stringify(row)}\n`;
     await appendFile(path, line, { flag: 'a' });
   }
 
   async loadHistory(opts: LoadHistoryOptions = {}): Promise<ChatLogRow[]> {
+    if (opts.limit !== undefined) {
+      if (
+        !Number.isFinite(opts.limit) ||
+        !Number.isInteger(opts.limit) ||
+        opts.limit < 1
+      ) {
+        throw new Error(
+          `ChatLog.loadHistory: limit must be a finite integer >= 1, got ${String(opts.limit)}`,
+        );
+      }
+    }
+    if (opts.sinceSeq !== undefined) {
+      if (
+        !Number.isFinite(opts.sinceSeq) ||
+        !Number.isInteger(opts.sinceSeq) ||
+        opts.sinceSeq < 0
+      ) {
+        throw new Error(
+          `ChatLog.loadHistory: sinceSeq must be a finite integer >= 0, got ${String(opts.sinceSeq)}`,
+        );
+      }
+    }
     const sinceSeq = opts.sinceSeq ?? 0;
     const limit = opts.limit ?? DEFAULT_LIMIT;
     const path = this.currentLogPath();

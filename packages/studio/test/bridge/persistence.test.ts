@@ -7,7 +7,13 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, existsSync, writeFileSync } from 'node:fs';
+import {
+  mkdtempSync,
+  rmSync,
+  existsSync,
+  writeFileSync,
+  readFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ChatLog } from '@/bridge/persistence.ts';
@@ -144,6 +150,10 @@ describe('ChatLog — day rotation', () => {
     expect(existsSync(day1Path)).toBe(true);
     expect(existsSync(day2Path)).toBe(true);
 
+    const day1Raw = readFileSync(day1Path, 'utf8').trim();
+    const day1Parsed: unknown = JSON.parse(day1Raw);
+    expect(day1Parsed).toMatchObject({ role: 'operator', text: 'day1' });
+
     // loadHistory uses the current day per dateProvider. now points to day2.
     const got = await log.loadHistory();
     expect(got.length).toBe(1);
@@ -152,6 +162,93 @@ describe('ChatLog — day rotation', () => {
       throw new Error('expected operator message on day 2');
     }
     expect(row.text).toBe('day2');
+  });
+});
+
+describe('ChatLog — concurrent appends', () => {
+  it('50 concurrent appends produce 50 rows in seq order with no duplicates and no gaps', async () => {
+    const log = makeLog();
+    const rows: ChatLogRow[] = Array.from({ length: 50 }, (_, i) => ({
+      seq: i + 1,
+      ts: (i + 1) * 10,
+      role: 'operator' as const,
+      text: `m${i + 1}`,
+    }));
+    await Promise.all(rows.map((r) => log.append(r)));
+
+    const got = await log.loadHistory({ limit: 100 });
+    const seqs: number[] = [];
+    for (const row of got) {
+      if (row.kind === 'corruption-marker') {
+        throw new Error('unexpected corruption marker in concurrent append test');
+      }
+      seqs.push(row.seq);
+    }
+    expect(seqs.length).toBe(50);
+    expect(seqs).toEqual(rows.map((r) => r.seq));
+    expect(new Set(seqs).size).toBe(50);
+  });
+
+  it('concurrent appends crossing a day rotation land in the correct files', async () => {
+    // Use local-time year/month/day — currentDateString reads local components.
+    let now = new Date(2026, 4, 6, 12, 0, 0);
+    const log = makeLog(() => now);
+    const day1Rows: ChatLogRow[] = Array.from({ length: 5 }, (_, i) => ({
+      seq: i + 1,
+      ts: 100 + i,
+      role: 'operator' as const,
+      text: `d1-${i + 1}`,
+    }));
+    const day2Rows: ChatLogRow[] = Array.from({ length: 5 }, (_, i) => ({
+      seq: i + 1,
+      ts: 200 + i,
+      role: 'operator' as const,
+      text: `d2-${i + 1}`,
+    }));
+
+    await Promise.all(day1Rows.map((r) => log.append(r)));
+    now = new Date(2026, 4, 7, 12, 0, 0);
+    await Promise.all(day2Rows.map((r) => log.append(r)));
+
+    const dir = join(tmp, '.deskwork', 'chat-log');
+    const day1Path = join(dir, '2026-05-06.jsonl');
+    const day2Path = join(dir, '2026-05-07.jsonl');
+    const day1Lines = readFileSync(day1Path, 'utf8')
+      .split('\n')
+      .filter((l) => l.length > 0);
+    const day2Lines = readFileSync(day2Path, 'utf8')
+      .split('\n')
+      .filter((l) => l.length > 0);
+    expect(day1Lines.length).toBe(5);
+    expect(day2Lines.length).toBe(5);
+  });
+});
+
+describe('ChatLog — loadHistory input validation', () => {
+  it('throws when limit is 0', async () => {
+    const log = makeLog();
+    await expect(log.loadHistory({ limit: 0 })).rejects.toThrow(/limit/);
+  });
+
+  it('throws when limit is negative', async () => {
+    const log = makeLog();
+    await expect(log.loadHistory({ limit: -1 })).rejects.toThrow(/limit/);
+  });
+
+  it('throws when limit is non-integer', async () => {
+    const log = makeLog();
+    await expect(log.loadHistory({ limit: 1.5 })).rejects.toThrow(/limit/);
+  });
+
+  it('throws when sinceSeq is negative', async () => {
+    const log = makeLog();
+    await expect(log.loadHistory({ sinceSeq: -1 })).rejects.toThrow(/sinceSeq/);
+  });
+
+  it('accepts no opts and empty opts', async () => {
+    const log = makeLog();
+    await expect(log.loadHistory()).resolves.toEqual([]);
+    await expect(log.loadHistory({})).resolves.toEqual([]);
   });
 });
 

@@ -101,6 +101,45 @@ describe('BridgeQueue — multi-subscriber fanout', () => {
     expect(errSpy).toHaveBeenCalled();
     errSpy.mockRestore();
   });
+
+  it('subscriber that unsubscribes itself mid-publish: remaining subscribers still receive THIS event in registration order', () => {
+    const q = new BridgeQueue();
+    const seen: string[] = [];
+    let unsubB: (() => void) | null = null;
+    q.subscribe((e) => seen.push(`A:${e.seq}`));
+    unsubB = q.subscribe((e) => {
+      seen.push(`B:${e.seq}`);
+      if (unsubB !== null) unsubB();
+    });
+    q.subscribe((e) => seen.push(`C:${e.seq}`));
+    q.subscribe((e) => seen.push(`D:${e.seq}`));
+
+    q.publishAgentEvent({ kind: 'prose', seq: 1, ts: 1, text: 'x' });
+    expect(seen).toEqual(['A:1', 'B:1', 'C:1', 'D:1']);
+
+    seen.length = 0;
+    q.publishAgentEvent({ kind: 'prose', seq: 2, ts: 2, text: 'y' });
+    expect(seen).toEqual(['A:2', 'C:2', 'D:2']);
+  });
+
+  it('subscriber that subscribes a new listener mid-publish: new listener is NOT delivered the in-flight event but IS delivered the next event', () => {
+    const q = new BridgeQueue();
+    const seen: string[] = [];
+    q.subscribe((e) => {
+      seen.push(`A:${e.seq}`);
+      q.subscribe((ev) => seen.push(`NEW:${ev.seq}`));
+    });
+    q.subscribe((e) => seen.push(`B:${e.seq}`));
+
+    q.publishAgentEvent({ kind: 'prose', seq: 1, ts: 1, text: 'x' });
+    expect(seen).toEqual(['A:1', 'B:1']);
+
+    seen.length = 0;
+    q.publishAgentEvent({ kind: 'prose', seq: 2, ts: 2, text: 'y' });
+    expect(seen).toContain('A:2');
+    expect(seen).toContain('B:2');
+    expect(seen).toContain('NEW:2');
+  });
 });
 
 describe('BridgeQueue — timeout and abort', () => {
@@ -144,6 +183,24 @@ describe('BridgeQueue — single-awaiter invariant', () => {
     expect(() => q.awaitNextOperatorMessage(10_000)).toThrow(
       /single-agent invariant/,
     );
+  });
+});
+
+describe('BridgeQueue — zero-timeout non-blocking poll', () => {
+  it('awaitNextOperatorMessage(0) with empty inbox resolves with null and registers no waiter', async () => {
+    const q = new BridgeQueue();
+    const first = await q.awaitNextOperatorMessage(0);
+    expect(first).toBeNull();
+    // If a waiter had been registered, this second call would throw.
+    const second = await q.awaitNextOperatorMessage(0);
+    expect(second).toBeNull();
+  });
+
+  it('awaitNextOperatorMessage(0) returns the queued message when one is present', async () => {
+    const q = new BridgeQueue();
+    q.enqueueOperatorMessage('hello');
+    const got = await q.awaitNextOperatorMessage(0);
+    expect(got?.text).toBe('hello');
   });
 });
 
