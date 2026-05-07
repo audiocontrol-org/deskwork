@@ -5,16 +5,16 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { Hono } from 'hono';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createApp } from '@/server.ts';
-import { BridgeQueue } from '@/bridge/queue.ts';
-import type { ChatLogStore } from '@/bridge/persistence.ts';
-import type { AgentEvent, ChatLogRow } from '@/bridge/types.ts';
+import { BridgeQueue } from '@/queue.ts';
+import type { ChatLogStore } from '@/persistence.ts';
+import type { AgentEvent, ChatLogRow } from '@/types.ts';
+import { createChatRouter } from '@/routes.ts';
 import { openSSE, readSSEUntil } from './sse-helpers.ts';
 import {
-  makeConfig,
   makeFixture,
   cleanupFixture,
   type Fixture,
@@ -182,11 +182,8 @@ describe('GET /api/chat/stream (SSE)', () => {
         append: () => Promise.resolve(),
         loadHistory: () => historyPromise,
       };
-      const app = createApp({
-        projectRoot: root,
-        config: makeConfig(),
-        bridge: { queue, log: controlledLog },
-      });
+      const app = new Hono();
+      app.route('/api/chat', createChatRouter({ queue, log: controlledLog }));
 
       const opened = await openSSE(app, 'http://x/api/chat/stream', {
         'Last-Event-ID': '1',
@@ -242,11 +239,8 @@ describe('GET /api/chat/stream (SSE)', () => {
         append: () => Promise.resolve(),
         loadHistory: () => historyPromise,
       };
-      const app = createApp({
-        projectRoot: root,
-        config: makeConfig(),
-        bridge: { queue, log: controlledLog },
-      });
+      const app = new Hono();
+      app.route('/api/chat', createChatRouter({ queue, log: controlledLog }));
 
       const opened = await openSSE(app, 'http://x/api/chat/stream', {
         'Last-Event-ID': '1',

@@ -14,9 +14,9 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import {
   awaitStudioMessageHandler,
   sendStudioResponseHandler,
-} from '@/bridge/mcp-server.ts';
-import { serializeAwaitResult } from '@/bridge/mcp-tools.ts';
-import type { AgentEvent } from '@/bridge/types.ts';
+} from '@/mcp-server.ts';
+import { serializeAwaitResult } from '@/mcp-tools.ts';
+import type { AgentEvent } from '@/types.ts';
 import {
   makeBridge,
   cleanupBridge,

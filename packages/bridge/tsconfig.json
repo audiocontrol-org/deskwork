@@ -15,20 +15,12 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "allowImportingTsExtensions": true,
-    "rewriteRelativeImportExtensions": true,
-    "verbatimModuleSyntax": false,
-    "composite": true,
-    "outDir": "dist",
-    "rootDir": "src",
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "noEmit": false
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
   },
-  "references": [
-    { "path": "../core/tsconfig.build.json" },
-    { "path": "../bridge/tsconfig.build.json" }
-  ],
-  "include": ["src/**/*.ts", "src/**/*.json"],
-  "exclude": ["node_modules", "dist", "test", "**/*.test.ts"]
+  "include": ["src/**/*.ts", "test/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
 }

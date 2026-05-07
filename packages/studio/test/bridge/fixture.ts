@@ -1,17 +1,17 @@
 /**
- * Shared fixture for bridge HTTP route tests. Builds a fresh Hono app
- * via `createApp(ctx)` with a `BridgeQueue` + `ChatLog` pointed at a
- * tmpdir project root. Each test file calls `makeFixture()` in its
- * `beforeEach` and `cleanupFixture(fx)` in its `afterEach`.
+ * Studio-side fixture for chat-page tests. The bridge route shapes are
+ * tested directly against `createChatRouter` in `@deskwork/bridge`'s
+ * test suite; this fixture only exists for the studio's `/dev/chat`
+ * page-render test, which needs a full `createApp` mount with `bridge`
+ * threaded through the StudioContext.
  */
 
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { BridgeQueue, ChatLog } from '@deskwork/bridge';
 import type { DeskworkConfig } from '@deskwork/core/config';
 import { createApp } from '@/server.ts';
-import { BridgeQueue } from '@/bridge/queue.ts';
-import { ChatLog } from '@/bridge/persistence.ts';
 
 export function makeConfig(): DeskworkConfig {
   return {
@@ -36,7 +36,7 @@ export interface Fixture {
 }
 
 export function makeFixture(): Fixture {
-  const root = mkdtempSync(join(tmpdir(), 'studio-bridge-routes-'));
+  const root = mkdtempSync(join(tmpdir(), 'studio-bridge-chat-page-'));
   const queue = new BridgeQueue();
   const log = new ChatLog({ projectRoot: root });
   const app = createApp({
@@ -49,42 +49,4 @@ export function makeFixture(): Fixture {
 
 export function cleanupFixture(fx: Fixture): void {
   rmSync(fx.root, { recursive: true, force: true });
-}
-
-export async function postJson(
-  fx: Fixture,
-  path: string,
-  body: unknown,
-): Promise<{ status: number; body: unknown }> {
-  const res = await fx.app.fetch(
-    new Request(`http://x${path}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-    }),
-  );
-  return { status: res.status, body: await res.json() };
-}
-
-export async function postRaw(
-  fx: Fixture,
-  path: string,
-  raw: string,
-): Promise<{ status: number; body: unknown }> {
-  const res = await fx.app.fetch(
-    new Request(`http://x${path}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: raw,
-    }),
-  );
-  return { status: res.status, body: await res.json() };
-}
-
-export async function getJson(
-  fx: Fixture,
-  path: string,
-): Promise<{ status: number; body: unknown }> {
-  const res = await fx.app.fetch(new Request(`http://x${path}`));
-  return { status: res.status, body: await res.json() };
 }

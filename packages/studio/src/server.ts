@@ -38,10 +38,12 @@ import { readWorkflow } from '@deskwork/core/review/pipeline';
 import { createApiRouter, type StudioContext } from './routes/api.ts';
 import { serveScrapbookFile } from './routes/scrapbook-file.ts';
 import { createScrapbookMutationsRouter } from './routes/scrapbook-mutations.ts';
-import { createChatRouter } from './bridge/routes.ts';
-import { createMcpHandler } from './bridge/mcp-server.ts';
-import { BridgeQueue } from './bridge/queue.ts';
-import { ChatLog } from './bridge/persistence.ts';
+import {
+  BridgeQueue,
+  ChatLog,
+  createChatRouter,
+  createMcpHandler,
+} from '@deskwork/bridge';
 import { buildClientAssets } from './build-client-assets.ts';
 import { renderChatPage } from './pages/chat.ts';
 import { renderDashboard } from './pages/dashboard.ts';

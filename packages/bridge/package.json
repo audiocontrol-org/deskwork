@@ -1,0 +1,56 @@
+{
+  "name": "@deskwork/bridge",
+  "version": "0.15.0",
+  "type": "module",
+  "description": "Long-lived sidecar bridge between Claude Code (MCP) and the deskwork studio chat panel",
+  "homepage": "https://github.com/audiocontrol-org/deskwork#readme",
+  "license": "GPL-3.0-or-later",
+  "author": "audiocontrol-org",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/audiocontrol-org/deskwork.git",
+    "directory": "packages/bridge"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist",
+    "package.json",
+    "README.md"
+  ],
+  "bin": {
+    "deskwork-bridge": "./dist/server.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsc -b tsconfig.build.json && chmod +x dist/server.js",
+    "prepack": "tsc -b tsconfig.build.json && chmod +x dist/server.js",
+    "dev": "tsc -b tsconfig.build.json --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@deskwork/core": "0.15.0",
+    "@hono/node-server": "^1.13.7",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "hono": "^4.6.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.2"
+  }
+}

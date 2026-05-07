@@ -13,12 +13,20 @@ export interface OpenedSSE {
   close(): Promise<void>;
 }
 
-export function openSSE(app: Hono, url: string, headers?: Record<string, string>): Promise<OpenedSSE> {
+export async function openSSE(
+  app: Hono,
+  url: string,
+  headers?: Record<string, string>,
+): Promise<OpenedSSE> {
   const controller = new AbortController();
   const init: RequestInit = headers === undefined
     ? { signal: controller.signal }
     : { signal: controller.signal, headers };
-  return app.fetch(new Request(url, init)).then((response) => ({
+  // Hono's `fetch` returns `Response | Promise<Response>` — sync for a
+  // bare app without async middleware, async otherwise. Awaiting the
+  // union normalizes both shapes.
+  const response = await app.fetch(new Request(url, init));
+  return {
     response,
     controller,
     close: async () => {
@@ -29,7 +37,7 @@ export function openSSE(app: Hono, url: string, headers?: Record<string, string>
         // Aborting an in-flight stream may produce a rejection on cancel.
       }
     },
-  }));
+  };
 }
 
 export async function readSSEUntil(

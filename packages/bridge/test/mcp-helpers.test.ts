@@ -5,13 +5,13 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { isLoopbackAddress, isOriginAllowed } from '@/bridge/mcp-server.ts';
+import { isLoopbackAddress, isOriginAllowed } from '@/mcp-server.ts';
 import {
   serializeAwaitResult,
   approximatePayloadSize,
   combineSignals,
   MAX_PAYLOAD_BYTES,
-} from '@/bridge/mcp-tools.ts';
+} from '@/mcp-tools.ts';
 
 describe('isLoopbackAddress', () => {
   it('accepts loopback variants', () => {

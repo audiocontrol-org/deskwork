@@ -1,15 +1,15 @@
 /**
  * Shared fixture for MCP-server tests. Builds a fresh `BridgeQueue` +
  * `ChatLog` pointed at a tmpdir project root. Distinct from `fixture.ts`
- * (which builds a full Hono `createApp`) — MCP tests instantiate the
+ * (which builds a minimal Hono mount of `/api/chat/*`) — MCP tests instantiate the
  * MCP handler directly.
  */
 
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { BridgeQueue } from '@/bridge/queue.ts';
-import { ChatLog } from '@/bridge/persistence.ts';
+import { BridgeQueue } from '@/queue.ts';
+import { ChatLog } from '@/persistence.ts';
 
 export interface Bridge {
   readonly queue: BridgeQueue;

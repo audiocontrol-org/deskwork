@@ -1,17 +1,14 @@
 /**
- * GET /api/chat/state and GET /api/chat/history route tests, plus the
- * "bridge router is opt-in" mount-conditional check (kept here because
- * it verifies the read-side surface is gated).
+ * GET /api/chat/state and GET /api/chat/history route tests against the
+ * package-local Hono mount. The "bridge router is opt-in" check is
+ * intrinsically a studio-side concern (it asserts createApp does NOT
+ * mount /api/chat when ctx.bridge is undefined) and lives in
+ * packages/studio/test/.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { createApp } from '@/server.ts';
-import type { ChatLogRow } from '@/bridge/types.ts';
+import type { ChatLogRow } from '@/types.ts';
 import {
-  makeConfig,
   makeFixture,
   cleanupFixture,
   getJson,
@@ -165,20 +162,3 @@ describe('GET /api/chat/history', () => {
   });
 });
 
-describe('Bridge router is opt-in', () => {
-  it('routes are NOT mounted when ctx.bridge is undefined', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'studio-bridge-routes-noop-'));
-    try {
-      const appNoBridge = createApp({
-        projectRoot: root,
-        config: makeConfig(),
-      });
-      const res = await appNoBridge.fetch(
-        new Request('http://x/api/chat/state'),
-      );
-      expect(res.status).toBe(404);
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
-  });
-});

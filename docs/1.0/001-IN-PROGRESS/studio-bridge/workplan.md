@@ -519,19 +519,19 @@ Tasks:
 
 Tasks:
 
-- [ ] Per 10a's package decision, create the new package directory or new bin. Move `packages/studio/src/bridge/{queue,persistence,types}.ts` and the `/api/chat/*` routes' wiring into the new home (or re-export, depending on 10a's choice).
-- [ ] Add a sidecar entry point that boots a Hono app with: `/mcp` (existing handler), `/api/chat/{send,stream,state,history}` (existing handlers), no `/dev/*` (yet — 10c adds the reverse proxy).
-- [ ] Sidecar writes the descriptor to `<projectRoot>/.deskwork/.bridge` at boot. Removes it on graceful exit (SIGTERM / SIGINT). Stale descriptor on crash is handled by the studio's discovery logic in 10c.
-- [ ] `deskwork-bridge --help` documents the bin: project root, port, foreground vs background semantics. Foreground default (operator runs it in their own terminal; sees its logs). No daemonization in this phase.
-- [ ] Tests: `packages/<bridge>/test/sidecar-boot.test.ts` — boot sidecar against a fixture project, hit `/api/chat/state`, expect `{mcpConnected:false, listenModeOn:false, awaitingMessage:false}`. Boot a second sidecar against the SAME project; expect a clear error (not silent port-collision). Boot against a fixture with a stale descriptor (dead pid, free port); expect successful boot + descriptor overwrite.
-- [ ] Existing studio tests still pass. Existing smoke (`smoke-bridge.sh`) still passes.
+- [x] Per 10a's package decision, create the new package directory or new bin. Move `packages/studio/src/bridge/{queue,persistence,types}.ts` and the `/api/chat/*` routes' wiring into the new home (or re-export, depending on 10a's choice).
+- [x] Add a sidecar entry point that boots a Hono app with: `/mcp` (existing handler), `/api/chat/{send,stream,state,history}` (existing handlers), no `/dev/*` (yet — 10c adds the reverse proxy).
+- [x] Sidecar writes the descriptor to `<projectRoot>/.deskwork/.bridge` at boot. Removes it on graceful exit (SIGTERM / SIGINT). Stale descriptor on crash is handled by the studio's discovery logic in 10c.
+- [x] `deskwork-bridge --help` documents the bin: project root, port, foreground vs background semantics. Foreground default (operator runs it in their own terminal; sees its logs). No daemonization in this phase.
+- [x] Tests: `packages/bridge/test/sidecar-boot.test.ts` — boot sidecar against a fixture project, hit `/api/chat/state`, expect `{mcpConnected:false, listenModeOn:false, awaitingMessage:false}`. Boot a second sidecar against the SAME project; expect a clear error (not silent port-collision). Boot against a fixture with a stale descriptor (dead pid, free port); expect successful boot + descriptor overwrite.
+- [x] Existing studio tests still pass. Existing smoke (`smoke-bridge.sh`) still passes.
 
 **Acceptance Criteria:**
 
-- [ ] `deskwork-bridge --project-root <fixture>` boots; `curl http://localhost:<port>/api/chat/state` returns the expected shape; `/mcp` POST initialize succeeds; `Bridge: ...` banner prints.
-- [ ] Descriptor file is written at boot, removed on graceful exit, overwrite-safe on stale-descriptor recovery.
-- [ ] Studio in single-process mode (pre-10c) still works unchanged. Tests pass on both surfaces.
-- [ ] No `--no-verify` on commits. No bypass of pre-commit hooks.
+- [x] `deskwork-bridge --project-root <fixture>` boots; `curl http://localhost:<port>/api/chat/state` returns the expected shape; `/mcp` POST initialize succeeds; `Bridge: ...` banner prints.
+- [x] Descriptor file is written at boot, removed on graceful exit, overwrite-safe on stale-descriptor recovery.
+- [x] Studio in single-process mode (pre-10c) still works unchanged. Tests pass on both surfaces.
+- [x] No `--no-verify` on commits. No bypass of pre-commit hooks.
 
 #### Phase 10c — Studio binds separate port; reverse-proxies through sidecar
 

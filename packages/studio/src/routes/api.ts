@@ -38,8 +38,7 @@ import type { DeskworkConfig } from '@deskwork/core/config';
 import type { OverrideResolver } from '@deskwork/core/overrides';
 import type { DraftAnnotation } from '@deskwork/core/review/types';
 import { parseEntryAnnotationBody } from './entry-annotation-body.ts';
-import type { BridgeQueue } from '../bridge/queue.ts';
-import type { ChatLogStore } from '../bridge/persistence.ts';
+import type { BridgeQueue, ChatLogStore } from '@deskwork/bridge';
 
 /**
  * Narrow a `HandlerResult.body` (typed as `unknown`) to extract the

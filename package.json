@@ -11,6 +11,7 @@
   "workspaces": [
     "packages/core",
     "packages/cli",
+    "packages/bridge",
     "packages/studio",
     "plugins/*"
   ],
@@ -20,7 +21,7 @@
   "scripts": {
     "prepare": "command -v husky >/dev/null 2>&1 && husky || true",
     "build": "npm run build --workspaces --if-present && bash scripts/link-workspace-bins.sh",
-    "dev": "npm run build && (npm run dev --workspace @deskwork/core & npm run dev --workspace @deskwork/cli & npm run dev --workspace @deskwork/studio & wait)",
+    "dev": "npm run build && (npm run dev --workspace @deskwork/core & npm run dev --workspace @deskwork/cli & npm run dev --workspace @deskwork/bridge & npm run dev --workspace @deskwork/studio & wait)",
     "version:bump": "tsx scripts/bump-version.ts"
   },
   "devDependencies": {

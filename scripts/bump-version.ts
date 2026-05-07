@@ -52,6 +52,7 @@ const MANIFESTS: readonly VersionedManifest[] = [
   { path: 'package.json', label: 'root package.json', kind: 'package-json' },
   { path: 'packages/core/package.json', label: '@deskwork/core', kind: 'package-json' },
   { path: 'packages/cli/package.json', label: '@deskwork/cli', kind: 'lockstep-package-json' },
+  { path: 'packages/bridge/package.json', label: '@deskwork/bridge', kind: 'lockstep-package-json' },
   { path: 'packages/studio/package.json', label: '@deskwork/studio', kind: 'lockstep-package-json' },
   { path: 'plugins/deskwork/package.json', label: 'deskwork plugin shell', kind: 'lockstep-package-json' },
   { path: 'plugins/deskwork-studio/package.json', label: 'deskwork-studio plugin shell', kind: 'lockstep-package-json' },

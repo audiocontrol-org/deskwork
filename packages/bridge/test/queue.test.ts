@@ -5,8 +5,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { BridgeQueue } from '@/bridge/queue.ts';
-import type { AgentEvent } from '@/bridge/types.ts';
+import { BridgeQueue } from '@/queue.ts';
+import type { AgentEvent } from '@/types.ts';
 
 describe('BridgeQueue — enqueue/await pairing', () => {
   it('enqueue-then-await: await resolves with the head message', async () => {

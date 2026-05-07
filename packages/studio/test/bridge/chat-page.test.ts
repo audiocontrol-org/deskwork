@@ -65,3 +65,25 @@ describe('GET /dev/chat', () => {
     expect(text).toContain('/static/css/chat.css');
   });
 });
+
+// Phase 10b: the bridge router lives in @deskwork/bridge, but the studio
+// still mounts /api/chat conditionally on ctx.bridge in single-process
+// mode. This test asserts the studio gates that mount; bridge-side route
+// shapes are exercised in @deskwork/bridge's own test suite.
+describe('Bridge router is opt-in (studio mount)', () => {
+  it('routes are NOT mounted when ctx.bridge is undefined', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'studio-bridge-routes-noop-'));
+    try {
+      const appNoBridge = createApp({
+        projectRoot: root,
+        config: makeConfig(),
+      });
+      const res = await appNoBridge.fetch(
+        new Request('http://x/api/chat/state'),
+      );
+      expect(res.status).toBe(404);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});

@@ -4,15 +4,15 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { Hono } from 'hono';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createApp } from '@/server.ts';
-import { BridgeQueue } from '@/bridge/queue.ts';
-import { ChatLog } from '@/bridge/persistence.ts';
-import type { ChatLogStore, LoadHistoryOptions } from '@/bridge/persistence.ts';
+import { BridgeQueue } from '@/queue.ts';
+import { ChatLog } from '@/persistence.ts';
+import type { ChatLogStore, LoadHistoryOptions } from '@/persistence.ts';
+import { createChatRouter } from '@/routes.ts';
 import {
-  makeConfig,
   makeFixture,
   cleanupFixture,
   postJson,
@@ -175,11 +175,11 @@ describe('POST /api/chat/send', () => {
           realLog.loadHistory(opts ?? {}),
       };
       const queue = new BridgeQueue();
-      const app = createApp({
-        projectRoot: root,
-        config: makeConfig(),
-        bridge: { queue, log: failingLog },
-      });
+      const app = new Hono();
+      app.route(
+        '/api/chat',
+        createChatRouter({ queue, log: failingLog }),
+      );
       queue.setMcpConnected(true);
       queue.setListenModeOn(true);
 

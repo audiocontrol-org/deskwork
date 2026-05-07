@@ -16,8 +16,8 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ChatLog } from '@/bridge/persistence.ts';
-import type { ChatLogRow } from '@/bridge/types.ts';
+import { ChatLog } from '@/persistence.ts';
+import type { ChatLogRow } from '@/types.ts';
 
 let tmp: string;
 

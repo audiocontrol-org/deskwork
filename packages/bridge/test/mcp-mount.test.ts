@@ -9,7 +9,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Hono } from 'hono';
-import { createMcpHandler } from '@/bridge/mcp-server.ts';
+import { createMcpHandler } from '@/mcp-server.ts';
 import {
   makeBridge,
   cleanupBridge,

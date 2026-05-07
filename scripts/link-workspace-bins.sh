@@ -20,7 +20,9 @@ cd "$(dirname "$0")/.."
 
 mkdir -p node_modules/.bin
 ln -sf ../@deskwork/cli/dist/cli.js node_modules/.bin/deskwork
+ln -sf ../@deskwork/bridge/dist/server.js node_modules/.bin/deskwork-bridge
 ln -sf ../@deskwork/studio/dist/server.js node_modules/.bin/deskwork-studio
 
 echo "linked node_modules/.bin/deskwork -> @deskwork/cli/dist/cli.js"
+echo "linked node_modules/.bin/deskwork-bridge -> @deskwork/bridge/dist/server.js"
 echo "linked node_modules/.bin/deskwork-studio -> @deskwork/studio/dist/server.js"

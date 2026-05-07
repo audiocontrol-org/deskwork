@@ -12,9 +12,9 @@ import {
   awaitStudioMessageHandler,
   sendStudioResponseHandler,
   type BridgeDeps,
-} from '@/bridge/mcp-server.ts';
-import type { ChatLogStore, LoadHistoryOptions } from '@/bridge/persistence.ts';
-import type { AgentEvent, ChatLogRow } from '@/bridge/types.ts';
+} from '@/mcp-server.ts';
+import type { ChatLogStore, LoadHistoryOptions } from '@/persistence.ts';
+import type { AgentEvent, ChatLogRow } from '@/types.ts';
 import { makeBridge, cleanupBridge, type Bridge } from './mcp-fixture.ts';
 
 describe('awaitStudioMessageHandler', () => {
