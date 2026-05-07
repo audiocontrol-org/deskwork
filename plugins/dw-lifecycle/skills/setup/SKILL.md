@@ -7,6 +7,10 @@ description: "Create branch + worktree + version-aware docs/<v>/<status>/<slug>/
 
 Provision a new feature: branch, worktree, status-organized docs directory, and scaffolded PRD/workplan/README from templates.
 
+## Prerequisite
+
+`/dw-lifecycle:install` must have run successfully on the host project. Setup needs `.dw-lifecycle/config.json` (the project-level config that tells dw-lifecycle where the docs tree lives, what the version-status conventions are, etc.). If the host hasn't been bootstrapped, setup fails with `No .dw-lifecycle/config.json found ... Run /dw-lifecycle:install first.` Run `/dw-lifecycle:install` first; then `/dw-lifecycle:setup` for each feature.
+
 ## Steps
 
 1. Confirm `slug` (kebab-case) and target version (defaults to `config.docs.defaultTargetVersion`).
