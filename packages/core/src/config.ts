@@ -66,6 +66,23 @@ export interface SiteConfig {
   redirectsPath?: string;
 }
 
+/**
+ * Studio-bridge feature configuration. When `enabled: true`, the studio
+ * exposes a loopback-only MCP endpoint and chat panel; the SessionStart
+ * hook auto-engages /deskwork:listen so the operator can dispatch from
+ * a phone or iPad over Tailscale. Default: feature is OFF unless
+ * explicitly enabled.
+ */
+export interface StudioBridgeConfig {
+  enabled?: boolean;
+  /**
+   * Idle timeout (seconds) for each await_studio_message poll inside
+   * the listen loop. Tunes how often the loop reports back to the
+   * agent before resuming the await. Defaults to 600 (10 minutes).
+   */
+  idleTimeout?: number;
+}
+
 /** Top-level deskwork config. */
 export interface DeskworkConfig {
   version: typeof CONFIG_VERSION;
@@ -81,6 +98,8 @@ export interface DeskworkConfig {
    * can point this at an existing directory (e.g. `journal/editorial`).
    */
   reviewJournalDir?: string;
+  /** Studio bridge (MCP listen-loop) configuration. Off by default. */
+  studioBridge?: StudioBridgeConfig;
 }
 
 const ALLOWED_TOP_LEVEL_KEYS = new Set([
@@ -89,7 +108,9 @@ const ALLOWED_TOP_LEVEL_KEYS = new Set([
   'defaultSite',
   'author',
   'reviewJournalDir',
+  'studioBridge',
 ]);
+const ALLOWED_STUDIO_BRIDGE_KEYS = new Set(['enabled', 'idleTimeout']);
 const REQUIRED_SITE_KEYS = ['contentDir', 'calendarPath'] as const;
 const ALLOWED_SITE_KEYS = new Set<string>([
   ...REQUIRED_SITE_KEYS,
@@ -185,7 +206,56 @@ export function parseConfig(value: unknown): DeskworkConfig {
     }
     config.reviewJournalDir = obj.reviewJournalDir;
   }
+  if (obj.studioBridge !== undefined) {
+    config.studioBridge = parseStudioBridgeConfig(obj.studioBridge);
+  }
   return config;
+}
+
+function parseStudioBridgeConfig(value: unknown): StudioBridgeConfig {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(
+      `Invalid deskwork config: "studioBridge" must be an object if set, got ${describe(
+        value,
+      )}.`,
+    );
+  }
+  const obj = value as Record<string, unknown>;
+
+  for (const key of Object.keys(obj)) {
+    if (!ALLOWED_STUDIO_BRIDGE_KEYS.has(key)) {
+      throw new Error(
+        `Invalid deskwork config: studioBridge has unknown field "${key}". ` +
+          `Allowed fields: ${[...ALLOWED_STUDIO_BRIDGE_KEYS].join(', ')}.`,
+      );
+    }
+  }
+
+  const out: StudioBridgeConfig = {};
+
+  if (obj.enabled !== undefined) {
+    if (typeof obj.enabled !== 'boolean') {
+      throw new Error(
+        `Invalid deskwork config: studioBridge.enabled must be a boolean when set, got ${describe(
+          obj.enabled,
+        )}.`,
+      );
+    }
+    out.enabled = obj.enabled;
+  }
+
+  if (obj.idleTimeout !== undefined) {
+    const t = obj.idleTimeout;
+    if (typeof t !== 'number' || !Number.isFinite(t) || !Number.isInteger(t) || t < 1) {
+      throw new Error(
+        `Invalid deskwork config: studioBridge.idleTimeout must be a positive integer ` +
+          `(>= 1) when set, got ${JSON.stringify(t)}.`,
+      );
+    }
+    out.idleTimeout = t;
+  }
+
+  return out;
 }
 
 function parseSiteConfig(slug: string, value: unknown): SiteConfig {

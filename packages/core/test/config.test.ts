@@ -239,6 +239,126 @@ describe('parseConfig', () => {
       }),
     ).toThrow(/blogOutlineSection/);
   });
+
+  describe('studioBridge', () => {
+    it('parses studioBridge: { enabled: true }', () => {
+      const cfg = parseConfig({
+        version: 1,
+        sites: { main: stubSite() },
+        studioBridge: { enabled: true },
+      });
+      expect(cfg.studioBridge?.enabled).toBe(true);
+      expect(cfg.studioBridge?.idleTimeout).toBeUndefined();
+    });
+
+    it('parses studioBridge: { enabled: true, idleTimeout: 300 }', () => {
+      const cfg = parseConfig({
+        version: 1,
+        sites: { main: stubSite() },
+        studioBridge: { enabled: true, idleTimeout: 300 },
+      });
+      expect(cfg.studioBridge?.enabled).toBe(true);
+      expect(cfg.studioBridge?.idleTimeout).toBe(300);
+    });
+
+    it('parses studioBridge: { enabled: false }', () => {
+      const cfg = parseConfig({
+        version: 1,
+        sites: { main: stubSite() },
+        studioBridge: { enabled: false },
+      });
+      expect(cfg.studioBridge?.enabled).toBe(false);
+    });
+
+    it('parses an empty studioBridge object', () => {
+      const cfg = parseConfig({
+        version: 1,
+        sites: { main: stubSite() },
+        studioBridge: {},
+      });
+      expect(cfg.studioBridge).toBeDefined();
+      expect(cfg.studioBridge?.enabled).toBeUndefined();
+      expect(cfg.studioBridge?.idleTimeout).toBeUndefined();
+    });
+
+    it('leaves studioBridge undefined when absent', () => {
+      const cfg = parseConfig({
+        version: 1,
+        sites: { main: stubSite() },
+      });
+      expect(cfg.studioBridge).toBeUndefined();
+    });
+
+    it('rejects non-object studioBridge', () => {
+      expect(() =>
+        parseConfig({
+          version: 1,
+          sites: { main: stubSite() },
+          studioBridge: 'true',
+        }),
+      ).toThrow(/studioBridge.*must be an object/);
+    });
+
+    it('rejects array studioBridge', () => {
+      expect(() =>
+        parseConfig({
+          version: 1,
+          sites: { main: stubSite() },
+          studioBridge: [],
+        }),
+      ).toThrow(/studioBridge.*must be an object/);
+    });
+
+    it('rejects non-boolean enabled', () => {
+      expect(() =>
+        parseConfig({
+          version: 1,
+          sites: { main: stubSite() },
+          studioBridge: { enabled: 'yes' },
+        }),
+      ).toThrow(/studioBridge\.enabled.*boolean/);
+    });
+
+    it('rejects idleTimeout = 0', () => {
+      expect(() =>
+        parseConfig({
+          version: 1,
+          sites: { main: stubSite() },
+          studioBridge: { idleTimeout: 0 },
+        }),
+      ).toThrow(/idleTimeout.*positive integer/);
+    });
+
+    it('rejects negative idleTimeout', () => {
+      expect(() =>
+        parseConfig({
+          version: 1,
+          sites: { main: stubSite() },
+          studioBridge: { idleTimeout: -5 },
+        }),
+      ).toThrow(/idleTimeout.*positive integer/);
+    });
+
+    it('rejects non-integer idleTimeout', () => {
+      expect(() =>
+        parseConfig({
+          version: 1,
+          sites: { main: stubSite() },
+          studioBridge: { idleTimeout: 1.5 },
+        }),
+      ).toThrow(/idleTimeout.*positive integer/);
+    });
+
+    it('rejects unknown subfield', () => {
+      expect(() =>
+        parseConfig({
+          version: 1,
+          sites: { main: stubSite() },
+          studioBridge: { unknownField: true },
+        }),
+      ).toThrow(/studioBridge.*unknown field "unknownField"/);
+    });
+  });
 });
 
 describe('readConfig', () => {
