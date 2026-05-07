@@ -197,7 +197,21 @@ describe('createMcpHandler — single-agent invariant + connection lifecycle', (
     expect(mcp.activeConnections()).toBe(0);
   });
 
-  it('rejects 409 when a second initialize lands while a session is active', async () => {
+  it('a second initialize PREEMPTS an existing tracker (issue #235 fix)', async () => {
+    // Pre-fix behavior: 409 bridge-busy if a tracker was already set.
+    // Post-fix behavior: the new initialize wins, the previous tracker
+    // is cleaned up. The streamable-HTTP transport's per-request stream
+    // cancel does NOT fire transport.onclose, so a CC session that lost
+    // its transport at the network layer (the ~5-min idle drop in #235)
+    // would leave the tracker pinned to a dead transport, blocking every
+    // subsequent CC session with 409 forever. Preempt-on-init unblocks
+    // recovery without requiring a sidecar restart.
+    //
+    // Trade-off: deliberate concurrent CC attaches see last-write-wins.
+    // Single-agent invariant becomes best-effort. Acceptable given the
+    // bridge's internal-only posture (PRD § "Phase 10 — Long-lived
+    // bridge sidecar"), and the prior 409 was unreachable in practice
+    // because of the zombie-tracker bug it was supposed to defend.
     const { mcp, app } = buildApp(bridge, '127.0.0.1');
 
     const r1 = await app.fetch(
@@ -206,21 +220,22 @@ describe('createMcpHandler — single-agent invariant + connection lifecycle', (
     expect(r1.status).toBeLessThan(400);
     expect(bridge.queue.currentState().mcpConnected).toBe(true);
     expect(mcp.activeConnections()).toBe(1);
+    const firstSessionId = r1.headers.get('mcp-session-id');
+    if (r1.body !== null) await r1.body.cancel().catch(() => undefined);
 
-    // Drive the second init while the first connection is still active.
-    // Body-cancel happens AFTER, so the cancel-onclose race can't free
-    // the tracker before the second request lands.
+    // Second init lands while r1's tracker is (probably) still set.
+    // Whether r1's body-cancel cleanup races ahead of r2's preemption
+    // is not load-bearing: either way, r2 must succeed (not 409).
     const r2 = await app.fetch(
       new Request('http://x/mcp', { method: 'POST', headers: INIT_HEADERS, body: INIT_BODY }),
     );
-    expect(r2.status).toBe(409);
-    expect(asErrorBody(await r2.json()).error).toBe('bridge-busy');
+    expect(r2.status).toBeLessThan(400);
+    expect(mcp.activeConnections()).toBe(1);
+    const secondSessionId = r2.headers.get('mcp-session-id');
+    expect(secondSessionId).toBeTruthy();
+    expect(secondSessionId).not.toBe(firstSessionId);
 
-    if (r1.body !== null) await r1.body.cancel().catch(() => undefined);
-    // Give the transport's onclose handler a chance to fire and clean up.
-    // If onclose doesn't fire (some SDK transports don't surface cancel
-    // as close), the tracker remains active — that's NOT a regression in
-    // OUR code; the 409 invariant above is what we're proving.
+    if (r2.body !== null) await r2.body.cancel().catch(() => undefined);
   });
 
   it('DELETE with the active session ID resets bridge state', async () => {

@@ -50,6 +50,7 @@ export interface McpHandler {
 interface ConnectionRecord {
   readonly transport: WebStandardStreamableHTTPServerTransport;
   readonly server: McpServer;
+  readonly abortRef: { current: AbortController | null };
 }
 
 interface ConnectionTracker {
@@ -207,11 +208,34 @@ export function createMcpHandler(
       );
     }
 
+    // Issue #235 / zombie tracker fix: a new initialize from CC always
+    // wins over any existing tracker. The previous behavior (409 on
+    // existing tracker) was correct in theory — single-agent invariant —
+    // but the streamable-HTTP transport's per-request stream cancel
+    // doesn't fire `transport.onclose`, so a CC session that lost its
+    // transport at the network layer (the 5-min idle drop documented in
+    // #235) leaves the tracker pinned to a dead transport. Without this
+    // override, the next CC reconnect (or a fresh CC session) gets 409
+    // forever, and the bridge requires a sidecar restart to recover.
+    //
+    // Trade-off: two CC sessions deliberately racing for the bridge will
+    // see the LAST initializer win, with the prior session's tracker
+    // cleaned up. v1's single-agent invariant becomes best-effort: we
+    // still publish events to one tracker at a time, but enforcement
+    // against deliberate concurrent attaches relaxes. Acceptable for the
+    // internal-only posture documented in the PRD.
     if (tracker.active !== null) {
-      return c.json(
-        { error: 'bridge-busy', message: 'Another agent is already connected to this studio' },
-        409,
+      const stale = tracker.active;
+      process.stderr.write(
+        `deskwork-bridge: a new MCP initialize is preempting an existing tracker (session=${stale.transport.sessionId ?? '<none>'}). Likely the previous session's transport silently dropped (issue #235). Cleaning up.\n`,
       );
+      cleanupConnection(tracker, stale, bridge.queue);
+      try {
+        await stale.transport.close();
+      } catch {
+        // Closing a dead transport may throw; the cleanup already cleared
+        // the tracker so this is best-effort.
+      }
     }
 
     const abortRef: { current: AbortController | null } = {
@@ -222,13 +246,13 @@ export function createMcpHandler(
       sessionIdGenerator: () => randomUUID(),
     });
     const server = buildMcpServer(bridge, abortRef);
-    const record: ConnectionRecord = { transport, server };
+    const record: ConnectionRecord = { transport, server, abortRef };
 
     tracker.active = record;
     bridge.queue.setMcpConnected(true);
 
     transport.onclose = (): void => {
-      cleanupConnection(tracker, record, bridge.queue, abortRef);
+      cleanupConnection(tracker, record, bridge.queue);
     };
 
     try {
@@ -240,7 +264,7 @@ export function createMcpHandler(
       });
       return transport.handleRequest(requestForTransport, { parsedBody });
     } catch (err) {
-      cleanupConnection(tracker, record, bridge.queue, abortRef);
+      cleanupConnection(tracker, record, bridge.queue);
       const reason = err instanceof Error ? err.message : String(err);
       return c.json({ error: 'mcp-init-failed', message: reason }, 500);
     }
@@ -256,7 +280,6 @@ function cleanupConnection(
   tracker: ConnectionTracker,
   record: ConnectionRecord,
   queue: BridgeQueue,
-  abortRef: { current: AbortController | null },
 ): void {
   if (tracker.active === record) {
     tracker.active = null;
@@ -264,8 +287,8 @@ function cleanupConnection(
     queue.setAwaitingMessage(false);
     queue.setMcpConnected(false);
   }
-  abortRef.current?.abort();
-  abortRef.current = null;
+  record.abortRef.current?.abort();
+  record.abortRef.current = null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
