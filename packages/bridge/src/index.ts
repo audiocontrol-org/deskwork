@@ -64,5 +64,9 @@ export {
   readDescriptor,
   removeDescriptor,
   descriptorPath,
+  writeStudioDescriptor,
+  readStudioDescriptor,
+  removeStudioDescriptor,
+  studioDescriptorPath,
 } from './descriptor.ts';
-export type { BridgeDescriptor } from './descriptor.ts';
+export type { BridgeDescriptor, StudioDescriptor } from './descriptor.ts';

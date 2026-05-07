@@ -23,7 +23,12 @@ A control channel between the deskwork-studio web UI and the operator's locally-
 | 5 | Affordance routing helper + decision-strip integration | Done — `912a892`, `13803f3` |
 | 6 | `/deskwork:listen` skill + SessionStart hook + config schema | Done — `8b58f95`, `06ab08f` |
 | 7 | Documentation + adopter wiring (MCP client config example) | Done — `76a084f` |
-| 8 | Local end-to-end smoke (validation gate) | Automated smoke landed (this commit); manual smoke checklist below — operator-driven |
+| 8 | Local end-to-end smoke (validation gate) | Automated smoke landed; manual smoke checklist below — operator-driven |
+| 9 | Phone UX fixes (stowable chat panel, sticky-edge, etc.) | Done — pre-Phase-10 |
+| 10a | Audit + design addendum (`design-phase-10.md`) | Done |
+| 10b | Extract bridge surface into sidecar process | Done — `5a38bf4` and earlier |
+| 10c | Studio binds separate port; sidecar reverse-proxies | **Done** — this commit |
+| 10d | Adopter-facing wiring (launchd / systemd / install skill) | Deferred — internal-use only |
 
 ### Worktree
 

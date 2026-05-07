@@ -38,7 +38,6 @@ import type { DeskworkConfig } from '@deskwork/core/config';
 import type { OverrideResolver } from '@deskwork/core/overrides';
 import type { DraftAnnotation } from '@deskwork/core/review/types';
 import { parseEntryAnnotationBody } from './entry-annotation-body.ts';
-import type { BridgeQueue, ChatLogStore } from '@deskwork/bridge';
 
 /**
  * Narrow a `HandlerResult.body` (typed as `unknown`) to extract the
@@ -92,14 +91,22 @@ export interface StudioContext {
    */
   resolver?: OverrideResolver;
   /**
-   * Studio ↔ Claude Code bridge. When present, `createApp` mounts
-   * `/api/chat/*`. When absent, the bridge routes are not mounted —
-   * existing tests build `ctx` without it.
+   * Studio ↔ Claude Code bridge marker.
+   *
+   * Phase 10c: the bridge no longer runs in-process. The sidecar
+   * (`deskwork-bridge`) owns `/api/chat/*` and `/mcp`; the studio is
+   * upstream-only and reverse-proxied through the sidecar. `bridge`
+   * remains as an optional MARKER so existing call sites can still
+   * gate features that only make sense when bridge mode is active
+   * (the docked chat panel mount on entry-review pages, the
+   * `/dev/chat` route, the chat.css stylesheet inclusion).
+   *
+   * Production boot sets `bridge: {}` when the sidecar discovery
+   * succeeds. The shape is intentionally open — this is just a
+   * "bridge is enabled for this studio" boolean dressed as an object
+   * so existing `ctx.bridge !== undefined` checks stay readable.
    */
-  bridge?: {
-    queue: BridgeQueue;
-    log: ChatLogStore;
-  };
+  bridge?: object;
 }
 
 export function createApiRouter(ctx: StudioContext): Hono {

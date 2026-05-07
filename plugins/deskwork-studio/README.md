@@ -73,11 +73,37 @@ The studio is **dev-only** — no auth, localhost binding only.
 
 > **Status: experimental.** The bridge currently lives on the [`feature/studio-bridge`](https://github.com/audiocontrol-org/deskwork/tree/feature/studio-bridge) branch and is NOT yet shipped through the marketplace install. This section documents the design so operators tracking the branch can wire it up. The bridge will fold into mainline only after the Phase 8 validation gate passes.
 
+#### Two-process model (Phase 10c)
+
+The bridge runs as a **long-lived sidecar** (`deskwork-bridge`) that persists across studio restarts. The studio (`deskwork-studio`) is the transient HTTP surface; the sidecar is the front door the phone hits.
+
+- The sidecar binds the canonical port (default `:47321`) on loopback + the local Tailscale interface(s). The phone connects to this port.
+- The studio binds a separate **loopback-only** port (default `:47422`). The sidecar reverse-proxies `/dev/*` and `/static/*` through to this port.
+- The sidecar owns the bridge state machine — `/api/chat/*` and `/mcp`. Restarting the studio does NOT drop CC's MCP connection; the chat panel SSE on already-loaded pages keeps streaming.
+
+Run them as **two separate commands** in two separate terminals (the operator decides their own lifetimes; auto-spawn would re-couple lifecycles and defeat the purpose):
+
+```
+# Terminal 1 — long-lived sidecar
+deskwork-bridge --project-root <path>
+
+# Terminal 2 — studio (restartable)
+deskwork-studio --project-root <path>
+```
+
+The studio refuses to boot if the sidecar isn't running, surfacing the documented error: *"Sidecar not running. Run `deskwork-bridge` first."* See the workplan's Phase 10a §5 for the full stale-descriptor handling matrix.
+
+Discovery happens via descriptor files under `<projectRoot>/.deskwork/`:
+- `.bridge` — written by the sidecar at boot, read by the studio.
+- `.studio` — written by the studio at boot, read by the sidecar's reverse proxy.
+
+Both files are removed on graceful exit (SIGTERM/SIGINT). SIGKILL bypasses cleanup; the consumer side detects the stale descriptor and surfaces a clear error instead of looping.
+
 #### What it is
 
 A control channel between the studio web UI and the operator's Claude Code session, so commands can be dispatched from a phone or iPad without a terminal. The studio gains:
 
-- An **MCP endpoint** at `/mcp` (loopback-only). Two tools — `await_studio_message` and `send_studio_response` — let an agent in your local Claude Code session block on operator input from the studio's chat panel and stream tool-use cards + prose responses back.
+- An **MCP endpoint** at `/mcp` (loopback-only, sidecar-served). Two tools — `await_studio_message` and `send_studio_response` — let an agent in your local Claude Code session block on operator input from the studio's chat panel and stream tool-use cards + prose responses back.
 - A **chat panel UI** rendered both as a docked panel on entry-review pages and as a full-page surface at `/dev/chat`. The panel persists operator-side input via `localStorage` (keyed on worktree path), replays history on reload, and reconnects through SSE when the bridge drops and comes back.
 
 The bridge is loopback-bound by construction. The chat panel's HTTP routes (`/api/chat/{send,stream,state,history}`) are reachable over Tailscale; the MCP endpoint at `/mcp` is not. Your phone never connects to MCP — only the agent on the same machine as the studio does.
@@ -101,7 +127,11 @@ When the bridge is offline, those same buttons fall back to the existing copy-to
 
    Optional: `"studioBridge": { "enabled": true, "idleTimeout": 600 }` — seconds the listen skill blocks on each `await_studio_message` iteration before re-entering. Default 600.
 
-2. **Register the studio's MCP endpoint with Claude Code.** The exact mechanism depends on your CC version; the typical shape is a `mcpServers` entry in `.claude/settings.json` or `.mcp.json` pointing at the studio's loopback URL. Using the studio's default port:
+2. **Start the sidecar first.** Run `deskwork-bridge --project-root <path>` in a long-lived terminal. The sidecar prints its bound URL(s) and writes the `.bridge` descriptor.
+
+3. **Start the studio.** Run `deskwork-studio --project-root <path>` in a separate terminal. The studio reads the sidecar's descriptor, binds its own loopback-only port, and writes a `.studio` descriptor. Restarting the studio while the sidecar is running does NOT drop CC's MCP connection.
+
+4. **Register the sidecar's MCP endpoint with Claude Code.** The exact mechanism depends on your CC version; the typical shape is a `mcpServers` entry in `.claude/settings.json` or `.mcp.json` pointing at the sidecar's canonical port:
 
    ```json
    {
@@ -114,17 +144,17 @@ When the bridge is offline, those same buttons fall back to the existing copy-to
    }
    ```
 
-   The studio prints the exact bridge URL in its startup banner, e.g.:
+   The sidecar prints the exact MCP URL in its startup banner:
 
    ```
-   Bridge: http://localhost:47321/mcp (loopback-only)
+   Bridge MCP: http://localhost:47321/mcp (MCP endpoint enforces loopback)
    ```
 
-   If you launched the studio on a non-default port, match that here. The MCP endpoint accepts only loopback connections (responses are 403 for any other peer); register the endpoint from the same machine that runs the studio.
+   If you launched the sidecar on a non-default port, match that here. The MCP endpoint accepts only loopback connections (responses are 403 for any other peer); register the endpoint from the same machine that runs the sidecar.
 
-3. **Start a Claude Code session and run** `/deskwork:listen`. With `studioBridge.enabled: true`, the SessionStart hook in the [`deskwork`](../deskwork/) plugin emits a one-shot directive instructing the agent to dispatch the listen skill automatically — no manual invocation needed once the hook fires.
+5. **Start a Claude Code session and run** `/deskwork:listen`. With `studioBridge.enabled: true`, the SessionStart hook in the [`deskwork`](../deskwork/) plugin emits a one-shot directive instructing the agent to dispatch the listen skill automatically — no manual invocation needed once the hook fires.
 
-4. **Open the chat panel.** Either visit `http://<host>:<port>/dev/chat` for the full-page version, or open any `/dev/editorial-review/<id>` page — the docked chat panel appears as a column on those surfaces.
+6. **Open the chat panel.** Visit the sidecar's canonical port (`http://<host>:47321/dev/chat` for the full-page version), or open any `/dev/editorial-review/<id>` page through the same canonical port — the docked chat panel appears as a column on those surfaces. The sidecar reverse-proxies these surfaces through to the studio.
 
 #### What works end-to-end
 

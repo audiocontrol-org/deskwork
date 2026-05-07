@@ -1,45 +1,65 @@
 /**
- * Discovery descriptor for the long-lived bridge sidecar.
+ * Discovery descriptors for the long-lived bridge sidecar AND the
+ * matching studio process.
  *
- * Path: `<projectRoot>/.deskwork/.bridge`
+ * The two-process model uses a symmetric pair of descriptors under
+ * `<projectRoot>/.deskwork/`:
+ *
+ *   - `.bridge` — written by `deskwork-bridge` at boot, consumed by
+ *     `deskwork-studio` to discover the sidecar's port.
+ *   - `.studio` — written by `deskwork-studio` at boot, consumed by
+ *     the sidecar's reverse proxy to discover the studio's port.
+ *
  * Schema: `{ port, pid, startedAt, version }` — see Phase 10a §5.
  *
  * Lifecycle:
- *   1. Sidecar binds its loopback port FIRST.
- *   2. Sidecar atomically writes the descriptor (`writeFile` to a
+ *   1. Process binds its loopback port FIRST.
+ *   2. Process atomically writes the descriptor (`writeFile` to a
  *      pid-suffixed temp path → `rename` to the final path).
- *   3. Sidecar removes the descriptor on graceful exit (SIGTERM/SIGINT).
- *      SIGKILL bypasses cleanup; the studio handles the stale-descriptor
- *      case at boot in Phase 10c.
+ *   3. Process removes the descriptor on graceful exit (SIGTERM/SIGINT).
+ *      SIGKILL bypasses cleanup; the consumer side handles the stale-
+ *      descriptor case at boot.
  *
  * The order matters: a descriptor that exists must always reflect a live
- * or recently-live sidecar. The studio's pre-bind health check
- * (`GET /api/chat/state`) closes the alive-vs-stale gap.
+ * or recently-live process. Pre-bind health checks
+ * (`GET /api/chat/state` for the sidecar) close the alive-vs-stale gap.
  */
 
 import { mkdir, rename, unlink, writeFile, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 export interface BridgeDescriptor {
-  /** Sidecar's chosen loopback port (after bind, not the requested port). */
+  /** Process's chosen loopback port (after bind, not the requested port). */
   readonly port: number;
-  /** Sidecar process id. */
+  /** Process id. */
   readonly pid: number;
   /** ISO 8601 timestamp; e.g. "2026-05-07T18:42:11.039Z". */
   readonly startedAt: string;
-  /** `@deskwork/bridge` package version. */
+  /** Package version (`@deskwork/bridge` for `.bridge`, `@deskwork/studio` for `.studio`). */
   readonly version: string;
 }
 
-const DESCRIPTOR_DIR = '.deskwork';
-const DESCRIPTOR_NAME = '.bridge';
+/** Studio descriptor shares the same shape as the bridge descriptor. */
+export type StudioDescriptor = BridgeDescriptor;
 
-export function descriptorPath(projectRoot: string): string {
-  return join(projectRoot, DESCRIPTOR_DIR, DESCRIPTOR_NAME);
+const DESCRIPTOR_DIR = '.deskwork';
+const BRIDGE_NAME = '.bridge';
+const STUDIO_NAME = '.studio';
+
+function descriptorAt(projectRoot: string, name: string): string {
+  return join(projectRoot, DESCRIPTOR_DIR, name);
 }
 
-function descriptorTempPath(projectRoot: string, pid: number): string {
-  return join(projectRoot, DESCRIPTOR_DIR, `${DESCRIPTOR_NAME}.tmp-${pid}`);
+function descriptorTempAt(projectRoot: string, name: string, pid: number): string {
+  return join(projectRoot, DESCRIPTOR_DIR, `${name}.tmp-${pid}`);
+}
+
+export function descriptorPath(projectRoot: string): string {
+  return descriptorAt(projectRoot, BRIDGE_NAME);
+}
+
+export function studioDescriptorPath(projectRoot: string): string {
+  return descriptorAt(projectRoot, STUDIO_NAME);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -59,35 +79,25 @@ function asDescriptor(value: unknown): BridgeDescriptor | null {
   return { port, pid, startedAt, version };
 }
 
-/**
- * Atomically write the descriptor. Ensures the parent directory exists,
- * writes to a pid-suffixed temp file, then renames into place.
- */
-export async function writeDescriptor(
+async function writeAt(
   projectRoot: string,
+  name: string,
   info: BridgeDescriptor,
 ): Promise<void> {
   const dir = join(projectRoot, DESCRIPTOR_DIR);
   await mkdir(dir, { recursive: true });
-  const finalPath = descriptorPath(projectRoot);
-  const tempPath = descriptorTempPath(projectRoot, info.pid);
+  const finalPath = descriptorAt(projectRoot, name);
+  const tempPath = descriptorTempAt(projectRoot, name, info.pid);
   const json = JSON.stringify(info);
   await writeFile(tempPath, json, 'utf8');
   await rename(tempPath, finalPath);
 }
 
-/**
- * Best-effort descriptor removal. Used by sidecar graceful-exit handlers;
- * a failure here (file already gone, permission churn) must NOT prevent
- * the process from exiting.
- */
-export async function removeDescriptor(projectRoot: string): Promise<void> {
-  const path = descriptorPath(projectRoot);
+async function removeAt(projectRoot: string, name: string): Promise<void> {
+  const path = descriptorAt(projectRoot, name);
   try {
     await unlink(path);
   } catch (err) {
-    // ENOENT → descriptor already gone, fine. Other errors → log and
-    // swallow; the process is on its way out.
     if (
       isRecord(err) &&
       (err as { code?: unknown }).code === 'ENOENT'
@@ -95,20 +105,15 @@ export async function removeDescriptor(projectRoot: string): Promise<void> {
       return;
     }
     const reason = err instanceof Error ? err.message : String(err);
-    process.stderr.write(`deskwork-bridge: failed to remove descriptor: ${reason}\n`);
+    process.stderr.write(`deskwork: failed to remove descriptor ${path}: ${reason}\n`);
   }
 }
 
-/**
- * Read + validate the descriptor. Returns `null` when the file is
- * missing, malformed JSON, or fails schema validation. Used by the
- * studio in Phase 10c (pre-bind discovery) and by the sidecar's own
- * collision-detection at boot (10b).
- */
-export async function readDescriptor(
+async function readAt(
   projectRoot: string,
+  name: string,
 ): Promise<BridgeDescriptor | null> {
-  const path = descriptorPath(projectRoot);
+  const path = descriptorAt(projectRoot, name);
   let raw: string;
   try {
     raw = await readFile(path, 'utf8');
@@ -128,4 +133,61 @@ export async function readDescriptor(
     return null;
   }
   return asDescriptor(parsed);
+}
+
+/**
+ * Atomically write the bridge descriptor.
+ */
+export async function writeDescriptor(
+  projectRoot: string,
+  info: BridgeDescriptor,
+): Promise<void> {
+  return writeAt(projectRoot, BRIDGE_NAME, info);
+}
+
+/**
+ * Best-effort bridge descriptor removal. Used by sidecar graceful-exit
+ * handlers; failures must NOT prevent the process from exiting.
+ */
+export async function removeDescriptor(projectRoot: string): Promise<void> {
+  return removeAt(projectRoot, BRIDGE_NAME);
+}
+
+/**
+ * Read + validate the bridge descriptor. Returns `null` when the file is
+ * missing, malformed JSON, or fails schema validation.
+ */
+export async function readDescriptor(
+  projectRoot: string,
+): Promise<BridgeDescriptor | null> {
+  return readAt(projectRoot, BRIDGE_NAME);
+}
+
+/**
+ * Atomically write the studio descriptor.
+ */
+export async function writeStudioDescriptor(
+  projectRoot: string,
+  info: StudioDescriptor,
+): Promise<void> {
+  return writeAt(projectRoot, STUDIO_NAME, info);
+}
+
+/**
+ * Best-effort studio descriptor removal.
+ */
+export async function removeStudioDescriptor(projectRoot: string): Promise<void> {
+  return removeAt(projectRoot, STUDIO_NAME);
+}
+
+/**
+ * Read + validate the studio descriptor. Returns `null` when the file is
+ * missing, malformed JSON, or fails schema validation. Used by the
+ * sidecar's reverse-proxy at request time to discover where the studio
+ * is currently bound.
+ */
+export async function readStudioDescriptor(
+  projectRoot: string,
+): Promise<StudioDescriptor | null> {
+  return readAt(projectRoot, STUDIO_NAME);
 }

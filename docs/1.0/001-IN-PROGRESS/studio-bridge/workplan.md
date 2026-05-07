@@ -539,20 +539,22 @@ Tasks:
 
 Tasks:
 
-- [ ] Add to studio: descriptor reader at boot. If descriptor present + sidecar healthy (port responds + pid alive), bind a separate loopback-only port (e.g. start at :47322 + auto-increment). If descriptor absent, surface a clear error: *"Sidecar not running. Run `deskwork-bridge` first."* Operators MUST start the sidecar before the studio.
-- [ ] Add to sidecar: reverse-proxy handlers for `/dev/*` and `/static/*` that forward to the studio's loopback URL. Use Hono's `proxy` helper (or similar) for HTTP request forwarding. Stream responses (don't buffer; the studio serves SSE-y resources too in some places).
-- [ ] When the studio process exits, the sidecar's reverse proxy returns 502 for `/dev/*` requests with a friendly *"Studio restarting…"* page. MCP and `/api/chat/*` are unaffected. Document the failure-mode behavior.
-- [ ] Modify the chat panel's bootstrap so the panel's HTTP calls go to the canonical port (sidecar) — which it already does, since today's chat panel uses relative URLs and the chat page is served from the same host. The reverse proxy makes this transparent.
-- [ ] Tests: integration test that boots sidecar + studio, connects an in-process MCP client, kills the studio with SIGKILL while the MCP client is in `await_studio_message`, restarts studio, asserts MCP client's await is uninterrupted (the mocked operator message arrives and the await resolves AFTER the studio bounce).
-- [ ] Smoke: extend `scripts/smoke-bridge.sh` (or add `scripts/smoke-bridge-sidecar.sh`) for the studio-restart-survives-MCP property. Local-only (per `.claude/rules/agent-discipline.md` "No test infrastructure in CI").
+- [x] Add to studio: descriptor reader at boot. If descriptor present + sidecar healthy (port responds + pid alive), bind a separate loopback-only port (default 47422 + auto-increment). If descriptor absent, surface a clear error: *"Sidecar not running. Run `deskwork-bridge` first."* Operators MUST start the sidecar before the studio. (`packages/studio/src/sidecar-discovery.ts` walks all 5 stale-state cases per 10a §5.)
+- [x] Add to sidecar: reverse-proxy handlers for `/dev/*` and `/static/*` that forward to the studio's loopback URL. Use Hono's `proxy` helper for HTTP request forwarding. Stream responses (don't buffer). (`packages/bridge/src/proxy.ts`.)
+- [x] When the studio process exits, the sidecar's reverse proxy returns 502 for `/dev/*` requests with a friendly *"Studio restarting…"* page. MCP and `/api/chat/*` are unaffected.
+- [x] Chat panel bootstrap: uses relative URLs (already correct since Phase 1). When the page is served through the sidecar's canonical port, all `/api/chat/*` calls naturally hit the sidecar. No injection needed.
+- [x] Tests: `packages/studio/test/sidecar-discovery.test.ts` (5 cases), `packages/bridge/test/reverse-proxy.test.ts` (6 cases), `packages/bridge/test/survives-studio-restart.test.ts` (1 case asserting the queue + MCP-await survive a fake-studio bounce).
+- [x] Smoke: `scripts/smoke-bridge-sidecar.sh` boots sidecar + studio against a tmp fixture, asserts through-sidecar `/dev/*` reaches the studio, SIGKILLs the studio, asserts `/dev/*` returns 502 + `/api/chat/state` still 200, restarts studio, asserts `/dev/*` returns 200 again.
+- [x] Sidecar→studio discovery: `.studio` descriptor (symmetric pattern with `.bridge`). Sidecar reads it per request via `readStudioDescriptor` so studio-port changes after restart are picked up automatically.
+- [x] Chat-page rendering decision: option (a) — the sidecar reverse-proxies `/dev/chat` to the studio. Moving the renderer would pull `layout()`, `clientScriptTag()`, `viteClientTag()`, glossary data, `renderEditorialFolio()` out of the studio package; the coupling cost outweighs the lifecycle benefit. The chat panel JS reconnects to `/api/chat/*` (sidecar-served) independently, so the live panel state is unaffected by `/dev/chat` 502s during studio restart.
 
 **Acceptance Criteria:**
 
-- [ ] After `deskwork-bridge` + `deskwork-studio` are running, the phone hits the canonical port and gets the chat panel + dev surfaces normally.
-- [ ] Killing + restarting `deskwork-studio` while CC's listen loop is active does NOT cause the listen loop to exit. Bridge state (queue + `listenModeOn` + `awaitingMessage`) is preserved. Operator does NOT need to re-dispatch `/deskwork:listen`.
-- [ ] During the studio restart window, `/dev/*` requests return 502 with a friendly message; `/api/chat/*` and `/mcp` are unaffected.
-- [ ] All Phase 1–9 acceptance criteria still hold.
-- [ ] Smoke script verifies the survives-restart property locally.
+- [x] After `deskwork-bridge` + `deskwork-studio` are running, the phone hits the canonical port and gets the chat panel + dev surfaces normally. (Verified by `smoke-bridge-sidecar.sh` B3.)
+- [x] Killing + restarting `deskwork-studio` while CC's listen loop is active does NOT cause the listen loop to exit. Bridge state (queue + `listenModeOn` + `awaitingMessage`) is preserved. Operator does NOT need to re-dispatch `/deskwork:listen`. (Verified by `survives-studio-restart.test.ts` — the queue's pending awaiter resolves with a post-bounce operator message.)
+- [x] During the studio restart window, `/dev/*` requests return 502 with a friendly message; `/api/chat/*` and `/mcp` are unaffected. (Verified by `smoke-bridge-sidecar.sh` B4 + B4b.)
+- [x] All Phase 1–9 acceptance criteria still hold (1316 tests pass across all workspaces).
+- [x] Smoke script verifies the survives-restart property locally.
 
 #### Phase 10d — Adopter-facing wiring (DEFERRED, document only)
 
