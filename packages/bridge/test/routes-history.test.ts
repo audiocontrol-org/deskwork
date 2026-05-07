@@ -96,7 +96,11 @@ describe('GET /api/chat/history', () => {
     expect(body.rows[0]).toMatchObject({ seq: 3 });
   });
 
-  it('?limit=1 returns 1 row', async () => {
+  it('?limit=1 returns the LAST row (not the first)', async () => {
+    // History returns the most-recent rows, so a chat-panel mount
+    // doesn't get ancient history. With an accumulated chat log,
+    // returning the FIRST `limit` rows surfaced messages from a
+    // prior day's session and hid current activity.
     await seedRows([
       { seq: 1, ts: 100, role: 'operator', text: 'one' },
       { seq: 2, ts: 200, role: 'operator', text: 'two' },
@@ -105,7 +109,7 @@ describe('GET /api/chat/history', () => {
     const r = await getJson(fx, '/api/chat/history?limit=1');
     const body = { rows: rowsOf(r.body) };
     expect(body.rows.length).toBe(1);
-    expect(body.rows[0]).toMatchObject({ seq: 1 });
+    expect(body.rows[0]).toMatchObject({ seq: 3 });
   });
 
   it('?since=0 returns all rows', async () => {

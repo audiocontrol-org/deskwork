@@ -124,14 +124,23 @@ export class ChatLog {
 
     const withMarkers = injectCorruptionMarkers(parsed);
 
+    // Return the LAST `limit` rows that pass the sinceSeq filter (in
+    // chronological order). The previous implementation broke at the
+    // FIRST `limit` matching rows — for an accumulated chat log, that
+    // returned ancient history instead of the most recent activity.
+    // Symptom: chat-panel mount calls `loadHistory(200)` on refresh,
+    // received the oldest 200 rows, never saw recent prose. Per-day
+    // chat-log files are small (bounded by the day's traffic), so
+    // collecting all matching rows then slicing the tail is fine for
+    // memory.
     const filtered: ChatLogRow[] = [];
     for (const row of withMarkers) {
       const seq = rowSeq(row);
       if (seq !== null && seq <= sinceSeq) continue;
       filtered.push(row);
-      if (filtered.length >= limit) break;
     }
-    return filtered;
+    if (filtered.length <= limit) return filtered;
+    return filtered.slice(filtered.length - limit);
   }
 
   private currentLogPath(): string {
