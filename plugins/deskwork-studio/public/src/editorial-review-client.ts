@@ -15,7 +15,8 @@
  */
 
 import { initScrapbookLightbox } from './lightbox.ts';
-import { copyOrShowFallback, isManualCopyOpen } from './clipboard.ts';
+import { isManualCopyOpen } from './clipboard.ts';
+import { dispatchToAgent } from './affordance-routing.ts';
 
 interface DraftRange {
   start: number;
@@ -1657,25 +1658,27 @@ export function initEditorialReview(): void {
   const rejectBtn = qn<HTMLButtonElement>('[data-action="reject"]');
 
   /**
-   * Copy the Claude Code command the operator needs to run next.
-   * Studio clicks only transition workflow state; the cognitive work
-   * (iterate, approve-and-write) lives in a skill the operator must
-   * invoke. On clipboard failure (HTTP origin, sandboxed iframe), the
-   * unified `copyOrShowFallback` helper renders a persistent manual-
-   * copy panel — this is the #74 fix (the prior auto-reload destroyed
-   * the toast before the operator could grab the command).
-   *
-   * Returns whether the clipboard write succeeded; callers gate their
-   * auto-reload on this.
+   * Route the Claude Code command the operator needs to run next
+   * through the affordance dispatcher. When the bridge is live, the
+   * docked chat panel pre-fills with `command` and the operator hits
+   * Send — no copy/paste round trip. When the bridge is offline, the
+   * helper falls back to `copyOrShowFallback` with the same options
+   * that previously lived inline here (the #74 manual-copy panel,
+   * onDismiss-triggered reload to preserve the operator's grab
+   * window). Studio clicks still only transition workflow state; the
+   * cognitive work (iterate, approve-and-write) lives in the skill
+   * the operator dispatches.
    */
-  async function copyCommandForNextStep(command: string, hint: string): Promise<boolean> {
-    return copyOrShowFallback(command, {
-      successMessage: `${hint}  (command copied — paste into Claude Code)`,
-      fallbackMessage: 'Clipboard unavailable — select and Cmd-C to copy this command, then paste it into Claude Code:',
-      // When the operator dismisses the manual-copy panel, the page
-      // reloads to advance to the post-mutation state — same effect
-      // as the auto-reload would have had if the clipboard had worked.
-      onDismiss: () => window.location.reload(),
+  async function copyCommandForNextStep(command: string, hint: string): Promise<void> {
+    await dispatchToAgent(command, {
+      clipboard: {
+        successMessage: `${hint}  (command copied — paste into Claude Code)`,
+        fallbackMessage: 'Clipboard unavailable — select and Cmd-C to copy this command, then paste it into Claude Code:',
+        // When the operator dismisses the manual-copy panel, the page
+        // reloads to advance to the post-mutation state — same effect
+        // as the auto-reload would have had if the clipboard had worked.
+        onDismiss: () => window.location.reload(),
+      },
     });
   }
 
@@ -1779,9 +1782,11 @@ export function initEditorialReview(): void {
         console.warn('copy-cmd: missing data-cmd attribute', btn);
         return;
       }
-      await copyOrShowFallback(cmd, {
-        successMessage: `Copied: ${cmd}  (paste into Claude Code)`,
-        fallbackMessage: 'Clipboard unavailable — select and Cmd-C to copy this command, then paste it into Claude Code:',
+      await dispatchToAgent(cmd, {
+        clipboard: {
+          successMessage: `Copied: ${cmd}  (paste into Claude Code)`,
+          fallbackMessage: 'Clipboard unavailable — select and Cmd-C to copy this command, then paste it into Claude Code:',
+        },
       });
     });
   });

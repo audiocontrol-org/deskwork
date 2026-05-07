@@ -27,7 +27,7 @@
  * client; their retirement is a follow-up.
  */
 
-import { copyOrShowFallback } from '../clipboard.ts';
+import { dispatchToAgent } from '../affordance-routing.ts';
 import type { EntryReviewState } from './state.ts';
 
 interface DecisionDom {
@@ -80,10 +80,13 @@ export function createDecisionController(
    */
   async function copyCommand(verb: 'approve' | 'iterate'): Promise<void> {
     const command = `/deskwork:${verb} ${state.slug}`;
-    await copyOrShowFallback(command, {
-      successMessage: `Copied — paste into a Claude Code chat to run \`${command}\`.`,
-      fallbackMessage:
-        `Clipboard unavailable on this origin. Copy this command and paste it into a Claude Code chat to run \`/deskwork:${verb}\`:`,
+    await dispatchToAgent(command, {
+      contextRef: state.slug,
+      clipboard: {
+        successMessage: `Copied — paste into a Claude Code chat to run \`${command}\`.`,
+        fallbackMessage:
+          `Clipboard unavailable on this origin. Copy this command and paste it into a Claude Code chat to run \`/deskwork:${verb}\`:`,
+      },
     });
   }
 

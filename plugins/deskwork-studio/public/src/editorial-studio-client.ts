@@ -5,7 +5,7 @@
  * marker. Clipboard helpers live in `./clipboard.ts`.
  */
 
-import { copyOrShowFallback } from './clipboard.ts';
+import { dispatchToAgent } from './affordance-routing.ts';
 
 function siteFromButton(btn: HTMLButtonElement): string {
   const site = btn.dataset.site;
@@ -38,13 +38,20 @@ function initCopyButtons(): void {
         return;
       }
       const original = btn.textContent;
-      const ok = await copyOrShowFallback(text, {
-        successMessage: 'Copied to clipboard',
-        fallbackMessage: 'Clipboard unavailable — select and Cmd-C to copy this command, then paste it into Claude Code:',
+      const result = await dispatchToAgent(text, {
+        clipboard: {
+          successMessage: 'Copied to clipboard',
+          fallbackMessage: 'Clipboard unavailable — select and Cmd-C to copy this command, then paste it into Claude Code:',
+        },
       });
-      if (ok) {
+      // The manual-copy fallback (delivered=false) renders its own
+      // loud panel — keep the button label stable so the operator's
+      // attention goes to the panel, matching the pre-routing UX.
+      // Panel prefill and successful clipboard writes both warrant
+      // the "copied/sent" affirm flash.
+      if (result.delivered) {
         btn.classList.add('copied');
-        btn.textContent = 'copied ✓';
+        btn.textContent = result.routed === 'panel' ? 'sent to chat ✓' : 'copied ✓';
         setTimeout(() => {
           btn.classList.remove('copied');
           btn.textContent = original;
@@ -396,13 +403,15 @@ function initIntakeForm(): void {
     const payload = lines.join('\n');
     const btn = form.querySelector<HTMLButtonElement>('[data-action="intake-copy"]');
     const original = btn?.textContent ?? null;
-    const ok = await copyOrShowFallback(payload, {
-      successMessage: 'Intake command copied — paste into Claude Code',
-      fallbackMessage: 'Clipboard unavailable — select and Cmd-C to copy this intake command, then paste it into Claude Code:',
+    const result = await dispatchToAgent(payload, {
+      clipboard: {
+        successMessage: 'Intake command copied — paste into Claude Code',
+        fallbackMessage: 'Clipboard unavailable — select and Cmd-C to copy this intake command, then paste it into Claude Code:',
+      },
     });
-    if (ok && btn) {
+    if (result.delivered && btn) {
       btn.classList.add('copied');
-      btn.textContent = 'copied ✓';
+      btn.textContent = result.routed === 'panel' ? 'sent to chat ✓' : 'copied ✓';
       setTimeout(() => {
         btn.classList.remove('copied');
         if (original !== null) btn.textContent = original;

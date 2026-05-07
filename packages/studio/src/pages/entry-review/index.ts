@@ -251,6 +251,15 @@ export async function renderEntryReviewPage(
     historical: data.historical !== null,
   });
 
+  // Bridge-aware chat panel mount. Only emit the placeholder div when
+  // the studio booted with `ctx.bridge !== undefined`; the chat-mount
+  // client script also no-ops on pages without the placeholder, so the
+  // server-side gate is defense in depth (and avoids loading an empty
+  // `[data-chat-panel-mount]` for non-bridge boots).
+  const chatPanelMount: RawHtml = ctx.bridge !== undefined
+    ? unsafe(`<div data-chat-panel-mount data-chat-context-ref="${escapeHtml(data.entry.uuid)}"></div>`)
+    : unsafe('');
+
   const body = html`
     <div data-review-ui="longform" class="er-review-shell">
       ${renderEditorialFolio('longform', folioSpine)}
@@ -278,27 +287,45 @@ export async function renderEntryReviewPage(
       <button class="er-pencil-btn" data-add-comment-btn hidden type="button">Mark</button>
       ${renderOutlineDrawer(outlineHtml)}
       ${scrapbookDrawer}
+      ${chatPanelMount}
       <div class="er-toast" data-toast hidden></div>
       ${renderShortcutsOverlay()}
       <div class="er-poll-indicator" data-poll>auto-refresh · 8s</div>
     </div>`;
 
+  // The ChatPanel constructor demands a non-empty `data-project-root`
+  // on `<body>` so its localStorage draft key namespaces per-worktree
+  // — emit it when the bridge is mounted. (Without the bridge, the
+  // chat-mount.ts script never runs because `[data-chat-panel-mount]`
+  // is also absent.)
+  const projectRootAttr = ctx.bridge !== undefined
+    ? ` data-project-root="${escapeHtml(ctx.projectRoot)}"`
+    : '';
+  // Load `chat-mount` only when the bridge is live so non-bridge boots
+  // don't ship dead code into the page.
+  const scriptModules = ctx.bridge !== undefined
+    ? ['entry-review-client', 'chat-mount']
+    : ['entry-review-client'];
+
+  const cssHrefs = [
+    '/static/css/editorial-review.css',
+    '/static/css/editorial-nav.css',
+    '/static/css/entry-review.css',
+    '/static/css/blog-figure.css',
+    '/static/css/review-viewport.css',
+    '/static/css/scrap-row.css',
+    ...(ctx.bridge !== undefined ? ['/static/css/chat.css'] : []),
+  ];
+
   return {
     status: 200,
     html: layout({
       title: `${titleField} — Review`,
-      cssHrefs: [
-        '/static/css/editorial-review.css',
-        '/static/css/editorial-nav.css',
-        '/static/css/entry-review.css',
-        '/static/css/blog-figure.css',
-        '/static/css/review-viewport.css',
-        '/static/css/scrap-row.css',
-      ],
-      bodyAttrs: 'data-review-ui="entry-review"',
+      cssHrefs,
+      bodyAttrs: `data-review-ui="entry-review"${projectRootAttr}`,
       bodyHtml: body,
       embeddedJson: [{ id: 'entry-review-state', data: state }],
-      scriptModules: ['entry-review-client'],
+      scriptModules,
     }),
   };
 }

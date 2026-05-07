@@ -24,7 +24,7 @@ import { wireMarginaliaPositioning } from './entry-review/marginalia-position.ts
 import { initOutlineDrawer } from './entry-review/outline-drawer.ts';
 import { initScrapbookDrawerToggle } from './entry-review/scrapbook-drawer.ts';
 import { initShortcuts } from './entry-review/shortcuts.ts';
-import { copyOrShowFallback } from './clipboard.ts';
+import { dispatchToAgent } from './affordance-routing.ts';
 
 const ENTRY_API = '/api/dev/editorial-review/entry';
 
@@ -61,13 +61,14 @@ const CONTROL_TO_ACTION: Readonly<Record<string, EntryAction>> = {
  * picker for Blocked / Cancelled, plus a delegated click handler for
  * any future `data-control="approve|block|cancel"` button).
  *
- * Per `THESIS.md` Consequence 2 (#189), every click here copies the
- * corresponding `/deskwork:<verb> <slug>` skill command to the
- * operator's clipboard via `copyOrShowFallback`. The state-machine
- * mutation belongs to the skill, not to this UI handler. The data
- * attributes carry the slug + uuid so the handler can build the
- * command without round-tripping to the server. Reject is unaffected
- * (separately disabled pending issue #173).
+ * Per `THESIS.md` Consequence 2 (#189), every click here routes the
+ * corresponding `/deskwork:<verb> <slug>` skill command via
+ * `dispatchToAgent` (chat-panel prefill when the bridge is live;
+ * clipboard fallback otherwise). The state-machine mutation belongs
+ * to the skill, not to this UI handler. The data attributes carry the
+ * slug + uuid so the handler can build the command without round-
+ * tripping to the server. Reject is unaffected (separately disabled
+ * pending issue #173).
  */
 function wireStageActions(): void {
   document.addEventListener('click', async (e) => {
@@ -80,10 +81,13 @@ function wireStageActions(): void {
     if (action === undefined) return;
     e.preventDefault();
     const command = `/deskwork:${action} ${slug}`;
-    await copyOrShowFallback(command, {
-      successMessage: `Copied — paste into a Claude Code chat to run \`${command}\`.`,
-      fallbackMessage:
-        `Clipboard unavailable on this origin. Copy this command and paste it into a Claude Code chat to run \`/deskwork:${action}\`:`,
+    await dispatchToAgent(command, {
+      contextRef: slug,
+      clipboard: {
+        successMessage: `Copied — paste into a Claude Code chat to run \`${command}\`.`,
+        fallbackMessage:
+          `Clipboard unavailable on this origin. Copy this command and paste it into a Claude Code chat to run \`/deskwork:${action}\`:`,
+      },
     });
   });
 
@@ -96,10 +100,13 @@ function wireStageActions(): void {
     const targetStage = target.value;
     if (!targetStage) return;
     const command = `/deskwork:induct ${slug} --to ${targetStage}`;
-    await copyOrShowFallback(command, {
-      successMessage: `Copied — paste into a Claude Code chat to run \`${command}\`.`,
-      fallbackMessage:
-        `Clipboard unavailable on this origin. Copy this command and paste it into a Claude Code chat to induct ${slug} into ${targetStage}:`,
+    await dispatchToAgent(command, {
+      contextRef: slug,
+      clipboard: {
+        successMessage: `Copied — paste into a Claude Code chat to run \`${command}\`.`,
+        fallbackMessage:
+          `Clipboard unavailable on this origin. Copy this command and paste it into a Claude Code chat to induct ${slug} into ${targetStage}:`,
+      },
     });
     // Reset the select to its placeholder so the change can be invoked
     // again (otherwise the same option stays selected and a second

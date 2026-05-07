@@ -26,6 +26,25 @@ import { buildChatSkeleton, type ChatSkeleton } from './chat-skeleton.ts';
 const MOBILE_BREAKPOINT_PX = 600;
 const NEAR_BOTTOM_PX = 50;
 
+/**
+ * Ambient declaration so `affordance-routing.ts` (and any other
+ * consumer that needs to pre-fill the docked panel without import-
+ * cycling through this module) can read `window.deskworkChatPanel`.
+ *
+ * Multi-mount contract: if multiple ChatPanel instances mount on the
+ * same page (e.g. a docked drawer + a full-page modal), the LAST
+ * mount wins — its constructor overwrites the global. When that
+ * panel destroys, it clears the global only if the global still
+ * points at itself, so an earlier panel that's still alive is not
+ * observed in a stale slot.
+ */
+declare global {
+  // eslint-disable-next-line no-var
+  interface Window {
+    deskworkChatPanel?: ChatPanel;
+  }
+}
+
 export interface ChatPanelOptions {
   readonly contextRef?: string;
   readonly fullPage?: boolean;
@@ -72,6 +91,7 @@ export class ChatPanel {
     this.applyMobileClass();
     this.applyInputEnabled();
     this.restoreDraft();
+    window.deskworkChatPanel = this;
     void this.bootstrapHistoryAndStream();
   }
 
@@ -107,6 +127,9 @@ export class ChatPanel {
       this.skel.root.parentNode.removeChild(this.skel.root);
     }
     this.skel = null;
+    if (window.deskworkChatPanel === this) {
+      window.deskworkChatPanel = undefined;
+    }
   }
 
   private wireEvents(): void {
