@@ -107,7 +107,7 @@ When the bridge is offline, those same buttons fall back to the existing copy-to
    {
      "mcpServers": {
        "deskwork-studio": {
-         "transport": "http",
+         "type": "http",
          "url": "http://localhost:47321/mcp"
        }
      }
