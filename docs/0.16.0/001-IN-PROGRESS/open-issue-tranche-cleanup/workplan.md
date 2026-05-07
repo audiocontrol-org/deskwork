@@ -155,8 +155,14 @@ deskwork:
 
 ### Task 3 (T2) — dw-lifecycle plugin UX cluster
 
-- [ ] Single dispatch covering [#185](https://github.com/audiocontrol-org/deskwork/issues/185), [#196](https://github.com/audiocontrol-org/deskwork/issues/196), [#209](https://github.com/audiocontrol-org/deskwork/issues/209), [#210](https://github.com/audiocontrol-org/deskwork/issues/210), [#211](https://github.com/audiocontrol-org/deskwork/issues/211), [#212](https://github.com/audiocontrol-org/deskwork/issues/212), [#213](https://github.com/audiocontrol-org/deskwork/issues/213), [#214](https://github.com/audiocontrol-org/deskwork/issues/214), [#215](https://github.com/audiocontrol-org/deskwork/issues/215). All touch `plugins/dw-lifecycle/` skills + helpers.
-- [ ] Per-issue evaluation + disposition; some may be wontfix or out-of-scope on closer reading.
+- [x] [#214](https://github.com/audiocontrol-org/deskwork/issues/214) — broaden self-description from "editorial calendar" to "longform-writing pipeline" (commit `f9c24d6`).
+- [x] [#210](https://github.com/audiocontrol-org/deskwork/issues/210) — surface `/dw-lifecycle:install` as the prerequisite for setup (commit `4621083`).
+- [x] [#213](https://github.com/audiocontrol-org/deskwork/issues/213) — back-fill `parentIssue` for any value form, not just the `<parentIssue>` template token (commit `da8f127`).
+- [x] [#196](https://github.com/audiocontrol-org/deskwork/issues/196) + [#209](https://github.com/audiocontrol-org/deskwork/issues/209) — setup helper reuses pre-created branch+worktree instead of doubling or aborting; resolves config from main worktree (commit `34ae79c`).
+- [x] [#212](https://github.com/audiocontrol-org/deskwork/issues/212) — `--workplan <path>` flag completes the brainstorming → writing-plans → setup chain (commit `370f915`).
+- [x] [#185](https://github.com/audiocontrol-org/deskwork/issues/185) — `commands/<name>.md` shims for every skill so `/<plugin>:<skill>` reaches users; covers both `deskwork` and `dw-lifecycle` plugins (commit `f28dd8b`).
+- [x] [#211](https://github.com/audiocontrol-org/deskwork/issues/211) — `dw-lifecycle install --config-overlay <path>` deep-merges JSON onto probed config (commit `572fc63`). Schema-extension (richer status-roles than the three-state default) deferred to a separate issue.
+- [x] [#215](https://github.com/audiocontrol-org/deskwork/issues/215) issues 1, 3, 4 — approve emits `review-state-change.to=null` to clear journal-sidecar drift; `deskwork doctor --help` now prints usage; "Calendar-level audit: clean" replaces the misleading "Doctor: clean" banner (commit `a6db33e`). Issue 2 (calendar lacks Final lane / regenerate writes to `.deskwork/calendar.md` not the per-site `calendarPath`) deferred — needs separate investigation into the dual-calendar architecture; will be filed as its own issue.
 
 ### Task 4 (T3) — doctor cleanup
 
