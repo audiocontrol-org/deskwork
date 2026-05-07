@@ -13,6 +13,24 @@ Populating this file is a step in `/session-end`. If a session didn't exercise t
 
 ---
 
+## 2026-05-06 (T2 burn-down): infrastructure-only session — no plugin exercise, by design
+
+**Arc:** Pure source-side work fixing the dw-lifecycle plugin UX cluster (T2: #185, #196, #209, #210, #211, #212, #213, #214, #215). 8-of-9 issues fix-landed across 6 commits. The work is reactive: every fix is a response to friction the operator already documented in those issues. No new dogfood walks happened; we didn't exercise the plugin against real content.
+
+**What should have been exercised but wasn't:** post-release verification via `/plugin marketplace update deskwork`. The fixes can't be verified against a real install until v0.18.0 ships. The agent-discipline rule *"issue closure requires verification in a formally-installed release"* is the gate here — nothing closes until a fresh marketplace install demonstrates the original symptoms are gone. That walk is pending the next release.
+
+**Adopter-friction signal still surfaces from the fix work itself:**
+
+- **insight** — **The 9 T2 issues map almost exactly to the seam between SKILL prose and helper code.** #196, #209, #210, #212 all came from the SKILL.md telling the operator one thing and the helper expecting another — pre-create a worktree and the helper aborts; pre-author a workplan and the helper renders a stub anyway; run setup without `/dw-lifecycle:install` first and get a confusing error. Whenever a SKILL describes a step the helper doesn't actually support (or the helper expects a precondition the SKILL doesn't surface), that's friction the adopter hits in their first attempt. Treating the SKILL as the operator-facing API and the helper as its implementation — and gating PR review on the two staying in sync — would catch these before they ship.
+
+- **insight** — **#185 is the canonical "packaging is UX" defect.** The plugin shipped 16 working SKILLs that no adopter could invoke via slash command, because shipped Claude Code requires `commands/<name>.md` shims to register the user-typeable form. SKILL.md alone isn't enough. The bug was invisible during in-monorepo dogfood (the project-local `.claude/skills/feature-*` shims worked) but every external adopter hit it. The `agent-discipline` rule *"Use the deskwork plugin only through the publicly-advertised distribution channel"* exists specifically to prevent this — when the dev path differs from the adopter path, friction hides until a real install surfaces it.
+
+- **insight** — **Splitting #215 into #232 preserved the architectural conversation.** Issue 1 (journal-sidecar drift after approve) was a clean code fix. Issue 2 (calendar regen writes to hardcoded `.deskwork/calendar.md` not per-site `calendarPath`) needs operator design input — entry-centric calendar vs. per-site legacy is a load-bearing architectural call. Cramming both into a single commit would have either shipped a fix to the wrong shape OR left issue 1's clean fix waiting on issue 2's design discussion. Per the *"file every UX friction immediately; let scoping happen later"* principle, splitting is the right move whenever a single issue contains two different *kinds* of work.
+
+**No `/plugin marketplace add` / install commands ran this session. No studio routes were navigated. No content was ingested or iterated against.** Next release (v0.18.0+) opens the post-install walk; that's where the next USAGE-JOURNAL entry should land.
+
+---
+
 ## 2026-05-04 / 05 (Phase 35 + UX polish + v0.15.0 release): hands-on review-surface dogfood; multi-issue triage; tranche-cleanup feature bootstrap
 
 **Arc:** Heavy-use session driving the studio's review surface against the issue-158 UX-audit doc. The session arc went audit → fix → audit → fix four times: fix the marginalia rail's vertical alignment → operator surfaces the next problem (composer rips you out of scroll context) → fix → operator surfaces the next problem (Cancel button doesn't work) → fix → bootstrap the next feature. Five issues filed during the work; one full release shipped to npm + marketplace + GitHub.

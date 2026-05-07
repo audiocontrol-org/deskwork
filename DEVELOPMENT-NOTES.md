@@ -4,6 +4,61 @@ Session journal for `deskwork`. Each entry records what was tried, what worked, 
 
 ---
 
+## 2026-05-06 (T2 burn-down): dw-lifecycle plugin UX cluster — 8 of 9 issues fix-landed across 6 commits; #215 sub-issue split into #232
+### Feature: open-issue-tranche-cleanup
+### Worktree: deskwork-open-issue-tranche-cleanup
+
+**Goal:** continue the post-compaction T2 burn-down (`/dw-lifecycle:implement` for the dw-lifecycle plugin UX cluster). T2 covered 9 issues filed during dogfood walks of v0.14.x — #185, #196, #209, #210, #211, #212, #213, #214, #215. Pre-compaction had #214 + #210 already shipped; this session opened with #213 in progress and burned down the rest.
+
+**Accomplished:**
+
+- **#213 — `parentIssue` back-fill matches any value form** (commit `da8f127`). The prior implementation `readme.replace(/<parentIssue>/g, ...)` only matched the literal pre-render template token. After template rendering the placeholder is one of `parentIssue: TBD`, `parentIssue:`, `parentIssue: null`, etc. — none matched. Now uses `/^(parentIssue:)([ \t]*[^\n]*)$/m` scoped to the leading frontmatter block, replaces with canonical `"#N"` form, surfaces a stderr warning when the field is missing entirely. Extended back-fill from README.md to prd.md per #213's repro. 9 regression tests cover `<parentIssue>`, TBD, empty, null, quoted re-run, missing field, no-frontmatter, body-content (must NOT touch), and indentation preservation.
+
+- **#196 + #209 — setup helper reuses pre-created branch+worktree** (commit `34ae79c`). Same root cause for both: the helper assumed sole ownership of branch+worktree creation, which conflicted with the SKILL's own step 2 (`superpowers:using-git-worktrees`). #209 surfaced as `Branch already exists`; #196 as a doubled-name `<repo>-<slug>-<slug>` worktree because `repoRoot()` returned the cwd's worktree (sibling) instead of the main repo. Three changes: (a) `mainWorktreePath()` helper resolves the main worktree via `git worktree list --porcelain`'s first record; (b) `repoBasename` now uses the main path so `<repo>` substitution can't double; (c) `findWorktreeForBranch` detects the pre-created case and reuses, with a clear error when the branch exists but no worktree is checked out. Rollback on scaffolding failure no longer destroys an operator-owned worktree. SKILL.md updated to call out step 2 as optional. New smoke test mirrors the operator's actual flow.
+
+- **#212 — `--workplan <path>` flag completes brainstorming → writing-plans → setup chain** (commit `370f915`). Setup rendered its own `templates/workplan.md` stub regardless of whether the operator had already authored a real workplan body via `superpowers:writing-plans`. New flag accepts a pre-authored body file: prepends standard frontmatter (slug/targetVersion/date) if absent, writes to `workplan.md`, skips the rendered stub entirely. Pre-flight existence check before worktree creation so a typo doesn't strand the operator with a half-scaffolded dir. Two regression tests (happy path + missing-file abort). SKILL.md updated.
+
+- **#185 — `commands/<name>.md` shims for every skill** (commit `f28dd8b`). Adopters typing `/dw-lifecycle:setup`, `/deskwork:add`, etc. got `Unknown command` because current shipped Claude Code requires `commands/<name>.md` to register the user-typeable slash-command surface — SKILL.md alone does not. Added 16 + 14 shims and `scripts/generate-command-shims.ts` to produce them from each skill's frontmatter description. Shim body is one line: a directive to invoke the same-named Skill via the Skill tool. SKILL.md remains the canonical procedure; no duplication. `deskwork-studio` intentionally not changed — its single-skill layout already worked per #185's diagnosis table.
+
+- **#211 — `dw-lifecycle install --config-overlay <path>`** (commit `572fc63`). Install only had `--dry-run` — overrides required hand-editing JSON post-write. New flag accepts a JSON file deep-merged onto the probed config (plain-object keys recurse; arrays/primitives replace wholesale). The merged result still passes through `validateConfig`. Bad inputs surface specifically: missing file, malformed JSON. Tests cover deep-merge override + non-overridden field preservation + missing/malformed error paths. SKILL.md updated with a concrete example overlay. Schema-extension work (richer status-roles than the three-state default) deferred per #211's option 4.
+
+- **#215 issues 1, 3, 4 — approve drift + doctor ergonomics** (commit `a6db33e`). Issue 1: `approveEntryStage` cleared `sidecar.reviewState` but never emitted a counterpart `review-state-change` journal event, so the doctor's `journal-sidecar` rule reported permanent drift after every iterate→approve sequence. Now appends `{kind: 'review-state-change', from: <prior>, to: null}` BEFORE the stage-transition when the prior reviewState was non-null (no event when already null). Issue 3: `deskwork doctor --help` errored `Unknown flag: --help` because `parseArgs` didn't know about it. Now detected before parseArgs runs, prints usage to stdout, exits 0. Issue 4: misleading `Doctor: clean` first line was the legacy/calendar pass's verdict but read as an overall judgment; rescoped to `Calendar-level audit: clean` so the parallel `Entry-centric validation: N failure(s)` line distinguishes the two passes.
+
+- **#215 issue 2 split off as #232** — `regenerateCalendar` writes to hardcoded `.deskwork/calendar.md` and ignores per-site `calendarPath`. Filed with two architecture questions for operator decision (entry-centric calendar vs. per-site legacy; multi-site fan-out shape) before code lands.
+
+- **Tests:** dw-lifecycle 105 → 120, core 523 → 525, cli 196 (no change). All three workspaces green.
+
+- **Workplan + README updated** to mark T2 done with per-issue commit hashes; #232 link inserted at the deferred-issue disposition.
+
+**Didn't Work:**
+
+- **First setup-reuse smoke test failed** because the test's pre-created worktree didn't have its own `.dw-lifecycle/config.json` — `loadConfig(repoRoot(cwd))` looked in the linked worktree, not the main one. Fixed by also routing the helper's config resolution through `mainWorktreePath()` (not just the worktree-path computation). The test then drove out the real bug: config is in the main worktree, but the helper was looking in the linked one.
+
+- **First `--workplan` smoke test failed** the missing-file abort assertion — the worktree got created before the existence check fired. Moved the workplanFile pre-flight up alongside the definitionFile pre-flight, before the worktree creation block.
+
+**Course Corrections:**
+
+- **[PROCESS]** Almost dispatched a batched 4-fix sub-agent earlier in the thread; operator had already corrected this pattern pre-compaction (*"do issues individually in-thread or per-issue dispatch"*). Stayed in-thread; per-issue commits with their own tests.
+- **[COMPLEXITY]** First instinct on #211 was to add four individual override flags (`--status-in-progress`, `--known-version`, etc.). Pulled back to just `--config-overlay <path>` — most general, smallest surface, lets operator override anything without flag-by-flag growth. Per-flag options remain available as future incremental work if the overlay path proves insufficient.
+- **[PROCESS]** Found a real bug in #215 issue 2 (hardcoded `.deskwork/calendar.md` in `regenerateCalendar` + `repair.ts`) but stopped short of fixing it. Two architectural questions need an operator decision (canonical-calendar intent + multi-site fan-out) before the right shape is clear. Filed as #232 with the questions; surfaced #215 as 3-of-4-fixed in the commit message and workplan.
+
+**Quantitative:**
+
+- Messages: ~25 (a single "continue the burn-down" arc post-compaction)
+- Commits: 7 on the feature branch (6 fixes + 1 doc-link update)
+- Issues: 0 closed (all stay open per agent-discipline release-gates rule); 1 filed (#232 split from #215)
+- Tests: +15 dw-lifecycle, +2 core, no change cli
+
+**Insights:**
+
+- **Per-issue in-thread commits with their own regression tests** is the right cadence for this kind of UX-cluster cleanup — each issue's bug is small enough for a single commit but its fix needs verification, and the regression test is the bridge that makes the verification durable across future refactors. Batched dispatch would have lost the per-issue traceability.
+- **Layered config-resolution bugs hide behind each other.** #196 looked like a `<repo>` substitution bug; fixing that surfaced the deeper `loadConfig` bug (config lives in main, helper looked in linked worktree). Each layer's fix had to land before the next layer's bug was visible. Same pattern as the marginalia rail's three-layered bugs in the prior session — fix one, the next surfaces.
+- **"Read the SKILL.md, write a one-line shim that delegates to it"** was the right scaling answer for #185. Treating `commands/<name>.md` as a thin slash-command surface and SKILL.md as the canonical procedure keeps drift impossible (no duplicated step bodies) and makes future skill additions a single `tsx scripts/generate-command-shims.ts` away.
+- **The `.git-commit-msg.tmp` + `git commit -F` pattern paired well with each per-issue commit's structured body** — every commit message has the bug → root cause → fix → tests structure that makes them readable later. The pattern is now muscle memory for this project; the work-level rule against `#` in heredocs is the forcing function.
+- **Filing #232 instead of cramming a fix into #215** preserved the architectural conversation. The operator's two decisions on #232 (canonical calendar location + multi-site shape) couldn't have happened cleanly inside a half-fixed #215 commit; splitting kept each issue's disposition crisp.
+
+---
+
 ## 2026-05-04 / 05 (Phase 35 + UX polish + v0.15.0 release): marginalia rail rebuild, THESIS articulation, decision-strip skill routing, multi-issue triage; also bootstrapped a follow-on cleanup feature
 ### Feature: deskwork-plugin
 ### Worktree: deskwork-plugin
