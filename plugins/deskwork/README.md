@@ -1,6 +1,8 @@
 ## deskwork
 
-Editorial calendar lifecycle plugin for [Claude Code](https://claude.com/claude-code). Capture ideas, plan drafts, run a structured review loop, publish, and track distribution — all driven by skills under the `/deskwork:` namespace, against `.deskwork/config.json` in any host project.
+Longform-writing pipeline plugin for [Claude Code](https://claude.com/claude-code). Capture ideas, plan drafts, run a structured review loop, publish, and track distribution — all driven by skills under the `/deskwork:` namespace, against `.deskwork/config.json` in any host project.
+
+The pipeline is general-purpose for any markdown-based longform writing: **blog posts, essays, design specs, ADRs, RFCs, internal memos, books, manuscripts, runbooks, post-mortems, knowledge bases**. The subject of the document doesn't change how it's drafted, reviewed, or shipped — capture → plan → outline → draft → review → publish works the same regardless. If you have a tree of markdown files moving through editorial states, deskwork manages it.
 
 ### Install
 

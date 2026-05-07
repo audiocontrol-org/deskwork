@@ -2,7 +2,7 @@
   "name": "@deskwork/plugin",
   "version": "0.17.1",
   "private": true,
-  "description": "Editorial calendar lifecycle plugin for Claude Code — thin shell pointing at @deskwork/cli",
+  "description": "Longform-writing pipeline plugin for Claude Code — thin shell pointing at @deskwork/cli. Works for blog posts, essays, design specs, ADRs, RFCs, internal memos, books, manuscripts, and any other markdown collection.",
   "license": "GPL-3.0-or-later",
   "repository": {
     "type": "git",

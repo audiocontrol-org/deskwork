@@ -5,7 +5,7 @@
     "url": "https://github.com/audiocontrol-org/deskwork"
   },
   "metadata": {
-    "description": "Open-source Claude Code plugins — editorial calendar, feature images, analytics",
+    "description": "Open-source Claude Code plugins — longform-writing pipeline, web studio, project lifecycle orchestration",
     "version": "0.17.1"
   },
   "plugins": [
@@ -17,7 +17,7 @@
         "path": "plugins/deskwork",
         "ref": "v0.17.1"
       },
-      "description": "Editorial calendar lifecycle: capture, plan, draft, publish, distribute",
+      "description": "Longform-writing pipeline: capture, plan, draft, review, publish. Works for blog posts, essays, design specs, ADRs, RFCs, internal memos, books, manuscripts, runbooks, and any other markdown collection.",
       "version": "0.17.1"
     },
     {

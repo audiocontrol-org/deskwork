@@ -1,7 +1,7 @@
 {
   "name": "deskwork",
   "version": "0.17.1",
-  "description": "Editorial calendar lifecycle for Claude Code — capture, plan, draft, publish, and distribute content through an agent-driven workflow",
+  "description": "Longform-writing pipeline for Claude Code — capture, plan, draft, review, and publish prose artifacts through an agent-driven workflow. Works for blog posts, essays, design specs, ADRs, RFCs, internal memos, books, manuscripts, runbooks, and any other markdown collection.",
   "homepage": "https://github.com/audiocontrol-org/deskwork",
   "repository": "https://github.com/audiocontrol-org/deskwork",
   "license": "GPL-3.0-or-later",
