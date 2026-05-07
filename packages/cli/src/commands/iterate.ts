@@ -56,9 +56,23 @@ import {
   type DispositionEntry,
 } from './iterate-dispositions.ts';
 
-const KNOWN_FLAGS = ['site', 'kind', 'platform', 'channel', 'dispositions'] as const;
+const KNOWN_FLAGS = [
+  'site',
+  'kind',
+  'platform',
+  'channel',
+  'dispositions',
+  'auto-dispositions',
+] as const;
 const VALID_KINDS = ['longform', 'outline', 'shortform'] as const;
 type Kind = (typeof VALID_KINDS)[number];
+
+const VALID_DISPOSITIONS = ['addressed', 'deferred', 'wontfix'] as const;
+type Disposition = (typeof VALID_DISPOSITIONS)[number];
+
+function isDisposition(v: string): v is Disposition {
+  return (VALID_DISPOSITIONS as readonly string[]).includes(v);
+}
 
 export async function run(argv: string[]): Promise<void> {
   let parsed;
@@ -74,7 +88,31 @@ export async function run(argv: string[]): Promise<void> {
     fail(
       'Usage: deskwork-iterate <project-root> [--site <slug>] ' +
         '[--kind longform|outline|shortform] [--platform <p>] [--channel <c>] ' +
-        '[--dispositions <path>] <slug>',
+        '[--dispositions <path>] [--auto-dispositions=addressed|deferred|wontfix] <slug>',
+      2,
+    );
+  }
+
+  // #226: --auto-dispositions=<value> applies the named disposition to every
+  // unresolved comment without requiring the agent to write a temp JSON. The
+  // common case (every margin note in this iteration was addressed by the
+  // rewrite) gets a one-flag invocation. Mutual exclusion with --dispositions:
+  // operator picks one shape per call.
+  if (
+    flags['auto-dispositions'] !== undefined &&
+    flags.dispositions !== undefined
+  ) {
+    fail(
+      '--auto-dispositions and --dispositions are mutually exclusive; pick one.',
+      2,
+    );
+  }
+  if (
+    flags['auto-dispositions'] !== undefined &&
+    !isDisposition(flags['auto-dispositions'])
+  ) {
+    fail(
+      `--auto-dispositions must be one of 'addressed', 'deferred', 'wontfix' (got "${flags['auto-dispositions']}").`,
       2,
     );
   }
@@ -140,11 +178,35 @@ async function runLongformIterate(
     dispositions = loadDispositionsFile(flags.dispositions);
   }
 
+  // #226: --auto-dispositions=<value> resolves AFTER we have the uuid,
+  // because we need to enumerate existing comments to build the map.
+  // Captured here for use post-uuid-resolution; mutual exclusion with
+  // --dispositions was already validated up top.
+  const autoDisposition: Disposition | null = isDisposition(
+    flags['auto-dispositions'] ?? '',
+  )
+    ? (flags['auto-dispositions'] as Disposition)
+    : null;
+
   let uuid: string;
   try {
     uuid = await resolveEntryUuid(projectRoot, slug);
   } catch (err) {
     fail(err instanceof Error ? err.message : String(err));
+  }
+
+  // #226: build the dispositions map from existing unresolved comments
+  // when --auto-dispositions is set. Done BEFORE iterateEntry so the
+  // failure shape matches the explicit-file path (fail-fast on bad
+  // input). For the auto case there's no input to validate beyond the
+  // value enum (already checked) — so this just enumerates.
+  if (autoDisposition !== null) {
+    const existing = await listEntryAnnotations(projectRoot, uuid);
+    dispositions = {};
+    for (const a of existing) {
+      if (a.type !== 'comment') continue;
+      dispositions[a.id] = { disposition: autoDisposition };
+    }
   }
 
   let result;

@@ -109,14 +109,17 @@ function seedEntryComment(entryId: string, commentId: string, text: string): voi
     },
   };
   // `appendJournalEvent` names files by `at-entryId-kind.json`. We mimic
-  // that here so the read path works the same.
+  // that here so the read path works the same. Suffix with the comment
+  // id so two calls in the same millisecond don't collide on filename
+  // (the at-timestamp is millisecond-resolution and back-to-back
+  // seedEntryComment calls in tests can land in the same ms).
   const safeAt = at.replace(/[:.]/g, '-');
   const file = join(
     project,
     '.deskwork',
     'review-journal',
     'history',
-    `${safeAt}-${entryId}-entry-annotation.json`,
+    `${safeAt}-${entryId}-entry-annotation-${commentId}.json`,
   );
   writeFileSync(file, JSON.stringify(event), 'utf-8');
 }
@@ -367,6 +370,118 @@ describe('deskwork iterate — entry-centric dispositions (#198)', () => {
     const res = run(['iterate', project, '--kind', 'longform', 'no-dispositions']);
 
     expect(res.stderr).toBe('');
+    expect(res.code).toBe(0);
+    const out = JSON.parse(res.stdout) as { addressedComments: string[] };
+    expect(out.addressedComments).toEqual([]);
+  });
+});
+
+describe('deskwork iterate — --auto-dispositions (#226)', () => {
+  const UUID = '550e8400-e29b-41d4-a716-446655442226';
+  const C1 = 'c2260001-0000-4000-8000-000000000001';
+  const C2 = 'c2260002-0000-4000-8000-000000000002';
+
+  it('applies addressed to every unresolved comment', () => {
+    writeSidecar({ uuid: UUID, slug: 'auto-addressed', currentStage: 'Outlining' });
+    writeStageArtifact('auto-addressed', 'Outlining', '# v1\n\nbody.\n');
+    seedEntryComment(UUID, C1, 'first comment');
+    seedEntryComment(UUID, C2, 'second comment');
+
+    const res = run([
+      'iterate',
+      project,
+      '--kind',
+      'longform',
+      '--auto-dispositions=addressed',
+      'auto-addressed',
+    ]);
+    expect(res.stderr).toBe('');
+    expect(res.code).toBe(0);
+
+    const out = JSON.parse(res.stdout) as { addressedComments: string[] };
+    expect(out.addressedComments.sort()).toEqual([C1, C2].sort());
+
+    // Confirm two address-typed annotations landed in the journal.
+    const events = readJournalEvents();
+    const addresses = events.filter(
+      (e) => e.kind === 'entry-annotation' && e.annotation?.type === 'address',
+    );
+    expect(addresses).toHaveLength(2);
+    expect(
+      addresses.every((e) => e.annotation?.disposition === 'addressed'),
+    ).toBe(true);
+  });
+
+  it('applies deferred when that value is requested', () => {
+    writeSidecar({ uuid: UUID, slug: 'auto-deferred', currentStage: 'Outlining' });
+    writeStageArtifact('auto-deferred', 'Outlining', '# v1\n');
+    seedEntryComment(UUID, C1, 'a comment');
+
+    const res = run([
+      'iterate',
+      project,
+      '--kind',
+      'longform',
+      '--auto-dispositions=deferred',
+      'auto-deferred',
+    ]);
+    expect(res.code).toBe(0);
+    const events = readJournalEvents();
+    const addresses = events.filter(
+      (e) => e.kind === 'entry-annotation' && e.annotation?.type === 'address',
+    );
+    expect(addresses).toHaveLength(1);
+    expect(addresses[0].annotation?.disposition).toBe('deferred');
+  });
+
+  it('rejects an invalid value with exit 2', () => {
+    writeSidecar({ uuid: UUID, slug: 'auto-bad', currentStage: 'Outlining' });
+    writeStageArtifact('auto-bad', 'Outlining', '# v1\n');
+
+    const res = run([
+      'iterate',
+      project,
+      '--kind',
+      'longform',
+      '--auto-dispositions=foo',
+      'auto-bad',
+    ]);
+    expect(res.code).toBe(2);
+    expect(res.stderr).toMatch(/--auto-dispositions must be one of/);
+  });
+
+  it('refuses when both --auto-dispositions and --dispositions are passed', () => {
+    writeSidecar({ uuid: UUID, slug: 'auto-both', currentStage: 'Outlining' });
+    writeStageArtifact('auto-both', 'Outlining', '# v1\n');
+    const dispPath = join(project, 'd.json');
+    writeFileSync(dispPath, JSON.stringify({}), 'utf-8');
+
+    const res = run([
+      'iterate',
+      project,
+      '--kind',
+      'longform',
+      '--auto-dispositions=addressed',
+      '--dispositions',
+      dispPath,
+      'auto-both',
+    ]);
+    expect(res.code).toBe(2);
+    expect(res.stderr).toMatch(/mutually exclusive/);
+  });
+
+  it('succeeds with empty addressedComments when no unresolved comments exist', () => {
+    writeSidecar({ uuid: UUID, slug: 'auto-none', currentStage: 'Outlining' });
+    writeStageArtifact('auto-none', 'Outlining', '# v1\n');
+
+    const res = run([
+      'iterate',
+      project,
+      '--kind',
+      'longform',
+      '--auto-dispositions=addressed',
+      'auto-none',
+    ]);
     expect(res.code).toBe(0);
     const out = JSON.parse(res.stdout) as { addressedComments: string[] };
     expect(out.addressedComments).toEqual([]);
