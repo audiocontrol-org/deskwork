@@ -20,6 +20,7 @@ import {
   removeHighlight,
   wrapRange,
 } from './range-utils.ts';
+import { computeMarkPencilPosition } from './pencil-position.ts';
 import { buildSidebarItem } from './sidebar-render.ts';
 import {
   createCommentEditApi,
@@ -396,9 +397,17 @@ export function createAnnotationsController(
       addBtn.hidden = true;
       return;
     }
-    const PENCIL_GAP = 14;
-    addBtn.style.top = `${rect.top - parent.top - addBtn.offsetHeight - PENCIL_GAP}px`;
-    addBtn.style.left = `${rect.left - parent.left + rect.width / 2}px`;
+    // #236 — coarse-pointer surfaces flip the pencil below the selection
+    // so it doesn't collide with iOS Safari's native selection callout.
+    const isCoarse = window.matchMedia?.('(pointer: coarse)').matches ?? false;
+    const { top, left } = computeMarkPencilPosition({
+      rect,
+      parentRect: parent,
+      btnHeight: addBtn.offsetHeight,
+      isCoarse,
+    });
+    addBtn.style.top = `${top}px`;
+    addBtn.style.left = `${left}px`;
     pendingRange = offsets;
     pendingRangePageTop = rect.top + window.scrollY;
   });
