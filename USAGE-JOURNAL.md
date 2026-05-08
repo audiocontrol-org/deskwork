@@ -2180,3 +2180,103 @@ This session is the longest end-to-end release arc to date — 5 sub-phases ship
 **insight** — **The "experimental on a feature branch" framing matters for what we ship.** Per `.claude/rules/agent-discipline.md`, packaging IS UX: every install-level defect counts as a UX bug. Today the bridge is reachable only by checking out `feature/studio-bridge` and running the workspace bin. That's *correct* for an exploratory experiment — adopters shouldn't be acquiring this code yet. But it also means *the eventual integration PR* is a packaging-UX test of its own: does the bridge feature-detect cleanly in a project whose `.deskwork/config.json` doesn't have `studioBridge`? Does the MCP endpoint silently not-mount when bridge is disabled? Those questions don't have answers yet because we never tried — the dogfood path that would surface them is also Phase 8.
 
 **Next dogfood arc:** the Phase 8 manual walk on writingcontrol.org. That's where this becomes a real USAGE-JOURNAL entry.
+
+---
+
+## 2026-05-07: Phase 9 + Phase 10 + post-10c dogfood — first end-to-end phone-driven listen-loop session
+
+**Arc:** Heaviest dogfood arc on the bridge yet. Started by walking the M1–M10 phone smoke from the prior session's hand-off, hit immediate trust-chain friction, walked through 5+ stealth bugs surfaced ONLY by real phone-driven use, shipped fixes for all of them. By the end, the bridge ran a real listen loop with the controller-as-listener pattern, weathered ~5min transport drops via auto-reconnect, and round-tripped operator messages from the phone successfully.
+
+The session's defining shape: **every architectural assumption from Phases 1–10c had at least one stealth bug that only manifested when a real phone hit a real bridge for >5 minutes.** Phase 8's smoke had been "automated assertions pass" — that turned out to be necessary but very far from sufficient.
+
+### Trust-chain dance — packaging UX is brutal
+
+Adopter onboarding requires three independent config touches across two file locations. Each one was a fresh discovery during the smoke walk:
+
+- **friction** — **`.mcp.json` schema field is `type`, NOT `transport`.** The Phase 7 README's example used `transport: "http"` (copied verbatim from somewhere). Claude Code silently dropped the malformed entry on parse — `/mcp` showed no `deskwork-studio` at all (not "failed", just absent). Operator's `claude doctor` caught it. Fixed in `7500145`. **Anyone copying the README example was hitting this same silent drop.** Documented commands need the same verification rigor as code.
+
+- **friction** — **`.claude/settings.local.json` needs `enabledMcpjsonServers: ["deskwork-studio"]`.** Without this the project-MCP allowlist rejects the server. Set per-project (gitignored) so the trust state doesn't follow the repo.
+
+- **friction** — **`~/.claude.json` needs a project entry with `hasTrustDialogAccepted: true`.** This was the dispositive blocker. We tried the `.mcp.json` + `enabledMcpjsonServers` combo and the bridge tools still didn't register. The operator's previous CC sessions had never seen the trust dialog because the worktree was new. Manually adding the project entry to `~/.claude.json` finally cleared the gate.
+
+**insight** — **The trust dance IS a packaging-UX bug if the bridge ships externally.** Per `.claude/rules/agent-discipline.md` "Packaging is UX," every install-level defect counts. Three separate config touches across two file locations to enable a single experimental feature is too much. **Mitigation if the bridge becomes adopter-facing:** `/deskwork:install` should detect bridge mode and auto-write all three pieces. Issue #235's writeup notes this; not implementing now (bridge is internal-only per operator).
+
+### MCP transport drops at ~5min idle (issue #235)
+
+- **friction** — **The MCP streamable-HTTP transport drops at variable idle duration (~2–6min) on long-blocking `await_studio_message`.** Across 4 diagnostic runs: 1m54s, 5m26s, 5m29s, 4m37s. Tried Node `requestTimeout=0` patch (didn't help). Tried server-side keepalive notifications (made it WORSE — drop happened earlier, suggesting the notifications themselves trigger something on the client side). Studio kill is NOT causal — drop happens with studio fully alive and untouched. Most likely cap is downstream of anything we control: CC's MCP client, or some intermediate.
+
+- **fix** — **723a704 + 1bced54 make the bridge survivable across drops without root-causing the drop.** Sidecar preempts zombie tracker on new initialize. Queue replaces parked waiter on second concurrent await. Listen skill retries on drop with exponential backoff (1s, 2s, 4s, max 3 attempts = ~15min idle window before exit). End-to-end verified: 3 consecutive ~5min drops, 3 transparent reconnects, then clean idle-exit.
+
+- **insight** — **Survivability and root-cause-fix are different problems.** We didn't fix the underlying drop — issue #235 stays open. But we made the bridge usable indefinitely despite it: each cap fires, the agent reconnects within seconds, the operator never sees an error. The SKILL.md prose change is what makes this work. **The bridge's "user-visible reliability" is decoupled from its "transport-layer reliability"** — that's a useful distinction worth keeping.
+
+### Stealth-bug cluster at the bridge↔studio↔panel boundary
+
+Five distinct bugs, each invisible until phone-driven use. None of them were in any individual component's internal logic — all of them lived at integration boundaries:
+
+- **friction** — **Studio mutations from phone returned 404.** Operator: *"I can't save marginalia or make edits to files."* The Phase 10c reverse-proxy mounted `/dev/*` and `/static/*` but missed `/api/dev/*`, where every studio mutation route lives. Each save POST silently 404'd at the sidecar gateway. Fixed in `f88270a`. **The smoke never noticed because it only tested GET `/dev/*`.**
+
+- **friction** — **Phone's pull-to-refresh showed only 8 rows from the morning's first session.** Two compounding bugs: (a) sidecar's `loadHistory` returned the FIRST N rows in file order, not the LAST N (`1e33758`); (b) chat panel's `knownSeqs` Set deduped by seq alone, but seq RESETS per sidecar process — so multiple distinct rows in an accumulated chat-log shared seqs `1, 2, 3...` and got filtered out (`a0d2376`). Verified via Playwright at 390×844 pre/post: 8 rows → 31 rows. Operator: *"Didn't work. Also, why doesn't the web server know that the browser client isn't accepting events?"*
+
+- **insight** — **The chat-log is shared-state across sidecar generations; both server and client need to handle that.** Server's pagination AND client's dedup both made the assumption "seq is monotonic for the rest of the day's file." That was true for one session, false across restarts. **Pattern: any client-side state that mirrors server-side is a coupling site for a stealth bug.**
+
+### Architectural framing — the operator named the shape that emerged
+
+Mid-debugging, after I made the case for proxying `/api/dev/*`, the operator asked the architectural question:
+
+> *"oh, i see. the sidecar is essentially a reverse proxy that allows a sort of microservices architecture, where the studio is one service and the chat channel is another so the studio and chat can have a separate lifecycle. Do I have that right?"*
+
+Yes — exactly right. **The sidecar IS a microservices gateway.** Bridge service (long-lived: MCP, queue, chat-log) + studio service (transient: UI rendering, mutations), independent lifecycles. The operator's reframe locked in the architectural intent: this isn't a temporary scaffolding for Phase 10's debugging convenience; this is the right shape for the project's separation of concerns going forward.
+
+- **insight** — **Microservices vocabulary is correct here.** Adopting the framing in DEVELOPMENT-NOTES.md and as a documentation theme will help future contributors reason about the shape: when adding a new URL prefix, decide which service owns it; when adding a new feature, decide which service it belongs to (or whether it needs a third service).
+
+### The two-CC-sessions debugging pattern
+
+Initially ran the listen-skill agent in a parallel CC session while the controller drove diagnostics from THIS session. Coordination via `AGENT-HANDOFF.md` (cross-session file). The pattern saved a wrong-narrative — the parallel CC's ground-truth on drop timing corrected my controller-side hypothesis (which was blind to the drop because of the zombie-tracker bug masking it from `/api/chat/state`).
+
+- **insight** — **When the bug lives in a round-trip, having two agents — one as actor, one as observer — gives independent ground-truth from both sides.** AGENT-HANDOFF.md is the coordination protocol.
+
+- **fix** — **Eventually consolidated into ONE session.** Operator: *"why can't you start the listener?"* — turns out my session pre-dated the trust-chain wiring, so my MCP client never registered the bridge. Restarted CC with the trust state in place; bridge tools registered; ran the listener from the controller session. **Made debugging dramatically faster** — single conversation, direct error visibility from the failing tool call. Worth documenting as a debugging technique for future bridge sessions.
+
+### Skill prose tuning
+
+- **friction** — **The 5-retry budget burned context for ~25min of pure idle.** Operator: *"Considering that the listener burns tokens at idle (if only to reconnect), it's best that it shuts down after it's been idle for a while."*
+
+- **fix** — **Reduced retries 5 → 3 (~15min idle) and reframed the policy.** From "transient recovery, generous budget" to "transient recovery + bounded idle exit." Counter still resets on every successful round-trip, so engaged sessions see effectively unlimited retries. Only fully-idle sessions hit the cap.
+
+- **insight** — **Skill prose IS implementation.** Sizing it for the wrong failure-mode (transient vs deterministic-cap) burns user context predictably. Worth checking other skill prose for similar mis-sizings: are the failures actually transient, or are they predictable-but-inconvenient masquerading as transient?
+
+### Pattern surfaced repeatedly: the smoke didn't catch what dogfood caught
+
+| Bug | Caught by smoke? | Caught by dogfood? |
+|---|---|---|
+| `.mcp.json` schema field | No | Yes (operator's `claude doctor`) |
+| MCP trust-chain | No | Yes (manual walk) |
+| MCP transport ~5min drop | No | Yes (idle wait during real session) |
+| Zombie tracker | No | Yes (next listen attempt got 409) |
+| Queue waiter leak | No | Yes (retry attempt got "second concurrent") |
+| `loadHistory` direction | No | Yes (phone showed ancient history) |
+| Panel seq-dedup | No | Yes (8 rows rendered instead of 30+) |
+| `/api/dev/*` proxy gap | No | Yes (operator: "can't save margin notes") |
+
+**Every stealth bug listed was at an integration boundary the smoke didn't exercise.** The Phase 10c smoke (`scripts/smoke-bridge-sidecar.sh`) tested `GET /dev/*` (200, 502 on studio-down, 200 on restart). It didn't test:
+- `POST /dev/*` mutations (would have caught the body-forwarding hypothesis the reviewer flagged)
+- `POST /api/dev/*` (would have caught the missing proxy mount)
+- Real MCP client holding an idle await for >5 min (would have caught the transport drop)
+- Pull-to-refresh after extended log accumulation (would have caught both history-direction and seq-dedup bugs)
+- Multi-session same-day chat-log behavior (would have caught the seq-reset coupling)
+
+**insight** — **The smoke's job is to enumerate the URL prefixes the panel-side JS actually fetches and assert each round-trips through the gateway.** Today's smoke enumerates prefixes the proxy code mentions; that's a strict subset. The integration PR's smoke needs to read the panel JS and walk every fetch path it makes.
+
+### What worked
+
+- **The retry-on-drop loop worked first try.** Proven with 3 successful end-to-end recoveries in dogfood.
+- **The reverse-proxy-as-gateway shape is right.** Operator confirmed; no rearchitecture needed.
+- **Playwright at phone size verified the panel-render fixes precisely.** 8 → 31 rows is a falsifiable measurement. Worth keeping the Playwright pattern as a fixture for any future panel-render work.
+- **The two-CC-sessions handoff via AGENT-HANDOFF.md was load-bearing during the diagnostic.** When debugging across processes, having a written cross-session log saved at least one wrong narrative from being committed.
+
+### Open questions for the next dogfood
+
+- **Does the chat panel's SSE replay logic have the same seq-reset bug?** `seq > lastReplayedSeq` in routes.ts has the same shape as the panel's `knownSeqs.has(seq)`. Only manifests across sidecar restarts within the same chat-log day. Probably worth fixing prophylactically.
+- **What's the actual cap on the MCP transport drop?** Issue #235 stays open. The bridge is now survivable; the underlying drop is still uncomfortable. Worth filing upstream once we have a clean reproduction script.
+- **Should `/deskwork:install` write the trust-chain pieces?** Today the operator does it manually; that's fine for internal-only. If the bridge ever ships externally, this is friction that breaks adopter-onboarding day-1.
+

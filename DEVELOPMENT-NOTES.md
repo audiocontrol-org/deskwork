@@ -4,6 +4,86 @@ Session journal for `deskwork`. Each entry records what was tried, what worked, 
 
 ---
 
+## 2026-05-07: Phase 9 + Phase 10 + post-10c dogfood fix-chain — sidecar architecture + 5 stealth-bug fixes after live use
+
+### Feature: studio-bridge
+### Worktree: studio-bridge
+
+**Goal:** walk the M1–M10 phone smoke from the prior session's hand-off, ship Phase 9 (phone UX fixes — stowable chat panel + landscape-tablet sticky), spec + ship Phase 10 (long-lived sidecar process so studio restart doesn't drop CC's MCP connection), then dogfood the result on a real phone against this worktree as the editorial collection. Surface and fix any bugs the dogfood reveals.
+
+**Accomplished:**
+
+- **Phase 9 (phone UX fixes).** `a123081`, `1f2fa69`, `cd9b9ec`. Stowable chat panel on phone with bottom-edge tab affordance (mirrors `.er-marginalia-tab` pattern). Default state is collapsed strip showing bridge-state chip + chevron-up; expand to fullscreen overlay; chevron-down or Esc to collapse back. `Shift+C` keyboard shortcut. localStorage persists choice. Phase 9b extended the model from `<600px` to `<1024px` so landscape phone + small tablet inherit the same affordances.
+
+- **Phase 10 sidecar architecture (10a → 10c).** `9ac30d8`, `48e6d43`, `e3b0883`, `84f7818`, `72b1260`. Split `@deskwork/studio` into two processes: long-lived `@deskwork/bridge` (sidecar) holding MCP + queue + chat-log + `/api/chat/*`, and the existing studio binding loopback-only with all `/dev/*` UI surfaces. Sidecar reverse-proxies `/dev/*` and `/static/*` to the studio's loopback port via Hono's `proxy()` helper. Studio writes a `.studio` descriptor at boot so the sidecar's reverse proxy discovers its port. Operator runs two commands (`deskwork-bridge` + `deskwork-studio`) — sidecar IS the canonical phone-facing port; studio is invisible behind it. Studio restart → sidecar's `/dev/*` proxy briefly returns 502; MCP + chat surfaces unaffected.
+
+- **Phase 10d explicitly deferred.** Adopter docs (launchd / systemd / install-skill MCP wiring) won't ship until the bridge is approved for public release. Per operator: bridge is internal-use only for the foreseeable future given the security gap (no per-action auth beyond Tailscale).
+
+- **Issue [#235](https://github.com/audiocontrol-org/deskwork/issues/235) filed.** Documented the ~5min idle MCP transport drop on long-blocking `await_studio_message` calls. Verified across multiple diagnostic runs. Ruled out: Node `requestTimeout` (patched, unchanged drop time), `headersTimeout`, server-side keepalive notifications (patched, made it worse), studio lifecycle (drop happens with studio untouched). Cap is downstream of the sidecar — most likely CC's MCP client or some intermediate idle TCP timeout.
+
+- **Post-10c dogfood fix chain (5 bugs).** Phase 10e — bugs only visible once we drove the bridge from a phone end-to-end:
+  - **`723a704` — sidecar preempts zombie tracker on new MCP initialize.** Streamable-HTTP transport's per-request stream cancel doesn't fire `transport.onclose`, so a network-level drop left `tracker.active` pinned to a dead transport. Every CC reconnect got 409 forever; required sidecar restart to recover. Now: new initialize cleans up the stale tracker and proceeds. Single-agent invariant relaxed to best-effort.
+  - **`1bced54` — queue replace-on-second-await.** CC reconnects with the SAME session ID after a transport drop, so no new initialize fires and the tracker-preemption path doesn't help — the queue's old waiter stayed parked. `awaitNextOperatorMessage` now aborts the existing waiter and replaces it instead of throwing.
+  - **`1e33758` — `loadHistory` returns LAST N rows, not first N.** The chat panel calls `/api/chat/history?since=0&limit=200` on mount expecting recent activity. Pre-fix, with hours of accumulated chat-log across sidecar generations, the panel always showed the morning's announce and never surfaced current prose. Pure phantom-test escape — the test asserted the wrong direction.
+  - **`a0d2376` — chat panel dedupes by `(seq+ts)`, not seq alone.** Seq RESETS per sidecar process (per-day chat-log file shared across generations). Multiple distinct rows had `seq=1, 2, 3...` Operator's pull-to-refresh showed only 8 rows from the first sidecar session of the day. Verified via Playwright at 390×844 pre/post: 8 rows → 31 rows.
+  - **`f88270a` — sidecar reverse-proxies `/api/dev/*`.** The Phase 10c proxy mounted `/dev/*` and `/static/*` but missed `/api/dev/*`, where every studio mutation route lives (save margin notes, save content, scrapbook). Operator hit "I can't save marginalia or make edits" mid-listen-loop; one-line fix.
+  - **`811b05c` + `c49a4c5` — listen skill caps idle reconnects at 3 (~15 min).** Operator pointed out the prior 5-retry budget burned context for ~25min of pure idle. Reduced to 3, reframed the prose as "transient recovery + bounded idle exit" rather than "infinite reconnect." Counter still resets on every successful round-trip; engaged sessions see effectively unlimited retries.
+
+- **Trust-chain wiring documented.** During the smoke walk we discovered the multi-step trust dance every adopter hits: `.mcp.json` schema field is `type` not `transport` (the Phase 7 README example was wrong — fixed in `7500145`); `.claude/settings.local.json` needs `enabledMcpjsonServers: ["deskwork-studio"]`; `~/.claude.json` needs a project entry with `hasTrustDialogAccepted: true`. Captured in `AGENT-HANDOFF.md` for the next listen-skill session and noted in issue #235 reproduction.
+
+- **Phone UX findings doc.** `docs/1.0/001-IN-PROGRESS/studio-bridge/phone-ux-findings.md` (uncommitted in working tree from earlier in session) captures Playwright-driven UX defects at 390×844 with falsifiable measurements. F1 was the BLOCKER (chat panel covers entire entry-review surface) — fixed by Phase 9a. F2 (panel falls below article in landscape) — fixed by Phase 9b. F3-F5 are deferred LOW.
+
+**Didn't Work:**
+
+- **Server-side keepalive experiment.** Diagnostic run #4 (commit since reverted) added `notifications/message` every 30s during the await. Drop happened EARLIER than unpatched runs (~4m37s vs ~5m26s baseline). The keepalive may have been protocol-malformed for a per-request response stream OR the cap is genuinely client-side and uncorrelated. Reverted the patch; it didn't help.
+
+- **Two confused diagnostic runs blamed the wrong thing.** Run #1: I claimed studio-kill caused the drop based on time correlation (kill at 18:29:00, drop in [27:06, 29:27] window). Run #2 with idle held to 3m45s, I declared "hypothesis A ruled out" — but the drop in run #2's CC was actually at 5m29s, after my monitor stopped. Both narratives wrong. The other CC's session — running concurrently as the listen-skill agent — caught the actual drop time and corrected me. **Parallel-CC handoff via AGENT-HANDOFF.md saved both diagnostics from drift.**
+
+- **The reviewer false-positive bug.** Phase 10c code-quality review flagged `proxy({...c.req})` as Critical — claimed HonoRequest's getters wouldn't be enumerable so method/body wouldn't forward. Implementer verified empirically: `raw` IS an own enumerable property on HonoRequest, the spread accidentally worked. Defense-in-depth fix landed anyway (`raw: c.req.raw` documents intent + survives future hono refactors); 8 new round-trip tests lock the contract going forward. Per the project memory "verify reviewer-cited external constraints" — instinct correctly applied.
+
+**Course Corrections:**
+
+- **[PROCESS] Phase 10c smoke didn't catch `/api/dev/*` because it only exercised GET `/dev/*`.** Operator's "can't save margin notes" surfaced the gap mid-listen-loop. Each bug found post-merge cost a re-build + re-deploy + reconnect cycle. **Insight**: integration smokes need to enumerate the URL prefixes the panel-side JS actually hits, not just the prefixes the proxy code mentions. The proxy mount list is the contract; the smoke must match it.
+
+- **[FABRICATION] First two diagnostic narratives for issue #235 were wrong (described above).** The corrective signal came from the parallel CC running the listen loop — they had ground-truth on the drop time from inside the failing tool call, while my controller-side polling was blind to it (the zombie-tracker bug masked the drop in the sidecar's `/api/chat/state`). Lesson: **the side that experienced the failure has more reliable timing data than the side observing externally.** When two sides disagree, trust the side closest to the failure.
+
+- **[COMPLEXITY] The 5-retry skill prose was over-budgeted for idle.** Operator: *"Considering that the listener burns tokens at idle (if only to reconnect), it's best that it shuts down after it's been idle for a while."* Reduced 5 → 3, reframed as idle-exit not infinite-reconnect. **Insight**: skill prose is implementation; sizing it for the wrong failure-mode (transient vs deterministic-cap) burns user context predictably. The cap WAS deterministic — should have noticed earlier and right-sized.
+
+- **[DOCUMENTATION] Phase 7 README's MCP-client snippet was wrong from the original commit.** `"transport": "http"` → `"type": "http"` per the actual Claude Code docs. Operator's `claude doctor` caught it. Fixed in `7500145`. Anyone copying the README example was hitting the same silent-drop. **Insight**: documented commands need the same verification rigor as code. The "Read documentation before quoting commands" agent-discipline rule applies to OUR docs too.
+
+- **[PROCESS] Worked through this whole arc as both controller and listener simultaneously.** Initially used a parallel CC session for `/deskwork:listen` and the controller drove diagnostics from THIS session. Operator asked: *"why can't you start the listener?"* — turns out my session pre-dated the trust-chain wiring, so my MCP client never registered. Restarted, registered, ran the listener from the controller session. **Made debugging dramatically faster** — single conversation, direct error visibility from the failing tool call. Worth documenting as a debugging technique for future bridge sessions.
+
+**Quantitative:**
+
+- Messages: ~150 (heavy session — phone smoke + Phase 9 + Phase 10 a/b/c + post-10c fix chain + dogfood)
+- Commits this session: **17** on `feature/studio-bridge` (`a123081` through `c49a4c5`)
+- Tests: 1318 passing across 4 workspaces (core 496 + cli 181 + bridge 136 + studio 406, +9 skipped, +29 skipped)
+- New tests: ~30 (queue replace-on-second-await test, mcp-mount preemption test, reverse-proxy `/api/dev/*` test, chat-panel collapse-strip tests, etc.)
+- Issues filed: 1 ([#235](https://github.com/audiocontrol-org/deskwork/issues/235), MCP transport drop)
+- Diagnostic runs for issue #235: 4 (eliminated several hypotheses; root cause still open at filing time)
+- Reviewer dispatches: ~10 (spec compliance + code quality after each major phase)
+
+**Insights:**
+
+- **The sidecar architecture IS a microservices gateway.** Operator's framing: *"the sidecar is essentially a reverse proxy that allows a sort of microservices architecture, where the studio is one service and the chat channel is another so the studio and chat can have a separate lifecycle."* Yes — bridge service (chat/MCP, long-lived) + studio service (UI, transient), with the sidecar as gateway in front. The proxy-mount list is the gateway's service-routing config. Forgetting a route prefix = forgetting to register a service path.
+
+- **Stealth bugs cluster at integration boundaries.** All 5 post-10c bugs were at the bridge↔studio↔panel boundary, none in the individual components' internal logic. The sidecar's MCP code, the queue's awaiter logic, the chat panel's render loop — each tested in isolation, all passed. The bugs lived between them: tracker-leak across drops, queue-waiter-leak across same-session reconnect, history-fetch-vs-server-pagination-direction mismatch, dedup-by-seq-vs-seq-resets, proxy-mount-list-vs-actual-routes mismatch. **Integration tests catch these; unit tests don't.** The sidecar smoke needs to grow.
+
+- **The retry-on-drop policy reframes from "transient recovery" to "idle bounded exit" once you know the cap is deterministic.** Same code, completely different mental model. Operator's nudge ("burns tokens at idle") was what surfaced the reframe. Worth applying to other policies that ASSUME transient failures: are the failures actually transient, or is "transient" a polite name for "predictable but inconvenient"?
+
+- **Two-CC-sessions-as-debugging-pattern is real.** When the bug lives in the round-trip between two parties, having two distinct agents (one as actor, one as observer) gives ground-truth from both sides. The `AGENT-HANDOFF.md` file is the coordination channel. Worked well for the issue #235 diagnostic before the operator pointed out we could just consolidate.
+
+- **Phase 10c smoke gap is a real concern for the integration PR.** The bridge has been internally usable for a session now, but `/api/dev/*` was 100% broken until the operator hit a save flow. Other URL prefixes might have similar gaps. Before any future "this is shippable" claim, the smoke needs to enumerate every prefix the panel-side JS actually fetches and assert each round-trips through the gateway.
+
+**Next session:**
+
+- Operator may continue dogfooding the bridge. The skill-side 3-retry idle exit is now in effect — purely-idle sessions auto-shut-down after ~15min, operator re-dispatches `/deskwork:listen` when needed.
+- Issue #235's underlying transport drop is still open. Investigation likely needs to look at CC's MCP client side (which we don't control) or file an upstream issue.
+- Phase 10d (adopter wiring) remains deferred until the security posture is hardened.
+- The chat-panel SSE replay logic uses `seq > lastReplayedSeq` for dedup, which has the same seq-reset bug as the panel's history dedup — only manifests across sidecar restarts within the same chat-log day. Worth fixing in a follow-up if it surfaces.
+
+---
+
 ## 2026-05-04 / 05 (Phase 35 + UX polish + v0.15.0 release): marginalia rail rebuild, THESIS articulation, decision-strip skill routing, multi-issue triage; also bootstrapped a follow-on cleanup feature
 ### Feature: deskwork-plugin
 ### Worktree: deskwork-plugin

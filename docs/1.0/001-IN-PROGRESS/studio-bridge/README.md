@@ -24,11 +24,12 @@ A control channel between the deskwork-studio web UI and the operator's locally-
 | 6 | `/deskwork:listen` skill + SessionStart hook + config schema | Done — `8b58f95`, `06ab08f` |
 | 7 | Documentation + adopter wiring (MCP client config example) | Done — `76a084f` |
 | 8 | Local end-to-end smoke (validation gate) | Automated smoke landed; manual smoke checklist below — operator-driven |
-| 9 | Phone UX fixes (stowable chat panel, sticky-edge, etc.) | Done — pre-Phase-10 |
-| 10a | Audit + design addendum (`design-phase-10.md`) | Done |
-| 10b | Extract bridge surface into sidecar process | Done — `5a38bf4` and earlier |
-| 10c | Studio binds separate port; sidecar reverse-proxies | **Done** — this commit |
+| 9 | Phone UX fixes (stowable chat panel, sticky-edge, etc.) | Done — `a123081`, `1f2fa69`, `cd9b9ec` |
+| 10a | Audit + design addendum (`design-phase-10.md`) | Done — `9ac30d8` |
+| 10b | Extract bridge surface into sidecar process | Done — `48e6d43`, `e3b0883` |
+| 10c | Studio binds separate port; sidecar reverse-proxies | Done — `84f7818`, `72b1260` |
 | 10d | Adopter-facing wiring (launchd / systemd / install skill) | Deferred — internal-use only |
+| 10e | Post-10c dogfood fixes (issue #235 + chain) | Done — `723a704`, `1bced54`, `1e33758`, `a0d2376`, `f88270a`, `811b05c`, `c49a4c5` |
 
 ### Worktree
 
