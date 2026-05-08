@@ -79,12 +79,23 @@
    * `.er-page-grid`; marginalia is `position: relative` inside its own
    * column rather than `position: fixed` on the viewport. These tokens
    * are the layout contract — see `.er-page` / `.er-page-grid` below. */
-  --er-page-max:        var(--er-container-wide);   /* 78rem outer page frame */
-  --er-page-pad-x:      var(--er-space-6);
+  /* Page-frame width tokens. Pre-#244-follow-up these were sized for
+   * a "single tangible page on the desk" feel at the cost of a lot
+   * of horizontal whitespace at desktop widths. Operator pushed back
+   * — at 1920px viewport the prior `--er-page-max: 78rem + --er-page-pad-x: 4rem`
+   * combo left ~400px of paper margin on each side (336 outer body
+   * bg + 64 page padding), eating ~41% of the viewport on margins.
+   * Tightened: page can now grow to 92rem (saves ~224px on each
+   * outer margin at 1920px), inner padding drops to space-4 (saves
+   * ~36px on each side), grid gap drops to space-4 (saves ~12px),
+   * article column grows to 56rem max (~896px) so the body uses the
+   * reclaimed space for actual reading width. */
+  --er-page-max:        92rem;
+  --er-page-pad-x:      var(--er-space-4);
   --er-page-pad-y:      var(--er-space-5);
-  --er-article-col:     minmax(28rem, 42rem);
+  --er-article-col:     minmax(28rem, 56rem);
   --er-marginalia-col:  minmax(16rem, 19rem);
-  --er-page-gap:        var(--er-space-5);
+  --er-page-gap:        var(--er-space-4);
 }
 
 /* ---------- Scoped reset + page chrome ---------- */
