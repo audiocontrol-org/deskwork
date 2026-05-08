@@ -90,12 +90,21 @@
    * ~36px on each side), grid gap drops to space-4 (saves ~12px),
    * article column grows to 56rem max (~896px) so the body uses the
    * reclaimed space for actual reading width. */
-  --er-page-max:        92rem;
-  --er-page-pad-x:      var(--er-space-4);
+  /* Iteration 2 (operator: review surface cramped + marginalia
+   * swimming in page margin). Wider page + tighter inner padding
+   * reclaim cream margins on both edges. Article + marginalia stay
+   * size-capped (prose readability + marginalia density); any
+   * remaining slack absorbs into the gap between article and
+   * marginalia via `justify-content: space-between` on the grid (set
+   * on `.er-page-grid` below) so marginalia sits flush against the
+   * right page padding instead of leaving a dead band of cream
+   * inside the page. */
+  --er-page-max:        100rem;
+  --er-page-pad-x:      var(--er-space-3);
   --er-page-pad-y:      var(--er-space-5);
   --er-article-col:     minmax(28rem, 56rem);
-  --er-marginalia-col:  minmax(16rem, 19rem);
-  --er-page-gap:        var(--er-space-4);
+  --er-marginalia-col:  minmax(18rem, 22rem);
+  --er-page-gap:        var(--er-space-3);
 }
 
 /* ---------- Scoped reset + page chrome ---------- */
@@ -1334,6 +1343,13 @@ body:has([data-review-ui="longform"]) .site-footer {
   gap: 0 var(--er-page-gap);
   padding: var(--er-page-pad-y) var(--er-page-pad-x);
   align-items: start;
+  /* Slack absorption: when the grid's max-track sum is less than the
+   * page's inner width (typical at desktop widths), `space-between`
+   * sends the slack into the gaps between fixed-size tracks rather
+   * than leaving a dead band on the right. Marginalia ends up flush
+   * against the right page padding, article hugs the left, and the
+   * slack reads as a generous "page gutter" between them. */
+  justify-content: space-between;
 }
 
 /* Single thin gutter rule between article and marginalia columns.
