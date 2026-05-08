@@ -90,19 +90,16 @@
    * ~36px on each side), grid gap drops to space-4 (saves ~12px),
    * article column grows to 56rem max (~896px) so the body uses the
    * reclaimed space for actual reading width. */
-  /* Iteration 4 (operator: 'we seem to have lost the visual metaphor
-   * of reviewing and editing on a piece of paper. Can we have a
-   * little bit of those margins back plus the shadow effect that
-   * makes it look like paper on a desk?'). Pull `--er-page-max`
-   * back from 100rem → 88rem so the desk reads visibly around the
-   * page on wide viewports (at 1920px viewport: 256px body margin
-   * each side, was 160px). Article column max drops 80rem → 70rem
-   * to keep the page proportional inside the smaller frame.
-   * Shadow strengthening lives in the `.er-page` rule below. */
+  /* Iteration 5 (operator: 'the marginalia column feels dangerously
+   * close to the right edge of the page'). Inner page padding goes
+   * from space-3 (20px) → space-4 (28px) so both the marginalia and
+   * the article inset further from the page edges. Article-column
+   * max compensates by 8rem so the article still meets the
+   * marginalia (no middle gulf). */
   --er-page-max:        88rem;
-  --er-page-pad-x:      var(--er-space-3);
+  --er-page-pad-x:      var(--er-space-4);
   --er-page-pad-y:      var(--er-space-5);
-  --er-article-col:     minmax(28rem, 70rem);
+  --er-article-col:     minmax(28rem, 68rem);
   --er-marginalia-col:  minmax(18rem, 22rem);
   --er-page-gap:        var(--er-space-3);
 }
