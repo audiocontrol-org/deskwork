@@ -31,6 +31,7 @@ import {
   renderMarkdownToHtml,
 } from '@deskwork/core/review/render';
 import { splitOutline } from '@deskwork/core/outline-split';
+import { extractToc, type TocEntry } from '@deskwork/core/review/toc';
 import type { ContentIndex } from '@deskwork/core/content-index';
 import { resolveCalendarPath } from '@deskwork/core/paths';
 import { readCalendar } from '@deskwork/core/calendar';
@@ -74,6 +75,7 @@ interface PreparedRender {
   readonly fm: Record<string, unknown>;
   readonly bodyHtml: string;
   readonly outlineHtml: string;
+  readonly tocEntries: readonly TocEntry[];
 }
 
 function stringField(v: unknown): string | undefined {
@@ -111,7 +113,12 @@ async function prepareRender(
     ? await renderMarkdownToHtml(split.outline, renderCtx)
     : '';
 
-  return { fm, bodyHtml: renderedHtml, outlineHtml };
+  // #244 — extract TOC from the rendered body's headings. The renderer
+  // ran rehype-slug so every h2/h3/h4 carries an `id` attribute; the
+  // extractor reads the `id` + visible text into a flat list.
+  const tocEntries = extractToc(renderedHtml);
+
+  return { fm, bodyHtml: renderedHtml, outlineHtml, tocEntries };
 }
 
 /**
@@ -191,7 +198,7 @@ export async function renderEntryReviewPage(
     return { status: 404, html: renderEntryNotFound(entryId, reason) };
   }
 
-  const { fm, bodyHtml, outlineHtml } = await prepareRender(data.markdown, {
+  const { fm, bodyHtml, outlineHtml, tocEntries } = await prepareRender(data.markdown, {
     entryId: data.entry.uuid,
     site: data.site,
   });
@@ -276,7 +283,7 @@ export async function renderEntryReviewPage(
       </article>
       ${renderMarginaliaTab()}
       <button class="er-pencil-btn" data-add-comment-btn hidden type="button">Mark</button>
-      ${renderOutlineDrawer(outlineHtml)}
+      ${renderOutlineDrawer(outlineHtml, tocEntries)}
       ${scrapbookDrawer}
       <div class="er-toast" data-toast hidden></div>
       ${renderShortcutsOverlay()}

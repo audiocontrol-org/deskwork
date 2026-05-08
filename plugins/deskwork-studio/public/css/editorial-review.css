@@ -2654,6 +2654,79 @@ body.er-focus-mode .er-focus-save-hint {
   padding: 0;
 }
 
+/* Horizontal rule separating curated outline from auto-TOC inside
+ * the drawer body, when both render. */
+.er-outline-drawer-rule {
+  border: 0;
+  border-top: 1px dashed var(--er-faded-2);
+  margin: var(--er-space-3) 0;
+}
+
+/* ---------- Auto-extracted Table of Contents (#244) ---------- */
+
+.er-outline-drawer-body .er-toc {
+  font-family: var(--er-font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  line-height: 1.55;
+}
+.er-outline-drawer-body .er-toc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.er-outline-drawer-body .er-toc-item {
+  margin: 0.05rem 0;
+  padding: 0;
+}
+/* Depth-driven indent. Top-level (h2 → depth 2) sits flush; deeper
+ * headings step in 0.9rem each level so the doc shape is legible at
+ * a glance. */
+.er-outline-drawer-body .er-toc-item--d2 { padding-left: 0; }
+.er-outline-drawer-body .er-toc-item--d3 { padding-left: 0.9rem; }
+.er-outline-drawer-body .er-toc-item--d4 { padding-left: 1.8rem; }
+
+.er-outline-drawer-body .er-toc-link {
+  display: block;
+  padding: 0.25rem 0.4rem;
+  color: var(--er-ink-soft) !important;
+  text-decoration: none;
+  border-left: 2px solid transparent;
+  border-radius: 0 2px 2px 0;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.er-outline-drawer-body .er-toc-link:hover,
+.er-outline-drawer-body .er-toc-link:focus-visible {
+  background: var(--er-paper-2);
+  color: var(--er-ink) !important;
+  border-left-color: var(--er-faded-2);
+  outline: none;
+}
+/* Active section — the heading currently in view, marked by
+ * scroll-spy in entry-review/toc.ts. */
+.er-outline-drawer-body .er-toc-link.is-active {
+  color: var(--er-red-pencil) !important;
+  border-left-color: var(--er-red-pencil);
+  background: var(--er-paper-2);
+}
+
+/* Smooth-scroll for jump-link clicks — disabled when the operator
+ * has prefers-reduced-motion set. */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* When jumping to a heading, leave room above so the heading isn't
+ * pinned at the very top of the viewport (the strip + folio chrome
+ * cover ~94px on desktop). */
+.er-page h2,
+.er-page h3,
+.er-page h4 {
+  scroll-margin-top: 6rem;
+}
+
 /* In focus mode, the drawer still works — it slides over the
  * fullscreen canvas. The tab, however, hides since focus-mode is
  * an intentional "no chrome" state; the Outline button in the

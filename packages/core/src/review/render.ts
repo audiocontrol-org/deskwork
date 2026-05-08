@@ -20,6 +20,7 @@ import remarkParse from 'remark-parse';
 import remarkGfm from 'remark-gfm';
 import remarkRehype from 'remark-rehype';
 import rehypeStringify from 'rehype-stringify';
+import rehypeSlug from 'rehype-slug';
 import { parseFrontmatter } from '../frontmatter.ts';
 // @ts-expect-error — JS module without a .d.ts; the plugin is plain mdast traversal.
 import remarkImageFigure from '../remark-image-figure.mjs';
@@ -80,9 +81,14 @@ export async function renderMarkdownToHtml(
     .use(remarkStripFirstH1)
     .use(remarkImageFigure)
     .use(remarkRehype);
+  // `rehype-slug` assigns a slugified `id` to every heading element
+  // (h1–h6). The TOC extractor (`./toc.ts`) reads those ids to build
+  // anchor links; without slug ids `<a href="#section">` jumps wouldn't
+  // resolve to anything.
+  const withSlug = base.use(rehypeSlug);
   const withRewrite = studioRewrite
-    ? base.use(rehypeRewriteScrapbookImages, studioRewrite)
-    : base;
+    ? withSlug.use(rehypeRewriteScrapbookImages, studioRewrite)
+    : withSlug;
   const result = await withRewrite.use(rehypeStringify).process(markdown);
   return String(result);
 }
