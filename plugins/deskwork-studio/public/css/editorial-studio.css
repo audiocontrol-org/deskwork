@@ -403,3 +403,65 @@ a.er-calendar-meta-link:focus-visible {
   }
 }
 
+/* ---------------------------------------------------------------------
+ * Phone reshape (#237) — dashboard rows at narrow widths.
+ *
+ * Desktop uses a 4-column grid `[num] [body] [status] [actions]` that
+ * reads as a horizontal record. At <= 600px the two `auto` end columns
+ * (status + actions) eat enough horizontal budget that `body` collapses
+ * to ~120px, and every word in slug/title/meta wraps onto its own line.
+ *
+ * Reshape to a 3-row stacked layout:
+ *
+ *   [num]  [status]
+ *   [body            ]   (full width)
+ *   [actions         ]   (full width; buttons remain horizontal)
+ *
+ * Desktop layout untouched — the rule is gated behind the media query.
+ * --------------------------------------------------------------------- */
+@media (max-width: 600px) {
+  .er-calendar-row {
+    grid-template-columns: auto auto;
+    grid-template-areas:
+      "num    status"
+      "body   body"
+      "action action";
+    column-gap: var(--er-space-2);
+    row-gap: var(--er-space-1);
+  }
+  .er-calendar-row > .er-row-num {
+    grid-area: num;
+    align-self: center;
+  }
+  .er-calendar-row > .er-calendar-status {
+    grid-area: status;
+    justify-self: end;
+    align-self: center;
+  }
+  .er-calendar-row > .er-calendar-body {
+    grid-area: body;
+  }
+  .er-calendar-row > .er-calendar-action {
+    grid-area: action;
+    justify-content: flex-start;
+  }
+  /* Long slugs (e.g. `deskwork-plugin/issue-158-ux-audit`) must break
+   * at any character so they can't ever overflow the body column. The
+   * display font has natural break opportunities at `/` and `-`; this
+   * rule guarantees a clean break even when those don't help. */
+  .er-row-slug,
+  .er-row-slug a {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+  /* Hierarchical-row indent at narrow widths is cosmetic noise — the
+   * left rail and slug shape already convey the relationship. Drop the
+   * left padding so child rows recover horizontal budget. */
+  .er-calendar-row-wrap[data-depth] {
+    padding-left: 0;
+  }
+  .er-calendar-row-wrap[data-depth]::before {
+    display: none;
+  }
+}
+
