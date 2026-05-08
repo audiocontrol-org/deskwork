@@ -90,11 +90,16 @@ export function renderRowActions(entry: Entry, defaultSite: string): RawHtml {
         data-copy="/deskwork:iterate ${entry.slug}"
         title="operator clicked Iterate — run the iterate skill in Claude Code">iterate →</button>`);
     }
-    if (entry.reviewState === 'approved') {
-      buttons.push(html`<button class="er-btn er-btn-small er-btn-approve er-copy-btn" type="button"
-        data-copy="/deskwork:approve ${entry.slug}"
-        title="approved — graduate to the next stage">approve →</button>`);
-    }
+    // Approve (#244) — unconditional on active-pipeline rows. Mirrors
+    // the review-surface decision strip (Approve is always visible
+    // there); the dashboard previously gated this button on
+    // `reviewState === 'approved'`, which is a transient state most
+    // rows never carry, leaving the button effectively invisible. The
+    // operator should be able to advance any active-pipeline entry
+    // from the dashboard without first opening the review surface.
+    buttons.push(html`<button class="er-btn er-btn-small er-btn-approve er-copy-btn" type="button"
+      data-copy="/deskwork:approve ${entry.slug}"
+      title="advance this entry to the next stage">approve →</button>`);
     // Cancel (#242) — pull this entry off-pipeline. Same clipboard
     // routing as approve / iterate; the skill mutates sidecar + journal.
     buttons.push(html`<button class="er-btn er-btn-small er-btn-reject er-copy-btn" type="button"
