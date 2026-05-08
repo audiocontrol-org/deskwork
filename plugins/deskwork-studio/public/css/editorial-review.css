@@ -1522,7 +1522,15 @@ body.er-focus-mode .er-marginalia-tab {
 /* Margin notes (marginalia column inside the page) */
 .er-marginalia {
   position: relative;
-  padding: var(--er-space-1) 0 0;
+  /* Internal padding-right insets the marginalia content (head rule,
+   * items) from the column's geometric right edge. Symmetric grid
+   * padding alone wasn't enough — the article body's paragraph
+   * wrapping leaves visual whitespace before the right edge, while
+   * the marginalia head's red rule extends to the column's full
+   * width, putting visible content much closer to the page edge
+   * than the article. The extra internal padding rebalances them
+   * perceptually. */
+  padding: var(--er-space-1) var(--er-space-4) 0 0;
   font-family: var(--er-font-body);
   /* Allow long words / quotes to wrap inside the column instead of
    * blowing out the grid track. */
