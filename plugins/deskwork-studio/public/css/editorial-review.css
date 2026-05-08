@@ -4004,10 +4004,19 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
   }
 
   /* Reveal the entry-label inside the toolbar so operator knows
-   * what they're editing. Compact, single-line ellipsis. */
+   * what they're editing. Compact, single-line ellipsis.
+   *
+   * `min-width: 0` is load-bearing: the flex default `min-width: auto`
+   * lets a flex item expand to its intrinsic content width, which on
+   * iOS Safari blows past the toolbar's box and side-scrolls the page
+   * even with `overflow:hidden + text-overflow:ellipsis` set. With
+   * `min-width: 0`, flex-shrink can clamp the label to its allotted
+   * basis and the ellipsis takes over visually. */
   body:has([data-edit-panes-host]:not([hidden])) .er-edit-entry-label {
     display: block;
     flex: 1 1 100%;
+    min-width: 0;
+    max-width: 100%;
     font-family: var(--er-font-display);
     font-style: italic;
     font-variation-settings: "opsz" 36, "wght" 500;
@@ -4019,6 +4028,17 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
     margin: 0;
     padding: 0 0 0.2rem;
     border-bottom: 1px solid var(--er-faded-2);
+  }
+  /* Defensive: every direct child of the toolbar gets min-width:0 so
+   * none can expand the toolbar past viewport. */
+  body:has([data-edit-panes-host]:not([hidden])) .er-edit-toolbar > * {
+    min-width: 0;
+  }
+  /* Cap the toolbar itself at viewport width — last-resort containment
+   * if any future child sneaks past. */
+  body:has([data-edit-panes-host]:not([hidden])) .er-edit-toolbar {
+    max-width: 100vw;
+    overflow: hidden;
   }
 
   /* Lay the review shell out as a flex column locked to the dynamic
