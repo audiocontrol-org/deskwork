@@ -3864,3 +3864,73 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
  * declared in the main `<table>` rule keeps the surface clean.
  * If a horizontal-scroll affordance is ever wanted, it should live on
  * a wrapping element (added via rehype) rather than on `<table>`. */
+
+/* ---------------------------------------------------------------------
+ * Phone edit-mode chrome trim (#239) — entry-review surface.
+ *
+ * Desktop edit mode shows Source/Split/Preview tabs + Outline / Focus /
+ * Save / Cancel / ? buttons in a single chrome bar above a side-by-side
+ * editor + preview. On phone (390px) the same shape becomes hostile:
+ *   - the action row wraps to two lines (~57px tall)
+ *   - data-view="split" forces a 1fr/1fr grid → ~190px-wide source pane
+ *   - CodeMirror's gutter eats another ~30px
+ *
+ * Trim to the essentials on phone:
+ *   - one mode toggle (Source / Preview only — no Split lane)
+ *   - Save + Cancel
+ * Hide Outline (already reachable via marginalia drawer), Focus (phone
+ * is already fullscreen), and the `?` shortcuts button (no keyboard).
+ *
+ * Force any `data-view="split"` to render as source-only on phone: split
+ * panes don't fit at this width regardless of the operator's pref.
+ * --------------------------------------------------------------------- */
+@media (max-width: 600px) {
+  .er-edit-toolbar {
+    padding: var(--er-space-1) var(--er-space-2);
+    gap: var(--er-space-1);
+  }
+  /* Hide the Split mode tab — only Source ↔ Preview makes sense at
+   * this width. The remaining pair stays as a 2-tab pill. */
+  .er-edit-modes [data-edit-view="split"] {
+    display: none;
+  }
+  .er-edit-mode-btn {
+    padding: 0.3rem 0.55rem;
+    font-size: 0.58rem;
+    letter-spacing: 0.1em;
+  }
+  /* Hide Outline / Focus / ? — desktop-only affordances. Save + Cancel
+   * stay visible; data-edit-hint stays so save state can be surfaced. */
+  .er-edit-actions [data-action="outline-drawer"],
+  .er-edit-actions [data-action="focus-mode"],
+  .er-edit-actions [data-action="shortcuts"] {
+    display: none;
+  }
+  .er-edit-actions {
+    gap: 0.3rem;
+  }
+  /* Force split → source on phone. The grid columns + the source pane
+   * borders + the preview's display:none all line up with what
+   * `data-view="source"` already produces; we just override the split
+   * variant. */
+  .er-edit-panes[data-view="split"] {
+    grid-template-columns: 1fr 0;
+  }
+  .er-edit-panes[data-view="split"] .er-edit-preview {
+    display: none;
+  }
+  .er-edit-panes[data-view="split"] .er-edit-source {
+    border-right: 0;
+  }
+  /* Hide CodeMirror's gutter (line numbers + fold marks) on phone —
+   * recovers ~30px of horizontal budget for the source itself. */
+  .er-edit-source .cm-gutters {
+    display: none !important;
+  }
+  /* Reduce the editor pane min-height — phone viewport is shorter than
+   * desktop, the 30rem floor pushes the bottom strip off-screen. */
+  .er-edit-panes {
+    min-height: 0;
+    height: 60vh;
+  }
+}
