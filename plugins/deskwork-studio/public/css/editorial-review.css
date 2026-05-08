@@ -1037,7 +1037,9 @@ body[data-review-ui="scrapbook"] {
   z-index: 40;
   background: var(--er-paper);
   border-bottom: var(--er-rule-med);
-  padding: var(--er-space-2) var(--er-space-3);
+  /* Tighter vertical padding to compact the chrome. The strip is
+   * permanent on the surface so every saved pixel pays back. */
+  padding: var(--er-space-1) var(--er-space-3);
   display: flex;
   align-items: center;
   gap: var(--er-space-3);
@@ -1142,9 +1144,12 @@ body:has([data-review-ui="longform"]) .site-footer {
   color: var(--er-ink-soft);
   background: var(--er-paper);
 }
-@media (max-width: 900px) {
-  .er-strip-hint { display: none; }
-}
+/* The strip hint ('select text to mark · double-click to edit · ?
+ * for shortcuts') was useful as a first-time-user tutorial but is
+ * permanent overhead for everyone else. Hide globally; the `?` button
+ * still surfaces the same affordances modally for anyone who needs
+ * the reference. Saves an entire row of strip height. */
+.er-strip-hint { display: none; }
 .er-strip-right { margin-left: auto; display: flex; gap: var(--er-space-1); flex-wrap: wrap; align-items: center; }
 
 /*
@@ -3792,13 +3797,13 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
   font-weight: 500;
 }
 
-@media (max-width: 60rem) {
-  /* On narrow viewports the strip already drops the inline hint
-   * (line 1090). Drop the per-button shortcut chips too — they
-   * crowd the button row. The shortcuts modal stays available. */
-  [data-review-ui="longform"] .er-shortcut-chip {
-    display: none;
-  }
+/* The per-button shortcut chips (a a / i i / r r underneath each
+ * decision button) added an entire row of height to the strip while
+ * duplicating information the `?` shortcuts modal already shows.
+ * Hide globally; operator who memorizes shortcuts uses them, others
+ * use the modal. Saves a second row of strip height. */
+[data-review-ui="longform"] .er-shortcut-chip {
+  display: none;
 }
 
 /* ---------- Longform review refinement (Phase 2 follow-up — Issue 7) ---------- */
