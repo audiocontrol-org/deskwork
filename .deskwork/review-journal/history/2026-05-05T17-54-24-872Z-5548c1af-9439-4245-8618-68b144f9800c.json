@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-05T17:54:24.872Z",
+  "entryId": "998b8a29-e754-4114-8998-d1aebf6f39d3",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "998b8a29-e754-4114-8998-d1aebf6f39d3",
+    "version": 2,
+    "range": {
+      "start": 177,
+      "end": 185
+    },
+    "text": "We need to integrate the findings in this audit into the prd, workplan, and relevant github issues.",
+    "category": "other",
+    "anchor": "Findings",
+    "id": "eba09a7f-bdcd-4a91-994f-fedbd4815ea4",
+    "createdAt": "2026-05-05T17:54:24.872Z"
+  }
+}

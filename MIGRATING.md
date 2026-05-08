@@ -1,3 +1,43 @@
+## Migrating to v0.16.0 (open-issue tranche cleanup)
+
+v0.16.0 ships the open-issue-tranche-cleanup feature. The behavior changes adopters should know about:
+
+### Single document evolves; scrapbook accumulates approved snapshots (Issue #222 / T1)
+
+Pre-T1, an entry's "primary file" depended on the entry's stage: Ideas → `scrapbook/idea.md`, Planned → `scrapbook/plan.md`, Outlining → `scrapbook/outline.md`, Drafting/Final → `index.md`. The studio review surface, the iterate CLI, and the entry resolver all key on stage to decide which file to read.
+
+Post-T1, **`index.md` is always "the document under review"**. The studio renders `index.md` regardless of currentStage; the iterate helper reads/writes `index.md` regardless of stage; and on `/deskwork:approve` at any stage transition, the backend atomically copies `index.md` → `scrapbook/<priorStage>.md` (lowercased) before mutating the sidecar. The scrapbook accumulates frozen snapshots; `index.md` is the live document.
+
+**Adopter impact:**
+
+- **Sidecar `artifactPath`** field used to point at the per-stage file (`docs/<slug>/scrapbook/outline.md` etc. for early stages). It now points at `<dir>/index.md` for all entries. Run `deskwork doctor --fix=all` to migrate sidecars automatically — the new `legacy-stage-artifact-path` rule copies the legacy file's content into `<dir>/index.md` and updates the sidecar. The legacy file is preserved (it's now a snapshot).
+- **First iterate at the new stage** is responsible for transforming `index.md` itself (e.g. outline → draft body). The prior stage's content is preserved at `scrapbook/<priorStage>.md` as a reference — the agent can read it, but should rewrite `index.md`.
+- **Marginalia comments** authored against the prior stage's `index.md` are **archived on approve** (Issue #200). They're preserved in the audit trail (`listEntryAnnotationsRaw`) but no longer render in the active marginalia sidebar of the new stage. Comments made in the new stage start fresh — anchor stability across document evolution under stage transition is unsolvable on the backend; archive-on-approve sidesteps it cleanly.
+- **`--kind` flag on `deskwork iterate`** narrows in role: for longform/outline it's metadata for the journal record (the `stage` field), no longer a file router. For shortform it still selects the legacy workflow-object code path.
+
+If a previous approve run left a `scrapbook/<stage>.md` file with operator-edited content that diverges from the entry's `index.md`, the next approve will refuse with a clear error rather than overwrite the snapshot. Resolve by deciding which copy is canonical, leave the other under `scrapbook/`, and re-run.
+
+### `/deskwork:ingest` defaults to `Drafting`, not `Ideas` ([#206](https://github.com/audiocontrol-org/deskwork/issues/206))
+
+Pre-v0.16.0, ingesting a markdown file whose frontmatter had no `state:` field landed it in **Ideas**. As of v0.16.0, the default is **Drafting**.
+
+Rationale: `/deskwork:ingest` is for backfilling existing content with body text already on disk. `/deskwork:add` is the path for capturing new ideas (no body text yet). Defaulting ingested files to Ideas conflated the two — ingested files are by definition past the "thought, no words yet" Ideas-stage shape and belong in Drafting.
+
+**Adopter impact:**
+
+- If your ingest workflows previously relied on the `Ideas` default and used `/deskwork:approve` cycles to advance entries to Drafting: the next ingest after upgrading lands in Drafting directly. The old default was the bug; the change is in the direction of correctness.
+- If you specifically want an ingested file in `Ideas`, pass `--state Ideas` explicitly, or set `state: ideas` in the file's frontmatter — both still win over the default.
+- Frontmatter state: anything → behavior unchanged (frontmatter still wins over the default).
+
+### `/deskwork:ingest` semantic distinction (companion clarification)
+
+- `/deskwork:add` — capture a new idea with no body text yet. Lands in Ideas.
+- `/deskwork:ingest` — backfill an existing markdown file (with body text). Defaults to Drafting; overridable per the rules above.
+
+If a file has no body text yet, the right path is `/deskwork:add`, not `/deskwork:ingest --state Ideas`. The ingest path is for content that already exists.
+
+---
+
 ## Migrating to v0.12.0 (post-v0.11.1 dogfood fixes)
 
 v0.12.0 is a corrective release that fixes a cluster of issues surfaced by dogfooding v0.11.1's entry-centric redesign on real calendars. **No breaking changes**; everything below is upgrade housekeeping.

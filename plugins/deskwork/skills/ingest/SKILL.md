@@ -145,7 +145,7 @@ By default, the helper reads the `state:` frontmatter field and normalizes it on
 | `idea`, `ideas` | Ideas |
 | (anything else) | **ambiguous** — operator must pass `--state` |
 
-Files without a `state:` field default to `Ideas`.
+Files without a `state:` field default to `Drafting` — `/deskwork:ingest` is for existing content with body text; for new ideas use `/deskwork:add`.
 
 ### Common flag combinations
 

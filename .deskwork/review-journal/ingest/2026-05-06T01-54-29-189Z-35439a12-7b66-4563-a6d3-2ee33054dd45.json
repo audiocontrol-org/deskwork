@@ -1,0 +1,21 @@
+{
+  "id": "35439a12-7b66-4563-a6d3-2ee33054dd45",
+  "timestamp": "2026-05-06T01:54:29.189Z",
+  "event": "ingest",
+  "slug": "open-issue-tranche-cleanup/v016-verification-walk",
+  "entryId": "35439a12-7b66-4563-a6d3-2ee33054dd45",
+  "site": "deskwork-internal",
+  "stage": "Drafting",
+  "sourceFile": "docs/0.16.0/001-IN-PROGRESS/open-issue-tranche-cleanup/2026-05-05-v0.16.0-verification-walk.md",
+  "frontmatterSnapshot": {
+    "title": "v0.16.0 verification walk",
+    "date": "2026-05-05",
+    "auditedFeature": "open-issue-tranche-cleanup",
+    "verifyingRelease": "v0.16.0"
+  },
+  "derivation": {
+    "slug": "explicit",
+    "state": "default",
+    "date": "frontmatter"
+  }
+}

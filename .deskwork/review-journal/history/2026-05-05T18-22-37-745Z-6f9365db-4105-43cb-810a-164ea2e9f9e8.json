@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-05T18:22:37.745Z",
+  "entryId": "d61642b3-614e-42c6-9e02-1f0a54137679",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "d61642b3-614e-42c6-9e02-1f0a54137679",
+    "version": 1,
+    "range": {
+      "start": 5655,
+      "end": 5686
+    },
+    "text": "Close this issue. We've worked around this pathology in multiple ways.",
+    "category": "other",
+    "anchor": "Task 3: External tracker triage",
+    "id": "4a9de719-7b20-46ad-9cd3-1dfca9a7f566",
+    "createdAt": "2026-05-05T18:22:37.745Z"
+  }
+}

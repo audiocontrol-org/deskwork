@@ -157,7 +157,114 @@ export function parseEntryAnnotationBody(body: unknown): ParseResult {
       };
       return { kind: 'ok', draft };
     }
+    case 'edit-comment': {
+      const commentId = obj.commentId;
+      if (typeof commentId !== 'string' || commentId.length === 0) {
+        return err('edit-comment.commentId is required');
+      }
+      const fields = parseEditCommentFields(obj);
+      if (fields.kind === 'err') return err(`edit-comment: ${fields.message}`);
+      const draft: AnnotationDraftFromBody = {
+        type: 'edit-comment',
+        workflowId,
+        commentId,
+        ...(fields.fields.text !== undefined ? { text: fields.fields.text } : {}),
+        ...(fields.fields.range !== undefined ? { range: fields.fields.range } : {}),
+        ...(fields.fields.category !== undefined ? { category: fields.fields.category } : {}),
+        ...(fields.fields.anchor !== undefined ? { anchor: fields.fields.anchor } : {}),
+      };
+      return { kind: 'ok', draft };
+    }
+    case 'delete-comment': {
+      const commentId = obj.commentId;
+      if (typeof commentId !== 'string' || commentId.length === 0) {
+        return err('delete-comment.commentId is required');
+      }
+      return {
+        kind: 'ok',
+        draft: { type: 'delete-comment', workflowId, commentId },
+      };
+    }
     default:
       return err(`unknown annotation type: ${type}`);
   }
+}
+
+/**
+ * Parser for the PATCH /entry/:entryId/comments/:commentId body.
+ *
+ * Differs from `parseEntryAnnotationBody` for the `edit-comment` case
+ * because the route already binds `commentId` from the URL — the body
+ * carries only the editable fields. The route mints the `workflowId`
+ * field (= entryId) on the draft to satisfy the schema.
+ */
+export interface ParseEditFieldsResult {
+  text?: string;
+  range?: { start: number; end: number };
+  category?: NonNullable<CommentDraft['category']>;
+  anchor?: string;
+}
+
+export type ParseEditFieldsOutcome =
+  | { kind: 'ok'; fields: ParseEditFieldsResult }
+  | { kind: 'err'; status: 400; message: string };
+
+export function parseEditCommentFields(body: unknown): ParseEditFieldsOutcome {
+  const obj = asObject(body);
+  if (!obj) return { kind: 'err', status: 400, message: 'expected JSON object body' };
+
+  const out: ParseEditFieldsResult = {};
+
+  if (obj.text !== undefined) {
+    if (typeof obj.text !== 'string') {
+      return { kind: 'err', status: 400, message: 'text must be a string' };
+    }
+    out.text = obj.text;
+  }
+
+  if (obj.range !== undefined) {
+    const range = asObject(obj.range);
+    if (!range || typeof range.start !== 'number' || typeof range.end !== 'number') {
+      return {
+        kind: 'err',
+        status: 400,
+        message: 'range must have numeric start/end',
+      };
+    }
+    out.range = { start: range.start, end: range.end };
+  }
+
+  if (obj.category !== undefined) {
+    const category = asCategory(obj.category);
+    if (category === null) {
+      return {
+        kind: 'err',
+        status: 400,
+        message: 'category must be a known category',
+      };
+    }
+    out.category = category;
+  }
+
+  if (obj.anchor !== undefined) {
+    if (typeof obj.anchor !== 'string') {
+      return { kind: 'err', status: 400, message: 'anchor must be a string' };
+    }
+    out.anchor = obj.anchor;
+  }
+
+  if (
+    out.text === undefined &&
+    out.range === undefined &&
+    out.category === undefined &&
+    out.anchor === undefined
+  ) {
+    return {
+      kind: 'err',
+      status: 400,
+      message: 'at least one of text / range / category / anchor is required',
+    };
+  }
+
+  return { kind: 'ok', fields: out };
 }

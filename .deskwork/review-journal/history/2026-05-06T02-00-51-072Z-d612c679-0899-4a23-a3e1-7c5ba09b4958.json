@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-06T02:00:51.072Z",
+  "entryId": "35439a12-7b66-4563-a6d3-2ee33054dd45",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "35439a12-7b66-4563-a6d3-2ee33054dd45",
+    "version": 1,
+    "range": {
+      "start": 51,
+      "end": 61
+    },
+    "text": "Put links to the github issues where they are mentioned. Also add the full list to an appendix at the end of this document",
+    "category": "other",
+    "anchor": " 18 issues",
+    "id": "da73ae7c-bff9-49b7-832f-ee488f046487",
+    "createdAt": "2026-05-06T02:00:51.072Z"
+  }
+}

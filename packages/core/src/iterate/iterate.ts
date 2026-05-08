@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { existsSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
 import { readSidecar } from '../sidecar/read.ts';
 import { writeSidecar } from '../sidecar/write.ts';
 import { appendJournalEvent } from '../journal/append.ts';
@@ -18,16 +19,37 @@ interface IterateResult {
   reviewState: 'in-review';
 }
 
-const STAGE_ARTIFACT_PATH: Record<Stage, ((slug: string, contentDir: string) => string) | null> = {
-  Ideas: (slug, contentDir) => join(contentDir, slug, 'scrapbook', 'idea.md'),
-  Planned: (slug, contentDir) => join(contentDir, slug, 'scrapbook', 'plan.md'),
-  Outlining: (slug, contentDir) => join(contentDir, slug, 'scrapbook', 'outline.md'),
-  Drafting: (slug, contentDir) => join(contentDir, slug, 'index.md'),
-  Final: (slug, contentDir) => join(contentDir, slug, 'index.md'),
-  Published: null,
-  Blocked: null,
-  Cancelled: null,
-};
+/**
+ * Resolve the entry's "document under review" path. Per Issue #222 /
+ * Option B + hybrid refinement, longform + outline iterate target a
+ * single canonical file regardless of stage.
+ *
+ * Resolution order (T1 + non-index.md fallback):
+ *   1. If the sidecar carries `artifactPath`:
+ *      a. Prefer `<dirname(artifactPath)>/index.md` IF that file exists
+ *         (T1's index.md-canonical case).
+ *      b. Otherwise fall back to `artifactPath` itself. Supports
+ *         shared-directory layouts (multiple entries per directory,
+ *         each addressed by its own filename).
+ *   2. No artifactPath: try `<contentDir>/<slug>/index.md` (legacy
+ *      shape, pre-#140 entries the doctor migration hasn't processed).
+ */
+function resolveIndexPath(projectRoot: string, sidecar: Entry): string {
+  if (sidecar.artifactPath) {
+    const absArtifact = join(projectRoot, sidecar.artifactPath);
+    // Strip the scrapbook segment for legacy `<dir>/scrapbook/<file>.md`
+    // shapes; otherwise dirname(absArtifact) IS the doc dir.
+    const dir =
+      basename(dirname(absArtifact)) === 'scrapbook'
+        ? dirname(dirname(absArtifact))
+        : dirname(absArtifact);
+    const indexPath = join(dir, 'index.md');
+    if (existsSync(indexPath)) return indexPath;
+    return absArtifact;
+  }
+  const contentDir = getContentDir(projectRoot);
+  return join(contentDir, sidecar.slug, 'index.md');
+}
 
 export async function iterateEntry(projectRoot: string, opts: IterateOptions): Promise<IterateResult> {
   const sidecar = await readSidecar(projectRoot, opts.uuid);
@@ -39,19 +61,10 @@ export async function iterateEntry(projectRoot: string, opts: IterateOptions): P
     throw new Error(`Cannot iterate: entry is ${sidecar.currentStage}; induct it back into the pipeline first.`);
   }
 
-  // #140: prefer the explicit artifactPath on the sidecar when present.
-  // Fall back to the slug+stage heuristic for entries without one.
-  let artifactPath: string;
-  if (sidecar.artifactPath) {
-    artifactPath = join(projectRoot, sidecar.artifactPath);
-  } else {
-    const pathFn = STAGE_ARTIFACT_PATH[sidecar.currentStage];
-    if (!pathFn) {
-      throw new Error(`Cannot iterate at stage ${sidecar.currentStage}: no artifact path defined.`);
-    }
-    const contentDir = getContentDir(projectRoot);
-    artifactPath = pathFn(sidecar.slug, contentDir);
-  }
+  // Issue #222 — single document evolves; always read/write index.md.
+  // Per-stage files (idea.md / plan.md / outline.md) are scrapbook
+  // snapshots produced by approve, not iterate's read target.
+  const artifactPath = resolveIndexPath(projectRoot, sidecar);
   const markdown = await readFile(artifactPath, 'utf8');
 
   // Iteration is the operator's explicit "pin a new version" decision;

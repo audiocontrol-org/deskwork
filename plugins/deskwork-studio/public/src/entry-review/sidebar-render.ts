@@ -55,6 +55,20 @@ export interface BuildSidebarItemDeps extends SidebarRenderDeps {
   /** Click on the Resolve button — the controller handles the
    *  POST + sidebar-list mutation. */
   onResolve: (annotation: CommentAnnotation, status: AnnotationStatus) => void;
+  /** Click on the Edit button — controller flips the card into the
+   *  inline-edit affordance and PATCHes the new text on save. */
+  onEdit: (
+    annotation: CommentAnnotation,
+    card: HTMLElement,
+    noteEl: HTMLElement,
+  ) => void;
+  /** Click on the Delete button — controller asks the operator to
+   *  confirm and DELETEs on yes. */
+  onDelete: (
+    annotation: CommentAnnotation,
+    card: HTMLElement,
+    deleteBtn: HTMLElement,
+  ) => void;
   /** Hover-on-item → highlight in the article body. */
   onHoverEnter: (annotationId: string) => void;
   onHoverLeave: (annotationId: string) => void;
@@ -108,11 +122,37 @@ export function buildSidebarItem(
   resolveBtn.type = 'button';
   resolveBtn.className = 'er-marginalia-action';
   resolveBtn.textContent = 'Resolve';
+  resolveBtn.dataset.action = 'resolve-comment';
   resolveBtn.addEventListener('click', (ev) => {
     ev.stopPropagation();
     deps.onResolve(annotation, status);
   });
+  // Phase 35 (issue #199) — Edit + Delete affordances live ON the
+  // card itself per `.claude/rules/affordance-placement.md`. Editing
+  // a margin note's text is the typo-fix path; deleting is distinct
+  // from Resolve (resolve says "this was addressed", delete says
+  // "this was a mistake").
+  const editBtn = document.createElement('button');
+  editBtn.type = 'button';
+  editBtn.className = 'er-marginalia-action';
+  editBtn.textContent = 'Edit';
+  editBtn.dataset.action = 'edit-comment';
+  editBtn.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    deps.onEdit(annotation, li, text);
+  });
+  const deleteBtn = document.createElement('button');
+  deleteBtn.type = 'button';
+  deleteBtn.className = 'er-marginalia-action er-marginalia-action--destructive';
+  deleteBtn.textContent = 'Delete';
+  deleteBtn.dataset.action = 'delete-comment';
+  deleteBtn.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    deps.onDelete(annotation, li, deleteBtn);
+  });
+  actions.appendChild(editBtn);
   actions.appendChild(resolveBtn);
+  actions.appendChild(deleteBtn);
   li.appendChild(actions);
 
   if (status !== 'unresolved') {

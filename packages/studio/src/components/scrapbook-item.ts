@@ -63,6 +63,16 @@ export interface ScrapbookAddress {
    * viewer uses in its URL.
    */
   path: string;
+  /**
+   * Optional UUID of the calendar entry whose scrapbook this addresses.
+   * When present, the standalone-viewer URL appends `?entryId=<uuid>` so
+   * the server resolves the listing via `scrapbookDirForEntry` —
+   * symmetric to the mutation API's entry-aware addressing (#191/#205).
+   *
+   * Falls back to slug-template addressing when absent (legacy callers
+   * and ad-hoc / organizational paths that aren't tracked entries).
+   */
+  entryId?: string;
 }
 
 /**
@@ -103,6 +113,11 @@ const TEXT_PREVIEW_LINES = 8;
  * read-only binary endpoint. The endpoint is read-only by design —
  * Phase 16's image / PDF previews need a stable URL, but full
  * scrapbook CRUD remains in the standalone viewer's surface.
+ *
+ * When `address.entryId` is present, sends `entryId=<uuid>` so the
+ * server resolves via the entry's sidecar (entry-aware addressing —
+ * #205, symmetric to the mutation API). Slug-template addressing
+ * (`path=`) is the fallback when no entry id is available.
  */
 export function scrapbookFileUrl(
   address: ScrapbookAddress,
@@ -111,9 +126,13 @@ export function scrapbookFileUrl(
 ): string {
   const params = new URLSearchParams({
     site: address.site,
-    path: address.path,
     name: filename,
   });
+  if (address.entryId !== undefined && address.entryId.length > 0) {
+    params.set('entryId', address.entryId);
+  } else {
+    params.set('path', address.path);
+  }
   if (opts.secret) params.set('secret', '1');
   return `/api/dev/scrapbook-file?${params.toString()}`;
 }
@@ -121,11 +140,20 @@ export function scrapbookFileUrl(
 /**
  * Build the URL to the standalone scrapbook viewer for an address —
  * the operator's "open scrapbook" jumping-off point.
+ *
+ * When `address.entryId` is present, appends `?entryId=<uuid>` so the
+ * server route resolves the listing via `scrapbookDirForEntry`
+ * (entry-aware addressing — #205). Slug-only fallback is preserved
+ * when no entry id is available.
  */
 export function scrapbookViewerUrl(address: ScrapbookAddress): string {
   // The path is already kebab-case + slash-separated; encodeURI keeps
   // the slashes literal while escaping anything else (defensive).
-  return `/dev/scrapbook/${address.site}/${encodeURI(address.path)}`;
+  const base = `/dev/scrapbook/${address.site}/${encodeURI(address.path)}`;
+  if (address.entryId !== undefined && address.entryId.length > 0) {
+    return `${base}?entryId=${encodeURIComponent(address.entryId)}`;
+  }
+  return base;
 }
 
 // ---------------------------------------------------------------------------

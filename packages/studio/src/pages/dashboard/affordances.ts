@@ -9,6 +9,7 @@
  */
 
 import { html, unsafe, type RawHtml } from '../html.ts';
+import { scrapbookViewerUrl } from '../../components/scrapbook-item.ts';
 import type { Entry, Stage, ReviewState } from '@deskwork/core/schema/entry';
 
 const REVIEW_STATE_LABEL: Record<ReviewState, string> = {
@@ -68,7 +69,18 @@ export function renderRowActions(entry: Entry, defaultSite: string): RawHtml {
   // primary value is the dashboard ↔ scrapbook entry point existing at
   // all, and most projects have a single site). Slug already contains
   // any hierarchical path segments.
-  const scrapLink = `/dev/scrapbook/${defaultSite}/${entry.slug}`;
+  //
+  // #205: thread the entry's UUID through `scrapbookViewerUrl` so the
+  // standalone viewer's server route resolves the listing via
+  // `scrapbookDirForEntry` for entries whose on-disk path doesn't match
+  // the slug template (e.g. feature-doc layouts under
+  // `docs/<version>/<status>/<slug>/`). Falls back to slug-template
+  // addressing for entries without an id binding.
+  const scrapLink = scrapbookViewerUrl({
+    site: defaultSite,
+    path: entry.slug,
+    entryId: entry.uuid,
+  });
 
   if (isLinearActiveStage(stage)) {
     buttons.push(html`<a class="er-btn er-btn-small" href="${reviewLink}"

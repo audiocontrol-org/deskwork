@@ -19,8 +19,10 @@
  *                    [--platform <p>] [--channel <c>]
  *                    [--dispositions <path>] <slug>
  *
- * The dispositions file (optional, shortform only) is a JSON object mapping
+ * The dispositions file (optional, all kinds) is a JSON object mapping
  * commentId to { disposition: 'addressed'|'deferred'|'wontfix', reason?: string }.
+ * Both paths emit `address` annotations into their respective annotation
+ * stores (workflow-keyed for shortform, entry-keyed for longform/outline).
  */
 
 import { existsSync, readFileSync } from 'node:fs';
@@ -43,6 +45,16 @@ import { isPlatform } from '@deskwork/core/types';
 import { absolutize, emit, fail, parseArgs } from '@deskwork/core/cli-args';
 import { iterateEntry } from '@deskwork/core/iterate';
 import { resolveEntryUuid } from '@deskwork/core/sidecar';
+import {
+  addEntryAnnotation,
+  listEntryAnnotations,
+  mintEntryAnnotation,
+} from '@deskwork/core/entry/annotations';
+import type { DraftAnnotation } from '@deskwork/core/review/types';
+import {
+  loadDispositionsFile,
+  type DispositionEntry,
+} from './iterate-dispositions.ts';
 
 const KNOWN_FLAGS = ['site', 'kind', 'platform', 'channel', 'dispositions'] as const;
 const VALID_KINDS = ['longform', 'outline', 'shortform'] as const;
@@ -90,9 +102,6 @@ export async function run(argv: string[]): Promise<void> {
   if (flags.platform !== undefined || flags.channel !== undefined) {
     fail('--platform / --channel are only valid with --kind=shortform.');
   }
-  if (flags.dispositions !== undefined) {
-    fail('--dispositions is currently only supported with --kind=shortform.');
-  }
 
   await runLongformIterate(positional, flags);
 }
@@ -124,6 +133,13 @@ async function runLongformIterate(
   // site keeps the CLI's error shape consistent with the legacy command.
   const site = resolveSite(config, flags.site);
 
+  // Parse dispositions file (if any) BEFORE iterating, so a malformed
+  // file fails fast — same fail-shape as the shortform path.
+  let dispositions: Record<string, DispositionEntry> | null = null;
+  if (flags.dispositions !== undefined) {
+    dispositions = loadDispositionsFile(flags.dispositions);
+  }
+
   let uuid: string;
   try {
     uuid = await resolveEntryUuid(projectRoot, slug);
@@ -138,6 +154,30 @@ async function runLongformIterate(
     fail(err instanceof Error ? err.message : String(err));
   }
 
+  // Emit per-comment address annotations against the entry-keyed store.
+  // Silently skip disposition entries whose commentId doesn't match an
+  // existing comment annotation (matches the shortform path's behavior).
+  const addressed: string[] = [];
+  if (dispositions) {
+    const existing = await listEntryAnnotations(projectRoot, uuid);
+    const knownCommentIds = new Set(
+      existing.filter((a) => a.type === 'comment').map((a) => a.id),
+    );
+    for (const [commentId, entry] of Object.entries(dispositions)) {
+      if (!knownCommentIds.has(commentId)) continue;
+      const ann: DraftAnnotation = mintEntryAnnotation({
+        type: 'address',
+        workflowId: uuid,
+        commentId,
+        version: result.version,
+        disposition: entry.disposition,
+        ...(entry.reason !== undefined ? { reason: entry.reason } : {}),
+      });
+      await addEntryAnnotation(projectRoot, uuid, ann);
+      addressed.push(commentId);
+    }
+  }
+
   emit({
     entryId: result.entryId,
     site,
@@ -145,6 +185,7 @@ async function runLongformIterate(
     stage: result.stage,
     state: result.reviewState,
     version: result.version,
+    addressedComments: addressed,
   });
 }
 
@@ -159,14 +200,6 @@ async function runShortformIterate(
   flags: Record<string, string>,
   kind: Kind,
 ): Promise<void> {
-  const DISPOSITIONS = new Set(['addressed', 'deferred', 'wontfix'] as const);
-  type Disposition = 'addressed' | 'deferred' | 'wontfix';
-
-  interface DispositionEntry {
-    disposition: Disposition;
-    reason?: string;
-  }
-
   const [rootArg, slug] = positional;
   const projectRoot = absolutize(rootArg);
 
@@ -266,37 +299,7 @@ async function runShortformIterate(
   // Load dispositions file, if provided. Validate each entry.
   let dispositions: Record<string, DispositionEntry> | null = null;
   if (flags.dispositions !== undefined) {
-    const path = absolutize(flags.dispositions);
-    if (!existsSync(path)) {
-      fail(`--dispositions file not found: ${path}`);
-    }
-    let parsedDisp: unknown;
-    try {
-      parsedDisp = JSON.parse(readFileSync(path, 'utf8'));
-    } catch (err) {
-      const reason = err instanceof Error ? err.message : String(err);
-      fail(`--dispositions: invalid JSON at ${path}: ${reason}`);
-    }
-    if (parsedDisp === null || typeof parsedDisp !== 'object' || Array.isArray(parsedDisp)) {
-      fail(`--dispositions: expected JSON object at ${path}`);
-    }
-    dispositions = {};
-    for (const [commentId, raw] of Object.entries(parsedDisp as Record<string, unknown>)) {
-      if (typeof raw !== 'object' || raw === null) {
-        fail(`--dispositions[${commentId}]: must be an object`);
-      }
-      const d = raw as { disposition?: unknown; reason?: unknown };
-      if (typeof d.disposition !== 'string' || !DISPOSITIONS.has(d.disposition as Disposition)) {
-        fail(
-          `--dispositions[${commentId}].disposition: must be 'addressed' | 'deferred' | 'wontfix'`,
-        );
-      }
-      const entry: DispositionEntry = { disposition: d.disposition as Disposition };
-      if (typeof d.reason === 'string' && d.reason.length > 0) {
-        entry.reason = d.reason;
-      }
-      dispositions[commentId] = entry;
-    }
+    dispositions = loadDispositionsFile(flags.dispositions);
   }
 
   // Append the new version from disk.

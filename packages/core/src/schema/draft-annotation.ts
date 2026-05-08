@@ -87,6 +87,29 @@ const AddressAnnotation = z.object({
   reason: z.string().optional(),
 });
 
+const EditCommentAnnotation = z.object({
+  ...BaseFields,
+  type: z.literal('edit-comment'),
+  commentId: z.string(),
+  text: z.string().optional(),
+  range: RangeSchema.optional(),
+  category: AnnotationCategoryEnum.optional(),
+  anchor: z.string().optional(),
+});
+
+const DeleteCommentAnnotation = z.object({
+  ...BaseFields,
+  type: z.literal('delete-comment'),
+  commentId: z.string(),
+});
+
+const ArchiveCommentAnnotation = z.object({
+  ...BaseFields,
+  type: z.literal('archive-comment'),
+  commentId: z.string(),
+  priorStage: z.string().optional(),
+});
+
 export const DraftAnnotationSchema = z.discriminatedUnion('type', [
   CommentAnnotation,
   EditAnnotation,
@@ -94,4 +117,7 @@ export const DraftAnnotationSchema = z.discriminatedUnion('type', [
   RejectAnnotation,
   ResolveAnnotation,
   AddressAnnotation,
+  EditCommentAnnotation,
+  DeleteCommentAnnotation,
+  ArchiveCommentAnnotation,
 ]);

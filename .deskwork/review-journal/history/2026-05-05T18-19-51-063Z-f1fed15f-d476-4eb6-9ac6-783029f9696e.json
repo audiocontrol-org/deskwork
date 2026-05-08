@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-05T18:19:51.063Z",
+  "entryId": "d61642b3-614e-42c6-9e02-1f0a54137679",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "d61642b3-614e-42c6-9e02-1f0a54137679",
+    "version": 1,
+    "range": {
+      "start": 4263,
+      "end": 4445
+    },
+    "text": "Confirmed--this works.",
+    "category": "other",
+    "anchor": " In the test environment, navigate to a multi-comment review surface; confirm items align vertically with their <mark> elements (deltas within ~1px); confirm collision cascade works.",
+    "id": "2adcfb50-3a75-4ff5-af5b-34a30efc6d17",
+    "createdAt": "2026-05-05T18:19:51.063Z"
+  }
+}

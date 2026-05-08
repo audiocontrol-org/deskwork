@@ -269,25 +269,51 @@ describe('discoverIngestCandidates — state derivation', () => {
     expect(r.candidates[0].rawState).toBe('published-elsewhere');
   });
 
-  it('defaults to Ideas when no state field is present', () => {
+  it('defaults to Drafting when no state field is present (#206)', () => {
+    // /deskwork:ingest is for existing content with body text; the
+    // semantic distinction with /deskwork:add (which captures new
+    // ideas) means an ingested file with no explicit state belongs in
+    // Drafting, not Ideas. Pre-#206 default was Ideas.
     write('p.md', '---\ntitle: P\n---\n');
     const r = discoverIngestCandidates([join(project, 'p.md')], baseOpts());
-    expect(r.candidates[0].derivedState).toBe('Ideas');
+    expect(r.candidates[0].derivedState).toBe('Drafting');
     // The value did not come from the file; provenance must reflect
     // that (#23). Was previously labeled 'frontmatter' (a lie).
     expect(r.candidates[0].stateSource).toBe('default');
   });
 
-  it('labels state source as `default` when --state-from datePublished has no datePublished', () => {
-    // No datePublished + stateFrom datePublished → defaults to Ideas.
-    // The audit trail must say `default`, not `frontmatter` (#23).
+  it('labels state source as `default` when --state-from datePublished has no datePublished (#206)', () => {
+    // No datePublished + stateFrom datePublished → defaults to
+    // Drafting per #206. The audit trail must say `default`, not
+    // `frontmatter` (#23).
     write('p.md', '---\ntitle: P\n---\n');
     const r = discoverIngestCandidates(
       [join(project, 'p.md')],
       baseOpts({ stateFrom: 'datePublished' }),
     );
-    expect(r.candidates[0].derivedState).toBe('Ideas');
+    expect(r.candidates[0].derivedState).toBe('Drafting');
     expect(r.candidates[0].stateSource).toBe('default');
+  });
+
+  it('explicit --state Ideas overrides the new Drafting default (#206)', () => {
+    // The default flipped to Drafting; explicit --state still wins.
+    // Operators who want an ingested file in Ideas can pass --state.
+    write('p.md', '---\ntitle: P\n---\n');
+    const r = discoverIngestCandidates(
+      [join(project, 'p.md')],
+      baseOpts({ explicitState: 'Ideas' }),
+    );
+    expect(r.candidates[0].derivedState).toBe('Ideas');
+    expect(r.candidates[0].stateSource).toBe('explicit');
+  });
+
+  it('frontmatter state: ideas wins over the new Drafting default (#206)', () => {
+    // Default flipped to Drafting, but frontmatter still wins. A file
+    // that explicitly carries `state: ideas` lands in Ideas.
+    write('p.md', '---\ntitle: P\nstate: ideas\n---\n');
+    const r = discoverIngestCandidates([join(project, 'p.md')], baseOpts());
+    expect(r.candidates[0].derivedState).toBe('Ideas');
+    expect(r.candidates[0].stateSource).toBe('frontmatter');
   });
 
   it('keeps state source as `frontmatter` when frontmatter has a real `state:` field', () => {
@@ -640,10 +666,11 @@ describe('discoverIngestCandidates — README.md without frontmatter (#23)', () 
     expect(r.candidates[0].derivedState).toBe('Drafting');
   });
 
-  it('still ingests index.md with no frontmatter (default-to-Ideas, unchanged)', () => {
+  it('still ingests index.md with no frontmatter (default-to-Drafting per #206)', () => {
     // The README rule is README-specific. index.md keeps its existing
-    // behavior — it ingests, defaulting state to Ideas. Provenance now
-    // labels that default honestly.
+    // behavior — it ingests, defaulting state to Drafting (was Ideas
+    // pre-#206; flipped per the add/ingest semantic distinction).
+    // Provenance labels that default honestly.
     write('content/posts/hello/index.md', 'no frontmatter here\n');
     const r = discoverIngestCandidates(
       [join(project, 'content/posts/hello/index.md')],
@@ -652,7 +679,7 @@ describe('discoverIngestCandidates — README.md without frontmatter (#23)', () 
     expect(r.skips).toEqual([]);
     expect(r.candidates).toHaveLength(1);
     expect(r.candidates[0].derivedSlug).toBe('hello');
-    expect(r.candidates[0].derivedState).toBe('Ideas');
+    expect(r.candidates[0].derivedState).toBe('Drafting');
     expect(r.candidates[0].stateSource).toBe('default');
   });
 

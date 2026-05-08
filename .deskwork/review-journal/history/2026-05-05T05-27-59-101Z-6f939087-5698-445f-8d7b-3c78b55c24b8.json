@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-05T05:27:59.101Z",
+  "entryId": "b3f20364-969a-4004-87bd-278cd5992e3c",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "b3f20364-969a-4004-87bd-278cd5992e3c",
+    "version": 1,
+    "range": {
+      "start": 3629,
+      "end": 3635
+    },
+    "text": "WE should scope and add this issue to the appropriate tranche: https://github.com/audiocontrol-org/deskwork/issues/199",
+    "category": "other",
+    "anchor": "Phases",
+    "id": "f4e1dc23-cbe2-462b-90d8-1808ecfb6024",
+    "createdAt": "2026-05-05T05:27:59.101Z"
+  }
+}

@@ -124,13 +124,74 @@ export interface AddressAnnotation extends AnnotationBase {
   reason?: string;
 }
 
+/**
+ * Edit a previously-recorded `comment` annotation. Append-only: the
+ * original comment annotation is preserved on disk; the folded view
+ * (returned by `listEntryAnnotations`) replaces the named comment's
+ * mutable fields with the latest edit-comment payload, in journal
+ * order.
+ *
+ * Each field is optional — a partial payload preserves prior values
+ * (text-only edit, range-only edit, etc.). At least one of `text` /
+ * `range` / `category` / `anchor` must be present at write time
+ * (validated by the route + the writer).
+ */
+export interface EditCommentAnnotation extends AnnotationBase {
+  type: 'edit-comment';
+  /** The original `comment` annotation's id. */
+  commentId: string;
+  /** New comment text — replaces the prior value when present. */
+  text?: string;
+  /** New character range — replaces the prior value when present. */
+  range?: DraftRange;
+  /** New category — replaces the prior value when present. */
+  category?: AnnotationCategory;
+  /** New anchor (selected-text quote) — replaces the prior value when present. */
+  anchor?: string;
+}
+
+/**
+ * Tombstone a `comment` annotation. Append-only: the original is left
+ * in place on disk; the folded view drops it from the active list.
+ * Distinct from `resolve` — resolve says "this comment was addressed",
+ * delete says "this comment was a mistake".
+ */
+export interface DeleteCommentAnnotation extends AnnotationBase {
+  type: 'delete-comment';
+  /** The original `comment` annotation's id. */
+  commentId: string;
+}
+
+/**
+ * Archive a `comment` annotation as part of a stage transition (#200,
+ * Issue #222 hybrid refinement). Append-only: the original is left in
+ * place on disk; the folded view drops it from the active list. Distinct
+ * from `delete-comment` — archive captures "this comment was made
+ * against a prior stage's content; the document has since evolved, so
+ * range/anchor stability cannot be guaranteed against the new content."
+ *
+ * The optional `priorStage` field records which stage the comment was
+ * archived OUT OF — useful for audit views that group archived comments
+ * by stage of origin.
+ */
+export interface ArchiveCommentAnnotation extends AnnotationBase {
+  type: 'archive-comment';
+  /** The original `comment` annotation's id. */
+  commentId: string;
+  /** The stage the document was at when the comment was archived. */
+  priorStage?: string;
+}
+
 export type DraftAnnotation =
   | CommentAnnotation
   | EditAnnotation
   | ApproveAnnotation
   | RejectAnnotation
   | ResolveAnnotation
-  | AddressAnnotation;
+  | AddressAnnotation
+  | EditCommentAnnotation
+  | DeleteCommentAnnotation
+  | ArchiveCommentAnnotation;
 
 export interface DraftVersion {
   /** 1-based version number; v1 is the initial draft. */

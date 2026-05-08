@@ -22,6 +22,7 @@ import schemaRejected from './rules/schema-rejected.ts';
 import workflowStale from './rules/workflow-stale.ts';
 import calendarUuidMissing from './rules/calendar-uuid-missing.ts';
 import legacyTopLevelIdMigration from './rules/legacy-top-level-id-migration.ts';
+import legacyStageArtifactPath from './rules/legacy-stage-artifact-path.ts';
 import { loadProjectRules, mergeRules } from './project-rules.ts';
 import type {
   DoctorContext,
@@ -48,6 +49,7 @@ import type {
 export const RULES: ReadonlyArray<DoctorRule> = [
   calendarUuidMissing,
   legacyTopLevelIdMigration,
+  legacyStageArtifactPath,
   missingFrontmatterId,
   orphanFrontmatterId,
   duplicateId,

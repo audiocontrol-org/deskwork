@@ -17,8 +17,9 @@
  * version strip + edit toolbar + marginalia + scrapbook drawer +
  * decision strip). The Reject button is rendered `disabled` with a
  * tooltip pointing at issue #173 (entry-keyed reject semantics
- * undefined). The Save button in the edit toolbar is similarly
- * disabled pending #174.
+ * undefined). The Save button is rendered ENABLED — it's a dumb
+ * file-write affordance (#174) that POSTs to the entry-keyed body
+ * endpoint.
  *
  * Read-only stages (Published / Blocked / Cancelled) still use the
  * `er-entry-control--*` class family from the original entry-review
@@ -124,10 +125,14 @@ describe('GET /dev/editorial-review/entry/:entryId', () => {
     expect(html).toContain('data-action="reject"');
     expect(html).toMatch(/data-action="reject"[^>]*disabled/);
     expect(html).toContain('issues/173');
-    // Edit toolbar: Save button is disabled pending #174.
+    // Edit toolbar: Save button is rendered ENABLED (#174 — dumb file
+    // write, no state-management gate). The pending-design tooltip is
+    // gone; the markup must NOT carry a `disabled` attribute on the
+    // save button.
     expect(html).toContain('data-action="save-version"');
-    expect(html).toMatch(/data-action="save-version"[^>]*disabled/);
-    expect(html).toContain('issues/174');
+    expect(html).not.toMatch(/data-action="save-version"[^>]*disabled/);
+    expect(html).not.toContain('Save semantics for the entry-keyed surface are pending design');
+    expect(html).not.toContain('issues/174');
     // Marginalia + scrapbook drawer + outline tab + shortcuts overlay.
     expect(html).toContain('data-comments-sidebar');
     expect(html).toContain('data-scrapbook-drawer');

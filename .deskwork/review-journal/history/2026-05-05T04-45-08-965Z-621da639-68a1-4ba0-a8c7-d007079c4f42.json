@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-05T04:45:08.965Z",
+  "entryId": "b3f20364-969a-4004-87bd-278cd5992e3c",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "b3f20364-969a-4004-87bd-278cd5992e3c",
+    "version": 1,
+    "range": {
+      "start": 1220,
+      "end": 1238
+    },
+    "text": "We need a section that describes the six phases",
+    "category": "other",
+    "anchor": "a six-phase triage",
+    "id": "e24b171b-13c6-454a-8986-b8043018ab8e",
+    "createdAt": "2026-05-05T04:45:08.965Z"
+  }
+}

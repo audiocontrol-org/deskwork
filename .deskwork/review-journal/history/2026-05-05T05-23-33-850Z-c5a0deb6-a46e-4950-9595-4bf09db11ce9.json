@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-05T05:23:33.850Z",
+  "entryId": "b3f20364-969a-4004-87bd-278cd5992e3c",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "b3f20364-969a-4004-87bd-278cd5992e3c",
+    "version": 1,
+    "range": {
+      "start": 3629,
+      "end": 3635
+    },
+    "text": "The Phases section should go before the Acceptance Criteria section",
+    "category": "other",
+    "anchor": "Phases",
+    "id": "5f1676d7-3ccc-48dd-b60d-f6f4bec5cf7e",
+    "createdAt": "2026-05-05T05:23:33.850Z"
+  }
+}

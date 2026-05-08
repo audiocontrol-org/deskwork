@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-05T16:49:18.468Z",
+  "entryId": "b3f20364-969a-4004-87bd-278cd5992e3c",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "b3f20364-969a-4004-87bd-278cd5992e3c",
+    "version": 3,
+    "range": {
+      "start": 100,
+      "end": 120
+    },
+    "text": "phase7 live test",
+    "category": "other",
+    "anchor": "test",
+    "id": "dfda20b0-283a-4dd2-b08b-170dd1605be5",
+    "createdAt": "2026-05-05T16:49:18.468Z"
+  }
+}

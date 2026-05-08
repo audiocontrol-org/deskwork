@@ -5,6 +5,12 @@
  * "Use fixture project trees on disk, never mock the filesystem"); the
  * scrapbook module touches readdirSync/statSync directly, so a mock
  * would just be testing the mock.
+ *
+ * Post-#192: the public mutation surface is the entry-aware `*AtDir`
+ * family. The slug-template fallback is exercised through
+ * `scrapbookDirForEntry({ slug })` with no id binding — the legacy
+ * `scrapbookDir(slug)` / `scrapbookFilePath(slug)` / slug-template CRUD
+ * helpers were collapsed to private internals.
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -21,14 +27,14 @@ import {
   classify,
   countScrapbook,
   countScrapbookForEntry,
-  createScrapbookMarkdown,
+  createScrapbookMarkdownAtDir,
   isNestedSlug,
   listScrapbook,
   readScrapbookFile,
-  scrapbookDir,
+  readScrapbookFileAtDir,
   scrapbookDirAtPath,
   scrapbookDirForEntry,
-  scrapbookFilePath,
+  scrapbookFilePathAtDir,
   slugSegments,
   SECRET_SUBDIR,
 } from '../src/scrapbook.ts';
@@ -78,7 +84,11 @@ describe('slug helpers', () => {
   });
 });
 
-describe('scrapbookDir + scrapbookFilePath path containment', () => {
+describe('scrapbookDirForEntry path containment (slug-template fallback)', () => {
+  // Post-#192: the slug-template fallback is the legacy path inside
+  // `scrapbookDirForEntry`. We exercise it by passing `{ slug }` with no
+  // id binding — the resolver falls through to the private slug-template
+  // helper.
   let root: string;
   const cfg = makeConfig();
 
@@ -87,18 +97,15 @@ describe('scrapbookDir + scrapbookFilePath path containment', () => {
   });
   afterEach(() => rmSync(root, { recursive: true, force: true }));
 
-  it('resolves to <contentDir>/<slug>/scrapbook for flat slugs', () => {
-    const dir = scrapbookDir(root, cfg, 'wc', 'flat-piece');
+  it('resolves to <contentDir>/<slug>/scrapbook for flat slugs (fallback)', () => {
+    const dir = scrapbookDirForEntry(root, cfg, 'wc', { slug: 'flat-piece' });
     expect(dir).toBe(join(root, 'src/content/projects/flat-piece/scrapbook'));
   });
 
-  it('resolves to <contentDir>/<deep-slug>/scrapbook for hierarchical slugs', () => {
-    const dir = scrapbookDir(
-      root,
-      cfg,
-      'wc',
-      'the-outbound/characters/strivers',
-    );
+  it('resolves to <contentDir>/<deep-slug>/scrapbook for hierarchical slugs (fallback)', () => {
+    const dir = scrapbookDirForEntry(root, cfg, 'wc', {
+      slug: 'the-outbound/characters/strivers',
+    });
     expect(dir).toBe(
       join(
         root,
@@ -107,22 +114,17 @@ describe('scrapbookDir + scrapbookFilePath path containment', () => {
     );
   });
 
-  it('scrapbookFilePath with secret:false returns top-level path', () => {
-    const p = scrapbookFilePath(root, cfg, 'wc', 'pillar', 'note.md');
+  it('scrapbookFilePathAtDir with secret:false returns top-level path', () => {
+    const dir = scrapbookDirForEntry(root, cfg, 'wc', { slug: 'pillar' });
+    const p = scrapbookFilePathAtDir(dir, 'note.md');
     expect(p).toBe(
       join(root, 'src/content/projects/pillar/scrapbook/note.md'),
     );
   });
 
-  it('scrapbookFilePath with secret:true joins the secret subdir', () => {
-    const p = scrapbookFilePath(
-      root,
-      cfg,
-      'wc',
-      'pillar',
-      'private.md',
-      { secret: true },
-    );
+  it('scrapbookFilePathAtDir with secret:true joins the secret subdir', () => {
+    const dir = scrapbookDirForEntry(root, cfg, 'wc', { slug: 'pillar' });
+    const p = scrapbookFilePathAtDir(dir, 'private.md', { secret: true });
     expect(p).toBe(
       join(
         root,
@@ -134,9 +136,8 @@ describe('scrapbookDir + scrapbookFilePath path containment', () => {
   });
 
   it('rejects a path-traversal filename', () => {
-    expect(() =>
-      scrapbookFilePath(root, cfg, 'wc', 'pillar', '../escape.md'),
-    ).toThrow();
+    const dir = scrapbookDirForEntry(root, cfg, 'wc', { slug: 'pillar' });
+    expect(() => scrapbookFilePathAtDir(dir, '../escape.md')).toThrow();
   });
 });
 
@@ -240,7 +241,11 @@ describe('countScrapbook', () => {
   });
 });
 
-describe('createScrapbookMarkdown with secret flag', () => {
+describe('createScrapbookMarkdownAtDir with secret flag', () => {
+  // Post-#192: callers compose `scrapbookDirForEntry({ slug })` (or the
+  // entry-aware variant) with `createScrapbookMarkdownAtDir`. The
+  // slug-template variant of create is no longer public — these tests
+  // exercise the same code path through the supported surface.
   let root: string;
   const cfg = makeConfig();
 
@@ -250,44 +255,28 @@ describe('createScrapbookMarkdown with secret flag', () => {
   afterEach(() => rmSync(root, { recursive: true, force: true }));
 
   it('creates a public file at scrapbook/<filename> by default', () => {
-    createScrapbookMarkdown(
-      root,
-      cfg,
-      'wc',
-      'p',
-      'public-note.md',
-      '# public',
-    );
+    const dir = scrapbookDirForEntry(root, cfg, 'wc', { slug: 'p' });
+    createScrapbookMarkdownAtDir(dir, 'public-note.md', '# public');
     const summary = listScrapbook(root, cfg, 'wc', 'p');
     expect(summary.items.map((i) => i.name)).toEqual(['public-note.md']);
     expect(summary.secretItems).toEqual([]);
   });
 
   it('creates a secret file at scrapbook/secret/<filename> when secret:true', () => {
-    createScrapbookMarkdown(
-      root,
-      cfg,
-      'wc',
-      'p',
-      'private-note.md',
-      '# private',
-      { secret: true },
-    );
+    const dir = scrapbookDirForEntry(root, cfg, 'wc', { slug: 'p' });
+    createScrapbookMarkdownAtDir(dir, 'private-note.md', '# private', {
+      secret: true,
+    });
     const summary = listScrapbook(root, cfg, 'wc', 'p');
     expect(summary.items).toEqual([]);
     expect(summary.secretItems.map((i) => i.name)).toEqual(['private-note.md']);
   });
 
   it('readScrapbookFile finds a secret file via the secret flag', () => {
-    createScrapbookMarkdown(
-      root,
-      cfg,
-      'wc',
-      'p',
-      'private.md',
-      '# private body',
-      { secret: true },
-    );
+    const dir = scrapbookDirForEntry(root, cfg, 'wc', { slug: 'p' });
+    createScrapbookMarkdownAtDir(dir, 'private.md', '# private body', {
+      secret: true,
+    });
     // Reading without the flag fails (looks at the public path)
     expect(() => readScrapbookFile(root, cfg, 'wc', 'p', 'private.md')).toThrow();
     // With the flag, it resolves
@@ -295,6 +284,15 @@ describe('createScrapbookMarkdown with secret flag', () => {
       secret: true,
     });
     expect(f.content.toString('utf-8')).toBe('# private body');
+  });
+
+  it('readScrapbookFileAtDir mirrors the slug-keyed read primitive', () => {
+    // The public dir-keyed read primitive — used by callers that have
+    // already resolved the dir via `scrapbookDirForEntry`.
+    const dir = scrapbookDirForEntry(root, cfg, 'wc', { slug: 'q' });
+    createScrapbookMarkdownAtDir(dir, 'note.md', '# body');
+    const f = readScrapbookFileAtDir(dir, 'note.md');
+    expect(f.content.toString('utf-8')).toBe('# body');
   });
 });
 
@@ -310,9 +308,9 @@ describe('classify (existing behavior, unchanged)', () => {
 });
 
 describe('scrapbookDirAtPath (Phase 19c)', () => {
-  // Path-addressed sibling of scrapbookDir — used when the studio
-  // already knows the fs path of an organizational/tracked node and
-  // doesn't need to re-derive through the slug regex.
+  // Path-addressed sibling of the legacy slug resolver — used when the
+  // studio already knows the fs path of an organizational/tracked node
+  // and doesn't need to re-derive through the slug regex.
   let root: string;
   const cfg = makeConfig();
 
@@ -499,5 +497,50 @@ describe('countScrapbookForEntry (issue #34)', () => {
       idx,
     );
     expect(n).toBe(0);
+  });
+});
+
+describe('public surface (#192) — slug-template helpers are no longer exported', () => {
+  // Regression coverage for #192: callers must reach the slug-template
+  // path through `scrapbookDirForEntry({ slug })` (which falls back
+  // internally) — never through a direct slug-template helper.
+  let root: string;
+  const cfg = makeConfig();
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'deskwork-sb-public-'));
+  });
+  afterEach(() => rmSync(root, { recursive: true, force: true }));
+
+  it('scrapbookDirForEntry({ slug }) round-trips create + list', () => {
+    const dir = scrapbookDirForEntry(root, cfg, 'wc', { slug: 'p' });
+    createScrapbookMarkdownAtDir(dir, 'note.md', '# hi');
+    const summary = listScrapbook(root, cfg, 'wc', 'p');
+    expect(summary.items.map((i) => i.name)).toEqual(['note.md']);
+  });
+
+  it('the entry-aware path is used when an id binding exists', () => {
+    // Same slug, but the entry binds to a deeper path on disk. The
+    // entry-aware resolver should walk to the bound file's parent dir;
+    // the slug-template fallback would point at the wrong location.
+    const id = 'cccccccc-dddd-4eee-8fff-000000000000';
+    const fileAbs = join(
+      root,
+      'src/content/projects/team/blog/the-outbound/index.md',
+    );
+    mkdirSync(join(fileAbs, '..'), { recursive: true });
+    writeFileSync(
+      fileAbs,
+      `---\ndeskwork:\n  id: ${id}\ntitle: The Outbound\n---\n`,
+    );
+    const dir = scrapbookDirForEntry(root, cfg, 'wc', {
+      id,
+      slug: 'the-outbound',
+    });
+    // The bound file's parent dir + scrapbook — NOT
+    // <contentDir>/the-outbound/scrapbook.
+    expect(dir).toBe(
+      join(root, 'src/content/projects/team/blog/the-outbound/scrapbook'),
+    );
   });
 });

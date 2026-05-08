@@ -60,6 +60,7 @@ import {
   type SlugFrom,
   type StateFrom,
 } from '@deskwork/core/ingest';
+import { readExistingDeskworkId } from '@deskwork/core/ingest-id';
 
 const KNOWN_FLAGS = [
   'site',
@@ -187,18 +188,15 @@ export async function run(argv: string[]): Promise<void> {
 
   const writeFrontmatterBinding = !booleans.has('no-write-frontmatter');
 
-  // Apply path: append entries and write journal records. The
-  // calendar is written once at the end so a partial run does not
-  // leave a torn calendar file. Issue #63: also persist the freshly-
-  // minted UUID into the source file's frontmatter under `deskwork.id`
-  // so the calendar entry isn't orphaned at creation (doctor was
-  // immediately flagging `missing-frontmatter-id` against every ingest).
-  // Issue #183: write the entry-centric sidecar at .deskwork/entries/<uuid>.json
-  // — Phase 30 made sidecars the SSOT, so an ingest that only updates
-  // calendar.md leaves the entry invisible on the studio dashboard and
-  // unreachable by deep-link.
+  // Apply path: append entries, write journal records + sidecar, and
+  // patch the source file's `deskwork.id` (Issue #63). Calendar is
+  // written once at end so a partial run does not leave a torn file.
+  // Issue #183: write entry-centric sidecar at .deskwork/entries/<uuid>.json
+  // (Phase 30 SSOT). Issue #197: honor an existing valid `deskwork.id`
+  // from frontmatter so /dw-lifecycle:setup → ingest handoff survives;
+  // discovery rejects collisions where the id belongs to another entry.
   for (const { candidate, stage } of actionable) {
-    const id = randomUUID();
+    const id = readExistingDeskworkId(candidate.frontmatter) ?? randomUUID();
     const entry: CalendarEntry = { id, ...candidateToEntry(candidate, stage) };
     calendar.entries.push(entry);
     writeIngestJournalEntry(projectRoot, config, site, candidate, entry);

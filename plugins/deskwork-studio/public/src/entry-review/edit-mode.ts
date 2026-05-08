@@ -4,16 +4,16 @@
  *
  * Mounts a CodeMirror editor inside `[data-edit-source]` and feeds the
  * preview pane via the existing `/api/dev/editorial-review/render`
- * endpoint. The Save action is intentionally inert pending the design
- * decision in issue #174 (entry-keyed save semantics undefined — the
- * button is server-side `disabled` with a tooltip pointing at the
- * issue, and the client handler defensively shows a toast that names
- * the same issue).
+ * endpoint. Save (#174) is a dumb file write: the click POSTs the
+ * editor text to `PUT /api/dev/editorial-review/entry/:entryId/body`,
+ * which writes to the entry's canonical document file on disk. NO
+ * version bump, NO journal record, NO state-machine mutation —
+ * `/deskwork:iterate` owns those.
  *
  *   - `Edit` button → `enterEdit` mounts the editor with the current
  *     artifact body.
  *   - `Cancel` → discard local edits + exit.
- *   - `Save` → toast pointing at #174.
+ *   - `Save` → write the current text to disk.
  *
  * The CodeMirror module is dynamically imported so the bundle only
  * loads when the operator actually enters edit mode.
@@ -26,8 +26,7 @@ import type { EntryReviewState } from './state.ts';
 import { inlineConfirm } from './inline-prompt.ts';
 
 const RENDER_API = '/api/dev/editorial-review/render';
-const SAVE_ISSUE_URL =
-  'https://github.com/audiocontrol-org/deskwork/issues/174';
+const ENTRY_API = '/api/dev/editorial-review/entry';
 
 interface EditDom {
   draftBody: HTMLElement;
@@ -99,17 +98,17 @@ export function createEditModeController(
   }
 
   function updateSaveState(): void {
-    // Save is server-disabled (#174); the focus-mode floating Save also
-    // stays disabled regardless of whether the buffer is dirty. The
-    // hint surfaces what's happening so the operator isn't confused
-    // when their edits can't land.
+    // #174 — Save is a dumb file write. Always enabled while editing
+    // so the operator never has to wonder "why won't this save?". The
+    // click handler is idempotent against a no-op edit; intent-to-save
+    // trumps any state-management cleverness on the UI side.
     const focusSaveBtn = document.querySelector<HTMLButtonElement>(
       '[data-focus-save] [data-action="save-version"]',
     );
-    if (focusSaveBtn) focusSaveBtn.disabled = true;
-    if (saveVersionBtn) saveVersionBtn.disabled = true;
+    if (focusSaveBtn) focusSaveBtn.disabled = false;
+    if (saveVersionBtn) saveVersionBtn.disabled = false;
     const changed = draftEdit.value !== state.markdown;
-    setHint(changed ? 'Modified — save pending #174' : 'No changes');
+    setHint(changed ? 'Modified' : 'No changes');
   }
 
   function hasUnsavedChanges(): boolean {
@@ -258,26 +257,76 @@ export function createEditModeController(
     editPreviewHost.innerHTML = '';
   }
 
-  // ---- Save ----
+  // ---- Save (#174) ----
   //
-  // The entry-keyed `iterateEntry` reads on-disk content rather than
-  // accepting a markdown body in the request, so the legacy edit-in-
-  // browser save flow has no entry-keyed endpoint that combines
-  // write-to-disk + iterate-record. The Save button is server-side
-  // `disabled`; the client handler defensively shows a toast pointing
-  // at issue #174 if anyone removes the disabled attribute via devtools.
+  // POST the current editor text to the entry-keyed body endpoint.
+  // Dumb file write: no version bump, no journal record, no
+  // state-machine flip. State-machine work belongs to `/deskwork:iterate`.
+  //
+  // Guards against double-submission via `saving`. On success: refresh
+  // `state.markdown` so subsequent dirty-detection compares against the
+  // newly-saved content; flash a "Saved" hint. On failure: show a toast
+  // and leave the buffer untouched so the operator can retry.
+  let saving = false;
 
-  function performSave(): void {
-    showToast(
-      `Save semantics for the entry-keyed surface are pending design — see ${SAVE_ISSUE_URL}`,
-      true,
-    );
+  function setSaveButtonsDisabled(disabled: boolean): void {
+    document
+      .querySelectorAll<HTMLButtonElement>('[data-action="save-version"]')
+      .forEach((btn) => {
+        btn.disabled = disabled;
+      });
+  }
+
+  async function performSave(): Promise<void> {
+    if (saving) return;
+    if (state.historical) {
+      showToast('Historical version is read-only — switch to current to save.', true);
+      return;
+    }
+    const value = editorHandle ? editorHandle.getValue() : draftEdit.value;
+    saving = true;
+    setSaveButtonsDisabled(true);
+    setHint('Saving…');
+    try {
+      const res = await fetch(
+        `${ENTRY_API}/${encodeURIComponent(state.entryId)}/body`,
+        {
+          method: 'PUT',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ markdown: value }),
+        },
+      );
+      const json: unknown = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const reason =
+          typeof json === 'object' && json !== null && 'error' in json &&
+          typeof (json as { error: unknown }).error === 'string'
+            ? (json as { error: string }).error
+            : `save endpoint returned ${res.status}`;
+        showToast(`Save failed: ${reason}`, true);
+        setHint('Save failed');
+        return;
+      }
+      // Reflect the new on-disk state in our dirty-tracking baseline so
+      // a follow-up no-op Save doesn't re-trigger unsaved-change UI.
+      state.markdown = value;
+      draftEdit.value = value;
+      showToast('Saved');
+      setHint('Saved');
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : String(e);
+      showToast(`Save failed: ${reason}`, true);
+      setHint('Save failed');
+    } finally {
+      saving = false;
+      setSaveButtonsDisabled(false);
+    }
   }
 
   document.querySelectorAll<HTMLButtonElement>('[data-action="save-version"]').forEach(
     (btn) => btn.addEventListener('click', (ev) => {
       ev.preventDefault();
-      performSave();
+      void performSave();
     }),
   );
 

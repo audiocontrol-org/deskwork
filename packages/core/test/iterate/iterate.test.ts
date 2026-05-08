@@ -36,6 +36,9 @@ describe('iterateEntry', () => {
       uuid, slug, title: 'My Article', keywords: [], source: 'manual',
       currentStage: stage,
       iterationByStage: stage === 'Ideas' ? {} : { Ideas: 1 },
+      // T1 (#222): artifactPath always points at index.md; iterate
+      // reads/writes index.md regardless of stage.
+      artifactPath: `docs/${slug}/index.md`,
       createdAt: '2026-04-30T10:00:00.000Z',
       updatedAt: '2026-04-30T10:00:00.000Z',
     };
@@ -45,9 +48,9 @@ describe('iterateEntry', () => {
 
   it('iterates even when on-disk content is unchanged (operator may be pinning marginalia or off-file work)', async () => {
     await setupEntry('Ideas');
-    const ideaPath = join(projectRoot, 'docs', slug, 'scrapbook', 'idea.md');
+    const indexPath = join(projectRoot, 'docs', slug, 'index.md');
     const body = `---\ndeskwork:\n  id: ${uuid}\n---\n\n# unchanged\n`;
-    await writeFile(ideaPath, body);
+    await writeFile(indexPath, body);
 
     // Iterate is the operator's explicit "pin this version" decision.
     // The core helper records what was asked; the orchestrating skill
@@ -61,8 +64,8 @@ describe('iterateEntry', () => {
 
   it('produces v1 from iteration 0 (no prior iteration)', async () => {
     await setupEntry('Ideas');
-    const ideaPath = join(projectRoot, 'docs', slug, 'scrapbook', 'idea.md');
-    await writeFile(ideaPath, `---\ndeskwork:\n  id: ${uuid}\n  stage: Ideas\n  iteration: 0\n---\n\n# my article idea\n`);
+    const indexPath = join(projectRoot, 'docs', slug, 'index.md');
+    await writeFile(indexPath, `---\ndeskwork:\n  id: ${uuid}\n  stage: Ideas\n  iteration: 0\n---\n\n# my article idea\n`);
 
     const result = await iterateEntry(projectRoot, { uuid });
     expect(result.version).toBe(1);
@@ -90,7 +93,7 @@ describe('iterateEntry', () => {
   it('emits an iteration journal event', async () => {
     await setupEntry('Ideas');
     await writeFile(
-      join(projectRoot, 'docs', slug, 'scrapbook', 'idea.md'),
+      join(projectRoot, 'docs', slug, 'index.md'),
       `---\ndeskwork:\n  id: ${uuid}\n  stage: Ideas\n  iteration: 0\n---\n\n# my idea\n`
     );
 
@@ -110,5 +113,56 @@ describe('iterateEntry', () => {
     await writeFile(join(projectRoot, 'docs', slug, 'index.md'), '# x\n');
 
     await expect(iterateEntry(projectRoot, { uuid })).rejects.toThrow(/published.*frozen/i);
+  });
+
+  // T1 (#222): even at Outlining, iterate reads index.md — NOT the
+  // legacy `scrapbook/outline.md`. Per Option B, the document under
+  // review is index.md regardless of stage.
+  it('reads index.md at Outlining stage (T1 — single document evolves)', async () => {
+    await setupEntry('Outlining');
+    const indexPath = join(projectRoot, 'docs', slug, 'index.md');
+    await writeFile(indexPath, `---\ndeskwork:\n  id: ${uuid}\n---\n\n# index body — outlining stage\n`);
+    // Decoy file in scrapbook should NOT be read.
+    await writeFile(
+      join(projectRoot, 'docs', slug, 'scrapbook', 'outline.md'),
+      'STALE outline content; iterate must NOT read this',
+    );
+
+    await iterateEntry(projectRoot, { uuid });
+    const events = await readJournalEvents(projectRoot, { entryId: uuid });
+    const iter = events.find((e) => e.kind === 'iteration');
+    expect(iter).toBeDefined();
+    if (iter && iter.kind === 'iteration') {
+      expect(iter.markdown).toContain('index body — outlining stage');
+      expect(iter.markdown).not.toContain('STALE outline content');
+    }
+  });
+
+  // Legacy artifactPath shape support: an entry whose sidecar still
+  // points at scrapbook/outline.md (pre-doctor migration) should
+  // resolve to <dirname>/index.md, not the legacy file.
+  it('resolves index.md from a legacy per-stage artifactPath', async () => {
+    const entry: Entry = {
+      uuid, slug, title: 'My Article', keywords: [], source: 'manual',
+      currentStage: 'Outlining',
+      iterationByStage: { Ideas: 1, Planned: 1 },
+      // Legacy sidecar shape — pre-T1 entries still carry this.
+      artifactPath: `docs/${slug}/scrapbook/outline.md`,
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    };
+    await writeSidecar(projectRoot, entry);
+    await writeFile(
+      join(projectRoot, 'docs', slug, 'index.md'),
+      '# index body — read this one\n',
+    );
+
+    await iterateEntry(projectRoot, { uuid });
+    const events = await readJournalEvents(projectRoot, { entryId: uuid });
+    const iter = events.find((e) => e.kind === 'iteration');
+    expect(iter).toBeDefined();
+    if (iter && iter.kind === 'iteration') {
+      expect(iter.markdown).toContain('index body — read this one');
+    }
   });
 });

@@ -3,20 +3,34 @@
  * handlers use this when they need both metadata (from the sidecar) and
  * the live document content (from the markdown artifact on disk).
  *
- * The artifact path depends on stage: scrapbook docs (idea/plan/outline)
- * for early stages, the canonical `index.md` for Drafting / Final /
- * Published. Off-pipeline stages (Blocked / Cancelled) carry their
- * priorStage so the resolver can locate the artifact even when the
- * entry is paused.
+ * Issue #222 (Option B + hybrid refinement) — `index.md` is always
+ * "the document under review" for index.md-canonical entries. The
+ * studio renders `index.md` regardless of `currentStage`. Per-stage
+ * scrapbook files are frozen snapshots produced by `approveEntryStage`.
  *
- * Pipeline-redesign Task 33 — Phase 6 entry resolver.
+ * Resolution order (T1 + non-index.md fallback):
+ *   1. If the sidecar carries an `artifactPath`:
+ *      a. Prefer `<dirname(artifactPath)>/index.md` IF it exists on disk
+ *         (T1's index.md-canonical case).
+ *      b. Otherwise fall back to `artifactPath` itself. Supports
+ *         shared-directory layouts (multiple entries per directory,
+ *         each addressed by its own filename) — e.g. deskwork's own
+ *         feature-doc layout where prd.md / workplan.md / README.md
+ *         share a directory.
+ *   2. No artifactPath: try `<contentDir>/<slug>/index.md` (pre-#140
+ *      entries that the doctor migration hasn't processed yet).
+ *
+ * Pre-T1 the resolver routed by stage (Ideas → idea.md, Planned →
+ * plan.md, Outlining → outline.md, Drafting/Final/Published →
+ * index.md). That routing has been retired — see Issue #222.
  */
 
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
 import { readSidecar } from '@deskwork/core/sidecar';
 import { getContentDir } from '@deskwork/core/config';
-import type { Entry, Stage } from '@deskwork/core/schema/entry';
+import type { Entry } from '@deskwork/core/schema/entry';
 
 interface ResolveResult {
   entry: Entry;
@@ -24,35 +38,68 @@ interface ResolveResult {
   artifactPath: string;
 }
 
-const STAGE_ARTIFACT: Record<Stage, ((slug: string, contentDir: string) => string) | null> = {
-  Ideas: (s, d) => join(d, s, 'scrapbook', 'idea.md'),
-  Planned: (s, d) => join(d, s, 'scrapbook', 'plan.md'),
-  Outlining: (s, d) => join(d, s, 'scrapbook', 'outline.md'),
-  Drafting: (s, d) => join(d, s, 'index.md'),
-  Final: (s, d) => join(d, s, 'index.md'),
-  Published: (s, d) => join(d, s, 'index.md'),
-  Blocked: null,
-  Cancelled: null,
-};
+/**
+ * Resolve the canonical document path for an entry. Used by both the
+ * read path (`resolveEntry`) and the write path (the Save route's
+ * `writeEntryBody`) so both surfaces address the same file.
+ *
+ * Exported so the Save route (#174) can resolve the write target with
+ * the SAME rules the read path uses; duplicating the resolution
+ * silently couples the surfaces to two different code paths and lets
+ * them drift.
+ */
+export function resolveIndexPath(projectRoot: string, entry: Entry): string {
+  if (entry.artifactPath) {
+    const absArtifact = join(projectRoot, entry.artifactPath);
+    // Strip the scrapbook segment for legacy `<dir>/scrapbook/<file>.md`
+    // shapes; otherwise dirname(absArtifact) IS the doc dir.
+    const dir =
+      basename(dirname(absArtifact)) === 'scrapbook'
+        ? dirname(dirname(absArtifact))
+        : dirname(absArtifact);
+    const indexPath = join(dir, 'index.md');
+    // T1's index.md-canonical preference: only if it actually exists.
+    // Otherwise fall back to artifactPath (shared-directory layouts).
+    if (existsSync(indexPath)) return indexPath;
+    return absArtifact;
+  }
+  const contentDir = getContentDir(projectRoot);
+  return join(contentDir, entry.slug, 'index.md');
+}
 
 export async function resolveEntry(projectRoot: string, uuid: string): Promise<ResolveResult> {
   const entry = await readSidecar(projectRoot, uuid);
-
-  // #140: prefer the explicit artifactPath when set; fall back to the
-  // slug+stage heuristic only for entries that don't have one (entries
-  // created pre-#140 fix and not yet doctor-repaired).
-  let artifactPath: string;
-  if (entry.artifactPath) {
-    artifactPath = join(projectRoot, entry.artifactPath);
-  } else {
-    const stage = entry.priorStage ?? entry.currentStage;
-    const pathFn = STAGE_ARTIFACT[stage];
-    if (pathFn === null) {
-      throw new Error(`No artifact path for stage ${stage}`);
-    }
-    const contentDir = getContentDir(projectRoot);
-    artifactPath = pathFn(entry.slug, contentDir);
-  }
+  const artifactPath = resolveIndexPath(projectRoot, entry);
   const artifactBody = await readFile(artifactPath, 'utf8');
   return { entry, artifactBody, artifactPath };
+}
+
+/**
+ * Atomically write `markdown` to the entry's canonical document path.
+ *
+ * Implements the Save semantics from issue #174 — the studio is the
+ * dumb file-write surface for in-browser edits. State-machine work
+ * (versioning, journal records, in-review flips) belongs to
+ * `/deskwork:iterate`, NOT to this function. Save and Iterate are
+ * orthogonal: an operator can Save many times before pinning a version.
+ *
+ * Atomic-write pattern (write-tmp + rename) mirrors `writeSidecar` and
+ * the snapshot helper. PID is embedded in the tmp filename so two
+ * concurrent writers don't clobber each other's tmp state.
+ *
+ * Returns the absolute path written so the caller can surface it to
+ * the operator (the Save route uses this for the response body).
+ */
+export async function writeEntryBody(
+  projectRoot: string,
+  uuid: string,
+  markdown: string,
+): Promise<{ writtenPath: string }> {
+  const entry = await readSidecar(projectRoot, uuid);
+  const writtenPath = resolveIndexPath(projectRoot, entry);
+  await mkdir(dirname(writtenPath), { recursive: true });
+  const tmpPath = `${writtenPath}.${process.pid}.tmp`;
+  await writeFile(tmpPath, markdown);
+  await rename(tmpPath, writtenPath);
+  return { writtenPath };
 }

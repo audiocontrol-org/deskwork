@@ -19,7 +19,7 @@
  * Both modes return the raw bytes of a single scrapbook file with a
  * sensible Content-Type header. Filename + path-traversal guards apply
  * in both modes (via `assertFilename` + the containment check in
- * `scrapbookFilePath` / `scrapbookFilePathAtDir`).
+ * `scrapbookFilePathAtDir`).
  */
 
 import type { Context } from 'hono';

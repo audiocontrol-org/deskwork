@@ -1,0 +1,21 @@
+{
+  "id": "998b8a29-e754-4114-8998-d1aebf6f39d3",
+  "timestamp": "2026-05-05T17:36:20.081Z",
+  "event": "ingest",
+  "slug": "open-issue-tranche-cleanup/prd-workplan-audit",
+  "entryId": "998b8a29-e754-4114-8998-d1aebf6f39d3",
+  "site": "deskwork-internal",
+  "stage": "Ideas",
+  "sourceFile": "docs/0.16.0/001-IN-PROGRESS/open-issue-tranche-cleanup/2026-05-05-prd-workplan-audit.md",
+  "frontmatterSnapshot": {
+    "title": "PRD and Workplan Audit",
+    "date": "2026-05-05",
+    "auditedFeature": "open-issue-tranche-cleanup",
+    "branch": "feature/deskwork-open-issue-tranche-cleanup"
+  },
+  "derivation": {
+    "slug": "path",
+    "state": "default",
+    "date": "frontmatter"
+  }
+}

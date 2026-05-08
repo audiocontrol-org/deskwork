@@ -4,7 +4,7 @@
     "root": "docs",
     "byVersion": true,
     "defaultTargetVersion": "1.0",
-    "knownVersions": ["1.0"],
+    "knownVersions": ["1.0", "0.16.0"],
     "statusDirs": {
       "inProgress": "001-IN-PROGRESS",
       "waiting": "002-WAITING",
