@@ -16,6 +16,19 @@ Before writing **any** of the following — commit message claiming a fix, end-o
 
 If any step is skipped, the report must say so explicitly: *"Verified at step N; not verified at step M because…"*.
 
+### Dual-viewport verification
+
+Any commit that touches CSS or markup on a surface that has both desktop and mobile breakpoints requires explicit before/after measurements at **BOTH a desktop viewport (≥1280px) AND a phone viewport (≤390px)**. This is non-negotiable for the entry-review surface (`/dev/editorial-review/entry/<uuid>`), the dashboard, the scrapbook viewer, and anything else that ships responsive CSS. A "verified at 1920×1080" commit that didn't re-check phone is a likely-regressing commit; same in reverse.
+
+The reason: the entry-review surface has accumulated a layered cascade of media queries. Desktop layout decisions (page max-width, gutter sizing, marginalia column, padding tokens) cross-talk with mobile rules (overflow containment, table/code-block wrap, hidden-strip-children). A change tested only at one viewport can silently regress the other. The 2026-05-08 session shipped nine commits in this pattern (eight desktop-only verifications, two phone-only verifications) and produced an iOS regression the operator caught only by manual phone testing — exactly the failure mode this rule is named to prevent. The operator's framing was *"we can't play whack-a-mole between mobile and desktop ux/ui"*, which is exactly right: each fix tested at one viewport is a coin flip on the other.
+
+**How to apply:**
+
+- Run `scripts/smoke-er-viewport-regressions.mjs` against the running dev studio BEFORE writing the commit message. The script walks N entries at desktop (1920×1080) and phone (390×844), asserts no page-level horizontal overflow, asserts compact-chrome invariants, and reports any fixed-position offender. Exit-zero is the precondition for claiming "verified". A non-zero exit means the change broke at least one of the cross-viewport invariants — fix before committing.
+- For interactive scenarios the smoke can't cover (edit-mode keyboard, scroll-context anchoring, click hit-areas), run a second manual pass at the OTHER viewport class. The rule is: never claim "verified" with only one viewport class measured.
+- WebKit-specific iOS issues (CSS `overflow: clip` quirks, `position: fixed` + soft keyboard, intrinsic-size flex children) require `scripts/probe-ios-overflow.mjs` against WebKit specifically. Chromium-at-iPhone-viewport is NOT a substitute for WebKit — it hides real iOS bugs. When in doubt, run the WebKit probe.
+- If the change is genuinely scoped to a single viewport class (e.g., a desktop-only rule inside `@media (min-width: 80rem)` that cannot affect mobile), the commit message must say so explicitly: *"Mobile not re-checked because the change is gated to ≥80rem."* This makes the scoping decision auditable; "I tested desktop and assume mobile is fine" is not.
+
 ### Falsifiable claims
 
 When reporting verification, write the report so the operator can re-run it in 30 seconds:
