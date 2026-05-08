@@ -2514,6 +2514,25 @@ body.er-focus-mode .er-focus-save-hint {
   transform: translateX(0);
 }
 
+/* Desktop split layout (#244 follow-up) — when the drawer is open at
+ * desktop widths, push the entire review shell right by the drawer's
+ * width so the article column is fully visible alongside the TOC.
+ * Operator framing: *"On desktop, there's plenty of room to fit the
+ * table of contents drawer without overlapping/covering the review
+ * surface."*
+ *
+ * Mobile (< 64rem) keeps the existing overlay behavior — there's not
+ * enough horizontal room to split. The transition matches the drawer's
+ * own slide-in timing so the two motions feel like one. */
+@media (min-width: 64rem) {
+  .er-review-shell {
+    transition: margin-left 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  body:has(.er-outline-drawer--open) .er-review-shell {
+    margin-left: 26rem;
+  }
+}
+
 .er-outline-drawer-head {
   display: flex;
   align-items: center;
