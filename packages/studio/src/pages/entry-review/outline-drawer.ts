@@ -40,8 +40,10 @@ export function renderOutlineDrawer(
     </button>
     <aside class="er-outline-drawer" data-outline-drawer aria-label="Outline + table of contents" hidden>
       <header class="er-outline-drawer-head">
+        <button type="button" class="er-outline-drawer-stow" data-outline-close aria-label="Hide outline (O or Esc)" title="Hide outline (O or Esc)">
+          <span aria-hidden="true">‹</span>
+        </button>
         <span class="er-outline-drawer-kicker">${kicker}</span>
-        <button type="button" class="er-outline-drawer-close" data-outline-close aria-label="Close outline (O or Esc)">×</button>
       </header>
       <div class="er-outline-drawer-body" data-outline-drawer-body>
         ${unsafe(hasOutline ? outlineHtml : '')}

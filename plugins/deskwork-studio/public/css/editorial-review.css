@@ -1497,6 +1497,13 @@ body.er-focus-mode .er-marginalia-tab {
   /* Allow long words / quotes to wrap inside the column instead of
    * blowing out the grid track. */
   min-width: 0;
+  /* Override the grid's `align-items: start` for this column so the
+   * marginalia element spans the full row height. The sticky head
+   * (`.er-marginalia-head`) needs a containing block that lives across
+   * the entire document scroll; without `stretch` the column shrinks
+   * to its content height (~head + empty-state) and the sticky head
+   * gets dragged out of view as soon as the operator scrolls past it. */
+  align-self: stretch;
 }
 
 .er-marginalia-head {
@@ -1515,8 +1522,17 @@ body.er-focus-mode .er-marginalia-tab {
   text-transform: uppercase;
   color: var(--er-faded);
   border-bottom: 1px solid var(--er-red-pencil);
-  padding-bottom: var(--er-space-1);
+  padding: var(--er-space-1) 0;
   margin: 0 0 var(--er-space-2);
+  /* Sticky so the header + stow affordance stay visible while the
+   * margin notes themselves scroll with the document (each note is
+   * absolutely-positioned alongside its `<mark>`). Top offset clears
+   * the folio + strip chrome stack. Operator framing: the operator
+   * never wants the "Margin notes" anchor to scroll out of reach. */
+  position: sticky;
+  top: 6.5rem;
+  z-index: 5;
+  background: var(--er-paper);
 }
 
 .er-marginalia-empty {
@@ -2536,7 +2552,7 @@ body.er-focus-mode .er-focus-save-hint {
 .er-outline-drawer-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 0.55rem;
   padding: var(--er-space-3);
   border-bottom: 1px solid var(--er-faded-2);
 }
@@ -2547,19 +2563,37 @@ body.er-focus-mode .er-focus-save-hint {
   text-transform: uppercase;
   color: var(--er-red-pencil);
 }
-.er-outline-drawer-close {
-  font-family: var(--er-font-display);
-  font-size: 1.5rem;
-  line-height: 1;
+/* Stow chevron mirroring `.er-marginalia-stow` so the "hide-this-rail"
+ * affordance is visually consistent across both rails. The chevron
+ * points LEFT here because the drawer lives on the LEFT edge of the
+ * viewport — clicking ‹-pointing-left "pushes" the drawer off-stage,
+ * matching the spatial mental model (mirror of the marginalia
+ * stow on the right). */
+.er-outline-drawer-stow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  padding: 0;
+  border: 1px solid var(--er-faded-2);
+  border-radius: 2px;
   background: transparent;
-  border: 0;
   color: var(--er-faded);
+  font-family: var(--er-font-mono);
+  font-size: 0.85rem;
+  line-height: 1;
   cursor: pointer;
-  padding: 0 0.35rem;
-  transition: color 120ms ease;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
 }
-.er-outline-drawer-close:hover {
+.er-outline-drawer-stow:hover {
   color: var(--er-red-pencil);
+  border-color: var(--er-red-pencil);
+  background: var(--er-paper);
+}
+.er-outline-drawer-stow:focus-visible {
+  outline: 2px solid var(--er-red-pencil);
+  outline-offset: 1px;
 }
 
 /* Drawer body typography. Every rule carries the parent
