@@ -69,9 +69,9 @@ Exit the loop (do NOT re-enter `await_studio_message`) only when one of these ha
 
 1. **Operator interrupts at the terminal (Ctrl-C / ESC).** This is the deterministic v1 exit. Claude Code's runtime delivers the interrupt to the agent; the in-flight `await_studio_message` tool call cancels. Treat this as "exit gracefully": send a final prose status via `send_studio_response({ kind: 'prose', text: 'Listen loop ended.' })`, then exit without re-entering the await.
 
-2. **5 consecutive transport drops without recovery** — see "Reconnect on transport drop" above. After the retry budget is exhausted, surface:
-   > Studio bridge disconnected after 5 reconnect attempts. Listen loop ended.
-   Then exit. Operator can re-dispatch `/deskwork:listen` to start fresh.
+2. **3 consecutive transport drops without recovery** — see "Reconnect on transport drop + idle exit" above. After the retry budget is exhausted (~15 min of pure idle), surface:
+   > Studio bridge disconnected after 3 reconnect attempts. Listen loop ended. Re-dispatch /deskwork:listen to resume.
+   Then exit. Operator re-dispatches when they want to interact again.
 
 3. **Soft intent recognition (fallback).** If the operator types something at the terminal whose intent is clearly "stop listening" (e.g. "stop listening", "exit listen mode", "end the bridge"), recognize the intent and exit. This is a soft signal — prefer Ctrl-C as the canonical exit; this branch exists for cases where Ctrl-C isn't natural (e.g. the agent is mid-compose on a long response).
 
