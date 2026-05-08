@@ -90,14 +90,17 @@
    * ~36px on each side), grid gap drops to space-4 (saves ~12px),
    * article column grows to 56rem max (~896px) so the body uses the
    * reclaimed space for actual reading width. */
-  /* Iteration 5 (operator: 'the marginalia column feels dangerously
-   * close to the right edge of the page'). Inner page padding goes
-   * from space-3 (20px) → space-4 (28px) so both the marginalia and
-   * the article inset further from the page edges. Article-column
-   * max compensates by 8rem so the article still meets the
-   * marginalia (no middle gulf). */
+  /* Iteration 6 (operator: the breathing room belongs between the
+   * marginalia and the right edge of the page, not as internal
+   * padding inside the marginalia). Asymmetric page padding: left
+   * stays at space-4 (28px); right grows to space-6 (64px) so the
+   * marginalia column's box ends well before the page right edge,
+   * matching the visible breathing the article gets via its natural
+   * paragraph wrap. The .er-marginalia internal right-padding from
+   * iter-5 reverted (revisited in `.er-marginalia` rule below). */
   --er-page-max:        88rem;
   --er-page-pad-x:      var(--er-space-4);
+  --er-page-pad-right:  var(--er-space-6);
   --er-page-pad-y:      var(--er-space-5);
   --er-article-col:     minmax(28rem, 68rem);
   --er-marginalia-col:  minmax(18rem, 22rem);
@@ -1351,7 +1354,15 @@ body:has([data-review-ui="longform"]) .site-footer {
   display: grid;
   grid-template-columns: var(--er-article-col) 1px var(--er-marginalia-col);
   gap: 0 var(--er-page-gap);
-  padding: var(--er-page-pad-y) var(--er-page-pad-x);
+  /* Asymmetric horizontal padding: the right side gets a larger
+   * inset so the marginalia column's box ends well before the page's
+   * right edge. The operator's framing — *"that margin/padding
+   * should be between the marginalia and the right edge of the
+   * page when marginalia is visible"* — is that the breathing room
+   * lives in the page itself (between marginalia element and page
+   * edge), not as content-inset inside the marginalia. The left
+   * side keeps the standard page-pad-x. */
+  padding: var(--er-page-pad-y) var(--er-page-pad-right) var(--er-page-pad-y) var(--er-page-pad-x);
   align-items: start;
 }
 
@@ -1522,18 +1533,7 @@ body.er-focus-mode .er-marginalia-tab {
 /* Margin notes (marginalia column inside the page) */
 .er-marginalia {
   position: relative;
-  /* Internal padding-right insets the marginalia content (head rule,
-   * items, action buttons) from the column's geometric right edge.
-   * Symmetric column-edge padding alone wasn't enough: the article
-   * paragraph wraps far inside its column (~250px of right-side
-   * whitespace before the column edge), while marginalia structures
-   * (head rule, comment cards with right-aligned action buttons)
-   * fill their column nearly to the edge. To make the right side
-   * read as visually balanced with the article's natural left inset,
-   * the marginalia content needs comparable visible breathing room.
-   * Bumped to space-5 (40px) so the right inset reads as significant
-   * cream margin matching the article's natural wrap. */
-  padding: var(--er-space-1) var(--er-space-5) 0 0;
+  padding: var(--er-space-1) 0 0;
   font-family: var(--er-font-body);
   /* Allow long words / quotes to wrap inside the column instead of
    * blowing out the grid track. */
