@@ -3723,10 +3723,20 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
   }
 }
 
-/* TINY — below 30rem (480px) — most-aggressive collapse */
+/* TINY — below 30rem (480px) — most-aggressive collapse.
+ *
+ * Mirror of the f7c3266 desktop strip compaction (175 → 102px) for phone
+ * widths. The decision buttons (Edit / Approve / Iterate / Reject /
+ * Cancel / ?) stay — operator needs them to clipboard-copy the skill
+ * command for cross-device paste into Claude Code (per THESIS Consequence
+ * 2). Tightening padding + font-size + gap collapses the 6-button
+ * `.er-strip-right` from two internal rows to one, dropping the overall
+ * strip from ~122px to ~70px on a 390-wide viewport — gives the operator
+ * back ~50px of vertical real estate before content begins.
+ *
+ * Verified via scripts/smoke-er-viewport-regressions.mjs at desktop
+ * (1920×1080, strip stays ≤110px) and phone (390×844, strip ≤80px). */
 @media (max-width: 30rem) {
-  /* Strip drops to back-link + state stamp only. ? shortcuts still
-   * available via the toggle button. */
   [data-review-ui="longform"] .er-strip-back {
     font-size: 0.7rem;
     padding: 0.2rem 0.4rem;
@@ -3736,6 +3746,66 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
     font-size: 0.75rem;
     padding: 0.2rem 0.5rem;
     transform: rotate(-1deg);  /* slightly less rotation at this scale */
+  }
+
+  /* Tighten outer flex layout: smaller gap between back / center / right
+   * groups so the strip-right has more horizontal room before wrapping
+   * to its own outer row. */
+  [data-review-ui="longform"] .er-strip-inner {
+    gap: var(--er-space-2);
+  }
+
+  /* Hide the strip's `::before` registration mark (`+`) on phone. At
+   * desktop it's an editorial decoration that frames the press-check
+   * aesthetic; on a 390px-wide viewport it consumes ~47px of the
+   * strip's content area (mark + flex gap), shrinking `.er-strip-inner`
+   * from a possible 350px down to 303px. That 47px is the budget the
+   * 6 decision buttons need to fit on a single internal row. The mark
+   * is decorative-only — no information loss from hiding. */
+  [data-review-ui="longform"] .er-strip::before {
+    display: none;
+  }
+
+  /* Hide the historical-stage induct picker on phone. It's a 210px-wide
+   * label + dropdown that forces `.er-strip-right` to a second internal
+   * row on every pipeline-active entry (e.g. Drafting/Outline/Final).
+   * Same THESIS Consequence-2 logic as the other decision buttons:
+   * induct is a skill command (`/deskwork:induct <slug>`) executed via
+   * Claude Code on desktop; reaching for it on phone is a rare cross-
+   * device flow that doesn't justify the chrome real-estate cost.
+   * Operator can still induct from a desktop session. The induct-picker
+   * is also the subject of #193 (broaden which stages surface it);
+   * if the picker becomes more central, revisit this hide.
+   *
+   * Specificity note: entry-review.css ships
+   *   [data-review-ui="entry-review"] .er-entry-control--history
+   *     { display: inline-flex }
+   * at (0,2,0). It loads AFTER editorial-review.css, so a same-
+   * specificity rule here loses the source-order tiebreak. Chain both
+   * data-review-ui scopes to lift this to (0,3,0) and win the cascade.
+   * (Body has data-review-ui="entry-review"; the inner shell carries
+   * data-review-ui="longform"; the picker lives inside both.) */
+  [data-review-ui="entry-review"] [data-review-ui="longform"] .er-entry-control--history {
+    display: none;
+  }
+
+  /* Decision-button group: tighter inter-button gap and smaller buttons
+   * so all six (Edit + Approve + Iterate + Reject + Cancel + ?) fit on
+   * one internal row inside `.er-strip-right`.
+   *
+   * `width: 100%` is load-bearing: when the strip-inner's outer wrap
+   * pushes `.er-strip-right` to its own row, flex's single-pass sizing
+   * leaves it at content-shrunk width (~303px) and the buttons wrap
+   * internally to a second row. Width: 100% forces the row-2 strip-right
+   * to take the full 358px available, giving the 6 buttons (~317px
+   * needed) room on a single internal row. */
+  [data-review-ui="longform"] .er-strip-right {
+    gap: 4px;
+    width: 100%;
+  }
+  [data-review-ui="longform"] .er-strip .er-btn-small {
+    font-size: 0.66rem;
+    padding: 0.15rem 0.4rem;
   }
 }
 
