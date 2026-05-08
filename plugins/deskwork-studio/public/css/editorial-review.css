@@ -3866,6 +3866,25 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
  * a wrapping element (added via rehype) rather than on `<table>`. */
 
 /* ---------------------------------------------------------------------
+ * Phone hard-clip on html + body (#240/#241 iOS follow-up).
+ *
+ * Even with `overflow-x: hidden` set, iOS Safari can still allow
+ * touch-scroll horizontally when a descendant's intrinsic size is
+ * wider than viewport (e.g. CodeMirror's internal scroller, a wide
+ * markdown table that we constrained to its own scroll container, the
+ * er-folio nav whose computed scrollWidth is ~8px over viewport).
+ * `overflow-x: clip` is a stronger containment value that does NOT
+ * create a scroll container (overflow-x: hidden does), so iOS can't
+ * treat the page as horizontally scrollable. Apply at the top of the
+ * cascade so every page on phone gets the protection.
+ * --------------------------------------------------------------------- */
+@media (max-width: 600px) {
+  html, body {
+    overflow-x: clip;
+  }
+}
+
+/* ---------------------------------------------------------------------
  * Phone overflow containment (#240) — review + edit surfaces.
  *
  * Markdown bodies frequently include fenced code blocks (long lines that
@@ -4117,6 +4136,30 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
   body:has([data-edit-panes-host]:not([hidden])) .er-edit-source .cm-editor,
   body:has([data-edit-panes-host]:not([hidden])) .er-edit-source .cm-scroller {
     height: 100%;
+  }
+  /* Force CodeMirror to never offer horizontal scroll on phone.
+   * `EditorView.lineWrapping` is enabled in the editor config but
+   * iOS Safari can still expose horizontal scroll on the .cm-scroller
+   * when a single token (UUID, long URL, hash) can't wrap at any
+   * character. Hard-clip the scroller and tell every line to break
+   * at any character. */
+  body:has([data-edit-panes-host]:not([hidden])) .cm-scroller {
+    overflow-x: hidden !important;
+  }
+  body:has([data-edit-panes-host]:not([hidden])) .cm-content,
+  body:has([data-edit-panes-host]:not([hidden])) .cm-line {
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+    max-width: 100%;
+  }
+  /* Lock body via position:fixed in mobile edit mode — iOS Safari
+   * sometimes ignores body overflow:hidden once a descendant has
+   * triggered a scroll context. position:fixed pins the body to the
+   * viewport so no kind of scroll moves it. */
+  body:has([data-edit-panes-host]:not([hidden])) {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
   }
 }
 
