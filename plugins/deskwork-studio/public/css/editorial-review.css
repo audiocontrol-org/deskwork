@@ -90,23 +90,23 @@
    * ~36px on each side), grid gap drops to space-4 (saves ~12px),
    * article column grows to 56rem max (~896px) so the body uses the
    * reclaimed space for actual reading width. */
-  /* Iteration 7 (operator: 'the padding you've been adding to the
-   * right of the marginalia should be the gutter between the review
-   * column and the marginalia'). Page padding goes back to symmetric
-   * (left and right both space-4 = 28px). The breathing room moves
-   * from the page-right padding into the column-gap between article
-   * and marginalia: --er-page-gap goes from space-3 (20px) to space-5
-   * (40px), so the visible gap between article right edge and
-   * marginalia left edge becomes 40+1+40 = 81px (was 41). Marginalia
-   * now sits 29px from the page right edge (= article's left inset
-   * from page edge), and the prominent breathing room reads as a
-   * generous gutter between the columns. */
+  /* Iteration 8 (operator: 'right now, the margin/padding on the
+   * right of the review column reads like an oddly wide gutter
+   * between the review column and the marginalia column. You've got
+   * the gutter and the right margin flipped'). Iter-7 made the gutter
+   * too wide (81px) at the expense of the marginalia's right margin.
+   * Flip them: the gutter goes BACK to a slim editorial gap (page-gap
+   * space-3 = 41px total visible), and the substantial breathing
+   * lives as page-pad-right (space-6 = 64px) between marginalia
+   * and the page right edge. Page-pad-x stays space-4 on the left
+   * (29px = article left inset). */
   --er-page-max:        88rem;
   --er-page-pad-x:      var(--er-space-4);
+  --er-page-pad-right:  var(--er-space-6);
   --er-page-pad-y:      var(--er-space-5);
   --er-article-col:     minmax(28rem, 68rem);
   --er-marginalia-col:  minmax(18rem, 22rem);
-  --er-page-gap:        var(--er-space-5);
+  --er-page-gap:        var(--er-space-3);
 }
 
 /* ---------- Scoped reset + page chrome ---------- */
@@ -1356,7 +1356,13 @@ body:has([data-review-ui="longform"]) .site-footer {
   display: grid;
   grid-template-columns: var(--er-article-col) 1px var(--er-marginalia-col);
   gap: 0 var(--er-page-gap);
-  padding: var(--er-page-pad-y) var(--er-page-pad-x);
+  /* Asymmetric horizontal padding: the right side gets a larger
+   * inset so the marginalia element ends with substantial cream
+   * margin between it and the page right edge. Operator framing —
+   * the gutter (article ↔ marginalia) should be a slim editorial
+   * gap, and the right margin (marginalia ↔ page edge) should be
+   * the prominent breathing room. */
+  padding: var(--er-page-pad-y) var(--er-page-pad-right) var(--er-page-pad-y) var(--er-page-pad-x);
   align-items: start;
 }
 
