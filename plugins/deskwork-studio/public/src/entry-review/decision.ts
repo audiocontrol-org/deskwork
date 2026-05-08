@@ -34,6 +34,7 @@ interface DecisionDom {
   approveBtn: HTMLButtonElement | null;
   iterateBtn: HTMLButtonElement | null;
   rejectBtn: HTMLButtonElement | null;
+  cancelBtn: HTMLButtonElement | null;
 }
 
 export interface DecisionControllerOptions {
@@ -46,13 +47,14 @@ export interface DecisionController {
   approve: () => Promise<void>;
   iterate: () => Promise<void>;
   reject: () => void;
+  cancel: () => Promise<void>;
 }
 
 export function createDecisionController(
   opts: DecisionControllerOptions,
 ): DecisionController {
   const { state, dom, showToast } = opts;
-  const { approveBtn, iterateBtn, rejectBtn } = dom;
+  const { approveBtn, iterateBtn, rejectBtn, cancelBtn } = dom;
 
   // Phase 34a F1 remediation — defense-in-depth against historical-
   // mode mutations. The server already renders these buttons disabled
@@ -78,7 +80,7 @@ export function createDecisionController(
    * they pasted the wrong command, OR they may decide to abandon the
    * action without the studio mutating any state.
    */
-  async function copyCommand(verb: 'approve' | 'iterate'): Promise<void> {
+  async function copyCommand(verb: 'approve' | 'iterate' | 'cancel'): Promise<void> {
     const command = `/deskwork:${verb} ${state.slug}`;
     await copyOrShowFallback(command, {
       successMessage: `Copied — paste into a Claude Code chat to run \`${command}\`.`,
@@ -99,6 +101,12 @@ export function createDecisionController(
     await copyCommand('iterate');
   }
 
+  async function cancel(): Promise<void> {
+    if (!cancelBtn) return;
+    if (refuseHistorical('Cancel')) return;
+    await copyCommand('cancel');
+  }
+
   function reject(): void {
     // Disabled — the button carries `disabled` server-side and the
     // tooltip names issue #173. The shortcut path lands here too;
@@ -113,6 +121,7 @@ export function createDecisionController(
 
   approveBtn?.addEventListener('click', () => { void approve(); });
   iterateBtn?.addEventListener('click', () => { void iterate(); });
+  cancelBtn?.addEventListener('click', () => { void cancel(); });
   // Guard: even though the button is `disabled`, attach a click handler
   // for screen-reader operators or anyone who removes the disabled
   // attribute via devtools. The handler shows the same toast as the
@@ -123,5 +132,5 @@ export function createDecisionController(
     reject();
   });
 
-  return { approve, iterate, reject };
+  return { approve, iterate, reject, cancel };
 }

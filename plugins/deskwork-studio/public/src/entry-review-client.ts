@@ -200,6 +200,7 @@ function initPressCheckSurface(): void {
       approveBtn: optEl<HTMLButtonElement>('[data-action="approve"]'),
       iterateBtn: optEl<HTMLButtonElement>('[data-action="iterate"]'),
       rejectBtn: optEl<HTMLButtonElement>('[data-action="reject"]'),
+      cancelBtn: optEl<HTMLButtonElement>('[data-action="cancel"][data-entry-uuid]'),
     },
   });
 

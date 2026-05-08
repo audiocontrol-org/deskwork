@@ -26,6 +26,7 @@
   "devDependencies": {
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
+    "playwright": "^1.49.0",
     "tsx": "^4.21.0"
   }
 }

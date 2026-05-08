@@ -95,6 +95,11 @@ export function renderRowActions(entry: Entry, defaultSite: string): RawHtml {
         data-copy="/deskwork:approve ${entry.slug}"
         title="approved — graduate to the next stage">approve →</button>`);
     }
+    // Cancel (#242) — pull this entry off-pipeline. Same clipboard
+    // routing as approve / iterate; the skill mutates sidecar + journal.
+    buttons.push(html`<button class="er-btn er-btn-small er-btn-reject er-copy-btn" type="button"
+      data-copy="/deskwork:cancel ${entry.slug}"
+      title="pull this entry off-pipeline (Cancelled). Reversible via /deskwork:induct.">cancel ⊘</button>`);
   } else if (stage === 'Published') {
     buttons.push(html`<a class="er-btn er-btn-small" href="${reviewLink}"
       title="read-only review surface for the published entry">view →</a>`);
