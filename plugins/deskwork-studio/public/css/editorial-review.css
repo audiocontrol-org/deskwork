@@ -1526,11 +1526,16 @@ body.er-focus-mode .er-marginalia-tab {
   margin: 0 0 var(--er-space-2);
   /* Sticky so the header + stow affordance stay visible while the
    * margin notes themselves scroll with the document (each note is
-   * absolutely-positioned alongside its `<mark>`). Top offset clears
-   * the folio + strip chrome stack. Operator framing: the operator
-   * never wants the "Margin notes" anchor to scroll out of reach. */
+   * absolutely-positioned alongside its `<mark>`). Top offset uses
+   * `--er-chrome-bottom`, which `initStickyOffset()` measures from
+   * `.er-strip`'s actual rendered bottom on every viewport / strip
+   * resize. The strip is `flex-wrap: wrap` so its height ranges from
+   * ~70px (single row at narrow widths) to ~175px (multi-row at
+   * wide widths) — a static `top` works at one width but lands the
+   * head behind the strip at another. Fallback `7rem` is a safe
+   * default when the JS hasn't run yet. */
   position: sticky;
-  top: 6.5rem;
+  top: var(--er-chrome-bottom, 7rem);
   z-index: 5;
   background: var(--er-paper);
 }
