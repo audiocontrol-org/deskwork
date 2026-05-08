@@ -90,19 +90,19 @@
    * ~36px on each side), grid gap drops to space-4 (saves ~12px),
    * article column grows to 56rem max (~896px) so the body uses the
    * reclaimed space for actual reading width. */
-  /* Iteration 3 (operator: 'now there's a giant gutter between the
-   * review pane and the marginalia column on desktop'). Article column
-   * absorbs the grid slack itself by raising its max from 56rem to
-   * 80rem; marginalia stays right-flush via the existing layout.
-   * The middle "gutter" closes — article expands to meet the gap
-   * before the marginalia. At 1920px viewport that's an article
-   * column ~1167px wide; at narrower viewports `minmax` clamps via
-   * the lower bound. Reading line-length is a tradeoff for the
-   * reclaimed real estate; the operator owns this call. */
-  --er-page-max:        100rem;
+  /* Iteration 4 (operator: 'we seem to have lost the visual metaphor
+   * of reviewing and editing on a piece of paper. Can we have a
+   * little bit of those margins back plus the shadow effect that
+   * makes it look like paper on a desk?'). Pull `--er-page-max`
+   * back from 100rem → 88rem so the desk reads visibly around the
+   * page on wide viewports (at 1920px viewport: 256px body margin
+   * each side, was 160px). Article column max drops 80rem → 70rem
+   * to keep the page proportional inside the smaller frame.
+   * Shadow strengthening lives in the `.er-page` rule below. */
+  --er-page-max:        88rem;
   --er-page-pad-x:      var(--er-space-3);
   --er-page-pad-y:      var(--er-space-5);
-  --er-article-col:     minmax(28rem, 80rem);
+  --er-article-col:     minmax(28rem, 70rem);
   --er-marginalia-col:  minmax(18rem, 22rem);
   --er-page-gap:        var(--er-space-3);
 }
@@ -1335,10 +1335,18 @@ body:has([data-review-ui="longform"]) .site-footer {
   background: var(--er-paper);
   border: 1px solid var(--er-paper-3);
   border-radius: 2px;
+  /* Paper-on-desk drop shadow. Three layers so the lift reads at
+   * close range and from across the room: the 1px highlight gives
+   * the page a definite top edge against the cream body; the larger
+   * 32px-blur cast is the soft ambient shadow under a loose galley
+   * proof; the closer 6px-blur cast plants the paper on the desk
+   * surface so it doesn't look like it's floating. Stronger than the
+   * pre-iteration-4 values because the wider body margins now show
+   * more desk around the paper, so the shadow has room to breathe. */
   box-shadow:
     0 1px 0 var(--er-paper-3),
-    0 14px 28px -10px rgba(26, 22, 20, 0.18),
-    0 4px 8px -2px rgba(26, 22, 20, 0.06);
+    0 18px 38px -12px rgba(26, 22, 20, 0.22),
+    0 6px 12px -2px rgba(26, 22, 20, 0.10);
   position: relative;
 }
 
