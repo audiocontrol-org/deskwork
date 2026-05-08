@@ -1524,6 +1524,16 @@ body.er-focus-mode .er-marginalia-tab {
    * to its content height (~head + empty-state) and the sticky head
    * gets dragged out of view as soon as the operator scrolls past it. */
   align-self: stretch;
+  /* Base transition for the marginalia stow/unstow opacity fade.
+   * Operator requested the marginalia toggle match the outline
+   * drawer's brief easing animation. The toggle controller
+   * (`marginalia-toggle.ts`) sets/clears inline opacity around the
+   * grid-template change; this transition makes those changes
+   * interpolate. The grid track itself still snaps to display:none
+   * (CSS Grid recomputes tracks synchronously when a track's child
+   * vanishes) — the fade smooths the visual exit but the column
+   * reflow at the end is instant. */
+  transition: opacity 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .er-marginalia-head {

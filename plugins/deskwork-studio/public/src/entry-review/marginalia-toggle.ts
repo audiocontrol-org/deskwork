@@ -28,9 +28,65 @@ export function initMarginaliaToggle(): MarginaliaToggle {
     document.querySelectorAll<HTMLButtonElement>('[data-action="toggle-marginalia"]'),
   );
 
-  function applyState(hidden: boolean): void {
-    if (hidden) document.body.setAttribute('data-marginalia', 'hidden');
-    else document.body.removeAttribute('data-marginalia');
+  const FADE_MS = 260;
+
+  function applyState(hidden: boolean, animate = false): void {
+    const marginalia = document.querySelector<HTMLElement>('.er-marginalia');
+    const tab = document.querySelector<HTMLElement>('.er-marginalia-tab');
+
+    if (!animate || !marginalia) {
+      // Initial state restoration (no animation): snap to the final
+      // attribute state. Animation only fires for explicit toggles.
+      if (hidden) document.body.setAttribute('data-marginalia', 'hidden');
+      else document.body.removeAttribute('data-marginalia');
+      for (const btn of buttons) {
+        btn.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+      }
+      return;
+    }
+
+    if (hidden) {
+      // Stow: fade marginalia out FIRST, then collapse the grid
+      // track. The `display: none` snap-to-no-grid-track is structural
+      // (CSS Grid recomputes track sizes synchronously when a track's
+      // child becomes display:none); the fade smooths the visual exit
+      // even if the article column reflow at the end is instant.
+      marginalia.style.opacity = '0';
+      window.setTimeout(() => {
+        document.body.setAttribute('data-marginalia', 'hidden');
+        marginalia.style.opacity = '';
+        // Tab fades in after the grid reflows.
+        if (tab) {
+          tab.style.opacity = '0';
+          requestAnimationFrame(() => {
+            tab.style.transition = `opacity ${FADE_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`;
+            tab.style.opacity = '1';
+            window.setTimeout(() => {
+              tab.style.transition = '';
+              tab.style.opacity = '';
+            }, FADE_MS + 60);
+          });
+        }
+      }, FADE_MS);
+    } else {
+      // Unstow: remove the body attribute first so the grid track
+      // snaps back open, then fade the marginalia in. The article
+      // column shrinks instantly; the marginalia fades to fill it.
+      document.body.removeAttribute('data-marginalia');
+      requestAnimationFrame(() => {
+        if (!marginalia) return;
+        marginalia.style.transition = 'none';
+        marginalia.style.opacity = '0';
+        // Force a layout pass so the next opacity:'' animates from 0.
+        void marginalia.offsetHeight;
+        marginalia.style.transition = `opacity ${FADE_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`;
+        requestAnimationFrame(() => {
+          marginalia.style.opacity = '';
+          window.setTimeout(() => { marginalia.style.transition = ''; }, FADE_MS + 60);
+        });
+      });
+    }
+
     for (const btn of buttons) {
       btn.setAttribute('aria-pressed', hidden ? 'true' : 'false');
     }
@@ -38,7 +94,7 @@ export function initMarginaliaToggle(): MarginaliaToggle {
 
   function toggle(): void {
     const hidden = document.body.getAttribute('data-marginalia') !== 'hidden';
-    applyState(hidden);
+    applyState(hidden, true);
     try {
       window.localStorage.setItem(MARGINALIA_HIDDEN_KEY, hidden ? '1' : '0');
     } catch {
