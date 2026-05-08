@@ -3611,6 +3611,21 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
   align-items: center;
   gap: var(--er-space-3);
   flex-wrap: wrap;
+  /* iOS Safari fix: flex children default to `min-width: auto` which
+   * lets them claim their intrinsic content width — at narrow phone
+   * viewports (376px) the HISTORICAL-STAGE label + dropdown group
+   * + ? button group exceeded viewport, pushing the strip wider than
+   * the page on real iOS. min-width: 0 on every flex child lets
+   * flex-shrink clamp them; the additional `overflow-x: clip` on
+   * the strip itself contains anything that still tries to overflow. */
+  overflow-x: clip;
+}
+[data-review-ui="longform"] .er-strip-inner > * {
+  min-width: 0;
+  max-width: 100%;
+}
+[data-review-ui="longform"] .er-strip {
+  overflow-x: clip;
 }
 
 /* When strip-inner is missing (no markup adjustment yet), fall back
@@ -4337,11 +4352,19 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
   /* Lock body via position:fixed in mobile edit mode — iOS Safari
    * sometimes ignores body overflow:hidden once a descendant has
    * triggered a scroll context. position:fixed pins the body to the
-   * viewport so no kind of scroll moves it. */
+   * viewport so no kind of scroll moves it.
+   *
+   * `width: 100%` (not `100vw`) so the body tracks the *visual*
+   * viewport. When iOS shows the soft keyboard the visual viewport
+   * shrinks (e.g. 402 → 352 wide) but `100vw` stays at the original
+   * "large" viewport width, so the body would extend past the
+   * visible area and the page would slosh horizontally. `100%`
+   * inherits from the html element's box and shrinks with the
+   * keyboard. */
   body:has([data-edit-panes-host]:not([hidden])) {
     position: fixed;
     inset: 0;
-    width: 100vw;
+    width: 100%;
   }
 }
 
