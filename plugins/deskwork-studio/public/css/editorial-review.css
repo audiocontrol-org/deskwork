@@ -3940,6 +3940,167 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
 }
 
 /* ---------------------------------------------------------------------
+ * Edit-mode entry label — visible only on phone (#241).
+ *
+ * Server-rendered `.er-edit-entry-label` carries the entry's title so
+ * the operator knows what they're editing when the rest of the page
+ * chrome is hidden in mobile edit mode (the desktop strip + folio
+ * already convey this on wider viewports). Hidden by default; the
+ * mobile media block below shows it. */
+.er-edit-entry-label {
+  display: none;
+}
+
+/* ---------------------------------------------------------------------
+ * Phone edit-mode fills viewport (#241) — entry-review surface.
+ *
+ * Operator framing: *"in edit mode, the chrome is completely
+ * uninteresting and the only thing i care about is the text editor.
+ * You don't want to get distracted and accidentally leave the editor
+ * with unsaved changes."*
+ *
+ * On phone in edit mode (detected via `:has([data-edit-panes-host]
+ * :not([hidden]))`), hide app-level chrome that has dangerous
+ * navigation taps (folio nav, ← studio link, marginalia drawer,
+ * scrapbook drawer), pin the edit-toolbar at the top, and fix the
+ * editor pane so it fills the rest of the viewport. The body itself
+ * is set to `overflow: hidden` so the operator can't accidentally
+ * scroll the editor partway off-screen.
+ *
+ * Desktop layout untouched.
+ * --------------------------------------------------------------------- */
+@media (max-width: 600px) {
+  /* Both html and body need overflow:hidden — `window.scrollTo` and
+   * touch-scroll target the documentElement (html); locking only body
+   * leaves the page free to drift. Also drop the body padding the
+   * desktop layout reserves for the absolutely-positioned strip /
+   * decision-strip — those are display:none in mobile edit mode and
+   * the reservation just adds dead space the editor can't use. */
+  html:has([data-edit-panes-host]:not([hidden])),
+  body:has([data-edit-panes-host]:not([hidden])) {
+    overflow: hidden;
+    height: 100dvh;
+  }
+  body:has([data-edit-panes-host]:not([hidden])) {
+    padding: 0 !important;
+    margin: 0;
+  }
+
+  /* Hide app chrome — every clickable thing here is either irrelevant
+   * to editing or a tap-trap that loses unsaved changes. */
+  body:has([data-edit-panes-host]:not([hidden])) .er-folio,
+  body:has([data-edit-panes-host]:not([hidden])) .er-strip,
+  body:has([data-edit-panes-host]:not([hidden])) .er-marginalia,
+  body:has([data-edit-panes-host]:not([hidden])) .er-marginalia-tab,
+  body:has([data-edit-panes-host]:not([hidden])) .er-page-gutter,
+  body:has([data-edit-panes-host]:not([hidden])) .er-pencil-btn,
+  body:has([data-edit-panes-host]:not([hidden])) .er-poll-indicator,
+  body:has([data-edit-panes-host]:not([hidden])) .er-toast,
+  body:has([data-edit-panes-host]:not([hidden])) .er-scrapbook-drawer,
+  body:has([data-edit-panes-host]:not([hidden])) [data-scrapbook-drawer],
+  body:has([data-edit-panes-host]:not([hidden])) .er-outline-drawer,
+  body:has([data-edit-panes-host]:not([hidden])) .er-outline-tab {
+    display: none !important;
+  }
+
+  /* Reveal the entry-label inside the toolbar so operator knows
+   * what they're editing. Compact, single-line ellipsis. */
+  body:has([data-edit-panes-host]:not([hidden])) .er-edit-entry-label {
+    display: block;
+    flex: 1 1 100%;
+    font-family: var(--er-font-display);
+    font-style: italic;
+    font-variation-settings: "opsz" 36, "wght" 500;
+    font-size: 0.95rem;
+    color: var(--er-ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin: 0;
+    padding: 0 0 0.2rem;
+    border-bottom: 1px solid var(--er-faded-2);
+  }
+
+  /* Lay the review shell out as a flex column locked to the dynamic
+   * viewport height: toolbar takes its natural height, editor takes
+   * the rest. `dvh` shrinks when iOS shows the keyboard so the editor
+   * stays above the keyboard. No magic numbers — layout solves itself. */
+  body:has([data-edit-panes-host]:not([hidden])) .er-review-shell {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    max-height: 100dvh;
+  }
+  body:has([data-edit-panes-host]:not([hidden])) .er-edit-toolbar {
+    flex: 0 0 auto;
+    margin: 0;
+    max-width: none;
+    border-bottom: 1px solid var(--er-faded-2);
+  }
+  body:has([data-edit-panes-host]:not([hidden])) .er-page {
+    flex: 1 1 0;
+    min-height: 0;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    border: 0;
+    box-shadow: none;
+    border-radius: 0;
+    background: var(--er-paper);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  body:has([data-edit-panes-host]:not([hidden])) .er-page-grid {
+    flex: 1 1 0;
+    min-height: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  body:has([data-edit-panes-host]:not([hidden])) .er-draft-frame {
+    flex: 1 1 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  body:has([data-edit-panes-host]:not([hidden])) [data-edit-panes-host] {
+    flex: 1 1 0;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  body:has([data-edit-panes-host]:not([hidden])) .er-edit-panes {
+    flex: 1 1 0;
+    min-height: 0;
+    height: auto;
+    border: 0;
+    overflow: hidden;
+    /* `display: grid` is preserved (the existing source/split/preview
+     * column tracks remain in effect — the #239 mobile rule already
+     * collapses split → source). Add an explicit single-row track so
+     * the source pane can resolve `height: 100%` against it. */
+    grid-template-rows: 1fr;
+  }
+  /* CodeMirror inside fills the source pane completely. */
+  body:has([data-edit-panes-host]:not([hidden])) .er-edit-source {
+    height: 100%;
+    min-height: 0;
+    border: 0;
+    overflow: hidden;
+  }
+  body:has([data-edit-panes-host]:not([hidden])) .er-edit-source .cm-editor,
+  body:has([data-edit-panes-host]:not([hidden])) .er-edit-source .cm-scroller {
+    height: 100%;
+  }
+}
+
+/* ---------------------------------------------------------------------
  * Phone edit-mode chrome trim (#239) — entry-review surface.
  *
  * Desktop edit mode shows Source/Split/Preview tabs + Outline / Focus /

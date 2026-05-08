@@ -270,7 +270,7 @@ export async function renderEntryReviewPage(
           ${decisionStrip}
         </div>
       </div>
-      ${renderEditToolbar(outlineHtml.length > 0)}
+      ${renderEditToolbar(outlineHtml.length > 0, titleField)}
       <article class="er-page" data-entry-uuid="${data.entry.uuid}">
         ${unsafe(pageGrid)}
       </article>
