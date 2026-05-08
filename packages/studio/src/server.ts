@@ -533,7 +533,7 @@ async function main(): Promise<void> {
 
     const viteRoot = join(pluginRoot(), 'public');
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, allowedHosts: true },
       appType: 'custom',
       root: viteRoot,
     });
