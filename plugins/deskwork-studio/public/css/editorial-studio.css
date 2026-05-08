@@ -404,6 +404,65 @@ a.er-calendar-meta-link:focus-visible {
 }
 
 /* ---------------------------------------------------------------------
+ * Phone preamble compression (#238) — dashboard masthead + filter strip.
+ *
+ * Desktop reads as a magazine masthead: kicker + huge Press-Check title +
+ * project path deck + counts strip + labelled search + labelled chips.
+ * Operator likes it on desktop; on phone (~1500px of preamble before any
+ * content) it's throat-clearing. We hide the decorative chrome and the
+ * redundant labels at narrow widths, keeping only the counts row + search
+ * input + chip row — ~250px of preamble, first content row at the fold.
+ *
+ * Scoped tight to the dashboard via the .er-pagehead--dashboard modifier
+ * the renderer sets on its <header>. Other surfaces using `er-pagehead`
+ * (review surfaces, content tree, manual) are untouched.
+ * --------------------------------------------------------------------- */
+@media (max-width: 600px) {
+  .er-pagehead--dashboard {
+    padding: var(--er-space-3) var(--er-space-3) var(--er-space-2);
+    border-bottom: var(--er-rule-thin);
+  }
+  .er-pagehead--dashboard .er-pagehead__kicker,
+  .er-pagehead--dashboard .er-pagehead__title,
+  .er-pagehead--dashboard .er-pagehead__deck {
+    display: none;
+  }
+  .er-pagehead--dashboard .er-pagehead__meta {
+    font-size: 0.62rem;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    line-height: 1.5;
+  }
+
+  /* Filter strip (search input + stage chips). Desktop has labels for
+   * each; on phone the placeholder + chip-row shape carry the meaning,
+   * so labels are pure noise. */
+  .er-filter {
+    padding: var(--er-space-2) 0;
+    gap: var(--er-space-2);
+    margin-bottom: var(--er-space-2);
+  }
+  .er-filter > .er-filter-label {
+    display: none;
+  }
+  .er-filter input[type="search"] {
+    min-width: 0;
+    width: 100%;
+    font-size: 0.95rem;
+  }
+  .er-chips {
+    gap: 0.3rem;
+    width: 100%;
+  }
+  .er-chip {
+    font-size: 0.62rem;
+    padding: 0.22rem 0.55rem;
+    letter-spacing: 0.06em;
+  }
+}
+
+/* ---------------------------------------------------------------------
  * Phone reshape (#237) — dashboard rows at narrow widths.
  *
  * Desktop uses a 4-column grid `[num] [body] [status] [actions]` that

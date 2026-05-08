@@ -42,7 +42,7 @@ export function renderHeader(
   const issueNum = String(data.entries.length).padStart(2, '0');
   const issueDate = `${now.getDate()} ${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`;
   return unsafe(html`
-  <header class="er-pagehead er-pagehead--centered">
+  <header class="er-pagehead er-pagehead--centered er-pagehead--dashboard">
     <p class="er-pagehead__kicker">
       Vol. ${volume} &middot; № ${issueNum}
     </p>
