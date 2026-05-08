@@ -50,18 +50,24 @@ Read `<projectRoot>/.deskwork/config.json` once at start. Use `studioBridge.idle
 
 If the operator types at the terminal mid-await, Claude Code's runtime interrupts the in-flight tool call. Handle the terminal turn as a normal Claude Code interaction (respond at the terminal). When the terminal turn finishes, re-enter `await_studio_message` to resume listening on the bridge.
 
-### Reconnect on transport drop (issue #235)
+### Reconnect on transport drop + idle exit (issue #235)
 
-The MCP streamable-HTTP transport has a documented ~5-min idle drop on long-blocking tool calls. When `await_studio_message` rejects with a transport-shaped error (anything that names the MCP transport, "transport dropped", "lost", "connection closed mid-call", etc.), the bridge state machine on the sidecar is unaffected — a fresh `await_studio_message` call will reconnect transparently because the sidecar now preempts the stale tracker on new initialize. Retry the call with exponential backoff:
+The MCP streamable-HTTP transport has a documented ~5-min idle drop on long-blocking tool calls. When `await_studio_message` rejects with a transport-shaped error (anything that names the MCP transport, "transport dropped", "lost", "connection closed mid-call", etc.), the bridge state machine on the sidecar is unaffected — a fresh `await_studio_message` call will reconnect transparently because the sidecar preempts any stale tracker on new initialize.
+
+The retry policy serves two purposes:
+- **Transient recovery** — survive a single drop during otherwise-active use.
+- **Bounded idle exit** — exit the loop after a reasonable idle window so the agent's context isn't burned reconnecting to nothing.
+
+Because the underlying drop is a **deterministic ~5-min cap**, not a transient blip, idle conditions produce one drop every ~5 minutes regardless of network health. The retry budget is sized to bound idle context-burn:
 
 1. **Catch the transport-drop error.** Distinguish it from the clean `{ received: false, message: null }` timeout return: a clean timeout is a successful tool result with `received: false`, NOT an exception.
-2. **Track a retry counter** that resets to 0 on every successful round-trip (any successful `await_studio_message` return — whether a real message or a timeout — counts as success).
-3. **Backoff schedule (seconds):** 1, 2, 4, 8, 16. Cap at 30 if you somehow exceed 5 retries (you shouldn't — see step 4).
-4. **Maximum 5 consecutive retries** without a successful round-trip. After the 5th drop in a row, exit the loop with the same disconnect prose ("Studio bridge disconnected. Listen loop ended.") and stop. Operator can re-dispatch `/deskwork:listen` to start a fresh loop.
-5. **Surface reconnect attempts in the chat panel BEFORE re-entering the await.** Send `send_studio_response({ kind: 'prose', text: "Studio bridge reconnecting (attempt N/5)..." })`. Do this AFTER the backoff sleep so the operator sees a reasonably current heartbeat in the panel. If the reconnecting prose itself fails to send (because the transport is still dead), proceed with the await call anyway — it'll either succeed (transport recovered) or throw (still dead, count as another drop).
+2. **Track a retry counter** that resets to 0 on every successful round-trip (any successful `await_studio_message` return — whether a real operator message or a clean timeout — counts as success).
+3. **Backoff schedule (seconds):** 1, 2, 4. Three retries max.
+4. **Maximum 3 consecutive retries** without a successful round-trip. After the 3rd drop in a row (~15 min of pure idle given the ~5-min cap), exit the loop with the disconnect prose ("Studio bridge disconnected after 3 reconnect attempts. Listen loop ended. Re-dispatch /deskwork:listen to resume.") and stop. Operator re-dispatches when they want to interact again.
+5. **Surface reconnect attempts in the chat panel BEFORE re-entering the await.** Send `send_studio_response({ kind: 'prose', text: "Studio bridge reconnecting (attempt N/3)..." })`. Do this AFTER the backoff sleep so the operator sees a reasonably current heartbeat in the panel. If the reconnecting prose itself fails to send (because the transport is still dead), proceed with the await call anyway — it'll either succeed (transport recovered) or throw (still dead, count as another drop).
 6. **Keep the loop body unchanged otherwise.** Retry logic is a wrapper around the await call. Operator messages, terminal interjections, tool-use cards — all behave the same way.
 
-This loop is what makes the bridge usable for >5 min sessions. The bridge architecture (sidecar + zombie-tracker preemption) is what makes the loop tractable.
+The 3-retry cap is intentional: an actively-used bridge sees the counter reset on each operator round-trip, so the budget is effectively unlimited for engaged sessions. A purely-idle bridge exits within ~15 minutes and stops burning agent context. Operator's re-dispatch cost is one slash command.
 
 ### Stop conditions
 
