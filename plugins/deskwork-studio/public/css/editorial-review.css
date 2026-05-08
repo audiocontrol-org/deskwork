@@ -1523,14 +1523,17 @@ body.er-focus-mode .er-marginalia-tab {
 .er-marginalia {
   position: relative;
   /* Internal padding-right insets the marginalia content (head rule,
-   * items) from the column's geometric right edge. Symmetric grid
-   * padding alone wasn't enough — the article body's paragraph
-   * wrapping leaves visual whitespace before the right edge, while
-   * the marginalia head's red rule extends to the column's full
-   * width, putting visible content much closer to the page edge
-   * than the article. The extra internal padding rebalances them
-   * perceptually. */
-  padding: var(--er-space-1) var(--er-space-4) 0 0;
+   * items, action buttons) from the column's geometric right edge.
+   * Symmetric column-edge padding alone wasn't enough: the article
+   * paragraph wraps far inside its column (~250px of right-side
+   * whitespace before the column edge), while marginalia structures
+   * (head rule, comment cards with right-aligned action buttons)
+   * fill their column nearly to the edge. To make the right side
+   * read as visually balanced with the article's natural left inset,
+   * the marginalia content needs comparable visible breathing room.
+   * Bumped to space-5 (40px) so the right inset reads as significant
+   * cream margin matching the article's natural wrap. */
+  padding: var(--er-space-1) var(--er-space-5) 0 0;
   font-family: var(--er-font-body);
   /* Allow long words / quotes to wrap inside the column instead of
    * blowing out the grid track. */
