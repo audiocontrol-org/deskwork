@@ -3866,6 +3866,80 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
  * a wrapping element (added via rehype) rather than on `<table>`. */
 
 /* ---------------------------------------------------------------------
+ * Phone overflow containment (#240) — review + edit surfaces.
+ *
+ * Markdown bodies frequently include fenced code blocks (long lines that
+ * default to white-space: pre and overflow horizontally) and tables
+ * (sized to widest content). Either pushes the entry-review page wider
+ * than the viewport, producing a page-level horizontal scroll that
+ * fights the operator's vertical thumb-scroll on phone.
+ *
+ * Strategy:
+ *   - <pre> / <pre><code> wrap long lines (white-space: pre-wrap);
+ *     formatting is preserved, no per-block scroll needed in most cases.
+ *   - <table> becomes a horizontally-scrollable block — wide tables
+ *     scroll inside their own container, page stays stationary.
+ *   - inline <code>, <p>, <li> get overflow-wrap: anywhere so long URLs
+ *     / file paths can't overflow.
+ *   - .er-page + .er-edit-preview get min-width: 0 so grid/flex parents
+ *     don't claim intrinsic content width.
+ *   - body gets overflow-x: hidden as defense-in-depth — any new
+ *     offender stays contained without re-opening a page-level scroll.
+ *
+ * Desktop layout untouched; every rule is gated by the media query.
+ * --------------------------------------------------------------------- */
+@media (max-width: 600px) {
+  /* The desktop rule sets `.er-page { width: 100% }`. Combined with
+   * the `@media (max-width: 40rem)` rule above that adds `margin: 0
+   * var(--er-space-1)`, the article box ends up at 100% + 16px (the
+   * margins are added on top of the 100% width), overflowing the
+   * viewport by 16px on every phone load. Switch to width:auto so the
+   * box solves to parent-minus-margins. */
+  .er-page {
+    width: auto;
+  }
+  body {
+    overflow-x: hidden;
+  }
+  .er-page,
+  .er-edit-preview {
+    min-width: 0;
+    max-width: 100%;
+  }
+  /* Fenced code blocks: wrap long lines instead of overflowing.
+   * `white-space: pre-wrap` keeps interior whitespace; `word-break:
+   * break-word` + `overflow-wrap: anywhere` ensure even a single long
+   * unbreakable token can't overflow. */
+  .er-page pre,
+  .er-page pre code,
+  .er-edit-preview pre,
+  .er-edit-preview pre code {
+    max-width: 100%;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+  /* Inline code + body prose: break long URLs / paths anywhere. */
+  .er-page :not(pre) > code,
+  .er-page p,
+  .er-page li,
+  .er-edit-preview :not(pre) > code,
+  .er-edit-preview p,
+  .er-edit-preview li {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+  /* Tables: scroll within their own block, not the whole page. */
+  .er-page table,
+  .er-edit-preview table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* ---------------------------------------------------------------------
  * Phone edit-mode chrome trim (#239) — entry-review surface.
  *
  * Desktop edit mode shows Source/Split/Preview tabs + Outline / Focus /
