@@ -82,6 +82,13 @@ export function createSidecarApp(projectRoot: string): SidecarApp {
   const proxyHandler = createProxyHandler({ projectRoot });
   app.all('/dev/*', proxyHandler);
   app.all('/static/*', proxyHandler);
+  // Studio admin/mutation routes (save marginalia, save content,
+  // scrapbook mutations, version probe). These live on the studio side
+  // but must be reachable through the canonical sidecar port — every
+  // panel-side fetch is relative, so the browser sends `/api/dev/*` to
+  // the sidecar, expecting a transparent proxy. Without this mount the
+  // studio's mutation surfaces silently 404 from the operator's POV.
+  app.all('/api/dev/*', proxyHandler);
   return { app, queue, log };
 }
 

@@ -97,6 +97,10 @@ async function bootFakeStudio(seed: number): Promise<RunningStudioFull> {
       'content-type': 'text/css',
     });
   });
+  app.get('/api/dev/version', (c) => {
+    receivedPaths.push(new URL(c.req.url).pathname);
+    return c.text(`api-dev from studio ${seed}`, 200);
+  });
 
   // Echoing handler used by the method/body/header round-trip tests.
   // Captures method, path, body, and a custom test header.
@@ -263,6 +267,27 @@ describe('sidecar reverse proxy', () => {
     const res = await app.fetch(new Request('http://x/api/chat/state'));
     // Sidecar handles state directly — should be 200, not the 502 from proxy.
     expect(res.status).toBe(200);
+  });
+
+  it('proxies /api/dev/* to the studio (mutation routes)', async () => {
+    // Studio admin routes (save margin notes, save content, scrapbook
+    // mutations) live at /api/dev/*. Without proxying them, every panel
+    // POST silently 404s at the sidecar.
+    const studio = await bootFakeStudio(13);
+    studios.push(studio);
+    await writeStudioDescriptor(fx.root, {
+      port: studio.port,
+      pid: process.pid,
+      startedAt: new Date().toISOString(),
+      version: '0.15.0',
+    });
+
+    const { app } = createSidecarApp(fx.root);
+    const res = await app.fetch(
+      new Request('http://x/api/dev/version'),
+    );
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe('api-dev from studio 13');
   });
 
   // ----- Phase 10c review fix-up: proxy round-trip regression tests -------
