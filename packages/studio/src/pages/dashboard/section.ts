@@ -74,9 +74,7 @@ export function renderRow(entry: Entry, index: number, defaultSite: string): Raw
           <time class="er-calendar-meta er-calendar-meta-updated" data-format="date"
             datetime="${entry.updatedAt}" title="${entry.updatedAt}">${formatDate(entry.updatedAt)}</time>
         </div>
-        <span class="er-calendar-status"><a href="${reviewLink}"
-          title="open the review surface for ${entry.slug}"
-          class="er-stamp-link">${renderReviewStateBadge(entry.reviewState)}</a></span>
+        ${renderStatusCell(entry, reviewLink)}
         ${renderRowActions(entry, defaultSite)}
       </div>
     </div>`);
@@ -146,4 +144,27 @@ function formatDate(iso: string): string {
   // Trim to YYYY-MM-DD for compact display. Full timestamp is on the
   // <span title="...">.
   return iso.slice(0, 10);
+}
+
+/**
+ * Render the status column for one row.
+ *
+ * #243 — when the entry has no reviewState, render an EMPTY span (no
+ * `<a>`, no em-dash placeholder, no stamp box). Operators were reading
+ * the previous box-with-em-dash as a button-like action; the slug-link
+ * in the row body already routes to the review surface, so the badge
+ * slot only carries information when there's a real reviewState.
+ *
+ * Grid alignment is preserved because CSS Grid auto-sizes columns from
+ * the widest cell — empty cells leave their slot blank without breaking
+ * sibling alignment.
+ */
+function renderStatusCell(entry: Entry, reviewLink: string): RawHtml {
+  if (entry.reviewState === undefined) {
+    return unsafe('<span class="er-calendar-status" aria-hidden="true"></span>');
+  }
+  return unsafe(html`
+    <span class="er-calendar-status"><a href="${reviewLink}"
+      title="open the review surface for ${entry.slug}"
+      class="er-stamp-link">${renderReviewStateBadge(entry.reviewState)}</a></span>`);
 }

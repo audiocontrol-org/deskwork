@@ -130,7 +130,7 @@ describe('studio dashboard — eight stage sections (Task 34)', () => {
     expect(r.html).toMatch(/data-review-state="in-review"[^>]*>in review/);
   });
 
-  it('renders an em-dash placeholder for entries with no reviewState', async () => {
+  it('renders an empty status cell (no em-dash, no link) for entries with no reviewState (#243)', async () => {
     await writeSidecar(root, makeEntry({
       uuid: UUID_IDEA,
       slug: 'fresh-idea',
@@ -141,7 +141,13 @@ describe('studio dashboard — eight stage sections (Task 34)', () => {
 
     const r = await getHtml(app, '/dev/editorial-studio');
     expect(r.status).toBe(200);
-    expect(r.html).toMatch(/data-review-state="none"/);
+    // Pre-#243 the status column rendered a stamp box with an em-dash;
+    // operators read it as a button. The cell is now empty when there's
+    // no reviewState to communicate. Grid alignment is preserved by the
+    // empty-but-present <span class="er-calendar-status">.
+    expect(r.html).not.toMatch(/data-review-state="none"/);
+    expect(r.html).not.toMatch(/er-stamp-none/);
+    expect(r.html).toMatch(/<span class="er-calendar-status" aria-hidden="true">/);
   });
 
   it('approved entry surfaces an "approve →" affordance', async () => {
