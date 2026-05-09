@@ -442,6 +442,21 @@ export function createApp(ctx: StudioContext): Hono {
   // Convenience root redirect to the studio index.
   app.get('/', (c) => c.redirect('/dev/'));
 
+  // Document root — serves top-level project files (DESKWORK-STATE-MACHINE.md,
+  // THESIS.md, README.md, DESIGN-STANDARDS.md, etc.) so the studio's URL
+  // namespace mirrors the project filesystem layout. Registered LAST so
+  // every more-specific route (`/dev/*`, `/api/*`, `/static/*`, the `/`
+  // redirect) matches first; only unmatched paths fall through to a
+  // filesystem lookup against the project root. Symlinks in `public/`
+  // didn't survive serveStatic's resolution (operator-reported 2026-05-09);
+  // serving the project root directly removes the need for symlinks at all.
+  app.use(
+    '*',
+    serveStatic({
+      root: ctx.projectRoot,
+    }),
+  );
+
   return app;
 }
 
