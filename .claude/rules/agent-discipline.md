@@ -2,6 +2,18 @@
 
 Project-scoped rules for how an agent should behave when working on deskwork. These are durable: anyone working on this codebase, from any worktree or machine, should follow them. New lessons learned in conversation that would otherwise go to auto-memory belong here instead — auto-memory is keyed to the working-directory path and does not survive worktree switches or fresh clones.
 
+## Use /frontend-design for all design tasks
+
+When the work requires a design decision — a new UI surface, a redesign of an existing surface, a placement decision for a new affordance, a visual language choice, anything that asks *"what should this look like / how should this work"* — invoke the **`/frontend-design`** skill (the `frontend-design:frontend-design` plugin skill). The skill produces opinionated mockups (typically 2–3 directions) the operator picks from before any implementation begins.
+
+**Why:** the 2026-05-08 review-surface rebuild and 2026-05-09 mobile-editor rebuild both succeeded because the agent produced HTML mockups first; the operator picked a direction; implementation was a translation problem instead of an exploration problem. The 5 hours of focused implementation in those sessions could have been 15 hours of incremental patching that never converged. Conversely, when the agent jumped straight to implementation on a design question (the multiple iterations of the marginalia toggle pre-affordance-placement-rule), three commits were needed to converge on the right shape.
+
+**How to apply:**
+- Whenever the task involves *"add an affordance,"* *"design X,"* *"how should Y look,"* *"the operator can't find Z" → /frontend-design first.
+- Skip /frontend-design only when the design is fully determined upstream (a workplan task that names exact CSS / markup, an operator instruction that names "use pattern X exactly," etc.). When in doubt, run it.
+- /frontend-design produces self-contained HTML+CSS mockup files (typically 2–3 directions), an updated `mockups/index.html` with a card per direction, and waits for the operator to pick before any implementation.
+- The directive applies to in-thread agent work AND to dispatch prompts: if delegating design work to a sub-agent, instruct them to use /frontend-design.
+
 ## Read documentation before quoting commands
 
 Before writing or speaking any install/setup command for a tool, plugin, library, or service: **read the tool's own documentation first**. Quote the documented command verbatim. Do not quote commands from memory or compose plausible-sounding CLI syntax.
