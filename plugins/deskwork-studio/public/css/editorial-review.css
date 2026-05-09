@@ -3672,111 +3672,391 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
 }
 
 /* MOBILE — below 48rem (768px) */
-@media (max-width: 48rem) {
-  /* Marginalia mobile drawer mode.
-   *
-   * Operator framing: "make the marginalia automatically stowed like
-   * the TOC is on mobile. It's currently all the way at the bottom
-   * under the entire document, so it's hard to tell it's even there
-   * and very hard to get to. It should open and close on mobile, not
-   * be at the end of a very long scroll column."
-   *
-   * Pre-2026-05-08 behavior: at <64rem the page-grid collapsed the
-   * marginalia track to a single column stacked BELOW the article.
-   * On a long-form entry that means the operator scrolls past the
-   * entire article body to reach the margin notes — they're
-   * indistinguishable from "no margin notes" in normal use.
-   *
-   * Drawer mode: marginalia becomes a fixed right-edge slide-in
-   * panel (mirrors the TOC's left-edge `.er-outline-drawer` pattern).
-   * Default-stowed on first phone visit (set in marginalia-toggle.ts);
-   * the operator pulls it open via the always-visible
-   * `.er-marginalia-tab` on the right edge of the viewport. Once
-   * unstowed, the drawer slides in over the article — no scrolling
-   * required. The localStorage preference pins the operator's choice
-   * across reloads.
-   *
-   * Marginalia-position.ts's absolute positioning of items (so they
-   * align vertically with article-body marks) is meaningless in this
-   * separate-spatial-track drawer; CSS forces the item list back
-   * into normal flow with `!important` to win over inline styles. */
+/* Mobile bar + sheet are phone-only (≤48rem). At desktop the elements
+ * exist in the DOM (they're rendered server-side by mobile-bar.ts so
+ * they're available when the viewport crosses the breakpoint without a
+ * page reload), but they MUST be hidden — otherwise they render as
+ * static blocks at the end of the document body, below the article. */
+.er-mobile-bar,
+.er-mobile-sheet {
+  display: none;
+}
 
-  /* Drawer base: fixed-position right-edge panel below the chrome. */
-  [data-review-ui="longform"] .er-marginalia {
-    position: fixed;
-    top: var(--er-chrome-bottom, 7rem);
-    right: 0;
-    bottom: 0;
-    width: min(22rem, 92vw);
-    z-index: 100;
-    background: var(--er-paper);
-    border-left: 1px solid var(--er-red-pencil);
-    border-top: 0;
-    box-shadow: -4px 0 16px rgba(26, 22, 20, 0.15);
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: var(--er-space-3);
-    margin-top: 0;
-    transform: translateX(0);
-    transition:
-      transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
-      opacity 200ms ease;
+@media (max-width: 48rem) {
+  /* =========================================================================
+   * Mobile review surface — bottom tab bar + sheet pattern
+   * (Mockup 1, operator-validated direction.)
+   *
+   * The pre-2026-05-08 mobile UX was a desktop layout compressed onto a phone:
+   * side-rail drawers with vertical pull-tabs, marginalia stacked below an
+   * entire article column, outline-drawer competing with the strip for the
+   * top of the viewport. Operator framing: "crappy repurposing of what's
+   * clearly meant for a desktop interface, half-assed onto a mobile UI."
+   *
+   * The redesign mirrors the iOS-native bottom-sheet pattern (Apple Maps,
+   * Music, Mail, Notes): a 64px tab bar pinned to the viewport bottom with
+   * three peers (Outline · Notes · Actions); tapping a tab slides up a sheet
+   * over the article. Decision buttons that lived in the top-strip's
+   * `.er-strip-right` move to the Actions sheet (Approve / Iterate / Reject /
+   * Cancel / ?). The bidirectional mark↔note linking (tap a highlighted run
+   * to open the Notes sheet scrolled to the matching note; tap a note to
+   * close the sheet and scroll the article to its mark) is wired in
+   * `mobile-sheet-bar.ts`.
+   *
+   * Visual reference: /static/mockups/mobile-1-bottom-sheet.html
+   * ========================================================================= */
+
+  /* --- Hide every desktop side-rail / overlay at phone widths ------------- */
+
+  /* The right-edge marginalia pull-tab and left-edge outline pull-tab are
+   * desktop affordances replaced by the bottom tab bar. */
+  [data-review-ui="longform"] .er-marginalia-tab,
+  [data-review-ui="longform"] .er-outline-tab {
+    display: none !important;
   }
 
-  /* Stowed state: slide off-stage right instead of `display: none` so
-   * the slide-out animates. `display: flex` overrides the cross-cut
-   * `body[data-marginalia="hidden"] .er-marginalia { display: none }`
-   * rule for mobile only. `pointer-events: none` so taps pass through
-   * to the article while the drawer is animating out. */
-  body[data-marginalia="hidden"] .er-marginalia {
+  /* The outline drawer's left-edge slide-in mode: the body content stays in
+   * the DOM (used as the source for the Outline sheet's slot), but the
+   * drawer itself never renders on mobile — when "open" on desktop it slides
+   * in from the left; on mobile we don't want that visual at all. */
+  [data-review-ui="longform"] .er-outline-drawer {
+    display: none !important;
+  }
+
+  /* The desktop marginalia element is hidden — its `[data-sidebar-list]`
+   * children are relocated by `mobile-sheet-bar.ts` into the Notes sheet
+   * slot at boot. Hiding here (rather than display:none in JS) keeps the
+   * source of truth in CSS for the cascade. */
+  [data-review-ui="longform"] .er-marginalia {
+    display: none;
+  }
+
+  /* The decision buttons (Approve / Iterate / Reject / Cancel / ?) move
+   * from the top strip to the Actions sheet. The induct picker is already
+   * hidden via the `<30rem` rule below; here we hide the entire group. */
+  [data-review-ui="longform"] .er-strip-right {
+    display: none !important;
+  }
+
+  /* --- Bottom tab bar ----------------------------------------------------- */
+
+  .er-mobile-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 64px;
+    background: var(--er-paper);
+    background-image:
+      url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    border-top: 1px solid var(--er-red-pencil);
+    box-shadow: 0 -2px 16px rgba(26, 22, 20, 0.06);
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    z-index: 60;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .er-mobile-tab {
     display: flex;
     flex-direction: column;
-    transform: translateX(101%);
-    pointer-events: none;
-    box-shadow: none;
+    align-items: center;
+    justify-content: center;
+    gap: 0.18rem;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    padding: 0.4rem 0.4rem 0.6rem;
+    color: var(--er-faded);
+    font-family: var(--er-font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    position: relative;
+    transition: color 160ms ease;
+  }
+  .er-mobile-tab .er-mobile-tab-glyph {
+    font-family: var(--er-font-display);
+    font-style: italic;
+    font-variation-settings: "opsz" 24, "wght" 500;
+    font-size: 1.5rem;
+    line-height: 1;
+    color: var(--er-faded);
+    transition: color 160ms ease;
+  }
+  .er-mobile-tab[aria-expanded="true"],
+  .er-mobile-tab[aria-expanded="true"] .er-mobile-tab-glyph {
+    color: var(--er-red-pencil);
+  }
+  .er-mobile-tab[aria-expanded="true"]::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 30px;
+    height: 2px;
+    background: var(--er-red-pencil);
+  }
+  .er-mobile-tab-count {
+    position: absolute;
+    top: 6px;
+    right: 30%;
+    background: var(--er-red-pencil);
+    color: var(--er-paper);
+    font-size: 0.55rem;
+    line-height: 1;
+    padding: 0.18rem 0.32rem;
+    border-radius: 8px;
+    letter-spacing: 0.04em;
+    min-width: 1rem;
+    text-align: center;
+  }
+  .er-mobile-tab-count[hidden] { display: none; }
+
+  /* Reserve room at the article body's bottom for the tab bar so the last
+   * paragraph isn't permanently obscured. */
+  body:has([data-review-ui="longform"]) {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom));
   }
 
-  /* Force the marginalia item list back into normal flow. The desktop
-   * positioning logic (marginalia-position.ts) is meaningful when the
-   * column sits in-grid alongside the article — items align vertically
-   * with their marks. Inside a drawer overlay there's no spatial
-   * relationship to the marks, so a normal vertical list reads as
-   * intended. `!important` overrides the controller's inline styles. */
-  [data-review-ui="longform"] .er-marginalia-list {
-    position: static !important;
-    min-height: auto !important;
+  /* --- Sheet host --------------------------------------------------------- */
+
+  .er-mobile-sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(64px + env(safe-area-inset-bottom));
+    height: 60vh;
+    max-height: 100dvh;
+    background: var(--er-paper);
+    background-image:
+      url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    border-top: 1px solid var(--er-red-pencil);
+    box-shadow: 0 -16px 40px rgba(26, 22, 20, 0.18);
+    border-radius: 24px 24px 0 0;
+    z-index: 70;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transform: translateY(100%);
+    transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+    pointer-events: none;
   }
-  [data-review-ui="longform"] .er-marginalia-item {
+  .er-mobile-sheet[hidden] { display: none; }
+  body[data-mobile-sheet-open] .er-mobile-sheet {
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  .er-mobile-sheet-handle {
+    align-self: center;
+    flex-shrink: 0;
+    width: 64px;
+    height: 22px;
+    border: 0;
+    background: transparent;
+    cursor: grab;
+    padding: 0.55rem 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .er-mobile-sheet-handle:active { cursor: grabbing; }
+  .er-mobile-sheet-handle-bar {
+    display: block;
+    width: 44px;
+    height: 5px;
+    background: var(--er-paper-3);
+    border-radius: 4px;
+    transition: background 160ms ease;
+  }
+  .er-mobile-sheet-handle:hover .er-mobile-sheet-handle-bar,
+  .er-mobile-sheet-handle:focus-visible .er-mobile-sheet-handle-bar {
+    background: var(--er-red-pencil);
+  }
+  .er-mobile-sheet-head {
+    padding: 0.1rem 1.2rem 0.65rem;
+    border-bottom: 1px solid var(--er-red-pencil);
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    flex-shrink: 0;
+  }
+  .er-mobile-sheet-kicker {
+    font-family: var(--er-font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--er-red-pencil);
+  }
+  .er-mobile-sheet-meta {
+    font-family: var(--er-font-mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--er-faded);
+    margin-left: auto;
+  }
+  .er-mobile-sheet-close {
+    background: transparent;
+    border: 1px solid var(--er-paper-3);
+    color: var(--er-faded);
+    font-size: 1rem;
+    line-height: 1;
+    padding: 0.15rem 0.45rem;
+    border-radius: 2px;
+    cursor: pointer;
+  }
+  .er-mobile-sheet-close:hover {
+    color: var(--er-red-pencil);
+    border-color: var(--er-red-pencil);
+  }
+  .er-mobile-sheet-body {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding: 0.8rem 1.2rem 1.4rem;
+  }
+  .er-mobile-sheet-slot[hidden] { display: none; }
+
+  /* Inside the sheet, the relocated marginalia list and outline body need
+   * sensible defaults — they were styled for desktop columns. */
+  .er-mobile-sheet-slot[data-mobile-sheet-slot="notes"] .er-marginalia-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    counter-reset: margin-note;
+  }
+  .er-mobile-sheet-slot[data-mobile-sheet-slot="notes"] .er-marginalia-item {
     position: static !important;
     top: auto !important;
     left: auto !important;
     right: auto !important;
+    transform: none !important;
+    transition: background 160ms ease;
+  }
+  .er-mobile-sheet-slot[data-mobile-sheet-slot="notes"] .er-marginalia-item.er-mobile-flash {
+    background: var(--er-highlight, rgba(184, 54, 42, 0.12));
   }
 
-  /* Pin the "MARGIN NOTES" head to the TOP of the drawer (not to the
-   * page chrome's bottom). The desktop rule sets
-   *   top: var(--er-chrome-bottom, 7rem)
-   * because marginalia is in-flow inside the page's scroll context —
-   * sticky binds against the viewport and the head pins below the
-   * fixed strip. Inside the drawer (its own overflow-y: auto scroll
-   * container) sticky binds against the drawer; `top: 124px` would
-   * pin the head 124px DOWN from the drawer's top edge instead of
-   * at the top. Override to `top: 0` so the head pins at the drawer's
-   * top edge as the operator scrolls notes inside it. */
-  [data-review-ui="longform"] .er-marginalia-head {
-    top: 0 !important;
+  /* Outline list inside the sheet — clone of `.er-outline-drawer-body`'s
+   * existing styling, scoped here so the sheet renders the same TOC. */
+  .er-mobile-sheet-slot[data-mobile-sheet-slot="outline"] {
+    font-family: var(--er-font-display);
+    font-size: 0.95rem;
+    line-height: 1.5;
+  }
+  .er-mobile-sheet-slot[data-mobile-sheet-slot="outline"] ul,
+  .er-mobile-sheet-slot[data-mobile-sheet-slot="outline"] ol {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .er-mobile-sheet-slot[data-mobile-sheet-slot="outline"] li {
+    padding: 0;
+  }
+  .er-mobile-sheet-slot[data-mobile-sheet-slot="outline"] a {
+    display: block;
+    padding: 0.55rem 0.6rem;
+    border-bottom: 1px dashed var(--er-paper-3);
+    text-decoration: none;
+    color: var(--er-ink);
+    font-family: var(--er-font-display);
+    font-size: 0.95rem;
+    line-height: 1.4;
+    transition: background 120ms ease;
+  }
+  .er-mobile-sheet-slot[data-mobile-sheet-slot="outline"] a:hover,
+  .er-mobile-sheet-slot[data-mobile-sheet-slot="outline"] a:focus-visible {
+    background: rgba(184, 54, 42, 0.08);
+    color: var(--er-red-pencil);
   }
 
+  /* Actions sheet — the decision buttons re-rendered as a comfortable
+   * stack instead of crammed into the top strip. Each row is a full-width
+   * tap target with per-action color accents on the left edge. */
+  .er-mobile-sheet-slot[data-mobile-sheet-slot="actions"] {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+  }
+  .er-mobile-action {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    width: 100%;
+    padding: 0.95rem 1rem;
+    background: var(--er-paper);
+    border: 1px solid var(--er-paper-3);
+    border-left: 3px solid var(--er-red-pencil);
+    border-radius: 2px;
+    color: var(--er-ink);
+    font-family: var(--er-font-display);
+    font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 500;
+    font-size: 1.05rem;
+    text-align: left;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 120ms ease, transform 120ms ease;
+  }
+  .er-mobile-action:hover { background: var(--er-paper-2); transform: translateX(2px); }
+  .er-mobile-action[data-action="approve"] { border-left-color: var(--er-stamp-green); color: var(--er-stamp-green); }
+  .er-mobile-action[data-action="iterate"] { border-left-color: var(--er-proof-blue); color: var(--er-proof-blue); }
+  .er-mobile-action[data-action="reject"]  { border-left-color: var(--er-red-pencil); color: var(--er-red-pencil); }
+  .er-mobile-action[data-action="cancel"]  { border-left-color: var(--er-faded); color: var(--er-faded); }
+  .er-mobile-action[disabled] { opacity: 0.45; cursor: not-allowed; }
+  .er-mobile-action .er-mobile-action-glyph {
+    font-family: var(--er-font-display);
+    font-style: italic;
+    font-size: 1.3rem;
+    line-height: 1;
+    width: 1.4rem;
+    text-align: center;
+  }
+  .er-mobile-action .er-mobile-action-meta {
+    margin-left: auto;
+    font-family: var(--er-font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--er-faded);
+    font-style: normal;
+  }
 
-  /* Scrapbook drawer (Dispatch D): the bottom-anchored drawer is now
-   * the primary scrapbook surface and remains visible at narrow widths.
-   * The shared transition + height variables are defined in the main
-   * .er-scrapbook-drawer block; the peek line truncates via
-   * text-overflow: ellipsis when the viewport gets tight. The legacy
-   * mobile-specific aria-expanded override (max-height 3rem / 50vh) was
-   * removed because the new mechanism uses body[data-drawer], not
-   * aria-expanded on the aside, and the shared height transition is
-   * already viewport-friendly. */
+  /* Article-body marks gain a subtle flash when the operator scrolls to
+   * one via the bidirectional link from the Notes sheet. The class is
+   * added by `mobile-sheet-bar.ts` and removed after the animation
+   * completes. */
+  [data-review-ui="longform"] mark[data-annotation-id].er-mobile-flash {
+    animation: er-mobile-flash-pulse 1100ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  @keyframes er-mobile-flash-pulse {
+    0%   { background: var(--er-highlight, #FAEABF); box-shadow: 0 0 0 4px rgba(184, 54, 42, 0.18); }
+    60%  { background: var(--er-highlight, #FAEABF); box-shadow: 0 0 0 0 rgba(184, 54, 42, 0); }
+    100% { background: var(--er-highlight, #FAEABF); box-shadow: 0 0 0 0 rgba(184, 54, 42, 0); }
+  }
+
+  /* In mobile edit mode, hide the bottom bar + sheet — the editor owns the
+   * canvas (existing rule already hides folio, strip, marginalia, drawers
+   * via `body:has([data-edit-panes-host]:not([hidden]))`). */
+  body:has([data-edit-panes-host]:not([hidden])) .er-mobile-bar,
+  body:has([data-edit-panes-host]:not([hidden])) .er-mobile-sheet {
+    display: none !important;
+  }
+  body:has([data-edit-panes-host]:not([hidden])) {
+    padding-bottom: 0 !important;
+  }
+
+  /* Reduced motion: disable sheet slide; collapse remains, just instant. */
+  @media (prefers-reduced-motion: reduce) {
+    .er-mobile-sheet { transition: none; }
+    @keyframes er-mobile-flash-pulse { from, to { background: var(--er-highlight, #FAEABF); } }
+  }
+
+  /* --- Legacy mobile rules below stay; they're scoped to elements that
+   *     the mobile-bar+sheet doesn't replace (strip-galley, slug, etc.). - */
 
   /* Strip elements drop to essentials: back link + state stamp + ? for
    * shortcuts. Edit / filed / version slot all hide. */

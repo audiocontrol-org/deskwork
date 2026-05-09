@@ -24,6 +24,7 @@ import { wireMarginaliaPositioning } from './entry-review/marginalia-position.ts
 import { initOutlineDrawer } from './entry-review/outline-drawer.ts';
 import { initStickyOffset } from './entry-review/sticky-offset.ts';
 import { initStripCollapse } from './entry-review/strip-collapse.ts';
+import { initMobileSheetBar } from './entry-review/mobile-sheet-bar.ts';
 import { initScrapbookDrawerToggle } from './entry-review/scrapbook-drawer.ts';
 import { initShortcuts } from './entry-review/shortcuts.ts';
 import { copyOrShowFallback } from './clipboard.ts';
@@ -236,6 +237,10 @@ function initPressCheckSurface(): void {
   initScrapbookLightbox(document);
   initStickyOffset();
   initStripCollapse();
+  initMobileSheetBar({
+    entrySlug: state.slug,
+    entryUuid: state.entryId,
+  });
 
   initShortcuts({
     showToast,
