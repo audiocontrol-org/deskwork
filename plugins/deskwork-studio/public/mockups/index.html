@@ -186,14 +186,49 @@ Two phone-shaped surfaces, two design problems. The <em>review surface</em> ship
   </ul>
 </div>
 
-<h2>Dashboard mobile-first · three&nbsp;directions <span style="font-family: var(--mono); font-size: 0.55rem; letter-spacing: 0.18em; color: var(--blue); border: 1px solid var(--blue); padding: 0.16rem 0.45rem; border-radius: 2px; vertical-align: 0.25em; margin-left: 0.5rem;">Active</span></h2>
+<h2>Dashboard mobile-first · revising&nbsp;Mockup&nbsp;1 <span style="font-family: var(--mono); font-size: 0.55rem; letter-spacing: 0.18em; color: var(--blue); border: 1px solid var(--blue); padding: 0.16rem 0.45rem; border-radius: 2px; vertical-align: 0.25em; margin-left: 0.5rem;">Mockup 1 picked · pick metaphor</span></h2>
 
-<p>The dashboard (<code style="font-family:var(--mono);font-size:0.85em">/dev/editorial-studio</code>) is the third phone-shaped surface to redesign — currently a desktop-first calendar table that produces a ~1500px masthead preamble and rows that collapse to one-word-per-line at 390px. Phase 1 of the <em>studio-mobile-first</em> feature closes <a href="https://github.com/audiocontrol-org/issues/237" style="color: var(--red);">#237</a> (row collapse), <a href="https://github.com/audiocontrol-org/issues/238" style="color: var(--red);">#238</a> (masthead preamble), and <a href="https://github.com/audiocontrol-org/issues/243" style="color: var(--red);">#243</a> (mystery em-dash for missing reviewState). The three directions below honor the press-check vocabulary already shipped on entry-review and editor — and propose three different relationships between "list of pipeline entries" and "cross-cutting affordances."</p>
+<p>The dashboard (<code style="font-family:var(--mono);font-size:0.85em">/dev/editorial-studio</code>) is the third phone-shaped surface to redesign — currently a desktop-first calendar table that produces a ~1500px masthead preamble and rows that collapse to one-word-per-line at 390px. Phase 1 of the <em>studio-mobile-first</em> feature closes <a href="https://github.com/audiocontrol-org/issues/237" style="color: var(--red);">#237</a> (row collapse), <a href="https://github.com/audiocontrol-org/issues/238" style="color: var(--red);">#238</a> (masthead preamble), and <a href="https://github.com/audiocontrol-org/issues/243" style="color: var(--red);">#243</a> (mystery em-dash for missing reviewState). The operator picked <strong>Dashboard 1 (Press tabs)</strong> for continuity with the review surface and editor — with two revisions: (a) a slot for creation actions (<em>+ New</em> / <em>Ingest</em> / <em>Shortform start</em>), and (b) a different mobile expression of the press-check vocabulary, since rotated rubber-stamps cluster vertically and read as "the page is crooked" rather than "hand-pressed." Three coherent variants below — each pairs ONE stamp metaphor with ONE creation-action placement. Pick one (or call out elements to combine).</p>
+
+<div class="grid">
+
+  <article class="card" style="border-left-color: var(--blue);">
+    <span class="num" style="color: var(--blue);">Dashboard 1b</span>
+    <h3>Letterpress tag + Compose tab</h3>
+    <p class="summary">Stamps are flat letterpress tags — doubled 2px+1px border, 0.12em tracking, 0.4px ink-bleed text-shadow. Tab 3 is <em>Compose</em> (replaces Folio) holding three creation verbs as cards — <em>/deskwork:add</em>, <em>/deskwork:ingest</em>, <em>/deskwork:shortform-start</em> — that copy the slash command to the clipboard per THESIS Consequence 2.</p>
+    <p class="pros"><span class="label">Strong</span> Most continuity with entry-review's chrome (same 3-tab idiom, same sheet pattern). Compose-tab is a direct peer of Pipeline and Press — creation framed as a verb, not an action.</p>
+    <p class="cons"><span class="label">Weak</span> Folio gets pushed off the bar entirely. Letterpress-tag is a rectangle box, which carries some weight in tight row chrome.</p>
+    <a class="open" href="./dashboard-1b-press-tabs-revised.html">Open mockup →</a>
+  </article>
+
+  <article class="card" style="border-left-color: var(--blue);">
+    <span class="num" style="color: var(--blue);">Dashboard 1c</span>
+    <h3>Filing tab + floating chip</h3>
+    <p class="summary">Stamps shaped like filing-folder tabs — notched corner-cut via clip-path, paper-3 fill, 3px stage-color edge bar on the left. Compose lives in a flat red-pencil floating chip at bottom-right (Material-FAB position, press-check vocabulary). Tabs return to 3 originals (Pipeline / Press / Folio).</p>
+    <p class="pros"><span class="label">Strong</span> Most-mobile-native of the three. Filing-tab silhouette carries the metaphor without color noise. Floating chip is in the natural thumb-reach zone for primary creation. Folio stays.</p>
+    <p class="cons"><span class="label">Weak</span> Two strong "this is mobile" cues at once may diverge from the editor / review surfaces' straight-rectangle stamps. FAB always covers ~12% of bottom-right body when scrolled.</p>
+    <a class="open" href="./dashboard-1c-filing-tab-fab.html">Open mockup →</a>
+  </article>
+
+  <article class="card" style="border-left-color: var(--blue);">
+    <span class="num" style="color: var(--blue);">Dashboard 1d</span>
+    <h3>Rule mark + masthead chip</h3>
+    <p class="summary">Stamps reduced to italic display text bracketed by 1px top + bottom rules in the stage color — no box, no fill, pure typography. <em>"+ New"</em> chip lives in the masthead right slot (where Help used to live; Help relocates to Compose sheet footer). Tabs return to 3 originals.</p>
+    <p class="pros"><span class="label">Strong</span> Most typographically refined. Stamps stop competing with row content. Masthead chip frames creation as a publishing act, not pipeline-nav peer. Nothing floats over content; everything has a home in chrome.</p>
+    <p class="cons"><span class="label">Weak</span> Stamps may read as too subtle for at-a-glance scan. Hero-strip "+ New" is upper-left-quadrant — slightly less thumb-reachable than a bottom-right FAB. Help moves to a discoverability-cost location.</p>
+    <a class="open" href="./dashboard-1d-rule-mark-strip-chip.html">Open mockup →</a>
+  </article>
+
+</div>
+
+<h2>Dashboard mobile-first · the&nbsp;original&nbsp;three <span style="font-family: var(--mono); font-size: 0.55rem; letter-spacing: 0.18em; color: var(--faded); border: 1px solid var(--faded); padding: 0.16rem 0.45rem; border-radius: 2px; vertical-align: 0.25em; margin-left: 0.5rem;">Mockup 1 picked</span></h2>
+
+<p>For reference. The operator picked Dashboard 1 (Press tabs) on 2026-05-09; the revised variants above explore alternative mobile expressions and creation-action placements within that pick.</p>
 
 <div class="grid">
 
   <article class="card">
-    <span class="num">Dashboard 1</span>
+    <span class="num">Dashboard 1 · original</span>
     <h3>Press tabs</h3>
     <p class="summary">Same 64px bottom-tab-bar idiom as the review surface, but operating at the calendar level. Three tabs swap which slice of the calendar shows: <em>Pipeline</em> (full stage list, the home tab), <em>Press</em> (focused queue of in-review / iterating / approved entries), <em>Folio</em> (cross-cutting scrapbook overview). Hero strip is 56px (was ~1500px). Each row is a 2-column stacked grid: row-num + content, with slug, title, and action chips as rows in the content column.</p>
     <p class="pros"><span class="label">Strong</span> Direct continuity with entry-review's chrome. Press-queue gets a dedicated tab (not stacked-below-pipeline like desktop). Predictable; muscle memory transfers.</p>
