@@ -42,10 +42,24 @@ interface SheetBarDeps {
   readonly entryUuid: string;
 }
 
-export function initMobileSheetBar(deps: SheetBarDeps): void {
+export interface MobileSheetBarController {
+  /** Open one of the three sheets. No-op on desktop (the bar/sheet are
+   *  display:none above 48rem). Used by the annotations controller's
+   *  `unstowMarginalia` hook so the composer (relocated into the Notes
+   *  slot at boot) becomes visible when the operator hits Mark. */
+  openSheet: (key: 'outline' | 'notes' | 'actions') => void;
+  /** True on phone widths. Callers gate behavior off this. */
+  isMobile: () => boolean;
+}
+
+export function initMobileSheetBar(deps: SheetBarDeps): MobileSheetBarController {
+  const noop: MobileSheetBarController = {
+    openSheet: () => {},
+    isMobile: () => window.matchMedia(MOBILE_QUERY).matches,
+  };
   const bar = document.querySelector<HTMLElement>('[data-mobile-bar]');
   const sheet = document.querySelector<HTMLElement>('[data-mobile-sheet-host]');
-  if (!bar || !sheet) return;
+  if (!bar || !sheet) return noop;
 
   // ---- Bind once at boot. The CSS gate handles desktop suppression of
   //      the bar/sheet visibility; this controller wires interactions
@@ -66,6 +80,27 @@ export function initMobileSheetBar(deps: SheetBarDeps): void {
   const notesCount = bar.querySelector<HTMLElement>('[data-notes-count]');
 
   if (!slots.outline || !slots.notes || !slots.actions || !kicker || !meta) return;
+
+  // The notes slot is structured as: [composer (mobile only), list-host].
+  // The list-host is the only thing `refreshNotesSlot` mutates so the
+  // composer stays anchored at the top of the slot through every
+  // annotation re-render.
+  //
+  // Composer relocation is gated on phone-width — on desktop the composer
+  // stays inside `.er-marginalia` where the annotations controller's
+  // inline absolute positioning (computed against the marginalia column's
+  // offsetParent) keeps working. Moving the composer into a display:none
+  // sheet on desktop would break that positioning.
+  let notesListHost: HTMLElement | null = null;
+  if (slots.notes) {
+    if (window.matchMedia(MOBILE_QUERY).matches) {
+      const composer = document.querySelector<HTMLElement>('[data-comment-composer]');
+      if (composer) slots.notes.insertBefore(composer, slots.notes.firstChild);
+    }
+    notesListHost = document.createElement('div');
+    notesListHost.setAttribute('data-mobile-notes-list-host', '');
+    slots.notes.appendChild(notesListHost);
+  }
 
   // The CSS toggles visibility with `body[data-mobile-sheet-open]` plus
   // `data-mobile-sheet-slot` on the host; the controller flips both.
@@ -157,14 +192,13 @@ export function initMobileSheetBar(deps: SheetBarDeps): void {
   }
 
   function refreshNotesSlot(): void {
-    if (!slots.notes) return;
+    if (!notesListHost) return;
     const source = document.querySelector<HTMLOListElement>('[data-sidebar-list]');
     if (!source) return;
 
-    // Build a fresh list by cloning items. Each cloned item carries its
-    // own `data-annotation-id` so the bidirectional handler can resolve
-    // back to the article mark.
-    slots.notes.innerHTML = '';
+    // Mutate ONLY the list host so the composer (slot's first child)
+    // stays anchored at the top of the sheet across re-renders.
+    notesListHost.innerHTML = '';
     const list = document.createElement('ol');
     list.className = 'er-marginalia-list er-mobile-notes-list';
     list.setAttribute('data-mobile-notes-list', '');
@@ -174,7 +208,7 @@ export function initMobileSheetBar(deps: SheetBarDeps): void {
 
     const items = Array.from(source.querySelectorAll<HTMLLIElement>('.er-marginalia-item'));
     if (items.length === 0) {
-      slots.notes.appendChild(empty);
+      notesListHost.appendChild(empty);
       return;
     }
     for (const item of items) {
@@ -188,7 +222,7 @@ export function initMobileSheetBar(deps: SheetBarDeps): void {
       clone.style.transform = '';
       list.appendChild(clone);
     }
-    slots.notes.appendChild(list);
+    notesListHost.appendChild(list);
 
     // Wire each cloned note: tap → close sheet + scroll article to mark.
     for (const note of list.querySelectorAll<HTMLElement>('[data-annotation-id]')) {
@@ -381,4 +415,15 @@ export function initMobileSheetBar(deps: SheetBarDeps): void {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && currentSheet !== null) closeSheet();
   });
+
+  return {
+    openSheet: (key) => {
+      if (!window.matchMedia(MOBILE_QUERY).matches) return;
+      // Defer to the next frame so the caller's own DOM mutations settle
+      // first (e.g. the annotations controller setting composer.hidden =
+      // false synchronously before the sheet opens).
+      requestAnimationFrame(() => openSheet(key));
+    },
+    isMobile: () => window.matchMedia(MOBILE_QUERY).matches,
+  };
 }

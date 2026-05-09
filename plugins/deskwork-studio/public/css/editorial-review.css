@@ -4025,6 +4025,27 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
     font-style: normal;
   }
 
+  /* Comment composer when relocated into the Notes sheet at boot.
+   * The annotations controller sets inline `position: absolute; top:
+   * <selection-y-px>; left: 0; right: 0; z-index: 2` for desktop's
+   * column layout — meaningful when the composer sits inside the
+   * marginalia column alongside the article. Inside the sheet's
+   * notes slot the composer should flow statically at the top of the
+   * scrollable body so the operator sees it the moment the sheet
+   * opens. `!important` overrides the controller's inline styles. */
+  .er-mobile-sheet-slot[data-mobile-sheet-slot="notes"] [data-comment-composer] {
+    position: static !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    z-index: auto !important;
+    margin: 0 0 var(--er-space-3);
+  }
+  /* Composer head + textarea sized for thumb input. */
+  .er-mobile-sheet-slot[data-mobile-sheet-slot="notes"] [data-comment-composer] textarea {
+    font-size: 16px; /* prevents iOS auto-zoom on focus */
+  }
+
   /* Article-body marks gain a subtle flash when the operator scrolls to
    * one via the bidirectional link from the Notes sheet. The class is
    * added by `mobile-sheet-bar.ts` and removed after the animation

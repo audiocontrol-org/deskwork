@@ -177,6 +177,16 @@ function initPressCheckSurface(): void {
 
   const marginaliaToggle = initMarginaliaToggle();
 
+  // Mobile sheet bar must initialize before the annotations controller
+  // so the unstowMarginalia callback can reach `mobileSheetBar.openSheet`.
+  // On phone, the composer lives inside the Notes sheet (relocated by
+  // `initMobileSheetBar`); the controller's "show composer" path needs
+  // to also open that sheet so the operator sees what they're typing into.
+  const mobileSheetBar = initMobileSheetBar({
+    entrySlug: state.slug,
+    entryUuid: state.entryId,
+  });
+
   const annotations = createAnnotationsController({
     state,
     showToast,
@@ -186,8 +196,14 @@ function initPressCheckSurface(): void {
     },
     // #188 — adding marginalia is an implicit ask to open the marginalia
     // drawer. The annotations controller invokes this just before
-    // opening the composer.
-    unstowMarginalia: () => marginaliaToggle.applyState(false),
+    // opening the composer. On phone, the composer lives inside the Notes
+    // sheet (relocated at boot by `initMobileSheetBar`), so we ALSO open
+    // that sheet — without it, `composer.hidden = false` flips a
+    // never-displayed element under a hidden sheet.
+    unstowMarginalia: () => {
+      marginaliaToggle.applyState(false);
+      if (mobileSheetBar.isMobile()) mobileSheetBar.openSheet('notes');
+    },
   });
 
   // #190 — keep marginalia items vertically aligned with their marks
@@ -237,10 +253,8 @@ function initPressCheckSurface(): void {
   initScrapbookLightbox(document);
   initStickyOffset();
   initStripCollapse();
-  initMobileSheetBar({
-    entrySlug: state.slug,
-    entryUuid: state.entryId,
-  });
+  // (mobileSheetBar already initialized above so the annotations controller
+  // can hook its openSheet for the composer flow.)
 
   initShortcuts({
     showToast,
