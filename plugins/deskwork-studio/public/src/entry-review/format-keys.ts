@@ -40,10 +40,26 @@ const SPECS: Record<FKey, InsertSpec> = {
   fence: { before: '```\n',  after: '\n```', placeholder: 'code block',  block: true  },
 };
 
+function isFKey(value: string | undefined): value is FKey {
+  return value !== undefined && value in SPECS;
+}
+
 function findEditorView(): EditorView | null {
   const root = document.querySelector<HTMLElement>('[data-edit-source] .cm-editor');
   if (!root) return null;
   return EditorView.findFromDOM(root);
+}
+
+// Block-level prefixes the toggle-off / replace logic recognizes.
+// Order matters — longer prefixes must come first so a `### ` line
+// isn't mis-recognized as `## ` or `# `.
+const BLOCK_PREFIXES = ['### ', '## ', '# ', '- ', '1. ', '> '];
+
+function strippedLineText(text: string): { stripped: string; removed: string } {
+  for (const p of BLOCK_PREFIXES) {
+    if (text.startsWith(p)) return { stripped: text.slice(p.length), removed: p };
+  }
+  return { stripped: text, removed: '' };
 }
 
 function applyFKey(key: FKey): boolean {
@@ -54,29 +70,81 @@ function applyFKey(key: FKey): boolean {
   const selected = view.state.sliceDoc(sel.from, sel.to);
 
   if (spec.block) {
-    const line = view.state.doc.lineAt(sel.from);
-    // Toggle off when the line already starts with this prefix and the
-    // operator has no active selection — second tap removes the prefix.
-    if (selected.length === 0 && line.text.startsWith(spec.before)) {
+    const firstLine = view.state.doc.lineAt(sel.from);
+    const lastLine = view.state.doc.lineAt(sel.to);
+    const multiLine = lastLine.number > firstLine.number;
+
+    // Toggle off / replace: when the operator has no selection and the
+    // current line already starts with ANY recognized block prefix,
+    // strip that prefix and apply the new one. This handles both the
+    // tap-twice toggle-off case (prefix matches) and the swap-heading-
+    // level case (e.g. tapping H1 on a `### ` line replaces with `# `).
+    // Pure toggle-off when the existing prefix matches the requested
+    // key's prefix and the operator wants to remove it.
+    if (selected.length === 0 && !multiLine) {
+      const { stripped, removed } = strippedLineText(firstLine.text);
+      if (removed === spec.before) {
+        view.dispatch({
+          changes: { from: firstLine.from, to: firstLine.from + removed.length, insert: '' },
+        });
+        view.focus();
+        return true;
+      }
+      if (removed !== '') {
+        view.dispatch({
+          changes: { from: firstLine.from, to: firstLine.to, insert: spec.before + stripped },
+        });
+        view.focus();
+        return true;
+      }
+      const body = spec.placeholder;
+      const insert = spec.before + body + spec.after;
       view.dispatch({
-        changes: { from: line.from, to: line.from + spec.before.length, insert: '' },
+        changes: { from: firstLine.from, to: sel.to, insert },
+        selection: { anchor: firstLine.from + spec.before.length, head: firstLine.from + spec.before.length + body.length },
       });
       view.focus();
       return true;
     }
-    const body = selected.length > 0 ? selected : spec.placeholder;
-    const insert = spec.before + body + spec.after;
-    const cursorAt = line.from + spec.before.length + body.length;
+
+    if (multiLine) {
+      // Prefix every line in the selection. Keeps `from === to` so the
+      // selected text is preserved between insertions.
+      const changes: Array<{ from: number; to: number; insert: string }> = [];
+      for (let n = firstLine.number; n <= lastLine.number; n++) {
+        const ln = view.state.doc.line(n);
+        const { stripped, removed } = strippedLineText(ln.text);
+        if (removed === '') {
+          changes.push({ from: ln.from, to: ln.from, insert: spec.before });
+        } else if (removed !== spec.before) {
+          changes.push({ from: ln.from, to: ln.to, insert: spec.before + stripped });
+        }
+      }
+      if (changes.length > 0) view.dispatch({ changes });
+      view.focus();
+      return true;
+    }
+
+    // Single-line with selection: wrap the selected text on its own line.
+    const { stripped, removed } = strippedLineText(firstLine.text);
+    if (removed !== '' && removed !== spec.before) {
+      view.dispatch({
+        changes: { from: firstLine.from, to: firstLine.to, insert: spec.before + stripped },
+      });
+      view.focus();
+      return true;
+    }
+    const insert = spec.before + selected + spec.after;
+    const cursorAt = firstLine.from + spec.before.length + selected.length;
     view.dispatch({
-      changes: { from: line.from, to: sel.to, insert },
-      selection: selected.length > 0
-        ? { anchor: cursorAt }
-        : { anchor: line.from + spec.before.length, head: cursorAt },
+      changes: { from: firstLine.from, to: sel.to, insert },
+      selection: { anchor: cursorAt },
     });
     view.focus();
     return true;
   }
 
+  // Inline keys: wrap the selection or insert the placeholder at caret.
   const body = selected.length > 0 ? selected : spec.placeholder;
   const insert = spec.before + body + spec.after;
   const wrapStart = sel.from + spec.before.length;
@@ -103,9 +171,9 @@ export function bindFormatKeys(host: HTMLElement, onAfter?: () => void): void {
     if (!(target instanceof HTMLElement)) return;
     const btn = target.closest<HTMLButtonElement>('[data-fkey]');
     if (!btn) return;
-    const key = btn.dataset.fkey as FKey | undefined;
-    if (!key || !(key in SPECS)) return;
+    const raw = btn.dataset.fkey;
+    if (!isFKey(raw)) return;
     ev.preventDefault();
-    if (applyFKey(key)) onAfter?.();
+    if (applyFKey(raw)) onAfter?.();
   });
 }

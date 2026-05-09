@@ -373,24 +373,40 @@ export function createEditModeController(
     ev.returnValue = '';
   });
 
-  // Auto-save on visibility-change to hidden + on pagehide. iOS Safari
-  // routinely reloads pages under memory pressure, dismisses on pull-
-  // to-refresh, and ignores `beforeunload` confirms — so the operator
-  // can lose unsaved edits with no warning. Saving on visibility-hidden
-  // (fires on app-switch, tab-switch, browser-nav-away) closes the
-  // gap. The save is idempotent against on-disk content; double-firing
-  // on the same buffer is a no-op. `keepalive: true` would let pagehide
-  // fetches survive teardown, but performSave doesn't currently expose
-  // that knob — visibilitychange runs slightly earlier and covers
-  // most scenarios.
+  // Auto-save on visibility-change to hidden — covers iOS app-switch,
+  // tab-switch, and most browser-nav-away cases. The page is still
+  // alive at this point, so the async performSave() chain completes
+  // normally. The save is idempotent against on-disk content; double-
+  // firing on the same buffer is a no-op.
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'hidden') return;
     if (!editing || !hasUnsavedChanges()) return;
     void performSave();
   });
+
+  // Auto-save on pagehide — covers full unloads (back-forward cache
+  // eviction, hard reload, memory-pressure reload on iOS Safari).
+  // CRITICAL: by the time pagehide fires the JS event loop is being
+  // torn down — async continuations after `await fetch(...)` are
+  // never reached. We fire a synchronous fetch with `keepalive: true`
+  // so the browser commits the request to the network stack before
+  // tearing the page down. This is the iOS-specific path; on
+  // visibilitychange the regular performSave runs.
   window.addEventListener('pagehide', () => {
     if (!editing || !hasUnsavedChanges()) return;
-    void performSave();
+    const value = editorHandle ? editorHandle.getValue() : draftEdit.value;
+    try {
+      void fetch(`${ENTRY_API}/${encodeURIComponent(state.entryId)}/body`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ markdown: value }),
+        keepalive: true,
+      });
+    } catch {
+      // Last-ditch save; can't surface errors after pagehide. The
+      // adjacent visibilitychange handler usually catches the same
+      // dirty state earlier in the unload sequence.
+    }
   });
 
   // Phone-only "✕ Done" exit affordance in the strip. Bound here (not

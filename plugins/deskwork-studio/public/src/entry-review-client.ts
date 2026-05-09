@@ -184,7 +184,6 @@ function initPressCheckSurface(): void {
   // to also open that sheet so the operator sees what they're typing into.
   const mobileSheetBar = initMobileSheetBar({
     entrySlug: state.slug,
-    entryUuid: state.entryId,
   });
 
   const annotations = createAnnotationsController({

@@ -36,19 +36,25 @@ const MOBILE_QUERY = '(max-width: 48rem)';
 const FLASH_MS = 1100;
 const SLIDE_MS = 280;
 
-type SheetKey = 'outline' | 'notes' | 'actions' | 'format' | 'scrapbook';
+export type SheetKey = 'outline' | 'notes' | 'actions' | 'format' | 'scrapbook';
+
+const SHEET_KEYS: ReadonlyArray<SheetKey> = ['outline', 'notes', 'actions', 'format', 'scrapbook'];
+
+function isSheetKey(value: string | undefined): value is SheetKey {
+  if (value === undefined) return false;
+  return SHEET_KEYS.some((k) => k === value);
+}
 
 interface SheetBarDeps {
   readonly entrySlug: string;
-  readonly entryUuid: string;
 }
 
 export interface MobileSheetBarController {
-  /** Open one of the three sheets. No-op on desktop (the bar/sheet are
+  /** Open any sheet programmatically. No-op on desktop (bar/sheet are
    *  display:none above 48rem). Used by the annotations controller's
    *  `unstowMarginalia` hook so the composer (relocated into the Notes
    *  slot at boot) becomes visible when the operator hits Mark. */
-  openSheet: (key: 'outline' | 'notes' | 'actions') => void;
+  openSheet: (key: SheetKey) => void;
   /** True on phone widths. Callers gate behavior off this. */
   isMobile: () => boolean;
 }
@@ -124,7 +130,7 @@ export function initMobileSheetBar(deps: SheetBarDeps): MobileSheetBarController
     currentSheet = key;
     sheet!.hidden = false;
     sheet!.setAttribute('data-mobile-sheet-slot', key);
-    for (const slotKey of Object.keys(slots) as SheetKey[]) {
+    for (const slotKey of SHEET_KEYS) {
       const slot = slots[slotKey];
       if (slot) slot.hidden = slotKey !== key;
     }
@@ -168,7 +174,7 @@ export function initMobileSheetBar(deps: SheetBarDeps): MobileSheetBarController
 
   // ---- Slot population --------------------------------------------------
 
-  let populatedSlots: Set<SheetKey> = new Set();
+  const populatedSlots: Set<SheetKey> = new Set();
 
   function populateSlot(key: SheetKey): void {
     if (populatedSlots.has(key)) {
@@ -202,7 +208,8 @@ export function initMobileSheetBar(deps: SheetBarDeps): MobileSheetBarController
       return;
     }
     for (const child of Array.from(source.children)) {
-      slots.scrapbook.appendChild(child.cloneNode(true) as HTMLElement);
+      const cloned = child.cloneNode(true);
+      if (cloned instanceof HTMLElement) slots.scrapbook.appendChild(cloned);
     }
   }
 
@@ -225,7 +232,8 @@ export function initMobileSheetBar(deps: SheetBarDeps): MobileSheetBarController
     }
     // Clone children (deep) so the desktop drawer's TOC stays intact.
     for (const child of Array.from(source.children)) {
-      slots.outline.appendChild(child.cloneNode(true) as HTMLElement);
+      const cloned = child.cloneNode(true);
+      if (cloned instanceof HTMLElement) slots.outline.appendChild(cloned);
     }
     // Wire anchor clicks to close the sheet after navigation.
     for (const a of slots.outline.querySelectorAll<HTMLAnchorElement>('a[href^="#"]')) {
@@ -313,8 +321,8 @@ export function initMobileSheetBar(deps: SheetBarDeps): MobileSheetBarController
 
   for (const tab of tabs) {
     tab.addEventListener('click', () => {
-      const key = tab.dataset.mobileSheet as SheetKey | undefined;
-      if (!key) return;
+      const key = tab.dataset.mobileSheet;
+      if (!isSheetKey(key)) return;
       openSheet(key);
     });
   }
