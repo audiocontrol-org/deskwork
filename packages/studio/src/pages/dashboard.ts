@@ -35,7 +35,6 @@ import {
   renderDistributionPlaceholder,
 } from './dashboard/section.ts';
 import { renderHeader, renderFilterStrip } from './dashboard/header.ts';
-import { renderPressQueue } from './dashboard/press-queue.ts';
 import type { ContentIndex } from '@deskwork/core/content-index';
 
 /**
@@ -66,6 +65,12 @@ export async function renderDashboard(
     return renderStageSection(stage, bucket, defaultSite).__raw;
   }).join('\n');
 
+  // Review-state-driven press queue (right-rail on desktop) was removed
+  // in v0.19 per operator: review state is being phased out and the
+  // press queue exists solely to surface review-state-derived "needs
+  // your eyes" entries. Without that signal, the queue has nothing to
+  // say. The .er-layout wrapper stays in place for now in case the
+  // right column reappears with a non-review-state surface later.
   const body = html`
   ${renderEditorialFolio('dashboard', 'press-check')}
   ${renderHeader(data, ctx.projectRoot, now)}
@@ -76,7 +81,6 @@ export async function renderDashboard(
         ${unsafe(stageSections)}
         ${renderDistributionPlaceholder()}
       </div>
-      ${renderPressQueue(data.entries, defaultSite, now)}
     </div>
   </main>
   ${renderComposeChrome()}

@@ -2,11 +2,15 @@
  * Dashboard masthead + filter strip.
  *
  * Pipeline-redesign Task 34. The masthead reads from sidecar-derived
- * counts (total entries, in-review entries) instead of the legacy
- * workflow store. The filter strip is a search-only row; stage chips
- * were removed in v0.19 (they were never used and added chrome noise).
- * The collapsible stage tiles on mobile now serve the per-stage
- * navigation role chips used to.
+ * counts (total entries) instead of the legacy workflow store. The
+ * filter strip is a search-only row; stage chips were removed in v0.19
+ * (they were never used and added chrome noise). The collapsible stage
+ * tiles on mobile now serve the per-stage navigation role chips used to.
+ *
+ * Review-state-derived stats ("X in review", "X approved") were removed
+ * in v0.19 per operator: review state isn't user-facing data and is
+ * slated for backend removal. The masthead surfaces only stage-shape
+ * counts (date + total) now.
  */
 
 import type { DashboardData } from './data.ts';
@@ -17,22 +21,6 @@ const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
-
-function reviewActiveCount(data: DashboardData): number {
-  let n = 0;
-  for (const entry of data.entries) {
-    if (entry.reviewState === 'in-review' || entry.reviewState === 'iterating') n++;
-  }
-  return n;
-}
-
-function approvedCount(data: DashboardData): number {
-  let n = 0;
-  for (const entry of data.entries) {
-    if (entry.reviewState === 'approved') n++;
-  }
-  return n;
-}
 
 export function renderHeader(
   data: DashboardData,
@@ -60,10 +48,6 @@ export function renderHeader(
       <span>${issueDate}</span>
       <span class="sep">·</span>
       <span>${data.entries.length} on the calendar</span>
-      <span class="sep">·</span>
-      <span>${reviewActiveCount(data)} in review</span>
-      <span class="sep">·</span>
-      <span>${approvedCount(data)} approved</span>
     </p>
   </header>`);
 }
