@@ -3673,13 +3673,86 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
 
 /* MOBILE — below 48rem (768px) */
 @media (max-width: 48rem) {
-  /* Pre-Dispatch-A: marginalia at this breakpoint became a fixed-bottom
-   * collapsible sheet because the desktop layout pinned marginalia to
-   * the viewport. With the page-grid (Issue #154 Dispatch A), the
-   * 64rem media query already collapses marginalia to a single column
-   * stacked below the article. The bottom-sheet treatment is reserved
-   * for a follow-up dispatch (B) if we want to bring it back; the
-   * single-column stack is the mobile experience for now. */
+  /* Marginalia mobile drawer mode.
+   *
+   * Operator framing: "make the marginalia automatically stowed like
+   * the TOC is on mobile. It's currently all the way at the bottom
+   * under the entire document, so it's hard to tell it's even there
+   * and very hard to get to. It should open and close on mobile, not
+   * be at the end of a very long scroll column."
+   *
+   * Pre-2026-05-08 behavior: at <64rem the page-grid collapsed the
+   * marginalia track to a single column stacked BELOW the article.
+   * On a long-form entry that means the operator scrolls past the
+   * entire article body to reach the margin notes — they're
+   * indistinguishable from "no margin notes" in normal use.
+   *
+   * Drawer mode: marginalia becomes a fixed right-edge slide-in
+   * panel (mirrors the TOC's left-edge `.er-outline-drawer` pattern).
+   * Default-stowed on first phone visit (set in marginalia-toggle.ts);
+   * the operator pulls it open via the always-visible
+   * `.er-marginalia-tab` on the right edge of the viewport. Once
+   * unstowed, the drawer slides in over the article — no scrolling
+   * required. The localStorage preference pins the operator's choice
+   * across reloads.
+   *
+   * Marginalia-position.ts's absolute positioning of items (so they
+   * align vertically with article-body marks) is meaningless in this
+   * separate-spatial-track drawer; CSS forces the item list back
+   * into normal flow with `!important` to win over inline styles. */
+
+  /* Drawer base: fixed-position right-edge panel below the chrome. */
+  [data-review-ui="longform"] .er-marginalia {
+    position: fixed;
+    top: var(--er-chrome-bottom, 7rem);
+    right: 0;
+    bottom: 0;
+    width: min(22rem, 92vw);
+    z-index: 100;
+    background: var(--er-paper);
+    border-left: 1px solid var(--er-red-pencil);
+    border-top: 0;
+    box-shadow: -4px 0 16px rgba(26, 22, 20, 0.15);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: var(--er-space-3);
+    margin-top: 0;
+    transform: translateX(0);
+    transition:
+      transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 200ms ease;
+  }
+
+  /* Stowed state: slide off-stage right instead of `display: none` so
+   * the slide-out animates. `display: flex` overrides the cross-cut
+   * `body[data-marginalia="hidden"] .er-marginalia { display: none }`
+   * rule for mobile only. `pointer-events: none` so taps pass through
+   * to the article while the drawer is animating out. */
+  body[data-marginalia="hidden"] .er-marginalia {
+    display: flex;
+    flex-direction: column;
+    transform: translateX(101%);
+    pointer-events: none;
+    box-shadow: none;
+  }
+
+  /* Force the marginalia item list back into normal flow. The desktop
+   * positioning logic (marginalia-position.ts) is meaningful when the
+   * column sits in-grid alongside the article — items align vertically
+   * with their marks. Inside a drawer overlay there's no spatial
+   * relationship to the marks, so a normal vertical list reads as
+   * intended. `!important` overrides the controller's inline styles. */
+  [data-review-ui="longform"] .er-marginalia-list {
+    position: static !important;
+    min-height: auto !important;
+  }
+  [data-review-ui="longform"] .er-marginalia-item {
+    position: static !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+  }
+
 
   /* Scrapbook drawer (Dispatch D): the bottom-anchored drawer is now
    * the primary scrapbook surface and remains visible at narrow widths.

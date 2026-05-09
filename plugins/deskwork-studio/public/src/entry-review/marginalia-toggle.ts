@@ -102,9 +102,25 @@ export function initMarginaliaToggle(): MarginaliaToggle {
     }
   }
 
-  // Initial state from persisted preference.
+  // Initial state. Resolution order:
+  //   1. Persisted preference (localStorage). The operator's explicit
+  //      stow/unstow always wins.
+  //   2. Phone-width default: stowed. On phone, marginalia rendered
+  //      in-flow drops to the bottom of a long article column and is
+  //      hard to discover or reach. Default-stowed pairs with the
+  //      `.er-marginalia-tab` right-edge pull-tab + the mobile-only
+  //      slide-in-drawer styling so the operator can open it on
+  //      demand without scrolling past the entire body.
+  //   3. Visible (desktop-default + ≥48rem viewports).
   try {
-    if (window.localStorage.getItem(MARGINALIA_HIDDEN_KEY) === '1') {
+    const persisted = window.localStorage.getItem(MARGINALIA_HIDDEN_KEY);
+    if (persisted === '1') {
+      applyState(true);
+    } else if (persisted === null && window.matchMedia('(max-width: 48rem)').matches) {
+      // No saved preference + phone-width: default to stowed (first
+      // visit on phone gets the drawer treatment; once the operator
+      // explicitly unstows, the localStorage entry pins that choice
+      // across reloads).
       applyState(true);
     }
   } catch {

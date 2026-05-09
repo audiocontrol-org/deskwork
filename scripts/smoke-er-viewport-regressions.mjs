@@ -115,11 +115,20 @@ async function probe(page, entryId, viewport) {
       if (cs.position !== 'fixed') continue;
       if (cs.display === 'none' || cs.visibility === 'hidden') continue;
       const r = el.getBoundingClientRect();
-      if (r.right > vp.width + 1 && r.width > 0) {
+      // Only flag elements that STRADDLE the viewport edge — i.e. they
+      // start inside the viewport but extend past its right edge. A
+      // fully-off-stage element (e.g. a slide-out drawer with
+      // transform: translateX(101%)) has its left edge ALSO past
+      // viewport and can't cause iOS horizontal pan because no part
+      // of it is reachable for touch interaction at the visible
+      // surface. The original heuristic was too conservative and
+      // false-positived legitimate stowed-drawer patterns.
+      if (r.right > vp.width + 1 && r.left < vp.width && r.width > 0) {
         fixedOffenders.push({
           tag: el.tagName.toLowerCase(),
           cls: (typeof el.className === 'string' ? el.className : '').slice(0, 60),
           right: Math.round(r.right),
+          left: Math.round(r.left),
           width: Math.round(r.width),
         });
       }
