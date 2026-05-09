@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-09T02:44:55.431Z",
+  "entryId": "f8fe989e-e845-4b4b-a5fb-1ef2bf77309e",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "f8fe989e-e845-4b4b-a5fb-1ef2bf77309e",
+    "version": 1,
+    "range": {
+      "start": 177,
+      "end": 181
+    },
+    "text": "this is just a tesr",
+    "category": "other",
+    "anchor": " thi",
+    "id": "bb579070-d17c-447a-b45e-a7f4838cf874",
+    "createdAt": "2026-05-09T02:44:55.431Z"
+  }
+}

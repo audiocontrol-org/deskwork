@@ -1,0 +1,12 @@
+{
+  "id": "cancel-c68dc297-1f25-4eed-903f-f051a9a194a6",
+  "timestamp": "2026-05-08T17:31:49.000Z",
+  "entry": {
+    "kind": "stage-transition",
+    "at": "2026-05-08T17:31:49.000Z",
+    "entryId": "c68dc297-1f25-4eed-903f-f051a9a194a6",
+    "slug": "source-shipped-deskwork-plan",
+    "from": "Drafting",
+    "to": "Cancelled"
+  }
+}

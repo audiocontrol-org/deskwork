@@ -9,12 +9,12 @@
     "source-shipped"
   ],
   "source": "manual",
-  "currentStage": "Drafting",
+  "currentStage": "Cancelled",
+  "priorStage": "Drafting",
   "iterationByStage": {
     "Drafting": 2
   },
-  "reviewState": "approved",
   "createdAt": "2026-05-01T00:17:31.526Z",
-  "updatedAt": "2026-05-01T04:08:23.606Z",
+  "updatedAt": "2026-05-08T17:31:49.000Z",
   "artifactPath": "docs/source-shipped-deskwork-plan/index.md"
 }
