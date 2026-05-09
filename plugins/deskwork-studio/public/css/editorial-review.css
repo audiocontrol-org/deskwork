@@ -3763,9 +3763,48 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
     border-top: 1px solid var(--er-red-pencil);
     box-shadow: 0 -2px 16px rgba(26, 22, 20, 0.06);
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
+    /* Review mode: 4 cells (Outline · Notes · Scrapbook · Actions).
+     * Edit mode: 3 cells (Format · Notes · Save) — overridden below. */
+    grid-template-columns: 1fr 1fr 1fr 1fr;
     z-index: 60;
     padding-bottom: env(safe-area-inset-bottom);
+  }
+  body[data-edit-mode="editing"] .er-mobile-bar {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  /* Tab labels and glyph compact slightly at 4 cells — at ~97.5px per
+   * cell on a 390px viewport, the existing 0.62rem mono caps and
+   * 1.5rem glyph still fit, but tightening padding gives the count
+   * badge breathing room. */
+  .er-mobile-bar .er-mobile-tab {
+    padding-inline: 0.25rem;
+  }
+  body[data-edit-mode="editing"] .er-mobile-bar .er-mobile-tab {
+    padding-inline: 0.4rem;
+  }
+
+  /* The desktop scrapbook drawer is `position: fixed bottom: 0
+   * z-index: 55`, which on phone hides behind the mobile bar
+   * (z-index 60). Its content lives on as the source-of-truth that
+   * the Scrapbook sheet slot clones from — but the drawer chrome
+   * itself shouldn't render. */
+  [data-review-ui="longform"] .er-scrapbook-drawer {
+    display: none !important;
+  }
+
+  /* Scrapbook tab — kraft glyph, kraft count badge to distinguish
+   * "context for the entry" from the red-pencil "marks operator left."
+   * Active tab still flips to red (consistent with other tabs). */
+  .er-mobile-tab--scrapbook .er-mobile-tab-glyph {
+    color: #8A7250;
+  }
+  .er-mobile-tab--scrapbook[aria-expanded="true"] .er-mobile-tab-glyph {
+    color: var(--er-red-pencil);
+  }
+  .er-mobile-tab-count--kraft {
+    background: #8A7250 !important;
+    color: var(--er-paper) !important;
   }
   .er-mobile-tab {
     display: flex;

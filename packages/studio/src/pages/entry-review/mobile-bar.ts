@@ -11,16 +11,20 @@
  *   - Review tabs: plugins/deskwork-studio/public/mockups/mobile-1-bottom-sheet.html
  *   - Editor tabs: plugins/deskwork-studio/public/mockups/editor-2-press-check-tabbar.html
  *
- * The bar carries FIVE tab buttons; CSS shows three at a time keyed
- * off `body[data-edit-mode="editing"]`:
- *   - Review mode: Outline · Notes · Actions
- *   - Edit mode:   Format  · Notes · Save
+ * The bar carries SIX tab buttons; CSS shows three or four at a time
+ * keyed off `body[data-edit-mode="editing"]`:
+ *   - Review mode: Outline · Notes · Scrapbook · Actions  (4-column grid)
+ *   - Edit mode:   Format  · Notes · Save                 (3-column grid)
  * The Notes tab is shared between modes (review notes the operator
  * leaves carry across into edit). The bar's data-mode attribute is
  * also flipped by the client so additional state-dependent styles
- * (Save dirty glow, etc.) can key off it.
+ * (Save dirty glow, etc.) can key off it. The Scrapbook tab uses a
+ * grid glyph (▦) and a kraft-tone count badge to distinguish it
+ * from the red-pencil Notes badge — folio is "context for the
+ * entry," not an action peer of decisions.
  *
- * The sheet has four content slots (outline / notes / actions / format).
+ * The sheet has five content slots (outline / notes / actions /
+ * scrapbook / format).
  * The client controller (`entry-review/mobile-sheet-bar.ts`) populates
  * each at first open. Slot sources:
  *   - outline: clone of `.er-outline-drawer-body`
@@ -51,6 +55,11 @@ export function renderMobileBar(): RawHtml {
         <span class="er-mobile-tab-glyph" aria-hidden="true">✎</span>
         <span class="er-mobile-tab-label">Notes</span>
         <span class="er-mobile-tab-count" data-notes-count hidden>0</span>
+      </button>
+      <button class="er-mobile-tab er-mobile-tab--review er-mobile-tab--scrapbook" data-mobile-sheet="scrapbook" type="button" aria-controls="er-mobile-sheet" aria-expanded="false">
+        <span class="er-mobile-tab-glyph" aria-hidden="true">▦</span>
+        <span class="er-mobile-tab-label">Scrapbook</span>
+        <span class="er-mobile-tab-count er-mobile-tab-count--kraft" data-scrapbook-count hidden>0</span>
       </button>
       <button class="er-mobile-tab er-mobile-tab--review" data-mobile-sheet="actions" type="button" aria-controls="er-mobile-sheet" aria-expanded="false">
         <span class="er-mobile-tab-glyph" aria-hidden="true">⊕</span>
@@ -111,6 +120,7 @@ export function renderMobileSheet(): RawHtml {
         <div class="er-mobile-sheet-slot" data-mobile-sheet-slot="outline" hidden></div>
         <div class="er-mobile-sheet-slot" data-mobile-sheet-slot="notes" hidden></div>
         <div class="er-mobile-sheet-slot" data-mobile-sheet-slot="actions" hidden></div>
+        <div class="er-mobile-sheet-slot er-mobile-sheet-slot--scrapbook" data-mobile-sheet-slot="scrapbook" hidden></div>
         <div class="er-mobile-sheet-slot er-mobile-sheet-slot--format" data-mobile-sheet-slot="format" hidden>${unsafe(renderFormatGrid())}</div>
       </div>
     </section>`);

@@ -29,14 +29,14 @@
  * Visual reference: /static/mockups/mobile-1-bottom-sheet.html
  */
 
-import { copyOrShowFallback } from '../clipboard.ts';
 import { bindFormatKeys } from './format-keys.ts';
+import { populateActionsSlot } from './mobile-actions-slot.ts';
 
 const MOBILE_QUERY = '(max-width: 48rem)';
 const FLASH_MS = 1100;
 const SLIDE_MS = 280;
 
-type SheetKey = 'outline' | 'notes' | 'actions' | 'format';
+type SheetKey = 'outline' | 'notes' | 'actions' | 'format' | 'scrapbook';
 
 interface SheetBarDeps {
   readonly entrySlug: string;
@@ -74,14 +74,16 @@ export function initMobileSheetBar(deps: SheetBarDeps): MobileSheetBarController
     notes: sheet.querySelector<HTMLElement>('[data-mobile-sheet-slot="notes"]'),
     actions: sheet.querySelector<HTMLElement>('[data-mobile-sheet-slot="actions"]'),
     format: sheet.querySelector<HTMLElement>('[data-mobile-sheet-slot="format"]'),
+    scrapbook: sheet.querySelector<HTMLElement>('[data-mobile-sheet-slot="scrapbook"]'),
   };
   const kicker = sheet.querySelector<HTMLElement>('[data-mobile-sheet-kicker]');
   const meta = sheet.querySelector<HTMLElement>('[data-mobile-sheet-meta]');
   const handle = sheet.querySelector<HTMLElement>('[data-mobile-sheet-handle]');
   const closeBtn = sheet.querySelector<HTMLButtonElement>('[data-mobile-sheet-close]');
   const notesCount = bar.querySelector<HTMLElement>('[data-notes-count]');
+  const scrapbookCount = bar.querySelector<HTMLElement>('[data-scrapbook-count]');
 
-  if (!slots.outline || !slots.notes || !slots.actions || !slots.format || !kicker || !meta) return noop;
+  if (!slots.outline || !slots.notes || !slots.actions || !slots.format || !slots.scrapbook || !kicker || !meta) return noop;
 
   // The notes slot is structured (on mobile) as:
   //   [composer, sidebar-empty, sidebar-list]
@@ -155,6 +157,9 @@ export function initMobileSheetBar(deps: SheetBarDeps): MobileSheetBarController
     } else if (key === 'format') {
       kicker!.textContent = 'Format · markdown';
       meta!.textContent = 'Tap to insert';
+    } else if (key === 'scrapbook') {
+      kicker!.textContent = '▦ Scrapbook · Folio';
+      meta!.textContent = scrapbookCountLabel();
     } else {
       kicker!.textContent = '⊕ Actions';
       meta!.textContent = '';
@@ -175,9 +180,30 @@ export function initMobileSheetBar(deps: SheetBarDeps): MobileSheetBarController
     }
     if (key === 'outline') refreshOutlineSlot();
     else if (key === 'notes') refreshNotesSlot();
-    else if (key === 'actions') populateActionsSlot();
+    else if (key === 'actions') populateActionsSlot(slots.actions!, { entrySlug: deps.entrySlug }, closeSheet);
     else if (key === 'format') populateFormatSlot();
+    else if (key === 'scrapbook') refreshScrapbookSlot();
     populatedSlots.add(key);
+  }
+
+  // The scrapbook desktop drawer (`.er-scrapbook-drawer-body`) is the
+  // server-rendered source of truth — it lists the entry's per-node
+  // scrapbook items with thumbnails, file names, sizes, etc. On phone
+  // the drawer itself is `display: none` (it lived at bottom: 0 z-index
+  // 55, which the mobile bar at z-index 60 obscured). We clone its
+  // children into the slot at first open + on every subsequent open
+  // so adds/deletes via the desktop UI surface in the mobile sheet too.
+  function refreshScrapbookSlot(): void {
+    if (!slots.scrapbook) return;
+    const source = document.querySelector<HTMLElement>('.er-scrapbook-drawer-body');
+    slots.scrapbook.innerHTML = '';
+    if (!source) {
+      slots.scrapbook.textContent = 'No scrapbook items for this entry.';
+      return;
+    }
+    for (const child of Array.from(source.children)) {
+      slots.scrapbook.appendChild(child.cloneNode(true) as HTMLElement);
+    }
   }
 
   // The format slot's grid is rendered server-side (mobile-bar.ts).
@@ -223,69 +249,6 @@ export function initMobileSheetBar(deps: SheetBarDeps): MobileSheetBarController
     // sheet that re-renders into the slot).
   }
 
-  function populateActionsSlot(): void {
-    if (!slots.actions) return;
-    slots.actions.innerHTML = '';
-
-    // Document section — local file actions distinct from state-machine
-    // verbs. Edit triggers the existing toggle-edit button (the strip's
-    // Edit affordance is `display: none` on phone post-mobile-rebuild,
-    // so this is the operator's only path into the editor at <48rem
-    // until/unless we add a more direct entry point).
-    const docSection = document.createElement('div');
-    docSection.className = 'er-mobile-action-section';
-    docSection.textContent = 'Document';
-    slots.actions.appendChild(docSection);
-
-    const editBtn = document.createElement('button');
-    editBtn.type = 'button';
-    editBtn.className = 'er-mobile-action er-mobile-action--edit';
-    editBtn.dataset.action = 'edit';
-    editBtn.innerHTML =
-      '<span class="er-mobile-action-glyph" aria-hidden="true">✎</span>' +
-      'Edit<span class="er-mobile-action-meta">Open editor</span>';
-    editBtn.addEventListener('click', () => {
-      const target = document.querySelector<HTMLButtonElement>('[data-action="toggle-edit"]');
-      target?.click();
-      closeSheet();
-    });
-    slots.actions.appendChild(editBtn);
-
-    const decisionSection = document.createElement('div');
-    decisionSection.className = 'er-mobile-action-section';
-    decisionSection.textContent = 'Decisions';
-    slots.actions.appendChild(decisionSection);
-
-    const actions: Array<{
-      key: 'approve' | 'iterate' | 'reject' | 'cancel';
-      label: string;
-      glyph: string;
-      meta: string;
-      verb: string;
-    }> = [
-      { key: 'approve', label: 'Approve',  glyph: '✓', meta: 'Stage advance', verb: 'approve' },
-      { key: 'iterate', label: 'Iterate',  glyph: '↻', meta: 'New version',   verb: 'iterate' },
-      { key: 'reject',  label: 'Reject',   glyph: '✕', meta: 'Send back',     verb: 'reject' },
-      { key: 'cancel',  label: 'Cancel',   glyph: '⊘', meta: 'Stop work',     verb: 'cancel' },
-    ];
-    for (const a of actions) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'er-mobile-action';
-      btn.dataset.action = a.key;
-      btn.innerHTML = `<span class="er-mobile-action-glyph" aria-hidden="true">${a.glyph}</span>${a.label}<span class="er-mobile-action-meta">${a.meta}</span>`;
-      btn.addEventListener('click', async () => {
-        const command = `/deskwork:${a.verb} ${deps.entrySlug}`;
-        await copyOrShowFallback(command, {
-          successMessage: `Copied — paste into a Claude Code chat to run \`${command}\`.`,
-          fallbackMessage: `Clipboard unavailable. Copy this command and paste it into a Claude Code chat: \`${command}\``,
-        });
-        closeSheet();
-      });
-      slots.actions.appendChild(btn);
-    }
-  }
-
   // ---- Counts -----------------------------------------------------------
 
   function noteCount(): number {
@@ -305,6 +268,16 @@ export function initMobileSheetBar(deps: SheetBarDeps): MobileSheetBarController
     if (links === 0) return '';
     return `${links} section${links === 1 ? '' : 's'}`;
   }
+  function scrapCount(): number {
+    const source = document.querySelector<HTMLElement>('.er-scrapbook-drawer-body');
+    if (!source) return 0;
+    return source.querySelectorAll('.scrap').length;
+  }
+  function scrapbookCountLabel(): string {
+    const n = scrapCount();
+    if (n === 0) return 'no items';
+    return `${n} item${n === 1 ? '' : 's'}`;
+  }
 
   function updateNotesCount(): void {
     if (!notesCount) return;
@@ -318,6 +291,21 @@ export function initMobileSheetBar(deps: SheetBarDeps): MobileSheetBarController
     }
     if (currentSheet === 'notes') {
       meta!.textContent = noteCountLabel();
+    }
+  }
+
+  function updateScrapbookCount(): void {
+    if (!scrapbookCount) return;
+    const n = scrapCount();
+    if (n === 0) {
+      scrapbookCount.hidden = true;
+      scrapbookCount.textContent = '0';
+    } else {
+      scrapbookCount.hidden = false;
+      scrapbookCount.textContent = String(n);
+    }
+    if (currentSheet === 'scrapbook') {
+      meta!.textContent = scrapbookCountLabel();
     }
   }
 
@@ -466,6 +454,23 @@ export function initMobileSheetBar(deps: SheetBarDeps): MobileSheetBarController
     obs.observe(source, { childList: true, subtree: true });
   }
   updateNotesCount();
+
+  // Same pattern for scrapbook items: the desktop drawer's body is the
+  // source of truth; we observe it for adds/deletes (e.g. operator
+  // uploads a file via the desktop drawer's drop zone) and refresh
+  // the badge + sheet content.
+  const scrapSource = document.querySelector<HTMLElement>('.er-scrapbook-drawer-body');
+  if (scrapSource) {
+    const obs = new MutationObserver(() => {
+      updateScrapbookCount();
+      if (currentSheet === 'scrapbook') {
+        populatedSlots.delete('scrapbook');
+        refreshScrapbookSlot();
+      }
+    });
+    obs.observe(scrapSource, { childList: true, subtree: true });
+  }
+  updateScrapbookCount();
 
   // Close the sheet on Escape (a11y).
   document.addEventListener('keydown', (e) => {
