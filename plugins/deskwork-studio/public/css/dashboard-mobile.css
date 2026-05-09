@@ -484,5 +484,25 @@ body[data-compose-sheet-open] .er-compose-fab {
   .er-stage-block [data-stage-section][data-collapsed] .er-calendar-row-wrap {
     display: none;
   }
+
+  /* Distribution placeholder — show only the tile on mobile; hide the
+   * section body (the "Reserved for shortform DistributionRecords"
+   * placeholder text). The tile is `is-empty + disabled`, so taps are
+   * no-ops. When DistributionRecords ship and the renderer starts
+   * emitting rows, this rule drops automatically because real rows
+   * live in `.er-calendar-row-wrap` (covered by the `[data-collapsed]`
+   * rule above), not `.er-empty`. */
+  .er-stage-block [data-stage-section="Distribution"] .er-section-head,
+  .er-stage-block [data-stage-section="Distribution"] .er-empty {
+    display: none;
+  }
+
+  /* Press queue — desktop-only surface (it's the right-rail stack on
+   * desktop using available real estate). On mobile the operator gets
+   * the same information via the per-stage "X in review" sub-counts on
+   * each stage tile, so the press queue is pure noise here. */
+  .er-press-queue {
+    display: none;
+  }
 }
 

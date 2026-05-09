@@ -193,22 +193,39 @@ export function renderStageSection(
 }
 
 /**
- * Render the reserved Distribution placeholder. Stays a separate
- * sibling of the stage sections — distribution records (shortform
- * cross-posts) are tracked under their own model and the dashboard
- * surfaces only a placeholder here until that integration lands.
+ * Render the reserved Distribution placeholder. Distribution isn't a
+ * pipeline stage in the formal sense (no entries flow through it; it
+ * lives under its own model when shortform cross-posts arrive), but on
+ * the mobile dashboard it renders as a stage tile alongside the rest
+ * so the operator's pipeline-shape scan stays uniform — see operator
+ * feedback on 2026-05-09. The tile is `is-empty` + `disabled` until
+ * DistributionRecords land in the data layer.
+ *
+ * On desktop, the existing section + heading + placeholder text render
+ * as before; the tile is `display: none` per dashboard-mobile.css.
  */
 export function renderDistributionPlaceholder(): RawHtml {
   return unsafe(html`
-    <section class="er-section" id="stage-distribution" data-stage-section="Distribution">
-      <h2 class="er-section-head">
-        <span>Distribution</span>
-        <span class="ornament">⌘</span>
-      </h2>
-      <div class="er-empty" style="padding: 1rem 0.25rem; font-size: 0.95rem;">
-        Reserved for shortform DistributionRecords — separate model.
-      </div>
-    </section>`);
+    <div class="er-stage-block" data-stage-block="Distribution">
+      <button class="er-stage-tile is-empty" type="button"
+        data-stage-tile="Distribution"
+        aria-expanded="false"
+        aria-controls="stage-distribution" disabled>
+        <span class="er-stage-tile-glyph" aria-hidden="true">⌘</span>
+        <span class="er-stage-tile-name">Distribution</span>
+        <span class="er-stage-tile-count"><span class="num">0</span></span>
+        <span class="er-stage-tile-chev" aria-hidden="true">›</span>
+      </button>
+      <section class="er-section" id="stage-distribution" data-stage-section="Distribution">
+        <h2 class="er-section-head">
+          <span>Distribution</span>
+          <span class="ornament">⌘</span>
+        </h2>
+        <div class="er-empty" style="padding: 1rem 0.25rem; font-size: 0.95rem;">
+          Reserved for shortform DistributionRecords — separate model.
+        </div>
+      </section>
+    </div>`);
 }
 
 function formatDate(iso: string): string {
