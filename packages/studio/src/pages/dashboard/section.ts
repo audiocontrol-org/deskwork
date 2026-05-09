@@ -13,7 +13,6 @@ import { html, unsafe, type RawHtml } from '../html.ts';
 import type { Entry, Stage } from '@deskwork/core/schema/entry';
 import {
   iterationForCurrentStage,
-  renderReviewStateBadge,
   renderRowActions,
 } from './affordances.ts';
 
@@ -81,25 +80,6 @@ export function renderRow(entry: Entry, index: number, defaultSite: string): Raw
 }
 
 /**
- * Count entries with an active reviewState (in-review, iterating, approved)
- * within a stage's bucket. The dashboard tile uses this as a sub-count to
- * surface "X in review" inline at the stage level.
- */
-function reviewActiveInBucket(entries: readonly Entry[]): number {
-  let n = 0;
-  for (const entry of entries) {
-    if (
-      entry.reviewState === 'in-review' ||
-      entry.reviewState === 'iterating' ||
-      entry.reviewState === 'approved'
-    ) {
-      n++;
-    }
-  }
-  return n;
-}
-
-/**
  * Render the stage tile (mobile-only collapsible head). Hidden on desktop
  * via dashboard-mobile.css; the existing `<h2 class="er-section-head">`
  * carries the head on desktop and is hidden at <=600px so the tile takes
@@ -108,14 +88,13 @@ function reviewActiveInBucket(entries: readonly Entry[]): number {
  * Empty stages render the same tile shape but with `is-empty` styling and
  * `disabled` so taps are no-ops (operator can still SEE the empty stage
  * in the pipeline shape — they just can't drill in to nothing).
+ *
+ * Review-state sub-counts (e.g. "5 · 3 in review") were removed in v0.19
+ * per operator: review state isn't user-facing data and is slated for
+ * backend removal; the tile shows total entry count only.
  */
-function renderStageTile(
-  stage: Stage,
-  count: number,
-  reviewCount: number,
-): RawHtml {
+function renderStageTile(stage: Stage, count: number): RawHtml {
   const isEmpty = count === 0;
-  const reviewLine = reviewCount > 0 ? ` · ${reviewCount} in review` : '';
   const classes = isEmpty ? 'er-stage-tile is-empty' : 'er-stage-tile';
   const disabledAttr = isEmpty ? ' disabled' : '';
   return unsafe(html`
@@ -125,7 +104,7 @@ function renderStageTile(
       aria-controls="stage-${stage.toLowerCase()}"${unsafe(disabledAttr)}>
       <span class="er-stage-tile-glyph" aria-hidden="true">${STAGE_ORNAMENTS[stage]}</span>
       <span class="er-stage-tile-name">${stage}</span>
-      <span class="er-stage-tile-count"><span class="num">${count}</span>${reviewLine}</span>
+      <span class="er-stage-tile-count"><span class="num">${count}</span></span>
       <span class="er-stage-tile-chev" aria-hidden="true">›</span>
     </button>`);
 }
@@ -156,8 +135,7 @@ export function renderStageSection(
   entries: readonly Entry[],
   defaultSite: string,
 ): RawHtml {
-  const reviewCount = reviewActiveInBucket(entries);
-  const tile = renderStageTile(stage, entries.length, reviewCount);
+  const tile = renderStageTile(stage, entries.length);
 
   if (entries.length === 0) {
     return unsafe(html`
@@ -237,22 +215,16 @@ function formatDate(iso: string): string {
 /**
  * Render the status column for one row.
  *
- * #243 — when the entry has no reviewState, render an EMPTY span (no
- * `<a>`, no em-dash placeholder, no stamp box). Operators were reading
- * the previous box-with-em-dash as a button-like action; the slug-link
- * in the row body already routes to the review surface, so the badge
- * slot only carries information when there's a real reviewState.
+ * Review state stamps (In review / Iterating / Approved) were removed in
+ * v0.19 per operator: review state isn't user-facing data and is slated
+ * for backend removal. The status column now always renders as an empty
+ * span; CSS Grid keeps sibling alignment intact.
  *
- * Grid alignment is preserved because CSS Grid auto-sizes columns from
- * the widest cell — empty cells leave their slot blank without breaking
- * sibling alignment.
+ * Originally (#243) this slot rendered the reviewState badge, with an
+ * empty span for entries lacking a state. Now both branches are empty.
  */
 function renderStatusCell(entry: Entry, reviewLink: string): RawHtml {
-  if (entry.reviewState === undefined) {
-    return unsafe('<span class="er-calendar-status" aria-hidden="true"></span>');
-  }
-  return unsafe(html`
-    <span class="er-calendar-status"><a href="${reviewLink}"
-      title="open the review surface for ${entry.slug}"
-      class="er-stamp-link">${renderReviewStateBadge(entry.reviewState)}</a></span>`);
+  void entry;
+  void reviewLink;
+  return unsafe('<span class="er-calendar-status" aria-hidden="true"></span>');
 }
