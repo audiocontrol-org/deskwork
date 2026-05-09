@@ -7,6 +7,7 @@
 
 import { copyOrShowFallback } from './clipboard.ts';
 import { initComposeChip } from './dashboard/compose-chip.ts';
+import { initStageTiles } from './dashboard/stage-tiles.ts';
 
 function siteFromButton(btn: HTMLButtonElement): string {
   const site = btn.dataset.site;
@@ -509,6 +510,7 @@ function init(): void {
   initIntakeForm();
   initLocaleDates();
   initComposeChip();
+  initStageTiles();
 }
 
 init();

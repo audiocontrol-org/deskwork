@@ -81,11 +81,73 @@ export function renderRow(entry: Entry, index: number, defaultSite: string): Raw
 }
 
 /**
+ * Count entries with an active reviewState (in-review, iterating, approved)
+ * within a stage's bucket. The dashboard tile uses this as a sub-count to
+ * surface "X in review" inline at the stage level.
+ */
+function reviewActiveInBucket(entries: readonly Entry[]): number {
+  let n = 0;
+  for (const entry of entries) {
+    if (
+      entry.reviewState === 'in-review' ||
+      entry.reviewState === 'iterating' ||
+      entry.reviewState === 'approved'
+    ) {
+      n++;
+    }
+  }
+  return n;
+}
+
+/**
+ * Render the stage tile (mobile-only collapsible head). Hidden on desktop
+ * via dashboard-mobile.css; the existing `<h2 class="er-section-head">`
+ * carries the head on desktop and is hidden at <=600px so the tile takes
+ * over.
+ *
+ * Empty stages render the same tile shape but with `is-empty` styling and
+ * `disabled` so taps are no-ops (operator can still SEE the empty stage
+ * in the pipeline shape — they just can't drill in to nothing).
+ */
+function renderStageTile(
+  stage: Stage,
+  count: number,
+  reviewCount: number,
+): RawHtml {
+  const isEmpty = count === 0;
+  const reviewLine = reviewCount > 0 ? ` · ${reviewCount} in review` : '';
+  const classes = isEmpty ? 'er-stage-tile is-empty' : 'er-stage-tile';
+  const disabledAttr = isEmpty ? ' disabled' : '';
+  return unsafe(html`
+    <button class="${classes}" type="button"
+      data-stage-tile="${stage}"
+      aria-expanded="false"
+      aria-controls="stage-${stage.toLowerCase()}"${unsafe(disabledAttr)}>
+      <span class="er-stage-tile-glyph" aria-hidden="true">${STAGE_ORNAMENTS[stage]}</span>
+      <span class="er-stage-tile-name">${stage}</span>
+      <span class="er-stage-tile-count"><span class="num">${count}</span>${reviewLine}</span>
+      <span class="er-stage-tile-chev" aria-hidden="true">›</span>
+    </button>`);
+}
+
+/**
  * Render one full stage section: heading + ornaments + count + rows.
  *
- * Empty stages render compact (just the heading, no placeholder body)
- * — keeps the operator's sense of pipeline shape without padding the
- * dashboard with multi-line empty placeholders for low-volume
+ * The output is wrapped in a `.er-stage-block` div that pairs a mobile-
+ * only stage tile (the collapsible head) with the existing section. On
+ * desktop, the tile is `display: none` and the section's `<h2>` head
+ * carries the heading as before. On mobile, the section's head is hidden
+ * and the tile is shown; tapping the tile toggles a `data-collapsed`
+ * attribute on the section that hides/shows its rows. Single-expand
+ * (tapping one tile collapses the others) is handled by
+ * `dashboard/stage-tiles.ts`.
+ *
+ * Empty stages still render their tile (so the pipeline shape is visible
+ * at-rest on phone) but the empty section body itself is hidden on mobile.
+ *
+ * Empty stages on desktop render compact (just the heading, no placeholder
+ * body) — keeps the operator's sense of pipeline shape without padding
+ * the dashboard with multi-line empty placeholders for low-volume
  * calendars (#112). The hover title still surfaces the stage's
  * "what to run next" hint when the operator points at the heading.
  */
@@ -94,31 +156,40 @@ export function renderStageSection(
   entries: readonly Entry[],
   defaultSite: string,
 ): RawHtml {
+  const reviewCount = reviewActiveInBucket(entries);
+  const tile = renderStageTile(stage, entries.length, reviewCount);
+
   if (entries.length === 0) {
     return unsafe(html`
-      <section class="er-section er-section--empty"
-        id="stage-${stage.toLowerCase()}" data-stage-section="${stage}"
-        data-empty-stage="${stage}">
-        <h2 class="er-section-head er-section-head--empty"
-          title="${STAGE_EMPTY_MESSAGES[stage]}">
-          <span>${stage}</span>
-          <span class="ornament">${STAGE_ORNAMENTS[stage]}</span>
-          <span class="count">№ 00</span>
-        </h2>
-      </section>`);
+      <div class="er-stage-block" data-stage-block="${stage}">
+        ${tile}
+        <section class="er-section er-section--empty"
+          id="stage-${stage.toLowerCase()}" data-stage-section="${stage}"
+          data-empty-stage="${stage}">
+          <h2 class="er-section-head er-section-head--empty"
+            title="${STAGE_EMPTY_MESSAGES[stage]}">
+            <span>${stage}</span>
+            <span class="ornament">${STAGE_ORNAMENTS[stage]}</span>
+            <span class="count">№ 00</span>
+          </h2>
+        </section>
+      </div>`);
   }
 
   const body = unsafe(entries.map((e, i) => renderRow(e, i, defaultSite).__raw).join(''));
 
   return unsafe(html`
-    <section class="er-section" id="stage-${stage.toLowerCase()}" data-stage-section="${stage}">
-      <h2 class="er-section-head">
-        <span>${stage}</span>
-        <span class="ornament">${STAGE_ORNAMENTS[stage]}</span>
-        <span class="count">№ ${entries.length}</span>
-      </h2>
-      ${body}
-    </section>`);
+    <div class="er-stage-block" data-stage-block="${stage}">
+      ${tile}
+      <section class="er-section" id="stage-${stage.toLowerCase()}" data-stage-section="${stage}">
+        <h2 class="er-section-head">
+          <span>${stage}</span>
+          <span class="ornament">${STAGE_ORNAMENTS[stage]}</span>
+          <span class="count">№ ${entries.length}</span>
+        </h2>
+        ${body}
+      </section>
+    </div>`);
 }
 
 /**

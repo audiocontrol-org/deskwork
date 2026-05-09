@@ -355,3 +355,134 @@ body[data-compose-sheet-open] .er-compose-fab {
     color: var(--er-stamp-green);
   }
 }
+
+/* ============================================================
+ *  4. Collapsible stage tiles (mobile only).
+ *
+ *  Each stage section is wrapped in a `.er-stage-block` containing a
+ *  `.er-stage-tile` (the mobile-only collapsible head) and the existing
+ *  `<section>`. On desktop the tile is hidden and the section's <h2>
+ *  carries the head as before. On mobile, the section's <h2> is hidden,
+ *  the tile takes over, and the section's row content is hidden when
+ *  `[data-collapsed]` is set on the section.
+ *
+ *  Empty stages still render their tile (so the operator sees the full
+ *  pipeline shape at-rest) but the empty-section <h2> is hidden via
+ *  `.er-section--empty` rule below.
+ *
+ *  Single-expand behavior — tap one tile to expand it, others auto-
+ *  collapse — lives in `dashboard/stage-tiles.ts`.
+ * ============================================================ */
+
+/* Default (desktop): tile is hidden, sections render as before */
+.er-stage-tile {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .er-stage-tile {
+    display: grid;
+    grid-template-columns: 1.6rem 1fr auto 1.4rem;
+    align-items: center;
+    column-gap: 0.55rem;
+    width: 100%;
+    border: none;
+    background: var(--er-paper);
+    border-bottom: 1px dashed var(--er-paper-3);
+    padding: 0.55rem 1rem;
+    cursor: pointer;
+    min-height: 44px;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    transition: background 120ms ease;
+  }
+  .er-stage-tile:active {
+    background: var(--er-paper-2);
+  }
+  .er-stage-tile:disabled {
+    cursor: default;
+  }
+
+  .er-stage-tile-glyph {
+    font-family: var(--er-font-display);
+    font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+    font-size: 1.25rem;
+    line-height: 1;
+    color: var(--er-red-pencil);
+    text-align: center;
+  }
+  .er-stage-tile-name {
+    font-family: var(--er-font-display);
+    font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 500;
+    font-size: 1rem;
+    line-height: 1.1;
+    color: var(--er-ink);
+  }
+  .er-stage-tile-count {
+    font-family: var(--er-font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+    color: var(--er-faded);
+    text-transform: uppercase;
+    text-align: right;
+  }
+  .er-stage-tile-count .num {
+    color: var(--er-ink);
+    font-weight: 500;
+  }
+  .er-stage-tile-chev {
+    font-family: var(--er-font-mono);
+    font-size: 0.95rem;
+    color: var(--er-red-pencil);
+    text-align: center;
+    line-height: 1;
+    transition: transform 200ms ease;
+  }
+
+  /* Empty tile — muted glyph/name/count, paper-3 chevron */
+  .er-stage-tile.is-empty .er-stage-tile-glyph,
+  .er-stage-tile.is-empty .er-stage-tile-name,
+  .er-stage-tile.is-empty .er-stage-tile-count .num {
+    color: var(--er-faded);
+  }
+  .er-stage-tile.is-empty .er-stage-tile-name {
+    font-style: italic;
+  }
+  .er-stage-tile.is-empty .er-stage-tile-chev {
+    color: var(--er-paper-3);
+  }
+
+  /* Expanded tile — paper-2 background, red name, rotated chevron */
+  .er-stage-tile[aria-expanded="true"] {
+    background: var(--er-paper-2);
+    border-bottom-color: var(--er-red-pencil);
+  }
+  .er-stage-tile[aria-expanded="true"] .er-stage-tile-name {
+    color: var(--er-red-pencil);
+  }
+  .er-stage-tile[aria-expanded="true"] .er-stage-tile-chev {
+    transform: rotate(90deg);
+  }
+
+  /* Hide the existing section head on mobile (the tile replaces it).
+   * Scoped to .er-stage-block so the Distribution placeholder section
+   * (rendered as a sibling, not in a stage-block) keeps its head. */
+  .er-stage-block .er-section .er-section-head {
+    display: none;
+  }
+
+  /* Empty stage's <section> body has no rows; hide it entirely on mobile
+   * (the empty tile carries the empty state). */
+  .er-stage-block .er-section--empty {
+    display: none;
+  }
+
+  /* Collapsed stage hides its row content. The tile stays visible above. */
+  .er-stage-block [data-stage-section][data-collapsed] .er-calendar-row-wrap {
+    display: none;
+  }
+}
+
