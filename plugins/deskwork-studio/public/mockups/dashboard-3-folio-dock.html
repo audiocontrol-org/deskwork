@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Dashboard mockup 3 · Folio dock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F5F1E8;
+    --paper-2: #ECE6D4;
+    --paper-3: #DFD7BF;
+    --kraft: #8A7250;
+    --kraft-2: #D9C8A2;
+    --kraft-paper: #EDE0C2;
+    --ink: #1A1614;
+    --faded: #8A7F70;
+    --faded-2: #C7BEAE;
+    --red: #B8362A;
+    --blue: #2A4B7C;
+    --green: #2E5D45;
+    --highlight: #FAEABF;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    --noise:
+      url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #2C2823;
+    background-image:
+      radial-gradient(circle at 30% 20%, rgba(184, 54, 42, 0.08), transparent 50%),
+      radial-gradient(circle at 70% 80%, rgba(42, 75, 124, 0.06), transparent 50%);
+    color: var(--ink);
+    font-family: var(--display);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem 4rem;
+  }
+  .meta {
+    color: #C7BEAE;
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 0.6rem;
+    text-align: center;
+  }
+  .meta a {
+    color: var(--paper);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(245, 241, 232, 0.4);
+  }
+  h1.demo-title {
+    color: var(--paper);
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 36, "wght" 500;
+    font-size: 1.6rem;
+    margin-bottom: 0.4rem;
+    text-align: center;
+  }
+  .demo-sub {
+    color: var(--faded-2);
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 1.6rem;
+    text-align: center;
+  }
+  .frames { display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center; }
+  .frame-wrap { display: flex; flex-direction: column; align-items: center; }
+  .caption {
+    color: #C7BEAE;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-top: 0.8rem;
+    text-align: center;
+    max-width: 410px;
+  }
+  .phone {
+    width: 410px;
+    height: 880px;
+    background: #050505;
+    border-radius: 50px;
+    padding: 12px;
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255,255,255,0.04);
+    position: relative;
+  }
+  .phone::before {
+    content: '';
+    position: absolute;
+    top: 22px; left: 50%;
+    transform: translateX(-50%);
+    width: 110px; height: 30px;
+    background: #000;
+    border-radius: 16px;
+    z-index: 100;
+  }
+  .screen {
+    width: 100%; height: 100%;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-radius: 38px;
+    overflow: hidden;
+    position: relative;
+    font-size: 17px;
+    line-height: 1.55;
+    color: var(--ink);
+  }
+  .ios-clock {
+    position: absolute; top: 28px; left: 32px;
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 0.95rem; font-weight: 600;
+    color: var(--ink); z-index: 110;
+  }
+  .ios-icons {
+    position: absolute; top: 30px; right: 32px;
+    color: var(--ink);
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 0.85rem; letter-spacing: 0.05em; z-index: 110;
+  }
+
+  /* ============================================================
+   *  Dashboard · folio dock
+   *  Card-stream primary (like #2). But a slim ~52px bottom dock
+   *  surfaces the cross-cutting affordances that don't fit a card:
+   *  the press-queue chip (kraft, opens a sheet), a "+ idea" chip,
+   *  and a Cancel/Done strip-position chip (#242 placeholder).
+   *  Scrolling keeps the dock visible — it never gets in the way
+   *  because it's HALF a tabbar.
+   * ============================================================ */
+
+  .strip {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 56px;
+    padding: 56px 1rem 0;
+    background: var(--paper);
+    border-bottom: 1px solid var(--red);
+    z-index: 50;
+    display: flex; align-items: center; gap: 0.6rem;
+  }
+  .strip-mark {
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 600;
+    font-size: 1rem;
+    color: var(--ink);
+    transform: rotate(-1.5deg);
+    border: 2px solid var(--ink);
+    padding: 0.05rem 0.45rem;
+    background: var(--paper);
+  }
+  .strip-mark em { color: var(--red); font-style: italic; }
+  .strip-vol {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--faded);
+  }
+  .strip-help {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink);
+    text-decoration: none;
+    padding: 0.28rem 0.5rem;
+    border: 1px solid var(--paper-3);
+    border-radius: 2px;
+  }
+
+  .filterbar {
+    position: absolute;
+    top: 56px; left: 0; right: 0;
+    height: 40px;
+    padding: 0.4rem 0.7rem;
+    background: var(--paper-2);
+    border-bottom: 1px solid var(--paper-3);
+    z-index: 49;
+    display: flex; align-items: center; gap: 0.4rem;
+    overflow-x: auto;
+  }
+  .filterbar::-webkit-scrollbar { display: none; }
+  .findbox {
+    flex-shrink: 0;
+    background: var(--paper);
+    border: 1px solid var(--paper-3);
+    border-radius: 2px;
+    padding: 0.25rem 0.5rem;
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.06em;
+    color: var(--faded);
+    min-width: 7.5rem;
+    display: flex; align-items: center; gap: 0.3rem;
+  }
+  .findbox .icon { color: var(--red); }
+  .chip {
+    flex-shrink: 0;
+    border: 1px solid var(--paper-3);
+    background: var(--paper);
+    border-radius: 999px;
+    padding: 0.22rem 0.6rem;
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faded);
+    cursor: pointer;
+  }
+  .chip.active {
+    background: var(--ink);
+    color: var(--paper);
+    border-color: var(--ink);
+  }
+
+  .stream {
+    position: absolute;
+    top: 96px; left: 0; right: 0; bottom: 52px;
+    overflow-y: auto;
+    padding: 0.7rem 0.85rem 1.5rem;
+  }
+
+  .stream-divider {
+    display: flex; align-items: baseline;
+    gap: 0.5rem;
+    margin: 1.1rem 0 0.55rem;
+  }
+  .stream-divider:first-child { margin-top: 0.2rem; }
+  .stream-divider .label {
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+    font-size: 1.1rem;
+    color: var(--ink);
+  }
+  .stream-divider .label em { color: var(--red); font-style: italic; }
+  .stream-divider .meta {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--faded);
+  }
+  .stream-divider .rule {
+    flex: 1;
+    border-bottom: 1px solid var(--red);
+    margin-bottom: 0.35rem;
+  }
+
+  .card {
+    background: var(--paper);
+    border: 1px solid var(--paper-3);
+    border-radius: 2px;
+    margin-bottom: 0.65rem;
+    padding: 0.7rem 0.85rem 0.7rem 0.95rem;
+    box-shadow: 0 1px 0 rgba(26,22,20,0.04), 0 6px 18px -8px rgba(26,22,20,0.10);
+    position: relative;
+  }
+  .card.in-review  { border-left: 3px solid var(--red); }
+  .card.iterating  { border-left: 3px solid var(--blue); }
+  .card.approved   { border-left: 3px solid var(--green); }
+
+  .card-kicker {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--red);
+    display: flex; align-items: baseline; gap: 0.5rem;
+    margin-bottom: 0.25rem;
+  }
+  .card-kicker .glyph {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 1rem;
+    color: var(--red);
+    line-height: 1;
+  }
+  .card-kicker .at {
+    color: var(--faded);
+    margin-left: auto;
+    letter-spacing: 0.06em;
+  }
+
+  .card-slug {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--ink);
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    line-height: 1.25;
+  }
+  .card-slug a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--paper-3); }
+  .card-title {
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+    font-size: 1.05rem;
+    line-height: 1.2;
+    margin: 0.18rem 0 0.45rem;
+  }
+  .card-meta {
+    display: flex; align-items: center; gap: 0.5rem;
+    margin-bottom: 0.55rem;
+    flex-wrap: wrap;
+  }
+  .stamp {
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 14, "wght" 600;
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border: 2px solid currentColor;
+    padding: 0.04rem 0.4rem;
+    transform: rotate(-1.2deg);
+    background: var(--paper);
+    line-height: 1.2;
+    flex-shrink: 0;
+  }
+  .stamp.review { color: var(--red); }
+  .stamp.iterating { color: var(--blue); }
+  .stamp.approved { color: var(--green); }
+  .iter-pip {
+    font-family: var(--mono);
+    font-size: 0.55rem;
+    letter-spacing: 0.06em;
+    color: var(--faded);
+    text-transform: uppercase;
+  }
+
+  .card-foot {
+    display: flex; gap: 0.35rem;
+    flex-wrap: wrap;
+    padding-top: 0.5rem;
+    border-top: 1px dashed var(--paper-3);
+  }
+  .act {
+    flex-shrink: 0;
+    border: 1px solid var(--paper-3);
+    background: var(--paper);
+    border-radius: 2px;
+    padding: 0.22rem 0.5rem;
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink);
+    text-decoration: none;
+    cursor: pointer;
+    line-height: 1.4;
+  }
+  .act.approve { color: var(--green); border-color: var(--green); }
+  .act.iterate { color: var(--blue); border-color: var(--blue); }
+  .act.cancel  { color: var(--faded); }
+  .act.scrap   {
+    color: var(--kraft);
+    border-color: var(--kraft-2);
+    background: var(--kraft-paper);
+    margin-left: auto;
+  }
+
+  /* ============================================================
+   *  The dock — slim 52px (vs. tabbar's 64px), purpose-built.
+   *  Houses cross-cutting affordances: + new idea, press queue
+   *  badge, and Cancel/Done (#242 placeholder).
+   *  Visually distinguished from a tabbar by NOT having
+   *  evenly-spaced peer slots — it has 3 chips of different shapes.
+   * ============================================================ */
+  .dock {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 52px;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-top: 1px solid var(--red);
+    box-shadow: 0 -2px 14px rgba(26,22,20,0.05);
+    display: flex; align-items: center;
+    padding: 0 0.65rem;
+    gap: 0.5rem;
+    z-index: 60;
+  }
+  .dock-chip {
+    border: 1px solid var(--paper-3);
+    background: var(--paper);
+    border-radius: 2px;
+    padding: 0.32rem 0.6rem;
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink);
+    text-decoration: none;
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    line-height: 1.4;
+  }
+  .dock-chip .glyph {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 1.05rem;
+    line-height: 1;
+  }
+  .dock-chip.new {
+    color: var(--red);
+    border-color: var(--red);
+  }
+  .dock-chip.press {
+    color: var(--kraft);
+    border-color: var(--kraft-2);
+    background: var(--kraft-paper);
+    flex: 1;
+    justify-content: center;
+  }
+  .dock-chip.press .glyph { color: var(--kraft); }
+  .dock-chip.press .count {
+    background: var(--kraft);
+    color: var(--paper);
+    font-size: 0.55rem;
+    line-height: 1;
+    padding: 0.18rem 0.32rem;
+    border-radius: 8px;
+    letter-spacing: 0.04em;
+    margin-left: 0.25rem;
+  }
+  .dock-chip.cancel {
+    color: var(--faded);
+  }
+
+  /* Sheet — slides up from bottom over the dock when "press" tapped */
+  .sheet {
+    position: absolute;
+    left: 0; right: 0; bottom: 52px;
+    height: 60%;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-top: 1px solid var(--kraft);
+    box-shadow: 0 -16px 40px rgba(26,22,20,0.18);
+    border-radius: 24px 24px 0 0;
+    z-index: 70;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .sheet-handle {
+    align-self: center;
+    width: 44px;
+    height: 5px;
+    background: var(--paper-3);
+    border-radius: 4px;
+    margin: 0.55rem 0 0.7rem;
+  }
+  .sheet-head {
+    padding: 0 1.2rem 0.7rem;
+    border-bottom: 1px solid var(--kraft);
+    display: flex; align-items: baseline; gap: 0.6rem;
+  }
+  .sheet-kicker {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--kraft);
+  }
+  .sheet-meta {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+    color: var(--faded);
+    margin-left: auto;
+  }
+  .sheet-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.6rem 1rem 1.2rem;
+  }
+
+  /* press-queue items — tight rows */
+  .pq-row {
+    background: var(--paper);
+    border: 1px solid var(--paper-3);
+    border-left: 3px solid var(--kraft);
+    border-radius: 2px;
+    padding: 0.55rem 0.7rem;
+    margin-bottom: 0.5rem;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.45rem 0.55rem;
+  }
+  .pq-row .pq-slug {
+    grid-column: 1; grid-row: 1;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--ink);
+    word-break: break-word;
+  }
+  .pq-row .pq-channels {
+    grid-column: 1 / -1; grid-row: 2;
+    display: flex; gap: 0.3rem; flex-wrap: wrap;
+  }
+  .pq-row .pq-act {
+    grid-column: 2; grid-row: 1;
+  }
+  .channel {
+    display: inline-flex; align-items: center; gap: 0.25rem;
+    font-family: var(--mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--kraft);
+    background: var(--paper);
+    border: 1px solid var(--kraft-2);
+    border-radius: 999px;
+    padding: 0.1rem 0.5rem;
+  }
+  .channel.posted { color: var(--green); border-color: var(--green); }
+  .channel.todo   { color: var(--red); border-color: var(--red); }
+
+  .scrim {
+    position: absolute;
+    top: 96px; left: 0; right: 0;
+    bottom: calc(52px + 60%);
+    background: linear-gradient(to bottom, transparent, rgba(245,241,232,0.85));
+    pointer-events: none;
+    z-index: 65;
+  }
+</style>
+</head>
+<body>
+
+<div class="meta"><a href="./index.html">← all directions</a></div>
+<h1 class="demo-title">Dashboard 3 · Folio dock.</h1>
+<div class="demo-sub">Card stream + 52px dock — hybrid · press-queue stays one tap away</div>
+
+<div class="frames">
+
+  <!-- Frame A: card stream + dock at rest -->
+  <div class="frame-wrap">
+    <div class="phone">
+      <div class="ios-clock">9:41</div>
+      <div class="ios-icons">·· ◎ ▮▮</div>
+      <div class="screen">
+
+        <div class="strip">
+          <span class="strip-mark"><em>Press-</em>Check</span>
+          <span class="strip-vol">Vol. 01 · № 12</span>
+          <a class="strip-help" href="#">Help</a>
+        </div>
+
+        <div class="filterbar">
+          <div class="findbox"><span class="icon">⌕</span> slug, title…</div>
+          <button class="chip active">All</button>
+          <button class="chip">Drafting</button>
+          <button class="chip">Final</button>
+          <button class="chip">Published</button>
+        </div>
+
+        <div class="stream">
+
+          <div class="stream-divider">
+            <span class="label"><em>Needs</em> your attention.</span>
+            <span class="meta">3</span>
+            <span class="rule"></span>
+          </div>
+
+          <article class="card in-review">
+            <div class="card-kicker">
+              <span class="glyph">✎</span>
+              <span>Drafting</span>
+              <span class="at">5m ago</span>
+            </div>
+            <div class="card-slug"><a href="#">post-release-acceptance-design</a></div>
+            <div class="card-title">Post-release customer acceptance playbook.</div>
+            <div class="card-meta">
+              <span class="stamp review">In review</span>
+              <span class="iter-pip">it. 02</span>
+            </div>
+            <div class="card-foot">
+              <a class="act" href="#">open →</a>
+              <button class="act approve">approve →</button>
+              <button class="act cancel">cancel ⊘</button>
+              <a class="act scrap" href="#">▦ 4</a>
+            </div>
+          </article>
+
+          <article class="card iterating">
+            <div class="card-kicker">
+              <span class="glyph">✎</span>
+              <span>Drafting</span>
+              <span class="at">12m ago</span>
+            </div>
+            <div class="card-slug"><a href="#">release-skill-design</a></div>
+            <div class="card-title">Release skill design.</div>
+            <div class="card-meta">
+              <span class="stamp iterating">Iterating</span>
+              <span class="iter-pip">it. 03</span>
+            </div>
+            <div class="card-foot">
+              <a class="act" href="#">open →</a>
+              <button class="act iterate">iterate →</button>
+              <a class="act scrap" href="#">▦ 2</a>
+            </div>
+          </article>
+
+          <div class="stream-divider">
+            <span class="label">In flight.</span>
+            <span class="meta">5</span>
+            <span class="rule"></span>
+          </div>
+
+          <article class="card">
+            <div class="card-kicker">
+              <span class="glyph">§</span>
+              <span>Planned</span>
+              <span class="at">3d ago</span>
+            </div>
+            <div class="card-slug"><a href="#">deskwork-plugin/issue-158-ux-audit</a></div>
+            <div class="card-title">Issue 158 · UX audit.</div>
+            <div class="card-foot">
+              <a class="act" href="#">open →</a>
+              <button class="act approve">approve →</button>
+              <button class="act cancel">cancel ⊘</button>
+              <a class="act scrap" href="#">▦ 0</a>
+            </div>
+          </article>
+
+          <article class="card">
+            <div class="card-kicker">
+              <span class="glyph">⊕</span>
+              <span>Final</span>
+              <span class="at">just now</span>
+            </div>
+            <div class="card-slug"><a href="#">studio-mobile-first</a></div>
+            <div class="card-title">Studio mobile-first.</div>
+            <div class="card-meta">
+              <span class="stamp approved">Approved</span>
+            </div>
+            <div class="card-foot">
+              <a class="act" href="#">open →</a>
+              <a class="act scrap" href="#">▦ 1</a>
+            </div>
+          </article>
+
+        </div>
+
+        <div class="dock">
+          <a class="dock-chip new" href="#"><span class="glyph">+</span>New idea</a>
+          <button class="dock-chip press">
+            <span class="glyph">▦</span>
+            Press queue
+            <span class="count">3</span>
+          </button>
+          <a class="dock-chip cancel" href="#">Done</a>
+        </div>
+
+      </div>
+    </div>
+    <div class="caption">A · stream + 52px dock at rest · ⊕ New · ▦ Press queue (kraft) · Done — three chips of different shapes (NOT evenly-spaced peers — that distinguishes it from a tabbar)</div>
+  </div>
+
+  <!-- Frame B: press queue sheet open -->
+  <div class="frame-wrap">
+    <div class="phone">
+      <div class="ios-clock">9:41</div>
+      <div class="ios-icons">·· ◎ ▮▮</div>
+      <div class="screen">
+
+        <div class="strip">
+          <span class="strip-mark"><em>Press-</em>Check</span>
+          <span class="strip-vol">Vol. 01 · № 12</span>
+          <a class="strip-help" href="#">Help</a>
+        </div>
+
+        <div class="filterbar">
+          <div class="findbox"><span class="icon">⌕</span> slug, title…</div>
+          <button class="chip active">All</button>
+          <button class="chip">Drafting</button>
+          <button class="chip">Final</button>
+          <button class="chip">Published</button>
+        </div>
+
+        <div class="stream">
+          <article class="card in-review">
+            <div class="card-kicker">
+              <span class="glyph">✎</span>
+              <span>Drafting</span>
+              <span class="at">5m ago</span>
+            </div>
+            <div class="card-slug">post-release-acceptance-design</div>
+            <div class="card-title">Post-release customer acceptance playbook.</div>
+            <div class="card-meta">
+              <span class="stamp review">In review</span>
+            </div>
+          </article>
+        </div>
+
+        <div class="scrim"></div>
+
+        <div class="sheet">
+          <div class="sheet-handle"></div>
+          <div class="sheet-head">
+            <span class="sheet-kicker">▦ Press queue · 3 in flight</span>
+            <span class="sheet-meta">tap a row to open</span>
+          </div>
+          <div class="sheet-body">
+
+            <article class="pq-row">
+              <div class="pq-slug">v018-mobile-editor</div>
+              <a class="act" href="#">open →</a>
+              <div class="pq-channels">
+                <span class="channel">LinkedIn</span>
+                <span class="channel todo">YouTube</span>
+                <span class="channel posted">Reddit · posted</span>
+              </div>
+            </article>
+
+            <article class="pq-row">
+              <div class="pq-slug">v017-mobile-review</div>
+              <a class="act" href="#">open →</a>
+              <div class="pq-channels">
+                <span class="channel posted">LinkedIn · posted</span>
+                <span class="channel posted">Reddit · posted</span>
+                <span class="channel">Instagram</span>
+              </div>
+            </article>
+
+            <article class="pq-row">
+              <div class="pq-slug">deskwork-plugin/issue-158-ux-audit</div>
+              <a class="act" href="#">open →</a>
+              <div class="pq-channels">
+                <span class="channel todo">LinkedIn</span>
+                <span class="channel todo">Reddit</span>
+              </div>
+            </article>
+
+          </div>
+        </div>
+
+        <div class="dock">
+          <a class="dock-chip new" href="#"><span class="glyph">+</span>New idea</a>
+          <button class="dock-chip press" style="background: var(--kraft); color: var(--paper); border-color: var(--kraft);">
+            <span class="glyph" style="color: var(--paper);">▦</span>
+            Press queue
+            <span class="count" style="background: var(--paper); color: var(--kraft);">3</span>
+          </button>
+          <a class="dock-chip cancel" href="#">Done</a>
+        </div>
+
+      </div>
+    </div>
+    <div class="caption">B · press-queue sheet open · 60% height · per-channel chips (LinkedIn, Reddit, YouTube, Instagram) · posted-green vs todo-red · dock chip flips kraft-filled</div>
+  </div>
+
+</div>
+
+<div style="margin-top: 2.5rem; max-width: 720px; padding: 0 1rem; color: #C7BEAE; font-family: var(--display); font-size: 0.95rem; line-height: 1.6;">
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">Pattern</span><strong style="color: var(--paper); font-style: italic; font-weight: 500;">A hybrid: card-stream as primary, with a 52px dock for cross-cutting affordances.</strong> The dock is intentionally HALF the height of a tabbar — and it has three chips of different shapes (red <em style="color: var(--paper);">+ New idea</em>, kraft-filled <em style="color: var(--paper);">▦ Press queue</em> with badge, faded <em style="color: var(--paper);">Done</em>). That visual asymmetry signals "this is NOT a tabbar" — it's a strip of cross-cutting actions, which solves the entry-review continuity problem without conflating a list page with a tabbed page.</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">Why a dock and not a tabbar</span>The dashboard isn't navigated by switching tabs — it's read as a stream and acted-on per-card. A tabbar would force the operator to context-switch between list-of-things and queue-of-channels, a peer relationship that <em style="color: var(--paper);">doesn't actually exist</em> (the press queue is data ABOUT certain entries, not a peer surface to the entry list). The dock surfaces it as a chip — same one-tap reach as a tab, but visually accurate ("this is something on the side, not a sibling page").</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">+ New idea</span>Red-pencil chip in the dock surfaces an action the operator does often but couldn't easily reach in #2 (which had no chrome at the bottom). One-tap "/deskwork:add" — clipboard-copy of the slash command, per THESIS Consequence 2. The skill does the work; the dock just routes intent.</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">Done chip</span>Reserves the slot for #242's cross-cutting Cancel/Done affordance (Phase 4 work). On the dashboard the Done chip is a no-op (operator dismisses to ... what, the studio index?), but the slot exists so the visual rhythm of "always a Done chip on the right" carries across surfaces. Phase 4 will wire it.</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">Press queue sheet</span>Per-channel chips (LinkedIn / Reddit / YouTube / Instagram), <em style="color: var(--paper);">posted</em> green and <em style="color: var(--paper);">todo</em> red, mirroring the existing distribution-matrix vocabulary. The sheet is 60% — same as the review surface's notes sheet — for muscle-memory reasons. Open a card from the sheet → goes to the entry's review surface where the operator runs <em style="color: var(--paper);">/deskwork:distribute</em> per channel.</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">Strong</span>Best of both. The card-stream's directness; the entry-review's discoverable affordances at the bottom. The dock's asymmetry honestly represents the dashboard's nature: the page IS the list, plus a few cross-cutting verbs. Press queue stays one tap away without taking 33% of the chrome budget. Cancel/Done slot is forward-compatible with #242 without needing a re-design.</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">Weak</span>Two chrome-bottom patterns to remember (entry-review's 64px tabbar vs. dashboard's 52px dock). The 12px height delta is intentional but adds two CSS surfaces. The "+ New idea" chip's exact placement might want operator opinion — left-anchored is reachable; alternatives (right-anchored, dock-center) trade reach for visual balance with the Press chip. The dock requires a second mental model (chip-strip vs. tabbar) which is a small cognitive cost.</p>
+</div>
+
+</body>
+</html>

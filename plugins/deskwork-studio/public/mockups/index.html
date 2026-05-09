@@ -186,6 +186,41 @@ Two phone-shaped surfaces, two design problems. The <em>review surface</em> ship
   </ul>
 </div>
 
+<h2>Dashboard mobile-first · three&nbsp;directions <span style="font-family: var(--mono); font-size: 0.55rem; letter-spacing: 0.18em; color: var(--blue); border: 1px solid var(--blue); padding: 0.16rem 0.45rem; border-radius: 2px; vertical-align: 0.25em; margin-left: 0.5rem;">Active</span></h2>
+
+<p>The dashboard (<code style="font-family:var(--mono);font-size:0.85em">/dev/editorial-studio</code>) is the third phone-shaped surface to redesign — currently a desktop-first calendar table that produces a ~1500px masthead preamble and rows that collapse to one-word-per-line at 390px. Phase 1 of the <em>studio-mobile-first</em> feature closes <a href="https://github.com/audiocontrol-org/issues/237" style="color: var(--red);">#237</a> (row collapse), <a href="https://github.com/audiocontrol-org/issues/238" style="color: var(--red);">#238</a> (masthead preamble), and <a href="https://github.com/audiocontrol-org/issues/243" style="color: var(--red);">#243</a> (mystery em-dash for missing reviewState). The three directions below honor the press-check vocabulary already shipped on entry-review and editor — and propose three different relationships between "list of pipeline entries" and "cross-cutting affordances."</p>
+
+<div class="grid">
+
+  <article class="card">
+    <span class="num">Dashboard 1</span>
+    <h3>Press tabs</h3>
+    <p class="summary">Same 64px bottom-tab-bar idiom as the review surface, but operating at the calendar level. Three tabs swap which slice of the calendar shows: <em>Pipeline</em> (full stage list, the home tab), <em>Press</em> (focused queue of in-review / iterating / approved entries), <em>Folio</em> (cross-cutting scrapbook overview). Hero strip is 56px (was ~1500px). Each row is a 2-column stacked grid: row-num + content, with slug, title, and action chips as rows in the content column.</p>
+    <p class="pros"><span class="label">Strong</span> Direct continuity with entry-review's chrome. Press-queue gets a dedicated tab (not stacked-below-pipeline like desktop). Predictable; muscle memory transfers.</p>
+    <p class="cons"><span class="label">Weak</span> Folio tab is the soft spot — minor surface that might be better used elsewhere. Press tab conflates in-review / iterating which are different operator obligations.</p>
+    <a class="open" href="./dashboard-1-press-tabs.html">Open mockup →</a>
+  </article>
+
+  <article class="card">
+    <span class="num">Dashboard 2</span>
+    <h3>Card stream</h3>
+    <p class="summary">No bottom-tab-bar at all. The dashboard is one continuous magazine-style stream of cards, ordered <em>"Needs your attention" → "In flight" → "Final" → "Shipped" → "Blocked."</em> Each card carries its own stage information (kicker glyph + label + relative time) so the operator never asks "what stage is this in." Press-queue cards interleave into the stream with a kraft-toned background — they're a kind of card, not a peer surface.</p>
+    <p class="pros"><span class="label">Strong</span> Most direct manipulation. The page IS the list. Stream order encodes priority directly. Full bottom of viewport is content — no chrome to dodge with the thumb.</p>
+    <p class="cons"><span class="label">Weak</span> Less continuity with entry-review's tabbar idiom. Filter-by-stage now lives entirely in the chip strip (was previously two affordances: tabs + sections). Card height on long titles can drop visible-card count.</p>
+    <a class="open" href="./dashboard-2-card-stream.html">Open mockup →</a>
+  </article>
+
+  <article class="card">
+    <span class="num">Dashboard 3</span>
+    <h3>Folio dock</h3>
+    <p class="summary">Hybrid: card-stream as primary (like #2), with a slim 52px <em>dock</em> at the bottom — half the height of a tabbar, with three chips of different shapes (red <em>+ New idea</em>, kraft-filled <em>▦ Press queue</em> with badge, faded <em>Done</em>). The asymmetry signals "this is NOT a tabbar — it's a strip of cross-cutting actions." Press queue stays one tap away (opens a sheet with per-channel chips); the Done slot reserves room for #242's cross-cutting Cancel affordance (Phase 4).</p>
+    <p class="pros"><span class="label">Strong</span> Best of both. Card-stream's directness + entry-review's discoverable bottom affordances. Honestly represents the dashboard's nature: list page + a few cross-cutting verbs. Forward-compatible with #242.</p>
+    <p class="cons"><span class="label">Weak</span> Two chrome-bottom patterns to remember (review surface's 64px tabbar vs. dashboard's 52px dock). The 12px height delta is intentional but adds two CSS surfaces. Operator has to learn the chip-strip-not-tabbar distinction.</p>
+    <a class="open" href="./dashboard-3-folio-dock.html">Open mockup →</a>
+  </article>
+
+</div>
+
 <h2>Review surface · scrapbook follow-up <span style="font-family: var(--mono); font-size: 0.55rem; letter-spacing: 0.18em; color: var(--blue); border: 1px solid var(--blue); padding: 0.16rem 0.45rem; border-radius: 2px; vertical-align: 0.25em; margin-left: 0.5rem;">Active</span></h2>
 
 <p>The shipped mobile review surface (Mockup 1, the bottom tab bar) has no affordance to open the scrapbook — the desktop drawer is hidden behind the fixed 64px bar on phone widths. Three directions for placement, each honoring the press-check vocabulary already shipped. Edit mode is unaffected (operator is writing, not browsing assets).</p>
