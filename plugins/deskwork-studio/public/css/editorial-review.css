@@ -4041,9 +4041,26 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
     z-index: auto !important;
     margin: 0 0 var(--er-space-3);
   }
-  /* Composer head + textarea sized for thumb input. */
-  .er-mobile-sheet-slot[data-mobile-sheet-slot="notes"] [data-comment-composer] textarea {
-    font-size: 16px; /* prevents iOS auto-zoom on focus */
+
+  /* iOS Safari zooms the layout viewport when a text input with
+   * font-size < 16px receives focus — that zoom then exposes any
+   * sub-pixel horizontal overflow as a "slosh" gesture, fighting the
+   * operator's vertical scroll. Force every focusable form input on
+   * the review surface to ≥16px at phone widths. Covers:
+   *   - composer textarea + category <select>
+   *   - inline edit form textarea (.er-marginalia-edit-textarea) +
+   *     its category <select>
+   *   - any future input the review surface adds
+   * Scoped under [data-review-ui] so host-site form rendering is
+   * unaffected. */
+  [data-review-ui] textarea,
+  [data-review-ui] input[type="text"],
+  [data-review-ui] input[type="search"],
+  [data-review-ui] input[type="email"],
+  [data-review-ui] input[type="url"],
+  [data-review-ui] input:not([type]),
+  [data-review-ui] select {
+    font-size: 16px !important;
   }
 
   /* Article-body marks gain a subtle flash when the operator scrolls to
