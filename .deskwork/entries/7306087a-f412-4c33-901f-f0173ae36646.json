@@ -6,10 +6,10 @@
   "source": "manual",
   "currentStage": "Drafting",
   "iterationByStage": {
-    "Drafting": 1
+    "Drafting": 2
   },
+  "reviewState": "in-review",
   "artifactPath": "DESKWORK-STATE-MACHINE.md",
   "createdAt": "2026-05-09T21:44:02.206Z",
-  "updatedAt": "2026-05-09T22:22:29.410Z",
-  "reviewState": "in-review"
+  "updatedAt": "2026-05-09T22:32:30.691Z"
 }

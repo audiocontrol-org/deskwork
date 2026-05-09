@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-09T22:30:27.880Z",
+  "entryId": "7306087a-f412-4c33-901f-f0173ae36646",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "7306087a-f412-4c33-901f-f0173ae36646",
+    "version": 1,
+    "range": {
+      "start": 2977,
+      "end": 2986
+    },
+    "text": "I think the rules we’ve established for items entering the published stage demand we rethink our versioning system for objects under management. There are two distinct notions of “version” at play. There is the version that gets incremented on each edit and iteration. Then, there’s the public version of the object that gets assigned on transition to published stage. That version must iterate when we want to make updates to a published object.",
+    "category": "other",
+    "anchor": "Published",
+    "id": "acfec3b7-a3a0-41ee-b891-6cc8a903a9c8",
+    "createdAt": "2026-05-09T22:30:27.880Z"
+  }
+}

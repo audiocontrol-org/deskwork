@@ -56,7 +56,7 @@ There is no "review state." There is no "in review" state. There is no "iteratin
 | **Outlining** | Outline drafted; structural review | `outline.md` |
 | **Drafting** | Body of the entry being written | `draft.md` (or final filename) |
 | **Final** | Content is locked — ready to publish, no further edits or iterations allowed in this stage. Approve forward to Published; induct backward to a previous stage to unlock for editing. | (same file as Drafting, frozen) |
-| **Published** | Terminal stage. Publicly committed and immutable, like an npm publish — the version is locked and visible to the world, no take-backs. Can be deleted (recall) but not modified. To revise: create a new version and induct it into a non-terminal stage; the published version stays as it was. The published item's filesystem disposition is NOT part of the semantics — what matters is that it's been publicly committed. | (immutable; location is not part of the contract) |
+| **Published** | Terminal stage. Publicly committed and immutable, like an npm publish — the version is locked and visible to the world, no take-backs. Can be deleted (recall) but not modified. Each transition to Published assigns a new **public version** (see § Versioning); to revise, bump the public version, induct the working copy into a non-terminal stage, complete the work, and approve forward to Published again — the prior public version stays as-is in the public record. The published item's filesystem disposition is NOT part of the semantics — what matters is the public commitment. | (immutable; location is not part of the contract; the public version IS the contract) |
 
 ### The two off-pipeline stages
 
@@ -88,8 +88,8 @@ Verbs are operations the operator performs on an entry. They are not states. An 
 - Planned → Outlining: yes
 - Outlining → Drafting: yes
 - Drafting → Final: yes
-- Final → Published: yes — approve graduates Final to Published, same as every other linear-pipeline transition. (See `publish` below — it's an optional clarity-alias for approve at this transition, not a separate operation.)
-- Published: NO — terminal stage; immutable. To revise a published item, create a NEW version and induct it into a non-terminal stage; the existing published version stays as-is.
+- Final → Published: yes — approve graduates Final to Published, same as every other linear-pipeline transition. Assigns a new public version (see § Versioning). (See `publish` below — it's an optional clarity-alias for approve at this transition, not a separate operation.)
+- Published: NO — terminal stage; immutable. To revise a published item, bump the public version target, induct the working copy into a non-terminal stage, iterate / edit, then approve forward back to Published. The existing public version stays as-is in the public record.
 - Blocked, Cancelled: NO — off-pipeline. Use `induct` to re-enter.
 
 **What it changes:** `currentStage` advances by one position in the linear pipeline. The next stage's primary artifact is scaffolded from the just-approved file (where applicable). A `stage-transition` journal event is appended.
@@ -117,6 +117,38 @@ Verbs are operations the operator performs on an entry. They are not states. An 
 ### `add` and `ingest`
 
 **`add`** creates a new Ideas-stage entry from scratch. **`ingest`** backfills existing markdown content into the calendar. These are entry-creation verbs, not state-transition verbs.
+
+## Versioning
+
+There are TWO distinct notions of "version" in the deskwork model. They serve different purposes and should not be conflated.
+
+### Internal version (iteration version)
+
+A monotonically-increasing counter the iterate verb bumps each time a new working version is appended. Incremented on every iteration regardless of stage. Lives in the entry's sidecar / journal as part of the working history. Internal-only — the operator does not need to think about it. It's bookkeeping for the agent and the studio so prior states can be reconstructed.
+
+### Public version
+
+A separate, monotonically-increasing identifier assigned each time the entry transitions to Published. This is the version of the OBJECT-AS-PUBLISHED — what an external consumer sees and refers to. Conceptually like a semver tag in npm: v1, v2, v3 (or v1.0, v1.1, etc. — the exact format is an implementation choice the spec doesn't pin down). The first Publish event assigns v1; each subsequent Publish increments.
+
+### How they interact
+
+A typical flow:
+
+1. Entry is created at Ideas. Internal version 1.
+2. Iterate / approve through stages. Internal version bumps on each iterate.
+3. Reach Final → approve. **Public version v1 assigned. Entry is now Published.**
+4. To revise: induct the entry to a non-terminal stage (e.g., Drafting). Iterate / edit until ready. Approve to Final, then approve to Published. **Public version becomes v2.**
+5. The previous Published version (v1) is preserved in the public record — published items are immutable; revising creates a NEW public version, not an in-place edit.
+
+The internal version is a single per-entry sequence that keeps incrementing throughout. The public version is a separate sequence that increments only at Publish events.
+
+### Why the distinction matters
+
+Because Published is immutable, "the version" of a published object can't refer to the working iteration counter (which keeps mutating during edits). External consumers refer to the public version. Internal tooling refers to the internal version. Conflating them — e.g., showing the operator "v17" because that's what the iteration counter says, when the public version is "v2" — is a category error.
+
+### Implementation status
+
+The current implementation has only the internal version (per-stage iteration counter). Public versioning is part of this spec's commitment but **not yet implemented**; the Phase 0.2 audit will surface where to add it (likely: a `publicVersion` field on the entry sidecar, incremented in `approveEntryStage` when transitioning to Published; surfaced on the studio's read-only Published stage view; included in any export / external-reference path).
 
 ## What was retired (and why this document exists)
 
@@ -208,3 +240,4 @@ Append a one-line entry every time this document is updated.
 
 - 2026-05-09 — Initial draft. Captures the post-2026-04-30-redesign canonical state machine and explicitly retires every form of "review state" surfacing. Operator-prompted after a design session in which retired patterns kept being re-introduced because the spec wasn't written down anywhere.
 - 2026-05-09 v2 — Iteration response to operator marginalia (comments `40fcf89c` and `a7fb88d4`). Two corrections: (a) Final is NOT terminal — approve works at Final → Published, same as every other linear-pipeline graduation. Final's contract is "content locked; only stage transitions allowed (approve forward, induct backward)" — iterate / edit are not allowed in Final, but the stage itself is forward-traversable. (b) Published has npm-publish semantics — terminal, publicly committed, immutable; revisions create new versions inducted into a non-terminal stage; filesystem disposition is decoupled from the published semantic. The `publish` verb is reframed as an optional clarity-alias for `approve` at the Final→Published transition rather than a separate operation. Iterate's stage gate is now explicit (Ideas/Planned/Outlining/Drafting only).
+- 2026-05-09 v3 — Iteration response to operator marginalia (comment `acfec3b7`). Added a § Versioning section distinguishing two version concepts: **internal version** (iteration counter; bookkeeping; bumps on every iterate) and **public version** (assigned at Publish; increments only at Publish events; what external consumers refer to). Updated Published stage description and approve verb gates to reference public version assignment. Implementation note: public versioning is committed in this spec but not yet implemented; Phase 0.2 audit will surface where to add it (likely a `publicVersion` field on the sidecar, incremented in approve when transitioning to Published).
