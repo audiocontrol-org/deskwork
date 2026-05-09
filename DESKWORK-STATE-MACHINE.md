@@ -1,3 +1,7 @@
+---
+deskwork:
+  id: 7306087a-f412-4c33-901f-f0173ae36646
+---
 <!--
   Canonical state machine spec for deskwork (and transitively, deskwork-studio).
   THIS DOCUMENT IS THE ONE SOURCE OF TRUTH. Code, skill prose, mockups, and
