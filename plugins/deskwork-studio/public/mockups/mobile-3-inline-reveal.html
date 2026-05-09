@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup 3 · Inline reveal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F5F1E8;
+    --paper-2: #ECE6D4;
+    --paper-3: #DFD7BF;
+    --ink: #1A1614;
+    --faded: #8A7F70;
+    --faded-2: #C7BEAE;
+    --red: #B8362A;
+    --blue: #2A4B7C;
+    --green: #2E5D45;
+    --highlight: #FAEABF;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    --noise:
+      url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #2C2823;
+    background-image:
+      radial-gradient(circle at 30% 20%, rgba(184, 54, 42, 0.08), transparent 50%),
+      radial-gradient(circle at 70% 80%, rgba(42, 75, 124, 0.06), transparent 50%);
+    color: var(--ink);
+    font-family: var(--display);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem 4rem;
+  }
+  .meta { color: #C7BEAE; font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 0.6rem; text-align: center; }
+  .meta a { color: var(--paper); text-decoration: none; border-bottom: 1px solid rgba(245, 241, 232, 0.4); }
+  h1.demo-title { color: var(--paper); font-family: var(--display); font-style: italic; font-variation-settings: "opsz" 36, "wght" 500; font-size: 1.6rem; margin-bottom: 1.4rem; text-align: center; }
+  .frames { display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center; }
+  .frame-wrap { display: flex; flex-direction: column; align-items: center; }
+  .caption { color: #C7BEAE; font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; margin-top: 0.8rem; text-align: center; }
+  .phone { width: 410px; height: 880px; background: #050505; border-radius: 50px; padding: 12px; box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255,255,255,0.04); position: relative; }
+  .phone::before { content: ''; position: absolute; top: 22px; left: 50%; transform: translateX(-50%); width: 110px; height: 30px; background: #000; border-radius: 16px; z-index: 100; }
+  .screen { width: 100%; height: 100%; background: var(--paper); background-image: var(--noise); border-radius: 38px; overflow: hidden; position: relative; font-size: 17px; line-height: 1.55; color: var(--ink); }
+
+  /* ============================================================
+   *  Mobile review surface — inline reveal pattern
+   * ============================================================ */
+
+  /* Compact strip */
+  .strip {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 84px;
+    padding: 60px 1rem 8px;
+    background: var(--paper);
+    border-bottom: 1px solid var(--red);
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .strip-back {
+    font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--ink); text-decoration: none;
+    padding: 0.25rem 0.5rem; border: 1px solid var(--paper-3); border-radius: 2px;
+  }
+  .stamp {
+    margin-left: auto;
+    font-family: var(--display); font-style: italic; font-variation-settings: "opsz" 18, "wght" 600;
+    font-size: 0.95rem; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--ink); border: 2px solid var(--ink);
+    padding: 0.18rem 0.55rem;
+    transform: rotate(-1.5deg);
+    background: var(--paper);
+  }
+
+  /* Article body — fills almost everything. Inline outline at top.
+   * Bottom action bar (~52px) reserves space at the bottom. */
+  .article {
+    position: absolute;
+    top: 84px; left: 0; right: 0; bottom: 56px;
+    overflow-y: auto;
+    padding: 1.1rem 1.4rem 1.6rem;
+  }
+
+  /* Outline — collapsible <details> at the top of the article. */
+  .outline {
+    background: var(--paper-2);
+    border-left: 2px solid var(--red);
+    margin-bottom: 1.4rem;
+    padding: 0;
+    border-radius: 0 2px 2px 0;
+  }
+  .outline > summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 0.7rem 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--red);
+  }
+  .outline > summary::-webkit-details-marker { display: none; }
+  .outline > summary::before {
+    content: '▾';
+    font-size: 0.7rem;
+    color: var(--red);
+    transition: transform 200ms ease;
+  }
+  .outline:not([open]) > summary::before { transform: rotate(-90deg); }
+  .outline-list {
+    list-style: none;
+    padding: 0.2rem 0 0.6rem;
+    margin: 0;
+    border-top: 1px dashed var(--paper-3);
+  }
+  .outline-list li {
+    padding: 0;
+  }
+  .outline-list a {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.8rem;
+    padding: 0.55rem 0.9rem;
+    text-decoration: none;
+    color: var(--ink);
+    font-family: var(--display);
+    font-size: 0.95rem;
+    line-height: 1.3;
+    border-bottom: 1px dashed transparent;
+    transition: background 120ms ease;
+  }
+  .outline-list a:hover { background: rgba(184, 54, 42, 0.08); }
+  .outline-list a .num {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+    color: var(--faded);
+    flex-shrink: 0;
+  }
+  .outline-list a .note-pip {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    color: var(--red);
+    background: rgba(184, 54, 42, 0.12);
+    padding: 0.1rem 0.42rem;
+    border-radius: 8px;
+    flex-shrink: 0;
+  }
+
+  .article-kicker {
+    font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--red); margin-bottom: 0.5rem;
+  }
+  .article-title {
+    font-family: var(--display); font-style: italic; font-variation-settings: "opsz" 48, "wght" 500;
+    font-size: 2rem; line-height: 1.1; margin-bottom: 1rem;
+  }
+  .article p {
+    font-family: var(--display); font-size: 1.04rem; line-height: 1.5; margin-bottom: 0.9rem;
+    position: relative;
+  }
+  .article p mark {
+    background: var(--highlight); padding: 0 0.1em; border-radius: 1px;
+    box-decoration-break: clone;
+    position: relative;
+  }
+  .article p mark.has-note::after {
+    content: attr(data-count);
+    position: absolute;
+    top: -0.25em;
+    right: -1.4em;
+    background: var(--red);
+    color: var(--paper);
+    font-family: var(--mono);
+    font-size: 0.55rem;
+    line-height: 1;
+    padding: 0.18rem 0.32rem;
+    border-radius: 8px;
+    letter-spacing: 0.04em;
+  }
+  .article h2 {
+    font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--ink); margin: 1.5rem 0 0.6rem; border-bottom: 1px solid var(--red); padding-bottom: 0.3rem;
+  }
+
+  /* Inline note — appears immediately after the paragraph it references */
+  .inline-note {
+    background: var(--paper-2);
+    border-left: 3px solid var(--red);
+    padding: 0.85rem 1rem 0.95rem 1rem;
+    margin: 0 -0.4rem 1rem 1.2rem;
+    border-radius: 0 2px 2px 0;
+    font-size: 0.92rem;
+    line-height: 1.5;
+    color: var(--ink);
+    position: relative;
+  }
+  .inline-note::before {
+    content: '';
+    position: absolute;
+    left: -3px;
+    top: -8px;
+    width: 18px;
+    height: 8px;
+    border-left: 3px solid var(--red);
+    border-top: 3px solid var(--red);
+    border-radius: 2px 0 0 0;
+  }
+  .inline-note .note-meta {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--faded);
+    margin-bottom: 0.4rem;
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+  }
+  .inline-note .note-meta .pip {
+    background: var(--red);
+    color: var(--paper);
+    padding: 0.08rem 0.32rem;
+    border-radius: 8px;
+    letter-spacing: 0.04em;
+  }
+  .inline-note .actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.55rem;
+  }
+  .inline-note .actions button {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    background: transparent;
+    border: 1px solid var(--paper-3);
+    color: var(--ink);
+    padding: 0.25rem 0.5rem;
+    border-radius: 2px;
+    cursor: pointer;
+  }
+  .inline-note .actions button.resolve { color: var(--green); border-color: var(--green); }
+  .inline-note .actions button.delete { color: var(--red); border-color: var(--red); }
+
+  /* Bottom action bar — always visible, the only persistent secondary chrome */
+  .actionbar {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 56px;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-top: 1px solid var(--red);
+    box-shadow: 0 -2px 16px rgba(26,22,20,0.06);
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr auto;
+    gap: 0;
+    z-index: 60;
+  }
+  .actionbar button {
+    background: transparent;
+    border: 0;
+    border-right: 1px solid var(--paper-3);
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 500;
+    font-size: 0.95rem;
+    color: var(--ink);
+    cursor: pointer;
+    transition: background 120ms ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+  }
+  .actionbar button .glyph {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 1.1rem;
+    line-height: 1;
+  }
+  .actionbar button.approve { color: var(--green); }
+  .actionbar button.iterate { color: var(--blue); }
+  .actionbar button.reject { color: var(--red); }
+  .actionbar .help {
+    width: 56px;
+    color: var(--faded);
+    border-right: 0;
+  }
+  .actionbar button:hover { background: rgba(184, 54, 42, 0.06); }
+</style>
+</head>
+<body>
+
+<div class="meta"><a href="./index.html">← all directions</a></div>
+<h1 class="demo-title">Mockup 3 · Inline reveal</h1>
+
+<div class="frames">
+
+  <!-- Frame 1: At rest — outline collapsed, all notes hidden -->
+  <div class="frame-wrap">
+    <div class="phone"><div class="screen">
+
+      <div class="strip">
+        <a class="strip-back" href="#">← Studio</a>
+        <span class="stamp">Drafting</span>
+      </div>
+
+      <div class="article">
+        <details class="outline">
+          <summary>§ Sections · 3 · 3 notes</summary>
+        </details>
+        <div class="article-kicker">Architecture · v0.16</div>
+        <h1 class="article-title">Deskwork architectural thesis.</h1>
+        <p>Read this before touching any deskwork code. This file exists because the thesis was implicit in the project's design but not written down anywhere discoverable, which let the wrong architecture creep into <mark class="has-note" data-count="1">the studio's review surface</mark> and waste an angry session correcting it.</p>
+        <h2>The canonical source</h2>
+        <p>"You never leave the agent for a static tool. You talk to it. It does the work." The agent's toolkit isn't a static configuration you set up once; it evolves, under your direction, in response to what the work actually needs.</p>
+        <p>The blog post is the canonical source. Everything below derives from it.</p>
+        <h2>What the thesis means</h2>
+        <p>The agent (Claude, in a Claude Code session) is the primary tool. Every other piece of deskwork — CLI verbs, the studio, doctor rules, sidecars, the calendar — exists to be <mark class="has-note" data-count="1">read, edited, and orchestrated by that agent</mark>. Static tools (opaque code the agent can't see or evolve, server endpoints that hide multi-step logic, UI that takes business-logic actions without surfacing what it's doing) are <mark class="has-note" data-count="1">what the thesis rejects</mark>.</p>
+      </div>
+
+      <div class="actionbar">
+        <button class="approve"><span class="glyph">✓</span> Approve</button>
+        <button class="iterate"><span class="glyph">↻</span> Iterate</button>
+        <button class="reject"><span class="glyph">✕</span> Reject</button>
+        <button class="help">?</button>
+      </div>
+
+    </div></div>
+    <div class="caption">A · default reading state, outline collapsed</div>
+  </div>
+
+  <!-- Frame 2: Outline open + one inline note expanded -->
+  <div class="frame-wrap">
+    <div class="phone"><div class="screen">
+
+      <div class="strip">
+        <a class="strip-back" href="#">← Studio</a>
+        <span class="stamp">Drafting</span>
+      </div>
+
+      <div class="article">
+        <details class="outline" open>
+          <summary>§ Sections · 3 · 3 notes</summary>
+          <ul class="outline-list">
+            <li><a href="#"><span><span class="num">§ 1 </span>Read this before touching any deskwork code</span><span class="note-pip">1</span></a></li>
+            <li><a href="#"><span><span class="num">§ 2 </span>The canonical source</span><span class="note-pip">0</span></a></li>
+            <li><a href="#"><span><span class="num">§ 3 </span>What the thesis means</span><span class="note-pip">2</span></a></li>
+          </ul>
+        </details>
+
+        <div class="article-kicker">Architecture · v0.16</div>
+        <h1 class="article-title">Deskwork architectural thesis.</h1>
+        <p>Read this before touching any deskwork code. This file exists because the thesis was implicit in the project's design but not written down anywhere discoverable, which let the wrong architecture creep into <mark class="has-note" data-count="1">the studio's review surface</mark> and waste an angry session correcting it.</p>
+
+        <aside class="inline-note">
+          <div class="note-meta"><span class="pip">Suggest</span> 2 min ago</div>
+          This whole arc starts with the studio's mobile chrome being mis-shaped. Worth saying that explicitly here.
+          <div class="actions">
+            <button class="resolve">Resolve</button>
+            <button>Edit</button>
+            <button class="delete">Delete</button>
+          </div>
+        </aside>
+
+        <h2>The canonical source</h2>
+        <p>"You never leave the agent for a static tool. You talk to it. It does the work." The agent's toolkit isn't a static configuration you set up once; it evolves, under your direction, in response to what the work actually needs.</p>
+      </div>
+
+      <div class="actionbar">
+        <button class="approve"><span class="glyph">✓</span> Approve</button>
+        <button class="iterate"><span class="glyph">↻</span> Iterate</button>
+        <button class="reject"><span class="glyph">✕</span> Reject</button>
+        <button class="help">?</button>
+      </div>
+
+    </div></div>
+    <div class="caption">B · outline open, note expanded inline</div>
+  </div>
+
+</div>
+
+<div style="margin-top: 2.5rem; max-width: 720px; padding: 0 1rem; color: #C7BEAE; font-family: var(--display); font-size: 0.95rem; line-height: 1.55;">
+  <p style="margin-bottom: 0.8rem;"><strong style="color: var(--paper); font-style: italic;">Notes on the pattern.</strong> No drawers, no FAB, no modal sheets. The outline lives at the top of the article as a collapsible <code style="font-family:var(--mono);font-size:0.85em">&lt;details&gt;</code> element — tap to expand into a section list with note-count pips per section. Each section link jumps the operator into the article (anchor scroll), then the operator can re-collapse the outline.</p>
+  <p style="margin-bottom: 0.8rem;">Margin notes are <em>spatially adjacent</em> to the text they reference. Each highlighted run carries a small note-count badge floating just past its right edge. Tap the highlight (or the badge) and the note expands inline immediately AFTER the paragraph — exactly where the operator's eye is — with Resolve / Edit / Delete actions on the card itself. The note is dismissed by the same tap, by tapping anywhere else, or by Resolve.</p>
+  <p style="margin-bottom: 0.8rem;">The persistent bottom action bar is the only permanent secondary chrome — three decision buttons (Approve / Iterate / Reject) and a help affordance. 56px tall, thumb-reachable, always visible. No mode-switching, no hidden state, no "where did the buttons go" moments.</p>
+  <p>This direction trades a more opinionated information architecture for a more legible reading experience. The note-count chips need careful tuning to not overpower the prose; the inline-note callout needs a max-height/overflow to avoid hijacking the article when there are many notes on one paragraph.</p>
+</div>
+
+</body>
+</html>

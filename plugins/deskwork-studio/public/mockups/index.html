@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mobile review surface — design directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F5F1E8;
+    --paper-2: #ECE6D4;
+    --paper-3: #DFD7BF;
+    --ink: #1A1614;
+    --faded: #8A7F70;
+    --red: #B8362A;
+    --blue: #2A4B7C;
+    --green: #2E5D45;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--display);
+    font-size: 17px;
+    line-height: 1.55;
+    min-height: 100vh;
+  }
+  body {
+    background-image:
+      radial-gradient(circle at 20% 10%, rgba(184, 54, 42, 0.05), transparent 60%),
+      radial-gradient(circle at 80% 90%, rgba(42, 75, 124, 0.04), transparent 60%);
+    padding: 3rem 1.4rem 4rem;
+    max-width: 60rem;
+    margin: 0 auto;
+  }
+  .kicker {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--red);
+    border-bottom: 1px solid var(--red);
+    padding-bottom: 0.45rem;
+    margin-bottom: 1.2rem;
+    display: inline-block;
+  }
+  h1 {
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 48, "wght" 500;
+    font-size: 2.4rem;
+    line-height: 1.1;
+    margin-bottom: 1rem;
+    color: var(--ink);
+  }
+  .lede {
+    font-family: var(--display);
+    font-size: 1.15rem;
+    line-height: 1.5;
+    color: var(--ink);
+    margin-bottom: 2.5rem;
+    max-width: 42rem;
+  }
+  .lede em { color: var(--red); font-style: italic; }
+  h2 {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--faded);
+    margin: 2.2rem 0 0.8rem;
+    border-bottom: 1px dashed var(--paper-3);
+    padding-bottom: 0.4rem;
+  }
+  p { margin-bottom: 0.8rem; max-width: 42rem; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+    gap: 1.2rem;
+    margin-top: 0.5rem;
+  }
+  .card {
+    background: var(--paper);
+    border: 1px solid var(--paper-3);
+    border-left: 3px solid var(--red);
+    padding: 1.4rem 1.4rem 1.6rem;
+    border-radius: 2px;
+    box-shadow: 0 1px 0 rgba(26, 22, 20, 0.04), 0 8px 24px -10px rgba(26, 22, 20, 0.10);
+    transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 200ms ease;
+  }
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 1px 0 rgba(26, 22, 20, 0.04), 0 14px 32px -10px rgba(26, 22, 20, 0.16);
+  }
+  .card .num {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.22em;
+    color: var(--red);
+    margin-bottom: 0.4rem;
+    display: block;
+  }
+  .card h3 {
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 32, "wght" 500;
+    font-size: 1.45rem;
+    line-height: 1.15;
+    margin-bottom: 0.7rem;
+  }
+  .card .summary {
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: var(--ink);
+    margin-bottom: 1rem;
+  }
+  .card .pros, .card .cons {
+    font-size: 0.82rem;
+    line-height: 1.45;
+    margin-bottom: 0.5rem;
+    color: var(--ink);
+  }
+  .card .label {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--faded);
+    margin-right: 0.5rem;
+  }
+  .card a.open {
+    display: inline-block;
+    margin-top: 0.8rem;
+    padding: 0.55rem 0.9rem;
+    border: 1.5px solid var(--ink);
+    color: var(--ink);
+    text-decoration: none;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    border-radius: 2px;
+    transition: background 120ms ease, color 120ms ease;
+  }
+  .card a.open:hover { background: var(--ink); color: var(--paper); }
+  .principles { background: var(--paper-2); padding: 1.2rem 1.4rem; border-left: 3px solid var(--blue); }
+  .principles ul { list-style: none; padding-left: 0; }
+  .principles li { padding-left: 1.4rem; position: relative; margin-bottom: 0.5rem; font-size: 0.95rem; }
+  .principles li::before { content: '§'; position: absolute; left: 0; color: var(--red); font-family: var(--display); font-style: italic; }
+  .footnote {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--paper-3);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    color: var(--faded);
+  }
+  .footnote em { color: var(--red); font-style: italic; font-family: var(--display); }
+</style>
+</head>
+<body>
+
+<span class="kicker">Mobile review surface · v0.16 design exploration</span>
+
+<h1>Three directions for a&nbsp;mobile-first review&nbsp;surface.</h1>
+
+<p class="lede">
+The current mobile UX is a desktop interface compressed onto a phone — side-rail drawers with vertical pull-tabs, marginalia stacked below an entire article column, outline as a sliding overlay competing with the strip for the top of the viewport. The operator's framing was direct: <em>"crappy repurposing of what's clearly meant for a desktop interface, half-assed onto a mobile UI."</em> Mobile users expect different idioms — bottom-anchored chrome for thumb reach, modal sheets sliding up from below, content-first space allocation, no chrome competing for the top of the viewport with the page itself.
+</p>
+
+<h2>Design principles for the&nbsp;rebuild</h2>
+
+<div class="principles">
+  <ul>
+    <li><strong>Content first.</strong> The article fills the viewport. Chrome is bottom-anchored, sheet-based, or content-inline — never a side-rail.</li>
+    <li><strong>Thumb reach.</strong> Frequent actions (decisions, navigation) sit in the lower half where the thumb naturally lands.</li>
+    <li><strong>One sheet at a time.</strong> Outline, notes, and actions are peers; opening one closes the others. No competing overlays.</li>
+    <li><strong>Native idioms.</strong> Drag-handles to dismiss, swipe-down to close, tap-outside-to-close. iOS Safari + Mobile Chrome, no app shell.</li>
+    <li><strong>Editorial language preserved.</strong> Cream paper, red-pencil accents, JetBrains Mono kicker labels, Newsreader italic display — but expressed as mobile-native components instead of a shrunk-down desktop layout.</li>
+  </ul>
+</div>
+
+<h2>The three&nbsp;directions</h2>
+
+<div class="grid">
+
+  <article class="card">
+    <span class="num">Mockup 1</span>
+    <h3>Bottom tab bar &amp; sheets</h3>
+    <p class="summary">A persistent 3-tab bar pinned to the bottom of the viewport. Tapping a tab reveals a sheet that slides up over the content. Outline, Notes, and Actions are peers, each in their own sheet. The "Apple Maps" pattern — predictable, native, always one tap away.</p>
+    <p class="pros"><span class="label">Strong</span> Discoverability is permanent. Thumb-reach is excellent. Counts on tabs surface state at a glance.</p>
+    <p class="cons"><span class="label">Weak</span> Permanent ~56px bottom chrome eats viewport. Three buttons may feel like clutter on the simplest entries.</p>
+    <a class="open" href="./mobile-1-bottom-sheet.html">Open mockup →</a>
+  </article>
+
+  <article class="card">
+    <span class="num">Mockup 2</span>
+    <h3>Single FAB &amp; radial menu</h3>
+    <p class="summary">No permanent bottom bar. A single floating action button sits bottom-right; tapping it reveals a vertical stack of secondary actions (Outline, Notes, Approve, Iterate, Reject). Each opens its own sheet. A <em>quieter</em> chrome — one round button instead of a strip.</p>
+    <p class="pros"><span class="label">Strong</span> Maximum content space. The button is a single, obvious entry point. The FAB itself is a recognizable pattern (Material, Twitter, Gmail).</p>
+    <p class="cons"><span class="label">Weak</span> One-tap-deeper for everything. Counts (note count, etc.) need to surface inside the menu, not at-a-glance.</p>
+    <a class="open" href="./mobile-2-fab-cluster.html">Open mockup →</a>
+  </article>
+
+  <article class="card">
+    <span class="num">Mockup 3</span>
+    <h3>Inline reveal</h3>
+    <p class="summary">No drawers. No FAB. The outline is a collapsible <code style="font-family:var(--mono);font-size:0.85em">&lt;details&gt;</code> at the top of the article; margin notes appear <em>inline</em> next to the paragraph they reference, behind a small per-paragraph chip; decision buttons live in a thin always-visible bottom bar. The most opinionated direction — content and notes are spatially related, not sheet-separated.</p>
+    <p class="pros"><span class="label">Strong</span> Notes-near-text matches how operators actually read margin notes. No mode-switching, no stacked chrome, no ceremony. Each surface is "just there."</p>
+    <p class="cons"><span class="label">Weak</span> Outline-at-top adds vertical preamble before the article begins. Inline note chips need careful design to not overpower the prose.</p>
+    <a class="open" href="./mobile-3-inline-reveal.html">Open mockup →</a>
+  </article>
+
+</div>
+
+<h2>How to&nbsp;review</h2>
+<p>Open each mockup on your phone (the studio's Tailscale URL works). Each is a static HTML demo — no live skill wiring — showing the at-rest state and one or two interaction states. Pick the one that feels right, or call out specific elements from each that you want combined.</p>
+
+<p class="footnote">
+mockups served from <em>/static/mockups/</em> · self-contained HTML+CSS · no live data
+</p>
+
+</body>
+</html>
