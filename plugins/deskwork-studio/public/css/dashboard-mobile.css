@@ -35,59 +35,22 @@
  */
 
 /* ============================================================
- *  1. Filing-tab stamps for dashboard rows on mobile.
+ *  1. Per-row state stamps — RETIRED on mobile.
  *
- *  Scoped to `.er-calendar-row .er-stamp` — entry-review's hero
- *  stamp (single proud mark in the top strip) keeps its rotation
- *  on all viewports. Only the per-row clustered stamps on the
- *  dashboard get the flat treatment.
+ *  Per the Studio Design Standards (docs/studio-design-standards.md
+ *  § Rubber-stamp conceit) the rubber-stamp pattern is retired on
+ *  mobile in ALL its forms — rotated rubber-stamps, letterpress tags,
+ *  filing-tabs, rule-bracketed marks, embossed seals. Mobile rows do
+ *  not carry state-on-a-rectangle chrome. Review state is internal-
+ *  only data and isn't surfaced anywhere on user-facing rows.
+ *
+ *  This block intentionally has no rules. It exists as a load-bearing
+ *  comment so future engineers don't re-introduce a stamp variant
+ *  here without re-reading the standards document.
+ *
+ *  Desktop rules in editorial-review.css continue to apply on desktop;
+ *  the rubber-stamp idiom IS the desktop press-check signature.
  * ============================================================ */
-@media (max-width: 600px) {
-  .er-calendar-row .er-stamp {
-    /* Reset desktop styling */
-    border: none;
-    border-radius: 0;
-    transform: none;
-
-    /* Filing-tab silhouette — paper-3 fill, mono-caps text, notched
-     * bottom-right corner. The notch is what carries the metaphor;
-     * color is restrained to the left edge bar (stage-color) plus
-     * the text. */
-    background: var(--er-paper-3);
-    color: var(--er-ink);
-    padding: 0.18rem 0.6rem 0.18rem 0.55rem;
-    font-family: var(--er-font-mono);
-    font-size: 0.62rem;
-    font-weight: 500;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    line-height: 1.2;
-    position: relative;
-
-    /* Notched bottom-right corner — 7px diagonal cut. */
-    clip-path: polygon(
-      0 0,
-      100% 0,
-      100% calc(100% - 7px),
-      calc(100% - 7px) 100%,
-      0 100%
-    );
-  }
-
-  /* 3px stage-color edge bar on the left. The stage-color comes from
-   * the existing .er-stamp-* color rules in editorial-review.css —
-   * we read it via `currentColor` here so each stamp gets the right
-   * accent without per-state overrides. */
-  .er-calendar-row .er-stamp::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 3px;
-    background: currentColor;
-  }
-}
 
 /* ============================================================
  *  2. Floating Compose chip (FAB).
