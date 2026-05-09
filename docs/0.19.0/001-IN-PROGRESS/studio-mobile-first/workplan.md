@@ -23,6 +23,56 @@ date: 2026-05-09
 - **Dual-viewport regression smoke updated per surface** — `scripts/smoke-er-viewport-regressions.mjs` (or a new `smoke-mobile-<surface>.mjs` if the surface diverges from the entry-review shape).
 - **Press-check vocabulary preserved** — cream paper (`#F5F1E8`), JetBrains Mono kickers, Newsreader italic display, accent map (red-pencil `#B8362A`, proof-blue `#2A4B7C`, stamp-green `#2E5D45`, kraft `#8A7250`), paper-noise SVG texture.
 - **Per-phase commit hygiene** — design mockups land in their own commit (`design(studio): ... mockups`); implementation in another (`feat(studio): ... mockup N`); review fixes in a third (`fix(studio): apply review findings on ...`).
+- **State machine compliance** — every UI element + skill prose + journal/sidecar field that surfaces or branches on state must conform to `DESKWORK-STATE-MACHINE.md` (top-level). The state machine is the eight stages; review state is retired. Verbs (iterate / approve / cancel) are universal. Non-conformance is a bug.
+
+---
+
+## Phase 0 — State machine canonization → blocks Phase 1
+
+Goal: lock the deskwork state machine spec in writing before any further redesign work. The 2026-04-30 pipeline redesign collapsed the calendar-stage and review-workflow state machines into ONE stage-driven state machine, but the migration left vestigial review-state code and documentation that keeps re-introducing the retired concept into mockups and skill prose. Until the canonical spec exists, every design pass relitigates first principles.
+
+### Task 0.1: Draft `DESKWORK-STATE-MACHINE.md`
+
+**Files:**
+- Create: `DESKWORK-STATE-MACHINE.md` (top-level)
+
+- [ ] **Step 0.1.1:** Read the original spec (`docs/superpowers/specs/2026-04-30-deskwork-pipeline-redesign-design.md`) and the migration commits (`5687404`, `07ac8dc`, `c21b8b9`, `ca7f785`) to ground the document in the migration's stated intent.
+- [ ] **Step 0.1.2:** Draft the canonical spec covering: stages (8, the state machine), verbs (iterate / approve / cancel — universal), what reviewState was and why it's retired, what the current schema vestige is, the studio's surfacing rules, the commandments that derived violations must obey.
+- [ ] **Step 0.1.3:** Operator review + approval. Iterate until locked.
+- [ ] **Step 0.1.4:** Commit `docs(state-machine): canonical spec — DESKWORK-STATE-MACHINE.md`.
+- [ ] **Step 0.1.5:** Wire the document into the `session-start` skill so every session reads it before touching code, alongside `THESIS.md` and `docs/studio-design-standards.md`.
+- [ ] **Step 0.1.6:** Add a project rule (`.claude/rules/state-machine.md`) saying: read the state machine spec before any work that touches stage / verb / state semantics; deviations require updating the spec first.
+
+### Task 0.2: Audit + destroy violations
+
+Goal: with the spec locked, sweep the codebase + docs to find and remove every vestige of the retired review-state concept and any other deviation from the spec.
+
+**Files (preliminary inventory — expand during audit):**
+- `packages/core/src/schema/entry.ts` — `ReviewState` type, `reviewState` field on Entry
+- `packages/studio/src/pages/dashboard/affordances.ts` — `REVIEW_STATE_LABELS`, `renderReviewStateBadge`
+- `packages/studio/src/pages/dashboard/affordances.ts` — iterate-button gating on `reviewState === 'iterating'`
+- `packages/studio/src/pages/dashboard/press-queue.ts` — already removed from dashboard.ts but module still in tree (review-state-driven; delete)
+- `packages/studio/src/pages/index.ts` — "in-review" caption text + sidecar filter
+- `packages/studio/src/pages/help.ts` — manual prose mentioning review state
+- `packages/core/src/journal/` — `review-state-change` event kind + bookkeeping
+- `packages/core/src/iterate/iterate.ts` — sidecar mutation that sets reviewState
+- `plugins/deskwork/skills/*/SKILL.md` — any prose mentioning reviewState as a gate or post-condition
+- `docs/studio-design-standards.md` — references to "review state internal-only" (replace with "review state is RETIRED, not internal")
+- `docs/0.19.0/001-IN-PROGRESS/studio-mobile-first/dashboard-audit.md` — historical audit, may need a "superseded by state machine spec" note
+
+- [ ] **Step 0.2.1:** Grep pass: `git grep -nE 'reviewState|ReviewState|in-review|in_review|iterating|review-state'` produces the violation candidate list.
+- [ ] **Step 0.2.2:** Categorize each hit: REMOVE (UI/skill surfacing), MIGRATE (data persistence — back-compat one-shot), or KEEP (legitimate journal-event historical record).
+- [ ] **Step 0.2.3:** Remove the REMOVE category. Each removal is a focused commit with a citation back to the spec.
+- [ ] **Step 0.2.4:** Run all tests + the dual-viewport smoke + a manual walk of `/dev/editorial-studio`. State machine spec should pass at 100%; no UI surfacing or skill gates remain on review state.
+- [ ] **Step 0.2.5:** Update `docs/studio-design-standards.md` § Review state to point at `DESKWORK-STATE-MACHINE.md` as the canonical record and reframe the section ("review state is retired" not "internal-only").
+
+**Acceptance for Phase 0:**
+- `DESKWORK-STATE-MACHINE.md` exists at top-level and is operator-approved
+- No UI surfaces review state on any studio page (mobile or desktop)
+- No skill prose gates on review state
+- The journal-event record may keep historical `review-state-change` events for backward compat but no NEW events of that kind are emitted
+- The schema's `ReviewState` type is removed OR explicitly marked `@deprecated — vestigial for sidecar back-compat only`
+- Phase 1 cannot resume until Phase 0 is signed off
 
 ---
 
