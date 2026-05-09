@@ -66,12 +66,61 @@ Goal: with the spec locked, sweep the codebase + docs to find and remove every v
 - [ ] **Step 0.2.4:** Run all tests + the dual-viewport smoke + a manual walk of `/dev/editorial-studio`. State machine spec should pass at 100%; no UI surfacing or skill gates remain on review state.
 - [ ] **Step 0.2.5:** Update `docs/studio-design-standards.md` § Review state to point at `DESKWORK-STATE-MACHINE.md` as the canonical record and reframe the section ("review state is retired" not "internal-only").
 
+### Task 0.3: Promote `DESIGN-STANDARDS.md` to canonical + establish design proposal record-keeping
+
+Goal: with the state machine canonized + violations cleaned, do the same for design. The current `docs/studio-design-standards.md` becomes a holy document at top-level (peer to `THESIS.md` and `DESKWORK-STATE-MACHINE.md`). Establish a proposal-archive pattern at `docs/studio-design/ACCEPTED/` and `REJECTED/` so design decisions are durable and traceable.
+
+**Files:**
+- Create: `DESIGN-STANDARDS.md` (top-level — `git mv` from `docs/studio-design-standards.md` so it's a rename, not a copy + delete)
+- Create: `docs/studio-design/ACCEPTED/` (directory)
+- Create: `docs/studio-design/REJECTED/` (directory)
+- Create: `docs/studio-design/README.md` (explains the contract + index)
+- Modify: `.claude/rules/studio-design-standards.md` → `git mv` to `.claude/rules/design-standards.md`; update to point at the new top-level doc + describe the ACCEPTED/REJECTED contract
+- Modify: `.claude/skills/session-start/SKILL.md` — read `DESIGN-STANDARDS.md` (top-level) instead of `docs/studio-design-standards.md`
+- Modify: `plugins/deskwork-studio/public/mockups/index.html` — link to the proposal archive instead of inline cards
+
+**Reachability:** the document-root serveStatic added in commit `a916001` already serves any top-level file at `/<filename>`. `DESIGN-STANDARDS.md` will be reachable at `/DESIGN-STANDARDS.md` automatically — no symlink, no copy. Same for any future top-level holy doc.
+
+**The proposal-archive contract (each entry MUST have):**
+- A directory under `ACCEPTED/` or `REJECTED/` named `<YYYY-MM-DD>-<slug>/`
+- A visual representation: either an HTML/CSS file directly inside the entry directory, OR (when the visual lives elsewhere in the tree, like an existing mockup file) a relative-path reference in the brief — **never a copy of the file**. The single source of truth lives at one path; the brief points at it.
+- A `brief.md` containing: what the proposal is, why accepted or rejected, when (date + commit), and a reference back to the motivating feature documentation (e.g. `docs/0.19.0/001-IN-PROGRESS/studio-mobile-first/`)
+
+**Sub-steps:**
+
+- [ ] **Step 0.3.1:** `git mv docs/studio-design-standards.md DESIGN-STANDARDS.md`. Update internal cross-references in the file (it currently mentions itself by the old path). Add a "Proposal archive" section pointing at `docs/studio-design/`. Update all references in other files (`.claude/rules/`, session-start skill, etc.) to the new path.
+- [ ] **Step 0.3.2:** Create `docs/studio-design/{ACCEPTED,REJECTED}/` with a top-level `README.md` documenting the contract.
+- [ ] **Step 0.3.3:** Migrate existing decisions into the archive. Each entry's visual representation is a **reference** to the canonical mockup file (in `plugins/deskwork-studio/public/mockups/` or `mockups/retired/`), NEVER a copy. Brief specifies the relative path. Examples to seed:
+  - `ACCEPTED/2026-05-09-collapsible-stage-tiles/brief.md` — operator picked Compact 1; visual ref → `plugins/deskwork-studio/public/mockups/retired/dashboard-compact-1-collapsible.html` for the original mockup, plus a screenshot of the live implementation if useful; brief explains scroll-cost reduction, structure-over-scrolling principle, link to the studio-mobile-first feature dir.
+  - `ACCEPTED/2026-05-09-floating-compose-chip-fab/brief.md` — picked from 1c; visual ref → the retired 1c mockup; brief explains rationale + feature link.
+  - `ACCEPTED/2026-05-09-distribution-as-stage-tile/brief.md` — brief + feature link; visual = inline screenshot of the live tile.
+  - `ACCEPTED/2026-05-09-press-queue-removed/brief.md` — brief explaining review-state-driven rationale; no visual needed (it's a removal).
+  - `REJECTED/2026-05-09-rotated-rubber-stamps-on-mobile/brief.md` — visual ref → `mockups/retired/dashboard-1-press-tabs.html`; brief = relitigated three times, vertical-stack visual noise, retired in favor of structure.
+  - `REJECTED/2026-05-09-filing-tab-stamps-on-mobile/brief.md` — visual ref → `mockups/retired/dashboard-1c-filing-tab-fab.html`; brief = same root cause; the rubber-stamp conceit retired in all forms.
+  - `REJECTED/2026-05-09-letterpress-tag-stamps/brief.md` — visual ref → 1b; brief.
+  - `REJECTED/2026-05-09-rule-bracketed-stamps/brief.md` — visual ref → 1d; brief.
+  - `REJECTED/2026-05-09-card-stream-no-tabs/brief.md` — visual ref → 2; brief.
+  - `REJECTED/2026-05-09-folio-dock-hybrid/brief.md` — visual ref → 3; brief.
+  - `REJECTED/2026-05-09-density-toggle-with-empty-stage-collapse/brief.md` — visual ref → compact-2; brief.
+  - `REJECTED/2026-05-09-attention-first-no-section-heads/brief.md` — visual ref → compact-3; brief.
+  - `REJECTED/2026-05-09-pipeline-press-folio-tabbar/brief.md` — visual ref → 1c (the tabbar shipped in mockup); brief = "Press" tab depended on retired review state.
+  - `REJECTED/2026-05-09-stage-filter-chips/brief.md` — brief = operator never used.
+- [ ] **Step 0.3.4:** `git mv plugins/deskwork-studio/public/mockups/retired/*` into the appropriate REJECTED entry directories — each retired mockup file's new home is its REJECTED archive entry, NEVER duplicated. Update REJECTED brief.md files to reference `mockup.html` (the moved file) directly. Remove the now-empty `mockups/retired/` directory and its README.
+- [ ] **Step 0.3.5:** Update `mockups/index.html` to be a redirect / index pointing at `docs/studio-design/` rather than its current grid of cards.
+- [ ] **Step 0.3.6:** `git mv .claude/rules/studio-design-standards.md .claude/rules/design-standards.md`. Update content to reference the new top-level doc + describe the ACCEPTED/REJECTED contract for the operational rule.
+- [ ] **Step 0.3.7:** ~~Symlink for studio access~~ — superseded. The document-root serveStatic in `a916001` already serves `DESIGN-STANDARDS.md` at `/DESIGN-STANDARDS.md`; nothing extra needed.
+- [ ] **Step 0.3.8:** Operator sign-off on `DESIGN-STANDARDS.md` content + the ACCEPTED/REJECTED archive structure.
+
 **Acceptance for Phase 0:**
 - `DESKWORK-STATE-MACHINE.md` exists at top-level and is operator-approved
 - No UI surfaces review state on any studio page (mobile or desktop)
 - No skill prose gates on review state
 - The journal-event record may keep historical `review-state-change` events for backward compat but no NEW events of that kind are emitted
 - The schema's `ReviewState` type is removed OR explicitly marked `@deprecated — vestigial for sidecar back-compat only`
+- `DESIGN-STANDARDS.md` exists at top-level (renamed from `docs/studio-design-standards.md`) and is operator-approved
+- `docs/studio-design/ACCEPTED/` and `REJECTED/` directories exist and contain entries for every design decision made through 2026-05-09 (each with visual reference + brief + feature reference; **no copied files**)
+- `.claude/rules/design-standards.md` enforces the ACCEPTED/REJECTED contract
+- Both holy docs reachable on phone via the document-root serveStatic at `/DESKWORK-STATE-MACHINE.md` and `/DESIGN-STANDARDS.md` (committed `a916001`)
 - Phase 1 cannot resume until Phase 0 is signed off
 
 ---
