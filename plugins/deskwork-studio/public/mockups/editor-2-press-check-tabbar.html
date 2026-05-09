@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Editor mockup 2 · Press-check tab bar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F5F1E8;
+    --paper-2: #ECE6D4;
+    --paper-3: #DFD7BF;
+    --ink: #1A1614;
+    --faded: #8A7F70;
+    --faded-2: #C7BEAE;
+    --red: #B8362A;
+    --blue: #2A4B7C;
+    --green: #2E5D45;
+    --highlight: #FAEABF;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    --noise:
+      url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #2C2823;
+    background-image:
+      radial-gradient(circle at 30% 20%, rgba(184, 54, 42, 0.08), transparent 50%),
+      radial-gradient(circle at 70% 80%, rgba(42, 75, 124, 0.06), transparent 50%);
+    color: var(--ink);
+    font-family: var(--display);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem 4rem;
+  }
+  .meta {
+    color: #C7BEAE;
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 0.6rem;
+    text-align: center;
+  }
+  .meta a {
+    color: var(--paper);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(245, 241, 232, 0.4);
+  }
+  h1.demo-title {
+    color: var(--paper);
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 36, "wght" 500;
+    font-size: 1.6rem;
+    margin-bottom: 0.4rem;
+    text-align: center;
+  }
+  .demo-sub {
+    color: var(--faded-2);
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 1.6rem;
+    text-align: center;
+  }
+  .frames { display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center; }
+  .frame-wrap { display: flex; flex-direction: column; align-items: center; }
+  .caption {
+    color: #C7BEAE;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-top: 0.8rem;
+    text-align: center;
+    max-width: 410px;
+  }
+  .phone {
+    width: 410px;
+    height: 880px;
+    background: #050505;
+    border-radius: 50px;
+    padding: 12px;
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255,255,255,0.04);
+    position: relative;
+  }
+  .phone::before {
+    content: '';
+    position: absolute;
+    top: 22px; left: 50%;
+    transform: translateX(-50%);
+    width: 110px; height: 30px;
+    background: #000;
+    border-radius: 16px;
+    z-index: 100;
+  }
+  .screen {
+    width: 100%; height: 100%;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-radius: 38px;
+    overflow: hidden;
+    position: relative;
+    font-size: 17px;
+    line-height: 1.55;
+    color: var(--ink);
+  }
+  .ios-clock {
+    position: absolute;
+    top: 28px; left: 32px;
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--ink);
+    z-index: 110;
+  }
+  .ios-icons {
+    position: absolute;
+    top: 30px; right: 32px;
+    color: var(--ink);
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 0.85rem;
+    letter-spacing: 0.05em;
+    z-index: 110;
+  }
+
+  /* ============================================================
+   *  Editor · press-check tab bar
+   *  Direction: same 64px bottom-tab-bar idiom as the mobile
+   *  review surface — but with editor verbs (Format / Notes / Save).
+   *  Mode (Source ↔ Preview) is a strip segment in the top chrome.
+   * ============================================================ */
+
+  /* Top strip (mirrors review surface) */
+  .strip {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 96px;
+    padding: 56px 1rem 0;
+    background: var(--paper);
+    border-bottom: 1px solid var(--red);
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+  }
+  .strip-back {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink);
+    text-decoration: none;
+    padding: 0.28rem 0.5rem;
+    border: 1px solid var(--paper-3);
+    border-radius: 2px;
+  }
+  .stamp {
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 600;
+    font-size: 0.92rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink);
+    border: 2px solid var(--ink);
+    padding: 0.16rem 0.5rem;
+    transform: rotate(-1.5deg);
+    background: var(--paper);
+  }
+  .stamp.editing {
+    border-color: var(--green);
+    color: var(--green);
+  }
+  .strip-mode {
+    margin-left: auto;
+    display: inline-flex;
+    border: 1px solid var(--paper-3);
+    border-radius: 2px;
+    background: var(--paper);
+  }
+  .strip-mode button {
+    border: none;
+    background: transparent;
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faded);
+    padding: 0.42rem 0.7rem;
+    cursor: pointer;
+    border-right: 1px solid var(--paper-3);
+  }
+  .strip-mode button:last-child { border-right: 0; }
+  .strip-mode button.active {
+    background: var(--blue);
+    color: var(--paper);
+  }
+
+  /* Editor area */
+  .editor {
+    position: absolute;
+    top: 96px; left: 0; right: 0; bottom: 64px;
+    overflow-y: auto;
+    padding: 1rem 1.4rem 1.6rem;
+    font-family: var(--mono);
+    font-size: 0.93rem;
+    line-height: 1.55;
+    color: var(--ink);
+  }
+  .editor .line { white-space: pre-wrap; }
+  .editor .ln-h1 { color: var(--red); font-weight: 600; }
+  .editor .ln-h2 { color: var(--blue); }
+  .editor .ln-comment { color: var(--faded); }
+  .editor .ln-bold { font-weight: 600; }
+  .editor .ln-em { font-style: italic; font-family: var(--display); font-size: 1rem; }
+  .editor .caret {
+    display: inline-block;
+    width: 2px;
+    height: 1.1em;
+    background: var(--red);
+    margin-left: -1px;
+    vertical-align: text-bottom;
+    animation: blink 1s steps(2, jump-none) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* Preview pane (frame B variation — replaces editor in preview mode) */
+  .preview {
+    position: absolute;
+    top: 96px; left: 0; right: 0; bottom: 64px;
+    overflow-y: auto;
+    padding: 1.2rem 1.4rem 1.6rem;
+    font-family: var(--display);
+    font-size: 1.04rem;
+    line-height: 1.55;
+    color: var(--ink);
+  }
+  .preview h1 {
+    font-style: italic;
+    font-variation-settings: "opsz" 48, "wght" 500;
+    font-size: 2rem;
+    line-height: 1.1;
+    margin-bottom: 1rem;
+  }
+  .preview h2 {
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink);
+    margin: 1.4rem 0 0.55rem;
+    border-bottom: 1px solid var(--red);
+    padding-bottom: 0.3rem;
+  }
+  .preview p { margin-bottom: 0.8rem; }
+  .preview blockquote {
+    border-left: 3px solid var(--red);
+    padding: 0.4rem 0 0.4rem 0.9rem;
+    margin: 0.7rem 0 1rem;
+    font-style: italic;
+    color: var(--faded);
+  }
+
+  /* Bottom tab bar (mirrors review surface 64px) */
+  .tabbar {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 64px;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-top: 1px solid var(--red);
+    box-shadow: 0 -2px 16px rgba(26,22,20,0.06);
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    z-index: 60;
+  }
+  .tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.18rem;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    padding: 0.4rem 0.4rem 0.6rem;
+    color: var(--faded);
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    position: relative;
+  }
+  .tab .glyph {
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 24, "wght" 500;
+    font-size: 1.5rem;
+    line-height: 1;
+    color: var(--faded);
+  }
+  .tab.active { color: var(--red); }
+  .tab.active .glyph { color: var(--red); }
+  .tab.active::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 50%; transform: translateX(-50%);
+    width: 30px; height: 2px;
+    background: var(--red);
+  }
+  .tab .count {
+    position: absolute;
+    top: 8px; right: 30%;
+    background: var(--red);
+    color: var(--paper);
+    font-size: 0.55rem;
+    line-height: 1;
+    padding: 0.18rem 0.32rem;
+    border-radius: 8px;
+    letter-spacing: 0.04em;
+    min-width: 1rem;
+    text-align: center;
+  }
+  /* Save tab — colored when dirty */
+  .tab.save-tab .glyph { color: var(--paper-3); }
+  .tab.save-tab.dirty {
+    color: var(--green);
+    background: rgba(46, 93, 69, 0.05);
+  }
+  .tab.save-tab.dirty .glyph {
+    color: var(--green);
+    text-shadow: 0 0 0 var(--green);
+  }
+  .tab.save-tab.dirty::before {
+    content: '';
+    position: absolute;
+    top: 12px; right: 32%;
+    width: 6px; height: 6px;
+    background: var(--green);
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px rgba(46, 93, 69, 0.18);
+  }
+
+  /* Format sheet (slides up from bottom) */
+  .sheet {
+    position: absolute;
+    left: 0; right: 0; bottom: 64px;
+    height: 56%;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-top: 1px solid var(--red);
+    box-shadow: 0 -16px 40px rgba(26,22,20,0.18);
+    border-radius: 24px 24px 0 0;
+    z-index: 70;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .sheet-handle {
+    align-self: center;
+    width: 44px;
+    height: 5px;
+    background: var(--paper-3);
+    border-radius: 4px;
+    margin: 0.55rem 0 0.7rem;
+  }
+  .sheet-head {
+    padding: 0 1.4rem 0.7rem;
+    border-bottom: 1px solid var(--red);
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+  }
+  .sheet-kicker {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--red);
+  }
+  .sheet-hint {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+    color: var(--faded);
+    margin-left: auto;
+  }
+  .sheet-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.9rem 1.4rem 1.4rem;
+  }
+
+  /* Press-check format keys */
+  .fkey-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.55rem;
+  }
+  .fkey {
+    background: var(--paper-2);
+    border: 1px solid var(--paper-3);
+    border-radius: 4px;
+    padding: 0.85rem 0.4rem;
+    text-align: center;
+    cursor: pointer;
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    box-shadow: 0 1px 0 rgba(26,22,20,0.06);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+  }
+  .fkey .face {
+    font-family: var(--display);
+    font-size: 1.4rem;
+    line-height: 1;
+    color: var(--ink);
+  }
+  .fkey.h1 .face { color: var(--red); font-weight: 600; font-style: italic; }
+  .fkey.h2 .face { color: var(--blue); font-weight: 500; font-style: italic; }
+  .fkey.h3 .face { color: var(--ink); font-weight: 500; font-style: italic; font-size: 1.15rem; }
+  .fkey.bold .face { font-weight: 700; font-family: var(--display); }
+  .fkey.em .face { font-style: italic; font-family: var(--display); }
+  .fkey.code .face { font-family: var(--mono); font-size: 1rem; background: var(--paper); padding: 0.05rem 0.3rem; border-radius: 2px; }
+  .fkey.link .face { color: var(--red); border-bottom: 2px solid var(--red); padding-bottom: 1px; }
+  .fkey.list .face { font-style: normal; }
+  .fkey.quote .face { font-style: italic; color: var(--faded); font-size: 1.6rem; line-height: 0.9; }
+  .fkey.hr { grid-column: span 2; }
+  .fkey.hr .face { letter-spacing: 0.2em; color: var(--faded); }
+  .fkey.image .face { color: var(--blue); }
+  .fkey.fence .face { font-family: var(--mono); font-size: 0.85rem; }
+  .fkey-section {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--faded);
+    margin: 0.85rem 0 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .fkey-section::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px dashed var(--paper-3);
+  }
+  .fkey-section:first-child { margin-top: 0; }
+
+  .scrim {
+    position: absolute;
+    top: 96px; left: 0; right: 0;
+    bottom: calc(64px + 56%);
+    background: linear-gradient(to bottom, transparent, rgba(245,241,232,0.85));
+    pointer-events: none;
+    z-index: 65;
+  }
+
+  .narrative {
+    margin-top: 2.5rem;
+    max-width: 720px;
+    padding: 0 1rem;
+    color: #C7BEAE;
+    font-family: var(--display);
+    font-size: 0.95rem;
+    line-height: 1.6;
+  }
+  .narrative strong {
+    color: var(--paper);
+    font-style: italic;
+    font-weight: 500;
+  }
+  .narrative em { color: var(--paper); font-style: italic; }
+  .narrative p { margin-bottom: 0.8rem; }
+  .narrative .label {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--red);
+    display: block;
+    margin-bottom: 0.4rem;
+  }
+</style>
+</head>
+<body>
+
+<div class="meta"><a href="./index.html">← all directions</a></div>
+<h1 class="demo-title">Editor 2 · Press-check tab bar.</h1>
+<div class="demo-sub">Continuity with the review surface</div>
+
+<div class="frames">
+
+  <!-- Frame A: source mode, default editing state -->
+  <div class="frame-wrap">
+    <div class="phone">
+      <div class="ios-clock">9:41</div>
+      <div class="ios-icons">·· ◎ ▮▮</div>
+      <div class="screen">
+
+        <div class="strip">
+          <a class="strip-back" href="#">← Studio</a>
+          <span class="stamp editing">Editing</span>
+          <div class="strip-mode">
+            <button class="active">Source</button>
+            <button>Preview</button>
+          </div>
+        </div>
+
+        <div class="editor">
+<div class="line ln-h1"># Deskwork architectural thesis</div>
+<div class="line">&nbsp;</div>
+<div class="line ln-comment">Read this before touching any deskwork code.</div>
+<div class="line">&nbsp;</div>
+<div class="line">This file exists because the thesis was implicit in the project's design but not written down anywhere discoverable, which let the wrong architecture creep into <span class="ln-em">the studio's review surface</span> and waste an angry session correcting it.</div>
+<div class="line">&nbsp;</div>
+<div class="line ln-h2">## The canonical source</div>
+<div class="line">&nbsp;</div>
+<div class="line">&gt; <span class="ln-em">"You never leave the agent for a static tool. You talk to it. It does the work."</span></div>
+<div class="line">&nbsp;</div>
+<div class="line">The agent's toolkit isn't a static configuration you set up once; it evolves, under your direction, in response to <span class="ln-bold">what the work actually needs</span>.<span class="caret"></span></div>
+        </div>
+
+        <div class="tabbar">
+          <button class="tab">
+            <span class="glyph">¶</span>
+            <span>Format</span>
+          </button>
+          <button class="tab">
+            <span class="glyph">✎</span>
+            <span>Notes</span>
+            <span class="count">3</span>
+          </button>
+          <button class="tab save-tab dirty">
+            <span class="glyph">⊕</span>
+            <span>Save</span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+    <div class="caption">A · editing state · stamp turns green · save tab glows · same 64px bottom bar as review</div>
+  </div>
+
+  <!-- Frame B: format sheet open over editor -->
+  <div class="frame-wrap">
+    <div class="phone">
+      <div class="ios-clock">9:41</div>
+      <div class="ios-icons">·· ◎ ▮▮</div>
+      <div class="screen">
+
+        <div class="strip">
+          <a class="strip-back" href="#">← Studio</a>
+          <span class="stamp editing">Editing</span>
+          <div class="strip-mode">
+            <button class="active">Source</button>
+            <button>Preview</button>
+          </div>
+        </div>
+
+        <div class="editor">
+<div class="line ln-h1"># Deskwork architectural thesis</div>
+<div class="line">&nbsp;</div>
+<div class="line ln-comment">Read this before touching any deskwork code.</div>
+<div class="line">&nbsp;</div>
+<div class="line">This file exists because the thesis was implicit in the project's design but not written down anywhere discoverable.</div>
+        </div>
+
+        <div class="scrim"></div>
+
+        <div class="sheet">
+          <div class="sheet-handle"></div>
+          <div class="sheet-head">
+            <span class="sheet-kicker">Format · markdown</span>
+            <span class="sheet-hint">Tap to insert · double-tap holds open</span>
+          </div>
+          <div class="sheet-body">
+            <div class="fkey-section">Headings</div>
+            <div class="fkey-grid">
+              <button class="fkey h1"><span class="face">H1</span><span>Title</span></button>
+              <button class="fkey h2"><span class="face">H2</span><span>Section</span></button>
+              <button class="fkey h3"><span class="face">H3</span><span>Sub</span></button>
+              <button class="fkey hr"><span class="face">— · — · —</span><span>Rule</span></button>
+            </div>
+            <div class="fkey-section">Inline</div>
+            <div class="fkey-grid">
+              <button class="fkey bold"><span class="face">B</span><span>Bold</span></button>
+              <button class="fkey em"><span class="face">I</span><span>Italic</span></button>
+              <button class="fkey code"><span class="face">` `</span><span>Code</span></button>
+              <button class="fkey link"><span class="face">link</span><span>Link</span></button>
+            </div>
+            <div class="fkey-section">Block</div>
+            <div class="fkey-grid">
+              <button class="fkey list"><span class="face">— · —<br>— · —</span><span>List</span></button>
+              <button class="fkey list"><span class="face">1·<br>2·</span><span>Numbered</span></button>
+              <button class="fkey quote"><span class="face">"</span><span>Quote</span></button>
+              <button class="fkey fence"><span class="face">```</span><span>Code block</span></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="tabbar">
+          <button class="tab active">
+            <span class="glyph">¶</span>
+            <span>Format</span>
+          </button>
+          <button class="tab">
+            <span class="glyph">✎</span>
+            <span>Notes</span>
+            <span class="count">3</span>
+          </button>
+          <button class="tab save-tab dirty">
+            <span class="glyph">⊕</span>
+            <span>Save</span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+    <div class="caption">B · format sheet open · press-check keys grouped by function · 56% sheet height</div>
+  </div>
+
+</div>
+
+<div class="narrative">
+  <p><span class="label">Pattern</span><strong>Same bottom-tab-bar idiom as the review surface</strong> — 64px, three tabs, glyph + label + count badge, red-pencil active accent. The editor inherits the operator's muscle memory: tabs sit where they're expected, sheets slide up the same way, the article is always visible behind a scrim. The operator transitions Review ↔ Edit and the bottom of the screen barely changes shape.</p>
+  <p><span class="label">Tabs</span><em>Format</em> opens a sheet of markdown press-check keys (H1/H2/H3, B/I/code/link, list/numbered/quote/fence) grouped by function. <em>Notes</em> opens the same sheet from the review surface (4 / 5 / 3 — always the live count). <em>Save</em> is the third slot — green when dirty, faded when clean, with a glowing dot and the kicker turning green to mirror the stamp on top. Tap = direct save.</p>
+  <p><span class="label">Mode (Source ↔ Preview)</span>Lives in the strip on the right side, not in the tab bar — because mode is a <em>view of the same thing</em>, not a peer action. Two-state pill in proof-blue. No Split (desktop luxury, hostile on phone per #239).</p>
+  <p><span class="label">Stage stamp turns green when editing</span>Subtle but loud — the rotated stamp on top has been the press-check signature throughout. In edit mode it shifts to stamp-green, signaling "you are mutating this entry." Closes the loop on #228 (operator can't tell the editor is dirty) and #241 (chrome should match the writing context, not just be dismissable).</p>
+  <p><span class="label">Why this is right</span>The review surface's mobile rebuild was operator-validated. This direction reuses the SAME chrome shape with editor-flavored verbs. The cost of remembering the editor's UX is zero — it's the review UX with three different verbs. The trade-off vs. Mockup 1: more chrome at rest (96px top + 64px bottom = 160px), fewer accessory affordances above the keyboard. The win is continuity; the cost is some viewport real estate.</p>
+</div>
+
+</body>
+</html>

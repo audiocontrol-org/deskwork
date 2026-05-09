@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Editor mockup 3 · Writing room</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F5F1E8;
+    --paper-2: #ECE6D4;
+    --paper-3: #DFD7BF;
+    --ink: #1A1614;
+    --faded: #8A7F70;
+    --faded-2: #C7BEAE;
+    --red: #B8362A;
+    --blue: #2A4B7C;
+    --green: #2E5D45;
+    --highlight: #FAEABF;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    --noise:
+      url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #2C2823;
+    background-image:
+      radial-gradient(circle at 30% 20%, rgba(184, 54, 42, 0.08), transparent 50%),
+      radial-gradient(circle at 70% 80%, rgba(42, 75, 124, 0.06), transparent 50%);
+    color: var(--ink);
+    font-family: var(--display);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem 4rem;
+  }
+  .meta {
+    color: #C7BEAE;
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 0.6rem;
+    text-align: center;
+  }
+  .meta a {
+    color: var(--paper);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(245, 241, 232, 0.4);
+  }
+  h1.demo-title {
+    color: var(--paper);
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 36, "wght" 500;
+    font-size: 1.6rem;
+    margin-bottom: 0.4rem;
+    text-align: center;
+  }
+  .demo-sub {
+    color: var(--faded-2);
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 1.6rem;
+    text-align: center;
+  }
+  .frames { display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center; }
+  .frame-wrap { display: flex; flex-direction: column; align-items: center; }
+  .caption {
+    color: #C7BEAE;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-top: 0.8rem;
+    text-align: center;
+    max-width: 410px;
+  }
+  .phone {
+    width: 410px;
+    height: 880px;
+    background: #050505;
+    border-radius: 50px;
+    padding: 12px;
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255,255,255,0.04);
+    position: relative;
+  }
+  .phone::before {
+    content: '';
+    position: absolute;
+    top: 22px; left: 50%;
+    transform: translateX(-50%);
+    width: 110px; height: 30px;
+    background: #000;
+    border-radius: 16px;
+    z-index: 100;
+  }
+  .screen {
+    width: 100%; height: 100%;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-radius: 38px;
+    overflow: hidden;
+    position: relative;
+    font-size: 17px;
+    line-height: 1.55;
+    color: var(--ink);
+  }
+  .ios-clock {
+    position: absolute;
+    top: 28px; left: 32px;
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--ink);
+    z-index: 110;
+  }
+  .ios-icons {
+    position: absolute;
+    top: 30px; right: 32px;
+    color: var(--ink);
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 0.85rem;
+    letter-spacing: 0.05em;
+    z-index: 110;
+  }
+
+  /* ============================================================
+   *  Editor · writing room
+   *  Direction: chrome auto-hides; the editor IS the page.
+   *  Edge pull-tabs reveal trays on demand. The keyboard
+   *  accessory bar (markdown helpers) is the only persistent UI.
+   * ============================================================ */
+
+  /* Editor takes the full screen */
+  .editor {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    overflow-y: auto;
+    padding: 92px 1.6rem 1.6rem;
+    font-family: var(--display);
+    font-size: 1.1rem;
+    line-height: 1.6;
+    color: var(--ink);
+  }
+  .editor.with-keyboard { bottom: 290px; padding-bottom: 56px; }
+  .editor h1 {
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 48, "wght" 500;
+    font-size: 2rem;
+    line-height: 1.1;
+    margin-bottom: 1rem;
+  }
+  .editor h2 {
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink);
+    margin: 1.4rem 0 0.55rem;
+    border-bottom: 1px solid var(--red);
+    padding-bottom: 0.3rem;
+  }
+  .editor p { margin-bottom: 0.8rem; }
+  .editor blockquote {
+    border-left: 3px solid var(--red);
+    padding: 0.4rem 0 0.4rem 0.9rem;
+    margin: 0.7rem 0 1rem;
+    font-style: italic;
+    color: var(--faded);
+  }
+  .editor strong { font-weight: 600; }
+  .editor em { font-style: italic; }
+  .editor .caret {
+    display: inline-block;
+    width: 2px;
+    height: 1.1em;
+    background: var(--red);
+    margin-left: -1px;
+    vertical-align: text-bottom;
+    animation: blink 1s steps(2, jump-none) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* Top edge — tiny pull-tab when chrome is hidden */
+  .pull-top {
+    position: absolute;
+    top: 56px; left: 50%;
+    transform: translateX(-50%);
+    width: 64px; height: 22px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    z-index: 90;
+    background: linear-gradient(to bottom, rgba(245,241,232,0.95), rgba(245,241,232,0));
+  }
+  .pull-top::after {
+    content: '';
+    width: 38px; height: 4px;
+    border-radius: 4px;
+    background: var(--paper-3);
+    margin-bottom: 4px;
+  }
+
+  /* Top tray (revealed when pulled) */
+  .toptray {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 96px;
+    padding: 56px 1rem 0;
+    background: var(--paper);
+    border-bottom: 1px solid var(--red);
+    z-index: 95;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    box-shadow: 0 4px 12px rgba(26,22,20,0.06);
+  }
+  .toptray .back {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    border: 1px solid var(--paper-3);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 1.1rem;
+    color: var(--ink);
+    background: var(--paper);
+    text-decoration: none;
+  }
+  .toptray .stamp {
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 600;
+    font-size: 0.88rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--green);
+    border: 2px solid var(--green);
+    padding: 0.14rem 0.45rem;
+    transform: rotate(-1.5deg);
+    background: var(--paper);
+  }
+  .toptray .mode {
+    margin-left: auto;
+    display: inline-flex;
+    border: 1px solid var(--paper-3);
+    border-radius: 2px;
+  }
+  .toptray .mode button {
+    border: none;
+    background: transparent;
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faded);
+    padding: 0.36rem 0.55rem;
+    cursor: pointer;
+    border-right: 1px solid var(--paper-3);
+  }
+  .toptray .mode button:last-child { border-right: 0; }
+  .toptray .mode button.active { background: var(--blue); color: var(--paper); }
+  .toptray .save-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-left: 0.45rem;
+    padding: 0.32rem 0.6rem;
+    border-radius: 2px;
+    background: var(--green);
+    color: var(--paper);
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    border: none;
+    cursor: pointer;
+  }
+  .toptray .save-state .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--paper);
+  }
+
+  /* Bottom-edge pull-tab (above keyboard) */
+  .pull-bottom {
+    position: absolute;
+    bottom: 290px; left: 50%;
+    transform: translateX(-50%);
+    width: 64px; height: 18px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    z-index: 90;
+    background: linear-gradient(to top, rgba(245,241,232,0.95), rgba(245,241,232,0));
+  }
+  .pull-bottom::after {
+    content: '';
+    width: 38px; height: 4px;
+    border-radius: 4px;
+    background: var(--paper-3);
+    margin-top: 4px;
+  }
+
+  /* Bottom tray (revealed when pulled up; sits on top of keyboard accessory) */
+  .bottomtray {
+    position: absolute;
+    left: 0; right: 0; bottom: 290px;
+    height: 56px;
+    background: var(--paper);
+    border-top: 1px solid var(--paper-3);
+    border-bottom: 1px solid var(--paper-3);
+    display: flex;
+    align-items: stretch;
+    z-index: 96;
+    box-shadow: 0 -2px 8px rgba(26,22,20,0.06);
+  }
+  .bottomtray button {
+    flex: 1;
+    border: none;
+    background: transparent;
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink);
+    cursor: pointer;
+    border-right: 1px solid var(--paper-3);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+  }
+  .bottomtray button:last-child { border-right: 0; }
+  .bottomtray button .glyph {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 1.1rem;
+    color: var(--red);
+  }
+  .bottomtray button .count { color: var(--red); margin-left: 0.1rem; }
+  .bottomtray button.discard { color: var(--faded); }
+  .bottomtray button.discard .glyph { color: var(--faded); }
+
+  /* Keyboard accessory bar (always visible above keyboard — the one persistent UI) */
+  .accessory {
+    position: absolute;
+    bottom: 290px; left: 0; right: 0;
+    height: 44px;
+    background: var(--paper-2);
+    border-top: 1px solid var(--paper-3);
+    border-bottom: 1px solid var(--paper-3);
+    display: flex;
+    align-items: stretch;
+    overflow-x: auto;
+    z-index: 70;
+    box-shadow: 0 -2px 8px rgba(26,22,20,0.04);
+  }
+  .accessory button {
+    flex-shrink: 0;
+    border: none;
+    border-right: 1px solid var(--paper-3);
+    background: transparent;
+    padding: 0 0.85rem;
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    color: var(--ink);
+    cursor: pointer;
+    min-width: 52px;
+  }
+  .accessory button .face {
+    font-family: var(--display);
+    font-size: 0.95rem;
+  }
+  .accessory button.bold .face { font-weight: 700; }
+  .accessory button.em .face { font-style: italic; }
+  .accessory button.code .face { font-family: var(--mono); background: var(--paper); padding: 0.04rem 0.24rem; border-radius: 2px; font-size: 0.72rem; }
+  .accessory .spacer { flex: 1; border-right: 0; }
+
+  /* Mock iOS keyboard */
+  .keyboard {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 290px;
+    background: linear-gradient(to bottom, #CDD1D7, #C0C5CC);
+    z-index: 60;
+    padding: 0.5rem 0.4rem 0.8rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  .keyboard .row {
+    display: flex;
+    gap: 0.32rem;
+    flex: 1;
+  }
+  .keyboard .key {
+    flex: 1;
+    background: linear-gradient(to bottom, #FCFCFD, #E5E8EC);
+    border-radius: 5px;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 1.1rem;
+    color: #1A1614;
+  }
+  .keyboard .key.wide { flex: 1.4; font-size: 0.85rem; color: #4A4F55; }
+  .keyboard .key.space { flex: 5.2; font-size: 0.85rem; color: #4A4F55; }
+  .keyboard .key.shift { background: #ABB0B6; }
+  .keyboard .indicator {
+    width: 110px; height: 4px; background: #1A1614;
+    border-radius: 4px; margin: 0.4rem auto 0;
+    opacity: 0.4;
+  }
+
+  /* Word count, faintly visible top-right corner of editor when chrome hidden */
+  .wordcount {
+    position: absolute;
+    top: 56px; right: 1rem;
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--faded-2);
+    z-index: 80;
+  }
+  .wordcount strong { color: var(--faded); font-weight: 500; }
+
+  .narrative {
+    margin-top: 2.5rem;
+    max-width: 720px;
+    padding: 0 1rem;
+    color: #C7BEAE;
+    font-family: var(--display);
+    font-size: 0.95rem;
+    line-height: 1.6;
+  }
+  .narrative strong {
+    color: var(--paper);
+    font-style: italic;
+    font-weight: 500;
+  }
+  .narrative em { color: var(--paper); font-style: italic; }
+  .narrative p { margin-bottom: 0.8rem; }
+  .narrative .label {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--red);
+    display: block;
+    margin-bottom: 0.4rem;
+  }
+</style>
+</head>
+<body>
+
+<div class="meta"><a href="./index.html">← all directions</a></div>
+<h1 class="demo-title">Editor 3 · Writing room.</h1>
+<div class="demo-sub">Distraction-free; chrome appears on demand</div>
+
+<div class="frames">
+
+  <!-- Frame A: chrome fully hidden, editor fills viewport, keyboard up, accessory only -->
+  <div class="frame-wrap">
+    <div class="phone">
+      <div class="ios-clock">9:41</div>
+      <div class="ios-icons">·· ◎ ▮▮</div>
+      <div class="screen">
+
+        <div class="pull-top"></div>
+        <div class="wordcount"><strong>1,247</strong> · words</div>
+
+        <div class="editor with-keyboard">
+          <h1>Deskwork architectural thesis.</h1>
+          <p>Read this before touching any deskwork code.</p>
+          <p>This file exists because the thesis was implicit in the project's design but not written down anywhere discoverable, which let the wrong architecture creep into <em>the studio's review surface</em> and waste an angry session correcting it. The thesis is the contract; the code below it must conform.<span class="caret"></span></p>
+          <h2>The canonical source</h2>
+          <blockquote>"You never leave the agent for a static tool. You talk to it. It does the work."</blockquote>
+          <p>The agent's toolkit isn't a static configuration you set up once; it evolves, under your direction, in response to <strong>what the work actually needs</strong>.</p>
+        </div>
+
+        <div class="pull-bottom"></div>
+
+        <div class="accessory">
+          <button class="bold"><span class="face"><strong>B</strong></span></button>
+          <button class="em"><span class="face"><em>I</em></span></button>
+          <button class="code"><span class="face"><code>` `</code></span></button>
+          <button><span class="face">H1</span></button>
+          <button><span class="face">H2</span></button>
+          <button><span class="face">link</span></button>
+          <button><span class="face">list</span></button>
+          <button><span class="face">"</span></button>
+          <span class="spacer"></span>
+          <button title="Undo">↶</button>
+        </div>
+
+        <div class="keyboard">
+          <div class="row">
+            <div class="key">q</div><div class="key">w</div><div class="key">e</div><div class="key">r</div><div class="key">t</div><div class="key">y</div><div class="key">u</div><div class="key">i</div><div class="key">o</div><div class="key">p</div>
+          </div>
+          <div class="row" style="padding: 0 1.4rem;">
+            <div class="key">a</div><div class="key">s</div><div class="key">d</div><div class="key">f</div><div class="key">g</div><div class="key">h</div><div class="key">j</div><div class="key">k</div><div class="key">l</div>
+          </div>
+          <div class="row">
+            <div class="key shift">⇧</div><div class="key">z</div><div class="key">x</div><div class="key">c</div><div class="key">v</div><div class="key">b</div><div class="key">n</div><div class="key">m</div><div class="key shift">⌫</div>
+          </div>
+          <div class="row">
+            <div class="key wide">123</div><div class="key wide">🌐</div><div class="key space">space</div><div class="key wide">return</div>
+          </div>
+          <div class="indicator"></div>
+        </div>
+
+      </div>
+    </div>
+    <div class="caption">A · writing state · only the keyboard accessory + two pull-tabs visible · 1,247 words · word count is the only chrome over the editor</div>
+  </div>
+
+  <!-- Frame B: both trays pulled out -->
+  <div class="frame-wrap">
+    <div class="phone">
+      <div class="ios-clock">9:41</div>
+      <div class="ios-icons">·· ◎ ▮▮</div>
+      <div class="screen">
+
+        <div class="toptray">
+          <a class="back" href="#">←</a>
+          <span class="stamp">Editing</span>
+          <div class="mode">
+            <button class="active">Source</button>
+            <button>Preview</button>
+          </div>
+          <button class="save-state"><span class="dot"></span>Save</button>
+        </div>
+
+        <div class="editor with-keyboard" style="padding-top: 1.2rem;">
+          <h1>Deskwork architectural thesis.</h1>
+          <p>Read this before touching any deskwork code.</p>
+          <p>This file exists because the thesis was implicit in the project's design but not written down anywhere discoverable, which let the wrong architecture creep into <em>the studio's review surface</em> and waste an angry session correcting it.<span class="caret"></span></p>
+        </div>
+
+        <div class="bottomtray">
+          <button>
+            <span class="glyph">¶</span>Format
+          </button>
+          <button>
+            <span class="glyph">✎</span>Notes<span class="count">3</span>
+          </button>
+          <button>
+            <span class="glyph">§</span>Outline
+          </button>
+          <button class="discard">
+            <span class="glyph">⊘</span>Discard
+          </button>
+        </div>
+
+        <div class="accessory">
+          <button class="bold"><span class="face"><strong>B</strong></span></button>
+          <button class="em"><span class="face"><em>I</em></span></button>
+          <button class="code"><span class="face"><code>` `</code></span></button>
+          <button><span class="face">H1</span></button>
+          <button><span class="face">H2</span></button>
+          <button><span class="face">link</span></button>
+          <button><span class="face">list</span></button>
+          <button><span class="face">"</span></button>
+          <span class="spacer"></span>
+          <button title="Undo">↶</button>
+        </div>
+
+        <div class="keyboard">
+          <div class="row">
+            <div class="key">q</div><div class="key">w</div><div class="key">e</div><div class="key">r</div><div class="key">t</div><div class="key">y</div><div class="key">u</div><div class="key">i</div><div class="key">o</div><div class="key">p</div>
+          </div>
+          <div class="row" style="padding: 0 1.4rem;">
+            <div class="key">a</div><div class="key">s</div><div class="key">d</div><div class="key">f</div><div class="key">g</div><div class="key">h</div><div class="key">j</div><div class="key">k</div><div class="key">l</div>
+          </div>
+          <div class="row">
+            <div class="key shift">⇧</div><div class="key">z</div><div class="key">x</div><div class="key">c</div><div class="key">v</div><div class="key">b</div><div class="key">n</div><div class="key">m</div><div class="key shift">⌫</div>
+          </div>
+          <div class="row">
+            <div class="key wide">123</div><div class="key wide">🌐</div><div class="key space">space</div><div class="key wide">return</div>
+          </div>
+          <div class="indicator"></div>
+        </div>
+
+      </div>
+    </div>
+    <div class="caption">B · both trays pulled out · top: back / stamp / mode / save · bottom: format / notes / outline / discard · trays auto-hide after ~2s of typing</div>
+  </div>
+
+</div>
+
+<div class="narrative">
+  <p><span class="label">Pattern</span><strong>The editor IS the page.</strong> No top strip, no bottom tab bar, no sheets at rest. Two thin pull-tabs sit on the top and bottom edges (above the keyboard). Pulling one out reveals a tray that auto-hides after ~2s of typing. The keyboard accessory bar (B / I / code / H1 / H2 / link / list / quote) is the ONLY persistent UI when typing — the markdown helpers, always at the thumb.</p>
+  <p><span class="label">Top tray</span>Pull down to reveal: back glyph, stage stamp (rotated, green when editing), Source/Preview pill, Save action button (stamp-green when dirty, faded when clean). The save state is visible only when the operator has pulled the tray — but a tiny corner-of-eye indicator (the green-ringed pull-tab when dirty, neutral when clean) gives a lower-fidelity signal at all times.</p>
+  <p><span class="label">Bottom tray</span>Pull up to reveal: Format / Notes / Outline / Discard. Format opens a sheet of markdown press-check keys (same as Mockup 2). Notes opens the same Notes sheet from review. Outline opens the table of contents. Discard exits without saving. All four trays slide up over the keyboard accessory; the accessory remains the bottom-most thing.</p>
+  <p><span class="label">Word count</span>A faded mono label in the top-right corner — "1,247 words" — is visible at all times. Editorial language preserved: literal press-check counter, not a chrome element.</p>
+  <p><span class="label">Why this is right (and the trade-off)</span>The current edit toolbar (#239) crams 9 chrome elements into a row that wraps on phone. This direction goes <em>past</em> minimal toward absent — the chrome IS hidden by default, revealed by pull-gesture. Best for sustained writing sessions where the operator just wants to type. The cost: discoverability. Operators have to learn that pull-tabs reveal trays. Mitigation: subtle pulse-once animation on the pull-tabs at edit-mode entry, so the tabs announce themselves the first time. The most opinionated direction; trades familiarity for focus.</p>
+</div>
+
+</body>
+</html>
