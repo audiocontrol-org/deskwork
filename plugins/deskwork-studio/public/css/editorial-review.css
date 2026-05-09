@@ -3753,6 +3753,20 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
     right: auto !important;
   }
 
+  /* Pin the "MARGIN NOTES" head to the TOP of the drawer (not to the
+   * page chrome's bottom). The desktop rule sets
+   *   top: var(--er-chrome-bottom, 7rem)
+   * because marginalia is in-flow inside the page's scroll context —
+   * sticky binds against the viewport and the head pins below the
+   * fixed strip. Inside the drawer (its own overflow-y: auto scroll
+   * container) sticky binds against the drawer; `top: 124px` would
+   * pin the head 124px DOWN from the drawer's top edge instead of
+   * at the top. Override to `top: 0` so the head pins at the drawer's
+   * top edge as the operator scrolls notes inside it. */
+  [data-review-ui="longform"] .er-marginalia-head {
+    top: 0 !important;
+  }
+
 
   /* Scrapbook drawer (Dispatch D): the bottom-anchored drawer is now
    * the primary scrapbook surface and remains visible at narrow widths.
