@@ -24,7 +24,7 @@ Triage the open-issue tracker for the `deskwork`, `deskwork-studio`, and support
 | 8 | Extend entry-aware addressing to scrapbook viewer + link emitters (#205) | Fix-landed (pending v0.16.0 verification); #207 split fix-landed |
 | 9 | Ingest defaults to Drafting per add/ingest semantic distinction (#206) | Fix-landed (pending v0.16.0 verification) |
 | 10 | Evaluate + fix dogfood bugs from v0.16.0 walk (#220, #221, #223, #224, #225, #226) | Folded into Phase 11 / T6 |
-| 11 | Tranche-organized burn-down (T1: #222 first; then T6, T2, T3, T4, T5; T7 in parallel) | T1 + T6 fix-landed; T2 fix-landed (8 of 9 issues; #215 issue 2 deferred); T5 partial: studio mobile UX rebuild fix-landed (12 commits, 2026-05-08, see DEVELOPMENT-NOTES) — strip compaction + sticky-fix + collapse-on-scroll + dual-viewport rule + Mockup-1 mobile-first review surface; T3, T4, T7 not started |
+| 11 | Tranche-organized burn-down (T1: #222 first; then T6, T2, T3, T4, T5; T7 in parallel) | T1 + T6 fix-landed; T2 fix-landed (8 of 9 issues; #215 issue 2 deferred); T5 partial: review-surface mobile rebuild fix-landed (12 commits, 2026-05-08); editor mobile rebuild (Mockup 2) + scrapbook mobile (Mockup 1) fix-landed 2026-05-09 (commits `cdc184a`–`23cb111`); review-driven cleanup applied 7 findings, 1 deferred to [#245](https://github.com/audiocontrol-org/deskwork/issues/245); T3, T4, T7 not started |
 
 ## Key Links
 
