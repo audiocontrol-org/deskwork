@@ -3,12 +3,13 @@
  *
  * Pipeline-redesign Task 34. The masthead reads from sidecar-derived
  * counts (total entries, in-review entries) instead of the legacy
- * workflow store. The filter strip exposes one chip per stage so
- * operators can collapse to a single section quickly.
+ * workflow store. The filter strip is a search-only row; stage chips
+ * were removed in v0.19 (they were never used and added chrome noise).
+ * The collapsible stage tiles on mobile now serve the per-stage
+ * navigation role chips used to.
  */
 
 import type { DashboardData } from './data.ts';
-import { DASHBOARD_STAGE_ORDER } from './data.ts';
 import { html, unsafe, type RawHtml } from '../html.ts';
 import { getStudioVersion } from '../../lib/version.ts';
 
@@ -72,12 +73,5 @@ export function renderFilterStrip(): RawHtml {
     <section class="er-filter" data-filter-strip>
       <span class="er-filter-label">Find</span>
       <input type="search" data-filter-input placeholder="slug, title…" autocomplete="off" />
-      <span class="er-filter-label er-filter-label--gap">Stage</span>
-      <div class="er-chips" role="tablist">
-        <button class="er-chip" aria-pressed="true" data-stage-chip="all">all</button>
-        ${DASHBOARD_STAGE_ORDER.map(
-          (s) => unsafe(html`<button class="er-chip" data-stage-chip="${s}">${s.toLowerCase()}</button>`),
-        )}
-      </div>
     </section>`);
 }
