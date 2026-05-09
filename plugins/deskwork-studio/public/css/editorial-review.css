@@ -4169,8 +4169,18 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
  *     / file paths can't overflow.
  *   - .er-page + .er-edit-preview get min-width: 0 so grid/flex parents
  *     don't claim intrinsic content width.
- *   - body gets overflow-x: hidden as defense-in-depth — any new
- *     offender stays contained without re-opening a page-level scroll.
+ *   - html / body get `overflow-x: clip` (set above at the top of this
+ *     phone block) as defense-in-depth — any new offender stays
+ *     contained without re-opening a page-level scroll.
+ *     CRITICAL: do NOT use `overflow-x: hidden` on body here. `hidden`
+ *     creates a scrolling box that becomes the containing block for any
+ *     `position: sticky` descendant — including `.er-strip` — and the
+ *     sticky element scrolls away with the content instead of pinning
+ *     to the viewport. `clip` does the same containment without
+ *     creating a scroll container, so sticky still binds to the
+ *     viewport. The decision-strip's whole job on phone is to stay
+ *     pinned at the top so the operator can hit Approve/Iterate/etc.
+ *     while reading; `hidden` here silently broke that.
  *
  * Desktop layout untouched; every rule is gated by the media query.
  * --------------------------------------------------------------------- */
@@ -4183,9 +4193,6 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
    * box solves to parent-minus-margins. */
   .er-page {
     width: auto;
-  }
-  body {
-    overflow-x: hidden;
   }
   .er-page,
   .er-edit-preview {
