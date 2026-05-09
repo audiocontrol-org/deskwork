@@ -34,16 +34,14 @@ There is no "review state." There is no "in review" state. There is no "iteratin
 ## The stages — the only state machine
 
 ```
-                                                  ┌───────────┐
    Ideas ──→ Planned ──→ Outlining ──→ Drafting ──→ Final ──→ Published
-       \         \          \           \         \         \
-        \         \          \           \         \         \
-         \         \          \           \         \         \
-                            ┌──────┐                          (Published is terminal
-                            │      │                           — the published file
-                  ◀━━━━━━━━━┤Blocked│━━━━━━━━━━━▶              is on disk; the entry
-                            │      │                           does not advance further.)
-                            └──────┘
+                                                                  (Published is terminal:
+                                                                   publicly committed and
+                                                                   immutable, like an npm
+                            ┌──────┐                               publish. To revise,
+                  ◀━━━━━━━━━┤Blocked│━━━━━━━━━━━▶                  create a new version
+                            └──────┘                               and induct it into a
+                                                                   non-terminal stage.)
                             ┌─────────┐
                   ◀━━━━━━━━━┤Cancelled│━━━━━━━━━━▶
                             └─────────┘
@@ -57,8 +55,8 @@ There is no "review state." There is no "in review" state. There is no "iteratin
 | **Planned** | Committed to publish; pre-outline groundwork | (varies) |
 | **Outlining** | Outline drafted; structural review | `outline.md` |
 | **Drafting** | Body of the entry being written | `draft.md` (or final filename) |
-| **Final** | Body is done; final pre-publication editorial pass | (same file as Drafting) |
-| **Published** | Published to the destination collection / website | The on-disk file |
+| **Final** | Content is locked — ready to publish, no further edits or iterations allowed in this stage. Approve forward to Published; induct backward to a previous stage to unlock for editing. | (same file as Drafting, frozen) |
+| **Published** | Terminal stage. Publicly committed and immutable, like an npm publish — the version is locked and visible to the world, no take-backs. Can be deleted (recall) but not modified. To revise: create a new version and induct it into a non-terminal stage; the published version stays as it was. The published item's filesystem disposition is NOT part of the semantics — what matters is that it's been publicly committed. | (immutable; location is not part of the contract) |
 
 ### The two off-pipeline stages
 
@@ -75,28 +73,28 @@ Verbs are operations the operator performs on an entry. They are not states. An 
 
 **What it means:** the agent examines the entry's content artifact for operator marginalia (margin notes left in the studio's review surface) and reacts to them — typically by editing the file to address each note.
 
-**When it can be invoked:** on any entry at any time. There is no "iterating state" gate. If the entry has marginalia, iterate addresses it. If the entry has no marginalia, iterate is a no-op.
+**When it can be invoked:** on any entry whose stage permits content edits — Ideas, Planned, Outlining, Drafting. There is no "iterating state" gate; the gate is purely stage-based. NOT in Final (Final locks the content; to iterate, induct backward to Drafting first). NOT in Published (Published is immutable; create a new version + induct). NOT in Blocked / Cancelled (off-pipeline; induct back first).
 
 **What it changes:** the content artifact on disk (per the agent's edits in response to marginalia). May also bump an iteration counter for telemetry / journal purposes (NOT a user-facing state).
 
-**Studio surfacing:** every active-pipeline row's affordance set includes `/deskwork:iterate <slug>` (clipboard-copy). Not gated on any state.
+**Studio surfacing:** every row whose stage permits edits (Ideas / Planned / Outlining / Drafting) includes `/deskwork:iterate <slug>` (clipboard-copy). Not gated on any state — only on stage.
 
 ### `approve`
 
 **What it means:** graduate the entry to the next stage of the linear pipeline.
 
-**When it can be invoked:** on any entry whose current stage is on the linear pipeline AND has a next stage. Specifically:
+**When it can be invoked:** on any entry whose current stage is on the linear pipeline AND has a next stage. The verb is universal — it works the same way at every transition. Specifically:
 - Ideas → Planned: yes
 - Planned → Outlining: yes
 - Outlining → Drafting: yes
 - Drafting → Final: yes
-- Final → Published: NO — `publish` is the verb for graduating to Published. Approve refuses on Final.
-- Published: NO — terminal stage.
+- Final → Published: yes — approve graduates Final to Published, same as every other linear-pipeline transition. (See `publish` below — it's an optional clarity-alias for approve at this transition, not a separate operation.)
+- Published: NO — terminal stage; immutable. To revise a published item, create a NEW version and induct it into a non-terminal stage; the existing published version stays as-is.
 - Blocked, Cancelled: NO — off-pipeline. Use `induct` to re-enter.
 
-**What it changes:** `currentStage` advances by one position in the linear pipeline. The next stage's primary artifact is scaffolded from the just-approved file. A `stage-transition` journal event is appended.
+**What it changes:** `currentStage` advances by one position in the linear pipeline. The next stage's primary artifact is scaffolded from the just-approved file (where applicable). A `stage-transition` journal event is appended.
 
-**Studio surfacing:** every active-pipeline row whose stage has a next stage shows `/deskwork:approve <slug>` (clipboard-copy). Not gated on any "review state."
+**Studio surfacing:** every active-pipeline row whose stage has a next stage shows `/deskwork:approve <slug>` (clipboard-copy) — including Final → Published. Not gated on any "review state."
 
 ### `cancel`
 
@@ -114,7 +112,7 @@ Verbs are operations the operator performs on an entry. They are not states. An 
 
 ### `publish`
 
-**`publish`** is a specialized form of approve for the Final → Published transition. It exists separately from `approve` because Published has different semantics (the file gets pushed to the destination collection). The verb name disambiguates.
+**`publish`** is an optional clarity-alias for `approve` at the Final → Published transition. It exists only for prose clarity — when the operator says "publish my-entry," the meaning is unambiguous. For consistency, `approve` is the universal verb and works at every transition including Final → Published; either name accomplishes the same thing. Do **not** implement `publish` as a separate operation with different semantics — Final → Published is a stage graduation like any other. The "different semantics" of Published (immutability, public commitment) live in the STAGE's contract, not in a special verb.
 
 ### `add` and `ingest`
 
@@ -151,15 +149,15 @@ These are the operational rules derived from the framing above. Violations are b
 
 ### I. The state is the stage. Nothing else is state.
 
-Any code that branches on something other than `entry.currentStage` to decide whether a stage transition is allowed is wrong. Legitimate branches: stage gates (e.g., approve refuses on Final). Illegitimate branches: gating on `reviewState`, on iteration count, on "is this entry approved", on any inferred state.
+Any code that branches on something other than `entry.currentStage` to decide whether a stage transition is allowed is wrong. Legitimate branches: stage gates (e.g., approve refuses on Published since it's terminal; iterate refuses on Final since the content is locked; cancel refuses on Cancelled since it's already there). Illegitimate branches: gating on `reviewState`, on iteration count, on "is this entry approved", on any inferred state.
 
 ### II. Verbs are universal.
 
-Any verb (iterate, approve, cancel) that is conditionally hidden / gated / disabled because of any property other than the entry's stage is a violation. Specifically:
-- The dashboard's iterate button is **not** gated on `reviewState === 'iterating'`. Iterate is available on any active-pipeline row.
-- The dashboard's approve button is **not** gated on `reviewState === 'approved'`. Approve is available on any active-pipeline row whose stage has a next stage.
+Any verb (iterate, approve, cancel) that is conditionally hidden / gated / disabled because of any property other than the entry's stage is a violation. Stage-based gates ARE legitimate (per Commandment I); state-based gates are not. Specifically:
+- The dashboard's iterate button is **not** gated on `reviewState === 'iterating'`. Iterate is available on rows whose stage permits edits (Ideas / Planned / Outlining / Drafting).
+- The dashboard's approve button is **not** gated on `reviewState === 'approved'`. Approve is available on any active-pipeline row whose stage has a next stage — INCLUDING Final → Published.
 - The dashboard's cancel button is **not** gated on any reviewState. Cancel is available on any row whose stage isn't already Cancelled.
-- Cross-cutting affordances (publish on Final, induct on Blocked/Cancelled) are gated by stage only.
+- Induct is gated by stage (Blocked / Cancelled only — induct re-enters the pipeline from off-pipeline; alternative use is to back out a Final entry to Drafting for further iteration).
 
 ### III. Review state is retired. Never surface it.
 
@@ -173,7 +171,7 @@ The skill prose for `/deskwork:iterate` describes this exact loop: read margin n
 
 ### V. Approve-as-verb means "graduate the stage."
 
-The skill prose for `/deskwork:approve` describes this exact action: load the sidecar, validate the stage gate (linear pipeline + has-next-stage), advance `currentStage`, scaffold the next-stage artifact from the just-approved file, journal a `stage-transition` event, regenerate the calendar. There is no "set reviewState to 'approved'" step. There is no "approve only if reviewState is 'approved'" gate.
+The skill prose for `/deskwork:approve` describes this exact action: load the sidecar, validate the stage gate (linear pipeline + has-next-stage), advance `currentStage`, scaffold the next-stage artifact from the just-approved file, journal a `stage-transition` event, regenerate the calendar. The verb works at every transition — including Final → Published — and behaves the same way each time. There is no "set reviewState to 'approved'" step. There is no "approve only if reviewState is 'approved'" gate. There is no "publish does something different on Final" — `publish` is an optional name for `approve` at that transition; the operation is the same stage graduation.
 
 ### VI. The schema's `ReviewState` type is vestigial — kill on sight where harmless.
 
@@ -209,3 +207,4 @@ A mockup that surfaces review-state labels, gates verbs on review state, or othe
 Append a one-line entry every time this document is updated.
 
 - 2026-05-09 — Initial draft. Captures the post-2026-04-30-redesign canonical state machine and explicitly retires every form of "review state" surfacing. Operator-prompted after a design session in which retired patterns kept being re-introduced because the spec wasn't written down anywhere.
+- 2026-05-09 v2 — Iteration response to operator marginalia (comments `40fcf89c` and `a7fb88d4`). Two corrections: (a) Final is NOT terminal — approve works at Final → Published, same as every other linear-pipeline graduation. Final's contract is "content locked; only stage transitions allowed (approve forward, induct backward)" — iterate / edit are not allowed in Final, but the stage itself is forward-traversable. (b) Published has npm-publish semantics — terminal, publicly committed, immutable; revisions create new versions inducted into a non-terminal stage; filesystem disposition is decoupled from the published semantic. The `publish` verb is reframed as an optional clarity-alias for `approve` at the Final→Published transition rather than a separate operation. Iterate's stage gate is now explicit (Ideas/Planned/Outlining/Drafting only).

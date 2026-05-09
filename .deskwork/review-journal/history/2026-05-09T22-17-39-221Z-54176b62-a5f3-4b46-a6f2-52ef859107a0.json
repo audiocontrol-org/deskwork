@@ -1,0 +1,13 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-09T22:17:39.221Z",
+  "entryId": "7306087a-f412-4c33-901f-f0173ae36646",
+  "annotation": {
+    "type": "edit-comment",
+    "workflowId": "7306087a-f412-4c33-901f-f0173ae36646",
+    "commentId": "a7fb88d4-668c-4631-889b-3411dd7a4181",
+    "text": "Final is not a terminal state. An item in final  can’t be iterated or edited, but it can be reinducted into a previous stage for editing or iteration. An item in final *can* be approved, in which case it is promoted to published (for clarity, we could have a distinct verb, “publish”, that promoted final items to published, bit for consistency, we should just use “approve”, since that’s the verb used for the same action on other stages",
+    "id": "27998749-6abc-4376-b4b4-4d4743fbcce9",
+    "createdAt": "2026-05-09T22:17:39.221Z"
+  }
+}
