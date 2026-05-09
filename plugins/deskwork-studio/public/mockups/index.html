@@ -186,9 +186,44 @@ Two phone-shaped surfaces, two design problems. The <em>review surface</em> ship
   </ul>
 </div>
 
-<h2>Editor · three&nbsp;directions <span style="font-family: var(--mono); font-size: 0.55rem; letter-spacing: 0.18em; color: var(--blue); border: 1px solid var(--blue); padding: 0.16rem 0.45rem; border-radius: 2px; vertical-align: 0.25em; margin-left: 0.5rem;">Active</span></h2>
+<h2>Review surface · scrapbook follow-up <span style="font-family: var(--mono); font-size: 0.55rem; letter-spacing: 0.18em; color: var(--blue); border: 1px solid var(--blue); padding: 0.16rem 0.45rem; border-radius: 2px; vertical-align: 0.25em; margin-left: 0.5rem;">Active</span></h2>
 
-<p>The editor is the next surface to rebuild. Three opinionated directions, each honoring the same press-check vocabulary the review surface settled on. Pick one — or call out specific elements from each that you want combined — and that direction becomes the implementation plan.</p>
+<p>The shipped mobile review surface (Mockup 1, the bottom tab bar) has no affordance to open the scrapbook — the desktop drawer is hidden behind the fixed 64px bar on phone widths. Three directions for placement, each honoring the press-check vocabulary already shipped. Edit mode is unaffected (operator is writing, not browsing assets).</p>
+
+<div class="grid">
+
+  <article class="card">
+    <span class="num">Scrapbook 1</span>
+    <h3>Fourth tab</h3>
+    <p class="summary">Bar grows to 4 tabs in review mode (Outline / Notes / Scrapbook / Actions). Tapping Scrapbook opens a sheet with a 2-column card grid; each card uses a format-specific abstract thumbnail (red↘blue gradient for images, paper-rule pattern for text, waveform for audio). Standalone viewer link in the sheet head.</p>
+    <p class="pros"><span class="label">Strong</span> Predictable. Same idiom as existing tabs. Item count surfaces at-a-glance via badge.</p>
+    <p class="cons"><span class="label">Weak</span> 97.5px per tab is denser than the 130px 3-tab layout. Dilutes the "thumb-reach for decisions" framing of the original Mockup 1.</p>
+    <a class="open" href="./scrapbook-1-fourth-tab.html">Open mockup →</a>
+  </article>
+
+  <article class="card">
+    <span class="num">Scrapbook 2</span>
+    <h3>Folio peek strip</h3>
+    <p class="summary">A ~36px kraft-warm strip wedges between the top chrome and the article body — notched left edge cut like a hanging-file folder tab, italic <em>"Folio"</em> label, item count, chip-thumbs previewing format diversity, and a viewer link. Tap expands the same sheet pattern. Bar stays 3 tabs.</p>
+    <p class="pros"><span class="label">Strong</span> Most distinctive — a new visual artifact rather than another tab. The metaphor (article inside a folio with materials) is structurally true and reads instantly. Format chips give at-a-glance content diversity.</p>
+    <p class="cons"><span class="label">Weak</span> +36px chrome above article. Notch + clip-path needs careful CSS. Empty-folio state needs handling.</p>
+    <a class="open" href="./scrapbook-2-folio-peek.html">Open mockup →</a>
+  </article>
+
+  <article class="card">
+    <span class="num">Scrapbook 3</span>
+    <h3>Actions sheet section</h3>
+    <p class="summary">Zero new chrome. Existing Actions sheet gains a third section between Document and Decisions: <em>Folio</em>. Each item renders as a compact one-line row (swatch + filename + format chip + size). Standalone viewer link in the section header. Sheet grows to 70% height to accommodate.</p>
+    <p class="pros"><span class="label">Strong</span> Most minimal — no new tab, no new strip, no new visual artifact. Semantic: folio is "context for the decision" and lives next to the decisions.</p>
+    <p class="cons"><span class="label">Weak</span> Discoverability cost — the operator has to know Actions holds folio. Item count requires opening the sheet (Notes count badges at-a-glance; Folio doesn't, unless we add a second indicator).</p>
+    <a class="open" href="./scrapbook-3-actions-section.html">Open mockup →</a>
+  </article>
+
+</div>
+
+<h2>Editor · three&nbsp;directions <span style="font-family: var(--mono); font-size: 0.55rem; letter-spacing: 0.18em; color: var(--green); border: 1px solid var(--green); padding: 0.16rem 0.45rem; border-radius: 2px; vertical-align: 0.25em; margin-left: 0.5rem;">Mockup 2 shipped</span></h2>
+
+<p>The mobile editor rebuild is shipped (operator picked Mockup 2 / press-check tab bar; commits <code style="font-family:var(--mono);font-size:0.85em">cdc184a</code> + <code style="font-family:var(--mono);font-size:0.85em">5baa042</code>). The original three editor options stay below for reference.</p>
 
 <div class="grid">
 

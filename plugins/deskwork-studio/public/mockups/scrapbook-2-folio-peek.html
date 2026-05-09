@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Scrapbook mockup 2 · Folio peek strip</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F5F1E8;
+    --paper-2: #ECE6D4;
+    --paper-3: #DFD7BF;
+    --kraft: #D9C8A2;
+    --kraft-deep: #B89F70;
+    --ink: #1A1614;
+    --faded: #8A7F70;
+    --faded-2: #C7BEAE;
+    --red: #B8362A;
+    --blue: #2A4B7C;
+    --green: #2E5D45;
+    --highlight: #FAEABF;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    --noise:
+      url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    --kraft-noise:
+      url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.10 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #2C2823;
+    background-image:
+      radial-gradient(circle at 30% 20%, rgba(184, 54, 42, 0.08), transparent 50%),
+      radial-gradient(circle at 70% 80%, rgba(42, 75, 124, 0.06), transparent 50%);
+    color: var(--ink);
+    font-family: var(--display);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem 4rem;
+  }
+  .meta { color: #C7BEAE; font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 0.6rem; text-align: center; }
+  .meta a { color: var(--paper); text-decoration: none; border-bottom: 1px solid rgba(245, 241, 232, 0.4); }
+  h1.demo-title { color: var(--paper); font-family: var(--display); font-style: italic; font-variation-settings: "opsz" 36, "wght" 500; font-size: 1.6rem; margin-bottom: 0.4rem; text-align: center; }
+  .demo-sub { color: var(--faded-2); font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 1.6rem; text-align: center; }
+  .frames { display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center; }
+  .frame-wrap { display: flex; flex-direction: column; align-items: center; }
+  .caption { color: #C7BEAE; font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; margin-top: 0.8rem; text-align: center; max-width: 410px; }
+  .phone { width: 410px; height: 880px; background: #050505; border-radius: 50px; padding: 12px; box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255,255,255,0.04); position: relative; }
+  .phone::before { content: ''; position: absolute; top: 22px; left: 50%; transform: translateX(-50%); width: 110px; height: 30px; background: #000; border-radius: 16px; z-index: 100; }
+  .screen { width: 100%; height: 100%; background: var(--paper); background-image: var(--noise); border-radius: 38px; overflow: hidden; position: relative; font-size: 17px; line-height: 1.55; color: var(--ink); }
+  .ios-clock { position: absolute; top: 28px; left: 32px; font-family: -apple-system, system-ui, sans-serif; font-size: 0.95rem; font-weight: 600; color: var(--ink); z-index: 110; }
+  .ios-icons { position: absolute; top: 30px; right: 32px; color: var(--ink); font-family: -apple-system, system-ui, sans-serif; font-size: 0.85rem; letter-spacing: 0.05em; z-index: 110; }
+
+  /* ============================================================
+   *  Scrapbook · Folio peek strip
+   *  Direction: a thin (~32px) kraft-warm strip wedges between the
+   *  top strip and the article body. Visual metaphor: a manila
+   *  folder peeking from a magazine spread. Notched left edge
+   *  (file-folder tab cut), tiny thumbnail chips inline, "open
+   *  viewer ↗" link on the right. Tap anywhere on the strip to
+   *  expand into a full sheet (slides up over the article).
+   *
+   *  Doesn't add a 4th tab to the bar. Trades ~32px of vertical
+   *  real estate above the article for permanent at-a-glance
+   *  scrapbook visibility. Reads as press-check editorial native:
+   *  the article is "in" a folio that has supporting materials.
+   * ============================================================ */
+
+  .strip {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 84px;
+    padding: 56px 1rem 0;
+    background: var(--paper);
+    border-bottom: 1px solid var(--red);
+    z-index: 50;
+    display: flex; align-items: center; gap: 0.7rem;
+  }
+  .strip-back {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink);
+    text-decoration: none;
+    padding: 0.28rem 0.5rem;
+    border: 1px solid var(--paper-3);
+    border-radius: 2px;
+  }
+  .stamp {
+    margin-left: auto;
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 600;
+    font-size: 0.92rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink);
+    border: 2px solid var(--ink);
+    padding: 0.16rem 0.5rem;
+    transform: rotate(-1.5deg);
+    background: var(--paper);
+  }
+
+  /* ---- Folio peek strip ---- */
+  .folio-peek {
+    position: absolute;
+    top: 84px; left: 0; right: 0;
+    height: 36px;
+    background: var(--kraft);
+    background-image: var(--kraft-noise);
+    border-bottom: 1px solid var(--kraft-deep);
+    z-index: 49;
+    display: flex; align-items: center;
+    gap: 0.55rem;
+    padding: 0 0.95rem 0 0;
+    cursor: pointer;
+    /* Notched left edge: file-folder tab cut. The clip-path
+     * carves a small chamfer + a wider tab so the peek reads as
+     * an inserted folder rather than a flat band. */
+    clip-path: polygon(
+      0 0,
+      28px 0,
+      36px 100%,
+      100% 100%,
+      100% 0,
+      100% 100%,
+      0 100%
+    );
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.18),
+      0 1px 0 rgba(184, 54, 42, 0.08);
+  }
+  .folio-tab {
+    /* Visual "tab" sticking up — actually rendered via the kraft
+     * strip's own contour; this label sits in the tab area. */
+    flex-shrink: 0;
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 14, "wght": 600;
+    font-size: 0.85rem;
+    color: var(--ink);
+    padding: 0 0.55rem 0 1.6rem;
+    letter-spacing: 0.04em;
+    border-right: 1px dashed var(--kraft-deep);
+    height: 100%;
+    display: flex; align-items: center;
+  }
+  .folio-count {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+  .folio-count strong {
+    font-weight: 600;
+    color: var(--red);
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 0.95rem;
+    margin-right: 0.18rem;
+  }
+  .folio-chips {
+    display: flex; gap: 0.28rem;
+    margin-left: 0.55rem;
+  }
+  .folio-chip {
+    width: 22px; height: 22px;
+    border-radius: 1px;
+    border: 1px solid var(--kraft-deep);
+    box-shadow: 0 1px 0 rgba(0,0,0,0.05);
+    flex-shrink: 0;
+  }
+  .folio-chip.image {
+    background:
+      linear-gradient(135deg, rgba(184, 54, 42, 0.4) 0%, rgba(42, 75, 124, 0.4) 100%),
+      var(--paper-3);
+  }
+  .folio-chip.image2 {
+    background:
+      linear-gradient(135deg, rgba(46, 93, 69, 0.4) 0%, rgba(184, 54, 42, 0.3) 100%),
+      var(--paper-2);
+  }
+  .folio-chip.text {
+    background:
+      repeating-linear-gradient(180deg, var(--paper-2) 0, var(--paper-2) 3px, var(--paper-3) 3.5px, var(--paper-3) 4.5px);
+  }
+  .folio-chip.audio {
+    background: linear-gradient(90deg, rgba(42, 75, 124, 0.2), rgba(42, 75, 124, 0.5), rgba(42, 75, 124, 0.2));
+  }
+  .folio-chip.more {
+    background: var(--kraft);
+    color: var(--ink);
+    font-family: var(--mono); font-size: 0.55rem;
+    display: flex; align-items: center; justify-content: center;
+    letter-spacing: 0;
+  }
+  .folio-open {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--blue);
+    text-decoration: none;
+    border-bottom: 1px dashed var(--kraft-deep);
+    padding-bottom: 1px;
+  }
+
+  .article {
+    position: absolute;
+    top: 120px; left: 0; right: 0; bottom: 64px;
+    overflow-y: auto;
+    padding: 1.2rem 1.4rem 2rem;
+  }
+  .article-kicker { font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); margin-bottom: 0.5rem; }
+  .article-title { font-family: var(--display); font-style: italic; font-variation-settings: "opsz" 48, "wght" 500; font-size: 2rem; line-height: 1.1; margin-bottom: 1rem; }
+  .article p { font-family: var(--display); font-size: 1.04rem; line-height: 1.5; margin-bottom: 0.9rem; }
+  .article p mark { background: var(--highlight); padding: 0 0.1em; border-radius: 1px; }
+  .article h2 { font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0.18em; text-transform: uppercase; margin: 1.5rem 0 0.6rem; border-bottom: 1px solid var(--red); padding-bottom: 0.3rem; }
+
+  /* Bottom tab bar — unchanged 3-tab layout */
+  .tabbar {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 64px;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-top: 1px solid var(--red);
+    box-shadow: 0 -2px 16px rgba(26,22,20,0.06);
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    z-index: 60;
+  }
+  .tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.18rem; border: none; background: transparent; cursor: pointer; padding: 0.4rem 0.4rem 0.6rem; color: var(--faded); font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.18em; text-transform: uppercase; position: relative; }
+  .tab .glyph { font-family: var(--display); font-style: italic; font-variation-settings: "opsz" 24, "wght" 500; font-size: 1.5rem; line-height: 1; color: var(--faded); }
+  .tab .count { position: absolute; top: 8px; right: 30%; background: var(--red); color: var(--paper); font-size: 0.55rem; line-height: 1; padding: 0.18rem 0.32rem; border-radius: 8px; letter-spacing: 0.04em; min-width: 1rem; text-align: center; }
+
+  /* Sheet (slides up when the folio peek is tapped) */
+  .sheet {
+    position: absolute; left: 0; right: 0; bottom: 64px;
+    height: 65%;
+    background: var(--paper); background-image: var(--noise);
+    border-top: 2px solid var(--kraft-deep);
+    box-shadow: 0 -16px 40px rgba(26,22,20,0.18);
+    border-radius: 24px 24px 0 0;
+    z-index: 70;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .sheet-handle { align-self: center; width: 44px; height: 5px; background: var(--paper-3); border-radius: 4px; margin: 0.55rem 0 0.7rem; }
+  .sheet-head {
+    padding: 0 1.4rem 0.7rem;
+    border-bottom: 1px solid var(--kraft-deep);
+    display: flex; align-items: baseline; gap: 0.6rem;
+  }
+  .sheet-kicker { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--red); }
+  .sheet-meta { font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.06em; color: var(--faded); margin-left: auto; }
+  .sheet-meta a { color: var(--blue); border-bottom: 1px dashed var(--paper-3); text-decoration: none; padding-bottom: 1px; }
+  .sheet-body { flex: 1; overflow-y: auto; padding: 0.8rem 1.4rem 1.4rem; }
+  .scrap-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; }
+  .scrap-card { background: var(--paper-2); border: 1px solid var(--paper-3); border-radius: 3px; overflow: hidden; padding: 0; cursor: pointer; box-shadow: 0 1px 0 rgba(26, 22, 20, 0.06); display: flex; flex-direction: column; }
+  .scrap-thumb { height: 92px; background: var(--paper-3); display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--paper-3); color: var(--faded); position: relative; }
+  .scrap-thumb.image { background: linear-gradient(135deg, rgba(184, 54, 42, 0.15) 0%, rgba(42, 75, 124, 0.18) 100%), var(--paper-3); }
+  .scrap-thumb.image::after { content: ''; position: absolute; inset: 18% 22% 18% 18%; background: linear-gradient(180deg, rgba(46, 93, 69, 0.4), rgba(184, 54, 42, 0.3) 70%, rgba(26, 22, 20, 0.15)); border-radius: 1px; box-shadow: inset 0 0 0 1px rgba(26, 22, 20, 0.12); }
+  .scrap-thumb.text { background: repeating-linear-gradient(180deg, var(--paper-2) 0, var(--paper-2) 6px, var(--paper-3) 7px, var(--paper-3) 8px); font-family: var(--display); font-style: italic; font-size: 1.4rem; color: var(--faded); }
+  .scrap-thumb.audio { background: var(--paper-2); background-image: linear-gradient(90deg, rgba(42, 75, 124, 0.12) 0%, rgba(42, 75, 124, 0.4) 30%, rgba(42, 75, 124, 0.7) 50%, rgba(42, 75, 124, 0.4) 70%, rgba(42, 75, 124, 0.12) 100%); }
+  .scrap-meta { padding: 0.45rem 0.55rem 0.55rem; background: var(--paper); border-top: 1px dashed var(--paper-3); }
+  .scrap-name { font-family: var(--mono); font-size: 0.7rem; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .scrap-attrs { font-family: var(--mono); font-size: 0.55rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faded); margin-top: 0.2rem; display: flex; gap: 0.4rem; align-items: center; }
+  .scrap-attrs .ext { color: var(--red); font-weight: 600; }
+  .scrap-attrs .ext.audio { color: var(--blue); }
+  .scrap-attrs .ext.text { color: var(--green); }
+  .scrim { position: absolute; top: 120px; left: 0; right: 0; bottom: calc(64px + 65%); background: linear-gradient(to bottom, transparent, rgba(245,241,232,0.85)); pointer-events: none; z-index: 65; }
+
+  .narrative { margin-top: 2.5rem; max-width: 720px; padding: 0 1rem; color: #C7BEAE; font-family: var(--display); font-size: 0.95rem; line-height: 1.6; }
+  .narrative strong { color: var(--paper); font-style: italic; font-weight: 500; }
+  .narrative em { color: var(--paper); font-style: italic; }
+  .narrative p { margin-bottom: 0.8rem; }
+  .narrative .label { font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem; }
+</style>
+</head>
+<body>
+
+<div class="meta"><a href="./index.html">← all directions</a></div>
+<h1 class="demo-title">Scrapbook 2 · Folio peek strip.</h1>
+<div class="demo-sub">Manuscript folder peeking from a magazine spread</div>
+
+<div class="frames">
+
+  <!-- Frame A: peek strip at rest, kraft tone, between strip and article -->
+  <div class="frame-wrap">
+    <div class="phone">
+      <div class="ios-clock">9:41</div>
+      <div class="ios-icons">·· ◎ ▮▮</div>
+      <div class="screen">
+
+        <div class="strip">
+          <a class="strip-back" href="#">← Studio</a>
+          <span class="stamp">Drafting</span>
+        </div>
+
+        <div class="folio-peek">
+          <span class="folio-tab"><em>Folio</em></span>
+          <span class="folio-count"><strong>5</strong> items</span>
+          <span class="folio-chips">
+            <span class="folio-chip image"></span>
+            <span class="folio-chip text"></span>
+            <span class="folio-chip audio"></span>
+            <span class="folio-chip image2"></span>
+            <span class="folio-chip more">+1</span>
+          </span>
+          <a class="folio-open" href="#">viewer ↗</a>
+        </div>
+
+        <div class="article">
+          <div class="article-kicker">Architecture · v0.16</div>
+          <h1 class="article-title">Deskwork architectural thesis.</h1>
+          <p>Read this before touching any deskwork code. This file exists because the thesis was implicit in the project's design but not written down anywhere discoverable.</p>
+          <h2>The canonical source</h2>
+          <p>"You never leave the agent for a static tool. You talk to it. It does the work." The agent's toolkit isn't a static configuration you set up once; it evolves, under your direction, in response to <mark>what the work actually needs</mark>.</p>
+          <p>The blog post is the canonical source. Everything below derives from it.</p>
+        </div>
+
+        <div class="tabbar">
+          <button class="tab"><span class="glyph">§</span><span>Outline</span></button>
+          <button class="tab"><span class="glyph">✎</span><span>Notes</span><span class="count">3</span></button>
+          <button class="tab"><span class="glyph">⊕</span><span>Actions</span></button>
+        </div>
+
+      </div>
+    </div>
+    <div class="caption">A · folio peek at rest · 36px kraft strip · italic "Folio" tab + count + 5 chips + viewer link · bar stays 3 tabs</div>
+  </div>
+
+  <!-- Frame B: tap-on-peek expands the sheet -->
+  <div class="frame-wrap">
+    <div class="phone">
+      <div class="ios-clock">9:41</div>
+      <div class="ios-icons">·· ◎ ▮▮</div>
+      <div class="screen">
+
+        <div class="strip">
+          <a class="strip-back" href="#">← Studio</a>
+          <span class="stamp">Drafting</span>
+        </div>
+
+        <div class="folio-peek">
+          <span class="folio-tab"><em>Folio</em></span>
+          <span class="folio-count"><strong>5</strong> items</span>
+          <span class="folio-chips">
+            <span class="folio-chip image"></span>
+            <span class="folio-chip text"></span>
+            <span class="folio-chip audio"></span>
+            <span class="folio-chip image2"></span>
+            <span class="folio-chip more">+1</span>
+          </span>
+          <a class="folio-open" href="#">viewer ↗</a>
+        </div>
+
+        <div class="article">
+          <div class="article-kicker">Architecture · v0.16</div>
+          <h1 class="article-title">Deskwork architectural thesis.</h1>
+          <p>Read this before touching any deskwork code.</p>
+        </div>
+
+        <div class="scrim"></div>
+
+        <div class="sheet">
+          <div class="sheet-handle"></div>
+          <div class="sheet-head">
+            <span class="sheet-kicker">Folio · 5 items</span>
+            <span class="sheet-meta"><a href="#">open viewer ↗</a></span>
+          </div>
+          <div class="sheet-body">
+            <div class="scrap-grid">
+              <article class="scrap-card">
+                <div class="scrap-thumb image"></div>
+                <div class="scrap-meta">
+                  <div class="scrap-name">decision-strip-overflow.png</div>
+                  <div class="scrap-attrs"><span class="ext">PNG</span><span>·</span><span>184 KB</span></div>
+                </div>
+              </article>
+              <article class="scrap-card">
+                <div class="scrap-thumb image"></div>
+                <div class="scrap-meta">
+                  <div class="scrap-name">marginalia-rail-1px.png</div>
+                  <div class="scrap-attrs"><span class="ext">PNG</span><span>·</span><span>92 KB</span></div>
+                </div>
+              </article>
+              <article class="scrap-card">
+                <div class="scrap-thumb text">¶</div>
+                <div class="scrap-meta">
+                  <div class="scrap-name">audit-2026-05-03.md</div>
+                  <div class="scrap-attrs"><span class="ext text">MD</span><span>·</span><span>4.1 KB</span></div>
+                </div>
+              </article>
+              <article class="scrap-card">
+                <div class="scrap-thumb audio"></div>
+                <div class="scrap-meta">
+                  <div class="scrap-name">interview-take-1.mp3</div>
+                  <div class="scrap-attrs"><span class="ext audio">MP3</span><span>·</span><span>1.2 MB</span></div>
+                </div>
+              </article>
+              <article class="scrap-card">
+                <div class="scrap-thumb image"></div>
+                <div class="scrap-meta">
+                  <div class="scrap-name">phone-strip-compaction.png</div>
+                  <div class="scrap-attrs"><span class="ext">PNG</span><span>·</span><span>76 KB</span></div>
+                </div>
+              </article>
+            </div>
+          </div>
+        </div>
+
+        <div class="tabbar">
+          <button class="tab"><span class="glyph">§</span><span>Outline</span></button>
+          <button class="tab"><span class="glyph">✎</span><span>Notes</span><span class="count">3</span></button>
+          <button class="tab"><span class="glyph">⊕</span><span>Actions</span></button>
+        </div>
+
+      </div>
+    </div>
+    <div class="caption">B · folio peek tapped · sheet slides up · same press-check item grid as Mockup 1's sheet · kraft top-border (2px) signals continuity from peek</div>
+  </div>
+
+</div>
+
+<div class="narrative">
+  <p><span class="label">Pattern</span><strong>The folio peek is its own visual artifact</strong> — a kraft-warm strip wedged between the top chrome and the article body, ~36px tall, with a notched left edge cut like a hanging-file folder tab. The italic <em>"Folio"</em> label sits in the tab; the item count, chip thumbs, and viewer link fill the rest. Reads as press-check editorial native: the article is "in" a folio that has supporting materials, and the folder is peeking out from behind it.</p>
+  <p><span class="label">Visual differentiation</span>This is the only mockup where the scrapbook is a <em>different kind of thing</em> visually, not just another peer in the existing chrome. The kraft tone (a warm desaturated tan, distinct from cream paper and paper-3 buff) gives it its own material identity. The chip thumbs preview format diversity at a glance — image, text, audio chips render with their format-specific gradient, so the operator sees "this entry has photos AND text AND audio" without opening anything.</p>
+  <p><span class="label">Sheet content</span>Same press-check 2-column item grid as Mockup 1. Sheet head reads "Folio · 5 items" with the standalone-viewer link. The 2px kraft top-border on the sheet ties the visual chain back to the peek strip — the sheet IS the folio expanded.</p>
+  <p><span class="label">Bar stays 3 tabs</span>Outline / Notes / Actions unchanged. The original "thumb-reach for decisions" framing of Mockup 1 stays intact. Scrapbook isn't an action — it's context, and lives in the chrome above the article where context belongs.</p>
+  <p><span class="label">Strong</span>Most distinctive of the three directions. Press-check vocabulary expressed with a new visual element instead of stretching the existing one. The chip preview gives at-a-glance format diversity that no tab-counter can. The metaphor (article inside a folio with materials) is structurally true and reads instantly.</p>
+  <p><span class="label">Weak</span>Adds 36px of chrome between strip and article — non-trivial real estate at phone widths. The notch + clip-path needs careful CSS to not break on scroll-into-view. Operators on entries with zero scrapbook items see an empty peek strip permanently — needs a tasteful empty state (or display:none when count is 0).</p>
+</div>
+
+</body>
+</html>

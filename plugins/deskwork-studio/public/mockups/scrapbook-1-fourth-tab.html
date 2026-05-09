@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Scrapbook mockup 1 · Fourth tab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F5F1E8;
+    --paper-2: #ECE6D4;
+    --paper-3: #DFD7BF;
+    --kraft: #D9C8A2;
+    --ink: #1A1614;
+    --faded: #8A7F70;
+    --faded-2: #C7BEAE;
+    --red: #B8362A;
+    --blue: #2A4B7C;
+    --green: #2E5D45;
+    --highlight: #FAEABF;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    --noise:
+      url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #2C2823;
+    background-image:
+      radial-gradient(circle at 30% 20%, rgba(184, 54, 42, 0.08), transparent 50%),
+      radial-gradient(circle at 70% 80%, rgba(42, 75, 124, 0.06), transparent 50%);
+    color: var(--ink);
+    font-family: var(--display);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem 4rem;
+  }
+  .meta {
+    color: #C7BEAE;
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 0.6rem;
+    text-align: center;
+  }
+  .meta a {
+    color: var(--paper);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(245, 241, 232, 0.4);
+  }
+  h1.demo-title {
+    color: var(--paper);
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 36, "wght" 500;
+    font-size: 1.6rem;
+    margin-bottom: 0.4rem;
+    text-align: center;
+  }
+  .demo-sub {
+    color: var(--faded-2);
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 1.6rem;
+    text-align: center;
+  }
+  .frames { display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center; }
+  .frame-wrap { display: flex; flex-direction: column; align-items: center; }
+  .caption {
+    color: #C7BEAE;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-top: 0.8rem;
+    text-align: center;
+    max-width: 410px;
+  }
+  .phone {
+    width: 410px;
+    height: 880px;
+    background: #050505;
+    border-radius: 50px;
+    padding: 12px;
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255,255,255,0.04);
+    position: relative;
+  }
+  .phone::before {
+    content: '';
+    position: absolute;
+    top: 22px; left: 50%;
+    transform: translateX(-50%);
+    width: 110px; height: 30px;
+    background: #000;
+    border-radius: 16px;
+    z-index: 100;
+  }
+  .screen {
+    width: 100%; height: 100%;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-radius: 38px;
+    overflow: hidden;
+    position: relative;
+    font-size: 17px;
+    line-height: 1.55;
+    color: var(--ink);
+  }
+  .ios-clock {
+    position: absolute; top: 28px; left: 32px;
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 0.95rem; font-weight: 600;
+    color: var(--ink); z-index: 110;
+  }
+  .ios-icons {
+    position: absolute; top: 30px; right: 32px;
+    color: var(--ink);
+    font-family: -apple-system, system-ui, sans-serif;
+    font-size: 0.85rem; letter-spacing: 0.05em; z-index: 110;
+  }
+
+  /* ============================================================
+   *  Scrapbook · 4-tab bar
+   *  Direction: bar grows from 3 → 4 tabs in review mode.
+   *  Outline · Notes · Scrapbook · Actions
+   *  Edit mode keeps 3 tabs (no scrapbook needed during writing).
+   * ============================================================ */
+
+  .strip {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 96px;
+    padding: 56px 1rem 0;
+    background: var(--paper);
+    border-bottom: 1px solid var(--red);
+    z-index: 50;
+    display: flex; align-items: center; gap: 0.7rem;
+  }
+  .strip-back {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink);
+    text-decoration: none;
+    padding: 0.28rem 0.5rem;
+    border: 1px solid var(--paper-3);
+    border-radius: 2px;
+  }
+  .stamp {
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 600;
+    font-size: 0.92rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink);
+    border: 2px solid var(--ink);
+    padding: 0.16rem 0.5rem;
+    transform: rotate(-1.5deg);
+    background: var(--paper);
+  }
+
+  .article {
+    position: absolute;
+    top: 96px; left: 0; right: 0; bottom: 64px;
+    overflow-y: auto;
+    padding: 1.4rem 1.4rem 2rem;
+  }
+  .article-kicker {
+    font-family: var(--mono); font-size: 0.65rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--red); margin-bottom: 0.5rem;
+  }
+  .article-title {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 48, "wght" 500;
+    font-size: 2rem; line-height: 1.1; margin-bottom: 1rem;
+  }
+  .article p { font-family: var(--display); font-size: 1.04rem; line-height: 1.5; margin-bottom: 0.9rem; }
+  .article p mark { background: var(--highlight); padding: 0 0.1em; border-radius: 1px; }
+  .article h2 {
+    font-family: var(--mono); font-size: 0.78rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    margin: 1.5rem 0 0.6rem;
+    border-bottom: 1px solid var(--red); padding-bottom: 0.3rem;
+  }
+
+  /* Bottom tab bar — 4 columns in review mode */
+  .tabbar {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 64px;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-top: 1px solid var(--red);
+    box-shadow: 0 -2px 16px rgba(26,22,20,0.06);
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    z-index: 60;
+  }
+  .tab {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 0.18rem;
+    border: none; background: transparent; cursor: pointer;
+    padding: 0.4rem 0.2rem 0.6rem;
+    color: var(--faded);
+    font-family: var(--mono); font-size: 0.6rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    position: relative;
+  }
+  .tab .glyph {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 24, "wght" 500;
+    font-size: 1.45rem; line-height: 1; color: var(--faded);
+  }
+  .tab.active { color: var(--red); }
+  .tab.active .glyph { color: var(--red); }
+  .tab.active::after {
+    content: ''; position: absolute;
+    top: 0; left: 50%; transform: translateX(-50%);
+    width: 28px; height: 2px; background: var(--red);
+  }
+  .tab .count {
+    position: absolute; top: 8px; right: 22%;
+    background: var(--red); color: var(--paper);
+    font-size: 0.55rem; line-height: 1;
+    padding: 0.18rem 0.32rem; border-radius: 8px;
+    letter-spacing: 0.04em; min-width: 1rem; text-align: center;
+  }
+
+  /* The Scrapbook tab gets a kraft-warm glyph color — its own
+   * color note within the existing palette to signal that this
+   * surface is a separate kind of thing (a folder of supporting
+   * materials, not a peer of the decision verbs). */
+  .tab.scrap .glyph { color: #8A7250; }
+  .tab.scrap.active .glyph { color: var(--red); }
+
+  /* Sheet (slides up) */
+  .sheet {
+    position: absolute; left: 0; right: 0; bottom: 64px;
+    height: 65%;
+    background: var(--paper); background-image: var(--noise);
+    border-top: 1px solid var(--red);
+    box-shadow: 0 -16px 40px rgba(26,22,20,0.18);
+    border-radius: 24px 24px 0 0;
+    z-index: 70;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .sheet-handle {
+    align-self: center; width: 44px; height: 5px;
+    background: var(--paper-3); border-radius: 4px;
+    margin: 0.55rem 0 0.7rem;
+  }
+  .sheet-head {
+    padding: 0 1.4rem 0.7rem;
+    border-bottom: 1px solid var(--red);
+    display: flex; align-items: baseline; gap: 0.6rem;
+  }
+  .sheet-kicker {
+    font-family: var(--mono);
+    font-size: 0.7rem; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--red);
+  }
+  .sheet-meta {
+    font-family: var(--mono); font-size: 0.62rem;
+    letter-spacing: 0.06em; color: var(--faded);
+    margin-left: auto;
+  }
+  .sheet-meta a {
+    color: var(--blue);
+    border-bottom: 1px dashed var(--paper-3);
+    text-decoration: none; padding-bottom: 1px;
+  }
+  .sheet-body {
+    flex: 1; overflow-y: auto;
+    padding: 0.8rem 1.4rem 1.4rem;
+  }
+
+  /* Scrapbook item grid */
+  .scrap-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.65rem;
+  }
+  .scrap-card {
+    background: var(--paper-2);
+    border: 1px solid var(--paper-3);
+    border-radius: 3px;
+    overflow: hidden;
+    padding: 0;
+    cursor: pointer;
+    transition: transform 120ms ease, box-shadow 120ms ease;
+    box-shadow: 0 1px 0 rgba(26, 22, 20, 0.06);
+    display: flex; flex-direction: column;
+  }
+  .scrap-card:active { transform: translateY(1px); }
+  .scrap-thumb {
+    height: 92px;
+    background: var(--paper-3);
+    background-image: var(--noise);
+    display: flex; align-items: center; justify-content: center;
+    border-bottom: 1px solid var(--paper-3);
+    color: var(--faded);
+    position: relative;
+  }
+  .scrap-thumb.image {
+    background:
+      linear-gradient(135deg, rgba(184, 54, 42, 0.15) 0%, rgba(42, 75, 124, 0.18) 100%),
+      var(--paper-3);
+  }
+  .scrap-thumb.image::after {
+    content: '';
+    position: absolute;
+    inset: 18% 22% 18% 18%;
+    background:
+      linear-gradient(180deg, rgba(46, 93, 69, 0.4), rgba(184, 54, 42, 0.3) 70%, rgba(26, 22, 20, 0.15));
+    border-radius: 1px;
+    box-shadow: inset 0 0 0 1px rgba(26, 22, 20, 0.12);
+  }
+  .scrap-thumb.text {
+    background:
+      repeating-linear-gradient(
+        180deg,
+        var(--paper-2) 0,
+        var(--paper-2) 6px,
+        var(--paper-3) 7px,
+        var(--paper-3) 8px
+      );
+    font-family: var(--display); font-style: italic;
+    font-size: 1.4rem; color: var(--faded);
+  }
+  .scrap-thumb.audio {
+    background: var(--paper-2);
+    background-image:
+      radial-gradient(circle at 30% 50%, var(--blue) 1.5px, transparent 1.5px),
+      radial-gradient(circle at 50% 50%, var(--blue) 1.5px, transparent 1.5px),
+      radial-gradient(circle at 70% 50%, var(--blue) 1.5px, transparent 1.5px),
+      linear-gradient(90deg,
+        rgba(42, 75, 124, 0.12) 0%, rgba(42, 75, 124, 0.4) 30%,
+        rgba(42, 75, 124, 0.7) 50%, rgba(42, 75, 124, 0.4) 70%,
+        rgba(42, 75, 124, 0.12) 100%);
+  }
+  .scrap-meta {
+    padding: 0.45rem 0.55rem 0.55rem;
+    background: var(--paper);
+    border-top: 1px dashed var(--paper-3);
+  }
+  .scrap-name {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--ink);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .scrap-attrs {
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--faded);
+    margin-top: 0.2rem;
+    display: flex; gap: 0.4rem; align-items: center;
+  }
+  .scrap-attrs .ext {
+    color: var(--red);
+    font-weight: 600;
+  }
+  .scrap-attrs .ext.audio { color: var(--blue); }
+  .scrap-attrs .ext.text { color: var(--green); }
+
+  .scrim {
+    position: absolute; top: 96px; left: 0; right: 0;
+    bottom: calc(64px + 65%);
+    background: linear-gradient(to bottom, transparent, rgba(245,241,232,0.85));
+    pointer-events: none; z-index: 65;
+  }
+
+  .narrative {
+    margin-top: 2.5rem; max-width: 720px; padding: 0 1rem;
+    color: #C7BEAE; font-family: var(--display);
+    font-size: 0.95rem; line-height: 1.6;
+  }
+  .narrative strong { color: var(--paper); font-style: italic; font-weight: 500; }
+  .narrative em { color: var(--paper); font-style: italic; }
+  .narrative p { margin-bottom: 0.8rem; }
+  .narrative .label {
+    font-family: var(--mono); font-size: 0.7rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--red); display: block; margin-bottom: 0.4rem;
+  }
+</style>
+</head>
+<body>
+
+<div class="meta"><a href="./index.html">← all directions</a></div>
+<h1 class="demo-title">Scrapbook 1 · Fourth tab.</h1>
+<div class="demo-sub">Bar grows to 4 tabs in review mode</div>
+
+<div class="frames">
+
+  <!-- Frame A: bar at rest with 4 tabs visible -->
+  <div class="frame-wrap">
+    <div class="phone">
+      <div class="ios-clock">9:41</div>
+      <div class="ios-icons">·· ◎ ▮▮</div>
+      <div class="screen">
+
+        <div class="strip">
+          <a class="strip-back" href="#">← Studio</a>
+          <span class="stamp">Drafting</span>
+        </div>
+
+        <div class="article">
+          <div class="article-kicker">Architecture · v0.16</div>
+          <h1 class="article-title">Deskwork architectural thesis.</h1>
+          <p>Read this before touching any deskwork code. This file exists because the thesis was implicit in the project's design but not written down anywhere discoverable.</p>
+          <h2>The canonical source</h2>
+          <p>"You never leave the agent for a static tool. You talk to it. It does the work." The agent's toolkit isn't a static configuration you set up once; it evolves, under your direction, in response to <mark>what the work actually needs</mark>.</p>
+          <p>The blog post is the canonical source. Everything below derives from it.</p>
+          <h2>What the thesis means</h2>
+          <p>The agent (Claude, in a Claude Code session) is the primary tool. Every other piece of deskwork — CLI verbs, the studio, doctor rules, sidecars, the calendar — exists to be read, edited, and orchestrated by that agent.</p>
+        </div>
+
+        <div class="tabbar">
+          <button class="tab"><span class="glyph">§</span><span>Outline</span></button>
+          <button class="tab"><span class="glyph">✎</span><span>Notes</span><span class="count">3</span></button>
+          <button class="tab scrap"><span class="glyph">▦</span><span>Scrapbook</span><span class="count" style="background:#8A7250;">5</span></button>
+          <button class="tab"><span class="glyph">⊕</span><span>Actions</span></button>
+        </div>
+
+      </div>
+    </div>
+    <div class="caption">A · 4-tab bar at rest · ~97.5px per tab on 390px viewport · scrapbook count uses kraft accent (not red) to signal "different kind of thing"</div>
+  </div>
+
+  <!-- Frame B: scrapbook sheet open with item grid -->
+  <div class="frame-wrap">
+    <div class="phone">
+      <div class="ios-clock">9:41</div>
+      <div class="ios-icons">·· ◎ ▮▮</div>
+      <div class="screen">
+
+        <div class="strip">
+          <a class="strip-back" href="#">← Studio</a>
+          <span class="stamp">Drafting</span>
+        </div>
+
+        <div class="article">
+          <div class="article-kicker">Architecture · v0.16</div>
+          <h1 class="article-title">Deskwork architectural thesis.</h1>
+          <p>Read this before touching any deskwork code.</p>
+        </div>
+
+        <div class="scrim"></div>
+
+        <div class="sheet">
+          <div class="sheet-handle"></div>
+          <div class="sheet-head">
+            <span class="sheet-kicker">▦ Scrapbook · Folio</span>
+            <span class="sheet-meta">5 items · <a href="#">open viewer ↗</a></span>
+          </div>
+          <div class="sheet-body">
+            <div class="scrap-grid">
+              <article class="scrap-card">
+                <div class="scrap-thumb image"></div>
+                <div class="scrap-meta">
+                  <div class="scrap-name">decision-strip-overflow.png</div>
+                  <div class="scrap-attrs"><span class="ext">PNG</span><span>·</span><span>184 KB</span></div>
+                </div>
+              </article>
+              <article class="scrap-card">
+                <div class="scrap-thumb image"></div>
+                <div class="scrap-meta">
+                  <div class="scrap-name">marginalia-rail-1px.png</div>
+                  <div class="scrap-attrs"><span class="ext">PNG</span><span>·</span><span>92 KB</span></div>
+                </div>
+              </article>
+              <article class="scrap-card">
+                <div class="scrap-thumb text">¶</div>
+                <div class="scrap-meta">
+                  <div class="scrap-name">audit-2026-05-03.md</div>
+                  <div class="scrap-attrs"><span class="ext text">MD</span><span>·</span><span>4.1 KB</span></div>
+                </div>
+              </article>
+              <article class="scrap-card">
+                <div class="scrap-thumb audio"></div>
+                <div class="scrap-meta">
+                  <div class="scrap-name">interview-take-1.mp3</div>
+                  <div class="scrap-attrs"><span class="ext audio">MP3</span><span>·</span><span>1.2 MB</span></div>
+                </div>
+              </article>
+              <article class="scrap-card">
+                <div class="scrap-thumb image"></div>
+                <div class="scrap-meta">
+                  <div class="scrap-name">phone-strip-compaction.png</div>
+                  <div class="scrap-attrs"><span class="ext">PNG</span><span>·</span><span>76 KB</span></div>
+                </div>
+              </article>
+            </div>
+          </div>
+        </div>
+
+        <div class="tabbar">
+          <button class="tab"><span class="glyph">§</span><span>Outline</span></button>
+          <button class="tab"><span class="glyph">✎</span><span>Notes</span><span class="count">3</span></button>
+          <button class="tab scrap active"><span class="glyph">▦</span><span>Scrapbook</span><span class="count" style="background:#8A7250;">5</span></button>
+          <button class="tab"><span class="glyph">⊕</span><span>Actions</span></button>
+        </div>
+
+      </div>
+    </div>
+    <div class="caption">B · scrapbook sheet open · 65% height · 2-column grid of cards · "open viewer ↗" link in head</div>
+  </div>
+
+</div>
+
+<div class="narrative">
+  <p><span class="label">Pattern</span><strong>The bar grows from three tabs to four in review mode.</strong> Edit mode keeps the established three (Format / Notes / Save). The scrapbook tab uses a grid glyph (▦) — visual shorthand for "a contact sheet of supporting materials" — and a kraft-tone count badge that distinguishes it from the red-pencil Notes count.</p>
+  <p><span class="label">Sheet content</span>2-column card grid; each card is a thumbnail + filename + format chip. Image cards render an abstract press-color preview (red ↘ blue gradient on cream). Text cards (`.md`) render with horizontal-rule paper texture + a pilcrow glyph. Audio cards (`.mp3`) render with a waveform-evoking radial pattern. The thumbnail style is the differentiation: each format gets its own editorial visual treatment instead of generic file-icon-and-extension chrome.</p>
+  <p><span class="label">Sheet head</span>"5 items · <em>open viewer ↗</em>" — the count is at-a-glance, the standalone-viewer link is one tap away. The viewer link is proof-blue (consistent with Source/Preview accents and the existing scrapbook drawer's "open viewer" affordance on desktop).</p>
+  <p><span class="label">Strong</span>Predictable. Same idiom as the existing tabs. Discovery is permanent — the operator sees the count badge at-a-glance even when not in the sheet.</p>
+  <p><span class="label">Weak</span>97.5px per tab is tighter than the 130px of the 3-tab layout. The labels still fit (longest is "Scrapbook" at 9 chars, mono 0.6rem, ~70px) but the visual feels denser. The 4th tab dilutes the "thumb-reach for decisions" framing of the original Mockup 1 — Decisions / Outline / Notes were 3 peers; now they share the bar with a fourth thing that's <em>about</em> the entry rather than an action <em>on</em> it.</p>
+</div>
+
+</body>
+</html>
