@@ -50,7 +50,7 @@ Goal: with the spec locked, sweep the codebase + docs to find and remove every v
 **Files (preliminary inventory — expand during audit):**
 - `packages/core/src/schema/entry.ts` — `ReviewState` type, `reviewState` field on Entry
 - `packages/studio/src/pages/dashboard/affordances.ts` — `REVIEW_STATE_LABELS`, `renderReviewStateBadge`
-- `packages/studio/src/pages/dashboard/affordances.ts` — iterate-button gating on `reviewState === 'iterating'`
+- `packages/studio/src/pages/dashboard/affordances.ts` — iterate-button gating on `reviewState === 'iterating'` (Commandment II violation — verb gated on retired state)
 - `packages/studio/src/pages/dashboard/press-queue.ts` — already removed from dashboard.ts but module still in tree (review-state-driven; delete)
 - `packages/studio/src/pages/index.ts` — "in-review" caption text + sidecar filter
 - `packages/studio/src/pages/help.ts` — manual prose mentioning review state
@@ -59,6 +59,8 @@ Goal: with the spec locked, sweep the codebase + docs to find and remove every v
 - `plugins/deskwork/skills/*/SKILL.md` — any prose mentioning reviewState as a gate or post-condition
 - `docs/studio-design-standards.md` — references to "review state internal-only" (replace with "review state is RETIRED, not internal")
 - `docs/0.19.0/001-IN-PROGRESS/studio-mobile-first/dashboard-audit.md` — historical audit, may need a "superseded by state machine spec" note
+- **`packages/cli/src/cmd/ingest.ts`** (or wherever the `--state` validator lives) — accepts `'Review'` (a retired stage) but rejects `'Final'` (a current stage). Surfaced 2026-05-09 when ingesting the state-machine spec itself; had to use `Drafting` since `Final` was rejected at the CLI layer despite being the appropriate stage. Validator must accept the full Stage enum (Ideas, Planned, Outlining, Drafting, Final, Published, Blocked, Cancelled).
+- **`plugins/deskwork/skills/ingest/SKILL.md`** — frontmatter→lane mapping table includes `'Review'` instead of `'Final'`. Same root cause as the CLI validator. Update prose to match the post-redesign Stage enum.
 
 - [ ] **Step 0.2.1:** Grep pass: `git grep -nE 'reviewState|ReviewState|in-review|in_review|iterating|review-state'` produces the violation candidate list.
 - [ ] **Step 0.2.2:** Categorize each hit: REMOVE (UI/skill surfacing), MIGRATE (data persistence — back-compat one-shot), or KEEP (legitimate journal-event historical record).
