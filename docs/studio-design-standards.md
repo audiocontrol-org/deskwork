@@ -58,6 +58,34 @@ The press-check vocabulary, established by the v0.17 + v0.18 mobile review-surfa
 | Approved / save-success | `--er-stamp-green` (where surfaced) |
 | Scrapbook / folio | `--er-kraft` |
 
+## Principles
+
+These are higher-order guides for design decisions. When the deltas section below doesn't speak directly to a question, fall back here.
+
+### Favor structure over scrolling
+
+A structured view with well-considered options for revealing more information on demand is preferable to an unstructured long scroll that hides the implicit structure of a thing.
+
+**What this means in practice:**
+
+- If a list has natural hierarchy (stages, sections, categories), surface that hierarchy at the top of the view as a compact summary the operator can scan at-a-glance. Let them drill into a specific node to see the rows underneath. **Don't** flatten the hierarchy into a long row stack and ask the operator to scroll to find the structure they already know exists.
+- Empty hierarchy nodes still have a place in the structured view. Showing "Ideas: 0" is a structural signal — the absence of items is information about the pipeline shape. Don't hide empty nodes just to shorten the page; they communicate "this stage exists, nothing here right now."
+- When the structure-summary view costs more chrome (a row of tiles, a stage stack) than just rendering everything, that chrome is paying for navigation. The operator's scroll cost drops in exchange.
+- "Reveal more on demand" patterns: collapse-by-default sections, tap-to-expand tiles, sheet-based detail views, sticky structure-strip + scrollable detail. All preferable to always-visible rows.
+- "Scrolling is sometimes necessary" — yes. After the operator drills into a node, the rows under it can scroll. Within a single section the row stack is fine. The principle is about the FIRST view: it should communicate structure, not pile rows.
+
+**Canonical example: the dashboard's collapsible stage tiles (v0.19).** Eight stage tiles in a ~360px stack at the top of the body. Whole pipeline shape visible at-a-glance. Tap one → that stage's rows expand inline; others stay collapsed and reachable above and below. Compare the pre-v0.19 dashboard: 746px scroll to reach the first row WITH activity, all four empty stages eating chrome equally, no way to jump straight to the stage you wanted.
+
+**Failure pattern: the "card stream" alternative considered for the dashboard.** A single long-scrolling stream of every entry across every stage, ordered by attention. Discarded specifically because it abandoned the pipeline-shape signal — the operator could no longer SEE that there were four empty stages, that Drafting had 5 entries with 3 needing review, etc. Without structure, the page just got longer.
+
+**How to apply:**
+
+- Before drafting a new mobile surface, ask: *what's the implicit structure of this thing?* (stages, sections, time-buckets, levels of detail, etc.)
+- Surface that structure compactly at the top.
+- Make detail-on-demand — tap, swipe, expand — the path to rows.
+- If the surface genuinely has no structure (a single homogeneous list with no useful hierarchy), then a scrolling list is fine. Be honest about which case you're in. "I couldn't think of a structure" usually means there IS one and the design didn't find it yet.
+- Scroll cost is a measurable thing. Cite it (in pixels, or "rows visible at-rest") when comparing direction options.
+
 ## Surfaces
 
 The studio has 7 web surfaces. v0.17 + v0.18 brought mobile-first treatment to entry-review (longform + shortform + edit + scrapbook). v0.19 brings it to dashboard. Subsequent phases will cover shortform-desk, content-tree, scrapbook-viewer, manual, studio-index. This document grows as each surface lands.
@@ -183,3 +211,4 @@ Decisions still under debate, recorded here so they don't get re-litigated as fr
 Append a one-line entry to this section every time the document is updated.
 
 - 2026-05-09 — Initial draft. Captured all design decisions made during the v0.19 dashboard rebuild session: rubber-stamp retired on mobile (filing-tab is also a rubber-stamp); review-state internal-only; filter chips removed; Compose FAB shape; collapsible stage tiles; Distribution-as-tile; press queue removed; chrome budget.
+- 2026-05-09 — Added Principles section with "Favor structure over scrolling" as the first principle. Cites the dashboard's collapsible stage tiles as the canonical application; cites the discarded card-stream as the failure pattern.
