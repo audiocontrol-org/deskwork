@@ -49,7 +49,7 @@ import { renderEditToolbar } from './edit-toolbar.ts';
 import { renderEditPanes } from './edit-panes.ts';
 import { renderOutlineDrawer } from './outline-drawer.ts';
 import { renderMarginalia, renderMarginaliaTab } from './marginalia.ts';
-import { renderMobileBar, renderMobileSheet } from './mobile-bar.ts';
+import { renderMobileBar, renderMobileSheet, renderStripModeSegment, renderStripEditExit } from './mobile-bar.ts';
 import { renderDecisionStrip } from './decision-strip.ts';
 import { renderShortcutsOverlay } from './shortcuts.ts';
 import { renderEntryNotFound } from './not-found.ts';
@@ -276,6 +276,8 @@ export async function renderEntryReviewPage(
             <span class="er-strip-hint">select text to <span class="er-gloss" data-term="marginalia" tabindex="0" role="button" aria-describedby="glossary-marginalia">mark</span> · double-click to edit · <kbd>?</kbd> for shortcuts</span>
           </span>
           ${decisionStrip}
+          ${renderStripModeSegment()}
+          ${renderStripEditExit()}
         </div>
       </div>
       ${renderEditToolbar(outlineHtml.length > 0, titleField)}

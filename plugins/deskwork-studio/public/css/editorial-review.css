@@ -3682,6 +3682,17 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
   display: none;
 }
 
+/* The strip Source/Preview pill + edit-mode Done button are phone-only —
+ * their companion `display: inline-flex` rules live inside the
+ * `(max-width: 48rem)` block. On desktop a span-in-flex-container
+ * blockifies via Chrome's flex-item rules, so we need unconditional
+ * top-level `display: none` defaults to keep them out of the desktop
+ * strip. */
+.er-strip-mode-mobile,
+.er-strip-edit-done {
+  display: none;
+}
+
 @media (max-width: 48rem) {
   /* =========================================================================
    * Mobile review surface — bottom tab bar + sheet pattern
@@ -4006,6 +4017,29 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
   .er-mobile-action[data-action="iterate"] { border-left-color: var(--er-proof-blue); color: var(--er-proof-blue); }
   .er-mobile-action[data-action="reject"]  { border-left-color: var(--er-red-pencil); color: var(--er-red-pencil); }
   .er-mobile-action[data-action="cancel"]  { border-left-color: var(--er-faded); color: var(--er-faded); }
+  .er-mobile-action[data-action="edit"]    { border-left-color: var(--er-ink); color: var(--er-ink); }
+
+  /* Section header for grouped actions inside the Actions sheet —
+   * "Document" (Edit) vs "Decisions" (Approve / Iterate / Reject /
+   * Cancel). Edit is a local file action distinct from state-machine
+   * verbs; the section break makes the semantic split visible. */
+  .er-mobile-action-section {
+    font-family: var(--er-font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--er-faded);
+    margin: 0.85rem 0 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .er-mobile-action-section::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px dashed var(--er-paper-3);
+  }
+  .er-mobile-action-section:first-child { margin-top: 0; }
   .er-mobile-action[disabled] { opacity: 0.45; cursor: not-allowed; }
   .er-mobile-action .er-mobile-action-glyph {
     font-family: var(--er-font-display);
@@ -4045,11 +4079,14 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
   /* iOS Safari zooms the layout viewport when a text input with
    * font-size < 16px receives focus — that zoom then exposes any
    * sub-pixel horizontal overflow as a "slosh" gesture, fighting the
-   * operator's vertical scroll. Force every focusable form input on
+   * operator's vertical scroll. Force every focusable text surface on
    * the review surface to ≥16px at phone widths. Covers:
    *   - composer textarea + category <select>
    *   - inline edit form textarea (.er-marginalia-edit-textarea) +
    *     its category <select>
+   *   - CodeMirror's `.cm-content` contenteditable (the actual
+   *     edit-mode source surface — same iOS zoom rule applies to
+   *     contenteditable elements as to <textarea>)
    *   - any future input the review surface adds
    * Scoped under [data-review-ui] so host-site form rendering is
    * unaffected. */
@@ -4059,7 +4096,10 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
   [data-review-ui] input[type="email"],
   [data-review-ui] input[type="url"],
   [data-review-ui] input:not([type]),
-  [data-review-ui] select {
+  [data-review-ui] select,
+  [data-review-ui] .cm-content,
+  [data-review-ui] [contenteditable="true"],
+  [data-review-ui] [contenteditable=""] {
     font-size: 16px !important;
   }
 
@@ -4076,15 +4116,241 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
     100% { background: var(--er-highlight, #FAEABF); box-shadow: 0 0 0 0 rgba(184, 54, 42, 0); }
   }
 
-  /* In mobile edit mode, hide the bottom bar + sheet — the editor owns the
-   * canvas (existing rule already hides folio, strip, marginalia, drawers
-   * via `body:has([data-edit-panes-host]:not([hidden]))`). */
-  body:has([data-edit-panes-host]:not([hidden])) .er-mobile-bar,
-  body:has([data-edit-panes-host]:not([hidden])) .er-mobile-sheet {
+  /* =========================================================================
+   * Mobile editor — press-check tab bar (Mockup 2)
+   *
+   * The mobile bar stays VISIBLE in edit mode; CSS swaps which three of
+   * the five rendered tabs are shown based on `body[data-edit-mode]`:
+   *   - Review mode: Outline · Notes · Actions
+   *   - Edit mode:   Format  · Notes · Save
+   * Source/Preview moves to a dedicated pill in the top strip
+   * (`.er-strip-mode-mobile`). The desktop edit-toolbar is hidden on
+   * phone in edit mode — its ergonomics (split-pane, 7+ controls in a
+   * single row) collapse on phone widths per #239 / #241.
+   *
+   * Visual reference: /static/mockups/editor-2-press-check-tabbar.html
+   * ========================================================================= */
+
+  /* Tab visibility swap. The Notes tab has neither modifier so it shows in
+   * both modes. The bar's three visible cells stay aligned because we use
+   * `display:none` rather than `visibility:hidden` — grid auto-flows the
+   * remaining children into 1fr / 1fr / 1fr. */
+  body[data-edit-mode="editing"] .er-mobile-tab--review {
+    display: none;
+  }
+  body:not([data-edit-mode="editing"]) .er-mobile-tab--edit {
+    display: none;
+  }
+
+  /* Save tab — colored kicker + glyph in edit mode; stamp-green pulse when
+   * the buffer is dirty. The dirty signal comes from
+   * `body[data-edit-dirty]` set by edit-mode.ts's updateSaveState(). */
+  body[data-edit-mode="editing"] .er-mobile-tab--save {
+    color: var(--er-stamp-green);
+  }
+  body[data-edit-mode="editing"] .er-mobile-tab--save .er-mobile-tab-glyph {
+    color: var(--er-stamp-green);
+  }
+  body[data-edit-mode="editing"][data-edit-dirty] .er-mobile-tab--save {
+    background: rgba(46, 93, 69, 0.06);
+  }
+  body[data-edit-mode="editing"][data-edit-dirty] .er-mobile-tab--save::before {
+    content: '';
+    position: absolute;
+    top: 10px;
+    right: 26%;
+    width: 7px;
+    height: 7px;
+    background: var(--er-stamp-green);
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px rgba(46, 93, 69, 0.18);
+    animation: er-save-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes er-save-pulse {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(46, 93, 69, 0.20); }
+    50%      { box-shadow: 0 0 0 5px rgba(46, 93, 69, 0.06); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    body[data-edit-mode="editing"][data-edit-dirty] .er-mobile-tab--save::before {
+      animation: none;
+    }
+  }
+
+  /* Stamp turns stamp-green when the operator enters edit mode. The press-
+   * check signature is preserved (rotation, border, italic), but the color
+   * shift signals "you are mutating this entry" without adding chrome. */
+  body[data-edit-mode="editing"] [data-review-ui="longform"] .er-stamp[data-state-label] {
+    color: var(--er-stamp-green);
+    border-color: var(--er-stamp-green);
+  }
+
+  /* Hide the desktop edit toolbar on phone — its layout (mode tabs +
+   * 7-button action row) is hostile at this breakpoint per #239. The
+   * mobile bar's Save tab + the strip's Source/Preview pill cover the
+   * full set of operator-facing affordances on phone. */
+  body[data-edit-mode="editing"] .er-edit-toolbar {
     display: none !important;
   }
-  body:has([data-edit-panes-host]:not([hidden])) {
-    padding-bottom: 0 !important;
+  /* The desktop rule (lines ~2182) collapses .er-strip-right + .er-strip-center
+   * when the edit-toolbar is visible. On phone the toolbar is hidden, so
+   * `:has()` no longer matches and the strip stays at full chrome — but
+   * `.er-strip-right` is hidden by the legacy phone rule and the center is
+   * the load-bearing one (carries the stamp). No additional override needed. */
+
+  /* --- Strip Source/Preview pill (phone-only, edit mode) ----------------- */
+
+  .er-strip-mode-mobile {
+    display: none;
+    margin-left: auto;
+    border: 1px solid var(--er-paper-3);
+    border-radius: 2px;
+    background: var(--er-paper);
+    overflow: hidden;
+  }
+  body[data-edit-mode="editing"] .er-strip-mode-mobile {
+    display: inline-flex;
+  }
+  .er-strip-mode-btn {
+    border: 0;
+    background: transparent;
+    font-family: var(--er-font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--er-faded);
+    padding: 0.36rem 0.6rem;
+    cursor: pointer;
+    border-right: 1px solid var(--er-paper-3);
+  }
+  .er-strip-mode-btn:last-child { border-right: 0; }
+  .er-strip-mode-btn[aria-pressed="true"] {
+    background: var(--er-proof-blue);
+    color: var(--er-paper);
+  }
+
+  /* --- Strip ✕ Done button (phone-only, edit mode) ------------------------ */
+
+  body[data-edit-mode="editing"] .er-strip-edit-done {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.32rem;
+    border: 1px solid var(--er-paper-3);
+    border-radius: 2px;
+    background: var(--er-paper);
+    color: var(--er-ink);
+    cursor: pointer;
+    padding: 0.32rem 0.55rem;
+    font-family: var(--er-font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .er-strip-edit-done-glyph {
+    color: var(--er-faded);
+    font-family: var(--er-font-display);
+    font-style: italic;
+    font-size: 0.85rem;
+    line-height: 1;
+  }
+
+  /* --- Format sheet · press-check key grid -------------------------------- */
+
+  .er-mobile-sheet-slot--format {
+    padding-top: 0.6rem;
+  }
+  .er-fkey-section {
+    font-family: var(--er-font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--er-faded);
+    margin: 0.85rem 0 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .er-fkey-section::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px dashed var(--er-paper-3);
+  }
+  .er-fkey-section:first-child { margin-top: 0; }
+  .er-fkey-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.55rem;
+  }
+  .er-fkey {
+    background: var(--er-paper-2);
+    border: 1px solid var(--er-paper-3);
+    border-radius: 4px;
+    padding: 0.85rem 0.4rem;
+    cursor: pointer;
+    color: var(--er-ink);
+    font-family: var(--er-font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    box-shadow: 0 1px 0 rgba(26, 22, 20, 0.06);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    min-height: 64px;
+    transition: background 120ms ease, transform 120ms ease;
+  }
+  .er-fkey:active {
+    background: var(--er-paper-3);
+    transform: translateY(1px);
+  }
+  .er-fkey-face {
+    font-family: var(--er-font-display);
+    font-size: 1.4rem;
+    line-height: 1;
+    color: var(--er-ink);
+  }
+  .er-fkey-label {
+    font-size: 0.6rem;
+  }
+  .er-fkey--h1 .er-fkey-face { color: var(--er-red-pencil); font-weight: 600; font-style: italic; }
+  .er-fkey--h2 .er-fkey-face { color: var(--er-proof-blue); font-weight: 500; font-style: italic; }
+  .er-fkey--h3 .er-fkey-face { font-weight: 500; font-style: italic; font-size: 1.15rem; }
+  .er-fkey--bold .er-fkey-face strong { font-weight: 700; }
+  .er-fkey--em .er-fkey-face em { font-style: italic; }
+  .er-fkey--code .er-fkey-face {
+    font-family: var(--er-font-mono);
+    font-size: 0.95rem;
+    background: var(--er-paper);
+    padding: 0.05rem 0.3rem;
+    border-radius: 2px;
+  }
+  .er-fkey--link .er-fkey-face {
+    color: var(--er-red-pencil);
+    border-bottom: 2px solid var(--er-red-pencil);
+    padding-bottom: 1px;
+  }
+  .er-fkey--quote .er-fkey-face {
+    font-style: italic;
+    color: var(--er-faded);
+    font-size: 1.6rem;
+    line-height: 0.9;
+  }
+  .er-fkey--list .er-fkey-face,
+  .er-fkey--ol .er-fkey-face {
+    font-size: 0.85rem;
+    line-height: 1.05;
+  }
+  .er-fkey--hr {
+    grid-column: span 2;
+  }
+  .er-fkey--hr .er-fkey-face {
+    color: var(--er-faded);
+    letter-spacing: 0.2em;
+  }
+  .er-fkey--fence .er-fkey-face {
+    font-family: var(--er-font-mono);
+    font-size: 0.78rem;
   }
 
   /* Reduced motion: disable sheet slide; collapse remains, just instant. */

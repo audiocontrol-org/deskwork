@@ -109,6 +109,12 @@ export function createEditModeController(
     if (saveVersionBtn) saveVersionBtn.disabled = false;
     const changed = draftEdit.value !== state.markdown;
     setHint(changed ? 'Modified' : 'No changes');
+    // Mobile editor (Mockup 2 / editor-2-press-check-tabbar): the
+    // bottom-bar Save tab keys off this attribute to render its
+    // dirty-state glow + colored kicker. Stamp on the strip uses the
+    // same signal to flip from neutral to stamp-green.
+    if (changed) document.body.setAttribute('data-edit-dirty', '');
+    else document.body.removeAttribute('data-edit-dirty');
   }
 
   function hasUnsavedChanges(): boolean {
@@ -231,7 +237,13 @@ export function createEditModeController(
       },
     });
     updateSaveState();
-    setEditView('split');
+    // Phone has no horizontal room for split-pane (#239); default to
+    // source-only and let the strip's mobile mode pill toggle to
+    // preview when the operator wants it. Desktop keeps the legacy
+    // split default.
+    const phone = window.matchMedia('(max-width: 48rem)').matches;
+    setEditView(phone ? 'source' : 'split');
+    document.body.setAttribute('data-edit-mode', 'editing');
     editToolbar.scrollIntoView({ behavior: 'smooth', block: 'start' });
     editorHandle.focus();
     schedulePreview(state.markdown);
@@ -249,6 +261,8 @@ export function createEditModeController(
     if (toggleBtn) toggleBtn.textContent = 'Edit';
     setEditModeLabel('preview');
     editing = false;
+    document.body.removeAttribute('data-edit-mode');
+    document.body.removeAttribute('data-edit-dirty');
     if (editorHandle) {
       editorHandle.destroy();
       editorHandle = null;
@@ -313,6 +327,10 @@ export function createEditModeController(
       draftEdit.value = value;
       showToast('Saved');
       setHint('Saved');
+      // Recompute dirty state — clears `body[data-edit-dirty]` so the
+      // mobile Save tab's stamp-green pulse stops and the dirty signal
+      // accurately reflects on-disk content.
+      updateSaveState();
     } catch (e) {
       const reason = e instanceof Error ? e.message : String(e);
       showToast(`Save failed: ${reason}`, true);
@@ -354,6 +372,34 @@ export function createEditModeController(
     ev.preventDefault();
     ev.returnValue = '';
   });
+
+  // Auto-save on visibility-change to hidden + on pagehide. iOS Safari
+  // routinely reloads pages under memory pressure, dismisses on pull-
+  // to-refresh, and ignores `beforeunload` confirms — so the operator
+  // can lose unsaved edits with no warning. Saving on visibility-hidden
+  // (fires on app-switch, tab-switch, browser-nav-away) closes the
+  // gap. The save is idempotent against on-disk content; double-firing
+  // on the same buffer is a no-op. `keepalive: true` would let pagehide
+  // fetches survive teardown, but performSave doesn't currently expose
+  // that knob — visibilitychange runs slightly earlier and covers
+  // most scenarios.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'hidden') return;
+    if (!editing || !hasUnsavedChanges()) return;
+    void performSave();
+  });
+  window.addEventListener('pagehide', () => {
+    if (!editing || !hasUnsavedChanges()) return;
+    void performSave();
+  });
+
+  // Phone-only "✕ Done" exit affordance in the strip. Bound here (not
+  // in the bar's HTML) so we can dispatch through the existing
+  // toggleBtn handler — that path already runs confirmDiscard when
+  // the buffer is dirty and exitEdit when clean.
+  document
+    .querySelector<HTMLButtonElement>('[data-strip-edit-done]')
+    ?.addEventListener('click', () => toggleBtn?.click());
 
   // ---- Focus mode ----
 

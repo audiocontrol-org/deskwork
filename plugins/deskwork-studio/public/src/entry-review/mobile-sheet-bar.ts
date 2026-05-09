@@ -30,12 +30,13 @@
  */
 
 import { copyOrShowFallback } from '../clipboard.ts';
+import { bindFormatKeys } from './format-keys.ts';
 
 const MOBILE_QUERY = '(max-width: 48rem)';
 const FLASH_MS = 1100;
 const SLIDE_MS = 280;
 
-type SheetKey = 'outline' | 'notes' | 'actions';
+type SheetKey = 'outline' | 'notes' | 'actions' | 'format';
 
 interface SheetBarDeps {
   readonly entrySlug: string;
@@ -72,6 +73,7 @@ export function initMobileSheetBar(deps: SheetBarDeps): MobileSheetBarController
     outline: sheet.querySelector<HTMLElement>('[data-mobile-sheet-slot="outline"]'),
     notes: sheet.querySelector<HTMLElement>('[data-mobile-sheet-slot="notes"]'),
     actions: sheet.querySelector<HTMLElement>('[data-mobile-sheet-slot="actions"]'),
+    format: sheet.querySelector<HTMLElement>('[data-mobile-sheet-slot="format"]'),
   };
   const kicker = sheet.querySelector<HTMLElement>('[data-mobile-sheet-kicker]');
   const meta = sheet.querySelector<HTMLElement>('[data-mobile-sheet-meta]');
@@ -79,7 +81,7 @@ export function initMobileSheetBar(deps: SheetBarDeps): MobileSheetBarController
   const closeBtn = sheet.querySelector<HTMLButtonElement>('[data-mobile-sheet-close]');
   const notesCount = bar.querySelector<HTMLElement>('[data-notes-count]');
 
-  if (!slots.outline || !slots.notes || !slots.actions || !kicker || !meta) return;
+  if (!slots.outline || !slots.notes || !slots.actions || !slots.format || !kicker || !meta) return noop;
 
   // The notes slot is structured (on mobile) as:
   //   [composer, sidebar-empty, sidebar-list]
@@ -150,6 +152,9 @@ export function initMobileSheetBar(deps: SheetBarDeps): MobileSheetBarController
     } else if (key === 'notes') {
       kicker!.textContent = 'Margin notes';
       meta!.textContent = noteCountLabel();
+    } else if (key === 'format') {
+      kicker!.textContent = 'Format · markdown';
+      meta!.textContent = 'Tap to insert';
     } else {
       kicker!.textContent = '⊕ Actions';
       meta!.textContent = '';
@@ -171,7 +176,17 @@ export function initMobileSheetBar(deps: SheetBarDeps): MobileSheetBarController
     if (key === 'outline') refreshOutlineSlot();
     else if (key === 'notes') refreshNotesSlot();
     else if (key === 'actions') populateActionsSlot();
+    else if (key === 'format') populateFormatSlot();
     populatedSlots.add(key);
+  }
+
+  // The format slot's grid is rendered server-side (mobile-bar.ts).
+  // First-open binds delegated click handling on each `[data-fkey]`
+  // button and closes the sheet after a successful insertion so the
+  // operator sees the editor update without dismissing manually.
+  function populateFormatSlot(): void {
+    if (!slots.format) return;
+    bindFormatKeys(slots.format, () => closeSheet());
   }
 
   function refreshOutlineSlot(): void {
@@ -211,6 +226,36 @@ export function initMobileSheetBar(deps: SheetBarDeps): MobileSheetBarController
   function populateActionsSlot(): void {
     if (!slots.actions) return;
     slots.actions.innerHTML = '';
+
+    // Document section — local file actions distinct from state-machine
+    // verbs. Edit triggers the existing toggle-edit button (the strip's
+    // Edit affordance is `display: none` on phone post-mobile-rebuild,
+    // so this is the operator's only path into the editor at <48rem
+    // until/unless we add a more direct entry point).
+    const docSection = document.createElement('div');
+    docSection.className = 'er-mobile-action-section';
+    docSection.textContent = 'Document';
+    slots.actions.appendChild(docSection);
+
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'er-mobile-action er-mobile-action--edit';
+    editBtn.dataset.action = 'edit';
+    editBtn.innerHTML =
+      '<span class="er-mobile-action-glyph" aria-hidden="true">✎</span>' +
+      'Edit<span class="er-mobile-action-meta">Open editor</span>';
+    editBtn.addEventListener('click', () => {
+      const target = document.querySelector<HTMLButtonElement>('[data-action="toggle-edit"]');
+      target?.click();
+      closeSheet();
+    });
+    slots.actions.appendChild(editBtn);
+
+    const decisionSection = document.createElement('div');
+    decisionSection.className = 'er-mobile-action-section';
+    decisionSection.textContent = 'Decisions';
+    slots.actions.appendChild(decisionSection);
+
     const actions: Array<{
       key: 'approve' | 'iterate' | 'reject' | 'cancel';
       label: string;
@@ -287,6 +332,21 @@ export function initMobileSheetBar(deps: SheetBarDeps): MobileSheetBarController
   }
 
   closeBtn?.addEventListener('click', closeSheet);
+
+  // The Save tab triggers the existing edit-toolbar's save handler.
+  // It's not a sheet — Save is a direct file mutation (THESIS C2: the
+  // single allowed write the studio performs on operator content).
+  // Routing through the canonical handler keeps the dirty-state and
+  // toast UX in one place.
+  const saveTab = bar.querySelector<HTMLButtonElement>('[data-mobile-action="save"]');
+  if (saveTab) {
+    saveTab.addEventListener('click', () => {
+      const target = document.querySelector<HTMLButtonElement>(
+        '.er-edit-toolbar [data-action="save-version"]',
+      );
+      target?.click();
+    });
+  }
 
   // Drag-to-dismiss the sheet via the handle. Touch + pointer.
   if (handle) {
