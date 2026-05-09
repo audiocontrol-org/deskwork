@@ -13,6 +13,77 @@ Populating this file is a step in `/session-end`. If a session didn't exercise t
 
 ---
 
+## 2026-05-08 (T5 mobile review-surface rebuild): live phone dogfood throughout — 12 commits, every fix surfaced by the operator using the studio on their actual iPhone
+
+**Arc:** The most direct hands-on phone usage session this project has had. The operator drove every fix this session by opening the studio's review surface on their iPhone via the Tailscale magic-DNS URL (`orion-m4.tail8254f4.ts.net:47323`) and reporting what was broken in real time. No simulator, no Playwright proxy — actual iOS Safari on actual hardware. Every commit closed a friction the operator had named in the prior message.
+
+The session arc was: *fix one specific phone bug → operator surfaces the next → fix → operator surfaces the next* — five rounds, then a hard reframe (*"this is whack-a-mole, you never properly designed a mobile-first UX"*), then three mockups, then a full mobile rebuild, then four post-rebuild fixes that ALL came from the operator clicking things and finding them broken.
+
+### Friction the operator found by using the actual phone
+
+#### Side-rail-with-pull-tabs is not a mobile pattern
+
+- **friction** — *"The way the outline and marginalia drawers work on mobile is very weird and unpleasant. It's a crappy repurposing of what's clearly meant for a desktop interface, half-assed onto a mobile UI. We never properly designed a mobile-first UX/UI for the review surface."* The pre-rebuild state — vertical pull-tabs on the left and right edges, marginalia stacked at the bottom of the article column, outline-drawer competing with the strip for the top of the viewport — was a desktop layout compressed onto a phone, not mobile-native. Adopters who came to the surface on mobile would have hit the same pattern. **insight**: if the chrome's primary affordances are vertical edge-tabs, the surface was designed for a mouse, not a thumb. Mobile-native idioms are bottom-anchored (thumb reach), modal sheets that slide up from below, content-first space allocation. The Mockup 1 rebuild followed those idioms; the operator's positive reaction (*"It looks great"*) came on the first pass.
+
+#### Mockups before code is a force multiplier
+
+- **insight** — Three opinionated HTML mockups under `/static/mockups/` (bottom-sheet, FAB, inline-reveal), each at 390×844 with the editorial language preserved (cream paper, red-pencil accents, Newsreader italic, JetBrains Mono labels), let the operator pick a direction in <5 minutes of review. The implementation became a translation problem (this mockup → real surface) instead of an exploration problem. Operator framing: *"It's probably worth actually mocking up some designs in html to review them instead of just hacking on one problem at a time."* The 5 hours of focused implementation time were possible because the destination was concrete. Without mockups, the same time would have produced 15+ hours of incremental drift.
+
+#### Adding a note didn't work
+
+- **friction** — *"did you try adding a note? I can't get it to work. I click the 'add mark' affordance, and nothing happens."* The composer's parent element (`.er-marginalia`) was hidden via `display: none` in the mobile rebuild because the marginalia rail was replaced by the bottom-sheet pattern. Toggling `composer.hidden = false` on a child of a `display: none` parent has no visible effect. The whole add-a-note path was dead from the rebuild's first commit until the operator typed "I can't get it to work." **fix**: relocate the composer into the Notes sheet's slot at boot on phone (gated on `matchMedia('(max-width: 48rem)')`); leave it in `.er-marginalia` on desktop where the inline absolute positioning still works. **insight**: visual smoke ≠ interactive smoke. The dual-viewport regression smoke (added the same day) verified the page rendered correctly at both viewports but didn't drive a single tap. Every fix-landed claim that doesn't drive at least one interaction per affected surface is a candidate for this same blind spot.
+
+#### Edit / Resolve / Delete on existing notes were dead
+
+- **friction** — *"edit, resolve, and delete on existing notes doesn't seem to work."* The Notes sheet rendered the action buttons correctly because the cloning preserved them visually. But `cloneNode(true)` doesn't copy `addEventListener`-attached handlers. Every button was a dead button — the operator's finger pressed something that looked clickable and did nothing. **fix**: refactored to MOVE the actual `[data-sidebar-list]` element into the sheet rather than cloning it. Single source of truth — the desktop renderer attaches handlers at render time to the actual rendered `<li>` children, regardless of where the parent list lives. **insight**: cloning DOM trees feels lightweight but creates a "what's missing?" puzzle for every cloned interactive element. The cleanest pattern for "show this content in a different place at a different breakpoint" is to MOVE the element. The desktop renderer becomes the single renderer; mobile is a view, not a separate render path.
+
+#### The page zooms when you tap into anything
+
+- **friction** — *"clicking edit works, but it appears to zoom in a bit on iOS, which then makes the app slosh around in horizontal scrolling."* Then: *"The same thing happens in the editor."* iOS Safari's auto-zoom-on-input-focus triggered on every tap into a textarea, the inline edit form, the CodeMirror surface. The page-level zoom then exposed any sub-pixel horizontal overflow as a touch-pan gesture, fighting the operator's vertical scroll.
+- **insight** — *"The problem isn't that a single textarea is zooming... it's the *entire* page that zooms. This has to be a well-known issue with a well-known fix."* The operator was right on both counts. The well-known fix is one line: `maximum-scale=1` on the viewport meta tag. iOS Safari respects this attribute to suppress auto-zoom on input focus while still honoring user pinch-to-zoom (in iOS 13+). The two prior commits (font-size:16px sweep on form inputs, then on `.cm-content`) addressed symptoms element-by-element. The viewport meta closes the entire class of bug in one line. **insight applicable to future agents**: when the operator says "this is a well-known issue with a well-known fix," that's a strong signal to web-search the canonical solution rather than continue patching symptoms.
+
+#### Cross-device clipboard-paste workflow
+
+- **insight** — The Actions sheet's design preserves a cross-device workflow specific to mobile use: the operator hits "Approve" on their phone, the skill command (`/deskwork:approve <slug>`) gets copied to the clipboard, iCloud syncs the clipboard to the laptop, and the operator pastes into a Claude Code chat there. This is per the THESIS Consequence-2 routing (UI buttons clipboard-copy skill commands, agent runs the work). It works because the Apple clipboard sync is universal across the operator's devices. The mobile design didn't have to invent a separate decision-flow for phone — it inherited the same flow as desktop, just routed through clipboard. **friction-not-encountered-but-watch-for**: if the operator is on Android (no iCloud), this workflow doesn't transfer. Worth flagging for any future cross-device decision flow.
+
+### What the dual-viewport regression smoke caught and didn't catch
+
+- **fix** — *"i suspect the desktop fixes trampled the fixes for ios. which, if true, means we have a serious problem with testing and regressions. we can't play whack-a-mole between mobile and desktop ux/ui."* The session opened with this framing; the response was a documented rule (`.claude/rules/ui-verification.md` Dual-viewport verification subsection) plus an enforcement smoke (`scripts/smoke-er-viewport-regressions.mjs`). For the rest of the session, every commit verified at both viewports as a precondition. Five subsequent commits would have introduced silent cross-viewport regressions without it.
+- **friction** — But the smoke is structural-only. It probes pages at scrollY=0 with no interactions, asserts no html-overflow + strip-height invariant + no fixed-position offenders. It doesn't drive Edit / Resolve / Delete / composer / scroll-collapse. Four of this session's 12 commits fixed bugs the smoke didn't catch. **insight**: a regression smoke that doesn't drive interactions has a sharp limit. The follow-up rule (mentioned in DEVELOPMENT-NOTES.md): drive at least one interactive flow per surface that a CSS or markup change affects. Could be encoded as an "interaction smoke" alongside the structural smoke; could just be a discipline checkbox in the verification protocol.
+
+### Operator-framing quotes worth preserving
+
+These quotes shaped the session's direction:
+
+- *"we can't play whack-a-mole between mobile and desktop ux/ui"* — drove the dual-viewport rule.
+- *"crappy repurposing of what's clearly meant for a desktop interface, half-assed onto a mobile UI"* — drove the mockups + Mockup 1 rebuild.
+- *"It's probably worth actually mocking up some designs in html to review them instead of just hacking on one problem at a time"* — direct prescription for the mockups-before-code workflow.
+- *"This has to be a well-known issue with a well-known fix"* — stopped the symptom-patching and led to the viewport meta canonical fix.
+- *"Whenever you don't use the frontend design skill on UI work, it always comes out garbage"* — operator's reminder to invoke `/frontend-design` deliberately. The mockups + Mockup 1 implementation both used the skill discipline; the post-rebuild fixes that needed correction (composer, edit handlers, iOS zoom) were ALL non-frontend-design changes where I jumped straight to code without the skill's design-thinking step. Pattern-match: skill discipline correlates with first-pass-correct UI.
+
+### What didn't get exercised but should have
+
+- **No actual iPhone Safari verification ran from the agent side.** Every commit was Chromium-verified at 390×844; the operator did the iPhone verification themselves. Xcode isn't installed on this machine (only CLT, no `simctl`), and Playwright WebKit installs aren't a substitute. The operator-on-iPhone flow worked because they were available to test live; for sessions where the operator isn't online, an iPhone simulator path needs to exist. **friction**: deferred (Xcode install is a 12GB user-decision).
+
+### Tagged summary
+
+| Tag | Item |
+|---|---|
+| **friction** | Side-rail-with-pull-tabs was the wrong pattern; operator named it directly. |
+| **friction** | Composer trapped in hidden parent — first-tap dead. |
+| **friction** | Cloned action buttons had no listeners — every tap dead. |
+| **friction** | iOS auto-zoom on every input — page-level slosh. |
+| **friction** | Dual-viewport smoke is structural-only, blind to interaction bugs. |
+| **fix** | Mockups-before-code converted abstract dissatisfaction into concrete direction. |
+| **fix** | Move-don't-clone for mobile relocation. |
+| **fix** | `maximum-scale=1` viewport meta as the universal iOS auto-zoom suppressor. |
+| **fix** | Dual-viewport rule + smoke as the cross-cut regression check. |
+| **insight** | Skill discipline (`/frontend-design`) correlates with first-pass-correct UI work. |
+| **insight** | "Well-known issue with a well-known fix" is a search-the-canonical-answer signal. |
+| **insight** | Cross-device clipboard-paste preserves the desktop decision flow on phone via iCloud sync. |
+
+---
+
 ## 2026-05-06 (T2 burn-down): infrastructure-only session — no plugin exercise, by design
 
 **Arc:** Pure source-side work fixing the dw-lifecycle plugin UX cluster (T2: #185, #196, #209, #210, #211, #212, #213, #214, #215). 8-of-9 issues fix-landed across 6 commits. The work is reactive: every fix is a response to friction the operator already documented in those issues. No new dogfood walks happened; we didn't exercise the plugin against real content.
