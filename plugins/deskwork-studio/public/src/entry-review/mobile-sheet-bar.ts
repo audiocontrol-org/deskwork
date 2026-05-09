@@ -81,25 +81,30 @@ export function initMobileSheetBar(deps: SheetBarDeps): MobileSheetBarController
 
   if (!slots.outline || !slots.notes || !slots.actions || !kicker || !meta) return;
 
-  // The notes slot is structured as: [composer (mobile only), list-host].
-  // The list-host is the only thing `refreshNotesSlot` mutates so the
-  // composer stays anchored at the top of the slot through every
-  // annotation re-render.
+  // The notes slot is structured (on mobile) as:
+  //   [composer, sidebar-empty, sidebar-list]
+  // All three elements are MOVED (not cloned) from `.er-marginalia` into
+  // the slot at boot. Moving means:
+  //   - The annotations controller's render target ([data-sidebar-list])
+  //     keeps working — every render attaches event listeners to fresh
+  //     <li> children, so Edit / Resolve / Delete / scroll-to-mark
+  //     handlers all fire correctly inside the sheet.
+  //   - The composer's annotations-controller wiring works too (the
+  //     controller holds a reference to the element; element.parentNode
+  //     changes, but the reference is stable).
   //
-  // Composer relocation is gated on phone-width — on desktop the composer
-  // stays inside `.er-marginalia` where the annotations controller's
-  // inline absolute positioning (computed against the marginalia column's
-  // offsetParent) keeps working. Moving the composer into a display:none
-  // sheet on desktop would break that positioning.
-  let notesListHost: HTMLElement | null = null;
-  if (slots.notes) {
-    if (window.matchMedia(MOBILE_QUERY).matches) {
-      const composer = document.querySelector<HTMLElement>('[data-comment-composer]');
-      if (composer) slots.notes.insertBefore(composer, slots.notes.firstChild);
-    }
-    notesListHost = document.createElement('div');
-    notesListHost.setAttribute('data-mobile-notes-list-host', '');
-    slots.notes.appendChild(notesListHost);
+  // Gated on matchMedia('(max-width: 48rem)'). On desktop everything
+  // stays in `.er-marginalia` where the annotations controller's inline
+  // absolute positioning (relative to the marginalia column's
+  // offsetParent) keeps working. Moving these into a display:none sheet
+  // on desktop would break the absolute positioning.
+  if (slots.notes && window.matchMedia(MOBILE_QUERY).matches) {
+    const composer = document.querySelector<HTMLElement>('[data-comment-composer]');
+    const empty = document.querySelector<HTMLElement>('[data-sidebar-empty]');
+    const list = document.querySelector<HTMLElement>('[data-sidebar-list]');
+    if (composer) slots.notes.appendChild(composer);
+    if (empty) slots.notes.appendChild(empty);
+    if (list) slots.notes.appendChild(list);
   }
 
   // The CSS toggles visibility with `body[data-mobile-sheet-open]` plus
@@ -192,51 +197,15 @@ export function initMobileSheetBar(deps: SheetBarDeps): MobileSheetBarController
   }
 
   function refreshNotesSlot(): void {
-    if (!notesListHost) return;
-    const source = document.querySelector<HTMLOListElement>('[data-sidebar-list]');
-    if (!source) return;
-
-    // Mutate ONLY the list host so the composer (slot's first child)
-    // stays anchored at the top of the sheet across re-renders.
-    notesListHost.innerHTML = '';
-    const list = document.createElement('ol');
-    list.className = 'er-marginalia-list er-mobile-notes-list';
-    list.setAttribute('data-mobile-notes-list', '');
-    const empty = document.createElement('p');
-    empty.className = 'er-marginalia-empty';
-    empty.textContent = 'No margin notes yet — select text in the article to leave one.';
-
-    const items = Array.from(source.querySelectorAll<HTMLLIElement>('.er-marginalia-item'));
-    if (items.length === 0) {
-      notesListHost.appendChild(empty);
-      return;
-    }
-    for (const item of items) {
-      const clone = item.cloneNode(true) as HTMLLIElement;
-      // Inline styles from marginalia-position (absolute top/left) are
-      // meaningless in the sheet's flow context; strip them.
-      clone.style.position = '';
-      clone.style.top = '';
-      clone.style.left = '';
-      clone.style.right = '';
-      clone.style.transform = '';
-      list.appendChild(clone);
-    }
-    notesListHost.appendChild(list);
-
-    // Wire each cloned note: tap → close sheet + scroll article to mark.
-    for (const note of list.querySelectorAll<HTMLElement>('[data-annotation-id]')) {
-      note.addEventListener('click', (ev) => {
-        // Avoid hijacking taps on inline buttons inside the note (resolve,
-        // edit, delete, etc.).
-        const target = ev.target;
-        if (target instanceof HTMLElement && target.closest('button, a')) return;
-        const id = note.dataset.annotationId;
-        if (!id) return;
-        ev.preventDefault();
-        scrollArticleToMark(id);
-      });
-    }
+    // No-op on mobile: the actual `[data-sidebar-list]` element was moved
+    // into the slot at boot, and the annotations controller renders
+    // directly into it — its render attaches Edit / Resolve / Delete /
+    // scroll-to-mark listeners to live <li> children. There is nothing
+    // to refresh from a separate source.
+    //
+    // The function stays as a hook in case the slot ever needs viewport-
+    // aware rebinding (e.g. if we add a "filter notes" UI inside the
+    // sheet that re-renders into the slot).
   }
 
   function populateActionsSlot(): void {
@@ -359,6 +328,33 @@ export function initMobileSheetBar(deps: SheetBarDeps): MobileSheetBarController
     if (mark.closest('[data-mobile-sheet-host], [data-comment-composer]')) return;
     ev.preventDefault();
     openNotesAndFocus(id);
+  });
+
+  // Tap on a note inside the Notes sheet → close the sheet and flash the
+  // article mark. The sidebar-render's per-<li> handler already calls
+  // `onScrollTo` (which `mark.scrollIntoView`s); we just need to dismiss
+  // the sheet so the operator sees the destination, plus flash the mark
+  // for visual feedback. Action buttons (Resolve/Edit/Delete/Cancel/Save)
+  // call ev.stopPropagation() so this never fires when those are tapped.
+  document.addEventListener('click', (ev) => {
+    if (!window.matchMedia(MOBILE_QUERY).matches) return;
+    if (currentSheet !== 'notes') return;
+    const target = ev.target;
+    if (!(target instanceof HTMLElement)) return;
+    if (target.closest('button, a, [data-comment-composer]')) return;
+    if (!target.closest('[data-mobile-sheet-host]')) return;
+    const item = target.closest<HTMLElement>('[data-annotation-id]');
+    if (!item) return;
+    const id = item.dataset.annotationId;
+    if (!id) return;
+    // Defer close so the existing scroll-to-mark gets a head start.
+    window.setTimeout(() => {
+      closeSheet();
+      const mark = document.querySelector<HTMLElement>(`mark[data-annotation-id="${CSS.escape(id)}"]`);
+      if (mark) {
+        window.setTimeout(() => flash(mark), SLIDE_MS + 40);
+      }
+    }, 80);
   });
 
   function openNotesAndFocus(id: string): void {
