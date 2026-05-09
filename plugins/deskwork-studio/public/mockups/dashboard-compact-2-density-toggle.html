@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Dashboard compact 2 · Hide empty + density toggle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F5F1E8;
+    --paper-2: #ECE6D4;
+    --paper-3: #DFD7BF;
+    --kraft: #8A7250;
+    --ink: #1A1614;
+    --faded: #8A7F70;
+    --faded-2: #C7BEAE;
+    --red: #B8362A;
+    --blue: #2A4B7C;
+    --green: #2E5D45;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    --noise:
+      url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #2C2823;
+    background-image:
+      radial-gradient(circle at 30% 20%, rgba(184, 54, 42, 0.08), transparent 50%),
+      radial-gradient(circle at 70% 80%, rgba(42, 75, 124, 0.06), transparent 50%);
+    color: var(--ink); font-family: var(--display);
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 2rem 1rem 4rem;
+  }
+  .meta { color: #C7BEAE; font-family: var(--mono); font-size: 0.8rem;
+          letter-spacing: 0.18em; text-transform: uppercase;
+          margin-bottom: 0.6rem; text-align: center; }
+  .meta a { color: var(--paper); text-decoration: none;
+            border-bottom: 1px solid rgba(245, 241, 232, 0.4); }
+  h1.demo-title { color: var(--paper); font-family: var(--display);
+                  font-style: italic;
+                  font-variation-settings: "opsz" 36, "wght" 500;
+                  font-size: 1.6rem; margin-bottom: 0.4rem; text-align: center; }
+  .demo-sub { color: var(--faded-2); font-family: var(--mono);
+              font-size: 0.7rem; letter-spacing: 0.18em;
+              text-transform: uppercase; margin-bottom: 1.6rem; text-align: center; }
+  .frames { display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center; }
+  .frame-wrap { display: flex; flex-direction: column; align-items: center; }
+  .caption { color: #C7BEAE; font-family: var(--mono);
+             font-size: 0.7rem; letter-spacing: 0.18em;
+             text-transform: uppercase; margin-top: 0.8rem;
+             text-align: center; max-width: 410px; }
+  .phone { width: 410px; height: 880px; background: #050505;
+           border-radius: 50px; padding: 12px;
+           box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5),
+                       inset 0 0 0 1px rgba(255,255,255,0.04);
+           position: relative; }
+  .phone::before { content: ''; position: absolute;
+                   top: 22px; left: 50%; transform: translateX(-50%);
+                   width: 110px; height: 30px; background: #000;
+                   border-radius: 16px; z-index: 100; }
+  .screen { width: 100%; height: 100%; background: var(--paper);
+            background-image: var(--noise);
+            border-radius: 38px; overflow: hidden; position: relative;
+            font-size: 17px; line-height: 1.55; color: var(--ink); }
+  .ios-clock { position: absolute; top: 28px; left: 32px;
+               font-family: -apple-system, system-ui, sans-serif;
+               font-size: 0.95rem; font-weight: 600;
+               color: var(--ink); z-index: 110; }
+  .ios-icons { position: absolute; top: 30px; right: 32px;
+               color: var(--ink);
+               font-family: -apple-system, system-ui, sans-serif;
+               font-size: 0.85rem; letter-spacing: 0.05em; z-index: 110; }
+
+  /* Hero strip */
+  .strip { position: absolute; top: 0; left: 0; right: 0;
+           height: 56px; padding: 56px 1rem 0;
+           background: var(--paper);
+           border-bottom: 1px solid var(--red);
+           z-index: 50;
+           display: flex; align-items: center; gap: 0.6rem; }
+  .strip-mark { font-family: var(--mono); font-size: 0.6rem;
+                letter-spacing: 0.16em; text-transform: uppercase;
+                color: var(--faded); }
+  .strip-mark .stat { color: var(--ink); }
+  .strip-help { margin-left: auto; font-family: var(--mono);
+                font-size: 0.62rem; letter-spacing: 0.16em;
+                text-transform: uppercase; color: var(--ink);
+                text-decoration: none;
+                padding: 0.28rem 0.5rem;
+                border: 1px solid var(--paper-3); border-radius: 2px; }
+
+  /* Filter strip — gains a density toggle on the right */
+  .filterbar {
+    position: absolute; top: 56px; left: 0; right: 0;
+    height: 40px; padding: 0.4rem 0.7rem;
+    background: var(--paper-2);
+    border-bottom: 1px solid var(--paper-3);
+    z-index: 49;
+    display: flex; align-items: center; gap: 0.4rem;
+  }
+  .filterbar-left {
+    display: flex; align-items: center; gap: 0.4rem;
+    flex: 1; overflow-x: auto; scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .filterbar-left::-webkit-scrollbar { display: none; }
+  .findbox { flex-shrink: 0; background: var(--paper);
+             border: 1px solid var(--paper-3); border-radius: 2px;
+             padding: 0.25rem 0.5rem;
+             font-family: var(--mono); font-size: 0.65rem;
+             letter-spacing: 0.06em; color: var(--faded);
+             min-width: 6rem;
+             display: flex; align-items: center; gap: 0.3rem; }
+  .findbox .icon { color: var(--red); }
+  .chip { flex-shrink: 0; border: 1px solid var(--paper-3);
+          background: var(--paper); border-radius: 999px;
+          padding: 0.2rem 0.55rem;
+          font-family: var(--mono); font-size: 0.58rem;
+          letter-spacing: 0.14em; text-transform: uppercase;
+          color: var(--faded); cursor: pointer; }
+  .chip.active { background: var(--ink); color: var(--paper);
+                 border-color: var(--ink); }
+
+  /* Density toggle — segmented pill */
+  .density {
+    flex-shrink: 0;
+    display: inline-flex;
+    border: 1px solid var(--paper-3);
+    border-radius: 2px;
+    background: var(--paper);
+    margin-left: 0.4rem;
+  }
+  .density button {
+    border: none; background: transparent;
+    font-family: var(--mono); font-size: 0.7rem;
+    color: var(--faded); cursor: pointer;
+    padding: 0.18rem 0.45rem;
+    line-height: 1; border-right: 1px solid var(--paper-3);
+  }
+  .density button:last-child { border-right: 0; }
+  .density button.active {
+    background: var(--ink); color: var(--paper);
+  }
+
+  .body {
+    position: absolute; top: 96px; left: 0; right: 0; bottom: 0;
+    overflow-y: auto;
+  }
+
+  /* Section heads — only render for non-empty stages */
+  .stage-head {
+    display: flex; align-items: baseline; gap: 0.5rem;
+    padding: 0.85rem 1rem 0.4rem;
+    border-bottom: 1px solid var(--paper-3);
+    background: var(--paper);
+  }
+  .stage-glyph {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 24, "wght" 500;
+    font-size: 1.2rem; color: var(--red); line-height: 1;
+  }
+  .stage-name {
+    font-family: var(--mono); font-size: 0.65rem;
+    letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--ink);
+  }
+  .stage-count {
+    margin-left: auto;
+    font-family: var(--mono); font-size: 0.58rem;
+    letter-spacing: 0.06em; color: var(--faded);
+  }
+
+  /* STANDARD ROW — stacked 3-line layout */
+  .row {
+    padding: 0.65rem 1rem 0.75rem;
+    border-bottom: 1px dashed var(--paper-3);
+    background: var(--paper);
+    display: grid;
+    grid-template-columns: 1.4rem 1fr;
+    column-gap: 0.5rem; row-gap: 0.2rem;
+  }
+  .row-num { grid-column: 1; grid-row: 1 / span 2;
+             font-family: var(--mono); font-size: 0.58rem;
+             letter-spacing: 0.06em; color: var(--faded);
+             padding-top: 0.2rem; }
+  .row-slug { grid-column: 2; grid-row: 1;
+              font-family: var(--mono); font-size: 0.78rem;
+              color: var(--ink); word-break: break-word;
+              overflow-wrap: anywhere; line-height: 1.2; }
+  .row-slug a { color: var(--ink); text-decoration: none;
+                border-bottom: 1px solid var(--paper-3); }
+  .row-title { grid-column: 2; grid-row: 2;
+               font-family: var(--display); font-style: italic;
+               font-variation-settings: "opsz" 18, "wght" 500;
+               font-size: 0.9rem; line-height: 1.2; color: var(--ink); }
+  .row-foot { grid-column: 1 / -1; grid-row: 3;
+              margin-top: 0.4rem;
+              display: flex; align-items: center; gap: 0.35rem;
+              flex-wrap: wrap; }
+
+  /* COMPACT ROW — single-line layout */
+  .row-compact {
+    padding: 0.45rem 1rem;
+    border-bottom: 1px dashed var(--paper-3);
+    background: var(--paper);
+    display: grid;
+    grid-template-columns: 1rem 1fr auto auto;
+    column-gap: 0.45rem; align-items: center;
+    min-height: 32px;
+  }
+  .row-compact-glyph {
+    font-family: var(--display); font-style: italic;
+    font-size: 0.95rem; line-height: 1;
+    color: var(--red);
+  }
+  .row-compact-slug {
+    font-family: var(--mono); font-size: 0.72rem;
+    color: var(--ink);
+    overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; line-height: 1.3;
+    direction: rtl; /* show the meaningful tail of slug paths */
+    text-align: left;
+  }
+  .row-compact-slug a {
+    color: var(--ink); text-decoration: none;
+    border-bottom: 1px solid var(--paper-3);
+    direction: ltr; unicode-bidi: bidi-override;
+  }
+  .row-compact-stamp {
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    background: var(--paper-3); color: var(--red);
+    padding: 0.08rem 0.4rem 0.08rem 0.34rem;
+    line-height: 1.2; flex-shrink: 0;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 4px),
+                       calc(100% - 4px) 100%, 0 100%);
+    position: relative;
+  }
+  .row-compact-stamp::before {
+    content: ''; position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 2px; background: currentColor;
+  }
+  .row-compact-stamp.iterating { color: var(--blue); }
+  .row-compact-stamp.approved { color: var(--green); }
+  .row-compact-arrow {
+    font-family: var(--mono); font-size: 0.85rem;
+    color: var(--red);
+  }
+
+  /* Filing-tab stamp (standard rows) */
+  .stamp {
+    font-family: var(--mono); font-size: 0.6rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    font-weight: 500;
+    background: var(--paper-3); color: var(--ink);
+    padding: 0.16rem 0.6rem 0.16rem 0.5rem;
+    line-height: 1.2; flex-shrink: 0; position: relative;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 6px),
+                       calc(100% - 6px) 100%, 0 100%);
+  }
+  .stamp::before {
+    content: ''; position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px; background: currentColor;
+  }
+  .stamp.review { color: var(--red); }
+  .stamp.iterating { color: var(--blue); }
+  .stamp.approved { color: var(--green); }
+
+  .iter-pip { font-family: var(--mono); font-size: 0.55rem;
+              letter-spacing: 0.06em; color: var(--faded);
+              text-transform: uppercase; }
+  .act { flex-shrink: 0;
+         border: 1px solid var(--paper-3);
+         background: var(--paper); border-radius: 2px;
+         padding: 0.16rem 0.4rem;
+         font-family: var(--mono); font-size: 0.58rem;
+         letter-spacing: 0.06em; text-transform: uppercase;
+         color: var(--ink); text-decoration: none; cursor: pointer;
+         line-height: 1.4; }
+  .act.approve { color: var(--green); border-color: var(--green); }
+  .act.iterate { color: var(--blue); border-color: var(--blue); }
+  .act.cancel { color: var(--faded); }
+  .act.scrap { color: var(--kraft); border-color: #D9C8A2; }
+
+  /* Empty stages footer */
+  .empty-foot {
+    padding: 0.7rem 1rem;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-bottom: 1px dashed var(--paper-3);
+    display: flex; align-items: center; gap: 0.55rem;
+    font-family: var(--mono); font-size: 0.6rem;
+    letter-spacing: 0.06em; color: var(--faded);
+    text-transform: uppercase;
+  }
+  .empty-foot::before {
+    content: '— ·'; color: var(--paper-3); flex-shrink: 0;
+  }
+  .empty-foot a {
+    color: var(--blue); text-decoration: none;
+    border-bottom: 1px dashed var(--paper-3);
+    padding-bottom: 1px;
+    margin-left: auto; flex-shrink: 0;
+  }
+
+  /* FAB */
+  .fab { position: absolute; bottom: 16px; right: 16px;
+         z-index: 65;
+         background: var(--red); color: var(--paper);
+         border: 1px solid var(--red); border-radius: 2px;
+         padding: 0.55rem 0.85rem;
+         box-shadow: inset 0 1px 0 rgba(255,255,255,0.12),
+                     0 4px 12px rgba(184, 54, 42, 0.28),
+                     0 1px 3px rgba(0,0,0,0.18);
+         font-family: var(--mono); font-size: 0.62rem;
+         font-weight: 500; letter-spacing: 0.16em;
+         text-transform: uppercase;
+         display: inline-flex; align-items: center; gap: 0.35rem;
+         cursor: pointer; line-height: 1; }
+  .fab .glyph { font-family: var(--mono); font-size: 0.95rem;
+                line-height: 1; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="meta"><a href="./index.html">← all directions</a></div>
+<h1 class="demo-title">Compact 2 · Hide empty + density toggle.</h1>
+<div class="demo-sub">Empty stages folded · row density on demand</div>
+
+<div class="frames">
+
+  <!-- Frame A: standard density, only non-empty stages -->
+  <div class="frame-wrap">
+    <div class="phone">
+      <div class="ios-clock">9:41</div>
+      <div class="ios-icons">·· ◎ ▮▮</div>
+      <div class="screen">
+
+        <div class="strip">
+          <span class="strip-mark"><span class="stat">11</span> on the calendar · <span class="stat">4</span> in review · <span class="stat">1</span> approved</span>
+          <a class="strip-help" href="#">Help</a>
+        </div>
+
+        <div class="filterbar">
+          <div class="filterbar-left">
+            <div class="findbox"><span class="icon">⌕</span> slug, title…</div>
+            <button class="chip active">All</button>
+            <button class="chip">Active</button>
+            <button class="chip">Drafting</button>
+          </div>
+          <div class="density">
+            <button>⊟</button>
+            <button class="active">☰</button>
+          </div>
+        </div>
+
+        <div class="body">
+
+          <div class="stage-head">
+            <span class="stage-glyph">§</span>
+            <span class="stage-name">Planned</span>
+            <span class="stage-count">1</span>
+          </div>
+          <div class="row">
+            <span class="row-num">01</span>
+            <div class="row-slug"><a href="#">deskwork-plugin/issue-158-ux-audit</a></div>
+            <div class="row-title">Issue 158 · UX audit</div>
+            <div class="row-foot">
+              <a class="act" href="#">open →</a>
+              <button class="act approve">approve →</button>
+              <a class="act scrap" href="#">▦ 0</a>
+            </div>
+          </div>
+
+          <div class="stage-head">
+            <span class="stage-glyph">✎</span>
+            <span class="stage-name">Drafting</span>
+            <span class="stage-count">5 · 3 in review</span>
+          </div>
+          <div class="row">
+            <span class="row-num">02</span>
+            <div class="row-slug"><a href="#">post-release-acceptance-design</a></div>
+            <div class="row-title">Post-release customer acceptance playbook</div>
+            <div class="row-foot">
+              <span class="stamp review">In review</span>
+              <span class="iter-pip">it. 02</span>
+              <a class="act" href="#">open →</a>
+              <button class="act approve">approve →</button>
+              <a class="act scrap" href="#">▦ 4</a>
+            </div>
+          </div>
+          <div class="row">
+            <span class="row-num">03</span>
+            <div class="row-slug"><a href="#">…/v016-verification-walk</a></div>
+            <div class="row-title">v0.16.0 verification walk</div>
+            <div class="row-foot">
+              <span class="stamp review">In review</span>
+              <span class="iter-pip">it. 01</span>
+              <a class="act" href="#">open →</a>
+              <button class="act approve">approve →</button>
+            </div>
+          </div>
+
+          <div class="empty-foot">
+            <span>0 in <strong style="color: var(--ink);">Ideas</strong> · <strong style="color: var(--ink);">Outlining</strong> · <strong style="color: var(--ink);">Blocked</strong> · <strong style="color: var(--ink);">Cancelled</strong></span>
+            <a href="#">show ↓</a>
+          </div>
+
+        </div>
+
+        <button class="fab" type="button">
+          <span class="glyph">+</span> Compose
+        </button>
+
+      </div>
+    </div>
+    <div class="caption">A · standard density · Ideas/Outlining/Blocked/Cancelled folded into one footer line · 4 visible stages instead of 8 · density toggle ⊟/☰ in the filter strip</div>
+  </div>
+
+  <!-- Frame B: compact density, single-line rows -->
+  <div class="frame-wrap">
+    <div class="phone">
+      <div class="ios-clock">9:41</div>
+      <div class="ios-icons">·· ◎ ▮▮</div>
+      <div class="screen">
+
+        <div class="strip">
+          <span class="strip-mark"><span class="stat">11</span> on the calendar · <span class="stat">4</span> in review · <span class="stat">1</span> approved</span>
+          <a class="strip-help" href="#">Help</a>
+        </div>
+
+        <div class="filterbar">
+          <div class="filterbar-left">
+            <div class="findbox"><span class="icon">⌕</span> slug, title…</div>
+            <button class="chip active">All</button>
+            <button class="chip">Active</button>
+            <button class="chip">Drafting</button>
+          </div>
+          <div class="density">
+            <button class="active">⊟</button>
+            <button>☰</button>
+          </div>
+        </div>
+
+        <div class="body">
+
+          <div class="stage-head">
+            <span class="stage-glyph">§</span>
+            <span class="stage-name">Planned</span>
+            <span class="stage-count">1</span>
+          </div>
+          <div class="row-compact">
+            <span class="row-compact-glyph">§</span>
+            <span class="row-compact-slug"><a href="#">deskwork-plugin/issue-158-ux-audit</a></span>
+            <span></span>
+            <span class="row-compact-arrow">→</span>
+          </div>
+
+          <div class="stage-head">
+            <span class="stage-glyph">✎</span>
+            <span class="stage-name">Drafting</span>
+            <span class="stage-count">5 · 3 in review</span>
+          </div>
+          <div class="row-compact">
+            <span class="row-compact-glyph">✎</span>
+            <span class="row-compact-slug"><a href="#">post-release-acceptance-design</a></span>
+            <span class="row-compact-stamp">In review</span>
+            <span class="row-compact-arrow">→</span>
+          </div>
+          <div class="row-compact">
+            <span class="row-compact-glyph">✎</span>
+            <span class="row-compact-slug"><a href="#">…/v016-verification-walk</a></span>
+            <span class="row-compact-stamp">In review</span>
+            <span class="row-compact-arrow">→</span>
+          </div>
+          <div class="row-compact">
+            <span class="row-compact-glyph">✎</span>
+            <span class="row-compact-slug"><a href="#">release-skill-design</a></span>
+            <span class="row-compact-stamp iterating">Iter</span>
+            <span class="row-compact-arrow">→</span>
+          </div>
+          <div class="row-compact">
+            <span class="row-compact-glyph">✎</span>
+            <span class="row-compact-slug"><a href="#">deskwork-plugin/open-issue-tranche-proposal</a></span>
+            <span class="row-compact-stamp">In review</span>
+            <span class="row-compact-arrow">→</span>
+          </div>
+          <div class="row-compact">
+            <span class="row-compact-glyph">✎</span>
+            <span class="row-compact-slug"><a href="#">…/workplan</a></span>
+            <span></span>
+            <span class="row-compact-arrow">→</span>
+          </div>
+
+          <div class="stage-head">
+            <span class="stage-glyph">⊕</span>
+            <span class="stage-name">Final</span>
+            <span class="stage-count">1 · 1 approved</span>
+          </div>
+          <div class="row-compact">
+            <span class="row-compact-glyph">⊕</span>
+            <span class="row-compact-slug"><a href="#">studio-mobile-first</a></span>
+            <span class="row-compact-stamp approved">App.</span>
+            <span class="row-compact-arrow">→</span>
+          </div>
+
+          <div class="stage-head">
+            <span class="stage-glyph">✦</span>
+            <span class="stage-name">Published</span>
+            <span class="stage-count">4</span>
+          </div>
+          <div class="row-compact">
+            <span class="row-compact-glyph">✦</span>
+            <span class="row-compact-slug"><a href="#">deskwork-plugin/v018-release</a></span>
+            <span></span>
+            <span class="row-compact-arrow">→</span>
+          </div>
+          <div class="row-compact">
+            <span class="row-compact-glyph">✦</span>
+            <span class="row-compact-slug"><a href="#">deskwork-plugin/v017-mobile-review</a></span>
+            <span></span>
+            <span class="row-compact-arrow">→</span>
+          </div>
+
+          <div class="empty-foot">
+            <span>0 in <strong style="color: var(--ink);">Ideas</strong> · <strong style="color: var(--ink);">Outlining</strong> · <strong style="color: var(--ink);">Blocked</strong> · <strong style="color: var(--ink);">Cancelled</strong></span>
+            <a href="#">show ↓</a>
+          </div>
+
+        </div>
+
+        <button class="fab" type="button">
+          <span class="glyph">+</span> Compose
+        </button>
+
+      </div>
+    </div>
+    <div class="caption">B · compact density · single-line rows (~32px each) · all 11 entries fit above the fold · stamp shrinks to 4-letter abbreviations · stage glyph on left rail to maintain stage cue without section heads being heavy</div>
+  </div>
+
+</div>
+
+<div style="margin-top: 2.5rem; max-width: 720px; padding: 0 1rem; color: #C7BEAE; font-family: var(--display); font-size: 0.95rem; line-height: 1.6;">
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">Pattern</span><strong style="color: var(--paper); font-style: italic; font-weight: 500;">Two compactness moves stacked.</strong> First, empty stages don't render their full section head — they collapse into one thin "0 in <em>Ideas · Outlining · Blocked · Cancelled</em> · show ↓" footer at the bottom. Tap "show ↓" to expand them back. Second, the filter strip gains a density toggle (⊟ Compact / ☰ Standard). Standard is the current 3-line stacked row; Compact is single-line: stage-glyph + slug + stamp-or-blank + → arrow. Both moves can be active at once (frame B).</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">Scroll cost (default state)</span><strong style="color: var(--paper); font-style: italic; font-weight: 500;">~96px to first content row in standard density</strong> (Planned head + first row, no preamble). With compact density, all 11 calendar entries fit in roughly one viewport (each row ~32px × 11 = ~352px + 4 stage heads × 36px = ~496px, plus 96px chrome = ~592px — easily within 844). The empty-stages footer is one line at the bottom.</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">Trade-off</span>Compact density loses the title and action chips per row. The operator sees slug + stamp + arrow; to act, they tap → and land on the entry's review surface where actions live. The "open / approve / cancel / scrapbook" inline chips disappear. That's a one-tap-deeper cost for the actions per entry — but the alternative (3-line standard rows) doesn't fit a meaningful number of entries on phone anyway. Standard density preserves the inline actions but only fits 2-3 rows at a time. The toggle lets the operator pick: SCAN mode (compact) vs ACT mode (standard).</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">When it wins</span>Operator opens the dashboard, glances at the compact list, sees "I have 3 in review in Drafting and 1 approved in Final" in one viewport. Taps the in-review entry that's most pressing → review surface. Returns to dashboard, taps the next. Browse-and-act loop is fast because they never lose context to scrolling. Power users will likely set Compact as their default and never see Standard.</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">When it doesn't</span>An operator who wants to act-from-the-dashboard (approve/iterate/cancel without going to the review surface) loses inline actions in compact mode. Standard mode preserves them but at the scroll cost. The density toggle is a manual choice the operator has to remember exists; some operators will never find it. For a NEW operator, the standard 3-line layout is more discoverable — the operator can see what each row's parts ARE without first learning that Compact exists.</p>
+</div>
+
+</body>
+</html>

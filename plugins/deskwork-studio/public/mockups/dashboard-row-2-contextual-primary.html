@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Dashboard row 2 · Contextual primary + overflow secondary</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F5F1E8;
+    --paper-2: #ECE6D4;
+    --paper-3: #DFD7BF;
+    --kraft: #8A7250;
+    --kraft-2: #D9C8A2;
+    --ink: #1A1614;
+    --faded: #8A7F70;
+    --faded-2: #C7BEAE;
+    --red: #B8362A;
+    --blue: #2A4B7C;
+    --green: #2E5D45;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    --noise:
+      url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #2C2823;
+    background-image:
+      radial-gradient(circle at 30% 20%, rgba(184, 54, 42, 0.08), transparent 50%),
+      radial-gradient(circle at 70% 80%, rgba(42, 75, 124, 0.06), transparent 50%);
+    color: var(--ink); font-family: var(--display);
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 2rem 1rem 4rem;
+  }
+  .meta { color: #C7BEAE; font-family: var(--mono); font-size: 0.8rem;
+          letter-spacing: 0.18em; text-transform: uppercase;
+          margin-bottom: 0.6rem; text-align: center; }
+  .meta a { color: var(--paper); text-decoration: none;
+            border-bottom: 1px solid rgba(245, 241, 232, 0.4); }
+  h1.demo-title { color: var(--paper); font-family: var(--display);
+                  font-style: italic;
+                  font-variation-settings: "opsz" 36, "wght" 500;
+                  font-size: 1.6rem; margin-bottom: 0.4rem; text-align: center; }
+  .demo-sub { color: var(--faded-2); font-family: var(--mono);
+              font-size: 0.7rem; letter-spacing: 0.18em;
+              text-transform: uppercase; margin-bottom: 1.6rem; text-align: center; }
+  .frames { display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center; }
+  .frame-wrap { display: flex; flex-direction: column; align-items: center; }
+  .caption { color: #C7BEAE; font-family: var(--mono);
+             font-size: 0.7rem; letter-spacing: 0.18em;
+             text-transform: uppercase; margin-top: 0.8rem;
+             text-align: center; max-width: 410px; }
+  .phone { width: 410px; height: 880px; background: #050505;
+           border-radius: 50px; padding: 12px;
+           box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5),
+                       inset 0 0 0 1px rgba(255,255,255,0.04);
+           position: relative; }
+  .phone::before { content: ''; position: absolute;
+                   top: 22px; left: 50%; transform: translateX(-50%);
+                   width: 110px; height: 30px; background: #000;
+                   border-radius: 16px; z-index: 100; }
+  .screen { width: 100%; height: 100%; background: var(--paper);
+            background-image: var(--noise);
+            border-radius: 38px; overflow: hidden; position: relative;
+            font-size: 17px; line-height: 1.55; color: var(--ink); }
+  .ios-clock { position: absolute; top: 28px; left: 32px;
+               font-family: -apple-system, system-ui, sans-serif;
+               font-size: 0.95rem; font-weight: 600;
+               color: var(--ink); z-index: 110; }
+  .ios-icons { position: absolute; top: 30px; right: 32px;
+               color: var(--ink);
+               font-family: -apple-system, system-ui, sans-serif;
+               font-size: 0.85rem; letter-spacing: 0.05em; z-index: 110; }
+
+  .strip { position: absolute; top: 0; left: 0; right: 0;
+           height: 56px; padding: 56px 1rem 0;
+           background: var(--paper);
+           border-bottom: 1px solid var(--red);
+           z-index: 50;
+           display: flex; align-items: center; gap: 0.6rem; }
+  .strip-mark { font-family: var(--mono); font-size: 0.6rem;
+                letter-spacing: 0.16em; text-transform: uppercase;
+                color: var(--faded); }
+  .strip-mark .stat { color: var(--ink); }
+
+  .filterbar {
+    position: absolute; top: 56px; left: 0; right: 0;
+    height: 40px; padding: 0.4rem 0.7rem;
+    background: var(--paper-2);
+    border-bottom: 1px solid var(--paper-3);
+    z-index: 49;
+    display: flex; align-items: center; gap: 0.4rem;
+  }
+  .findbox { background: var(--paper);
+             border: 1px solid var(--paper-3); border-radius: 2px;
+             padding: 0.25rem 0.5rem; flex: 1;
+             font-family: var(--mono); font-size: 0.65rem;
+             letter-spacing: 0.06em; color: var(--faded);
+             display: flex; align-items: center; gap: 0.3rem; }
+  .findbox .icon { color: var(--red); }
+
+  .body { position: absolute; top: 96px; left: 0; right: 0; bottom: 0;
+          overflow-y: auto; }
+
+  .stage-tile {
+    display: grid;
+    grid-template-columns: 1.6rem 1fr auto 1.4rem;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.55rem 1rem;
+    border-bottom: 1px dashed var(--paper-3);
+    background: var(--paper);
+    cursor: pointer; min-height: 44px;
+  }
+  .stage-tile.expanded {
+    background: var(--paper-2);
+    border-bottom-color: var(--red);
+  }
+  .stage-tile-glyph { font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+    font-size: 1.25rem; line-height: 1; color: var(--red); text-align: center; }
+  .stage-tile-name {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 500;
+    font-size: 1rem; line-height: 1.1;
+  }
+  .stage-tile.expanded .stage-tile-name { color: var(--red); }
+  .stage-tile-count {
+    font-family: var(--mono); font-size: 0.62rem;
+    letter-spacing: 0.06em; color: var(--faded);
+    text-transform: uppercase; text-align: right;
+  }
+  .stage-tile-count .num { color: var(--ink); font-weight: 500; }
+  .stage-tile-chev {
+    font-family: var(--mono); font-size: 0.95rem;
+    color: var(--red); text-align: center;
+    transition: transform 200ms ease;
+  }
+  .stage-tile.expanded .stage-tile-chev { transform: rotate(90deg); }
+
+  /* ============================================================
+   *  ROW PATTERN — CONTEXTUAL PRIMARY + OVERFLOW SECONDARY
+   *
+   *  Layout:
+   *    [num+slug+title]   [primary verb]  [⋮]
+   *
+   *  The PRIMARY VERB is contextual based on state:
+   *    - in-review        → Approve →   (green, prominent)
+   *    - iterating        → Iterate →   (blue, prominent)
+   *    - approved         → Open →      (ink, neutral)
+   *    - no review state  → Open →      (ink, neutral)
+   *  This makes the most-likely-next-action one tap from the dashboard.
+   *  Tap row body → Open. Tap primary verb → contextual action.
+   *  Tap ⋮ → secondary actions menu (Cancel · Scrapbook · etc.)
+   * ============================================================ */
+  .stage-rows {
+    background: var(--paper);
+    background-image: var(--noise);
+    border-bottom: 1px solid var(--paper-3);
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 1fr auto 28px;
+    column-gap: 0.5rem;
+    align-items: center;
+    padding: 0.65rem 1rem 0.7rem 1.5rem;
+    border-bottom: 1px dashed var(--paper-3);
+    cursor: pointer;
+    background: var(--paper);
+  }
+  .row:active { background: var(--paper-2); }
+  .row:last-child { border-bottom: 0; }
+  .row-body {
+    grid-column: 1; grid-row: 1;
+    min-width: 0;
+  }
+  .row-head {
+    display: flex; align-items: center; gap: 0.45rem;
+    margin-bottom: 0.18rem;
+  }
+  .row-head-num {
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--faded);
+  }
+  .stamp {
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    font-weight: 500;
+    background: var(--paper-3); color: var(--ink);
+    padding: 0.1rem 0.5rem 0.1rem 0.4rem;
+    line-height: 1.2; flex-shrink: 0; position: relative;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 5px),
+                       calc(100% - 5px) 100%, 0 100%);
+  }
+  .stamp::before {
+    content: ''; position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px; background: currentColor;
+  }
+  .stamp.review { color: var(--red); }
+  .stamp.iterating { color: var(--blue); }
+  .stamp.approved { color: var(--green); }
+  .row-iter {
+    font-family: var(--mono); font-size: 0.5rem;
+    letter-spacing: 0.06em; color: var(--faded);
+    text-transform: uppercase;
+  }
+  .row-slug {
+    font-family: var(--mono); font-size: 0.78rem;
+    color: var(--ink);
+    word-break: break-word; overflow-wrap: anywhere;
+    line-height: 1.2;
+    border-bottom: 1px solid var(--paper-3);
+    padding-bottom: 1px;
+  }
+  .row-title {
+    display: block;
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 500;
+    font-size: 0.95rem; line-height: 1.2;
+    color: var(--ink);
+    margin-top: 0.18rem;
+  }
+
+  /* The contextual primary verb chip */
+  .primary {
+    grid-column: 2; grid-row: 1;
+    flex-shrink: 0;
+    border: 1px solid currentColor;
+    background: var(--paper);
+    border-radius: 2px;
+    padding: 0.32rem 0.6rem;
+    font-family: var(--mono); font-size: 0.62rem;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    font-weight: 500;
+    cursor: pointer;
+    line-height: 1;
+    color: var(--ink);
+  }
+  .primary.approve {
+    color: var(--green);
+    background: rgba(46, 93, 69, 0.05);
+  }
+  .primary.iterate {
+    color: var(--blue);
+    background: rgba(42, 75, 124, 0.05);
+  }
+  .primary.open {
+    color: var(--ink);
+    border-color: var(--paper-3);
+  }
+
+  /* Overflow ⋮ */
+  .overflow-btn {
+    grid-column: 3; grid-row: 1;
+    width: 28px; height: 28px;
+    border: 1px solid var(--paper-3);
+    background: var(--paper);
+    border-radius: 2px;
+    color: var(--ink);
+    font-family: var(--mono); font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .overflow-btn:hover { background: var(--paper-2); }
+  .overflow-btn.active {
+    background: var(--ink); color: var(--paper);
+    border-color: var(--ink);
+  }
+
+  /* Secondary action sheet — slides up from bottom (not a popover this time) */
+  .scrim {
+    position: absolute; inset: 0;
+    background: rgba(26, 22, 20, 0.18);
+    backdrop-filter: blur(1px);
+    z-index: 65;
+  }
+  .sheet {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-top: 1px solid var(--red);
+    border-radius: 24px 24px 0 0;
+    box-shadow: 0 -16px 40px rgba(26,22,20,0.18);
+    z-index: 70;
+    overflow: hidden;
+  }
+  .sheet-handle {
+    align-self: center;
+    width: 44px; height: 5px;
+    background: var(--paper-3);
+    border-radius: 4px;
+    margin: 0.55rem auto 0.7rem;
+    display: block;
+  }
+  .sheet-head {
+    padding: 0 1rem 0.7rem;
+    border-bottom: 1px solid var(--red);
+    display: flex; align-items: baseline; gap: 0.6rem;
+  }
+  .sheet-kicker {
+    font-family: var(--mono); font-size: 0.65rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--red);
+  }
+  .sheet-meta {
+    font-family: var(--mono); font-size: 0.58rem;
+    letter-spacing: 0.06em; color: var(--faded);
+    text-transform: uppercase;
+    margin-left: auto;
+  }
+  .sheet-body {
+    padding: 0.5rem 0.85rem 1rem;
+  }
+  .menu-item {
+    display: flex; align-items: baseline; gap: 0.55rem;
+    padding: 0.7rem 0.55rem;
+    border-bottom: 1px dashed var(--paper-3);
+    cursor: pointer;
+    text-decoration: none;
+    color: var(--ink);
+  }
+  .menu-item:last-child { border-bottom: 0; }
+  .menu-item:active { background: var(--paper-2); }
+  .menu-item-glyph {
+    font-family: var(--display); font-style: italic;
+    font-size: 1.2rem; line-height: 1; width: 1.2rem; text-align: center;
+  }
+  .menu-item.cancel .menu-item-glyph { color: var(--faded); }
+  .menu-item.scrap .menu-item-glyph { color: var(--kraft); }
+  .menu-item.induct .menu-item-glyph { color: var(--red); }
+  .menu-item-name {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+    font-size: 1rem; flex: 1;
+  }
+  .menu-item.cancel .menu-item-name { color: var(--faded); }
+  .menu-item.scrap .menu-item-name { color: var(--kraft); }
+  .menu-item.induct .menu-item-name { color: var(--red); }
+  .menu-item-meta {
+    font-family: var(--mono); font-size: 0.58rem;
+    letter-spacing: 0.06em; color: var(--faded);
+    text-transform: uppercase;
+  }
+  .menu-item.scrap .menu-item-meta { color: var(--kraft); }
+
+  .fab { position: absolute; bottom: 16px; right: 16px;
+         z-index: 65;
+         background: var(--red); color: var(--paper);
+         border: 1px solid var(--red); border-radius: 2px;
+         padding: 0.55rem 0.85rem;
+         box-shadow: inset 0 1px 0 rgba(255,255,255,0.12),
+                     0 4px 12px rgba(184, 54, 42, 0.28),
+                     0 1px 3px rgba(0,0,0,0.18);
+         font-family: var(--mono); font-size: 0.62rem;
+         font-weight: 500; letter-spacing: 0.16em;
+         text-transform: uppercase;
+         display: inline-flex; align-items: center; gap: 0.35rem;
+         cursor: pointer; line-height: 1; }
+  .fab .glyph { font-family: var(--mono); font-size: 0.95rem;
+                line-height: 1; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="meta"><a href="./index.html">← all directions</a></div>
+<h1 class="demo-title">Row 2 · Contextual primary + overflow.</h1>
+<div class="demo-sub">Most-likely-next-action one tap · cancel/scrap one tap deeper</div>
+
+<div class="frames">
+
+  <!-- Frame A: rows showing different contextual primaries -->
+  <div class="frame-wrap">
+    <div class="phone">
+      <div class="ios-clock">9:41</div>
+      <div class="ios-icons">·· ◎ ▮▮</div>
+      <div class="screen">
+
+        <div class="strip">
+          <span class="strip-mark"><span class="stat">11</span> on the calendar · <span class="stat">4</span> in review · <span class="stat">1</span> approved</span>
+        </div>
+
+        <div class="filterbar">
+          <div class="findbox"><span class="icon">⌕</span> slug, title…</div>
+        </div>
+
+        <div class="body">
+          <div class="stage-tile expanded">
+            <span class="stage-tile-glyph">✎</span>
+            <span class="stage-tile-name">Drafting</span>
+            <span class="stage-tile-count"><span class="num">5</span> · 3 in review</span>
+            <span class="stage-tile-chev">›</span>
+          </div>
+          <div class="stage-rows">
+            <div class="row">
+              <div class="row-body">
+                <div class="row-head">
+                  <span class="row-head-num">№ 01</span>
+                  <span class="stamp review">In review</span>
+                  <span class="row-iter">it. 02 · ▦ 4</span>
+                </div>
+                <a class="row-slug" href="#">post-release-acceptance-design</a>
+                <span class="row-title">Post-release customer acceptance playbook</span>
+              </div>
+              <button class="primary approve">approve →</button>
+              <button class="overflow-btn">⋮</button>
+            </div>
+            <div class="row">
+              <div class="row-body">
+                <div class="row-head">
+                  <span class="row-head-num">№ 02</span>
+                  <span class="stamp review">In review</span>
+                  <span class="row-iter">it. 01 · ▦ 1</span>
+                </div>
+                <a class="row-slug" href="#">…/v016-verification-walk</a>
+                <span class="row-title">v0.16.0 verification walk</span>
+              </div>
+              <button class="primary approve">approve →</button>
+              <button class="overflow-btn">⋮</button>
+            </div>
+            <div class="row">
+              <div class="row-body">
+                <div class="row-head">
+                  <span class="row-head-num">№ 03</span>
+                  <span class="stamp iterating">Iterating</span>
+                  <span class="row-iter">it. 03 · ▦ 2</span>
+                </div>
+                <a class="row-slug" href="#">release-skill-design</a>
+                <span class="row-title">Release skill design</span>
+              </div>
+              <button class="primary iterate">iterate →</button>
+              <button class="overflow-btn">⋮</button>
+            </div>
+            <div class="row">
+              <div class="row-body">
+                <div class="row-head">
+                  <span class="row-head-num">№ 04</span>
+                  <span class="row-iter">no review yet</span>
+                </div>
+                <a class="row-slug" href="#">…/workplan</a>
+                <span class="row-title">Workplan</span>
+              </div>
+              <button class="primary open">open →</button>
+              <button class="overflow-btn">⋮</button>
+            </div>
+          </div>
+        </div>
+
+        <button class="fab" type="button">
+          <span class="glyph">+</span> Compose
+        </button>
+
+      </div>
+    </div>
+    <div class="caption">A · contextual primary verb per row · approve→ when in-review · iterate→ when iterating · open→ when no state · scope-light secondary ⋮ · row-head consolidates №+stamp+iter into ONE inline strip</div>
+  </div>
+
+  <!-- Frame B: secondary action sheet open from ⋮ -->
+  <div class="frame-wrap">
+    <div class="phone">
+      <div class="ios-clock">9:41</div>
+      <div class="ios-icons">·· ◎ ▮▮</div>
+      <div class="screen">
+
+        <div class="strip">
+          <span class="strip-mark"><span class="stat">11</span> on the calendar · <span class="stat">4</span> in review · <span class="stat">1</span> approved</span>
+        </div>
+
+        <div class="filterbar">
+          <div class="findbox"><span class="icon">⌕</span> slug, title…</div>
+        </div>
+
+        <div class="body">
+          <div class="stage-tile expanded">
+            <span class="stage-tile-glyph">✎</span>
+            <span class="stage-tile-name">Drafting</span>
+            <span class="stage-tile-count"><span class="num">5</span> · 3 in review</span>
+            <span class="stage-tile-chev">›</span>
+          </div>
+          <div class="stage-rows">
+            <div class="row">
+              <div class="row-body">
+                <div class="row-head">
+                  <span class="row-head-num">№ 01</span>
+                  <span class="stamp review">In review</span>
+                  <span class="row-iter">it. 02 · ▦ 4</span>
+                </div>
+                <a class="row-slug" href="#">post-release-acceptance-design</a>
+                <span class="row-title">Post-release customer acceptance playbook</span>
+              </div>
+              <button class="primary approve">approve →</button>
+              <button class="overflow-btn active">⋮</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="scrim"></div>
+
+        <div class="sheet">
+          <span class="sheet-handle"></span>
+          <div class="sheet-head">
+            <span class="sheet-kicker">post-release-acceptance-design</span>
+            <span class="sheet-meta">More actions</span>
+          </div>
+          <div class="sheet-body">
+            <a class="menu-item scrap" href="#">
+              <span class="menu-item-glyph">▦</span>
+              <span class="menu-item-name">Scrapbook</span>
+              <span class="menu-item-meta">4 items ↗</span>
+            </a>
+            <a class="menu-item cancel" href="#">
+              <span class="menu-item-glyph">⊘</span>
+              <span class="menu-item-name">Cancel</span>
+              <span class="menu-item-meta">/deskwork:cancel</span>
+            </a>
+            <a class="menu-item induct" href="#">
+              <span class="menu-item-glyph">↻</span>
+              <span class="menu-item-name">Induct to other stage</span>
+              <span class="menu-item-meta">/deskwork:induct</span>
+            </a>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    <div class="caption">B · ⋮ tapped on row 01 · bottom sheet with secondaries (Scrapbook · Cancel · Induct) · primary action (approve) NOT in this sheet — it's already the visible primary chip · cleaner separation of "do the next thing" vs "do something other"</div>
+  </div>
+
+</div>
+
+<div style="margin-top: 2.5rem; max-width: 720px; padding: 0 1rem; color: #C7BEAE; font-family: var(--display); font-size: 0.95rem; line-height: 1.6;">
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">Pattern</span><strong style="color: var(--paper); font-style: italic; font-weight: 500;">One contextual primary verb per row.</strong> The row layout has three columns: row-body (slug + title + meta strip), primary verb chip (contextual to state), and overflow ⋮ (secondaries). The primary verb is what the operator most-likely-wants-to-do RIGHT NOW based on the entry's state: <em style="color: var(--paper);">approve</em> when reviewState is in-review, <em style="color: var(--paper);">iterate</em> when iterating, <em style="color: var(--paper);">open</em> for everything else (no state, approved, etc.). The ⋮ holds the longer-tail secondaries (cancel, scrapbook, induct).</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">Row height (default state)</span><strong style="color: var(--paper); font-style: italic; font-weight: 500;">~70px regardless of state.</strong> Slightly taller than Direction A (the row-head meta strip costs a line) but stable. The row-head consolidates №+stamp+iter into one inline cluster instead of stacking them — that's the geometric trick that keeps the row stable.</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">Trade-off</span>The primary verb takes 80-90px of horizontal real estate from the slug/title body. On long slugs (e.g. <em style="color: var(--paper);">deskwork-plugin/open-issue-tranche-proposal</em> at 39 chars) that compresses the slug column to ~180px, forcing word-wrap. The row body still wraps gracefully (overflow-wrap: anywhere) but it's denser. Approve / iterate / open all become 1-tap from the dashboard. Cancel / scrapbook / induct are 2-tap (via ⋮ → sheet).</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">When it wins</span>Operator's most-common-action stays at 1 tap. The dashboard becomes a triage queue: see what needs review → approve. The visible verb is also a HINT about what's expected of the operator (the in-review badge says "needs your attention" — the approve button says "specifically, your APPROVAL or rejection"). Reduces the cognitive load of "what should I do here?" because the row tells you.</p>
+  <p style="margin-bottom: 0.8rem;"><span style="font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--red); display: block; margin-bottom: 0.4rem;">When it doesn't</span>Operator wants to cancel several entries quickly — each cancel is 2 taps + sheet dismissal. Direction C (swipe) is faster for that. Also: the contextual primary's color (green for approve, blue for iterate) competes for visual weight with the stamp's color rail — at-a-glance the row has TWO color signals saying "here's the state" which is redundant. Could mitigate by making the chip flat (no fill), keeping color in the icon only.</p>
+</div>
+
+</body>
+</html>
