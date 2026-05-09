@@ -1,0 +1,357 @@
+/**
+ * Dashboard mobile-first chrome — Phase 1 of studio-mobile-first feature.
+ *
+ * Scope: all rules in this file are gated behind `@media (max-width: 600px)`
+ * AND scoped to the dashboard surface (via `[data-review-ui="studio"]`,
+ * `.er-calendar-row`, or `[data-compose-fab]`/`[data-compose-sheet]`
+ * markers that exist only on the dashboard's body). Other surfaces
+ * (entry-review, content tree, manual) keep their desktop-derived
+ * styling unchanged.
+ *
+ * Three additions, all implementing the "Dashboard 1c · filing tab + FAB"
+ * design picked on 2026-05-09:
+ *
+ *   1. `.er-calendar-row .er-stamp` — filing-folder-tab silhouette on
+ *      mobile (no rotation, paper-3 fill, notched bottom-right corner
+ *      via clip-path, 3px stage-color edge bar). Replaces the rotated
+ *      rubber-stamp metaphor that read as "the page is crooked" when
+ *      stamps clustered vertically in narrow rows.
+ *
+ *   2. `.er-compose-fab` — flat red-pencil floating chip at bottom-right,
+ *      above the (currently nonexistent) tabbar. NOT a Material round
+ *      FAB with elevation shadow — the rectangular pill with mono-caps
+ *      label keeps the press-check vocabulary.
+ *
+ *   3. `.er-compose-sheet` — slide-up bottom sheet listing creation
+ *      verbs (/deskwork:add, /deskwork:ingest, /deskwork:shortform-start).
+ *      Opened via the FAB; dismissed via close button, scrim tap, ESC,
+ *      or drag the handle down.
+ *
+ * Reference mockup: /static/mockups/dashboard-1c-filing-tab-fab.html
+ *
+ * Sister rules in editorial-studio.css already implement #237 (row
+ * collapse → stacked grid) and #238 (masthead preamble compression).
+ * This file ADDS to that set; it does not duplicate or override.
+ */
+
+/* ============================================================
+ *  1. Filing-tab stamps for dashboard rows on mobile.
+ *
+ *  Scoped to `.er-calendar-row .er-stamp` — entry-review's hero
+ *  stamp (single proud mark in the top strip) keeps its rotation
+ *  on all viewports. Only the per-row clustered stamps on the
+ *  dashboard get the flat treatment.
+ * ============================================================ */
+@media (max-width: 600px) {
+  .er-calendar-row .er-stamp {
+    /* Reset desktop styling */
+    border: none;
+    border-radius: 0;
+    transform: none;
+
+    /* Filing-tab silhouette — paper-3 fill, mono-caps text, notched
+     * bottom-right corner. The notch is what carries the metaphor;
+     * color is restrained to the left edge bar (stage-color) plus
+     * the text. */
+    background: var(--er-paper-3);
+    color: var(--er-ink);
+    padding: 0.18rem 0.6rem 0.18rem 0.55rem;
+    font-family: var(--er-font-mono);
+    font-size: 0.62rem;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    line-height: 1.2;
+    position: relative;
+
+    /* Notched bottom-right corner — 7px diagonal cut. */
+    clip-path: polygon(
+      0 0,
+      100% 0,
+      100% calc(100% - 7px),
+      calc(100% - 7px) 100%,
+      0 100%
+    );
+  }
+
+  /* 3px stage-color edge bar on the left. The stage-color comes from
+   * the existing .er-stamp-* color rules in editorial-review.css —
+   * we read it via `currentColor` here so each stamp gets the right
+   * accent without per-state overrides. */
+  .er-calendar-row .er-stamp::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: currentColor;
+  }
+}
+
+/* ============================================================
+ *  2. Floating Compose chip (FAB).
+ *
+ *  Rendered in dashboard.ts via renderComposeChrome(). Hidden on
+ *  desktop entirely; visible on phone, anchored to the bottom-
+ *  right with a 16px gutter. The dashboard has no bottom tabbar,
+ *  so the chip can sit at the bottom edge directly (vs. entry-
+ *  review where it would need to clear the 64px tabbar).
+ * ============================================================ */
+
+/* Default: hidden everywhere. */
+.er-compose-fab {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .er-compose-fab {
+    /* Layout */
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    z-index: 65;
+
+    /* Visual — flat red-pencil pill in press-check vocabulary */
+    background: var(--er-red-pencil);
+    color: var(--er-paper);
+    border: 1px solid var(--er-red-pencil);
+    border-radius: 2px;
+    padding: 0.6rem 0.95rem;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
+      0 4px 12px rgba(184, 54, 42, 0.28),
+      0 1px 3px rgba(0, 0, 0, 0.18);
+
+    /* Type — JetBrains Mono caps, matching other dashboard chrome */
+    font-family: var(--er-font-mono);
+    font-size: 0.66rem;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .er-compose-fab-glyph {
+    font-family: var(--er-font-mono);
+    font-size: 1rem;
+    line-height: 1;
+    font-weight: 600;
+  }
+
+  .er-compose-fab:active {
+    transform: translateY(1px);
+  }
+}
+
+/* When the sheet is open, fade the FAB so it doesn't fight the sheet
+ * for visual priority. */
+body[data-compose-sheet-open] .er-compose-fab {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* ============================================================
+ *  3. Compose sheet — slide-up panel with verb cards.
+ * ============================================================ */
+
+.er-compose-sheet {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .er-compose-sheet {
+    /* Sheet host covers the viewport (so the scrim catches taps).
+     * The visible panel is positioned inside via .er-compose-panel. */
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+  }
+
+  .er-compose-sheet[hidden] {
+    display: none;
+  }
+
+  /* Scrim — full-bleed dim layer. Tappable to dismiss. */
+  .er-compose-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(26, 22, 20, 0.18);
+    backdrop-filter: blur(1px);
+  }
+
+  /* Panel — slides up from bottom. 60% height matches the
+   * entry-review notes sheet so muscle memory transfers. */
+  .er-compose-panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 60%;
+    background: var(--er-paper);
+    border-top: 1px solid var(--er-red-pencil);
+    box-shadow: 0 -16px 40px rgba(26, 22, 20, 0.18);
+    border-radius: 24px 24px 0 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transform: translateY(100%);
+    transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  body[data-compose-sheet-open] .er-compose-panel {
+    transform: translateY(0);
+  }
+
+  /* Drag handle — paper-3 bar centered above the head */
+  .er-compose-handle {
+    align-self: center;
+    border: none;
+    background: transparent;
+    padding: 0.55rem 1.2rem 0.5rem;
+    cursor: grab;
+    touch-action: none;
+  }
+  .er-compose-handle-bar {
+    display: block;
+    width: 44px;
+    height: 5px;
+    background: var(--er-paper-3);
+    border-radius: 4px;
+  }
+
+  /* Head — kicker (red), meta (faded), close button (right) */
+  .er-compose-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    padding: 0 1rem 0.7rem;
+    border-bottom: 1px solid var(--er-red-pencil);
+  }
+  .er-compose-kicker {
+    font-family: var(--er-font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--er-red-pencil);
+  }
+  .er-compose-meta {
+    font-family: var(--er-font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.06em;
+    color: var(--er-faded);
+    margin-left: auto;
+  }
+  .er-compose-close {
+    border: 1px solid var(--er-paper-3);
+    background: var(--er-paper);
+    color: var(--er-ink);
+    border-radius: 2px;
+    width: 1.6rem;
+    height: 1.6rem;
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+  }
+  .er-compose-close:hover {
+    background: var(--er-paper-2);
+  }
+
+  /* Body — scrollable list of verb cards */
+  .er-compose-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.85rem 1rem 1.2rem;
+  }
+
+  /* Verb card — full-width button. The card IS the button. */
+  .er-compose-verb {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: var(--er-paper);
+    border: 1px solid var(--er-paper-3);
+    border-left: 3px solid var(--er-red-pencil);
+    border-radius: 2px;
+    padding: 0.7rem 0.85rem;
+    margin-bottom: 0.6rem;
+    cursor: pointer;
+    box-shadow: 0 1px 0 rgba(26, 22, 20, 0.05);
+    font: inherit;
+    color: inherit;
+    transition: background 120ms ease, border-color 120ms ease;
+  }
+  .er-compose-verb:active,
+  .er-compose-verb:focus-visible {
+    background: var(--er-paper-2);
+  }
+  .er-compose-verb.is-copied {
+    background: rgba(46, 93, 69, 0.06);
+    border-left-color: var(--er-stamp-green);
+  }
+
+  .er-compose-verb-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.55rem;
+    margin-bottom: 0.3rem;
+  }
+  .er-compose-verb-glyph {
+    font-family: var(--er-font-display);
+    font-style: italic;
+    font-variation-settings: "opsz" 24, "wght" 500;
+    font-size: 1.35rem;
+    line-height: 1;
+    color: var(--er-red-pencil);
+  }
+  .er-compose-verb-name {
+    font-family: var(--er-font-display);
+    font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+    font-size: 1.05rem;
+    color: var(--er-ink);
+  }
+  .er-compose-verb-cmd {
+    margin-left: auto;
+    font-family: var(--er-font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+    color: var(--er-proof-blue);
+    border: 1px solid var(--er-paper-3);
+    background: var(--er-paper-2);
+    border-radius: 2px;
+    padding: 0.18rem 0.4rem;
+  }
+  .er-compose-verb.is-copied .er-compose-verb-cmd {
+    color: var(--er-stamp-green);
+    border-color: var(--er-stamp-green);
+  }
+  .er-compose-verb-desc {
+    display: block;
+    font-family: var(--er-font-display);
+    font-size: 0.92rem;
+    line-height: 1.4;
+    color: var(--er-ink);
+  }
+  .er-compose-verb-foot {
+    display: block;
+    margin-top: 0.5rem;
+    padding-top: 0.45rem;
+    border-top: 1px dashed var(--er-paper-3);
+    font-family: var(--er-font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.06em;
+    color: var(--er-faded);
+    text-transform: uppercase;
+  }
+  .er-compose-verb.is-copied .er-compose-verb-foot::after {
+    content: ' · copied ✓';
+    color: var(--er-stamp-green);
+  }
+}
