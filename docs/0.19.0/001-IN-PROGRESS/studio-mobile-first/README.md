@@ -22,7 +22,8 @@ Extend the press-check mobile-first design language already shipped on the entry
 | 1.3 | Probe + dual-viewport smoke for dashboard | Complete (`scripts/probe-mobile-dashboard.mjs` 16/16; `scripts/smoke-er-viewport-regressions.mjs` 8/8) |
 | 1.4 | `/dw-lifecycle:review` + integrate findings | Complete (4 findings applied, 3 withdrawn after verification, 1 deferred to Phase 2) |
 | 1.5 | Release v0.19 + iPhone walk + close issues | Pending (operator-driven release) |
-| 1.6 | Audit-driven remediations (Phase 0 / 1 cleanup per 2026-05-09 implementation audit) | In progress |
+| 1.6 | Audit-driven remediations (Phase 0 / 1 cleanup per 2026-05-09 implementation audit) | Complete |
+| 1.7 | Final reviewState retirement (schema + journal cascade) | Complete |
 | 2 | Extract `mobile-shell` + Shortform desk → v0.20 | Not started |
 | 3 | Standalone scrapbook viewer + Content view → v0.21 | Not started |
 | 4 | Editorial Help + Studio Index + #242 cross-cutting Cancel → v0.22 | Re-narration pending (Cancel already shipped on dashboard + entry-review during Phase 1; Phase 4's residual scope is the remaining surfaces — see workplan Step 1.6.6) |
