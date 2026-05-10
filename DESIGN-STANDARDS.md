@@ -2,6 +2,8 @@
 title: Deskwork Studio Design Standards
 status: load-bearing
 last-updated: 2026-05-09
+deskwork:
+  id: 0e8e8d37-9242-42f1-9c8c-cf70330e899f
 ---
 
 # Deskwork Studio Design Standards
