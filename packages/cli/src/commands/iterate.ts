@@ -245,7 +245,6 @@ async function runLongformIterate(
     site,
     slug,
     stage: result.stage,
-    state: result.reviewState,
     version: result.version,
     addressedComments: addressed,
   });

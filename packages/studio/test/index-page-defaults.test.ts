@@ -99,14 +99,16 @@ describe('studio index — sensible link defaults (#107)', () => {
     expect(r.html).toContain('&lt;site&gt;/&lt;path&gt;');
   });
 
-  it('Longform (III) with no open entries links to dashboard Review anchor', async () => {
+  it('Longform (III) with no open entries links to dashboard Drafting anchor (post-v0.19; Review stage retired)', async () => {
     seedEmpty(root);
     const app = createApp({ projectRoot: root, config: cfg });
     const r = await getHtml(app, '/dev/');
     expect(r.status).toBe(200);
 
+    // Per DESKWORK-STATE-MACHINE.md the legacy `Review` stage was
+    // collapsed into `Drafting`; the fallback anchor follows.
     expect(r.html).toMatch(
-      /<a class="er-toc-entry__title" href="\/dev\/editorial-studio#stage-review">\s*Longform reviews\s*<\/a>/,
+      /<a class="er-toc-entry__title" href="\/dev\/editorial-studio#stage-drafting">\s*Longform reviews\s*<\/a>/,
     );
     // URL template hint preserved alongside.
     expect(r.html).toContain('/dev/editorial-review/entry/');

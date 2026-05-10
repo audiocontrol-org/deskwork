@@ -16,7 +16,6 @@ interface IterateResult {
   entryId: string;
   stage: Stage;
   version: number;
-  reviewState: 'in-review';
 }
 
 /**
@@ -93,31 +92,24 @@ export async function iterateEntry(projectRoot: string, opts: IterateOptions): P
     markdown,
   });
 
-  // Update sidecar
+  // Update sidecar. Per DESKWORK-STATE-MACHINE.md (Commandment III),
+  // `reviewState` is RETIRED — iterate does NOT write it. Strip any
+  // vestigial `reviewState` from legacy sidecars via destructuring so a
+  // stale field doesn't survive an iterate; the schema's `reviewState`
+  // is back-compat-read-only and the doctor migration is responsible
+  // for legacy data on disk.
+  const { reviewState: _legacy, ...rest } = sidecar;
+  void _legacy;
   const updated: Entry = {
-    ...sidecar,
+    ...rest,
     iterationByStage: { ...sidecar.iterationByStage, [sidecar.currentStage]: newVersion },
-    reviewState: 'in-review',
     updatedAt: at,
   };
   await writeSidecar(projectRoot, updated);
-
-  // Emit review-state-change if state actually changed
-  if (sidecar.reviewState !== 'in-review') {
-    await appendJournalEvent(projectRoot, {
-      kind: 'review-state-change',
-      at,
-      entryId: sidecar.uuid,
-      stage: sidecar.currentStage,
-      from: sidecar.reviewState ?? null,
-      to: 'in-review',
-    });
-  }
 
   return {
     entryId: sidecar.uuid,
     stage: sidecar.currentStage,
     version: newVersion,
-    reviewState: 'in-review',
   };
 }
