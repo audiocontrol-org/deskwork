@@ -211,10 +211,10 @@ git commit -m "test(studio): probe + smoke for dashboard mobile-first"
 
 ### Task 1.4: /dw-lifecycle:review
 
-- [ ] **Step 1.4.1:** Invoke `/dw-lifecycle:review` per the global rule. Dispatch parallel reviewers (correctness/security + architecture/conventions). Pass the relevant commit range.
-- [ ] **Step 1.4.2:** Triage findings per `superpowers:receiving-code-review` discipline. Push back on wrong findings with code/measurement evidence.
-- [ ] **Step 1.4.3:** Apply verified findings inline. Any deferred fix MUST get BOTH a workplan entry AND a GitHub issue per the global rule.
-- [ ] **Step 1.4.4:** Commit fix-up:
+- [x] **Step 1.4.1:** Invoke `/dw-lifecycle:review` per the global rule. Dispatch parallel reviewers (correctness/security + architecture/conventions). Pass the relevant commit range. *(Dispatched code-reviewer + architect-reviewer over `817dde5..HEAD`. Both returned categorized findings.)*
+- [x] **Step 1.4.2:** Triage findings per `superpowers:receiving-code-review` discipline. Push back on wrong findings with code/measurement evidence. *(3 reviewer findings withdrawn after deeper analysis: rapid-toggle race in compose-chip — `if (!isOpen)` guard handles it; type concern at dashboard.ts:120 — convention is consistent across codebase; mouse/touch double-fire in compose-chip — `dragging` guard + Playwright behavior verify safe.)*
+- [x] **Step 1.4.3:** Apply verified findings inline. Any deferred fix MUST get BOTH a workplan entry AND a GitHub issue per the global rule. *(4 findings applied in commit b4de035: stale docstrings rewritten in dashboard.ts and section.ts; 195-line orphan press-queue CSS deleted from editorial-studio.css; dead .er-press-queue hide rule removed from dashboard-mobile.css; .er-layout "for now" wrapper removed from dashboard.ts; renderStatusCell no-op inlined and deleted. 1 finding deferred — drag-handler duplication between compose-chip and entry-review's mobile-sheet-bar — already tracked under Phase 2 mobile-shell extraction in this workplan, no new GitHub issue needed.)*
+- [x] **Step 1.4.4:** Commit fix-up. *(Landed in b4de035.)*
 
 ```bash
 git add <fixed-files>
