@@ -1,12 +1,17 @@
 /**
  * Single-stage section renderer.
  *
- * Pipeline-redesign Task 34. Each of the eight stage sections renders
- * with a section heading (stage name + entry count) and either a list
- * of rows or an empty-state placeholder. Per-row HTML carries the
- * sidecar-derived state inline (iteration count + reviewState badge)
- * so an operator can see at a glance where each entry sits without
- * opening it.
+ * Each of the eight stage sections (plus the Distribution placeholder)
+ * renders with a section heading (stage name + entry count) and either
+ * a list of rows or an empty-state placeholder. Each row carries the
+ * entry's slug, title, updated-at timestamp, and stage-gated verb
+ * buttons. Per DESKWORK-STATE-MACHINE.md Commandment III, rows do NOT
+ * surface iteration counts or reviewState — those were retired in
+ * v0.19 along with the legacy reviewState concept.
+ *
+ * On mobile, each section is fronted by a collapsible tile (see
+ * `renderStageTile`); on desktop the tiles are display:none and the
+ * `<h2 class="er-section-head">` heading carries the stage name.
  */
 
 import { html, unsafe, type RawHtml } from '../html.ts';
@@ -71,7 +76,7 @@ export function renderRow(entry: Entry, index: number, defaultSite: string): Raw
           <time class="er-calendar-meta er-calendar-meta-updated" data-format="date"
             datetime="${entry.updatedAt}" title="${entry.updatedAt}">${formatDate(entry.updatedAt)}</time>
         </div>
-        ${renderStatusCell(entry, reviewLink)}
+        <span class="er-calendar-status" aria-hidden="true"></span>
         ${renderRowActions(entry, defaultSite)}
       </div>
     </div>`);
@@ -208,21 +213,4 @@ function formatDate(iso: string): string {
   // Trim to YYYY-MM-DD for compact display. Full timestamp is on the
   // <span title="...">.
   return iso.slice(0, 10);
-}
-
-/**
- * Render the status column for one row.
- *
- * Review state stamps (In review / Iterating / Approved) were removed in
- * v0.19 per operator: review state isn't user-facing data and is slated
- * for backend removal. The status column now always renders as an empty
- * span; CSS Grid keeps sibling alignment intact.
- *
- * Originally (#243) this slot rendered the reviewState badge, with an
- * empty span for entries lacking a state. Now both branches are empty.
- */
-function renderStatusCell(entry: Entry, reviewLink: string): RawHtml {
-  void entry;
-  void reviewLink;
-  return unsafe('<span class="er-calendar-status" aria-hidden="true"></span>');
 }

@@ -461,12 +461,5 @@ body[data-compose-sheet-open] .er-compose-fab {
     display: none;
   }
 
-  /* Press queue — desktop-only surface (it's the right-rail stack on
-   * desktop using available real estate). On mobile the operator gets
-   * the same information via the per-stage "X in review" sub-counts on
-   * each stage tile, so the press queue is pure noise here. */
-  .er-press-queue {
-    display: none;
-  }
 }
 

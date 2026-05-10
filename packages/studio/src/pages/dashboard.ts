@@ -1,28 +1,34 @@
 /**
  * Studio dashboard page — `/dev/editorial-studio`.
  *
- * Pipeline-redesign Task 34. The dashboard renders eight stage
- * sections — Ideas → Planned → Outlining → Drafting → Final →
- * Published, plus Blocked and Cancelled — backed by sidecar reads
- * under `<projectRoot>/.deskwork/entries/*.json`. Each row carries
- * the entry's iteration count for its current stage and a
- * reviewState badge so an operator can see at a glance where each
- * entry sits without opening it.
+ * The dashboard renders eight stage sections — Ideas → Planned →
+ * Outlining → Drafting → Final → Published, plus Blocked and
+ * Cancelled — backed by sidecar reads under
+ * `<projectRoot>/.deskwork/entries/*.json`, with a Distribution
+ * placeholder pinned at the end. Each row carries the entry's slug,
+ * title, updated-at timestamp, and stage-gated verb buttons that
+ * clipboard-copy `/deskwork:<verb> <slug>` (THESIS Consequence 2 —
+ * the studio routes commands; skills do the work). On phone (≤600px)
+ * each stage section is collapsed by default and fronted by a tile
+ * (see Compact-1 in DESIGN-STANDARDS.md); on desktop everything is
+ * expanded with the existing `<h2 class="er-section-head">` heading
+ * carrying the stage name.
  *
- * Replaces the legacy calendar.md + workflow store rendering. The
- * scaffold (folio, masthead, filter strip, layout) is preserved so
- * existing CSS keeps working.
+ * Per DESKWORK-STATE-MACHINE.md (Commandment III), reviewState is
+ * RETIRED. Rows do NOT carry per-stage iteration counts or
+ * reviewState badges; that legacy "at-a-glance" surfacing was
+ * removed in v0.19.
  *
  * The renderer's data flow:
  *   1. loadDashboardData reads every sidecar and groups by stage.
- *   2. Each of the eight stages renders via `renderStageSection`.
- *   3. The Distribution placeholder pins beneath the stage sections.
+ *   2. Each stage renders via `renderStageSection`.
+ *   3. The Distribution placeholder renders below the stage sections.
+ *   4. The mobile-only Compose chrome (FAB + slide-up sheet) renders
+ *      at the page tail; CSS hides it on desktop.
  *
- * The legacy export `renderDashboard` stays — server.ts wires it as
- * the page handler. The `getIndex` parameter is preserved for
- * signature compatibility with the override resolver in server.ts;
- * the new dashboard does not currently consume it (sidecars are the
- * data source, not the on-disk content tree).
+ * `getIndex` is preserved for signature compatibility with the
+ * override resolver in server.ts; the dashboard does not consume it
+ * (sidecars are the data source, not the on-disk content tree).
  */
 
 import type { StudioContext } from '../routes/api.ts';
@@ -65,23 +71,18 @@ export async function renderDashboard(
     return renderStageSection(stage, bucket, defaultSite).__raw;
   }).join('\n');
 
-  // Review-state-driven press queue (right-rail on desktop) was removed
-  // in v0.19 per operator: review state is being phased out and the
-  // press queue exists solely to surface review-state-derived "needs
-  // your eyes" entries. Without that signal, the queue has nothing to
-  // say. The .er-layout wrapper stays in place for now in case the
-  // right column reappears with a non-review-state surface later.
+  // The press queue (right-rail on desktop) was removed in v0.19
+  // per DESKWORK-STATE-MACHINE.md Commandment III — its primary
+  // purpose was surfacing review-state, which is RETIRED. The
+  // archive entry at docs/studio-design/ACCEPTED/2026-05-09-press-queue-removed/
+  // captures the rationale.
   const body = html`
   ${renderEditorialFolio('dashboard', 'press-check')}
   ${renderHeader(data, ctx.projectRoot, now)}
   <main class="er-container">
     ${renderFilterStrip()}
-    <div class="er-layout">
-      <div>
-        ${unsafe(stageSections)}
-        ${renderDistributionPlaceholder()}
-      </div>
-    </div>
+    ${unsafe(stageSections)}
+    ${renderDistributionPlaceholder()}
   </main>
   ${renderComposeChrome()}
   <div class="er-toast" data-toast hidden></div>
