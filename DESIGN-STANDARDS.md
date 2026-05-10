@@ -14,10 +14,20 @@ It exists because design decisions kept being relitigated. **If a global design 
 
 - **Before any UI design or implementation work** on the studio: read this document.
 - **When a design decision has global impact** (changes the vocabulary, alters how a class of element looks/behaves, applies across multiple pages, or differs between desktop and mobile): update this document **in the same commit** as the implementation change. The update is part of the work, not a follow-up.
+- **File a proposal-archive entry** under `docs/studio-design/ACCEPTED/<date>-<slug>/` (or `REJECTED/<date>-<slug>/`) whenever a design direction is picked OR rejected. The archive is the durable record of *what was considered* alongside this document's record of *what was settled*. See `docs/studio-design/README.md` for the contract.
 - The standards document is referenced from the **`session-start` skill** so every session loads it.
-- The **`studio-design-standards` rule** in `.claude/rules/` enforces it.
+- The **`design-standards` rule** in `.claude/rules/` enforces both the standards-doc updates AND the proposal-archive entries.
 
 If a design decision feels like it might have global impact and you're unsure: it does. Document it.
+
+## Proposal archive
+
+Durable history of design decisions lives at **`docs/studio-design/`**:
+
+- **`ACCEPTED/<YYYY-MM-DD>-<slug>/`** — design decisions that landed
+- **`REJECTED/<YYYY-MM-DD>-<slug>/`** — design directions explored and declined
+
+Each entry contains a `brief.md` (what / why / when / feature reference) and either a self-contained visual file or a relative-path reference to the canonical mockup elsewhere in the tree (never a copy). Read `docs/studio-design/README.md` for the contract.
 
 ## Vocabulary (shared across desktop and mobile)
 

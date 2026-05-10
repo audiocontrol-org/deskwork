@@ -259,7 +259,7 @@ Where `ReviewState` is referenced AT ALL in user-facing rendering, gating, or sk
 
 ### VIII. Mockups must comply.
 
-A mockup that surfaces review-state labels, gates verbs on review state, or otherwise contradicts this document is misleading and is to be retired. Refer to `docs/studio-design-standards.md` for additional conformance constraints; the state machine spec is upstream of the studio design standards (the studio standards inherit from this document).
+A mockup that surfaces review-state labels, gates verbs on review state, or otherwise contradicts this document is misleading and is to be retired. Refer to `DESIGN-STANDARDS.md` for additional conformance constraints; the state machine spec is upstream of the studio design standards (the studio standards inherit from this document).
 
 ### IX. Every Published entry has a version. Every iterate bumps a revision.
 
@@ -272,7 +272,7 @@ Versions (public) and revisions (internal) are distinct serial numbers; see § V
 
 - **`docs/superpowers/specs/2026-04-30-deskwork-pipeline-redesign-design.md`** — the original design that motivated the collapse. Read for the "why."
 - **`THESIS.md`** — the agent-as-primary-tool architectural thesis. State machine compliance + studio clipboard-copy compliance both derive from THESIS Consequence 2.
-- **`docs/studio-design-standards.md`** — the studio design standards. Inherits this document; restate redundancies are allowed but should not contradict.
+- **`DESIGN-STANDARDS.md`** — the studio design standards. Inherits this document; restate redundancies are allowed but should not contradict.
 
 ## Migration commits referenced
 

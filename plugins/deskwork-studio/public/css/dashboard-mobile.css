@@ -37,12 +37,13 @@
 /* ============================================================
  *  1. Per-row state stamps — RETIRED on mobile.
  *
- *  Per the Studio Design Standards (docs/studio-design-standards.md
- *  § Rubber-stamp conceit) the rubber-stamp pattern is retired on
- *  mobile in ALL its forms — rotated rubber-stamps, letterpress tags,
- *  filing-tabs, rule-bracketed marks, embossed seals. Mobile rows do
- *  not carry state-on-a-rectangle chrome. Review state is internal-
- *  only data and isn't surfaced anywhere on user-facing rows.
+ *  Per DESIGN-STANDARDS.md § Rubber-stamp conceit, the rubber-stamp
+ *  pattern is retired on mobile in ALL its forms — rotated rubber-
+ *  stamps, letterpress tags, filing-tabs, rule-bracketed marks,
+ *  embossed seals. Mobile rows do not carry state-on-a-rectangle
+ *  chrome. Review state itself is RETIRED per
+ *  DESKWORK-STATE-MACHINE.md and isn't surfaced anywhere on user-
+ *  facing rows.
  *
  *  This block intentionally has no rules. It exists as a load-bearing
  *  comment so future engineers don't re-introduce a stamp variant
