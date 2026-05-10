@@ -202,7 +202,7 @@ node scripts/smoke-er-viewport-regressions.mjs
 ```
 
 Expected: 0 failures across all probes. *(0 failures across 8 probes — 3 entries × 2 viewports + dashboard × 2 viewports. Strip-height invariant gated to entry-review surface so dashboard's lack of `.er-strip` doesn't false-fail.)*
-- [ ] **Step 1.3.4:** Commit:
+- [x] **Step 1.3.4:** Commit. *(Landed in 9561622.)*
 
 ```bash
 git add scripts/probe-mobile-dashboard.mjs scripts/smoke-er-viewport-regressions.mjs
