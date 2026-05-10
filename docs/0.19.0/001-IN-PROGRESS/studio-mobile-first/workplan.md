@@ -36,12 +36,12 @@ Goal: lock the deskwork state machine spec in writing before any further redesig
 **Files:**
 - Create: `DESKWORK-STATE-MACHINE.md` (top-level)
 
-- [ ] **Step 0.1.1:** Read the original spec (`docs/superpowers/specs/2026-04-30-deskwork-pipeline-redesign-design.md`) and the migration commits (`5687404`, `07ac8dc`, `c21b8b9`, `ca7f785`) to ground the document in the migration's stated intent.
-- [ ] **Step 0.1.2:** Draft the canonical spec covering: stages (8, the state machine), verbs (iterate / approve / cancel — universal), what reviewState was and why it's retired, what the current schema vestige is, the studio's surfacing rules, the commandments that derived violations must obey.
-- [ ] **Step 0.1.3:** Operator review + approval. Iterate until locked.
-- [ ] **Step 0.1.4:** Commit `docs(state-machine): canonical spec — DESKWORK-STATE-MACHINE.md`.
-- [ ] **Step 0.1.5:** Wire the document into the `session-start` skill so every session reads it before touching code, alongside `THESIS.md` and `docs/studio-design-standards.md`.
-- [ ] **Step 0.1.6:** Add a project rule (`.claude/rules/state-machine.md`) saying: read the state machine spec before any work that touches stage / verb / state semantics; deviations require updating the spec first.
+- [x] **Step 0.1.1:** Read the original spec (`docs/superpowers/specs/2026-04-30-deskwork-pipeline-redesign-design.md`) and the migration commits (`5687404`, `07ac8dc`, `c21b8b9`, `ca7f785`) to ground the document in the migration's stated intent.
+- [x] **Step 0.1.2:** Draft the canonical spec covering: stages (8, the state machine), verbs (iterate / approve / cancel — universal), what reviewState was and why it's retired, what the current schema vestige is, the studio's surfacing rules, the commandments that derived violations must obey.
+- [x] **Step 0.1.3:** Operator review + approval. Iterate until locked. *(Iterated to v5 via /deskwork:iterate; approved Drafting → Final via /deskwork:approve.)*
+- [x] **Step 0.1.4:** Commit `docs(state-machine): canonical spec — DESKWORK-STATE-MACHINE.md`.
+- [x] **Step 0.1.5:** Wire the document into the `session-start` skill so every session reads it before touching code, alongside `THESIS.md` and `DESIGN-STANDARDS.md` (path updated post-Phase-0.3).
+- [ ] **Step 0.1.6:** Add a project rule (`.claude/rules/state-machine.md`) saying: read the state machine spec before any work that touches stage / verb / state semantics; deviations require updating the spec first. *(Surfaced in 2026-05-09 audit — never created. Pending.)*
 
 ### Task 0.2: Audit + destroy violations
 
@@ -123,7 +123,7 @@ Goal: with the state machine canonized + violations cleaned, do the same for des
 - [x] **Step 0.3.5:** Update `mockups/index.html` to be a redirect / index pointing at `docs/studio-design/` rather than its current grid of cards. *(Landed in 7471ca2 — Retired Dashboard mockups section replaced with Design proposal archive section pointing at docs/studio-design/. Active mockup sections preserved as they are still active mockup-pick surfaces.)*
 - [x] **Step 0.3.6:** `git mv .claude/rules/studio-design-standards.md .claude/rules/design-standards.md`. Update content to reference the new top-level doc + describe the ACCEPTED/REJECTED contract for the operational rule. *(Landed in 45952fd — rule rewritten with proposal-archive contract section + scan-REJECTED-before-proposing pre-implementation gate.)*
 - [x] **Step 0.3.7:** ~~Symlink for studio access~~ — superseded. The document-root serveStatic in `a916001` already serves `DESIGN-STANDARDS.md` at `/DESIGN-STANDARDS.md`; nothing extra needed. *(Verified post-migration: /DESIGN-STANDARDS.md, /docs/studio-design/README.md, /docs/studio-design/ACCEPTED/<entry>/brief.md all return 200.)*
-- [ ] **Step 0.3.8:** Operator sign-off on `DESIGN-STANDARDS.md` content + the ACCEPTED/REJECTED archive structure.
+- [x] **Step 0.3.8:** Operator sign-off on `DESIGN-STANDARDS.md` content + the ACCEPTED/REJECTED archive structure. *(Operator approved 5 docs Drafting → Final via /deskwork:approve: design-standards (d55d5c0), design-archive-contract (e9923d6), design-standards-rule (e20ade1), accepted-press-queue-removed + rejected-filing-tab-stamps (df90c1f).)*
 
 **Acceptance for Phase 0:**
 - `DESKWORK-STATE-MACHINE.md` exists at top-level and is operator-approved
@@ -149,18 +149,18 @@ Goal: with the state machine canonized + violations cleaned, do the same for des
 - Create: `plugins/deskwork-studio/public/mockups/dashboard-1-<idiom>.html` (×2-3)
 - Modify: `plugins/deskwork-studio/public/mockups/index.html` (add new section)
 
-- [ ] **Step 1.1.1:** Audit current Dashboard structure. Read `packages/studio/src/pages/dashboard.ts` + the dashboard module under `packages/studio/src/pages/dashboard/`. Capture the per-row affordances (pipeline status, press-queue chips, scrapbook chips, induct picker, decision hints).
-- [ ] **Step 1.1.2:** Walk the existing `/dev/editorial-studio` on phone via Tailscale. Capture the friction (which #236-#243 symptoms reproduce). Take screenshots if useful — store under `<dashboard-entry>/scrapbook/` per the THESIS adjacent-assets pattern.
-- [ ] **Step 1.1.3:** Invoke `frontend-design:frontend-design` to produce 2-3 dashboard mockups. Honor the press-check vocabulary; explore: (a) bottom-tab-bar with Pipeline/Press-queue/Scrapbook tabs, (b) a "card stream" with no tabs (pipeline rows are the primary affordance), (c) hybrid TBD via mockup.
-- [ ] **Step 1.1.4:** Update `mockups/index.html` with a new "Dashboard mobile-first [Active]" section + per-mockup cards.
-- [ ] **Step 1.1.5:** Commit:
+- [x] **Step 1.1.1:** Audit current Dashboard structure. Read `packages/studio/src/pages/dashboard.ts` + the dashboard module under `packages/studio/src/pages/dashboard/`. Capture the per-row affordances (pipeline status, press-queue chips, scrapbook chips, induct picker, decision hints). *(Landed in 6616959 — `dashboard-audit.md`.)*
+- [x] **Step 1.1.2:** Walk the existing `/dev/editorial-studio` on phone via Tailscale. Capture the friction (which #236-#243 symptoms reproduce). Take screenshots if useful — store under `<dashboard-entry>/scrapbook/` per the THESIS adjacent-assets pattern.
+- [x] **Step 1.1.3:** Invoke `frontend-design:frontend-design` to produce 2-3 dashboard mockups. Honor the press-check vocabulary; explore: (a) bottom-tab-bar with Pipeline/Press-queue/Scrapbook tabs, (b) a "card stream" with no tabs (pipeline rows are the primary affordance), (c) hybrid TBD via mockup. *(Multiple rounds: dedf7df, d6336f8, ddd474b. All retired mockups now in `docs/studio-design/REJECTED/`; the picked direction is filed under `ACCEPTED/2026-05-09-collapsible-stage-tiles/`.)*
+- [x] **Step 1.1.4:** Update `mockups/index.html` with a new "Dashboard mobile-first [Active]" section + per-mockup cards. *(Updated alongside mockup commits; later rewritten in 7471ca2 to point at the design archive.)*
+- [x] **Step 1.1.5:** Commit:
 
 ```bash
 git add plugins/deskwork-studio/public/mockups/dashboard-*.html plugins/deskwork-studio/public/mockups/index.html
 git commit -m "design(studio): three dashboard mobile direction mockups (HTML, no code)"
 ```
 
-- [ ] **Step 1.1.6:** Operator walks the mockups on phone. Operator picks one. **STOP for operator pick.**
+- [x] **Step 1.1.6:** Operator walks the mockups on phone. Operator picks one. **STOP for operator pick.** *(Operator picked Compact-1 collapsible-stage-tiles + Dashboard-1c filing-tab/FAB chrome direction. See ACCEPTED archive entries.)*
 
 ### Task 1.2: Implement the picked Dashboard mockup
 
@@ -170,11 +170,11 @@ git commit -m "design(studio): three dashboard mobile direction mockups (HTML, n
 - Modify: `plugins/deskwork-studio/public/css/editorial-studio.css` (or a new dashboard-mobile.css if the existing file balloons past 500 lines)
 - Possibly create: `plugins/deskwork-studio/public/src/dashboard/mobile-bar.ts` (client controller for dashboard-specific tab interactions, copying patterns from `entry-review/mobile-sheet-bar.ts`)
 
-- [ ] **Step 1.2.1:** Pull patterns from `packages/studio/src/pages/entry-review/mobile-bar.ts` and `plugins/deskwork-studio/public/src/entry-review/mobile-sheet-bar.ts`. Adapt to dashboard's data shape (rows-of-entries vs. one-entry).
-- [ ] **Step 1.2.2:** Implement the mockup-picked layout. CSS additions go in `editorial-studio.css`; if it crosses 500 lines, split.
-- [ ] **Step 1.2.3:** Wire any client-side tab/sheet behavior to mirror `mobile-sheet-bar.ts`'s patterns (matchMedia gate, sheet host, drag-handle dismiss, MutationObserver-driven count badges).
-- [ ] **Step 1.2.4:** Boot dev studio: `npm run dev`. Walk the changes against `http://orion-m4:<port>/dev/editorial-studio` on phone via Tailscale.
-- [ ] **Step 1.2.5:** Commit:
+- [x] **Step 1.2.1:** Pull patterns from `packages/studio/src/pages/entry-review/mobile-bar.ts` and `plugins/deskwork-studio/public/src/entry-review/mobile-sheet-bar.ts`. Adapt to dashboard's data shape (rows-of-entries vs. one-entry). *(Landed across 70664f6 / 15cd8eb / f1db25d; the dashboard's chrome did NOT end up using the mobile-bar/sheet pattern. Compact-1's collapsible stage tiles + a floating-Compose FAB+sheet won the design pass instead, so the dashboard ships its own client controllers (`stage-tiles.ts`, `compose-chip.ts`) inspired by but not reusing entry-review's mobile-bar. Phase 2's mobile-shell extraction will reconcile.)*
+- [x] **Step 1.2.2:** Implement the mockup-picked layout. CSS additions go in `editorial-studio.css`; if it crosses 500 lines, split. *(Split: a new `dashboard-mobile.css` carries the v0.19 mobile rules; `editorial-studio.css` stays the desktop scaffold.)*
+- [x] **Step 1.2.3:** Wire any client-side tab/sheet behavior to mirror `mobile-sheet-bar.ts`'s patterns (matchMedia gate, sheet host, drag-handle dismiss, MutationObserver-driven count badges). *(Compose-chip controller mirrors mobile-sheet-bar's matchMedia gate + drag-dismiss + sheet-host pattern. Stage-tiles uses matchMedia + collapse-state attrs; no MutationObserver needed since counts are server-rendered.)*
+- [x] **Step 1.2.4:** Boot dev studio: `npm run dev`. Walk the changes against `http://orion-m4:<port>/dev/editorial-studio` on phone via Tailscale.
+- [x] **Step 1.2.5:** Commit:
 
 ```bash
 git add packages/studio/src/pages/dashboard.ts packages/studio/src/pages/dashboard/ plugins/deskwork-studio/public/css/editorial-studio.css plugins/deskwork-studio/public/src/dashboard/
@@ -233,6 +233,55 @@ git commit -m "fix(studio): apply review findings on dashboard mobile-first"
 - Press-check vocabulary preserved
 - Probe + smoke green
 - #236, #237, #238, #243 closed against v0.19.0 install
+
+### Task 1.6 — Audit-driven remediations (Phase 0 / Phase 1 cleanup)
+
+**Goal:** address gaps surfaced by the 2026-05-09 implementation audit. The audit was right about real gaps in the Phase 0 conformance sweep + feature-status doc rot; one finding was mis-characterized and is excluded here. Each item below is a concrete action that closes one audit finding.
+
+The audit's full report lives at [`./2026-05-09-implementation-audit.md`](./2026-05-09-implementation-audit.md). Findings the operator/agent agreed to ACT on are listed below; findings rejected after verification are listed under "Audit findings rejected" at the end.
+
+**Files:**
+- Modify: `packages/core/src/iterate/iterate.ts`
+- Modify: `packages/core/src/iterate/iterate.test.ts` (and any other tests asserting `reviewState: 'in-review'` after iterate)
+- Modify: `README.md` (top-level — fix the lifecycle stage list)
+- Create: `.claude/rules/state-machine.md`
+- Modify: `docs/0.19.0/001-IN-PROGRESS/studio-mobile-first/README.md` (replace placeholder with real status)
+- Modify: this workplan (Phase 4 reshape — see Step 1.6.7)
+
+**Sub-steps:**
+
+- [ ] **Step 1.6.1:** Drop the `reviewState: 'in-review'` writes from `packages/core/src/iterate/iterate.ts`. After this change, iterate bumps the per-stage iteration counter and appends a journal record but does NOT set `reviewState` on the sidecar. (Approve.ts already correctly *clears* reviewState on stage transition; do not touch approve.) Per `DESIGN-STANDARDS.md:148`: "new code does not write it." Update tests that assert post-iterate `reviewState === 'in-review'` — they should now assert no reviewState write. The iterate CLI's success-output `state: 'in-review'` field is part of the same fix; either drop it or document as `null`.
+- [ ] **Step 1.6.2:** Update `README.md:19` — replace the lifecycle list `Ideas → Planned → Outlining → Drafting → Review → Published` with the post-redesign 8-stage list `Ideas → Planned → Outlining → Drafting → Final → Published, plus Blocked and Cancelled off-pipeline`. Cite `DESKWORK-STATE-MACHINE.md` as the canonical reference. Walk the rest of the README for any other "Review" stage references.
+- [ ] **Step 1.6.3:** Create `.claude/rules/state-machine.md`. Step 0.1.6 was specced but never written. Content per the original step text: read `DESKWORK-STATE-MACHINE.md` before any work that touches stage / verb / state semantics; deviations require updating the spec first; cite the spec section in the commit message when changing stage/verb behavior.
+- [ ] **Step 1.6.4:** Replace the feature `README.md` placeholder content with a real status table reflecting actual phase progress:
+  - Phase 0.1 — Complete (DESKWORK-STATE-MACHINE.md Final)
+  - Phase 0.2 — Complete except cascading inventory (tracked in Task 0.2 footnote)
+  - Phase 0.3 — Complete (DESIGN-STANDARDS.md Final, archive established, operator-approved)
+  - Phase 1.1 — Complete
+  - Phase 1.2 — Complete
+  - Phase 1.3 — Complete
+  - Phase 1.4 — Complete
+  - Phase 1.5 — Pending operator-driven release
+  - Phase 1.6 — In progress (this task)
+  - Phase 2/3/4 — Not started
+- [ ] **Step 1.6.5:** Promote the iterate.ts violation onto the Phase 0.2 inventory's "address now" list (currently it's in the deferred-cascade pile). The 2026-05-09 audit makes the case that the canonical doc + live code disagreement is the highest-severity remaining Phase 0 gap and shouldn't ride out to Phase 2.
+- [ ] **Step 1.6.6:** Re-narrate **Phase 4** to reflect that the Cancel verb is no longer a future cross-cutting affordance — it ships as a stage-conditional verb on dashboard rows + entry-review decision strip in v0.19. Phase 4's remaining cross-cutting Cancel scope is whatever surfaces still lack it (Help, Index, Standalone scrapbook viewer, Content view). The Phase 4 task body needs an explicit revision; do that as part of this step.
+- [ ] **Step 1.6.7:** Commit each of the above as its own focused commit (per the per-phase commit-hygiene convention at the top of this workplan):
+
+```
+fix(core/iterate): stop writing reviewState — DESKWORK-STATE-MACHINE.md compliance
+docs(readme): use 8-stage post-redesign lifecycle list
+docs(rules): create .claude/rules/state-machine.md (Step 0.1.6 backfill)
+docs(workplan): replace feature README placeholder with real status
+docs(workplan): re-narrate Phase 4 (Cancel is shipped, not pending)
+```
+
+**Audit findings rejected after verification:**
+
+- *"`approve.ts` still persists and journals review-state semantics."* Mis-characterized. `approve.ts:99-103` deletes `reviewState` from the sidecar on stage transition (`const { reviewState: _drop, ...rest } = sidecar`) and journals the prior value for audit. That's the *correct* post-spec behavior — approve cleans up vestigial state. No fix needed.
+- *"Step 0.3.8 is unchecked."* Stale at audit time. Operator HAS signed off via 5 `/deskwork:approve` invocations (commits d55d5c0, e9923d6, e20ade1, df90c1f); workplan checkbox is now ticked.
+- *"Phase 1.4 not yet recorded."* The audit was written before Phase 1.4 ran. Phase 1.4 is now complete (commits 9561622 + b4de035); workplan reflects this.
+- *"Cancel landed before Phase 4 — out of order."* Mis-framed. Cancel ships as a stage-conditional verb per Commandment II; integrating it during Phase 1 is correct. The Phase 4 plan is what's stale (Step 1.6.6 addresses).
 
 ---
 
