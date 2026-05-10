@@ -56,7 +56,7 @@ There is no "review state." There is no "in review" state. There is no "iteratin
 | **Outlining** | Outline drafted; structural review | `outline.md` |
 | **Drafting** | Body of the entry being written | `draft.md` (or final filename) |
 | **Final** | Content is locked — ready to publish, no further edits or iterations allowed in this stage. Approve forward to Published; induct backward to a previous stage to unlock for editing. | (same file as Drafting, frozen) |
-| **Published** | Terminal stage. Publicly committed and immutable, like an npm publish — the version is locked and visible to the world, no take-backs. Can be deleted (recall) but not modified. Each transition to Published assigns a new **public version** (see § Versioning); to revise, bump the public version, induct the working copy into a non-terminal stage, complete the work, and approve forward to Published again — the prior public version stays as-is in the public record. The published item's filesystem disposition is NOT part of the semantics — what matters is the public commitment. | (immutable; location is not part of the contract; the public version IS the contract) |
+| **Published** | Terminal stage. Publicly committed and immutable, like an npm publish — the version is locked and visible to the world, no take-backs. Can be deleted (recall) but not modified. **Every transition to Published assigns a new version** (default scheme: monotonic integer `v1`, `v2`, ...; operators may override; see § Versions and revisions). To revise: induct the working copy into a non-terminal stage, complete the work, approve forward to Published again — a new version is assigned; the prior version stays as-is in the public record. The published item's filesystem disposition is NOT part of the semantics — what matters is the public commitment + its version. | (immutable; the version IS the contract) |
 
 ### The two off-pipeline stages
 
@@ -75,7 +75,7 @@ Verbs are operations the operator performs on an entry. They are not states. An 
 
 **When it can be invoked:** on any entry whose stage permits content edits — Ideas, Planned, Outlining, Drafting. There is no "iterating state" gate; the gate is purely stage-based. NOT in Final (Final locks the content; to iterate, induct backward to Drafting first). NOT in Published (Published is immutable; create a new version + induct). NOT in Blocked / Cancelled (off-pipeline; induct back first).
 
-**What it changes:** the content artifact on disk (per the agent's edits in response to marginalia). May also bump an iteration counter for telemetry / journal purposes (NOT a user-facing state).
+**What it changes:** the content artifact on disk (per the agent's edits in response to marginalia). Bumps the entry's **revision** counter (see § Versions and revisions — revisions are bookkeeping; the operator only sees them via revision history / revert flows, not in the routine drafting loop).
 
 **Studio surfacing:** every row whose stage permits edits (Ideas / Planned / Outlining / Drafting) includes `/deskwork:iterate <slug>` (clipboard-copy). Not gated on any state — only on stage.
 
@@ -88,8 +88,8 @@ Verbs are operations the operator performs on an entry. They are not states. An 
 - Planned → Outlining: yes
 - Outlining → Drafting: yes
 - Drafting → Final: yes
-- Final → Published: yes — approve graduates Final to Published, same as every other linear-pipeline transition. Assigns a new public version (see § Versioning). (See `publish` below — it's an optional clarity-alias for approve at this transition, not a separate operation.)
-- Published: NO — terminal stage; immutable. To revise a published item, bump the public version target, induct the working copy into a non-terminal stage, iterate / edit, then approve forward back to Published. The existing public version stays as-is in the public record.
+- Final → Published: yes — approve graduates Final to Published, same as every other linear-pipeline transition. **Always assigns a new version** per the operator's declared scheme (default: monotonic integer `v1`, `v2`, ...; see § Versions and revisions). Versioning is mandatory, not optional. (See `publish` below — it's an optional clarity-alias for approve at this transition, not a separate operation.)
+- Published: NO — terminal stage; immutable. To revise a published item, induct the working copy into a non-terminal stage, iterate / edit, then approve forward back to Published — a new version is assigned. The existing version stays as-is in the public record.
 - Blocked, Cancelled: NO — off-pipeline. Use `induct` to re-enter.
 
 **What it changes:** `currentStage` advances by one position in the linear pipeline. The next stage's primary artifact is scaffolded from the just-approved file (where applicable). A `stage-transition` journal event is appended.
@@ -118,37 +118,64 @@ Verbs are operations the operator performs on an entry. They are not states. An 
 
 **`add`** creates a new Ideas-stage entry from scratch. **`ingest`** backfills existing markdown content into the calendar. These are entry-creation verbs, not state-transition verbs.
 
-## Versioning
+## Versions and revisions
 
-There are TWO distinct notions of "version" in the deskwork model. They serve different purposes and should not be conflated.
+Two distinct serial numbers play different roles in deskwork. **Naming matters — they are not the same kind of thing, and conflating them is a category error.** This section establishes the canonical names.
 
-### Internal version (iteration version)
+### Version (public)
 
-A monotonically-increasing counter the iterate verb bumps each time a new working version is appended. Incremented on every iteration regardless of stage. Lives in the entry's sidecar / journal as part of the working history. Internal-only — the operator does not need to think about it. It's bookkeeping for the agent and the studio so prior states can be reconstructed.
+The **version** is the public identifier of the entry-as-published. **Every Published entry has a version. There is no such thing as an unversioned Published entry.** A version is assigned at every Final → Published transition (the act of publishing IS the act of assigning a version).
 
-### Public version
+**Default scheme: monotonic integer** — `v1`, `v2`, `v3`, .... The first Publish event assigns `v1`; each subsequent Publish increments. The operator gets versioning automatically with no setup, prompt, or opt-in. This is the deliberate default so casual content (one-off blog posts) can be published without ceremony — they still have versions, the operator just doesn't have to think about them.
 
-A separate, monotonically-increasing identifier assigned each time the entry transitions to Published. This is the version of the OBJECT-AS-PUBLISHED — what an external consumer sees and refers to. Conceptually like a semver tag in npm: v1, v2, v3 (or v1.0, v1.1, etc. — the exact format is an implementation choice the spec doesn't pin down). The first Publish event assigns v1; each subsequent Publish increments.
+**Operators may override the scheme** for content that needs formal versioning (semver, date-based, custom). The mechanism is reserved (per-site config / per-entry frontmatter / TBD; Phase 0.2 audit will design it). Override is opt-in; declaring a scheme replaces the default for that site or entry. **The default cannot be opted out of** — there's always a version.
+
+In operator-facing prose, "version" alone always means the public version.
+
+### Revision (internal)
+
+The **revision** is a per-entry counter the agent bumps each time `iterate` appends a new working draft. It exists for working history — so prior working states can be reconstructed, journals can be filtered, the operator can view revision history and revert to a previous revision (Google Docs / Wikipedia analogue).
+
+A revision is "a working draft on the way to becoming a version." Many revisions accumulate; at each Publish event, the current state is anointed as a new version.
+
+The operator sees revisions when:
+- Viewing revision history (the studio's "View History" surface — TBD)
+- Reverting to a previous revision (`/deskwork:revert <slug> --to-revision N` — TBD; reverting creates a NEW revision identical to the old one; history is append-only)
+
+The operator does not see revisions in the routine drafting flow — only when explicitly inspecting history.
+
+### Why the names matter
+
+Two operator audiences benefit from the separation:
+
+- **Casual content (one-off blog post):** the operator publishes, gets `v1` automatically, never thinks about it. If they revise later they get `v2` automatically. Zero mental overhead.
+- **Formal content (software license, versioned essay, compositor's manual):** the operator declares a scheme, controls the version label per their conventions, and sees the version on every external-facing surface.
+
+In both cases the **revision** counter ticks invisibly; it surfaces only when the operator wants history or revert.
 
 ### How they interact
 
-A typical flow:
+Typical flow:
 
-1. Entry is created at Ideas. Internal version 1.
-2. Iterate / approve through stages. Internal version bumps on each iterate.
-3. Reach Final → approve. **Public version v1 assigned. Entry is now Published.**
-4. To revise: induct the entry to a non-terminal stage (e.g., Drafting). Iterate / edit until ready. Approve to Final, then approve to Published. **Public version becomes v2.**
-5. The previous Published version (v1) is preserved in the public record — published items are immutable; revising creates a NEW public version, not an in-place edit.
+1. Entry created at Ideas. Revision 1.
+2. Iterate / approve through stages. Revision bumps on each iterate.
+3. Reach Final → approve. **Version `v1` assigned (default scheme).** Entry is now Published.
+4. To revise the published entry: induct to a non-terminal stage (e.g., Drafting). Iterate / edit. Revisions keep bumping. Approve to Final, then approve to Published. **Version `v2` assigned.**
+5. The previous version (`v1`) stays in the public record — published items are immutable; revising creates a new version, not an in-place edit.
 
-The internal version is a single per-entry sequence that keeps incrementing throughout. The public version is a separate sequence that increments only at Publish events.
-
-### Why the distinction matters
-
-Because Published is immutable, "the version" of a published object can't refer to the working iteration counter (which keeps mutating during edits). External consumers refer to the public version. Internal tooling refers to the internal version. Conflating them — e.g., showing the operator "v17" because that's what the iteration counter says, when the public version is "v2" — is a category error.
+The revision counter is one per-entry sequence that keeps incrementing throughout. The version is a separate sequence that increments only at Publish events. Many revisions roll up into one version.
 
 ### Implementation status
 
-The current implementation has only the internal version (per-stage iteration counter). Public versioning is part of this spec's commitment but **not yet implemented**; the Phase 0.2 audit will surface where to add it (likely: a `publicVersion` field on the entry sidecar, incremented in `approveEntryStage` when transitioning to Published; surfaced on the studio's read-only Published stage view; included in any export / external-reference path).
+The current implementation has only revisions (the per-stage iteration counter, which has been called `iterationByStage` historically). Versions (public, mandatory, with default-scheme + override) are committed in this spec but **not yet implemented**. The Phase 0.2 audit will surface where to add:
+
+1. A `version: string` field on the entry sidecar, assigned in `approveEntryStage` at the Final → Published transition.
+2. A scheme-override mechanism (per-site config? per-entry frontmatter? to be designed). Default: monotonic integer, applied when no override is declared.
+3. Read-path surfacing: the studio's Published-stage view shows the version; revisions are surfaced only via the View History surface.
+
+The `/deskwork:revert <slug> --to-revision N` verb (or equivalent) is also reserved for implementation — it produces a new revision with the content of revision N, preserving the append-only history.
+
+Until public versioning lands, operator-facing prose may still say "iteration count" in places — that's a historical artifact. New code should use the names "version" (public) and "revision" (internal) per this section.
 
 ## What was retired (and why this document exists)
 
@@ -221,6 +248,13 @@ Where `ReviewState` is referenced AT ALL in user-facing rendering, gating, or sk
 
 A mockup that surfaces review-state labels, gates verbs on review state, or otherwise contradicts this document is misleading and is to be retired. Refer to `docs/studio-design-standards.md` for additional conformance constraints; the state machine spec is upstream of the studio design standards (the studio standards inherit from this document).
 
+### IX. Every Published entry has a version. Every iterate bumps a revision.
+
+Versions (public) and revisions (internal) are distinct serial numbers; see § Versions and revisions. Two non-negotiable invariants:
+
+1. **There is no such thing as an unversioned Published entry.** Every Final → Published transition assigns a version per the operator's scheme (default: monotonic integer). Code that allows a Publish without assigning a version is a violation. UI that shows a Published entry without its version is a violation.
+2. **Revision and version are not interchangeable.** Code or prose that uses one name for the other concept is a violation. "Revision" never means the public identifier; "version" never means the working counter.
+
 ## Reference materials
 
 - **`docs/superpowers/specs/2026-04-30-deskwork-pipeline-redesign-design.md`** — the original design that motivated the collapse. Read for the "why."
@@ -241,3 +275,4 @@ Append a one-line entry every time this document is updated.
 - 2026-05-09 — Initial draft. Captures the post-2026-04-30-redesign canonical state machine and explicitly retires every form of "review state" surfacing. Operator-prompted after a design session in which retired patterns kept being re-introduced because the spec wasn't written down anywhere.
 - 2026-05-09 v2 — Iteration response to operator marginalia (comments `40fcf89c` and `a7fb88d4`). Two corrections: (a) Final is NOT terminal — approve works at Final → Published, same as every other linear-pipeline graduation. Final's contract is "content locked; only stage transitions allowed (approve forward, induct backward)" — iterate / edit are not allowed in Final, but the stage itself is forward-traversable. (b) Published has npm-publish semantics — terminal, publicly committed, immutable; revisions create new versions inducted into a non-terminal stage; filesystem disposition is decoupled from the published semantic. The `publish` verb is reframed as an optional clarity-alias for `approve` at the Final→Published transition rather than a separate operation. Iterate's stage gate is now explicit (Ideas/Planned/Outlining/Drafting only).
 - 2026-05-09 v3 — Iteration response to operator marginalia (comment `acfec3b7`). Added a § Versioning section distinguishing two version concepts: **internal version** (iteration counter; bookkeeping; bumps on every iterate) and **public version** (assigned at Publish; increments only at Publish events; what external consumers refer to). Updated Published stage description and approve verb gates to reference public version assignment. Implementation note: public versioning is committed in this spec but not yet implemented; Phase 0.2 audit will surface where to add it (likely a `publicVersion` field on the sidecar, incremented in approve when transitioning to Published).
+- 2026-05-09 v4 — Iteration response to operator chat-direct guidance on naming + version mandatory-ness. Three changes: (a) **Renamed** the version-concepts section to "Versions and revisions" with explicit naming as the central point. **version** = public, the canonical user-facing identifier; **revision** = internal counter, bumped by iterate, surfaced only via revision history / revert flows (Google Docs / Wikipedia analogue). (b) **Versioning is mandatory** — every Published entry has a version. Default scheme = monotonic integer (`v1`, `v2`, ...) so operators get versioning automatically without setup. Operators MAY override with semver / date-based / custom schemes; opt-out is not allowed. (c) Added Commandment IX codifying the two non-negotiables: every Publish assigns a version; revision and version are not interchangeable names. Phase 0.2 inventory will need to add: scheme-override mechanism, `/deskwork:revert <slug> --to-revision N` verb, View History studio surface.
