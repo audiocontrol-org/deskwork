@@ -75,7 +75,7 @@ Verbs are operations the operator performs on an entry. They are not states. An 
 
 **When it can be invoked:** on any entry whose stage permits content edits — Ideas, Planned, Outlining, Drafting. There is no "iterating state" gate; the gate is purely stage-based. NOT in Final (Final locks the content; to iterate, induct backward to Drafting first). NOT in Published (Published is immutable; create a new version + induct). NOT in Blocked / Cancelled (off-pipeline; induct back first).
 
-**What it changes:** the content artifact on disk (per the agent's edits in response to marginalia). Bumps the entry's **revision** counter (see § Versions and revisions — revisions are bookkeeping; the operator only sees them via revision history / revert flows, not in the routine drafting loop).
+**What it changes:** the content artifact on disk (per the agent's edits in response to marginalia). Bumps the entry's **revision** counter — like every other source of a revision bump (see § Versions and revisions). The agent's iterate is one of several producers of revisions; operator saves and direct filesystem edits also bump the same counter. Revisions are bookkeeping; the operator only sees them via revision history / revert flows, not in the routine drafting loop.
 
 **Studio surfacing:** every row whose stage permits edits (Ideas / Planned / Outlining / Drafting) includes `/deskwork:iterate <slug>` (clipboard-copy). Not gated on any state — only on stage.
 
@@ -134,9 +134,22 @@ In operator-facing prose, "version" alone always means the public version.
 
 ### Revision (internal)
 
-The **revision** is a per-entry counter the agent bumps each time `iterate` appends a new working draft. It exists for working history — so prior working states can be reconstructed, journals can be filtered, the operator can view revision history and revert to a previous revision (Google Docs / Wikipedia analogue).
+The **revision** is a per-entry counter that bumps **any time the working content changes**. It exists for working history — so prior working states can be reconstructed, journals can be filtered, the operator can view revision history and revert to a previous revision (Google Docs / Wikipedia analogue).
 
 A revision is "a working draft on the way to becoming a version." Many revisions accumulate; at each Publish event, the current state is anointed as a new version.
+
+#### Sources of a revision bump
+
+Every change to the working content produces a new revision. The producers are:
+
+- **`add` / `ingest`** — entry creation. The first revision (`r1`) captures the scaffolded or ingested content as the entry's initial working state.
+- **Agent `iterate`** — the agent reads operator marginalia and rewrites the file in response; a new revision records the result.
+- **Operator save** — any save through the studio's editor surface produces a new revision; the operator's direct edits are first-class and append the same way an agent iterate does.
+- **Direct filesystem edits** — when the operator (or any tool) writes the working file outside the studio, the next deskwork operation that observes the change produces a revision capturing it. The system never silently drops a working state.
+
+Each revision records **who originated it** (agent vs operator) and **when**, so revision history surfaces a coherent record of who-changed-what across the lifetime of the entry. The counter is a single per-entry sequence regardless of who or what triggered the bump.
+
+#### When the operator sees revisions
 
 The operator sees revisions when:
 - Viewing revision history (the studio's "View History" surface — TBD)
@@ -276,3 +289,4 @@ Append a one-line entry every time this document is updated.
 - 2026-05-09 v2 — Iteration response to operator marginalia (comments `40fcf89c` and `a7fb88d4`). Two corrections: (a) Final is NOT terminal — approve works at Final → Published, same as every other linear-pipeline graduation. Final's contract is "content locked; only stage transitions allowed (approve forward, induct backward)" — iterate / edit are not allowed in Final, but the stage itself is forward-traversable. (b) Published has npm-publish semantics — terminal, publicly committed, immutable; revisions create new versions inducted into a non-terminal stage; filesystem disposition is decoupled from the published semantic. The `publish` verb is reframed as an optional clarity-alias for `approve` at the Final→Published transition rather than a separate operation. Iterate's stage gate is now explicit (Ideas/Planned/Outlining/Drafting only).
 - 2026-05-09 v3 — Iteration response to operator marginalia (comment `acfec3b7`). Added a § Versioning section distinguishing two version concepts: **internal version** (iteration counter; bookkeeping; bumps on every iterate) and **public version** (assigned at Publish; increments only at Publish events; what external consumers refer to). Updated Published stage description and approve verb gates to reference public version assignment. Implementation note: public versioning is committed in this spec but not yet implemented; Phase 0.2 audit will surface where to add it (likely a `publicVersion` field on the sidecar, incremented in approve when transitioning to Published).
 - 2026-05-09 v4 — Iteration response to operator chat-direct guidance on naming + version mandatory-ness. Three changes: (a) **Renamed** the version-concepts section to "Versions and revisions" with explicit naming as the central point. **version** = public, the canonical user-facing identifier; **revision** = internal counter, bumped by iterate, surfaced only via revision history / revert flows (Google Docs / Wikipedia analogue). (b) **Versioning is mandatory** — every Published entry has a version. Default scheme = monotonic integer (`v1`, `v2`, ...) so operators get versioning automatically without setup. Operators MAY override with semver / date-based / custom schemes; opt-out is not allowed. (c) Added Commandment IX codifying the two non-negotiables: every Publish assigns a version; revision and version are not interchangeable names. Phase 0.2 inventory will need to add: scheme-override mechanism, `/deskwork:revert <slug> --to-revision N` verb, View History studio surface.
+- 2026-05-09 v5 — Iteration response to operator marginalia (comment `94699c3c`): "Doesn't saving direct user edits require a revision bump, as well?" Yes. Expanded the Revision subsection to enumerate all four sources of a revision bump: `add`/`ingest` (initial revision), agent `iterate`, operator save through the studio editor, direct filesystem edits. Each revision records originator (agent vs operator) and timestamp; the counter is a single per-entry sequence regardless of who triggered the bump. Iterate verb's "what it changes" updated to acknowledge it's one of several producers, not the only one.
