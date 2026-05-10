@@ -439,9 +439,11 @@ git commit -m "refactor(studio): extract mobile-shell shared primitives"
 
 ---
 
-## Phase 4 — Editorial Help + Studio Index + #242 Cancel cross-cutting → v0.22
+## Phase 4 — Editorial Help + Studio Index + #242 Cancel residual scope → v0.22
 
-**Goal:** Static doc pages get typography + layout treatment; cross-cutting Cancel affordance lands on every interactive surface.
+**Goal:** Static doc pages get typography + layout treatment; the Cancel verb's coverage gets audited and completed on the surfaces that didn't get it during Phase 1.
+
+**Cancel scope re-narration (post-2026-05-09 audit, per Step 1.6.6):** The original Phase 4 plan treated Cancel as a future cross-cutting affordance to design and apply uniformly. That framing turned out to be wrong: Cancel ships as a stage-conditional verb on dashboard rows (`packages/studio/src/pages/dashboard/affordances.ts`) and on the entry-review decision strip (`packages/studio/src/pages/entry-review/decision-strip.ts`) in v0.19, integrated during Phase 1 work. That's the correct shape per `DESKWORK-STATE-MACHINE.md` Commandment II ("verbs are universal and stage-gated"). What remains for Phase 4 is the **residual surface audit** — which surfaces still lack a Cancel verb (or equivalent affordance), and which should they have. Phase 4 is no longer about "design a cross-cutting cancel pattern;" it's about "verify Cancel coverage on Help, Index, Standalone scrapbook viewer, Content view, and add it where genuinely missing — but only on surfaces where Cancel is semantically meaningful." Some surfaces (the Help docs) may not need a Cancel verb at all.
 
 ### Task 4.1: Mockup + implement Editorial Help / Manual
 
@@ -468,21 +470,28 @@ git commit -m "refactor(studio): extract mobile-shell shared primitives"
 - [ ] **Step 4.2.3:** Operator picks. **STOP.**
 - [ ] **Step 4.2.4:** Implement + commit feat.
 
-### Task 4.3: Mockup + implement #242 cross-cutting Cancel affordance
+### Task 4.3: #242 Cancel residual scope audit + completion
 
-**Files:**
-- Create: `plugins/deskwork-studio/public/mockups/cancel-affordance-N-<idiom>.html` (×2-3)
-- Modify: `plugins/deskwork-studio/public/mockups/index.html`
-- Modify: every interactive surface's mobile chrome to absorb the chosen Cancel pattern
+**Already shipped (Phase 1):**
+- Dashboard rows — stage-conditional `cancel ⊘` button on every active-stage row, copies `/deskwork:cancel <slug>` (`packages/studio/src/pages/dashboard/affordances.ts:89`).
+- Entry-review decision strip — Cancel button on the fixed strip alongside Approve / Iterate (`packages/studio/src/pages/entry-review/decision-strip.ts:150`).
+- ✕ Done button on entry-review edit mode (v0.18; not technically Cancel but adjacent).
 
-- [ ] **Step 4.3.1:** Audit which surfaces lack a Cancel affordance on phone (per #242). Likely: Dashboard, Shortform, Standalone scrapbook viewer, Content view, Help, Index. (Entry-review has the ✕ Done button from v0.18.)
-- [ ] **Step 4.3.2:** Invoke `/frontend-design`. Single design applied across N surfaces. Possibly: a strip-position cancel chip mirroring entry-review's Done button.
-- [ ] **Step 4.3.3:** Operator picks. **STOP.**
-- [ ] **Step 4.3.4:** Apply to every interactive surface. Multiple touch points; commit per-surface or one rollup.
+**Files (residual scope):**
+- Modify: per-surface client + server modules for any surface where a Cancel verb is genuinely needed and currently absent.
+
+- [ ] **Step 4.3.1:** Walk each remaining surface and decide whether Cancel is semantically meaningful there:
+  - **Studio Index (`/dev/`)** — read-only navigation. No Cancel verb needed; close-tab is the cancel.
+  - **Editorial Help (`/dev/editorial-help`)** — read-only manual. No Cancel verb needed.
+  - **Standalone scrapbook viewer (`/dev/scrapbook/<site>/<path>`)** — entry-aware. The viewer's mutation surface is the per-item add/remove; a Cancel verb at the *entry* level makes sense if/when this viewer surfaces entry chrome. Decide during Phase 3 mockups.
+  - **Content view (`/dev/content`)** — read-only browse. No Cancel verb at the surface level; per-entry Cancel happens via the entry-review surface.
+  - **Shortform desk** — has its own decision affordances; Cancel applicability is part of Phase 2.
+- [ ] **Step 4.3.2:** For surfaces where Cancel IS missing AND IS semantically meaningful (decision: list determined by Step 4.3.1), invoke `/frontend-design` if the affordance shape isn't already settled by the dashboard / entry-review precedents. Otherwise apply the existing pattern directly (button on row chrome / decision strip — not a separate "cross-cutting cancel design").
+- [ ] **Step 4.3.3:** Apply the Cancel verb to the surfaces identified in 4.3.1 and 4.3.2; per-surface commits or one rollup.
 
 ### Task 4.4: Probes + smoke + review
 
-- [ ] **Step 4.4.1:** Write `probe-mobile-help.mjs`, `probe-mobile-index.mjs`, `probe-mobile-cancel-affordance.mjs` (the last covers Cancel behavior on every surface that has it).
+- [ ] **Step 4.4.1:** Write `probe-mobile-help.mjs`, `probe-mobile-index.mjs`. The originally-planned `probe-mobile-cancel-affordance.mjs` is no longer needed as a single cross-cutting probe — Cancel coverage on dashboard + entry-review is already covered by `probe-mobile-dashboard.mjs` (Phase 1) and `probe-mobile-editor.mjs` (v0.18). Per-surface Cancel coverage on any newly-added Phase 4 surface goes in that surface's own probe.
 - [ ] **Step 4.4.2:** Run + fix until green.
 - [ ] **Step 4.4.3:** Update smoke.
 - [ ] **Step 4.4.4:** Commit tests.
@@ -493,9 +502,9 @@ git commit -m "refactor(studio): extract mobile-shell shared primitives"
 
 **Acceptance:**
 - Help + Index walk on phone with press-check typography
-- Every interactive surface has a phone-visible Cancel affordance per #242's design
+- Every interactive surface where Cancel is semantically meaningful has a phone-visible Cancel verb (dashboard + entry-review already shipped in Phase 1; remaining surfaces audited and addressed per Step 4.3.1)
 - Probe + smoke green
-- #242 closed against v0.22.0 install
+- #242 closed against v0.22.0 install — verification narrative covers ALL surfaces with Cancel, not just those added in Phase 4
 
 ---
 
