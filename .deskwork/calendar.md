@@ -24,6 +24,10 @@
 | 818a5ef7-5ff8-444a-a01c-3fa31906d345 | deskwork-plugin/open-issue-tranche-proposal | Open Issue Tranche Proposal |  |  | manual |
 | d61642b3-614e-42c6-9e02-1f0a54137679 | open-issue-tranche-cleanup/workplan | Workplan |  |  | manual |
 | 0e8e8d37-9242-42f1-9c8c-cf70330e899f | design-standards | Deskwork Studio Design Standards |  |  | manual |
+| 4b6878ea-ec26-4b32-b7f1-7b8c75b4faf6 | accepted-press-queue-removed | Accepted Press Queue Removed |  |  | manual |
+| 10dcf2ca-cab0-477f-835d-d2fae18e243e | rejected-filing-tab-stamps | Rejected Filing Tab Stamps |  |  | manual |
+| 738b5007-c16e-4b57-9127-8184110b87dc | design-standards-rule | Design Standards Rule |  |  | manual |
+| 04629697-716e-4203-acd1-c4b1f79c0c04 | design-archive-contract | Studio Design Proposal Archive — Contract |  |  | manual |
 
 ## Review
 

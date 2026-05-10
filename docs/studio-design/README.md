@@ -1,3 +1,11 @@
+---
+title: Studio Design Proposal Archive — Contract
+status: load-bearing
+last-updated: 2026-05-09
+deskwork:
+  id: 04629697-716e-4203-acd1-c4b1f79c0c04
+---
+
 # Studio Design Proposal Archive
 
 Durable history of design decisions for `@deskwork/studio`. Companion to `DESIGN-STANDARDS.md` (top-level): the standards doc records *what is settled*; this archive records *what was considered* — including directions that were rejected, with the reasoning. Future sessions read both before drafting new mockups so we don't relitigate decisions that already had their fair hearing.

@@ -4,6 +4,8 @@ status: REJECTED
 date: 2026-05-09
 feature: docs/0.19.0/001-IN-PROGRESS/studio-mobile-first/
 visual: ./mockup.html
+deskwork:
+  id: 10dcf2ca-cab0-477f-835d-d2fae18e243e
 ---
 
 # Filing-tab state stamps

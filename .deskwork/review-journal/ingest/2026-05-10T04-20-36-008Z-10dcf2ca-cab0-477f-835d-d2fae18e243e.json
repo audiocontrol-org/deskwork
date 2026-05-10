@@ -1,0 +1,22 @@
+{
+  "id": "10dcf2ca-cab0-477f-835d-d2fae18e243e",
+  "timestamp": "2026-05-10T04:20:36.008Z",
+  "event": "ingest",
+  "slug": "rejected-filing-tab-stamps",
+  "entryId": "10dcf2ca-cab0-477f-835d-d2fae18e243e",
+  "site": "deskwork-internal",
+  "stage": "Drafting",
+  "sourceFile": "docs/studio-design/REJECTED/2026-05-09-filing-tab-stamps-on-mobile/brief.md",
+  "frontmatterSnapshot": {
+    "proposal": "Filing-tab state chrome on mobile dashboard rows",
+    "status": "REJECTED",
+    "date": "2026-05-09",
+    "feature": "docs/0.19.0/001-IN-PROGRESS/studio-mobile-first/",
+    "visual": "./mockup.html"
+  },
+  "derivation": {
+    "slug": "explicit",
+    "state": "explicit",
+    "date": "frontmatter"
+  }
+}

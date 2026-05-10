@@ -1,3 +1,7 @@
+---
+deskwork:
+  id: 738b5007-c16e-4b57-9127-8184110b87dc
+---
 # Design Standards — Read & Update
 
 The studio's design decisions are captured in **`DESIGN-STANDARDS.md`** (top-level — peer to `THESIS.md` and `DESKWORK-STATE-MACHINE.md`). That document is canonical. The proposal archive at **`docs/studio-design/`** records the durable history of accepted and rejected design decisions. This rule is the operational constraint that makes both stay canonical.

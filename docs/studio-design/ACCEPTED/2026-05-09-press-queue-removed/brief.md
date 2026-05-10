@@ -4,6 +4,8 @@ status: ACCEPTED
 date: 2026-05-09
 feature: docs/0.19.0/001-IN-PROGRESS/studio-mobile-first/
 visual: N/A — non-visual decision (a removal)
+deskwork:
+  id: 4b6878ea-ec26-4b32-b7f1-7b8c75b4faf6
 ---
 
 # Press-queue removed
