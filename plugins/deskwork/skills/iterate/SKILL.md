@@ -1,24 +1,26 @@
 ---
 name: iterate
-description: Snapshot the agent's revised content file as a new workflow version and transition back to in-review. Run after the agent has addressed operator comments by rewriting the file on disk. Works for longform (`--kind longform`), outlines (`--kind outline`), and shortform drafts (`--kind shortform`). Optionally records per-comment dispositions (addressed / deferred / wontfix) that the studio sidebar renders as badges.
+description: Append a new revision of the entry's content after the agent has addressed operator marginalia. Bumps the entry's revision counter; the new revision joins the entry's append-only history (visible via the studio's revision-history surface). Works for longform (`--kind longform`), outlines (`--kind outline`), and shortform drafts (`--kind shortform`). Optionally records per-comment dispositions (addressed / deferred / wontfix) that the studio sidebar renders as badges.
 ---
 
 ## Iterate
 
-Called by the agent AFTER rewriting the content file on disk to address an operator's review comments. This helper:
+Called by the agent AFTER rewriting the content file on disk to address an operator's marginalia. This helper:
 
 1. Reads the current file (SSOT: disk IS the article / outline / shortform copy)
-2. Appends a new workflow version with `originatedBy: 'agent'`
+2. Appends a new revision with `originatedBy: 'agent'` (see `DESKWORK-STATE-MACHINE.md` § Versions and revisions)
 3. Optionally records per-comment disposition annotations
-4. Transitions the workflow back to `in-review` so the operator can review the new version
+4. The studio re-reads the entry's annotations on the next page load — operator inspects the new revision and either approves the entry forward or leaves more marginalia
 
-The same review pipeline drives all three content kinds — the only difference is which file disk path the helper reads back from.
+The same revision-history mechanism drives all three content kinds — the only difference is which file disk path the helper reads back from.
 
 ### Prerequisite
 
-The operator's `/deskwork:iterate <slug>` invocation IS the request to iterate — per THESIS Consequence 2, the studio's "Request iteration" button is a clipboard-copy of this slash command and does NOT mutate workflow state. The skill itself reads margin notes, rewrites the file, and flips the workflow back to `in-review` after appending the new version (longform/outline path).
+The operator's `/deskwork:iterate <slug>` invocation IS the request to iterate — per THESIS Consequence 2, the studio's "Request iteration" button is a clipboard-copy of this slash command and does NOT mutate sidecar state. The skill itself reads marginalia, rewrites the file, and appends the new revision.
 
-For shortform (legacy workflow-object model): the underlying CLI requires the workflow to be in state `iterating` before snapshotting; that gate is enforced by the CLI itself, not by the skill prose.
+Iterate is **stage-gated** per `DESKWORK-STATE-MACHINE.md` Commandment II: the verb runs on stages that permit edits (Ideas / Planned / Outlining / Drafting). Final locks content; iterate refuses there. Published is immutable. Off-pipeline stages (Blocked / Cancelled) need induct first.
+
+For shortform (legacy workflow-object model): the underlying CLI's shortform path has additional internal bookkeeping; iterate's contract is the same — append a new revision after the rewrite.
 
 ### Input
 
@@ -53,7 +55,7 @@ For longform / outline, the `--kind` flag's role is metadata for the iteration j
 
 `--platform` (and optionally `--channel`) are required for shortform iterations so the helper resolves the same scrapbook file the workflow is bound to.
 
-The helper appends v(n+1) from disk, emits address annotations, and flips the workflow to `in-review`.
+The helper appends a new revision (revision N+1) from disk and emits per-comment disposition annotations.
 
 7. Report: new version number, list of addressed comment ids.
 
