@@ -131,14 +131,17 @@ These **stay on desktop**. Don't remove them without an explicit decision logged
 - Subtle row treatment (a colored left rail, not a label)
 - Nothing — let the absence-of-state mean the operator drills into the row to learn more
 
-### Review state — internal-only, not user-facing
+### Review state — RETIRED
 
-The fields `entry.reviewState` (in-review / iterating / approved) and the per-stage iteration counter are **internal data structures**. They are slated for backend removal. Do not surface them on user-facing surfaces:
+The pre-redesign concept of "review state" (`in-review` / `iterating` / `approved`) is **retired** per `DESKWORK-STATE-MACHINE.md` (the project's canonical state-machine spec). It was the parallel state machine the 2026-04-30 pipeline redesign collapsed into stage. The schema's vestigial `ReviewState` type exists only as a back-compat artifact for reading legacy sidecars; new code does not write it and no UI surface renders it.
 
-- **No** "IN REVIEW" / "ITERATING" / "APPROVED" labels anywhere on mobile
-- **No** "X in review" / "X approved" stats in mobile masthead
+Do not surface review state anywhere on any studio surface (desktop or mobile):
+
+- **No** "IN REVIEW" / "ITERATING" / "APPROVED" labels
+- **No** "X in review" / "X approved" stats in any masthead
 - **No** sub-counts like "5 · 3 in review" on stage tiles
-- **No** review-state-driven sidebars (the mobile press queue is hidden; desktop press queue is removed)
+- **No** review-state-driven sidebars (the press queue was removed end-to-end)
+- **No** verbs gated on review state — verbs are stage-gated only (per `DESKWORK-STATE-MACHINE.md` Commandment II)
 
 User-facing pipeline shape comes from **stages**, which IS user-facing data:
 
@@ -146,6 +149,8 @@ User-facing pipeline shape comes from **stages**, which IS user-facing data:
 - Stage glyphs (◇ § ⊹ ✎ ※ ✓ ⊘ ✗) — **always** user-facing
 - Per-stage entry counts — **always** user-facing
 - Distribution as a visual sibling of stages (not technically a stage; renders as one for pipeline-shape uniformity) — see Distribution below
+
+The state machine spec is upstream of these standards. When in conflict, `DESKWORK-STATE-MACHINE.md` wins.
 
 ### Filter chips — removed entirely
 

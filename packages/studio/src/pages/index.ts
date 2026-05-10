@@ -74,20 +74,21 @@ interface IndexSection {
 
 /**
  * Pick the entry that should be the default Longform-reviews target —
- * the most-recent in-pipeline entry whose review state is in-review or
- * iterating. Returns null when no candidate exists; the caller falls
- * back to the dashboard's Review section anchor.
+ * the most-recently-updated entry in a stage that permits edits
+ * (Ideas / Planned / Outlining / Drafting). Returns null when no
+ * candidate exists.
  *
- * Replaces the legacy workflow-based picker as part of the pipeline
- * redesign (Task 36) — the studio's review surfaces are now keyed by
- * entry uuid, not workflow uuid.
+ * Per DESKWORK-STATE-MACHINE.md (v5): the previous reviewState filter
+ * (in-review / iterating) is retired. Stage IS the state machine; the
+ * editable-stage filter approximates "the entry the operator is most
+ * likely actively working on" without depending on the retired
+ * reviewState concept.
  */
 export function pickDefaultLongformEntry(
   entries: readonly Entry[],
 ): Entry | null {
   const candidates = entries
     .filter((e) => LONGFORM_PIPELINE_STAGES.has(e.currentStage))
-    .filter((e) => e.reviewState === 'in-review' || e.reviewState === 'iterating')
     .slice()
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   return candidates[0] ?? null;
@@ -102,14 +103,15 @@ async function buildSections(ctx: StudioContext): Promise<readonly IndexSection[
     }
   })();
   const longformDefaultEntry = pickDefaultLongformEntry(entries);
-  // Issue #107: III links to the most-recent in-review (or iterating)
-  // longform entry when one exists, else falls back to the dashboard's
-  // Review section anchor (`#stage-review`). The link target is the
-  // entry-keyed review route `/dev/editorial-review/entry/<uuid>`.
+  // Issue #107: III links to the most-recently-updated longform entry
+  // in a stage that permits edits (Ideas / Planned / Outlining /
+  // Drafting), else falls back to the dashboard's Drafting section
+  // anchor. The link target is the entry-keyed review route
+  // `/dev/editorial-review/entry/<uuid>`.
   const longformLinkHref =
     longformDefaultEntry !== null
       ? `/dev/editorial-review/entry/${longformDefaultEntry.uuid}`
-      : '/dev/editorial-studio#stage-review';
+      : '/dev/editorial-studio#stage-drafting';
 
   return [
     {
@@ -149,8 +151,8 @@ async function buildSections(ctx: StudioContext): Promise<readonly IndexSection[
           hint: 'entry-by-entry',
           postHint:
             longformDefaultEntry !== null
-              ? `Defaults to the most-recent in-review longform (${longformDefaultEntry.slug}). Or reach via the Dashboard or Content view.`
-              : 'Defaults to the dashboard\'s Review section. Open a longform workflow to populate the per-entry deep-link.',
+              ? `Defaults to the most-recently-updated longform (${longformDefaultEntry.slug}). Or reach via the Dashboard or Content view.`
+              : 'Defaults to the dashboard\'s Drafting section. Add or ingest a longform entry to populate the per-entry deep-link.',
         },
       ],
     },

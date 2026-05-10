@@ -1,6 +1,8 @@
 ---
 audit-of: dashboard
 captured: 2026-05-09
+superseded-by: ../../../../DESKWORK-STATE-MACHINE.md
+status: historical
 sources:
   - packages/studio/src/pages/dashboard.ts
   - packages/studio/src/pages/dashboard/data.ts
@@ -14,6 +16,8 @@ sources:
   - plugins/deskwork-studio/public/css/editorial-review.css
   - plugins/deskwork-studio/public/css/editorial-nav.css
 ---
+
+> **Superseded notice (2026-05-09):** several findings in this audit describe behaviors that have since been retired per `DESKWORK-STATE-MACHINE.md`. Specifically: the iterate-button's `reviewState === 'iterating'` gate (Commandment II violation), the per-row `iteration: N` display (Commandment III violation), the `renderReviewStateBadge` helper, and the press queue (review-state-driven; deleted entirely in v0.19). The audit is retained as a historical snapshot of the dashboard's state at the time of the v0.19 mobile-first design audit; for current dashboard behavior, read the source code directly. The state-machine spec is the canonical reference.
 
 # Dashboard Audit — Phase 1 Task 1.1.1
 
