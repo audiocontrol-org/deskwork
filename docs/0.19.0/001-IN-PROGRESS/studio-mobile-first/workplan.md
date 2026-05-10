@@ -187,21 +187,21 @@ git commit -m "feat(studio): dashboard mobile-first — Mockup N"
 - Create: `scripts/probe-mobile-dashboard.mjs`
 - Modify: `scripts/smoke-er-viewport-regressions.mjs` (or create `scripts/smoke-mobile-dashboard.mjs` if dashboard diverges from entry-review's invariants)
 
-- [ ] **Step 1.3.1:** Write `scripts/probe-mobile-dashboard.mjs` mirroring `probe-mobile-editor.mjs` structure. Assert the operator path: tab swap, sheet open with content, count badges live, no horizontal scroll at 390×844, mobile chrome hidden at 1280×800.
-- [ ] **Step 1.3.2:** Run probe, fix any failing assertions:
+- [x] **Step 1.3.1:** Write `scripts/probe-mobile-dashboard.mjs` mirroring `probe-mobile-editor.mjs` structure. Assert the operator path: tab swap, sheet open with content, count badges live, no horizontal scroll at 390×844, mobile chrome hidden at 1280×800. *(Wrote 16 assertions covering stage-tile expand/collapse, single-expand invariant, FAB visibility + sheet open/close, no-overflow at both viewports, mobile chrome hidden at desktop.)*
+- [x] **Step 1.3.2:** Run probe, fix any failing assertions:
 
 ```bash
 node scripts/probe-mobile-dashboard.mjs
 ```
 
-Expected: 0 failures.
-- [ ] **Step 1.3.3:** Update `scripts/smoke-er-viewport-regressions.mjs` to include `/dev/editorial-studio` in its walked surfaces. Run to confirm green:
+Expected: 0 failures. *(0 failures on first run — implementation matches mockup contract.)*
+- [x] **Step 1.3.3:** Update `scripts/smoke-er-viewport-regressions.mjs` to include `/dev/editorial-studio` in its walked surfaces. Run to confirm green:
 
 ```bash
 node scripts/smoke-er-viewport-regressions.mjs
 ```
 
-Expected: 0 failures across all probes.
+Expected: 0 failures across all probes. *(0 failures across 8 probes — 3 entries × 2 viewports + dashboard × 2 viewports. Strip-height invariant gated to entry-review surface so dashboard's lack of `.er-strip` doesn't false-fail.)*
 - [ ] **Step 1.3.4:** Commit:
 
 ```bash

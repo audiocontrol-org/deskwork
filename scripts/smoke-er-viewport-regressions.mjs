@@ -1,16 +1,21 @@
 #!/usr/bin/env node
 /**
- * Dual-viewport regression smoke for the entry-review surface.
+ * Dual-viewport regression smoke for press-check studio surfaces.
  *
  * Drives Playwright Chromium against the running dev studio at BOTH a
- * desktop viewport (1920x1080) and a phone viewport (390x844). Walks N
- * entries from the project's calendar; for each (entry × viewport) pair
- * asserts:
+ * desktop viewport (1920x1080) and a phone viewport (390x844). Walks
+ * two surface classes:
+ *   - **entry-review** — N entries from the project's calendar
+ *     (one probe per entry × viewport)
+ *   - **dashboard** — `/dev/editorial-studio` (one probe per viewport)
+ *
+ * For each (surface × viewport) pair, asserts:
  *
  *   1. No page-level horizontal overflow:
  *        documentElement.scrollWidth === viewport.width
- *   2. Compact-chrome invariant at desktop:
- *        .er-strip rendered height <= 110px
+ *   2. Compact-chrome invariant at desktop (entry-review only):
+ *        .er-strip rendered height <= 110px. Surfaces without an
+ *        `.er-strip` element skip this assertion.
  *   3. No fixed-position element whose right edge exceeds viewport width
  *      (those bypass html-level overflow:clip on real iOS Safari).
  *
@@ -96,14 +101,13 @@ async function pickEntries() {
 
 // ---- Per-probe measurement ------------------------------------------------
 
-async function probe(page, entryId, viewport) {
+async function probe(page, surfaceUrl, viewport, surfaceKind) {
   await page.setViewportSize({ width: viewport.width, height: viewport.height });
-  const url = `${STUDIO_URL}/dev/editorial-review/entry/${entryId}`;
-  const resp = await page.goto(url, { waitUntil: 'networkidle' });
+  const resp = await page.goto(surfaceUrl, { waitUntil: 'networkidle' });
   if (!resp || resp.status() !== 200) {
     return { navOk: false, navStatus: resp?.status?.() ?? -1 };
   }
-  return await page.evaluate(({ vp, stripMax }) => {
+  return await page.evaluate(({ vp, stripMax, kind }) => {
     const doc = document.documentElement;
     const body = document.body;
     const docW = doc.scrollWidth;
@@ -133,9 +137,13 @@ async function probe(page, entryId, viewport) {
         });
       }
     }
+    // Strip-height invariant is entry-review-specific. The element only
+    // exists on the entry-review surface; on surfaces without it
+    // (dashboard, etc.) the assertion is N/A and the probe records
+    // stripH=null with stripPass=true so it doesn't false-fail.
     const strip = document.querySelector('.er-strip');
     const stripH = strip ? Math.round(strip.getBoundingClientRect().height) : null;
-    const stripPass = vp.name === 'desktop'
+    const stripPass = (vp.name === 'desktop' && kind === 'entry-review')
       ? (stripH != null && stripH <= stripMax)
       : true;
     return {
@@ -147,7 +155,7 @@ async function probe(page, entryId, viewport) {
       stripPass,
       fixedOffenders: fixedOffenders.slice(0, 10),
     };
-  }, { vp: viewport, stripMax: STRIP_HEIGHT_MAX_DESKTOP_PX });
+  }, { vp: viewport, stripMax: STRIP_HEIGHT_MAX_DESKTOP_PX, kind: surfaceKind });
 }
 
 // ---- Main loop ------------------------------------------------------------
@@ -174,38 +182,64 @@ async function main() {
   const page = await context.newPage();
 
   const rows = [];
+  // entry-review: N entries × M viewports
   for (const entryId of entries) {
     for (const viewport of VIEWPORTS) {
-      const result = await probe(page, entryId, viewport);
+      const url = `${STUDIO_URL}/dev/editorial-review/entry/${entryId}`;
+      const result = await probe(page, url, viewport, 'entry-review');
       const overflowFail = result.overflow === true;
       const stripFail = result.stripPass === false;
       const fixedFail = (result.fixedOffenders?.length ?? 0) > 0;
       const navFail = result.navOk === false;
       const fail = navFail || overflowFail || stripFail || fixedFail;
-      rows.push({ entryId, viewport: viewport.name, ...result, fail });
+      rows.push({
+        label: entryId.slice(0, 8),
+        surface: 'entry-review',
+        viewport: viewport.name,
+        ...result,
+        fail,
+      });
     }
+  }
+  // dashboard: 1 surface × M viewports
+  for (const viewport of VIEWPORTS) {
+    const url = `${STUDIO_URL}/dev/editorial-studio`;
+    const result = await probe(page, url, viewport, 'dashboard');
+    const overflowFail = result.overflow === true;
+    const stripFail = result.stripPass === false;
+    const fixedFail = (result.fixedOffenders?.length ?? 0) > 0;
+    const navFail = result.navOk === false;
+    const fail = navFail || overflowFail || stripFail || fixedFail;
+    rows.push({
+      label: 'dashboard',
+      surface: 'dashboard',
+      viewport: viewport.name,
+      ...result,
+      fail,
+    });
   }
   await browser.close();
 
   // Summary
-  console.log(`\nentry-review viewport regression smoke`);
+  console.log(`\npress-check viewport regression smoke`);
   console.log(`  studio:    ${STUDIO_URL}`);
-  console.log(`  entries:   ${entries.length}`);
+  console.log(`  surfaces:  entry-review (${entries.length} entries), dashboard`);
   console.log(`  viewports: ${VIEWPORTS.map((v) => `${v.name}(${v.width}x${v.height})`).join(', ')}\n`);
 
   const failures = rows.filter((r) => r.fail);
   for (const row of rows) {
     const tag = row.fail ? 'FAIL' : 'pass';
-    const eid = row.entryId.slice(0, 8);
+    const label = row.label.padEnd(12);
+    const surface = row.surface.padEnd(13);
     const vp = row.viewport.padEnd(7);
     if (row.navOk === false) {
-      console.log(`  [${tag}] ${eid}  ${vp} navigation failed (status=${row.navStatus})`);
+      console.log(`  [${tag}] ${label} ${surface} ${vp} navigation failed (status=${row.navStatus})`);
       continue;
     }
     const sw = `scrollW=${row.docW}`.padEnd(13);
     const sh = `strip=${row.stripH ?? '-'}`.padEnd(12);
     const fo = `fixedOver=${row.fixedOffenders?.length ?? 0}`;
-    console.log(`  [${tag}] ${eid}  ${vp} ${sw} ${sh} ${fo}`);
+    console.log(`  [${tag}] ${label} ${surface} ${vp} ${sw} ${sh} ${fo}`);
     if (row.fixedOffenders && row.fixedOffenders.length > 0) {
       for (const o of row.fixedOffenders) {
         console.log(`         ${o.right > 9999 ? '' : ' '}-> <${o.tag} class="${o.cls}"> right=${o.right} width=${o.width}`);
