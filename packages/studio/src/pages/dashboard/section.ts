@@ -11,10 +11,7 @@
 
 import { html, unsafe, type RawHtml } from '../html.ts';
 import type { Entry, Stage } from '@deskwork/core/schema/entry';
-import {
-  iterationForCurrentStage,
-  renderRowActions,
-} from './affordances.ts';
+import { renderRowActions } from './affordances.ts';
 
 const STAGE_ORNAMENTS: Record<Stage, string> = {
   Ideas: '◇',
@@ -42,13 +39,16 @@ const STAGE_EMPTY_MESSAGES: Record<Stage, string> = {
  * Render one entry as a single dashboard row. Carries inline:
  *   - slug (linked to the review surface)
  *   - title
- *   - iteration count for the entry's currentStage
- *   - reviewState badge (or an em-dash placeholder)
  *   - updatedAt timestamp
  *   - per-stage action buttons
+ *
+ * Per DESKWORK-STATE-MACHINE.md (v5): revisions (the iteration counter)
+ * are bookkeeping and do NOT surface in routine UI. The previous
+ * "iteration: N" inline display was a violation — operators see
+ * revisions only via the View History surface and revert flows.
+ * reviewState badges are likewise retired (Commandment III).
  */
 export function renderRow(entry: Entry, index: number, defaultSite: string): RawHtml {
-  const iteration = iterationForCurrentStage(entry);
   const reviewLink = `/dev/editorial-review/entry/${entry.uuid}`;
   const search = [entry.slug, entry.title, entry.keywords.join(' ')].join(' ').toLowerCase();
   // Hierarchical entries (slugs containing `/`) get a visual indent
@@ -68,8 +68,6 @@ export function renderRow(entry: Entry, index: number, defaultSite: string): Raw
           <span class="er-row-slug"><a href="${reviewLink}"
             title="open the review surface">${entry.slug}</a></span>
           <span class="er-calendar-title">${entry.title}</span>
-          <span class="er-calendar-meta er-calendar-meta-iteration"
-            data-iteration="${iteration}">iteration: ${iteration}</span>
           <time class="er-calendar-meta er-calendar-meta-updated" data-format="date"
             datetime="${entry.updatedAt}" title="${entry.updatedAt}">${formatDate(entry.updatedAt)}</time>
         </div>
