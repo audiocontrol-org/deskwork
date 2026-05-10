@@ -150,7 +150,7 @@ export async function run(argv: string[]): Promise<void> {
  *   - reads the disk artifact at the stage's conventional path,
  *   - appends an iteration event to the per-entry journal,
  *   - bumps the iteration counter on the sidecar,
- *   - flips reviewState to 'in-review'.
+ *   - (review-state flip removed: reviewState is RETIRED per DESKWORK-STATE-MACHINE.md)
  */
 async function runLongformIterate(
   positional: string[],

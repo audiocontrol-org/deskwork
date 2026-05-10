@@ -5,7 +5,7 @@ import { writeSidecar } from '../sidecar/write.ts';
 import { renderCalendar } from '../calendar/render.ts';
 import { appendJournalEvent } from '../journal/append.ts';
 import { readJournalEvents } from '../journal/read.ts';
-import type { Entry, Stage, ReviewState } from '../schema/entry.ts';
+import type { Entry, Stage } from '../schema/entry.ts';
 import type { JournalEvent } from '../schema/journal-events.ts';
 
 interface IngestRecord {
@@ -58,9 +58,11 @@ async function findIngestSourceFile(
 
 /**
  * Walk legacy pipeline-workflow records and group by entryId. Used by
- * migration to populate Entry.iterationByStage[currentStage] +
- * Entry.reviewState (#141). Multiple records per entryId keep the highest
- * currentVersion.
+ * migration to populate Entry.iterationByStage[currentStage]. Multiple
+ * records per entryId keep the highest currentVersion. (Pre-Phase-30
+ * this also derived an `Entry.reviewState` from the legacy state, but
+ * reviewState is RETIRED per DESKWORK-STATE-MACHINE.md and the helper
+ * no longer surfaces it.)
  */
 async function readLegacyPipelineRecords(
   projectRoot: string,
@@ -90,18 +92,6 @@ async function readLegacyPipelineRecords(
     }
   }
   return out;
-}
-
-/**
- * Translate a legacy review-workflow `state` string to the Phase 30
- * ReviewState enum (`'in-review' | 'iterating' | 'approved'`). Legacy
- * states without a clean Phase 30 mapping translate to undefined (drop).
- */
-function translateLegacyState(state: string): ReviewState | undefined {
-  if (state === 'applied') return 'approved';
-  if (state === 'iterating') return 'iterating';
-  if (state === 'open') return 'in-review';
-  return undefined;
 }
 
 interface MigrateOptions {
@@ -178,12 +168,11 @@ export async function migrateCalendar(
     const priorStage = src.currentStage === 'Blocked' || src.currentStage === 'Cancelled'
       ? inferPriorStageFromJournal(events)
       : undefined;
-    // #141: prefer the journal-derived reviewState; fall back to the
-    // legacy pipeline-workflow state if the journal has no review-state-
-    // change events for this entry.
-    const reviewState =
-      latestReviewStateFromJournal(events) ??
-      (pipelineSummary ? translateLegacyState(pipelineSummary.state) : undefined);
+    // Per DESKWORK-STATE-MACHINE.md Commandment III, reviewState is
+    // RETIRED — the migration tool no longer derives it onto new
+    // sidecars. Existing journals with `review-state-change` events
+    // still parse for historical reads (the schema kept the event
+    // kind), but the migration doesn't surface them onto entry shape.
     const description = src.description !== '' ? src.description : undefined;
 
     // #140: prefer the actual on-disk path recorded in the ingest journal.
@@ -204,7 +193,6 @@ export async function migrateCalendar(
       updatedAt: latest,
       ...(description !== undefined && { description }),
       ...(priorStage !== undefined && { priorStage }),
-      ...(reviewState !== undefined && { reviewState }),
       ...(artifactPath !== undefined && { artifactPath }),
     };
     sidecars.push(entry);
@@ -248,10 +236,3 @@ function inferPriorStageFromJournal(events: JournalEvent[]): Stage {
   return 'Drafting'; // safe default when no transition history is available
 }
 
-function latestReviewStateFromJournal(events: JournalEvent[]): ReviewState | undefined {
-  for (let i = events.length - 1; i >= 0; i--) {
-    const e = events[i];
-    if (e && e.kind === 'review-state-change' && e.to) return e.to;
-  }
-  return undefined;
-}

@@ -60,26 +60,14 @@ describe('approveEntryStage', () => {
     expect(result.toStage).toBe('Final');
     const sidecar = await readSidecar(projectRoot, uuid);
     expect(sidecar.currentStage).toBe('Final');
-    // reviewState clears on stage transition.
+    // Per DESKWORK-STATE-MACHINE.md Commandment III, reviewState is
+    // RETIRED — the schema field is gone, so it's necessarily absent
+    // from any read sidecar.
     expect(sidecar.reviewState).toBeUndefined();
   });
 
-  it('emits review-state-change.to=null when clearing a non-null reviewState (#215)', async () => {
-    await setupEntry({ currentStage: 'Drafting', reviewState: 'in-review' });
-    await approveEntryStage(projectRoot, { uuid });
-    const events = await readJournalEvents(projectRoot, { entryId: uuid });
-    const reviewChanges = events.filter((e) => e.kind === 'review-state-change');
-    const latestReviewChange = reviewChanges.at(-1);
-    expect(latestReviewChange).toBeDefined();
-    if (latestReviewChange && latestReviewChange.kind === 'review-state-change') {
-      expect(latestReviewChange.from).toBe('in-review');
-      expect(latestReviewChange.to).toBeNull();
-      expect(latestReviewChange.stage).toBe('Drafting');
-    }
-  });
-
-  it('does NOT emit a redundant review-state-change when reviewState was already null', async () => {
-    await setupEntry({ currentStage: 'Ideas' });
+  it('does NOT emit a review-state-change journal event on approve (Commandment III — reviewState is retired)', async () => {
+    await setupEntry({ currentStage: 'Drafting' });
     await approveEntryStage(projectRoot, { uuid });
     const events = await readJournalEvents(projectRoot, { entryId: uuid });
     const reviewChanges = events.filter((e) => e.kind === 'review-state-change');

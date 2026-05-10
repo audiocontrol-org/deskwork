@@ -1,5 +1,5 @@
 import { writeSidecar } from '../sidecar/write.ts';
-import type { Entry, ReviewState, Stage } from '../schema/entry.ts';
+import type { Entry, Stage } from '../schema/entry.ts';
 
 /**
  * Inputs for a freshly-minted entry sidecar.
@@ -7,11 +7,10 @@ import type { Entry, ReviewState, Stage } from '../schema/entry.ts';
  * Both `deskwork add` and `deskwork ingest --apply` produce new entries
  * that need a sidecar written under the Phase 30 contract. They differ
  * in the optional fields (ingest knows an `artifactPath`; published
- * candidates carry a `datePublishedDate`; legacy `Review` mapping
- * produces a `reviewState`), but the required-field shape and the
- * defaults (`keywords=[]`, `iterationByStage={}`, `createdAt=updatedAt=now`)
- * are identical. This helper is the single point that knows the new-entry
- * shape so both call sites stay aligned.
+ * candidates carry a `datePublishedDate`), but the required-field
+ * shape and the defaults (`keywords=[]`, `iterationByStage={}`,
+ * `createdAt=updatedAt=now`) are identical. This helper is the single
+ * point that knows the new-entry shape so both call sites stay aligned.
  */
 export interface CreateEntryParams {
   readonly uuid: string;
@@ -20,7 +19,6 @@ export interface CreateEntryParams {
   readonly description?: string;
   readonly currentStage: Stage;
   readonly source: string;
-  readonly reviewState?: ReviewState;
   readonly artifactPath?: string;
   /**
    * YYYY-MM-DD; the helper converts to a full ISO datetime so the
@@ -69,7 +67,6 @@ export async function createFreshEntrySidecar(
     source: params.source,
     currentStage: params.currentStage,
     iterationByStage: {},
-    ...(params.reviewState !== undefined ? { reviewState: params.reviewState } : {}),
     ...(params.artifactPath !== undefined ? { artifactPath: params.artifactPath } : {}),
     ...(params.currentStage === 'Published' && params.datePublishedDate
       ? { datePublished: `${params.datePublishedDate}T00:00:00.000Z` }

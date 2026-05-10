@@ -268,6 +268,58 @@ The audit's full report lives at [`./2026-05-09-implementation-audit.md`](./2026
 - [x] **Step 1.6.6:** Re-narrate **Phase 4** to reflect that the Cancel verb is no longer a future cross-cutting affordance — it ships as a stage-conditional verb on dashboard rows + entry-review decision strip in v0.19. *(Landed in b2b93e2. Phase 4 header retitled, preamble re-narrated with audit citation, Task 4.3 reshaped from 'design + apply' to 'audit residual scope + complete', per-surface walk added, cross-cutting cancel-affordance probe dropped in favor of per-surface probes, acceptance criteria reworded.)*
 - [x] **Step 1.6.7:** Commit each of the above as its own focused commit (per the per-phase commit-hygiene convention at the top of this workplan). *(Landed across six focused commits: 5a4584b 1.6.1 / c4ffa64 1.6.2 / 785b42a 1.6.3 / bc1056a 1.6.4 / 54355e9 1.6.5 / b2b93e2 1.6.6. Each commit message cites the relevant Commandment or audit finding it addresses.)*
 
+### Task 1.7 — Final reviewState retirement (close the schema + journal cascade)
+
+**Goal:** Land the residual `ReviewState` schema-type removal + `review-state-change` journal-event-emit removal so v0.19 closes the review-state retirement story end-to-end. The audit caught the contradiction (canonical doc says retired; schema type still defined; approve.ts still emits review-state-change events); Task 1.6 closed the iterate.ts side, this task closes the rest.
+
+**Scope decisions:**
+
+- **Schema field `entry.reviewState`** — REMOVED. zod's default is non-strict-keys, so existing on-disk sidecars carrying a `reviewState` field still parse cleanly (the field is silently dropped on read, then absent on next write).
+- **Schema type `ReviewState`** — REMOVED. No code outside the migration tool references it after this task.
+- **Journal event kind `review-state-change`** — KEPT in the union schema for *historical* read compat (journals on disk still carry these events) but no NEW code path emits one. The schema entry effectively becomes "legacy event kind, do not emit." This is the analogue of how the schema's `Review` stage-name remains in legacy data shapes without being a current stage.
+- **`approve.ts` reviewState clear-and-emit** — REMOVED. With the schema field gone, the strip-on-transition is a no-op; the conditional `review-state-change.to=null` emit existed only to keep the doctor's journal-sidecar invariant green, and that invariant is also being removed (next bullet).
+- **Doctor `validate-journal-sidecar` reviewState comparison** — REMOVED. With sidecar.reviewState gone there's nothing to compare against; the rule is dead. Note: the rule's *stage-transition* check stays.
+- **`doctor/migrate.ts` reviewState read** — REMOVED. The migration tool no longer derives `entry.reviewState` from journal events because there's no field to derive into. The migration tool still works for the rest of the legacy → entry-centric conversion.
+- **`entry/create.ts` reviewState param** — REMOVED. The optional `reviewState?: ReviewState` param on `createEntry` is dead; nothing should pass it post-spec.
+
+**Files:**
+- Modify: `packages/core/src/schema/entry.ts` (drop type + enum + field)
+- Modify: `packages/core/src/iterate/iterate.ts` (drop destructure that targeted the now-gone field)
+- Modify: `packages/core/src/entry/approve.ts` (drop strip + conditional emit)
+- Modify: `packages/core/src/entry/create.ts` (drop reviewState param + spread)
+- Modify: `packages/core/src/doctor/migrate.ts` (drop reviewState derivation + helper)
+- Modify: `packages/core/src/doctor/validate.ts` (drop journal-sidecar reviewState comparison)
+- Modify: `packages/cli/src/commands/iterate.ts` (docstring sweep)
+- Touch: `packages/core/src/schema/journal-events.ts` only to add a deprecation comment to `ReviewStateChangeEvent` — schema kept for historical reads.
+- Update tests across `packages/core/test/` for behavior changes.
+
+**Sub-steps:**
+
+- [ ] **Step 1.7.1:** Schema-side removal. Drop `ReviewState` type, `ReviewStateEnum`, and `reviewState` field from `entry.ts`. Verify zod read still parses existing sidecars (extra-keys are dropped by default).
+- [ ] **Step 1.7.2:** approve.ts + iterate.ts adjustments. Drop the now-redundant destructure in iterate.ts; drop the strip + conditional `review-state-change.to=null` emit in approve.ts.
+- [ ] **Step 1.7.3:** create.ts cleanup. Drop the optional `reviewState` param + spread.
+- [ ] **Step 1.7.4:** Doctor migrate.ts cleanup. Drop `latestReviewStateFromJournal`, the `reviewState` build-up + spread, the `ReviewState` import, and `translateLegacyState`'s sole use site (the function itself can stay if it has unrelated callers).
+- [ ] **Step 1.7.5:** Doctor validate.ts cleanup. Drop the journal-sidecar `reviewState` comparison block (lines 287-299 in the current snapshot). Keep the stage-transition comparison; that's a separate invariant.
+- [ ] **Step 1.7.6:** Add deprecation comment to `journal-events.ts` `ReviewStateChangeEvent`. Schema stays for historical reads; mark "do not emit new events."
+- [ ] **Step 1.7.7:** CLI iterate.ts docstring sweep. Drop "flips reviewState to 'in-review'" prose.
+- [ ] **Step 1.7.8:** Test suite sweep. Find every test asserting reviewState reads / writes / transitions / journal events; rewrite or remove as appropriate. Workspace tests must come back green.
+- [ ] **Step 1.7.9:** `deskwork doctor` against this project to verify post-cleanup state. Expected: the four pre-existing journal-sidecar failures the v0.18 doctor was reporting (against entries with `review-state-change.to=in-review` events vs cleared sidecars) are now silently passing because the rule is gone.
+- [ ] **Step 1.7.10:** Commit each step or batch as one focused commit if they're tightly coupled (the schema removal + immediate cascade fixes are tightly coupled by definition — one commit is fine).
+
+**Acceptance:**
+- `ReviewState` type no longer exported from `@deskwork/core/schema/entry`
+- `entry.reviewState` no longer in the EntrySchema
+- No code path emits `review-state-change` journal events
+- The historical event kind reads cleanly from existing journals on disk
+- All workspace tests green
+- `deskwork doctor` reports no regressions; the prior journal-sidecar warnings about review-state are gone
+
+**Out of scope (explicit):**
+- Cleaning legacy `reviewState` fields from already-on-disk sidecars. The doctor's existing migration is responsible for legacy data; we don't ship a one-shot cleaner for it because the field is silently dropped on next write.
+- Removing the historical `review-state-change` event kind from the journal schema. Historical reads must continue to work.
+
+---
+
 **Audit findings rejected after verification:**
 
 - *"`approve.ts` still persists and journals review-state semantics."* Mis-characterized. `approve.ts:99-103` deletes `reviewState` from the sidecar on stage transition (`const { reviewState: _drop, ...rest } = sidecar`) and journals the prior value for audit. That's the *correct* post-spec behavior — approve cleans up vestigial state. No fix needed.

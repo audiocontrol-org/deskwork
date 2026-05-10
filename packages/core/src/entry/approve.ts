@@ -96,35 +96,18 @@ export async function approveEntryStage(
     await addEntryAnnotation(projectRoot, sidecar.uuid, annotation);
   }
 
-  // 3. Strip reviewState on stage transition. exactOptionalPropertyTypes
-  //    requires us to omit the key entirely rather than set undefined.
-  const priorReviewState = sidecar.reviewState ?? null;
-  const { reviewState: _drop, ...rest } = sidecar;
-  void _drop;
+  // 3. Update sidecar with the new stage. Per DESKWORK-STATE-MACHINE.md
+  //    Commandment III, reviewState is RETIRED — the schema field is
+  //    gone, so no strip-on-transition is needed and no
+  //    `review-state-change` journal event is emitted (the doctor's
+  //    journal-sidecar rule that gated on this invariant is also gone).
   const updated: Entry = {
-    ...rest,
+    ...sidecar,
     currentStage: to,
     updatedAt: at,
   };
   await writeSidecar(projectRoot, updated);
 
-  // 3a. Emit a `review-state-change.to=null` event when the stage
-  //     transition implicitly clears a non-null prior review state
-  //     (#215 issue 1). Without this event, the doctor's
-  //     `journal-sidecar` rule reads the LATEST review-state-change
-  //     (the iterate-side `to=in-review`) and reports drift against
-  //     the now-cleared sidecar. Recording the clear keeps the audit
-  //     trail honest and the validator green.
-  if (priorReviewState !== null) {
-    await appendJournalEvent(projectRoot, {
-      kind: 'review-state-change',
-      at,
-      entryId: sidecar.uuid,
-      stage: from,
-      from: priorReviewState,
-      to: null,
-    });
-  }
   await appendJournalEvent(projectRoot, {
     kind: 'stage-transition',
     at,

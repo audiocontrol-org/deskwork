@@ -2,8 +2,6 @@ export type Stage =
   | 'Ideas' | 'Planned' | 'Outlining' | 'Drafting' | 'Final' | 'Published'
   | 'Blocked' | 'Cancelled';
 
-export type ReviewState = 'in-review' | 'iterating' | 'approved';
-
 const LINEAR_PIPELINE: readonly Stage[] = ['Ideas', 'Planned', 'Outlining', 'Drafting', 'Final', 'Published'] as const;
 const OFF_PIPELINE: readonly Stage[] = ['Blocked', 'Cancelled'] as const;
 
@@ -33,7 +31,6 @@ export function nextStage(s: Stage): Stage | null {
 import { z } from 'zod';
 
 const StageEnum = z.enum(['Ideas', 'Planned', 'Outlining', 'Drafting', 'Final', 'Published', 'Blocked', 'Cancelled']);
-const ReviewStateEnum = z.enum(['in-review', 'iterating', 'approved']);
 
 export const EntrySchema = z.object({
   // Identity
@@ -45,10 +42,14 @@ export const EntrySchema = z.object({
   source: z.string(),
 
   // Pipeline state
+  // Per DESKWORK-STATE-MACHINE.md (Commandment III), reviewState is
+  // RETIRED — no `reviewState` field exists on Entry. zod's default
+  // is non-strict, so existing on-disk sidecars carrying a vestigial
+  // `reviewState` key parse cleanly (the field is silently dropped on
+  // read; absent on next write).
   currentStage: StageEnum,
   priorStage: StageEnum.optional(),
   iterationByStage: z.record(StageEnum, z.number().int().nonnegative()),
-  reviewState: ReviewStateEnum.optional(),
 
   // Editorial
   targetVersion: z.string().optional(),
