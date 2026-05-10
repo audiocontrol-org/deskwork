@@ -18,7 +18,6 @@
 
 | UUID | Slug | Title | Description | Keywords | Source | Updated |
 |------|------|------|------|------|------|------|
-| 04629697-716e-4203-acd1-c4b1f79c0c04 | design-archive-contract | Studio Design Proposal Archive — Contract |  |  | manual | 2026-05-10T04:20:56.335Z |
 | 10dcf2ca-cab0-477f-835d-d2fae18e243e | rejected-filing-tab-stamps | Rejected Filing Tab Stamps |  |  | manual | 2026-05-10T04:20:36.011Z |
 | 1c3bfe8f-e9c2-4133-ab88-2aa08d9fa702 | post-release-acceptance-design | Post-release customer acceptance playbook | A pair of skills that codify how to evaluate the freshly-installed deskwork marketplace plugin, surface friction, and file issues — using the deskwork pipeline itself as the triage surface. |  | manual | 2026-05-08T16:14:00.938Z |
 | 35439a12-7b66-4563-a6d3-2ee33054dd45 | open-issue-tranche-cleanup/v016-verification-walk | v0.16.0 verification walk |  |  | manual | 2026-05-06T02:02:39.275Z |
@@ -32,6 +31,7 @@
 
 | UUID | Slug | Title | Description | Keywords | Source | Updated |
 |------|------|------|------|------|------|------|
+| 04629697-716e-4203-acd1-c4b1f79c0c04 | design-archive-contract | Studio Design Proposal Archive — Contract |  |  | manual | 2026-05-10T04:33:58.476Z |
 | 0e8e8d37-9242-42f1-9c8c-cf70330e899f | design-standards | Deskwork Studio Design Standards |  |  | manual | 2026-05-10T04:32:36.808Z |
 | 7306087a-f412-4c33-901f-f0173ae36646 | deskwork-state-machine | Deskwork State Machine |  |  | manual | 2026-05-10T02:39:23.868Z |
 | 9845c268-670f-4793-b986-0433e9ef4fb9 | deskwork-plugin/prd | Prd |  | deskwork-plugin, prd, feature-tracking, internal-doc | manual | 2026-05-03T18:18:46.400Z |
