@@ -250,10 +250,10 @@ The audit's full report lives at [`./2026-05-09-implementation-audit.md`](./2026
 
 **Sub-steps:**
 
-- [ ] **Step 1.6.1:** Drop the `reviewState: 'in-review'` writes from `packages/core/src/iterate/iterate.ts`. After this change, iterate bumps the per-stage iteration counter and appends a journal record but does NOT set `reviewState` on the sidecar. (Approve.ts already correctly *clears* reviewState on stage transition; do not touch approve.) Per `DESIGN-STANDARDS.md:148`: "new code does not write it." Update tests that assert post-iterate `reviewState === 'in-review'` — they should now assert no reviewState write. The iterate CLI's success-output `state: 'in-review'` field is part of the same fix; either drop it or document as `null`.
-- [ ] **Step 1.6.2:** Update `README.md:19` — replace the lifecycle list `Ideas → Planned → Outlining → Drafting → Review → Published` with the post-redesign 8-stage list `Ideas → Planned → Outlining → Drafting → Final → Published, plus Blocked and Cancelled off-pipeline`. Cite `DESKWORK-STATE-MACHINE.md` as the canonical reference. Walk the rest of the README for any other "Review" stage references.
-- [ ] **Step 1.6.3:** Create `.claude/rules/state-machine.md`. Step 0.1.6 was specced but never written. Content per the original step text: read `DESKWORK-STATE-MACHINE.md` before any work that touches stage / verb / state semantics; deviations require updating the spec first; cite the spec section in the commit message when changing stage/verb behavior.
-- [ ] **Step 1.6.4:** Replace the feature `README.md` placeholder content with a real status table reflecting actual phase progress:
+- [x] **Step 1.6.1:** Drop the `reviewState: 'in-review'` writes from `packages/core/src/iterate/iterate.ts`. *(Landed in 5a4584b. iterate.ts now strips vestigial reviewState via destructuring and does not emit the review-state-change journal event. CLI emit() drops the `state` field. Test suite swept: 1 iterate test rewrite + 1 new strip-vestigial test + 4 stale studio tests rewritten — total 7 tests touched, all green. 532 core / 196 cli / 430 studio tests pass.)*
+- [x] **Step 1.6.2:** Update `README.md:19` — replace the lifecycle list `Ideas → Planned → Outlining → Drafting → Review → Published` with the post-redesign 8-stage list. *(Landed in c4ffa64. README now cites DESKWORK-STATE-MACHINE.md as canonical and lists eight stages + universal verbs.)*
+- [x] **Step 1.6.3:** Create `.claude/rules/state-machine.md`. Step 0.1.6 was specced but never written. *(Landed in 785b42a. Rule mirrors design-standards.md's pattern: read-before-write, cite-Commandment-in-commit-message, anti-patterns refused. Pre-implementation gate explicit.)*
+- [x] **Step 1.6.4:** Replace the feature `README.md` placeholder content with a real status table reflecting actual phase progress. *(Landed in bc1056a. README now has phase status table with Phase 0.1-0.3, 1.1-1.6, 2-4; issue cross-reference table; key-links section pointing at canonical docs + design archive.)*
   - Phase 0.1 — Complete (DESKWORK-STATE-MACHINE.md Final)
   - Phase 0.2 — Complete except cascading inventory (tracked in Task 0.2 footnote)
   - Phase 0.3 — Complete (DESIGN-STANDARDS.md Final, archive established, operator-approved)
@@ -265,16 +265,8 @@ The audit's full report lives at [`./2026-05-09-implementation-audit.md`](./2026
   - Phase 1.6 — In progress (this task)
   - Phase 2/3/4 — Not started
 - [x] **Step 1.6.5:** ~~Promote the iterate.ts violation onto the Phase 0.2 inventory's "address now" list (currently it's in the deferred-cascade pile).~~ Subsumed by Step 1.6.1's commit 5a4584b — the violation was fixed directly rather than first being promoted on the inventory. Phase 0.2 inventory entries for iterate.ts (workplan lines 58, 64) updated to mark CLOSED with the commit reference.
-- [ ] **Step 1.6.6:** Re-narrate **Phase 4** to reflect that the Cancel verb is no longer a future cross-cutting affordance — it ships as a stage-conditional verb on dashboard rows + entry-review decision strip in v0.19. Phase 4's remaining cross-cutting Cancel scope is whatever surfaces still lack it (Help, Index, Standalone scrapbook viewer, Content view). The Phase 4 task body needs an explicit revision; do that as part of this step.
-- [ ] **Step 1.6.7:** Commit each of the above as its own focused commit (per the per-phase commit-hygiene convention at the top of this workplan):
-
-```
-fix(core/iterate): stop writing reviewState — DESKWORK-STATE-MACHINE.md compliance
-docs(readme): use 8-stage post-redesign lifecycle list
-docs(rules): create .claude/rules/state-machine.md (Step 0.1.6 backfill)
-docs(workplan): replace feature README placeholder with real status
-docs(workplan): re-narrate Phase 4 (Cancel is shipped, not pending)
-```
+- [x] **Step 1.6.6:** Re-narrate **Phase 4** to reflect that the Cancel verb is no longer a future cross-cutting affordance — it ships as a stage-conditional verb on dashboard rows + entry-review decision strip in v0.19. *(Landed in b2b93e2. Phase 4 header retitled, preamble re-narrated with audit citation, Task 4.3 reshaped from 'design + apply' to 'audit residual scope + complete', per-surface walk added, cross-cutting cancel-affordance probe dropped in favor of per-surface probes, acceptance criteria reworded.)*
+- [x] **Step 1.6.7:** Commit each of the above as its own focused commit (per the per-phase commit-hygiene convention at the top of this workplan). *(Landed across six focused commits: 5a4584b 1.6.1 / c4ffa64 1.6.2 / 785b42a 1.6.3 / bc1056a 1.6.4 / 54355e9 1.6.5 / b2b93e2 1.6.6. Each commit message cites the relevant Commandment or audit finding it addresses.)*
 
 **Audit findings rejected after verification:**
 
