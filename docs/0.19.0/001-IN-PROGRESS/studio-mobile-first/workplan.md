@@ -234,6 +234,80 @@ git commit -m "fix(studio): apply review findings on dashboard mobile-first"
 - Probe + smoke green
 - #236, #237, #238, #243 closed against v0.19.0 install
 
+### Task 1.8 — Row affordance redesign (overflow + swipe + full verb vocabulary) → v0.20.0
+
+**Goal:** close the row-affordance pick gate that was implicitly skipped during Phase 1 (Task 1.1.6 conflated the dashboard chrome pick with the per-row affordance pick). Implement the operator-approved Row 4 hybrid: clean at-rest row, swipe-drawer + ⋮ menu on mobile, inline iterate/approve chips + ⋮ menu on desktop, full stage-aware verb vocabulary including the previously-missing `iterate`, `block`, and `induct…` (omnidirectional). Replaces the v0.19 dashboard's stacked-outlined-button row chrome.
+
+**Design source of truth:** [`docs/studio-design/ACCEPTED/2026-05-11-row-affordance-overflow-plus-swipe/brief.md`](../../studio-design/ACCEPTED/2026-05-11-row-affordance-overflow-plus-swipe/brief.md) (visual: [`plugins/deskwork-studio/public/mockups/dashboard-row-4-overflow-plus-swipe.html`](../../../../plugins/deskwork-studio/public/mockups/dashboard-row-4-overflow-plus-swipe.html)).
+
+**Files:**
+- Modify: `packages/studio/src/pages/dashboard/affordances.ts` — stage-aware verb-set rendering (add block + induct-anywhere; current code surfaces induct only on Blocked/Cancelled).
+- Modify: `packages/studio/src/pages/dashboard/section.ts` — row markup adopts the ⋮ button + drawer-host shape; remove the stacked inline button block on mobile breakpoints.
+- Create: `plugins/deskwork-studio/public/src/dashboard/row-actions.ts` — client controller for the swipe-drawer gesture (matchMedia phone-only) AND the ⋮ menu popover (open/close, click-outside, escape key, accessible focus management).
+- Modify: `plugins/deskwork-studio/public/css/dashboard-mobile.css` — swipe-drawer + ⋮-menu chrome; replace the stacked-outlined-button mobile rules.
+- Modify: `plugins/deskwork-studio/public/css/editorial-studio.css` — desktop row chrome adopts inline-chips-plus-⋮ pattern.
+- Verify (do not modify unless gaps found): `/deskwork:block` skill + `packages/core/src/entry/block.ts` helper. The skill is documented; the CLI helper should already exist. If a gap surfaces, file it as a separate task (do not silently widen this one).
+- Modify: `scripts/probe-mobile-dashboard.mjs` — assert: row has no stacked inline buttons at-rest; ⋮ button visible; tap ⋮ opens menu; swipe-left reveals drawer; drawer/menu contain stage-aware verbs.
+- Modify: `scripts/smoke-er-viewport-regressions.mjs` — pick up dashboard rows under the new chrome (existing invariants should still pass; this is precautionary).
+
+**Sub-steps:**
+
+- [ ] **Step 1.8.1:** Verify `/deskwork:block` round-trip works end-to-end (CLI invocation + sidecar transition + journal event + studio refresh). The skill is documented; this step confirms the CLI helper + sidecar mutation path is wired and the studio renders the resulting `Blocked` stage correctly. If anything is missing, file a separate prerequisite task before continuing.
+- [ ] **Step 1.8.2:** Update `affordances.ts` — render the full stage-aware verb set per the brief's table. `iterate` already present on active stages; `approve`/`cancel`/`scrapbook` already present. New: `block` button on active stages (Ideas/Planned/Outlining/Drafting/Final), `induct` button on active stages (currently rendered only on Blocked/Cancelled). Block routes through `/deskwork:block <slug>` clipboard-copy; induct routes through `/deskwork:induct <slug>` with the stage-picker happening in the skill, not the studio.
+- [ ] **Step 1.8.3:** Update `section.ts` — row markup adopts the new shape (top body: slug/title/date; trailing ⋮ button; absolute-positioned action drawer behind row-fg for swipe reveal). Both mobile and desktop variants emit the same DOM; CSS handles the chrome differences.
+- [ ] **Step 1.8.4:** Implement `row-actions.ts` client controller:
+  - matchMedia phone gate for swipe behavior (desktop = no swipe, only ⋮ menu)
+  - Touch-event swipe handler (touchstart/touchmove/touchend) with horizontal threshold for drawer reveal
+  - Open-one-row-at-a-time: opening a drawer on one row closes any other open drawer
+  - ⋮ click → menu open; click outside → close; Escape → close; menu-item click → execute verb (clipboard-copy slash command) and close
+  - Accessible: aria-expanded on ⋮, aria-haspopup, focus management on menu open/close, arrow-key navigation inside menu
+- [ ] **Step 1.8.5:** CSS for mobile chrome (`dashboard-mobile.css`):
+  - Remove the existing stacked-outlined-button rules on rows at ≤600px
+  - Add `.er-row-overflow` button styling (small, low-contrast trailing position)
+  - Add `.er-row-drawer` styling (absolute-positioned behind row-fg; revealed via translate on row-fg)
+  - Add `.er-row-menu` popover styling (matches mockup: cream paper, press-check vocabulary, dotted-divider menu items, two thin dividers separating primary/secondary/off-pipeline verb groups)
+  - Stage-aware drawer item visibility: each row's drawer renders only its stage-applicable verbs
+- [ ] **Step 1.8.6:** CSS for desktop chrome (`editorial-studio.css`):
+  - Replace stacked-outlined-button rules with `iterate ↻` + `approve →` inline chips
+  - Add `.er-row-overflow` desktop variant (slightly larger touch target since hover-driven)
+  - Reuse `.er-row-menu` popover (same styling as mobile; menus look the same across viewports)
+- [ ] **Step 1.8.7:** Update `probe-mobile-dashboard.mjs`:
+  - Assert no `[open →]` / `[approve →]` / `[cancel ⊘]` stacked-inline buttons at-rest at 390x844 (the v0.19 regression check)
+  - Assert `.er-row-overflow` visible on rows
+  - Assert tapping ⋮ sets aria-expanded=true and renders the menu
+  - Assert menu contains stage-aware verb set (iterate/approve/block/induct/cancel/scrapbook on an active-stage row)
+  - Assert swipe-left simulation reveals drawer (use Playwright's touch APIs)
+  - At desktop 1280x800: assert `iterate ↻` + `approve →` inline chips visible; swipe gesture is no-op
+- [ ] **Step 1.8.8:** Run dual-viewport smoke (`smoke-er-viewport-regressions.mjs`). All probes must stay green; this is a non-regression check.
+- [ ] **Step 1.8.9:** Walk the change against the workspace dev studio on phone via Tailscale. Verify visually: row composition matches Frame A; swipe behaves like Frame B; ⋮ menu behaves like Frame C; desktop matches the desktop frame.
+- [ ] **Step 1.8.10:** `/dw-lifecycle:review` — dispatch parallel reviewers (correctness/security + architecture/conventions). Triage findings; apply or defer per the global rule.
+- [ ] **Step 1.8.11:** Commit. Per-phase commit hygiene:
+  - `feat(studio): row-affordance redesign — overflow menu + swipe drawer + stage-aware verb vocabulary`
+  - `test(studio): dashboard probe asserts new row-affordance chrome`
+  - `fix(studio): apply review findings on row-affordance redesign`
+- [ ] **Step 1.8.12:** Retire the three superseded direction mockups into REJECTED archive entries:
+  - `REJECTED/2026-05-11-row-1-overflow-only/` — direction 1 alone (no swipe path)
+  - `REJECTED/2026-05-11-row-2-contextual-primary/` — direction 2 (depended on retired reviewState)
+  - `REJECTED/2026-05-11-row-3-swipe-only/` — direction 3 alone (no discoverable backup for non-swipers)
+  Each with a brief explaining what was rejected and why (the hybrid in `ACCEPTED/2026-05-11-row-affordance-overflow-plus-swipe/` superseded them). `git mv` the mockup files into their REJECTED entries; the mockup-4 file stays at its current path (referenced by the ACCEPTED entry).
+- [ ] **Step 1.8.13:** Release v0.20.0 via `/release`. Smoke + tag + push.
+- [ ] **Step 1.8.14:** Operator iPhone walk against the marketplace-installed v0.20.0 to confirm the redesigned chrome lands correctly.
+
+**Acceptance:**
+- Mobile dashboard rows: clean at-rest, no stacked inline buttons, trailing ⋮ visible
+- Mobile swipe-left reveals the stage-aware drawer; swipe-right or tap-outside closes
+- Tap ⋮ opens menu with full stage-aware verb set; tap-outside or Escape closes
+- Block + induct affordances reachable on all applicable stages on both mobile and desktop
+- Desktop: inline iterate / approve chips + ⋮ menu for secondaries (no stacked outlined buttons)
+- All verbs route via clipboard-copy of `/deskwork:<verb> <slug>` (THESIS Consequence 2 preserved)
+- Probe + smoke green
+- v0.20.0 released and walked on iPhone
+
+**Out of scope:**
+- Mobile-shell extraction — that's Phase 2. The row-actions controller may end up extracted there; for now it lives in dashboard's own client tree.
+- Touch-gesture refinements beyond the basic swipe (multi-finger gestures, customizable swipe thresholds, etc.).
+- Custom keyboard shortcuts for the menu beyond the standard arrow-key navigation + Escape.
+
 ### Task 1.6 — Audit-driven remediations (Phase 0 / Phase 1 cleanup)
 
 **Goal:** address gaps surfaced by the 2026-05-09 implementation audit. The audit was right about real gaps in the Phase 0 conformance sweep + feature-status doc rot; one finding was mis-characterized and is excluded here. Each item below is a concrete action that closes one audit finding.

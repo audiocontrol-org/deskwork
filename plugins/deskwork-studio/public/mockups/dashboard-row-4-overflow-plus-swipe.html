@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Dashboard row 4 · Overflow + swipe hybrid (with iterate)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F5F1E8;
+    --paper-2: #ECE6D4;
+    --paper-3: #DFD7BF;
+    --kraft: #8A7250;
+    --ink: #1A1614;
+    --faded: #8A7F70;
+    --faded-2: #C7BEAE;
+    --red: #B8362A;
+    --blue: #2A4B7C;
+    --green: #2E5D45;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    --noise:
+      url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #2C2823;
+    background-image:
+      radial-gradient(circle at 30% 20%, rgba(184, 54, 42, 0.08), transparent 50%),
+      radial-gradient(circle at 70% 80%, rgba(42, 75, 124, 0.06), transparent 50%);
+    color: var(--ink); font-family: var(--display);
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 2rem 1rem 4rem;
+  }
+  .meta { color: #C7BEAE; font-family: var(--mono); font-size: 0.8rem;
+          letter-spacing: 0.18em; text-transform: uppercase;
+          margin-bottom: 0.6rem; text-align: center; }
+  .meta a { color: var(--paper); text-decoration: none;
+            border-bottom: 1px solid rgba(245, 241, 232, 0.4); }
+  h1.demo-title { color: var(--paper); font-family: var(--display);
+                  font-style: italic;
+                  font-variation-settings: "opsz" 36, "wght" 500;
+                  font-size: 1.7rem; margin-bottom: 0.4rem; text-align: center; }
+  .demo-sub { color: var(--faded-2); font-family: var(--mono);
+              font-size: 0.7rem; letter-spacing: 0.18em;
+              text-transform: uppercase; margin-bottom: 1.4rem; text-align: center; }
+  .banner {
+    max-width: 720px; margin: 0 auto 1.8rem;
+    padding: 0.85rem 1rem;
+    background: rgba(245, 241, 232, 0.08);
+    border-left: 3px solid var(--red);
+    color: #C7BEAE;
+    font-family: var(--display); font-size: 0.92rem; line-height: 1.55;
+  }
+  .banner .kicker {
+    font-family: var(--mono); font-size: 0.65rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--red); display: block; margin-bottom: 0.4rem;
+  }
+  .banner em { color: var(--paper); font-style: italic; }
+
+  .frames { display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center; }
+  .frame-wrap { display: flex; flex-direction: column; align-items: center; }
+  .caption { color: #C7BEAE; font-family: var(--mono);
+             font-size: 0.7rem; letter-spacing: 0.18em;
+             text-transform: uppercase; margin-top: 0.8rem;
+             text-align: center; max-width: 410px; line-height: 1.5; }
+  .caption strong { color: var(--paper); }
+
+  .phone { width: 410px; height: 880px; background: #050505;
+           border-radius: 50px; padding: 12px;
+           box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5),
+                       inset 0 0 0 1px rgba(255,255,255,0.04);
+           position: relative; }
+  .phone::before { content: ''; position: absolute;
+                   top: 22px; left: 50%; transform: translateX(-50%);
+                   width: 110px; height: 30px; background: #000;
+                   border-radius: 16px; z-index: 100; }
+  .screen { width: 100%; height: 100%; background: var(--paper);
+            background-image: var(--noise);
+            border-radius: 38px; overflow: hidden; position: relative;
+            font-size: 17px; line-height: 1.55; color: var(--ink); }
+  .ios-clock { position: absolute; top: 28px; left: 32px;
+               font-family: -apple-system, system-ui, sans-serif;
+               font-size: 0.95rem; font-weight: 600;
+               color: var(--ink); z-index: 110; }
+  .ios-icons { position: absolute; top: 30px; right: 32px;
+               color: var(--ink);
+               font-family: -apple-system, system-ui, sans-serif;
+               font-size: 0.85rem; letter-spacing: 0.05em; z-index: 110; }
+
+  .strip { position: absolute; top: 0; left: 0; right: 0;
+           height: 56px; padding: 56px 1rem 0;
+           background: var(--paper);
+           border-bottom: 1px solid var(--red);
+           z-index: 50;
+           display: flex; align-items: center; gap: 0.6rem; }
+  .strip-title { font-family: var(--display); font-style: italic;
+                 font-variation-settings: "opsz" 22, "wght" 500;
+                 font-size: 1.05rem; color: var(--red); }
+  .strip-mark { font-family: var(--mono); font-size: 0.6rem;
+                letter-spacing: 0.16em; text-transform: uppercase;
+                color: var(--faded); margin-left: auto; }
+
+  .body { position: absolute; top: 56px; left: 0; right: 0; bottom: 0;
+          overflow-y: auto; }
+
+  .stage-tile {
+    display: grid;
+    grid-template-columns: 1.6rem 1fr auto 1.4rem;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.55rem 1rem;
+    border-bottom: 1px dashed var(--paper-3);
+    background: var(--paper);
+    min-height: 44px;
+  }
+  .stage-tile.expanded { background: var(--paper-2); border-bottom-color: var(--red); }
+  .stage-tile-glyph { font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+    font-size: 1.25rem; line-height: 1; color: var(--red); text-align: center; }
+  .stage-tile-name { font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 500; font-size: 1rem; line-height: 1.1; }
+  .stage-tile.expanded .stage-tile-name { color: var(--red); }
+  .stage-tile-count { font-family: var(--mono); font-size: 0.62rem;
+    letter-spacing: 0.06em; color: var(--faded); text-transform: uppercase; text-align: right; }
+  .stage-tile-count .num { color: var(--ink); font-weight: 500; }
+  .stage-tile-chev { font-family: var(--mono); font-size: 0.95rem;
+    color: var(--red); text-align: center;
+    transition: transform 200ms ease; }
+  .stage-tile.expanded .stage-tile-chev { transform: rotate(90deg); }
+
+  /* ============================================================
+   *  ROW PATTERN — OVERFLOW + SWIPE HYBRID
+   *
+   *  AT-REST: row is clean — slug + title + date + a tiny low-contrast
+   *  trailing ⋮. No buttons stacked under the row. Composition mirrors
+   *  Direction 3's restraint.
+   *
+   *  TAP THE ROW BODY → opens entry-review surface (primary action).
+   *
+   *  SWIPE LEFT on the row → action drawer slides in from the right
+   *  with stage-aware verb buttons (Direction 3, with iterate added):
+   *    - Drafting/Ideas/Planned/Outlining → [iterate] [approve] [cancel] [scrapbook]
+   *    - Final                            → [approve→publish] [cancel] [scrapbook]
+   *    - Blocked/Cancelled                → [induct] [scrapbook]
+   *    - Published                        → [view] [scrapbook]
+   *  Color-coded per the press-check accent map (iterate=proof-blue,
+   *  approve=stamp-green, cancel=red-pencil, induct=proof-blue,
+   *  scrap/view=kraft).
+   *
+   *  TAP THE ⋮ → vertical popover with the SAME stage-aware verbs
+   *  in a discoverable list. Power users use swipe; discoverers find
+   *  the menu. Both surfaces are stage-aware and route through the
+   *  same clipboard-copy slash-command path (THESIS Consequence 2).
+   *
+   *  Trade-off vs Direction 3 alone: a small ⋮ adds discoverability
+   *  at the cost of ~16px of trailing chrome per row. Trade-off vs
+   *  Direction 1 alone: power users still get one-gesture access
+   *  without traversing a two-tap menu.
+   * ============================================================ */
+  .row-shell {
+    position: relative;
+    overflow: hidden;
+    border-bottom: 1px dashed var(--paper-3);
+    background: var(--paper);
+  }
+  .row-shell:last-child { border-bottom: 0; }
+  /* When the overflow menu is open, the shell must NOT clip — the
+     popover extends downward over the row(s) below. The swipe drawer
+     is anchored right:0 underneath the row-fg (z-index: 2) so it
+     stays hidden at-rest even without overflow clipping. */
+  .row-shell.menu-open { overflow: visible; z-index: 50; }
+
+  .row-bg {
+    position: absolute;
+    top: 0; right: 0; bottom: 0;
+    display: flex; align-items: stretch;
+  }
+  .row-action {
+    border: none;
+    width: 64px;
+    color: var(--paper);
+    font-family: var(--mono); font-size: 0.58rem;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    font-weight: 500;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 0.18rem;
+  }
+  .row-action-glyph {
+    font-family: var(--display); font-style: italic;
+    font-size: 1.3rem; line-height: 1;
+  }
+  .row-action.iterate { background: var(--blue); }
+  .row-action.approve { background: var(--green); }
+  .row-action.cancel { background: var(--red); }
+  .row-action.block { background: var(--kraft); }
+  .row-action.induct { background: var(--blue); }
+  .row-action.view { background: var(--kraft); }
+  .row-action.scrap { background: var(--kraft); }
+
+  .row-fg {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    column-gap: 0.6rem;
+    align-items: start;
+    padding: 0.7rem 0.85rem 0.75rem 1.5rem;
+    background: var(--paper);
+    background-image: var(--noise);
+    position: relative;
+    z-index: 2;
+    transition: transform 250ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  /* Swiped states by action count */
+  .row-shell.swipe-4 .row-fg { transform: translateX(-256px); }  /* 4 × 64 */
+  .row-shell.swipe-3 .row-fg { transform: translateX(-192px); }
+  .row-shell.swipe-2 .row-fg { transform: translateX(-128px); }
+
+  .row-body { grid-column: 1; min-width: 0; }
+  .row-head {
+    display: flex; align-items: baseline; gap: 0.5rem;
+    margin-bottom: 0.2rem;
+  }
+  .row-head-num {
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--faded);
+  }
+  .row-date {
+    font-family: var(--mono); font-size: 0.58rem;
+    letter-spacing: 0.06em; color: var(--faded);
+    margin-left: auto;
+  }
+  .row-slug {
+    font-family: var(--mono); font-size: 0.78rem;
+    color: var(--ink);
+    word-break: break-word; overflow-wrap: anywhere;
+    line-height: 1.2;
+    border-bottom: 1px solid var(--paper-3);
+    padding-bottom: 1px; display: inline-block;
+  }
+  .row-title {
+    display: block;
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 500;
+    font-size: 0.95rem; line-height: 1.25;
+    color: var(--ink);
+    margin-top: 0.2rem;
+  }
+  .row-overflow {
+    grid-column: 3; grid-row: 1 / span 3;
+    align-self: stretch;
+    display: flex; align-items: flex-start; justify-content: center;
+    padding-top: 0.1rem;
+    width: 28px;
+    background: transparent;
+    border: none;
+    color: var(--paper-3);
+    font-family: var(--mono); font-size: 1.2rem; font-weight: 600;
+    line-height: 1; cursor: pointer;
+    transition: color 120ms ease;
+  }
+  .row-overflow:hover, .row-overflow:focus-visible { color: var(--faded); outline: none; }
+  .row-overflow.active { color: var(--red); }
+
+  /* Popover menu (Direction 1) — z-index 200 escapes any stacking
+     context created by subsequent rows' .row-fg (which sits at z:2). */
+  .menu {
+    position: absolute; z-index: 200;
+    top: 38px; right: 14px;
+    background: var(--paper);
+    border: 1px solid var(--paper-3);
+    border-radius: 2px;
+    box-shadow:
+      0 10px 24px rgba(26, 22, 20, 0.18),
+      0 2px 4px rgba(26, 22, 20, 0.08);
+    min-width: 220px;
+    padding: 0.3rem 0;
+  }
+  .menu::before {
+    content: ''; position: absolute;
+    top: -7px; right: 12px;
+    width: 12px; height: 12px;
+    background: var(--paper);
+    border-top: 1px solid var(--paper-3);
+    border-left: 1px solid var(--paper-3);
+    transform: rotate(45deg);
+  }
+  .menu-item {
+    display: flex; align-items: baseline;
+    padding: 0.55rem 0.9rem;
+    gap: 0.55rem;
+    cursor: pointer;
+    border-bottom: 1px dotted var(--paper-3);
+  }
+  .menu-item:last-child { border-bottom: 0; }
+  .menu-item:hover { background: var(--paper-2); }
+  .menu-glyph {
+    font-family: var(--display); font-style: italic;
+    font-size: 1.05rem; line-height: 1;
+    width: 18px; text-align: center;
+    flex-shrink: 0;
+  }
+  .menu-glyph.iterate { color: var(--blue); }
+  .menu-glyph.approve { color: var(--green); }
+  .menu-glyph.cancel { color: var(--red); }
+  .menu-glyph.block   { color: var(--kraft); }
+  .menu-glyph.scrap   { color: var(--kraft); }
+  .menu-glyph.view    { color: var(--kraft); }
+  .menu-glyph.induct  { color: var(--blue); }
+  .menu-divider {
+    height: 0; border: 0;
+    border-top: 1px solid var(--paper-3);
+    margin: 0.25rem 0.7rem;
+  }
+  .menu-label {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 16, "wght" 500;
+    font-size: 0.92rem; line-height: 1.2; color: var(--ink);
+  }
+  .menu-cmd {
+    font-family: var(--mono); font-size: 0.52rem;
+    letter-spacing: 0.06em; color: var(--faded);
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+
+  .swipe-hint {
+    text-align: center; padding: 0.45rem;
+    font-family: var(--mono); font-size: 0.52rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--faded);
+    background: var(--paper-2);
+    border-top: 1px dotted var(--paper-3);
+    border-bottom: 1px dotted var(--paper-3);
+  }
+
+  .fab { position: absolute; bottom: 16px; right: 16px;
+         z-index: 65;
+         background: var(--red); color: var(--paper);
+         border: 1px solid var(--red); border-radius: 2px;
+         padding: 0.55rem 0.85rem;
+         box-shadow: inset 0 1px 0 rgba(255,255,255,0.12),
+                     0 4px 12px rgba(184, 54, 42, 0.28),
+                     0 1px 3px rgba(0,0,0,0.18);
+         font-family: var(--mono); font-size: 0.62rem;
+         font-weight: 500; letter-spacing: 0.16em;
+         text-transform: uppercase;
+         display: inline-flex; align-items: center; gap: 0.35rem;
+         line-height: 1; }
+  .fab .glyph { font-family: var(--mono); font-size: 0.95rem;
+                line-height: 1; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="meta"><a href="../index.html">← back to mockups</a></div>
+<h1 class="demo-title">Row 4 · Overflow + swipe (hybrid).</h1>
+<div class="demo-sub">Direction 1 + Direction 3 · stage-aware verbs · with iterate</div>
+
+<div class="banner">
+  <span class="kicker">Mockup direction · proposed for v0.20 row affordance pick</span>
+  Per <a href="../../../../DESIGN-STANDARDS.md" style="color: var(--paper); text-decoration: underline;">Design Standards § Rubber-stamp conceit</a> + <a href="../../../../DESKWORK-STATE-MACHINE.md" style="color: var(--paper); text-decoration: underline;">DESKWORK-STATE-MACHINE.md Commandment II</a>: mobile rows have no state-stamp chrome, and verbs are universal + stage-gated only. This mockup combines <em>Direction 1's discoverable overflow menu</em> with <em>Direction 3's power-user swipe gesture</em> and surfaces the full stage-aware verb vocabulary including <em>iterate</em>, <em>block</em>, and <em>induct…</em> (none of which the v0.19 dashboard surfaces). Power users swipe; discoverers tap the ⋮. Desktop applies the same ⋮-menu pattern alongside high-frequency inline chips. Both surfaces route through clipboard-copy of the corresponding <code style="font-family:var(--mono);color:var(--paper)">/deskwork:&lt;verb&gt;</code> slash command (THESIS Consequence 2).
+</div>
+
+<div class="frames">
+
+  <!-- ====================== FRAME A: at-rest ====================== -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:51</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="strip">
+        <span class="strip-title">Dashboard</span>
+        <span class="strip-mark">FINAL · 4</span>
+      </div>
+
+      <div class="body">
+
+        <div class="stage-tile expanded">
+          <span class="stage-tile-glyph">※</span>
+          <span class="stage-tile-name">Final</span>
+          <span class="stage-tile-count"><span class="num">4</span></span>
+          <span class="stage-tile-chev">›</span>
+        </div>
+
+        <!-- Drafting-stage rows would show iterate; using Final rows here
+             to mirror the operator's screenshot. Operator: switch the
+             expanded stage to compare. -->
+
+        <!-- Row 1: at-rest -->
+        <div class="row-shell">
+          <div class="row-bg">
+            <div class="row-action approve">
+              <span class="row-action-glyph">✓</span><span>Publish</span>
+            </div>
+            <div class="row-action cancel">
+              <span class="row-action-glyph">⊘</span><span>Cancel</span>
+            </div>
+            <div class="row-action scrap">
+              <span class="row-action-glyph">⊞</span><span>Scrpbk</span>
+            </div>
+          </div>
+          <div class="row-fg">
+            <div class="row-body">
+              <div class="row-head">
+                <span class="row-head-num">№ 01</span>
+                <span class="row-date">May 09, 2026</span>
+              </div>
+              <span class="row-slug">accepted-press-queue-removed</span>
+              <span class="row-title">Accepted Press Queue Removed</span>
+            </div>
+            <button class="row-overflow" aria-label="Show all actions">⋮</button>
+          </div>
+        </div>
+
+        <!-- Row 2 -->
+        <div class="row-shell">
+          <div class="row-bg">
+            <div class="row-action approve"><span class="row-action-glyph">✓</span><span>Publish</span></div>
+            <div class="row-action cancel"><span class="row-action-glyph">⊘</span><span>Cancel</span></div>
+            <div class="row-action scrap"><span class="row-action-glyph">⊞</span><span>Scrpbk</span></div>
+          </div>
+          <div class="row-fg">
+            <div class="row-body">
+              <div class="row-head">
+                <span class="row-head-num">№ 02</span>
+                <span class="row-date">May 09, 2026</span>
+              </div>
+              <span class="row-slug">design-archive-contract</span>
+              <span class="row-title">Studio Design Proposal Archive — Contract</span>
+            </div>
+            <button class="row-overflow" aria-label="Show all actions">⋮</button>
+          </div>
+        </div>
+
+        <!-- Row 3 -->
+        <div class="row-shell">
+          <div class="row-bg">
+            <div class="row-action approve"><span class="row-action-glyph">✓</span><span>Publish</span></div>
+            <div class="row-action cancel"><span class="row-action-glyph">⊘</span><span>Cancel</span></div>
+            <div class="row-action scrap"><span class="row-action-glyph">⊞</span><span>Scrpbk</span></div>
+          </div>
+          <div class="row-fg">
+            <div class="row-body">
+              <div class="row-head">
+                <span class="row-head-num">№ 03</span>
+                <span class="row-date">May 09, 2026</span>
+              </div>
+              <span class="row-slug">design-standards</span>
+              <span class="row-title">Deskwork Studio Design Standards</span>
+            </div>
+            <button class="row-overflow" aria-label="Show all actions">⋮</button>
+          </div>
+        </div>
+
+        <!-- Row 4 -->
+        <div class="row-shell">
+          <div class="row-bg">
+            <div class="row-action approve"><span class="row-action-glyph">✓</span><span>Publish</span></div>
+            <div class="row-action cancel"><span class="row-action-glyph">⊘</span><span>Cancel</span></div>
+            <div class="row-action scrap"><span class="row-action-glyph">⊞</span><span>Scrpbk</span></div>
+          </div>
+          <div class="row-fg">
+            <div class="row-body">
+              <div class="row-head">
+                <span class="row-head-num">№ 04</span>
+                <span class="row-date">May 10, 2026</span>
+              </div>
+              <span class="row-slug">design-standards-rule</span>
+              <span class="row-title">Design Standards Rule</span>
+            </div>
+            <button class="row-overflow" aria-label="Show all actions">⋮</button>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="fab">
+        <span class="glyph">+</span><span>Compose</span>
+      </div>
+    </div>
+  </div>
+  <div class="caption">
+    <strong>Frame A · At-rest.</strong> Row is clean — slug + title + date.<br>
+    Tiny low-contrast ⋮ trails each row.<br>
+    Compare to current v0.19 row's stacked outlined buttons.
+  </div>
+  </div>
+
+  <!-- ====================== FRAME B: swipe ====================== -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:51</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="strip">
+        <span class="strip-title">Dashboard</span>
+        <span class="strip-mark">DRAFTING · 5</span>
+      </div>
+
+      <div class="body">
+
+        <div class="stage-tile expanded">
+          <span class="stage-tile-glyph">✎</span>
+          <span class="stage-tile-name">Drafting</span>
+          <span class="stage-tile-count"><span class="num">5</span></span>
+          <span class="stage-tile-chev">›</span>
+        </div>
+
+        <!-- Row in SWIPED state — drawer revealed. 4 actions × 64px. -->
+        <div class="row-shell swipe-4">
+          <div class="row-bg">
+            <div class="row-action iterate">
+              <span class="row-action-glyph">↻</span><span>Iterate</span>
+            </div>
+            <div class="row-action approve">
+              <span class="row-action-glyph">✓</span><span>Approve</span>
+            </div>
+            <div class="row-action cancel">
+              <span class="row-action-glyph">⊘</span><span>Cancel</span>
+            </div>
+            <div class="row-action scrap">
+              <span class="row-action-glyph">⊞</span><span>Scrpbk</span>
+            </div>
+          </div>
+          <div class="row-fg">
+            <div class="row-body">
+              <div class="row-head">
+                <span class="row-head-num">№ 01</span>
+                <span class="row-date">May 11, 2026</span>
+              </div>
+              <span class="row-slug">whats-in-a-name</span>
+              <span class="row-title">What's in a Name?</span>
+            </div>
+            <button class="row-overflow" aria-label="Show all actions">⋮</button>
+          </div>
+        </div>
+
+        <!-- Other rows still at-rest -->
+        <div class="row-shell">
+          <div class="row-bg">
+            <div class="row-action iterate"><span class="row-action-glyph">↻</span><span>Iterate</span></div>
+            <div class="row-action approve"><span class="row-action-glyph">✓</span><span>Approve</span></div>
+            <div class="row-action cancel"><span class="row-action-glyph">⊘</span><span>Cancel</span></div>
+            <div class="row-action scrap"><span class="row-action-glyph">⊞</span><span>Scrpbk</span></div>
+          </div>
+          <div class="row-fg">
+            <div class="row-body">
+              <div class="row-head">
+                <span class="row-head-num">№ 02</span>
+                <span class="row-date">May 10, 2026</span>
+              </div>
+              <span class="row-slug">on-revising-in-the-open</span>
+              <span class="row-title">On Revising in the Open</span>
+            </div>
+            <button class="row-overflow" aria-label="Show all actions">⋮</button>
+          </div>
+        </div>
+
+        <div class="row-shell">
+          <div class="row-bg">
+            <div class="row-action iterate"><span class="row-action-glyph">↻</span><span>Iterate</span></div>
+            <div class="row-action approve"><span class="row-action-glyph">✓</span><span>Approve</span></div>
+            <div class="row-action cancel"><span class="row-action-glyph">⊘</span><span>Cancel</span></div>
+            <div class="row-action scrap"><span class="row-action-glyph">⊞</span><span>Scrpbk</span></div>
+          </div>
+          <div class="row-fg">
+            <div class="row-body">
+              <div class="row-head">
+                <span class="row-head-num">№ 03</span>
+                <span class="row-date">May 09, 2026</span>
+              </div>
+              <span class="row-slug">the-deskwork-experiment</span>
+              <span class="row-title">The Deskwork Experiment</span>
+            </div>
+            <button class="row-overflow" aria-label="Show all actions">⋮</button>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="swipe-hint">⌫ swipe left to reveal · tap row to open</div>
+
+      <div class="fab">
+        <span class="glyph">+</span><span>Compose</span>
+      </div>
+    </div>
+  </div>
+  <div class="caption">
+    <strong>Frame B · Swipe drawer (Drafting row).</strong><br>
+    4 stage-aware verbs revealed: iterate / approve / cancel / scrap.<br>
+    Each tap copies <code>/deskwork:&lt;verb&gt; &lt;slug&gt;</code> to clipboard.
+  </div>
+  </div>
+
+  <!-- ====================== FRAME C: overflow menu ====================== -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:51</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="strip">
+        <span class="strip-title">Dashboard</span>
+        <span class="strip-mark">DRAFTING · 5</span>
+      </div>
+
+      <div class="body">
+
+        <div class="stage-tile expanded">
+          <span class="stage-tile-glyph">✎</span>
+          <span class="stage-tile-name">Drafting</span>
+          <span class="stage-tile-count"><span class="num">5</span></span>
+          <span class="stage-tile-chev">›</span>
+        </div>
+
+        <!-- Row with overflow menu OPEN. menu-open class flips
+             overflow:visible so the popover isn't clipped by the
+             row-shell's normal overflow:hidden (which exists for the
+             swipe-drawer reveal). -->
+        <div class="row-shell menu-open">
+          <div class="row-bg">
+            <div class="row-action iterate"><span class="row-action-glyph">↻</span><span>Iterate</span></div>
+            <div class="row-action approve"><span class="row-action-glyph">✓</span><span>Approve</span></div>
+            <div class="row-action cancel"><span class="row-action-glyph">⊘</span><span>Cancel</span></div>
+            <div class="row-action scrap"><span class="row-action-glyph">⊞</span><span>Scrpbk</span></div>
+          </div>
+          <div class="row-fg">
+            <div class="row-body">
+              <div class="row-head">
+                <span class="row-head-num">№ 01</span>
+                <span class="row-date">May 11, 2026</span>
+              </div>
+              <span class="row-slug">whats-in-a-name</span>
+              <span class="row-title">What's in a Name?</span>
+            </div>
+            <button class="row-overflow active" aria-label="Show all actions" aria-expanded="true">⋮</button>
+          </div>
+          <div class="menu">
+            <div class="menu-item">
+              <span class="menu-glyph iterate">↻</span>
+              <span class="menu-label">Iterate</span>
+              <span class="menu-cmd">/deskwork:iterate</span>
+            </div>
+            <div class="menu-item">
+              <span class="menu-glyph approve">✓</span>
+              <span class="menu-label">Approve → Final</span>
+              <span class="menu-cmd">/deskwork:approve</span>
+            </div>
+            <hr class="menu-divider">
+            <div class="menu-item">
+              <span class="menu-glyph block">‖</span>
+              <span class="menu-label">Block (pause)</span>
+              <span class="menu-cmd">/deskwork:block</span>
+            </div>
+            <div class="menu-item">
+              <span class="menu-glyph induct">⇄</span>
+              <span class="menu-label">Induct… (pick stage)</span>
+              <span class="menu-cmd">/deskwork:induct</span>
+            </div>
+            <hr class="menu-divider">
+            <div class="menu-item">
+              <span class="menu-glyph cancel">⊘</span>
+              <span class="menu-label">Cancel</span>
+              <span class="menu-cmd">/deskwork:cancel</span>
+            </div>
+            <div class="menu-item">
+              <span class="menu-glyph scrap">⊞</span>
+              <span class="menu-label">Open scrapbook</span>
+              <span class="menu-cmd">/dev/scrapbook</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="row-shell">
+          <div class="row-bg"></div>
+          <div class="row-fg">
+            <div class="row-body">
+              <div class="row-head">
+                <span class="row-head-num">№ 02</span>
+                <span class="row-date">May 10, 2026</span>
+              </div>
+              <span class="row-slug">on-revising-in-the-open</span>
+              <span class="row-title">On Revising in the Open</span>
+            </div>
+            <button class="row-overflow" aria-label="Show all actions">⋮</button>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="swipe-hint">tap ⋮ for menu · swipe row for fast path</div>
+
+      <div class="fab">
+        <span class="glyph">+</span><span>Compose</span>
+      </div>
+    </div>
+  </div>
+  <div class="caption">
+    <strong>Frame C · Overflow menu open.</strong><br>
+    Same stage-aware verbs as the swipe drawer, in a popover.<br>
+    For discoverers + accessibility (no gesture required).
+  </div>
+  </div>
+
+</div>
+
+<div style="max-width: 720px; margin: 2.5rem auto 0; padding: 1rem;
+            background: rgba(245, 241, 232, 0.05);
+            border: 1px solid rgba(245, 241, 232, 0.12);
+            color: #C7BEAE;
+            font-family: var(--display); font-size: 0.9rem; line-height: 1.6;">
+  <div style="font-family: var(--mono); font-size: 0.62rem;
+              letter-spacing: 0.18em; text-transform: uppercase;
+              color: var(--paper); margin-bottom: 0.5rem;">
+    Stage-aware verb table (drives both swipe drawer + ⋮ menu)
+  </div>
+  <table style="width: 100%; border-collapse: collapse;
+                font-family: var(--mono); font-size: 0.72rem;
+                color: var(--paper-3); line-height: 1.4;">
+    <tr style="text-align: left; color: var(--paper);">
+      <th style="padding: 0.35rem 0.5rem; border-bottom: 1px solid rgba(245,241,232,0.18);">Stage</th>
+      <th style="padding: 0.35rem 0.5rem; border-bottom: 1px solid rgba(245,241,232,0.18);">Verbs (left → right in drawer; top → bottom in menu)</th>
+    </tr>
+    <tr><td style="padding: 0.3rem 0.5rem; vertical-align: top;">Ideas / Planned / Outlining / Drafting</td>
+        <td style="padding: 0.3rem 0.5rem;">
+          <strong style="color: var(--paper);">Drawer (top 4):</strong> iterate · approve · cancel · scrapbook<br>
+          <strong style="color: var(--paper);">Menu (full set):</strong> iterate · approve · <span style="color: #D9C8A2;">block ‖</span> · <span style="color: #C7D4E8;">induct… ⇄</span> · cancel · scrapbook
+        </td></tr>
+    <tr><td style="padding: 0.3rem 0.5rem; vertical-align: top;">Final</td>
+        <td style="padding: 0.3rem 0.5rem;">
+          <strong style="color: var(--paper);">Drawer (top 3):</strong> approve (→ Published) · cancel · scrapbook<br>
+          <strong style="color: var(--paper);">Menu (full set):</strong> approve · <span style="color: #D9C8A2;">block ‖</span> · <span style="color: #C7D4E8;">induct… ⇄</span> · cancel · scrapbook
+        </td></tr>
+    <tr><td style="padding: 0.3rem 0.5rem; vertical-align: top;">Blocked / Cancelled</td>
+        <td style="padding: 0.3rem 0.5rem;">induct… (forward to pick stage) · scrapbook</td></tr>
+    <tr><td style="padding: 0.3rem 0.5rem; vertical-align: top;">Published</td>
+        <td style="padding: 0.3rem 0.5rem;">view · scrapbook</td></tr>
+  </table>
+  <p style="margin-top: 0.8rem; font-style: italic; color: var(--paper-3);">
+    iterate is missing from Final by design (Commandment II — Final locks content; iterate would mutate). It's also missing from Blocked / Cancelled / Published — those stages have no active in-place revision. <strong style="color:var(--paper);">block</strong> pauses an in-pipeline entry without abandoning it (waiting on external review, etc.); <strong style="color:var(--paper);">induct…</strong> teleports to an operator-chosen stage (works in both directions — forward to skip stages, or backward to retreat to a prior stage). Both are secondary verbs by frequency, so they live in the overflow menu but not in the swipe drawer. The <code style="font-family:var(--mono);color:var(--paper)">…</code> on induct indicates a sub-prompt: the operator picks which stage to teleport to.
+  </p>
+</div>
+
+<!-- ====================== DESKTOP FRAME ====================== -->
+<div style="margin: 3rem auto 0; max-width: 1100px;">
+  <div class="caption" style="max-width: 1100px; margin-bottom: 1.2rem;">
+    <strong>Desktop affordance (1100px+).</strong>
+    Same vocabulary, different chrome — high-frequency verbs stay inline as outlined chips; <code>⋮</code> menu adds block / induct… / cancel / scrap (secondary verbs). Operator gains the new verbs without crowding the row.
+  </div>
+  <div style="background: var(--paper); background-image: var(--noise);
+              border-radius: 4px; padding: 1.2rem 1.4rem;
+              box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+              border: 1px solid var(--paper-3);">
+
+    <div style="font-family: var(--display); font-style: italic;
+                font-variation-settings: 'opsz' 22, 'wght' 500;
+                font-size: 1.4rem; color: var(--red);
+                border-bottom: 1px solid var(--red); padding-bottom: 0.4rem;
+                margin-bottom: 1rem;">
+      Drafting <span style="font-family: var(--mono); font-style: normal; font-size: 0.7rem; color: var(--faded); letter-spacing: 0.18em; margin-left: 0.4rem;">№ 05</span>
+    </div>
+
+    <!-- Desktop row 1 -->
+    <div style="display: grid; grid-template-columns: 2.4rem 1fr auto auto;
+                column-gap: 1rem; align-items: center;
+                padding: 0.75rem 0;
+                border-bottom: 1px dashed var(--paper-3);">
+      <span style="font-family: var(--mono); font-size: 0.6rem;
+                   letter-spacing: 0.16em; text-transform: uppercase;
+                   color: var(--faded);">№ 01</span>
+      <div>
+        <div style="display: flex; align-items: baseline; gap: 0.6rem;">
+          <a href="#" style="font-family: var(--mono); font-size: 0.85rem;
+                  color: var(--ink); text-decoration: underline;
+                  text-decoration-color: var(--paper-3);
+                  text-underline-offset: 3px;">whats-in-a-name</a>
+          <span style="font-family: var(--display); font-style: italic;
+                       font-variation-settings: 'opsz' 18, 'wght' 500;
+                       font-size: 1rem; color: var(--ink);">What's in a Name?</span>
+        </div>
+        <span style="font-family: var(--mono); font-size: 0.62rem;
+                     color: var(--faded); display: inline-block;
+                     margin-top: 0.15rem;">updated may 11, 2026</span>
+      </div>
+      <!-- Inline high-frequency verbs -->
+      <div style="display: flex; gap: 0.4rem;">
+        <button style="background: transparent;
+                       border: 1px solid var(--blue); color: var(--blue);
+                       font-family: var(--mono); font-size: 0.62rem;
+                       letter-spacing: 0.06em;
+                       padding: 0.35rem 0.7rem;
+                       border-radius: 1px; cursor: pointer;
+                       text-transform: lowercase; line-height: 1.1;">iterate&nbsp;↻</button>
+        <button style="background: transparent;
+                       border: 1px solid var(--green); color: var(--green);
+                       font-family: var(--mono); font-size: 0.62rem;
+                       letter-spacing: 0.06em;
+                       padding: 0.35rem 0.7rem;
+                       border-radius: 1px; cursor: pointer;
+                       text-transform: lowercase; line-height: 1.1;">approve&nbsp;→</button>
+      </div>
+      <!-- Secondary verbs in ⋮ menu -->
+      <button style="background: transparent; border: none;
+                     color: var(--faded); font-family: var(--mono);
+                     font-size: 1.15rem; cursor: pointer; padding: 0 0.3rem;
+                     line-height: 1;">⋮</button>
+    </div>
+
+    <!-- Desktop row 2 — with ⋮ menu OPEN to demonstrate -->
+    <div style="display: grid; grid-template-columns: 2.4rem 1fr auto auto;
+                column-gap: 1rem; align-items: center;
+                padding: 0.75rem 0;
+                border-bottom: 1px dashed var(--paper-3); position: relative;">
+      <span style="font-family: var(--mono); font-size: 0.6rem;
+                   letter-spacing: 0.16em; text-transform: uppercase;
+                   color: var(--faded);">№ 02</span>
+      <div>
+        <div style="display: flex; align-items: baseline; gap: 0.6rem;">
+          <a href="#" style="font-family: var(--mono); font-size: 0.85rem;
+                  color: var(--ink); text-decoration: underline;
+                  text-decoration-color: var(--paper-3);
+                  text-underline-offset: 3px;">on-revising-in-the-open</a>
+          <span style="font-family: var(--display); font-style: italic;
+                       font-variation-settings: 'opsz' 18, 'wght' 500;
+                       font-size: 1rem; color: var(--ink);">On Revising in the Open</span>
+        </div>
+        <span style="font-family: var(--mono); font-size: 0.62rem;
+                     color: var(--faded); display: inline-block;
+                     margin-top: 0.15rem;">updated may 10, 2026</span>
+      </div>
+      <div style="display: flex; gap: 0.4rem;">
+        <button style="background: transparent; border: 1px solid var(--blue); color: var(--blue);
+                       font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.06em;
+                       padding: 0.35rem 0.7rem; border-radius: 1px; cursor: pointer;
+                       text-transform: lowercase; line-height: 1.1;">iterate&nbsp;↻</button>
+        <button style="background: transparent; border: 1px solid var(--green); color: var(--green);
+                       font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.06em;
+                       padding: 0.35rem 0.7rem; border-radius: 1px; cursor: pointer;
+                       text-transform: lowercase; line-height: 1.1;">approve&nbsp;→</button>
+      </div>
+      <button style="background: transparent; border: none; color: var(--red);
+                     font-family: var(--mono); font-size: 1.15rem; cursor: pointer;
+                     padding: 0 0.3rem; line-height: 1;">⋮</button>
+
+      <!-- Menu open -->
+      <div style="position: absolute; top: 100%; right: 0.2rem; margin-top: 0.4rem;
+                  background: var(--paper); border: 1px solid var(--paper-3);
+                  border-radius: 2px; min-width: 240px;
+                  box-shadow: 0 10px 24px rgba(26,22,20,0.18),
+                              0 2px 4px rgba(26,22,20,0.08); z-index: 20;">
+        <div class="menu-item" style="display: flex; padding: 0.5rem 0.85rem; gap: 0.5rem;
+                                       border-bottom: 1px dotted var(--paper-3);">
+          <span style="font-family: var(--display); font-style: italic; font-size: 1rem; color: var(--kraft); width: 18px; text-align: center;">‖</span>
+          <span style="font-family: var(--display); font-style: italic;
+                       font-variation-settings: 'opsz' 16, 'wght' 500;
+                       font-size: 0.92rem; color: var(--ink);">Block (pause)</span>
+          <span style="font-family: var(--mono); font-size: 0.52rem;
+                       color: var(--faded); margin-left: auto;">/deskwork:block</span>
+        </div>
+        <div class="menu-item" style="display: flex; padding: 0.5rem 0.85rem; gap: 0.5rem;
+                                       border-bottom: 1px dotted var(--paper-3);">
+          <span style="font-family: var(--display); font-style: italic; font-size: 1rem; color: var(--blue); width: 18px; text-align: center;">⇄</span>
+          <span style="font-family: var(--display); font-style: italic;
+                       font-variation-settings: 'opsz' 16, 'wght' 500;
+                       font-size: 0.92rem; color: var(--ink);">Induct… (pick stage)</span>
+          <span style="font-family: var(--mono); font-size: 0.52rem;
+                       color: var(--faded); margin-left: auto;">/deskwork:induct</span>
+        </div>
+        <div class="menu-item" style="display: flex; padding: 0.5rem 0.85rem; gap: 0.5rem;
+                                       border-bottom: 1px dotted var(--paper-3);">
+          <span style="font-family: var(--display); font-style: italic; font-size: 1rem; color: var(--red); width: 18px; text-align: center;">⊘</span>
+          <span style="font-family: var(--display); font-style: italic;
+                       font-variation-settings: 'opsz' 16, 'wght' 500;
+                       font-size: 0.92rem; color: var(--ink);">Cancel</span>
+          <span style="font-family: var(--mono); font-size: 0.52rem;
+                       color: var(--faded); margin-left: auto;">/deskwork:cancel</span>
+        </div>
+        <div class="menu-item" style="display: flex; padding: 0.5rem 0.85rem; gap: 0.5rem;">
+          <span style="font-family: var(--display); font-style: italic; font-size: 1rem; color: var(--kraft); width: 18px; text-align: center;">⊞</span>
+          <span style="font-family: var(--display); font-style: italic;
+                       font-variation-settings: 'opsz' 16, 'wght' 500;
+                       font-size: 0.92rem; color: var(--ink);">Open scrapbook</span>
+          <span style="font-family: var(--mono); font-size: 0.52rem;
+                       color: var(--faded); margin-left: auto;">scrapbook ↗</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Desktop row 3 -->
+    <div style="display: grid; grid-template-columns: 2.4rem 1fr auto auto;
+                column-gap: 1rem; align-items: center;
+                padding: 0.75rem 0;">
+      <span style="font-family: var(--mono); font-size: 0.6rem;
+                   letter-spacing: 0.16em; text-transform: uppercase;
+                   color: var(--faded);">№ 03</span>
+      <div>
+        <div style="display: flex; align-items: baseline; gap: 0.6rem;">
+          <a href="#" style="font-family: var(--mono); font-size: 0.85rem;
+                  color: var(--ink); text-decoration: underline;
+                  text-decoration-color: var(--paper-3);
+                  text-underline-offset: 3px;">the-deskwork-experiment</a>
+          <span style="font-family: var(--display); font-style: italic;
+                       font-variation-settings: 'opsz' 18, 'wght' 500;
+                       font-size: 1rem; color: var(--ink);">The Deskwork Experiment</span>
+        </div>
+        <span style="font-family: var(--mono); font-size: 0.62rem;
+                     color: var(--faded); display: inline-block;
+                     margin-top: 0.15rem;">updated may 09, 2026</span>
+      </div>
+      <div style="display: flex; gap: 0.4rem;">
+        <button style="background: transparent; border: 1px solid var(--blue); color: var(--blue);
+                       font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.06em;
+                       padding: 0.35rem 0.7rem; border-radius: 1px; cursor: pointer;
+                       text-transform: lowercase; line-height: 1.1;">iterate&nbsp;↻</button>
+        <button style="background: transparent; border: 1px solid var(--green); color: var(--green);
+                       font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.06em;
+                       padding: 0.35rem 0.7rem; border-radius: 1px; cursor: pointer;
+                       text-transform: lowercase; line-height: 1.1;">approve&nbsp;→</button>
+      </div>
+      <button style="background: transparent; border: none; color: var(--faded);
+                     font-family: var(--mono); font-size: 1.15rem; cursor: pointer;
+                     padding: 0 0.3rem; line-height: 1;">⋮</button>
+    </div>
+
+  </div>
+  <div class="caption" style="max-width: 1100px; margin-top: 0.8rem;">
+    Compare current v0.19 desktop dashboard (5 inline outlined buttons per row) with this proposal (2 inline + ⋮ for the new + secondary verbs). Same visual restraint as the mobile mockup, plus block / induct… now reachable on desktop.
+  </div>
+</div>
+
+</body>
+</html>
