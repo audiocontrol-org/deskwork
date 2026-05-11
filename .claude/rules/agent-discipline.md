@@ -59,33 +59,44 @@ The operator decides what's in scope. Never pre-decide for them.
 - Distinguish: items the user actively rejected (don't revive) vs. items I unilaterally deferred (do, by surfacing them).
 - Sub-agent dispatch reports get treated as action lists, not disclosures: each *"flag for triage"* becomes either a fix-in-this-PR or a filed issue, with the link in my next response.
 
-## The orchestrator prepares infrastructure; it does not implement the feature
+## The orchestrator session is separate from the implementation session
 
-The agent's role across the dw-lifecycle skills is split cleanly at the `/dw-lifecycle:implement` handoff:
+The agent's role across the dw-lifecycle skills splits across **two distinct Claude Code sessions**, not one session with a sub-agent dispatch:
 
-- **Before `/dw-lifecycle:implement` — orchestrator work, in-thread.** Driving `/dw-lifecycle:define`, `/dw-lifecycle:setup`, the PRD iterate/approve loop via deskwork, `/dw-lifecycle:issues`, filing friction issues, running CLI helpers, scaffolding the feature's PRD / workplan / README content from the design spec, moving worktrees, restarting studios, etc. — all of this is infrastructure preparation. The orchestrator authors this material in-thread; that is the orchestrator's job.
-- **At `/dw-lifecycle:implement` — handoff.** The actual feature gets built. The orchestrator dispatches the implementation work to specialists per the Sub-Agent Delegation table in `.claude/CLAUDE.md` (`feature-orchestrator` for multi-chunk PR delivery, `typescript-pro` for code, `documentation-engineer` for new SKILL.md prose, etc.), reviews what comes back, integrates, runs `/dw-lifecycle:review`, and reports. The orchestrator does NOT write the feature's code, new skills, tests, or other implementation artifacts in-thread.
+- **Orchestrator session** — runs in the **main repo working tree** (`/Users/orion/work/deskwork`). Drives `/dw-lifecycle:define`, `/dw-lifecycle:setup`, the PRD iterate/approve loop via deskwork, `/dw-lifecycle:issues`, friction-issue filing, related CLI helpers, scaffolding the feature's PRD / workplan / README content from the design spec, moving worktrees. This is **infrastructure preparation**. The orchestrator session's terminal output is "infrastructure ready; feature worktree at `<path>`; implementation happens in a separate session."
+- **Implementation session** — runs in the **feature worktree** (`~/work/deskwork-work/<slug>/`). The operator opens a new Claude Code session pointed at the worktree directory, invokes `/dw-lifecycle:implement`, and that session does the actual feature work — new TypeScript files, new SKILL.md prose, new tests, commits, `/dw-lifecycle:review` cycles, PR delivery via `/dw-lifecycle:ship`.
 
-The operator's framing, verbatim: *"you are the orchestrator, not the implementer"* — clarified with *"As the orchestrator, you define and prepare feature infrastructure. You don't implement the feature."*
+The orchestrator session **does NOT invoke `/dw-lifecycle:implement`**. The boundary is the session, not a sub-agent dispatch. Two-session isolation keeps the orchestrator session focused on cross-feature workflow and the implementation session focused on one feature's code without context pollution in either direction.
 
-**Why:** the 2026-05-11 `command-shortcuts` setup session generated this rule. Across `define → setup → PRD iter → issues` the agent appropriately authored the design spec, the PRD content, the workplan task breakdown, the README, and six friction-issue bodies in-thread — all infrastructure preparation. The line that would have been crossed (and wasn't, because the session stopped here) is starting to write the feature's new dw-lifecycle skills, the schemes module, the CLI subcommands, and the tests in-thread instead of dispatching `feature-orchestrator` at `/dw-lifecycle:implement`. A first pass at this rule ([commit reverted in-session]) miscast the line as "any prose authoring goes to a sub-agent" — that's wrong, because PRD/workplan/README/issue prose IS the orchestrator's deliverable at the prep stage. The clarification narrowed the rule to the implement handoff specifically.
+The operator's framing, verbatim: *"you are the orchestrator, not the implementer"* — clarified with *"As the orchestrator, you define and prepare feature infrastructure. You don't implement the feature."* and tightened further: *"implementation must be done in a different worktree which implies a different claude session."*
+
+**Why:** the 2026-05-11 `command-shortcuts` setup session generated this rule. The orchestrator session correctly handled define → setup → PRD iter → issues — all infrastructure preparation in the main repo. The line that would have been crossed (and wasn't, because the operator interrupted) is running `/dw-lifecycle:implement` from the orchestrator session, even via a `feature-orchestrator` sub-agent dispatch. Two earlier drafts of this rule placed the boundary at "delegate content authoring to specialists" and then at "dispatch `feature-orchestrator` at implement-time." Both were too lax. The operator's actual boundary: implementation happens in a **separate session**, opened by the operator in the **feature worktree**, and the orchestrator session is over once the infrastructure is staged for that handoff.
 
 **Failure modes this rule names (forward-looking):**
 
 | The pattern | What it actually means |
 |---|---|
-| Orchestrator opens `packages/<pkg>/src/<file>.ts` and starts writing TypeScript at `/dw-lifecycle:implement` | The orchestrator has become the implementer; dispatch instead |
-| Orchestrator authors a new SKILL.md for the feature being shipped in-thread | Same — dispatch `documentation-engineer` |
-| Orchestrator hand-writes the feature's test cases in-thread | Same — dispatch `typescript-pro` or `feature-orchestrator` |
-| Orchestrator dispatches `feature-orchestrator` but then "fixes" the returned code in-thread without re-dispatching | Same — return findings to the specialist or invoke `/dw-lifecycle:review` |
+| Orchestrator session runs `/dw-lifecycle:implement` after filing issues | Wrong session for that work; close out the orchestrator session instead |
+| Orchestrator session dispatches `feature-orchestrator` as a sub-agent to implement the feature | Still wrong session — dispatch pollutes the main session with implementation context |
+| Orchestrator session opens `packages/<pkg>/src/<file>.ts` and starts writing TypeScript | Wrong session AND wrong working tree (main, not worktree) |
+| Orchestrator session "just fixes one small thing" in the worktree's source after issues are filed | Same — the implementation session is responsible for everything inside the worktree |
 
-**How to apply:**
+**How to apply (orchestrator session):**
 
-- During define / setup / PRD iter / issues / friction-capture: write content in-thread as the natural deliverable of orchestration. Don't over-delegate routine prep work.
-- At `/dw-lifecycle:implement` (and beyond): stop. Plan delegation, dispatch the specialist(s), receive output, integrate. Don't open a `.ts` file to "just fix one thing" in-thread.
-- Before authoring any line of feature code (a new TypeScript file, a new SKILL.md for the feature being shipped, a new test): the test is *"is this the feature itself, or is this infrastructure for the feature?"* If feature, dispatch. If infrastructure (PRD, workplan, README, issue body, design spec, journal), in-thread.
-- Running slash commands, CLI helpers (`deskwork <verb>`, `dw-lifecycle <verb>`), git operations, file moves, studio restarts, friction-issue filing — orchestrator work, in-thread.
-- When a dispatched specialist's output needs adjustment: re-dispatch with a corrected brief, or `/dw-lifecycle:review` it. Don't bridge into the implementer role to "polish" their work.
+- Run `/dw-lifecycle:define`, `/dw-lifecycle:setup`, `/deskwork:ingest`, `/deskwork:approve` (PRD), `/dw-lifecycle:issues`, file friction. Author PRD/workplan/README/issue-body content in-thread as the natural deliverable of this prep work.
+- Surface the worktree path + the GitHub issue tree.
+- Close out with `/session-end` (or equivalent journal/wrap-up). Operator opens the new session against the worktree to continue.
+- Do NOT run `/dw-lifecycle:implement` in the orchestrator session.
+
+**How to apply (implementation session — separate Claude Code session):**
+
+- Opens against the feature worktree (`~/work/deskwork-work/<slug>/`), NOT the main repo.
+- Runs `/dw-lifecycle:implement` to pick up the workplan.
+- Dispatches in-session specialists (`typescript-pro`, `documentation-engineer`) for the substantive content. The implement-session can do sub-agent dispatch internally; the boundary that matters is the SESSION + worktree, not in-thread vs sub-agent.
+- Runs `/dw-lifecycle:review` after each commit; iterates on findings.
+- Ships via `/dw-lifecycle:ship` → `/dw-lifecycle:complete`.
+
+**Practical handoff:** the orchestrator session's final report names the worktree path explicitly so the operator can `cd` there and start a new Claude Code session against it. Operator's command pattern: `claude` from inside the worktree directory (loads the same plugin set; CWD is the worktree).
 
 ## "Just for now" is bullshit — no temporary fallbacks, no IOU comments, no will-fix-later deferrals
 
