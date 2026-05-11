@@ -3,7 +3,7 @@ slug: command-shortcuts
 targetVersion: "1.0"
 date: 2026-05-11
 branch: feature/command-shortcuts
-parentIssue: 
+parentIssue: "#250"
 designSpec: docs/superpowers/specs/2026-05-11-command-shortcuts-design.md
 ---
 

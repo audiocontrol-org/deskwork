@@ -3,7 +3,7 @@ slug: command-shortcuts
 title: Command shortcuts for dw-lifecycle
 targetVersion: "1.0"
 date: 2026-05-11
-parentIssue:
+parentIssue: "#250"
 deskwork:
   id: 49cb7baf-dc4f-4acc-a860-1fc2d2681831
 designSpec: docs/superpowers/specs/2026-05-11-command-shortcuts-design.md
