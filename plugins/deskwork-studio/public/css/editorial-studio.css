@@ -14,7 +14,16 @@
   border-bottom: var(--er-rule-thin);
 }
 .er-calendar-row:first-of-type { border-top: var(--er-rule-thin); }
-.er-calendar-row:hover { background: rgba(26,22,20,0.03); }
+/* Hover tint applies only on hover-capable input devices (mouse / trackpad).
+ * Touch-only devices (iOS Safari, Android Chrome) get persistent :hover
+ * after a tap — and the semi-transparent dark tint here makes the row's
+ * foreground translucent, letting the swipe drawer's chips bleed through
+ * the foreground until the operator taps somewhere else. Gating with
+ * `@media (hover: hover)` keeps the desktop affordance and removes the
+ * touch-device cross-talk that violated the spec's at-rest-clean rule. */
+@media (hover: hover) {
+  .er-calendar-row:hover { background: rgba(26,22,20,0.03); }
+}
 .er-calendar-row[hidden] { display: none !important; }
 
 /*
