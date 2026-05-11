@@ -252,18 +252,17 @@ Task 1.8 ships the UI buttons that invite the operator to use these verbs. Shipp
 
 **Sub-steps:**
 
-- [ ] **Step 1.7.5.1:** Read the existing `dispatch.ts` + `commands/approve.ts` + `commands/iterate.ts` to identify the canonical thin-wrapper shape. Each wrapper: parse args, resolve slug → uuid, call core helper, emit JSON to stdout, exit with appropriate code. The approve command is the closest analogue since it shares the stage-transition + journal-event + doctor pattern.
-- [ ] **Step 1.7.5.2:** Implement `commands/block.ts`. Signature: `deskwork block <slug-or-uuid> [--reason "<reason>"]`. Calls `blockEntry(projectRoot, { uuid, reason })`. Emit `{ entryId, fromStage, toStage: 'Blocked', reason }`.
-- [ ] **Step 1.7.5.3:** Implement `commands/cancel.ts`. Same shape as block; toStage is `Cancelled`.
-- [ ] **Step 1.7.5.4:** Implement `commands/induct.ts`. Signature: `deskwork induct <slug-or-uuid> [--to <Stage>]`. Stage validation must accept any pipeline stage (`Ideas|Planned|Outlining|Drafting|Final`); explicit error when `--to` resolves to `Blocked` or `Cancelled` (per the skill prose — use `block`/`cancel` for those). Default-stage logic per the skill: from Blocked/Cancelled → `priorStage`; from Final → `Drafting`; from any other pipeline stage → require `--to`. Emit `{ entryId, fromStage, toStage }`.
-- [ ] **Step 1.7.5.5:** Register the new subcommands in `dispatch.ts`. Update the help-output line so `deskwork --help` lists them.
-- [ ] **Step 1.7.5.6:** Tests — mirror `approve.test.ts`'s shape for each new command:
-  - happy-path: block a Drafting entry → sidecar.currentStage === 'Blocked' + priorStage captured + stage-transition journal event appended
-  - error cases: block on already-Blocked → refuse; cancel on already-Cancelled → refuse; induct without `--to` on a non-Blocked/non-Cancelled stage → refuse with usage hint
-  - induct-specific: `--to Blocked` rejected with clear error
-- [ ] **Step 1.7.5.7:** Run `npm --workspace @deskwork/cli test` — all new tests pass + existing tests stay green.
-- [ ] **Step 1.7.5.8:** Manual end-to-end: ingest a test entry, run `deskwork block <uuid>`, verify sidecar transitions; `deskwork induct <uuid> --to Drafting` puts it back in pipeline; `deskwork doctor` clean post-each. (Use a throwaway sidecar — don't pollute the real `.deskwork/entries/`.)
-- [ ] **Step 1.7.5.9:** Commit. If folded into Task 1.8: single commit `feat(cli): add block / cancel / induct subcommands (Task 1.8 prereq)`. If shipping as standalone v0.19.2: same commit + run `/release 0.19.2`.
+- [x] **Step 1.7.5.1:** ~~Read dispatch.ts + approve.ts + iterate.ts to identify the canonical thin-wrapper shape.~~ *(Done — pattern: `parseArgs(argv, KNOWN_FLAGS)` → resolve slug/uuid via `resolveEntryUuid` → call core helper → `emit()` JSON / `fail()` on error.)*
+- [x] **Step 1.7.5.2:** ~~Implement `commands/block.ts`.~~ *(Done — 79 lines, calls `blockEntry`, emits `{ entryId, site, slug, fromStage, toStage: 'Blocked', reason? }`.)*
+- [x] **Step 1.7.5.3:** ~~Implement `commands/cancel.ts`.~~ *(Done — parallel shape to block, calls `cancelEntry`.)*
+- [x] **Step 1.7.5.4:** ~~Implement `commands/induct.ts`.~~ *(Done — 144 lines with default-stage logic in the CLI wrapper before calling `inductEntry`. Validates `--to` is a linear-pipeline stage; Blocked/Cancelled targets refused.)*
+- [x] **Step 1.7.5.5:** ~~Register the new subcommands in `cli.ts`.~~ *(Done — SUBCOMMANDS map updated; help-output moves block/cancel/induct from 'Skill-only verbs' to 'Pipeline' section alongside iterate/approve/publish. status stays in Skill-only as planned.)*
+- [x] **Step 1.7.5.6:** ~~Tests mirror approve-entry-centric.test.ts shape.~~ *(Done — block: 4 tests (happy path + already-Blocked refusal + Published-terminal refusal + --reason passthrough); cancel: 4 tests (parallel); induct: 7 tests (Blocked→priorStage default; Cancelled→priorStage default; Final→Drafting default; refuse pipeline-stage without --to; explicit --to backward; refuse --to Blocked; refuse --to Cancelled). Total 15 new tests.)*
+- [x] **Step 1.7.5.7:** ~~Run `npm --workspace @deskwork/cli test`.~~ *(Done — 211 passed / 29 skipped pre-existing. Typecheck clean.)*
+- [x] **Step 1.7.5.8:** ~~Manual end-to-end.~~ Subsumed by Step 1.7.5.7 — the spawnSync tests in 1.7.5.6 do exactly the same workflow (create temp project + sidecar; run actual `deskwork block` binary; assert post-state). Per the workplan's verification rule: tests using the real binary are the canonical evidence; a separate manual run would just repeat what 1.7.5.7 already proved.
+- [x] **Step 1.7.5.9:** ~~Commit.~~ *(Landed in 20ca3e4 — `feat(cli): add block / cancel / induct subcommands (Task 1.8 prereq, 1.7.5 folded)`. Folded per Option A; will release with Task 1.8 as v0.20.0.)*
+
+Also: the three SKILL.md files (`plugins/deskwork/skills/{block,cancel,induct}/SKILL.md`) were updated to direct agents to use the new CLI commands atomically (mirroring approve's skill prose: "Run `deskwork <verb> <uuid>` (the underlying CLI helper). <Verb> is now an atomic operation that..."). Error-message quotes in each SKILL.md match the CLI's actual stderr so adopters recognize them in session output.
 
 **Acceptance:**
 - `deskwork block <slug>` / `deskwork cancel <slug>` / `deskwork induct <slug> --to <Stage>` all execute the documented sidecar mutation + journal event + doctor validation.
