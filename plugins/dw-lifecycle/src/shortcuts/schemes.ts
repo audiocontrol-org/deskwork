@@ -1,5 +1,12 @@
 export type SchemeId = 'A' | 'B' | 'C';
 
+export const SCHEME_IDS: ReadonlyArray<SchemeId> = ['A', 'B', 'C'];
+
+export function isSchemeId(value: unknown): value is SchemeId {
+  return typeof value === 'string'
+    && (SCHEME_IDS as ReadonlyArray<string>).includes(value);
+}
+
 export interface SchemeMapping {
   readonly id: SchemeId;
   shimFor(command: string): string;

@@ -10,13 +10,20 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   getScheme,
+  isSchemeId,
+  SCHEME_IDS,
   type SchemeId,
   type SchemeMapping,
 } from '../shortcuts/schemes.js';
+import {
+  manifestPath as resolveManifestPath,
+  readManifest,
+  writeManifest,
+  MANIFEST_SCHEMA_VERSION,
+  type ManifestShimEntry,
+  type ShortcutsManifest,
+} from '../shortcuts/manifest.js';
 
-const SCHEME_IDS: ReadonlyArray<SchemeId> = ['A', 'B', 'C'];
-const MANIFEST_VERSION = 1 as const;
-const MANIFEST_NAME = '.dw-lifecycle-shortcuts.json';
 const RENAME_PATTERN = /^[a-z0-9-]+$/;
 
 export interface ParsedInstallShortcutsArgs {
@@ -36,20 +43,6 @@ export interface InstallShortcutsOptions {
   rename?: string;
   replace?: boolean;
   pluginVersion: string;
-}
-
-export interface ManifestShimEntry {
-  command: string;
-  shimName: string;
-  path: string;
-}
-
-export interface ShortcutsManifest {
-  version: typeof MANIFEST_VERSION;
-  scheme: SchemeId;
-  rename: string | null;
-  pluginVersion: string;
-  shims: ReadonlyArray<ManifestShimEntry>;
 }
 
 export interface InstallShortcutsResult {
@@ -78,10 +71,6 @@ function printInstallShortcutsUsage(): void {
   console.log(
     '  --replace          Uninstall a prior deskwork-managed install before installing.',
   );
-}
-
-function isSchemeId(value: string): value is SchemeId {
-  return (SCHEME_IDS as ReadonlyArray<string>).includes(value);
 }
 
 function parseSchemeValue(value: string): SchemeId {
@@ -228,43 +217,6 @@ function plannedShimEntries(
   });
 }
 
-function isShortcutsManifest(value: unknown): value is ShortcutsManifest {
-  if (typeof value !== 'object' || value === null) return false;
-  const record = value as Record<string, unknown>;
-  if (record.version !== MANIFEST_VERSION) return false;
-  if (typeof record.scheme !== 'string' || !isSchemeId(record.scheme)) return false;
-  if (record.rename !== null && typeof record.rename !== 'string') return false;
-  if (typeof record.pluginVersion !== 'string') return false;
-  if (!Array.isArray(record.shims)) return false;
-  for (const shim of record.shims) {
-    if (typeof shim !== 'object' || shim === null) return false;
-    const s = shim as Record<string, unknown>;
-    if (typeof s.command !== 'string') return false;
-    if (typeof s.shimName !== 'string') return false;
-    if (typeof s.path !== 'string') return false;
-  }
-  return true;
-}
-
-function readManifest(manifestFile: string): ShortcutsManifest {
-  const raw = readFileSync(manifestFile, 'utf8');
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err);
-    throw new Error(
-      `Failed to parse prior manifest at ${manifestFile}: ${reason}`,
-    );
-  }
-  if (!isShortcutsManifest(parsed)) {
-    throw new Error(
-      `Prior manifest at ${manifestFile} does not match the expected schema (version ${MANIFEST_VERSION}).`,
-    );
-  }
-  return parsed;
-}
-
 function uninstallPriorManifest(manifestFile: string): void {
   const prior = readManifest(manifestFile);
   for (const entry of prior.shims) {
@@ -284,7 +236,7 @@ export function runInstallShortcuts(
 
   const scheme = getScheme(options.scheme);
   const commandsDir = join(options.home, '.claude', 'commands');
-  const manifestFile = join(commandsDir, MANIFEST_NAME);
+  const manifestFile = resolveManifestPath(options.home);
   const dryRun = options.dryRun === true;
   const force = options.force === true;
   const replace = options.replace === true;
@@ -310,15 +262,9 @@ export function runInstallShortcuts(
   // prior manifest's shim set.
   const priorPaths = new Set<string>();
   if (priorManifestExists && replace) {
-    try {
-      const prior = readManifest(manifestFile);
-      for (const entry of prior.shims) {
-        priorPaths.add(entry.path);
-      }
-    } catch (err) {
-      // If the prior manifest is malformed, escalate — we won't silently
-      // clobber files we can't verify ownership of.
-      throw err;
+    const prior = readManifest(manifestFile);
+    for (const entry of prior.shims) {
+      priorPaths.add(entry.path);
     }
   }
 
@@ -360,13 +306,13 @@ export function runInstallShortcuts(
   }
 
   const manifest: ShortcutsManifest = {
-    version: MANIFEST_VERSION,
+    version: MANIFEST_SCHEMA_VERSION,
     scheme: options.scheme,
     rename: options.rename ?? null,
     pluginVersion: options.pluginVersion,
     shims: planned,
   };
-  writeFileSync(manifestFile, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
+  writeManifest(manifestFile, manifest);
 
   return {
     scheme: options.scheme,
