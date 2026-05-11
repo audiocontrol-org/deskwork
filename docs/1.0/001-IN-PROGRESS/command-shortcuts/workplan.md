@@ -29,17 +29,19 @@ Design spec: `docs/superpowers/specs/2026-05-11-command-shortcuts-design.md`.
 
 ### Task 2: Install CLI helper
 
-- [ ] Author `plugins/dw-lifecycle/src/subcommands/install-shortcuts.ts` exposing `dw-lifecycle install-shortcuts --scheme=<A|B|C> [--force] [--dry-run] [--rename <prefix>] [--replace]`.
-- [ ] Probe `~/.claude/commands/` for collisions against the chosen scheme; refuse and exit non-zero (code 2) unless `--force`.
-- [ ] Write each shim's one-line body: `/dw-lifecycle:<command> $ARGUMENTS`.
-- [ ] Write the manifest at `~/.claude/commands/.dw-lifecycle-shortcuts.json` recording the scheme, every shim path, and the dw-lifecycle plugin version.
-- [ ] Register the subcommand in `plugins/dw-lifecycle/src/cli.ts`.
-- [ ] Integration test at `plugins/dw-lifecycle/src/__tests__/install-shortcuts.smoke.test.ts` exercising tmp HOME fixture, `--force`, `--dry-run`, `--replace`.
+- [x] Author `plugins/dw-lifecycle/src/subcommands/install-shortcuts.ts` exposing `dw-lifecycle install-shortcuts --scheme=<A|B|C> [--force] [--dry-run] [--rename <prefix>] [--replace]`.
+- [x] Probe `~/.claude/commands/` for collisions against the chosen scheme; refuse and exit non-zero (code 2) unless `--force`.
+- [x] Write each shim's one-line body: `/dw-lifecycle:<command> $ARGUMENTS`.
+- [x] Write the manifest at `~/.claude/commands/.dw-lifecycle-shortcuts.json` recording the scheme, every shim path, and the dw-lifecycle plugin version.
+- [x] Register the subcommand in `plugins/dw-lifecycle/src/cli.ts`.
+- [x] Integration test at `plugins/dw-lifecycle/src/__tests__/install-shortcuts.smoke.test.ts` exercising tmp HOME fixture, `--force`, `--dry-run`, `--replace`.
 
 **Acceptance Criteria:**
-- [ ] Dry-run prints intended writes and touches no files
-- [ ] Force overwrite path is exercised in a test
-- [ ] Re-run with different scheme refuses without `--replace`
+- [x] Dry-run prints intended writes and touches no files
+- [x] Force overwrite path is exercised in a test
+- [x] Re-run with different scheme refuses without `--replace`
+
+**Landed:** `1ecf528` (initial) + `234186a` (extracted shortcuts/manifest.ts ahead of Task 3) + `bae9e93` (code-review fixes: typed CollisionError/PriorManifestError, atomic manifest write via .tmp+rename, single-read prior manifest with actionable schema-mismatch errors, manifest entries portable—no absolute paths, SchemeMapping.prefix as source of truth for rename, tightened rename regex, shortcuts/errors.ts module). 39 install-shortcuts tests + 13 manifest tests; full plugin suite 288 green.
 
 ### Task 3: Uninstall CLI helper
 
