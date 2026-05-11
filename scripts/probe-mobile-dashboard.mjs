@@ -353,6 +353,27 @@ async function main() {
     });
     assert(menuClosed.anyOpen === 0, 'Click-outside closes the menu');
     assert(menuClosed.ariaExpanded === 'false', '⋮ aria-expanded resets to false');
+
+    // 15. Click on row body (title / date — NOT slug link, NOT button)
+    //     navigates to the entry-review surface. Per the Row-4 brief,
+    //     tap-anywhere-on-the-row IS the primary action. Was a real
+    //     bug shipped briefly post-Task-1.8: the row chrome rendered
+    //     but click-on-body was a no-op because only the slug carried
+    //     a <a href>. Operators tapping the title or date got nothing.
+    const navBefore = phone.url();
+    await phone.evaluate(() => {
+      const title = document.querySelector(
+        '[data-row-shell] .er-row-fg .er-calendar-title',
+      );
+      // Cast to HTMLElement for click() — querySelector returns Element.
+      (title)?.click();
+    });
+    await phone.waitForTimeout(600);
+    const navAfter = phone.url();
+    assert(
+      navAfter !== navBefore && navAfter.includes('/dev/editorial-review/entry/'),
+      `Click row body (title) navigates to entry-review surface (before=${navBefore.slice(-40)}, after=${navAfter.slice(-40)})`,
+    );
   }
 
   // ============== DESKTOP VIEWPORT ==============

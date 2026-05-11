@@ -27,7 +27,17 @@
 import { copyOrShowFallback } from '../clipboard.ts';
 
 const MOBILE_QUERY = '(max-width: 600px)';
-const SWIPE_THRESHOLD_PX = 60;
+// Commit threshold: how far the user must drag horizontally before
+// the foreground begins to translate (revealing the drawer). Below
+// this, taps with natural finger drift don't visually move the row.
+const SWIPE_COMMIT_PX = 24;
+// Latch threshold: how far past commit the user must drag for the
+// drawer to latch open on touchend. Below this, the row snaps back.
+const SWIPE_LATCH_PX = 60;
+// Axis-lock threshold: minimum total movement (in either axis) before
+// the gesture commits to horizontal or vertical. Raised from 8 so
+// natural finger jitter during a tap doesn't lock to horizontal.
+const AXIS_LOCK_PX = 16;
 const COPIED_FLASH_MS = 1500;
 
 function isMobile(): boolean {
@@ -92,6 +102,34 @@ function wireOverflowButton(shell: HTMLElement): void {
       openMenu(shell);
     }
   });
+}
+
+/**
+ * Row-body click → navigate to the entry-review surface. Per the
+ * Row-4 design brief, tap-anywhere-on-the-row IS the primary action
+ * (the slug link is the visible affordance, but the entire row body
+ * should respond — operators won't precisely target the slug text
+ * on phone).
+ *
+ * Skips clicks on: buttons (handled by their own controllers), links
+ * (browser handles native navigation), elements inside the drawer or
+ * menu (handled by their respective wirers), and the ⋮ button.
+ */
+function wireRowBodyClick(shell: HTMLElement): void {
+  const fg = shell.querySelector<HTMLElement>('.er-row-fg');
+  const uuid = shell.dataset.uuid;
+  if (!fg || !uuid) return;
+  fg.addEventListener('click', (e) => {
+    const target = e.target;
+    if (!(target instanceof Element)) return;
+    // Let buttons + links own their own clicks.
+    if (target.closest('button, a, [data-row-overflow]')) return;
+    // Don't navigate if any drawer or menu is open on this shell.
+    if (shell.classList.contains('is-menu-open') || shell.classList.contains('is-swiped')) return;
+    window.location.href = `/dev/editorial-review/entry/${uuid}`;
+  });
+  // Make it clear the row is clickable.
+  fg.style.cursor = 'pointer';
 }
 
 function wireMenuItems(shell: HTMLElement): void {
@@ -176,6 +214,15 @@ function wireSwipe(shell: HTMLElement): void {
   let startY = 0;
   let dragging = false;
   let axisLocked: 'h' | 'v' | null = null;
+  let translating = false;
+
+  function reset(): void {
+    dragging = false;
+    axisLocked = null;
+    translating = false;
+    fg!.style.transition = '';
+    fg!.style.transform = '';
+  }
 
   fg.addEventListener(
     'touchstart',
@@ -187,7 +234,9 @@ function wireSwipe(shell: HTMLElement): void {
       startY = t.clientY;
       dragging = true;
       axisLocked = null;
-      fg.style.transition = 'none';
+      translating = false;
+      // Don't set transition: 'none' until we're actually translating —
+      // otherwise a tap leaves transition disabled until the next move.
     },
     { passive: true },
   );
@@ -203,39 +252,68 @@ function wireSwipe(shell: HTMLElement): void {
       // Lock axis on first non-trivial movement so vertical scrolls
       // through the dashboard don't trigger row swipes.
       if (axisLocked === null) {
-        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        if (Math.abs(dx) < AXIS_LOCK_PX && Math.abs(dy) < AXIS_LOCK_PX) return;
         axisLocked = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
       }
       if (axisLocked !== 'h') return;
-      // Only allow leftward swipe (positive translate becomes negative).
-      const tx = Math.min(0, dx);
+      // Only translate once dx exceeds the commit threshold. Below
+      // commit, even a clear horizontal jitter doesn't reveal the
+      // drawer — a tap with natural finger drift shows zero visual
+      // movement.
+      if (dx > -SWIPE_COMMIT_PX) {
+        if (translating) {
+          // We had committed; user is dragging back below threshold.
+          fg.style.transform = '';
+        }
+        return;
+      }
+      if (!translating) {
+        translating = true;
+        fg.style.transition = 'none';
+      }
+      // Subtract the commit threshold so the visible motion begins at 0
+      // when the user crosses the commit line, not at -24.
+      const tx = dx + SWIPE_COMMIT_PX;
       fg.style.transform = `translateX(${tx}px)`;
     },
     { passive: true },
   );
 
-  fg.addEventListener(
-    'touchend',
-    (e: TouchEvent) => {
-      if (!dragging || !isMobile()) return;
-      dragging = false;
-      fg.style.transition = '';
-      if (axisLocked !== 'h') {
-        // Vertical scroll or no movement — reset.
-        fg.style.transform = '';
-        return;
-      }
-      const t = e.changedTouches[0];
-      const dx = t ? t.clientX - startX : 0;
-      if (dx < -SWIPE_THRESHOLD_PX) {
-        openDrawer(shell);
-      } else {
-        // Below threshold — snap back.
-        fg.style.transform = '';
-        shell.classList.remove('is-swiped');
-        openSurfaces.delete(shell);
-      }
+  function onEnd(e: TouchEvent): void {
+    if (!dragging || !isMobile()) return;
+    const wasTranslating = translating;
+    dragging = false;
+    fg!.style.transition = '';
+    if (!wasTranslating) {
+      // No visible translate happened — this was a tap (with possibly
+      // some jitter) or a vertical scroll. Nothing to snap back.
       axisLocked = null;
+      translating = false;
+      return;
+    }
+    const t = e.changedTouches[0];
+    const dx = t ? t.clientX - startX : 0;
+    if (dx < -SWIPE_LATCH_PX) {
+      openDrawer(shell);
+    } else {
+      fg!.style.transform = '';
+      shell.classList.remove('is-swiped');
+      openSurfaces.delete(shell);
+    }
+    axisLocked = null;
+    translating = false;
+  }
+
+  fg.addEventListener('touchend', onEnd, { passive: true });
+  // touchcancel fires when iOS / Android decides to take over the
+  // touch (scroll, system gesture, etc.). Reset state so a follow-up
+  // touch doesn't pick up stale `dragging=true`.
+  fg.addEventListener(
+    'touchcancel',
+    () => {
+      reset();
+      shell.classList.remove('is-swiped');
+      openSurfaces.delete(shell);
     },
     { passive: true },
   );
@@ -273,6 +351,7 @@ export function initRowActions(): void {
     wireMenuItems(shell);
     wireDrawerActions(shell);
     wireSwipe(shell);
+    wireRowBodyClick(shell);
   }
   wireGlobalDismiss();
 }
