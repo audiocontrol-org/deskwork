@@ -25,6 +25,26 @@ export class PriorManifestError extends Error {
   }
 }
 
+/**
+ * Thrown by `runUninstallShortcuts` when a shim on disk has drifted
+ * from the canonical body that `install-shortcuts` originally wrote.
+ * The uninstall refuses to silently overwrite operator edits; passing
+ * `--force-uninstall` overrides the refusal. Discriminated as a
+ * refusal-class error so the dispatch shell exits 2 (same as
+ * collision / prior-manifest refusals).
+ */
+export class DriftError extends Error {
+  readonly kind = 'drift' as const;
+  constructor(message: string) {
+    super(message);
+    this.name = 'DriftError';
+  }
+}
+
 export function isRefusalError(err: unknown): boolean {
-  return err instanceof CollisionError || err instanceof PriorManifestError;
+  return (
+    err instanceof CollisionError ||
+    err instanceof PriorManifestError ||
+    err instanceof DriftError
+  );
 }

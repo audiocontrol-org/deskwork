@@ -30,6 +30,7 @@ import {
   PriorManifestError,
   isRefusalError,
 } from '../shortcuts/errors.js';
+import { shimBody } from '../shortcuts/shim-body.js';
 
 /**
  * Rename prefix must be all-lowercase alphanumeric with internal
@@ -214,10 +215,6 @@ function applyRename(
   }
   const separator = prefix.endsWith('-') ? '-' : '';
   return rename + separator + shim.slice(prefix.length);
-}
-
-function shimBody(command: string): string {
-  return `/dw-lifecycle:${command} $ARGUMENTS\n`;
 }
 
 function plannedShimEntries(
