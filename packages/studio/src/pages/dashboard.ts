@@ -95,6 +95,7 @@ export async function renderDashboard(
       '/static/css/editorial-nav.css',
       '/static/css/editorial-studio.css',
       '/static/css/dashboard-mobile.css',
+      '/static/css/dashboard-row-affordances.css',
     ],
     bodyAttrs: 'data-review-ui="studio"',
     bodyHtml: body,

@@ -77,13 +77,17 @@ export function renderRow(entry: Entry, index: number, defaultSite: string): Raw
   //     <er-row-menu/>          ← absolute-positioned popover anchored to ⋮.
   //   </er-row-shell>
   // Client controller `row-actions.ts` wires the swipe gesture + menu state.
+  // data-* attrs (search/stage/uuid/slug) live on the SHELL only —
+  // the shell is the affordance boundary now. Existing filter +
+  // probe code targets `.er-calendar-row` so the legacy class stays
+  // on `.er-row-fg`, but the canonical attribute carriers are on the
+  // shell. Test selectors should prefer `[data-row-shell]`.
   return unsafe(html`
     <div class="er-row-shell" data-row-shell data-search="${search}"${depthAttrs}
       data-stage="${entry.currentStage}"
       data-uuid="${entry.uuid}" data-slug="${entry.slug}">
       ${renderRowDrawer(entry, defaultSite)}
-      <div class="er-row-fg er-calendar-row" data-stage="${entry.currentStage}"
-        data-uuid="${entry.uuid}" data-slug="${entry.slug}" data-search="${search}">
+      <div class="er-row-fg er-calendar-row">
         <span class="er-row-num">№ ${String(index + 1).padStart(2, '0')}</span>
         <div class="er-calendar-body">
           <span class="er-row-slug"><a href="${reviewLink}"

@@ -175,23 +175,39 @@ function verbsForStage(
       menu: [inductForward, scrapbook],
     };
   }
-  // Published — frozen artifact; view + scrapbook only.
-  return {
-    inline: [view, scrapbook],
-    drawer: [view, scrapbook],
-    menu: [view, scrapbook],
-  };
+  if (stage === 'Published') {
+    // Frozen artifact; view + scrapbook only.
+    return {
+      inline: [view, scrapbook],
+      drawer: [view, scrapbook],
+      menu: [view, scrapbook],
+    };
+  }
+  // Exhaustiveness check — if the Stage union gains a new variant, the
+  // assertion will fail at typecheck time and at runtime so we don't
+  // silently fall through to an empty verb set.
+  const _exhaustive: never = stage;
+  throw new Error(`verbsForStage: unhandled stage "${String(_exhaustive)}"`);
 }
 
 function renderDrawerChip(verb: Verb): string {
   const labelText = verb.drawerLabel ?? verb.label.split(' ')[0];
-  const dataAttr =
-    verb.copy !== undefined
-      ? `data-copy="${verb.copy}"`
-      : `data-href="${verb.href ?? ''}"`;
+  // Route the data attribute through the html tag so its value is
+  // properly attribute-escaped. Slug regex constrains the payload today
+  // (no unbalanced quotes possible) but future-verb churn could land a
+  // payload with HTML-sensitive characters; the tag handles them.
+  if (verb.copy !== undefined) {
+    return html`<button type="button"
+      class="er-row-action er-row-action-${verb.kind}"
+      data-copy="${verb.copy}"
+      title="${verb.title}">
+      <span class="er-row-action-glyph" aria-hidden="true">${verb.glyph}</span>
+      <span class="er-row-action-label">${labelText}</span>
+    </button>`;
+  }
   return html`<button type="button"
     class="er-row-action er-row-action-${verb.kind}"
-    ${unsafe(dataAttr)}
+    data-href="${verb.href ?? ''}"
     title="${verb.title}">
     <span class="er-row-action-glyph" aria-hidden="true">${verb.glyph}</span>
     <span class="er-row-action-label">${labelText}</span>
@@ -216,15 +232,23 @@ function renderInlineChip(verb: Verb): string {
 }
 
 function renderMenuItem(verb: Verb): string {
-  const action =
-    verb.href !== undefined
-      ? `data-href="${verb.href}"`
-      : `data-copy="${verb.copy ?? ''}"`;
   const cmdHint = verb.copy ?? verb.href ?? '';
+  // Route data attributes through the html tag for proper escaping.
+  if (verb.href !== undefined) {
+    return html`<button type="button"
+      class="er-row-menu-item"
+      role="menuitem"
+      data-href="${verb.href}"
+      title="${verb.title}">
+      <span class="er-row-menu-glyph er-row-menu-glyph-${verb.kind}" aria-hidden="true">${verb.glyph}</span>
+      <span class="er-row-menu-label">${verb.label}</span>
+      <span class="er-row-menu-cmd">${cmdHint}</span>
+    </button>`;
+  }
   return html`<button type="button"
     class="er-row-menu-item"
     role="menuitem"
-    ${unsafe(action)}
+    data-copy="${verb.copy ?? ''}"
     title="${verb.title}">
     <span class="er-row-menu-glyph er-row-menu-glyph-${verb.kind}" aria-hidden="true">${verb.glyph}</span>
     <span class="er-row-menu-label">${verb.label}</span>

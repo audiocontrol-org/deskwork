@@ -92,8 +92,11 @@
 }
 .er-btn-chip-iterate { border-color: var(--er-proof-blue); color: var(--er-proof-blue); }
 .er-btn-chip-approve { border-color: var(--er-stamp-green); color: var(--er-stamp-green); }
+.er-btn-chip-cancel  { border-color: var(--er-red-pencil); color: var(--er-red-pencil); }
+.er-btn-chip-block   { border-color: var(--er-kraft); color: var(--er-kraft); }
 .er-btn-chip-induct  { border-color: var(--er-proof-blue); color: var(--er-proof-blue); }
 .er-btn-chip-view    { border-color: var(--er-kraft); color: var(--er-kraft); }
+.er-btn-chip-scrapbook { border-color: var(--er-kraft); color: var(--er-kraft); }
 
 /* Overflow button — same shape as mobile, slightly smaller hit area. */
 .er-row-overflow {
