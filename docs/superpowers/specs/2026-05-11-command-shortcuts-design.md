@@ -5,6 +5,7 @@ date: 2026-05-11
 status: draft
 deskwork:
   doc: design-spec
+  id: 4dd47cee-a59b-4801-9ef3-7bb2cfda0a88
 ---
 
 # Command shortcuts — design
