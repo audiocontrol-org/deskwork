@@ -234,6 +234,49 @@ git commit -m "fix(studio): apply review findings on dashboard mobile-first"
 - Probe + smoke green
 - #236, #237, #238, #243 closed against v0.19.0 install
 
+### Task 1.7.5 — CLI dispatcher gap: missing subcommands for block / cancel / induct (prereq for 1.8)
+
+**Goal:** close a gap surfaced by Task 1.8's Step 1.8.1 verification: the `/deskwork:block`, `/deskwork:cancel`, and `/deskwork:induct` skills exist and their core helpers exist (`packages/core/src/entry/{block,cancel,induct}.ts`), but the CLI dispatcher in `packages/cli/src/dispatch.ts` doesn't route those verbs. Running `deskwork block <uuid>` returns *"unknown subcommand"*; the same for `cancel` and `induct`. When an agent receives a pasted `/deskwork:block <slug>` from the dashboard's (about-to-be-added) Block button and tries to invoke the helper atomically, it has to walk the skill steps manually via Read/Write/journal-append instead of dispatching `deskwork block <uuid>`. The UI clipboard-copy works regardless; the receiving-agent's downstream execution is degraded.
+
+Task 1.8 ships the UI buttons that invite the operator to use these verbs. Shipping the surface before the atomic CLI plumbing is the *"ship the surface, defer the plumbing"* pattern that bites in the next session. This task closes the plumbing so 1.8 lands honest.
+
+**Decision pending:** either ship as standalone v0.19.2 patch *(separate release before 1.8 implementation begins)*, or **fold into Task 1.8** as sub-steps 1.8.1a / 1.8.1b / 1.8.1c executed before 1.8.2 *(single release as v0.20.0)*. Co-location preferred (one release, related work, reviewers see CLI + UI together). Pending operator pick.
+
+**Files:**
+- Modify: `packages/cli/src/dispatch.ts` — route `block`, `cancel`, `induct` subcommands to thin CLI wrappers around their existing core helpers.
+- Create: `packages/cli/src/commands/block.ts` — thin wrapper invoking `blockEntry` from `@deskwork/core/entry/block`.
+- Create: `packages/cli/src/commands/cancel.ts` — thin wrapper invoking `cancelEntry`.
+- Create: `packages/cli/src/commands/induct.ts` — thin wrapper invoking `inductEntry`. Must handle the `--to <Stage>` flag (per the skill's input shape) and the default-stage logic (Blocked → priorStage, Cancelled → priorStage, Final → Drafting, pipeline → require explicit `--to`).
+- Modify: `packages/cli/src/dispatch.ts` help-output — list the new subcommands alongside `approve`, `iterate`, etc.
+- Create / modify: tests under `packages/cli/test/commands/` mirroring the existing `approve.test.ts` / `iterate.test.ts` patterns — assert exit codes, sidecar mutations, journal events, doctor compatibility for each verb.
+
+**Sub-steps:**
+
+- [ ] **Step 1.7.5.1:** Read the existing `dispatch.ts` + `commands/approve.ts` + `commands/iterate.ts` to identify the canonical thin-wrapper shape. Each wrapper: parse args, resolve slug → uuid, call core helper, emit JSON to stdout, exit with appropriate code. The approve command is the closest analogue since it shares the stage-transition + journal-event + doctor pattern.
+- [ ] **Step 1.7.5.2:** Implement `commands/block.ts`. Signature: `deskwork block <slug-or-uuid> [--reason "<reason>"]`. Calls `blockEntry(projectRoot, { uuid, reason })`. Emit `{ entryId, fromStage, toStage: 'Blocked', reason }`.
+- [ ] **Step 1.7.5.3:** Implement `commands/cancel.ts`. Same shape as block; toStage is `Cancelled`.
+- [ ] **Step 1.7.5.4:** Implement `commands/induct.ts`. Signature: `deskwork induct <slug-or-uuid> [--to <Stage>]`. Stage validation must accept any pipeline stage (`Ideas|Planned|Outlining|Drafting|Final`); explicit error when `--to` resolves to `Blocked` or `Cancelled` (per the skill prose — use `block`/`cancel` for those). Default-stage logic per the skill: from Blocked/Cancelled → `priorStage`; from Final → `Drafting`; from any other pipeline stage → require `--to`. Emit `{ entryId, fromStage, toStage }`.
+- [ ] **Step 1.7.5.5:** Register the new subcommands in `dispatch.ts`. Update the help-output line so `deskwork --help` lists them.
+- [ ] **Step 1.7.5.6:** Tests — mirror `approve.test.ts`'s shape for each new command:
+  - happy-path: block a Drafting entry → sidecar.currentStage === 'Blocked' + priorStage captured + stage-transition journal event appended
+  - error cases: block on already-Blocked → refuse; cancel on already-Cancelled → refuse; induct without `--to` on a non-Blocked/non-Cancelled stage → refuse with usage hint
+  - induct-specific: `--to Blocked` rejected with clear error
+- [ ] **Step 1.7.5.7:** Run `npm --workspace @deskwork/cli test` — all new tests pass + existing tests stay green.
+- [ ] **Step 1.7.5.8:** Manual end-to-end: ingest a test entry, run `deskwork block <uuid>`, verify sidecar transitions; `deskwork induct <uuid> --to Drafting` puts it back in pipeline; `deskwork doctor` clean post-each. (Use a throwaway sidecar — don't pollute the real `.deskwork/entries/`.)
+- [ ] **Step 1.7.5.9:** Commit. If folded into Task 1.8: single commit `feat(cli): add block / cancel / induct subcommands (Task 1.8 prereq)`. If shipping as standalone v0.19.2: same commit + run `/release 0.19.2`.
+
+**Acceptance:**
+- `deskwork block <slug>` / `deskwork cancel <slug>` / `deskwork induct <slug> --to <Stage>` all execute the documented sidecar mutation + journal event + doctor validation.
+- `deskwork --help` lists the new subcommands.
+- CLI test suite green: `npm --workspace @deskwork/cli test` passes (new tests + existing tests).
+- An agent receiving a pasted `/deskwork:block <slug>` can dispatch `deskwork block <uuid>` atomically instead of walking skill steps manually.
+
+**Out of scope:**
+- `status` CLI subcommand. The `/deskwork:status` skill is read-only and doesn't surface as a dashboard button in Task 1.8. If a `deskwork status` CLI gets added later, it's a separate task; not blocking 1.8.
+- Refactoring the dispatch.ts to use a different routing pattern. Stay consistent with the existing approve/iterate shape.
+
+---
+
 ### Task 1.8 — Row affordance redesign (overflow + swipe + full verb vocabulary) → v0.20.0
 
 **Goal:** close the row-affordance pick gate that was implicitly skipped during Phase 1 (Task 1.1.6 conflated the dashboard chrome pick with the per-row affordance pick). Implement the operator-approved Row 4 hybrid: clean at-rest row, swipe-drawer + ⋮ menu on mobile, inline iterate/approve chips + ⋮ menu on desktop, full stage-aware verb vocabulary including the previously-missing `iterate`, `block`, and `induct…` (omnidirectional). Replaces the v0.19 dashboard's stacked-outlined-button row chrome.
@@ -252,7 +295,7 @@ git commit -m "fix(studio): apply review findings on dashboard mobile-first"
 
 **Sub-steps:**
 
-- [ ] **Step 1.8.1:** Verify `/deskwork:block` round-trip works end-to-end (CLI invocation + sidecar transition + journal event + studio refresh). The skill is documented; this step confirms the CLI helper + sidecar mutation path is wired and the studio renders the resulting `Blocked` stage correctly. If anything is missing, file a separate prerequisite task before continuing.
+- [x] **Step 1.8.1:** ~~Verify `/deskwork:block` round-trip works end-to-end~~ → **Gap surfaced 2026-05-11.** Skill + core helper exist; CLI subcommands for `block` / `cancel` / `induct` are missing from `packages/cli/src/dispatch.ts`. Scoped as **Task 1.7.5** (prereq, above). Must complete before continuing Step 1.8.2 — OR be folded into 1.8 as sub-steps 1.8.1a-1.8.1c if shipping as one release (operator pick pending). Verification command used: `node_modules/.bin/deskwork block --help` → `unknown subcommand: block`. The receiving-agent flow degrades to manual skill-step walking without the CLI; UI clipboard-copy itself works regardless.
 - [ ] **Step 1.8.2:** Update `affordances.ts` — render the full stage-aware verb set per the brief's table. `iterate` already present on active stages; `approve`/`cancel`/`scrapbook` already present. New: `block` button on active stages (Ideas/Planned/Outlining/Drafting/Final), `induct` button on active stages (currently rendered only on Blocked/Cancelled). Block routes through `/deskwork:block <slug>` clipboard-copy; induct routes through `/deskwork:induct <slug>` with the stage-picker happening in the skill, not the studio.
 - [ ] **Step 1.8.3:** Update `section.ts` — row markup adopts the new shape (top body: slug/title/date; trailing ⋮ button; absolute-positioned action drawer behind row-fg for swipe reveal). Both mobile and desktop variants emit the same DOM; CSS handles the chrome differences.
 - [ ] **Step 1.8.4:** Implement `row-actions.ts` client controller:
