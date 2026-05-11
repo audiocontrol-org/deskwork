@@ -118,6 +118,37 @@ describe('uninstall-shortcuts (smoke)', () => {
         expect(message).toContain('dw-setup.md');
       }
     });
+
+    it('multi-line drift renders internal newlines as literal \\n in the error message', () => {
+      runInstallShortcuts({
+        home: tmp,
+        scheme: 'C',
+        pluginVersion: '0.0.0',
+      });
+
+      // Operator replaced a shim with a multi-line custom prompt.
+      writeFileSync(
+        join(resolveCommandsDir(tmp), 'dw-implement.md'),
+        'line1\nline2\nline3\n',
+        'utf8',
+      );
+
+      let thrown: unknown;
+      try {
+        runUninstallShortcuts({ home: tmp });
+      } catch (err) {
+        thrown = err;
+      }
+      expect(thrown).toBeInstanceOf(DriftError);
+      const message = (thrown as Error).message;
+      // The actual: line carries the multi-line body with internal
+      // newlines escaped as two-char \n so each shim renders on a
+      // single row in the operator's terminal.
+      expect(message).toContain('line1\\nline2\\nline3');
+      // Belt-and-suspenders: confirm no raw inner newline snuck
+      // between the literal-escaped tokens.
+      expect(message).not.toMatch(/line1\nline2/);
+    });
   });
 
   describe('--force-uninstall overrides drift refusal', () => {
@@ -203,11 +234,14 @@ describe('uninstall-shortcuts (smoke)', () => {
 
       expect(result.dryRun).toBe(true);
       expect(result.shimsRemoved.length).toBe(16);
-      expect(result.manifestRemoved).toBe(true); // intended, not actual
+      // manifestRemoved means "actually deleted in this call" — false
+      // on dry-run. The dry-run caller infers "would remove" from
+      // dryRun: true + no errors thrown.
+      expect(result.manifestRemoved).toBe(false);
+      expect(existsSync(manifestPath(tmp))).toBe(true);
 
       const filesAfter = readdirSync(resolveCommandsDir(tmp)).sort();
       expect(filesAfter).toEqual(filesBefore);
-      expect(existsSync(manifestPath(tmp))).toBe(true);
     });
 
     it('dry-run reports drift without throwing', () => {
@@ -427,13 +461,11 @@ describe('uninstall-shortcuts (smoke)', () => {
 
         await uninstallShortcuts([]);
 
-        // Dispatch may or may not call exit explicitly on the happy
-        // path; either way the side effect we care about is the file
-        // removal.
+        // Contract: happy path returns normally (no explicit process.exit
+        // call). A future refactor that adds an unintended exit fails
+        // this assertion.
+        expect(exitCalls.length).toBe(0);
         expect(existsSync(manifestPath(tmp))).toBe(false);
-        if (exitCalls.length > 0) {
-          expect(exitCalls).toEqual([0]);
-        }
       } finally {
         if (originalHome === undefined) {
           delete process.env.HOME;

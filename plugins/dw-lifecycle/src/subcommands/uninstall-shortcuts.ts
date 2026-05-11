@@ -48,7 +48,7 @@ export interface UninstallShortcutsResult {
   missingShims: ReadonlyArray<DriftReport>;
   /** Shims listed in the manifest whose body had drifted; surfaced even on the force path. */
   driftedShims: ReadonlyArray<DriftReport>;
-  /** True if the manifest was (or would be) removed. */
+  /** True only if the manifest was actually deleted in this call. False on dry-run. */
   manifestRemoved: boolean;
   dryRun: boolean;
 }
@@ -155,15 +155,27 @@ function truncate(s: string, limit: number): string {
   return s.slice(0, limit) + '...';
 }
 
+/**
+ * Render a single drift-report field for terminal display: strip the
+ * trailing newline, then escape any remaining internal `\n` as the
+ * two-character literal `\n` so the rendered line stays single-row in
+ * the operator's terminal. Applied to both `expected` and `actual` for
+ * symmetry, even though the canonical body is single-line today —
+ * defensive against future changes to `shimBody`.
+ */
+function escapeForDriftLine(value: string): string {
+  return value.replace(/\n+$/, '').replace(/\n/g, '\\n');
+}
+
 function formatDriftMessage(drifts: ReadonlyArray<DriftReport>): string {
   const header =
     `Refusing to uninstall: ${drifts.length} shim file(s) have drifted from their original content.\n` +
     'Pass --force-uninstall to remove them anyway.\n';
   const body = drifts
     .map((d) => {
-      const expectedLine = (d.expected ?? '').replace(/\n+$/, '');
+      const expectedLine = escapeForDriftLine(d.expected ?? '');
       const actualLine = truncate(
-        (d.actual ?? '').replace(/\n+$/, ''),
+        escapeForDriftLine(d.actual ?? ''),
         DRIFT_ACTUAL_PREVIEW_LIMIT,
       );
       return (
@@ -232,7 +244,7 @@ export function runUninstallShortcuts(
       shimsRemoved: shimsToRemove,
       missingShims,
       driftedShims,
-      manifestRemoved: true,
+      manifestRemoved: false,
       dryRun: true,
     };
   }
