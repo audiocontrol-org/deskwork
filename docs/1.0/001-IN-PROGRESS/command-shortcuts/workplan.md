@@ -64,30 +64,30 @@ Design spec: `docs/superpowers/specs/2026-05-11-command-shortcuts-design.md`.
 
 ### Task 4: Install skill
 
-- [ ] Author `plugins/dw-lifecycle/skills/install-shortcuts/SKILL.md` rendering the three scheme options in a terminal table with example mappings; default scheme C.
-- [ ] Author the matching `plugins/dw-lifecycle/commands/install-shortcuts.md` command file.
-- [ ] Skill prose invokes the CLI helper with the operator-picked scheme.
+- [x] Author `plugins/dw-lifecycle/skills/install-shortcuts/SKILL.md` rendering the three scheme options in a terminal table with example mappings; default scheme C.
+- [x] Author the matching `plugins/dw-lifecycle/commands/install-shortcuts.md` command file.
+- [x] Skill prose invokes the CLI helper with the operator-picked scheme.
 
 **Acceptance Criteria:**
-- [ ] Skill is discoverable via Claude Code slash-command picker as `/dw-lifecycle:install-shortcuts`
-- [ ] Default scheme is C (verbose)
+- [x] Skill is discoverable via Claude Code slash-command picker as `/dw-lifecycle:install-shortcuts`
+- [x] Default scheme is C (verbose)
 
 ### Task 5: Uninstall skill
 
-- [ ] Author `plugins/dw-lifecycle/skills/uninstall-shortcuts/SKILL.md`.
-- [ ] Author the matching `plugins/dw-lifecycle/commands/uninstall-shortcuts.md` command file.
+- [x] Author `plugins/dw-lifecycle/skills/uninstall-shortcuts/SKILL.md`.
+- [x] Author the matching `plugins/dw-lifecycle/commands/uninstall-shortcuts.md` command file.
 
 **Acceptance Criteria:**
-- [ ] Skill is discoverable as `/dw-lifecycle:uninstall-shortcuts`
-- [ ] Skill surfaces the manifest path and drift behavior in its report
+- [x] Skill is discoverable as `/dw-lifecycle:uninstall-shortcuts`
+- [x] Skill surfaces the manifest path and drift behavior in its report
 
 ### Task 6: Existing-install nudge
 
-- [ ] Add one line to the final report of `plugins/dw-lifecycle/skills/install/SKILL.md`: "Want shorter command invocations? Run /dw-lifecycle:install-shortcuts."
-- [ ] Verify nothing else in the install skill changes; the nudge is purely additive.
+- [x] Add one line to the final report of `plugins/dw-lifecycle/skills/install/SKILL.md`: "Want shorter command invocations? Run /dw-lifecycle:install-shortcuts."
+- [x] Verify nothing else in the install skill changes; the nudge is purely additive.
 
 **Acceptance Criteria:**
-- [ ] Nudge appears in the install skill's report only; doesn't alter behavior
+- [x] Nudge appears in the install skill's report only; doesn't alter behavior
 
 ## Phase 3: Documentation + dogfood
 

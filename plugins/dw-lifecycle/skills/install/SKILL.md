@@ -53,6 +53,8 @@ The helper writes `.dw-lifecycle/config.json` with the resolved values.
 
 6. Report: config path, which fields were detected vs. defaulted vs. overlaid, peer-plugin status (run `dw-lifecycle doctor` to surface).
 
+7. **One-line nudge:** mention to the operator: *"Want shorter command invocations? Run /dw-lifecycle:install-shortcuts."* This is a one-off pointer to the opt-in shortcuts skill; do not nag on subsequent invocations or other skills.
+
 ## Error handling
 
 - **Config already exists.** Surface path and stop. No overwrite.
