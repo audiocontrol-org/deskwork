@@ -439,30 +439,37 @@ a.er-calendar-meta-link:focus-visible {
  * Desktop layout untouched — the rule is gated behind the media query.
  * --------------------------------------------------------------------- */
 @media (max-width: 600px) {
+  /* v0.20 row layout — collapse to a single row with ⋮ at the trailing
+   * edge. Status cell is empty (reviewState retired); drop from mobile to
+   * recover horizontal budget. Row num pins left; body fills middle;
+   * action area (containing only the ⋮ button on mobile, since inline
+   * chips are `display: none`) pins right.
+   *
+   * Pre-v0.20 used a 3-row layout (`num/status | body | action`) because
+   * the action area carried 3-4 stacked outlined buttons that wrapped
+   * unpredictably. With v0.20's single ⋮, that wrap is gone — the row
+   * fits on one line. */
   .er-calendar-row {
-    grid-template-columns: auto auto;
-    grid-template-areas:
-      "num    status"
-      "body   body"
-      "action action";
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas: "num body action";
     column-gap: var(--er-space-2);
-    row-gap: var(--er-space-1);
+    align-items: center;
   }
   .er-calendar-row > .er-row-num {
     grid-area: num;
     align-self: center;
   }
   .er-calendar-row > .er-calendar-status {
-    grid-area: status;
-    justify-self: end;
-    align-self: center;
+    display: none;
   }
   .er-calendar-row > .er-calendar-body {
     grid-area: body;
   }
   .er-calendar-row > .er-calendar-action {
     grid-area: action;
-    justify-content: flex-start;
+    align-self: center;
+    display: flex;
+    align-items: center;
   }
   /* Long slugs (e.g. `deskwork-plugin/issue-158-ux-audit`) must break
    * at any character so they can't ever overflow the body column. The

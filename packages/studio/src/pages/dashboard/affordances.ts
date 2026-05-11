@@ -315,7 +315,13 @@ export function renderRowActions(entry: Entry, defaultSite: string): RawHtml {
     aria-haspopup="menu"
     aria-expanded="false"
     aria-label="More actions">⋮</button>`;
-  return unsafe(`<span class="er-row-affordances">${chips}${overflow}</span>`);
+  // Keep `.er-calendar-action` as the wrapper class so the existing
+  // mobile grid-template-areas (`action` area at row 3 of the row
+  // grid) and desktop layout rules continue to position the chrome.
+  // The `.er-row-affordances` class is added alongside as a v0.20
+  // marker for any future rules that need to target the new chrome
+  // specifically.
+  return unsafe(`<span class="er-calendar-action er-row-affordances">${chips}${overflow}</span>`);
 }
 
 /**
