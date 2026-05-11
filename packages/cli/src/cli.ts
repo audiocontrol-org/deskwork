@@ -21,9 +21,12 @@ import { isRetired, printRetiredError } from './commands/retired.ts';
 const SUBCOMMANDS: Record<string, () => Promise<{ run: (argv: string[]) => Promise<void> }>> = {
   add: () => import('./commands/add.ts'),
   approve: () => import('./commands/approve.ts'),
+  block: () => import('./commands/block.ts'),
+  cancel: () => import('./commands/cancel.ts'),
   customize: () => import('./commands/customize.ts'),
   distribute: () => import('./commands/distribute.ts'),
   doctor: () => import('./commands/doctor.ts'),
+  induct: () => import('./commands/induct.ts'),
   ingest: () => import('./commands/ingest.ts'),
   install: () => import('./commands/install.ts'),
   iterate: () => import('./commands/iterate.ts'),
@@ -84,8 +87,11 @@ function printUsage(): void {
   out.write('  add             capture a new idea (Ideas stage)\n\n');
   out.write('Pipeline:\n');
   out.write('  iterate         within-stage revision (snapshots a version)\n');
-  out.write('  approve         finalize an approved review workflow\n');
-  out.write('  publish         move to Published\n\n');
+  out.write('  approve         advance to the next pipeline stage\n');
+  out.write('  publish         move to Published\n');
+  out.write('  block           pull an entry off-pipeline (Blocked; resumable via induct)\n');
+  out.write('  cancel          pull an entry off-pipeline (Cancelled; rarely resumed)\n');
+  out.write('  induct          teleport an entry to a chosen pipeline stage\n\n');
   out.write('Shortform:\n');
   out.write('  shortform-start enqueue a shortform draft for review\n');
   out.write('  distribute      record a posted shortform URL on the calendar\n\n');
@@ -94,9 +100,6 @@ function printUsage(): void {
   out.write('  customize       copy a plugin default into .deskwork/<category>/<name>.ts\n');
   out.write('  repair-install  prune stale entries from Claude Code\'s plugin registry\n\n');
   out.write('Skill-only verbs (use via /deskwork:<verb>):\n');
-  out.write('  block           pull an entry off-pipeline (Blocked)\n');
-  out.write('  cancel          pull an entry off-pipeline (Cancelled)\n');
-  out.write('  induct          teleport an entry to a chosen stage\n');
   out.write('  status          per-entry state summary\n\n');
   out.write('Run `deskwork <subcommand>` with no further args to see its usage.\n');
   out.write('Retired verbs (plan, outline, draft, pause, resume, review-*) print a migration\n');
