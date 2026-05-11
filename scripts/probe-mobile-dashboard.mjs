@@ -237,6 +237,124 @@ async function main() {
     `No horizontal overflow at 390x844 (scrollWidth=${phoneOverflow.scrollWidth}, innerWidth=${phoneOverflow.innerWidth})`,
   );
 
+  // ============== ROW AFFORDANCE CHROME (v0.20) ==============
+  console.log('');
+  console.log('row-affordance chrome (phone)');
+
+  // Expand a stage that has rows so the assertions below have rows to act on.
+  if (firstNonEmptyStage) {
+    // Re-expand it (previous test sequence may have left a different one open).
+    await phone.click(`[data-stage-tile="${firstNonEmptyStage}"]`);
+    await phone.waitForTimeout(150);
+  }
+
+  // 10. Rows are wrapped in [data-row-shell] with the new chrome
+  const rowChromeState = await phone.evaluate(() => {
+    const shells = Array.from(document.querySelectorAll('[data-row-shell]'));
+    if (shells.length === 0) return { ok: false, reason: 'no row shells found' };
+    const shell = shells[0];
+    return {
+      ok: true,
+      hasDrawer: !!shell.querySelector('.er-row-drawer'),
+      hasFg: !!shell.querySelector('.er-row-fg'),
+      hasOverflow: !!shell.querySelector('[data-row-overflow]'),
+      hasMenu: !!shell.querySelector('.er-row-menu'),
+      menuHiddenAtRest: shell.querySelector('.er-row-menu')?.hasAttribute('hidden') === true,
+      overflowAriaExpandedAtRest:
+        shell.querySelector('[data-row-overflow]')?.getAttribute('aria-expanded') === 'false',
+    };
+  });
+  if (!rowChromeState.ok) {
+    console.log(`  [skip] ${rowChromeState.reason ?? 'unknown'} — no rows to check`);
+  } else {
+    assert(rowChromeState.hasDrawer, 'Row shell carries .er-row-drawer');
+    assert(rowChromeState.hasFg, 'Row shell carries .er-row-fg');
+    assert(rowChromeState.hasOverflow, 'Row shell carries [data-row-overflow] (⋮ button)');
+    assert(rowChromeState.hasMenu, 'Row shell carries .er-row-menu');
+    assert(rowChromeState.menuHiddenAtRest, 'Menu is hidden at-rest');
+    assert(rowChromeState.overflowAriaExpandedAtRest, '⋮ button has aria-expanded=false at-rest');
+  }
+
+  // 11. v0.19 regression check: no stacked-inline `.er-btn-small` buttons
+  //     visible inside row foregrounds on phone (the desktop-style chrome
+  //     that v0.20 retires). Inline chips (`.er-btn-chip`) are present in
+  //     the HTML but `display: none` on phone.
+  const v019Regression = await phone.evaluate(() => {
+    const fgs = Array.from(document.querySelectorAll('.er-row-fg'));
+    let visibleBtnSmall = 0;
+    for (const fg of fgs) {
+      const btns = fg.querySelectorAll('.er-btn-small');
+      for (const b of btns) {
+        if (getComputedStyle(b).display !== 'none') visibleBtnSmall++;
+      }
+    }
+    // Inline chips should be hidden on phone.
+    const chips = Array.from(document.querySelectorAll('.er-btn-chip'));
+    const visibleChips = chips.filter((c) => getComputedStyle(c).display !== 'none').length;
+    return { visibleBtnSmall, visibleChips };
+  });
+  assert(
+    v019Regression.visibleBtnSmall === 0,
+    `No legacy .er-btn-small buttons visible on phone rows (got ${v019Regression.visibleBtnSmall})`,
+  );
+  assert(
+    v019Regression.visibleChips === 0,
+    `No .er-btn-chip inline chips visible on phone (got ${v019Regression.visibleChips})`,
+  );
+
+  // 12. Tap ⋮ opens the menu (sets aria-expanded=true + un-hides menu)
+  if (rowChromeState.ok) {
+    await phone.click('[data-row-shell] [data-row-overflow]');
+    await phone.waitForTimeout(100);
+    const menuOpen = await phone.evaluate(() => {
+      const shell = document.querySelector('.is-menu-open');
+      if (!shell) return null;
+      return {
+        ariaExpanded: shell.querySelector('[data-row-overflow]')?.getAttribute('aria-expanded'),
+        menuHidden: shell.querySelector('.er-row-menu')?.hasAttribute('hidden'),
+        menuItems: shell.querySelectorAll('.er-row-menu-item').length,
+      };
+    });
+    assert(menuOpen !== null, 'Tap ⋮ adds .is-menu-open class to the row shell');
+    if (menuOpen) {
+      assert(menuOpen.ariaExpanded === 'true', '⋮ aria-expanded=true when menu open');
+      assert(menuOpen.menuHidden === false, 'Menu un-hidden when ⋮ is tapped');
+      assert(menuOpen.menuItems >= 2, `Menu renders items (got ${menuOpen.menuItems})`);
+    }
+
+    // 13. Menu contains stage-aware verbs for an active-pipeline row.
+    //     Active stages should expose iterate / approve / block / induct /
+    //     cancel / scrapbook (6 items per the brief's verb table).
+    const verbSet = await phone.evaluate(() => {
+      const items = Array.from(
+        document.querySelectorAll('.is-menu-open .er-row-menu-item'),
+      );
+      return items.map((i) => {
+        const cmd = i.dataset.copy ?? i.dataset.href ?? '';
+        return cmd.replace(/ .+$/, '').replace(/\?.+$/, ''); // strip args / query
+      });
+    });
+    // Tolerant assertion: the verb set depends on the stage of the first
+    // row we opened. Active stages should include iterate + block; Final
+    // stages include block but not iterate. Either is acceptable — what we
+    // want is evidence the FULL set is rendered (not just 2 verbs).
+    assert(verbSet.length >= 4, `Menu renders ≥4 stage-aware verbs (got ${verbSet.length}: ${verbSet.join(', ')})`);
+
+    // 14. Click outside the menu closes it
+    await phone.click('body', { position: { x: 10, y: 10 } });
+    await phone.waitForTimeout(150);
+    const menuClosed = await phone.evaluate(() => {
+      return {
+        anyOpen: document.querySelectorAll('.is-menu-open').length,
+        ariaExpanded: document
+          .querySelector('[data-row-shell] [data-row-overflow]')
+          ?.getAttribute('aria-expanded'),
+      };
+    });
+    assert(menuClosed.anyOpen === 0, 'Click-outside closes the menu');
+    assert(menuClosed.ariaExpanded === 'false', '⋮ aria-expanded resets to false');
+  }
+
   // ============== DESKTOP VIEWPORT ==============
   console.log('');
   console.log('desktop (1280x800)');
@@ -288,6 +406,48 @@ async function main() {
   assert(
     desktopOverflow.scrollWidth === desktopOverflow.innerWidth,
     `No horizontal overflow at 1280x800 (scrollWidth=${desktopOverflow.scrollWidth}, innerWidth=${desktopOverflow.innerWidth})`,
+  );
+
+  // Inline `.er-btn-chip` chips visible on desktop (high-frequency verbs).
+  const desktopChips = await desktop.evaluate(() => {
+    const chips = Array.from(document.querySelectorAll('.er-btn-chip'));
+    return {
+      total: chips.length,
+      visible: chips.filter((c) => getComputedStyle(c).display !== 'none').length,
+    };
+  });
+  assert(
+    desktopChips.total > 0 && desktopChips.visible > 0,
+    `Desktop renders inline .er-btn-chip chips (got ${desktopChips.visible}/${desktopChips.total} visible)`,
+  );
+
+  // Drawer rendered in DOM but display:none on desktop (swipe is mobile-only).
+  const desktopDrawerHidden = await desktop.evaluate(() => {
+    const drawer = document.querySelector('.er-row-drawer');
+    if (!drawer) return null;
+    return getComputedStyle(drawer).display;
+  });
+  assert(
+    desktopDrawerHidden === 'none',
+    `Drawer display:none on desktop (got ${desktopDrawerHidden})`,
+  );
+
+  // ⋮ button + menu work on desktop too.
+  const desktopOverflowBtn = await desktop.evaluate(() => {
+    const btn = document.querySelector('[data-row-overflow]');
+    if (!btn) return null;
+    return {
+      visible: getComputedStyle(btn).display !== 'none',
+      ariaExpanded: btn.getAttribute('aria-expanded'),
+    };
+  });
+  assert(
+    desktopOverflowBtn?.visible === true,
+    `⋮ button visible on desktop (got ${desktopOverflowBtn?.visible})`,
+  );
+  assert(
+    desktopOverflowBtn?.ariaExpanded === 'false',
+    `⋮ aria-expanded=false at-rest on desktop`,
   );
 
   await browser.close();
