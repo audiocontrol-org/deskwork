@@ -59,6 +59,34 @@ The operator decides what's in scope. Never pre-decide for them.
 - Distinguish: items the user actively rejected (don't revive) vs. items I unilaterally deferred (do, by surfacing them).
 - Sub-agent dispatch reports get treated as action lists, not disclosures: each *"flag for triage"* becomes either a fix-in-this-PR or a filed issue, with the link in my next response.
 
+## The orchestrator prepares infrastructure; it does not implement the feature
+
+The agent's role across the dw-lifecycle skills is split cleanly at the `/dw-lifecycle:implement` handoff:
+
+- **Before `/dw-lifecycle:implement` — orchestrator work, in-thread.** Driving `/dw-lifecycle:define`, `/dw-lifecycle:setup`, the PRD iterate/approve loop via deskwork, `/dw-lifecycle:issues`, filing friction issues, running CLI helpers, scaffolding the feature's PRD / workplan / README content from the design spec, moving worktrees, restarting studios, etc. — all of this is infrastructure preparation. The orchestrator authors this material in-thread; that is the orchestrator's job.
+- **At `/dw-lifecycle:implement` — handoff.** The actual feature gets built. The orchestrator dispatches the implementation work to specialists per the Sub-Agent Delegation table in `.claude/CLAUDE.md` (`feature-orchestrator` for multi-chunk PR delivery, `typescript-pro` for code, `documentation-engineer` for new SKILL.md prose, etc.), reviews what comes back, integrates, runs `/dw-lifecycle:review`, and reports. The orchestrator does NOT write the feature's code, new skills, tests, or other implementation artifacts in-thread.
+
+The operator's framing, verbatim: *"you are the orchestrator, not the implementer"* — clarified with *"As the orchestrator, you define and prepare feature infrastructure. You don't implement the feature."*
+
+**Why:** the 2026-05-11 `command-shortcuts` setup session generated this rule. Across `define → setup → PRD iter → issues` the agent appropriately authored the design spec, the PRD content, the workplan task breakdown, the README, and six friction-issue bodies in-thread — all infrastructure preparation. The line that would have been crossed (and wasn't, because the session stopped here) is starting to write the feature's new dw-lifecycle skills, the schemes module, the CLI subcommands, and the tests in-thread instead of dispatching `feature-orchestrator` at `/dw-lifecycle:implement`. A first pass at this rule ([commit reverted in-session]) miscast the line as "any prose authoring goes to a sub-agent" — that's wrong, because PRD/workplan/README/issue prose IS the orchestrator's deliverable at the prep stage. The clarification narrowed the rule to the implement handoff specifically.
+
+**Failure modes this rule names (forward-looking):**
+
+| The pattern | What it actually means |
+|---|---|
+| Orchestrator opens `packages/<pkg>/src/<file>.ts` and starts writing TypeScript at `/dw-lifecycle:implement` | The orchestrator has become the implementer; dispatch instead |
+| Orchestrator authors a new SKILL.md for the feature being shipped in-thread | Same — dispatch `documentation-engineer` |
+| Orchestrator hand-writes the feature's test cases in-thread | Same — dispatch `typescript-pro` or `feature-orchestrator` |
+| Orchestrator dispatches `feature-orchestrator` but then "fixes" the returned code in-thread without re-dispatching | Same — return findings to the specialist or invoke `/dw-lifecycle:review` |
+
+**How to apply:**
+
+- During define / setup / PRD iter / issues / friction-capture: write content in-thread as the natural deliverable of orchestration. Don't over-delegate routine prep work.
+- At `/dw-lifecycle:implement` (and beyond): stop. Plan delegation, dispatch the specialist(s), receive output, integrate. Don't open a `.ts` file to "just fix one thing" in-thread.
+- Before authoring any line of feature code (a new TypeScript file, a new SKILL.md for the feature being shipped, a new test): the test is *"is this the feature itself, or is this infrastructure for the feature?"* If feature, dispatch. If infrastructure (PRD, workplan, README, issue body, design spec, journal), in-thread.
+- Running slash commands, CLI helpers (`deskwork <verb>`, `dw-lifecycle <verb>`), git operations, file moves, studio restarts, friction-issue filing — orchestrator work, in-thread.
+- When a dispatched specialist's output needs adjustment: re-dispatch with a corrected brief, or `/dw-lifecycle:review` it. Don't bridge into the implementer role to "polish" their work.
+
 ## "Just for now" is bullshit — no temporary fallbacks, no IOU comments, no will-fix-later deferrals
 
 **Reject every "just for now" / "for now" / "we'll fix it later" / "DONE_WITH_CONCERNS, address in F-later" pattern.** Not as a sub-agent's escalation. Not as a code comment. Not as a controller-side acceptance. Every single "just for now" is a nucleation site for bad behavior that compounds invisibly and never gets cleaned up.
