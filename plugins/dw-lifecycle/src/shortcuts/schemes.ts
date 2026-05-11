@@ -27,6 +27,8 @@ export const COMMANDS = [
 
 type Command = (typeof COMMANDS)[number];
 
+// Widened to ReadonlySet<string> so .has() accepts unknown input
+// without a forbidden `as Command` cast in assertKnownCommand.
 const COMMAND_SET: ReadonlySet<string> = new Set(COMMANDS);
 
 function assertKnownCommand(command: string): asserts command is Command {
@@ -37,60 +39,63 @@ function assertKnownCommand(command: string): asserts command is Command {
   }
 }
 
-const SCHEME_A_MAP: Readonly<Record<Command, string>> = {
-  implement: 'dwi',
-  setup: 'dws',
-  ship: 'dwsh',
-  'session-start': 'dwss',
-  'session-end': 'dwse',
-  define: 'dwd',
-  doctor: 'dwdo',
-  customize: 'dwc',
-  complete: 'dwco',
-  extend: 'dwe',
-  help: 'dwh',
-  install: 'dwin',
-  issues: 'dwis',
-  pickup: 'dwp',
-  review: 'dwr',
-  teardown: 'dwt',
-} as const;
+const SCHEME_A_ENTRIES = [
+  ['implement', 'dwi'],
+  ['setup', 'dws'],
+  ['ship', 'dwsh'],
+  ['session-start', 'dwss'],
+  ['session-end', 'dwse'],
+  ['define', 'dwd'],
+  ['doctor', 'dwdo'],
+  ['customize', 'dwc'],
+  ['complete', 'dwco'],
+  ['extend', 'dwe'],
+  ['help', 'dwh'],
+  ['install', 'dwin'],
+  ['issues', 'dwis'],
+  ['pickup', 'dwp'],
+  ['review', 'dwr'],
+  ['teardown', 'dwt'],
+] as const satisfies ReadonlyArray<readonly [Command, string]>;
 
-const SCHEME_B_MAP: Readonly<Record<Command, string>> = {
-  implement: 'dw-im',
-  setup: 'dw-se',
-  define: 'dw-de',
-  ship: 'dw-sh',
-  'session-start': 'dw-ss',
-  'session-end': 'dw-en',
-  customize: 'dw-cu',
-  complete: 'dw-co',
-  doctor: 'dw-do',
-  extend: 'dw-ex',
-  help: 'dw-he',
-  install: 'dw-in',
-  issues: 'dw-is',
-  pickup: 'dw-pi',
-  review: 'dw-re',
-  teardown: 'dw-te',
-} as const;
+const SCHEME_B_ENTRIES = [
+  ['implement', 'dw-im'],
+  ['setup', 'dw-se'],
+  ['define', 'dw-de'],
+  ['ship', 'dw-sh'],
+  ['session-start', 'dw-ss'],
+  ['session-end', 'dw-en'],
+  ['customize', 'dw-cu'],
+  ['complete', 'dw-co'],
+  ['doctor', 'dw-do'],
+  ['extend', 'dw-ex'],
+  ['help', 'dw-he'],
+  ['install', 'dw-in'],
+  ['issues', 'dw-is'],
+  ['pickup', 'dw-pi'],
+  ['review', 'dw-re'],
+  ['teardown', 'dw-te'],
+] as const satisfies ReadonlyArray<readonly [Command, string]>;
 
 function makeTableScheme(
   id: SchemeId,
-  table: Readonly<Record<Command, string>>,
-  order: ReadonlyArray<Command>,
+  table: ReadonlyArray<readonly [Command, string]>,
 ): SchemeMapping {
-  const ordered: ReadonlyArray<readonly [string, string]> = order.map(
-    (cmd) => [cmd, table[cmd]] as const,
-  );
+  const lookup = new Map<Command, string>(table);
   return {
     id,
     shimFor(command: string): string {
       assertKnownCommand(command);
-      return table[command];
+      const shim = lookup.get(command);
+      if (shim === undefined) {
+        throw new Error(
+          `scheme ${id} has no shim for command: ${command}`,
+        );
+      }
+      return shim;
     },
     entries(): ReadonlyArray<readonly [string, string]> {
-      return ordered;
+      return table;
     },
   };
 }
@@ -111,47 +116,9 @@ function makeAlgorithmicScheme(id: SchemeId): SchemeMapping {
   };
 }
 
-const SCHEME_A_ORDER: ReadonlyArray<Command> = [
-  'implement',
-  'setup',
-  'ship',
-  'session-start',
-  'session-end',
-  'define',
-  'doctor',
-  'customize',
-  'complete',
-  'extend',
-  'help',
-  'install',
-  'issues',
-  'pickup',
-  'review',
-  'teardown',
-];
-
-const SCHEME_B_ORDER: ReadonlyArray<Command> = [
-  'implement',
-  'setup',
-  'define',
-  'ship',
-  'session-start',
-  'session-end',
-  'customize',
-  'complete',
-  'doctor',
-  'extend',
-  'help',
-  'install',
-  'issues',
-  'pickup',
-  'review',
-  'teardown',
-];
-
 export const SCHEMES: Readonly<Record<SchemeId, SchemeMapping>> = {
-  A: makeTableScheme('A', SCHEME_A_MAP, SCHEME_A_ORDER),
-  B: makeTableScheme('B', SCHEME_B_MAP, SCHEME_B_ORDER),
+  A: makeTableScheme('A', SCHEME_A_ENTRIES),
+  B: makeTableScheme('B', SCHEME_B_ENTRIES),
   C: makeAlgorithmicScheme('C'),
 } as const;
 

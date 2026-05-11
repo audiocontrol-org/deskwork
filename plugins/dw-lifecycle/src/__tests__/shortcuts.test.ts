@@ -15,6 +15,9 @@ const COMMANDS_DIR = resolve(__dirname, '../../commands');
 
 const SCHEME_IDS: readonly SchemeId[] = ['A', 'B', 'C'];
 
+// These tables are the authoritative spec copy of Schemes A and B.
+// They duplicate schemes.ts intentionally — an edit there without a
+// matching edit here fails this test, which is the point.
 const SCHEME_A_TABLE: ReadonlyArray<readonly [string, string]> = [
   ['implement', 'dwi'],
   ['setup', 'dws'],
@@ -55,9 +58,11 @@ const SCHEME_B_TABLE: ReadonlyArray<readonly [string, string]> = [
 
 describe('COMMANDS canonical list', () => {
   it('matches the on-disk commands/ directory exactly', () => {
-    const onDisk = readdirSync(COMMANDS_DIR)
-      .filter((f) => f.endsWith('.md'))
-      .map((f) => f.slice(0, -'.md'.length))
+    const onDisk = readdirSync(COMMANDS_DIR, { withFileTypes: true })
+      .filter(
+        (e) => e.isFile() && !e.name.startsWith('.') && e.name.endsWith('.md'),
+      )
+      .map((e) => e.name.slice(0, -'.md'.length))
       .sort();
     const fromModule = [...COMMANDS].sort();
     expect(fromModule).toEqual(onDisk);
@@ -114,6 +119,11 @@ describe('no-duplicates invariant per scheme', () => {
       it('has 16 unique commands', () => {
         const commands = new Set(entries.map(([cmd]) => cmd));
         expect(commands.size).toBe(16);
+      });
+
+      it('entry command set equals the canonical COMMANDS set', () => {
+        const entryCommands = new Set(entries.map(([cmd]) => cmd));
+        expect(entryCommands).toEqual(new Set(COMMANDS));
       });
 
       it('has 16 unique shim names', () => {
