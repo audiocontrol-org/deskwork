@@ -1,6 +1,23 @@
 import { readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join, relative } from 'node:path';
 import { isSchemeId, type SchemeId } from './schemes.js';
+
+/**
+ * Conservative match for shim filenames: lowercase alphanumeric with
+ * optional internal dashes; must start and end alphanumeric. This is
+ * also what install-shortcuts enforces on `--rename <prefix>`. Sharing
+ * the pattern keeps the install-side (where the operator can pass an
+ * untrusted CLI argument) and the read-side (where the manifest itself
+ * could be hand-edited) gated by the same character set.
+ *
+ * The validation matters because {@link shimPathFor} concatenates the
+ * `shimName` into a `${shimName}.md` filename joined under
+ * {@link commandsDir}. A `shimName` of `"../../etc/passwd"` would
+ * otherwise resolve to `/etc/passwd.md`, and downstream destructive
+ * paths (install's `--replace` cleanup and `--force-uninstall`) would
+ * happily call `rmSync` on it.
+ */
+const SHIM_NAME_PATTERN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
 
 /**
  * Schema version stamped into every manifest written. Bump in lockstep
@@ -60,9 +77,29 @@ export function manifestPath(home: string): string {
  * identity (`shimName`) plus the host home directory. The manifest does
  * NOT store this path itself — see {@link ManifestShimEntry} — so this
  * helper is the single source of truth for the mapping.
+ *
+ * Belt-and-suspenders: even though {@link readManifest} validates
+ * `shimName` against {@link SHIM_NAME_PATTERN} on the read path, we
+ * additionally verify here that the resolved path lands UNDER
+ * {@link commandsDir}. Any future code path that constructs a
+ * `shimName` from an untrusted source without going through the
+ * manifest reader will still be caught by this inner check before any
+ * destructive caller (`rmSync` under `--replace` or
+ * `--force-uninstall`) touches the filesystem.
  */
 export function shimPathFor(home: string, shimName: string): string {
-  return join(commandsDir(home), `${shimName}.md`);
+  const dir = commandsDir(home);
+  const resolved = join(dir, `${shimName}.md`);
+  const rel = relative(dir, resolved);
+  if (rel.startsWith('..') || isAbsolute(rel)) {
+    throw new Error(
+      `Refusing to construct shim path outside commands directory: `
+        + `shimName=${JSON.stringify(shimName)} `
+        + `resolved=${JSON.stringify(resolved)} `
+        + `commandsDir=${JSON.stringify(dir)}`,
+    );
+  }
+  return resolved;
 }
 
 function isManifestShimEntry(value: unknown): value is ManifestShimEntry {
@@ -71,6 +108,7 @@ function isManifestShimEntry(value: unknown): value is ManifestShimEntry {
   return (
     typeof record.command === 'string'
     && typeof record.shimName === 'string'
+    && SHIM_NAME_PATTERN.test(record.shimName)
   );
 }
 
