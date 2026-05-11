@@ -119,6 +119,14 @@ body[data-compose-sheet-open] .er-compose-fab {
   pointer-events: none;
 }
 
+/* When any row's drawer or overflow menu is open, hide the FAB entirely
+ * so it cannot occlude the trailing drawer chip on rows that sit near
+ * the FAB's viewport-bottom position. The body class is toggled by
+ * row-actions.ts based on the openSurfaces set. */
+body.er-row-surface-open .er-compose-fab {
+  display: none;
+}
+
 /* ============================================================
  *  3. Compose sheet — slide-up panel with verb cards.
  * ============================================================ */

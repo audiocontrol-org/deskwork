@@ -47,6 +47,24 @@ function isMobile(): boolean {
 /** All currently-open menus + swiped rows; closing any closes all. */
 const openSurfaces = new Set<HTMLElement>();
 
+/**
+ * Body-level class toggled whenever ANY row has an open surface (swipe
+ * drawer or overflow menu). The compose FAB hides itself via CSS while
+ * this class is present so it cannot occlude the trailing drawer chip
+ * on rows that happen to sit near the FAB's viewport-bottom position.
+ *
+ * Spec: the brief's swipe-drawer table promises N chips per stage; if
+ * the FAB paints over chip N, the row is missing affordances the spec
+ * guarantees. Hiding the FAB while a surface is open keeps the promise
+ * without compromising the FAB's separate role.
+ */
+function syncBodyOpenSurfaceFlag(): void {
+  document.body.classList.toggle(
+    'er-row-surface-open',
+    openSurfaces.size > 0,
+  );
+}
+
 function closeAllSurfaces(): void {
   for (const el of openSurfaces) closeSurface(el);
 }
@@ -60,6 +78,7 @@ function closeSurface(shell: HTMLElement): void {
   if (fg) fg.style.transform = '';
   shell.classList.remove('is-menu-open', 'is-swiped');
   openSurfaces.delete(shell);
+  syncBodyOpenSurfaceFlag();
 }
 
 function openMenu(shell: HTMLElement): void {
@@ -71,6 +90,7 @@ function openMenu(shell: HTMLElement): void {
   overflow.setAttribute('aria-expanded', 'true');
   shell.classList.add('is-menu-open');
   openSurfaces.add(shell);
+  syncBodyOpenSurfaceFlag();
   // Focus first menu item for keyboard users.
   const firstItem = menu.querySelector<HTMLElement>('.er-row-menu-item');
   firstItem?.focus();
@@ -89,6 +109,7 @@ function openDrawer(shell: HTMLElement): void {
   shell.classList.add('is-swiped');
   drawer.setAttribute('aria-hidden', 'false');
   openSurfaces.add(shell);
+  syncBodyOpenSurfaceFlag();
 }
 
 function wireOverflowButton(shell: HTMLElement): void {
@@ -299,6 +320,7 @@ function wireSwipe(shell: HTMLElement): void {
       fg!.style.transform = '';
       shell.classList.remove('is-swiped');
       openSurfaces.delete(shell);
+      syncBodyOpenSurfaceFlag();
     }
     axisLocked = null;
     translating = false;
@@ -314,6 +336,7 @@ function wireSwipe(shell: HTMLElement): void {
       reset();
       shell.classList.remove('is-swiped');
       openSurfaces.delete(shell);
+      syncBodyOpenSurfaceFlag();
     },
     { passive: true },
   );
