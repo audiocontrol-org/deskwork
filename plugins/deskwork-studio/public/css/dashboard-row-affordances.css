@@ -46,7 +46,13 @@
   }
   .er-row-shell.is-menu-open {
     overflow: visible;
-    z-index: 5;
+    /* Must exceed the compose FAB's z-index (65 in dashboard-mobile.css)
+     * because `position:relative` + z-index on the shell creates a
+     * stacking context; the menu inside (z-index 200) is then scoped
+     * within that context and only escapes when the shell's own stack
+     * position outranks neighbors. Without this, the FAB paints over
+     * the menu items. */
+    z-index: 80;
   }
 
   /* Drawer — absolute-positioned at the row's trailing edge. Hidden

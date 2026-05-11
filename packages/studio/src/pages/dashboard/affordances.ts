@@ -232,7 +232,18 @@ function renderInlineChip(verb: Verb): string {
 }
 
 function renderMenuItem(verb: Verb): string {
-  const cmdHint = verb.copy ?? verb.href ?? '';
+  // Short command hint matching the mockup's compact form:
+  //   copy verbs → `/deskwork:approve` (verb only, no slug)
+  //   href verbs → `/dev/scrapbook` / `/dev/editorial-review` (path stem,
+  //                no site / uuid / query string)
+  // The clipboard-copy still routes the FULL slash command via data-copy;
+  // hrefs still navigate to the full URL via data-href. The hint is just a
+  // visual reminder of which command/route is being invoked — appending the
+  // slug / full path doubles the cmd cell width and forces the label to
+  // wrap on narrow viewports.
+  const cmdHint = verb.copy !== undefined
+    ? verb.copy.split(' ', 1)[0]
+    : (verb.href ?? '').split('/').slice(0, 3).join('/');
   // Route data attributes through the html tag for proper escaping.
   if (verb.href !== undefined) {
     return html`<button type="button"
