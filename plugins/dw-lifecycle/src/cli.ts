@@ -1,4 +1,5 @@
 import { install } from './subcommands/install.js';
+import { installShortcuts } from './subcommands/install-shortcuts.js';
 import { setup } from './subcommands/setup.js';
 import { doctor } from './subcommands/doctor.js';
 import { journalAppend } from './subcommands/journal-append.js';
@@ -11,6 +12,7 @@ const args = process.argv.slice(3);
 
 const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   install,
+  'install-shortcuts': installShortcuts,
   setup,
   issues,
   transition,
