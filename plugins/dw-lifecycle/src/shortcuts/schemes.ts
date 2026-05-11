@@ -9,6 +9,14 @@ export function isSchemeId(value: unknown): value is SchemeId {
 
 export interface SchemeMapping {
   readonly id: SchemeId;
+  /**
+   * The leading shim-name prefix this scheme uses. Scheme A uses `dw`
+   * (no hyphen — shims are `dwi`, `dws`, `dwsh`, ...). Schemes B and C
+   * use `dw-` (shims are `dw-im`, `dw-implement`, ...). Surfaced here so
+   * rename mechanics consult a single source of truth rather than
+   * guessing from the shim string.
+   */
+  readonly prefix: string;
   shimFor(command: string): string;
   entries(): ReadonlyArray<readonly [string, string]>;
 }
@@ -86,11 +94,13 @@ const SCHEME_B_ENTRIES = [
 
 function makeTableScheme(
   id: SchemeId,
+  prefix: string,
   table: ReadonlyArray<readonly [Command, string]>,
 ): SchemeMapping {
   const lookup = new Map<Command, string>(table);
   return {
     id,
+    prefix,
     shimFor(command: string): string {
       assertKnownCommand(command);
       const shim = lookup.get(command);
@@ -113,6 +123,7 @@ function makeAlgorithmicScheme(id: SchemeId): SchemeMapping {
   );
   return {
     id,
+    prefix: 'dw-',
     shimFor(command: string): string {
       assertKnownCommand(command);
       return `dw-${command}`;
@@ -124,8 +135,8 @@ function makeAlgorithmicScheme(id: SchemeId): SchemeMapping {
 }
 
 export const SCHEMES: Readonly<Record<SchemeId, SchemeMapping>> = {
-  A: makeTableScheme('A', SCHEME_A_ENTRIES),
-  B: makeTableScheme('B', SCHEME_B_ENTRIES),
+  A: makeTableScheme('A', 'dw', SCHEME_A_ENTRIES),
+  B: makeTableScheme('B', 'dw-', SCHEME_B_ENTRIES),
   C: makeAlgorithmicScheme('C'),
 } as const;
 

@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { isSchemeId, type SchemeId } from './schemes.js';
 
@@ -17,10 +17,16 @@ export const MANIFEST_SCHEMA_VERSION = 1 as const;
  */
 export const MANIFEST_FILENAME = '.dw-lifecycle-shortcuts.json';
 
+/**
+ * Manifest shim entries store only the logical identity (`command` +
+ * `shimName`). Absolute paths are reconstructed at consumer time via
+ * {@link shimPathFor}, so the manifest stays portable across home-dir
+ * relocations (a tarball-and-extract into a fresh user account keeps
+ * working without rewriting paths in the manifest).
+ */
 export interface ManifestShimEntry {
   command: string;
   shimName: string;
-  path: string;
 }
 
 export interface ShortcutsManifest {
@@ -32,12 +38,31 @@ export interface ShortcutsManifest {
 }
 
 /**
+ * Resolve the canonical `.claude/commands/` directory under a given
+ * home. Centralized so callers (install, uninstall, doctor) never spell
+ * the path inline.
+ */
+export function commandsDir(home: string): string {
+  return join(home, '.claude', 'commands');
+}
+
+/**
  * Resolve the canonical manifest path for a given home directory.
  * Centralized so callers (install, uninstall, doctor) never spell the
  * filename inline — drift between them would be silent breakage.
  */
 export function manifestPath(home: string): string {
-  return join(home, '.claude', 'commands', MANIFEST_FILENAME);
+  return join(commandsDir(home), MANIFEST_FILENAME);
+}
+
+/**
+ * Reconstruct the absolute on-disk path of a shim from its logical
+ * identity (`shimName`) plus the host home directory. The manifest does
+ * NOT store this path itself — see {@link ManifestShimEntry} — so this
+ * helper is the single source of truth for the mapping.
+ */
+export function shimPathFor(home: string, shimName: string): string {
+  return join(commandsDir(home), `${shimName}.md`);
 }
 
 function isManifestShimEntry(value: unknown): value is ManifestShimEntry {
@@ -46,7 +71,6 @@ function isManifestShimEntry(value: unknown): value is ManifestShimEntry {
   return (
     typeof record.command === 'string'
     && typeof record.shimName === 'string'
-    && typeof record.path === 'string'
   );
 }
 
@@ -59,6 +83,22 @@ function isShortcutsManifest(value: unknown): value is ShortcutsManifest {
   if (typeof record.pluginVersion !== 'string') return false;
   if (!Array.isArray(record.shims)) return false;
   return record.shims.every(isManifestShimEntry);
+}
+
+/**
+ * Extract a printable representation of the on-disk manifest's version
+ * field for error messages. We don't trust the structure (the file may
+ * have any JSON shape on a schema-mismatch path), so we only surface
+ * primitive values; anything object-shaped or absent becomes
+ * `<unknown>`.
+ */
+function describeOnDiskVersion(parsed: unknown): string {
+  if (typeof parsed !== 'object' || parsed === null) return '<unknown>';
+  const v = (parsed as Record<string, unknown>).version;
+  if (typeof v === 'number' || typeof v === 'string' || typeof v === 'boolean') {
+    return String(v);
+  }
+  return '<unknown>';
 }
 
 /**
@@ -86,19 +126,29 @@ export function readManifest(path: string): ShortcutsManifest {
   }
 
   if (!isShortcutsManifest(parsed)) {
+    const onDisk = describeOnDiskVersion(parsed);
     throw new Error(
-      `Manifest at ${path} does not match the expected schema (version ${MANIFEST_SCHEMA_VERSION}).`,
+      `Manifest at ${path} has schema version ${onDisk}; this dw-lifecycle knows version ${MANIFEST_SCHEMA_VERSION}. ` +
+        `Upgrade dw-lifecycle, or remove the manifest by hand to force a fresh install.`,
     );
   }
   return parsed;
 }
 
 /**
- * Write a manifest to disk as JSON with 2-space indentation and a
- * trailing newline. Mirrors the on-disk shape every adopter has seen
- * since v0.1.0 — do not change the spacing without bumping
+ * Write a manifest to disk atomically: serialize to a sibling `.tmp`
+ * file, then `renameSync` it into place. `renameSync` is atomic on
+ * POSIX for same-filesystem renames, which `~/.claude/commands/`
+ * always is. The canonical manifest existing on disk thereby implies a
+ * successful install; a half-written `.tmp` left behind after a crash
+ * does NOT register as a valid prior install.
+ *
+ * The on-disk shape is pretty-printed JSON (2-space indent) with a
+ * trailing newline — do not change the spacing without bumping
  * {@link MANIFEST_SCHEMA_VERSION}.
  */
 export function writeManifest(path: string, manifest: ShortcutsManifest): void {
-  writeFileSync(path, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
+  const tmp = `${path}.tmp`;
+  writeFileSync(tmp, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
+  renameSync(tmp, path);
 }

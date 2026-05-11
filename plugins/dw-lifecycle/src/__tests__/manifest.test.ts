@@ -1,12 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   MANIFEST_FILENAME,
   MANIFEST_SCHEMA_VERSION,
+  commandsDir,
   manifestPath,
   readManifest,
+  shimPathFor,
   writeManifest,
   type ShortcutsManifest,
 } from '../shortcuts/manifest.js';
@@ -21,7 +23,6 @@ function makeManifest(): ShortcutsManifest {
       {
         command: 'implement',
         shimName: 'dw-implement',
-        path: '/tmp/x/.claude/commands/dw-implement.md',
       },
     ],
   };
@@ -46,6 +47,20 @@ describe('shortcuts/manifest', () => {
     });
   });
 
+  describe('commandsDir', () => {
+    it('returns the canonical .claude/commands/ directory', () => {
+      expect(commandsDir(tmp)).toBe(join(tmp, '.claude', 'commands'));
+    });
+  });
+
+  describe('shimPathFor', () => {
+    it('reconstructs the on-disk shim path from a logical shimName', () => {
+      expect(shimPathFor(tmp, 'dw-implement')).toBe(
+        join(tmp, '.claude', 'commands', 'dw-implement.md'),
+      );
+    });
+  });
+
   describe('writeManifest + readManifest round-trip', () => {
     it('reads back what was written, byte-for-byte structurally', () => {
       const file = join(tmp, 'manifest.json');
@@ -64,6 +79,25 @@ describe('shortcuts/manifest', () => {
       expect(raw.endsWith('\n')).toBe(true);
       expect(raw).toContain('  "version": 1');
     });
+
+    it('shim entries are exactly two fields (command + shimName) — no absolute path', () => {
+      const file = join(tmp, 'manifest.json');
+      writeManifest(file, makeManifest());
+
+      const raw = readFileSync(file, 'utf8');
+      const parsed = JSON.parse(raw) as ShortcutsManifest;
+      for (const entry of parsed.shims) {
+        expect(Object.keys(entry).sort()).toEqual(['command', 'shimName']);
+      }
+    });
+
+    it('writes atomically via .tmp + rename — no .tmp file left behind on success', () => {
+      const file = join(tmp, 'manifest.json');
+      writeManifest(file, makeManifest());
+
+      expect(existsSync(file)).toBe(true);
+      expect(existsSync(`${file}.tmp`)).toBe(false);
+    });
   });
 
   describe('readManifest errors', () => {
@@ -79,14 +113,26 @@ describe('shortcuts/manifest', () => {
       expect(() => readManifest(file)).toThrow(/Failed to parse manifest/);
     });
 
-    it('throws on wrong schema version', () => {
+    it('throws on wrong schema version with actionable error (names both versions + recovery hint)', () => {
       const file = join(tmp, 'manifest.json');
       writeFileSync(
         file,
         JSON.stringify({ ...makeManifest(), version: 999 }, null, 2) + '\n',
         'utf8',
       );
-      expect(() => readManifest(file)).toThrow(/expected schema/);
+      // Error must name BOTH the actual version on disk (999) AND the
+      // version this binary knows (1), plus the recovery hint.
+      expect(() => readManifest(file)).toThrow(/schema version 999/);
+      expect(() => readManifest(file)).toThrow(
+        new RegExp(`knows version ${MANIFEST_SCHEMA_VERSION}`),
+      );
+      expect(() => readManifest(file)).toThrow(/remove the manifest by hand/);
+    });
+
+    it('reports <unknown> when the on-disk file has no usable version field', () => {
+      const file = join(tmp, 'manifest.json');
+      writeFileSync(file, JSON.stringify({ shims: [] }, null, 2), 'utf8');
+      expect(() => readManifest(file)).toThrow(/schema version <unknown>/);
     });
 
     it('throws on missing required fields', () => {
@@ -100,7 +146,10 @@ describe('shortcuts/manifest', () => {
         ),
         'utf8',
       );
-      expect(() => readManifest(file)).toThrow(/expected schema/);
+      // The version on disk equals our version, so the schema-mismatch
+      // path produces our version on both sides — but the recovery hint
+      // is still there.
+      expect(() => readManifest(file)).toThrow(/schema version/);
     });
 
     it('throws when a shim entry is malformed', () => {
@@ -110,7 +159,7 @@ describe('shortcuts/manifest', () => {
         shims: [{ command: 'implement' }],
       };
       writeFileSync(file, JSON.stringify(bad, null, 2), 'utf8');
-      expect(() => readManifest(file)).toThrow(/expected schema/);
+      expect(() => readManifest(file)).toThrow(/schema version/);
     });
   });
 });

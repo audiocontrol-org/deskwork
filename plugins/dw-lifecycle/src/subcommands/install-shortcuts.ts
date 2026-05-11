@@ -16,15 +16,29 @@ import {
   type SchemeMapping,
 } from '../shortcuts/schemes.js';
 import {
+  commandsDir,
   manifestPath as resolveManifestPath,
   readManifest,
+  shimPathFor,
   writeManifest,
   MANIFEST_SCHEMA_VERSION,
   type ManifestShimEntry,
   type ShortcutsManifest,
 } from '../shortcuts/manifest.js';
+import {
+  CollisionError,
+  PriorManifestError,
+  isRefusalError,
+} from '../shortcuts/errors.js';
 
-const RENAME_PATTERN = /^[a-z0-9-]+$/;
+/**
+ * Rename prefix must be all-lowercase alphanumeric with internal
+ * dashes; a single character is fine, but multi-char inputs must start
+ * AND end with an alphanumeric character. This rejects pathological
+ * inputs like `-`, `--`, `-mt`, `mt-` that the looser `[a-z0-9-]+`
+ * pattern would have accepted.
+ */
+const RENAME_PATTERN = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
 
 export interface ParsedInstallShortcutsArgs {
   scheme?: SchemeId;
@@ -169,33 +183,37 @@ function validateRename(rename: string): void {
   }
   if (!RENAME_PATTERN.test(rename)) {
     throw new Error(
-      `Invalid --rename: ${JSON.stringify(rename)} (must match [a-z0-9-]+; no uppercase, no path separators).`,
+      `Invalid --rename: ${JSON.stringify(rename)} (must be all-lowercase alphanumeric with internal dashes; must start and end with an alphanumeric character).`,
     );
   }
 }
 
 /**
- * Compute the on-disk shim name after applying an optional rename.
+ * Replace a shim's scheme prefix with a rename prefix while preserving
+ * the rest of the shim name. The scheme tells us its prefix explicitly
+ * (Scheme A: `dw`, Schemes B/C: `dw-`) rather than us guessing from the
+ * shim string.
  *
- * Scheme A uses the `dw` prefix (no hyphen): `dwi`, `dws`, `dwsh`, ...
- * Schemes B and C use the `dw-` prefix: `dw-im`, `dw-implement`, ...
- *
- * The rename replaces the leading prefix while preserving the rest of
- * the shim name. We detect the prefix from the shim string directly
- * rather than threading scheme information through — both prefixes are
- * unambiguously identifiable from the shim itself.
+ * The rename argument is a "stem" — alphanumeric letters only — and
+ * preserves the separator semantics of the scheme's prefix. Scheme A
+ * has no trailing hyphen (`dw` → `dwi` → rename `mt` → `mti`); Schemes
+ * B and C have a trailing hyphen (`dw-` → `dw-im` → rename `mt` →
+ * `mt-im`). We detect that by checking whether the scheme's prefix
+ * ends in `-` and carry the hyphen through the substitution.
  */
-export function applyRename(shim: string, rename: string | undefined): string {
+function applyRename(
+  shim: string,
+  prefix: string,
+  rename: string | undefined,
+): string {
   if (rename === undefined) return shim;
-  if (shim.startsWith('dw-')) {
-    return `${rename}-${shim.slice('dw-'.length)}`;
+  if (!shim.startsWith(prefix)) {
+    throw new Error(
+      `applyRename: shim ${JSON.stringify(shim)} does not start with scheme prefix ${JSON.stringify(prefix)}.`,
+    );
   }
-  if (shim.startsWith('dw')) {
-    return `${rename}${shim.slice('dw'.length)}`;
-  }
-  throw new Error(
-    `applyRename: shim ${JSON.stringify(shim)} does not start with the expected dw / dw- prefix.`,
-  );
+  const separator = prefix.endsWith('-') ? '-' : '';
+  return rename + separator + shim.slice(prefix.length);
 }
 
 function shimBody(command: string): string {
@@ -205,23 +223,22 @@ function shimBody(command: string): string {
 function plannedShimEntries(
   scheme: SchemeMapping,
   rename: string | undefined,
-  commandsDir: string,
 ): ReadonlyArray<ManifestShimEntry> {
-  return scheme.entries().map(([command, baseShim]) => {
-    const shimName = applyRename(baseShim, rename);
-    return {
-      command,
-      shimName,
-      path: join(commandsDir, `${shimName}.md`),
-    };
-  });
+  return scheme.entries().map(([command, baseShim]) => ({
+    command,
+    shimName: applyRename(baseShim, scheme.prefix, rename),
+  }));
 }
 
-function uninstallPriorManifest(manifestFile: string): void {
-  const prior = readManifest(manifestFile);
+function uninstallPriorManifest(
+  home: string,
+  manifestFile: string,
+  prior: ShortcutsManifest,
+): void {
   for (const entry of prior.shims) {
-    if (existsSync(entry.path)) {
-      rmSync(entry.path, { force: true });
+    const path = shimPathFor(home, entry.shimName);
+    if (existsSync(path)) {
+      rmSync(path, { force: true });
     }
   }
   rmSync(manifestFile, { force: true });
@@ -235,13 +252,16 @@ export function runInstallShortcuts(
   }
 
   const scheme = getScheme(options.scheme);
-  const commandsDir = join(options.home, '.claude', 'commands');
+  const dir = commandsDir(options.home);
   const manifestFile = resolveManifestPath(options.home);
   const dryRun = options.dryRun === true;
   const force = options.force === true;
   const replace = options.replace === true;
 
-  const planned = plannedShimEntries(scheme, options.rename, commandsDir);
+  const planned = plannedShimEntries(scheme, options.rename);
+  const plannedPaths = planned.map((entry) =>
+    shimPathFor(options.home, entry.shimName),
+  );
 
   // Prior-manifest handling. If a manifest exists, --replace must be set;
   // otherwise the call refuses. With --replace, the prior install is
@@ -249,11 +269,16 @@ export function runInstallShortcuts(
   // intent via the planned writes).
   const priorManifestExists = existsSync(manifestFile);
   if (priorManifestExists && !replace) {
-    throw new Error(
+    throw new PriorManifestError(
       `Prior deskwork shortcuts manifest exists at ${manifestFile}. ` +
         `Pass --replace to uninstall the prior install before installing the new scheme.`,
     );
   }
+
+  // Read the prior manifest exactly once when --replace is in play;
+  // re-reading invites TOCTOU and doubles the disk-failure surface.
+  const prior: ShortcutsManifest | null =
+    priorManifestExists && replace ? readManifest(manifestFile) : null;
 
   // After --replace cleanup (or no prior manifest), detect foreign-file
   // collisions. A foreign file is any planned shim path that already
@@ -261,24 +286,23 @@ export function runInstallShortcuts(
   // cleanup. In dry-run we approximate by ignoring files that are in the
   // prior manifest's shim set.
   const priorPaths = new Set<string>();
-  if (priorManifestExists && replace) {
-    const prior = readManifest(manifestFile);
+  if (prior !== null) {
     for (const entry of prior.shims) {
-      priorPaths.add(entry.path);
+      priorPaths.add(shimPathFor(options.home, entry.shimName));
     }
   }
 
   const collisions: string[] = [];
-  for (const entry of planned) {
-    if (priorPaths.has(entry.path)) continue;
-    if (existsSync(entry.path)) {
-      collisions.push(entry.path);
+  for (const path of plannedPaths) {
+    if (priorPaths.has(path)) continue;
+    if (existsSync(path)) {
+      collisions.push(path);
     }
   }
 
   if (collisions.length > 0 && !force) {
     const list = collisions.map((p) => `  - ${p}`).join('\n');
-    throw new Error(
+    throw new CollisionError(
       `Refusing to overwrite ${collisions.length} foreign file(s) at planned shim paths (collision):\n${list}\n` +
         `Pass --force to overwrite, or move the foreign files aside.`,
     );
@@ -287,7 +311,7 @@ export function runInstallShortcuts(
   if (dryRun) {
     return {
       scheme: options.scheme,
-      shimsWritten: planned.map((p) => p.path),
+      shimsWritten: plannedPaths,
       manifestPath: manifestFile,
       collisions,
       dryRun: true,
@@ -295,14 +319,17 @@ export function runInstallShortcuts(
   }
 
   // Real run: unwind prior install first.
-  if (priorManifestExists && replace) {
-    uninstallPriorManifest(manifestFile);
+  if (prior !== null) {
+    uninstallPriorManifest(options.home, manifestFile, prior);
   }
 
-  mkdirSync(commandsDir, { recursive: true });
+  mkdirSync(dir, { recursive: true });
 
-  for (const entry of planned) {
-    writeFileSync(entry.path, shimBody(entry.command), 'utf8');
+  for (let i = 0; i < planned.length; i++) {
+    const entry = planned[i];
+    const path = plannedPaths[i];
+    if (entry === undefined || path === undefined) continue;
+    writeFileSync(path, shimBody(entry.command), 'utf8');
   }
 
   const manifest: ShortcutsManifest = {
@@ -316,7 +343,7 @@ export function runInstallShortcuts(
 
   return {
     scheme: options.scheme,
-    shimsWritten: planned.map((p) => p.path),
+    shimsWritten: plannedPaths,
     manifestPath: manifestFile,
     collisions,
     dryRun: false,
@@ -341,12 +368,34 @@ function isPackageJsonShape(value: unknown): value is PackageJsonShape {
  * keeps the lookup correct whether we're running from dist/ (one level
  * down from the package root) or via tsx from src/subcommands/ (two
  * levels down). Both resolve via `../../package.json`.
+ *
+ * Errors from `readFileSync` or `JSON.parse` are wrapped with the
+ * resolved path so the operator sees what we tried to read.
  */
 function readPluginVersion(): string {
   const here = dirname(fileURLToPath(import.meta.url));
   const pkgPath = join(here, '..', '..', 'package.json');
-  const raw = readFileSync(pkgPath, 'utf8');
-  const parsed: unknown = JSON.parse(raw);
+
+  let raw: string;
+  try {
+    raw = readFileSync(pkgPath, 'utf8');
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `Could not read plugin version (${pkgPath}): ${reason}`,
+    );
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `Could not parse plugin version (${pkgPath}): ${reason}`,
+    );
+  }
+
   if (!isPackageJsonShape(parsed)) {
     throw new Error(
       `Could not read plugin version from ${pkgPath}: missing or non-string "version" field.`,
@@ -402,13 +451,10 @@ export async function installShortcuts(args: string[]): Promise<void> {
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     console.error(reason);
-    // Exit code 2 signals a collision / refusal per the workplan spec;
-    // other failures (invalid rename, etc.) also surface here. Distinguish
-    // collisions by inspecting the message.
-    const isCollision =
-      reason.toLowerCase().includes('collision') ||
-      reason.toLowerCase().includes('prior deskwork shortcuts manifest');
-    process.exit(isCollision ? 2 : 1);
+    // Refusal-class errors (collision, prior-manifest) exit with code 2
+    // per the workplan spec. Every other failure exits 1. Discriminating
+    // on `instanceof` keeps the routing safe across message rephrasings.
+    process.exit(isRefusalError(err) ? 2 : 1);
     return;
   }
 

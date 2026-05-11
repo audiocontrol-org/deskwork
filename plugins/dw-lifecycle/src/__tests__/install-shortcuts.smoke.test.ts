@@ -8,13 +8,10 @@ import {
   runInstallShortcuts,
 } from '../subcommands/install-shortcuts.js';
 import { COMMANDS, getScheme, type SchemeId } from '../shortcuts/schemes.js';
+import { manifestPath } from '../shortcuts/manifest.js';
 
 function commandsDir(home: string): string {
   return join(home, '.claude', 'commands');
-}
-
-function manifestPath(home: string): string {
-  return join(commandsDir(home), '.dw-lifecycle-shortcuts.json');
 }
 
 function readManifest(home: string): unknown {
@@ -63,13 +60,14 @@ describe('install-shortcuts (smoke)', () => {
         rename: null,
         pluginVersion: '0.0.0',
       });
-      const m = manifest as { shims: ReadonlyArray<{ command: string; shimName: string; path: string }> };
+      const m = manifest as { shims: ReadonlyArray<{ command: string; shimName: string }> };
       expect(m.shims.length).toBe(16);
 
       for (const entry of m.shims) {
         expect(COMMANDS).toContain(entry.command);
         expect(entry.shimName).toBe(`dw-${entry.command}`);
-        expect(entry.path).toBe(join(commandsDir(tmp), `${entry.shimName}.md`));
+        // Entry contract: exactly two fields (no absolute path field).
+        expect(Object.keys(entry).sort()).toEqual(['command', 'shimName']);
       }
     });
   });
@@ -268,6 +266,38 @@ describe('install-shortcuts (smoke)', () => {
         }),
       ).toThrow(/rename/i);
     });
+
+    // Pathological inputs accepted by the looser `[a-z0-9-]+` pattern
+    // but rejected by the tighter start/end-alphanumeric rule.
+    it.each([['-'], ['--'], ['-mt'], ['mt-'], ['---']])(
+      'rejects pathological rename %s',
+      (bad) => {
+        expect(() =>
+          runInstallShortcuts({
+            home: tmp,
+            scheme: 'C',
+            pluginVersion: '0.0.0',
+            rename: bad,
+          }),
+        ).toThrow(/rename/i);
+      },
+    );
+
+    it.each([['m'], ['mt'], ['mt1'], ['my-shortcut'], ['a-b-c'], ['ab12']])(
+      'accepts legitimate rename %s',
+      (good) => {
+        expect(() =>
+          runInstallShortcuts({
+            home: tmp,
+            scheme: 'C',
+            pluginVersion: '0.0.0',
+            rename: good,
+          }),
+        ).not.toThrow();
+        // Cleanup between iterations: re-mkdir for next.
+        rmSync(commandsDir(tmp), { recursive: true, force: true });
+      },
+    );
   });
 
   describe('CLI arg parsing', () => {
@@ -318,7 +348,7 @@ describe('install-shortcuts (smoke)', () => {
     });
   });
 
-  describe('installShortcuts dispatch shell (help flag)', () => {
+  describe('installShortcuts dispatch shell', () => {
     it('prints usage and exits 0 on --help', async () => {
       const originalLog = console.log;
       const originalExit = process.exit;
@@ -338,6 +368,90 @@ describe('install-shortcuts (smoke)', () => {
         expect(exitCalls).toEqual([0]);
         expect(stdout.join('\n')).toMatch(/Usage: dw-lifecycle install-shortcuts/);
       } finally {
+        console.log = originalLog;
+        process.exit = originalExit;
+      }
+    });
+
+    it('exits with code 2 on a foreign-file collision (no --force)', async () => {
+      // Plant a foreign file in the user's $HOME so the install refuses.
+      // We override $HOME for the duration of this call so the dispatch
+      // shell resolves to our tmp dir.
+      const originalHome = process.env.HOME;
+      const originalError = console.error;
+      const originalExit = process.exit;
+      try {
+        process.env.HOME = tmp;
+        mkdirSync(commandsDir(tmp), { recursive: true });
+        const foreignPath = join(commandsDir(tmp), 'dw-implement.md');
+        writeFileSync(foreignPath, 'pre-existing content', 'utf8');
+
+        const stderr: string[] = [];
+        const exitCalls: number[] = [];
+
+        console.error = (message?: unknown) => {
+          stderr.push(String(message ?? ''));
+        };
+        process.exit = ((code?: string | number | null) => {
+          exitCalls.push(Number(code ?? 0));
+          throw new Error(`exit:${code ?? 0}`);
+        }) as typeof process.exit;
+
+        await expect(installShortcuts(['--scheme=C'])).rejects.toThrow(/exit:2/);
+        expect(exitCalls).toEqual([2]);
+        expect(stderr.join('\n')).toMatch(/collision/i);
+        // Foreign file must remain untouched.
+        expect(readFileSync(foreignPath, 'utf8')).toBe('pre-existing content');
+      } finally {
+        if (originalHome === undefined) {
+          delete process.env.HOME;
+        } else {
+          process.env.HOME = originalHome;
+        }
+        console.error = originalError;
+        process.exit = originalExit;
+      }
+    });
+
+    it('exits with code 2 on a prior-manifest refusal (no --replace)', async () => {
+      const originalHome = process.env.HOME;
+      const originalError = console.error;
+      const originalLog = console.log;
+      const originalExit = process.exit;
+      try {
+        process.env.HOME = tmp;
+
+        // Plant a prior install to refuse against.
+        runInstallShortcuts({
+          home: tmp,
+          scheme: 'C',
+          pluginVersion: '0.0.0',
+        });
+
+        const stderr: string[] = [];
+        const exitCalls: number[] = [];
+
+        console.error = (message?: unknown) => {
+          stderr.push(String(message ?? ''));
+        };
+        console.log = () => {
+          /* swallow stdout */
+        };
+        process.exit = ((code?: string | number | null) => {
+          exitCalls.push(Number(code ?? 0));
+          throw new Error(`exit:${code ?? 0}`);
+        }) as typeof process.exit;
+
+        await expect(installShortcuts(['--scheme=B'])).rejects.toThrow(/exit:2/);
+        expect(exitCalls).toEqual([2]);
+        expect(stderr.join('\n')).toMatch(/prior deskwork shortcuts manifest/i);
+      } finally {
+        if (originalHome === undefined) {
+          delete process.env.HOME;
+        } else {
+          process.env.HOME = originalHome;
+        }
+        console.error = originalError;
         console.log = originalLog;
         process.exit = originalExit;
       }
