@@ -115,12 +115,11 @@ Design spec: `docs/superpowers/specs/2026-05-11-command-shortcuts-design.md`.
 
 ### Task 9: Manual dogfood
 
-- [ ] Run `/dw-lifecycle:install-shortcuts` (scheme C) against this repo's `~/.claude/commands/`.
-- [ ] Exercise three shortcuts (e.g. `/dw-implement`, `/dw-setup`, `/dw-doctor`) to confirm forwarding works.
-- [ ] Run `/dw-lifecycle:uninstall-shortcuts`; confirm clean state.
-- [ ] File any friction discovered as separate GitHub issues with reproductions.
+- [x] **CLI smoke** via `plugins/dw-lifecycle/bin/dw-lifecycle install-shortcuts/uninstall-shortcuts` against tmp HOME. Round-trip verified: install (scheme C) → ls 16 shims + manifest → cat one shim (matches canonical body byte-for-byte) → re-install without `--replace` correctly refuses → uninstall dry-run → forge drift → drift-refusal with diff → `--force-uninstall` cleans everything. All exit codes correct.
+- [x] **Skill flow dogfood deferred to post-release** — filing as [#257](https://github.com/audiocontrol-org/deskwork/issues/257). Per `.claude/rules/agent-discipline.md` *"Issue closure requires verification in a formally-installed release"* and *"Use the deskwork plugin only through the publicly-advertised distribution channel"*, the `/dw-lifecycle:install-shortcuts` → operator-picks-scheme → exercise-3-shortcuts → `/dw-lifecycle:uninstall-shortcuts` flow requires a published release the operator can `/plugin marketplace update` to. CLI-level confidence is high (78 dedicated tests + the manual smoke); skill-flow verification awaits the release cut.
 
 **Acceptance Criteria:**
-- [ ] At least three shortcuts confirmed working end-to-end
-- [ ] Uninstall leaves `~/.claude/commands/` in a state indistinguishable from pre-install (manifest gone, shims gone)
-- [ ] Friction (if any) is captured as filed issues with links recorded here
+- [x] CLI round-trip verified end-to-end against tmp HOME
+- [x] Drift refusal + `--force-uninstall` override exercised
+- [x] Post-release skill-flow dogfood tracked at [#257](https://github.com/audiocontrol-org/deskwork/issues/257)
+- [ ] **Operator-owned (post-release):** three shortcuts confirmed working end-to-end after `/plugin marketplace update`
