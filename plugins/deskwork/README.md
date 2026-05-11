@@ -259,7 +259,22 @@ Local-dev installs hit path 1. Marketplace-install users hit path 3 once, then p
 
 ### Updates + pinning
 
-Tracks the default branch of `audiocontrol-org/deskwork`. To pull the latest, run `/plugin marketplace update deskwork && /reload-plugins`. To pin to a stable release, install the marketplace with a tag: `/plugin marketplace add audiocontrol-org/deskwork#v0.1.0`. See the [root README](../../README.md#getting-updates) for the full update story.
+Tracks the default branch of `audiocontrol-org/deskwork`. Pulling the latest is a two-step flow — Claude Code separates marketplace-catalog refresh from per-plugin payload fetch (like `apt update` + `apt upgrade`):
+
+```
+/plugin marketplace update deskwork
+/plugin install deskwork@deskwork
+/reload-plugins
+```
+
+If you also have the optional companion plugins installed, upgrade each one explicitly — `/plugin marketplace update` does NOT auto-upgrade their payloads:
+
+```
+/plugin install deskwork-studio@deskwork
+/plugin install dw-lifecycle@deskwork
+```
+
+To pin to a stable release, install the marketplace with a tag: `/plugin marketplace add audiocontrol-org/deskwork#v0.1.0`. See the [root README](../../README.md#getting-updates) for the full update story including the rationale for the two-step flow.
 
 ### Troubleshooting: bin not on PATH after install ([#89](https://github.com/audiocontrol-org/deskwork/issues/89), [#125](https://github.com/audiocontrol-org/deskwork/issues/125), [#131](https://github.com/audiocontrol-org/deskwork/issues/131))
 

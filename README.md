@@ -48,16 +48,24 @@ See each plugin's `README.md` under `plugins/` for configuration and usage. The 
 
 ### Getting updates
 
-deskwork tracks the default branch of `audiocontrol-org/deskwork`. To pull the latest:
+deskwork tracks the default branch of `audiocontrol-org/deskwork`. Claude Code splits the update flow into a metadata refresh + a per-plugin payload fetch (the analogue of `apt update` + `apt upgrade`, or `brew update` + `brew upgrade`). To pull the latest **for every plugin you have installed**:
 
 ```
 /plugin marketplace update deskwork
+/plugin install deskwork@deskwork           # if you have deskwork installed
+/plugin install deskwork-studio@deskwork    # if you have it installed
+/plugin install dw-lifecycle@deskwork       # if you have it installed
 /reload-plugins
 ```
 
-The first invocation of any deskwork skill after an update may rerun the plugin tree's `npm install --omit=dev` if the pinned `@deskwork/*` version changed (still a one-time ~30s step per update). Subsequent invocations are fast.
+What each step does:
+- `/plugin marketplace update <name>` refreshes the marketplace catalog only — it does NOT pull new plugin payloads. After this command, Claude Code knows v0.19.0 exists but your installed plugins are still running v0.18.x code.
+- `/plugin install <plugin>@<marketplace>` for each installed plugin fetches its latest payload from the now-refreshed catalog. Re-running this against an already-installed plugin upgrades it in place.
+- `/reload-plugins` activates the fetched code in the current Claude Code session without requiring a restart.
 
-By default, third-party marketplaces don't auto-update — run those two commands when you want to refresh. To toggle auto-update, use `/plugin` and look for the **Marketplaces** tab.
+The first invocation of any deskwork skill after an upgrade may rerun the plugin tree's `npm install --omit=dev` if the pinned `@deskwork/*` version changed (still a one-time ~30s step per upgrade). Subsequent invocations are fast.
+
+By default, third-party marketplaces don't auto-update the catalog — run the full sequence above when you want to refresh. To toggle catalog auto-update, use `/plugin` and look for the **Marketplaces** tab. (Even with catalog auto-update on, per-plugin `/plugin install` is still required to actually pull new payloads — auto-update only refreshes the manifest.)
 
 ### Pinning to a stable release
 
