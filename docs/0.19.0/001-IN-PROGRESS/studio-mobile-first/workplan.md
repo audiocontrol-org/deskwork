@@ -295,45 +295,19 @@ Also: the three SKILL.md files (`plugins/deskwork/skills/{block,cancel,induct}/S
 **Sub-steps:**
 
 - [x] **Step 1.8.1:** ~~Verify `/deskwork:block` round-trip works end-to-end~~ → **Gap surfaced + scoped as Task 1.7.5** (prereq, above). Folded into Task 1.8 per operator decision 2026-05-11 (Option A: single v0.20.0 release). Task 1.7.5 sub-steps execute BEFORE Step 1.8.2 begins. Verification command that surfaced the gap: `node_modules/.bin/deskwork block --help` → `unknown subcommand: block`.
-- [ ] **Step 1.8.2:** Update `affordances.ts` — render the full stage-aware verb set per the brief's table. `iterate` already present on active stages; `approve`/`cancel`/`scrapbook` already present. New: `block` button on active stages (Ideas/Planned/Outlining/Drafting/Final), `induct` button on active stages (currently rendered only on Blocked/Cancelled). Block routes through `/deskwork:block <slug>` clipboard-copy; induct routes through `/deskwork:induct <slug>` with the stage-picker happening in the skill, not the studio.
-- [ ] **Step 1.8.3:** Update `section.ts` — row markup adopts the new shape (top body: slug/title/date; trailing ⋮ button; absolute-positioned action drawer behind row-fg for swipe reveal). Both mobile and desktop variants emit the same DOM; CSS handles the chrome differences.
-- [ ] **Step 1.8.4:** Implement `row-actions.ts` client controller:
-  - matchMedia phone gate for swipe behavior (desktop = no swipe, only ⋮ menu)
-  - Touch-event swipe handler (touchstart/touchmove/touchend) with horizontal threshold for drawer reveal
-  - Open-one-row-at-a-time: opening a drawer on one row closes any other open drawer
-  - ⋮ click → menu open; click outside → close; Escape → close; menu-item click → execute verb (clipboard-copy slash command) and close
-  - Accessible: aria-expanded on ⋮, aria-haspopup, focus management on menu open/close, arrow-key navigation inside menu
-- [ ] **Step 1.8.5:** CSS for mobile chrome (`dashboard-mobile.css`):
-  - Remove the existing stacked-outlined-button rules on rows at ≤600px
-  - Add `.er-row-overflow` button styling (small, low-contrast trailing position)
-  - Add `.er-row-drawer` styling (absolute-positioned behind row-fg; revealed via translate on row-fg)
-  - Add `.er-row-menu` popover styling (matches mockup: cream paper, press-check vocabulary, dotted-divider menu items, two thin dividers separating primary/secondary/off-pipeline verb groups)
-  - Stage-aware drawer item visibility: each row's drawer renders only its stage-applicable verbs
-- [ ] **Step 1.8.6:** CSS for desktop chrome (`editorial-studio.css`):
-  - Replace stacked-outlined-button rules with `iterate ↻` + `approve →` inline chips
-  - Add `.er-row-overflow` desktop variant (slightly larger touch target since hover-driven)
-  - Reuse `.er-row-menu` popover (same styling as mobile; menus look the same across viewports)
-- [ ] **Step 1.8.7:** Update `probe-mobile-dashboard.mjs`:
-  - Assert no `[open →]` / `[approve →]` / `[cancel ⊘]` stacked-inline buttons at-rest at 390x844 (the v0.19 regression check)
-  - Assert `.er-row-overflow` visible on rows
-  - Assert tapping ⋮ sets aria-expanded=true and renders the menu
-  - Assert menu contains stage-aware verb set (iterate/approve/block/induct/cancel/scrapbook on an active-stage row)
-  - Assert swipe-left simulation reveals drawer (use Playwright's touch APIs)
-  - At desktop 1280x800: assert `iterate ↻` + `approve →` inline chips visible; swipe gesture is no-op
-- [ ] **Step 1.8.8:** Run dual-viewport smoke (`smoke-er-viewport-regressions.mjs`). All probes must stay green; this is a non-regression check.
-- [ ] **Step 1.8.9:** Walk the change against the workspace dev studio on phone via Tailscale. Verify visually: row composition matches Frame A; swipe behaves like Frame B; ⋮ menu behaves like Frame C; desktop matches the desktop frame.
-- [ ] **Step 1.8.10:** `/dw-lifecycle:review` — dispatch parallel reviewers (correctness/security + architecture/conventions). Triage findings; apply or defer per the global rule.
-- [ ] **Step 1.8.11:** Commit. Per-phase commit hygiene:
-  - `feat(studio): row-affordance redesign — overflow menu + swipe drawer + stage-aware verb vocabulary`
-  - `test(studio): dashboard probe asserts new row-affordance chrome`
-  - `fix(studio): apply review findings on row-affordance redesign`
-- [ ] **Step 1.8.12:** Retire the three superseded direction mockups into REJECTED archive entries:
-  - `REJECTED/2026-05-11-row-1-overflow-only/` — direction 1 alone (no swipe path)
-  - `REJECTED/2026-05-11-row-2-contextual-primary/` — direction 2 (depended on retired reviewState)
-  - `REJECTED/2026-05-11-row-3-swipe-only/` — direction 3 alone (no discoverable backup for non-swipers)
-  Each with a brief explaining what was rejected and why (the hybrid in `ACCEPTED/2026-05-11-row-affordance-overflow-plus-swipe/` superseded them). `git mv` the mockup files into their REJECTED entries; the mockup-4 file stays at its current path (referenced by the ACCEPTED entry).
-- [ ] **Step 1.8.13:** Release v0.20.0 via `/release`. Smoke + tag + push.
-- [ ] **Step 1.8.14:** Operator iPhone walk against the marketplace-installed v0.20.0 to confirm the redesigned chrome lands correctly.
+- [x] **Step 1.8.2:** ~~Update `affordances.ts` — render the full stage-aware verb set per the brief's table.~~ *(Landed in 4063cae. Refactored from flat-button-strip rendering into a stage-aware verb-set abstraction with three output surfaces — `renderRowActions` (inline chips + ⋮), `renderRowDrawer` (top-N drawer chips), `renderRowMenu` (full set with grouped dividers). block + induct surfaced on active stages; all verbs route via clipboard-copy of /deskwork:<verb> <slug>.)*
+- [x] **Step 1.8.3:** ~~Update `section.ts` — row markup adopts the new shape.~~ *(Landed in 4063cae. Row markup is now <er-row-shell> containing <er-row-drawer> + <er-row-fg.er-calendar-row> + <er-row-menu hidden>. data-* attrs canonical on the shell; refined in b47b6ac.)*
+- [x] **Step 1.8.4:** ~~Implement `row-actions.ts` client controller.~~ *(Landed in 4063cae. Handles ⋮ menu open/close, click-outside dismiss, Escape, arrow-key navigation, matchMedia phone-only swipe-gesture with axis-locking, open-one-at-a-time invariant across all rows.)*
+- [x] **Step 1.8.5:** ~~CSS for mobile chrome.~~ *(Landed in 4063cae; extracted into dashboard-row-affordances.css in b47b6ac per CSS file-size discipline. dashboard-mobile.css 656 → 471 lines.)*
+- [x] **Step 1.8.6:** ~~CSS for desktop chrome.~~ *(Landed in 4063cae; cancel/block/scrapbook accent rules added in b47b6ac per review.)*
+- [x] **Step 1.8.7:** ~~Update `probe-mobile-dashboard.mjs`.~~ *(Landed in df71d3b. 28 assertions total (was 16): adds row-shell structure check, no-stacked-buttons v0.19 regression check, no-inline-chip mobile check, ⋮ menu open/close, stage-aware verb-set rendering, click-outside dismiss, desktop inline-chip visibility + drawer:display:none.)*
+- [x] **Step 1.8.8:** ~~Run dual-viewport smoke.~~ *(0 failures across 8 probes: 3 entries × 2 viewports + dashboard × 2 viewports.)*
+- [ ] **Step 1.8.9:** Operator visual walk against the workspace dev studio on phone via Tailscale. URL: http://orion-m4.tail8254f4.ts.net:47330/dev/editorial-studio. *(Operator-driven.)*
+- [x] **Step 1.8.10:** ~~`/dw-lifecycle:review` — dispatch parallel reviewers.~~ *(Done. Dispatched code-reviewer + architect-reviewer in parallel against `6ef72e6..HEAD`. Findings triaged: 5 applied in b47b6ac, 1 deferred with GitHub issue #246 (pre-existing /deskwork:approve refuses Final — couples with deferred public-versioning work).)*
+- [x] **Step 1.8.11:** ~~Commit.~~ *(Per-phase commit hygiene: 20ca3e4 feat(cli) [Task 1.7.5 folded]; 4063cae feat(studio); df71d3b test(studio); b47b6ac fix(studio); 64a77f1 design(studio) [mockup retirement].)*
+- [x] **Step 1.8.12:** ~~Retire the three superseded direction mockups into REJECTED archive entries.~~ *(Landed in 64a77f1. REJECTED/2026-05-11-row-{1,2,3}-* entries each with brief.md + mockup.html (git mv'd from public/mockups/). mockups/index.html updated to point at the picked Row 4 + cross-link the REJECTED entries.)*
+- [ ] **Step 1.8.13:** Release v0.20.0 via `/release`. Smoke + tag + push. *(Operator-driven.)*
+- [ ] **Step 1.8.14:** Operator iPhone walk against the marketplace-installed v0.20.0 to confirm the redesigned chrome lands correctly. *(Operator-driven, post-release.)*
 
 **Acceptance:**
 - Mobile dashboard rows: clean at-rest, no stacked inline buttons, trailing ⋮ visible
