@@ -16,14 +16,16 @@ Design spec: `docs/superpowers/specs/2026-05-11-command-shortcuts-design.md`.
 
 ### Task 1: Schemes module + tests
 
-- [ ] Author `plugins/dw-lifecycle/src/shortcuts/schemes.ts` with static command→shim maps for schemes A (2-letter `dw<initial>` with disambiguation), B (3-letter `dw-<2-char>`), and C (`dw-<verb>`).
-- [ ] Unit-test correctness: every one of the 16 dw-lifecycle commands maps to a unique shim name within each scheme; no duplicates within a scheme; the full table is covered for all three schemes.
-- [ ] Tests live at `plugins/dw-lifecycle/src/__tests__/shortcuts.test.ts`.
+- [x] Author `plugins/dw-lifecycle/src/shortcuts/schemes.ts` with static command→shim maps for schemes A (2-letter `dw<initial>` with disambiguation), B (3-letter `dw-<2-char>`), and C (`dw-<verb>`).
+- [x] Unit-test correctness: every one of the 16 dw-lifecycle commands maps to a unique shim name within each scheme; no duplicates within a scheme; the full table is covered for all three schemes.
+- [x] Tests live at `plugins/dw-lifecycle/src/__tests__/shortcuts.test.ts`.
 
 **Acceptance Criteria:**
-- [ ] Vitest passes locally for the schemes module
-- [ ] All 16 commands × 3 schemes have explicit test coverage
-- [ ] No-duplicates invariant is asserted per scheme
+- [x] Vitest passes locally for the schemes module
+- [x] All 16 commands × 3 schemes have explicit test coverage
+- [x] No-duplicates invariant is asserted per scheme
+
+**Landed:** `c6cfcf7` (initial) + `aae403e` (code-review fixes: collapsed dual map+order into single tuple-list source of truth; strengthened no-duplicates test with entry-set parity; robust on-disk parity scan). 116 shortcuts tests green; full plugin suite 236 tests green.
 
 ### Task 2: Install CLI helper
 
