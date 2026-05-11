@@ -45,16 +45,18 @@ Design spec: `docs/superpowers/specs/2026-05-11-command-shortcuts-design.md`.
 
 ### Task 3: Uninstall CLI helper
 
-- [ ] Author `plugins/dw-lifecycle/src/subcommands/uninstall-shortcuts.ts` exposing `dw-lifecycle uninstall-shortcuts [--force-uninstall] [--dry-run]`.
-- [ ] Read manifest; drift-check each shim's current content against what was originally written; refuse on drift unless `--force-uninstall`.
-- [ ] Remove each shim; remove the manifest.
-- [ ] Register the subcommand in `plugins/dw-lifecycle/src/cli.ts`.
-- [ ] Extend the integration test to cover install → uninstall cycle, drift refusal, missing-shim graceful handling.
+- [x] Author `plugins/dw-lifecycle/src/subcommands/uninstall-shortcuts.ts` exposing `dw-lifecycle uninstall-shortcuts [--force-uninstall] [--dry-run]`.
+- [x] Read manifest; drift-check each shim's current content against what was originally written; refuse on drift unless `--force-uninstall`.
+- [x] Remove each shim; remove the manifest.
+- [x] Register the subcommand in `plugins/dw-lifecycle/src/cli.ts`.
+- [x] Extend the integration test to cover install → uninstall cycle, drift refusal, missing-shim graceful handling.
 
 **Acceptance Criteria:**
-- [ ] Manifest drift is detected and surfaces a diff
-- [ ] `--force-uninstall` overrides drift refusal
-- [ ] A manually-deleted shim is noted but doesn't fail the uninstall
+- [x] Manifest drift is detected and surfaces a diff
+- [x] `--force-uninstall` overrides drift refusal
+- [x] A manually-deleted shim is noted but doesn't fail the uninstall
+
+**Landed:** `aea6fbc` (initial — extracted shortcuts/shim-body.ts as canonical body source for install + uninstall; DriftError joined CollisionError + PriorManifestError under isRefusalError) + `de864e8` (code-review fixes: manifestRemoved=false on dry-run, multi-line drift content escaped in error message, shimBody validates command, hardened happy-path exit assertion). 22 uninstall + 4 shim-body tests; full plugin suite 314 green.
 
 ## Phase 2: Skills + plugin integration
 
