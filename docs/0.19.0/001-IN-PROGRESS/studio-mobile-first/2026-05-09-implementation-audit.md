@@ -1,7 +1,7 @@
 ---
 title: studio-mobile-first implementation audit
 date: 2026-05-09
-revised: 2026-05-10
+revised: 2026-05-11
 audited-branch: feature/studio-mobile-first
 audited-against: docs/0.19.0/001-IN-PROGRESS/studio-mobile-first/workplan.md
 ---
@@ -12,42 +12,35 @@ audited-against: docs/0.19.0/001-IN-PROGRESS/studio-mobile-first/workplan.md
 
 This audit compares the current `feature/studio-mobile-first` branch against the recorded feature workplan. It is a static implementation audit only: code, docs, tests, probes, and feature artifacts were inspected, but no fixes were applied and no new behavioral verification was run.
 
-This report was revised after subsequent audit passes on May 9 and May 10, 2026. The first pass under-called some completed work. In particular:
+This report was revised after subsequent audit passes on May 9, May 10, and May 11, 2026. Earlier revisions under-called some completed work, and this revision also supersedes findings that are no longer true. In particular:
 
 - Phase 0.3 artifacts do exist (`DESIGN-STANDARDS.md`, `docs/studio-design/`, `.claude/rules/design-standards.md`).
 - `session-start` was updated to read both `DESKWORK-STATE-MACHINE.md` and `DESIGN-STANDARDS.md`.
 - `scripts/probe-mobile-dashboard.mjs` exists, and `scripts/smoke-er-viewport-regressions.mjs` now includes `/dev/editorial-studio`.
+- `ReviewState` has been removed from the entry schema, `iterate.ts` no longer writes it, the root feature README is no longer scaffold text, and `.claude/rules/state-machine.md` now exists.
 
 ## Findings
 
-### 1. Phase 0.2 conformance is still incomplete, and canonical docs now contradict live code in a few important places
+### 1. Phase 0.2 is marked complete in feature docs, but several adopter-facing and canonical docs still describe pre-cleanup review-state semantics
 
-The branch did land the state-machine spec and the design-standards/archive work, but the Phase 0.2 “audit + destroy violations” pass is still incomplete. The unresolved issue is no longer “Phase 0 didn’t happen”; it is “Phase 0 happened unevenly.”
+The branch has now removed `ReviewState` from the entry schema and stopped writing it in the iterate path, but the documentation cleanup is still incomplete.
 
-- `ReviewState` is still a first-class schema type and field in [packages/core/src/schema/entry.ts](/Users/orion/work/deskwork-studio-mobile-first/packages/core/src/schema/entry.ts:1).
-- The core iterate/approve flow still persists and journals review-state semantics in [packages/core/src/iterate/iterate.ts](/Users/orion/work/deskwork-studio-mobile-first/packages/core/src/iterate/iterate.ts:100) and [packages/core/src/entry/approve.ts](/Users/orion/work/deskwork-studio-mobile-first/packages/core/src/entry/approve.ts:99).
-- The top-level project README still teaches a retired lifecycle with a `Review` stage: [README.md](/Users/orion/work/deskwork-studio-mobile-first/README.md:19).
 - Plugin-facing docs and skills still surface review-state language, for example:
   - [plugins/deskwork/README.md](/Users/orion/work/deskwork-studio-mobile-first/plugins/deskwork/README.md:84)
   - [plugins/deskwork/skills/status/SKILL.md](/Users/orion/work/deskwork-studio-mobile-first/plugins/deskwork/skills/status/SKILL.md:3)
   - [plugins/deskwork/skills/doctor/SKILL.md](/Users/orion/work/deskwork-studio-mobile-first/plugins/deskwork/skills/doctor/SKILL.md:55)
-- `DESIGN-STANDARDS.md` says the vestigial `ReviewState` exists only for back-compat and that new code does not write it, but `iterate.ts` still writes it today. That means the canonical design doc and the implementation disagree: [DESIGN-STANDARDS.md](/Users/orion/work/deskwork-studio-mobile-first/DESIGN-STANDARDS.md:148), [packages/core/src/iterate/iterate.ts](/Users/orion/work/deskwork-studio-mobile-first/packages/core/src/iterate/iterate.ts:97).
+- Canonical docs still describe a vestigial `ReviewState` type/read-side artifact, but that type is now gone from the entry schema. The prose is behind the implementation in both [DESIGN-STANDARDS.md](/Users/orion/work/deskwork-studio-mobile-first/DESIGN-STANDARDS.md:148) and [.claude/rules/state-machine.md](/Users/orion/work/deskwork-studio-mobile-first/.claude/rules/state-machine.md:13).
 
-This is the highest-severity remaining gap. The problem is no longer missing artifacts; it is incomplete conformance cleanup across code, canonical docs, and user-facing project docs.
+This is the highest-severity remaining gap. The branch did the code cleanup, but the surrounding guidance still over-explains or mis-explains a model that is no longer present in the entry schema.
 
-### 2. The feature-status docs are internally inconsistent and no longer trustworthy as pickup state
+### 2. The feature-status docs improved materially, but they still overstate “complete” for Phase 0.2
 
-The feature README still reads like a brand-new scaffold, while the workplan now contains a mix of recorded completions and stale unchecked tasks.
+The feature README is no longer placeholder content, and the workplan’s Phase 0.1 / 1.1 / 1.2 checkbox drift has largely been corrected. The remaining problem is narrower: feature-facing status now says Phase 0.2 is complete, while the repo still contains unresolved review-state language in adopter docs and skills.
 
-- The feature README still has placeholder prose and claims Phase 1 is “Not started”: [README.md](/Users/orion/work/deskwork-studio-mobile-first/docs/0.19.0/001-IN-PROGRESS/studio-mobile-first/README.md:1).
-- The workplan records Phase 0.3 and Phase 1.3/1.4 as completed, but Phase 1.1/1.2 remain unchecked even though the repo clearly contains the dashboard mockups, dashboard mobile CSS, stage-tile controller, compose-chip controller, and dashboard probe:
-  - [packages/studio/src/pages/dashboard.ts](/Users/orion/work/deskwork-studio-mobile-first/packages/studio/src/pages/dashboard.ts:1)
-  - [plugins/deskwork-studio/public/css/dashboard-mobile.css](/Users/orion/work/deskwork-studio-mobile-first/plugins/deskwork-studio/public/css/dashboard-mobile.css:1)
-  - [plugins/deskwork-studio/public/src/dashboard/stage-tiles.ts](/Users/orion/work/deskwork-studio-mobile-first/plugins/deskwork-studio/public/src/dashboard/stage-tiles.ts:1)
-  - [plugins/deskwork-studio/public/src/dashboard/compose-chip.ts](/Users/orion/work/deskwork-studio-mobile-first/plugins/deskwork-studio/public/src/dashboard/compose-chip.ts:1)
-  - [scripts/probe-mobile-dashboard.mjs](/Users/orion/work/deskwork-studio-mobile-first/scripts/probe-mobile-dashboard.mjs:1)
+- The feature README now reports `0.2` as complete: [README.md](/Users/orion/work/deskwork-studio-mobile-first/docs/0.19.0/001-IN-PROGRESS/studio-mobile-first/README.md:14).
+- The workplan records `1.6` and `1.7` as complete and closes the old schema/README/rule gaps, but the remaining plugin-doc and skill drift means “complete” is still too strong for the broader Phase 0.2 goal as written.
 
-The result is that a future session-start or pickup pass cannot infer true feature state from either feature doc alone.
+The pickup-state problem is now mostly fixed. The remaining mismatch is between “complete” in feature docs and the still-open cleanup surface in adopter-facing prose.
 
 ### 3. Implementation order diverged from the sequenced plan, and the workplan does not yet narrate that drift clearly
 
@@ -69,26 +62,29 @@ The code can legitimately diverge from the original sequence, but once that happ
 
 ### Phase 0
 
-Status: `mixed`
+Status: `mostly complete, with residual Phase 0.2 doc drift`
 
-- Task 0.1: substantially implemented, but the checkbox ledger is stale.
+- Task 0.1: complete.
   - `DESKWORK-STATE-MACHINE.md` exists and is substantial: [DESKWORK-STATE-MACHINE.md](/Users/orion/work/deskwork-studio-mobile-first/DESKWORK-STATE-MACHINE.md:1).
   - `session-start` now reads the state-machine spec and design standards: [.claude/skills/session-start/SKILL.md](/Users/orion/work/deskwork-studio-mobile-first/.claude/skills/session-start/SKILL.md:15).
-  - Step 0.1.6 is not complete as written: no `.claude/rules/state-machine.md` file is present.
-- Task 0.2: partially implemented.
+  - `.claude/rules/state-machine.md` now exists: [.claude/rules/state-machine.md](/Users/orion/work/deskwork-studio-mobile-first/.claude/rules/state-machine.md:1).
+- Task 0.2: mostly implemented, but not fully complete as claimed.
   - Dashboard/UI behavior was moved toward stage-gated verbs and stage-driven defaults:
     - [packages/studio/src/pages/dashboard/affordances.ts](/Users/orion/work/deskwork-studio-mobile-first/packages/studio/src/pages/dashboard/affordances.ts:65)
     - [packages/studio/src/pages/index.ts](/Users/orion/work/deskwork-studio-mobile-first/packages/studio/src/pages/index.ts:75)
-  - Review-state persistence, schema, and adopter-facing/plugin-facing prose are still live, so the conformance sweep is not done.
-- Task 0.3: largely implemented.
+  - The entry schema cleanup did land:
+    - [packages/core/src/schema/entry.ts](/Users/orion/work/deskwork-studio-mobile-first/packages/core/src/schema/entry.ts:1)
+    - [packages/core/src/iterate/iterate.ts](/Users/orion/work/deskwork-studio-mobile-first/packages/core/src/iterate/iterate.ts:95)
+  - Adopter-facing/plugin-facing prose still contains review-state language, so the conformance sweep is not fully done.
+- Task 0.3: complete.
   - Top-level design standards doc exists: [DESIGN-STANDARDS.md](/Users/orion/work/deskwork-studio-mobile-first/DESIGN-STANDARDS.md:1).
   - Proposal archive exists: [docs/studio-design/README.md](/Users/orion/work/deskwork-studio-mobile-first/docs/studio-design/README.md:1).
   - `.claude/rules/design-standards.md` exists.
-  - Step 0.3.8 operator sign-off is still unchecked in the workplan.
+  - The workplan now records operator sign-off on 0.3.8.
 
 ### Phase 1
 
-Status: `substantially implemented, but incompletely recorded`
+Status: `implemented through 1.4, with release/verification pending`
 
 - Task 1.1: implemented.
   - Dashboard audit exists: [dashboard-audit.md](/Users/orion/work/deskwork-studio-mobile-first/docs/0.19.0/001-IN-PROGRESS/studio-mobile-first/dashboard-audit.md:1).
@@ -101,6 +97,10 @@ Status: `substantially implemented, but incompletely recorded`
   - Smoke includes dashboard coverage: [scripts/smoke-er-viewport-regressions.mjs](/Users/orion/work/deskwork-studio-mobile-first/scripts/smoke-er-viewport-regressions.mjs:10).
 - Task 1.4: recorded as implemented in the workplan.
   - The workplan now includes reviewer/disposition notes for 1.4.1–1.4.4.
+- Task 1.6: implemented.
+  - The workplan records six audit-driven remediation commits, including the root README fix, state-machine rule, feature README rewrite, and Phase 4 re-narration.
+- Task 1.7: implemented.
+  - The workplan records schema removal and cascade cleanup.
 - Task 1.5: not evidenced in this feature directory.
   - No feature-local release verification note for `v0.19.0`.
   - The feature docs do not record issue-closeout or iPhone verification.
@@ -158,13 +158,14 @@ Even with the gaps above, the branch already contains meaningful work that shoul
 
 ## Recommended Next Doc Corrections
 
-1. Update the feature README so it no longer presents this branch as “Not started.”
-2. Reconcile the workplan checkbox ledger with the actual implementation state for Phase 0.1 and Phase 1.1/1.2. Right now the narrative notes say work landed, but the checkboxes still read as undone.
-3. Record which work landed out of order:
+1. Tighten the remaining Phase 0.2 prose so “complete” is actually true:
+   - remove lingering review-state language from `plugins/deskwork/README.md`
+   - remove or rewrite stale `reviewState` references in deskwork skills such as `status` and `doctor`
+   - update canonical docs that still describe a vestigial `ReviewState` type when the type has already been removed
+2. Record which work landed out of order:
    - `#242` before Phase 4
    - `#244` before the planned Shortform/`mobile-shell` phase
-4. Add a Phase 0.2 cleanup note explicitly calling out the remaining contradictions:
-   - root README still teaches a `Review` stage
-   - plugin README and some deskwork skills still teach `reviewState` semantics
-   - `iterate.ts` still writes `reviewState`
-   - canonical docs should not claim that conformance sweep is complete until those are resolved
+3. Add a release/verification note when Phase 1.5 actually happens:
+   - v0.19.0 release
+   - iPhone verification
+   - issue closeout narrative for `#236`, `#237`, `#238`, and `#243`
