@@ -23,11 +23,13 @@
  * rule on the left so a tree of nested chapters reads as belonging to
  * the same parent, without trying to imitate a real tree-view widget.
  */
-.er-calendar-row-wrap[data-depth] {
+.er-calendar-row-wrap[data-depth],
+.er-row-shell[data-depth] {
   position: relative;
   padding-left: calc(var(--er-row-depth, 0) * 1.4rem);
 }
-.er-calendar-row-wrap[data-depth]::before {
+.er-calendar-row-wrap[data-depth]::before,
+.er-row-shell[data-depth]::before {
   content: "";
   position: absolute;
   left: calc((var(--er-row-depth, 0) - 0.5) * 1.4rem);
@@ -36,6 +38,156 @@
   width: 1px;
   background: var(--er-rule-mid, currentColor);
   opacity: 0.18;
+}
+
+/* ---------------------------------------------------------------------
+ * Row-affordance chrome (v0.20 redesign) — desktop variant.
+ *
+ * Mobile rules live in dashboard-mobile.css under the @media (max-width:
+ * 600px) block. On desktop, the row chrome keeps high-frequency verbs
+ * (iterate / approve / view / induct as applicable) as inline outlined
+ * chips next to the row content; the same `⋮` overflow button + menu
+ * popover hold the secondary verbs (block / cancel / scrapbook).
+ *
+ * Shell stays position:relative on desktop so the menu popover anchors
+ * cleanly. No swipe gesture on desktop (matchMedia-gated in the client
+ * controller).
+ * --------------------------------------------------------------------- */
+
+.er-row-shell {
+  position: relative;
+}
+
+/* Drawer renders in DOM but is hidden on desktop — swipe is mobile-only. */
+.er-row-drawer {
+  display: none;
+}
+
+/* Inline desktop chips — high-frequency verbs as outlined press-check
+ * pills. Each chip uses its accent color (iterate=proof-blue,
+ * approve=stamp-green, induct=proof-blue, view=kraft). */
+.er-row-affordances {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.er-btn-chip {
+  font-family: var(--er-font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  padding: 0.35rem 0.7rem;
+  border-radius: 1px;
+  border: 1px solid var(--er-paper-3);
+  background: transparent;
+  cursor: pointer;
+  text-transform: lowercase;
+  line-height: 1.1;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.er-btn-chip.is-copied {
+  background: rgba(46, 93, 69, 0.1);
+}
+.er-btn-chip-iterate { border-color: var(--er-proof-blue); color: var(--er-proof-blue); }
+.er-btn-chip-approve { border-color: var(--er-stamp-green); color: var(--er-stamp-green); }
+.er-btn-chip-induct  { border-color: var(--er-proof-blue); color: var(--er-proof-blue); }
+.er-btn-chip-view    { border-color: var(--er-kraft); color: var(--er-kraft); }
+
+/* Overflow button — same shape as mobile, slightly smaller hit area. */
+.er-row-overflow {
+  background: transparent;
+  border: 0;
+  color: var(--er-faded);
+  font-family: var(--er-font-mono);
+  font-size: 1.15rem;
+  line-height: 1;
+  padding: 0.2rem 0.45rem;
+  cursor: pointer;
+}
+.er-row-overflow:hover,
+.er-row-overflow:focus-visible {
+  color: var(--er-ink);
+  outline: none;
+}
+.er-row-overflow[aria-expanded="true"] {
+  color: var(--er-red-pencil);
+}
+
+/* Menu popover — desktop reuses the mobile shape; anchored bottom-right
+ * of the row, drops downward. */
+.er-row-menu {
+  position: absolute;
+  z-index: 200;
+  top: 100%;
+  right: 0.2rem;
+  margin-top: 0.4rem;
+  background: var(--er-paper);
+  border: 1px solid var(--er-paper-3);
+  border-radius: 2px;
+  min-width: 240px;
+  padding: 0.3rem 0;
+  box-shadow:
+    0 10px 24px rgba(26, 22, 20, 0.18),
+    0 2px 4px rgba(26, 22, 20, 0.08);
+}
+.er-row-menu[hidden] {
+  display: none;
+}
+.er-row-menu-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.55rem;
+  padding: 0.5rem 0.85rem;
+  border: 0;
+  border-bottom: 1px dotted var(--er-paper-3);
+  background: transparent;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+.er-row-menu-item:last-child { border-bottom: 0; }
+.er-row-menu-item:hover,
+.er-row-menu-item:focus-visible {
+  background: var(--er-paper-2);
+  outline: none;
+}
+.er-row-menu-glyph {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-size: 1rem;
+  line-height: 1;
+  width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.er-row-menu-glyph-iterate { color: var(--er-proof-blue); }
+.er-row-menu-glyph-approve { color: var(--er-stamp-green); }
+.er-row-menu-glyph-cancel  { color: var(--er-red-pencil); }
+.er-row-menu-glyph-block   { color: var(--er-kraft); }
+.er-row-menu-glyph-induct  { color: var(--er-proof-blue); }
+.er-row-menu-glyph-scrapbook,
+.er-row-menu-glyph-view    { color: var(--er-kraft); }
+.er-row-menu-label {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-size: 0.92rem;
+  line-height: 1.2;
+  color: var(--er-ink);
+}
+.er-row-menu-cmd {
+  font-family: var(--er-font-mono);
+  font-size: 0.52rem;
+  letter-spacing: 0.06em;
+  color: var(--er-faded);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.er-row-menu-divider {
+  border: 0;
+  border-top: 1px solid var(--er-paper-3);
+  margin: 0.25rem 0.7rem;
 }
 .er-row-slug-ancestors {
   font-variation-settings: "opsz" 28, "wght" 350;
@@ -321,7 +473,8 @@ a.er-calendar-meta-link:focus-visible {
   /* Hierarchical-row indent at narrow widths is cosmetic noise — the
    * left rail and slug shape already convey the relationship. Drop the
    * left padding so child rows recover horizontal budget. */
-  .er-calendar-row-wrap[data-depth] {
+  .er-calendar-row-wrap[data-depth],
+  .er-row-shell[data-depth] {
     padding-left: 0;
   }
   .er-calendar-row-wrap[data-depth]::before {

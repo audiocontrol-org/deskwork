@@ -16,7 +16,7 @@
 
 import { html, unsafe, type RawHtml } from '../html.ts';
 import type { Entry, Stage } from '@deskwork/core/schema/entry';
-import { renderRowActions } from './affordances.ts';
+import { renderRowActions, renderRowDrawer, renderRowMenu } from './affordances.ts';
 
 const STAGE_ORNAMENTS: Record<Stage, string> = {
   Ideas: '◇',
@@ -64,9 +64,25 @@ export function renderRow(entry: Entry, index: number, defaultSite: string): Raw
       ? unsafe(html` data-depth="${depth}" style="--er-row-depth: ${depth}"`)
       : '';
 
+  // Row composition (v0.20 redesign — ACCEPTED archive entry
+  // `docs/studio-design/ACCEPTED/2026-05-11-row-affordance-overflow-plus-swipe/`):
+  //   <er-row-shell data-row-shell>
+  //     <er-row-drawer/>        ← absolute-positioned, hidden at-rest;
+  //                               revealed by swipe-left translating row-fg.
+  //     <er-row-fg>             ← visible foreground.
+  //       <er-row-num/>
+  //       <er-calendar-body/>   ← slug + title + date
+  //       <er-row-affordances/> ← inline chips (desktop) + ⋮ button
+  //     </er-row-fg>
+  //     <er-row-menu/>          ← absolute-positioned popover anchored to ⋮.
+  //   </er-row-shell>
+  // Client controller `row-actions.ts` wires the swipe gesture + menu state.
   return unsafe(html`
-    <div class="er-calendar-row-wrap" data-row-wrap data-search="${search}"${depthAttrs}>
-      <div class="er-calendar-row" data-stage="${entry.currentStage}"
+    <div class="er-row-shell" data-row-shell data-search="${search}"${depthAttrs}
+      data-stage="${entry.currentStage}"
+      data-uuid="${entry.uuid}" data-slug="${entry.slug}">
+      ${renderRowDrawer(entry, defaultSite)}
+      <div class="er-row-fg er-calendar-row" data-stage="${entry.currentStage}"
         data-uuid="${entry.uuid}" data-slug="${entry.slug}" data-search="${search}">
         <span class="er-row-num">№ ${String(index + 1).padStart(2, '0')}</span>
         <div class="er-calendar-body">
@@ -79,6 +95,7 @@ export function renderRow(entry: Entry, index: number, defaultSite: string): Raw
         <span class="er-calendar-status" aria-hidden="true"></span>
         ${renderRowActions(entry, defaultSite)}
       </div>
+      ${renderRowMenu(entry, defaultSite)}
     </div>`);
 }
 
