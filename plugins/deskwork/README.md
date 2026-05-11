@@ -259,7 +259,18 @@ Local-dev installs hit path 1. Marketplace-install users hit path 3 once, then p
 
 ### Updates + pinning
 
-Tracks the default branch of `audiocontrol-org/deskwork`. Pulling the latest is a two-step flow — Claude Code separates marketplace-catalog refresh from per-plugin payload fetch (like `apt update` + `apt upgrade`):
+Tracks the default branch of `audiocontrol-org/deskwork`. The command sequence depends on whether your install is **user-scope** (global to your machine; auto-upgrades on marketplace update) or **project-scope** (pinned to the project where you ran `/plugin install`; needs explicit re-install to upgrade). See the [root README § Install scope](../../README.md#install-scope-user-vs-project) for the scope distinction in full.
+
+**User-scope installs (the default):**
+
+```
+/plugin marketplace update deskwork
+/reload-plugins
+```
+
+The marketplace update advances the catalog and Claude Code auto-upgrades the user-scope install.
+
+**Project-scope installs:**
 
 ```
 /plugin marketplace update deskwork
@@ -267,14 +278,16 @@ Tracks the default branch of `audiocontrol-org/deskwork`. Pulling the latest is 
 /reload-plugins
 ```
 
-If you also have the optional companion plugins installed, upgrade each one explicitly — `/plugin marketplace update` does NOT auto-upgrade their payloads:
+The explicit `/plugin install` re-fetches the payload at the current catalog version in this project's scope. If you also have the optional companion plugins installed at project-scope, upgrade each:
 
 ```
 /plugin install deskwork-studio@deskwork
 /plugin install dw-lifecycle@deskwork
 ```
 
-To pin to a stable release, install the marketplace with a tag: `/plugin marketplace add audiocontrol-org/deskwork#v0.1.0`. See the [root README](../../README.md#getting-updates) for the full update story including the rationale for the two-step flow.
+**To pin to a stable release**, install the marketplace with a tag: `/plugin marketplace add audiocontrol-org/deskwork#v0.1.0`.
+
+See the [root README § Getting updates](../../README.md#getting-updates) for the full update flow including filesystem layout, registry inspection, and the rationale for the two-step model.
 
 ### Troubleshooting: bin not on PATH after install ([#89](https://github.com/audiocontrol-org/deskwork/issues/89), [#125](https://github.com/audiocontrol-org/deskwork/issues/125), [#131](https://github.com/audiocontrol-org/deskwork/issues/131))
 
