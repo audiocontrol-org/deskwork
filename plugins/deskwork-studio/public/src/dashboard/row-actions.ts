@@ -145,8 +145,20 @@ function wireRowBodyClick(shell: HTMLElement): void {
     if (!(target instanceof Element)) return;
     // Let buttons + links own their own clicks.
     if (target.closest('button, a, [data-row-overflow]')) return;
-    // Don't navigate if any drawer or menu is open on this shell.
-    if (shell.classList.contains('is-menu-open') || shell.classList.contains('is-swiped')) return;
+    // Spec: "Tap the row body, swipe right, or scroll away closes."
+    // A tap on a latched-open row dismisses the drawer rather than
+    // navigating to the entry-review surface.
+    if (shell.classList.contains('is-swiped')) {
+      closeSurface(shell);
+      return;
+    }
+    // Don't navigate when a menu is open — the menu's own dismiss
+    // logic handles the click via wireGlobalDismiss.
+    if (shell.classList.contains('is-menu-open')) return;
+    // Don't navigate if this click is the synthesized tail of a swipe
+    // gesture (touchend with movement fires a click; without this gate
+    // a swipe-to-close would close AND navigate in the same event).
+    if (shell.dataset.justSwiped) return;
     window.location.href = `/dev/editorial-review/entry/${uuid}`;
   });
   // Make it clear the row is clickable.
@@ -236,11 +248,27 @@ function wireSwipe(shell: HTMLElement): void {
   let dragging = false;
   let axisLocked: 'h' | 'v' | null = null;
   let translating = false;
+  // `startedLatched` records whether the row was already swiped-open when
+  // the touch began. The two cases need opposite gesture handling:
+  //   - not latched + leftward swipe → open
+  //   - latched + rightward swipe → close
+  // Per the spec brief: "Tap the row body, swipe right, or scroll away
+  // closes." Without distinguishing these cases, a latched row could only
+  // be closed by tapping outside it — which the operator caught.
+  let startedLatched = false;
+  let drawerWidth = 0;
+
+  function getDrawerWidth(): number {
+    const drawer = shell.querySelector<HTMLElement>('.er-row-drawer');
+    if (!drawer) return 0;
+    return drawer.querySelectorAll('.er-row-action').length * 64;
+  }
 
   function reset(): void {
     dragging = false;
     axisLocked = null;
     translating = false;
+    startedLatched = false;
     fg!.style.transition = '';
     fg!.style.transform = '';
   }
@@ -256,8 +284,8 @@ function wireSwipe(shell: HTMLElement): void {
       dragging = true;
       axisLocked = null;
       translating = false;
-      // Don't set transition: 'none' until we're actually translating —
-      // otherwise a tap leaves transition disabled until the next move.
+      startedLatched = shell.classList.contains('is-swiped');
+      drawerWidth = startedLatched ? getDrawerWidth() : 0;
     },
     { passive: true },
   );
@@ -277,13 +305,25 @@ function wireSwipe(shell: HTMLElement): void {
         axisLocked = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
       }
       if (axisLocked !== 'h') return;
-      // Only translate once dx exceeds the commit threshold. Below
-      // commit, even a clear horizontal jitter doesn't reveal the
-      // drawer — a tap with natural finger drift shows zero visual
-      // movement.
+
+      if (startedLatched) {
+        // Closing gesture: anchor is -drawerWidth; positive dx drags the
+        // foreground back toward 0 (closed). Clamp so the operator can't
+        // overshoot in either direction.
+        if (!translating) {
+          translating = true;
+          fg.style.transition = 'none';
+        }
+        const target = Math.max(-drawerWidth, Math.min(0, -drawerWidth + dx));
+        fg.style.transform = `translateX(${target}px)`;
+        return;
+      }
+
+      // Opening gesture: leftward dx past the commit threshold begins
+      // translating the foreground. Below commit, taps with natural
+      // finger drift show zero visual movement.
       if (dx > -SWIPE_COMMIT_PX) {
         if (translating) {
-          // We had committed; user is dragging back below threshold.
           fg.style.transform = '';
         }
         return;
@@ -292,8 +332,6 @@ function wireSwipe(shell: HTMLElement): void {
         translating = true;
         fg.style.transition = 'none';
       }
-      // Subtract the commit threshold so the visible motion begins at 0
-      // when the user crosses the commit line, not at -24.
       const tx = dx + SWIPE_COMMIT_PX;
       fg.style.transform = `translateX(${tx}px)`;
     },
@@ -310,11 +348,24 @@ function wireSwipe(shell: HTMLElement): void {
       // some jitter) or a vertical scroll. Nothing to snap back.
       axisLocked = null;
       translating = false;
+      startedLatched = false;
       return;
     }
     const t = e.changedTouches[0];
     const dx = t ? t.clientX - startX : 0;
-    if (dx < -SWIPE_LATCH_PX) {
+
+    if (startedLatched) {
+      // Closing: rightward dx past the latch threshold closes; else
+      // snap back to the latched-open position.
+      if (dx > SWIPE_LATCH_PX) {
+        fg!.style.transform = '';
+        shell.classList.remove('is-swiped');
+        openSurfaces.delete(shell);
+        syncBodyOpenSurfaceFlag();
+      } else {
+        openDrawer(shell);
+      }
+    } else if (dx < -SWIPE_LATCH_PX) {
       openDrawer(shell);
     } else {
       fg!.style.transform = '';
@@ -322,8 +373,19 @@ function wireSwipe(shell: HTMLElement): void {
       openSurfaces.delete(shell);
       syncBodyOpenSurfaceFlag();
     }
+
+    // Mark the row as "just swiped" so the click event that browsers
+    // synthesize after a touchend with movement doesn't fire navigation
+    // via wireRowBodyClick. The flag clears after one event loop tick;
+    // 300ms is the upper bound of iOS click-after-touch latency.
+    shell.dataset.justSwiped = '1';
+    window.setTimeout(() => {
+      delete shell.dataset.justSwiped;
+    }, 300);
+
     axisLocked = null;
     translating = false;
+    startedLatched = false;
   }
 
   fg.addEventListener('touchend', onEnd, { passive: true });

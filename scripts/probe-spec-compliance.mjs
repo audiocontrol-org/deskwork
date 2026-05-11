@@ -303,7 +303,108 @@ for (const { stage } of stagesWithRows) {
     fullPage: false,
   });
 
-  // Dismiss the latched drawer before moving to the next stage.
+  // Spec assertion 7: SWIPE-RIGHT-TO-CLOSE on a latched row. Brief:
+  // "Tap the row body, swipe right, or scroll away closes." Simulate
+  // a rightward touch-swipe past the latch threshold and assert the
+  // foreground transform clears and is-swiped is removed.
+  const closeBySwipe = await page.evaluate(async (s) => {
+    function fire(fg, type, x, y) {
+      const evt = new Event(type, { bubbles: true, cancelable: true });
+      const t = { clientX: x, clientY: y, identifier: 1 };
+      Object.defineProperty(evt, 'touches', { value: type === 'touchend' ? [] : [t] });
+      Object.defineProperty(evt, 'changedTouches', { value: [t] });
+      fg.dispatchEvent(evt);
+    }
+    const shell = document.querySelector(`[data-stage-section="${s}"] .er-row-shell`);
+    const fg = shell.querySelector('.er-row-fg');
+    // Touch position relative to the *translated* fg's visible area.
+    const r = fg.getBoundingClientRect();
+    const sx = r.x + r.width * 0.3;
+    const sy = r.y + r.height * 0.5;
+    fire(fg, 'touchstart', sx, sy);
+    await new Promise((r) => setTimeout(r, 20));
+    fire(fg, 'touchmove', sx + 120, sy); // 120px rightward (> SWIPE_LATCH_PX=60)
+    await new Promise((r) => setTimeout(r, 20));
+    fire(fg, 'touchend', sx + 120, sy);
+    await new Promise((r) => setTimeout(r, 400));
+    return {
+      transform: getComputedStyle(fg).transform,
+      classes: shell.className,
+    };
+  }, stage);
+  assert(
+    `C.${stage}.7 swipe-right past latch closes the drawer (transform clears)`,
+    closeBySwipe.transform === 'none' || closeBySwipe.transform === 'matrix(1, 0, 0, 0, 0, 0)',
+    `transform: ${closeBySwipe.transform}`,
+  );
+  assert(
+    `C.${stage}.7b swipe-right past latch removes is-swiped`,
+    !closeBySwipe.classes.includes('is-swiped'),
+    `classes: ${closeBySwipe.classes}`,
+  );
+
+  // Re-latch the drawer so we can test tap-to-close.
+  await page.evaluate(async (s) => {
+    function fire(fg, type, x, y) {
+      const evt = new Event(type, { bubbles: true, cancelable: true });
+      const t = { clientX: x, clientY: y, identifier: 1 };
+      Object.defineProperty(evt, 'touches', { value: type === 'touchend' ? [] : [t] });
+      Object.defineProperty(evt, 'changedTouches', { value: [t] });
+      fg.dispatchEvent(evt);
+    }
+    const shell = document.querySelector(`[data-stage-section="${s}"] .er-row-shell`);
+    const fg = shell.querySelector('.er-row-fg');
+    const r = shell.getBoundingClientRect();
+    const sx = r.x + r.width * 0.7;
+    const sy = r.y + r.height * 0.5;
+    fire(fg, 'touchstart', sx, sy);
+    await new Promise((r) => setTimeout(r, 20));
+    fire(fg, 'touchmove', sx - 120, sy);
+    await new Promise((r) => setTimeout(r, 20));
+    fire(fg, 'touchend', sx - 120, sy);
+    await new Promise((r) => setTimeout(r, 400));
+  }, stage);
+  // Wait past the justSwiped 300ms suppressor so a programmatic click
+  // exercises the tap-to-close path (not the click-after-swipe gate).
+  await page.waitForTimeout(350);
+
+  // Spec assertion 8: TAP ON ROW BODY closes a latched drawer (per brief).
+  // Dispatch a click on the foreground (not on a button/link).
+  const closeByTap = await page.evaluate(async (s) => {
+    const shell = document.querySelector(`[data-stage-section="${s}"] .er-row-shell`);
+    const fg = shell.querySelector('.er-row-fg');
+    // Pick a click target that's neither button nor link — use the fg's
+    // first descendant that's a span (title or row-num).
+    const target = fg.querySelector('.er-calendar-title')
+      ?? fg.querySelector('.er-row-num')
+      ?? fg;
+    target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    // 400ms > 250ms snap-back transition; otherwise we read transform mid-animation.
+    await new Promise((r) => setTimeout(r, 400));
+    return {
+      transform: getComputedStyle(fg).transform,
+      classes: shell.className,
+      // Did we accidentally navigate? Check that we're still on the dashboard.
+      url: location.pathname,
+    };
+  }, stage);
+  assert(
+    `C.${stage}.8 tap on row body closes a latched drawer (transform clears)`,
+    closeByTap.transform === 'none' || closeByTap.transform === 'matrix(1, 0, 0, 0, 0, 0)',
+    `transform: ${closeByTap.transform}`,
+  );
+  assert(
+    `C.${stage}.8b tap on row body removes is-swiped`,
+    !closeByTap.classes.includes('is-swiped'),
+    `classes: ${closeByTap.classes}`,
+  );
+  assert(
+    `C.${stage}.8c tap on latched row does NOT navigate`,
+    closeByTap.url === '/dev/editorial-studio',
+    `url: ${closeByTap.url}`,
+  );
+
+  // Dismiss any residual state before moving to the next stage.
   await page.mouse.click(5, 5);
   await page.waitForTimeout(200);
 }
