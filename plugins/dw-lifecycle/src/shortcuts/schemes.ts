@@ -21,6 +21,12 @@ export interface SchemeMapping {
   entries(): ReadonlyArray<readonly [string, string]>;
 }
 
+// The 16 lifecycle commands that get shortcut shims. The plugin also
+// ships `install-shortcuts` and `uninstall-shortcuts` as meta-commands;
+// those are intentionally excluded here — they bootstrap and roll back
+// the shim install itself, so giving them shims would be a chicken-and-
+// egg shape. The on-disk parity test in __tests__/shortcuts.test.ts
+// accounts for the exclusion explicitly.
 export const COMMANDS = [
   'complete',
   'customize',

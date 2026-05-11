@@ -56,20 +56,29 @@ const SCHEME_B_TABLE: ReadonlyArray<readonly [string, string]> = [
   ['teardown', 'dw-te'],
 ];
 
+// Meta-commands intentionally excluded from COMMANDS: the shortcuts
+// skills install shortcuts FOR the 16 lifecycle commands; they are
+// themselves invoked via the namespaced `/dw-lifecycle:` form (the
+// chicken-and-egg moment), so they get no shim of their own.
+const META_COMMANDS = ['install-shortcuts', 'uninstall-shortcuts'] as const;
+
 describe('COMMANDS canonical list', () => {
-  it('matches the on-disk commands/ directory exactly', () => {
+  it('matches the on-disk commands/ directory (plus meta-commands) exactly', () => {
     const onDisk = readdirSync(COMMANDS_DIR, { withFileTypes: true })
       .filter(
         (e) => e.isFile() && !e.name.startsWith('.') && e.name.endsWith('.md'),
       )
       .map((e) => e.name.slice(0, -'.md'.length))
       .sort();
-    const fromModule = [...COMMANDS].sort();
-    expect(fromModule).toEqual(onDisk);
+    const expected = [...COMMANDS, ...META_COMMANDS].sort();
+    expect(expected).toEqual(onDisk);
   });
 
-  it('contains exactly 16 commands', () => {
+  it('contains exactly 16 commands (meta-commands tracked separately)', () => {
     expect(COMMANDS.length).toBe(16);
+    for (const meta of META_COMMANDS) {
+      expect(COMMANDS).not.toContain(meta);
+    }
   });
 });
 

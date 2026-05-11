@@ -95,21 +95,23 @@ Design spec: `docs/superpowers/specs/2026-05-11-command-shortcuts-design.md`.
 
 ### Task 7: README update
 
-- [ ] Add a new "Shortcuts" section to `plugins/dw-lifecycle/README.md` covering: what the three schemes are, install/uninstall commands, manifest location, drift behavior, collision handling.
+- [x] Add a new "Shortcuts" section to `plugins/dw-lifecycle/README.md` covering: what the three schemes are, install/uninstall commands, manifest location, drift behavior, collision handling.
 
 **Acceptance Criteria:**
-- [ ] Section is reachable from the README's table of contents
-- [ ] Each scheme has an example mapping
-- [ ] Uninstall path is documented as visible as install
+- [x] Section is reachable from the README's table of contents
+- [x] Each scheme has an example mapping
+- [x] Uninstall path is documented as visible as install
 
 ### Task 8: Integration tests
 
-- [ ] Confirm `plugins/dw-lifecycle/src/__tests__/install-shortcuts.smoke.test.ts` covers: install with each of A/B/C; collision with/without `--force`; dry-run for both subcommands; drift refusal on uninstall; replace flow.
-- [ ] Run `npm --workspace @deskwork/plugin-dw-lifecycle test` and confirm green.
+- [x] Confirm `plugins/dw-lifecycle/src/__tests__/install-shortcuts.smoke.test.ts` covers: install with each of A/B/C; collision with/without `--force`; dry-run for both subcommands; drift refusal on uninstall; replace flow.
+- [x] Run `npm --workspace @deskwork/plugin-dw-lifecycle test` and confirm green.
 
 **Acceptance Criteria:**
-- [ ] All three schemes have install + uninstall coverage
-- [ ] Drift detection is exercised explicitly
+- [x] All three schemes have install + uninstall coverage
+- [x] Drift detection is exercised explicitly
+
+**Landed:** README "Shortcuts" section + on-disk parity test updated to account for `install-shortcuts`/`uninstall-shortcuts` meta-commands (the chicken-and-egg ones that intentionally don't get shims). Full plugin suite 314 green; tsc clean.
 
 ### Task 9: Manual dogfood
 

@@ -90,7 +90,66 @@ All commands are under the `/dw-lifecycle:` namespace. Grouped by lifecycle stag
 |---|---|
 | `doctor` | Audit binding between calendar/journal/docs/issues; opt-in `--fix=<rule>` for repair |
 
-Sixteen commands total. Each is a single, composable action — UNIX-style — never a monolithic guided flow. See [`design.md` §3](../../docs/1.0/001-IN-PROGRESS/dw-lifecycle/design.md) for the full integration map (per-command Layer 2 / Layer 1 invocations).
+### Shortcuts (opt-in)
+
+| Command | Purpose |
+|---|---|
+| `install-shortcuts` | Install user-level shim files at `~/.claude/commands/<short>.md` that forward to `/dw-lifecycle:<command>` — three naming schemes (terse / regular / verbose) |
+| `uninstall-shortcuts` | Remove the shim files and manifest installed by `install-shortcuts`; drift-checks each shim before deletion |
+
+See [Shortcuts](#shortcuts) below for the schemes, manifest layout, and drift behavior.
+
+Eighteen commands total. Each is a single, composable action — UNIX-style — never a monolithic guided flow. See [`design.md` §3](../../docs/1.0/001-IN-PROGRESS/dw-lifecycle/design.md) for the full integration map (per-command Layer 2 / Layer 1 invocations).
+
+## Shortcuts
+
+Claude Code requires plugin commands to be invoked as `/<plugin>:<command>` (e.g. `/dw-lifecycle:implement`). For day-to-day use across 18 commands, the `/dw-lifecycle:` prefix is friction-heavy. The opt-in `install-shortcuts` skill writes user-level shim files at `~/.claude/commands/<short>.md` that forward to the namespaced form, so the operator can type `/dw-implement` (or another scheme they pick) instead.
+
+This is the documented workaround for upstream [anthropics/claude-code#15882](https://github.com/anthropics/claude-code/issues/15882) (plugin commands are always namespaced) and [#23589](https://github.com/anthropics/claude-code/issues/23589) (feature request for first-class shorthand aliases). The shortcuts feature retires when #23589 lands.
+
+### Schemes
+
+`/dw-lifecycle:install-shortcuts` offers three naming schemes — the operator picks one at install time:
+
+| Scheme | Pattern | Example mappings |
+|---|---|---|
+| **A** | 2-letter `dw<initial>` w/ disambiguation suffixes | `dwi` (implement), `dws` (setup), `dwsh` (ship), `dwss` (session-start), `dwse` (session-end), `dwd` (define), `dwdo` (doctor), `dwc` (customize) |
+| **B** | 3-letter `dw-<2-char>` (regular pattern, zero collisions) | `dw-im`, `dw-se`, `dw-sh`, `dw-ss`, `dw-en`, `dw-de`, `dw-do`, `dw-cu` |
+| **C** | `dw-<verb>` — **default** | `dw-implement`, `dw-setup`, `dw-ship`, `dw-session-start`, `dw-session-end`, `dw-define`, `dw-doctor`, `dw-customize` |
+
+The trade-off: A is terse but cryptic and needs disambiguation suffixes; B is regular but still abbreviated; C preserves discoverability at the cost of verbosity. The CLI's default is C; operator overrides with `--scheme=A` or `--scheme=B`.
+
+### Install / uninstall
+
+```
+dw-lifecycle install-shortcuts --scheme=<A|B|C> [--force] [--dry-run] [--rename <prefix>] [--replace]
+dw-lifecycle uninstall-shortcuts [--force-uninstall] [--dry-run]
+```
+
+The skill flow (`/dw-lifecycle:install-shortcuts`) walks the operator through scheme selection before invoking the CLI. A `--dry-run` preview is always available.
+
+### Manifest
+
+The install writes a manifest at `~/.claude/commands/.dw-lifecycle-shortcuts.json` recording: scheme picked, rename prefix (if any), dw-lifecycle plugin version, and the list of shim files. The manifest is what `uninstall-shortcuts` reads to roll back cleanly. The schema is versioned (`version: 1`) so a future schema migration can detect old installs.
+
+**Do not edit the manifest by hand** — it would put uninstall into drift-refusal.
+
+### Drift behavior
+
+`uninstall-shortcuts` compares each shim's on-disk content against the canonical body (`/dw-lifecycle:<command> $ARGUMENTS\n`):
+
+- **Match** — file deleted.
+- **Missing** — recorded as a non-fatal note; cleanup proceeds.
+- **Modified** — drift detected. The helper lists each drifted path with an `expected:` / `actual:` diff and refuses (exit code 2). The operator runs again with `--force-uninstall` to override, or inspects the modified files first.
+
+The manifest is removed **last**, so a partial failure mid-cleanup leaves the manifest on disk as a recovery breadcrumb; a re-run picks up where the previous run stopped.
+
+### Collision handling
+
+Install-side, the helper refuses to clobber existing files by default:
+
+- **Foreign shim collision** — a file exists at a target shim path that's not part of a prior dw-lifecycle install. Refused with exit 2; operator passes `--force` to overwrite, or `--rename <prefix>` to avoid the collision entirely (e.g. `--rename mt` produces `mti` / `mt-implement` etc.).
+- **Prior dw-lifecycle install** — a manifest already exists. Refused with exit 2; operator passes `--replace` to uninstall the prior install before installing the new scheme. `--replace` and `--force` are orthogonal — both can be set if migrating from a prior install AND clobbering an unrelated foreign file in the new scheme's path.
 
 ## Boundary contract
 
