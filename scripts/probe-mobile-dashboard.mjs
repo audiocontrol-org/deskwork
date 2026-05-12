@@ -35,35 +35,15 @@
  *   2  setup error (no studio reachable)
  */
 
-import { chromium } from 'playwright';
+import { ping, assert, launchBrowser, newPage, parseProbeArgs, summarizeResults } from './lib/mobile-probe-helpers.mjs';
 
 // ---- Args -----------------------------------------------------------------
 
-let argStudio = process.env.STUDIO_URL ?? 'http://localhost:47323';
-const args = process.argv.slice(2);
-for (let i = 0; i < args.length; i++) {
-  const a = args[i];
-  if (a === '--studio-url' && args[i + 1]) { argStudio = args[++i]; }
-}
-
-const failures = [];
-function assert(cond, label) {
-  if (cond) {
-    console.log(`  [pass] ${label}`);
-  } else {
-    console.log(`  [FAIL] ${label}`);
-    failures.push(label);
-  }
-}
-
-async function ping(url) {
-  try {
-    const res = await fetch(url, { method: 'GET' });
-    return res.ok || res.status === 302 || res.status === 200;
-  } catch { return false; }
-}
+const { studioUrl: argStudio } = parseProbeArgs(process.argv.slice(2));
 
 async function main() {
+  const failures = [];
+
   if (!(await ping(argStudio + '/dev/'))) {
     console.error(`no dev studio at ${argStudio}; start it with \`npm run dev\``);
     process.exit(2);
@@ -72,13 +52,12 @@ async function main() {
   console.log(`  studio: ${argStudio}`);
   console.log('');
 
-  const browser = await chromium.launch();
+  const browser = await launchBrowser();
   const url = `${argStudio}/dev/editorial-studio`;
 
   // ============== PHONE VIEWPORT ==============
   console.log('phone (390x844)');
-  const phoneCtx = await browser.newContext({ viewport: { width: 390, height: 844 } });
-  const phone = await phoneCtx.newPage();
+  const phone = await newPage(browser, { width: 390, height: 844 });
   await phone.goto(url, { waitUntil: 'load' });
   await phone.waitForSelector('[data-stage-tile]', { timeout: 5000 });
 
@@ -86,7 +65,7 @@ async function main() {
   const tileCount = await phone.evaluate(() =>
     document.querySelectorAll('[data-stage-tile]').length,
   );
-  assert(tileCount >= 6, `Stage tiles rendered (got ${tileCount}; expected ≥6 — Ideas/Planned/Outlining/Drafting/Final/Published at minimum)`);
+  assert(tileCount >= 6, `Stage tiles rendered (got ${tileCount}; expected ≥6 — Ideas/Planned/Outlining/Drafting/Final/Published at minimum)`, failures);
 
   // 2. At-rest, all sections are collapsed on phone
   const collapsedAtRest = await phone.evaluate(() => {
@@ -99,6 +78,7 @@ async function main() {
   assert(
     collapsedAtRest.total > 0 && collapsedAtRest.collapsed === collapsedAtRest.total,
     `All ${collapsedAtRest.total} stage sections are [data-collapsed] at-rest on phone (got ${collapsedAtRest.collapsed} collapsed)`,
+    failures,
   );
 
   // 3. Tapping a non-empty stage tile expands it.
@@ -129,10 +109,12 @@ async function main() {
     assert(
       expandedAfterTap.sectionCollapsed === false,
       `Tapping ${firstNonEmptyStage} tile drops [data-collapsed] from its section (got ${expandedAfterTap.sectionCollapsed})`,
+      failures,
     );
     assert(
       expandedAfterTap.tileExpanded === 'true',
       `Tapping ${firstNonEmptyStage} tile sets aria-expanded="true" (got ${expandedAfterTap.tileExpanded})`,
+      failures,
     );
 
     // 4. Single-expand: tapping a SECOND non-empty tile collapses the first.
@@ -167,10 +149,12 @@ async function main() {
       assert(
         singleExpandState.firstCollapsed === true,
         `Tapping ${secondNonEmptyStage} re-collapses ${firstNonEmptyStage} section (single-expand)`,
+        failures,
       );
       assert(
         singleExpandState.secondCollapsed === false,
         `Tapping ${secondNonEmptyStage} expands its section`,
+        failures,
       );
     }
   }
@@ -184,6 +168,7 @@ async function main() {
   assert(
     fabDisplay !== null && fabDisplay !== 'none',
     `Compose FAB visible on phone (got ${fabDisplay})`,
+    failures,
   );
 
   // 6. Tap FAB → sheet opens
@@ -199,10 +184,12 @@ async function main() {
   assert(
     sheetOpen.bodyAttr === true,
     `body[data-compose-sheet-open] set after FAB tap`,
+    failures,
   );
   assert(
     sheetOpen.sheetHidden === false,
     `Compose sheet hidden=false after FAB tap (got hidden=${sheetOpen.sheetHidden})`,
+    failures,
   );
 
   // 7. Sheet renders verb buttons
@@ -212,6 +199,7 @@ async function main() {
   assert(
     verbCount > 0,
     `Compose sheet renders [data-compose-verb] buttons (got ${verbCount})`,
+    failures,
   );
 
   // 8. Tap close → sheet closes
@@ -225,6 +213,7 @@ async function main() {
   assert(
     bodyClearedAfterClose === false,
     `body[data-compose-sheet-open] cleared after close button`,
+    failures,
   );
 
   // 9. No horizontal overflow on phone
@@ -235,6 +224,7 @@ async function main() {
   assert(
     phoneOverflow.scrollWidth === phoneOverflow.innerWidth,
     `No horizontal overflow at 390x844 (scrollWidth=${phoneOverflow.scrollWidth}, innerWidth=${phoneOverflow.innerWidth})`,
+    failures,
   );
 
   // ============== ROW AFFORDANCE CHROME (v0.20) ==============
@@ -267,12 +257,12 @@ async function main() {
   if (!rowChromeState.ok) {
     console.log(`  [skip] ${rowChromeState.reason ?? 'unknown'} — no rows to check`);
   } else {
-    assert(rowChromeState.hasDrawer, 'Row shell carries .er-row-drawer');
-    assert(rowChromeState.hasFg, 'Row shell carries .er-row-fg');
-    assert(rowChromeState.hasOverflow, 'Row shell carries [data-row-overflow] (⋮ button)');
-    assert(rowChromeState.hasMenu, 'Row shell carries .er-row-menu');
-    assert(rowChromeState.menuHiddenAtRest, 'Menu is hidden at-rest');
-    assert(rowChromeState.overflowAriaExpandedAtRest, '⋮ button has aria-expanded=false at-rest');
+    assert(rowChromeState.hasDrawer, 'Row shell carries .er-row-drawer', failures);
+    assert(rowChromeState.hasFg, 'Row shell carries .er-row-fg', failures);
+    assert(rowChromeState.hasOverflow, 'Row shell carries [data-row-overflow] (⋮ button)', failures);
+    assert(rowChromeState.hasMenu, 'Row shell carries .er-row-menu', failures);
+    assert(rowChromeState.menuHiddenAtRest, 'Menu is hidden at-rest', failures);
+    assert(rowChromeState.overflowAriaExpandedAtRest, '⋮ button has aria-expanded=false at-rest', failures);
   }
 
   // 11. v0.19 regression check: no stacked-inline `.er-btn-small` buttons
@@ -296,10 +286,12 @@ async function main() {
   assert(
     v019Regression.visibleBtnSmall === 0,
     `No legacy .er-btn-small buttons visible on phone rows (got ${v019Regression.visibleBtnSmall})`,
+    failures,
   );
   assert(
     v019Regression.visibleChips === 0,
     `No .er-btn-chip inline chips visible on phone (got ${v019Regression.visibleChips})`,
+    failures,
   );
 
   // 12. Tap ⋮ opens the menu (sets aria-expanded=true + un-hides menu)
@@ -315,11 +307,11 @@ async function main() {
         menuItems: shell.querySelectorAll('.er-row-menu-item').length,
       };
     });
-    assert(menuOpen !== null, 'Tap ⋮ adds .is-menu-open class to the row shell');
+    assert(menuOpen !== null, 'Tap ⋮ adds .is-menu-open class to the row shell', failures);
     if (menuOpen) {
-      assert(menuOpen.ariaExpanded === 'true', '⋮ aria-expanded=true when menu open');
-      assert(menuOpen.menuHidden === false, 'Menu un-hidden when ⋮ is tapped');
-      assert(menuOpen.menuItems >= 2, `Menu renders items (got ${menuOpen.menuItems})`);
+      assert(menuOpen.ariaExpanded === 'true', '⋮ aria-expanded=true when menu open', failures);
+      assert(menuOpen.menuHidden === false, 'Menu un-hidden when ⋮ is tapped', failures);
+      assert(menuOpen.menuItems >= 2, `Menu renders items (got ${menuOpen.menuItems})`, failures);
     }
 
     // 13. Menu contains stage-aware verbs for an active-pipeline row.
@@ -338,7 +330,7 @@ async function main() {
     // row we opened. Active stages should include iterate + block; Final
     // stages include block but not iterate. Either is acceptable — what we
     // want is evidence the FULL set is rendered (not just 2 verbs).
-    assert(verbSet.length >= 4, `Menu renders ≥4 stage-aware verbs (got ${verbSet.length}: ${verbSet.join(', ')})`);
+    assert(verbSet.length >= 4, `Menu renders ≥4 stage-aware verbs (got ${verbSet.length}: ${verbSet.join(', ')})`, failures);
 
     // 14. Click outside the menu closes it
     await phone.click('body', { position: { x: 10, y: 10 } });
@@ -351,8 +343,8 @@ async function main() {
           ?.getAttribute('aria-expanded'),
       };
     });
-    assert(menuClosed.anyOpen === 0, 'Click-outside closes the menu');
-    assert(menuClosed.ariaExpanded === 'false', '⋮ aria-expanded resets to false');
+    assert(menuClosed.anyOpen === 0, 'Click-outside closes the menu', failures);
+    assert(menuClosed.ariaExpanded === 'false', '⋮ aria-expanded resets to false', failures);
 
     // 15. Click on row body (title / date — NOT slug link, NOT button)
     //     navigates to the entry-review surface. Per the Row-4 brief,
@@ -373,14 +365,14 @@ async function main() {
     assert(
       navAfter !== navBefore && navAfter.includes('/dev/editorial-review/entry/'),
       `Click row body (title) navigates to entry-review surface (before=${navBefore.slice(-40)}, after=${navAfter.slice(-40)})`,
+      failures,
     );
   }
 
   // ============== DESKTOP VIEWPORT ==============
   console.log('');
   console.log('desktop (1280x800)');
-  const desktopCtx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-  const desktop = await desktopCtx.newPage();
+  const desktop = await newPage(browser, { width: 1280, height: 800 });
   await desktop.goto(url, { waitUntil: 'load' });
   await desktop.waitForSelector('[data-stage-section]', { timeout: 5000 });
 
@@ -393,6 +385,7 @@ async function main() {
   assert(
     desktopTileDisplay === 'none',
     `Stage tiles hidden on desktop (got ${desktopTileDisplay})`,
+    failures,
   );
 
   // Sections must be uncollapsed on desktop.
@@ -406,6 +399,7 @@ async function main() {
   assert(
     desktopCollapseState.total > 0 && desktopCollapseState.collapsed === 0,
     `All ${desktopCollapseState.total} stage sections expanded on desktop (got ${desktopCollapseState.collapsed} collapsed; expected 0)`,
+    failures,
   );
 
   // Compose FAB must be display:none on desktop.
@@ -417,6 +411,7 @@ async function main() {
   assert(
     desktopFabDisplay === 'none',
     `Compose FAB hidden on desktop (got ${desktopFabDisplay})`,
+    failures,
   );
 
   // No horizontal overflow on desktop.
@@ -427,6 +422,7 @@ async function main() {
   assert(
     desktopOverflow.scrollWidth === desktopOverflow.innerWidth,
     `No horizontal overflow at 1280x800 (scrollWidth=${desktopOverflow.scrollWidth}, innerWidth=${desktopOverflow.innerWidth})`,
+    failures,
   );
 
   // Inline `.er-btn-chip` chips visible on desktop (high-frequency verbs).
@@ -440,6 +436,7 @@ async function main() {
   assert(
     desktopChips.total > 0 && desktopChips.visible > 0,
     `Desktop renders inline .er-btn-chip chips (got ${desktopChips.visible}/${desktopChips.total} visible)`,
+    failures,
   );
 
   // Drawer rendered in DOM but display:none on desktop (swipe is mobile-only).
@@ -451,6 +448,7 @@ async function main() {
   assert(
     desktopDrawerHidden === 'none',
     `Drawer display:none on desktop (got ${desktopDrawerHidden})`,
+    failures,
   );
 
   // ⋮ button + menu work on desktop too.
@@ -465,17 +463,17 @@ async function main() {
   assert(
     desktopOverflowBtn?.visible === true,
     `⋮ button visible on desktop (got ${desktopOverflowBtn?.visible})`,
+    failures,
   );
   assert(
     desktopOverflowBtn?.ariaExpanded === 'false',
     `⋮ aria-expanded=false at-rest on desktop`,
+    failures,
   );
 
   await browser.close();
 
-  console.log('');
-  console.log(`${failures.length} failure(s)`);
-  process.exit(failures.length === 0 ? 0 : 1);
+  summarizeResults(failures);
 }
 
 main().catch((err) => {

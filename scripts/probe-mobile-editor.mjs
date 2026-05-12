@@ -29,21 +29,14 @@
  *   2  setup error (no studio reachable, no entry found, etc.)
  */
 
-import { chromium } from 'playwright';
 import { readdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
+import { ping, assert, launchBrowser, newPage, parseProbeArgs, summarizeResults } from './lib/mobile-probe-helpers.mjs';
 
 // ---- Args -----------------------------------------------------------------
 
-let argEntry = null;
-let argStudio = process.env.STUDIO_URL ?? 'http://localhost:47323';
-const args = process.argv.slice(2);
-for (let i = 0; i < args.length; i++) {
-  const a = args[i];
-  if (a === '--entry' && args[i + 1]) { argEntry = args[++i]; }
-  else if (a === '--studio-url' && args[i + 1]) { argStudio = args[++i]; }
-}
+const { studioUrl: argStudio, entryUuid: argEntry } = parseProbeArgs(process.argv.slice(2));
 
 const here = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(here, '..');
@@ -62,24 +55,9 @@ async function pickEntry() {
   throw new Error('no entry with artifactPath found');
 }
 
-const failures = [];
-function assert(cond, label) {
-  if (cond) {
-    console.log(`  [pass] ${label}`);
-  } else {
-    console.log(`  [FAIL] ${label}`);
-    failures.push(label);
-  }
-}
-
-async function ping(url) {
-  try {
-    const res = await fetch(url, { method: 'GET' });
-    return res.ok || res.status === 302 || res.status === 200;
-  } catch { return false; }
-}
-
 async function main() {
+  const failures = [];
+
   if (!(await ping(argStudio + '/dev/'))) {
     console.error(`no dev studio at ${argStudio}; start it with \`npm run dev\``);
     process.exit(2);
@@ -90,13 +68,12 @@ async function main() {
   console.log(`  entry:  ${entryId}`);
   console.log('');
 
-  const browser = await chromium.launch();
+  const browser = await launchBrowser();
   const url = `${argStudio}/dev/editorial-review/entry/${entryId}`;
 
   // ============== PHONE VIEWPORT ==============
   console.log('phone (390x844)');
-  const phoneCtx = await browser.newContext({ viewport: { width: 390, height: 844 } });
-  const phone = await phoneCtx.newPage();
+  const phone = await newPage(browser, { width: 390, height: 844 });
   await phone.goto(url, { waitUntil: 'load' });
   await phone.waitForSelector('[data-mobile-bar]', { timeout: 5000 });
 
@@ -117,6 +94,7 @@ async function main() {
   assert(
     await phone.evaluate(() => document.body.dataset.editMode === 'editing'),
     'body[data-edit-mode="editing"] is set',
+    failures,
   );
 
   // 2. Tab visibility swap
@@ -134,11 +112,11 @@ async function main() {
       save: get('[data-mobile-action="save"]'),
     };
   });
-  assert(tabState.outline === 'none', `Outline tab hidden in edit mode (got ${tabState.outline})`);
-  assert(tabState.actions === 'none', `Actions tab hidden in edit mode (got ${tabState.actions})`);
-  assert(tabState.format !== 'none' && tabState.format !== null, `Format tab visible (got ${tabState.format})`);
-  assert(tabState.save !== 'none' && tabState.save !== null, `Save tab visible (got ${tabState.save})`);
-  assert(tabState.notes !== 'none' && tabState.notes !== null, `Notes tab visible in both modes (got ${tabState.notes})`);
+  assert(tabState.outline === 'none', `Outline tab hidden in edit mode (got ${tabState.outline})`, failures);
+  assert(tabState.actions === 'none', `Actions tab hidden in edit mode (got ${tabState.actions})`, failures);
+  assert(tabState.format !== 'none' && tabState.format !== null, `Format tab visible (got ${tabState.format})`, failures);
+  assert(tabState.save !== 'none' && tabState.save !== null, `Save tab visible (got ${tabState.save})`, failures);
+  assert(tabState.notes !== 'none' && tabState.notes !== null, `Notes tab visible in both modes (got ${tabState.notes})`, failures);
 
   // 3. Stamp color
   const stampColor = await phone.evaluate(() => {
@@ -150,6 +128,7 @@ async function main() {
   assert(
     stampColor && /rgb\(46,?\s*93,?\s*69\)/.test(stampColor),
     `Stamp color is stamp-green in edit mode (got ${stampColor})`,
+    failures,
   );
 
   // 4. Strip Source/Preview pill visible
@@ -161,6 +140,7 @@ async function main() {
   assert(
     stripPillDisplay && stripPillDisplay !== 'none',
     `Strip Source/Preview pill visible in edit mode (got ${stripPillDisplay})`,
+    failures,
   );
 
   // 5. Format sheet opens with [data-fkey] keys
@@ -171,7 +151,7 @@ async function main() {
   const fkeyCount = await phone.evaluate(() => {
     return document.querySelectorAll('[data-mobile-sheet-slot="format"] [data-fkey]').length;
   });
-  assert(fkeyCount === 12, `Format slot renders 12 press-check keys (got ${fkeyCount})`);
+  assert(fkeyCount === 12, `Format slot renders 12 press-check keys (got ${fkeyCount})`, failures);
 
   // 6. Tap Bold key — verify editor content changed + sheet closed + dirty set
   const beforeContent = await phone.evaluate(() => {
@@ -185,17 +165,18 @@ async function main() {
     const el = document.querySelector('[data-edit-source] .cm-content');
     return el?.textContent ?? '';
   });
-  assert(afterContent !== beforeContent, `Editor content changed after Bold tap`);
+  assert(afterContent !== beforeContent, `Editor content changed after Bold tap`, failures);
   assert(
     afterContent.includes('**bold**'),
     `Bold inserted '**bold**' placeholder (got tail: ${afterContent.slice(-30)})`,
+    failures,
   );
   const sheetOpenAfter = await phone.evaluate(() =>
     document.body.hasAttribute('data-mobile-sheet-open'),
   );
-  assert(!sheetOpenAfter, `Sheet closes after format key tap`);
+  assert(!sheetOpenAfter, `Sheet closes after format key tap`, failures);
   const dirty = await phone.evaluate(() => document.body.hasAttribute('data-edit-dirty'));
-  assert(dirty, `body[data-edit-dirty] set after edit`);
+  assert(dirty, `body[data-edit-dirty] set after edit`, failures);
 
   // 7. Tap Save — verify dirty cleared
   // Watch for the PUT request as a separate signal
@@ -207,11 +188,11 @@ async function main() {
   });
   await phone.click('[data-mobile-action="save"]', { force: true });
   await phone.waitForTimeout(800);
-  assert(savePutSeen, `PUT /api/dev/editorial-review/entry/.../body fired on Save tap`);
+  assert(savePutSeen, `PUT /api/dev/editorial-review/entry/.../body fired on Save tap`, failures);
   const dirtyAfterSave = await phone.evaluate(() =>
     document.body.hasAttribute('data-edit-dirty'),
   );
-  assert(!dirtyAfterSave, `body[data-edit-dirty] cleared after successful Save`);
+  assert(!dirtyAfterSave, `body[data-edit-dirty] cleared after successful Save`, failures);
 
   // 8. ✕ Done affordance is visible on phone in edit mode
   const doneVisible = await phone.evaluate(() => {
@@ -223,6 +204,7 @@ async function main() {
   assert(
     doneVisible !== null && doneVisible !== 'none',
     `Strip ✕ Done button visible on phone in edit mode (got ${doneVisible})`,
+    failures,
   );
 
   // 9. Visibility-change auto-save: dirty buffer → hidden → save fires
@@ -237,7 +219,7 @@ async function main() {
   const dirtyBeforeHide = await phone.evaluate(() =>
     document.body.hasAttribute('data-edit-dirty'),
   );
-  assert(dirtyBeforeHide, `body[data-edit-dirty] set after second edit`);
+  assert(dirtyBeforeHide, `body[data-edit-dirty] set after second edit`, failures);
 
   let visibilityPutSeen = false;
   phone.on('request', (req) => {
@@ -257,7 +239,7 @@ async function main() {
     document.dispatchEvent(new Event('visibilitychange'));
   });
   await phone.waitForTimeout(800);
-  assert(visibilityPutSeen, `PUT fires on visibilitychange when buffer is dirty`);
+  assert(visibilityPutSeen, `PUT fires on visibilitychange when buffer is dirty`, failures);
 
   // 10. ✕ Done click triggers exit (after the save settled, buffer is clean,
   // so toggle-edit exits without a discard prompt)
@@ -281,13 +263,13 @@ async function main() {
   assert(
     await phone.evaluate(() => !document.body.hasAttribute('data-edit-mode')),
     `Tapping ✕ Done exits edit mode (buffer clean, no confirm)`,
+    failures,
   );
 
   // ============== DESKTOP VIEWPORT ==============
   console.log('');
   console.log('desktop (1280x800)');
-  const desktopCtx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-  const desktop = await desktopCtx.newPage();
+  const desktop = await newPage(browser, { width: 1280, height: 800 });
   await desktop.goto(url, { waitUntil: 'load' });
   await desktop.click('[data-action="toggle-edit"]', { force: true });
   await desktop.waitForFunction(
@@ -302,7 +284,7 @@ async function main() {
     if (!el) return null;
     return getComputedStyle(el).display;
   });
-  assert(desktopStripPill === 'none', `Strip mode pill hidden on desktop (got ${desktopStripPill})`);
+  assert(desktopStripPill === 'none', `Strip mode pill hidden on desktop (got ${desktopStripPill})`, failures);
 
   // Edit toolbar must still be visible on desktop.
   const desktopToolbar = await desktop.evaluate(() => {
@@ -310,7 +292,7 @@ async function main() {
     if (!el) return null;
     return getComputedStyle(el).display;
   });
-  assert(desktopToolbar !== 'none' && desktopToolbar !== null, `Edit toolbar visible on desktop (got ${desktopToolbar})`);
+  assert(desktopToolbar !== 'none' && desktopToolbar !== null, `Edit toolbar visible on desktop (got ${desktopToolbar})`, failures);
 
   // ✕ Done button must be hidden on desktop too.
   const desktopDone = await desktop.evaluate(() => {
@@ -318,13 +300,11 @@ async function main() {
     if (!el) return null;
     return getComputedStyle(el).display;
   });
-  assert(desktopDone === 'none', `✕ Done button hidden on desktop (got ${desktopDone})`);
+  assert(desktopDone === 'none', `✕ Done button hidden on desktop (got ${desktopDone})`, failures);
 
   await browser.close();
 
-  console.log('');
-  console.log(`${failures.length} failure(s)`);
-  process.exit(failures.length === 0 ? 0 : 1);
+  summarizeResults(failures);
 }
 
 main().catch((err) => {

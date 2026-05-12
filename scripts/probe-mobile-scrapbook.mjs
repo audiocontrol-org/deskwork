@@ -23,19 +23,12 @@
  *   node scripts/probe-mobile-scrapbook.mjs [--entry UUID] [--studio-url URL]
  */
 
-import { chromium } from 'playwright';
 import { readdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
+import { ping, assert, launchBrowser, newPage, parseProbeArgs, summarizeResults } from './lib/mobile-probe-helpers.mjs';
 
-let argEntry = null;
-let argStudio = process.env.STUDIO_URL ?? 'http://localhost:47323';
-const args = process.argv.slice(2);
-for (let i = 0; i < args.length; i++) {
-  const a = args[i];
-  if (a === '--entry' && args[i + 1]) argEntry = args[++i];
-  else if (a === '--studio-url' && args[i + 1]) argStudio = args[++i];
-}
+const { studioUrl: argStudio, entryUuid: argEntry } = parseProbeArgs(process.argv.slice(2));
 
 const here = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(here, '..');
@@ -61,18 +54,9 @@ async function pickEntry() {
   return fallback;
 }
 
-const failures = [];
-function assert(cond, label) {
-  if (cond) console.log(`  [pass] ${label}`);
-  else { console.log(`  [FAIL] ${label}`); failures.push(label); }
-}
-
-async function ping(url) {
-  try { const res = await fetch(url, { method: 'GET' }); return res.ok || res.status === 302; }
-  catch { return false; }
-}
-
 async function main() {
+  const failures = [];
+
   if (!(await ping(argStudio + '/dev/'))) {
     console.error(`no dev studio at ${argStudio}; start with \`npm run dev\``);
     process.exit(2);
@@ -82,13 +66,12 @@ async function main() {
   console.log(`  studio: ${argStudio}`);
   console.log(`  entry:  ${entryId}\n`);
 
-  const browser = await chromium.launch();
+  const browser = await launchBrowser();
   const url = `${argStudio}/dev/editorial-review/entry/${entryId}`;
 
   // ============== PHONE ==============
   console.log('phone (390x844)');
-  const phoneCtx = await browser.newContext({ viewport: { width: 390, height: 844 } });
-  const phone = await phoneCtx.newPage();
+  const phone = await newPage(browser, { width: 390, height: 844 });
   await phone.goto(url, { waitUntil: 'load' });
   await phone.waitForSelector('[data-mobile-bar]', { timeout: 5000 });
 
@@ -101,6 +84,7 @@ async function main() {
   assert(
     tabDisplay !== null && tabDisplay !== 'none',
     `Scrapbook tab visible in review mode (got ${tabDisplay})`,
+    failures,
   );
 
   // 2. Bar is 4-column grid in review mode
@@ -109,7 +93,7 @@ async function main() {
     if (!bar) return null;
     return getComputedStyle(bar).gridTemplateColumns.split(' ').length;
   });
-  assert(reviewCols === 4, `Bar grid is 4-col in review mode (got ${reviewCols})`);
+  assert(reviewCols === 4, `Bar grid is 4-col in review mode (got ${reviewCols})`, failures);
 
   // 3. Count badge has kraft tone (not red-pencil)
   const badgeBg = await phone.evaluate(() => {
@@ -121,6 +105,7 @@ async function main() {
   assert(
     badgeBg && /rgb\(138,?\s*114,?\s*80\)/.test(badgeBg),
     `Scrapbook count badge is kraft-toned (got ${badgeBg})`,
+    failures,
   );
 
   // 4. Tap Scrapbook → sheet opens; slot populated
@@ -135,7 +120,7 @@ async function main() {
     if (!slot) return false;
     return !slot.hidden;
   });
-  assert(slotVisible, `Scrapbook slot is visible after tab tap`);
+  assert(slotVisible, `Scrapbook slot is visible after tab tap`, failures);
 
   // 5. Sheet kicker
   const kicker = await phone.evaluate(() => {
@@ -145,6 +130,7 @@ async function main() {
   assert(
     kicker && kicker.includes('Scrapbook') && kicker.includes('Folio'),
     `Sheet kicker reads "▦ Scrapbook · Folio" (got ${JSON.stringify(kicker)})`,
+    failures,
   );
 
   // 6. Desktop scrapbook drawer is hidden on phone
@@ -153,7 +139,7 @@ async function main() {
     if (!el) return null;
     return getComputedStyle(el).display;
   });
-  assert(drawerDisplay === 'none', `Desktop scrapbook drawer hidden on phone (got ${drawerDisplay})`);
+  assert(drawerDisplay === 'none', `Desktop scrapbook drawer hidden on phone (got ${drawerDisplay})`, failures);
 
   // 7. Edit-mode swap: open Actions sheet → tap Edit; verify tab swap
   // First close the scrapbook sheet
@@ -173,13 +159,12 @@ async function main() {
     scrapbook: getComputedStyle(document.querySelector('[data-mobile-sheet="scrapbook"]')).display,
     cols: getComputedStyle(document.querySelector('[data-mobile-bar]')).gridTemplateColumns.split(' ').length,
   }));
-  assert(editTabState.scrapbook === 'none', `Scrapbook tab hidden in edit mode (got ${editTabState.scrapbook})`);
-  assert(editTabState.cols === 3, `Bar grid is 3-col in edit mode (got ${editTabState.cols})`);
+  assert(editTabState.scrapbook === 'none', `Scrapbook tab hidden in edit mode (got ${editTabState.scrapbook})`, failures);
+  assert(editTabState.cols === 3, `Bar grid is 3-col in edit mode (got ${editTabState.cols})`, failures);
 
   // ============== DESKTOP ==============
   console.log('\ndesktop (1280x800)');
-  const dCtx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-  const desktop = await dCtx.newPage();
+  const desktop = await newPage(browser, { width: 1280, height: 800 });
   await desktop.goto(url, { waitUntil: 'load' });
 
   // 8. Mobile bar (and scrapbook tab inside it) hidden on desktop
@@ -188,7 +173,7 @@ async function main() {
     if (!el) return null;
     return getComputedStyle(el).display;
   });
-  assert(mobileBarOnDesktop === 'none', `Mobile bar hidden on desktop (got ${mobileBarOnDesktop})`);
+  assert(mobileBarOnDesktop === 'none', `Mobile bar hidden on desktop (got ${mobileBarOnDesktop})`, failures);
 
   // 9. Desktop scrapbook drawer remains visible on desktop
   const drawerOnDesktop = await desktop.evaluate(() => {
@@ -199,11 +184,11 @@ async function main() {
   assert(
     drawerOnDesktop !== 'none' && drawerOnDesktop !== null,
     `Desktop scrapbook drawer visible on desktop (got ${drawerOnDesktop})`,
+    failures,
   );
 
   await browser.close();
-  console.log(`\n${failures.length} failure(s)`);
-  process.exit(failures.length === 0 ? 0 : 1);
+  summarizeResults(failures);
 }
 
 main().catch((err) => { console.error('probe error:', err); process.exit(2); });
