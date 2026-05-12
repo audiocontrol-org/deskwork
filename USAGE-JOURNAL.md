@@ -13,6 +13,68 @@ Populating this file is a step in `/session-end`. If a session didn't exercise t
 
 ---
 
+## 2026-05-11 (v0.20.0 row affordance redesign): live phone dogfood throughout — every fix surfaced by the operator walking the studio on their actual iPhone, including a 1.21:1-contrast control that "shipped" past the agent's own probe
+
+**Arc:** Second consecutive session where the operator drove every fix by opening the workspace dev studio on their iPhone via the Tailscale magic-DNS URL (`orion-m4.tail8254f4.ts.net:47330`) and reporting what was broken. The agent claimed "implementation complete" three times during the session; each claim was followed by an operator catch within one or two messages. The pattern is now well-documented: the agent's headless probe is a precondition, not evidence — only the operator's phone walk is evidence.
+
+The session arc: *fix one phone bug → operator walks → operator surfaces next → fix → walk → next* — seven rounds, plus one mid-session reframe (*"Don't we have accessibility standards in the design standards?"*) that turned into a written standard + a contrast direction mockup + a code fix, all in the same v0.20.0 release.
+
+### Friction the operator found by using the actual phone
+
+#### "did u actually try the implementation. its extremely broken"
+
+- **friction** — Agent had reported the v0.20 row-affordance work as "implementation complete, probe + tests green." Operator opened it on phone and the ⋮ overflow button was rendering as tiny centered dots BELOW the row body — not at the row's trailing edge as the brief specified. Root cause: my refactor renamed the wrapper class on the row foreground; the mobile CSS grid-template-areas still targeted the old class, so the action cell got dropped to a new grid row instead of staying inline. **insight**: this exact failure mode (CSS class rename + adjacent layout breaks) is the load-bearing one for "probe passes but operator catches" in this codebase. The probe asserts the DOM shape; the visual rendering depends on the CSS resolving against the DOM shape. Decoupling those two surfaces of truth is what creates the gap.
+
+#### "did you try clicking on an item?"
+
+- **friction** — The slug link in each row was navigable; the rest of the row body (title text, date, anywhere outside the slug link) was a dead click. Operator's question was leading — *did you try clicking on an item* — implying the answer was already known to be no. The probe asserted ⋮ menu open/close + chip clicks but didn't drive a row body click. **fix**: added a row-body click handler that navigates to entry-review on tap (skipping if shell.is-menu-open / is-swiped). **insight**: when the spec says *"tap the row body → opens the entry-review surface"*, "the row body" is a verbatim spec clause that needs its own assertion. Anything-the-operator-can-tap is the probe's responsibility.
+
+#### "touching an item causes the actions meant to be activated by a slide gesture to appear"
+
+- **friction** — Natural finger drift during a tap (10-20px of horizontal movement) was crossing my touchmove handler's axis-lock threshold (8px) and revealing the swipe drawer. The drawer briefly slid out, then snapped back on touchend. From the operator's perspective: tap an item to navigate, see a brief flash of green/red chips, then the page navigates. Disorienting and ugly. **fix**: raised axis-lock threshold (8 → 16px), added a separate commit threshold (24px) before any visible translate, added touchcancel handler. **insight**: synthetic touch events in headless probes don't model finger drift accurately. The probe was firing touchmove(-50, 0) cleanly; real fingers fire touchmove(-12, 4), touchmove(-15, 7), touchmove(-18, 9)... and natural drift dominates the early movement until intent becomes clear. The fix is to require both AXIS_LOCK_PX (committing to horizontal) AND SWIPE_COMMIT_PX (committing to translating) before showing any visual change.
+
+#### "is there a reason you don't use the ios simulator to test?"
+
+- **insight** — Agent had been running Playwright Chromium with iPhone device emulation. Operator named the gap directly. iOS Simulator (full Xcode) isn't installed on this Mac, but Playwright WebKit (the same engine iOS Safari uses) is — a strictly better substitute than Chromium-emulating-iPhone. After the switch, three subsequent bugs (iOS sticky-hover bleed, native swipe behavior, hover-state persistence) were reproducible in the probe. **insight**: the rules already say *"Chromium-at-iPhone-viewport is NOT a substitute for WebKit"* (`.claude/rules/ui-verification.md` § Dual-viewport). The agent had been ignoring that rule for the entire prior session and the first half of this one. Operator-prompted pivots to a documented standard practice are a signal that the standard practice isn't being checked at session start.
+
+#### "why did you tell me you had implemented the feature according to the spec when clearly you hadn't?"
+
+- **friction** — This was the load-bearing operator catch of the session. Agent had reported "17/17 spec assertions pass" with a probe that asserted CSS computed-style values — `transform === matrix(1, 0, 0, 1, -192, 0)`, `shell has is-swiped class`, etc. Operator opened the screenshot and counted chips. The spec says Final stage renders 3 drawer chips (approve / cancel / SCRPBK); the screenshot showed 2 (the FAB was occluding SCRPBK). The probe's name was a claim it couldn't underwrite — every assertion tested mechanism, none tested the spec's literal visible promise. **fix**: rewrote the probe to derive every assertion from a literal spec clause expressed as an operator-perceivable measurement (chip count, chip identity + order, chip visibility within viewport, chip background opacity, chip not occluded via `elementsFromPoint`). 17 assertions became 139 by the end of the session. **insight**: a passing probe with the wrong assertions is worse than no probe — it underwrites false confidence with computed-style evidence. Codified the lesson in `.claude/rules/ui-verification.md` § Spec-compliance probes: assertions derived from the spec, not from the implementation.
+
+#### "I can't slide the item closed after sliding it open. did you check that behavior?"
+
+- **friction** — One commit AFTER the "assertions from the spec" rule landed, operator caught another instance of the same failure mode. Spec brief says *"Tap the row body, swipe right, or scroll away closes."* My implementation honored none of the three. The probe had been extended with chip-count and chip-visibility assertions but didn't test any of the three close behaviors — because I'd read the spec sentence as a single behavior to assert (and asserted none of them). **fix**: implemented swipe-right-to-close (track `startedLatched` at touchstart, animate fg back to 0 when dx past latch), tap-row-to-close (close drawer instead of navigating when shell.is-swiped), and a `data-just-swiped` flag to suppress the click-after-touchend that browsers synthesize after touch gestures. Added 6 close-behavior assertions per stage. **insight**: multi-behavior spec clauses with coordinating conjunctions (*"X, Y, or Z closes"*) need one probe assertion per behavior. The rule needs that addendum. Recorded as a follow-up in the journal entry.
+
+#### "the three dots affordance is so low contrast, I can barely see it. Don't we have accessibility standards in the design standards?"
+
+- **friction** — ⋮ overflow button shipped at `color: var(--er-paper-3)` (#DFD7BF) against `var(--er-paper)` (#F5F1E8). Contrast ratio: 1.21:1. Fails every WCAG 2.1 criterion. The token used was the same value as the row's dashed border rule — passed every internal review because no contrast assertion existed and no human had walked the surface on a real display. Operator's question landed two pieces of work in the same release: a written Accessibility / Contrast section for `DESIGN-STANDARDS.md` (codifying WCAG 2.1 AA — 4.5:1 body, 3:1 large, 3:1 non-text UI, 3:1 ornamental chrome) AND Direction B (ink-soft, 11.06:1) for the ⋮ itself. **insight**: standards questions from the operator are often the highest-leverage moments in a session. The standard generalizes; the fix is local. Both landed in the same commit because the standard codified the trade-off that justified the fix.
+
+#### "you should take action on my previous prompt with the frontend-design plugin"
+
+- **friction** — Agent was about to skip /frontend-design for the contrast decision because *"it's just changing one color."* The rule (`.claude/rules/agent-discipline.md` § Use /frontend-design for all design tasks) is unconditional; the agent was rationalizing around it. **fix**: produced a mockup with three contrast directions (A faded 3.53:1, B ink-soft 11.06:1, C press-mark ring 3.53:1) + proposed standards text. Operator picked B in one prompt; the artifacts (mockup, ACCEPTED/REJECTED archive entries, change-log entry) make the decision auditable. **insight**: the rule pays off most exactly when the design feels small. The artifact discipline is what makes the decision durable — without the mockup, the same operator question two months from now produces *"didn't we already pick something for this?"* and a re-litigation. With the mockup + archive entry, the answer is *"yes, Direction B, here's why A and C were rejected."*
+
+#### Marketplace install fix-up after v0.20.0 release
+
+- **friction** — After `/release` succeeded and the operator ran `/plugin marketplace update deskwork`, the output reported *"Updated 1 marketplace (2 plugins bumped)"* — 2, not 3. The cache showed `deskwork` and `deskwork-studio` had fetched v0.20.0 directories, but `dw-lifecycle` was stuck at v0.17.1. Root cause: dw-lifecycle was never explicitly installed on this machine after v0.17.1 (had drifted forward to nothing on its own through prior marketplace updates). `/plugin install dw-lifecycle@deskwork` followed by a Claude Code restart resolved it. **friction**: the *"2 plugins bumped"* message was informative but didn't explain WHICH 2 of the 3 advertised plugins moved, or what to do about the third. An adopter would have to walk the cache directory to learn what the agent walked to find out. **insight**: plugin install state has several stages (marketplace pointer, cache fetch, `.in_use` marker activation) that can diverge silently. A diagnostic — *"plugin status"* — that shows expected-vs-actual per plugin would close this gap. File as follow-up.
+
+### What worked
+
+- **The Tailscale magic-DNS workflow stayed friction-free.** Operator could open `orion-m4.tail8254f4.ts.net:47330/dev/editorial-studio` on their phone without VPN configuration, without exposing the dev studio to the LAN, without copying URLs. The studio's default behavior (auto-detect Tailscale interface + magic-DNS hostname in the banner) is doing exactly what the deskwork-studio skill prose promised.
+- **The `/release` skill held the line.** Pause 1 (preconditions) caught an untracked `tmp/probe-webkit/` directory the agent had been writing screenshots into and refused to proceed until it was gitignored. Pause 3 (pre-publish) caught zero issues (the version was fresh on npm). Pause 4 (smoke against published packages) caught zero issues. The hard-gated procedure means the only operator interruption was: pick version, ✓ commit, run `make publish` in own terminal, ✓ confirm, accept tag message, ✓ push. Clean.
+- **The /dw-lifecycle:review parallel dispatch produced 5 applied findings + 1 deferred to a filed issue (#246).** This had run earlier in the session series; the deferred item was tracked properly per the agent-discipline rule. The cycle (design → implement → review → integrate or defer) compounded cleanly.
+
+### Themes the operator named
+
+The session-level themes the operator surfaced explicitly:
+
+- *"why did you tell me you had implemented the feature according to the spec when clearly you hadn't?"* — assertions tested mechanism, not spec promises. New rule landed (`ui-verification.md` § Spec-compliance probes).
+- *"Don't we have accessibility standards in the design standards?"* — we didn't. New section landed (`DESIGN-STANDARDS.md` § Accessibility / Contrast).
+- *"you should take action on my previous prompt with the frontend-design plugin"* — agent was rationalizing around an unconditional rule. /frontend-design produced a mockup + archive entries that make the contrast pick durable.
+
+The pattern across all three: the agent's instinct was to "just fix the thing" without writing the standard, the assertion, or the mockup. The operator's questions reframed each one into "fix the thing AND codify the lesson so the next regression can't ship." Every codification paid off within the same session — the contrast standard caught one sibling regression (empty-stage-tile chevron) the agent wouldn't have audited otherwise; the spec-assertion rule was test-driven by the close-gesture failure that followed it; the /frontend-design mockup produced operator-readable artifacts that survive the conversation buffer.
+
+---
+
 ## 2026-05-08 (T5 mobile review-surface rebuild): live phone dogfood throughout — 12 commits, every fix surfaced by the operator using the studio on their actual iPhone
 
 **Arc:** The most direct hands-on phone usage session this project has had. The operator drove every fix this session by opening the studio's review surface on their iPhone via the Tailscale magic-DNS URL (`orion-m4.tail8254f4.ts.net:47323`) and reporting what was broken in real time. No simulator, no Playwright proxy — actual iOS Safari on actual hardware. Every commit closed a friction the operator had named in the prior message.

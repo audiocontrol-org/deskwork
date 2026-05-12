@@ -24,7 +24,8 @@ Extend the press-check mobile-first design language already shipped on the entry
 | 1.5 | Release v0.19 + iPhone walk + close issues | Pending (operator-driven release) |
 | 1.6 | Audit-driven remediations (Phase 0 / 1 cleanup per 2026-05-09 implementation audit) | Complete |
 | 1.7 | Final reviewState retirement (schema + journal cascade) | Complete |
-| 1.8 | Row affordance redesign — overflow menu + swipe drawer + full verb vocabulary (block, induct, iterate) → v0.20.0 | Implementation complete (pending operator visual walk + /release) |
+| 1.8 | Row affordance redesign — overflow menu + swipe drawer + full verb vocabulary (block, induct, iterate) → v0.20.0 | Complete + released as v0.20.0 (operator walked marketplace install on phone, 2026-05-11) |
+| 1.8b | Mid-flight accessibility contrast standard — added `DESIGN-STANDARDS.md` § Accessibility (WCAG 2.1 AA floor) + Direction B ⋮ overflow fix (1.21:1 → 11.06:1) + audit other affordances + spec probe extended with WCAG contrast assertions | Complete in v0.20.0 |
 | 2 | Extract `mobile-shell` + Shortform desk → v0.20 | Not started |
 | 3 | Standalone scrapbook viewer + Content view → v0.21 | Not started |
 | 4 | Editorial Help + Studio Index + #242 cross-cutting Cancel → v0.22 | Re-narration pending (Cancel already shipped on dashboard + entry-review during Phase 1; Phase 4's residual scope is the remaining surfaces — see workplan Step 1.6.6) |

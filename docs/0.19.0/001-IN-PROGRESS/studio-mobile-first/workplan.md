@@ -302,12 +302,12 @@ Also: the three SKILL.md files (`plugins/deskwork/skills/{block,cancel,induct}/S
 - [x] **Step 1.8.6:** ~~CSS for desktop chrome.~~ *(Landed in 4063cae; cancel/block/scrapbook accent rules added in b47b6ac per review.)*
 - [x] **Step 1.8.7:** ~~Update `probe-mobile-dashboard.mjs`.~~ *(Landed in df71d3b. 28 assertions total (was 16): adds row-shell structure check, no-stacked-buttons v0.19 regression check, no-inline-chip mobile check, ⋮ menu open/close, stage-aware verb-set rendering, click-outside dismiss, desktop inline-chip visibility + drawer:display:none.)*
 - [x] **Step 1.8.8:** ~~Run dual-viewport smoke.~~ *(0 failures across 8 probes: 3 entries × 2 viewports + dashboard × 2 viewports.)*
-- [ ] **Step 1.8.9:** Operator visual walk against the workspace dev studio on phone via Tailscale. URL: http://orion-m4.tail8254f4.ts.net:47330/dev/editorial-studio. *(Operator-driven.)*
+- [x] **Step 1.8.9:** ~~Operator visual walk against the workspace dev studio on phone via Tailscale.~~ *(Done 2026-05-11. Walk surfaced 7 real-device bugs the Chromium probe missed: menu cmd hint wrapping, FAB z-index over menu, iOS sticky-hover making row fg transparent and bleeding drawer chips through, missing `--er-kraft` token rendering scrapbook/block/view/induct chips invisible, FAB occluding the trailing drawer chip, no swipe-right-or-tap close gesture, ⋮ button at 1.21:1 contrast. Each fixed in its own commit; spec probe extended to assert the spec's visible promises rather than implementation mechanism after the operator caught a "17/17 spec assertions pass" false-positive. See DEVELOPMENT-NOTES 2026-05-11 entry.)*
 - [x] **Step 1.8.10:** ~~`/dw-lifecycle:review` — dispatch parallel reviewers.~~ *(Done. Dispatched code-reviewer + architect-reviewer in parallel against `6ef72e6..HEAD`. Findings triaged: 5 applied in b47b6ac, 1 deferred with GitHub issue #246 (pre-existing /deskwork:approve refuses Final — couples with deferred public-versioning work).)*
 - [x] **Step 1.8.11:** ~~Commit.~~ *(Per-phase commit hygiene: 20ca3e4 feat(cli) [Task 1.7.5 folded]; 4063cae feat(studio); df71d3b test(studio); b47b6ac fix(studio); 64a77f1 design(studio) [mockup retirement].)*
 - [x] **Step 1.8.12:** ~~Retire the three superseded direction mockups into REJECTED archive entries.~~ *(Landed in 64a77f1. REJECTED/2026-05-11-row-{1,2,3}-* entries each with brief.md + mockup.html (git mv'd from public/mockups/). mockups/index.html updated to point at the picked Row 4 + cross-link the REJECTED entries.)*
-- [ ] **Step 1.8.13:** Release v0.20.0 via `/release`. Smoke + tag + push. *(Operator-driven.)*
-- [ ] **Step 1.8.14:** Operator iPhone walk against the marketplace-installed v0.20.0 to confirm the redesigned chrome lands correctly. *(Operator-driven, post-release.)*
+- [x] **Step 1.8.13:** ~~Release v0.20.0 via `/release`.~~ *(Done 2026-05-11. Tag `v0.20.0` (64c7b29). @deskwork/{core,cli,studio}@0.20.0 published to npm. Marketplace smoke passed. GitHub release: https://github.com/audiocontrol-org/deskwork/releases/tag/v0.20.0)*
+- [x] **Step 1.8.14:** ~~Operator iPhone walk against the marketplace-installed v0.20.0.~~ *(Done 2026-05-11. Operator: "Looks good. I'd say that's done." After `/plugin marketplace update deskwork` + Claude Code restart, dw-lifecycle install fix-up was needed (cache lagged at 0.17.1 — `/plugin install dw-lifecycle@deskwork` resolved it).)*
 
 **Acceptance:**
 - Mobile dashboard rows: clean at-rest, no stacked inline buttons, trailing ⋮ visible
@@ -323,6 +323,41 @@ Also: the three SKILL.md files (`plugins/deskwork/skills/{block,cancel,induct}/S
 - Mobile-shell extraction — that's Phase 2. The row-actions controller may end up extracted there; for now it lives in dashboard's own client tree.
 - Touch-gesture refinements beyond the basic swipe (multi-finger gestures, customizable swipe thresholds, etc.).
 - Custom keyboard shortcuts for the menu beyond the standard arrow-key navigation + Escape.
+
+### Task 1.8b — Accessibility contrast standard + ⋮ overflow fix (mid-flight, bundled into v0.20.0)
+
+**Goal:** add an Accessibility / Contrast section to `DESIGN-STANDARDS.md` (codifying WCAG 2.1 AA as the floor) and fix the row ⋮ overflow button that shipped at 1.21:1 contrast (operator-confirmed unusable on phone). Triggered by operator question mid-walk: *"Don't we have accessibility standards in the design standards?"* — we didn't. Now we do.
+
+**Files:**
+- Modify: `DESIGN-STANDARDS.md` — append `## Accessibility — Contrast` section + change-log entry.
+- Modify: `plugins/deskwork-studio/public/css/dashboard-row-affordances.css` — `.er-row-overflow` color → `var(--er-ink-soft)` (11.06:1).
+- Modify: `plugins/deskwork-studio/public/css/editorial-studio.css` — desktop `.er-row-overflow` color → `var(--er-ink-soft)` (matching mobile for consistency).
+- Modify: `plugins/deskwork-studio/public/css/dashboard-mobile.css` — empty-stage-tile chevron from `--er-paper-3` (1.21:1) → `--er-faded` (3.53:1, sibling regression caught during audit).
+- Create: `plugins/deskwork-studio/public/mockups/row-overflow-contrast.html` — three directions (A/B/C) with WCAG ratios, proposed standard text, side-by-side comparison.
+- Create: `docs/studio-design/ACCEPTED/2026-05-11-row-overflow-contrast-B-ink-soft/brief.md`.
+- Create: `docs/studio-design/REJECTED/2026-05-11-row-overflow-contrast-A-faded/brief.md`.
+- Create: `docs/studio-design/REJECTED/2026-05-11-row-overflow-contrast-C-press-mark-ring/brief.md`.
+- Modify: `plugins/deskwork-studio/public/mockups/index.html` — card for Direction B picked.
+- Modify: `scripts/probe-spec-compliance.mjs` — WCAG 2.1 relative-luminance + contrast-ratio helpers; per-affordance audit (⋮ overflow, drawer chip glyph + label, menu glyph + label + cmd hint).
+
+**Sub-steps:**
+
+- [x] **Step 1.8b.1:** ~~Run `/frontend-design` to produce contrast directions.~~ *(Landed in f8484c2 within the same workplan-1.8 release commit train. Three directions: A faded glyph 3.53:1, B ink-soft glyph 11.06:1, C press-mark ring 3.53:1+3.53:1. Operator picked B for headroom and visual consistency with section heads.)*
+- [x] **Step 1.8b.2:** ~~Add `DESIGN-STANDARDS.md` § Accessibility / Contrast.~~ *(Landed in f8484c2. Codifies 4.5:1 body / 3:1 large / 3:1 non-text UI / 3:1 ornamental press-check chrome with WCAG criterion citations. Change-log entry added.)*
+- [x] **Step 1.8b.3:** ~~Apply Direction B to `.er-row-overflow` on mobile + desktop.~~ *(Landed in f8484c2. Both viewports now at 11.06:1.)*
+- [x] **Step 1.8b.4:** ~~Audit other affordances; fix sibling regressions.~~ *(Landed in f8484c2. Empty-stage-tile chevron was the same broken `--er-paper-3` foreground pattern; fixed at the same time.)*
+- [x] **Step 1.8b.5:** ~~File ACCEPTED + REJECTED archive entries per design-standards rule.~~ *(Landed in f8484c2.)*
+- [x] **Step 1.8b.6:** ~~Extend spec probe with WCAG contrast assertions per affordance.~~ *(Landed in f8484c2. 139/139 assertions pass on real WebKit at iPhone 14 viewport, up from 97/97; +42 contrast assertions. Per-stage drawer chip glyph + label vs chip bg; per-menu-item glyph + label + cmd hint vs menu bg; ⋮ overflow vs row fg.)*
+- [x] **Step 1.8b.7:** ~~Commit.~~ *(Landed in f8484c2 — `feat(studio): land accessibility contrast standard + fix row ⋮ button`. Shipped as part of v0.20.0.)*
+
+**Acceptance:**
+- `DESIGN-STANDARDS.md` has an Accessibility / Contrast section with WCAG 2.1 AA minimums and "how to apply" guidance
+- Row ⋮ overflow at ≥3:1 contrast on both viewports (actual: 11.06:1)
+- Spec probe asserts WCAG contrast for every affordance the brief promises; passes 139/139
+- ACCEPTED + REJECTED archive entries filed for each contrast direction considered
+
+**Out of scope:**
+- Wider studio audit (entry-review surface, scrapbook viewer, content view) — file as a separate task if/when needed. Phase 2/3 surfaces will inherit the new standard.
 
 ### Task 1.6 — Audit-driven remediations (Phase 0 / Phase 1 cleanup)
 
