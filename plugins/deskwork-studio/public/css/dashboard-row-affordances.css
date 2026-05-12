@@ -114,12 +114,17 @@
     display: none;
   }
 
-  /* Overflow button — low-contrast trailing dot trio. Phone gets a
-   * slightly larger touch target than desktop. */
+  /* Overflow button — ink-soft glyph (Direction B per
+   * docs/studio-design/ACCEPTED/2026-05-11-row-overflow-contrast-B-ink-soft/).
+   * Resting contrast: #3A332E on #F5F1E8 = 11.06:1 — comfortably above
+   * WCAG 2.1 AA (4.5:1 normal text, 3:1 non-text UI components).
+   * The prior value (var(--er-paper-3) = #DFD7BF) shipped at 1.21:1
+   * and was operator-confirmed unusable on phone.
+   * Phone gets a slightly larger touch target than desktop. */
   .er-row-overflow {
     background: transparent;
     border: 0;
-    color: var(--er-paper-3);
+    color: var(--er-ink-soft);
     font-family: var(--er-font-mono);
     font-size: 1.25rem;
     line-height: 1;
@@ -129,7 +134,7 @@
   }
   .er-row-overflow:hover,
   .er-row-overflow:focus-visible {
-    color: var(--er-faded);
+    color: var(--er-ink);
     outline: none;
   }
   .er-row-overflow[aria-expanded="true"] {

@@ -107,11 +107,17 @@
 .er-btn-chip-view    { border-color: var(--er-kraft); color: var(--er-kraft); }
 .er-btn-chip-scrapbook { border-color: var(--er-kraft); color: var(--er-kraft); }
 
-/* Overflow button — same shape as mobile, slightly smaller hit area. */
+/* Overflow button — same shape as mobile, slightly smaller hit area.
+ * Color matches Direction B per
+ * docs/studio-design/ACCEPTED/2026-05-11-row-overflow-contrast-B-ink-soft/
+ * (ink-soft, 11.06:1 against paper). Desktop previously used --er-faded
+ * at 3.53:1 — bare WCAG floor with no headroom; ink-soft brings desktop
+ * up to AAA and keeps the affordance treatment consistent across
+ * viewports. */
 .er-row-overflow {
   background: transparent;
   border: 0;
-  color: var(--er-faded);
+  color: var(--er-ink-soft);
   font-family: var(--er-font-mono);
   font-size: 1.15rem;
   line-height: 1;

@@ -216,6 +216,30 @@ The desktop right-rail press queue (`<aside class="er-press-queue">`) is removed
 - No bottom tab bar on dashboard (parked design question — see decisions below)
 - Floating Compose chip overlays content at bottom-right (~52px tall)
 
+## Accessibility — Contrast
+
+The press-check aesthetic is restrained, but restraint is not invisibility. Every affordance must meet WCAG 2.1 AA contrast minimums against its adjacent background. *"Subdued"* and *"invisible"* are not the same word.
+
+### Minimums
+
+| Element | Minimum contrast | WCAG criterion |
+|---|---|---|
+| **Body text** (paragraphs, list items, table cells, captions) | ≥4.5:1 | 2.1 SC 1.4.3 (AA — normal text) |
+| **Large text** (≥18px / 1.125rem, or ≥14px / 0.875rem bold) | ≥3:1 | 2.1 SC 1.4.3 (AA — large text) |
+| **Interactive UI components** (buttons, icons, controls, focus indicators, drawer chips, menu items, FABs, stage-tile chevrons — anything the operator can tap) | ≥3:1 against the adjacent background | 2.1 SC 1.4.11 (Non-Text Contrast) |
+| **Ornamental press-check chrome** (decorative glyphs, kicker dividers, rule lines, stage ornaments — anything that contributes to the surface reading as press-check) | ≥3:1 | (project standard — decorative ≠ invisible) |
+
+### How to apply
+
+- Before shipping a CSS color pair (foreground on background) for any of the elements above, run a contrast check. Document the ratio in a CSS comment when it's a deliberate near-minimum choice (e.g. *"3.53:1 — bare WCAG 1.4.11 floor against `--er-paper`"*).
+- The token palette in `editorial-review.css` is the canonical color source. When picking a foreground for any affordance, check the resulting ratio against the likely backgrounds (`--er-paper`, `--er-paper-2`, `--er-paper-3`, `--er-ink`). If the chosen token fails, pick a different token — don't ship a near-invisible affordance.
+- For active / hover / focus states, the **resting** state is what governs compliance. A button that meets 3:1 only on hover doesn't pass — the operator has to find it first.
+- The spec-compliance probe (`scripts/probe-spec-compliance.mjs`) checks contrast for every affordance the brief promises. Adding a new affordance? Add its contrast assertion.
+
+### Why this section exists
+
+This section was added after the 2026-05-11 v0.20 row-affordance walk surfaced that the row's ⋮ overflow button shipped at `color: var(--er-paper-3)` on `var(--er-paper)` — a 1.21:1 contrast ratio. Operator on phone: *"the three dots affordance that opens the per-item menu is so low contrast, I can barely see it."* The token used was the same value as the row's dashed border rule, and no probe assertion existed to catch the gap. Codifying the minimums (with WCAG criterion citations) keeps the press-check restraint *and* keeps every affordance reachable.
+
 ## Open / parked design questions
 
 Decisions still under debate, recorded here so they don't get re-litigated as fresh:
@@ -229,3 +253,4 @@ Append a one-line entry to this section every time the document is updated.
 
 - 2026-05-09 — Initial draft. Captured all design decisions made during the v0.19 dashboard rebuild session: rubber-stamp retired on mobile (filing-tab is also a rubber-stamp); review-state internal-only; filter chips removed; Compose FAB shape; collapsible stage tiles; Distribution-as-tile; press queue removed; chrome budget.
 - 2026-05-09 — Added Principles section with "Favor structure over scrolling" as the first principle. Cites the dashboard's collapsible stage tiles as the canonical application; cites the discarded card-stream as the failure pattern.
+- 2026-05-11 — Added Accessibility / Contrast section codifying WCAG 2.1 AA minimums (4.5:1 body, 3:1 large, 3:1 non-text UI, 3:1 ornamental chrome). Triggered by the v0.20 dashboard ⋮ shipping at 1.21:1; companion ⋮ Direction B (ink-soft glyph, 11.06:1) lands the row-affordance fix.

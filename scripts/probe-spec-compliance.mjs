@@ -33,6 +33,44 @@ function isOpaque(rgb) {
 }
 
 /**
+ * WCAG 2.1 relative-luminance + contrast-ratio implementation, per
+ * https://www.w3.org/WAI/WCAG21/Techniques/general/G18 .
+ * `parseRgb` accepts "rgb(R, G, B)" or "rgba(R, G, B, A)" — the same
+ * shape `getComputedStyle(...).backgroundColor` / `.color` returns in
+ * modern engines.
+ */
+function parseRgb(s) {
+  const m = s.match(/rgba?\(\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)/);
+  if (!m) return null;
+  return [parseFloat(m[1]), parseFloat(m[2]), parseFloat(m[3])];
+}
+
+function relativeLuminance([r, g, b]) {
+  const norm = [r, g, b].map((c) => {
+    const cs = c / 255;
+    return cs <= 0.03928 ? cs / 12.92 : Math.pow((cs + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * norm[0] + 0.7152 * norm[1] + 0.0722 * norm[2];
+}
+
+function contrastRatio(fg, bg) {
+  const fgRgb = parseRgb(fg);
+  const bgRgb = parseRgb(bg);
+  if (!fgRgb || !bgRgb) return null;
+  const fgL = relativeLuminance(fgRgb);
+  const bgL = relativeLuminance(bgRgb);
+  const [hi, lo] = fgL > bgL ? [fgL, bgL] : [bgL, fgL];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/**
+ * WCAG 2.1 minimums per the DESIGN-STANDARDS.md Accessibility section.
+ * 'body' = 4.5:1 (SC 1.4.3 AA normal text); 'large' / 'ui' = 3:1
+ * (SC 1.4.3 AA large text + SC 1.4.11 Non-Text Contrast).
+ */
+const WCAG_FLOOR = { body: 4.5, large: 3.0, ui: 3.0 };
+
+/**
  * Spec table from the brief. Each entry names the stage and the verb
  * kinds the drawer must reveal IN ORDER (left → right).
  */
@@ -90,6 +128,25 @@ assert(
     && !restState.shellClasses.includes('is-menu-open'),
 );
 assert('A.5 ⋮ overflow button rendered (low-contrast trailing)', restState.overflowVisible);
+
+// Per DESIGN-STANDARDS.md § Accessibility / Contrast: interactive UI
+// components must have ≥3:1 contrast against their adjacent background
+// (WCAG 2.1 SC 1.4.11). The ⋮ shipped at 1.21:1 in v0.20 and was
+// operator-confirmed unusable on phone.
+const overflowColors = await page.evaluate(() => {
+  const overflow = document.querySelector('[data-stage-section="Final"] [data-row-overflow]');
+  const fg = overflow.closest('.er-row-fg');
+  return {
+    fg: getComputedStyle(overflow).color,
+    bg: getComputedStyle(fg).backgroundColor,
+  };
+});
+const overflowRatio = contrastRatio(overflowColors.fg, overflowColors.bg);
+assert(
+  `A.6 ⋮ overflow button has ≥${WCAG_FLOOR.ui}:1 contrast (WCAG 2.1 SC 1.4.11)`,
+  overflowRatio !== null && overflowRatio >= WCAG_FLOOR.ui,
+  `${overflowColors.fg} on ${overflowColors.bg} = ${overflowRatio?.toFixed(2)}:1`,
+);
 
 console.log('\n=== B. Post-tap-hover (iOS Safari sticky-hover) ===');
 const fgLocator = page.locator('[data-stage-section="Final"] .er-row-shell').nth(1).locator('.er-row-fg');
@@ -266,6 +323,39 @@ for (const { stage } of stagesWithRows) {
       `C.${stage}.5.${c.kind} chip background is opaque (not transparent)`,
       !isTransparent,
       `bg: ${c.bg}`,
+    );
+  }
+
+  // Per DESIGN-STANDARDS.md § Accessibility / Contrast: chip glyph +
+  // label must read against the chip's accent background at ≥3:1
+  // (WCAG SC 1.4.11 for the glyph as a UI affordance + SC 1.4.3 large
+  // text for the label which is uppercase tracked mono at ~0.58rem).
+  const chipTextContrast = await page.evaluate((s) => {
+    const shell = document.querySelector(`[data-stage-section="${s}"] .er-row-shell`);
+    const chips = Array.from(shell.querySelectorAll('.er-row-drawer .er-row-action'));
+    return chips.map((c) => {
+      const kind = c.className.match(/er-row-action-(\w+)/)?.[1];
+      const bg = getComputedStyle(c).backgroundColor;
+      const fg = getComputedStyle(c).color;
+      const glyph = c.querySelector('.er-row-action-glyph');
+      const glyphFg = glyph ? getComputedStyle(glyph).color : fg;
+      const label = c.querySelector('.er-row-action-label');
+      const labelFg = label ? getComputedStyle(label).color : fg;
+      return { kind, bg, glyphFg, labelFg };
+    });
+  }, stage);
+  for (const c of chipTextContrast) {
+    const glyphRatio = contrastRatio(c.glyphFg, c.bg);
+    assert(
+      `C.${stage}.5b.${c.kind} chip glyph ≥${WCAG_FLOOR.ui}:1 vs chip bg`,
+      glyphRatio !== null && glyphRatio >= WCAG_FLOOR.ui,
+      `${c.glyphFg} on ${c.bg} = ${glyphRatio?.toFixed(2)}:1`,
+    );
+    const labelRatio = contrastRatio(c.labelFg, c.bg);
+    assert(
+      `C.${stage}.5c.${c.kind} chip label ≥${WCAG_FLOOR.large}:1 vs chip bg`,
+      labelRatio !== null && labelRatio >= WCAG_FLOOR.large,
+      `${c.labelFg} on ${c.bg} = ${labelRatio?.toFixed(2)}:1`,
     );
   }
 
@@ -463,6 +553,56 @@ assert(
   wrappedItems.length === 0,
   `items > 50px tall: ${wrappedItems.length}`,
 );
+
+// Per DESIGN-STANDARDS.md § Accessibility / Contrast: menu item glyph,
+// label, and command-hint each need ≥3:1 vs the menu's paper background
+// (1.4.11 non-text for glyph; 1.4.3 large for label; 1.4.3 normal for
+// cmd hint mono caption).
+const menuItemContrasts = await page.evaluate(() => {
+  const menu = document.querySelector('[data-stage-section="Final"] .er-row-menu');
+  const bg = getComputedStyle(menu).backgroundColor;
+  const items = Array.from(menu.querySelectorAll('.er-row-menu-item'));
+  return items.map((item) => {
+    const glyph = item.querySelector('.er-row-menu-glyph');
+    const label = item.querySelector('.er-row-menu-label');
+    const cmd = item.querySelector('.er-row-menu-cmd');
+    return {
+      itemClasses: item.className,
+      bg,
+      glyphFg: glyph ? getComputedStyle(glyph).color : null,
+      glyphKind: glyph?.className.match(/er-row-menu-glyph-(\w+)/)?.[1],
+      labelFg: label ? getComputedStyle(label).color : null,
+      cmdFg: cmd ? getComputedStyle(cmd).color : null,
+    };
+  });
+});
+for (const m of menuItemContrasts) {
+  if (m.glyphFg) {
+    const r = contrastRatio(m.glyphFg, m.bg);
+    assert(
+      `F.5.${m.glyphKind} menu glyph ≥${WCAG_FLOOR.ui}:1 vs menu bg`,
+      r !== null && r >= WCAG_FLOOR.ui,
+      `${m.glyphFg} on ${m.bg} = ${r?.toFixed(2)}:1`,
+    );
+  }
+  if (m.labelFg) {
+    const r = contrastRatio(m.labelFg, m.bg);
+    assert(
+      `F.6.${m.glyphKind ?? '?'} menu label ≥${WCAG_FLOOR.body}:1 vs menu bg`,
+      r !== null && r >= WCAG_FLOOR.body,
+      `${m.labelFg} on ${m.bg} = ${r?.toFixed(2)}:1`,
+    );
+  }
+  if (m.cmdFg) {
+    const r = contrastRatio(m.cmdFg, m.bg);
+    assert(
+      `F.7.${m.glyphKind ?? '?'} menu cmd hint ≥${WCAG_FLOOR.large}:1 vs menu bg`,
+      r !== null && r >= WCAG_FLOOR.large,
+      `${m.cmdFg} on ${m.bg} = ${r?.toFixed(2)}:1`,
+    );
+  }
+}
+
 await page.screenshot({ path: resolve(OUT, '51-spec-menu-open.png'), fullPage: false });
 
 // =====================================================================

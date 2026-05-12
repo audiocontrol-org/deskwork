@@ -423,8 +423,12 @@ body.er-row-surface-open .er-compose-fab {
   .er-stage-tile.is-empty .er-stage-tile-name {
     font-style: italic;
   }
+  /* Empty-tile chevron — was var(--er-paper-3) at 1.21:1 (fails WCAG
+   * 2.1 SC 1.4.11). Per DESIGN-STANDARDS.md § Accessibility, decorative
+   * press-check chrome must read at ≥3:1. Faded (#8A7F70) lands at
+   * 3.53:1 against paper, matching the rest of the empty-tile chrome. */
   .er-stage-tile.is-empty .er-stage-tile-chev {
-    color: var(--er-paper-3);
+    color: var(--er-faded);
   }
 
   /* Expanded tile — paper-2 background, red name, rotated chevron */
