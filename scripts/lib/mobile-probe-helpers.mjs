@@ -23,7 +23,7 @@ import { chromium } from 'playwright';
 export async function ping(url) {
   try {
     const res = await fetch(url, { method: 'GET' });
-    return res.ok || res.status === 302 || res.status === 200;
+    return res.ok || res.status === 302;
   } catch {
     return false;
   }
@@ -101,6 +101,9 @@ export function parseProbeArgs(argv) {
  * @param {string} label       Human-readable probe name for the summary line (optional).
  */
 export function summarizeResults(failures, label) {
+  if (!Array.isArray(failures)) {
+    throw new TypeError('summarizeResults: failures must be an array');
+  }
   if (label) {
     console.log('');
     console.log(`${label}: ${failures.length} failure(s)`);
