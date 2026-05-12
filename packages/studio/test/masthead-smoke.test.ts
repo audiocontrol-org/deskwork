@@ -25,6 +25,7 @@ import { writeSidecar } from '@deskwork/core/sidecar';
 import type { Entry } from '@deskwork/core/schema/entry';
 import { createApp } from '../src/server.ts';
 import { renderMasthead } from '../src/pages/masthead.ts';
+import { unsafe } from '../src/pages/html.ts';
 
 const UUID_DRAFT = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
@@ -158,6 +159,17 @@ describe('renderMasthead helper — unit contract', () => {
     ).toThrow(/exactly one of \{ slug, title \}/);
   });
 
+  it('throws when both kicker and kickerHtml are passed', () => {
+    expect(() =>
+      renderMasthead({
+        kicker: 'plain',
+        kickerHtml: unsafe('<span>raw</span>'),
+        slug: 'x',
+        isHub: false,
+      }),
+    ).toThrow(/exactly one of \{ kicker, kickerHtml \}/);
+  });
+
   it('appends metaInline to the kicker with a separator', () => {
     const out = renderMasthead({
       kicker: 'entry · drafting · № 12',
@@ -267,11 +279,11 @@ describe('Universal masthead — Desk / entry-review / shortform surfaces', () =
     expect(r.html).toContain('/static/css/mobile-shell.css');
   });
 
-  // Note: shortform-review needs a workflow store, not a sidecar.
-  // The folio-cross-page test already covers the chrome on that URL;
-  // we only assert the renderer doesn't crash and the masthead is in
-  // the markup when the workflow resolves. Without a real workflow
-  // fixture the surface returns its error-shell, which intentionally
-  // does NOT emit the new masthead (see renderError() — error shells
-  // keep the legacy folio for parity with other studio error pages).
+  // Shortform-review's masthead emission is exercised by the
+  // renderMasthead helper unit-contract tests above (hub variant, slug
+  // body, kickerHtml inline ornament, metaInline rendering, escape
+  // behavior). A full per-surface integration smoke for shortform is
+  // gated on a workflow-store fixture that this test plant doesn't
+  // synthesize; full surface coverage lands as part of Step 2.2.10
+  // when the shortform review surface gets its complete v7 rewrite.
 });

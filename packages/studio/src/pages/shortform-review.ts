@@ -27,11 +27,10 @@ import {
   renderMarkdownToHtml,
 } from '@deskwork/core/review/render';
 import type { StudioContext } from '../routes/api.ts';
-import { html, unsafe, type RawHtml } from './html.ts';
+import { escapeHtml, gloss, html, unsafe, type RawHtml } from './html.ts';
 import { layout } from './layout.ts';
 import { renderEditorialFolio } from './chrome.ts';
 import { renderMasthead } from './masthead.ts';
-import { escapeHtml, gloss } from './html.ts';
 
 interface ShortformReviewQuery {
   /** ?v=<n>; null shows the workflow's currentVersion. */

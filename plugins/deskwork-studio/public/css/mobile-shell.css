@@ -126,9 +126,12 @@
   }
 
   /* Inline meta (e.g. `v3 · 2h`, `№ 03`, `17 longform · 7 shortform`).
-   * Faded color (3.48:1 vs paper) — ornamental floor; not body text. */
+   * Informational supporting text (counts, version numbers, age) — body
+   * text class per WCAG 1.4.3, needs 4.5:1. --er-faded would render at
+   * 3.48:1 (fails). --er-ink-soft renders at 8.92:1 (AAA-comfortable).
+   * Matches the desk-states-v7 a11y substitution. */
   .er-masthead-meta-inline {
-    color: var(--er-faded);
+    color: var(--er-ink-soft);
   }
 
   /* Inline platform tag inside kickers (e.g. linkedin badge on the

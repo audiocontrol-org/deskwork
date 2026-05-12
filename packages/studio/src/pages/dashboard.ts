@@ -74,9 +74,10 @@ export async function renderDashboard(
 
   // v7 universal masthead. Mobile-only at this commit (CSS hides it
   // on desktop so the existing er-pagehead chrome below keeps its
-  // present-day desktop appearance). Step 2.2.9 retires the
-  // er-pagehead chrome on mobile once the Desk's body-content
-  // rework lands.
+  // present-day desktop appearance). Step 2.2.8 (renderMobileBar
+  // refactor) is the natural moment to retire redundant pre-v7
+  // chrome on mobile across surfaces; Step 2.2.9 (Desk's
+  // Shortform-by-platform section) ships the Desk body refresh.
   const longformCount = data.entries.length;
   const mastheadMeta = `${longformCount} on the calendar`;
   const masthead = renderMasthead({

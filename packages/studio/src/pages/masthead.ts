@@ -89,6 +89,12 @@ export interface MastheadOpts {
 const DESK_HREF = '/dev/editorial-studio';
 
 function renderKicker(opts: MastheadOpts): RawHtml {
+  if (opts.kicker !== undefined && opts.kickerHtml !== undefined) {
+    throw new Error(
+      'renderMasthead: pass exactly one of { kicker, kickerHtml }, not both. ' +
+        'See packages/studio/src/pages/masthead.ts for the MastheadOpts contract.',
+    );
+  }
   const meta = opts.metaInline
     ? html`<span class="er-masthead-kicker-sep">·</span><span class="er-masthead-meta-inline">${opts.metaInline}</span>`
     : '';
