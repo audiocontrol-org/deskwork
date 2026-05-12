@@ -223,16 +223,16 @@ git commit -m "fix(studio): apply review findings on dashboard mobile-first"
 
 ### Task 1.5: Release v0.19 + verify on iPhone + close issues
 
-- [ ] **Step 1.5.1:** Run `/release` (operator-driven). Picks v0.19.0. Atomic-pushes to main + branch + tag.
-- [ ] **Step 1.5.2:** Operator runs `/plugin marketplace update deskwork` against an iPhone-walked install. Confirms #236, #237, #238, #243 symptoms are gone.
-- [ ] **Step 1.5.3:** Post fix-landed comments on #236, #237, #238, #243 referencing v0.19.0 + commits.
-- [ ] **Step 1.5.4:** Close #236, #237, #238, #243 with `--reason completed`.
+- [x] **Step 1.5.1:** ~~Run `/release` (operator-driven). Picks v0.19.0. Atomic-pushes to main + branch + tag.~~ *(Bundled with Task 1.8 + 1.8b and shipped as v0.20.0 on 2026-05-11 — tag `v0.20.0` (`64c7b29`), `@deskwork/{core,cli,studio}@0.20.0` published to npm.)*
+- [x] **Step 1.5.2:** ~~Operator runs `/plugin marketplace update deskwork` against an iPhone-walked install. Confirms #236, #237, #238, #243 symptoms are gone.~~ *(Operator walked v0.20.0 marketplace install on phone 2026-05-11: "Looks good. I'd say that's done.")*
+- [x] **Step 1.5.3:** ~~Post fix-landed comments on #236, #237, #238, #243 referencing v0.19.0 + commits.~~ *(Posted 2026-05-12 referencing v0.20.0 — comment IDs 4427437325 / 4427437402 / 4427437466 / 4427437537. Each cites commit + file:line + operator-walk quote.)*
+- [x] **Step 1.5.4:** ~~Close #236, #237, #238, #243 with `--reason completed`.~~ *(Closed 2026-05-12 with `--reason completed` after operator authorization "close the issues".)*
 
 **Acceptance:**
 - Dashboard walks on phone without horizontal scroll
 - Press-check vocabulary preserved
 - Probe + smoke green
-- #236, #237, #238, #243 closed against v0.19.0 install
+- #236, #237, #238, #243 closed against v0.20.0 install
 
 ### Task 1.7.5 — CLI dispatcher gap: missing subcommands for block / cancel / induct (prereq for 1.8)
 

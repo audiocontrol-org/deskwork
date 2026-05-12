@@ -21,7 +21,7 @@ Extend the press-check mobile-first design language already shipped on the entry
 | 1.2 | Implement Dashboard mobile-first | Complete (collapsible stage tiles + FAB Compose chip shipped) |
 | 1.3 | Probe + dual-viewport smoke for dashboard | Complete (`scripts/probe-mobile-dashboard.mjs` 16/16; `scripts/smoke-er-viewport-regressions.mjs` 8/8) |
 | 1.4 | `/dw-lifecycle:review` + integrate findings | Complete (4 findings applied, 3 withdrawn after verification, 1 deferred to Phase 2) |
-| 1.5 | Release v0.19 + iPhone walk + close issues | Pending (operator-driven release) |
+| 1.5 | Release v0.19 + iPhone walk + close issues | Complete (bundled with v0.20.0; operator walked 2026-05-11; #236/#237/#238/#243 closed 2026-05-12) |
 | 1.6 | Audit-driven remediations (Phase 0 / 1 cleanup per 2026-05-09 implementation audit) | Complete |
 | 1.7 | Final reviewState retirement (schema + journal cascade) | Complete |
 | 1.8 | Row affordance redesign — overflow menu + swipe drawer + full verb vocabulary (block, induct, iterate) → v0.20.0 | Complete + released as v0.20.0 (operator walked marketplace install on phone, 2026-05-11) |
@@ -46,9 +46,9 @@ Extend the press-check mobile-first design language already shipped on the entry
 
 | Issue | Phase | Status |
 |---|---|---|
-| #236 | 1 | Implementation landed; pending verification at v0.19 release |
-| #237 | 1 | Implementation landed; pending verification at v0.19 release |
-| #238 | 1 | Implementation landed; pending verification at v0.19 release |
+| #236 | 1 | Closed 2026-05-12 (verified in v0.20.0) |
+| #237 | 1 | Closed 2026-05-12 (verified in v0.20.0) |
+| #238 | 1 | Closed 2026-05-12 (verified in v0.20.0) |
 | #242 | 1 (Cancel verb on dashboard rows + entry-review decision strip) + 4 (remaining surfaces) | Partially landed; cross-cutting completion deferred to Phase 4 |
-| #243 | 1 | Implementation landed; pending verification at v0.19 release |
+| #243 | 1 | Closed 2026-05-12 (verified in v0.20.0) |
 | #244 | 2 | Outline-drawer foundation in place; full Phase 2 mobile-shell extraction pending |
