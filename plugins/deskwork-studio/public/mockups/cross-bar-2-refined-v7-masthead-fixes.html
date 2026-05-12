@@ -198,6 +198,12 @@ WHY THE POPOVER PATTERN MATTERS
   }
   .v7-masthead.dashboard {
     border-bottom: 1px solid var(--red);
+    /* Desk has no back-link — collapse to 2-column grid so the
+       center stack gets the full width (v6 had this; v7 lost it
+       in the rewrite, which caused severe truncation on Desk
+       where .v7-center was being crammed into a 24px back-glyph
+       column instead of the 1fr center column). */
+    grid-template-columns: 1fr 24px;
   }
   .v7-back {
     align-self: center;               /* CHANGED from 'end' */
