@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Shortform 3 · Bottom tab bar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<!--
+============================================================
+SHORTFORM MOCKUP · DIRECTION C · BOTTOM TAB BAR
+============================================================
+
+WHAT
+  A thin bottom tab bar carries up to three tabs: Actions /
+  Versions / TOC. Each tab is a button that opens its own
+  slide-up sheet. Actions = the three verbs (iterate, approve,
+  cancel). Versions = the version picker (only present when
+  versions > 1; tab hides otherwise). TOC = the heading-derived
+  table of contents (only present when the rendered HTML has
+  ≥2 h2/h3/h4 entries; tab hides otherwise — empty-state grace
+  per the audit's recommendation). The tab bar is the entry-
+  review surface's idiom translated to shortform; this is the
+  direction that maximizes shared infrastructure.
+
+WHY THIS DIRECTION IS IN PLAY
+  · Closes #244 (TOC drawer) for shortform as a natural side
+    effect of the tab bar shape — TOC is just one of the tabs.
+  · Aligns shortform's mobile chrome with entry-review's existing
+    mobile-bar.ts pattern. If picked, Task 2.2.5's extraction
+    decision becomes "yes, parameterize renderMobileBar()" with
+    a concrete two-consumer design space.
+  · Friction F.2 (decisions out of reach) AND Friction F.3
+    (platform/channel context invisible at action time) are both
+    solved: the Actions sheet shows the slash command with all
+    flags before commit; the Versions sheet supports v-picker
+    that today's strip handles awkwardly.
+  · Tradeoff accepted: the most chrome at rest of any direction.
+    A 48px tab bar plus the masthead means ~130px of viewport
+    is non-article. For long-shortform reads (YouTube descriptions
+    ~400 words) this is fine; for a 50-word LinkedIn post it's
+    proportionally heavy.
+
+HOW IT CONSUMES PHASE 2.1 PRIMITIVES
+  · Three sheet-controller instances — one per tab. Same API
+    as direction B; each tab opens its own sheet.
+  · Body-attribute names: data-sf-sheet-open=
+    "actions" | "versions" | "toc" — single attribute, three
+    values; the controller doesn't need to know which is active.
+  · Tab bar IS the natural extraction point for Task 2.2.5:
+    renderMobileBar({ tabs: ['actions','versions','toc'] }) would
+    serve both entry-review and shortform after parameterization.
+
+SPEC COMPLIANCE
+  · No state stamps anywhere on mobile.
+  · No reviewState gating.
+  · TOC tab honors the audit's empty-state recommendation
+    (hidden when no headings) — preserves the "structure over
+    scrolling" principle: chrome that pays its way or vanishes.
+  · Sheet contents are clipboard-copy buttons; no POSTs.
+============================================================
+-->
+<style>
+  :root {
+    --paper: #F5F1E8;
+    --paper-2: #ECE6D4;
+    --paper-3: #DFD7BF;
+    --kraft: #8A7250;
+    --ink: #1A1614;
+    --faded: #8A7F70;
+    --faded-2: #C7BEAE;
+    --red: #B8362A;
+    --blue: #2A4B7C;
+    --green: #2E5D45;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    --noise:
+      url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #2C2823;
+    background-image:
+      radial-gradient(circle at 30% 20%, rgba(184, 54, 42, 0.08), transparent 50%),
+      radial-gradient(circle at 70% 80%, rgba(42, 75, 124, 0.06), transparent 50%);
+    color: var(--ink); font-family: var(--display);
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 2rem 1rem 4rem;
+  }
+  .meta { color: #C7BEAE; font-family: var(--mono); font-size: 0.8rem;
+          letter-spacing: 0.18em; text-transform: uppercase;
+          margin-bottom: 0.6rem; text-align: center; }
+  .meta a { color: var(--paper); text-decoration: none;
+            border-bottom: 1px solid rgba(245, 241, 232, 0.4); }
+  h1.demo-title { color: var(--paper); font-family: var(--display);
+                  font-style: italic;
+                  font-variation-settings: "opsz" 36, "wght" 500;
+                  font-size: 1.7rem; margin-bottom: 0.4rem; text-align: center; }
+  .demo-sub { color: var(--faded-2); font-family: var(--mono);
+              font-size: 0.7rem; letter-spacing: 0.18em;
+              text-transform: uppercase; margin-bottom: 1.4rem; text-align: center; }
+  .banner {
+    max-width: 760px; margin: 0 auto 1.8rem;
+    padding: 0.85rem 1rem;
+    background: rgba(245, 241, 232, 0.08);
+    border-left: 3px solid var(--blue);
+    color: #C7BEAE;
+    font-family: var(--display); font-size: 0.92rem; line-height: 1.55;
+  }
+  .banner .kicker {
+    font-family: var(--mono); font-size: 0.65rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--blue); display: block; margin-bottom: 0.4rem;
+  }
+  .banner em { color: var(--paper); font-style: italic; }
+  .banner code { font-family: var(--mono); font-size: 0.8rem; color: var(--paper); }
+
+  .frames { display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center; }
+  .frame-wrap { display: flex; flex-direction: column; align-items: center; }
+  .caption { color: #C7BEAE; font-family: var(--mono);
+             font-size: 0.7rem; letter-spacing: 0.18em;
+             text-transform: uppercase; margin-top: 0.8rem;
+             text-align: center; max-width: 410px; line-height: 1.5; }
+  .caption strong { color: var(--paper); }
+  .caption code { font-family: var(--mono); font-size: 0.62rem; color: var(--paper-3); text-transform: lowercase; letter-spacing: 0; }
+
+  /* ============ PHONE FRAME ============ */
+  .phone { width: 410px; height: 880px; background: #050505;
+           border-radius: 50px; padding: 12px;
+           box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5),
+                       inset 0 0 0 1px rgba(255,255,255,0.04);
+           position: relative; }
+  .phone::before { content: ''; position: absolute;
+                   top: 22px; left: 50%; transform: translateX(-50%);
+                   width: 110px; height: 30px; background: #000;
+                   border-radius: 16px; z-index: 100; }
+  .screen { width: 100%; height: 100%; background: var(--paper);
+            background-image: var(--noise);
+            border-radius: 38px; overflow: hidden; position: relative;
+            font-size: 17px; line-height: 1.55; color: var(--ink); }
+  .ios-clock { position: absolute; top: 28px; left: 32px;
+               font-family: -apple-system, system-ui, sans-serif;
+               font-size: 0.95rem; font-weight: 600;
+               color: var(--ink); z-index: 110; }
+  .ios-icons { position: absolute; top: 30px; right: 32px;
+               color: var(--ink);
+               font-family: -apple-system, system-ui, sans-serif;
+               font-size: 0.85rem; letter-spacing: 0.05em; z-index: 110; }
+
+  /* ============ REVIEW SURFACE — MASTHEAD ============ */
+  .sf-masthead {
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 82px; padding: 56px 1.1rem 0;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-bottom: 1px solid var(--paper-3);
+    z-index: 50;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    column-gap: 0.6rem;
+    align-items: end;
+    padding-bottom: 0.55rem;
+  }
+  .sf-mast-l { min-width: 0; }
+  .sf-mast-kicker {
+    font-family: var(--mono); font-size: 0.58rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--red);
+    line-height: 1.2; margin-bottom: 0.15rem;
+  }
+  .sf-mast-kicker .platform {
+    background: var(--red); color: var(--paper);
+    padding: 0.08rem 0.36rem;
+    margin-right: 0.35rem;
+    letter-spacing: 0.18em; font-size: 0.55rem;
+  }
+  .sf-mast-slug {
+    font-family: var(--mono); font-size: 0.78rem;
+    color: var(--ink);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    border-bottom: 1px solid var(--paper-3);
+    padding-bottom: 1px;
+  }
+  .sf-mast-r {
+    font-family: var(--mono); font-size: 0.6rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--faded);
+    line-height: 1.2; text-align: right;
+  }
+  .sf-mast-r .num {
+    color: var(--ink); font-size: 0.95rem; font-weight: 500;
+    letter-spacing: 0;
+    display: block;
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+  }
+  .sf-mast-back {
+    position: absolute; top: 58px; right: 1.1rem;
+    font-family: var(--mono); font-size: 0.6rem;
+    color: var(--blue); letter-spacing: 0.12em;
+    text-transform: uppercase;
+    text-decoration: none;
+    border-bottom: 1px solid var(--blue);
+  }
+
+  /* ============ REVIEW SURFACE — BODY ============ */
+  .sf-body {
+    position: absolute; top: 82px; left: 0; right: 0; bottom: 48px;
+    overflow-y: auto;
+    padding: 1.1rem 1.2rem 1.5rem;
+  }
+  .sf-body h1 {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 36, "wght" 500;
+    font-size: 1.5rem; line-height: 1.15;
+    margin-bottom: 0.4rem; color: var(--ink);
+  }
+  .sf-body .dek {
+    font-family: var(--display);
+    font-size: 0.95rem; color: var(--faded);
+    margin-bottom: 1rem;
+    line-height: 1.4;
+    border-bottom: 1px dashed var(--paper-3);
+    padding-bottom: 0.7rem;
+  }
+  .sf-body p {
+    font-family: var(--display);
+    font-size: 0.96rem; line-height: 1.55;
+    margin-bottom: 0.8rem; color: var(--ink);
+  }
+  .sf-body h2 {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 24, "wght" 500;
+    font-size: 1.1rem; line-height: 1.2;
+    color: var(--red);
+    margin: 1.3rem 0 0.5rem;
+  }
+  .sf-body p em { font-style: italic; color: var(--red); }
+  .sf-body code {
+    font-family: var(--mono); font-size: 0.85rem;
+    background: var(--paper-2);
+    padding: 0.04rem 0.28rem;
+    border-radius: 2px;
+  }
+  .sf-body .toc-anchor { color: var(--red); }
+  .sf-body h2:target,
+  .sf-body h3:target { background: rgba(184, 54, 42, 0.08); }
+
+  /* ============ TAB BAR ============ */
+  .sf-tabbar {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    height: 48px;
+    background: var(--paper-2);
+    background-image: var(--noise);
+    border-top: 1px solid var(--paper-3);
+    box-shadow: 0 -2px 6px rgba(26, 22, 20, 0.05);
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    column-gap: 0;
+    z-index: 60;
+  }
+  .sf-tab {
+    border: none;
+    background: transparent;
+    color: var(--faded);
+    font-family: var(--mono); font-size: 0.58rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    font-weight: 500;
+    padding: 0.45rem 0.4rem;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 0.1rem;
+    line-height: 1;
+    border-right: 1px solid var(--paper-3);
+    cursor: pointer;
+  }
+  .sf-tab:last-child { border-right: 0; }
+  .sf-tab-glyph {
+    font-family: var(--display); font-style: italic;
+    font-size: 1.15rem; line-height: 1;
+    font-variation-settings: "opsz" 22, "wght" 500;
+  }
+  .sf-tab.active {
+    color: var(--ink);
+    background: var(--paper);
+    box-shadow: inset 0 2px 0 var(--red);
+  }
+  .sf-tab.active .sf-tab-glyph { color: var(--red); }
+
+  /* ============ SCRIM ============ */
+  .scrim {
+    position: absolute; inset: 0;
+    background: rgba(26, 22, 20, 0.42);
+    z-index: 70;
+    border-radius: 38px;
+  }
+
+  /* ============ SHEET (shared visual) ============ */
+  .sf-sheet {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-top: 1px solid var(--paper-3);
+    border-top-left-radius: 14px;
+    border-top-right-radius: 14px;
+    box-shadow:
+      0 -10px 30px rgba(26, 22, 20, 0.18),
+      0 -2px 6px rgba(26, 22, 20, 0.08);
+    padding: 0.55rem 1.2rem 1.2rem;
+    z-index: 80;
+    display: flex; flex-direction: column;
+    gap: 0.8rem;
+    max-height: 65%;
+    overflow-y: auto;
+  }
+  .sf-sheet-handle {
+    align-self: center;
+    width: 44px; height: 4px;
+    background: var(--paper-3);
+    border-radius: 2px;
+    margin-bottom: 0.45rem;
+    flex-shrink: 0;
+  }
+  .sf-sheet-head {
+    border-bottom: 1px dashed var(--paper-3);
+    padding-bottom: 0.7rem;
+    flex-shrink: 0;
+  }
+  .sf-sheet-kicker {
+    font-family: var(--mono); font-size: 0.6rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--red);
+    margin-bottom: 0.3rem;
+  }
+  .sf-sheet-kicker .platform {
+    background: var(--red); color: var(--paper);
+    padding: 0.08rem 0.36rem;
+    margin-right: 0.35rem;
+    font-size: 0.58rem;
+  }
+  .sf-sheet-q {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 28, "wght" 500;
+    font-size: 1.25rem;
+    color: var(--ink);
+    line-height: 1.1;
+  }
+  .sf-sheet-q em { color: var(--red); }
+
+  /* ============ SHEET — Actions ============ */
+  .sf-sheet-actions {
+    display: flex; flex-direction: column; gap: 0.55rem;
+  }
+  .sf-sheet-btn {
+    display: flex; align-items: center; gap: 0.7rem;
+    padding: 0.8rem 1rem;
+    border: 1px solid;
+    border-radius: 2px;
+    background: var(--paper);
+    cursor: pointer;
+    text-align: left;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.4);
+  }
+  .sf-sheet-btn-glyph {
+    font-family: var(--display); font-style: italic;
+    font-size: 1.35rem; line-height: 1;
+    font-variation-settings: "opsz" 28, "wght" 500;
+    width: 22px; text-align: center; flex-shrink: 0;
+  }
+  .sf-sheet-btn-l { flex-grow: 1; min-width: 0; }
+  .sf-sheet-btn-label {
+    display: block;
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 20, "wght" 500;
+    font-size: 1.05rem; color: var(--ink); line-height: 1.1;
+  }
+  .sf-sheet-btn-hint {
+    display: block;
+    font-family: var(--mono); font-size: 0.57rem;
+    letter-spacing: 0.08em; color: var(--faded);
+    margin-top: 0.18rem;
+  }
+  .sf-sheet-btn-arrow {
+    font-family: var(--mono); font-size: 1.05rem;
+    flex-shrink: 0;
+  }
+  .sf-sheet-btn.iterate { border-color: var(--blue); }
+  .sf-sheet-btn.iterate .sf-sheet-btn-glyph,
+  .sf-sheet-btn.iterate .sf-sheet-btn-arrow { color: var(--blue); }
+  .sf-sheet-btn.approve { border-color: var(--green); }
+  .sf-sheet-btn.approve .sf-sheet-btn-glyph,
+  .sf-sheet-btn.approve .sf-sheet-btn-arrow { color: var(--green); }
+  .sf-sheet-btn.cancel { border-color: var(--red); }
+  .sf-sheet-btn.cancel .sf-sheet-btn-glyph,
+  .sf-sheet-btn.cancel .sf-sheet-btn-arrow { color: var(--red); }
+
+  /* ============ SHEET — TOC ============ */
+  .sf-sheet-toc {
+    display: flex; flex-direction: column;
+    gap: 0.1rem;
+  }
+  .sf-toc-item {
+    display: flex; align-items: baseline; gap: 0.7rem;
+    padding: 0.55rem 0.4rem;
+    border-bottom: 1px dotted var(--paper-3);
+    text-decoration: none;
+    color: var(--ink);
+  }
+  .sf-toc-item:last-child { border-bottom: 0; }
+  .sf-toc-item.depth-3 { padding-left: 1.4rem; }
+  .sf-toc-item.depth-4 { padding-left: 2.4rem; }
+  .sf-toc-num {
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.12em; color: var(--faded);
+    flex-shrink: 0;
+  }
+  .sf-toc-text {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 500;
+    font-size: 1rem; line-height: 1.25;
+    color: var(--ink); flex-grow: 1;
+  }
+  .sf-toc-item.active { background: rgba(184, 54, 42, 0.06); }
+  .sf-toc-item.active .sf-toc-text {
+    color: var(--red);
+    text-decoration: underline;
+    text-decoration-color: var(--red);
+    text-underline-offset: 3px;
+  }
+  .sf-toc-empty {
+    padding: 1.2rem 0 0.4rem;
+    text-align: center;
+    color: var(--faded);
+    font-family: var(--display); font-style: italic;
+    font-size: 0.95rem;
+  }
+
+  /* ============ SHEET — Versions ============ */
+  .sf-sheet-versions {
+    display: flex; flex-direction: column;
+    gap: 0.1rem;
+  }
+  .sf-v-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    column-gap: 0.7rem;
+    padding: 0.6rem 0.4rem;
+    border-bottom: 1px dotted var(--paper-3);
+    align-items: baseline;
+    text-decoration: none;
+    color: var(--ink);
+  }
+  .sf-v-row:last-child { border-bottom: 0; }
+  .sf-v-num {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 20, "wght" 500;
+    font-size: 1.1rem; color: var(--red);
+  }
+  .sf-v-meta {
+    font-family: var(--mono); font-size: 0.62rem;
+    color: var(--ink);
+    line-height: 1.3;
+  }
+  .sf-v-meta .by {
+    color: var(--faded); display: block;
+    font-size: 0.55rem; letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-top: 0.1rem;
+  }
+  .sf-v-tag {
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--faded);
+  }
+  .sf-v-row.active .sf-v-num { color: var(--ink); }
+  .sf-v-row.active .sf-v-tag { color: var(--red); }
+
+  /* ============ DESK INDEX (shared with A + B) ============ */
+  .dx-masthead {
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 92px; padding: 56px 1.1rem 0.8rem;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-bottom: 1px solid var(--red);
+    z-index: 50;
+  }
+  .dx-mast-kicker {
+    font-family: var(--mono); font-size: 0.6rem;
+    letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--red); margin-bottom: 0.2rem;
+  }
+  .dx-mast-title {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 28, "wght" 500;
+    font-size: 1.2rem; line-height: 1.15;
+    color: var(--ink);
+  }
+  .dx-mast-count {
+    font-family: var(--mono); font-size: 0.6rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--faded);
+    margin-top: 0.15rem;
+  }
+  .dx-mast-count .num { color: var(--ink); font-weight: 500; }
+  .dx-body {
+    position: absolute; top: 92px; left: 0; right: 0; bottom: 0;
+    overflow-y: auto;
+  }
+  .dx-platform {
+    padding: 0.55rem 1rem 0.3rem;
+    background: var(--paper-2);
+    border-top: 1px solid var(--paper-3);
+    border-bottom: 1px dashed var(--paper-3);
+    font-family: var(--mono); font-size: 0.62rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--red);
+    display: flex; align-items: baseline; gap: 0.55rem;
+  }
+  .dx-platform .count { color: var(--faded); letter-spacing: 0.12em; }
+  .dx-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    column-gap: 0.6rem;
+    padding: 0.65rem 1rem 0.7rem;
+    border-bottom: 1px dashed var(--paper-3);
+    background: var(--paper);
+    align-items: start;
+  }
+  .dx-row-body { min-width: 0; }
+  .dx-row-slug {
+    font-family: var(--mono); font-size: 0.76rem;
+    color: var(--ink);
+    border-bottom: 1px solid var(--paper-3);
+    padding-bottom: 1px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    display: inline-block;
+    max-width: 100%;
+  }
+  .dx-row-title {
+    display: block;
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 500;
+    font-size: 0.95rem; line-height: 1.25;
+    color: var(--ink);
+    margin-top: 0.2rem;
+  }
+  .dx-row-meta {
+    font-family: var(--mono); font-size: 0.58rem;
+    color: var(--faded);
+    text-align: right;
+    line-height: 1.4;
+  }
+  .dx-row-meta .ts { display: block; }
+  .dx-row-meta .v {
+    color: var(--ink); font-size: 0.62rem;
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 16, "wght" 500;
+    margin-top: 0.05rem;
+  }
+  .dx-channel {
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.1em;
+    color: var(--blue);
+    display: inline-block;
+    margin-top: 0.18rem;
+  }
+</style>
+</head>
+<body>
+
+<div class="meta"><a href="index.html">← back to mockups</a></div>
+<h1 class="demo-title">Shortform 3 · Bottom tab bar.</h1>
+<div class="demo-sub">Mobile-first · Direction C · 2-3 tabs · entry-review-aligned · 3× sheet-controller</div>
+
+<div class="banner">
+  <span class="kicker">Mockup direction C · proposed for Task 2.2 shortform pick</span>
+  A 48px bottom tab bar carries <em>Actions</em>, <em>Versions</em>, and (when there are headings) <em>TOC</em>. Each tab opens its own slide-up sheet via a Phase 2.1 <code>createSlideUpSheet()</code> instance. The TOC tab is conditional — hides entirely when the rendered body has &lt;2 h2/h3/h4 entries (the audit's empty-state recommendation). The Versions tab is conditional on multiple versions. This is the direction that aligns shortform with entry-review's mobile-bar idiom — picking it makes Task 2.2.5's <code>renderMobileBar()</code> parameterization a concrete two-consumer design problem rather than speculative API.
+</div>
+
+<div class="frames">
+
+  <!-- ====================== FRAME A: YouTube long, TOC sheet open ====================== -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:54</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="sf-masthead">
+        <div class="sf-mast-l">
+          <div class="sf-mast-kicker">
+            <span class="platform" style="background: var(--kraft); border-color: var(--kraft);">youtube</span>
+            <span>@deskwork</span>
+          </div>
+          <div class="sf-mast-slug">two-flavors-of-css</div>
+        </div>
+        <div class="sf-mast-r">
+          galley<br>
+          <span class="num">№ 04</span>
+        </div>
+        <a class="sf-mast-back" href="#">← desk</a>
+      </div>
+
+      <div class="sf-body">
+        <h1>Two flavors of CSS in 2026.</h1>
+        <p class="dek">Why I stopped reaching for utility-first frameworks on serious projects.</p>
+        <p>This is how I think about CSS in 2026, and why I stopped reaching for utility-first frameworks on serious projects.</p>
+        <h2>The first flavor: rules of the game</h2>
+        <p>Flexbox alignment. What <code>min-width: 0</code> does to grid items. The cascade. What <code>position: sticky</code> actually requires from its scroll container. These are decisions.</p>
+        <p>Each one carries weight: a wrong call propagates to every descendant element, every viewport, every operator's device.</p>
+      </div>
+
+      <div class="sf-tabbar">
+        <button class="sf-tab">
+          <span class="sf-tab-glyph">↻</span>
+          <span>Actions</span>
+        </button>
+        <button class="sf-tab">
+          <span class="sf-tab-glyph">№</span>
+          <span>Versions · 4</span>
+        </button>
+        <button class="sf-tab active">
+          <span class="sf-tab-glyph">⊟</span>
+          <span>TOC · 2</span>
+        </button>
+      </div>
+
+      <div class="scrim"></div>
+
+      <div class="sf-sheet">
+        <div class="sf-sheet-handle"></div>
+
+        <div class="sf-sheet-head">
+          <div class="sf-sheet-kicker">
+            <span class="platform" style="background: var(--kraft); border-color: var(--kraft);">youtube</span>
+            <span>two-flavors-of-css · 2 sections</span>
+          </div>
+          <div class="sf-sheet-q">Jump to <em>section</em></div>
+        </div>
+
+        <div class="sf-sheet-toc">
+          <a class="sf-toc-item active" href="#first-flavor">
+            <span class="sf-toc-num">§ 1</span>
+            <span class="sf-toc-text">The first flavor: rules of the game</span>
+          </a>
+          <a class="sf-toc-item" href="#second-flavor">
+            <span class="sf-toc-num">§ 2</span>
+            <span class="sf-toc-text">The second flavor: the press-check vocabulary</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="caption">
+    <strong>Frame A · YouTube · TOC sheet open.</strong><br>
+    Three tabs; TOC active. Two h2 sections list; active section underlined red.<br>
+    Tap a section → smooth-scroll + sheet auto-closes.
+  </div>
+  </div>
+
+  <!-- ====================== FRAME B: LinkedIn no headings, Actions sheet ====================== -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:51</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="sf-masthead">
+        <div class="sf-mast-l">
+          <div class="sf-mast-kicker">
+            <span class="platform">linkedin</span>
+            <span>deskwork-blog</span>
+          </div>
+          <div class="sf-mast-slug">v021-mobile-first-shortform</div>
+        </div>
+        <div class="sf-mast-r">
+          galley<br>
+          <span class="num">№ 03</span>
+        </div>
+        <a class="sf-mast-back" href="#">← desk</a>
+      </div>
+
+      <div class="sf-body">
+        <h1>What I learned shipping mobile-first.</h1>
+        <p class="dek">Three iterations on the state-stamp pattern…</p>
+        <p>Press-check vocabulary, take three. I keep going back to this question…</p>
+        <p>The first iterations leaned on rotated rubber stamps…</p>
+      </div>
+
+      <div class="sf-tabbar">
+        <button class="sf-tab active">
+          <span class="sf-tab-glyph">↻</span>
+          <span>Actions</span>
+        </button>
+        <button class="sf-tab">
+          <span class="sf-tab-glyph">№</span>
+          <span>Versions · 3</span>
+        </button>
+        <!-- TOC tab HIDDEN (no headings in body) -->
+      </div>
+
+      <div class="scrim"></div>
+
+      <div class="sf-sheet">
+        <div class="sf-sheet-handle"></div>
+
+        <div class="sf-sheet-head">
+          <div class="sf-sheet-kicker">
+            <span class="platform">linkedin</span>
+            <span>deskwork-blog · v021-mobile-first-shortform</span>
+          </div>
+          <div class="sf-sheet-q">What now, <em>compositor</em>?</div>
+        </div>
+
+        <div class="sf-sheet-actions">
+          <button class="sf-sheet-btn iterate">
+            <span class="sf-sheet-btn-glyph">↻</span>
+            <span class="sf-sheet-btn-l">
+              <span class="sf-sheet-btn-label">Iterate</span>
+              <span class="sf-sheet-btn-hint">copy /deskwork:iterate · agent rewrites</span>
+            </span>
+            <span class="sf-sheet-btn-arrow">→</span>
+          </button>
+          <button class="sf-sheet-btn approve">
+            <span class="sf-sheet-btn-glyph">✓</span>
+            <span class="sf-sheet-btn-l">
+              <span class="sf-sheet-btn-label">Approve</span>
+              <span class="sf-sheet-btn-hint">copy /deskwork:approve · graduate stage</span>
+            </span>
+            <span class="sf-sheet-btn-arrow">→</span>
+          </button>
+          <button class="sf-sheet-btn cancel">
+            <span class="sf-sheet-btn-glyph">⊘</span>
+            <span class="sf-sheet-btn-l">
+              <span class="sf-sheet-btn-label">Cancel</span>
+              <span class="sf-sheet-btn-hint">copy /deskwork:cancel · to cancelled</span>
+            </span>
+            <span class="sf-sheet-btn-arrow">→</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="caption">
+    <strong>Frame B · LinkedIn · TOC tab hidden, Actions sheet open.</strong><br>
+    No headings in body → TOC tab vanishes. Tab bar adapts: 2 tabs only.<br>
+    The chrome pays its way: tabs without payload disappear.
+  </div>
+  </div>
+
+  <!-- ====================== FRAME C: Reddit, Versions sheet ====================== -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:53</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="sf-masthead">
+        <div class="sf-mast-l">
+          <div class="sf-mast-kicker">
+            <span class="platform" style="background: var(--blue); border-color: var(--blue);">reddit</span>
+            <span>r/programming</span>
+          </div>
+          <div class="sf-mast-slug">why-i-stopped-css-by-hand</div>
+        </div>
+        <div class="sf-mast-r">
+          galley<br>
+          <span class="num">№ 02</span>
+        </div>
+        <a class="sf-mast-back" href="#">← desk</a>
+      </div>
+
+      <div class="sf-body">
+        <h2>Why I stopped writing CSS by hand</h2>
+        <p>I keep two flavors of CSS in my head these days…</p>
+        <p>The first flavor matters. It's the part where you make a decision…</p>
+      </div>
+
+      <div class="sf-tabbar">
+        <button class="sf-tab">
+          <span class="sf-tab-glyph">↻</span>
+          <span>Actions</span>
+        </button>
+        <button class="sf-tab active">
+          <span class="sf-tab-glyph">№</span>
+          <span>Versions · 2</span>
+        </button>
+        <button class="sf-tab">
+          <span class="sf-tab-glyph">⊟</span>
+          <span>TOC · 1</span>
+        </button>
+      </div>
+
+      <div class="scrim"></div>
+
+      <div class="sf-sheet">
+        <div class="sf-sheet-handle"></div>
+
+        <div class="sf-sheet-head">
+          <div class="sf-sheet-kicker">
+            <span class="platform" style="background: var(--blue); border-color: var(--blue);">reddit</span>
+            <span>r/programming · why-i-stopped-css-by-hand</span>
+          </div>
+          <div class="sf-sheet-q">Switch to a <em>version</em></div>
+        </div>
+
+        <div class="sf-sheet-versions">
+          <a class="sf-v-row active" href="?v=2">
+            <span class="sf-v-num">№ 02</span>
+            <span class="sf-v-meta">
+              May 11, 2026 · 11:48
+              <span class="by">operator save · current</span>
+            </span>
+            <span class="sf-v-tag">current</span>
+          </a>
+          <a class="sf-v-row" href="?v=1">
+            <span class="sf-v-num">№ 01</span>
+            <span class="sf-v-meta">
+              May 10, 2026 · 14:20
+              <span class="by">/deskwork:iterate · agent</span>
+            </span>
+            <span class="sf-v-tag">prior</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="caption">
+    <strong>Frame C · Reddit · Versions sheet.</strong><br>
+    Each version row shows who-originated (agent vs operator), when, and tag.<br>
+    Single TOC entry → TOC tab present but quiet (count: · 1).
+  </div>
+  </div>
+
+</div>
+
+<div style="margin: 3rem auto 0; max-width: 1100px;
+            background: rgba(245, 241, 232, 0.05);
+            border: 1px solid rgba(245, 241, 232, 0.12);
+            color: #C7BEAE;
+            padding: 1.2rem 1.4rem;
+            font-family: var(--display); font-size: 0.92rem; line-height: 1.6;">
+  <div style="font-family: var(--mono); font-size: 0.62rem;
+              letter-spacing: 0.18em; text-transform: uppercase;
+              color: var(--paper); margin-bottom: 0.5rem;">
+    Tab-bar conditional logic
+  </div>
+  <table style="width: 100%; border-collapse: collapse;
+                font-family: var(--mono); font-size: 0.72rem;
+                color: var(--paper-3); line-height: 1.4;">
+    <tr style="text-align: left; color: var(--paper);">
+      <th style="padding: 0.35rem 0.5rem; border-bottom: 1px solid rgba(245,241,232,0.18);">Tab</th>
+      <th style="padding: 0.35rem 0.5rem; border-bottom: 1px solid rgba(245,241,232,0.18);">Visible when</th>
+      <th style="padding: 0.35rem 0.5rem; border-bottom: 1px solid rgba(245,241,232,0.18);">Sheet contents</th>
+    </tr>
+    <tr><td style="padding: 0.35rem 0.5rem;">Actions</td>
+        <td style="padding: 0.35rem 0.5rem;">Always</td>
+        <td style="padding: 0.35rem 0.5rem;">iterate · approve · cancel + clipboard-copy hints</td></tr>
+    <tr><td style="padding: 0.35rem 0.5rem;">Versions · N</td>
+        <td style="padding: 0.35rem 0.5rem;"><code style="font-family:var(--mono);color:var(--paper)">versions.length ≥ 2</code></td>
+        <td style="padding: 0.35rem 0.5rem;">version picker with origin (agent/operator) + timestamp</td></tr>
+    <tr><td style="padding: 0.35rem 0.5rem;">TOC · N</td>
+        <td style="padding: 0.35rem 0.5rem;"><code style="font-family:var(--mono);color:var(--paper)">tocEntries.length ≥ 2</code></td>
+        <td style="padding: 0.35rem 0.5rem;">h2/h3/h4 list with scroll-spy active state + jump links</td></tr>
+  </table>
+  <p style="margin-top: 0.8rem; font-style: italic; color: var(--paper-3);">
+    Tab count is reactive — operators don't see chrome that has no payload. A 50-word LinkedIn post with one version + no headings sees one tab (Actions). A long YouTube description with 4 versions and 5 headings sees three tabs. Direction C's discipline is "earn the chrome."
+  </p>
+</div>
+
+</body>
+</html>
