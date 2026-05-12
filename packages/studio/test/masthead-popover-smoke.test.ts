@@ -25,9 +25,13 @@ describe('renderMastheadMenu — popover scaffold', () => {
     );
   });
 
-  it('marks the popover container with role=menu and links it to the trigger', () => {
+  it('labels the popover as a dialog linked to the trigger', () => {
+    // ARIA `role="menu"` was downgraded to `role="dialog"` per the
+    // 7e03d57 review: a menu role implies arrow-key navigation that
+    // this surface doesn't provide. dialog is honest about the
+    // settings-panel pattern actually shipped.
     const out = renderMastheadMenu();
-    expect(out.__raw).toMatch(/role="menu"/);
+    expect(out.__raw).toMatch(/role="dialog"/);
     expect(out.__raw).toMatch(/aria-labelledby="masthead-menu-trigger"/);
   });
 
@@ -91,10 +95,22 @@ describe('renderMastheadMenu — popover scaffold', () => {
     );
   });
 
-  it('decorates every menu item with role=menuitem', () => {
+  it('renders exactly 5 popover items in the operator-facing menu', () => {
+    // role="menuitem" was dropped from each item along with the
+    // popover's role="menu" (see "labels the popover as a dialog" test
+    // above for the rationale). Items remain native <a>/<button>; tab
+    // order handles navigation. Count is now by class membership.
     const out = renderMastheadMenu();
-    // Five operator-facing items: Manual, Shortcuts, Configure, Issue, About.
-    const menuitemMatches = out.__raw.match(/role="menuitem"/g) ?? [];
-    expect(menuitemMatches.length).toBe(5);
+    const matches = out.__raw.match(/class="er-masthead-popover-item[ "]/g) ?? [];
+    expect(matches.length).toBe(5);
+  });
+
+  it('marks the Configure (Phase 4) item with tabindex=-1 so keyboard tab order skips it', () => {
+    // aria-disabled signals AT-disabled state but does NOT remove the
+    // element from sequential tab focus. tabindex="-1" keeps the item
+    // AT-discoverable while preventing keyboard tab-traversal from
+    // landing on a non-interactive placeholder.
+    const out = renderMastheadMenu();
+    expect(out.__raw).toMatch(/data-er-masthead-popover-action="configure"[\s\S]*?tabindex="-1"/);
   });
 });

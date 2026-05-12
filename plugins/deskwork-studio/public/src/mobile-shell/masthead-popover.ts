@@ -133,6 +133,15 @@ export function initMastheadPopover(): MastheadPopover | null {
   );
   if (!triggerEl || !popoverEl || !scrimEl) return null;
 
+  // Idempotency guard. The item listeners below aren't tracked by the
+  // controller's destroy(), so if init runs twice they'd double-register.
+  // The trigger/scrim/document listeners are owned by createMastheadPopover
+  // and DO get cleaned up by destroy(); the per-item listeners are init-
+  // scoped and don't have a teardown path. A sentinel on the popover
+  // element prevents the second wiring pass.
+  if (popoverEl.dataset.erPopoverWired === 'true') return null;
+  popoverEl.dataset.erPopoverWired = 'true';
+
   const controller = createMastheadPopover({ triggerEl, popoverEl, scrimEl });
 
   // Action wiring.

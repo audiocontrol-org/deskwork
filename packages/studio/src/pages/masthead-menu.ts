@@ -49,7 +49,7 @@ export function renderMastheadMenu(): RawHtml {
     <div
       class="er-masthead-popover"
       data-er-masthead-popover
-      role="menu"
+      role="dialog"
       aria-labelledby="masthead-menu-trigger"
       hidden
     >
@@ -58,7 +58,6 @@ export function renderMastheadMenu(): RawHtml {
         <a
           class="er-masthead-popover-item"
           href="${MANUAL_HREF}"
-          role="menuitem"
         >
           <span class="er-masthead-popover-item-glyph">§</span>
           <span class="er-masthead-popover-item-body">
@@ -71,7 +70,6 @@ export function renderMastheadMenu(): RawHtml {
           type="button"
           class="er-masthead-popover-item"
           data-er-masthead-popover-action="shortcuts"
-          role="menuitem"
         >
           <span class="er-masthead-popover-item-glyph er-masthead-popover-item-glyph--blue">⌘</span>
           <span class="er-masthead-popover-item-body">
@@ -89,7 +87,7 @@ export function renderMastheadMenu(): RawHtml {
           data-er-masthead-popover-action="configure"
           data-disabled="true"
           aria-disabled="true"
-          role="menuitem"
+          tabindex="-1"
         >
           <span class="er-masthead-popover-item-glyph er-masthead-popover-item-glyph--kraft">⊞</span>
           <span class="er-masthead-popover-item-body">
@@ -106,7 +104,6 @@ export function renderMastheadMenu(): RawHtml {
           href="${ISSUE_HREF}"
           target="_blank"
           rel="noopener noreferrer"
-          role="menuitem"
         >
           <span class="er-masthead-popover-item-glyph er-masthead-popover-item-glyph--blue">✎</span>
           <span class="er-masthead-popover-item-body">
@@ -118,7 +115,6 @@ export function renderMastheadMenu(): RawHtml {
         <a
           class="er-masthead-popover-item"
           href="${MANUAL_HREF}"
-          role="menuitem"
         >
           <span class="er-masthead-popover-item-glyph">❡</span>
           <span class="er-masthead-popover-item-body">
