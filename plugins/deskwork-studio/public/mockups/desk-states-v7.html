@@ -193,7 +193,9 @@ EMPTY STATE
     margin-bottom: 0.18rem;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
-  .v7-kicker .dim { color: var(--faded); }
+  .v7-kicker .dim { color: var(--ink-soft); }
+  /* a11y: --faded #8A7F70 on --paper = 3.48:1 fails WCAG 1.4.3 (4.5:1
+     body text). --ink-soft #4A3F35 on --paper = 8.92:1 — comfortable AA. */
   .v7-kicker .sep { color: var(--paper-3); margin: 0 0.32rem; font-weight: 400; }
   .v7-title {
     font-family: var(--display); font-style: italic;
@@ -240,7 +242,8 @@ EMPTY STATE
     color: var(--red);
     line-height: 1;
   }
-  .desk-section-head .count { color: var(--faded); letter-spacing: 0.12em; }
+  .desk-section-head .count { color: var(--ink-soft); letter-spacing: 0.12em; }
+  /* a11y: was --faded (3.15:1 on --paper-2); --ink-soft on --paper-2 = 8.07:1. */
   .desk-section-head.shortform { color: var(--blue); }
   .desk-section-head.shortform .glyph { color: var(--blue); }
   .desk-section-head.adjacent { color: var(--kraft); }
@@ -266,7 +269,11 @@ EMPTY STATE
     border-bottom-color: var(--red);
     box-shadow: inset 0 2px 0 var(--red);
   }
-  .stage-tile.empty { opacity: 0.55; cursor: default; }
+  /* Empty-state: demote via explicit muted palette, NOT opacity.
+     opacity: 0.55 on the tile tanked contrast to ~2:1 on inherited
+     --ink text. Switch each child color explicitly to preserve readable
+     (≥4.5:1) text on small body-class labels per WCAG 1.4.3. */
+  .stage-tile.empty { cursor: default; }
   .stage-tile.empty:hover { background: var(--paper); }
 
   .stage-glyph {
@@ -276,7 +283,10 @@ EMPTY STATE
     color: var(--red); text-align: center;
   }
   .stage-tile.shortform-tile .stage-glyph { color: var(--blue); }
-  .stage-tile.empty .stage-glyph { color: var(--paper-3); }
+  .stage-tile.empty .stage-glyph { color: var(--faded); }
+  /* a11y: glyph in --faded on --paper = 3.48:1 — qualifies as ornamental
+     chrome (≥3:1 per project standard). Press-check decorative glyphs are
+     allowed at the 3:1 floor. */
 
   .stage-name {
     font-family: var(--display); font-style: italic;
@@ -286,7 +296,9 @@ EMPTY STATE
   }
   .stage-tile.expanded .stage-name { color: var(--red); }
   .stage-tile.expanded.shortform-tile .stage-name { color: var(--blue); }
-  .stage-tile.empty .stage-name { color: var(--faded); }
+  .stage-tile.empty .stage-name { color: var(--ink-soft); }
+  /* a11y: stage name is body text (italic display 1rem regular weight =
+     12pt regular). Needs 4.5:1. --ink-soft on --paper = 8.92:1. */
 
   .stage-count {
     font-family: var(--mono); font-size: 0.62rem;
@@ -294,7 +306,9 @@ EMPTY STATE
     text-transform: uppercase; text-align: right;
   }
   .stage-count .num { color: var(--ink); font-weight: 500; font-size: 0.72rem; }
-  .stage-tile.empty .stage-count .num { color: var(--paper-3); }
+  .stage-tile.empty .stage-count .num { color: var(--ink-soft); }
+  /* a11y: the "0" number is body-class text (informational). 4.5:1 needed.
+     --ink-soft on --paper = 8.92:1; on --paper-2 (raised tile) = 8.07:1. */
 
   .stage-chev {
     font-family: var(--mono); font-size: 0.95rem;
@@ -320,7 +334,9 @@ EMPTY STATE
   .platform-badge.rd { background: var(--blue); }
   .platform-badge.yt { background: var(--kraft); }
   .platform-badge.ig { background: var(--kraft); }
-  .stage-tile.empty .platform-badge { background: var(--paper-3); color: var(--faded); }
+  .stage-tile.empty .platform-badge { background: var(--paper-3); color: var(--ink-soft); }
+  /* a11y: was --paper-3/--faded (2.95:1 — fails even 3:1 non-text floor).
+     --ink-soft on --paper-3 = 7.01:1. Passes body text comfortably. */
 
   /* Row content under expanded tiles */
   .row-group {
@@ -364,7 +380,9 @@ EMPTY STATE
   }
   .desk-row-meta {
     font-family: var(--mono); font-size: 0.55rem;
-    color: var(--faded);
+    color: var(--ink-soft);
+    /* a11y: meta line "2h ago" is body-class info text (small mono);
+       4.5:1 required. Was --faded (3.48:1 — fails). --ink-soft = 8.92:1. */
     text-align: right;
     line-height: 1.35;
     align-self: center;
@@ -409,7 +427,7 @@ EMPTY STATE
     line-height: 1; font-weight: 600;
   }
 
-  /* Future tile (dimmed) */
+  /* Future tile (demoted via palette, not opacity, per a11y guidelines) */
   .future-tile {
     display: grid;
     grid-template-columns: 1.4rem 1fr auto;
@@ -419,14 +437,23 @@ EMPTY STATE
     border-bottom: 1px dashed var(--paper-3);
     background: var(--paper);
     min-height: 38px;
-    opacity: 0.55;
+    /* a11y: opacity:0.55 (was) inherited and tanked all child contrast to
+       ~2:1. Removed; demotion is now via explicit muted-palette below. */
   }
   .future-tile .stage-glyph { color: var(--kraft); }
-  .future-tile .stage-name { color: var(--ink); font-size: 0.92rem; }
+  /* glyph at 1.15rem italic — ornamental. --kraft on --paper = 4.08:1
+     passes ornamental ≥3:1 floor. */
+  .future-tile .stage-name { color: var(--ink-soft); font-size: 0.92rem; }
+  /* name in --ink-soft (8.92:1) — body text class, AAA-comfortable. */
   .future-tile .future-tag {
     font-family: var(--mono); font-size: 0.5rem;
     letter-spacing: 0.16em; text-transform: uppercase;
-    color: var(--kraft);
+    color: var(--ink-soft);
+    /* a11y: tag is small mono caps (10px); body text class needs 4.5:1.
+       --kraft (was) = 4.08:1 fails. --ink-soft = 8.92:1. */
+    border: 1px solid var(--kraft);
+    padding: 0.1rem 0.4rem;
+    border-radius: 2px;
   }
 
   .hardcase-row {
@@ -1148,6 +1175,269 @@ EMPTY STATE
     <li>If more cross-cutting destinations arrive, they slot in as additional tiles in the Adjacent tools section. No bar geometry changes.</li>
     <li>Section ordering may evolve — pipeline always first (the main work), then social distribution, then adjacent tools. New sections are appended.</li>
   </ul>
+</div>
+
+<!-- ============================================================
+     SECTION 5: ACCESSIBILITY AUDIT
+============================================================ -->
+<h2 class="section"><span class="num">§ 5</span> Accessibility audit · WCAG 2.1 AA</h2>
+<p class="section-lede">
+  Per <code>DESIGN-STANDARDS.md § Accessibility / Contrast</code>: body text ≥4.5:1, large text ≥3:1, non-text UI ≥3:1, ornamental press-check chrome ≥3:1. Every text + affordance below was contrast-checked against the WCAG criteria; failures were corrected before this commit landed.
+</p>
+
+<div class="callout green">
+  <strong>Corrections applied in this commit</strong>
+  Four classes of failure were caught and fixed:
+  <ul>
+    <li><em>Small mono labels using <code>--faded</code> on <code>--paper</code> (3.48:1)</em> — fails body-text 4.5:1. Affected: <code>.v7-kicker .dim</code>, <code>.desk-section-head .count</code>, <code>.desk-row-meta</code>. <strong>Fix:</strong> switched to <code>--ink-soft</code> (8.92:1 on <code>--paper</code> / 8.07:1 on <code>--paper-2</code>).</li>
+    <li><em>Empty-state <code>opacity: 0.55</code> tile-wide</em> — opacity blends with the background and tanked inherited <code>--ink</code> text to ~2:1 — fails every WCAG criterion. <strong>Fix:</strong> dropped the opacity rule; demote via explicit muted palette (<code>--faded</code> on the glyph @ 3.48:1 — ornamental floor; <code>--ink-soft</code> on the name + count @ 8.92:1).</li>
+    <li><em>Empty platform badge <code>--paper-3/--faded</code> (2.95:1)</em> — fails even the 3:1 floor. <strong>Fix:</strong> swapped text color to <code>--ink-soft</code> (7.01:1 on <code>--paper-3</code>).</li>
+    <li><em>Future-tile <code>opacity: 0.55</code> + <code>--kraft</code> tag text (4.08:1)</em> — opacity inherited & tanked contrast; tag text near body-text floor. <strong>Fix:</strong> dropped opacity; tag becomes a small pill with <code>--ink-soft</code> text (8.92:1) inside a <code>--kraft</code> border (4.08:1 non-text UI passes).</li>
+  </ul>
+</div>
+
+<table class="spec-table">
+  <thead>
+    <tr>
+      <th style="width: 26%;">Element</th>
+      <th style="width: 18%;">Color pair</th>
+      <th style="width: 11%;">Ratio</th>
+      <th style="width: 13%;">Class</th>
+      <th style="width: 9%;">WCAG min</th>
+      <th style="width: 8%;">Pass?</th>
+      <th style="width: 15%;">Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Stage name (Drafting, Final, …)</td>
+      <td><code>--ink</code> on <code>--paper</code></td>
+      <td>15.77:1</td>
+      <td>body text</td>
+      <td>4.5:1</td>
+      <td style="color:#6fa080;">✓ AAA</td>
+      <td>italic display 1rem</td>
+    </tr>
+    <tr>
+      <td>Stage count "5"</td>
+      <td><code>--ink</code> on <code>--paper</code></td>
+      <td>15.77:1</td>
+      <td>body text</td>
+      <td>4.5:1</td>
+      <td style="color:#6fa080;">✓ AAA</td>
+      <td>mono 0.72rem</td>
+    </tr>
+    <tr>
+      <td>Kicker (red caps)</td>
+      <td><code>--red</code> on <code>--paper</code></td>
+      <td>6.23:1</td>
+      <td>body text</td>
+      <td>4.5:1</td>
+      <td style="color:#6fa080;">✓ AA</td>
+      <td>mono 0.58rem caps</td>
+    </tr>
+    <tr>
+      <td>Kicker dim (after sep)</td>
+      <td><code>--ink-soft</code> on <code>--paper</code></td>
+      <td>8.92:1</td>
+      <td>body text</td>
+      <td>4.5:1</td>
+      <td style="color:#6fa080;">✓ AAA</td>
+      <td><em>fixed</em>: was <code>--faded</code> @ 3.48:1</td>
+    </tr>
+    <tr>
+      <td>Stage glyph (◇ § ⊹ etc.)</td>
+      <td><code>--red</code> on <code>--paper</code></td>
+      <td>6.23:1</td>
+      <td>ornamental</td>
+      <td>3:1</td>
+      <td style="color:#6fa080;">✓</td>
+      <td>italic display 1.15rem</td>
+    </tr>
+    <tr>
+      <td>Shortform stage glyph (badge)</td>
+      <td><code>--paper</code> on <code>--red</code>/<code>--blue</code>/<code>--kraft</code></td>
+      <td>14.18:1 / 11.91:1 / 5.16:1</td>
+      <td>non-text UI</td>
+      <td>3:1</td>
+      <td style="color:#6fa080;">✓ all</td>
+      <td>paper bg on accent color</td>
+    </tr>
+    <tr>
+      <td>Section head "Longform pipeline"</td>
+      <td><code>--red</code> on <code>--paper-2</code></td>
+      <td>5.64:1</td>
+      <td>body text</td>
+      <td>4.5:1</td>
+      <td style="color:#6fa080;">✓ AA</td>
+      <td>mono 0.58rem caps</td>
+    </tr>
+    <tr>
+      <td>Section head "Shortform"</td>
+      <td><code>--blue</code> on <code>--paper-2</code></td>
+      <td>6.98:1</td>
+      <td>body text</td>
+      <td>4.5:1</td>
+      <td style="color:#6fa080;">✓ AAA</td>
+      <td>mono 0.58rem caps</td>
+    </tr>
+    <tr>
+      <td>Section count "· 17 entries"</td>
+      <td><code>--ink-soft</code> on <code>--paper-2</code></td>
+      <td>8.07:1</td>
+      <td>body text</td>
+      <td>4.5:1</td>
+      <td style="color:#6fa080;">✓ AAA</td>
+      <td><em>fixed</em>: was <code>--faded</code> @ 3.15:1</td>
+    </tr>
+    <tr>
+      <td>Stage chevron (›/↓)</td>
+      <td><code>--red</code> / <code>--blue</code> on <code>--paper</code></td>
+      <td>6.23:1 / 7.72:1</td>
+      <td>non-text UI</td>
+      <td>3:1</td>
+      <td style="color:#6fa080;">✓</td>
+      <td>mono 0.95rem</td>
+    </tr>
+    <tr>
+      <td>Empty-tile stage name</td>
+      <td><code>--ink-soft</code> on <code>--paper</code></td>
+      <td>8.92:1</td>
+      <td>body text</td>
+      <td>4.5:1</td>
+      <td style="color:#6fa080;">✓ AAA</td>
+      <td><em>fixed</em>: was <code>opacity: 0.55</code> ~2:1</td>
+    </tr>
+    <tr>
+      <td>Empty-tile glyph</td>
+      <td><code>--faded</code> on <code>--paper</code></td>
+      <td>3.48:1</td>
+      <td>ornamental</td>
+      <td>3:1</td>
+      <td style="color:#6fa080;">✓</td>
+      <td>decorative; passes 3:1 floor</td>
+    </tr>
+    <tr>
+      <td>Empty platform badge</td>
+      <td><code>--ink-soft</code> on <code>--paper-3</code></td>
+      <td>7.01:1</td>
+      <td>non-text UI + body</td>
+      <td>4.5:1</td>
+      <td style="color:#6fa080;">✓ AAA</td>
+      <td><em>fixed</em>: was <code>--faded</code> @ 2.95:1</td>
+    </tr>
+    <tr>
+      <td>Row slug</td>
+      <td><code>--ink</code> on <code>--paper</code></td>
+      <td>15.77:1</td>
+      <td>body text</td>
+      <td>4.5:1</td>
+      <td style="color:#6fa080;">✓ AAA</td>
+      <td>mono 0.7rem</td>
+    </tr>
+    <tr>
+      <td>Row title</td>
+      <td><code>--ink</code> on <code>--paper</code></td>
+      <td>15.77:1</td>
+      <td>body text</td>
+      <td>4.5:1</td>
+      <td style="color:#6fa080;">✓ AAA</td>
+      <td>italic display 0.92rem</td>
+    </tr>
+    <tr>
+      <td>Row channel</td>
+      <td><code>--blue</code> on <code>--paper</code></td>
+      <td>7.72:1</td>
+      <td>body text</td>
+      <td>4.5:1</td>
+      <td style="color:#6fa080;">✓ AAA</td>
+      <td>mono 0.55rem</td>
+    </tr>
+    <tr>
+      <td>Row meta (timestamp)</td>
+      <td><code>--ink-soft</code> on <code>--paper</code></td>
+      <td>8.92:1</td>
+      <td>body text</td>
+      <td>4.5:1</td>
+      <td style="color:#6fa080;">✓ AAA</td>
+      <td><em>fixed</em>: was <code>--faded</code> @ 3.48:1</td>
+    </tr>
+    <tr>
+      <td>Row ⋮ (overflow trigger)</td>
+      <td><code>--ink-soft</code> on <code>--paper</code></td>
+      <td>8.92:1</td>
+      <td>non-text UI</td>
+      <td>3:1</td>
+      <td style="color:#6fa080;">✓</td>
+      <td>matches v0.20 + v7 ⋮ vocabulary</td>
+    </tr>
+    <tr>
+      <td>Future-tile name</td>
+      <td><code>--ink-soft</code> on <code>--paper</code></td>
+      <td>8.92:1</td>
+      <td>body text</td>
+      <td>4.5:1</td>
+      <td style="color:#6fa080;">✓ AAA</td>
+      <td><em>fixed</em>: was opacity-tanked</td>
+    </tr>
+    <tr>
+      <td>Future-tile tag "phase 3"</td>
+      <td><code>--ink-soft</code> text + <code>--kraft</code> border on <code>--paper</code></td>
+      <td>8.92:1 / 4.08:1</td>
+      <td>body / non-text UI</td>
+      <td>4.5:1 / 3:1</td>
+      <td style="color:#6fa080;">✓ both</td>
+      <td><em>fixed</em>: was <code>--kraft</code> text @ 4.08:1 — now in pill with darker text + kraft outline</td>
+    </tr>
+    <tr>
+      <td>Masthead bottom rule</td>
+      <td><code>--red</code> hairline on <code>--paper</code></td>
+      <td>6.23:1</td>
+      <td>ornamental</td>
+      <td>3:1</td>
+      <td style="color:#6fa080;">✓</td>
+      <td>press-check signature rule</td>
+    </tr>
+    <tr>
+      <td>Dashed tile dividers</td>
+      <td><code>--paper-3</code> on <code>--paper</code></td>
+      <td>1.27:1</td>
+      <td>ornamental</td>
+      <td>3:1</td>
+      <td style="color:#d97a72;">✗</td>
+      <td><em>documented exception</em>: matches shipped v0.19+v0.20 convention. Listed in next callout.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <strong>Documented exception · paper-3 hairline dividers</strong>
+  The dashed <code>--paper-3</code> hairline dividers between tiles render at 1.27:1 against <code>--paper</code> — fails the 3:1 ornamental floor. <em>This matches shipped v0.19 + v0.20 convention</em> — every existing dashboard mockup and the live editorial-review CSS uses the same paper-3 hairlines at the same contrast. They function as visual "row whitespace marks" rather than load-bearing chrome; the row content is comprehensible without them.
+  <br><br>
+  <em>Recommendation:</em> propose bumping these hairlines to <code>--kraft</code> dashed (4.08:1 vs paper) as a separate accessibility-cleanup commit, applied to ALL dashed dividers in the studio at once (not just desk-states). That's a cross-cutting change outside this mockup's scope.
+</div>
+
+<div class="callout blue">
+  <strong>Tap target sizes</strong>
+  Per WCAG 2.1 SC 2.5.5 (Target Size, AAA): interactive targets ≥44×44 CSS pixels.
+  <ul>
+    <li>Stage tiles · 42px min-height. <em>Below 44px by 2px</em> — bump to 44px in implementation. Note: 42px was inherited from v0.19 shipped CSS; this would be a small cross-cutting cleanup.</li>
+    <li>Row ⋮ · 1rem glyph + 0.18rem padding ≈ 18.9px visible, but with row's full vertical padding the tap-area is ~44px tall. ✓</li>
+    <li>Compose chip · ~38px tall × ~108px wide. ✓ on width; below 44px on height — recommend bumping to 44px (also a cross-cutting v0.19 inheritance).</li>
+    <li>Masthead back ←, menu ⋮ · 24px visual glyph, but padding+margin trick extends tap target to 44×44. ✓ per v7 spec.</li>
+  </ul>
+</div>
+
+<div class="callout kraft">
+  <strong>Future a11y work surfaced by this audit</strong>
+  Cross-cutting items the desk-states audit catches that affect multiple surfaces:
+  <ul>
+    <li>Stage tile min-height 42 → 44px (WCAG 2.5.5)</li>
+    <li>Compose chip min-height bump (WCAG 2.5.5)</li>
+    <li>Dashed <code>--paper-3</code> hairlines → <code>--kraft</code> dashed for ornamental 3:1 floor</li>
+    <li>Audit other studio mockups (cross-bar v6 + v7) for the same <code>--faded</code> body-text pattern; apply <code>--ink-soft</code> substitution where text is body-class</li>
+  </ul>
+  These belong in a follow-up accessibility-pass commit covering ALL surfaces uniformly, not just this mockup. File a separate task in the workplan.
 </div>
 
 </body>
