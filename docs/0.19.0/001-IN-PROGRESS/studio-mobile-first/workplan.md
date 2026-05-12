@@ -530,7 +530,7 @@ The audit's full report lives at [`./2026-05-09-implementation-audit.md`](./2026
 - Modify: relevant CSS
 - **Conditional extraction (depending on Shortform consumer shape):** if Shortform mockups land on a tab-bar + slide-up-sheet idiom that meaningfully overlaps entry-review's existing `mobile-bar.ts`, extract `packages/studio/src/mobile-shell/{bar,sheet}.ts` server templates as part of this task — designed against the concrete consumer pair. If Shortform's idiom diverges substantially, keep its bar/sheet surface-specific.
 
-- [ ] **Step 2.2.1:** Audit `/dev/editorial-review-shortform`. Identify the data shape (shortform entries vs. longform), and the open #244 (TOC drawer per #169) requirements.
+- [x] **Step 2.2.1:** ~~Audit `/dev/editorial-review-shortform`. Identify the data shape (shortform entries vs. longform), and the open #244 (TOC drawer per #169) requirements.~~ *(Landed 2026-05-12 in `2026-05-12-shortform-audit.md`. Surfaces have zero mobile CSS scoped to shortform; both pages carry Commandment III stamps; `editorial-review-client.ts:1619` POSTs state mutations (THESIS violation). TOC infrastructure is one call away (`rehype-slug` already runs in `renderMarkdownToHtml`). `sheet-controller` is ready to consume; `renderMobileBar` would need parameterization to share. Six out-of-band findings catalogued for separate triage.)*
 - [ ] **Step 2.2.2:** Invoke `/frontend-design` for Shortform mockups. Honor press-check; explore: tab bar with TOC tab (closing #244), hybrid card-stream, etc.
 - [ ] **Step 2.2.3:** Update `mockups/index.html`. Commit `design(studio): three shortform direction mockups (HTML, no code)`.
 - [ ] **Step 2.2.4:** Operator picks. **STOP for pick.**
