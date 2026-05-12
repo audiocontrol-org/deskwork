@@ -19,8 +19,6 @@
 
 /** Default drag-to-dismiss threshold in pixels (matches both consumers). */
 const DEFAULT_DRAG_DISMISS_PX = 80;
-/** Default slide animation duration in ms (matches both consumers). */
-const DEFAULT_SLIDE_MS = 280;
 
 export interface SlideUpSheetOptions {
   /**
@@ -53,12 +51,6 @@ export interface SlideUpSheetOptions {
    * Default: 80.
    */
   dragDismissPx?: number;
-  /**
-   * Slide animation duration in ms. Stored for consumers that need it
-   * (e.g. post-close hidden-attribute delay).
-   * Default: 280.
-   */
-  slideMs?: number;
   /**
    * Called when the sheet closes (any path: handle drag, close btn,
    * scrim click, Escape key, programmatic close).

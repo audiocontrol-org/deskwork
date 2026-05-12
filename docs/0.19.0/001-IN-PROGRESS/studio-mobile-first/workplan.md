@@ -508,9 +508,10 @@ The audit's full report lives at [`./2026-05-09-implementation-audit.md`](./2026
 
 - **Breakpoint alignment.** Entry-review uses `(max-width: 48rem)` = 768px; dashboard uses `(max-width: 600px)`. A cross-surface CSS extraction would need to resolve this — surface this when/if Task 2.2 or Task 2.3 introduces shared CSS. Until then, both breakpoints stay where they are (and the audit confirms this is fine for Direction A; the JS controller doesn't gate on either breakpoint — its consumers do).
 
-**Out-of-band finding flagged for separate cleanup:**
+**Out-of-band findings flagged for separate cleanup:**
 
-- `plugins/deskwork-studio/public/src/entry-review/mobile-actions-slot.ts:64` surfaces a `reject` verb (`/deskwork:reject <slug>` clipboard-copy). `reject` is not in `DESKWORK-STATE-MACHINE.md` — Commandment II violation. Filed as a separate issue (see GitHub issue list). NOT Task 2.1 work — it lands in a separate state-machine compliance commit.
+- `plugins/deskwork-studio/public/src/entry-review/mobile-actions-slot.ts:64` surfaces a `reject` verb (`/deskwork:reject <slug>` clipboard-copy). `reject` is not in `DESKWORK-STATE-MACHINE.md` — Commandment II violation. Filed as [#260](https://github.com/audiocontrol-org/deskwork/issues/260). NOT Task 2.1 work — separate state-machine compliance commit.
+- `mobile-shell/sheet-controller.ts` returns a controller with no `destroy()` method. Listeners on `document` (mousemove, mouseup, keydown) are attached once per instance and never removed. Not a current bug — both consumers are page singletons — but the API will leak if a third consumer instantiates dynamically. Filed as [#261](https://github.com/audiocontrol-org/deskwork/issues/261). Surfaced by `/dw-lifecycle:review` on commits `275b8fa..c661a5a`.
 
 **Acceptance for Task 2.1:**
 - `scripts/lib/mobile-probe-helpers.mjs` exists and is consumed by all three existing probes
