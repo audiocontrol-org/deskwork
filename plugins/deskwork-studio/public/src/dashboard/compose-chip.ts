@@ -18,10 +18,10 @@
  */
 
 import { copyOrShowFallback } from '../clipboard.ts';
+import { createSlideUpSheet, type SlideUpSheetController } from '../mobile-shell/sheet-controller.ts';
 
 const MOBILE_QUERY = '(max-width: 600px)';
 const SLIDE_MS = 280;
-const DRAG_DISMISS_PX = 80;
 const COPIED_FLASH_MS = 1500;
 
 export function initComposeChip(): void {
@@ -40,81 +40,42 @@ export function initComposeChip(): void {
     return window.matchMedia(MOBILE_QUERY).matches;
   }
 
-  let isOpen = false;
-
-  function openSheet(): void {
-    if (!isMobile()) return;
-    if (isOpen) {
-      closeSheet();
-      return;
-    }
-    isOpen = true;
-    sheet!.hidden = false;
-    document.body.setAttribute('data-compose-sheet-open', '');
-    fab!.setAttribute('aria-expanded', 'true');
-  }
-
-  function closeSheet(): void {
-    if (!isOpen) return;
-    isOpen = false;
-    document.body.removeAttribute('data-compose-sheet-open');
+  // Called by the shared controller on every close path (drag, close btn,
+  // scrim click, Escape, programmatic close). Restores FAB aria state and
+  // delays the hidden attribute so the slide-out transition completes before
+  // click-through is restored.
+  function onSheetClose(): void {
     fab!.setAttribute('aria-expanded', 'false');
-    // Hide the sheet host after the slide-out completes so click-through
-    // works during the transition.
     window.setTimeout(() => {
-      if (!isOpen) sheet!.hidden = true;
+      if (!sheetController.isOpen()) sheet!.hidden = true;
     }, SLIDE_MS + 40);
   }
 
-  fab.addEventListener('click', openSheet);
-  closeBtn?.addEventListener('click', closeSheet);
-  scrim?.addEventListener('click', closeSheet);
-
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && isOpen) closeSheet();
+  // The shared controller owns: drag-handle gesture, close button, scrim
+  // click, Escape key, and the body[data-compose-sheet-open] attribute
+  // toggle. Constants use controller defaults (80px dismiss, 280ms slide)
+  // which match the values formerly inlined in this file.
+  const sheetController: SlideUpSheetController = createSlideUpSheet({
+    sheetEl: sheet,
+    bodyOpenAttr: 'data-compose-sheet-open',
+    handleEl: handle ?? undefined,
+    closeBtnEl: closeBtn ?? undefined,
+    scrimEl: scrim ?? undefined,
+    onClose: onSheetClose,
   });
 
-  // Drag-to-dismiss the panel via the handle. Mirrors the pattern in
-  // entry-review/mobile-sheet-bar.ts so the gesture muscle memory
-  // transfers between the two surfaces.
-  if (handle) {
-    let startY = 0;
-    let dragging = false;
-    function onStart(y: number): void {
-      startY = y;
-      dragging = true;
-      sheet!.style.transition = 'none';
+  function openSheet(): void {
+    if (!isMobile()) return;
+    if (sheetController.isOpen()) {
+      sheetController.close();
+      return;
     }
-    function onMove(y: number): void {
-      if (!dragging) return;
-      const dy = Math.max(0, y - startY);
-      sheet!.style.transform = `translateY(${dy}px)`;
-    }
-    function onEnd(y: number): void {
-      if (!dragging) return;
-      dragging = false;
-      sheet!.style.transition = '';
-      const dy = Math.max(0, y - startY);
-      sheet!.style.transform = '';
-      if (dy > DRAG_DISMISS_PX) closeSheet();
-    }
-    handle.addEventListener(
-      'touchstart',
-      (e) => onStart(e.touches[0]?.clientY ?? 0),
-      { passive: true },
-    );
-    handle.addEventListener(
-      'touchmove',
-      (e) => onMove(e.touches[0]?.clientY ?? 0),
-      { passive: true },
-    );
-    handle.addEventListener('touchend', (e) =>
-      onEnd(e.changedTouches[0]?.clientY ?? 0),
-    );
-    handle.addEventListener('mousedown', (e) => onStart(e.clientY));
-    document.addEventListener('mousemove', (e) => onMove(e.clientY));
-    document.addEventListener('mouseup', (e) => onEnd(e.clientY));
+    sheet!.hidden = false;
+    fab!.setAttribute('aria-expanded', 'true');
+    sheetController.open();
   }
+
+  fab.addEventListener('click', openSheet);
 
   // Verb cards copy their slash command. The buttons carry `data-copy`
   // (the slash command source) and `data-compose-verb` (the selector
