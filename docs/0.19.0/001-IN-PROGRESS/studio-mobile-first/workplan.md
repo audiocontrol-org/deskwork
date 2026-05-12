@@ -633,6 +633,59 @@ The audit's full report lives at [`./2026-05-09-implementation-audit.md`](./2026
 - [ ] **Step 2.5.2:** Bump stage tile min-height from 42px to 44px (WCAG 2.5.5 tap target). Bump Compose chip min-height from ~38px to 44px (same criterion). These are v0.19 inheritances. Commit: `style(studio): tap targets ≥44px for stage tiles + compose chip`.
 - [ ] **Step 2.5.3:** Sweep cross-bar mockups (v6 + v7) for `--faded` body-text usage; apply same `--ink-soft` substitution as desk-states-v7. The mockups are reference artifacts, not shipped code — but they should match the standard so future readers don't copy the broken pattern. Commit: `fix(mockup): cross-bar mockups apply --ink-soft body-text substitution`.
 
+### Task 2.6: Capabilities-as-contracts methodology post-mortem (Phase 2 retrospective)
+
+**Why this task exists:** During Phase 2 the operator surfaced the [`CAPABILITIES-AS-CONTRACTS.md`](./references/capabilities-as-contracts.md) essay (verbatim snapshot in `references/`) — a methodology for refactoring evolving GUIs without regression via three artifacts (capability inventory, test-name protocol, atomic-primitive design system) plus a three-track verification pattern and a workplan-as-defensive-contract discipline. The operator's framing: *"by the end of this redesign process, we will have a stronger sense of what the UI capabilities contract should be."* This task captures that reassessment at the end of Phase 2 rather than during, when adoption would have derailed the active work.
+
+**Why the timing matters:** Phase 2 deliberately churned the studio's chrome (v1→v7 cross-bar refinements + desk-states + masthead + ⋮ popover + Desk Shortform-by-platform absorption). Adopting a capability-inventory methodology *during* that churn would have produced an inventory that needed rewriting per refinement pass. Reassessing *after* the chrome has settled and shipped (v0.21 released, the iPhone walk done, the redesign in operator's hands) means the post-mortem has the full data: which artifacts would have caught the HMR reload-storm regression, which would have improved the masthead extraction's verification quality, which would have made the cross-bar mockup arc more navigable.
+
+**Specific phase-2 experience the post-mortem must evaluate:**
+
+- The HMR reload-storm regression I shipped + claimed verified via `curl` (commits `b9a1d40` / `aba7162` claimed verified; commit `e6deafb` fixed the actual cause). Would Track 1 of the essay's three-track verification pattern (orchestrator independently re-runs the load-bearing test gate, including Playwright for UI-touching changes) have prevented this? What would the rule look like inside `/dw-lifecycle:review`?
+- The masthead extraction's `--er-faded` body-text contrast failure caught only in the review pass after the commit had landed. Would a capability inventory row `D-MASTHEAD-XX: kicker meta text is readable at WCAG AA` with a test citation have caught this before commit?
+- The v1→v7 cross-bar refinement arc (7 refinement passes + a Desk-states elaboration + an a11y audit). Would a capability inventory + test-name protocol have made each refinement step's diff smaller and more reviewable?
+- The Phase 2 architecture re-scope (the workplan grew from "Shortform mobile-first" to "v7 cross-cutting architecture"). Would the essay's workplan-as-defensive-contract principles have surfaced this scope expansion earlier?
+
+**Files:**
+- Read: [`./references/capabilities-as-contracts.md`](./references/capabilities-as-contracts.md) (snapshot landed 2026-05-12 with Task 2.6 introduction)
+- Create: `./capabilities-contracts-postmortem.md` — the post-mortem document
+
+- [ ] **Step 2.6.1:** Re-read the snapshot end-to-end. Cross-reference each of the essay's five artifacts (inventory, test-name protocol, atomic-primitive design system, three-track verification pattern, workplan as defensive contract) against the phase-2 experience. For each artifact: (a) what's already in place in deskwork-studio's current practice (cite specific files), (b) what gap the artifact would close, (c) the specific phase-2 incident that would have been caught or avoided.
+
+- [ ] **Step 2.6.2:** Draft a proposed capability-inventory shape for deskwork-studio. Not a full inventory — a SHAPE: ID-prefix conventions (e.g. `D-DESK-`, `D-MASTHEAD-`, `D-REVIEW-`, `D-SHORTFORM-`); status column values + meanings; columns + their semantics; how it would relate to `DESKWORK-STATE-MACHINE.md` (which already enumerates state-machine verbs/stages — a partial capability artifact) and `DESIGN-STANDARDS.md` (which already enumerates the design vocabulary — another partial artifact). Sketch ~10 representative rows covering the v7 architecture so the operator can see what an actual inventory entry would look like.
+
+- [ ] **Step 2.6.3:** Make adoption decisions per artifact. Per the essay's §10 ("How to Retrofit") and §9 ("When This Methodology Doesn't Apply"), categorize each artifact as:
+  - **Adopt now** — bring into Phase 3's workplan + open implementation issues.
+  - **Adopt incrementally** — touch-when-you-touch on new work, e.g. test-name protocol on new tests only.
+  - **Defer** — record the artifact as a candidate but skip until a later phase triggers it.
+  - **Decline** — the artifact's shape doesn't fit deskwork-studio for the reasons captured in §9 of the essay.
+  
+  Each decision must be backed by ≥1 specific phase-2 reference (incident, file, commit, or rule) that informs it.
+
+- [ ] **Step 2.6.4:** Apply any "Adopt now" findings:
+  - If the three-track verification pattern is adopted: edit `/dw-lifecycle:review` SKILL.md to require Track 1 (orchestrator independent test re-run, INCLUDING Playwright for UI-touching changes) before reviewer dispatch.
+  - If the test-name protocol is adopted on new tests: add a one-paragraph rule to `.claude/rules/agent-discipline.md` or a new section in `DESIGN-STANDARDS.md`.
+  - If an inventory shape is adopted: file a GitHub issue for the initial build-out (probably a Phase 3 task).
+  - Each adoption gets a commit; reference Task 2.6 in the commit message.
+
+- [ ] **Step 2.6.5:** Update `agent-discipline.md` with the procedural lessons from phase 2 regardless of which artifacts are adopted:
+  - The "curl is not browser verification" lesson (companion to the existing `ui-verification.md` rule — the existing rule was right; the failure was that I didn't apply it).
+  - The "shipped a regression then asked operator to walk it" failure mode + how to avoid it.
+  - Any other phase-2 incident that produced a durable lesson worth keeping.
+
+**Proven complete when (per the essay's "observable gate" principle):**
+- `docs/0.19.0/.../studio-mobile-first/capabilities-contracts-postmortem.md` exists and is operator-reviewed.
+- Every artifact in the essay has a row in the post-mortem's summary table with an adoption disposition AND a phase-2 reference.
+- Any "Adopt now" decisions have either (a) a corresponding commit on this branch OR (b) a filed GitHub issue with a phase-3-scope label.
+- `agent-discipline.md` carries the procedural lessons from phase 2 regardless of adoption decisions.
+
+**Out of scope for Task 2.6 (deferred to a later phase if any artifact is adopted):**
+- Building the actual full capability inventory (~30-50 rows for the studio's current surfaces).
+- Renaming existing tests to the test-name protocol (touch-when-you-touch is the cheaper path).
+- Authoring a per-primitive reference doc derived from `DESIGN-STANDARDS.md`.
+
+**When to run this task:** AFTER Task 2.4 (release v0.21) is complete and the operator has walked the redesign on phone. The post-mortem needs the full Phase 2 experience — including how the release went — to be useful. Task 2.5 (a11y cleanup) and Task 2.6 (post-mortem) can run in either order or in parallel; they're independent.
+
 **Acceptance (revised for v7 scope):**
 - `DESIGN-STANDARDS.md` carries `§ Studio navigation model` + `§ Desk information architecture` sections per v7 + desk-states-v7 specs.
 - ACCEPTED archive entry filed for the picked architecture; REJECTED entries filed for cross-bar 1/3 + cross-bar 2 refinements v1/v2/v3/v5/v6.

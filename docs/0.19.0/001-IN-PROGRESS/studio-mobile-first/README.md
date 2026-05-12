@@ -29,6 +29,7 @@ Extend the press-check mobile-first design language already shipped on the entry
 | 2.1 | Narrow `mobile-shell` extraction — probe helpers + slide-up sheet controller (audit-driven re-scope) → v0.21 | Complete (2026-05-12 — 7 commits: probe-helpers extracted; sheet-controller TDD'd at 19/19; entry-review + dashboard consumers migrated; reviewer findings applied or filed as #260/#261; workspace tests 1310/1310, smoke 12/12, no regressions) |
 | 2.2 | Shortform desk mobile-first → re-scoped 2026-05-12 to **v7 cross-cutting architecture** (Desk-as-hub star nav, masthead ←/⋮, zero-nav-region bar, Desk absorbs Shortform-by-platform section) | Mockups complete (v1→v7 + desk-states + a11y audit); implementation pending (Steps 2.2.5–2.2.10) |
 | 2.5 | Cross-cutting accessibility cleanup (surfaced by desk-states a11y audit) | Pending (separable from Task 2.2 implementation) |
+| 2.6 | Capabilities-as-contracts methodology post-mortem (Phase 2 retrospective) | Pending — runs AFTER Task 2.4 release; essay snapshot in `references/` |
 | 3 | Standalone scrapbook viewer + Content view → v0.22 | Not started |
 | 4 | Editorial Help + Studio Index + #242 cross-cutting Cancel → v0.23 | Re-narration pending (Cancel already shipped on dashboard + entry-review during Phase 1; Phase 4's residual scope is the remaining surfaces — see workplan Step 1.6.6) |
 
