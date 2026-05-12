@@ -55,6 +55,13 @@ export function initShortcuts(deps: ShortcutDeps): void {
   btn?.addEventListener('click', () => show(true));
   backdrop?.addEventListener('click', () => show(false));
 
+  // Step 2.2.7: the masthead `⋮` popover dispatches a custom
+  // `studio:show-shortcuts` event when the operator picks the
+  // Keyboard shortcuts menu item. Listen for it so the existing
+  // overlay opens. Other surfaces without this overlay ignore the
+  // event (no listener fires).
+  document.addEventListener('studio:show-shortcuts', () => show(true));
+
   let armedKey: DestructiveKey | null = null;
   let armedTimer: ReturnType<typeof setTimeout> | null = null;
   function disarm(): void {

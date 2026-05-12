@@ -43,6 +43,7 @@ import { html, unsafe, escapeHtml, gloss, type RawHtml } from '../html.ts';
 import { layout } from '../layout.ts';
 import { renderEditorialFolio } from '../chrome.ts';
 import { renderMasthead } from '../masthead.ts';
+import { renderMastheadMenu } from '../masthead-menu.ts';
 import { renderScrapbookDrawer } from '../review-scrapbook-drawer.ts';
 import { loadEntryReviewData, type EntryReviewData } from './data.ts';
 import { renderVersionsStrip } from './version-strip.ts';
@@ -280,6 +281,7 @@ export async function renderEntryReviewPage(
   const body = html`
     <div data-review-ui="longform" class="er-review-shell">
       ${masthead}
+      ${renderMastheadMenu()}
       ${renderEditorialFolio('longform', folioSpine)}
       <div class="er-strip">
         <div class="er-strip-inner">

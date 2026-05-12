@@ -202,4 +202,231 @@
   .er-masthead-menu[aria-expanded="true"] {
     color: var(--er-red-pencil);
   }
+
+  /* ==========================================================
+     v7 MASTHEAD POPOVER MENU — Step 2.2.7.
+     Dropdown popover anchored under the `⋮` glyph with an
+     up-pointing arrow at the glyph's x-position. Mirrors the
+     v0.20 row `⋮` overflow popover idiom. NOT a slide-up sheet
+     (top-anchored trigger → top-anchored reveal).
+
+     Hidden by default — `[hidden]` is honored by the browser
+     for both .er-masthead-popover and .er-masthead-popover-scrim.
+     The client controller flips `hidden=false` to open.
+  ========================================================== */
+
+  /* Scrim sits between the page body and the popover. Lighter
+   * than the slide-up sheet's scrim (per v7 mockup) — the
+   * popover is meant to read as a transient overlay, not a
+   * modal context shift.
+   *
+   * `top: 102px` (matches the masthead's `min-height`) so the
+   * scrim does NOT cover the masthead chrome. This preserves
+   * the spec's "trigger tap-again closes" dismiss path: if the
+   * scrim covered the ⋮ button, the tap would always hit the
+   * scrim first and close the popover via the scrim handler
+   * instead of toggling via the trigger handler. The effect on
+   * the operator is identical (popover closes), but keeping the
+   * trigger reachable lets the same physical tap function as a
+   * toggle — close immediately followed by re-open. */
+  .er-masthead-popover-scrim {
+    position: fixed;
+    top: 102px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(26, 22, 20, 0.22);
+    z-index: 75;
+  }
+
+  /* The popover itself. Anchored at top: 92px (just below the
+   * 102px masthead's content baseline) and right: 0.7rem so the
+   * arrow at right: 16px registers with the `⋮` glyph's
+   * viewport-x position. Width 270px matches the v7 mockup; the
+   * popover is intentionally narrower than the screen so the
+   * masthead context behind it stays visible. */
+  .er-masthead-popover {
+    position: fixed;
+    top: 92px;
+    right: 0.7rem;
+    width: 270px;
+    background: var(--er-paper);
+    border: 1px solid var(--er-paper-3);
+    border-radius: 3px;
+    box-shadow:
+      0 12px 30px rgba(26, 22, 20, 0.22),
+      0 3px 8px rgba(26, 22, 20, 0.12);
+    z-index: 80;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Up-pointing arrow at the popover's top edge, registered to
+   * the `⋮` glyph's x-position. Drawn as a rotated square that
+   * shares the popover's top + left borders, sitting on top of
+   * the box-shadow so the popover reads as connected to the
+   * glyph. */
+  .er-masthead-popover::before {
+    content: '';
+    position: absolute;
+    top: -7px;
+    right: 16px;
+    width: 12px;
+    height: 12px;
+    background: var(--er-paper);
+    border-top: 1px solid var(--er-paper-3);
+    border-left: 1px solid var(--er-paper-3);
+    transform: rotate(45deg);
+  }
+
+  /* Sections within the popover. Dotted bottom rule separates
+   * sections; the last section drops its rule. */
+  .er-masthead-popover-section {
+    padding: 0.2rem 0;
+    border-bottom: 1px dotted var(--er-paper-3);
+  }
+  .er-masthead-popover-section:last-child {
+    border-bottom: 0;
+  }
+
+  /* Section kicker — mono caps, faded.  --er-faded sits at
+   * 3.48:1 against paper, meeting the 3:1 ornamental-chrome
+   * floor (per Design Standards § Accessibility). Section
+   * labels are decorative orientation, not body text. */
+  .er-masthead-popover-section-label {
+    font-family: var(--er-font-mono);
+    font-size: 0.5rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--er-faded);
+    padding: 0.5rem 0.85rem 0.25rem;
+  }
+
+  /* Menu item — three-column grid: glyph | body | arrow. The
+   * body column carries the label + route stacked vertically.
+   * `<a>` items inherit the link role; `<button>` items reset
+   * the default button chrome so they read as menu rows. */
+  .er-masthead-popover-item {
+    display: grid;
+    grid-template-columns: 1.4rem 1fr auto;
+    align-items: center;
+    column-gap: 0.65rem;
+    padding: 0.55rem 0.85rem;
+    text-decoration: none;
+    cursor: pointer;
+    background: transparent;
+    border: 0;
+    width: 100%;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+  }
+  .er-masthead-popover-item:hover,
+  .er-masthead-popover-item:focus-visible {
+    background: var(--er-paper-2);
+    outline: none;
+  }
+
+  /* Glyph — italic display, accent color per item kind. Default
+   * red-pencil; modifier classes for blue (proof-blue) and kraft
+   * variants per the v7 mockup. All three sit well above the
+   * 3:1 non-text UI contrast floor against paper. */
+  .er-masthead-popover-item-glyph {
+    font-family: var(--er-font-display);
+    font-style: italic;
+    font-size: 1.05rem;
+    line-height: 1;
+    font-variation-settings: "opsz" 20, "wght" 500;
+    color: var(--er-red-pencil);
+    text-align: center;
+  }
+  .er-masthead-popover-item-glyph--blue {
+    color: var(--er-proof-blue);
+  }
+  .er-masthead-popover-item-glyph--kraft {
+    color: var(--er-kraft);
+  }
+
+  /* Body column — label (italic display, ink) + route (mono,
+   * ink-soft) stacked. ink-soft renders at 8.92:1 against
+   * paper, well above the WCAG 4.5:1 body-text floor. NOT
+   * --er-faded (3.48:1, fails for body text). */
+  .er-masthead-popover-item-body {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .er-masthead-popover-item-label {
+    font-family: var(--er-font-display);
+    font-style: italic;
+    font-variation-settings: "opsz" 20, "wght" 500;
+    font-size: 0.92rem;
+    color: var(--er-ink);
+    line-height: 1.15;
+  }
+  .er-masthead-popover-item-route {
+    font-family: var(--er-font-mono);
+    font-size: 0.55rem;
+    color: var(--er-ink-soft);
+    letter-spacing: 0.06em;
+    margin-top: 0.1rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Trailing chevron / external-link arrow. ink-soft for the
+   * default chevron (8.92:1 — accessibility floor met).
+   * proof-blue for external-link variants (8.13:1). */
+  .er-masthead-popover-item-arrow {
+    font-family: var(--er-font-mono);
+    font-size: 0.78rem;
+    color: var(--er-ink-soft);
+    flex-shrink: 0;
+  }
+  .er-masthead-popover-item-arrow--external {
+    color: var(--er-proof-blue);
+  }
+
+  /* Future-placeholder variant (Configure studio · Phase 4).
+   * Visually demoted via explicit muted palette — opacity is
+   * AVOIDED here per the empty-tile pattern in Design Standards
+   * (opacity tanks inherited contrast; muted palette preserves
+   * WCAG ratios). cursor: default + aria-disabled signal
+   * "not actionable yet" without hiding the affordance entirely. */
+  .er-masthead-popover-item--future {
+    cursor: default;
+  }
+  .er-masthead-popover-item--future:hover,
+  .er-masthead-popover-item--future:focus-visible {
+    background: transparent;
+  }
+  .er-masthead-popover-item--future .er-masthead-popover-item-label {
+    color: var(--er-ink-soft);
+  }
+  .er-masthead-popover-item--future .er-masthead-popover-item-route {
+    color: var(--er-faded);
+  }
+
+  /* The Phase-4 tag inline within the route hint. */
+  .er-masthead-popover-item-future-tag {
+    font-family: var(--er-font-mono);
+    font-size: 0.48rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--er-kraft);
+    margin-left: 0.25rem;
+  }
+}
+
+/* ============================================================
+   v7 MASTHEAD POPOVER — desktop default: hidden.
+   Mirrors the masthead's mobile-only gate. The popover scaffold
+   is emitted on every surface but only renders on mobile.
+============================================================ */
+@media (min-width: 601px) {
+  .er-masthead-popover,
+  .er-masthead-popover-scrim {
+    display: none !important;
+  }
 }

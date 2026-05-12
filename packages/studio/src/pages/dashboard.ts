@@ -36,6 +36,7 @@ import { html, unsafe, type RawHtml } from './html.ts';
 import { layout } from './layout.ts';
 import { renderEditorialFolio } from './chrome.ts';
 import { renderMasthead } from './masthead.ts';
+import { renderMastheadMenu } from './masthead-menu.ts';
 import { loadDashboardData, DASHBOARD_STAGE_ORDER } from './dashboard/data.ts';
 import {
   renderStageSection,
@@ -94,6 +95,7 @@ export async function renderDashboard(
   // captures the rationale.
   const body = html`
   ${masthead}
+  ${renderMastheadMenu()}
   ${renderEditorialFolio('dashboard', 'press-check')}
   ${renderHeader(data, ctx.projectRoot, now)}
   <main class="er-container">

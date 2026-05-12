@@ -31,6 +31,7 @@ import { escapeHtml, gloss, html, unsafe, type RawHtml } from './html.ts';
 import { layout } from './layout.ts';
 import { renderEditorialFolio } from './chrome.ts';
 import { renderMasthead } from './masthead.ts';
+import { renderMastheadMenu } from './masthead-menu.ts';
 
 interface ShortformReviewQuery {
   /** ?v=<n>; null shows the workflow's currentVersion. */
@@ -315,6 +316,7 @@ export async function renderShortformReviewPage(
   const body = html`
     <div data-review-ui="shortform" class="er-review-shell">
       ${masthead}
+      ${renderMastheadMenu()}
       ${renderEditorialFolio('shortform', folioSpine)}
       ${shortformMeta}
       <div class="er-strip">

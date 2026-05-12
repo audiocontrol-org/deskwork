@@ -16,6 +16,7 @@
 
 import { initScrapbookLightbox } from './lightbox.ts';
 import { copyOrShowFallback, isManualCopyOpen } from './clipboard.ts';
+import { initMastheadPopover } from './mobile-shell/masthead-popover.ts';
 
 interface DraftRange {
   start: number;
@@ -1799,6 +1800,15 @@ export function initEditorialReview(): void {
   shortcutsBtn?.addEventListener('click', () => showShortcuts(true));
   shortcutsBackdrop?.addEventListener('click', () => showShortcuts(false));
 
+  // Step 2.2.7: the masthead `⋮` popover dispatches a custom
+  // `studio:show-shortcuts` event when the operator picks the
+  // Keyboard shortcuts menu item. Listen for it here so the
+  // existing overlay opens. Other surfaces without this overlay
+  // ignore the event (no listener fires).
+  document.addEventListener('studio:show-shortcuts', () => {
+    showShortcuts(true);
+  });
+
   // ---- Destructive shortcut soft-confirm (#108) ----
   // Approve / Iterate / Reject all transition workflow state and are
   // hard to undo. Single-keystroke firing meant a stray `a` while the
@@ -2092,3 +2102,4 @@ function initMobileMarginaliaToggle(): void {
 }
 
 initEditorialReview();
+initMastheadPopover();

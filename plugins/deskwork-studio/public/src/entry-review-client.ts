@@ -28,6 +28,7 @@ import { initMobileSheetBar } from './entry-review/mobile-sheet-bar.ts';
 import { initScrapbookDrawerToggle } from './entry-review/scrapbook-drawer.ts';
 import { initShortcuts } from './entry-review/shortcuts.ts';
 import { copyOrShowFallback } from './clipboard.ts';
+import { initMastheadPopover } from './mobile-shell/masthead-popover.ts';
 
 const ENTRY_API = '/api/dev/editorial-review/entry';
 
@@ -301,3 +302,4 @@ function initPressCheckSurface(): void {
 
 wireStageActions();
 initPressCheckSurface();
+initMastheadPopover();

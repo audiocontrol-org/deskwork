@@ -9,6 +9,7 @@ import { copyOrShowFallback } from './clipboard.ts';
 import { initComposeChip } from './dashboard/compose-chip.ts';
 import { initRowActions } from './dashboard/row-actions.ts';
 import { initStageTiles } from './dashboard/stage-tiles.ts';
+import { initMastheadPopover } from './mobile-shell/masthead-popover.ts';
 
 function siteFromButton(btn: HTMLButtonElement): string {
   const site = btn.dataset.site;
@@ -513,6 +514,7 @@ function init(): void {
   initComposeChip();
   initStageTiles();
   initRowActions();
+  initMastheadPopover();
 }
 
 init();
