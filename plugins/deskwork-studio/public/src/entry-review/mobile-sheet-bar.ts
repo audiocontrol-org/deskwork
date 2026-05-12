@@ -31,6 +31,7 @@
 
 import { bindFormatKeys } from './format-keys.ts';
 import { populateActionsSlot } from './mobile-actions-slot.ts';
+import { createSlideUpSheet, type SlideUpSheetController } from '../mobile-shell/sheet-controller.ts';
 
 const MOBILE_QUERY = '(max-width: 48rem)';
 const FLASH_MS = 1100;
@@ -118,8 +119,20 @@ export function initMobileSheetBar(deps: SheetBarDeps): MobileSheetBarController
   }
 
   // The CSS toggles visibility with `body[data-mobile-sheet-open]` plus
-  // `data-mobile-sheet-slot` on the host; the controller flips both.
+  // `data-mobile-sheet-slot` on the host; the shared controller flips the
+  // body attribute and owns gesture/dismiss. Local state (currentSheet,
+  // aria-expanded, sheet.hidden delay) is managed here in onClose.
   let currentSheet: SheetKey | null = null;
+
+  function onSheetClose(): void {
+    currentSheet = null;
+    for (const t of tabs) t.setAttribute('aria-expanded', 'false');
+    // Hide the sheet host after the slide-out completes so click-through
+    // works during the transition.
+    window.setTimeout(() => {
+      if (currentSheet === null) sheet!.hidden = true;
+    }, SLIDE_MS + 40);
+  }
 
   function openSheet(key: SheetKey): void {
     if (currentSheet === key) {
@@ -135,23 +148,28 @@ export function initMobileSheetBar(deps: SheetBarDeps): MobileSheetBarController
       if (slot) slot.hidden = slotKey !== key;
     }
     setSheetHeader(key);
-    document.body.setAttribute('data-mobile-sheet-open', '');
+    sheetController.open();
     for (const t of tabs) {
       t.setAttribute('aria-expanded', t.dataset.mobileSheet === key ? 'true' : 'false');
     }
   }
 
   function closeSheet(): void {
-    if (currentSheet === null) return;
-    currentSheet = null;
-    document.body.removeAttribute('data-mobile-sheet-open');
-    for (const t of tabs) t.setAttribute('aria-expanded', 'false');
-    // Hide the sheet host after the slide-out completes so click-through
-    // works during the transition.
-    window.setTimeout(() => {
-      if (currentSheet === null) sheet!.hidden = true;
-    }, SLIDE_MS + 40);
+    sheetController.close();
   }
+
+  // Create the shared controller. handle and closeBtn may be null; the
+  // controller accepts undefined for optional elements. No scrim in the
+  // entry-review sheet template. Constants use controller defaults:
+  //   dragDismissPx = 80 (matches the former inline magic number)
+  //   slideMs = 280 (matches SLIDE_MS used for the hidden-delay timeout)
+  const sheetController: SlideUpSheetController = createSlideUpSheet({
+    sheetEl: sheet,
+    bodyOpenAttr: 'data-mobile-sheet-open',
+    handleEl: handle ?? undefined,
+    closeBtnEl: closeBtn ?? undefined,
+    onClose: onSheetClose,
+  });
 
   function setSheetHeader(key: SheetKey): void {
     if (key === 'outline') {
@@ -327,8 +345,6 @@ export function initMobileSheetBar(deps: SheetBarDeps): MobileSheetBarController
     });
   }
 
-  closeBtn?.addEventListener('click', closeSheet);
-
   // The Save tab triggers the existing edit-toolbar's save handler.
   // It's not a sheet — Save is a direct file mutation (THESIS C2: the
   // single allowed write the studio performs on operator content).
@@ -342,32 +358,6 @@ export function initMobileSheetBar(deps: SheetBarDeps): MobileSheetBarController
       );
       target?.click();
     });
-  }
-
-  // Drag-to-dismiss the sheet via the handle. Touch + pointer.
-  if (handle) {
-    let startY = 0;
-    let dragging = false;
-    function onStart(y: number): void { startY = y; dragging = true; sheet!.style.transition = 'none'; }
-    function onMove(y: number): void {
-      if (!dragging) return;
-      const dy = Math.max(0, y - startY);
-      sheet!.style.transform = `translateY(${dy}px)`;
-    }
-    function onEnd(y: number): void {
-      if (!dragging) return;
-      dragging = false;
-      sheet!.style.transition = '';
-      const dy = Math.max(0, y - startY);
-      sheet!.style.transform = '';
-      if (dy > 80) closeSheet();
-    }
-    handle.addEventListener('touchstart', (e) => onStart(e.touches[0]?.clientY ?? 0), { passive: true });
-    handle.addEventListener('touchmove', (e) => onMove(e.touches[0]?.clientY ?? 0), { passive: true });
-    handle.addEventListener('touchend', (e) => onEnd(e.changedTouches[0]?.clientY ?? 0));
-    handle.addEventListener('mousedown', (e) => onStart(e.clientY));
-    document.addEventListener('mousemove', (e) => onMove(e.clientY));
-    document.addEventListener('mouseup', (e) => onEnd(e.clientY));
   }
 
   // Tap on the article body's `<mark>` opens Notes sheet + scrolls.
@@ -479,11 +469,6 @@ export function initMobileSheetBar(deps: SheetBarDeps): MobileSheetBarController
     obs.observe(scrapSource, { childList: true, subtree: true });
   }
   updateScrapbookCount();
-
-  // Close the sheet on Escape (a11y).
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && currentSheet !== null) closeSheet();
-  });
 
   return {
     openSheet: (key) => {
