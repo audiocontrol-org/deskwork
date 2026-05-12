@@ -7,6 +7,7 @@
 
 import { copyOrShowFallback } from './clipboard.ts';
 import { initComposeChip } from './dashboard/compose-chip.ts';
+import { initRowActions } from './dashboard/row-actions.ts';
 import { initStageTiles } from './dashboard/stage-tiles.ts';
 
 function siteFromButton(btn: HTMLButtonElement): string {
@@ -511,6 +512,7 @@ function init(): void {
   initLocaleDates();
   initComposeChip();
   initStageTiles();
+  initRowActions();
 }
 
 init();

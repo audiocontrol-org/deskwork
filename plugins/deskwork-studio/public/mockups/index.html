@@ -186,39 +186,28 @@ Two phone-shaped surfaces, two design problems. The <em>review surface</em> ship
   </ul>
 </div>
 
-<h2>Dashboard mobile-first · per-row affordance pick <span style="font-family: var(--mono); font-size: 0.55rem; letter-spacing: 0.18em; color: var(--blue); border: 1px solid var(--blue); padding: 0.16rem 0.45rem; border-radius: 2px; vertical-align: 0.25em; margin-left: 0.5rem;">Active</span></h2>
+<h2>Dashboard mobile-first · per-row affordance <span style="font-family: var(--mono); font-size: 0.55rem; letter-spacing: 0.18em; color: var(--green); border: 1px solid var(--green); padding: 0.16rem 0.45rem; border-radius: 2px; vertical-align: 0.25em; margin-left: 0.5rem;">Row 4 picked · shipping in v0.20.0</span></h2>
 
-<p>The dashboard's per-row affordance shape is still under design. The earlier dashboard-1/1b/1c/1d/2/3/compact-1/2/3 mockups have been retired (they predate the <a href="../../../../DESIGN-STANDARDS.md" style="color: var(--red);">Design Standards</a> — they encode review-state surfacing and rubber-stamp variants that the standards now prohibit). The live implementation IS the canonical record for the picked direction; see the standards doc for the spec. Retired and accepted dashboard mockups now live in the design proposal archive under <code style="font-family:var(--mono);font-size:0.85em"><a href="../../../../docs/studio-design/" style="color: var(--red);">docs/studio-design/</a></code> — see <a href="../../../../docs/studio-design/" style="color: var(--red);">ACCEPTED/</a> and <a href="../../../../docs/studio-design/REJECTED/" style="color: var(--red);">REJECTED/</a>.</p>
+<p>The dashboard's per-row affordance shape was approved by the operator on 2026-05-11. The picked direction is the <strong>Row 4 hybrid — overflow menu + swipe drawer + stage-aware verb vocabulary</strong> (including <code>iterate</code>, <code>block</code>, and <code>induct…</code> alongside the existing <code>approve</code> / <code>cancel</code> / <code>scrapbook</code>). See the <a href="../../../../docs/studio-design/ACCEPTED/2026-05-11-row-affordance-overflow-plus-swipe/" style="color: var(--green);">ACCEPTED archive entry</a> for the full rationale; the mockup file is at <a href="./dashboard-row-4-overflow-plus-swipe.html" style="color: var(--green);">dashboard-row-4-overflow-plus-swipe.html</a>.</p>
 
-<p>Three active per-row directions remain — each shows a different shape for the in-row action affordances (open / approve / cancel / scrapbook). They've been stripped of stamp markup and bear deprecation banners where their narratives reference review-state-driven contextual logic that needs redrafting on a stage-graduation basis. <strong>Pick one (or call out elements to combine).</strong></p>
+<p>The three superseded direction mockups (Row 1 overflow-only, Row 2 contextual-primary, Row 3 swipe-only) have been retired into REJECTED archive entries — each with a brief explaining what was rejected and why the Row 4 hybrid supersedes them. See <a href="../../../../docs/studio-design/REJECTED/2026-05-11-row-1-overflow-only/" style="color: var(--red);">REJECTED/2026-05-11-row-1-overflow-only/</a>, <a href="../../../../docs/studio-design/REJECTED/2026-05-11-row-2-contextual-primary/" style="color: var(--red);">REJECTED/2026-05-11-row-2-contextual-primary/</a>, and <a href="../../../../docs/studio-design/REJECTED/2026-05-11-row-3-swipe-only/" style="color: var(--red);">REJECTED/2026-05-11-row-3-swipe-only/</a>.</p>
 
 <div class="grid">
 
-  <article class="card" style="border-left-color: var(--blue);">
-    <span class="num" style="color: var(--blue);">Dashboard row 1</span>
-    <h3>Tap-anywhere + overflow menu</h3>
-    <p class="summary">Row click → review surface. A single 32×32 ⋮ button on the right surfaces ALL secondary actions in a contextual menu — Open, Approve, Cancel, Scrapbook. Compact, predictable.</p>
-    <p class="pros"><span class="label">Strong</span> Cleanest row composition. ~64px row regardless of action count. No chip wrap. Familiar overflow-menu idiom.</p>
-    <p class="cons"><span class="label">Weak</span> Every secondary action is 2 taps (⋮ → action). Bulk operations slow.</p>
-    <a class="open" href="./dashboard-row-1-overflow.html">Open mockup →</a>
+  <article class="card" style="border-left-color: var(--green);">
+    <span class="num" style="color: var(--green);">Dashboard row 4 (picked)</span>
+    <h3>Overflow menu + swipe drawer (hybrid)</h3>
+    <p class="summary">Clean at-rest row (slug + title + date + trailing ⋮). Tap row → review surface. Swipe left → action drawer with top-N stage-aware verbs (iterate / approve / cancel / scrapbook chips). Tap ⋮ → menu popover with the full stage-aware verb set (adds block / induct… as secondary verbs). Desktop renders inline iterate / approve / scrapbook chips + ⋮ menu for the rest.</p>
+    <p class="pros"><span class="label">Strong</span> Cleanest at-rest composition AND discoverable for new operators AND fast for power users. Adds block + induct verbs the v0.19 dashboard didn't surface.</p>
+    <a class="open" href="./dashboard-row-4-overflow-plus-swipe.html">Open mockup →</a>
   </article>
 
-  <article class="card" style="border-left-color: var(--blue);">
-    <span class="num" style="color: var(--blue);">Dashboard row 2</span>
-    <h3>Contextual primary + overflow secondary</h3>
-    <p class="summary">Row click → review surface. ONE primary verb chip on the right (was: review-state-contextual; needs redraft as <em>stage-graduation-contextual</em> per the standards — Drafting → Approve, Final → Publish, Blocked → Induct). Tiny ⋮ for the rest.</p>
-    <p class="pros"><span class="label">Strong</span> Most-likely-next-action is one tap from the dashboard. Verb-on-row hints at what's expected.</p>
-    <p class="cons"><span class="label">Needs redraft</span> Original mockup was built around review-state-contextualization which is now retired. Pick this direction and we'll redraft on stage-graduation.</p>
-    <a class="open" href="./dashboard-row-2-contextual-primary.html">Open mockup →</a>
-  </article>
-
-  <article class="card" style="border-left-color: var(--blue);">
-    <span class="num" style="color: var(--blue);">Dashboard row 3</span>
-    <h3>Swipe gestures</h3>
-    <p class="summary">No buttons visible at-rest. Row click → review surface. Swipe left → action drawer slides in (Approve / Cancel / Scrap). iOS-native muscle memory.</p>
-    <p class="pros"><span class="label">Strong</span> Cleanest possible at-rest composition. Power-user fast for bulk.</p>
-    <p class="cons"><span class="label">Weak</span> Discovery cliff. New operators don't know swipe exists. More JS to maintain.</p>
-    <a class="open" href="./dashboard-row-3-swipe.html">Open mockup →</a>
+  <article class="card" style="border-left-color: var(--green);">
+    <span class="num" style="color: var(--green);">Direction B picked · accessibility</span>
+    <h3>Row ⋮ contrast directions</h3>
+    <p class="summary">Operator caught the v0.20 ⋮ overflow button at 1.21:1 contrast (fails every WCAG criterion). Mockup proposed an Accessibility section for <code>DESIGN-STANDARDS.md</code> + three ⋮ treatments. <strong>Direction B picked</strong> — ink-soft glyph at <strong>11.06:1</strong> (comfortably AAA). Companion standard landed in <a href="../../../../DESIGN-STANDARDS.md" style="color: var(--green);">DESIGN-STANDARDS.md § Accessibility / Contrast</a>. Archive: <a href="../../../../docs/studio-design/ACCEPTED/2026-05-11-row-overflow-contrast-B-ink-soft/" style="color: var(--green);">ACCEPTED/2026-05-11-row-overflow-contrast-B-ink-soft/</a>; <a href="../../../../docs/studio-design/REJECTED/2026-05-11-row-overflow-contrast-A-faded/" style="color: var(--red);">A rejected</a> (no headroom), <a href="../../../../docs/studio-design/REJECTED/2026-05-11-row-overflow-contrast-C-press-mark-ring/" style="color: var(--red);">C rejected</a> (ring motif not used elsewhere on dashboard).</p>
+    <p class="pros"><span class="label">Shipped</span> CSS landed in <code>dashboard-row-affordances.css</code> + <code>editorial-studio.css</code>; spec-compliance probe extended with WCAG contrast assertions per affordance — 139/139 pass at iPhone 14 viewport.</p>
+    <a class="open" href="./row-overflow-contrast.html">Open mockup →</a>
   </article>
 
 </div>

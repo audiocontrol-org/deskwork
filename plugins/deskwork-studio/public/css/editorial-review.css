@@ -43,6 +43,13 @@
   --er-highlight-soft: #F9E8BE;
   --er-stamp-green: #2E5D45;
   --er-stamp-purple: #5A3E5F;
+  /* Kraft brown — the press-check palette's neutral accent. Used for
+   * non-mutating verbs (open scrapbook, view, induct, block) where a
+   * destructive red or terminal green would mis-signal. The value
+   * (#8A7250) traces to the dashboard-row-4 mockup. Without this token
+   * defined, `var(--er-kraft)` references fall back to no color and
+   * those chips/glyphs render invisible against the paper background. */
+  --er-kraft: #8A7250;
 
   /* Type */
   --er-font-display: 'Fraunces', 'Newsreader', Georgia, 'Times New Roman', serif;

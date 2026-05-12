@@ -234,6 +234,96 @@ git commit -m "fix(studio): apply review findings on dashboard mobile-first"
 - Probe + smoke green
 - #236, #237, #238, #243 closed against v0.19.0 install
 
+### Task 1.7.5 — CLI dispatcher gap: missing subcommands for block / cancel / induct (prereq for 1.8)
+
+**Goal:** close a gap surfaced by Task 1.8's Step 1.8.1 verification: the `/deskwork:block`, `/deskwork:cancel`, and `/deskwork:induct` skills exist and their core helpers exist (`packages/core/src/entry/{block,cancel,induct}.ts`), but the CLI dispatcher in `packages/cli/src/dispatch.ts` doesn't route those verbs. Running `deskwork block <uuid>` returns *"unknown subcommand"*; the same for `cancel` and `induct`. When an agent receives a pasted `/deskwork:block <slug>` from the dashboard's (about-to-be-added) Block button and tries to invoke the helper atomically, it has to walk the skill steps manually via Read/Write/journal-append instead of dispatching `deskwork block <uuid>`. The UI clipboard-copy works regardless; the receiving-agent's downstream execution is degraded.
+
+Task 1.8 ships the UI buttons that invite the operator to use these verbs. Shipping the surface before the atomic CLI plumbing is the *"ship the surface, defer the plumbing"* pattern that bites in the next session. This task closes the plumbing so 1.8 lands honest.
+
+**Decision (2026-05-11):** Operator framed it as a UX principle — *"UX is the goal of this feature, so bad UX must be remedied"*. The receiving-agent's manual-step-walking IS the bad UX. **Option A picked: fold 1.7.5 into 1.8** — both ship together as v0.20.0. The CLI work executes BEFORE the UI work in 1.8 (sub-steps 1.7.5.1-1.7.5.9 run first; then 1.8.2 onwards). Rationale: shipping v0.19.2 with CLI subcommands but no adopter-visible UI is low signal-to-noise; single coherent v0.20.0 lands the full round-trip together. The 1.7.5 sub-steps stay numbered as 1.7.5.* (not renumbered into 1.8.*) so this gap is auditable as its own discrete fix in the commit history; the release is what bundles them.
+
+**Files:**
+- Modify: `packages/cli/src/dispatch.ts` — route `block`, `cancel`, `induct` subcommands to thin CLI wrappers around their existing core helpers.
+- Create: `packages/cli/src/commands/block.ts` — thin wrapper invoking `blockEntry` from `@deskwork/core/entry/block`.
+- Create: `packages/cli/src/commands/cancel.ts` — thin wrapper invoking `cancelEntry`.
+- Create: `packages/cli/src/commands/induct.ts` — thin wrapper invoking `inductEntry`. Must handle the `--to <Stage>` flag (per the skill's input shape) and the default-stage logic (Blocked → priorStage, Cancelled → priorStage, Final → Drafting, pipeline → require explicit `--to`).
+- Modify: `packages/cli/src/dispatch.ts` help-output — list the new subcommands alongside `approve`, `iterate`, etc.
+- Create / modify: tests under `packages/cli/test/commands/` mirroring the existing `approve.test.ts` / `iterate.test.ts` patterns — assert exit codes, sidecar mutations, journal events, doctor compatibility for each verb.
+
+**Sub-steps:**
+
+- [x] **Step 1.7.5.1:** ~~Read dispatch.ts + approve.ts + iterate.ts to identify the canonical thin-wrapper shape.~~ *(Done — pattern: `parseArgs(argv, KNOWN_FLAGS)` → resolve slug/uuid via `resolveEntryUuid` → call core helper → `emit()` JSON / `fail()` on error.)*
+- [x] **Step 1.7.5.2:** ~~Implement `commands/block.ts`.~~ *(Done — 79 lines, calls `blockEntry`, emits `{ entryId, site, slug, fromStage, toStage: 'Blocked', reason? }`.)*
+- [x] **Step 1.7.5.3:** ~~Implement `commands/cancel.ts`.~~ *(Done — parallel shape to block, calls `cancelEntry`.)*
+- [x] **Step 1.7.5.4:** ~~Implement `commands/induct.ts`.~~ *(Done — 144 lines with default-stage logic in the CLI wrapper before calling `inductEntry`. Validates `--to` is a linear-pipeline stage; Blocked/Cancelled targets refused.)*
+- [x] **Step 1.7.5.5:** ~~Register the new subcommands in `cli.ts`.~~ *(Done — SUBCOMMANDS map updated; help-output moves block/cancel/induct from 'Skill-only verbs' to 'Pipeline' section alongside iterate/approve/publish. status stays in Skill-only as planned.)*
+- [x] **Step 1.7.5.6:** ~~Tests mirror approve-entry-centric.test.ts shape.~~ *(Done — block: 4 tests (happy path + already-Blocked refusal + Published-terminal refusal + --reason passthrough); cancel: 4 tests (parallel); induct: 7 tests (Blocked→priorStage default; Cancelled→priorStage default; Final→Drafting default; refuse pipeline-stage without --to; explicit --to backward; refuse --to Blocked; refuse --to Cancelled). Total 15 new tests.)*
+- [x] **Step 1.7.5.7:** ~~Run `npm --workspace @deskwork/cli test`.~~ *(Done — 211 passed / 29 skipped pre-existing. Typecheck clean.)*
+- [x] **Step 1.7.5.8:** ~~Manual end-to-end.~~ Subsumed by Step 1.7.5.7 — the spawnSync tests in 1.7.5.6 do exactly the same workflow (create temp project + sidecar; run actual `deskwork block` binary; assert post-state). Per the workplan's verification rule: tests using the real binary are the canonical evidence; a separate manual run would just repeat what 1.7.5.7 already proved.
+- [x] **Step 1.7.5.9:** ~~Commit.~~ *(Landed in 20ca3e4 — `feat(cli): add block / cancel / induct subcommands (Task 1.8 prereq, 1.7.5 folded)`. Folded per Option A; will release with Task 1.8 as v0.20.0.)*
+
+Also: the three SKILL.md files (`plugins/deskwork/skills/{block,cancel,induct}/SKILL.md`) were updated to direct agents to use the new CLI commands atomically (mirroring approve's skill prose: "Run `deskwork <verb> <uuid>` (the underlying CLI helper). <Verb> is now an atomic operation that..."). Error-message quotes in each SKILL.md match the CLI's actual stderr so adopters recognize them in session output.
+
+**Acceptance:**
+- `deskwork block <slug>` / `deskwork cancel <slug>` / `deskwork induct <slug> --to <Stage>` all execute the documented sidecar mutation + journal event + doctor validation.
+- `deskwork --help` lists the new subcommands.
+- CLI test suite green: `npm --workspace @deskwork/cli test` passes (new tests + existing tests).
+- An agent receiving a pasted `/deskwork:block <slug>` can dispatch `deskwork block <uuid>` atomically instead of walking skill steps manually.
+
+**Out of scope:**
+- `status` CLI subcommand. The `/deskwork:status` skill is read-only and doesn't surface as a dashboard button in Task 1.8. If a `deskwork status` CLI gets added later, it's a separate task; not blocking 1.8.
+- Refactoring the dispatch.ts to use a different routing pattern. Stay consistent with the existing approve/iterate shape.
+
+---
+
+### Task 1.8 — Row affordance redesign (overflow + swipe + full verb vocabulary) → v0.20.0
+
+**Goal:** close the row-affordance pick gate that was implicitly skipped during Phase 1 (Task 1.1.6 conflated the dashboard chrome pick with the per-row affordance pick). Implement the operator-approved Row 4 hybrid: clean at-rest row, swipe-drawer + ⋮ menu on mobile, inline iterate/approve chips + ⋮ menu on desktop, full stage-aware verb vocabulary including the previously-missing `iterate`, `block`, and `induct…` (omnidirectional). Replaces the v0.19 dashboard's stacked-outlined-button row chrome.
+
+**Design source of truth:** [`docs/studio-design/ACCEPTED/2026-05-11-row-affordance-overflow-plus-swipe/brief.md`](../../studio-design/ACCEPTED/2026-05-11-row-affordance-overflow-plus-swipe/brief.md) (visual: [`plugins/deskwork-studio/public/mockups/dashboard-row-4-overflow-plus-swipe.html`](../../../../plugins/deskwork-studio/public/mockups/dashboard-row-4-overflow-plus-swipe.html)).
+
+**Files:**
+- Modify: `packages/studio/src/pages/dashboard/affordances.ts` — stage-aware verb-set rendering (add block + induct-anywhere; current code surfaces induct only on Blocked/Cancelled).
+- Modify: `packages/studio/src/pages/dashboard/section.ts` — row markup adopts the ⋮ button + drawer-host shape; remove the stacked inline button block on mobile breakpoints.
+- Create: `plugins/deskwork-studio/public/src/dashboard/row-actions.ts` — client controller for the swipe-drawer gesture (matchMedia phone-only) AND the ⋮ menu popover (open/close, click-outside, escape key, accessible focus management).
+- Modify: `plugins/deskwork-studio/public/css/dashboard-mobile.css` — swipe-drawer + ⋮-menu chrome; replace the stacked-outlined-button mobile rules.
+- Modify: `plugins/deskwork-studio/public/css/editorial-studio.css` — desktop row chrome adopts inline-chips-plus-⋮ pattern.
+- Verify (do not modify unless gaps found): `/deskwork:block` skill + `packages/core/src/entry/block.ts` helper. The skill is documented; the CLI helper should already exist. If a gap surfaces, file it as a separate task (do not silently widen this one).
+- Modify: `scripts/probe-mobile-dashboard.mjs` — assert: row has no stacked inline buttons at-rest; ⋮ button visible; tap ⋮ opens menu; swipe-left reveals drawer; drawer/menu contain stage-aware verbs.
+- Modify: `scripts/smoke-er-viewport-regressions.mjs` — pick up dashboard rows under the new chrome (existing invariants should still pass; this is precautionary).
+
+**Sub-steps:**
+
+- [x] **Step 1.8.1:** ~~Verify `/deskwork:block` round-trip works end-to-end~~ → **Gap surfaced + scoped as Task 1.7.5** (prereq, above). Folded into Task 1.8 per operator decision 2026-05-11 (Option A: single v0.20.0 release). Task 1.7.5 sub-steps execute BEFORE Step 1.8.2 begins. Verification command that surfaced the gap: `node_modules/.bin/deskwork block --help` → `unknown subcommand: block`.
+- [x] **Step 1.8.2:** ~~Update `affordances.ts` — render the full stage-aware verb set per the brief's table.~~ *(Landed in 4063cae. Refactored from flat-button-strip rendering into a stage-aware verb-set abstraction with three output surfaces — `renderRowActions` (inline chips + ⋮), `renderRowDrawer` (top-N drawer chips), `renderRowMenu` (full set with grouped dividers). block + induct surfaced on active stages; all verbs route via clipboard-copy of /deskwork:<verb> <slug>.)*
+- [x] **Step 1.8.3:** ~~Update `section.ts` — row markup adopts the new shape.~~ *(Landed in 4063cae. Row markup is now <er-row-shell> containing <er-row-drawer> + <er-row-fg.er-calendar-row> + <er-row-menu hidden>. data-* attrs canonical on the shell; refined in b47b6ac.)*
+- [x] **Step 1.8.4:** ~~Implement `row-actions.ts` client controller.~~ *(Landed in 4063cae. Handles ⋮ menu open/close, click-outside dismiss, Escape, arrow-key navigation, matchMedia phone-only swipe-gesture with axis-locking, open-one-at-a-time invariant across all rows.)*
+- [x] **Step 1.8.5:** ~~CSS for mobile chrome.~~ *(Landed in 4063cae; extracted into dashboard-row-affordances.css in b47b6ac per CSS file-size discipline. dashboard-mobile.css 656 → 471 lines.)*
+- [x] **Step 1.8.6:** ~~CSS for desktop chrome.~~ *(Landed in 4063cae; cancel/block/scrapbook accent rules added in b47b6ac per review.)*
+- [x] **Step 1.8.7:** ~~Update `probe-mobile-dashboard.mjs`.~~ *(Landed in df71d3b. 28 assertions total (was 16): adds row-shell structure check, no-stacked-buttons v0.19 regression check, no-inline-chip mobile check, ⋮ menu open/close, stage-aware verb-set rendering, click-outside dismiss, desktop inline-chip visibility + drawer:display:none.)*
+- [x] **Step 1.8.8:** ~~Run dual-viewport smoke.~~ *(0 failures across 8 probes: 3 entries × 2 viewports + dashboard × 2 viewports.)*
+- [ ] **Step 1.8.9:** Operator visual walk against the workspace dev studio on phone via Tailscale. URL: http://orion-m4.tail8254f4.ts.net:47330/dev/editorial-studio. *(Operator-driven.)*
+- [x] **Step 1.8.10:** ~~`/dw-lifecycle:review` — dispatch parallel reviewers.~~ *(Done. Dispatched code-reviewer + architect-reviewer in parallel against `6ef72e6..HEAD`. Findings triaged: 5 applied in b47b6ac, 1 deferred with GitHub issue #246 (pre-existing /deskwork:approve refuses Final — couples with deferred public-versioning work).)*
+- [x] **Step 1.8.11:** ~~Commit.~~ *(Per-phase commit hygiene: 20ca3e4 feat(cli) [Task 1.7.5 folded]; 4063cae feat(studio); df71d3b test(studio); b47b6ac fix(studio); 64a77f1 design(studio) [mockup retirement].)*
+- [x] **Step 1.8.12:** ~~Retire the three superseded direction mockups into REJECTED archive entries.~~ *(Landed in 64a77f1. REJECTED/2026-05-11-row-{1,2,3}-* entries each with brief.md + mockup.html (git mv'd from public/mockups/). mockups/index.html updated to point at the picked Row 4 + cross-link the REJECTED entries.)*
+- [ ] **Step 1.8.13:** Release v0.20.0 via `/release`. Smoke + tag + push. *(Operator-driven.)*
+- [ ] **Step 1.8.14:** Operator iPhone walk against the marketplace-installed v0.20.0 to confirm the redesigned chrome lands correctly. *(Operator-driven, post-release.)*
+
+**Acceptance:**
+- Mobile dashboard rows: clean at-rest, no stacked inline buttons, trailing ⋮ visible
+- Mobile swipe-left reveals the stage-aware drawer; swipe-right or tap-outside closes
+- Tap ⋮ opens menu with full stage-aware verb set; tap-outside or Escape closes
+- Block + induct affordances reachable on all applicable stages on both mobile and desktop
+- Desktop: inline iterate / approve chips + ⋮ menu for secondaries (no stacked outlined buttons)
+- All verbs route via clipboard-copy of `/deskwork:<verb> <slug>` (THESIS Consequence 2 preserved)
+- Probe + smoke green
+- v0.20.0 released and walked on iPhone
+
+**Out of scope:**
+- Mobile-shell extraction — that's Phase 2. The row-actions controller may end up extracted there; for now it lives in dashboard's own client tree.
+- Touch-gesture refinements beyond the basic swipe (multi-finger gestures, customizable swipe thresholds, etc.).
+- Custom keyboard shortcuts for the menu beyond the standard arrow-key navigation + Escape.
+
 ### Task 1.6 — Audit-driven remediations (Phase 0 / Phase 1 cleanup)
 
 **Goal:** address gaps surfaced by the 2026-05-09 implementation audit. The audit was right about real gaps in the Phase 0 conformance sweep + feature-status doc rot; one finding was mis-characterized and is excluded here. Each item below is a concrete action that closes one audit finding.

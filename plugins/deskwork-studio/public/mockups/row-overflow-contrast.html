@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Row ⋮ contrast directions · accessibility standards</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F5F1E8;
+    --paper-2: #ECE6D4;
+    --paper-3: #DFD7BF;
+    --ink: #1A1614;
+    --ink-soft: #3A332E;
+    --faded: #8A7F70;
+    --red: #B8362A;
+    --kraft: #8A7250;
+    --green: #2E5D45;
+    --blue: #2A4B7C;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Fraunces', 'Newsreader', Georgia, serif;
+    --body: 'Newsreader', Georgia, serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.55;
+    min-height: 100vh;
+  }
+  body {
+    padding: 2rem 1.4rem 4rem;
+    max-width: 50rem;
+    margin: 0 auto;
+  }
+  .kicker {
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 0.6rem;
+  }
+  h1 {
+    font-family: var(--display);
+    font-style: italic;
+    font-weight: 500;
+    font-size: 2rem;
+    line-height: 1.1;
+    color: var(--ink);
+    margin-bottom: 0.8rem;
+  }
+  h2 {
+    font-family: var(--display);
+    font-style: italic;
+    font-weight: 500;
+    font-size: 1.4rem;
+    margin: 2.2rem 0 0.6rem;
+    color: var(--ink);
+  }
+  p { margin-bottom: 0.8rem; }
+  code {
+    font-family: var(--mono);
+    font-size: 0.85em;
+    background: var(--paper-2);
+    padding: 0.04rem 0.3rem;
+    border-radius: 2px;
+  }
+  .intro {
+    border-left: 3px solid var(--red);
+    padding-left: 1rem;
+    margin: 1.4rem 0 2rem;
+    color: var(--ink-soft);
+  }
+  .intro strong { color: var(--ink); }
+
+  /* Proposed standard section */
+  .standard {
+    border: 1px solid var(--ink);
+    padding: 1.2rem 1.4rem;
+    margin: 1.4rem 0;
+    background: var(--paper-2);
+  }
+  .standard h3 {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink);
+    margin-bottom: 0.7rem;
+  }
+  .standard ul { margin-left: 1.2rem; }
+  .standard li { margin-bottom: 0.35rem; }
+
+  /* Direction card */
+  .direction {
+    border: 1px solid var(--paper-3);
+    padding: 1.4rem;
+    margin: 1.2rem 0;
+    background: var(--paper);
+  }
+  .direction-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.9rem;
+    margin-bottom: 0.5rem;
+  }
+  .direction-num {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--faded);
+  }
+  .direction-title {
+    font-family: var(--display);
+    font-style: italic;
+    font-weight: 500;
+    font-size: 1.25rem;
+    color: var(--ink);
+  }
+  .direction-meta {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.1em;
+    color: var(--ink-soft);
+  }
+  .direction-meta .ratio { font-weight: 600; color: var(--green); }
+  .direction-meta .ratio.fail { color: var(--red); }
+
+  /* Mock row preview — mirrors the live dashboard's row chrome at
+     mobile width so the ⋮ rendering reads exactly as it does on a
+     phone. The ⋮ glyph and any per-direction overrides come from a
+     CSS variable scoped to each .preview-* class. */
+  .preview {
+    margin: 0.9rem 0 1rem;
+    border-top: 1px dashed var(--paper-3);
+    border-bottom: 1px dashed var(--paper-3);
+    background: var(--paper);
+    padding: 0;
+  }
+  .preview-row {
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr) 32px;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.85rem 0.85rem;
+  }
+  .preview-num {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    color: var(--ink-soft);
+  }
+  .preview-slug {
+    font-family: var(--body);
+    font-size: 0.95rem;
+    color: var(--blue);
+    text-decoration: underline;
+    text-decoration-color: rgba(42, 75, 124, 0.4);
+  }
+  .preview-title {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 1rem;
+    color: var(--ink);
+    line-height: 1.25;
+    margin-top: 0.1rem;
+  }
+  .preview-date {
+    font-family: var(--mono);
+    font-size: 0.55rem;
+    letter-spacing: 0.1em;
+    color: var(--faded);
+    margin-top: 0.18rem;
+    text-transform: lowercase;
+  }
+  .preview-overflow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    font-family: var(--mono);
+    line-height: 1;
+  }
+
+  /* === Direction A: faded glyph (current target — 3.53:1) === */
+  .preview-A .preview-overflow {
+    color: var(--faded);
+    font-size: 1.4rem;
+    font-weight: 600;
+  }
+
+  /* === Direction B: ink-soft glyph (11:1) === */
+  .preview-B .preview-overflow {
+    color: var(--ink-soft);
+    font-size: 1.4rem;
+    font-weight: 600;
+  }
+
+  /* === Direction C: press-mark ring (3.53:1 glyph + 3.53:1 ring) === */
+  .preview-C .preview-overflow {
+    color: var(--faded);
+    font-size: 1rem;
+    font-weight: 700;
+    width: 26px;
+    height: 26px;
+    border: 1px solid var(--faded);
+    border-radius: 50%;
+    padding: 0;
+    /* Letter-spacing makes the three dots breathe in the small circle. */
+    letter-spacing: -0.04em;
+  }
+
+  /* === Reference: the current broken state (1.21:1) === */
+  .preview-current .preview-overflow {
+    color: var(--paper-3);
+    font-size: 1.4rem;
+    font-weight: 600;
+  }
+
+  .pros, .cons {
+    font-size: 0.95rem;
+    margin: 0.4rem 0;
+  }
+  .pros::before { content: "✓ "; color: var(--green); font-weight: 600; }
+  .cons::before { content: "✗ "; color: var(--red); font-weight: 600; }
+
+  .pick-cta {
+    margin-top: 2.5rem;
+    padding: 1.2rem 1.4rem;
+    border: 2px solid var(--ink);
+    background: var(--paper);
+  }
+  .pick-cta h3 {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 0.6rem;
+  }
+</style>
+</head>
+<body>
+
+<div class="kicker">Mockup · accessibility — row overflow button</div>
+<h1>The ⋮ is broken; we need a standard, and we need to fix it</h1>
+
+<div class="intro">
+<p>Operator caught it on phone: <em>"the three dots affordance that opens the per-item menu is so low contrast, I can <strong>barely</strong> see it."</em> The current implementation uses <code>color: var(--er-paper-3)</code> against <code>var(--er-paper)</code> — a <strong>contrast ratio of 1.21:1</strong>, which fails every WCAG criterion that touches an interactive control.</p>
+<p>This mockup proposes <strong>adding an Accessibility section</strong> to <code>DESIGN-STANDARDS.md</code> AND picking a treatment for the ⋮ that meets the proposed standard.</p>
+</div>
+
+<h2>Proposed standard for <code>DESIGN-STANDARDS.md</code></h2>
+
+<div class="standard">
+<h3>Accessibility — Contrast</h3>
+<p>The press-check aesthetic is restrained, but restraint is not invisibility. All affordances must meet WCAG 2.1 AA contrast minimums against their adjacent background.</p>
+<ul>
+<li><strong>Body text:</strong> ≥4.5:1 (WCAG 2.1 SC 1.4.3, AA — normal text).</li>
+<li><strong>Large text</strong> (≥18px, or ≥14px bold): ≥3:1 (WCAG 2.1 SC 1.4.3, AA — large text).</li>
+<li><strong>Interactive UI components</strong> (buttons, icons, controls, focus indicators): ≥3:1 against adjacent colors (WCAG 2.1 SC 1.4.11, Non-Text Contrast). This applies to the ⋮ overflow trigger, drawer chips, menu items, FABs, stage tile chevrons — everything the operator can tap.</li>
+<li><strong>Ornamental press-check chrome</strong> (decorative glyphs, kicker dividers, rule lines): ≥3:1. Decorative ≠ invisible — the chrome is what makes the surface read as press-check, so it has to be legible.</li>
+</ul>
+<p style="margin-top:0.7rem">When in doubt, run the foreground / background pair through a contrast checker. Document the ratio in the CSS comment.</p>
+</div>
+
+<h2>Current state · ⋮ at <code>var(--er-paper-3)</code> on <code>var(--er-paper)</code></h2>
+<p>This is what ships today. The ⋮ is at position 3 of the row grid (rightmost), in the same color the row's dashed border uses. Operator can't see it on phone.</p>
+
+<div class="direction">
+<div class="direction-head">
+<span class="direction-num">Reference / current</span>
+<span class="direction-title">Broken — 1.21:1</span>
+<span class="direction-meta">FG #DFD7BF · BG #F5F1E8 · ratio <span class="ratio fail">1.21:1</span></span>
+</div>
+<div class="preview preview-current">
+<div class="preview-row">
+<div class="preview-num">№ 02</div>
+<div>
+<div class="preview-slug">design-archive-contract</div>
+<div class="preview-title">Studio Design Proposal Archive — Contract</div>
+<div class="preview-date">may 09, 2026</div>
+</div>
+<button type="button" class="preview-overflow">⋮</button>
+</div>
+</div>
+<p class="cons">Fails WCAG 2.1 SC 1.4.11 (3:1 minimum for non-text UI components).</p>
+<p class="cons">Fails WCAG 2.1 SC 1.4.3 (4.5:1 normal text, 3:1 large text — the ⋮ at 20px is borderline-large).</p>
+<p class="cons">Operator-confirmed unusable on phone.</p>
+</div>
+
+<h2>Direction A · faded glyph (minimum compliance)</h2>
+
+<div class="direction">
+<div class="direction-head">
+<span class="direction-num">Direction A</span>
+<span class="direction-title">Faded glyph</span>
+<span class="direction-meta">FG #8A7F70 · BG #F5F1E8 · ratio <span class="ratio">3.53:1</span></span>
+</div>
+<div class="preview preview-A">
+<div class="preview-row">
+<div class="preview-num">№ 02</div>
+<div>
+<div class="preview-slug">design-archive-contract</div>
+<div class="preview-title">Studio Design Proposal Archive — Contract</div>
+<div class="preview-date">may 09, 2026</div>
+</div>
+<button type="button" class="preview-overflow">⋮</button>
+</div>
+</div>
+<p class="pros">Meets WCAG 2.1 SC 1.4.11 (3:1 floor) with no margin to spare.</p>
+<p class="pros">Preserves the "subdued chrome, primary content" hierarchy the press-check aesthetic wants.</p>
+<p class="cons">Bare minimum — older operators / glare conditions / low-end displays may still struggle.</p>
+<p class="cons">No headroom: any future palette tweak to <code>--er-paper</code> or <code>--er-faded</code> risks dropping below the floor.</p>
+</div>
+
+<h2>Direction B · ink-soft glyph (comfortably AAA)</h2>
+
+<div class="direction">
+<div class="direction-head">
+<span class="direction-num">Direction B</span>
+<span class="direction-title">Ink-soft glyph</span>
+<span class="direction-meta">FG #3A332E · BG #F5F1E8 · ratio <span class="ratio">11.06:1</span></span>
+</div>
+<div class="preview preview-B">
+<div class="preview-row">
+<div class="preview-num">№ 02</div>
+<div>
+<div class="preview-slug">design-archive-contract</div>
+<div class="preview-title">Studio Design Proposal Archive — Contract</div>
+<div class="preview-date">may 09, 2026</div>
+</div>
+<button type="button" class="preview-overflow">⋮</button>
+</div>
+</div>
+<p class="pros">Passes WCAG 2.1 AAA across the board (4.5:1 body, 3:1 large, 3:1 non-text). Comfortable headroom.</p>
+<p class="pros">Reads cleanly in glare and low-end displays.</p>
+<p class="pros">Same value as section heads / dashboard kickers — visual rhythm stays consistent with existing chrome.</p>
+<p class="cons">⋮ becomes a visually present control rather than ornamental chrome. May fight the row title for hierarchy.</p>
+</div>
+
+<h2>Direction C · press-mark ring (component contrast via border)</h2>
+
+<div class="direction">
+<div class="direction-head">
+<span class="direction-num">Direction C</span>
+<span class="direction-title">Faded glyph + faded ring</span>
+<span class="direction-meta">glyph 3.53:1 · ring 3.53:1 · <span class="ratio">passes 1.4.11</span></span>
+</div>
+<div class="preview preview-C">
+<div class="preview-row">
+<div class="preview-num">№ 02</div>
+<div>
+<div class="preview-slug">design-archive-contract</div>
+<div class="preview-title">Studio Design Proposal Archive — Contract</div>
+<div class="preview-date">may 09, 2026</div>
+</div>
+<button type="button" class="preview-overflow">⋮</button>
+</div>
+</div>
+<p class="pros">The ring gives the ⋮ a clear "tappable region" boundary independent of glyph contrast — the affordance reads as a button, not just three dots floating in space.</p>
+<p class="pros">Reinforces press-check vocabulary (stipple / press-mark / engraved circle motifs already in the design language).</p>
+<p class="pros">Glyph stays subdued, so the ⋮ doesn't compete with the row title for attention; the affordance is communicated by the ring shape.</p>
+<p class="cons">Adds 26px of trailing chrome per row (vs 20-24px for the bare glyph) — minor density cost.</p>
+<p class="cons">Bigger visual change from current chrome; operators may need a beat to learn what the new shape means.</p>
+</div>
+
+<div class="pick-cta">
+<h3>Operator decision</h3>
+<p style="margin-bottom:0.6rem">Two things to pick:</p>
+<ol style="margin-left:1.2rem">
+<li>Should the proposed Accessibility section land in <code>DESIGN-STANDARDS.md</code> as written? (Or with edits — say what.)</li>
+<li>Which ⋮ direction (A / B / C) wins?</li>
+</ol>
+<p style="margin-top:0.7rem">After your pick: implementation lands the chosen direction, runs the spec-compliance probe extended with a per-affordance contrast assertion, audits other affordances on the dashboard for the same gap (drawer-chip labels, menu cmd hints, stage-tile counts, FAB), files issues for any that fail.</p>
+</div>
+
+</body>
+</html>
