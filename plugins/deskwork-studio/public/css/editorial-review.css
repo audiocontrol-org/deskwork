@@ -3161,6 +3161,17 @@ body.er-focus-mode .er-outline-tab {
   50% { opacity: 1; }
 }
 
+/* On mobile the polling indicator sits bottom-right at the same
+ * coordinates as the Compose FAB (.er-compose-fab in dashboard-mobile.css
+ * — bottom: 16px; right: 16px; z-index: 65). The FAB occludes the
+ * indicator. Per DESIGN-STANDARDS.md § Mobile chrome restraint, hide
+ * the indicator entirely on mobile; polling itself keeps running. */
+@media (max-width: 600px) {
+  .er-poll-indicator {
+    display: none;
+  }
+}
+
 /* ---------- Error banner (longform route when workflow missing) ---------- */
 
 .er-error {
