@@ -454,71 +454,72 @@ The audit's full report lives at [`./2026-05-09-implementation-audit.md`](./2026
 
 ---
 
-## Phase 2 — Extract `mobile-shell` + Shortform desk → v0.20
+## Phase 2 — Extract `mobile-shell` + Shortform desk → v0.21
 
-**Goal:** Pull the now-second-surface-validated mobile primitives into a shared module. Build Shortform as the first consumer of the extracted primitives. Closes #244.
+**Goal:** Pull the **genuinely shared** mobile primitives into a small shared module, then build Shortform as a new mobile-first surface. Closes #244.
 
-### Task 2.1: Audit and extract `mobile-shell`
+**Audit-driven re-scope (2026-05-12):** The original Phase 2 framing assumed (a) the dashboard had a `mobile-bar` equivalent to entry-review and (b) the three "sheet-like" patterns shared one abstraction. Neither is true — see [`2026-05-12-mobile-shell-audit.md`](./2026-05-12-mobile-shell-audit.md). The dashboard's stage-tiles are an in-flow navigation idiom, not a fixed bar. The row-actions per-row swipe drawer is a different gesture model than the slide-up sheet shared by `mobile-sheet-bar.ts` + `compose-chip.ts`. Task 2.1 is re-scoped to the narrow, evidence-grounded extraction (operator-approved Direction A). Server-side bar/sheet templates are deferred to Task 2.2 when Shortform mockups give a concrete consumer shape — designing API against a hypothetical consumer is exactly the over-abstraction `THESIS.md` rejects.
+
+### Task 2.1: Narrow extraction — probe helpers + slide-up sheet controller
 
 **Files:**
-- Create: `packages/studio/src/mobile-shell/index.ts` (re-exports the public surface)
-- Create: `packages/studio/src/mobile-shell/bar.ts` (server `renderMobileBar(config)` accepting surface-specific tab config)
-- Create: `packages/studio/src/mobile-shell/sheet.ts` (server `renderMobileSheet(config)`)
-- Create: `plugins/deskwork-studio/public/src/mobile-shell/sheet-controller.ts` (client controller, parameterized; sheet open/close, drag-handle, slot dispatch)
-- Create: `plugins/deskwork-studio/public/css/mobile-shell.css` (press-check tokens + base classes; the existing per-page CSS files import or extend)
-- Create: `scripts/lib/mobile-probe-helpers.mjs` (shared probe helpers — `pingStudio`, `pickEntry`, `assert`, `bootBrowser`)
-- Modify: every consumer of the now-extracted modules — `packages/studio/src/pages/entry-review/mobile-bar.ts` becomes a thin shim, `plugins/deskwork-studio/public/src/entry-review/mobile-sheet-bar.ts` consumes `mobile-shell/sheet-controller.ts`
+- Create: `scripts/lib/mobile-probe-helpers.mjs` (shared probe helpers — `ping`, `assert`, `bootBrowser`, `pickEntry`, `summarizeResults`; pure deduplication, zero surface-specific logic)
+- Create: `plugins/deskwork-studio/public/src/mobile-shell/sheet-controller.ts` (parameterized slide-up sheet controller — drag-handle, scrim, close-btn, Escape, slot dispatch optional)
+- Modify: `plugins/deskwork-studio/public/src/entry-review/mobile-sheet-bar.ts` — consume the shared controller, drop the ~60 lines of duplicated gesture code
+- Modify: `plugins/deskwork-studio/public/src/dashboard/compose-chip.ts` — consume the shared controller, drop the ~40 lines of duplicated gesture code
+- Modify: `scripts/probe-mobile-editor.mjs`, `scripts/probe-mobile-scrapbook.mjs`, `scripts/probe-mobile-dashboard.mjs` — consume the shared probe helpers, drop the duplicated `ping`/`assert`/`bootBrowser` definitions
 
-- [ ] **Step 2.1.1:** Audit entry-review's `mobile-bar.ts`, `mobile-sheet-bar.ts`, the press-check CSS block, and Phase 1's dashboard mobile-bar. Identify the shared core vs. surface-specific config.
-- [ ] **Step 2.1.2:** Design the `mobile-shell` public API. Each consumer should provide: tab config (`{ key, label, glyph, count?: () => number, onTap: () => void }[]`), sheet slot renderers, and any per-surface event hooks. The shared module owns: tab bar markup, sheet host + drag-handle, MutationObserver scaffolding for count updates, accessibility roles.
-- [ ] **Step 2.1.3:** Write the shared module's tests first:
+**Out of scope (deferred to Task 2.2 — operator-approved Direction A):**
+- Server-side `renderMobileBar(config)` / `renderMobileSheet(config)` templates — designed when Task 2.2's Shortform consumer shape is concrete, not before
+- Stage-tiles abstraction — different idiom from a tab bar, not shared
+- Row-actions swipe-drawer abstraction — different gesture model, not shared
+- Cross-surface CSS extraction (`mobile-shell.css`) — press-check tokens already cascade from `editorial-review.css`'s root vars; no JS-layer extraction needed
+- Breakpoint alignment (entry-review uses `48rem`/768px; dashboard uses `600px`) — captured as a parked decision below; not blocking Task 2.1 because the narrow extraction does not introduce new shared CSS
 
-```typescript
-// packages/studio/src/mobile-shell/test/sheet.test.ts
-import { describe, it, expect } from 'vitest';
-import { renderMobileSheet } from '@/mobile-shell/sheet';
+**Sub-steps:**
 
-describe('renderMobileSheet', () => {
-  it('renders one slot per configured key', () => {
-    const html = renderMobileSheet({ slots: [{ key: 'a' }, { key: 'b' }] });
-    expect(html).toContain('data-mobile-sheet-slot="a"');
-    expect(html).toContain('data-mobile-sheet-slot="b"');
-  });
-  it('renders no slots when config is empty', () => {
-    const html = renderMobileSheet({ slots: [] });
-    expect(html).not.toContain('data-mobile-sheet-slot');
-  });
-});
-```
+- [x] **Step 2.1.1:** ~~Audit entry-review's `mobile-bar.ts`, `mobile-sheet-bar.ts`, the press-check CSS block, and Phase 1's dashboard mobile-bar. Identify the shared core vs. surface-specific config.~~ *(Landed 2026-05-12 in commit `c920fc2` — `2026-05-12-mobile-shell-audit.md`. Dashboard never had a mobile-bar; three sheet-like patterns are two idioms; probe helpers are pure duplication.)*
+- [x] **Step 2.1.2:** ~~Design the `mobile-shell` public API.~~ *(Operator picked Direction A 2026-05-12: narrow extraction only. Server bar/sheet templates deferred to Task 2.2.)*
+- [ ] **Step 2.1.3:** Extract probe helpers to `scripts/lib/mobile-probe-helpers.mjs`. Migrate the three existing probes to consume it. Run each probe to confirm green:
+  ```bash
+  node scripts/probe-mobile-editor.mjs && node scripts/probe-mobile-scrapbook.mjs && node scripts/probe-mobile-dashboard.mjs
+  ```
+- [ ] **Step 2.1.4:** Write failing tests for the sheet controller (matchMedia gate, drag-to-dismiss threshold past 80px, Escape closes, click-outside closes via scrim, open/isOpen/close API surface):
+  ```bash
+  npm test --workspace @deskwork/studio -- --run mobile-shell
+  ```
+  Expected: FAIL (module doesn't exist yet).
+- [ ] **Step 2.1.5:** Implement `plugins/deskwork-studio/public/src/mobile-shell/sheet-controller.ts` exposing `createSlideUpSheet(opts: { sheetEl, bodyOpenClass, handleEl?, closeBtnEl?, scrimEl?, dragDismissPx?, slideMs?, onClose? })`. Pass tests.
+- [ ] **Step 2.1.6:** Migrate `mobile-sheet-bar.ts` to consume the shared controller. Existing `probe-mobile-editor.mjs` and `probe-mobile-scrapbook.mjs` MUST still pass — they are the regression net for the migration. Drop the ~60 lines of duplicated gesture code from `mobile-sheet-bar.ts`.
+- [ ] **Step 2.1.7:** Migrate `compose-chip.ts` to consume the shared controller. Existing `probe-mobile-dashboard.mjs` MUST still pass. Drop the ~40 lines of duplicated gesture code from `compose-chip.ts`.
+- [ ] **Step 2.1.8:** Run all probes + smoke + workspace tests:
+  ```bash
+  node scripts/probe-mobile-editor.mjs && node scripts/probe-mobile-scrapbook.mjs && node scripts/probe-mobile-dashboard.mjs && node scripts/smoke-er-viewport-regressions.mjs && npm test --workspaces
+  ```
+  Expected: all green.
+- [ ] **Step 2.1.9:** Commit per the per-phase commit-hygiene convention:
+  - `refactor(scripts): extract mobile-shell probe helpers` (Step 2.1.3)
+  - `test(studio): mobile-shell sheet-controller failing tests` (Step 2.1.4)
+  - `feat(studio): mobile-shell sheet-controller — slide-up sheet primitive` (Step 2.1.5)
+  - `refactor(studio): migrate entry-review mobile-sheet-bar to mobile-shell controller` (Step 2.1.6)
+  - `refactor(studio): migrate dashboard compose-chip to mobile-shell controller` (Step 2.1.7)
 
-- [ ] **Step 2.1.4:** Run tests; confirm they fail (module doesn't exist):
+**Parked decision (not blocking Task 2.1):**
 
-```bash
-npm test --workspace @deskwork/studio -- --run mobile-shell
-```
+- **Breakpoint alignment.** Entry-review uses `(max-width: 48rem)` = 768px; dashboard uses `(max-width: 600px)`. A cross-surface CSS extraction would need to resolve this — surface this when/if Task 2.2 or Task 2.3 introduces shared CSS. Until then, both breakpoints stay where they are (and the audit confirms this is fine for Direction A; the JS controller doesn't gate on either breakpoint — its consumers do).
 
-Expected: FAIL with `cannot find module '@/mobile-shell/sheet'`.
-- [ ] **Step 2.1.5:** Implement `mobile-shell/bar.ts` and `mobile-shell/sheet.ts` minimally to pass the tests.
-- [ ] **Step 2.1.6:** Run tests; confirm they pass.
-- [ ] **Step 2.1.7:** Add 2-3 more test cases for the controller (matchMedia gate, drag-to-dismiss threshold, slot-key dispatch).
-- [ ] **Step 2.1.8:** Implement `mobile-shell/sheet-controller.ts` to pass.
-- [ ] **Step 2.1.9:** Migrate entry-review's `mobile-bar.ts` and `mobile-sheet-bar.ts` to consume the shared module. Existing `probe-mobile-editor.mjs` and `probe-mobile-scrapbook.mjs` MUST still pass — these are the regression net for the migration.
-- [ ] **Step 2.1.10:** Migrate Phase 1's dashboard mobile-bar to consume the shared module. Existing `probe-mobile-dashboard.mjs` MUST still pass.
-- [ ] **Step 2.1.11:** Run all probes + smoke + workspace tests:
+**Out-of-band finding flagged for separate cleanup:**
 
-```bash
-node scripts/probe-mobile-editor.mjs && node scripts/probe-mobile-scrapbook.mjs && node scripts/probe-mobile-dashboard.mjs && node scripts/smoke-er-viewport-regressions.mjs && npm test --workspaces
-```
+- `plugins/deskwork-studio/public/src/entry-review/mobile-actions-slot.ts:64` surfaces a `reject` verb (`/deskwork:reject <slug>` clipboard-copy). `reject` is not in `DESKWORK-STATE-MACHINE.md` — Commandment II violation. Filed as a separate issue (see GitHub issue list). NOT Task 2.1 work — it lands in a separate state-machine compliance commit.
 
-Expected: all green.
-- [ ] **Step 2.1.12:** Commit:
+**Acceptance for Task 2.1:**
+- `scripts/lib/mobile-probe-helpers.mjs` exists and is consumed by all three existing probes
+- `plugins/deskwork-studio/public/src/mobile-shell/sheet-controller.ts` exists with tested API
+- `mobile-sheet-bar.ts` and `compose-chip.ts` consume the shared controller (no duplicated gesture code)
+- All probes + smoke + workspace tests green
+- No regressions on entry-review or dashboard surfaces (validated by existing probes)
 
-```bash
-git add packages/studio/src/mobile-shell/ plugins/deskwork-studio/public/src/mobile-shell/ plugins/deskwork-studio/public/css/mobile-shell.css scripts/lib/mobile-probe-helpers.mjs packages/studio/src/pages/entry-review/mobile-bar.ts plugins/deskwork-studio/public/src/entry-review/mobile-sheet-bar.ts
-git commit -m "refactor(studio): extract mobile-shell shared primitives"
-```
-
-### Task 2.2: Mockup + implement Shortform mobile-first
+### Task 2.2: Mockup + implement Shortform mobile-first (+ extract server bar/sheet if needed)
 
 **Files:**
 - Create: `plugins/deskwork-studio/public/mockups/shortform-N-<idiom>.html` (×2-3)
@@ -526,12 +527,14 @@ git commit -m "refactor(studio): extract mobile-shell shared primitives"
 - Modify: `packages/studio/src/pages/shortform-review.ts`
 - Modify: `packages/studio/src/pages/shortform/*.ts`
 - Modify: relevant CSS
+- **Conditional extraction (depending on Shortform consumer shape):** if Shortform mockups land on a tab-bar + slide-up-sheet idiom that meaningfully overlaps entry-review's existing `mobile-bar.ts`, extract `packages/studio/src/mobile-shell/{bar,sheet}.ts` server templates as part of this task — designed against the concrete consumer pair. If Shortform's idiom diverges substantially, keep its bar/sheet surface-specific.
 
 - [ ] **Step 2.2.1:** Audit `/dev/editorial-review-shortform`. Identify the data shape (shortform entries vs. longform), and the open #244 (TOC drawer per #169) requirements.
 - [ ] **Step 2.2.2:** Invoke `/frontend-design` for Shortform mockups. Honor press-check; explore: tab bar with TOC tab (closing #244), hybrid card-stream, etc.
 - [ ] **Step 2.2.3:** Update `mockups/index.html`. Commit `design(studio): three shortform direction mockups (HTML, no code)`.
 - [ ] **Step 2.2.4:** Operator picks. **STOP for pick.**
-- [ ] **Step 2.2.5:** Implement using `mobile-shell` primitives. Commit `feat(studio): shortform mobile-first — Mockup N`.
+- [ ] **Step 2.2.5:** Decide on server-template extraction based on the picked mockup. If extraction is in scope: design `renderMobileBar` + `renderMobileSheet` against the concrete entry-review + Shortform consumer pair. Otherwise skip.
+- [ ] **Step 2.2.6:** Implement Shortform using `mobile-shell` primitives (sheet controller from Task 2.1; bar/sheet server templates if extracted in 2.2.5). Commit `feat(studio): shortform mobile-first — Mockup N`.
 
 ### Task 2.3: Probes + smoke
 
@@ -546,14 +549,15 @@ git commit -m "refactor(studio): extract mobile-shell shared primitives"
 
 ### Task 2.4: /dw-lifecycle:review + release
 
-- [ ] **Step 2.4.1:** Invoke `/dw-lifecycle:review`. The extraction architecture should get explicit reviewer focus. Triage findings; defer with workplan-and-issue per the rule.
+- [ ] **Step 2.4.1:** Invoke `/dw-lifecycle:review`. The narrow extraction + Shortform implementation should get explicit reviewer focus. Triage findings; defer with workplan-and-issue per the rule.
 - [ ] **Step 2.4.2:** Apply fixes; commit `fix(studio): apply review findings on shortform + mobile-shell extraction`.
-- [ ] **Step 2.4.3:** Run `/release` for v0.20.0.
+- [ ] **Step 2.4.3:** Run `/release` for v0.21.0.
 - [ ] **Step 2.4.4:** iPhone walk; confirm #244 symptoms gone.
 - [ ] **Step 2.4.5:** Close #244 with `--reason completed`.
 
 **Acceptance:**
-- `mobile-shell` module exists and is consumed by entry-review + dashboard + shortform
+- `mobile-shell` module exists with the narrow extraction (probe helpers + sheet controller; server bar/sheet templates only if the Shortform pick warranted them in Task 2.2.5)
+- `mobile-sheet-bar.ts` and `compose-chip.ts` consume the shared sheet controller
 - Shortform walks on phone; #244 closed
 - All prior phases' probes still green (no regressions from extraction)
 - Release notes name the extraction as the architectural shift
