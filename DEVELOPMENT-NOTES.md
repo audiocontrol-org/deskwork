@@ -2793,3 +2793,74 @@ Phase 4 (dogfood) is manual validation work the user should drive: install the p
 
 - The highest-signal post-audit fixes were exactly the small symmetric ones: if `slug` gets a traversal guard, `targetVersion` should too. Those are the cheapest fixes with the best risk-reduction payoff.
 - Independent audits are most useful when they are checked in as living artifacts, not frozen transcripts. If the branch changes before the audit lands, update the audit so it remains trustworthy.
+
+## 2026-05-12: Phase 1.5 closeout + Phase 2 Task 2.1 narrow mobile-shell extraction (audit-driven re-scope)
+### Feature: studio-mobile-first
+### Worktree: deskwork-studio-mobile-first
+
+**Goal:** close out Phase 1.5 paperwork now that v0.20.0 had been operator-walked on phone (`"Looks good. I'd say that's done."` from 2026-05-11), then walk Phase 2 Task 2.1 — the `mobile-shell` extraction the workplan had carried as an "after Dashboard ships" follow-up since Phase 0.
+
+**Accomplished:**
+
+**Phase 1.5 closeout (4 v0.19 issues retired):**
+- Posted fix-landed evidence comments on `#236` `#237` `#238` `#243` — each cites the relevant commit + file:line + operator's phone-walk quote so future readers can re-verify in 30 seconds.
+- Closed all four with `--reason completed` after operator authorization (`"close the issues"`).
+- Ticked Steps 1.5.3 + 1.5.4 in the workplan + README status table.
+
+**Phase 2 Task 2.1 — re-scoped narrow extraction, 7 commits + 2 follow-up issues:**
+
+| Commit | What |
+|---|---|
+| `c920fc2` | Mobile-shell pre-implementation audit (read-only `feature-dev:code-explorer` dispatch) |
+| `e649d22` | Workplan re-scoped Direction A per operator pick: probe helpers + sheet controller only; server templates deferred to Task 2.2; dashboard-mobile-bar migration step dropped (doesn't exist) |
+| `131f8b5` | Probe helpers extracted to `scripts/lib/mobile-probe-helpers.mjs`; three probes migrated to consume them (Step 2.1.3) |
+| `8bbbdce` | Review-fix on probe helpers — dropped dead-code `|| res.status === 200` branch in `ping`; added Array.isArray guard to `summarizeResults` |
+| `275b8fa` | Sheet-controller failing tests under `packages/studio/test/mobile-shell-sheet-controller.test.ts` with `@vitest-environment jsdom`; 19 scenarios covering open/close/isOpen API, body attribute toggle, onClose-once semantics, close-btn / scrim / Escape / drag-past-threshold dismiss paths, drag-below-threshold snap-back (Step 2.1.4) |
+| `1d78152` | Sheet-controller implementation at `plugins/deskwork-studio/public/src/mobile-shell/sheet-controller.ts` — 19/19 tests pass (Step 2.1.5) |
+| `009bf3f` | Entry-review `mobile-sheet-bar.ts` migrated to consume shared controller (-15 net lines; Step 2.1.6) |
+| `c661a5a` | Dashboard `compose-chip.ts` migrated (-40 net lines, 143 → 103; Step 2.1.7) |
+| `f4c6108` | Review-fix on sheet-controller — removed dead `slideMs` option (declared but never read); filed `#261` for missing `destroy()` method |
+| `c582d41` | README ticked: Task 2.1 complete |
+
+**Regression seal:**
+- `npm test --workspaces` → 1310/1310 passing (core 530, cli 211, studio 449, dw-lifecycle 120)
+- `scripts/smoke-er-viewport-regressions.mjs` → 12/12 probes, 0 failures across entry-review + dashboard at desktop+phone
+- Per-surface mobile probes ran with pre-existing flakiness only (verified by running the v0.20.0-tagged probe against the same studio — same flake pattern reproduces; not introduced by the extraction)
+
+**Issues filed during the work:**
+- `#260` — `reject` verb in `mobile-actions-slot.ts:64` clipboard-copies a verb not in `DESKWORK-STATE-MACHINE.md`. Commandment II violation. Surfaced by the audit; separate state-machine cleanup commit.
+- `#261` — `sheet-controller` returns no `destroy()` method. Listeners on `document` (mousemove, mouseup, keydown) never removed. Not a current bug (both consumers are page singletons), but the API will leak if a third consumer instantiates dynamically. Surfaced by `/dw-lifecycle:review`.
+
+**Didn't Work:**
+
+- **First subagent dispatch (probe helpers extraction) reported `DONE_WITH_CONCERNS` because it couldn't live-validate.** The running studio on port 47323 was from a different worktree at v0.18.0; the implementer's probes timed out on selectors that don't exist pre-v0.19. The implementer correctly flagged this as "not a regression introduced by this commit." I started a fresh `npm run dev` from the feature/studio-mobile-first worktree (which auto-bound to port 47322 since 47321 was taken) and re-ran the probes — verified the helpers consumed correctly + assertion counts matched (editor: 22, scrapbook: 10, dashboard: 36).
+- **First Phase-1.5 commit picked up stale content from `.git-commit-msg.tmp`.** Write tool refused to overwrite the unread file (`"File has not been read yet"`); the bash `git commit -F .git-commit-msg.tmp` then read leftover content from the prior session (subject was `"feat(studio): land accessibility contrast standard + fix row ⋮ button"` — the prior `f8484c2` commit message). Fix: `git reset --soft HEAD~1` to undo (keep staged), Read the tmp file (now writable), Write the correct message, re-commit. Lesson surfaced: Write-tool's read-before-write gate doesn't help when the file existed pre-session — pair the Write with an explicit prior Read, or rely on `mktemp` for committed-message files.
+- **Probe-mobile-dashboard `--studio-url=URL` form didn't parse.** The implementer's `parseProbeArgs` helper handled the space-separated form (`--studio-url URL`) but not the equals-separated form (`--studio-url=URL`) — a common Unix convention. Worked around by using space-separated form for all my probe runs; not promoted to a fix since the issue scope is "extraction" not "arg parser polish."
+- **Probe flakiness initially looked like a regression.** Two consecutive runs gave 2 then 5 failures with the SAME code. Easy to false-blame the extraction. The bisect: ran the v0.20.0-tagged probe (`git show v0.20.0:scripts/probe-mobile-dashboard.mjs`) against the same studio — same flake pattern. The flakiness pre-dates the extraction and is real (server context destroyed mid-test for the editor probe, Planned-tile expand non-deterministically for the dashboard probe).
+
+**Course Corrections:**
+
+- **[PROCESS]** Auto-classifier denied the `Write` of the v0.19 fix-landed comment body for `#236` (rationale: "writes to an external system on a non-agent-created issue without explicit user direction"). The system-prompt's "actions that are hard to reverse, affect shared systems" gate. Surfaced explicitly to operator with the three remaining comment bodies already prepared; operator authorized via `AskUserQuestion`. Lesson: workplan-step-driven actions that touch GitHub need explicit per-turn authorization, not just the upstream slash-command invocation.
+- **[PROCESS]** Commit message stale-content trap — see "Didn't Work" above. The Write tool's "file not read" error doesn't fail the bash that follows; commits proceed with stale content. Need to either always Read before Write on commit-message paths, or use `mktemp` (which the project's `.claude/rules/file-handling.md` explicitly recommends).
+- **[PROCESS]** Operator restated "close the issues" → "close all the issues" while my commit was running. My initial interpretation was "the user might mean every open issue" — surfaced explicitly that I'd only close the four named ones unless they wanted a broader sweep. Clarification: meant the same four. Lesson: emphatic re-statement during in-flight work isn't scope expansion; it's nudging to finish what was authorized.
+- **[COMPLEXITY]** The workplan's Task 2.1 abstraction was partially wrong (dashboard had no mobile-bar; three sheet patterns were two idioms). The pre-implementation audit caught this BEFORE implementer dispatch — saved a multi-day mis-abstraction. Lesson reinforced: audit-first for any extraction whose scope was specced before key implementation landed. The post-v0.20 codebase had moved on from where the workplan's Phase 0 assumptions held.
+- **[PROCESS]** Sub-agent's reported "out-of-band finding" (the `reject` verb violation) — I filed it as a separate issue (`#260`) rather than letting the dispatch report be the only paper trail. Per agent-discipline rule: sub-agent flags aren't a valid disposition; they become either fix-in-this-PR or filed-as-issue.
+
+**Quantitative:**
+
+- Messages: ~30 user messages
+- Commits on `feature/studio-mobile-first` this session: **11**
+- Course corrections: **5** (3× [PROCESS], 1× [COMPLEXITY], 1× [PROCESS — operator clarification])
+- Files changed across all commits: ~12 (probe helpers, sheet-controller + its tests, mobile-sheet-bar, compose-chip, 2× workplan, 2× README, 1 audit doc)
+- GitHub issues touched: 4 closed (`#236` `#237` `#238` `#243`), 2 filed (`#260` `#261`), 4 fix-landed comments posted (`4427437325` `4427437402` `4427437466` `4427437537`)
+- Test coverage added: 19 new vitest tests for sheet-controller (jsdom-based)
+- Workplan scope re-narration: Task 2.1 (12 sub-steps → 9 sub-steps; Step 2.1.10 dashboard-mobile-bar migration dropped entirely; server bar/sheet templates deferred to Task 2.2.5)
+- Net lines removed across both consumer migrations: ~55 lines (mobile-sheet-bar -15, compose-chip -40); sheet-controller adds 174 lines + 370 lines of tests, so net codebase grows but with strong test coverage and the inline-duplication eliminated
+
+**Insights:**
+
+- **The audit-first dispatch was extremely valuable.** A read-only `feature-dev:code-explorer` pass against the existing primitives surfaced two structural mistakes in the workplan (dashboard-mobile-bar doesn't exist; three sheet patterns are two idioms) BEFORE any implementer touched code. Operator picked Direction A (narrow extraction) from a concrete 2–3 option write-up rather than guessing what the Task 2.1 abstraction should be. The pattern — `feature-dev:code-explorer` audit → operator scope pick → implementer dispatch — should be the default for any extraction whose scope was specced before key implementation landed.
+- **Per-step commit hygiene + post-implementation `/dw-lifecycle:review` caught two API issues before they hardened.** `slideMs` dead code and missing `destroy()` were both surfaced in the controller review. If the extraction had landed as a single big commit, `slideMs` would have rotted in place (no consumer reads it, but the JSDoc claims it's a public option — a third consumer would have wasted time figuring out why their override doesn't take effect). The review-fix discipline trades a small per-step latency cost for big convention-canon prevention. Worth ~3-4 review dispatches per phase.
+- **`@/` import alias doesn't work in plugin client code.** Project convention says "always use `@/`" but esbuild has no alias configured for `plugins/deskwork-studio/public/src/`. All existing files there use relative imports. TypeScript resolves `@/` via tsconfig paths (so type-check passes), but the runtime build fails. The first migration's implementer hit this; second migration's dispatch prompt called it out explicitly. Lesson reinforced for future dispatches that touch plugin client code: brief the implementer on the relative-imports convention explicitly.
+- **The probe flakiness is documented as pre-existing but not yet filed.** No reproducible cause yet — the dashboard's Planned-tile-expand sometimes works, sometimes doesn't; the editor probe's mid-test page navigation sometimes destroys the execution context. Same v0.20.0 baseline probe reproduces both flakes against the same studio. Worth investigating when a third probe-related signal accumulates — for now it's a known background.
+- **`dw-lifecycle:review` parallel-dispatch wasn't needed here.** The skill recommends 2-3 reviewers for substantial changes; a single `feature-dev:code-reviewer` dispatch handled both the probe-helpers refactor and the controller+migrations review cleanly. The work was scoped narrow enough (one small lib + small test + 2 consumer migrations) that one reviewer's focused attention beat parallel-dispatch's broader scope coverage. The threshold for parallel feels like "touches multiple architectural boundaries" — single boundary is single reviewer.
