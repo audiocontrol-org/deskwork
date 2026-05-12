@@ -58,3 +58,7 @@ yarn-error.log*
 ## with other audiocontrol.org worktrees and to keep tool-permission
 ## scope inside one directory. Never committed.
 /.audiocontrol.org/
+
+# WebKit probe screenshots + JSON dumps written by scripts/probe-*.mjs.
+# Per-session output, never committed.
+/tmp/
