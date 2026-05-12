@@ -30,6 +30,7 @@ import type { StudioContext } from '../routes/api.ts';
 import { html, unsafe, type RawHtml } from './html.ts';
 import { layout } from './layout.ts';
 import { renderEditorialFolio } from './chrome.ts';
+import { renderMasthead } from './masthead.ts';
 import { escapeHtml, gloss } from './html.ts';
 
 interface ShortformReviewQuery {
@@ -290,6 +291,19 @@ export async function renderShortformReviewPage(
 
   const folioSpine = `shortform · ${workflow.platform ?? '?'}${workflow.channel ? ` · ${workflow.channel}` : ''} · ${slug}`;
 
+  // v7 universal masthead (mobile-only at this commit). Kicker carries
+  // the platform badge + channel as inline markup; the meta tag holds
+  // the galley number. Slug occupies the bottom row.
+  const platformLabel = workflow.platform ?? 'other';
+  const channelLabel = workflow.channel ? ` ${workflow.channel}` : '';
+  const mastheadKicker = unsafe(html`<span class="platform">${platformLabel}</span>${channelLabel}`);
+  const masthead = renderMasthead({
+    kickerHtml: mastheadKicker,
+    slug,
+    metaInline: `№ ${currentVersion.version}`,
+    isHub: false,
+  });
+
   const pageGrid = html`
     <div class="er-page-grid">
       <div class="er-draft-frame">
@@ -301,6 +315,7 @@ export async function renderShortformReviewPage(
 
   const body = html`
     <div data-review-ui="shortform" class="er-review-shell">
+      ${masthead}
       ${renderEditorialFolio('shortform', folioSpine)}
       ${shortformMeta}
       <div class="er-strip">
@@ -334,6 +349,7 @@ export async function renderShortformReviewPage(
       '/static/css/editorial-nav.css',
       '/static/css/blog-figure.css',
       '/static/css/review-viewport.css',
+      '/static/css/mobile-shell.css',
     ],
     bodyHtml: body,
     embeddedJson: [{ id: 'draft-state', data: draftState }],

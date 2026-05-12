@@ -35,6 +35,7 @@ import type { StudioContext } from '../routes/api.ts';
 import { html, unsafe, type RawHtml } from './html.ts';
 import { layout } from './layout.ts';
 import { renderEditorialFolio } from './chrome.ts';
+import { renderMasthead } from './masthead.ts';
 import { loadDashboardData, DASHBOARD_STAGE_ORDER } from './dashboard/data.ts';
 import {
   renderStageSection,
@@ -71,12 +72,27 @@ export async function renderDashboard(
     return renderStageSection(stage, bucket, defaultSite).__raw;
   }).join('\n');
 
+  // v7 universal masthead. Mobile-only at this commit (CSS hides it
+  // on desktop so the existing er-pagehead chrome below keeps its
+  // present-day desktop appearance). Step 2.2.9 retires the
+  // er-pagehead chrome on mobile once the Desk's body-content
+  // rework lands.
+  const longformCount = data.entries.length;
+  const mastheadMeta = `${longformCount} on the calendar`;
+  const masthead = renderMasthead({
+    kicker: "The compositor's desk",
+    title: 'Pipeline + Press.',
+    metaInline: mastheadMeta,
+    isHub: true,
+  });
+
   // The press queue (right-rail on desktop) was removed in v0.19
   // per DESKWORK-STATE-MACHINE.md Commandment III — its primary
   // purpose was surfacing review-state, which is RETIRED. The
   // archive entry at docs/studio-design/ACCEPTED/2026-05-09-press-queue-removed/
   // captures the rationale.
   const body = html`
+  ${masthead}
   ${renderEditorialFolio('dashboard', 'press-check')}
   ${renderHeader(data, ctx.projectRoot, now)}
   <main class="er-container">
@@ -96,6 +112,7 @@ export async function renderDashboard(
       '/static/css/editorial-studio.css',
       '/static/css/dashboard-mobile.css',
       '/static/css/dashboard-row-affordances.css',
+      '/static/css/mobile-shell.css',
     ],
     bodyAttrs: 'data-review-ui="studio"',
     bodyHtml: body,

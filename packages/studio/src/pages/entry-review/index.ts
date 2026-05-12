@@ -42,6 +42,7 @@ import type { StudioContext } from '../../routes/api.ts';
 import { html, unsafe, escapeHtml, gloss, type RawHtml } from '../html.ts';
 import { layout } from '../layout.ts';
 import { renderEditorialFolio } from '../chrome.ts';
+import { renderMasthead } from '../masthead.ts';
 import { renderScrapbookDrawer } from '../review-scrapbook-drawer.ts';
 import { loadEntryReviewData, type EntryReviewData } from './data.ts';
 import { renderVersionsStrip } from './version-strip.ts';
@@ -224,6 +225,23 @@ export async function renderEntryReviewPage(
     ? unsafe(html`<span class="er-strip-historical" title="Historical version (read-only)">historical · v${data.historical.versionNumber}</span>`)
     : unsafe('');
 
+  // v7 universal masthead (mobile-only at this commit). The kicker
+  // reads `entry · <stage> · № <version>`; the slug occupies the
+  // bottom row; the inline meta carries the historical badge when a
+  // historical view is active. Step 2.2.8 retires the er-strip-back
+  // redundant with the masthead's `←`.
+  const versionLabel = state.currentVersion !== null
+    ? `№ ${state.currentVersion}`
+    : '№ —';
+  const mastheadKicker = `entry · ${stageLabel.toLowerCase()} · ${versionLabel}`;
+  const mastheadMeta = data.historical
+    ? `historical · v${data.historical.versionNumber}`
+    : undefined;
+  const mastheadOpts = mastheadMeta === undefined
+    ? { kicker: mastheadKicker, slug: data.entry.slug, isHub: false } as const
+    : { kicker: mastheadKicker, slug: data.entry.slug, metaInline: mastheadMeta, isHub: false } as const;
+  const masthead = renderMasthead(mastheadOpts);
+
   // The page-grid composes the article column + the marginalia rail.
   // Mirrors the legacy longform layout (`.er-page-grid` with the
   // `.er-draft-frame` + `.er-page-gutter` + `.er-marginalia` triplet).
@@ -261,6 +279,7 @@ export async function renderEntryReviewPage(
 
   const body = html`
     <div data-review-ui="longform" class="er-review-shell">
+      ${masthead}
       ${renderEditorialFolio('longform', folioSpine)}
       <div class="er-strip">
         <div class="er-strip-inner">
@@ -306,6 +325,7 @@ export async function renderEntryReviewPage(
         '/static/css/blog-figure.css',
         '/static/css/review-viewport.css',
         '/static/css/scrap-row.css',
+        '/static/css/mobile-shell.css',
       ],
       bodyAttrs: 'data-review-ui="entry-review"',
       bodyHtml: body,
