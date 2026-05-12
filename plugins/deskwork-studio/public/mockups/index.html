@@ -321,6 +321,45 @@ Two phone-shaped surfaces, two design problems. The <em>review surface</em> ship
 
 </div>
 
+<h2>Cross-cutting bottom bar · three&nbsp;directions <span style="font-family: var(--mono); font-size: 0.55rem; letter-spacing: 0.18em; color: var(--red); border: 1px solid var(--red); padding: 0.16rem 0.45rem; border-radius: 2px; vertical-align: 0.25em; margin-left: 0.5rem;">Active · prerequisite to shortform pick</span></h2>
+
+<p>The bottom-bar question is a <em>cross-cutting</em> design decision — its answer determines how every studio surface (dashboard, shortform review, entry-review longform, scrapbook viewer, manual) anchors its chrome. Today the studio already ships two different bottom patterns: dashboard's floating Compose chip (v0.19) and entry-review's 4-tab mobile-bar (v0.18). Shortform adding a third pattern would lock in "convention canon" by accident. <strong>This pick precedes the shortform pick</strong> — the cross-bar shape determines how the shortform direction docks. Each mockup shows the same bar treatment across dashboard + shortform review + entry-review longform side-by-side so the cross-surface implications are visible at a glance.</p>
+
+<div class="grid">
+
+  <article class="card">
+    <span class="num">Cross-bar 1</span>
+    <h3>Nav strip + per-surface action</h3>
+    <p class="summary">Two stacked bars. A 44px universal nav strip at the bottom carrying three top-level destinations (Desk · Shortform · Manual). Above it, each surface stacks its own action region — the dashboard's floating Compose chip, the shortform review's 3 colored pills, the entry-review's 4 chip-tabs. Total: 96px of bottom chrome on heavy surfaces; 44px on light ones.</p>
+    <p class="pros"><span class="label">Strong</span> Hard separation of concerns — nav is global and fixed; action is surface-shaped. Operators never wonder what a tab means in context. Manual / scrapbook can be lightest (44px only).</p>
+    <p class="cons"><span class="label">Weak</span> Heaviest bottom chrome of the three directions on review surfaces. Two visual artifacts to learn instead of one.</p>
+    <a class="open" href="./cross-bar-1-nav-strip-plus-action.html">Open mockup →</a>
+  </article>
+
+  <article class="card" style="border-left-color: var(--green);">
+    <span class="num" style="color: var(--green);">Cross-bar 2</span>
+    <h3>Split bar (nav | contextual)</h3>
+    <p class="summary">A single 56px bar with two regions split by a kraft hairline rule. Left half: three universal nav tabs (Desk · Shortform · Manual). Right half: 1-3 contextual cells per surface. Total: 4-6 cells across one bar. The most chrome-economical direction — saves 40px on every surface that has both nav and action.</p>
+    <p class="pros"><span class="label">Strong</span> Single bar, single height — one visual artifact for operators to learn. Maximum article real estate. Reads as an editor's ruler with a structural punctuation rule.</p>
+    <p class="cons"><span class="label">Weak</span> Cells get small (~65px) when carrying 6 verbs; labels truncate ("Iter.", "Apprv."). Mixing nav (low-frequency) with action (high-frequency) in the same bar can confuse the tap target.</p>
+    <a class="open" href="./cross-bar-2-split-bar.html">Open mockup →</a>
+  </article>
+
+  <article class="card" style="border-left-color: var(--kraft);">
+    <span class="num" style="color: var(--kraft);">Cross-bar 3</span>
+    <h3>No cross-bar — vocabulary is the consistency</h3>
+    <p class="summary">The null hypothesis. Each surface keeps the idiom shaped to its job: dashboard ships v0.19's floating Compose chip, entry-review ships v0.18's 4-tab mobile-bar, shortform picks one of 1/2/3, scrapbook viewer + manual design when their phases land. The cross-cutting consistency lives in the press-check vocabulary — cream paper, paper-noise, Newsreader italic, JetBrains Mono kickers, red-pencil accents — not in any chrome shape.</p>
+    <p class="pros"><span class="label">Strong</span> Doesn't break what works (operator already approved v0.19 + v0.18 on iPhone). Each surface's chrome is shaped to its own job. The vocabulary callout makes the unifying thread visible.</p>
+    <p class="cons"><span class="label">Weak</span> No permanent global nav — operators travel via the folio's back-link, one extra tap per surface switch. Forces every future surface's design pass to make its own bar decision.</p>
+    <a class="open" href="./cross-bar-3-press-vocabulary-only.html">Open mockup →</a>
+  </article>
+
+</div>
+
+<p style="margin-top: 1.4rem; padding: 0.95rem 1.2rem; background: var(--paper-2); border-left: 3px solid var(--red); font-size: 0.92rem; line-height: 1.55;">
+  <strong style="font-family: var(--display); font-style: italic; font-variation-settings: 'opsz' 22, 'wght' 500; color: var(--red);">Pick order:</strong> cross-bar first, then shortform. Picking Cross-bar 1 or 2 commits every future studio surface to that bar shape (and the shortform mockup chosen below has to fit inside it). Picking Cross-bar 3 keeps surfaces free-shaped and the shortform pick stands on its own.
+</p>
+
 <h2>Shortform mobile-first · three&nbsp;directions <span style="font-family: var(--mono); font-size: 0.55rem; letter-spacing: 0.18em; color: var(--red); border: 1px solid var(--red); padding: 0.16rem 0.45rem; border-radius: 2px; vertical-align: 0.25em; margin-left: 0.5rem;">Active · pick pending</span></h2>
 
 <p>The shortform review surface (<code style="font-family:var(--mono);font-size:0.85em">/dev/editorial-review/&lt;workflow-id&gt;</code>) and the shortform desk index (<code style="font-family:var(--mono);font-size:0.85em">/dev/editorial-review-shortform</code>) are the next surfaces to receive mobile-first treatment (Task 2.2 of <code style="font-family:var(--mono);font-size:0.85em">studio-mobile-first</code> → v0.21). The <a href="../../../../docs/0.19.0/001-IN-PROGRESS/studio-mobile-first/2026-05-12-shortform-audit.md" style="color: var(--red);">2026-05-12 audit</a> documents the primary friction: decision buttons scroll out of sight on phone, the strip's flex layout is scoped to longform only, and platform/channel context — required for the iterate slash command — is buried. Three directions explored; operator picks one before implementation.</p>

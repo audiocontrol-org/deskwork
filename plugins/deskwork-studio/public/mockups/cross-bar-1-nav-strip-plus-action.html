@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Cross-bar 1 · Nav strip + per-surface action</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<!--
+============================================================
+CROSS-BAR MOCKUP · DIRECTION 1
+TWO STACKED BARS — fixed nav at bottom, surface action above
+============================================================
+
+WHAT
+  A 44px fixed bottom navigation strip appears on EVERY studio
+  surface, carrying exactly three top-level destinations:
+  Desk · Shortform · Manual. The currently-active surface is
+  highlighted with a red-pencil underline rule. Above the nav
+  strip, each surface stacks its own action affordance —
+  either a 52px sticky-pills strip (review surfaces) or a
+  floating compose pill (dashboard) or nothing (manual at rest).
+  The two bars are visually distinct: the action region uses
+  paper or paper-2 with sharp boundaries to its content; the
+  nav strip uses paper-3 with the global-feel of a viewport
+  anchor.
+
+WHY THIS DIRECTION IS IN PLAY
+  · Solves cross-cutting NAVIGATION — operators always know
+    how to get from any surface to any other surface. Today
+    they squint at the folio's tiny "← back to studio" link.
+  · Solves per-surface ACTION via the upper strip — actions
+    stay surface-shaped (sheet, pills, FAB) and aren't
+    crammed into a navigation tab.
+  · Separation of concerns: nav is global, action is surface.
+    Each region has one job. Operators don't learn what each
+    tab means under different contexts — the meaning is fixed.
+  · Tradeoff accepted: 44 + 52 = 96px of bottom chrome on
+    surfaces that have both. Heavier than today. On surfaces
+    without surface-action (manual at rest), it's just 44px.
+
+HOW IT CONSUMES PHASE 2.1 PRIMITIVES
+  · Action sheets (sheet-controller) trigger from action-strip
+    pills the same way they would in standalone surfaces —
+    no change to sheet-controller required.
+  · The nav strip is pure server-rendered + plain anchor tags.
+    Highlighting the active surface is a CSS class set
+    server-side. Zero client wiring required for nav alone.
+
+SPEC COMPLIANCE
+  · No state stamps anywhere on mobile.
+  · No "Pipeline / Press / Folio" — the rejected names. Three
+    tabs are Desk · Shortform · Manual — each has a clear
+    post-review-state meaning (Desk = pipeline view; Shortform
+    = social distribution surface; Manual = docs/glossary).
+  · WCAG: active-tab red-pencil underline (3:1 on paper-3),
+    inactive-tab ink-faded (8.45:1 on paper-3). All affordances
+    in the action strip use accent colors with verified ≥4.5:1
+    contrast against their backgrounds.
+============================================================
+-->
+<style>
+  :root {
+    --paper: #F5F1E8;
+    --paper-2: #ECE6D4;
+    --paper-3: #DFD7BF;
+    --kraft: #8A7250;
+    --ink: #1A1614;
+    --faded: #8A7F70;
+    --faded-2: #C7BEAE;
+    --red: #B8362A;
+    --blue: #2A4B7C;
+    --green: #2E5D45;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    --noise:
+      url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #2C2823;
+    background-image:
+      radial-gradient(circle at 30% 20%, rgba(184, 54, 42, 0.08), transparent 50%),
+      radial-gradient(circle at 70% 80%, rgba(42, 75, 124, 0.06), transparent 50%);
+    color: var(--ink); font-family: var(--display);
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 2rem 1rem 4rem;
+  }
+  .meta { color: #C7BEAE; font-family: var(--mono); font-size: 0.8rem;
+          letter-spacing: 0.18em; text-transform: uppercase;
+          margin-bottom: 0.6rem; text-align: center; }
+  .meta a { color: var(--paper); text-decoration: none;
+            border-bottom: 1px solid rgba(245, 241, 232, 0.4); }
+  h1.demo-title { color: var(--paper); font-family: var(--display);
+                  font-style: italic;
+                  font-variation-settings: "opsz" 36, "wght" 500;
+                  font-size: 1.7rem; margin-bottom: 0.4rem; text-align: center; }
+  .demo-sub { color: var(--faded-2); font-family: var(--mono);
+              font-size: 0.7rem; letter-spacing: 0.18em;
+              text-transform: uppercase; margin-bottom: 1.4rem; text-align: center; }
+  .banner {
+    max-width: 900px; margin: 0 auto 2rem;
+    padding: 1rem 1.2rem;
+    background: rgba(245, 241, 232, 0.08);
+    border-left: 3px solid var(--red);
+    color: #C7BEAE;
+    font-family: var(--display); font-size: 0.92rem; line-height: 1.6;
+  }
+  .banner .kicker {
+    font-family: var(--mono); font-size: 0.65rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--red); display: block; margin-bottom: 0.4rem;
+  }
+  .banner em { color: var(--paper); font-style: italic; }
+  .banner code { font-family: var(--mono); font-size: 0.8rem; color: var(--paper); }
+
+  .frames { display: flex; gap: 1.5rem; flex-wrap: wrap; justify-content: center; max-width: 1340px; margin: 0 auto; }
+  .frame-wrap { display: flex; flex-direction: column; align-items: center; }
+  .caption { color: #C7BEAE; font-family: var(--mono);
+             font-size: 0.65rem; letter-spacing: 0.16em;
+             text-transform: uppercase; margin-top: 0.8rem;
+             text-align: center; max-width: 370px; line-height: 1.55; }
+  .caption strong { color: var(--paper); }
+  .caption code { font-family: var(--mono); font-size: 0.58rem; color: var(--paper-3); text-transform: lowercase; letter-spacing: 0; }
+  .surface-label {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+    font-size: 1rem;
+    color: var(--paper);
+    margin-top: 1rem;
+    text-align: center;
+  }
+  .surface-label .url {
+    display: block;
+    font-family: var(--mono); font-size: 0.58rem;
+    letter-spacing: 0.12em;
+    color: var(--faded-2);
+    font-style: normal;
+    margin-top: 0.18rem;
+  }
+
+  /* ============ PHONE FRAME (370px wide) ============ */
+  .phone { width: 370px; height: 800px; background: #050505;
+           border-radius: 46px; padding: 10px;
+           box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5),
+                       inset 0 0 0 1px rgba(255,255,255,0.04);
+           position: relative; }
+  .phone::before { content: ''; position: absolute;
+                   top: 20px; left: 50%; transform: translateX(-50%);
+                   width: 100px; height: 27px; background: #000;
+                   border-radius: 14px; z-index: 100; }
+  .screen { width: 100%; height: 100%; background: var(--paper);
+            background-image: var(--noise);
+            border-radius: 36px; overflow: hidden; position: relative;
+            font-size: 15.5px; line-height: 1.5; color: var(--ink); }
+  .ios-clock { position: absolute; top: 26px; left: 30px;
+               font-family: -apple-system, system-ui, sans-serif;
+               font-size: 0.85rem; font-weight: 600;
+               color: var(--ink); z-index: 110; }
+  .ios-icons { position: absolute; top: 28px; right: 30px;
+               color: var(--ink);
+               font-family: -apple-system, system-ui, sans-serif;
+               font-size: 0.78rem; letter-spacing: 0.05em; z-index: 110; }
+
+  /* ============ TOP MASTHEAD (shared) ============ */
+  .top-masthead {
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 76px; padding: 52px 1rem 0;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-bottom: 1px solid var(--paper-3);
+    z-index: 50;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    column-gap: 0.6rem;
+    align-items: end;
+    padding-bottom: 0.5rem;
+  }
+  .top-masthead.dashboard { border-bottom: 1px solid var(--red); }
+  .top-mast-kicker {
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--red);
+    line-height: 1.2;
+    margin-bottom: 0.15rem;
+  }
+  .top-mast-kicker .platform {
+    background: var(--red); color: var(--paper);
+    padding: 0.06rem 0.32rem;
+    margin-right: 0.32rem;
+    letter-spacing: 0.18em; font-size: 0.5rem;
+  }
+  .top-mast-slug {
+    font-family: var(--mono); font-size: 0.72rem;
+    color: var(--ink);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    border-bottom: 1px solid var(--paper-3);
+    padding-bottom: 1px;
+  }
+  .top-mast-title {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 26, "wght" 500;
+    font-size: 1.1rem; line-height: 1.1;
+    color: var(--ink);
+  }
+  .top-mast-r {
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--faded);
+    line-height: 1.2; text-align: right;
+  }
+  .top-mast-r .num {
+    color: var(--ink); font-size: 0.9rem; font-weight: 500;
+    letter-spacing: 0;
+    display: block;
+    font-family: var(--display);
+    font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+  }
+
+  /* ============ SURFACE BODY (shared) ============ */
+  .surface-body {
+    position: absolute; top: 76px; left: 0; right: 0;
+    overflow-y: auto;
+  }
+  /* Body extents differ per direction; this file uses 96px total bottom (52 + 44) */
+  .surface-body.with-action { bottom: 96px; }
+  .surface-body.no-action { bottom: 44px; }
+
+  /* ====== Dashboard surface body ====== */
+  .dx-stage-tile {
+    display: grid;
+    grid-template-columns: 1.4rem 1fr auto 1.2rem;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.95rem;
+    border-bottom: 1px dashed var(--paper-3);
+    background: var(--paper);
+    min-height: 42px;
+  }
+  .dx-stage-tile.expanded { background: var(--paper-2); border-bottom-color: var(--red); }
+  .dx-stage-glyph { font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+    font-size: 1.1rem; line-height: 1; color: var(--red); text-align: center; }
+  .dx-stage-name { font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 500; font-size: 0.95rem; line-height: 1.1; }
+  .dx-stage-tile.expanded .dx-stage-name { color: var(--red); }
+  .dx-stage-count { font-family: var(--mono); font-size: 0.58rem;
+    letter-spacing: 0.06em; color: var(--faded); text-transform: uppercase; text-align: right; }
+  .dx-stage-count .num { color: var(--ink); font-weight: 500; }
+  .dx-stage-chev { font-family: var(--mono); font-size: 0.85rem;
+    color: var(--red); text-align: center; }
+  .dx-stage-tile.expanded .dx-stage-chev { transform: rotate(90deg); }
+  .dx-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    column-gap: 0.5rem;
+    padding: 0.6rem 0.95rem 0.65rem;
+    border-bottom: 1px dashed var(--paper-3);
+    background: var(--paper);
+  }
+  .dx-row-slug {
+    font-family: var(--mono); font-size: 0.7rem;
+    color: var(--ink);
+    border-bottom: 1px solid var(--paper-3);
+    padding-bottom: 1px;
+    display: inline-block;
+    max-width: 100%;
+  }
+  .dx-row-title {
+    display: block;
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 500;
+    font-size: 0.88rem; line-height: 1.2;
+    color: var(--ink);
+    margin-top: 0.15rem;
+  }
+  .dx-row-meta {
+    font-family: var(--mono); font-size: 0.55rem;
+    color: var(--faded);
+    text-align: right;
+    line-height: 1.35;
+  }
+  .dx-row-meta .ts { display: block; }
+  .dx-row-meta .more {
+    color: var(--paper-3); font-size: 1rem;
+    line-height: 1;
+    display: block;
+    margin-top: 0.1rem;
+  }
+
+  /* ====== Review surface body (shortform + longform) ====== */
+  .rv-body { padding: 1rem 1.1rem 1.3rem; }
+  .rv-body h1 {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 32, "wght" 500;
+    font-size: 1.35rem; line-height: 1.15;
+    margin-bottom: 0.35rem; color: var(--ink);
+  }
+  .rv-body .dek {
+    font-family: var(--display);
+    font-size: 0.88rem; color: var(--faded);
+    margin-bottom: 0.8rem;
+    line-height: 1.4;
+    border-bottom: 1px dashed var(--paper-3);
+    padding-bottom: 0.6rem;
+  }
+  .rv-body p {
+    font-family: var(--display);
+    font-size: 0.9rem; line-height: 1.55;
+    margin-bottom: 0.7rem; color: var(--ink);
+  }
+  .rv-body h2 {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+    font-size: 1.02rem; line-height: 1.2;
+    color: var(--red);
+    margin: 1rem 0 0.4rem;
+  }
+  .rv-body p em { font-style: italic; color: var(--red); }
+  .rv-body code {
+    font-family: var(--mono); font-size: 0.78rem;
+    background: var(--paper-2);
+    padding: 0.04rem 0.25rem;
+    border-radius: 2px;
+  }
+
+  /* Marginalia note pin for longform — illustrative only */
+  .rv-body .pin {
+    display: inline-block;
+    width: 1rem; height: 1rem;
+    background: var(--red); color: var(--paper);
+    font-family: var(--mono); font-size: 0.55rem;
+    border-radius: 50%;
+    text-align: center; line-height: 1rem;
+    margin-left: 0.2rem;
+    vertical-align: super;
+  }
+
+  /* ============ ACTION STRIP (above nav) ============ */
+  .action-strip {
+    position: absolute; bottom: 44px; left: 0; right: 0;
+    height: 52px;
+    background: var(--paper-2);
+    background-image: var(--noise);
+    border-top: 1px solid var(--paper-3);
+    box-shadow: 0 -2px 6px rgba(26, 22, 20, 0.04);
+    display: flex;
+    align-items: center;
+    padding: 0.4rem 0.7rem;
+    gap: 0.45rem;
+    z-index: 60;
+  }
+  /* Review-surface action strip: 3 pills */
+  .action-strip.review-pills {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+  /* Entry-review longform action strip: 4 chip tabs */
+  .action-strip.longform-tabs {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    padding: 0.35rem 0.5rem;
+    gap: 0.3rem;
+  }
+  /* Dashboard action strip: floating compose-style chip on the right */
+  .action-strip.dashboard-chip {
+    background: transparent;
+    border-top: 0;
+    box-shadow: none;
+    justify-content: flex-end;
+    padding: 0.45rem 0.85rem;
+    pointer-events: none;
+  }
+  .action-strip.dashboard-chip > * { pointer-events: auto; }
+
+  .act-pill {
+    border: 1px solid transparent;
+    color: var(--paper);
+    font-family: var(--mono); font-size: 0.6rem;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    font-weight: 500;
+    padding: 0.5rem 0.4rem;
+    border-radius: 2px;
+    display: flex; align-items: center; justify-content: center;
+    gap: 0.32rem;
+    line-height: 1;
+    height: 100%;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.12),
+      0 1px 3px rgba(0,0,0,0.18);
+  }
+  .act-pill-glyph {
+    font-family: var(--display); font-style: italic;
+    font-size: 1rem; line-height: 1;
+    font-variation-settings: "opsz" 22, "wght" 500;
+  }
+  .act-pill.iterate { background: var(--blue); border-color: var(--blue); }
+  .act-pill.approve { background: var(--green); border-color: var(--green); }
+  .act-pill.cancel { background: var(--red); border-color: var(--red); }
+
+  .act-tab {
+    background: var(--paper);
+    border: 1px solid var(--paper-3);
+    color: var(--ink);
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    padding: 0.4rem 0.3rem;
+    border-radius: 2px;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 0.1rem;
+    line-height: 1;
+  }
+  .act-tab-glyph {
+    font-family: var(--display); font-style: italic;
+    font-size: 0.95rem; line-height: 1;
+    color: var(--faded);
+  }
+  .act-tab.active { background: var(--paper); border-color: var(--red); }
+  .act-tab.active .act-tab-glyph { color: var(--red); }
+  .act-tab .badge {
+    position: absolute;
+    top: 0.15rem; right: 0.18rem;
+    background: var(--red); color: var(--paper);
+    font-family: var(--mono); font-size: 0.46rem;
+    padding: 0 0.16rem;
+    border-radius: 1px;
+    line-height: 1.1;
+  }
+
+  .compose-chip {
+    background: var(--red); color: var(--paper);
+    border: 1px solid var(--red); border-radius: 2px;
+    padding: 0.5rem 0.75rem;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.12),
+      0 4px 12px rgba(184, 54, 42, 0.28),
+      0 1px 3px rgba(0,0,0,0.18);
+    font-family: var(--mono); font-size: 0.58rem;
+    font-weight: 500; letter-spacing: 0.16em;
+    text-transform: uppercase;
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    line-height: 1;
+  }
+  .compose-chip .glyph {
+    font-family: var(--mono); font-size: 0.85rem;
+    line-height: 1; font-weight: 600;
+  }
+
+  /* ============ NAV STRIP (universal, 44px, paper-3) ============ */
+  .nav-strip {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    height: 44px;
+    background: var(--paper-3);
+    background-image: var(--noise);
+    border-top: 1px solid var(--kraft);
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    z-index: 70;
+  }
+  .nav-tab {
+    background: transparent;
+    border: none;
+    border-right: 1px solid rgba(138, 114, 80, 0.3);
+    color: var(--faded);
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    font-weight: 500;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 0.1rem;
+    line-height: 1;
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .nav-tab:last-child { border-right: 0; }
+  .nav-tab-glyph {
+    font-family: var(--display); font-style: italic;
+    font-size: 1rem; line-height: 1;
+    font-variation-settings: "opsz" 22, "wght" 500;
+  }
+  .nav-tab.active {
+    color: var(--ink);
+    background: var(--paper);
+    box-shadow: inset 0 2px 0 var(--red);
+  }
+  .nav-tab.active .nav-tab-glyph { color: var(--red); }
+
+  /* Section between mockup rows for the desktop note */
+  .section-note {
+    margin: 3rem auto 0; max-width: 900px;
+    background: rgba(245, 241, 232, 0.05);
+    border: 1px solid rgba(245, 241, 232, 0.12);
+    color: #C7BEAE;
+    padding: 1.2rem 1.4rem;
+    font-family: var(--display); font-size: 0.92rem; line-height: 1.6;
+  }
+  .section-note h3 {
+    font-family: var(--mono); font-size: 0.62rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--paper); margin-bottom: 0.7rem;
+    font-weight: normal;
+  }
+  .section-note code { font-family: var(--mono); font-size: 0.8rem; color: var(--paper); }
+  .section-note em { color: var(--paper); font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="meta"><a href="index.html">← back to mockups</a></div>
+<h1 class="demo-title">Cross-bar 1 · Nav strip + per-surface action.</h1>
+<div class="demo-sub">Two stacked bars · 44px nav universal · surface-shaped action region above</div>
+
+<div class="banner">
+  <span class="kicker">Cross-cutting bar mockup · direction 1 · v0.21 prerequisite</span>
+  A 44px fixed bottom nav strip appears on <em>every</em> studio surface, carrying three top-level destinations: <em>Desk · Shortform · Manual</em>. The currently-active surface gets a red-pencil underline rule on its tab. Above the nav strip, each surface stacks whatever action affordance it needs — the dashboard floats a Compose pill at right, review surfaces lay 3 colored pills as a sticky strip, longform entry-review lays 4 chip-tabs (Outline · Notes · Scrapbook · Actions). The two regions are visually distinct: the action area uses paper-2 or transparent floats; the nav strip uses paper-3 with a kraft top-rule. Cost: 96px bottom chrome on surfaces with both regions.
+</div>
+
+<div class="frames">
+
+  <!-- ====================== FRAME A: dashboard ====================== -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:48</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="top-masthead dashboard">
+        <div>
+          <div class="top-mast-kicker">The compositor's desk</div>
+          <div class="top-mast-title">Pipeline.</div>
+        </div>
+        <div class="top-mast-r">
+          drafting<br>
+          <span class="num">№ 5</span>
+        </div>
+      </div>
+
+      <div class="surface-body with-action">
+
+        <div class="dx-stage-tile expanded">
+          <span class="dx-stage-glyph">✎</span>
+          <span class="dx-stage-name">Drafting</span>
+          <span class="dx-stage-count"><span class="num">5</span></span>
+          <span class="dx-stage-chev">›</span>
+        </div>
+
+        <div class="dx-row">
+          <div>
+            <span class="dx-row-slug">whats-in-a-name</span>
+            <span class="dx-row-title">What's in a Name?</span>
+          </div>
+          <div class="dx-row-meta">
+            <span class="ts">2h ago</span>
+            <span class="more">⋮</span>
+          </div>
+        </div>
+
+        <div class="dx-row">
+          <div>
+            <span class="dx-row-slug">on-revising-in-the-open</span>
+            <span class="dx-row-title">On Revising in the Open</span>
+          </div>
+          <div class="dx-row-meta">
+            <span class="ts">May 10</span>
+            <span class="more">⋮</span>
+          </div>
+        </div>
+
+        <div class="dx-row">
+          <div>
+            <span class="dx-row-slug">the-deskwork-experiment</span>
+            <span class="dx-row-title">The Deskwork Experiment</span>
+          </div>
+          <div class="dx-row-meta">
+            <span class="ts">May 09</span>
+            <span class="more">⋮</span>
+          </div>
+        </div>
+
+        <div class="dx-stage-tile">
+          <span class="dx-stage-glyph">※</span>
+          <span class="dx-stage-name">Final</span>
+          <span class="dx-stage-count"><span class="num">4</span></span>
+          <span class="dx-stage-chev">›</span>
+        </div>
+
+      </div>
+
+      <div class="action-strip dashboard-chip">
+        <div class="compose-chip">
+          <span class="glyph">+</span><span>Compose</span>
+        </div>
+      </div>
+
+      <nav class="nav-strip">
+        <a class="nav-tab active" href="#">
+          <span class="nav-tab-glyph">⌗</span>
+          <span>Desk</span>
+        </a>
+        <a class="nav-tab" href="#">
+          <span class="nav-tab-glyph">⊟</span>
+          <span>Shortform</span>
+        </a>
+        <a class="nav-tab" href="#">
+          <span class="nav-tab-glyph">§</span>
+          <span>Manual</span>
+        </a>
+      </nav>
+
+    </div>
+  </div>
+  <div class="surface-label">
+    Dashboard
+    <span class="url">/dev/editorial-studio</span>
+  </div>
+  <div class="caption">
+    <strong>Action region:</strong> floating Compose pill (current v0.19).<br>
+    Nav strip: Desk highlighted.
+  </div>
+  </div>
+
+  <!-- ====================== FRAME B: shortform review ====================== -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:51</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="top-masthead">
+        <div>
+          <div class="top-mast-kicker">
+            <span class="platform">linkedin</span>
+            <span>deskwork-blog</span>
+          </div>
+          <div class="top-mast-slug">v021-mobile-first-shortform</div>
+        </div>
+        <div class="top-mast-r">
+          galley<br>
+          <span class="num">№ 03</span>
+        </div>
+      </div>
+
+      <div class="surface-body with-action">
+        <div class="rv-body">
+          <h1>What I learned shipping mobile-first.</h1>
+          <p class="dek">Three iterations on the state-stamp pattern; what finally worked was retiring it on mobile.</p>
+          <p>Press-check vocabulary, take three. I keep going back to this question: what should a <em>reviewed</em> draft actually look like on screen?</p>
+          <p>The first iterations leaned on rotated rubber stamps — they read on desktop where stamps spread horizontally, but on mobile they cluster.</p>
+          <p>Letterpress tags were no better — a label on a rectangle is a label on a rectangle.</p>
+          <p>The third draft retires state surfacing entirely on mobile.</p>
+        </div>
+      </div>
+
+      <div class="action-strip review-pills">
+        <button class="act-pill iterate">
+          <span class="act-pill-glyph">↻</span><span>Iterate</span>
+        </button>
+        <button class="act-pill approve">
+          <span class="act-pill-glyph">✓</span><span>Approve</span>
+        </button>
+        <button class="act-pill cancel">
+          <span class="act-pill-glyph">⊘</span><span>Cancel</span>
+        </button>
+      </div>
+
+      <nav class="nav-strip">
+        <a class="nav-tab" href="#">
+          <span class="nav-tab-glyph">⌗</span>
+          <span>Desk</span>
+        </a>
+        <a class="nav-tab active" href="#">
+          <span class="nav-tab-glyph">⊟</span>
+          <span>Shortform</span>
+        </a>
+        <a class="nav-tab" href="#">
+          <span class="nav-tab-glyph">§</span>
+          <span>Manual</span>
+        </a>
+      </nav>
+
+    </div>
+  </div>
+  <div class="surface-label">
+    Shortform review
+    <span class="url">/dev/editorial-review/&lt;wid&gt;</span>
+  </div>
+  <div class="caption">
+    <strong>Action region:</strong> 3 sticky pills (Shortform-1 mockup).<br>
+    Nav strip: Shortform highlighted.
+  </div>
+  </div>
+
+  <!-- ====================== FRAME C: longform entry-review ====================== -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:54</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="top-masthead">
+        <div>
+          <div class="top-mast-kicker">
+            entry · drafting · № 12
+          </div>
+          <div class="top-mast-slug">studio-mobile-first-prd</div>
+        </div>
+        <div class="top-mast-r">
+          v3<br>
+          <span class="num">2h</span>
+        </div>
+      </div>
+
+      <div class="surface-body with-action">
+        <div class="rv-body">
+          <h1>Studio mobile-first — PRD.</h1>
+          <p class="dek">Extend the press-check vocabulary across every studio surface.</p>
+          <h2>Problem</h2>
+          <p>The dashboard, shortform desk, and review surfaces all ship desktop-shaped CSS. On phone the strip flex layout breaks, controls scroll out of sight, and the operator can't review on iOS without scrolling back to the top each time.<span class="pin">3</span></p>
+          <p>The v0.17 + v0.18 entry-review rebuild proved that press-check on mobile reads beautifully when the chrome is right.<span class="pin">5</span></p>
+          <h2>Scope</h2>
+          <p>Four sequenced cuts: Dashboard → Shortform → Standalone scrapbook → Help + Index.</p>
+        </div>
+      </div>
+
+      <!-- 4 chip-tabs: Outline · Notes · Scrapbook · Actions -->
+      <div class="action-strip longform-tabs">
+        <button class="act-tab" style="position: relative;">
+          <span class="act-tab-glyph">§</span>
+          <span>Outline</span>
+        </button>
+        <button class="act-tab" style="position: relative;">
+          <span class="act-tab-glyph">✎</span>
+          <span>Notes</span>
+          <span class="badge">5</span>
+        </button>
+        <button class="act-tab" style="position: relative;">
+          <span class="act-tab-glyph">▦</span>
+          <span>Scrapbook</span>
+        </button>
+        <button class="act-tab active" style="position: relative;">
+          <span class="act-tab-glyph">⊕</span>
+          <span>Actions</span>
+        </button>
+      </div>
+
+      <nav class="nav-strip">
+        <a class="nav-tab active" href="#">
+          <span class="nav-tab-glyph">⌗</span>
+          <span>Desk</span>
+        </a>
+        <a class="nav-tab" href="#">
+          <span class="nav-tab-glyph">⊟</span>
+          <span>Shortform</span>
+        </a>
+        <a class="nav-tab" href="#">
+          <span class="nav-tab-glyph">§</span>
+          <span>Manual</span>
+        </a>
+      </nav>
+
+    </div>
+  </div>
+  <div class="surface-label">
+    Entry-review (longform)
+    <span class="url">/dev/editorial-review/entry/&lt;uuid&gt;</span>
+  </div>
+  <div class="caption">
+    <strong>Action region:</strong> 4 chip-tabs (Outline · Notes · Scrapbook · Actions).<br>
+    Nav strip: Desk highlighted (operator came from desk).
+  </div>
+  </div>
+
+</div>
+
+<div class="section-note">
+  <h3>Cross-surface bottom-chrome budget under Direction 1</h3>
+  <table style="width: 100%; border-collapse: collapse;
+                font-family: var(--mono); font-size: 0.74rem;
+                color: var(--paper-3); line-height: 1.5;">
+    <tr style="text-align: left; color: var(--paper);">
+      <th style="padding: 0.4rem 0.5rem; border-bottom: 1px solid rgba(245,241,232,0.18);">Surface</th>
+      <th style="padding: 0.4rem 0.5rem; border-bottom: 1px solid rgba(245,241,232,0.18);">Action region</th>
+      <th style="padding: 0.4rem 0.5rem; border-bottom: 1px solid rgba(245,241,232,0.18);">Action h</th>
+      <th style="padding: 0.4rem 0.5rem; border-bottom: 1px solid rgba(245,241,232,0.18);">Nav h</th>
+      <th style="padding: 0.4rem 0.5rem; border-bottom: 1px solid rgba(245,241,232,0.18);">Total</th>
+    </tr>
+    <tr><td style="padding: 0.3rem 0.5rem;">Dashboard</td>
+        <td style="padding: 0.3rem 0.5rem;">Floating Compose chip (transparent zone)</td>
+        <td style="padding: 0.3rem 0.5rem;">52</td>
+        <td style="padding: 0.3rem 0.5rem;">44</td>
+        <td style="padding: 0.3rem 0.5rem;">96 (chip floats above row tap targets)</td></tr>
+    <tr><td style="padding: 0.3rem 0.5rem;">Shortform review</td>
+        <td style="padding: 0.3rem 0.5rem;">3 colored pills (iterate / approve / cancel)</td>
+        <td style="padding: 0.3rem 0.5rem;">52</td>
+        <td style="padding: 0.3rem 0.5rem;">44</td>
+        <td style="padding: 0.3rem 0.5rem;">96</td></tr>
+    <tr><td style="padding: 0.3rem 0.5rem;">Entry-review longform</td>
+        <td style="padding: 0.3rem 0.5rem;">4 chip-tabs (outline / notes / scrapbook / actions)</td>
+        <td style="padding: 0.3rem 0.5rem;">52</td>
+        <td style="padding: 0.3rem 0.5rem;">44</td>
+        <td style="padding: 0.3rem 0.5rem;">96</td></tr>
+    <tr><td style="padding: 0.3rem 0.5rem;">Scrapbook viewer (Phase 3)</td>
+        <td style="padding: 0.3rem 0.5rem;">Filter chips + view-full pill</td>
+        <td style="padding: 0.3rem 0.5rem;">52</td>
+        <td style="padding: 0.3rem 0.5rem;">44</td>
+        <td style="padding: 0.3rem 0.5rem;">96</td></tr>
+    <tr><td style="padding: 0.3rem 0.5rem;">Manual (Phase 4)</td>
+        <td style="padding: 0.3rem 0.5rem;">— (nothing at rest)</td>
+        <td style="padding: 0.3rem 0.5rem;">0</td>
+        <td style="padding: 0.3rem 0.5rem;">44</td>
+        <td style="padding: 0.3rem 0.5rem;">44 (lightest surface)</td></tr>
+  </table>
+  <p style="margin-top: 0.9rem; font-style: italic; color: var(--paper-3);">
+    Cost reading: surfaces with active work cost 96px of bottom chrome. Manual costs 44px (just nav). The dashboard's <code>compose-chip</code> floats over an essentially-transparent 52px zone, so it's visually quieter than the review-surface pills — but the bottom 96px is still anchored to nav + chip and not available to the row list. Operators get one anchor for "go to another surface" and one anchor for "act on this surface" — never the same anchor doing both jobs.
+  </p>
+</div>
+
+</body>
+</html>

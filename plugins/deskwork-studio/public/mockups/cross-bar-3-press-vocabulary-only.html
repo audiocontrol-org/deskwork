@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Cross-bar 3 · Press vocabulary as consistency (no cross-bar)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<!--
+============================================================
+CROSS-BAR MOCKUP · DIRECTION 3
+NO CROSS-CUTTING BAR — vocabulary IS the consistency
+============================================================
+
+WHAT
+  The status quo / null hypothesis. Each surface keeps its own
+  affordance idiom shaped to its job: dashboard has the floating
+  Compose chip + collapsible stage tiles (v0.19, shipped);
+  entry-review longform has the 4-tab mobile-bar with sheets
+  (v0.17/v0.18, shipped); shortform review gets whichever of
+  directions 1/2/3 the operator picks; scrapbook viewer and
+  manual get per-surface designs when their phases land. The
+  cross-cutting consistency lives in the PRESS-CHECK VOCABULARY
+  (cream paper, paper-noise, Newsreader italic, JetBrains Mono
+  kickers, red-pencil accents) — not in any chrome shape.
+
+WHY THIS DIRECTION IS IN PLAY
+  · Argues that a uniform bar is a category error. The
+    surfaces have genuinely different needs — a dashboard
+    (browse + compose), a review surface (read + decide), a
+    scrapbook (browse adjacent assets), a manual (read docs).
+    Forcing them into one shape compromises every one.
+  · Today's surfaces already work where they're shipped:
+    operator walked v0.20 on iPhone and signed off. The v0.19
+    Compose chip and v0.18 6-tab mobile-bar are operator-
+    approved. Direction 3 says "don't break what works."
+  · Cross-cutting NAVIGATION is solved by the folio header —
+    the kicker + back-link pattern at the TOP of every page,
+    consistent across all surfaces.
+  · Tradeoff accepted: no permanent global nav. Operators
+    navigate via the folio's "← back to studio" link, then
+    drill into another surface. One extra tap to switch
+    surfaces vs. Directions 1/2 (where the bar tab does it
+    in zero taps).
+
+WHY YOU SHOULD STILL CONSIDER THIS
+  Designs that look unified often hide forcing functions —
+  cells with truncated labels (Direction 2), or double-
+  stacked chrome that eats vertical real estate (Direction
+  1). The "looks consistent" framing can override "actually
+  serves the work." Direction 3 names the principle that
+  consistency-in-vocabulary may be the right consistency for
+  this codebase.
+
+SPEC COMPLIANCE
+  · No state stamps on mobile (this is the rule the
+    vocabulary enforces — same as Directions 1 + 2).
+  · Press-check vocabulary stays the actual cross-cutting
+    artifact: paper colors, paper-noise, Newsreader italic,
+    JetBrains Mono kickers, kraft/blue/red/green accents
+    used per the standard semantic map.
+  · WCAG: every surface independently meets contrast.
+
+WHAT THIS DIRECTION DOES NOT DECIDE
+  Picking Direction 3 does NOT pick a shortform direction.
+  The operator still needs to pick Shortform-1/2/3 separately.
+  Direction 3's claim is "the shortform pick is allowed to be
+  different in shape from the dashboard's pick" — not "here
+  is the shortform pick."
+============================================================
+-->
+<style>
+  :root {
+    --paper: #F5F1E8;
+    --paper-2: #ECE6D4;
+    --paper-3: #DFD7BF;
+    --kraft: #8A7250;
+    --ink: #1A1614;
+    --faded: #8A7F70;
+    --faded-2: #C7BEAE;
+    --red: #B8362A;
+    --blue: #2A4B7C;
+    --green: #2E5D45;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+    --noise:
+      url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='1 1 1 1 0, 1 1 1 1 0, 1 1 1 1 0, 0 0 0 0.06 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #2C2823;
+    background-image:
+      radial-gradient(circle at 30% 20%, rgba(184, 54, 42, 0.08), transparent 50%),
+      radial-gradient(circle at 70% 80%, rgba(42, 75, 124, 0.06), transparent 50%);
+    color: var(--ink); font-family: var(--display);
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 2rem 1rem 4rem;
+  }
+  .meta { color: #C7BEAE; font-family: var(--mono); font-size: 0.8rem;
+          letter-spacing: 0.18em; text-transform: uppercase;
+          margin-bottom: 0.6rem; text-align: center; }
+  .meta a { color: var(--paper); text-decoration: none;
+            border-bottom: 1px solid rgba(245, 241, 232, 0.4); }
+  h1.demo-title { color: var(--paper); font-family: var(--display);
+                  font-style: italic;
+                  font-variation-settings: "opsz" 36, "wght" 500;
+                  font-size: 1.7rem; margin-bottom: 0.4rem; text-align: center; }
+  .demo-sub { color: var(--faded-2); font-family: var(--mono);
+              font-size: 0.7rem; letter-spacing: 0.18em;
+              text-transform: uppercase; margin-bottom: 1.4rem; text-align: center; }
+  .banner {
+    max-width: 900px; margin: 0 auto 2rem;
+    padding: 1rem 1.2rem;
+    background: rgba(245, 241, 232, 0.08);
+    border-left: 3px solid var(--kraft);
+    color: #C7BEAE;
+    font-family: var(--display); font-size: 0.92rem; line-height: 1.6;
+  }
+  .banner .kicker {
+    font-family: var(--mono); font-size: 0.65rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--kraft); display: block; margin-bottom: 0.4rem;
+  }
+  .banner em { color: var(--paper); font-style: italic; }
+  .banner code { font-family: var(--mono); font-size: 0.8rem; color: var(--paper); }
+
+  .frames { display: flex; gap: 1.5rem; flex-wrap: wrap; justify-content: center; max-width: 1340px; margin: 0 auto; }
+  .frame-wrap { display: flex; flex-direction: column; align-items: center; }
+  .caption { color: #C7BEAE; font-family: var(--mono);
+             font-size: 0.65rem; letter-spacing: 0.16em;
+             text-transform: uppercase; margin-top: 0.8rem;
+             text-align: center; max-width: 370px; line-height: 1.55; }
+  .caption strong { color: var(--paper); }
+  .surface-label {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+    font-size: 1rem; color: var(--paper);
+    margin-top: 1rem; text-align: center;
+  }
+  .surface-label .url {
+    display: block; font-family: var(--mono); font-size: 0.58rem;
+    letter-spacing: 0.12em; color: var(--faded-2);
+    font-style: normal; margin-top: 0.18rem;
+  }
+  .surface-label .ships-as {
+    display: block; font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.16em; color: var(--green);
+    font-style: normal; margin-top: 0.3rem;
+    text-transform: uppercase;
+  }
+  .surface-label .ships-as.pending {
+    color: var(--red);
+  }
+
+  /* ============ PHONE FRAME ============ */
+  .phone { width: 370px; height: 800px; background: #050505;
+           border-radius: 46px; padding: 10px;
+           box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5),
+                       inset 0 0 0 1px rgba(255,255,255,0.04);
+           position: relative; }
+  .phone::before { content: ''; position: absolute;
+                   top: 20px; left: 50%; transform: translateX(-50%);
+                   width: 100px; height: 27px; background: #000;
+                   border-radius: 14px; z-index: 100; }
+  .screen { width: 100%; height: 100%; background: var(--paper);
+            background-image: var(--noise);
+            border-radius: 36px; overflow: hidden; position: relative;
+            font-size: 15.5px; line-height: 1.5; color: var(--ink); }
+  .ios-clock { position: absolute; top: 26px; left: 30px;
+               font-family: -apple-system, system-ui, sans-serif;
+               font-size: 0.85rem; font-weight: 600;
+               color: var(--ink); z-index: 110; }
+  .ios-icons { position: absolute; top: 28px; right: 30px;
+               color: var(--ink);
+               font-family: -apple-system, system-ui, sans-serif;
+               font-size: 0.78rem; letter-spacing: 0.05em; z-index: 110; }
+
+  /* ============ MASTHEAD (the cross-cutting NAV affordance per Direction 3) ============ */
+  .top-masthead {
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 82px; padding: 52px 1rem 0.55rem;
+    background: var(--paper);
+    background-image: var(--noise);
+    border-bottom: 1px solid var(--paper-3);
+    z-index: 50;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    column-gap: 0.6rem;
+    align-items: end;
+  }
+  .top-masthead.dashboard { border-bottom: 1px solid var(--red); }
+  .top-mast-kicker {
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--red); line-height: 1.2;
+    margin-bottom: 0.15rem;
+  }
+  .top-mast-kicker .platform {
+    background: var(--red); color: var(--paper);
+    padding: 0.06rem 0.32rem;
+    margin-right: 0.32rem;
+    letter-spacing: 0.18em; font-size: 0.5rem;
+  }
+  .top-mast-slug {
+    font-family: var(--mono); font-size: 0.72rem;
+    color: var(--ink);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    border-bottom: 1px solid var(--paper-3);
+    padding-bottom: 1px;
+  }
+  .top-mast-title {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 26, "wght" 500;
+    font-size: 1.1rem; line-height: 1.1; color: var(--ink);
+  }
+  .top-mast-r {
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--faded); line-height: 1.2; text-align: right;
+  }
+  .top-mast-r .num {
+    color: var(--ink); font-size: 0.9rem; font-weight: 500;
+    letter-spacing: 0; display: block;
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+  }
+  .top-mast-back {
+    position: absolute; top: 56px; right: 1rem;
+    font-family: var(--mono); font-size: 0.55rem;
+    color: var(--blue); letter-spacing: 0.14em;
+    text-transform: uppercase;
+    text-decoration: none;
+    border-bottom: 1px solid var(--blue);
+  }
+
+  .surface-body { position: absolute; top: 76px; left: 0; right: 0; overflow-y: auto; }
+
+  /* Dashboard body (bottom 0 — chip floats over content) */
+  .surface-body.dashboard { bottom: 0; }
+  /* Shortform-FAB body (bottom 0 — chip floats over content) */
+  .surface-body.shortform { bottom: 0; }
+  /* Longform body (bottom 56px — actual mobile-bar at bottom) */
+  .surface-body.longform { bottom: 56px; }
+
+  .dx-stage-tile {
+    display: grid;
+    grid-template-columns: 1.4rem 1fr auto 1.2rem;
+    align-items: center; gap: 0.5rem;
+    padding: 0.5rem 0.95rem;
+    border-bottom: 1px dashed var(--paper-3);
+    background: var(--paper); min-height: 42px;
+  }
+  .dx-stage-tile.expanded { background: var(--paper-2); border-bottom-color: var(--red); }
+  .dx-stage-glyph { font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+    font-size: 1.1rem; line-height: 1; color: var(--red); text-align: center; }
+  .dx-stage-name { font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 500; font-size: 0.95rem; line-height: 1.1; }
+  .dx-stage-tile.expanded .dx-stage-name { color: var(--red); }
+  .dx-stage-count { font-family: var(--mono); font-size: 0.58rem;
+    letter-spacing: 0.06em; color: var(--faded); text-transform: uppercase; text-align: right; }
+  .dx-stage-count .num { color: var(--ink); font-weight: 500; }
+  .dx-stage-chev { font-family: var(--mono); font-size: 0.85rem; color: var(--red); }
+  .dx-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    column-gap: 0.5rem;
+    padding: 0.6rem 0.95rem 0.65rem;
+    border-bottom: 1px dashed var(--paper-3);
+    background: var(--paper);
+  }
+  .dx-row-slug {
+    font-family: var(--mono); font-size: 0.7rem; color: var(--ink);
+    border-bottom: 1px solid var(--paper-3); padding-bottom: 1px;
+    display: inline-block; max-width: 100%;
+  }
+  .dx-row-title {
+    display: block;
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 18, "wght" 500;
+    font-size: 0.88rem; line-height: 1.2; color: var(--ink);
+    margin-top: 0.15rem;
+  }
+  .dx-row-meta {
+    font-family: var(--mono); font-size: 0.55rem;
+    color: var(--faded); text-align: right; line-height: 1.35;
+  }
+  .dx-row-meta .ts { display: block; }
+  .dx-row-meta .more { color: var(--paper-3); font-size: 1rem;
+    line-height: 1; display: block; margin-top: 0.1rem; }
+
+  .rv-body { padding: 1rem 1.1rem 4rem; }
+  .rv-body h1 { font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 32, "wght" 500;
+    font-size: 1.35rem; line-height: 1.15;
+    margin-bottom: 0.35rem; color: var(--ink); }
+  .rv-body .dek { font-family: var(--display);
+    font-size: 0.88rem; color: var(--faded);
+    margin-bottom: 0.8rem; line-height: 1.4;
+    border-bottom: 1px dashed var(--paper-3);
+    padding-bottom: 0.6rem; }
+  .rv-body p { font-family: var(--display);
+    font-size: 0.9rem; line-height: 1.55;
+    margin-bottom: 0.7rem; color: var(--ink); }
+  .rv-body h2 { font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 22, "wght" 500;
+    font-size: 1.02rem; line-height: 1.2;
+    color: var(--red); margin: 1rem 0 0.4rem; }
+  .rv-body p em { font-style: italic; color: var(--red); }
+  .rv-body .pin {
+    display: inline-block; width: 1rem; height: 1rem;
+    background: var(--red); color: var(--paper);
+    font-family: var(--mono); font-size: 0.55rem;
+    border-radius: 50%; text-align: center; line-height: 1rem;
+    margin-left: 0.2rem; vertical-align: super;
+  }
+
+  /* ============ DASHBOARD COMPOSE CHIP (v0.19 shipped, unchanged) ============ */
+  .compose-chip {
+    position: absolute; bottom: 16px; right: 16px;
+    z-index: 65;
+    background: var(--red); color: var(--paper);
+    border: 1px solid var(--red); border-radius: 2px;
+    padding: 0.5rem 0.75rem;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.12),
+      0 4px 12px rgba(184, 54, 42, 0.28),
+      0 1px 3px rgba(0,0,0,0.18);
+    font-family: var(--mono); font-size: 0.6rem;
+    font-weight: 500; letter-spacing: 0.16em;
+    text-transform: uppercase;
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    line-height: 1;
+  }
+  .compose-chip .glyph { font-family: var(--mono); font-size: 0.85rem;
+    line-height: 1; font-weight: 600; }
+
+  /* ============ SHORTFORM FAB (Shortform-2 mockup as default) ============ */
+  .sf-fab {
+    position: absolute; bottom: 16px; right: 16px;
+    z-index: 65;
+    background: var(--red); color: var(--paper);
+    border: 1px solid var(--red); border-radius: 2px;
+    padding: 0.5rem 0.75rem;
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.12),
+      0 4px 12px rgba(184, 54, 42, 0.28),
+      0 1px 3px rgba(0,0,0,0.18);
+    font-family: var(--mono); font-size: 0.6rem;
+    font-weight: 500; letter-spacing: 0.16em;
+    text-transform: uppercase;
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    line-height: 1;
+  }
+  .sf-fab .glyph {
+    font-family: var(--display); font-style: italic;
+    font-size: 1rem; line-height: 1;
+    font-variation-settings: "opsz" 22, "wght" 500;
+  }
+
+  /* ============ LONGFORM MOBILE-BAR (v0.18 shipped, unchanged) ============ */
+  .lf-mobile-bar {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    height: 56px;
+    background: var(--paper-2);
+    background-image: var(--noise);
+    border-top: 1px solid var(--paper-3);
+    box-shadow: 0 -2px 6px rgba(26, 22, 20, 0.05);
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    z-index: 60;
+  }
+  .lf-tab {
+    background: transparent; border: none;
+    border-right: 1px solid var(--paper-3);
+    color: var(--faded);
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 0.1rem;
+    line-height: 1; position: relative;
+  }
+  .lf-tab:last-child { border-right: 0; }
+  .lf-tab-glyph {
+    font-family: var(--display); font-style: italic;
+    font-size: 1rem; line-height: 1;
+    font-variation-settings: "opsz" 22, "wght" 500;
+  }
+  .lf-tab.active {
+    color: var(--ink); background: var(--paper);
+    box-shadow: inset 0 2px 0 var(--red);
+  }
+  .lf-tab.active .lf-tab-glyph { color: var(--red); }
+  .lf-tab .badge {
+    position: absolute; top: 0.2rem; right: 0.3rem;
+    background: var(--red); color: var(--paper);
+    font-family: var(--mono); font-size: 0.46rem;
+    padding: 0 0.18rem; border-radius: 1px; line-height: 1.2;
+  }
+  .lf-tab .badge.kraft { background: var(--kraft); }
+
+  /* ============ VOCABULARY-CALLOUT ANNOTATIONS ============ */
+  .vocab-callouts {
+    margin: 3rem auto 0; max-width: 1100px;
+    display: grid; grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+  }
+  .vocab-callout {
+    background: rgba(245, 241, 232, 0.05);
+    border: 1px solid rgba(245, 241, 232, 0.12);
+    color: #C7BEAE;
+    padding: 0.95rem 1.1rem;
+    font-family: var(--display); font-size: 0.92rem; line-height: 1.55;
+  }
+  .vocab-callout h3 {
+    font-family: var(--mono); font-size: 0.6rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--paper); margin-bottom: 0.45rem;
+    font-weight: normal;
+  }
+  .vocab-callout h3::before {
+    content: '§ '; color: var(--red); font-family: var(--display);
+    font-style: italic;
+  }
+  .vocab-callout em { color: var(--paper); font-style: italic; }
+  .vocab-callout code { font-family: var(--mono); font-size: 0.78rem; color: var(--paper); }
+  .swatch {
+    display: inline-block; width: 0.85rem; height: 0.85rem;
+    border-radius: 50%;
+    border: 1px solid rgba(245,241,232,0.3);
+    vertical-align: middle;
+    margin-right: 0.25rem;
+  }
+  .swatch-paper   { background: #F5F1E8; }
+  .swatch-paper-2 { background: #ECE6D4; }
+  .swatch-paper-3 { background: #DFD7BF; }
+  .swatch-red     { background: #B8362A; }
+  .swatch-blue    { background: #2A4B7C; }
+  .swatch-green   { background: #2E5D45; }
+  .swatch-kraft   { background: #8A7250; }
+</style>
+</head>
+<body>
+
+<div class="meta"><a href="index.html">← back to mockups</a></div>
+<h1 class="demo-title">Cross-bar 3 · No cross-bar — vocabulary is the consistency.</h1>
+<div class="demo-sub">Per-surface idioms · folio as nav · press-check vocabulary as the cross-cutting artifact</div>
+
+<div class="banner">
+  <span class="kicker">Cross-cutting bar mockup · direction 3 · v0.21 prerequisite · null hypothesis</span>
+  Each surface keeps the affordance idiom shaped to its job. Dashboard ships v0.19's <em>floating Compose chip + collapsible stage tiles</em> (operator-walked on phone, 2026-05-11). Entry-review longform ships v0.18's <em>4-tab mobile-bar</em>. Shortform gets one of directions 1/2/3. Scrapbook viewer and manual design when their phases land. The cross-cutting consistency lives in the press-check vocabulary itself — <em>cream paper, paper-noise, Newsreader italic, JetBrains Mono kickers, red-pencil accents</em> — not in any chrome shape. The argument: a uniform bar is a category error; surfaces have genuinely different needs and forcing them into one shape compromises every one.
+</div>
+
+<div class="frames">
+
+  <!-- ====================== FRAME A: dashboard (v0.19 ships) ====================== -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:48</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="top-masthead dashboard">
+        <div>
+          <div class="top-mast-kicker">The compositor's desk</div>
+          <div class="top-mast-title">Pipeline.</div>
+        </div>
+        <div class="top-mast-r">drafting<br><span class="num">№ 5</span></div>
+      </div>
+
+      <div class="surface-body dashboard">
+
+        <div class="dx-stage-tile expanded">
+          <span class="dx-stage-glyph">✎</span>
+          <span class="dx-stage-name">Drafting</span>
+          <span class="dx-stage-count"><span class="num">5</span></span>
+          <span class="dx-stage-chev">›</span>
+        </div>
+
+        <div class="dx-row">
+          <div>
+            <span class="dx-row-slug">whats-in-a-name</span>
+            <span class="dx-row-title">What's in a Name?</span>
+          </div>
+          <div class="dx-row-meta"><span class="ts">2h ago</span><span class="more">⋮</span></div>
+        </div>
+        <div class="dx-row">
+          <div>
+            <span class="dx-row-slug">on-revising-in-the-open</span>
+            <span class="dx-row-title">On Revising in the Open</span>
+          </div>
+          <div class="dx-row-meta"><span class="ts">May 10</span><span class="more">⋮</span></div>
+        </div>
+        <div class="dx-row">
+          <div>
+            <span class="dx-row-slug">the-deskwork-experiment</span>
+            <span class="dx-row-title">The Deskwork Experiment</span>
+          </div>
+          <div class="dx-row-meta"><span class="ts">May 09</span><span class="more">⋮</span></div>
+        </div>
+        <div class="dx-row">
+          <div>
+            <span class="dx-row-slug">design-standards</span>
+            <span class="dx-row-title">Deskwork Studio Design Standards</span>
+          </div>
+          <div class="dx-row-meta"><span class="ts">May 09</span><span class="more">⋮</span></div>
+        </div>
+
+        <div class="dx-stage-tile">
+          <span class="dx-stage-glyph">※</span>
+          <span class="dx-stage-name">Final</span>
+          <span class="dx-stage-count"><span class="num">4</span></span>
+          <span class="dx-stage-chev">›</span>
+        </div>
+
+      </div>
+
+      <div class="compose-chip">
+        <span class="glyph">+</span><span>Compose</span>
+      </div>
+
+    </div>
+  </div>
+  <div class="surface-label">
+    Dashboard
+    <span class="url">/dev/editorial-studio</span>
+    <span class="ships-as">v0.19 ships · unchanged</span>
+  </div>
+  <div class="caption">
+    <strong>Idiom:</strong> floating Compose chip + collapsible tiles.<br>
+    Per-surface; no global nav at bottom.
+  </div>
+  </div>
+
+  <!-- ====================== FRAME B: shortform review (Direction 3 = Shortform-2 default) ====================== -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:51</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="top-masthead">
+        <div>
+          <div class="top-mast-kicker">
+            <span class="platform">linkedin</span>
+            <span>deskwork-blog</span>
+          </div>
+          <div class="top-mast-slug">v021-mobile-first-shortform</div>
+        </div>
+        <div class="top-mast-r">galley<br><span class="num">№ 03</span></div>
+        <a class="top-mast-back" href="#">← desk</a>
+      </div>
+
+      <div class="surface-body shortform">
+        <div class="rv-body">
+          <h1>What I learned shipping mobile-first.</h1>
+          <p class="dek">Three iterations on the state-stamp pattern; what finally worked was retiring it on mobile.</p>
+          <p>Press-check vocabulary, take three. I keep going back to this question: what should a <em>reviewed</em> draft actually look like on screen?</p>
+          <p>The first iterations leaned on rotated rubber stamps — they read on desktop where stamps spread horizontally, but on mobile they cluster.</p>
+          <p>Letterpress tags were no better — a label on a rectangle is a label on a rectangle.</p>
+          <p>The third draft retires state surfacing entirely on mobile.</p>
+        </div>
+      </div>
+
+      <div class="sf-fab">
+        <span class="glyph">↗</span><span>Actions</span>
+      </div>
+
+    </div>
+  </div>
+  <div class="surface-label">
+    Shortform review
+    <span class="url">/dev/editorial-review/&lt;wid&gt;</span>
+    <span class="ships-as pending">Shortform-2 default · operator still picks 1/2/3</span>
+  </div>
+  <div class="caption">
+    <strong>Idiom:</strong> per-surface (Shortform-2 = FAB+sheet here).<br>
+    Back-to-desk link in masthead provides nav escape.
+  </div>
+  </div>
+
+  <!-- ====================== FRAME C: entry-review longform (v0.18 ships) ====================== -->
+  <div class="frame-wrap">
+  <div class="phone">
+    <div class="screen">
+      <div class="ios-clock">11:54</div>
+      <div class="ios-icons">●●●● 􀙇 􀛨</div>
+
+      <div class="top-masthead">
+        <div>
+          <div class="top-mast-kicker">entry · drafting · № 12</div>
+          <div class="top-mast-slug">studio-mobile-first-prd</div>
+        </div>
+        <div class="top-mast-r">v3<br><span class="num">2h</span></div>
+        <a class="top-mast-back" href="#">← desk</a>
+      </div>
+
+      <div class="surface-body longform">
+        <div class="rv-body">
+          <h1>Studio mobile-first — PRD.</h1>
+          <p class="dek">Extend the press-check vocabulary across every studio surface.</p>
+          <h2>Problem</h2>
+          <p>The dashboard, shortform desk, and review surfaces all ship desktop-shaped CSS. On phone the strip flex layout breaks, controls scroll out of sight.<span class="pin">3</span></p>
+          <p>The v0.17 + v0.18 entry-review rebuild proved that press-check on mobile reads beautifully when the chrome is right.<span class="pin">5</span></p>
+          <h2>Scope</h2>
+          <p>Four sequenced cuts: Dashboard → Shortform → Standalone scrapbook → Help + Index.</p>
+        </div>
+      </div>
+
+      <!-- 4-tab mobile-bar (v0.18 shipped, unchanged) -->
+      <nav class="lf-mobile-bar">
+        <button class="lf-tab">
+          <span class="lf-tab-glyph">§</span><span>Outline</span>
+        </button>
+        <button class="lf-tab">
+          <span class="lf-tab-glyph">✎</span><span>Notes</span>
+          <span class="badge">5</span>
+        </button>
+        <button class="lf-tab">
+          <span class="lf-tab-glyph">▦</span><span>Scrapbook</span>
+          <span class="badge kraft">3</span>
+        </button>
+        <button class="lf-tab active">
+          <span class="lf-tab-glyph">⊕</span><span>Actions</span>
+        </button>
+      </nav>
+
+    </div>
+  </div>
+  <div class="surface-label">
+    Entry-review (longform)
+    <span class="url">/dev/editorial-review/entry/&lt;uuid&gt;</span>
+    <span class="ships-as">v0.18 ships · unchanged</span>
+  </div>
+  <div class="caption">
+    <strong>Idiom:</strong> 4-tab mobile-bar with sheet host.<br>
+    Per-surface; no global nav. Back-link in masthead.
+  </div>
+  </div>
+
+</div>
+
+<!-- ============ VOCABULARY CALLOUT (the argument) ============ -->
+<div style="margin-top: 3rem; max-width: 1100px; text-align: center; padding: 0 1rem;
+            color: #C7BEAE; font-family: var(--display);
+            font-size: 1.05rem; line-height: 1.6; font-style: italic;">
+  Three surfaces. Three idioms. <em style="color: var(--paper);">One vocabulary</em> glues them together — and the vocabulary is what's actually consistent. The chrome shapes match each surface's work.
+</div>
+
+<div class="vocab-callouts">
+
+  <div class="vocab-callout">
+    <h3>The palette is the constant</h3>
+    <p>
+      <span class="swatch swatch-paper"></span> <code>--er-paper</code> (cream page)<br>
+      <span class="swatch swatch-paper-2"></span> <code>--er-paper-2</code> (raised surface)<br>
+      <span class="swatch swatch-paper-3"></span> <code>--er-paper-3</code> (hairline)<br>
+      <span class="swatch swatch-red"></span> <code>--er-red-pencil</code> (primary accent · masthead rules, section heads)<br>
+      <span class="swatch swatch-blue"></span> <code>--er-proof-blue</code> (links, iterate, secondary)<br>
+      <span class="swatch swatch-green"></span> <code>--er-stamp-green</code> (approve, save success)<br>
+      <span class="swatch swatch-kraft"></span> <code>--er-kraft</code> (scrapbook, folio surfaces)<br>
+    </p>
+    <p style="margin-top: 0.5rem;">
+      Every studio surface reads from these tokens. Identical across dashboard / review / shortform / scrapbook / manual.
+    </p>
+  </div>
+
+  <div class="vocab-callout">
+    <h3>The typography is the constant</h3>
+    <p>
+      <em style="font-family: var(--display); font-style: italic; font-variation-settings: 'opsz' 28, 'wght' 500;">Newsreader italic</em> — masthead titles, section heads, stage glyphs<br>
+      <code style="font-family: var(--mono); font-size: 0.75rem;">JetBrains Mono</code> — kickers, labels, slugs, meta<br>
+      No Inter. No system-default sans. No Roboto.
+    </p>
+    <p style="margin-top: 0.5rem;">
+      The optical-size aware Newsreader means every italic glyph at every scale reads as the same family. Mono caps with 0.18em tracking carries every kicker. The two-family pairing is the wordmark of the studio.
+    </p>
+  </div>
+
+  <div class="vocab-callout">
+    <h3>The texture is the constant</h3>
+    <p>
+      A paper-noise SVG turbulence filter sits behind <em>every</em> raised surface — masthead, mobile-bar, FAB, sheets, stage tiles. Subtle (0.06 alpha) but always present.
+    </p>
+    <p style="margin-top: 0.5rem; font-family: var(--mono); font-size: 0.7rem; color: var(--paper-3);">
+      background-image: var(--noise);
+    </p>
+    <p style="margin-top: 0.5rem;">
+      You feel it before you see it. It's what makes the studio feel like a workshop instead of a web app.
+    </p>
+  </div>
+
+  <div class="vocab-callout">
+    <h3>The folio is the nav</h3>
+    <p>
+      Every surface carries a folio masthead at the top — kicker (mono, red), title (italic display), meta (mono, faded). On non-home surfaces, a back-link sits at the right edge (proof-blue, mono, underlined). The folio IS the navigation chrome — operators have learned it across every surface that's shipped.
+    </p>
+    <p style="margin-top: 0.5rem; font-style: italic;">
+      Direction 3's claim: this is sufficient nav. Adding a bottom-bar nav adds a second nav affordance, not a better one.
+    </p>
+  </div>
+
+</div>
+
+<div style="margin: 3rem auto 0; max-width: 900px;
+            background: rgba(245, 241, 232, 0.05);
+            border: 1px solid rgba(245, 241, 232, 0.12);
+            color: #C7BEAE;
+            padding: 1.2rem 1.4rem;
+            font-family: var(--display); font-size: 0.92rem; line-height: 1.6;">
+  <div style="font-family: var(--mono); font-size: 0.62rem;
+              letter-spacing: 0.18em; text-transform: uppercase;
+              color: var(--paper); margin-bottom: 0.7rem;">
+    What Direction 3 means for v0.21 specifically
+  </div>
+  <p>
+    Picking Direction 3 means: the shortform mobile-first pass produces a shortform-shaped chrome (Shortform-1, 2, or 3 from the existing pick). The dashboard's <code style="font-family:var(--mono);color:var(--paper)">compose-chip</code> stays as it is. The entry-review longform 4-tab bar stays as it is. Scrapbook viewer (Phase 3) will design its own. Manual (Phase 4) will design its own.
+  </p>
+  <p style="margin-top: 0.5rem;">
+    The downstream commitment: each future surface's mockup pass invokes <code style="font-family:var(--mono);color:var(--paper)">/frontend-design</code> with a brief that says "design from the press-check vocabulary; don't assume the shape of any other surface's chrome." The cross-cutting consistency is the vocabulary, not the layout.
+  </p>
+  <p style="margin-top: 0.5rem; font-style: italic; color: var(--paper-3);">
+    The implicit operator burden: learn each surface's chrome. The argument that this is OK: today's two surfaces (dashboard + entry-review) already differ, and operators have not complained. The friction the operator is naming on shortform is "decisions out of reach" — solvable by giving shortform good chrome, not by giving all surfaces the same chrome.
+  </p>
+</div>
+
+</body>
+</html>
