@@ -520,48 +520,136 @@ The audit's full report lives at [`./2026-05-09-implementation-audit.md`](./2026
 - All probes + smoke + workspace tests green
 - No regressions on entry-review or dashboard surfaces (validated by existing probes)
 
-### Task 2.2: Mockup + implement Shortform mobile-first (+ extract server bar/sheet if needed)
+### Task 2.2: Mockup + implement Shortform mobile-first (re-scoped to v7 cross-cutting architecture, 2026-05-12)
 
-**Files:**
-- Create: `plugins/deskwork-studio/public/mockups/shortform-N-<idiom>.html` (×2-3)
-- Modify: `plugins/deskwork-studio/public/mockups/index.html` (add Shortform section)
-- Modify: `packages/studio/src/pages/shortform-review.ts`
-- Modify: `packages/studio/src/pages/shortform/*.ts`
-- Modify: relevant CSS
-- **Conditional extraction (depending on Shortform consumer shape):** if Shortform mockups land on a tab-bar + slide-up-sheet idiom that meaningfully overlaps entry-review's existing `mobile-bar.ts`, extract `packages/studio/src/mobile-shell/{bar,sheet}.ts` server templates as part of this task — designed against the concrete consumer pair. If Shortform's idiom diverges substantially, keep its bar/sheet surface-specific.
+**v7 architecture re-scope (2026-05-12):** During Task 2.2.2 the operator and agent worked through seven mockup refinements (v1→v7) of the cross-cutting bar. The operator approved v7's "Desk as hub" star-nav architecture, which expands Task 2.2's scope from "Shortform mobile-first" to "v7 cross-cutting architecture + Shortform implementation atop it." Sub-steps 2.2.5–2.2.10 are restructured to reflect this. Mockups: [`cross-bar-2-refined-v7-masthead-fixes.html`](../../../../plugins/deskwork-studio/public/mockups/cross-bar-2-refined-v7-masthead-fixes.html) (the architecture) + [`desk-states-v7.html`](../../../../plugins/deskwork-studio/public/mockups/desk-states-v7.html) (the Desk's full IA under v7).
+
+**The v7 architecture in one paragraph:** Star navigation — the Desk (`/dev/editorial-studio`) is the hub; every other surface is a leaf reached BY navigating from the Desk. Every non-Desk surface carries a `←` glyph (leftmost masthead) and a `⋮` glyph (rightmost masthead). The Desk absorbs the Shortform desk's content as a Shortform-by-platform section + reserves Adjacent-tools tiles for Phase 3 (Folio + Files). The bar has zero nav region — pure 1-6 contextual cells. The masthead `⋮` opens a popover anchored under the glyph (same idiom as v0.20 row ⋮, NOT the Phase 2.1 slide-up sheet primitive — top-anchored affordances reveal popovers, not sheets).
+
+**Files (revised):**
+- Modify: `DESIGN-STANDARDS.md` (add `§ Studio navigation model` + `§ Desk information architecture` sections)
+- Create: `docs/studio-design/ACCEPTED/2026-05-12-cross-bar-2-star-nav-desk-as-hub/` (archive entry)
+- Create: `docs/studio-design/REJECTED/2026-05-12-cross-bar-1-nav-strip-plus-action/` + REJECTED entries for cross-bar 3, cross-bar 2 refinements v1/v2/v3/v5/v6
+- Create: `packages/studio/src/pages/masthead.ts` (universal masthead chrome — back-link + ⋮ menu)
+- Create: `plugins/deskwork-studio/public/src/mobile-shell/masthead-popover.ts` (new client primitive — popover anchored under masthead ⋮; not the slide-up sheet)
+- Refactor: `packages/studio/src/pages/entry-review/mobile-bar.ts` → `packages/studio/src/pages/mobile-bar.ts` (universal; drop nav region; cap 6 cells)
+- Modify: `packages/studio/src/pages/dashboard.ts` (add Shortform-by-platform section + Adjacent-tools placeholder tiles)
+- Modify: `packages/studio/src/pages/shortform-review.ts` (use new masthead + mobile-bar; address audit findings G.1-G.6)
+- Modify: `plugins/deskwork-studio/public/src/editorial-review-client.ts` (remove `postDecision` POST chain per THESIS Cons. 2 fix)
+- Modify: `plugins/deskwork-studio/public/css/editorial-review.css` (retire `[data-review-ui="longform"]` scoped selectors that now apply to all surfaces; drop dead `.er-galley` CSS)
+- Create: `plugins/deskwork-studio/public/css/mobile-shell.css` (new file for masthead + bar + menu-popover CSS)
 
 - [x] **Step 2.2.1:** ~~Audit `/dev/editorial-review-shortform`. Identify the data shape (shortform entries vs. longform), and the open #244 (TOC drawer per #169) requirements.~~ *(Landed 2026-05-12 in `2026-05-12-shortform-audit.md`. Surfaces have zero mobile CSS scoped to shortform; both pages carry Commandment III stamps; `editorial-review-client.ts:1619` POSTs state mutations (THESIS violation). TOC infrastructure is one call away (`rehype-slug` already runs in `renderMarkdownToHtml`). `sheet-controller` is ready to consume; `renderMobileBar` would need parameterization to share. Six out-of-band findings catalogued for separate triage.)*
-- [x] **Step 2.2.2:** ~~Invoke `/frontend-design` for Shortform mockups. Honor press-check; explore: tab bar with TOC tab (closing #244), hybrid card-stream, etc.~~ *(Landed 2026-05-12. Three directions: sticky bar / floating action sheet / bottom tab bar. Each self-contained HTML at phone-width with realistic LinkedIn + Reddit + YouTube bodies. Index gallery updated.)*
-- [x] **Step 2.2.3:** ~~Update `mockups/index.html`. Commit `design(studio): three shortform direction mockups (HTML, no code)`.~~ *(Landed 2026-05-12 same commit.)*
-- [ ] **Step 2.2.4:** Operator picks. **STOP for pick.**
-- [ ] **Step 2.2.5:** Decide on server-template extraction based on the picked mockup. If extraction is in scope: design `renderMobileBar` + `renderMobileSheet` against the concrete entry-review + Shortform consumer pair. Otherwise skip.
-- [ ] **Step 2.2.6:** Implement Shortform using `mobile-shell` primitives (sheet controller from Task 2.1; bar/sheet server templates if extracted in 2.2.5). Commit `feat(studio): shortform mobile-first — Mockup N`.
+- [x] **Step 2.2.2:** ~~Invoke `/frontend-design` for Shortform mockups. Honor press-check; explore: tab bar with TOC tab (closing #244), hybrid card-stream, etc.~~ *(Landed 2026-05-12. Three direction shortform mockups + seven cross-bar refinement mockups (v1→v7) + desk-states mockup. Architecture settled at v7: Desk-as-hub star nav, zero-nav-region bar, masthead ←/⋮ chrome.)*
+- [x] **Step 2.2.3:** ~~Update `mockups/index.html`. Commit `design(studio): three shortform direction mockups (HTML, no code)`.~~ *(Landed 2026-05-12. Gallery index updated through v7 + desk-states.)*
+- [x] **Step 2.2.4:** ~~Operator picks. **STOP for pick.**~~ *(2026-05-12: operator approved v7 architecture — "Desk as hub" star nav; v7 masthead chrome (← leftmost + ⋮ rightmost, popover-not-sheet); desk-states v7 (all 8 longform stages + 4 shortform platforms + 2 future tiles, single-expand within section, independent across sections). Shortform contextual region pick (Shortform-1/2/3) still pending — folded into Step 2.2.10.)*
+- [ ] **Step 2.2.5: Land v7 architecture in standards + archive.**
+  - Edit `DESIGN-STANDARDS.md`: add `§ Studio navigation model` section (per v5+v6+v7 standards drafts: star nav, ← leftmost / ⋮ rightmost universal masthead affordances, hub role, popover-not-sheet reveal pattern, ⋮ vocabulary scope convention).
+  - Edit `DESIGN-STANDARDS.md`: add `§ Desk information architecture` section (per desk-states-v7 spec: 3 sections — longform pipeline + shortform-by-platform + adjacent tools; single-expand within section; independent across; empty-state via palette not opacity).
+  - Edit `DESIGN-STANDARDS.md` parked-decisions section: mark "Bottom tabbar (Pipeline / Press / Folio)" as RESOLVED — v7 star-nav supersedes the parked tabbar question. Mark "Per-row affordance shape" as RESOLVED (shipped in v0.20).
+  - File ACCEPTED archive entry: `docs/studio-design/ACCEPTED/2026-05-12-cross-bar-2-star-nav-desk-as-hub/brief.md` with reference back to the v7 + desk-states mockups.
+  - File REJECTED archive entries for cross-bar 1 (nav-strip), cross-bar 3 (no-cross-bar), cross-bar 2 refinements v1 (3-nav), v2-A (2-nav), v2-B (quiet manual), v3 (collapsed picker), v5 (hamburger menu + word-back), v6 (strikethrough alignment).
+  - Commit: `docs(standards): land v7 cross-cutting nav architecture + Desk IA spec`.
+- [ ] **Step 2.2.6: Extract `renderMasthead()` universal chrome.**
+  - Create `packages/studio/src/pages/masthead.ts` exposing `renderMasthead(opts)`:
+    ```ts
+    renderMasthead({
+      kicker: string,                                     // mono caps, red
+      slug?: string,                                      // mono, when slug-shaped surface
+      title?: string,                                     // italic display, when title-shaped surface
+      metaInline?: string,                                // optional inline meta after sep
+      isHub: boolean,                                     // true on Desk; suppresses back-link
+    })
+    ```
+  - Back-link: single italic-display `←` in `--er-proof-blue` (8.13:1 vs paper), 24px visual / 44px tap target via padding+margin; absent only when `isHub: true`.
+  - Menu glyph: mono `⋮` in `--er-ink-soft` (8.92:1), 24px visual / 44px tap target; same idiom as v0.20 row overflow.
+  - Masthead height 102px on mobile (was 82px in entry-review's chrome); `align-items: center` so glyphs flank text stack without overlapping border-bottom rule.
+  - Replace existing masthead chrome on entry-review longform (`entry-review/index.ts`), shortform review (`shortform-review.ts`), dashboard (`dashboard.ts`) with universal `renderMasthead` consumption.
+  - Commit: `feat(studio): renderMasthead universal chrome (v7 ← + ⋮)`.
+- [ ] **Step 2.2.7: Implement masthead ⋮ popover menu primitive.**
+  - Create `plugins/deskwork-studio/public/src/mobile-shell/masthead-popover.ts` exposing `createMastheadPopover({ triggerEl, popoverEl, scrimEl, onClose })`.
+  - NOT the Phase 2.1 `createSlideUpSheet` — popovers are different. Position absolute, anchored under trigger, up-arrow CSS-rendered at trigger's x-coord. Dismiss patterns: scrim tap, trigger tap-again, Escape. Active state: trigger gets `.popover-open` class (color shifts to `--er-red-pencil`).
+  - Server-side popover content rendered alongside masthead by `renderMastheadMenu()` helper: three sections (Operator help [Manual + Keyboard shortcuts], Configure [placeholder for Phase 4], Connect [File an issue → github new tab + About → in-studio about pane]).
+  - Wire menu sections to existing destinations: Manual → `/dev/editorial-help`; Keyboard shortcuts → existing `?` overlay on entry-review (move to universal shortcut overlay primitive); File an issue → `https://github.com/audiocontrol-org/deskwork/issues/new` in new tab; About → small in-studio modal with version + license + thesis link.
+  - Configure entry remains dimmed (Phase 4 placeholder).
+  - Commit: `feat(studio): masthead ⋮ popover menu (v7 — Manual / Shortcuts / File-issue / About)`.
+- [ ] **Step 2.2.8: Refactor `renderMobileBar()` — drop nav region.**
+  - Move `packages/studio/src/pages/entry-review/mobile-bar.ts` → `packages/studio/src/pages/mobile-bar.ts` (universal location).
+  - Revise API to `renderMobileBar({ contextual: Cell[] })` — no `navActive` opts; the nav region is gone. Cap: 6 cells (5 if we keep the kraft hairline as left-edge accent).
+  - Update entry-review longform's existing 4-tab bar (Outline · Notes · Scrapbook · Actions) to use new API with `[outline, notes, scrapbook, actions]` cells. Edit mode swaps to `[format, notes, save]`. Bar's CSS scoped selectors `[data-review-ui="longform"]` are removed (universal now); ensure `editorial-review.css` rules at `:1030`, `:3613-3628`, `:3703` no longer use the longform-scoped selector.
+  - Compose-chip CSS stays as Dashboard floating affordance.
+  - Commit: `refactor(studio): renderMobileBar universal — drop nav region; entry-review consumes new API`.
+- [ ] **Step 2.2.9: Implement Desk's Shortform-by-platform + Adjacent-tools sections.**
+  - Refactor `packages/studio/src/pages/dashboard.ts` (renderDashboardPage):
+    - Section 1 (existing): Longform pipeline — 8 stage tiles per `DESKWORK-STATE-MACHINE.md` (Ideas ◇ · Planned § · Outlining ⊹ · Drafting ✎ · Final ※ · Published ✓ · Blocked ⊘ · Cancelled ✗). Single-expand. v0.19's existing behavior; just confirm the tile rendering matches the desk-states-v7 spec.
+    - Section 2 (NEW): Shortform · by platform — 4 platform tiles (LinkedIn `in` red · Reddit `r/` blue · YouTube `@` kraft · Instagram `IG` kraft). Each tile shows workflow count. Single-expand within section. Expanded tile shows workflow rows with slug + title + channel + version/age + trailing `⋮`. Data source: `listOpen()` filtered by `contentKind === 'shortform'`, grouped by platform (today's logic in `pages/shortform.ts` ports over).
+    - Section 3 (NEW): Adjacent tools — 2 dimmed placeholder tiles (Folio + Files), non-tappable, "(phase 3)" tag. Reserve for Phase 3 implementation.
+  - Empty-state handling per desk-states-v7 a11y audit: explicit muted palette (no opacity dimming), `--er-ink-soft` for body-text-class labels.
+  - Stage tile / platform tile min-height ≥44px (WCAG 2.5.5; was 42px).
+  - Commit: `feat(studio): Desk absorbs Shortform-by-platform + reserves Adjacent-tools tiles (v7)`.
+- [ ] **Step 2.2.10: Implement shortform review surface using v7 chrome + address audit findings.**
+  - Pick Shortform-1, Shortform-2, or Shortform-3 idiom for the contextual region. **STOP for operator pick.** Once picked, implement.
+  - Update `packages/studio/src/pages/shortform-review.ts` to use `renderMasthead` (new) + `renderMobileBar` (new universal). Remove existing `er-strip` chrome.
+  - **Address out-of-band findings G.1-G.6 from Task 2.2.1 audit (see `2026-05-12-shortform-audit.md`):**
+    - G.1 Commandment III state-stamps (`shortform.ts:85` + `shortform-review.ts:313`): remove the `<span class="er-stamp er-stamp-${state}">` markup; state is no longer surfaced as a label.
+    - G.2 Commandment I/II state-based branching: refactor `renderControlsRight()` to render verbs unconditionally (iterate / approve / cancel) — verb visibility is stage-gated only, not state-gated. (Note: shortform-review.ts file header documents intentional deferral of the legacy state machine; verify with operator before invasive changes — may be deferred again pending the shortform calendar-stage migration.)
+    - G.3 THESIS Cons. 2 violation: remove `postDecision()` POST chain from `editorial-review-client.ts:1619-1764`. Verbs become clipboard-copy only — no state mutation from button clicks. Server endpoint `/api/dev/editorial-review/decision` can stay for now (other callers may exist) but the client must not invoke it from the shortform/longform decision handlers.
+    - G.4 Reject verb violation (matches issue [#260](https://github.com/audiocontrol-org/deskwork/issues/260)): replace `data-action="reject"` with `data-action="cancel"`; copy `/deskwork:cancel` instead of `/deskwork:reject`. Update keyboard shortcut from `r` to `c` (or retire — `cancel` doesn't need a double-tap shortcut).
+    - G.5 Iterate `--platform` / `--channel` flags: update `pendingSkillCmd()` and the iterate handler at `editorial-review-client.ts:1734-1739` to include `--platform ${workflow.platform} --channel ${workflow.channel}` when `contentKind === 'shortform'`.
+    - G.6 Dead `.er-galley` CSS at `editorial-review.css:941-1022`: delete the ~80 dead lines.
+  - Probe extension: `mobile-probe-helpers.mjs` `parseProbeArgs` add `--workflow-id` parameter for shortform-specific probe URL pattern (`/dev/editorial-review/<workflow-id>`).
+  - Commit: `feat(studio): shortform review surface — v7 chrome + state-machine compliance (G.1-G.6)`.
 
-### Task 2.3: Probes + smoke
+### Task 2.3: Probes + smoke (v7 multi-surface)
 
 **Files:**
 - Create: `scripts/probe-mobile-shortform.mjs`
+- Create: `scripts/probe-mobile-desk.mjs` (new — covers Shortform-by-platform section + Adjacent-tools tiles)
+- Modify: `scripts/probe-mobile-dashboard.mjs` (existing — extend with v7 masthead + ⋮ popover assertions)
+- Modify: `scripts/lib/mobile-probe-helpers.mjs` (add `--workflow-id` arg parser, masthead chrome assertions)
 - Modify: `scripts/smoke-er-viewport-regressions.mjs`
 
-- [ ] **Step 2.3.1:** Write `probe-mobile-shortform.mjs` using the shared helpers from `scripts/lib/mobile-probe-helpers.mjs`. Assert TOC drawer behavior (#244), tab swap, sheet content, no horizontal scroll.
-- [ ] **Step 2.3.2:** Run; fix until green.
-- [ ] **Step 2.3.3:** Update smoke to walk Shortform.
-- [ ] **Step 2.3.4:** Commit `test(studio): probe + smoke for shortform mobile-first`.
+- [ ] **Step 2.3.1:** Extend `mobile-probe-helpers.mjs` with shared masthead chrome assertions (back-link visible on non-Desk surfaces, ⋮ glyph visible on every surface, popover opens on ⋮ tap, popover anchored under glyph, dismisses correctly).
+- [ ] **Step 2.3.2:** Write `probe-mobile-shortform.mjs` for the shortform review surface — exercises Iter/Apprv/Canc + the picked Shortform-1/2/3 idiom. Assert TOC drawer behavior (#244), no horizontal scroll, masthead chrome present.
+- [ ] **Step 2.3.3:** Write `probe-mobile-desk.mjs` for the Desk's Shortform-by-platform section expansion + Adjacent-tools tile presence.
+- [ ] **Step 2.3.4:** Extend `probe-mobile-dashboard.mjs` for v7 masthead + ⋮ popover (replaces the v0.19 floating ? overlay).
+- [ ] **Step 2.3.5:** Run all probes + smoke; fix until green.
+- [ ] **Step 2.3.6:** Update `smoke-er-viewport-regressions.mjs` to walk all v7 surfaces.
+- [ ] **Step 2.3.7:** Commit `test(studio): probes + smoke for v7 architecture (shortform + desk + dashboard + entry-review)`.
 
-### Task 2.4: /dw-lifecycle:review + release
+### Task 2.4: /dw-lifecycle:review + release v0.21 (v7 architecture shift)
 
-- [ ] **Step 2.4.1:** Invoke `/dw-lifecycle:review`. The narrow extraction + Shortform implementation should get explicit reviewer focus. Triage findings; defer with workplan-and-issue per the rule.
-- [ ] **Step 2.4.2:** Apply fixes; commit `fix(studio): apply review findings on shortform + mobile-shell extraction`.
+- [ ] **Step 2.4.1:** Invoke `/dw-lifecycle:review`. The architecture pass is substantial — likely 3-4 reviewer dispatches in parallel covering: (a) v7 architecture standards + archive (correctness/conventions), (b) renderMasthead + popover (TypeScript/UI), (c) Desk Shortform absorbing (architecture/data-flow), (d) shortform review G.1-G.6 fixes (state-machine compliance).
+- [ ] **Step 2.4.2:** Apply fixes; commit `fix(studio): apply review findings on v7 architecture + shortform implementation`.
 - [ ] **Step 2.4.3:** Run `/release` for v0.21.0.
-- [ ] **Step 2.4.4:** iPhone walk; confirm #244 symptoms gone.
-- [ ] **Step 2.4.5:** Close #244 with `--reason completed`.
+- [ ] **Step 2.4.4:** iPhone walk. Confirm: (a) #244 symptoms gone on both review surfaces; (b) star nav works (← Desk returns from every leaf); (c) ⋮ popover anchored correctly; (d) Desk Shortform section visible + expandable; (e) no strikethrough on any masthead.
+- [ ] **Step 2.4.5:** Close issues with `--reason completed`: #244 (TOC drawer), #260 (`reject` verb violation — fixed in G.4), and any G.1-G.6 issues filed during implementation.
 
-**Acceptance:**
-- `mobile-shell` module exists with the narrow extraction (probe helpers + sheet controller; server bar/sheet templates only if the Shortform pick warranted them in Task 2.2.5)
-- `mobile-sheet-bar.ts` and `compose-chip.ts` consume the shared sheet controller
-- Shortform walks on phone; #244 closed
-- All prior phases' probes still green (no regressions from extraction)
-- Release notes name the extraction as the architectural shift
+### Task 2.5: Cross-cutting accessibility cleanup (lower priority — separable commit)
+
+**Surfaced during Task 2.2's desk-states a11y audit (2026-05-12). Items that affect MULTIPLE surfaces and are best handled in a single pass rather than per-surface. Can ship as part of v0.21 OR be deferred to a v0.21.1 patch — operator pick.**
+
+**Files:**
+- Modify: `plugins/deskwork-studio/public/css/editorial-review.css` (dashed `--paper-3` hairlines → `--kraft` dashed)
+- Modify: `plugins/deskwork-studio/public/css/editorial-studio.css` (compose-chip + dashboard row min-height)
+- Modify: `packages/studio/src/pages/dashboard.ts` (stage tile min-height 42 → 44px)
+- Modify: cross-bar mockup files (v6 + v7) to apply same `--ink-soft` substitution for body-text-class `--faded` usage
+
+- [ ] **Step 2.5.1:** Bump dashed `--paper-3` hairline dividers to `--kraft` dashed (4.08:1 vs paper) across all surfaces. Affects `.er-row`, `.dx-stage-tile`, `.desk-row`, and any other dashed-divider rule. The paper-3 hairlines fail the 3:1 ornamental floor; switching to kraft fixes them uniformly. Commit: `style(studio): bump dashed hairlines to --kraft (a11y 3:1 floor)`.
+- [ ] **Step 2.5.2:** Bump stage tile min-height from 42px to 44px (WCAG 2.5.5 tap target). Bump Compose chip min-height from ~38px to 44px (same criterion). These are v0.19 inheritances. Commit: `style(studio): tap targets ≥44px for stage tiles + compose chip`.
+- [ ] **Step 2.5.3:** Sweep cross-bar mockups (v6 + v7) for `--faded` body-text usage; apply same `--ink-soft` substitution as desk-states-v7. The mockups are reference artifacts, not shipped code — but they should match the standard so future readers don't copy the broken pattern. Commit: `fix(mockup): cross-bar mockups apply --ink-soft body-text substitution`.
+
+**Acceptance (revised for v7 scope):**
+- `DESIGN-STANDARDS.md` carries `§ Studio navigation model` + `§ Desk information architecture` sections per v7 + desk-states-v7 specs.
+- ACCEPTED archive entry filed for the picked architecture; REJECTED entries filed for cross-bar 1/3 + cross-bar 2 refinements v1/v2/v3/v5/v6.
+- `renderMasthead()` + `createMastheadPopover()` shipped as universal chrome; every non-Desk surface carries `← Desk` (leftmost) + `⋮` (rightmost). Both glyphs vertically centered; no border-rule strikethrough.
+- `renderMobileBar()` refactored to universal API (zero nav region, 1-6 contextual cells); entry-review longform's bar consumes new API without regression.
+- Desk page renders 3 sections: longform pipeline (8 stage tiles) + shortform-by-platform (4 platform tiles, expand inline) + adjacent-tools (2 dimmed placeholders).
+- Shortform review surface renders v7 chrome + picked Shortform-1/2/3 contextual idiom; audit findings G.1-G.6 addressed.
+- All prior phases' probes still green; new probes cover Desk Shortform expansion + masthead popover.
+- Shortform walks on phone; #244 closed.
+- Release notes name "v7 cross-cutting nav architecture" as the v0.21 architectural shift (not just shortform mobile-first — broader).
+- Standards rule update: `.claude/rules/design-standards.md` references the new `§ Studio navigation model` section as enforceable.
 
 ---
 
