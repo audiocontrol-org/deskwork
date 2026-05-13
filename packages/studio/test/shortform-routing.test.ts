@@ -260,13 +260,16 @@ describe('GET /dev/editorial-review/<workflow-id> for shortform', () => {
     // Platform header element renders the workflow's platform.
     expect(r.text).toContain('class="er-shortform-meta"');
     expect(r.text).toContain('class="er-platform">linkedin');
-    // The unified review surface buttons (longform contract) are
-    // present — same data-action selectors, no shortform-specific
-    // duplicates.
+    // Universal mobile bar's Actions sheet carries the three
+    // stage-gated verbs per Commandment II. Save lives in the desktop
+    // edit-panes (renderEditPanes) and is gated by edit mode.
+    // G.4: destructive verb is `cancel` (NOT `reject` — the state
+    // machine has no `reject`).
     expect(r.text).toMatch(/data-action="save-version"/);
     expect(r.text).toMatch(/data-action="approve"/);
     expect(r.text).toMatch(/data-action="iterate"/);
-    expect(r.text).toMatch(/data-action="reject"/);
+    expect(r.text).toMatch(/data-action="cancel"/);
+    expect(r.text).not.toMatch(/data-action="reject"/);
   });
 
   it('renders the channel chip when the workflow has one', async () => {

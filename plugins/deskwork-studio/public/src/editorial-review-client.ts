@@ -17,6 +17,7 @@
 import { initScrapbookLightbox } from './lightbox.ts';
 import { copyOrShowFallback, isManualCopyOpen } from './clipboard.ts';
 import { initMastheadPopover } from './mobile-shell/masthead-popover.ts';
+import { createSlideUpSheet, type SlideUpSheetController } from './mobile-shell/sheet-controller.ts';
 
 interface DraftRange {
   start: number;
@@ -109,88 +110,11 @@ function qn<T extends Element = HTMLElement>(selector: string): T | null {
   return document.querySelector<T>(selector);
 }
 
-/**
- * #166 Phase 34b — inline rejection-reason prompt that replaces the
- * pre-existing `window.prompt('Optional reason for rejection:')`.
- * Anchors a small composer (textarea + cancel + confirm) directly
- * after the trigger button so the operator's eye doesn't have to
- * leave the strip. Returns the reason string (possibly empty) on
- * confirm, or `null` if the operator cancels (Esc or cancel button).
- *
- * The composer is built dynamically and removed on resolve so this
- * helper has no server-side markup dependency. Cmd/Ctrl+Enter
- * confirms, Esc cancels — same chord as the marginalia composer.
- */
-function promptForRejectionReason(
-  anchor: HTMLElement,
-): Promise<string | null> {
-  // If a previous instance is still mounted (operator triggered the
-  // shortcut while the composer was already open), focus the existing
-  // textarea instead of stacking duplicates.
-  const existing = document.querySelector<HTMLDivElement>('[data-reject-reason]');
-  if (existing) {
-    existing.querySelector<HTMLTextAreaElement>('textarea')?.focus();
-    return Promise.resolve(null);
-  }
-  return new Promise((resolve) => {
-    const wrap = document.createElement('div');
-    wrap.className = 'er-reject-reason';
-    wrap.dataset.rejectReason = 'true';
-    wrap.setAttribute('role', 'dialog');
-    wrap.setAttribute('aria-label', 'Rejection reason');
-
-    const label = document.createElement('p');
-    label.className = 'er-reject-reason-label';
-    label.textContent = 'Optional reason for rejection';
-
-    const textarea = document.createElement('textarea');
-    textarea.className = 'er-reject-reason-input';
-    textarea.rows = 3;
-    textarea.placeholder = 'leave blank to reject without explanation';
-    textarea.setAttribute('aria-label', 'Rejection reason');
-
-    const actions = document.createElement('div');
-    actions.className = 'er-reject-reason-actions';
-    const cancel = document.createElement('button');
-    cancel.type = 'button';
-    cancel.className = 'er-btn er-btn-small';
-    cancel.textContent = 'Cancel';
-    const confirm = document.createElement('button');
-    confirm.type = 'button';
-    confirm.className = 'er-btn er-btn-small er-btn-reject';
-    confirm.textContent = 'Reject';
-    actions.appendChild(cancel);
-    actions.appendChild(confirm);
-
-    wrap.appendChild(label);
-    wrap.appendChild(textarea);
-    wrap.appendChild(actions);
-
-    // Anchor the composer immediately after the reject button so it
-    // renders in the same row of the strip when there's room and below
-    // when the strip wraps. Keeps the gesture spatially coherent.
-    anchor.insertAdjacentElement('afterend', wrap);
-    textarea.focus();
-
-    function close(value: string | null): void {
-      wrap.remove();
-      resolve(value);
-    }
-    cancel.addEventListener('click', () => close(null));
-    confirm.addEventListener('click', () => close(textarea.value.trim()));
-    textarea.addEventListener('keydown', (ev) => {
-      if (ev.key === 'Escape') {
-        ev.preventDefault();
-        close(null);
-        return;
-      }
-      if ((ev.metaKey || ev.ctrlKey) && ev.key === 'Enter') {
-        ev.preventDefault();
-        close(textarea.value.trim());
-      }
-    });
-  });
-}
+// `promptForRejectionReason` (formerly Phase-34b's inline rejection-
+// reason composer) was retired in Step 2.2.10 alongside the `reject`
+// verb. The state machine has no `reject`; the destructive verb is
+// `cancel` and is terminal — no reason composer is needed. Removed in
+// the G.4 cleanup pass.
 
 export function initEditorialReview(): void {
   const stateEl = document.getElementById('draft-state');
@@ -199,6 +123,19 @@ export function initEditorialReview(): void {
   const state = JSON.parse(stateEl.textContent || '{}') as DraftState;
   const workflowId = state.workflow.id;
   const versionNum = state.currentVersion.version;
+
+  // Step 2.2.10: shortform surfaces share this client bundle but do
+  // NOT render the longform annotation chrome (margin composer,
+  // sidebar list, comment categories, etc.) nor the legacy edit
+  // toolbar. Dispatch to the slimmer shortform init when the shell
+  // identifies as shortform; the longform init below assumes the
+  // full annotation chrome and would throw on a missing
+  // `[data-edit-toolbar]` / `[data-comment-composer]` etc.
+  const isShortform = document.querySelector('[data-review-ui="shortform"]') !== null;
+  if (isShortform) {
+    initShortformReview(state, workflowId, versionNum);
+    return;
+  }
 
   const draftBody = q<HTMLElement>('#draft-body');
   const draftEdit = q<HTMLTextAreaElement>('#draft-edit');
@@ -1615,47 +1552,27 @@ export function initEditorialReview(): void {
     (btn) => btn.addEventListener('click', () => { void performSave(); }),
   );
 
-  // ---- Decision buttons (Approve / Iterate / Reject) ----
-
-  async function postDecision(to: string): Promise<boolean> {
-    const res = await fetch('/api/dev/editorial-review/decision', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ workflowId, to }),
-    });
-    const body = await res.json();
-    if (!res.ok) { showToast(`Decision failed: ${body.error || res.status}`, true); return false; }
-    return true;
-  }
-
-  // If the workflow is still in `open`, bridge to `in-review` first so the
-  // downstream transition (approved/iterating) is legal per VALID_TRANSITIONS.
-  async function ensureInReview(): Promise<boolean> {
-    if (state.workflow.state !== 'open') return true;
-    return postDecision('in-review');
-  }
-
-  async function postApproveAnnotation(): Promise<boolean> {
-    const res = await fetch('/api/dev/editorial-review/annotate', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ type: 'approve', workflowId, version: versionNum }),
-    });
-    return res.ok;
-  }
-
-  async function postRejectAnnotation(reason: string): Promise<boolean> {
-    const res = await fetch('/api/dev/editorial-review/annotate', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ type: 'reject', workflowId, version: versionNum, reason }),
-    });
-    return res.ok;
-  }
+  // ---- Decision buttons (Approve / Iterate / Cancel) ----
+  //
+  // Per THESIS Cons. 2 + DESKWORK-STATE-MACHINE.md Commandment VII: the
+  // studio is a routing surface; verbs run in the agent. The decision
+  // buttons clipboard-copy the corresponding /deskwork: slash command;
+  // no state mutation is performed from a button click here. The legacy
+  // `postDecision` / `ensureInReview` / `postRejectAnnotation` POST
+  // chain — which was a Commandment VII violation — was removed in Step
+  // 2.2.10 (Audit finding G.3). The server endpoint
+  // `/api/dev/editorial-review/decision` may still be reachable from
+  // other paths; this client does not invoke it.
+  //
+  // G.4 (issue #260): the destructive verb is `cancel`, NOT `reject`.
+  // The state machine has no `reject` verb. Markup carries
+  // `data-action="cancel"`; the legacy `r-r` keyboard chord and the
+  // rejection-reason composer are retired (cancel is terminal and
+  // doesn't need a free-text reason).
 
   const approveBtn = qn<HTMLButtonElement>('[data-action="approve"]');
   const iterateBtn = qn<HTMLButtonElement>('[data-action="iterate"]');
-  const rejectBtn = qn<HTMLButtonElement>('[data-action="reject"]');
+  const cancelBtn = qn<HTMLButtonElement>('[data-action="cancel"]');
 
   /**
    * Copy the Claude Code command the operator needs to run next.
@@ -1694,75 +1611,68 @@ export function initEditorialReview(): void {
 
   approveBtn?.addEventListener('click', async () => {
     approveBtn.disabled = true;
-    const bridged = await ensureInReview();
-    if (!bridged) { approveBtn.disabled = false; return; }
-    await postApproveAnnotation();
-    const ok = await postDecision('approved');
-    if (!ok) { approveBtn.disabled = false; return; }
-    // Approve writes to disk + transitions to applied via
-    // /deskwork:approve in Claude Code, not by the studio click. Build
-    // the command that matches the workflow.
+    // Approve is a pure clipboard-copy per THESIS Cons. 2. Skill in
+    // Claude Code does the work; no POST from the click.
     //
     // Outline-approve semantics are an open design question — see
     // https://github.com/audiocontrol-org/deskwork/issues/181. Until
     // resolved, outline workflows use the same /deskwork:approve
-    // command as longform; this matches the legacy code path's actual
-    // dispatch (it emitted /editorial-outline-approve which had no
-    // dedicated handler under the hood).
+    // command as longform.
     const site = state.workflow.site;
     const slug = state.workflow.slug;
     const kind = state.workflow.contentKind;
     const approveCmd = `/deskwork:approve --site ${site} ${slug}`;
     const approveHint =
       kind === 'outline'
-        ? `Approved outline v${versionNum}. Next: ${approveCmd} finalizes the workflow.`
-        : `Approved v${versionNum}. Next: ${approveCmd} writes the file and marks the workflow applied.`;
+        ? `Approve outline v${versionNum}: ${approveCmd} finalizes the workflow.`
+        : `Approve v${versionNum}: ${approveCmd} graduates the stage.`;
     await copyCommandForNextStep(approveCmd, approveHint);
     reloadUnlessManualCopyOpen(2400);
   });
 
   iterateBtn?.addEventListener('click', async () => {
     iterateBtn.disabled = true;
-    const bridged = await ensureInReview();
-    if (!bridged) { iterateBtn.disabled = false; return; }
-    const ok = await postDecision('iterating');
-    if (!ok) { iterateBtn.disabled = false; return; }
     const site = state.workflow.site;
     const slug = state.workflow.slug;
     const kind = state.workflow.contentKind;
     // /deskwork:iterate defaults to --kind longform; outline and
-    // shortform workflows pass the flag so the helper picks the right
-    // workflow. Shortform additionally needs --platform / --channel,
-    // but the studio's shortform desk emits those via a different path.
-    const iterateCmd =
-      kind === 'outline'
-        ? `/deskwork:iterate --kind outline --site ${site} ${slug}`
-        : `/deskwork:iterate --site ${site} ${slug}`;
+    // shortform workflows pass --kind so the helper picks the right
+    // workflow. G.5 (audit 2026-05-12): shortform iterate must
+    // additionally include --platform and --channel so the iterate
+    // skill produces platform-appropriate copy.
+    let iterateCmd: string;
+    if (kind === 'shortform') {
+      const platform = state.workflow.platform ?? 'other';
+      const channelArg = state.workflow.channel
+        ? ` --channel ${state.workflow.channel}`
+        : '';
+      iterateCmd = `/deskwork:iterate --kind shortform --site ${site} --platform ${platform}${channelArg} ${slug}`;
+    } else if (kind === 'outline') {
+      iterateCmd = `/deskwork:iterate --kind outline --site ${site} ${slug}`;
+    } else {
+      iterateCmd = `/deskwork:iterate --site ${site} ${slug}`;
+    }
     await copyCommandForNextStep(
       iterateCmd,
-      `Iterating on v${versionNum}. Next: ${iterateCmd} revises against your comments and appends v${versionNum + 1}.`,
+      `Iterate on v${versionNum}: ${iterateCmd} revises against your comments and appends v${versionNum + 1}.`,
     );
     reloadUnlessManualCopyOpen(2400);
   });
 
-  rejectBtn?.addEventListener('click', async () => {
-    // #166 Phase 34b — inline reason composer replaces the legacy
-    // `window.prompt()`. Renders an in-page form anchored to the
-    // reject button; cancel returns null, confirm returns the (possibly
-    // empty) reason. Same submit flow as the prior code path.
-    const reason = await promptForRejectionReason(rejectBtn);
-    if (reason === null) return; // operator cancelled
-    rejectBtn.disabled = true;
-    if (reason) await postRejectAnnotation(reason);
-    const ok = await postDecision('cancelled');
-    if (ok) {
-      // Reject is terminal; nothing for the operator to run in Claude
-      // Code. Just confirm and reload.
-      showToast('Workflow cancelled.');
-      setTimeout(() => window.location.reload(), 900);
-    } else {
-      rejectBtn.disabled = false;
-    }
+  cancelBtn?.addEventListener('click', async () => {
+    // G.4 (issue #260): cancel is the state-machine's destructive verb
+    // (not "reject"). Cancel is terminal; clipboard-copy of
+    // /deskwork:cancel is the only action — no reason composer, no
+    // POST, no /deskwork:reject.
+    cancelBtn.disabled = true;
+    const site = state.workflow.site;
+    const slug = state.workflow.slug;
+    const cancelCmd = `/deskwork:cancel --site ${site} ${slug}`;
+    await copyCommandForNextStep(
+      cancelCmd,
+      `Cancel v${versionNum}: ${cancelCmd} moves the workflow to Cancelled.`,
+    );
+    reloadUnlessManualCopyOpen(2400);
   });
 
   // ---- Re-copy pending skill command ----
@@ -1810,16 +1720,18 @@ export function initEditorialReview(): void {
   });
 
   // ---- Destructive shortcut soft-confirm (#108) ----
-  // Approve / Iterate / Reject all transition workflow state and are
-  // hard to undo. Single-keystroke firing meant a stray `a` while the
-  // operator was reading collapsed weeks of work. The two-key sequence
-  // pattern (a-a, i-i, r-r within 500ms) keeps the keystroke speed
-  // muscle-memory advantage while requiring intent to fire.
-  type DestructiveKey = 'a' | 'i' | 'r';
+  // Approve / Iterate are routing actions (clipboard-copy of slash
+  // commands); the soft-confirm keeps a stray keypress from copying
+  // the wrong command. Two-key sequence (a-a, i-i within 500ms)
+  // matches the prior muscle memory.
+  //
+  // G.4: the `r` chord (originally bound to a "reject" verb the state
+  // machine doesn't have) is retired. Cancel is terminal and rare
+  // enough that a keyboard chord is not warranted.
+  type DestructiveKey = 'a' | 'i';
   const DESTRUCTIVE_LABELS: Readonly<Record<DestructiveKey, string>> = {
     a: 'approve',
     i: 'iterate',
-    r: 'reject',
   };
   let armedKey: DestructiveKey | null = null;
   let armedTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1925,14 +1837,14 @@ export function initEditorialReview(): void {
     }
     if (ev.key === 'e') { ev.preventDefault(); disarm(); toggleBtn.click(); return; }
     // Destructive actions (#108): two-key sequence within 500ms.
-    if (ev.key === 'a' || ev.key === 'i' || ev.key === 'r') {
+    // G.4: `r` chord retired alongside the `reject` verb.
+    if (ev.key === 'a' || ev.key === 'i') {
       ev.preventDefault();
       const key = ev.key as DestructiveKey;
       if (armedKey === key) {
         disarm();
         if (key === 'a') approveBtn?.click();
-        else if (key === 'i') iterateBtn?.click();
-        else rejectBtn?.click();
+        else iterateBtn?.click();
       } else {
         armKey(key);
       }
@@ -2005,6 +1917,230 @@ export function initEditorialReview(): void {
   // scrapbook drawer's bottom-anchor mechanism replaces the legacy
   // shared mobile pattern, so this handler now only wires marginalia.
   initMobileMarginaliaToggle();
+  // Note: shortform mobile bar + sheet wiring lives in
+  // `initShortformReview` (dispatched at the top of this function);
+  // longform/entry-review surfaces use their own
+  // `entry-review/mobile-sheet-bar.ts` controller from a different
+  // client bundle (`entry-review-client.ts`).
+}
+
+/**
+ * Step 2.2.10 — slim init path for the shortform review surface. The
+ * shortform surface shares this client bundle with longform but does
+ * not render the longform annotation chrome (margin composer, sidebar
+ * list, comment editing controls). This function wires only what
+ * shortform actually carries: the three decision buttons (Approve /
+ * Iterate / Cancel, clipboard-copy per THESIS Cons. 2), the universal
+ * mobile bar + sheet host, and the auto-refresh poll. The longform
+ * `initEditorialReview` body assumes the richer chrome and would
+ * throw `editorial-review: missing required element [data-edit-toolbar]`
+ * on a shortform shell.
+ */
+function initShortformReview(
+  state: DraftState,
+  workflowId: string,
+  versionNum: number,
+): void {
+  const toastEl = document.querySelector<HTMLElement>('[data-toast]');
+  function showToast(msg: string, isError = false): void {
+    if (!toastEl) return;
+    toastEl.textContent = msg;
+    toastEl.classList.toggle('error', isError);
+    toastEl.hidden = false;
+    setTimeout(() => { toastEl.hidden = true; }, 4000);
+  }
+
+  async function copyCommandForNextStep(command: string, hint: string): Promise<boolean> {
+    return copyOrShowFallback(command, {
+      successMessage: `${hint}  (command copied — paste into Claude Code)`,
+      fallbackMessage: 'Clipboard unavailable — select and Cmd-C to copy this command, then paste it into Claude Code:',
+      onDismiss: () => window.location.reload(),
+    });
+  }
+
+  function reloadUnlessManualCopyOpen(delayMs: number): void {
+    setTimeout(() => {
+      if (!isManualCopyOpen()) window.location.reload();
+    }, delayMs);
+  }
+
+  // Per Commandment II + VII: the three universal verbs render
+  // unconditionally; the click handler is clipboard-copy only.
+  // G.4 (issue #260): destructive verb is `cancel`, NOT `reject`.
+  // G.5: shortform iterate carries --platform and --channel so the
+  // iterate skill produces platform-appropriate copy.
+  const approveBtn = document.querySelector<HTMLButtonElement>('[data-action="approve"]');
+  const iterateBtn = document.querySelector<HTMLButtonElement>('[data-action="iterate"]');
+  const cancelBtn = document.querySelector<HTMLButtonElement>('[data-action="cancel"]');
+
+  approveBtn?.addEventListener('click', async () => {
+    approveBtn.disabled = true;
+    const cmd = `/deskwork:approve --site ${state.workflow.site} ${state.workflow.slug}`;
+    await copyCommandForNextStep(
+      cmd,
+      `Approve v${versionNum}: ${cmd} graduates the stage.`,
+    );
+    reloadUnlessManualCopyOpen(2400);
+  });
+
+  iterateBtn?.addEventListener('click', async () => {
+    iterateBtn.disabled = true;
+    const site = state.workflow.site;
+    const slug = state.workflow.slug;
+    const platform = state.workflow.platform ?? 'other';
+    const channelArg = state.workflow.channel
+      ? ` --channel ${state.workflow.channel}`
+      : '';
+    const cmd = `/deskwork:iterate --kind shortform --site ${site} --platform ${platform}${channelArg} ${slug}`;
+    await copyCommandForNextStep(
+      cmd,
+      `Iterate on v${versionNum}: ${cmd} revises against your comments and appends v${versionNum + 1}.`,
+    );
+    reloadUnlessManualCopyOpen(2400);
+  });
+
+  cancelBtn?.addEventListener('click', async () => {
+    cancelBtn.disabled = true;
+    const cmd = `/deskwork:cancel --site ${state.workflow.site} ${state.workflow.slug}`;
+    await copyCommandForNextStep(
+      cmd,
+      `Cancel v${versionNum}: ${cmd} moves the workflow to Cancelled.`,
+    );
+    reloadUnlessManualCopyOpen(2400);
+  });
+
+  // Re-copy pending skill command — works the same on every surface.
+  document.querySelectorAll<HTMLButtonElement>('[data-action="copy-cmd"]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const cmd = btn.getAttribute('data-cmd') ?? '';
+      if (!cmd) return;
+      await copyOrShowFallback(cmd, {
+        successMessage: `Copied: ${cmd}  (paste into Claude Code)`,
+        fallbackMessage: 'Clipboard unavailable — select and Cmd-C to copy this command, then paste it into Claude Code:',
+      });
+    });
+  });
+
+  // Auto-refresh poll — reload when the workflow's state changes or a
+  // new version is recorded.
+  const POLL_MS = 8000;
+  let pollingBusy = false;
+  async function poll(): Promise<void> {
+    if (pollingBusy) return;
+    pollingBusy = true;
+    try {
+      const res = await fetch(
+        `/api/dev/editorial-review/workflow?id=${encodeURIComponent(workflowId)}`,
+      );
+      if (!res.ok) return;
+      const body = await res.json();
+      const w = body.workflow as { currentVersion: number; state: string } | undefined;
+      if (!w) return;
+      const versionChanged = w.currentVersion !== state.workflow.currentVersion;
+      const stateChanged = w.state !== state.workflow.state;
+      if (versionChanged) {
+        showToast(`New version v${w.currentVersion} available — reloading…`);
+        setTimeout(() => {
+          window.location.href = `?v=${w.currentVersion}`;
+        }, 1200);
+      } else if (stateChanged) {
+        showToast(`State changed: ${state.workflow.state} → ${w.state}`);
+        setTimeout(() => window.location.reload(), 1500);
+      }
+    } catch {
+      // network hiccup — ignore
+    } finally {
+      pollingBusy = false;
+    }
+  }
+  setInterval(() => { void poll(); }, POLL_MS);
+
+  // Wire the universal mobile bar + sheet for the shortform surface.
+  initShortformMobileSheet();
+}
+
+/**
+ * Step 2.2.10 — universal mobile bar + sheet wiring for the shortform
+ * review surface. No-op on desktop (CSS hides the bar) and on surfaces
+ * without the bar (e.g. the error page). Server-rendered slots are
+ * pre-populated; this wiring only manages open/close + active-slot
+ * visibility.
+ */
+function initShortformMobileSheet(): void {
+  const bar = document.querySelector<HTMLElement>('[data-mobile-bar]');
+  const sheet = document.querySelector<HTMLElement>('[data-mobile-sheet-host]');
+  if (!bar || !sheet) return;
+
+  const tabs = Array.from(bar.querySelectorAll<HTMLButtonElement>('[data-mobile-sheet]'));
+  if (tabs.length === 0) return;
+  const slots = Array.from(
+    sheet.querySelectorAll<HTMLElement>('[data-mobile-sheet-slot]'),
+  );
+  const handle = sheet.querySelector<HTMLElement>('[data-mobile-sheet-handle]');
+  const closeBtn = sheet.querySelector<HTMLButtonElement>('[data-mobile-sheet-close]');
+  const kicker = sheet.querySelector<HTMLElement>('[data-mobile-sheet-kicker]');
+  const meta = sheet.querySelector<HTMLElement>('[data-mobile-sheet-meta]');
+
+  // Per-surface kicker labels. Shortform surfaces today: toc / versions
+  // / actions. Other slots are ignored (no shortform consumer; the
+  // entry-review path uses its own controller).
+  const KICKERS: Readonly<Record<string, { kicker: string; meta: string }>> = {
+    toc: { kicker: '§ TOC', meta: '' },
+    versions: { kicker: '№ Versions', meta: '' },
+    actions: { kicker: '⊕ Actions', meta: '' },
+  };
+
+  let currentSheet: string | null = null;
+  const SLIDE_MS = 280;
+
+  function setHeader(name: string): void {
+    const cfg = KICKERS[name];
+    if (kicker) kicker.textContent = cfg?.kicker ?? '';
+    if (meta) meta.textContent = cfg?.meta ?? '';
+  }
+
+  function onClose(): void {
+    currentSheet = null;
+    for (const t of tabs) t.setAttribute('aria-expanded', 'false');
+    window.setTimeout(() => {
+      if (currentSheet === null) sheet!.hidden = true;
+    }, SLIDE_MS + 40);
+  }
+
+  const controller: SlideUpSheetController = createSlideUpSheet({
+    sheetEl: sheet,
+    bodyOpenAttr: 'data-mobile-sheet-open',
+    handleEl: handle ?? undefined,
+    closeBtnEl: closeBtn ?? undefined,
+    onClose,
+  });
+
+  function openSheet(name: string): void {
+    if (currentSheet === name) {
+      controller.close();
+      return;
+    }
+    currentSheet = name;
+    sheet!.hidden = false;
+    sheet!.setAttribute('data-mobile-sheet-slot', name);
+    for (const slot of slots) {
+      const slotName = slot.dataset.mobileSheetSlot;
+      slot.hidden = slotName !== name;
+    }
+    setHeader(name);
+    controller.open();
+    for (const t of tabs) {
+      t.setAttribute('aria-expanded', t.dataset.mobileSheet === name ? 'true' : 'false');
+    }
+  }
+
+  for (const tab of tabs) {
+    tab.addEventListener('click', () => {
+      const name = tab.dataset.mobileSheet;
+      if (!name) return;
+      openSheet(name);
+    });
+  }
 }
 
 /**

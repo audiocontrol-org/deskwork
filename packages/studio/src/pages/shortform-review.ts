@@ -15,9 +15,28 @@
  *
  * Workflow-keyed wording in this file is documenting that deliberate
  * deferral; do not flag in audits.
+ *
+ * Step 2.2.10 (v7 universal chrome + state-machine compliance):
+ *   - Server-side: er-strip / er-stamp / er-pending-state / shortcut
+ *     overlay / state-branched control rendering all REMOVED. The
+ *     universal `renderMobileBar` primitive + a shortform-specific
+ *     sheet host (`./shortform-review-mobile-sheet.ts`) replace them.
+ *   - Per DESIGN-STANDARDS.md § Universal bar contract: this surface
+ *     composes its `Cell[]` mechanically (TOC / Versions / Actions)
+ *     and passes it to `renderMobileBar`. No bespoke chrome shape.
+ *   - Per DESKWORK-STATE-MACHINE.md Commandment III: no review-state
+ *     labels on the page (the stamp + pending pills were the
+ *     violations).
+ *   - The desktop edit-mode panes (`renderEditPanes`) stay — they're
+ *     gated by the existing `data-edit-mode` body attribute and the
+ *     Edit toolbar is still part of the desktop chrome. Mobile edit
+ *     entry-point is deferred to a future task (the workplan keeps
+ *     the broader shortform state-machine migration explicitly out
+ *     of scope for this step).
  */
 
 import { handleGetWorkflow } from '@deskwork/core/review/handlers';
+import { extractToc } from '@deskwork/core/review/toc';
 import type {
   DraftVersion,
   DraftWorkflowItem,
@@ -27,11 +46,16 @@ import {
   renderMarkdownToHtml,
 } from '@deskwork/core/review/render';
 import type { StudioContext } from '../routes/api.ts';
-import { escapeHtml, gloss, html, unsafe, type RawHtml } from './html.ts';
+import { escapeHtml, html, unsafe, type RawHtml } from './html.ts';
 import { layout } from './layout.ts';
 import { renderEditorialFolio } from './chrome.ts';
 import { renderMasthead } from './masthead.ts';
 import { renderMastheadMenu } from './masthead-menu.ts';
+import { renderMobileBar } from './mobile-bar.ts';
+import {
+  getShortformBarCells,
+  renderShortformMobileSheet,
+} from './shortform-review-mobile-sheet.ts';
 
 interface ShortformReviewQuery {
   /** ?v=<n>; null shows the workflow's currentVersion. */
@@ -55,10 +79,6 @@ function errorFromBody(body: unknown): string {
 
 function stringField(v: unknown): string | undefined {
   return typeof v === 'string' ? v : undefined;
-}
-
-function stateLabel(state?: string): string {
-  return (state ?? '').replace('-', ' ');
 }
 
 interface PreparedRender {
@@ -85,122 +105,12 @@ async function prepareShortformRender(markdown: string): Promise<PreparedRender>
   return { fm, bodyHtml: renderedHtml };
 }
 
-function renderVersionsStrip(
-  versions: readonly DraftVersion[],
-  current: DraftVersion,
-): RawHtml {
-  if (versions.length <= 1) return unsafe('');
-  const links = versions
-    .map((v) => {
-      const isActive = v.version === current.version;
-      const href = `?v=${v.version}`;
-      return html`<a href="${href}" class="${isActive ? 'active' : ''}">v${v.version}</a>`;
-    })
-    .join('');
-  return unsafe(html`<span class="er-strip-versions">${unsafe(links)}</span>`);
-}
-
-function pendingSkillCmd(workflow: DraftWorkflowItem): string {
-  const { site, slug, state } = workflow;
-  if (state === 'iterating') {
-    return `/deskwork:iterate --site ${site} ${slug}`;
-  }
-  if (state === 'approved') {
-    return `/deskwork:approve --site ${site} ${slug}`;
-  }
-  return '';
-}
-
-function shortcutChipWrap(buttonHtml: string, letter: 'a' | 'i' | 'r'): string {
-  return html`<span class="er-shortcut-chip-wrap">${unsafe(buttonHtml)}<small class="er-shortcut-chip"><kbd>${letter}</kbd><kbd>${letter}</kbd></small></span>`;
-}
-
-function renderControlsRight(workflow: DraftWorkflowItem): RawHtml {
-  const isActive = workflow.state === 'open' || workflow.state === 'in-review';
-  const isApproved = workflow.state === 'approved';
-  const isIterating = workflow.state === 'iterating';
-  const isTerminal = workflow.state === 'applied' || workflow.state === 'cancelled';
-  const buttons: string[] = [];
-  buttons.push(html`<button class="er-btn er-btn-small" data-action="toggle-edit" type="button">Edit</button><span class="er-edit-mode-label" data-mode="preview">preview</span>`);
-  if (isActive) {
-    buttons.push(
-      shortcutChipWrap(
-        html`<button class="er-btn er-btn-small er-btn-approve" data-action="approve" type="button">Approve</button>`,
-        'a',
-      ),
-    );
-    buttons.push(
-      shortcutChipWrap(
-        html`<button class="er-btn er-btn-small" data-action="iterate" type="button">Iterate</button>`,
-        'i',
-      ),
-    );
-    buttons.push(
-      shortcutChipWrap(
-        html`<button class="er-btn er-btn-small er-btn-reject" data-action="reject" type="button">Reject</button>`,
-        'r',
-      ),
-    );
-  }
-  if (isApproved) {
-    const applyCmd = pendingSkillCmd(workflow);
-    buttons.push(html`<span class="er-pending-state">awaiting apply…</span>`);
-    buttons.push(html`<button class="er-btn er-btn-small" data-action="copy-cmd" data-cmd="${applyCmd}" title="Copy ${applyCmd} to clipboard" type="button">copy <code>/deskwork:approve</code></button>`);
-    buttons.push(
-      shortcutChipWrap(
-        html`<button class="er-btn er-btn-small er-btn-reject" data-action="reject" type="button">Reject</button>`,
-        'r',
-      ),
-    );
-  }
-  if (isIterating) {
-    const iterateCmd = pendingSkillCmd(workflow);
-    buttons.push(html`<span class="er-pending-state">agent iterating…</span>`);
-    buttons.push(html`<button class="er-btn er-btn-small" data-action="copy-cmd" data-cmd="${iterateCmd}" title="Copy ${iterateCmd} to clipboard" type="button">copy <code>/deskwork:iterate</code></button>`);
-  }
-  if (isTerminal) {
-    buttons.push(html`<span class="er-pending-state er-pending-state--filed">filed (${workflow.state})</span>`);
-  }
-  buttons.push(html`<button class="er-btn er-btn-small" data-action="shortcuts" type="button" aria-label="Show keyboard shortcuts" title="Keyboard shortcuts">?</button>`);
-  return unsafe(`<span class="er-strip-right">${buttons.join('')}</span>`);
-}
-
-function renderShortcutsOverlay(): RawHtml {
-  return unsafe(html`
-    <div class="er-shortcuts" data-shortcuts-overlay hidden role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
-      <div class="er-shortcuts-backdrop" data-shortcuts-backdrop></div>
-      <div class="er-shortcuts-panel">
-        <h2>Keyboard</h2>
-        <dl>
-          <dt><kbd>e</kbd> / dbl-click</dt><dd>toggle edit mode</dd>
-          <dt><kbd>a</kbd> <kbd>a</kbd></dt><dd>approve <em>— press twice within 500ms</em></dd>
-          <dt><kbd>i</kbd> <kbd>i</kbd></dt><dd>iterate <em>— press twice within 500ms</em></dd>
-          <dt><kbd>r</kbd> <kbd>r</kbd></dt><dd>reject <em>— press twice within 500ms</em></dd>
-          <dt><kbd>?</kbd></dt><dd>this panel</dd>
-          <dt><kbd>esc</kbd></dt><dd>close</dd>
-        </dl>
-        <p class="er-shortcuts-footer">Press <kbd>?</kbd> anytime.</p>
-      </div>
-    </div>`);
-}
-
-function renderEditToolbar(): RawHtml {
-  return unsafe(html`
-    <div class="er-edit-toolbar" data-edit-toolbar hidden>
-      <div class="er-edit-modes" role="tablist" aria-label="Editor mode">
-        <button class="er-edit-mode-btn" data-edit-view="source" type="button" aria-pressed="true">Source</button>
-        <button class="er-edit-mode-btn" data-edit-view="split" type="button" aria-pressed="false">Split</button>
-        <button class="er-edit-mode-btn" data-edit-view="preview" type="button" aria-pressed="false">Preview</button>
-      </div>
-      <div class="er-edit-actions">
-        <button class="er-btn er-btn-small" data-action="focus-mode" type="button" title="Distraction-free mode (Shift+F)" aria-pressed="false">Focus ⛶</button>
-        <button class="er-btn er-btn-primary" data-action="save-version" type="button">Save as new version</button>
-        <button class="er-btn" data-action="cancel-edit" type="button">Cancel</button>
-        <span class="er-edit-hint" data-edit-hint></span>
-      </div>
-    </div>`);
-}
-
+/**
+ * Desktop-only edit panes. The `data-edit-mode` body attribute is the
+ * gate (set by the existing client toggle-edit handler). On mobile,
+ * edit mode is not currently surfaced from this surface — the broader
+ * shortform state-machine migration is the right place to design that.
+ */
 function renderEditPanes(): RawHtml {
   return unsafe(html`
     <div class="er-edit-mode" data-edit-panes-host hidden>
@@ -281,6 +191,10 @@ export async function renderShortformReviewPage(
   const draftState = { workflow, currentVersion, versions };
   const titleField = stringField(fm.title) ?? `Draft: ${slug}`;
 
+  // #244 — extract TOC from the rendered body. `rehype-slug` already
+  // gave every h2/h3/h4 an `id`; `extractToc` reads the slugs + text.
+  const tocEntries = extractToc(bodyHtml);
+
   const shortformMeta: RawHtml = unsafe(html`
     <div class="er-shortform-meta">
       <span class="er-platform">${workflow.platform ?? 'other'}</span>
@@ -304,6 +218,19 @@ export async function renderShortformReviewPage(
     isHub: false,
   });
 
+  // v7 universal mobile bar. The cell list is composed mechanically
+  // from the surface's TOC + Versions + (always) Actions per
+  // DESIGN-STANDARDS.md § Universal bar contract. The Actions cell
+  // guarantees the bar is never empty.
+  const barCells = getShortformBarCells({ tocEntries, versions });
+  const mobileBar = renderMobileBar({ contextual: barCells });
+  const mobileSheet = renderShortformMobileSheet({
+    tocEntries,
+    versions,
+    workflow,
+    currentVersion,
+  });
+
   const pageGrid = html`
     <div class="er-page-grid">
       <div class="er-draft-frame">
@@ -319,28 +246,12 @@ export async function renderShortformReviewPage(
       ${renderMastheadMenu()}
       ${renderEditorialFolio('shortform', folioSpine)}
       ${shortformMeta}
-      <div class="er-strip">
-        <div class="er-strip-inner">
-          <a class="er-strip-back" href="/dev/editorial-studio" title="Back to the editorial studio">← studio</a>
-          <span class="er-strip-galley">${gloss('galley')} <em>№ ${currentVersion.version}</em></span>
-          <span class="er-strip-slug">${workflow.site} / ${workflow.slug}</span>
-          ${renderVersionsStrip(versions, currentVersion)}
-          <span class="er-strip-center">
-            <span class="er-stamp er-stamp-big er-stamp-${workflow.state}" data-state-label>
-              ${stateLabel(workflow.state)}
-            </span>
-            <span class="er-strip-hint">double-click to edit · <kbd>?</kbd> for shortcuts</span>
-          </span>
-          ${renderControlsRight(workflow)}
-        </div>
-      </div>
-      ${renderEditToolbar()}
       <article class="er-page">
         ${unsafe(pageGrid)}
       </article>
+      ${mobileBar}
+      ${mobileSheet}
       <div class="er-toast" data-toast hidden></div>
-      ${renderShortcutsOverlay()}
-      <div class="er-poll-indicator" data-poll>auto-refresh · 8s</div>
     </div>`;
 
   return layout({

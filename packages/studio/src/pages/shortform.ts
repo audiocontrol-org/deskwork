@@ -82,7 +82,6 @@ function renderRow(w: DraftWorkflowItem, now: Date): RawHtml {
       <span class="er-row-site er-row-site--${w.site}" title="${w.site}">${siteLabel(w.site)}</span>
       <span class="er-row-slug">${w.slug}</span>
       ${channelMarkup}
-      <span class="er-stamp er-stamp-${w.state}">${w.state.replace('-', ' ')}</span>
       <span class="er-row-ts">v${w.currentVersion} · ${fmtRelTime(w.updatedAt, now)}</span>
       <span class="er-row-hint">Open in review →</span>
     </a>`);

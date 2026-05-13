@@ -71,27 +71,53 @@ export async function newPage(browser, viewport) {
 /**
  * Parse CLI arguments for the mobile probes.
  *
- * Recognised flags:
- *   --studio-url <url>   Override the studio base URL (default: $STUDIO_URL or http://localhost:47323)
- *   --entry <uuid>       Pin a specific entry UUID (optional; probes auto-pick if omitted)
+ * Recognised flags (each accepts both `--flag value` and `--flag=value` forms):
+ *   --studio-url <url>     Override the studio base URL (default: $STUDIO_URL or http://localhost:47323)
+ *   --entry <uuid>         Pin a specific entry UUID (entry-keyed probes auto-pick if omitted)
+ *   --workflow-id <uuid>   Pin a specific workflow UUID (workflow-keyed probes; e.g. shortform review)
  *
  * @param {string[]} argv  Typically process.argv.slice(2)
- * @returns {{ studioUrl: string, entryUuid: string | null }}
+ * @returns {{ studioUrl: string, entryUuid: string | null, workflowId: string | null }}
  */
 export function parseProbeArgs(argv) {
   let studioUrl = process.env.STUDIO_URL ?? 'http://localhost:47323';
   let entryUuid = null;
+  let workflowId = null;
+
+  function readValue(arg, flag, nextArg) {
+    const eqIdx = arg.indexOf('=');
+    if (eqIdx >= 0 && arg.slice(0, eqIdx) === flag) {
+      return { value: arg.slice(eqIdx + 1), consumedNext: false };
+    }
+    if (arg === flag && typeof nextArg === 'string') {
+      return { value: nextArg, consumedNext: true };
+    }
+    return null;
+  }
 
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (a === '--studio-url' && argv[i + 1]) {
-      studioUrl = argv[++i];
-    } else if (a === '--entry' && argv[i + 1]) {
-      entryUuid = argv[++i];
+    const studioMatch = readValue(a, '--studio-url', argv[i + 1]);
+    if (studioMatch) {
+      studioUrl = studioMatch.value;
+      if (studioMatch.consumedNext) i++;
+      continue;
+    }
+    const entryMatch = readValue(a, '--entry', argv[i + 1]);
+    if (entryMatch) {
+      entryUuid = entryMatch.value;
+      if (entryMatch.consumedNext) i++;
+      continue;
+    }
+    const workflowMatch = readValue(a, '--workflow-id', argv[i + 1]);
+    if (workflowMatch) {
+      workflowId = workflowMatch.value;
+      if (workflowMatch.consumedNext) i++;
+      continue;
     }
   }
 
-  return { studioUrl, entryUuid };
+  return { studioUrl, entryUuid, workflowId };
 }
 
 /**
