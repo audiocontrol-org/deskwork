@@ -2037,14 +2037,17 @@ function initShortformReview(
       const w = body.workflow as { currentVersion: number; state: string } | undefined;
       if (!w) return;
       const versionChanged = w.currentVersion !== state.workflow.currentVersion;
-      const stateChanged = w.state !== state.workflow.state;
+      // Per DESKWORK-STATE-MACHINE.md Commandment III, the operator-facing
+      // surface does NOT label review state. Workflow advances reload the
+      // page so the server-rendered chrome re-derives from current state.
+      const workflowAdvanced = w.state !== state.workflow.state;
       if (versionChanged) {
         showToast(`New version v${w.currentVersion} available — reloading…`);
         setTimeout(() => {
           window.location.href = `?v=${w.currentVersion}`;
         }, 1200);
-      } else if (stateChanged) {
-        showToast(`State changed: ${state.workflow.state} → ${w.state}`);
+      } else if (workflowAdvanced) {
+        showToast('Workflow updated — reloading…');
         setTimeout(() => window.location.reload(), 1500);
       }
     } catch {
