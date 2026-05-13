@@ -121,9 +121,15 @@ function renderStageTile(stage: Stage, count: number): RawHtml {
   const isEmpty = count === 0;
   const classes = isEmpty ? 'er-stage-tile is-empty' : 'er-stage-tile';
   const disabledAttr = isEmpty ? ' disabled' : '';
+  // v7 architecture (Step 2.2.9): `data-stage-section-group="longform"`
+  // partitions single-expand state so the longform pipeline and the
+  // shortform-by-platform section operate independently. The client
+  // controller in `dashboard/stage-tiles.ts` reads this attribute to
+  // collapse only siblings in the same group when a tile is opened.
   return unsafe(html`
     <button class="${classes}" type="button"
       data-stage-tile="${stage}"
+      data-stage-section-group="longform"
       aria-expanded="false"
       aria-controls="stage-${stage.toLowerCase()}"${unsafe(disabledAttr)}>
       <span class="er-stage-tile-glyph" aria-hidden="true">${STAGE_ORNAMENTS[stage]}</span>
@@ -211,6 +217,7 @@ export function renderDistributionPlaceholder(): RawHtml {
     <div class="er-stage-block" data-stage-block="Distribution">
       <button class="er-stage-tile is-empty" type="button"
         data-stage-tile="Distribution"
+        data-stage-section-group="longform"
         aria-expanded="false"
         aria-controls="stage-distribution" disabled>
         <span class="er-stage-tile-glyph" aria-hidden="true">⌘</span>

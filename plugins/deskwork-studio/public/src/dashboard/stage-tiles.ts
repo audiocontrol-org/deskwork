@@ -4,8 +4,19 @@
  * On phone (<=600px), each stage section is collapsed by default and
  * fronted by a `<button class="er-stage-tile">` that the operator taps
  * to expand. Single-expand: tapping a tile collapses any other expanded
- * section. Empty-stage tiles are `disabled` (no rows to expand) but
- * stay visible so the operator can SEE the full pipeline shape at-rest.
+ * section IN THE SAME GROUP. Empty-stage tiles are `disabled` (no rows
+ * to expand) but stay visible so the operator can SEE the full pipeline
+ * shape at-rest.
+ *
+ * v7 architecture (Step 2.2.9): single-expand is partitioned by
+ * `data-stage-section-group`. The longform pipeline and the shortform-
+ * by-platform section operate independent single-expand state — the
+ * operator may have one longform stage AND one shortform platform
+ * expanded simultaneously, useful when cross-referencing pipeline state
+ * with social distribution shape (per DESIGN-STANDARDS.md § Desk
+ * information architecture). Tiles without a group attribute (e.g. a
+ * standalone Distribution placeholder pre-v7) participate in NO group
+ * — tapping them does its own thing.
  *
  * On desktop, all sections render expanded; the tile is `display: none`
  * via dashboard-mobile.css and the existing `<h2 class="er-section-head">`
@@ -13,7 +24,7 @@
  * gated by matchMedia at click-time so desktop clicks (which can't even
  * reach the tile) are safe no-ops.
  *
- * Visual reference: /static/mockups/dashboard-compact-1-collapsible.html
+ * Visual reference: /static/mockups/desk-states-v7.html
  */
 
 const MOBILE_QUERY = '(max-width: 600px)';
@@ -70,18 +81,24 @@ export function initStageTiles(): void {
 
       const wasCollapsed = section.hasAttribute('data-collapsed');
 
-      // Single-expand: collapse all OTHER sections so only one stage's
-      // rows are visible at a time on phone. Drop their userOpened mark
-      // so a viewport-resize-driven applyViewportCollapse() re-collapses
-      // them correctly later.
-      for (const other of tiles) {
-        if (other === tile) continue;
-        const otherStage = other.dataset.stageTile;
-        if (!otherStage) continue;
-        const otherSection = getSection(otherStage);
-        if (otherSection) otherSection.setAttribute('data-collapsed', '');
-        other.setAttribute('aria-expanded', 'false');
-        delete other.dataset.userOpened;
+      // Single-expand SCOPED TO THE TILE'S GROUP. v7 architecture:
+      // tiles in different sections (longform pipeline vs shortform-by-
+      // platform) operate independent single-expand state. Tiles
+      // without `data-stage-section-group` are standalone — they collapse
+      // NO siblings on expand (legacy pre-v7 behavior for any unmarked
+      // tile that still ships).
+      const group = tile.dataset.stageSectionGroup;
+      if (group !== undefined && group !== '') {
+        for (const other of tiles) {
+          if (other === tile) continue;
+          if (other.dataset.stageSectionGroup !== group) continue;
+          const otherStage = other.dataset.stageTile;
+          if (!otherStage) continue;
+          const otherSection = getSection(otherStage);
+          if (otherSection) otherSection.setAttribute('data-collapsed', '');
+          other.setAttribute('aria-expanded', 'false');
+          delete other.dataset.userOpened;
+        }
       }
 
       if (wasCollapsed) {

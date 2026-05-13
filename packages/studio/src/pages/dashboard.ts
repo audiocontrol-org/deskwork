@@ -43,6 +43,8 @@ import {
   renderDistributionPlaceholder,
 } from './dashboard/section.ts';
 import { renderHeader, renderFilterStrip } from './dashboard/header.ts';
+import { renderShortformSection } from './dashboard/shortform-section.ts';
+import { renderAdjacentSection } from './dashboard/adjacent-section.ts';
 import type { ContentIndex } from '@deskwork/core/content-index';
 
 /**
@@ -64,7 +66,7 @@ export async function renderDashboard(
   // Touch the parameter so the unused-param check stays satisfied.
   void getIndex;
 
-  const data = await loadDashboardData(ctx.projectRoot);
+  const data = await loadDashboardData(ctx.projectRoot, ctx.config);
   const now = ctx.now ? ctx.now() : new Date();
 
   const defaultSite = ctx.config.defaultSite;
@@ -73,14 +75,19 @@ export async function renderDashboard(
     return renderStageSection(stage, bucket, defaultSite).__raw;
   }).join('\n');
 
-  // v7 universal masthead. Mobile-only at this commit (CSS hides it
-  // on desktop so the existing er-pagehead chrome below keeps its
-  // present-day desktop appearance). Step 2.2.8 (renderMobileBar
-  // refactor) is the natural moment to retire redundant pre-v7
-  // chrome on mobile across surfaces; Step 2.2.9 (Desk's
-  // Shortform-by-platform section) ships the Desk body refresh.
+  // v7 architecture (Step 2.2.9 — studio-mobile-first): the Desk absorbs
+  // the Shortform-by-platform view as its second section, plus reserved
+  // Adjacent-tools placeholders for Phase 3+ Folio + Files surfaces. Per
+  // the v7 mockup at desk-states-v7.html:563, the masthead meta reads
+  // "${longformCount} longform · ${shortformCount} shortform" when any
+  // shortform workflows exist; otherwise it falls back to longform-only
+  // to avoid a misleading "0 shortform" claim.
   const longformCount = data.entries.length;
-  const mastheadMeta = `${longformCount} on the calendar`;
+  const shortformCount = data.shortformWorkflows.length;
+  const mastheadMeta =
+    shortformCount > 0
+      ? `${longformCount} longform · ${shortformCount} shortform`
+      : `${longformCount} longform`;
   const masthead = renderMasthead({
     kicker: "The compositor's desk",
     title: 'Pipeline + Press.',
@@ -93,6 +100,15 @@ export async function renderDashboard(
   // purpose was surfacing review-state, which is RETIRED. The
   // archive entry at docs/studio-design/ACCEPTED/2026-05-09-press-queue-removed/
   // captures the rationale.
+  const shortformSection = renderShortformSection(
+    {
+      shortformByPlatform: data.shortformByPlatform,
+      totalCount: shortformCount,
+    },
+    now,
+  );
+  const adjacentSection = renderAdjacentSection();
+
   const body = html`
   ${masthead}
   ${renderMastheadMenu()}
@@ -102,6 +118,8 @@ export async function renderDashboard(
     ${renderFilterStrip()}
     ${unsafe(stageSections)}
     ${renderDistributionPlaceholder()}
+    ${shortformSection}
+    ${adjacentSection}
   </main>
   ${renderComposeChrome()}
   <div class="er-toast" data-toast hidden></div>
@@ -114,6 +132,7 @@ export async function renderDashboard(
       '/static/css/editorial-nav.css',
       '/static/css/editorial-studio.css',
       '/static/css/dashboard-mobile.css',
+      '/static/css/dashboard-desk-sections.css',
       '/static/css/dashboard-row-affordances.css',
       '/static/css/mobile-shell.css',
     ],
