@@ -1,75 +1,91 @@
 /**
- * Mobile bottom-bar + sheet host for the entry-keyed review surface.
+ * Entry-review-specific mobile sheet host + strip affordances.
  *
- * Renders a 3-tab bottom bar and a sheet host that slides up from the
- * viewport bottom. Visible only at <48rem (phone widths) — see
- * editorial-review.css. Above that the bar and sheet are display:none
- * and the desktop layout (in-flow marginalia column, outline-drawer
- * overlay, decision strip in the top strip) carries the surface.
+ * Renders the bottom-sheet container with the five named slots
+ * (outline / notes / actions / scrapbook / format) the entry-review
+ * surface composes against, plus the two phone-only strip affordances
+ * (Source/Preview pill, ✕ Done exit) that live in the top strip when
+ * editing on phone.
+ *
+ * The mobile-BAR helper itself is universal — it moved to
+ * `../mobile-bar.ts` and accepts a list of `Cell`s the caller supplies
+ * to describe each tab. The entry-review consumer composes the
+ * pre-refactor 6-cell configuration via `getEntryReviewBarCells()`
+ * below.
  *
  * Design references:
  *   - Review tabs: plugins/deskwork-studio/public/mockups/mobile-1-bottom-sheet.html
  *   - Editor tabs: plugins/deskwork-studio/public/mockups/editor-2-press-check-tabbar.html
  *
- * The bar carries SIX tab buttons; CSS shows three or four at a time
- * keyed off `body[data-edit-mode="editing"]`:
- *   - Review mode: Outline · Notes · Scrapbook · Actions  (4-column grid)
- *   - Edit mode:   Format  · Notes · Save                 (3-column grid)
- * The Notes tab is shared between modes (review notes the operator
- * leaves carry across into edit). The bar's data-mode attribute is
- * also flipped by the client so additional state-dependent styles
- * (Save dirty glow, etc.) can key off it. The Scrapbook tab uses a
- * grid glyph (▦) and a kraft-tone count badge to distinguish it
- * from the red-pencil Notes badge — folio is "context for the
- * entry," not an action peer of decisions.
- *
- * The sheet has five content slots (outline / notes / actions /
- * scrapbook / format).
- * The client controller (`entry-review/mobile-sheet-bar.ts`) populates
- * each at first open. Slot sources:
+ * The sheet has five content slots. The client controller
+ * (`entry-review/mobile-sheet-bar.ts`) populates each at first open.
+ * Slot sources:
  *   - outline: clone of `.er-outline-drawer-body`
  *   - notes:   actual `[data-sidebar-list]` element MOVED in on phone
  *              (preserves event listeners; see mobile-sheet-bar.ts)
  *   - actions: rendered fresh from the decision verbs
  *   - format:  the press-check key grid rendered server-side below
- *
- * The Save tab is NOT a sheet — it triggers the existing
- * `[data-action="save-version"]` handler directly (the one allowed
- * file mutation per THESIS Consequence 2).
  */
 
 import { html, unsafe, type RawHtml } from '../html.ts';
+import type { Cell } from '../mobile-bar.ts';
 
-export function renderMobileBar(): RawHtml {
-  return unsafe(html`
-    <nav class="er-mobile-bar" data-mobile-bar aria-label="Surface tabs">
-      <button class="er-mobile-tab er-mobile-tab--review" data-mobile-sheet="outline" type="button" aria-controls="er-mobile-sheet" aria-expanded="false">
-        <span class="er-mobile-tab-glyph" aria-hidden="true">§</span>
-        <span class="er-mobile-tab-label">Outline</span>
-      </button>
-      <button class="er-mobile-tab er-mobile-tab--edit" data-mobile-sheet="format" type="button" aria-controls="er-mobile-sheet" aria-expanded="false">
-        <span class="er-mobile-tab-glyph" aria-hidden="true">¶</span>
-        <span class="er-mobile-tab-label">Format</span>
-      </button>
-      <button class="er-mobile-tab" data-mobile-sheet="notes" type="button" aria-controls="er-mobile-sheet" aria-expanded="false">
-        <span class="er-mobile-tab-glyph" aria-hidden="true">✎</span>
-        <span class="er-mobile-tab-label">Notes</span>
-        <span class="er-mobile-tab-count" data-notes-count hidden>0</span>
-      </button>
-      <button class="er-mobile-tab er-mobile-tab--review er-mobile-tab--scrapbook" data-mobile-sheet="scrapbook" type="button" aria-controls="er-mobile-sheet" aria-expanded="false">
-        <span class="er-mobile-tab-glyph" aria-hidden="true">▦</span>
-        <span class="er-mobile-tab-label">Scrapbook</span>
-        <span class="er-mobile-tab-count er-mobile-tab-count--kraft" data-scrapbook-count hidden>0</span>
-      </button>
-      <button class="er-mobile-tab er-mobile-tab--review" data-mobile-sheet="actions" type="button" aria-controls="er-mobile-sheet" aria-expanded="false">
-        <span class="er-mobile-tab-glyph" aria-hidden="true">⊕</span>
-        <span class="er-mobile-tab-label">Actions</span>
-      </button>
-      <button class="er-mobile-tab er-mobile-tab--edit er-mobile-tab--save" data-mobile-action="save" type="button">
-        <span class="er-mobile-tab-glyph" aria-hidden="true">⊕</span>
-        <span class="er-mobile-tab-label">Save</span>
-      </button>
-    </nav>`);
+/**
+ * The entry-review bar's contextual cell list. Six cells; CSS hides
+ * the off-mode cells via the `er-mobile-tab--review` /
+ * `er-mobile-tab--edit` modifiers (gated on
+ * `body[data-edit-mode="editing"]`).
+ *
+ *   - Review mode visible: Outline · Notes · Scrapbook · Actions
+ *   - Edit mode visible:   Format · Notes · Save
+ *
+ * The Notes tab is mode `'both'` — review notes the operator leaves
+ * carry across into edit. The Scrapbook tab uses the kraft-tone count
+ * badge to distinguish folio context from action peers.
+ */
+export function getEntryReviewBarCells(): readonly Cell[] {
+  return [
+    {
+      glyph: '§',
+      label: 'Outline',
+      mode: 'review',
+      action: { kind: 'sheet', name: 'outline' },
+    },
+    {
+      glyph: '¶',
+      label: 'Format',
+      mode: 'edit',
+      action: { kind: 'sheet', name: 'format' },
+    },
+    {
+      glyph: '✎',
+      label: 'Notes',
+      mode: 'both',
+      action: { kind: 'sheet', name: 'notes' },
+      count: { dataAttr: 'data-notes-count' },
+    },
+    {
+      glyph: '▦',
+      label: 'Scrapbook',
+      mode: 'review',
+      action: { kind: 'sheet', name: 'scrapbook' },
+      count: { dataAttr: 'data-scrapbook-count', tone: 'kraft' },
+      modifierClass: 'er-mobile-tab--scrapbook',
+    },
+    {
+      glyph: '⊕',
+      label: 'Actions',
+      mode: 'review',
+      action: { kind: 'sheet', name: 'actions' },
+    },
+    {
+      glyph: '⊕',
+      label: 'Save',
+      mode: 'edit',
+      action: { kind: 'direct', action: 'save' },
+      modifierClass: 'er-mobile-tab--save',
+    },
+  ];
 }
 
 function renderFormatGrid(): string {

@@ -51,7 +51,13 @@ import { renderEditToolbar } from './edit-toolbar.ts';
 import { renderEditPanes } from './edit-panes.ts';
 import { renderOutlineDrawer } from './outline-drawer.ts';
 import { renderMarginalia, renderMarginaliaTab } from './marginalia.ts';
-import { renderMobileBar, renderMobileSheet, renderStripModeSegment, renderStripEditExit } from './mobile-bar.ts';
+import { renderMobileBar } from '../mobile-bar.ts';
+import {
+  renderMobileSheet,
+  renderStripModeSegment,
+  renderStripEditExit,
+  getEntryReviewBarCells,
+} from './mobile-sheet.ts';
 import { renderDecisionStrip } from './decision-strip.ts';
 import { renderShortcutsOverlay } from './shortcuts.ts';
 import { renderEntryNotFound } from './not-found.ts';
@@ -309,7 +315,7 @@ export async function renderEntryReviewPage(
       <button class="er-pencil-btn" data-add-comment-btn hidden type="button">Mark</button>
       ${renderOutlineDrawer(outlineHtml, tocEntries)}
       ${scrapbookDrawer}
-      ${renderMobileBar()}
+      ${renderMobileBar({ contextual: getEntryReviewBarCells() })}
       ${renderMobileSheet()}
       <div class="er-toast" data-toast hidden></div>
       ${renderShortcutsOverlay()}
