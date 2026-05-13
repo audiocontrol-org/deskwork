@@ -598,6 +598,10 @@ The audit's full report lives at [`./2026-05-09-implementation-audit.md`](./2026
 
   Commit: `feat(studio): shortform review surface — v7 universal chrome + state-machine compliance (G.1-G.6)`.
 
+  **Review deferrals (filed 2026-05-13 after `/dw-lifecycle:review` cycle on ce0eb9f + bf50ffc + ab955f7):**
+  - [ ] **Step 2.2.10-f1:** Delete confirmed-dead longform body from `editorial-review-client.ts` + migrate the two coupled tests (`review-marginalia-behavior.test.ts`, `review-scrapbook-drawer.test.ts`) to point at `entry-review-client.ts` where the longform behavior actually ships. Drops the file from 2244 lines to ~430 (below the 300–500 cap). Filed as [#264](https://github.com/audiocontrol-org/deskwork/issues/264). Deferred from this commit because the test-migration is non-trivial scope expansion.
+  - [ ] **Step 2.2.10-f2:** Add JSDOM unit tests for `initShortformMobileSheet` (open/close/toggle, slot switching, KICKERS header config, drag-race guard). Pairs with the existing `mobile-shell-sheet-controller.test.ts` pattern. Filed as [#265](https://github.com/audiocontrol-org/deskwork/issues/265). Deferred because Playwright probe coverage is already in place; unit tests are belt-and-suspenders.
+
 ### Task 2.3: Probes + smoke (v7 multi-surface)
 
 **Files:**
