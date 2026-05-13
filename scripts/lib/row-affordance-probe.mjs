@@ -170,7 +170,7 @@ export async function assertRowAffordanceChrome(phone, firstNonEmptyStage, failu
     const title = document.querySelector(
       '[data-row-shell] .er-row-fg .er-calendar-title',
     );
-    (title)?.click();
+    title?.click();
   });
   await phone.waitForTimeout(600);
   const navAfter = phone.url();

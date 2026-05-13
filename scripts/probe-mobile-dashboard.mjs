@@ -102,10 +102,19 @@ async function main() {
   );
 
   // 3. Tapping a non-empty stage tile expands it.
-  // Find the first non-disabled tile (ones with entries).
+  // Find the first non-disabled LONGFORM tile. The dashboard now hosts
+  // both longform and shortform tiles under the shared
+  // `[data-stage-tile]` attribute (per Step 2.2.9); the row-affordance
+  // chrome assertion below targets longform row markup specifically, so
+  // we must filter to longform here. Otherwise on calendars with no
+  // non-empty longform stages but non-empty shortform platforms, this
+  // helper would pick a shortform tile and assertRowAffordanceChrome()
+  // would FAIL on the (correct) shortform row chrome.
   const firstNonEmptyStage = await phone.evaluate(() => {
     const tiles = Array.from(
-      document.querySelectorAll('[data-stage-tile]'),
+      document.querySelectorAll(
+        '[data-stage-tile][data-stage-section-group="longform"]',
+      ),
     );
     for (const tile of tiles) {
       if (!tile.disabled) return tile.dataset.stageTile;

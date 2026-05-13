@@ -111,8 +111,20 @@ async function pickEntries() {
  * Mirrors the auto-discovery pattern in `scripts/probe-mobile-shortform.mjs`.
  */
 async function discoverShortformWorkflow() {
-  const res = await fetch(`${STUDIO_URL}/dev/editorial-review-shortform`).catch(() => null);
-  if (!res || !res.ok) return null;
+  // Differentiate failure modes: network error, HTTP error, valid HTML
+  // without a workflow attribute. Silently collapsing them to `null`
+  // would let a regressed shortform desk look like an empty calendar.
+  let res;
+  try {
+    res = await fetch(`${STUDIO_URL}/dev/editorial-review-shortform`);
+  } catch (err) {
+    console.log(`  [warn] shortform desk fetch failed: ${err.message}`);
+    return null;
+  }
+  if (!res.ok) {
+    console.log(`  [warn] shortform desk returned HTTP ${res.status}`);
+    return null;
+  }
   const html = await res.text();
   const match = html.match(/data-workflow-id="([^"]+)"/);
   return match ? match[1] : null;
@@ -204,7 +216,7 @@ async function main() {
   // entry-review: N entries × M viewports
   for (const entryId of entries) {
     for (const viewport of VIEWPORTS) {
-      const url = `${STUDIO_URL}/dev/editorial-review/entry/${entryId}`;
+      const url = `${STUDIO_URL}/dev/editorial-review/entry/${encodeURIComponent(entryId)}`;
       const result = await probe(page, url, viewport, 'entry-review');
       const overflowFail = result.overflow === true;
       const stripFail = result.stripPass === false;
@@ -251,7 +263,7 @@ async function main() {
     );
   } else {
     for (const viewport of VIEWPORTS) {
-      const url = `${STUDIO_URL}/dev/editorial-review/${shortformWorkflowId}`;
+      const url = `${STUDIO_URL}/dev/editorial-review/${encodeURIComponent(shortformWorkflowId)}`;
       const result = await probe(page, url, viewport, 'shortform-review');
       const overflowFail = result.overflow === true;
       // stripPass is auto-true on non-entry-review surfaces (the probe

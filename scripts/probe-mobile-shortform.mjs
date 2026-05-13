@@ -99,7 +99,7 @@ async function main() {
   console.log('');
 
   const browser = await launchBrowser();
-  const url = `${argStudio}/dev/editorial-review/${workflowId}`;
+  const url = `${argStudio}/dev/editorial-review/${encodeURIComponent(workflowId)}`;
 
   // ============== PHONE VIEWPORT ==============
   console.log('phone (390x844)');
