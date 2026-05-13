@@ -93,18 +93,30 @@ function loadOpenShortform(
 /**
  * Bucket shortform workflows by platform. Insertion order matches
  * `DASHBOARD_PLATFORM_ORDER` — even empty platforms get a Map entry so
- * the renderer can iterate the four canonical tiles uniformly. Workflows
- * whose `platform` is undefined (legacy data without the field set) are
- * dropped on the floor; the renderer's contract is "platform-keyed
- * tiles" and unkeyed workflows have no tile to live under.
+ * the renderer can iterate the four canonical tiles uniformly.
+ *
+ * Throws on a workflow whose `platform` is undefined. Per project rule
+ * "Never implement fallbacks or use mock data outside of test code" — a
+ * shortform workflow without a platform is a data-integrity bug
+ * upstream, not a case to silently drop. Throwing surfaces the bug;
+ * silent-drop would hide missing-from-the-Desk rows behind a count that
+ * disagrees with the workflow store.
  */
-function bucketizeShortform(
+/** @internal — exported only for testability of the throw contract. */
+export function bucketizeShortform(
   workflows: readonly DraftWorkflowItem[],
 ): Map<Platform, DraftWorkflowItem[]> {
   const out = new Map<Platform, DraftWorkflowItem[]>();
   for (const platform of DASHBOARD_PLATFORM_ORDER) out.set(platform, []);
   for (const w of workflows) {
-    if (w.platform === undefined) continue;
+    if (w.platform === undefined) {
+      throw new Error(
+        `Shortform workflow "${w.id}" (slug "${w.slug}") has no platform — ` +
+          `the Desk cannot bucket it. This is a data-integrity bug; ` +
+          `every shortform workflow must carry a platform per ` +
+          `@deskwork/core/review/types DraftWorkflowItem.`,
+      );
+    }
     const bucket = out.get(w.platform);
     if (bucket !== undefined) bucket.push(w);
   }

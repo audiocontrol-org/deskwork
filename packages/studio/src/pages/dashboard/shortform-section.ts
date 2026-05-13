@@ -19,7 +19,19 @@
  * placeholder anchor links to `/dev/editorial-review/<workflow.id>`;
  * Step 2.2.10 lands the v0.20-style row popover with stage-aware verbs
  * once the shortform verb-routing pieces (issues G.1-G.6) land. This
- * commit does NOT smuggle verb-routing in early.
+ * commit does NOT smuggle verb-routing in early. Tracked in
+ * https://github.com/audiocontrol-org/deskwork/issues/263.
+ *
+ * TRANSITIONAL SHAPE: this row's `er-row-shell` markup is a strict
+ * subset of the longform row shell defined in
+ * `dashboard/section.ts:renderRow`. Longform shells carry three
+ * children (`er-row-drawer`, `er-row-fg`, `er-row-menu`); this shell
+ * carries only the `er-row-fg`. Step 2.2.10's popover wire-up is
+ * purely additive on the existing shape — it inserts the missing
+ * `er-row-menu` (and possibly `er-row-drawer` if a swipe gesture is
+ * scoped in). Keep the two row paths' attribute conventions aligned
+ * (data-row-shell, data-platform, data-site, data-slug already match)
+ * so the unification stays straightforward.
  */
 
 import { html, unsafe, type RawHtml } from '../html.ts';
@@ -109,7 +121,11 @@ export function renderShortformRow(
   workflow: DraftWorkflowItem,
   now: Date,
 ): RawHtml {
-  const reviewLink = `/dev/editorial-review/${workflow.id}`;
+  // workflow.id is typed as `string` on DraftWorkflowItem; UUIDs are the
+  // current shape but the type system doesn't enforce that. Encode the
+  // path segment so a future non-UUID id (e.g. one containing `?`, `#`,
+  // space) doesn't silently produce a broken link.
+  const reviewLink = `/dev/editorial-review/${encodeURIComponent(workflow.id)}`;
   const search = [workflow.slug, workflow.channel ?? '', workflow.platform ?? '']
     .join(' ')
     .toLowerCase();
@@ -186,6 +202,16 @@ export interface ShortformSectionData {
  * platforms render even when zero — empty tiles communicate platform
  * existence (per § Empty-state rendering, "the absence of items is
  * information about the pipeline shape").
+ *
+ * API shape note: this helper iterates platforms internally (single
+ * call → whole section), whereas the longform `renderStageSection` is
+ * called per-stage by `dashboard.ts` (caller iterates). The asymmetry
+ * is intentional: longform stages share a uniform shape across all
+ * eight stages, so the caller-iterates pattern keeps the loop visible
+ * in `dashboard.ts`. Shortform's four platforms share a section head
+ * and ordered iteration constraint that lives more cleanly inside the
+ * composer. If a future surface needs both shapes via a common
+ * abstraction, the unification belongs there, not here.
  */
 export function renderShortformSection(
   data: ShortformSectionData,

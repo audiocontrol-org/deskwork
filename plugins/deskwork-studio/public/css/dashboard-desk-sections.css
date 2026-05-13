@@ -347,12 +347,18 @@
  *  desktop section heads continue to drive the layout. The v7 section
  *  heads + shortform tiles + future tiles are mobile-only at this
  *  commit.
+ *
+ *  The `.er-row-group` rule below is scoped to shortform-section
+ *  groups (`[data-stage-section^="shortform-"]`) so a future longform
+ *  refactor that reuses the generic `.er-row-group` class is not
+ *  silently hidden on desktop. The shortform-keyed selector matches
+ *  exactly the row groups emitted by `shortform-section.ts`.
  * ============================================================ */
 @media (min-width: 601px) {
   .er-desk-section-head,
   .er-stage-tile--shortform,
   .er-future-tile,
-  .er-row-group {
+  .er-row-group[data-stage-section^="shortform-"] {
     display: none;
   }
 }

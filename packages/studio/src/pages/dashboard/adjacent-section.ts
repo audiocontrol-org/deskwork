@@ -16,6 +16,10 @@
  * interactive markup — so the stage-tiles.ts controller leaves them
  * alone and assistive tech doesn't announce a disabled control. The
  * `aria-disabled="true"` attribute communicates the inert state to AT.
+ * The `<div>`'s implicit `generic` role is preserved (no `role=
+ * presentation` override); per WAI-ARIA the generic role honors
+ * `aria-disabled` state, whereas `role="presentation"` would strip
+ * the element of all semantic identity and nullify the aria attribute.
  */
 
 import { html, unsafe, type RawHtml } from '../html.ts';
@@ -48,7 +52,7 @@ export function renderAdjacentSectionHead(): RawHtml {
 
 function renderFutureTile(tile: FutureTile): RawHtml {
   return unsafe(html`
-    <div class="er-future-tile" aria-disabled="true" role="presentation">
+    <div class="er-future-tile" aria-disabled="true">
       <span class="er-future-tile-glyph" aria-hidden="true">${tile.glyph}</span>
       <span class="er-future-tile-name">${tile.name}</span>
       <span class="er-future-tile-tag">${tile.tag}</span>
