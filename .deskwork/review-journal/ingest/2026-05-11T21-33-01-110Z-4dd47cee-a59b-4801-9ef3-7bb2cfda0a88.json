@@ -1,0 +1,24 @@
+{
+  "id": "4dd47cee-a59b-4801-9ef3-7bb2cfda0a88",
+  "timestamp": "2026-05-11T21:33:01.110Z",
+  "event": "ingest",
+  "slug": "command-shortcuts-design",
+  "entryId": "4dd47cee-a59b-4801-9ef3-7bb2cfda0a88",
+  "site": "deskwork-internal",
+  "stage": "Drafting",
+  "sourceFile": "docs/superpowers/specs/2026-05-11-command-shortcuts-design.md",
+  "frontmatterSnapshot": {
+    "title": "Command shortcuts — design spec",
+    "slug": "command-shortcuts",
+    "date": "2026-05-11",
+    "status": "draft",
+    "deskwork": {
+      "doc": "design-spec"
+    }
+  },
+  "derivation": {
+    "slug": "path",
+    "state": "default",
+    "date": "frontmatter"
+  }
+}
