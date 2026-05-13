@@ -454,7 +454,13 @@ The audit's full report lives at [`./2026-05-09-implementation-audit.md`](./2026
 
 ---
 
-## Phase 2 — Extract `mobile-shell` + Shortform desk → v0.21
+## Phase 2 — Extract `mobile-shell` + Shortform desk → v0.22
+
+> **Target version note:** Originally scoped as v0.21. While studio-mobile-first
+> was in progress, the parallel `feature/command-shortcuts` branch released
+> v0.21.0 (dw-lifecycle command shortcuts + CLI off-pipeline transitions). Phase 2
+> shifts to v0.22.0; historical commit messages preserve the v0.21 references
+> as written.
 
 **Goal:** Pull the **genuinely shared** mobile primitives into a small shared module, then build Shortform as a new mobile-first surface. Closes #244.
 
@@ -620,19 +626,19 @@ The audit's full report lives at [`./2026-05-09-implementation-audit.md`](./2026
 - [x] **Step 2.3.7:** Commit `test(studio): probes + smoke for v7 architecture (shortform + desk + dashboard + entry-review)`. *(Landed in `a1407e1`.)*
 
   **Review deferrals (filed 2026-05-13 after `/dw-lifecycle:review` cycle on `a1407e1` + `f2c9cad` + `96e3f00`):**
-  - [ ] **Step 2.3-f1:** Retire `DraftWorkflowState` schema vocabulary — the workflow-record `state` field still uses the legacy `'open' | 'in-review' | 'iterating' | 'approved' | 'applied' | 'cancelled'` union retired by `DESKWORK-STATE-MACHINE.md` Commandments III + VI. Surfaced when the Step 2.3 probe fixture had to use `"in-review"` for an active shortform workflow because the schema offers no non-retired vocabulary for that case. Filed as [#266](https://github.com/audiocontrol-org/deskwork/issues/266). The accompanying fixture-pattern question (committed-fixture vs. seed-and-clean) is conceptually folded into this work — when the vocabulary retirement lands, the probe fixture either gets the new vocabulary or is redesigned as seed-and-clean. Deferred from v0.21 because the retirement work touches core schema + handler migrations across longform AND shortform call sites; out of scope for a release-gate task.
+  - [ ] **Step 2.3-f1:** Retire `DraftWorkflowState` schema vocabulary — the workflow-record `state` field still uses the legacy `'open' | 'in-review' | 'iterating' | 'approved' | 'applied' | 'cancelled'` union retired by `DESKWORK-STATE-MACHINE.md` Commandments III + VI. Surfaced when the Step 2.3 probe fixture had to use `"in-review"` for an active shortform workflow because the schema offers no non-retired vocabulary for that case. Filed as [#266](https://github.com/audiocontrol-org/deskwork/issues/266). The accompanying fixture-pattern question (committed-fixture vs. seed-and-clean) is conceptually folded into this work — when the vocabulary retirement lands, the probe fixture either gets the new vocabulary or is redesigned as seed-and-clean. Deferred from v0.22 because the retirement work touches core schema + handler migrations across longform AND shortform call sites; out of scope for a release-gate task.
 
-### Task 2.4: /dw-lifecycle:review + release v0.21 (v7 architecture shift)
+### Task 2.4: /dw-lifecycle:review + release v0.22 (v7 architecture shift)
 
 - [x] **Step 2.4.1:** Invoke `/dw-lifecycle:review`. The architecture pass is substantial — likely 3-4 reviewer dispatches in parallel covering: (a) v7 architecture standards + archive (correctness/conventions), (b) renderMasthead + popover (TypeScript/UI), (c) Desk Shortform absorbing (architecture/data-flow), (d) shortform review G.1-G.6 fixes (state-machine compliance). *(Resolved via DISTRIBUTED per-step reviews per the `agent-discipline.md` "Use /dw-lifecycle:review after every implementation step" rule: (a) `aafb0fe`; (b) `b9a1d40`+`aba7162` / `7e03d57`+`83ca3a5`; (c) `ffd8b53`+`00b43dc`; (d) `ce0eb9f`+`bf50ffc`+`ab955f7`. Probes+smoke (Task 2.3) reviewed in `a1407e1`+`f2c9cad`+`96e3f00`. Every feature commit since v0.20.0 carries at least one paired review-fix commit.)*
 - [x] **Step 2.4.2:** Apply fixes; commit `fix(studio): apply review findings on v7 architecture + shortform implementation`. *(All per-step review findings already applied across the feature → review-fix commit pairs above. No outstanding backlog. Deferred items with both-track recording: #264 (dead longform body); #265 (controller unit tests); #266 (DraftWorkflowState retirement).)*
-- [ ] **Step 2.4.3:** Run `/release` for v0.21.0.
+- [ ] **Step 2.4.3:** Run `/release` for v0.22.0.
 - [ ] **Step 2.4.4:** iPhone walk. Confirm: (a) #244 symptoms gone on both review surfaces; (b) star nav works (← Desk returns from every leaf); (c) ⋮ popover anchored correctly; (d) Desk Shortform section visible + expandable; (e) no strikethrough on any masthead.
 - [ ] **Step 2.4.5:** Close issues with `--reason completed`: #244 (TOC drawer), #260 (`reject` verb violation — fixed in G.4), and any G.1-G.6 issues filed during implementation.
 
 ### Task 2.5: Cross-cutting accessibility cleanup (lower priority — separable commit)
 
-**Surfaced during Task 2.2's desk-states a11y audit (2026-05-12). Items that affect MULTIPLE surfaces and are best handled in a single pass rather than per-surface. Can ship as part of v0.21 OR be deferred to a v0.21.1 patch — operator pick.**
+**Surfaced during Task 2.2's desk-states a11y audit (2026-05-12). Items that affect MULTIPLE surfaces and are best handled in a single pass rather than per-surface. Can ship as part of v0.22 OR be deferred to a v0.22.1 patch — operator pick.**
 
 **Files:**
 - Modify: `plugins/deskwork-studio/public/css/editorial-review.css` (dashed `--paper-3` hairlines → `--kraft` dashed)
@@ -648,7 +654,7 @@ The audit's full report lives at [`./2026-05-09-implementation-audit.md`](./2026
 
 **Why this task exists:** During Phase 2 the operator surfaced the [`CAPABILITIES-AS-CONTRACTS.md`](./references/capabilities-as-contracts.md) essay (verbatim snapshot in `references/`) — a methodology for refactoring evolving GUIs without regression via three artifacts (capability inventory, test-name protocol, atomic-primitive design system) plus a three-track verification pattern and a workplan-as-defensive-contract discipline. The operator's framing: *"by the end of this redesign process, we will have a stronger sense of what the UI capabilities contract should be."* This task captures that reassessment at the end of Phase 2 rather than during, when adoption would have derailed the active work.
 
-**Why the timing matters:** Phase 2 deliberately churned the studio's chrome (v1→v7 cross-bar refinements + desk-states + masthead + ⋮ popover + Desk Shortform-by-platform absorption). Adopting a capability-inventory methodology *during* that churn would have produced an inventory that needed rewriting per refinement pass. Reassessing *after* the chrome has settled and shipped (v0.21 released, the iPhone walk done, the redesign in operator's hands) means the post-mortem has the full data: which artifacts would have caught the HMR reload-storm regression, which would have improved the masthead extraction's verification quality, which would have made the cross-bar mockup arc more navigable.
+**Why the timing matters:** Phase 2 deliberately churned the studio's chrome (v1→v7 cross-bar refinements + desk-states + masthead + ⋮ popover + Desk Shortform-by-platform absorption). Adopting a capability-inventory methodology *during* that churn would have produced an inventory that needed rewriting per refinement pass. Reassessing *after* the chrome has settled and shipped (v0.22 released, the iPhone walk done, the redesign in operator's hands) means the post-mortem has the full data: which artifacts would have caught the HMR reload-storm regression, which would have improved the masthead extraction's verification quality, which would have made the cross-bar mockup arc more navigable.
 
 **Specific phase-2 experience the post-mortem must evaluate:**
 
@@ -695,7 +701,7 @@ The audit's full report lives at [`./2026-05-09-implementation-audit.md`](./2026
 - Renaming existing tests to the test-name protocol (touch-when-you-touch is the cheaper path).
 - Authoring a per-primitive reference doc derived from `DESIGN-STANDARDS.md`.
 
-**When to run this task:** AFTER Task 2.4 (release v0.21) is complete and the operator has walked the redesign on phone. The post-mortem needs the full Phase 2 experience — including how the release went — to be useful. Task 2.5 (a11y cleanup) and Task 2.6 (post-mortem) can run in either order or in parallel; they're independent.
+**When to run this task:** AFTER Task 2.4 (release v0.22) is complete and the operator has walked the redesign on phone. The post-mortem needs the full Phase 2 experience — including how the release went — to be useful. Task 2.5 (a11y cleanup) and Task 2.6 (post-mortem) can run in either order or in parallel; they're independent.
 
 **Acceptance (revised for v7 scope):**
 - `DESIGN-STANDARDS.md` carries `§ Studio navigation model` + `§ Universal bar contract` + `§ Desk information architecture` sections per v7 + desk-states-v7 specs + the 2026-05-13 universal-bar codification.
@@ -706,12 +712,12 @@ The audit's full report lives at [`./2026-05-09-implementation-audit.md`](./2026
 - Shortform review surface renders v7 universal chrome — `renderMasthead` + `renderMobileBar` consuming a TOC / Versions / Actions `Cell[]` derived per `§ Universal bar contract`. No bespoke per-surface bar shape. Audit findings G.1-G.6 addressed.
 - All prior phases' probes still green; new probes cover Desk Shortform expansion + masthead popover + shortform universal-bar cell composition.
 - Shortform walks on phone; #244 closed.
-- Release notes name "v7 cross-cutting nav architecture" as the v0.21 architectural shift (not just shortform mobile-first — broader).
+- Release notes name "v7 cross-cutting nav architecture" as the v0.22 architectural shift (not just shortform mobile-first — broader).
 - Standards rule update: `.claude/rules/design-standards.md` references the new `§ Studio navigation model` + `§ Universal bar contract` sections as enforceable.
 
 ---
 
-## Phase 3 — Standalone scrapbook viewer + Content view → v0.21
+## Phase 3 — Standalone scrapbook viewer + Content view → v0.23
 
 **Goal:** Two reading-shaped surfaces get mobile-first treatment. May or may not use the bottom-tab-bar idiom — mockups confirm.
 
@@ -749,17 +755,17 @@ The audit's full report lives at [`./2026-05-09-implementation-audit.md`](./2026
 - [ ] **Step 3.3.3:** Update smoke for both surfaces.
 - [ ] **Step 3.3.4:** Commit tests.
 - [ ] **Step 3.3.5:** `/dw-lifecycle:review` (one combined dispatch covering both surfaces). Apply / defer / push back.
-- [ ] **Step 3.3.6:** Release v0.21.0. iPhone walks for both surfaces.
+- [ ] **Step 3.3.6:** Release v0.23.0. iPhone walks for both surfaces.
 
 **Acceptance:**
 - Standalone scrapbook viewer + Content view walk on phone
 - Press-check vocabulary preserved on both
 - Probe + smoke green for both
-- v0.21.0 shipped + verified on iPhone
+- v0.23.0 shipped + verified on iPhone
 
 ---
 
-## Phase 4 — Editorial Help + Studio Index + #242 Cancel residual scope → v0.22
+## Phase 4 — Editorial Help + Studio Index + #242 Cancel residual scope → v0.24
 
 **Goal:** Static doc pages get typography + layout treatment; the Cancel verb's coverage gets audited and completed on the surfaces that didn't get it during Phase 1.
 
@@ -816,7 +822,7 @@ The audit's full report lives at [`./2026-05-09-implementation-audit.md`](./2026
 - [ ] **Step 4.4.3:** Update smoke.
 - [ ] **Step 4.4.4:** Commit tests.
 - [ ] **Step 4.4.5:** `/dw-lifecycle:review`.
-- [ ] **Step 4.4.6:** Release v0.22.0.
+- [ ] **Step 4.4.6:** Release v0.24.0.
 - [ ] **Step 4.4.7:** iPhone walks for Help, Index, and Cancel-on-each-surface.
 - [ ] **Step 4.4.8:** Close #242 with verification narrative.
 
@@ -824,7 +830,7 @@ The audit's full report lives at [`./2026-05-09-implementation-audit.md`](./2026
 - Help + Index walk on phone with press-check typography
 - Every interactive surface where Cancel is semantically meaningful has a phone-visible Cancel verb (dashboard + entry-review already shipped in Phase 1; remaining surfaces audited and addressed per Step 4.3.1)
 - Probe + smoke green
-- #242 closed against v0.22.0 install — verification narrative covers ALL surfaces with Cancel, not just those added in Phase 4
+- #242 closed against v0.24.0 install — verification narrative covers ALL surfaces with Cancel, not just those added in Phase 4
 
 ---
 
