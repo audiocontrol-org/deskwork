@@ -89,15 +89,15 @@ function renderCell(cell: Cell): string {
     ariaAttrs = '';
   }
 
-  const countMarkup = cell.count !== undefined
-    ? (() => {
-        const tone = cell.count.tone ?? 'red';
-        const countClass = tone === 'kraft'
-          ? 'er-mobile-tab-count er-mobile-tab-count--kraft'
-          : 'er-mobile-tab-count';
-        return `<span class="${countClass}" ${cell.count.dataAttr} hidden>0</span>`;
-      })()
-    : '';
+  const count = cell.count;
+  let countMarkup = '';
+  if (count !== undefined) {
+    const tone = count.tone ?? 'red';
+    const countClass = tone === 'kraft'
+      ? 'er-mobile-tab-count er-mobile-tab-count--kraft'
+      : 'er-mobile-tab-count';
+    countMarkup = `<span class="${countClass}" ${escapeHtml(count.dataAttr)} hidden>0</span>`;
+  }
 
   return `<button class="${escapeHtml(baseClass)}" ${actionAttr} type="button"${ariaAttrs}>`
     + `<span class="er-mobile-tab-glyph" aria-hidden="true">${escapeHtml(cell.glyph)}</span>`

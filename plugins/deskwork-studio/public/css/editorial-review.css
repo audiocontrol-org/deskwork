@@ -3782,7 +3782,11 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
     box-shadow: 0 -2px 16px rgba(26, 22, 20, 0.06);
     display: grid;
     /* Review mode: 4 cells (Outline · Notes · Scrapbook · Actions).
-     * Edit mode: 3 cells (Format · Notes · Save) — overridden below. */
+     * Edit mode: 3 cells (Format · Notes · Save) — overridden below.
+     * The server-side helper at `packages/studio/src/pages/mobile-bar.ts`
+     * caps total cells at `MAX_CELLS = 6` (the entry-review bar reuses
+     * the Notes slot across modes, so 4+3-1 = 6 distinct cells). If you
+     * widen the bar's cell budget, bump `MAX_CELLS` in lockstep. */
     grid-template-columns: 1fr 1fr 1fr 1fr;
     z-index: 60;
     padding-bottom: env(safe-area-inset-bottom);

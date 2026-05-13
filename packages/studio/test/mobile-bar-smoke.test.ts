@@ -233,7 +233,15 @@ describe('renderMobileBar — contract', () => {
   });
 });
 
-describe('renderMobileBar — entry-review back-compat fixture', () => {
+describe('renderMobileBar — entry-review configuration (regression net)', () => {
+  // These tests verify the SHAPE of each cell in the entry-review 6-cell
+  // configuration: that the right attributes, classes, and child elements
+  // land on the right button. They do NOT assert byte-equality (attribute
+  // order is not part of the contract); the contract suite above covers
+  // the attribute-level spec clauses. The purpose here is to catch a
+  // future refactor of `renderCell` that drops or mis-routes an attribute
+  // for a specific cell shape (e.g. dropping aria-controls from a
+  // sheet-kind cell that also carries a count badge).
   const ENTRY_REVIEW_CELLS: readonly Cell[] = [
     {
       glyph: '§',
@@ -277,65 +285,155 @@ describe('renderMobileBar — entry-review back-compat fixture', () => {
     },
   ];
 
-  it('emits the pre-refactor Outline button verbatim', () => {
+  // Asserts each cell's structural fingerprint: every attribute, class,
+  // and child element the CSS / client controller depends on is present
+  // on the right cell. Does NOT assert order — order is not part of the
+  // contract.
+  function assertCellShape(
+    raw: string,
+    selector: { dataAttr: string; value: string },
+    expected: {
+      classes: readonly string[];
+      hasAriaControls: boolean;
+      glyph: string;
+      label: string;
+      count?: { dataAttr: string; isKraft: boolean };
+    },
+  ): void {
+    // Find the button by its data-mobile-sheet / data-mobile-action match.
+    const buttonRe = new RegExp(
+      `<button\\s[^>]*${selector.dataAttr}="${selector.value}"[^>]*>[\\s\\S]*?</button>`,
+    );
+    const match = raw.match(buttonRe);
+    expect(match, `button with ${selector.dataAttr}="${selector.value}" not found`).not.toBeNull();
+    const buttonHtml = match![0];
+
+    // Class tokens — order-insensitive.
+    for (const cls of expected.classes) {
+      expect(buttonHtml).toMatch(new RegExp(`class="[^"]*\\b${cls}\\b[^"]*"`));
+    }
+
+    // ARIA gating — only sheet-kind cells carry these.
+    if (expected.hasAriaControls) {
+      expect(buttonHtml).toContain('aria-controls="er-mobile-sheet"');
+      expect(buttonHtml).toContain('aria-expanded="false"');
+    } else {
+      expect(buttonHtml).not.toContain('aria-controls');
+      expect(buttonHtml).not.toContain('aria-expanded');
+    }
+
+    // Glyph + label child elements.
+    expect(buttonHtml).toContain(
+      `<span class="er-mobile-tab-glyph" aria-hidden="true">${expected.glyph}</span>`,
+    );
+    expect(buttonHtml).toContain(
+      `<span class="er-mobile-tab-label">${expected.label}</span>`,
+    );
+
+    // Count badge (presence + kraft modifier).
+    if (expected.count !== undefined) {
+      const countClass = expected.count.isKraft
+        ? 'er-mobile-tab-count er-mobile-tab-count--kraft'
+        : 'er-mobile-tab-count';
+      expect(buttonHtml).toContain(
+        `<span class="${countClass}" ${expected.count.dataAttr} hidden>0</span>`,
+      );
+    } else {
+      expect(buttonHtml).not.toContain('er-mobile-tab-count');
+    }
+  }
+
+  it('Outline cell carries review modifier + outline sheet wiring', () => {
     const out = renderMobileBar({ contextual: ENTRY_REVIEW_CELLS });
-    expect(out.__raw).toContain(
-      '<button class="er-mobile-tab er-mobile-tab--review" data-mobile-sheet="outline" type="button" aria-controls="er-mobile-sheet" aria-expanded="false">'
-        + '<span class="er-mobile-tab-glyph" aria-hidden="true">§</span>'
-        + '<span class="er-mobile-tab-label">Outline</span>'
-        + '</button>',
+    assertCellShape(
+      out.__raw,
+      { dataAttr: 'data-mobile-sheet', value: 'outline' },
+      {
+        classes: ['er-mobile-tab', 'er-mobile-tab--review'],
+        hasAriaControls: true,
+        glyph: '§',
+        label: 'Outline',
+      },
     );
   });
 
-  it('emits the pre-refactor Format button verbatim', () => {
+  it('Format cell carries edit modifier + format sheet wiring', () => {
     const out = renderMobileBar({ contextual: ENTRY_REVIEW_CELLS });
-    expect(out.__raw).toContain(
-      '<button class="er-mobile-tab er-mobile-tab--edit" data-mobile-sheet="format" type="button" aria-controls="er-mobile-sheet" aria-expanded="false">'
-        + '<span class="er-mobile-tab-glyph" aria-hidden="true">¶</span>'
-        + '<span class="er-mobile-tab-label">Format</span>'
-        + '</button>',
+    assertCellShape(
+      out.__raw,
+      { dataAttr: 'data-mobile-sheet', value: 'format' },
+      {
+        classes: ['er-mobile-tab', 'er-mobile-tab--edit'],
+        hasAriaControls: true,
+        glyph: '¶',
+        label: 'Format',
+      },
     );
   });
 
-  it('emits the pre-refactor Notes button verbatim (mode "both", red count)', () => {
+  it('Notes cell renders in both modes + carries red-tone count badge', () => {
     const out = renderMobileBar({ contextual: ENTRY_REVIEW_CELLS });
-    expect(out.__raw).toContain(
-      '<button class="er-mobile-tab" data-mobile-sheet="notes" type="button" aria-controls="er-mobile-sheet" aria-expanded="false">'
-        + '<span class="er-mobile-tab-glyph" aria-hidden="true">✎</span>'
-        + '<span class="er-mobile-tab-label">Notes</span>'
-        + '<span class="er-mobile-tab-count" data-notes-count hidden>0</span>'
-        + '</button>',
+    assertCellShape(
+      out.__raw,
+      { dataAttr: 'data-mobile-sheet', value: 'notes' },
+      {
+        classes: ['er-mobile-tab'],
+        hasAriaControls: true,
+        glyph: '✎',
+        label: 'Notes',
+        count: { dataAttr: 'data-notes-count', isKraft: false },
+      },
+    );
+    // Mode 'both' means NO modifier class is appended.
+    const buttonRe = /<button\s[^>]*data-mobile-sheet="notes"[^>]*>/;
+    const match = out.__raw.match(buttonRe);
+    expect(match![0]).not.toMatch(/er-mobile-tab--(review|edit)/);
+  });
+
+  it('Scrapbook cell carries review + scrapbook modifiers + kraft count badge', () => {
+    const out = renderMobileBar({ contextual: ENTRY_REVIEW_CELLS });
+    assertCellShape(
+      out.__raw,
+      { dataAttr: 'data-mobile-sheet', value: 'scrapbook' },
+      {
+        classes: [
+          'er-mobile-tab',
+          'er-mobile-tab--review',
+          'er-mobile-tab--scrapbook',
+        ],
+        hasAriaControls: true,
+        glyph: '▦',
+        label: 'Scrapbook',
+        count: { dataAttr: 'data-scrapbook-count', isKraft: true },
+      },
     );
   });
 
-  it('emits the pre-refactor Scrapbook button verbatim (kraft count + modifier)', () => {
+  it('Actions cell carries review modifier + actions sheet wiring', () => {
     const out = renderMobileBar({ contextual: ENTRY_REVIEW_CELLS });
-    expect(out.__raw).toContain(
-      '<button class="er-mobile-tab er-mobile-tab--review er-mobile-tab--scrapbook" data-mobile-sheet="scrapbook" type="button" aria-controls="er-mobile-sheet" aria-expanded="false">'
-        + '<span class="er-mobile-tab-glyph" aria-hidden="true">▦</span>'
-        + '<span class="er-mobile-tab-label">Scrapbook</span>'
-        + '<span class="er-mobile-tab-count er-mobile-tab-count--kraft" data-scrapbook-count hidden>0</span>'
-        + '</button>',
+    assertCellShape(
+      out.__raw,
+      { dataAttr: 'data-mobile-sheet', value: 'actions' },
+      {
+        classes: ['er-mobile-tab', 'er-mobile-tab--review'],
+        hasAriaControls: true,
+        glyph: '⊕',
+        label: 'Actions',
+      },
     );
   });
 
-  it('emits the pre-refactor Actions button verbatim', () => {
+  it('Save cell uses data-mobile-action (not sheet) + carries no aria-controls', () => {
     const out = renderMobileBar({ contextual: ENTRY_REVIEW_CELLS });
-    expect(out.__raw).toContain(
-      '<button class="er-mobile-tab er-mobile-tab--review" data-mobile-sheet="actions" type="button" aria-controls="er-mobile-sheet" aria-expanded="false">'
-        + '<span class="er-mobile-tab-glyph" aria-hidden="true">⊕</span>'
-        + '<span class="er-mobile-tab-label">Actions</span>'
-        + '</button>',
-    );
-  });
-
-  it('emits the pre-refactor Save button verbatim (no aria-controls)', () => {
-    const out = renderMobileBar({ contextual: ENTRY_REVIEW_CELLS });
-    expect(out.__raw).toContain(
-      '<button class="er-mobile-tab er-mobile-tab--edit er-mobile-tab--save" data-mobile-action="save" type="button">'
-        + '<span class="er-mobile-tab-glyph" aria-hidden="true">⊕</span>'
-        + '<span class="er-mobile-tab-label">Save</span>'
-        + '</button>',
+    assertCellShape(
+      out.__raw,
+      { dataAttr: 'data-mobile-action', value: 'save' },
+      {
+        classes: ['er-mobile-tab', 'er-mobile-tab--edit', 'er-mobile-tab--save'],
+        hasAriaControls: false,
+        glyph: '⊕',
+        label: 'Save',
+      },
     );
   });
 
