@@ -49,6 +49,11 @@ yarn-error.log*
 ## generated during dogfood UX sessions). Never committed.
 .playwright-mcp/
 
+## Session-paperwork screenshots dropped at repo root during dogfood walks
+## (no intentional root-level PNGs exist; subdirectory PNGs under docs/ +
+## plugins/ are not affected by the leading slash anchor).
+/*.png
+
 ## Superpowers brainstorming companion mockups (visual session content).
 .superpowers/
 
