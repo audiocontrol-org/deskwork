@@ -13,6 +13,53 @@ Populating this file is a step in `/session-end`. If a session didn't exercise t
 
 ---
 
+## 2026-05-12 (Task 2.2 v7 architecture): driving the studio against the live workspace to walk 7 cross-bar mockup iterations + 4 implementation cycles — agent ran phone-viewport Playwright probes while operator viewed mockups; one HMR regression caught only by operator-side browser fall-back
+
+**Arc:** Session was a mix of design-time mockup review (where the operator drove the studio in browser as the picking surface) and implementation-time live probing (where the agent ran headless Playwright against the workspace dev studio at phone viewport, 390×844). The picking phase was operator-led: 7 cross-bar mockup iterations + 2 desk-states a11y-audit revisions, all served from `/static/mockups/` on the workspace dev studio. The implementing phase was agent-led: each step's commit verified via Playwright at the magic-DNS Tailscale URL, with operator screenshots arriving when the agent's probe missed something.
+
+Critical lesson from one screenshot: the polling indicator (`auto-refresh · 10s` chrome at bottom-right) was being occluded by the Compose FAB on mobile. **The agent's headless probe never asked "is anything visually behind anything else?"** — and wouldn't have, because the probe targets named elements, not visual layering. The operator's *"not sure what's lurking behind the 'Compose' button"* was the entire bug report; the screenshot was the entire evidence.
+
+### Friction the operator drove out by using the studio
+
+#### "all of the links pathologically refresh as fast as possible"
+
+- **friction** — Agent had reported Step 2.2.6 (renderMasthead refactor) as "verified live" after a curl read of the HTML. Operator opened the workspace dev studio in browser and every link triggered an immediate page reload, cascading. Root cause: the Vite middleware mode's default HMR WebSocket port (24678) was held by a sibling worktree's tsx process. Vite couldn't bind, the browser fell into "polling for restart" mode, and every visit re-triggered the reload loop. **fix**: added `findFreePort(base, max)` that walks forward from 24678; passed the picked port to Vite via `server.hmr.port`. Wrote `scripts/probe-no-reload-storm.mjs` regression probe (opens dashboard + shortform desk, waits 4 seconds, asserts exactly 1 navigation) so this class of bug fails fast next time. **insight**: cross-worktree dev-server port collisions are a recurring failure class on this machine (multiple worktrees of the same package running concurrently). A "claim a free port deterministically" helper is now in the dev server; any future Vite-served middleware in the same repo should reuse it.
+
+#### "masthead and menu are good. Not sure what's lurking behind the 'Compose' button"
+
+- **friction** — Operator's screenshot showed the auto-refresh polling indicator (`auto-refresh · 10s`, small kraft text) sitting BEHIND the Compose FAB at the bottom-right corner. Both elements were `position: fixed; bottom; right`; the indicator at `z-index: 10`, the FAB at `z-index: 65`. The FAB had been the bottom-right occupant since v0.19's Compose redesign; the indicator predated it. **fix**: hide the polling indicator on mobile (`@media (max-width: 600px) { .er-poll-indicator { display: none } }`). Polling itself keeps running; only the visible chrome is suppressed. **insight**: stacking-context conflicts are invisible to assertion-based probes — the agent's probe queried `.er-poll-indicator` and `.er-compose-fab` independently, found both present + visible, and reported "no issues." Visual overlap detection (e.g. `elementsFromPoint` at the indicator's center) would have caught it. Worth adding to the v7 multi-surface probe in Task 2.3.
+
+#### "the hamburger menu doesn't fit the design language"
+
+- **friction** — During cross-bar refinement v5, agent introduced a `≡` hamburger glyph for the masthead menu. Operator caught it on the next mockup viewing: the codebase had already established `⋮` (overflow glyph) on v0.20 row menus; reusing it on the masthead keeps the vocabulary consistent. v6 swapped in `⋮`. **insight**: the project's `.claude/rules/affordance-placement.md` rule names "find the existing pattern in this list that matches and mirror it" — but only for placement, not for glyph vocabulary. Worth expanding the rule (or a sibling rule) to make glyph reuse explicit: *"if the codebase already has a glyph for this affordance class, use that glyph."*
+
+#### "the red horizontal line reads as a strikethrough — especially where it literally strikes through the stacked dots affordance"
+
+- **friction** — v6 masthead used `align-items: end` on the grid, placing the `⋮` menu glyph at the same y-coordinate as the masthead's border-bottom rule. The horizontal red line crossed the middle of the glyph. Operator immediately read it as a strikethrough (i.e., a disabled control), not as a divider rule beneath the chrome. **fix**: v7 switched to `align-items: center` so the glyph sits above the rule's vertical midline. **insight**: a horizontal rule crossing the middle of a chrome element reads as a strikethrough regardless of intent. The CSS press-check vocabulary already establishes the border-bottom rule as a divider primitive; chrome elements must clear it vertically.
+
+#### "v7 looks great. I assume this is just an error on this one mockup" [with screenshot of truncated Desk title]
+
+- **friction** — v7 mockup-pre-fix showed the Desk's title as "TH..." / "P..." because the masthead's universal 3-column grid was applied to the hub-state Desk too. Hub-state should be 2-column (no back-link). **fix**: restore the 2-column override on the `.dashboard` variant in `754778d`. **insight**: variant overrides on a parameterized component are easy to forget when the parameterization is recent. The `renderMasthead({ isHub: true })` API is correct; the CSS variant rule needed to land alongside. Spec-derived test added: "Desk masthead renders 2-column grid (no back-link area)."
+
+### Studio used as the design-pick surface
+
+The 7 cross-bar mockup iterations were served from the workspace dev studio at `/static/mockups/cross-bar-2-refined-v{1..7}.html` + `/static/mockups/cross-bar-2-refined-v7-masthead-fixes.html`. Operator opened the mockups directly in browser at the iPhone-viewport-matched window size. This is the third session running where the dev studio's static asset serving has been the operator's design-review surface — distinct from claude.ai or a separate mockup-hosting service. **insight**: the dev studio's `/static/` mount is doing double duty as a design-review tool. Worth surfacing in the README or skill index that mockups can be authored adjacent to the studio and served from the same dev server.
+
+### Operator-side dev studio access pattern
+
+The agent ran Playwright probes against `http://localhost:47322` (the tsx --watch-served studio in this worktree); the operator opened the same studio via the Tailscale magic-DNS URL (`orion-m4.tail8254f4.ts.net:47330`, which is the compiled `deskwork-studio` binary). One side effect: the compiled binary doesn't watch source changes, so when the agent landed Step 2.2.9 the operator's port-47330 view didn't auto-refresh until the binary was restarted (or until the tsc --watch process recompiled to dist/). **friction**: the agent attempted to restart the compiled-binary studio via `kill PID` and was correctly denied by the permission gate (the operator may have been actively using the port-47330 studio for browsing). Workaround: directed operator visual checks at the tsx-served port-47322. **insight**: when the workspace has both a tsx-watch studio AND a compiled-binary studio running concurrently, the agent should always direct the operator to the tsx-watch one for live preview of in-flight code. The compiled binary is for "stable snapshot" use cases, not "watch-the-fix-land" use cases.
+
+### Two GitHub issues filed for deferred work — both surfaced by reviewer dispatches catching deferrals
+
+- **#262** (Step 2.2.7 About modal deferral): reviewer flagged that the About item linked to the manual instead of opening a small in-studio modal with version + license + thesis link, as specified in the workplan brief. Per "Just for now is bullshit" rule, deferrals need both workplan entry AND GitHub issue. Issue body specifies the modal's contents + acceptance criteria + integration with existing `renderShortcutsOverlay` pattern.
+- **#263** (Step 2.2.9 ⋮ row popover deferral): reviewer flagged that the shortform row's `⋮` was rendered as a plain navigation anchor (links to entry-review) instead of the v0.20-style popover with stage-aware verbs. Deferral is intentional — Step 2.2.10's G.1–G.5 verb-routing fixes need to land first — but the rule requires the issue regardless. Both filed within the same session-end commit cycle.
+
+### Cumulative friction count from this session
+
+5 distinct friction items the operator surfaced this session, all from using the live studio. None caught by the agent's headless probes alone. The pattern matches prior sessions: probe-based verification catches structural correctness; operator-side visual / interaction walking catches everything else.
+
+---
+
 ## 2026-05-11 (v0.20.0 row affordance redesign): live phone dogfood throughout — every fix surfaced by the operator walking the studio on their actual iPhone, including a 1.21:1-contrast control that "shipped" past the agent's own probe
 
 **Arc:** Second consecutive session where the operator drove every fix by opening the workspace dev studio on their iPhone via the Tailscale magic-DNS URL (`orion-m4.tail8254f4.ts.net:47330`) and reporting what was broken. The agent claimed "implementation complete" three times during the session; each claim was followed by an operator catch within one or two messages. The pattern is now well-documented: the agent's headless probe is a precondition, not evidence — only the operator's phone walk is evidence.
