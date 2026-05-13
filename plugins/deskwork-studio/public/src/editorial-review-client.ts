@@ -38,6 +38,14 @@ interface DraftWorkflow {
   state: string;
   currentVersion: number;
   contentKind: 'longform' | 'shortform' | 'outline';
+  /** Distribution platform; populated only for shortform workflows.
+   *  Canonical Platform union lives in @deskwork/core types
+   *  (`'reddit' | 'linkedin' | 'youtube' | 'instagram'`); typed as
+   *  string here because this client bundle doesn't import from core. */
+  platform?: string;
+  /** Sub-platform channel (e.g., subreddit name); populated only for
+   *  shortform workflows where it applies. */
+  channel?: string;
 }
 
 interface CommentAnnotation {
