@@ -42,7 +42,15 @@
  *   2  setup error (no studio reachable, no shortform workflow found, etc.)
  */
 
-import { ping, assert, launchBrowser, newPage, parseProbeArgs, summarizeResults } from './lib/mobile-probe-helpers.mjs';
+import {
+  ping,
+  assert,
+  launchBrowser,
+  newPage,
+  parseProbeArgs,
+  summarizeResults,
+  assertMastheadChrome,
+} from './lib/mobile-probe-helpers.mjs';
 
 const { studioUrl: argStudio, workflowId: argWorkflowId } = parseProbeArgs(process.argv.slice(2));
 
@@ -105,24 +113,8 @@ async function main() {
 
   await phone.waitForSelector('[data-er-masthead]', { timeout: 5000 });
 
-  // 1. Universal masthead chrome present
-  const mastheadPresent = await phone.evaluate(() => {
-    const el = document.querySelector('[data-er-masthead]');
-    return el !== null && getComputedStyle(el).display !== 'none';
-  });
-  assert(mastheadPresent, 'Universal masthead [data-er-masthead] visible on phone', failures);
-
-  const backLinkPresent = await phone.evaluate(() => {
-    const el = document.querySelector('.er-masthead-back');
-    return el !== null && getComputedStyle(el).display !== 'none';
-  });
-  assert(backLinkPresent, 'Back-link .er-masthead-back present (non-Desk surface)', failures);
-
-  const menuGlyphPresent = await phone.evaluate(() => {
-    const el = document.querySelector('[data-er-masthead-menu]');
-    return el !== null && getComputedStyle(el).display !== 'none';
-  });
-  assert(menuGlyphPresent, '⋮ menu glyph [data-er-masthead-menu] present', failures);
+  // 1. Universal masthead chrome present (shortform = leaf surface; isHub=false)
+  await assertMastheadChrome(phone, false, failures);
 
   // 2. Universal mobile bar present
   const barPresent = await phone.evaluate(() => {

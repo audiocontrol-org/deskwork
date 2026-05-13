@@ -35,7 +35,17 @@
  *   2  setup error (no studio reachable)
  */
 
-import { ping, assert, launchBrowser, newPage, parseProbeArgs, summarizeResults } from './lib/mobile-probe-helpers.mjs';
+import {
+  ping,
+  assert,
+  launchBrowser,
+  newPage,
+  parseProbeArgs,
+  summarizeResults,
+  assertMastheadChrome,
+  assertMastheadMenuPopover,
+} from './lib/mobile-probe-helpers.mjs';
+import { assertRowAffordanceChrome } from './lib/row-affordance-probe.mjs';
 
 // ---- Args -----------------------------------------------------------------
 
@@ -60,6 +70,16 @@ async function main() {
   const phone = await newPage(browser, { width: 390, height: 844 });
   await phone.goto(url, { waitUntil: 'load' });
   await phone.waitForSelector('[data-stage-tile]', { timeout: 5000 });
+  await phone.waitForSelector('[data-er-masthead]', { timeout: 5000 });
+
+  // 0a. Universal masthead chrome — Desk = hub (isHub=true; back-link absent)
+  //     Per DESIGN-STANDARDS.md § Studio navigation model: "← absent only
+  //     on the Desk itself (you're already home)."
+  await assertMastheadChrome(phone, true, failures);
+
+  // 0b. ⋮ popover opens / closes correctly. Replaces the v0.19 floating `?`
+  //     overlay (retired in v7 per § Studio navigation model).
+  await assertMastheadMenuPopover(phone, failures);
 
   // 1. Stage tiles rendered
   const tileCount = await phone.evaluate(() =>
@@ -228,146 +248,9 @@ async function main() {
   );
 
   // ============== ROW AFFORDANCE CHROME (v0.20) ==============
-  console.log('');
-  console.log('row-affordance chrome (phone)');
-
-  // Expand a stage that has rows so the assertions below have rows to act on.
-  if (firstNonEmptyStage) {
-    // Re-expand it (previous test sequence may have left a different one open).
-    await phone.click(`[data-stage-tile="${firstNonEmptyStage}"]`);
-    await phone.waitForTimeout(150);
-  }
-
-  // 10. Rows are wrapped in [data-row-shell] with the new chrome
-  const rowChromeState = await phone.evaluate(() => {
-    const shells = Array.from(document.querySelectorAll('[data-row-shell]'));
-    if (shells.length === 0) return { ok: false, reason: 'no row shells found' };
-    const shell = shells[0];
-    return {
-      ok: true,
-      hasDrawer: !!shell.querySelector('.er-row-drawer'),
-      hasFg: !!shell.querySelector('.er-row-fg'),
-      hasOverflow: !!shell.querySelector('[data-row-overflow]'),
-      hasMenu: !!shell.querySelector('.er-row-menu'),
-      menuHiddenAtRest: shell.querySelector('.er-row-menu')?.hasAttribute('hidden') === true,
-      overflowAriaExpandedAtRest:
-        shell.querySelector('[data-row-overflow]')?.getAttribute('aria-expanded') === 'false',
-    };
-  });
-  if (!rowChromeState.ok) {
-    console.log(`  [skip] ${rowChromeState.reason ?? 'unknown'} — no rows to check`);
-  } else {
-    assert(rowChromeState.hasDrawer, 'Row shell carries .er-row-drawer', failures);
-    assert(rowChromeState.hasFg, 'Row shell carries .er-row-fg', failures);
-    assert(rowChromeState.hasOverflow, 'Row shell carries [data-row-overflow] (⋮ button)', failures);
-    assert(rowChromeState.hasMenu, 'Row shell carries .er-row-menu', failures);
-    assert(rowChromeState.menuHiddenAtRest, 'Menu is hidden at-rest', failures);
-    assert(rowChromeState.overflowAriaExpandedAtRest, '⋮ button has aria-expanded=false at-rest', failures);
-  }
-
-  // 11. v0.19 regression check: no stacked-inline `.er-btn-small` buttons
-  //     visible inside row foregrounds on phone (the desktop-style chrome
-  //     that v0.20 retires). Inline chips (`.er-btn-chip`) are present in
-  //     the HTML but `display: none` on phone.
-  const v019Regression = await phone.evaluate(() => {
-    const fgs = Array.from(document.querySelectorAll('.er-row-fg'));
-    let visibleBtnSmall = 0;
-    for (const fg of fgs) {
-      const btns = fg.querySelectorAll('.er-btn-small');
-      for (const b of btns) {
-        if (getComputedStyle(b).display !== 'none') visibleBtnSmall++;
-      }
-    }
-    // Inline chips should be hidden on phone.
-    const chips = Array.from(document.querySelectorAll('.er-btn-chip'));
-    const visibleChips = chips.filter((c) => getComputedStyle(c).display !== 'none').length;
-    return { visibleBtnSmall, visibleChips };
-  });
-  assert(
-    v019Regression.visibleBtnSmall === 0,
-    `No legacy .er-btn-small buttons visible on phone rows (got ${v019Regression.visibleBtnSmall})`,
-    failures,
-  );
-  assert(
-    v019Regression.visibleChips === 0,
-    `No .er-btn-chip inline chips visible on phone (got ${v019Regression.visibleChips})`,
-    failures,
-  );
-
-  // 12. Tap ⋮ opens the menu (sets aria-expanded=true + un-hides menu)
-  if (rowChromeState.ok) {
-    await phone.click('[data-row-shell] [data-row-overflow]');
-    await phone.waitForTimeout(100);
-    const menuOpen = await phone.evaluate(() => {
-      const shell = document.querySelector('.is-menu-open');
-      if (!shell) return null;
-      return {
-        ariaExpanded: shell.querySelector('[data-row-overflow]')?.getAttribute('aria-expanded'),
-        menuHidden: shell.querySelector('.er-row-menu')?.hasAttribute('hidden'),
-        menuItems: shell.querySelectorAll('.er-row-menu-item').length,
-      };
-    });
-    assert(menuOpen !== null, 'Tap ⋮ adds .is-menu-open class to the row shell', failures);
-    if (menuOpen) {
-      assert(menuOpen.ariaExpanded === 'true', '⋮ aria-expanded=true when menu open', failures);
-      assert(menuOpen.menuHidden === false, 'Menu un-hidden when ⋮ is tapped', failures);
-      assert(menuOpen.menuItems >= 2, `Menu renders items (got ${menuOpen.menuItems})`, failures);
-    }
-
-    // 13. Menu contains stage-aware verbs for an active-pipeline row.
-    //     Active stages should expose iterate / approve / block / induct /
-    //     cancel / scrapbook (6 items per the brief's verb table).
-    const verbSet = await phone.evaluate(() => {
-      const items = Array.from(
-        document.querySelectorAll('.is-menu-open .er-row-menu-item'),
-      );
-      return items.map((i) => {
-        const cmd = i.dataset.copy ?? i.dataset.href ?? '';
-        return cmd.replace(/ .+$/, '').replace(/\?.+$/, ''); // strip args / query
-      });
-    });
-    // Tolerant assertion: the verb set depends on the stage of the first
-    // row we opened. Active stages should include iterate + block; Final
-    // stages include block but not iterate. Either is acceptable — what we
-    // want is evidence the FULL set is rendered (not just 2 verbs).
-    assert(verbSet.length >= 4, `Menu renders ≥4 stage-aware verbs (got ${verbSet.length}: ${verbSet.join(', ')})`, failures);
-
-    // 14. Click outside the menu closes it
-    await phone.click('body', { position: { x: 10, y: 10 } });
-    await phone.waitForTimeout(150);
-    const menuClosed = await phone.evaluate(() => {
-      return {
-        anyOpen: document.querySelectorAll('.is-menu-open').length,
-        ariaExpanded: document
-          .querySelector('[data-row-shell] [data-row-overflow]')
-          ?.getAttribute('aria-expanded'),
-      };
-    });
-    assert(menuClosed.anyOpen === 0, 'Click-outside closes the menu', failures);
-    assert(menuClosed.ariaExpanded === 'false', '⋮ aria-expanded resets to false', failures);
-
-    // 15. Click on row body (title / date — NOT slug link, NOT button)
-    //     navigates to the entry-review surface. Per the Row-4 brief,
-    //     tap-anywhere-on-the-row IS the primary action. Was a real
-    //     bug shipped briefly post-Task-1.8: the row chrome rendered
-    //     but click-on-body was a no-op because only the slug carried
-    //     a <a href>. Operators tapping the title or date got nothing.
-    const navBefore = phone.url();
-    await phone.evaluate(() => {
-      const title = document.querySelector(
-        '[data-row-shell] .er-row-fg .er-calendar-title',
-      );
-      // Cast to HTMLElement for click() — querySelector returns Element.
-      (title)?.click();
-    });
-    await phone.waitForTimeout(600);
-    const navAfter = phone.url();
-    assert(
-      navAfter !== navBefore && navAfter.includes('/dev/editorial-review/entry/'),
-      `Click row body (title) navigates to entry-review surface (before=${navBefore.slice(-40)}, after=${navAfter.slice(-40)})`,
-      failures,
-    );
-  }
+  // Extracted to scripts/lib/row-affordance-probe.mjs during Step 2.3.4
+  // (studio-mobile-first) to keep this file under the 500-line cap.
+  await assertRowAffordanceChrome(phone, firstNonEmptyStage, failures);
 
   // ============== DESKTOP VIEWPORT ==============
   console.log('');
@@ -385,6 +268,21 @@ async function main() {
   assert(
     desktopTileDisplay === 'none',
     `Stage tiles hidden on desktop (got ${desktopTileDisplay})`,
+    failures,
+  );
+
+  // Universal masthead must be display:none on desktop. Per
+  // DESIGN-STANDARDS.md § Studio navigation model the masthead is
+  // mobile-only (≤600px); desktop refinement is deferred to a separate
+  // feature branch.
+  const desktopMastheadDisplay = await desktop.evaluate(() => {
+    const el = document.querySelector('[data-er-masthead]');
+    if (!el) return null;
+    return getComputedStyle(el).display;
+  });
+  assert(
+    desktopMastheadDisplay === 'none',
+    `Mobile masthead hidden on desktop (got ${desktopMastheadDisplay})`,
     failures,
   );
 

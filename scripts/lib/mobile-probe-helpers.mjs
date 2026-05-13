@@ -139,3 +139,172 @@ export function summarizeResults(failures, label) {
   }
   process.exit(failures.length === 0 ? 0 : 1);
 }
+
+/**
+ * Assert that the universal masthead chrome is present on the page,
+ * matching the v7 star-navigation model defined in
+ * `DESIGN-STANDARDS.md § Studio navigation model`.
+ *
+ *   - `[data-er-masthead]` element is present + visible
+ *   - On leaf surfaces (`isHub === false`): `.er-masthead-back` (`←`) is
+ *     present + visible.
+ *   - On the Desk (`isHub === true`): the back-link is SUPPRESSED — zero
+ *     `.er-masthead-back` elements in the DOM. *"Absent only on the Desk
+ *     itself (you're already home)"* per § Studio navigation model.
+ *   - `[data-er-masthead-menu]` (`⋮`) is present + visible on every
+ *     surface, including the Desk.
+ *
+ * @param {import('playwright').Page} page   Playwright page already navigated.
+ * @param {boolean} isHub                    True for the Desk; false for every leaf.
+ * @param {string[]} failures                Failures accumulator (mutated).
+ */
+export async function assertMastheadChrome(page, isHub, failures) {
+  const mastheadPresent = await page.evaluate(() => {
+    const el = document.querySelector('[data-er-masthead]');
+    return el !== null && getComputedStyle(el).display !== 'none';
+  });
+  assert(mastheadPresent, 'Universal masthead [data-er-masthead] visible on phone', failures);
+
+  if (isHub) {
+    const backLinkAbsent = await page.evaluate(() => {
+      return document.querySelectorAll('.er-masthead-back').length === 0;
+    });
+    assert(
+      backLinkAbsent,
+      'Back-link .er-masthead-back ABSENT on Desk (isHub=true; you are already home)',
+      failures,
+    );
+  } else {
+    const backLinkPresent = await page.evaluate(() => {
+      const el = document.querySelector('.er-masthead-back');
+      return el !== null && getComputedStyle(el).display !== 'none';
+    });
+    assert(
+      backLinkPresent,
+      'Back-link .er-masthead-back present + visible on leaf surface',
+      failures,
+    );
+  }
+
+  const menuGlyphPresent = await page.evaluate(() => {
+    const el = document.querySelector('[data-er-masthead-menu]');
+    return el !== null && getComputedStyle(el).display !== 'none';
+  });
+  assert(menuGlyphPresent, '⋮ menu glyph [data-er-masthead-menu] present + visible', failures);
+}
+
+/**
+ * Drive a full open → assert-visible → dismiss-by-scrim → assert-closed
+ * cycle on the masthead `⋮` popover.
+ *
+ * Asserts (per `DESIGN-STANDARDS.md § Menu reveal pattern · popover, not
+ * slide-up sheet` and the controller contract in
+ * `plugins/deskwork-studio/public/src/mobile-shell/masthead-popover.ts`):
+ *
+ *   - Initial state: popover is hidden (the popover element exists in
+ *     the DOM but `hidden` attribute is set).
+ *   - Trigger `aria-expanded` is `"false"` at-rest.
+ *   - Tapping `[data-er-masthead-menu]` un-hides the popover + scrim
+ *     and sets `aria-expanded="true"` on the trigger.
+ *   - Tapping the scrim (`[data-er-masthead-popover-scrim]`) re-hides
+ *     the popover + scrim and returns `aria-expanded` to `"false"`.
+ *
+ * The popover does NOT use the Phase 2.1 `createSlideUpSheet` primitive
+ * — top-anchored affordance reveals downward; bottom-anchored
+ * affordances reveal upward. Mixing reveal directions is the v6→v7
+ * failure mode.
+ *
+ * @param {import('playwright').Page} page   Playwright page already navigated.
+ * @param {string[]} failures                Failures accumulator (mutated).
+ */
+export async function assertMastheadMenuPopover(page, failures) {
+  // Initial state: popover hidden, scrim hidden, trigger aria-expanded=false
+  const initialState = await page.evaluate(() => {
+    const trigger = document.querySelector('[data-er-masthead-menu]');
+    const popover = document.querySelector('[data-er-masthead-popover]');
+    const scrim = document.querySelector('[data-er-masthead-popover-scrim]');
+    return {
+      hasTrigger: trigger !== null,
+      hasPopover: popover !== null,
+      hasScrim: scrim !== null,
+      ariaExpanded: trigger?.getAttribute('aria-expanded') ?? null,
+      popoverHidden: popover?.hasAttribute('hidden') ?? null,
+      scrimHidden: scrim?.hasAttribute('hidden') ?? null,
+    };
+  });
+  assert(initialState.hasPopover, '[data-er-masthead-popover] element present in DOM', failures);
+  assert(initialState.hasScrim, '[data-er-masthead-popover-scrim] element present in DOM', failures);
+  assert(
+    initialState.popoverHidden === true,
+    `Popover hidden at-rest (got hidden=${initialState.popoverHidden})`,
+    failures,
+  );
+  assert(
+    initialState.scrimHidden === true,
+    `Scrim hidden at-rest (got hidden=${initialState.scrimHidden})`,
+    failures,
+  );
+  assert(
+    initialState.ariaExpanded === 'false',
+    `Trigger aria-expanded="false" at-rest (got ${initialState.ariaExpanded})`,
+    failures,
+  );
+
+  // Tap ⋮ — popover + scrim become visible; aria-expanded flips to true
+  await page.click('[data-er-masthead-menu]', { force: true });
+  await page.waitForTimeout(100);
+  const openState = await page.evaluate(() => {
+    const trigger = document.querySelector('[data-er-masthead-menu]');
+    const popover = document.querySelector('[data-er-masthead-popover]');
+    const scrim = document.querySelector('[data-er-masthead-popover-scrim]');
+    return {
+      ariaExpanded: trigger?.getAttribute('aria-expanded') ?? null,
+      popoverHidden: popover?.hasAttribute('hidden') ?? null,
+      scrimHidden: scrim?.hasAttribute('hidden') ?? null,
+    };
+  });
+  assert(
+    openState.popoverHidden === false,
+    `Popover un-hidden after ⋮ tap (got hidden=${openState.popoverHidden})`,
+    failures,
+  );
+  assert(
+    openState.scrimHidden === false,
+    `Scrim un-hidden after ⋮ tap (got hidden=${openState.scrimHidden})`,
+    failures,
+  );
+  assert(
+    openState.ariaExpanded === 'true',
+    `Trigger aria-expanded="true" after ⋮ tap (got ${openState.ariaExpanded})`,
+    failures,
+  );
+
+  // Tap scrim — popover + scrim hide again; aria-expanded returns to false
+  await page.click('[data-er-masthead-popover-scrim]', { force: true });
+  await page.waitForTimeout(100);
+  const closedState = await page.evaluate(() => {
+    const trigger = document.querySelector('[data-er-masthead-menu]');
+    const popover = document.querySelector('[data-er-masthead-popover]');
+    const scrim = document.querySelector('[data-er-masthead-popover-scrim]');
+    return {
+      ariaExpanded: trigger?.getAttribute('aria-expanded') ?? null,
+      popoverHidden: popover?.hasAttribute('hidden') ?? null,
+      scrimHidden: scrim?.hasAttribute('hidden') ?? null,
+    };
+  });
+  assert(
+    closedState.popoverHidden === true,
+    `Popover hidden after scrim tap (got hidden=${closedState.popoverHidden})`,
+    failures,
+  );
+  assert(
+    closedState.scrimHidden === true,
+    `Scrim hidden after scrim tap (got hidden=${closedState.scrimHidden})`,
+    failures,
+  );
+  assert(
+    closedState.ariaExpanded === 'false',
+    `Trigger aria-expanded="false" after scrim tap (got ${closedState.ariaExpanded})`,
+    failures,
+  );
+}

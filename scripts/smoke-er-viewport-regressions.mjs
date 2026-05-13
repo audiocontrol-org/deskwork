@@ -4,10 +4,15 @@
  *
  * Drives Playwright Chromium against the running dev studio at BOTH a
  * desktop viewport (1920x1080) and a phone viewport (390x844). Walks
- * two surface classes:
+ * three surface classes:
  *   - **entry-review** — N entries from the project's calendar
  *     (one probe per entry × viewport)
  *   - **dashboard** — `/dev/editorial-studio` (one probe per viewport)
+ *   - **shortform-review** — `/dev/editorial-review/<workflow-id>` for
+ *     the first open shortform workflow, if any. Auto-discovered via
+ *     the `/dev/editorial-review-shortform` index. SKIPPED with a log
+ *     message (no failure) when no open shortform workflows exist in
+ *     the project; the absence is real data, not a hole to fail on.
  *
  * For each (surface × viewport) pair, asserts:
  *
@@ -97,6 +102,20 @@ async function pickEntries() {
     throw new Error(`No entries found in ${ENTRIES_DIR}`);
   }
   return ids.slice(0, LIMIT);
+}
+
+/**
+ * Discover an open shortform workflow id by parsing the studio's
+ * `/dev/editorial-review-shortform` HTML index. Returns the first
+ * `data-workflow-id` attribute found, or null if no workflows exist.
+ * Mirrors the auto-discovery pattern in `scripts/probe-mobile-shortform.mjs`.
+ */
+async function discoverShortformWorkflow() {
+  const res = await fetch(`${STUDIO_URL}/dev/editorial-review-shortform`).catch(() => null);
+  if (!res || !res.ok) return null;
+  const html = await res.text();
+  const match = html.match(/data-workflow-id="([^"]+)"/);
+  return match ? match[1] : null;
 }
 
 // ---- Per-probe measurement ------------------------------------------------
@@ -218,12 +237,47 @@ async function main() {
       fail,
     });
   }
+
+  // shortform-review: auto-discover the first open shortform workflow.
+  // If none exists in this project, log a "skipped" line and continue —
+  // the absence is real data, not a failure case (mirrors the
+  // probe-mobile-shortform.mjs `exit 2 + diagnostic` pattern, but the
+  // smoke is "best-effort cross-surface" so we record a skip rather
+  // than exit).
+  const shortformWorkflowId = await discoverShortformWorkflow();
+  if (!shortformWorkflowId) {
+    console.log(
+      '  [skip] shortform-review: no open shortform workflow found in this project',
+    );
+  } else {
+    for (const viewport of VIEWPORTS) {
+      const url = `${STUDIO_URL}/dev/editorial-review/${shortformWorkflowId}`;
+      const result = await probe(page, url, viewport, 'shortform-review');
+      const overflowFail = result.overflow === true;
+      // stripPass is auto-true on non-entry-review surfaces (the probe
+      // function gates on kind === 'entry-review'); the shortform surface
+      // is a leaf without an .er-strip element per the Task 2.2.10
+      // retirement.
+      const stripFail = result.stripPass === false;
+      const fixedFail = (result.fixedOffenders?.length ?? 0) > 0;
+      const navFail = result.navOk === false;
+      const fail = navFail || overflowFail || stripFail || fixedFail;
+      rows.push({
+        label: shortformWorkflowId.slice(0, 8),
+        surface: 'shortform-rev',
+        viewport: viewport.name,
+        ...result,
+        fail,
+      });
+    }
+  }
   await browser.close();
 
   // Summary
   console.log(`\npress-check viewport regression smoke`);
   console.log(`  studio:    ${STUDIO_URL}`);
-  console.log(`  surfaces:  entry-review (${entries.length} entries), dashboard`);
+  const shortformLabel = shortformWorkflowId ? ', shortform-review' : '';
+  console.log(`  surfaces:  entry-review (${entries.length} entries), dashboard${shortformLabel}`);
   console.log(`  viewports: ${VIEWPORTS.map((v) => `${v.name}(${v.width}x${v.height})`).join(', ')}\n`);
 
   const failures = rows.filter((r) => r.fail);
