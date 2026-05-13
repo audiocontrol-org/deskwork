@@ -364,47 +364,17 @@ Two phone-shaped surfaces, two design problems. The <em>review surface</em> ship
 
 </div>
 
-<p style="margin-top: 1.4rem; padding: 0.95rem 1.2rem; background: var(--paper-2); border-left: 3px solid var(--red); font-size: 0.92rem; line-height: 1.55;">
-  <strong style="font-family: var(--display); font-style: italic; font-variation-settings: 'opsz' 22, 'wght' 500; color: var(--red);">Pick order:</strong> cross-bar first, then shortform. Picking Cross-bar 1 or 2 commits every future studio surface to that bar shape (and the shortform mockup chosen below has to fit inside it). Picking Cross-bar 3 keeps surfaces free-shaped and the shortform pick stands on its own.
-</p>
+<h2>Shortform mobile-first · superseded by v7 universal-bar contract <span style="font-family: var(--mono); font-size: 0.55rem; letter-spacing: 0.18em; color: var(--ink-soft, #555); border: 1px solid var(--ink-soft, #555); padding: 0.16rem 0.45rem; border-radius: 2px; vertical-align: 0.25em; margin-left: 0.5rem;">Retired · archived</span></h2>
 
-<h2>Shortform mobile-first · three&nbsp;directions <span style="font-family: var(--mono); font-size: 0.55rem; letter-spacing: 0.18em; color: var(--red); border: 1px solid var(--red); padding: 0.16rem 0.45rem; border-radius: 2px; vertical-align: 0.25em; margin-left: 0.5rem;">Active · pick pending</span></h2>
+<p>The three shortform direction mockups (sticky-decision-bar, floating-action-sheet, bottom-tab-bar) were drafted 2026-05-12 in Step 2.2.2 of <code style="font-family:var(--mono);font-size:0.85em">studio-mobile-first</code>. They were superseded the same week by the v1→v7 cross-bar arc, which settled the contextual bar as a <strong>universal</strong> primitive: <code style="font-family:var(--mono);font-size:0.85em">renderMobileBar</code> is the same chrome on every non-Desk mobile surface, with a 1–6 cell <code style="font-family:var(--mono);font-size:0.85em">Cell[]</code> as the per-surface design variable. Surface-bespoke bar idioms (sticky decision bar, floating action sheet, bottom tab bar) are retired in favor of the universal contract.</p>
 
-<p>The shortform review surface (<code style="font-family:var(--mono);font-size:0.85em">/dev/editorial-review/&lt;workflow-id&gt;</code>) and the shortform desk index (<code style="font-family:var(--mono);font-size:0.85em">/dev/editorial-review-shortform</code>) are the next surfaces to receive mobile-first treatment (Task 2.2 of <code style="font-family:var(--mono);font-size:0.85em">studio-mobile-first</code> → v0.21). The <a href="../../../../docs/0.19.0/001-IN-PROGRESS/studio-mobile-first/2026-05-12-shortform-audit.md" style="color: var(--red);">2026-05-12 audit</a> documents the primary friction: decision buttons scroll out of sight on phone, the strip's flex layout is scoped to longform only, and platform/channel context — required for the iterate slash command — is buried. Three directions explored; operator picks one before implementation.</p>
+<p>The three mockup files have been moved into <code style="font-family:var(--mono);font-size:0.85em">docs/studio-design/REJECTED/</code> as archive entries, each with a <code style="font-family:var(--mono);font-size:0.85em">brief.md</code> explaining the supersession. See <a href="../../../../DESIGN-STANDARDS.md" style="color: var(--red);">DESIGN-STANDARDS.md § Universal bar contract</a> for the settled standard.</p>
 
-<div class="grid">
-
-  <article class="card">
-    <span class="num">Shortform 1</span>
-    <h3>Sticky decision bar</h3>
-    <p class="summary">A thin sticky bottom bar carries Iterate / Approve / Cancel as three pills, color-coded per the press-check accent map (blue / green / red). The top strip becomes a banner showing the slash command's required context (<em>platform · channel · slug</em>). The article body owns the middle of the screen and scrolls freely. Every pill tap is a one-shot clipboard-copy of <code style="font-family:var(--mono);font-size:0.85em">/deskwork:&lt;verb&gt;</code>.</p>
-    <p class="pros"><span class="label">Strong</span> One-tap to act — decisions always within thumb reach regardless of draft length. Banner surfaces platform/channel inline so the operator confirms context just by reading the masthead.</p>
-    <p class="cons"><span class="label">Weak</span> 52px of always-visible bottom chrome. No sheet-controller reuse — three direct buttons rather than the Phase 2.1 primitive.</p>
-    <a class="open" href="./shortform-1-sticky-bar.html">Open mockup →</a>
-  </article>
-
-  <article class="card" style="border-left-color: var(--green);">
-    <span class="num" style="color: var(--green);">Shortform 2</span>
-    <h3>Floating action sheet</h3>
-    <p class="summary">At rest, only a small <em>Actions →</em> pill at bottom-right. Tap → slide-up sheet covering ~45% of the screen, with platform/channel confirmed in the sheet header and the three action buttons stacked large. Sheet dismisses via scrim, drag-down (80px), Escape, or close button. Reuses Phase 2.1's <code style="font-family:var(--mono);font-size:0.85em">createSlideUpSheet()</code> exactly — same idiom as the dashboard's Compose chip.</p>
-    <p class="pros"><span class="label">Strong</span> Maximum article real estate at rest (only a small pill visible). Sheet header re-confirms platform/channel before commit — a deliberate friction beat for "what am I about to copy?" Architecturally cleanest reuse of Phase 2.1.</p>
-    <p class="cons"><span class="label">Weak</span> One extra tap to act (FAB → action) vs Direction 1's one-tap.</p>
-    <a class="open" href="./shortform-2-action-sheet.html">Open mockup →</a>
-  </article>
-
-  <article class="card" style="border-left-color: var(--blue);">
-    <span class="num" style="color: var(--blue);">Shortform 3</span>
-    <h3>Bottom tab bar</h3>
-    <p class="summary">A 48px bottom tab bar with up to three tabs — Actions, Versions, TOC. Each tab opens its own slide-up sheet via a separate sheet-controller instance. The TOC tab is conditional (hides when the body has &lt;2 h2/h3/h4 entries); the Versions tab is conditional (hides when there's only one version). Closes #244 (TOC drawer for shortform) as a natural side effect. Aligns shortform with entry-review's mobile-bar idiom.</p>
-    <p class="pros"><span class="label">Strong</span> Earns its chrome — tab count is reactive to content (1-3 tabs). Closes #244 inline. Picking this direction makes Task 2.2.5's <code style="font-family:var(--mono);font-size:0.85em">renderMobileBar()</code> parameterization a concrete two-consumer design rather than speculative.</p>
-    <p class="cons"><span class="label">Weak</span> Most chrome at rest of any direction. For 50-word LinkedIn drafts, 48px tab bar is proportionally heavy.</p>
-    <a class="open" href="./shortform-3-bottom-tabbar.html">Open mockup →</a>
-  </article>
-
-</div>
-
-<h2>How to&nbsp;review</h2>
-<p>Open each mockup on your phone (the studio's Tailscale URL works). Each is a static HTML demo — no live skill wiring — showing the at-rest state and one or two interaction states. Pick the one that feels right, or call out specific elements from each that you want combined.</p>
+<ul style="font-family: var(--mono); font-size: 0.85rem; line-height: 1.7; margin: 0.8rem 0 0 0; padding-left: 1.2rem; list-style-type: '— ';">
+  <li>Shortform 1 (sticky decision bar) → <a href="../../../../docs/studio-design/REJECTED/2026-05-12-shortform-1-sticky-decision-bar/brief.md" style="color: var(--ink-soft, #555);">brief</a></li>
+  <li>Shortform 2 (floating action sheet) → <a href="../../../../docs/studio-design/REJECTED/2026-05-12-shortform-2-floating-action-sheet/brief.md" style="color: var(--ink-soft, #555);">brief</a></li>
+  <li>Shortform 3 (bottom tab bar) → <a href="../../../../docs/studio-design/REJECTED/2026-05-12-shortform-3-bottom-tab-bar/brief.md" style="color: var(--ink-soft, #555);">brief</a></li>
+</ul>
 
 <p class="footnote">
 mockups served from <em>/static/mockups/</em> · self-contained HTML+CSS · no live data

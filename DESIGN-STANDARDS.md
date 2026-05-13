@@ -154,6 +154,49 @@ Seven mockup passes reached this point:
 
 Each pass added simplification without losing capability. The architecture is at the asymptote — there's nothing left to remove from the bar's nav region (it's gone entirely) and the masthead's two glyphs are the minimum affordance set.
 
+## Universal bar contract
+
+The mobile contextual bar is **universal** — every non-Desk mobile surface consumes the same primitive: `renderMobileBar({ contextual: readonly Cell[] })`. Surface-bespoke bar idioms are **retired**.
+
+This section settles a class of design question that kept resurfacing during v0.21 implementation: *"what idiom should this surface's bottom bar use — sticky decision bar / floating action sheet / bottom tab bar / something else?"* The answer is that the question has the wrong shape. The chrome is fixed by v7; the per-surface design variable is **which cells** the bar carries, not **what shape** the bar takes.
+
+### The contract
+
+1. **One primitive, one shape.** Every non-Desk mobile surface uses `renderMobileBar` (`packages/studio/src/pages/mobile-bar.ts`). No bespoke bar component, no surface-specific tab strip, no inline sticky chrome that duplicates the bar's job. If a surface needs different chrome, the answer is to change the cells passed to `renderMobileBar`, not to draft a new chrome shape.
+
+2. **Zero nav region.** The bar carries zero navigation cells. Per the v7 settlement, navigation lives in the masthead (`←` returns to the Desk; `⋮` opens the cross-cutting menu). A bar cell that triggers navigation to another destination is a violation. (Cells that open per-surface auxiliary surfaces — a TOC sheet, a versions sheet, a row-overflow popover — are not navigation; they're contextual actions on the current surface.)
+
+3. **1–6 contextual cells.** The bar holds between one and six cells. Surfaces with fewer than one cell don't render a bar at all (the Desk is the canonical zero-bar surface). Surfaces with more than six need their cells consolidated — likely by collapsing several into a sheet behind a single cell — not by widening the bar.
+
+4. **Cell API is the per-surface design variable.** The `Cell` discriminated-action union (`{kind:'sheet',name}` or `{kind:'direct',action}`) is the entire interface. Each cell is either *"open this slide-up sheet"* or *"perform this action immediately"*. Cells with sheet-opening semantics use the Phase 2.1 `sheet-controller` primitive. Cells with direct-action semantics dispatch the action inline (typically clipboard-copy of a slash command per THESIS Consequence 2). The API has been deliberately kept small; expanding it ahead of need is a code smell.
+
+5. **No state-derived cell shape.** Cells are gated by stage per `DESKWORK-STATE-MACHINE.md` Commandment II — never by review state, iteration count, or any other retired axis. Cells that render conditionally because of "what the operator just did" (the agent is iterating, the workflow is awaiting apply, etc.) are surfacing review state and are violations of Commandment III. Per-surface "pending pill" affordances of that shape are retired alongside the rubber-stamp conceit.
+
+6. **Bar-bottom-anchored ⇒ slide-up sheets.** Sheets opened from bar cells reveal upward (the Phase 2.1 primitive). Top-anchored affordances (the masthead `⋮`) reveal popovers downward per § Studio navigation model. This spatial rule is non-negotiable; mixing reveal directions is the v6→v7 failure mode.
+
+### What this rules out
+
+- A *"sticky decision bar"* that renders verb chips inline at the bottom outside of `renderMobileBar`. (If the surface needs verbs in the bar, they're cells; they're not a separate sticky strip.)
+- A *"floating action sheet"* with bespoke FAB-shaped trigger chrome. (The Desk's Compose chip is a documented exception with its own § entry; new surfaces don't get bespoke FABs.)
+- A *"bottom tab bar"* named as such — the word *"tab bar"* is exactly what v4→v7 retired at the architectural level. The bar's cells may resemble tabs visually, but the contract is "1-6 contextual cells consuming the universal primitive," not "tabs choosing among destinations or modes."
+- Per-surface visual variants of the bar (different height, different cell-cap, different reveal direction).
+
+### What this rules in
+
+- Per-surface variation in **which cells** the bar carries (e.g., entry-review's 6 cells vs. shortform-review's 3–4 cells vs. dashboard's 0 cells).
+- Per-surface variation in **what each cell opens** (a TOC sheet on surfaces with headings; a row-popover sheet on surfaces with row drawers; a versions sheet on surfaces with version history; etc.).
+- Per-surface variation in **cell labels and glyphs**, within the press-check vocabulary.
+
+### When a surface seems to need a new bar shape
+
+It doesn't. The thing that varies is the cell list. If the apparent design problem is *"shortform needs three tabs"*, the actual design problem is *"shortform's `Cell[]` is [TOC, Actions, Versions]"* and the implementation is `renderMobileBar({ contextual: [tocCell, actionsCell, versionsCell] })`. The chrome that renders those three cells is the same chrome that renders every other surface's cells.
+
+If a genuine new affordance shape is needed — a search pill that's not sheet-and-not-direct, an inline scrubber, anything that doesn't fit the two-arm `Cell` API — the response is to amend this section (proposing a third Cell arm with operator agreement) **before** drafting markup. Expanding the `Cell` API drift-and-retroactively is the same convention-canon failure mode this section is named to prevent.
+
+### Why this is settled
+
+The same v1→v7 cross-bar arc that settled the masthead's chrome also settled the bar's contract. By v7, the bar's job is exactly "do work on this surface" — a contract that admits exactly the two-arm Cell API and admits no per-surface bespoke variation in chrome shape. Surface-bespoke bar idioms drafted before v7 landed (sticky-decision-bar, floating-action-sheet, bottom-tabbar variants) are archived under `docs/studio-design/REJECTED/2026-05-12-shortform-{1,2,3}-*` with briefs noting their supersession.
+
 ## Desk information architecture
 
 The Desk's body is organized into stacked **sections**, each with its own header. Sections are append-only — new destinations slot in as additional sections, not as new top-level navigation entries. The current three sections, top-to-bottom:
@@ -373,3 +416,4 @@ Append a one-line entry to this section every time the document is updated.
 - 2026-05-09 — Added Principles section with "Favor structure over scrolling" as the first principle. Cites the dashboard's collapsible stage tiles as the canonical application; cites the discarded card-stream as the failure pattern.
 - 2026-05-11 — Added Accessibility / Contrast section codifying WCAG 2.1 AA minimums (4.5:1 body, 3:1 large, 3:1 non-text UI, 3:1 ornamental chrome). Triggered by the v0.20 dashboard ⋮ shipping at 1.21:1; companion ⋮ Direction B (ink-soft glyph, 11.06:1) lands the row-affordance fix.
 - 2026-05-12 — Added `§ Studio navigation model` (the v7 star-nav architecture: Desk-as-hub, universal `← / ⋮` masthead affordances, `⋮` popover-not-sheet reveal pattern, `⋮` vocabulary scope convention). Added `§ Desk information architecture` (three sections: longform pipeline + shortform-by-platform + adjacent-tools placeholders; single-expand within section, independent across; explicit muted-palette empty-state rendering). Marked two parked decisions RESOLVED: Pipeline/Press/Folio tabbar superseded by star nav; per-row affordance shipped in v0.20.
+- 2026-05-13 — Added `§ Universal bar contract` codifying the v7 settlement explicitly: `renderMobileBar` is the universal contextual chrome on every non-Desk mobile surface; per-surface bespoke bar idioms are retired; the per-surface design variable is which `Cell[]` to pass, not what shape the bar takes. Added because the workplan's stale "Pick Shortform-1/2/3 idiom" sub-step trapped the next implement-skill invocation into relitigating a settled cross-cutting decision. The three shortform-bespoke idioms (sticky-decision-bar, floating-action-sheet, bottom-tab-bar) are filed in `docs/studio-design/REJECTED/2026-05-12-shortform-{1,2,3}-*` with briefs noting their supersession.
