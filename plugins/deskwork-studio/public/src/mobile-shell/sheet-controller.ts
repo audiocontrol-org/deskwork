@@ -36,6 +36,21 @@ export interface SlideUpSheetOptions {
   /**
    * Optional drag handle. If present, touch and mouse drag downward
    * past dragDismissPx closes the sheet.
+   *
+   * **CSS REQUIREMENT (#268):** the handle element MUST have
+   * `touch-action: none` in CSS. Without it, the browser's native
+   * touch-scroll behavior wins over the controller's touchmove
+   * handler (the handler is registered passive and cannot
+   * preventDefault), the page behind the sheet scrolls instead of
+   * the gesture being routed to drag-to-dismiss, and the sheet never
+   * closes via drag. Working precedents:
+   *   - `dashboard-mobile.css .er-compose-handle` (Compose FAB)
+   *   - `editorial-review.css .er-mobile-sheet-handle` (entry-review +
+   *     shortform sheets)
+   * Add the rule to any new consumer's handle CSS before consuming
+   * this controller; failure to do so produces a silent UX
+   * regression on touch devices (the handle looks right, the
+   * controller fires, but the gesture is consumed by the page).
    */
   handleEl?: HTMLElement;
   /**

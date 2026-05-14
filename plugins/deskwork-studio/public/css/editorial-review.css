@@ -3850,6 +3850,11 @@ body[data-drawer="open"]:has(.er-scrapbook-drawer) {
     display: flex;
     align-items: center;
     justify-content: center;
+    /* #268: opt the handle out of native touch scrolling so the
+       sheet-controller's touchmove handler can route the drag to the
+       drag-to-dismiss gesture instead of the page-scroll consumer.
+       Matches the precedent at dashboard-mobile.css .er-compose-handle. */
+    touch-action: none;
   }
   .er-mobile-sheet-handle:active { cursor: grabbing; }
   .er-mobile-sheet-handle-bar {
