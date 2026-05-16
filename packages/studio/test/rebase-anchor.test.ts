@@ -154,4 +154,83 @@ describe('rebaseAnchor', () => {
       expect(r).toEqual({ start: 10, end: 13 });
     });
   });
+
+  describe('fuzzy fallback (diff-match-patch, when exact + context fails)', () => {
+    it('recovers anchor edited by a single character insertion', () => {
+      // Original anchor "the goal" was edited to "the new goal" in v2.
+      // Exact indexOf for "the goal" finds nothing → falls through to fuzzy.
+      const root = rootWith(
+        'We set the new goal of shipping in May. ' +
+        'Done.',
+      );
+      const r = rebaseAnchor(
+        root,
+        'the goal',
+        /* prefix */ 'We set ',
+        /* suffix */ ' of shipping',
+        /* originalStart */ 7,
+      );
+      expect(r).not.toBeNull();
+      // Returns approximate range near where the fuzzy match landed
+      // (Bitap returns the START position of the closest match).
+      expect(r!.start).toBeGreaterThanOrEqual(7);
+      expect(r!.start).toBeLessThanOrEqual(15);
+    });
+
+    it('recovers anchor edited by a single character deletion', () => {
+      // Original "the elephant" → "the elphant" (typo introduced).
+      const root = rootWith('the elphant in the room');
+      const r = rebaseAnchor(
+        root,
+        'the elephant',
+        /* prefix */ '',
+        /* suffix */ ' in the room',
+        /* originalStart */ 0,
+      );
+      expect(r).not.toBeNull();
+      expect(r!.start).toBe(0);
+    });
+
+    it('returns null when fuzzy similarity is below threshold', () => {
+      // Anchor "alpha bravo charlie" — completely unrelated to the text.
+      const root = rootWith('totally different content here, nothing to match');
+      const r = rebaseAnchor(
+        root,
+        'alpha bravo charlie',
+        '',
+        '',
+        /* originalStart */ 5,
+      );
+      expect(r).toBeNull();
+    });
+
+    it('does not fuzzy-match when originalStart is omitted (back-compat)', () => {
+      // Edited anchor + no originalStart hint → no fuzzy fallback.
+      // Falls through to exact null since "the new goal" isn't an exact
+      // anchor in our search ("the goal" is what we look for).
+      const root = rootWith('We set the new goal of shipping.');
+      const r = rebaseAnchor(
+        root,
+        'the goal',
+        'We set ',
+        ' of shipping',
+        /* originalStart omitted */
+      );
+      expect(r).toBeNull();
+    });
+
+    it('prefers exact match over fuzzy when both could apply', () => {
+      // "the goal" appears EXACTLY once (no edit) AND fuzzy would also
+      // succeed. Exact path should win and return precise range.
+      const root = rootWith('We set the goal of shipping.');
+      const r = rebaseAnchor(
+        root,
+        'the goal',
+        'We set ',
+        ' of shipping',
+        /* originalStart */ 7,
+      );
+      expect(r).toEqual({ start: 7, end: 15 });
+    });
+  });
 });

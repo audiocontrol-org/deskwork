@@ -300,7 +300,13 @@ export function createAnnotationsController(
         if (resolvedIds.has(a.id)) {
           let status: AnnotationStatus = 'current';
           if (a.version !== versionNum) {
-            status = rebaseAnchor(draftBody, a.anchor, a.anchorPrefix, a.anchorSuffix)
+            status = rebaseAnchor(
+              draftBody,
+              a.anchor,
+              a.anchorPrefix,
+              a.anchorSuffix,
+              a.range.start,
+            )
               ? 'rebased'
               : 'unresolved';
           }
@@ -316,6 +322,7 @@ export function createAnnotationsController(
           a.anchor,
           a.anchorPrefix,
           a.anchorSuffix,
+          a.range.start,
         );
         if (rebasedRange) rebased.push({ ann: a, range: rebasedRange });
         else unanchored.push(a);
@@ -366,6 +373,7 @@ export function createAnnotationsController(
         annotation.anchor,
         annotation.anchorPrefix,
         annotation.anchorSuffix,
+        annotation.range.start,
       );
       if (r) wrapRange(draftBody, r, annotation.id);
     } else if (status === 'current') {
