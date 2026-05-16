@@ -1,0 +1,15 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-16T14:45:27.912Z",
+  "entryId": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+  "annotation": {
+    "type": "address",
+    "workflowId": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+    "commentId": "1c507d88-587e-4762-a833-cbda5f528bc7",
+    "version": 1,
+    "disposition": "addressed",
+    "reason": "Updated the templates section header to 'presets, not the bounding space' with explicit prose that presets are exemplars, not the enumerated possible space. Also clarified in studio rendering that templates can be preset or operator-authored — same first-class status.",
+    "id": "80847a52-fdf1-4ae3-8b53-99e3155fe1a0",
+    "createdAt": "2026-05-16T14:45:27.912Z"
+  }
+}

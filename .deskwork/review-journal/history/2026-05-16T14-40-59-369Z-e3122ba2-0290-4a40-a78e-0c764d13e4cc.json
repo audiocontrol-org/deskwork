@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-16T14:40:59.369Z",
+  "entryId": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+    "version": 1,
+    "range": {
+      "start": 16776,
+      "end": 16789
+    },
+    "text": "We may need to revisit the skill changes to support lane and groups CRUD and selection",
+    "category": "other",
+    "anchor": "Skill changes",
+    "id": "c5be7c36-7813-4e8f-9f4d-0ae383d786d3",
+    "createdAt": "2026-05-16T14:40:59.369Z"
+  }
+}

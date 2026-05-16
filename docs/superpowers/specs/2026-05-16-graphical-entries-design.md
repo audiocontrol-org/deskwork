@@ -32,7 +32,6 @@ The two problems are entangled: graphical entries need their own pipeline shape 
 
 - **Recursive groups** (a group inside a group). YAGNI until a concrete use surfaces.
 - **Custom per-stage gate logic.** Stage transitions stay as defined by the template; no project-specific hooks beyond locked-stages and induct destinations.
-- **Iterate on binary images.** PNG/JPG entries have no agent-editable representation; iterate is refused. Approve / cancel / induct only.
 - **Additional artifact kinds (video, audio, PDF, executable code).** v1 ships `markdown`, `html-mockup`, `single-file-html`, `image`. Additional kinds wait for a concrete use case to surface their lifecycle and review-surface needs.
 - **Per-stage custom skills.** The universal verbs (`iterate`, `approve`, `cancel`, `induct`) cover every stage in every template; new verbs are not introduced.
 - **CI test infrastructure.** Per the deskwork rule *"No test infrastructure in CI."* Local vitest only.
@@ -62,11 +61,11 @@ Invariants:
 
 Default templates ship in plugin defaults; operators override per-project via `/deskwork:customize pipeline <id>` (existing customize skill machinery). Plugin defaults live at `packages/core/src/pipelines/<id>.json`; project overrides at `<projectRoot>/.deskwork/pipelines/<id>.json`. The override resolver (already in `packages/core/src/overrides.ts` per the THESIS Consequence 3 infrastructure) picks the project file when present and falls back to the plugin default.
 
-### Default templates shipped in v1
+### Default templates shipped in v1 — presets, not the bounding space
 
-Five templates ship as plugin defaults:
+The plugin ships five **preset templates** as starting points for operator configuration. These presets are exemplars — *not* the enumerated space of possible pipelines. A project may have any number of lanes (≥1), each bound to either a plugin-shipped preset or an operator-authored custom pipeline. Custom pipelines are first-class citizens, not "overrides" of presets — they're just additional `PipelineTemplate` JSON files the operator places under `<projectRoot>/.deskwork/pipelines/`.
 
-| Template `id` | linearStages | lockedStages | offPipelineStages |
+| Preset `id` | linearStages | lockedStages | offPipelineStages |
 |---|---|---|---|
 | `editorial` | `["Ideas","Planned","Outlining","Drafting","Final","Published"]` | `["Final"]` | `["Blocked","Cancelled"]` |
 | `visual` | `["Sketched","Iterating","Approved","Shipped"]` | `["Approved"]` | `["Blocked","Cancelled","Archived"]` |
@@ -74,7 +73,9 @@ Five templates ship as plugin defaults:
 | `qa-plan` | `["Drafted","Reviewed","Tested","Approved"]` | `["Reviewed"]` | `["Blocked","Cancelled","Archived"]` |
 | `blog-post` | `["Idea","Drafting","Edited","Published"]` | `["Edited"]` | `["Blocked","Cancelled"]` |
 
-Each template ships with comment headers in its JSON file documenting the lifecycle rationale so operators authoring custom templates have working exemplars. The `editorial` template's stage names match the legacy single-pipeline names exactly — this is what backs the migration of pre-feature entries (see § Migration).
+Each preset ships with comment headers in its JSON file documenting the lifecycle rationale so operators authoring custom templates have working exemplars. The `editorial` preset's stage names match the legacy single-pipeline names exactly — this is what backs the migration of pre-feature entries (see § Migration).
+
+**Custom templates.** Operators author new pipeline JSONs at `<projectRoot>/.deskwork/pipelines/<id>.json` (no preset basis required — the file can be authored from scratch). The override resolver loads any `*.json` file in that directory as an available template; the studio's lane-config UI lists every template found (shipped presets + project-authored) when choosing which template a lane binds to. The customize skill (`/deskwork:customize pipeline <preset-id>`) is a convenience for "start from a preset and modify it" — it's not required.
 
 ### Lanes
 
@@ -112,26 +113,36 @@ Graphical entries are entries whose primary artifact is non-markdown. Three arti
 |---|---|---|---|
 | **HTML mockup** | Directory `<slug>/` with `index.html` + sibling assets (`*.css`, `*.js`, `*.png`, etc.) | Yes — agent edits HTML/CSS/JS to address marginalia | DOM-selector + x/y offset (resilient to small layout changes) + ranged-text fallback when comment references visible text |
 | **Single-file HTML** | `<slug>.html` with inline styles/scripts | Yes — same as above | Same as above |
-| **Image (PNG/JPG/SVG)** | `<slug>.png` (or .jpg/.svg) | No — refused; image is frozen-on-create | Pixel coordinates only |
+| **Image (PNG/JPG/SVG)** | `<slug>.<ext>` | Yes — agent replaces the file or invokes operator-configured iteration handler (see below) | Pixel coordinates for raster; element-selector for SVG |
 
 The studio's existing review surface gains a "graphical" mode that activates when an entry's artifact is one of the above shapes. The review surface renders the artifact in an iframe (HTML cases) or `<img>` (image cases) inside a wrapper that captures clicks for marginalia pin placement. The verb chrome (Iterate / Approve / Cancel buttons) is identical to the markdown review surface and continues to clipboard-copy `/deskwork:<verb> <slug>` per THESIS Consequence 2 — the studio never mutates sidecar state from button clicks.
 
 For HTML mockups, iterate reads each marginalia anchor (DOM selector + offset + comment text), resolves it against the live DOM, identifies the most plausible element, and edits the HTML/CSS/JS to address the comment — same skill prose pattern as markdown iterate, just operating on different file types.
 
-For image entries, iterate is refused at the CLI level with `image entries cannot be iterated — they are frozen on create; use /deskwork:cancel or /deskwork:induct to backward-step`.
+For image entries, iterate is supported and intentionally open-ended at the CLI level. There are multiple plausible ways an agent can address marginalia on an image, and the right approach depends on the image and on what tooling the operator has configured:
+
+- **Agent-driven regeneration.** For images produced by a generation pipeline (Midjourney, Stable Diffusion, DALL·E, etc.), the agent reads the comments and regenerates the image with an updated prompt. The new file replaces the old at `artifactPath`; iterate appends a new revision per `DESKWORK-STATE-MACHINE.md` § Versions and revisions, preserving the prior revision's bytes in the journal.
+- **Agent-driven programmatic transformation.** For images that have a programmatic origin (crops, annotations, composites), the agent runs the transformation (ImageMagick, sharp, custom script) per the comment and replaces the file.
+- **SVG edits.** SVGs are XML; element-selector marginalia anchors let the agent edit the SVG source directly the way it edits HTML.
+- **Operator-supplied replacement.** The operator drops a new image file at `artifactPath` and `/deskwork:iterate` appends it as the next revision.
+
+The skill prose for `/deskwork:iterate` enumerates these paths and asks the agent to pick the one that matches the comments and the available tooling. If none apply, the agent reports back to the operator with the comments unaddressed and lets the operator drive (e.g., supply a replacement image manually). Per-project iteration handlers (e.g. `<projectRoot>/.deskwork/iterate-handlers/image.ts`) are a future extension hook — not in v1, but the architecture leaves room.
 
 ### Studio rendering
 
-- **Per-lane dashboards.** The studio dashboard surfaces a tab strip (one tab per lane) plus a "Combined" overview tab. Tab order is lane-config order. Empty lanes still render their tab + an empty state so operators see the pipeline shape.
-- **Per-lane stage columns.** Each lane's dashboard shows columns for that lane's `linearStages` (in order) plus a separate "Off-pipeline" section listing entries in `offPipelineStages`. The stage labels are the template's stage names — no hardcoded "Drafting" / "Published" anywhere in studio render code.
-- **Group rendering.** A group entry's row in its lane dashboard shows the member count as a badge. The group's review surface adds a "Members" section listing each member's lane, stage, and a clipboard-copy link to its review surface. The member entries' own rows show a "Member of: <group slug>" badge for navigability.
+A project may have any number of lanes (≥1), so the studio must handle both small (single-lane back-compat) and large (many-lane) configurations gracefully.
+
+- **Per-lane dashboards with operator-selectable visibility.** The studio dashboard surfaces a tab strip with one tab per lane plus a "Combined" overview tab. With many lanes, the tab strip overflows into a horizontally-scrollable strip with a "lanes ▾" dropdown for direct selection. Operators choose which lanes are visible on the desk via a lane-visibility panel — hidden lanes don't render tabs but their entries still exist and count in dashboard stats. Tab order respects operator-configured ordering (drag-to-reorder in the lane-visibility panel). Empty visible lanes render their tab + an empty state so operators see the pipeline shape.
+- **Per-lane stage columns.** Each lane's dashboard shows columns for that lane's `linearStages` (in order) plus a separate "Off-pipeline" section listing entries in `offPipelineStages`. The stage labels are the template's stage names (drawn from whichever pipeline JSON the lane is bound to — preset or operator-authored) — no hardcoded "Drafting" / "Published" anywhere in studio render code.
+- **Lane / group management surfaces.** The studio exposes CRUD surfaces (see § CRUD support below): a lane management page (list, create, edit, archive lanes; pick which pipeline template a lane binds to; reorder; toggle visibility) and a group management page (list, create, edit, archive groups; manage members; observe member lane/stage at a glance).
+- **Group rendering on lane dashboards.** A group entry's row in its lane dashboard shows the member count as a badge. The group's review surface adds a "Members" section listing each member's lane, stage, and a clipboard-copy link to its review surface. The member entries' own rows show a "Member of: <group slug>" badge for navigability.
 - **Graphical review surface.** Renders artifact-in-iframe (HTML) or `<img>` (image) with marginalia overlay. Otherwise identical chrome to the markdown review surface.
 
 ### Verb semantics across templates
 
 | Verb | Behavior | Stage gate |
 |---|---|---|
-| `iterate` | Agent reads marginalia, edits artifact to address each comment, bumps revision counter | Any non-terminal, non-locked, non-off-pipeline linear stage. Image entries refuse unconditionally. |
+| `iterate` | Agent reads marginalia, edits or regenerates artifact to address each comment, bumps revision counter | Any non-terminal, non-locked, non-off-pipeline linear stage. All artifact kinds supported (see § Graphical entries for image-specific iteration paths). |
 | `approve` | Advances `currentStage` to next element of `linearStages`. At terminal stage, assigns a new version per § Versions and revisions in `DESKWORK-STATE-MACHINE.md`. | Any linear stage with a next-stage (i.e. not the terminal). Terminal stage refuses with "Already at terminal; induct backward to revise." |
 | `cancel` | Moves `currentStage` to `Cancelled` (must exist in `offPipelineStages`). | Any stage except `Cancelled` itself. |
 | `induct` | Moves `currentStage` from an off-pipeline stage back to an operator-chosen linear stage. Also: backward-induct from `Final` (or any locked stage) to a non-locked linear stage to unlock for editing. | From: any off-pipeline stage OR any locked stage. To: any linear stage. |
@@ -206,14 +217,29 @@ New rules:
 - **artifact-kind-mismatch.** Entry's `artifactKind` doesn't match the file extension at `artifactPath`. Repair: prompts to correct.
 - **image-locked-stage.** An image entry is in a `lockedStages` stage but has been iterated since reaching it (iterate should refuse on images; this rule catches drift). Repair: surfaces the iterate journal entries for manual review.
 
+## CRUD support — lanes, groups, pipelines
+
+Lanes, groups, and (operator-authored) pipelines are first-class operator-owned objects. The feature ships full CRUD support across CLI and studio so operators can manage them without hand-editing JSON.
+
+| Object | Create | Read / List | Update | Delete |
+|---|---|---|---|---|
+| **Lane** | `/deskwork:lane create <id> --template <preset-or-custom> --content-dir <path>` + studio "New lane" form | `/deskwork:lane list`, `/deskwork:lane show <id>` + studio lane management page | `/deskwork:lane update <id> [--template <id>] [--name <label>] [--content-dir <path>]` + studio edit form | `/deskwork:lane archive <id>` (soft, no destructive default) + studio archive action. Hard delete requires `--purge` flag and is studio-gated behind a confirm modal. |
+| **Group** | `/deskwork:group create <slug> --lane <lane-id>` + studio "New group" form | `/deskwork:group list`, `/deskwork:group show <slug>` + studio group management page | `/deskwork:group add-member <group> <entry>`, `/deskwork:group remove-member <group> <entry>`, `/deskwork:group update <slug> [--title <text>]` + studio member-management UI | `/deskwork:group cancel <slug>` (uses universal cancel verb) + studio surface. Hard delete same `--purge` pattern. |
+| **Pipeline (custom)** | `/deskwork:customize pipeline <preset-id>` (start-from-preset) OR `/deskwork:pipeline create <id> --shape <linear-stages-spec>` (from-scratch) | `/deskwork:pipeline list`, `/deskwork:pipeline show <id>` + studio template browser | `/deskwork:pipeline update <id> --add-stage <name> [--position N]`, `--rename-stage <from> <to>`, `--remove-stage <name>` + studio template editor | `/deskwork:pipeline delete <id>` (refused if any lane references it; force with `--reassign-lanes-to <other-id>`). |
+
+Soft-archive is the default for lanes and groups (preserves history, hides from active dashboards). Hard delete (`--purge`) is reserved for empty objects or genuine cleanup; doctor flags orphan-pipeline-references and dangling-group-members.
+
 ## Skill changes
 
-- **New skill `/deskwork:lane`** (composite: `lane list`, `lane create`, `lane show <id>`) — operator-facing lane management.
-- **New skill `/deskwork:group`** (composite: `group create`, `group add-member <group> <entry>`, `group remove-member <group> <entry>`) — group management.
+- **New skill `/deskwork:lane`** (composite) — `list`, `show <id>`, `create`, `update`, `archive`, `purge` (gated). Operator-facing lane CRUD.
+- **New skill `/deskwork:group`** (composite) — `list`, `show <slug>`, `create`, `update`, `add-member`, `remove-member`, `archive`. Cancel uses the universal `/deskwork:cancel`.
+- **New skill `/deskwork:pipeline`** (composite) — `list`, `show <id>`, `create`, `update` (add-stage / rename-stage / remove-stage / set-locked / set-off-pipeline), `delete`. Operator-facing pipeline-template CRUD that complements the existing `/deskwork:customize pipeline <preset>` start-from-preset convenience.
 - **Updated skill `/deskwork:add`** — accepts `--lane <id>` and `--kind <markdown|html-mockup|single-file-html|image>` flags.
 - **Updated skill `/deskwork:ingest`** — accepts `--lane <id>` (defaults to `default`); auto-detects `artifactKind` from file extension.
-- **Updated skill `/deskwork:iterate`** — refuses on image entries with the specific error message.
-- **Existing skills `/deskwork:approve`, `/deskwork:cancel`, `/deskwork:induct`** — unchanged in operator-facing semantics; internal stage-list reads now go through the lane's template.
+- **Updated skill `/deskwork:iterate`** — handles all artifact kinds including images per § Graphical entries; the skill prose enumerates the image-iteration paths and asks the agent to pick the right one for the comments + tooling available.
+- **Existing skills `/deskwork:approve`, `/deskwork:cancel`, `/deskwork:induct`** — unchanged in operator-facing semantics; internal stage-list reads now go through the lane's template (which may be a preset or operator-authored).
+
+These skill-set deltas are themselves part of the feature's scope and the workplan reflects that — earlier phases stabilize templates / lanes / verb refactor; later phases add the management skills and studio surfaces. The list above may evolve during implementation as lane/group/pipeline CRUD surfaces concretize; treat it as a starting catalog, not the final shape.
 
 ## Testing
 
@@ -232,14 +258,16 @@ New rules:
 
 ## Tasks (high-level)
 
-The implementation decomposes into ~6 phases. Setup will scaffold a workplan from these. Numbers are approximate phase sizes, not commitments.
+The implementation decomposes into ~8 phases. Setup will scaffold a workplan from these. Numbers are approximate phase sizes, not commitments.
 
-1. **Pipeline template loader + plugin defaults + override resolver.** Load JSON; validate schema; merge plugin-default + project-override per the THESIS Consequence 3 pattern. Ship five default templates. Unit tests.
+1. **Pipeline template loader + preset defaults + override resolver.** Load JSON; validate schema; merge plugin-shipped presets + operator-authored custom pipelines per the THESIS Consequence 3 override-resolver pattern. Ship five preset templates as starting points. Unit tests.
 2. **Lane data model + config loader + entry schema delta.** New `.deskwork/lanes/<id>.json` files; entry sidecar gains `lane` + `artifactKind`. Doctor migration creates `default` lane and back-fills entries on first run. Unit tests.
-3. **Verb refactor: stage-list reads go through lane template.** `approve`, `iterate`, `cancel`, `induct` all currently read a hardcoded stage list; refactor to consult the entry's lane template. Image-entry iterate refusal lands here. Existing skill behavior preserved when the lane is `default`. Unit tests.
-4. **Studio render: per-lane tabs + per-template stage columns + combined overview.** New tab strip; per-tab dashboards; template-aware column rendering. No graphical surface yet (still markdown-only). Integration test against multi-lane fixture.
-5. **Groups: members field + group review surface + add-member / remove-member skills.** Cross-lane membership; no propagation on approve; doctor rule for recursion + dangling members. Unit + integration tests.
-6. **Graphical entries: graphical review surface + marginalia overlay + HTML iterate skill prose update.** Iframe / `<img>` rendering; coordinate-pinned marginalia; iterate against HTML mockups (skill prose update + agent guidance). Integration test against a fixture mockup. Manual dogfood: ingest one of the project's existing `docs/studio-design/` mockups as a `visual`-lane entry, iterate it, approve it.
+3. **Verb refactor: stage-list reads go through the lane's template.** `approve`, `iterate`, `cancel`, `induct` all currently read a hardcoded stage list; refactor to consult the entry's lane template (preset or custom). Existing skill behavior preserved when the lane is `default`. Unit tests.
+4. **Studio render: per-lane tabs + per-template stage columns + combined overview + lane-visibility panel.** New tab strip (with overflow / dropdown for many-lane projects); per-tab dashboards; template-aware column rendering; operator-controlled lane visibility + ordering. No graphical surface yet (still markdown-only). Integration test against multi-lane fixture.
+5. **Lane + pipeline CRUD skills + studio management surfaces.** `/deskwork:lane` (list/show/create/update/archive/purge), `/deskwork:pipeline` (list/show/create/update/delete), and studio lane-management + pipeline-editor pages. Doctor rules for orphan pipeline references. Integration test: create a lane bound to a custom pipeline, add entries, archive the lane, restore.
+6. **Groups: members field + group CRUD skills + group review surface.** `/deskwork:group` skill family (list/show/create/update/add-member/remove-member/archive); group review surface with member panel; cross-lane membership; no propagation on approve; doctor rules for recursion + dangling members. Studio group-management page. Unit + integration tests.
+7. **Graphical entries — HTML review surface.** Iframe-based review for `html-mockup` and `single-file-html`; coordinate-pinned + DOM-anchored marginalia; iterate against HTML mockups (skill prose update + agent guidance for editing HTML/CSS/JS in response to marginalia). Integration test against a fixture mockup.
+8. **Graphical entries — image review surface + image iteration paths.** `<img>` review surface with pixel-coordinate marginalia (raster) + element-selector marginalia (SVG); iterate skill prose enumerates the regenerate / transform / replace / operator-supplied paths; agent guidance for picking the right path per comment + tooling. Manual dogfood: ingest one of the project's existing `docs/studio-design/` mockups as a `visual`-lane entry, iterate it, approve it; ingest a screenshot, iterate it via operator-supplied replacement.
 
 ## Open questions
 

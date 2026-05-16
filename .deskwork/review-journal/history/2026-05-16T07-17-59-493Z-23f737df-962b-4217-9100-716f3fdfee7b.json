@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-16T07:17:59.493Z",
+  "entryId": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+    "version": 1,
+    "range": {
+      "start": 2287,
+      "end": 2311
+    },
+    "text": "this is an artificial restriction. there are ways to iterate on images.",
+    "category": "other",
+    "anchor": "Iterate on binary images",
+    "id": "d711cab9-a69f-4e9d-9359-1acad44e13ad",
+    "createdAt": "2026-05-16T07:17:59.493Z"
+  }
+}

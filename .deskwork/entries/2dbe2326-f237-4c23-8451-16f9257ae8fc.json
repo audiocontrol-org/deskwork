@@ -5,8 +5,10 @@
   "keywords": [],
   "source": "manual",
   "currentStage": "Drafting",
-  "iterationByStage": {},
+  "iterationByStage": {
+    "Drafting": 1
+  },
   "artifactPath": "docs/superpowers/specs/2026-05-16-graphical-entries-design.md",
   "createdAt": "2026-05-16T07:13:10.154Z",
-  "updatedAt": "2026-05-16T07:13:10.154Z"
+  "updatedAt": "2026-05-16T14:45:27.885Z"
 }

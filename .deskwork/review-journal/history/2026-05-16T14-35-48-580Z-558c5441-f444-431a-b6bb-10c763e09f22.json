@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-16T14:35:48.580Z",
+  "entryId": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+    "version": 1,
+    "range": {
+      "start": 9976,
+      "end": 10004
+    },
+    "text": "There are an arbitrary number of lanes in each project. Lanes are user-configurable—there can be any number of lanes (>=1). There is a set of lane templates we ship with, but those are essentially “presets”, not the enumerated space of possible lanes.\n\nWe’ll need CRUD support for lanes and groups as well as UI support for selecting pipelines to view on the studio desk",
+    "category": "other",
+    "anchor": "tab strip (one tab per lane)",
+    "id": "1ae54900-4105-49d2-933a-8bfbb680b6ca",
+    "createdAt": "2026-05-16T14:35:48.580Z"
+  }
+}
