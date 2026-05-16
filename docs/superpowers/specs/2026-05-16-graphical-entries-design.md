@@ -28,13 +28,15 @@ The two problems are entangled: graphical entries need their own pipeline shape 
 - Preserve the canonical pipeline *shape* (linear forward + cul-de-sac off-pipeline + universal iterate/approve/cancel verbs); only stage names and lengths vary per template.
 - Migrate every existing entry into the new model with zero data loss and no operator action required.
 
-## Non-goals (explicitly out of scope)
+## Captured but pending operator scope decision
 
-- **Recursive groups** (a group inside a group). YAGNI until a concrete use surfaces.
-- **Custom per-stage gate logic.** Stage transitions stay as defined by the template; no project-specific hooks beyond locked-stages and induct destinations.
-- **Additional artifact kinds (video, audio, PDF, executable code).** v1 ships `markdown`, `html-mockup`, `single-file-html`, `image`. Additional kinds wait for a concrete use case to surface their lifecycle and review-surface needs.
-- **Per-stage custom skills.** The universal verbs (`iterate`, `approve`, `cancel`, `induct`) cover every stage in every template; new verbs are not introduced.
-- **CI test infrastructure.** Per the deskwork rule *"No test infrastructure in CI."* Local vitest only.
+Items below are **captured** (designed) so the operator can scope them explicitly. The capture itself doesn't decide whether they ship in v1 — the operator does that in a separate scoping pass. See § Implied scope captured for the rest.
+
+- **Recursive groups.** A group whose members include another group. Useful for: nested initiatives ("mobile-first redesign" contains the "phone-first dashboard" sub-initiative which contains its mockups). Open questions: does a parent group's stage propagate to nested groups? does the doctor's cycle-detection cover recursive depth >2? does the studio's group review surface render N levels of nesting expandable?
+- **Custom per-stage gate logic.** Stage transitions today are gated only by stage position + locked-stages. Templates could optionally specify per-stage gates (e.g. "Drafting → Final requires at least 1 marginalia resolved" or "Final → Published requires linked PR merged"). Open questions: gate DSL design (declarative vs scripted), failure-message surfacing, how doctor reports unmet gates, whether gates are skippable with an override flag.
+- **Additional artifact kinds.** Beyond `markdown` / `html-mockup` / `single-file-html` / `image`: video (`.mp4` / `.mov`), audio (`.mp3` / `.wav`), PDF, executable code (`.ts` / `.py` snippets demoing something), notebooks (`.ipynb`), data files (`.csv` / `.json` payloads under review), diagrams (Mermaid / PlantUML / Draw.io source files). Each surfaces different review-surface affordances (transport controls for media; rendered preview for notebooks/diagrams; syntax-highlighted display for code) and different iterate semantics.
+- **Per-stage custom skills.** Today the universal verbs (`iterate`, `approve`, `cancel`, `induct`) cover every stage. A project could attach a custom skill to a specific stage (e.g. lane `qa-plan` stage `Tested` triggers `/qa:smoke-test` automatically). Open questions: declarative attachment vs operator-invoked; skill-discovery surfacing; cycle / re-entry protection.
+- **CI test infrastructure.** Per the deskwork project rule *"No test infrastructure in CI."* The operator may revisit this when graphical entries' studio interactions raise the cost of CI-less verification.
 
 ## Approach
 
@@ -126,7 +128,9 @@ For image entries, iterate is supported and intentionally open-ended at the CLI 
 - **SVG edits.** SVGs are XML; element-selector marginalia anchors let the agent edit the SVG source directly the way it edits HTML.
 - **Operator-supplied replacement.** The operator drops a new image file at `artifactPath` and `/deskwork:iterate` appends it as the next revision.
 
-The skill prose for `/deskwork:iterate` enumerates these paths and asks the agent to pick the one that matches the comments and the available tooling. If none apply, the agent reports back to the operator with the comments unaddressed and lets the operator drive (e.g., supply a replacement image manually). Per-project iteration handlers (e.g. `<projectRoot>/.deskwork/iterate-handlers/image.ts`) are a future extension hook — not in v1, but the architecture leaves room.
+The skill prose for `/deskwork:iterate` enumerates these paths and asks the agent to pick the one that matches the comments and the available tooling. If none apply, the agent reports back to the operator with the comments unaddressed and lets the operator drive (e.g., supply a replacement image manually).
+
+**Per-project iteration handlers.** Operators can register project-specific iteration handlers at `<projectRoot>/.deskwork/iterate-handlers/<artifactKind>.ts`. The handler exports a function the agent invokes to address marginalia on an entry of the given kind. Use cases: a project that authors mockups via a specific design tool (e.g. Figma export pipeline) registers a Figma-aware handler; a project with custom image transformation pipelines registers one that maps comment text to specific ImageMagick operations. Handler discovery uses the same override-resolver pattern as templates and doctor rules. The agent reads the handler signature, passes the marginalia + entry context, and persists whatever the handler returns as the new revision content. Handler authoring is documented; the skill prose explains when the agent uses the handler vs. its own judgment.
 
 ### Graphical review surface — chrome-free rendering + threaded comments + screenshot capture
 
@@ -332,6 +336,162 @@ These skill-set deltas are themselves part of the feature's scope and the workpl
 - **Marginalia anchor resilience on HTML mockups.** A DOM-selector-based anchor can drift if the operator hand-edits the HTML. Mitigation: anchor records both a selector and a text snippet + pixel offset. The studio's resolver tries selector first, then text-snippet match, then pixel coordinates as last resort. Doctor surfaces unresolved anchors as warnings.
 - **Five default templates risks bikeshedding.** Operators may have opinions about whether `feature-doc` should have `Reviewed` or `Implemented` as its terminal. Mitigation: ship reasonable defaults; the customize seam is the answer to "I want different stages" — not "let's debate the defaults forever."
 - **Group cross-lane semantics on doctor.** Doctor needs to follow member UUIDs across lanes to validate. This is a small lookup-cost concern, not a correctness one. Mitigation: doctor builds an index of UUID → lane lookups once per run.
+
+## Implied scope captured
+
+This section enumerates every aspect of the design that's implied by what's above but not yet specified in detail. Each item is **captured** so the operator can decide what to keep in v1, what to split into a follow-up, and what to drop. The capture itself doesn't decide scope — that's a separate operator-driven pass per the project rule "Capture mode vs scope mode" in `.claude/rules/agent-discipline.md`.
+
+### Search, filtering, navigation
+
+- **Per-lane search.** Each lane dashboard needs a search affordance — slug match, title match, content full-text match, member-of-group match, stage filter, tag filter, artifact-kind filter, has-unaddressed-comments filter. Single search bar with structured filter chips, or sidebar with separate inputs? Open.
+- **Cross-lane search on Combined view.** Same affordances, but search results show lane membership as a column / badge.
+- **"Needs my attention" filter.** Entries with unaddressed comments, in operator-actionable stages, sorted by recency or priority. Equivalent across markdown and graphical entries.
+- **Recent activity feed.** A studio surface showing the last N journal events across all lanes (iterations, approvals, cancellations, comment additions, member changes) so the operator can catch up after time away.
+- **Keyboard navigation.** Tab/shift-tab between lanes, j/k between entries within a lane's stage column, enter to open review surface, esc to return to dashboard. Mirror existing studio shortcut conventions where they exist.
+- **Deep links.** Direct URLs to a specific lane (`/dev/lane/<id>`), a specific entry (`/dev/editorial-review/entry/<uuid>` — already exists), a specific comment thread on an entry (`/dev/editorial-review/entry/<uuid>#comment/<comment-id>`), a specific multi-lane composed view (`/dev/view/<view-id>`).
+
+### Tagging and categorization
+
+- **Tags as orthogonal labels.** An entry can be tagged with operator-defined labels (e.g. `design-system`, `accessibility`, `v0.22-target`, `customer-reported`). Tags span lanes — an entry in `feature-doc` and an entry in `mockups` can both carry `design-system`. Tags differ from groups in that they don't have their own lifecycle; they're metadata for filtering.
+- **Tag schema.** Stored on the entry sidecar as `tags: string[]`. Tag-master config at `<projectRoot>/.deskwork/tags.json` defines tag colors, descriptions, and (optionally) which lanes a tag is allowed in.
+- **Studio tag affordances.** Per-row tag chips on dashboards; tag filter in search; tag manager surface (create/rename/delete tags; recolor).
+- **Tag-driven groups.** A group can declare a tag and auto-include any entry carrying that tag. Open question: how often does the auto-membership recompute, on every save?
+
+### Bulk operations
+
+- **Multi-select on dashboards.** Operator selects N entries (checkbox-style or shift-click range), then applies a bulk verb.
+- **Bulk verbs.** `approve all selected` (refuses if any selected entry's currentStage isn't approve-able), `cancel all selected`, `tag/untag all selected`, `move all selected to group/lane`, `archive all selected`.
+- **Bulk operations on groups.** When acting on a group, the operator can opt-in to apply the verb to all members ("approve this group AND its members"). This is an explicit opt-in even though the universal-verb semantics keep group and member lifecycles independent.
+- **CLI bulk affordances.** `/deskwork:approve --slugs <slug1,slug2,...>` and similar. Studio's bulk surface clipboard-copies the equivalent CLI invocation per THESIS Consequence 2.
+
+### Lane lifecycle and administration
+
+- **Lane archive behavior.** Archived lanes don't render in the active tab strip; their entries continue to exist on disk and in the journal; verbs on archived-lane entries refuse with "lane is archived; restore first or migrate the entry." Doctor lists archived lanes separately from active ones.
+- **Lane restore.** `/deskwork:lane restore <id>` reverses archive.
+- **Lane rename.** Lane IDs are stable; lane display names are editable. ID rename requires a dedicated migration (rewriting `lane` fields on every member entry's sidecar) and is gated behind a confirm flow.
+- **Lane removal vs archive.** Hard delete refuses if the lane has any entries (archived or active); operator first migrates entries to another lane (see "Cross-lane induct" below) or cancels them, then deletes.
+- **Lane reordering.** Operator-controlled order, stored in `<projectRoot>/.deskwork/lane-order.json` (project-wide) or per-operator preference (TBD per § Studio personalization).
+- **Default lane on entry creation.** The `/deskwork:add` and `/deskwork:ingest` default lane is configurable per-project (defaults to `default`); operator can change per project at `.deskwork/config.json#defaultLane`.
+
+### Pipeline template lifecycle
+
+- **Template editing while entries are active.** When an operator edits a pipeline template (renames a stage, adds a stage, removes a stage), what happens to entries currently in the affected stages? Doctor flags affected entries; operator chooses a remediation (manual induct, automatic rename via doctor `--apply`, etc.).
+- **Stage rename migration.** A doctor rule handles stage-name renames declared in a `pipeline-renames.json` migration file; doctor rewrites entry `currentStage` fields atomically.
+- **Stage removal.** Removing a stage refuses if any entry is currently in it. Operator first inducts those entries to a remaining stage, then the doctor allows the template edit.
+- **Preset evolution.** When a new version of deskwork ships with a refined preset (e.g. `editorial` v2 adds a new stage), projects using the preset don't auto-upgrade. The operator opts in via `/deskwork:customize pipeline editorial --refresh` which prompts before overwriting. Operators on a custom-edited preset see a diff and choose merge / keep-mine / take-theirs per-field.
+- **Template versioning.** Each template JSON has a `templateVersion` integer; doctor tracks the version each lane is using and surfaces upgrade prompts.
+
+### Group lifecycle edge cases
+
+- **Group with all members cancelled.** Group stays in its own stage; doctor flags it for operator review ("group has zero non-cancelled members"); operator chooses to cancel the group, remove the cancelled members, or leave as-is.
+- **Group with members removed (empty members[]).** Doctor flag; same operator triage.
+- **Group cancel semantics.** Cancelling a group does NOT propagate to members by default (universal-verb rule). Operator-opt-in propagation (`--cascade`) supported.
+- **Group at terminal stage with members still active.** Allowed; the group's terminal assertion is independent of member state. Doctor surfaces the divergence as informational, not as an error.
+- **Group as content vs metadata.** A group entry has the same schema as any entry, including an optional `artifactPath`. If set, the group has a content body (e.g. a `manifesto.md` describing the initiative). If unset, the group is metadata-only. Both shapes are supported.
+- **Group review-surface iterate.** When a group has an `artifactPath`, iterate addresses comments on that file (same as any entry). When it doesn't, iterate refuses with "group has no editable artifact — iterate operates on the content body when present; otherwise this group is metadata-only."
+
+### Member management edge cases
+
+- **Multi-group membership.** An entry can be a member of multiple groups simultaneously. Studio row shows multi-badge ("Member of: <group-a>, <group-b>"); review surface lists all parent groups.
+- **Member ordering within a group.** Members are an ordered array; operator drags to reorder in the studio group-management page. Order surfaces in the group's review surface and in `deskwork group show <slug>` output.
+- **Dangling member references.** A member UUID that doesn't resolve. Doctor rule `group-member-missing`; remediation is operator-driven (remove the dangling ref).
+- **Member moved to another lane.** Group continues to reference the member (members are by UUID, lane-independent). The group's multi-lane composition view re-renders the member in its new lane.
+- **Member cancelled / archived.** Group keeps the reference; the multi-lane composition shows the member's current stage including cul-de-sac states.
+
+### Comment thread lifecycle
+
+- **Comment editing.** Operator and agent can edit their own comments (text or attachments). Edits append an `edited-at` timestamp to the annotation; original text preserved in the journal.
+- **Comment deletion.** Operator can delete a comment they authored (or any comment in operator-mode). Deletion writes a `comment-deleted` annotation referencing the original; original stays in the journal. UI hides deleted comments (shows count + "show deleted" toggle).
+- **Thread deletion.** Deleting the root comment of a thread soft-deletes the whole thread (all replies become hidden). Soft-delete is reversible; hard-delete requires `--purge`.
+- **Comment resolution independent of iterate.** Operator can mark a comment resolved without an iterate cycle (e.g. "actually this is fine after re-reading"). Resolution creates a disposition annotation (`disposition: 'wontfix'` or `'resolved-without-iteration'`) without bumping the revision counter. Iterate-time dispositions remain primary; this is the manual-resolution path.
+- **Reactions.** Lightweight thumbs-up / thumbs-down on comments and replies (no thread, no text — just a count). Useful for "I agree" without adding noise.
+- **@mentions.** Mentioning another operator in a comment notifies them (mechanism TBD — could be a notification feed, an email, a Slack hook). v1 may or may not include mentions; capture either way.
+- **Comment-thread permalinks.** Direct URLs to a specific thread, scrollable from outside the entry's review surface.
+
+### Screenshot lifecycle
+
+- **Storage location.** `<entryDir>/scrapbook/screenshots/<comment-id>-<timestamp>.png` for entry-anchored screenshots; `<projectRoot>/.deskwork/screenshots-orphan/<timestamp>-<hash>.png` for screenshots not yet attached to a comment (capture-then-attach flow).
+- **Retention.** Screenshots persist as long as their comment persists. On comment deletion, screenshots become orphans (moved to `screenshots-orphan/`) and the operator can re-attach or clean up. Hard-purge cascades to associated screenshots.
+- **Versioning.** Screenshots are NOT versioned across entry revisions — they're tied to the comment, not the entry. A comment's attached screenshot remains immutable; if the operator wants to attach a new screenshot to address an updated state, they add a new attachment to the same comment or a reply.
+- **Screenshot annotation (drawing on screenshots).** Operator can mark up a screenshot before attaching: arrows, boxes, text labels, blur for sensitive content. The annotated screenshot saves as a new file; the original is preserved alongside. Annotation UI is part of the capture flow.
+- **Cross-entry screenshot attachment.** An operator can attach a screenshot of entry A to a comment on entry B (e.g. "this layout in feature-doc/dashboard breaks because of mockup/dashboard"). The screenshot lives in entry B's scrapbook (the comment's location) and references entry A via a `sourceEntry` field on the attachment metadata.
+- **External-image attachment.** Operator can attach any image file from their filesystem (paste from clipboard or drag-and-drop) to a comment, not just screenshots of the rendered surface.
+
+### Migration details (existing data)
+
+- **Legacy `sites` config migration.** Current `.deskwork/config.json` has `sites.<id>.contentDir`; new model has `lanes/<id>.json`. Migration: for each legacy site, create a corresponding lane with `id: <site-id>`, `pipelineTemplate: 'editorial'`, `contentDir: <site.contentDir>`. The legacy `sites` block stays during a deprecation period (doctor surfaces as warning) and is removed in a later release after operators have migrated.
+- **Legacy comments (no `replyTo` / `attachments` / `spatialAnchor`).** Read normally — all new fields are optional. No migration needed for existing single-comment annotations; they continue to render as zero-reply threads in the new model.
+- **Migration journal entry.** Each migration step (lane creation, sidecar back-fill, sites-to-lanes mapping) emits a journal event of kind `migration` recording the change and timestamp. Operator can audit what changed when.
+- **Schema version on `.deskwork/config.json`.** A `schemaVersion` field bumps when the project's `.deskwork/` layout changes incompatibly. New CLI invocations check the version; CLI version newer than schema can run migrations; CLI version older than schema refuses with a clear "upgrade your plugin" message.
+
+### Studio rendering details
+
+- **Default tab on first load.** Combined view by default; remembers last-active tab per-operator via localStorage.
+- **Empty lane state.** Shows the lane's pipeline shape as empty stage columns + a "Create your first entry" CTA that clipboard-copies `/deskwork:add --lane <id>`.
+- **Empty project state.** When the project has no lanes beyond `default`, the lane-tab strip hides; just the default lane's dashboard renders. Add-lane CTA in the studio header.
+- **Error states.** Broken pipeline template, missing lane config, unresolvable member UUID — all render inline error chrome with the doctor rule that flagged them and a "run /deskwork:doctor --apply" copy-button.
+- **Loading states.** While the studio reads sidecars + journal at boot, render skeleton placeholders for the active tab so the operator sees structure before data lands.
+- **Large-project performance.** With N lanes × M entries × K journal events, the studio's per-tab render must be sub-second. Implementation likely needs incremental render (paginate stage columns; lazy-load journal-derived signals; cache the UUID-to-lane index across page loads).
+- **Studio personalization.** Per-operator preferences (active multi-lane views, lane ordering, tab default, theme) stored at `<projectRoot>/.deskwork/personal/<operator-id>.json` or via browser localStorage. Project-level preferences (default lane, default template) at `.deskwork/config.json#preferences`.
+- **Mobile / phone rendering.** Per the existing dashboard mobile-first work, the new lane tab strip + multi-lane composed views must render correctly on phone viewports. Stage columns collapse to a vertical accordion; tab strip becomes a swipeable carousel; multi-lane composed views show one lane at a time with edge-swipe to next.
+- **Read-only mode.** A studio mode (URL param or per-operator flag) where verb buttons hide and the operator can only browse. Useful for sharing a link to a non-deskwork operator (stakeholder review).
+
+### Cross-lane operations
+
+- **Lane changes (entry moves between lanes).** Operator moves an entry from lane A to lane B (e.g. promote an `internal-notes` draft into the `blog-post` lane). CLI: `/deskwork:lane move <slug> --to <lane-id>`. Studio: drag entry between lanes' dashboards.
+- **Stage remap on lane change.** Lane A's template and lane B's template may have different stage lists. Operator picks the target stage at move time; if not specified, the move defaults to the target lane's first linear stage. Open question: do we preserve `iterationByStage` counters across the move?
+- **Content-tree relocation.** Lane has a `contentDir`. Moving an entry to a different lane moves its artifact file (and scrapbook) to the new lane's content tree. Cross-lane moves are file-system operations as well as sidecar updates.
+- **Group migration.** Groups can be moved between lanes (the group entry itself; members stay in their original lanes).
+
+### Concurrent operations + multi-operator
+
+- **Concurrent iterate / approve.** What happens when two agents (or one agent + one operator) modify the same entry at the same time? Last-write-wins on sidecar (atomic tmp+rename minimizes torn writes); journal append is always safe (each event is a new file). The studio detects sidecar mtime change and prompts the operator to reload.
+- **Multi-operator on the same project.** v1 assumes single-operator. Multi-operator support requires: per-operator identity propagated through journals and annotations; concurrent-edit detection; merge UX for divergent edits. Captured here; v1 scoping decides.
+- **Concurrent comment authoring.** Two operators commenting on the same entry simultaneously: each comment writes its own journal file, no conflict. Threaded replies might race (two replies arrive at the same time with the same `replyTo`); both land, both render.
+
+### Deletion semantics
+
+- **Entry hard delete (`--purge`).** Removes the sidecar from `.deskwork/entries/`; preserves journal events (they reference the UUID but the UUID has no resolver); operator can opt to also remove the artifact file (`--purge-artifact`).
+- **Entry recovery.** If an entry was soft-cancelled (in `Cancelled` cul-de-sac), induct restores. If hard-purged, recovery requires git history (the sidecar JSON was committed) — surfaced in the operator-facing docs as "purge is final; archive instead."
+- **Group hard delete.** Same pattern; members stay (UUIDs continue to exist).
+- **Lane hard delete.** Refuses if the lane has any entries; operator clears the lane first.
+- **Pipeline hard delete.** Refuses if any lane references it; operator reassigns lanes first.
+- **Comment hard delete.** Removes the annotation from the journal index (the file stays for audit); attached screenshots cascade.
+- **Audit log.** Every hard-delete writes a `purge` journal event recording what was purged, when, by whom.
+
+### Backup, export, import
+
+- **Project export.** Tar the `.deskwork/` directory + the content tree + the docs/studio-design/ archive. Single deterministic format. Operator can move a deskwork-managed project to a new machine or version control with one tar+untar.
+- **Project import.** Untar to a new directory; `deskwork doctor --apply` rebuilds any derived state.
+- **Selective export.** Export a single lane, a single group, a single entry (with its journal subset). Useful for sharing a feature's working state with a collaborator.
+- **JSON export of sidecars + journal.** Operator-friendly canonical JSON dump for offline analysis or migration to other tooling.
+
+### Doctor rule remediation flows
+
+- **Auto-fix vs operator-prompt.** Each doctor rule declares whether it's auto-fixable (`--apply` resolves) or operator-prompt-only (surfaces issue, requires operator decision). The rule registry tracks both.
+- **Diff-then-apply flow.** Doctor's `--apply` shows the proposed change diff (sidecar JSON before/after, file moves, journal additions) and requires explicit confirmation for destructive changes.
+- **Doctor-driven migrations.** New schema versions ship with declarative migration scripts under `packages/core/src/migrations/<schemaVersion>.ts`; doctor runs the matching migration when it detects the schema is behind.
+- **Doctor reports as a studio surface.** `/dev/doctor` renders the same `deskwork doctor` output with clickable per-rule remediation buttons.
+
+### CLI defaults and conventions
+
+- **`--lane` default.** When omitted, falls back to `config.defaultLane` (default `default`). Operator can override per-session via `DESKWORK_LANE` env var.
+- **`--site` deprecation.** Existing `--site` flag maps to `--lane` during the migration period (with a deprecation warning); removed in a later release.
+- **`--kind` flag default for `/deskwork:add`.** Inferred from operator-supplied artifact extension; explicit flag overrides.
+- **Skill-vs-CLI parity.** Every CLI subcommand has a corresponding skill prose entry; every skill ultimately dispatches a CLI subcommand per THESIS Consequence 2.
+- **Verbose / quiet output.** All CLI subcommands accept `--quiet` and `--json` flags for scripting; doctor and ingest accept `--dry-run`.
+
+### Studio interactions out-of-band
+
+- **External file edits.** When the operator edits a sidecar / config / template directly on disk (outside the studio), the studio detects the change (file-watch) and reloads. No "studio is the only writer" assumption.
+- **Editor integration.** Studio's review surface optionally opens the artifact in the operator's preferred editor (VS Code / vim / etc.) via `vscode://` URLs or similar.
+- **CLI-while-studio-running.** Running CLI verbs while the studio is open: the studio sees the journal append and re-renders.
+
+### Telemetry, observability, debug
+
+- **No external telemetry by default.** Deskwork doesn't phone home. (Captured to make the non-decision explicit.)
+- **Debug logging.** CLI accepts `DESKWORK_DEBUG=1` to emit verbose logs; studio's `/dev/debug` surface streams the same.
+- **Health endpoint.** Studio exposes `/health` returning version, project root, lane count, entry count, error count from last doctor run.
 
 ## Tasks (high-level)
 
