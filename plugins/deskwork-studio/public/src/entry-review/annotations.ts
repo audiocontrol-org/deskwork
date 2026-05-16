@@ -16,6 +16,7 @@
 import {
   computeOffsetFromRange,
   extractQuote,
+  plainText,
   rebaseAnchor,
   removeHighlight,
   wrapRange,
@@ -223,6 +224,20 @@ export function createAnnotationsController(
       return;
     }
     const anchor = extractQuote(draftBody, pendingRange);
+    // #200 — capture W3C TextQuoteSelector prefix/suffix context for
+    // later-version anchor disambiguation. ~64 chars per side from
+    // the draft body's plain-text projection (same coordinate space
+    // as range/anchor). Truncated at document boundaries.
+    const CONTEXT_CHARS = 64;
+    const bodyText = plainText(draftBody);
+    const anchorPrefix = bodyText.slice(
+      Math.max(0, pendingRange.start - CONTEXT_CHARS),
+      pendingRange.start,
+    );
+    const anchorSuffix = bodyText.slice(
+      pendingRange.end,
+      pendingRange.end + CONTEXT_CHARS,
+    );
     // Phase 34a: entry-keyed annotations reuse entryId as workflowId
     // for type compatibility; field retired in shortform-migration phase.
     const payload = {
@@ -233,6 +248,8 @@ export function createAnnotationsController(
       text,
       category: categorySel.value,
       anchor,
+      anchorPrefix,
+      anchorSuffix,
     };
     try {
       const res = await fetch(annotateUrl(), {
@@ -283,7 +300,9 @@ export function createAnnotationsController(
         if (resolvedIds.has(a.id)) {
           let status: AnnotationStatus = 'current';
           if (a.version !== versionNum) {
-            status = rebaseAnchor(draftBody, a.anchor) ? 'rebased' : 'unresolved';
+            status = rebaseAnchor(draftBody, a.anchor, a.anchorPrefix, a.anchorSuffix)
+              ? 'rebased'
+              : 'unresolved';
           }
           resolvedHistory.push({ ann: a, status });
           continue;
@@ -292,7 +311,12 @@ export function createAnnotationsController(
           current.push(a);
           continue;
         }
-        const rebasedRange = rebaseAnchor(draftBody, a.anchor);
+        const rebasedRange = rebaseAnchor(
+          draftBody,
+          a.anchor,
+          a.anchorPrefix,
+          a.anchorSuffix,
+        );
         if (rebasedRange) rebased.push({ ann: a, range: rebasedRange });
         else unanchored.push(a);
       }
@@ -337,7 +361,12 @@ export function createAnnotationsController(
     const idx = resolvedHistory.findIndex((r) => r.ann.id === annotation.id);
     if (idx >= 0) resolvedHistory.splice(idx, 1);
     if (status === 'rebased') {
-      const r = rebaseAnchor(draftBody, annotation.anchor);
+      const r = rebaseAnchor(
+        draftBody,
+        annotation.anchor,
+        annotation.anchorPrefix,
+        annotation.anchorSuffix,
+      );
       if (r) wrapRange(draftBody, r, annotation.id);
     } else if (status === 'current') {
       wrapRange(draftBody, annotation.range, annotation.id);

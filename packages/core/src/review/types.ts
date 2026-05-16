@@ -67,11 +67,36 @@ export interface CommentAnnotation extends AnnotationBase {
   category?: AnnotationCategory;
   /**
    * The displayed text the operator selected when making the comment.
-   * Used on later versions to re-locate the anchor via `indexOf`: if the
-   * quote appears exactly once in the new version the comment rebases,
-   * otherwise it renders as unresolved-from-v{N}.
+   * On later versions, the client re-locates the anchor per the W3C
+   * Web Annotation TextQuoteSelector algorithm (see `rebaseAnchor` in
+   * `plugins/deskwork-studio/public/src/entry-review/range-utils.ts`):
+   *
+   *   1. Single match of `anchor` in the current text → rebase to that
+   *      position. Back-compat path; works for legacy comments that
+   *      pre-date the prefix/suffix fields.
+   *   2. Multiple matches with `anchorPrefix`/`anchorSuffix` → score
+   *      each candidate by boundary character match against the
+   *      captured surrounding context; highest non-zero non-tied score
+   *      wins.
+   *   3. Otherwise → unresolved-from-v{N}.
    */
   anchor?: string;
+  /**
+   * Up to ~64 characters of the displayed text *immediately before*
+   * the anchor at capture time. Used by `rebaseAnchor` to
+   * disambiguate when the anchor quote appears multiple times in a
+   * later version (see `anchor` JSDoc). W3C Web Annotation Model
+   * TextQuoteSelector's `prefix` field
+   * (https://www.w3.org/TR/annotation-model/#text-quote-selector).
+   * Optional for back-compat with legacy comments.
+   */
+  anchorPrefix?: string;
+  /**
+   * Up to ~64 characters of the displayed text *immediately after*
+   * the anchor at capture time. W3C TextQuoteSelector's `suffix`
+   * field. Optional for back-compat.
+   */
+  anchorSuffix?: string;
 }
 
 export interface EditAnnotation extends AnnotationBase {
