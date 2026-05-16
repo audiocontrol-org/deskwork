@@ -5,6 +5,7 @@ date: 2026-05-16
 status: draft
 deskwork:
   doc: design-spec
+  id: 2dbe2326-f237-4c23-8451-16f9257ae8fc
 ---
 
 # Graphical entries — design
