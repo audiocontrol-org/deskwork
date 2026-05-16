@@ -128,15 +128,61 @@ For image entries, iterate is supported and intentionally open-ended at the CLI 
 
 The skill prose for `/deskwork:iterate` enumerates these paths and asks the agent to pick the one that matches the comments and the available tooling. If none apply, the agent reports back to the operator with the comments unaddressed and lets the operator drive (e.g., supply a replacement image manually). Per-project iteration handlers (e.g. `<projectRoot>/.deskwork/iterate-handlers/image.ts`) are a future extension hook — not in v1, but the architecture leaves room.
 
+### Graphical review surface — chrome-free rendering + threaded comments + screenshot capture
+
+The graphical review surface is the highest-design-risk part of this feature. Markdown review reuses an editor pattern that's well-understood (pin a comment to a text range). Graphical review introduces multiple new affordances at once: rendering the artifact full-bleed, pinning comments to spatial regions, threading comment conversations, and capturing screenshots of rendered state. Each of these needs design iteration before implementation.
+
+**Design pass via `/frontend-design` is required.** Phase 7 (HTML review surface) and Phase 8 (image review surface + iteration paths) BOTH start with a `/frontend-design` iteration to mock up the surface (chrome-free render area, pin placement, thread expansion, screenshot capture affordance) before any implementation begins. The workplan will gate implementation on operator-picked mockup direction. This is the same pattern that worked for the v0.17/0.18 mobile review-surface rebuild — design first, then translate.
+
+**Chrome-free rendering.** The mockup or image renders without surrounding studio chrome so the operator sees the artifact at intended scale and composition. The verb bar (Iterate / Approve / Cancel) and comment-thread sidebar dock to the edges via a slim overlay that the operator can collapse to view the artifact full-screen. For HTML mockups, the iframe loads `index.html` directly with no wrapper styling — the mockup's own CSS governs the rendered surface entirely.
+
+**Spatial comments + threads.** A comment in the graphical review surface anchors to a spatial region (coordinate pin for raster; DOM selector + offset for HTML; element selector for SVG). Comments support **threaded replies** — operator and agent can have back-and-forth conversation on a single anchor instead of stacking standalone comments. The thread is a sequence of `comment-reply` annotations chained off the root comment via a `replyTo: <comment-id>` field. The studio's marginalia sidebar renders threads expandable; collapsed threads show only the root comment + reply count badge.
+
+**Screenshot capture + attachment.** Operators can capture a screenshot of the rendered artifact (or a specific region) and attach it to a comment or reply. Use cases: (1) "this header takes too much vertical space" with a screenshot showing the offending layout; (2) "pathological behavior on hover — see attached" with a screenshot of the broken state the operator triggered manually; (3) "looks fine on desktop but breaks on mobile — desktop ✓, mobile ✗" with two screenshots side by side.
+
+Screenshots are captured by the studio (browser-side `getDisplayMedia()` API or DOM-to-canvas for HTML mockups; selection-rectangle UI for region capture) and stored as a sidecar asset under the entry's scrapbook directory: `<entryDir>/scrapbook/screenshots/<comment-id>-<timestamp>.png`. The comment annotation gains an `attachments: string[]` field listing the screenshot paths.
+
+**Annotation model extensions (cross-cutting).** Threads and screenshot attachments are scoped to graphical entries by use case but applicable to every entry kind. The annotation schema is extended once to support both, and markdown review benefits automatically:
+
+```ts
+type CommentAnnotation = {
+  // unchanged
+  id: string;
+  type: 'comment';
+  workflowId: string;
+  version: number;
+  text: string;
+  category: string;
+  anchor: string;
+  createdAt: string;
+  // new
+  replyTo?: string;       // present on reply comments; references root comment id
+  attachments?: string[]; // relative paths under <entryDir>/scrapbook/screenshots/
+  spatialAnchor?: {       // present for graphical entries; absent for markdown
+    kind: 'pixel' | 'dom-selector' | 'svg-element';
+    selector?: string;    // dom-selector / svg-element only
+    x?: number;           // pixel only (also dom-selector fallback)
+    y?: number;
+  };
+  // existing `range` field stays for markdown
+}
+```
+
+Markdown entries get threads + attachments as a bonus (operator can attach a screenshot to a markdown-review comment). Graphical entries get the same plus spatial anchoring. The schema change is additive; existing single-comment annotations keep working unchanged.
+
+**Implication for /frontend-design pass.** The mockup phase needs to cover: chrome-free render area + pin placement UX + thread expansion in sidebar + thread inline-on-pin vs sidebar-grouped + screenshot capture affordance (region select vs full-frame) + screenshot attachment to root comment vs to reply + thread navigation when many threads exist. Operator picks the direction; Phase 7/8 implementation translates the picked mockup.
+
 ### Studio rendering
 
 A project may have any number of lanes (≥1), so the studio must handle both small (single-lane back-compat) and large (many-lane) configurations gracefully.
 
 - **Per-lane dashboards with operator-selectable visibility.** The studio dashboard surfaces a tab strip with one tab per lane plus a "Combined" overview tab. With many lanes, the tab strip overflows into a horizontally-scrollable strip with a "lanes ▾" dropdown for direct selection. Operators choose which lanes are visible on the desk via a lane-visibility panel — hidden lanes don't render tabs but their entries still exist and count in dashboard stats. Tab order respects operator-configured ordering (drag-to-reorder in the lane-visibility panel). Empty visible lanes render their tab + an empty state so operators see the pipeline shape.
+- **Multi-lane composed views.** Beyond per-lane tabs and the all-lanes Combined view, the studio supports operator-defined **multi-lane composed views**: pick a subset of lanes (e.g. `mockups` + `feature-doc`) and view their pipelines side-by-side. This is the "view multiple lanes' pipelines at once on the desk" use case — for cross-lane coordinated work (a feature with a mockup AND a doc both moving together) the operator pins a multi-lane view that shows both pipelines aligned. Multi-lane views are saved per-operator (or per-project) so they can be reopened. Implementation extends the same per-lane render pattern; the composed view tiles N lane-dashboards horizontally with shared scroll for stage rows.
 - **Per-lane stage columns.** Each lane's dashboard shows columns for that lane's `linearStages` (in order) plus a separate "Off-pipeline" section listing entries in `offPipelineStages`. The stage labels are the template's stage names (drawn from whichever pipeline JSON the lane is bound to — preset or operator-authored) — no hardcoded "Drafting" / "Published" anywhere in studio render code.
 - **Lane / group management surfaces.** The studio exposes CRUD surfaces (see § CRUD support below): a lane management page (list, create, edit, archive lanes; pick which pipeline template a lane binds to; reorder; toggle visibility) and a group management page (list, create, edit, archive groups; manage members; observe member lane/stage at a glance).
 - **Group rendering on lane dashboards.** A group entry's row in its lane dashboard shows the member count as a badge. The group's review surface adds a "Members" section listing each member's lane, stage, and a clipboard-copy link to its review surface. The member entries' own rows show a "Member of: <group slug>" badge for navigability.
-- **Graphical review surface.** Renders artifact-in-iframe (HTML) or `<img>` (image) with marginalia overlay. Otherwise identical chrome to the markdown review surface.
+- **Group multi-lane review.** A group's review surface renders members in a coordinated multi-lane composition — one column per lane that the group spans, members in their lane's stage position, with the group's own stage shown above. This is the same multi-lane composed-view machinery scoped to one group's member set.
+- **Graphical review surface.** Renders artifact-in-iframe (HTML) or `<img>` (image) with marginalia overlay. See § Graphical review surface (below) for chrome-free rendering, annotation model, and screenshot capture.
 
 ### Verb semantics across templates
 
@@ -258,16 +304,18 @@ These skill-set deltas are themselves part of the feature's scope and the workpl
 
 ## Tasks (high-level)
 
-The implementation decomposes into ~8 phases. Setup will scaffold a workplan from these. Numbers are approximate phase sizes, not commitments.
+The implementation decomposes into ~10 phases. Setup will scaffold a workplan from these. Numbers are approximate phase sizes, not commitments.
 
 1. **Pipeline template loader + preset defaults + override resolver.** Load JSON; validate schema; merge plugin-shipped presets + operator-authored custom pipelines per the THESIS Consequence 3 override-resolver pattern. Ship five preset templates as starting points. Unit tests.
 2. **Lane data model + config loader + entry schema delta.** New `.deskwork/lanes/<id>.json` files; entry sidecar gains `lane` + `artifactKind`. Doctor migration creates `default` lane and back-fills entries on first run. Unit tests.
 3. **Verb refactor: stage-list reads go through the lane's template.** `approve`, `iterate`, `cancel`, `induct` all currently read a hardcoded stage list; refactor to consult the entry's lane template (preset or custom). Existing skill behavior preserved when the lane is `default`. Unit tests.
-4. **Studio render: per-lane tabs + per-template stage columns + combined overview + lane-visibility panel.** New tab strip (with overflow / dropdown for many-lane projects); per-tab dashboards; template-aware column rendering; operator-controlled lane visibility + ordering. No graphical surface yet (still markdown-only). Integration test against multi-lane fixture.
+4. **Studio render: per-lane tabs + per-template stage columns + combined overview + lane-visibility panel + multi-lane composed views.** New tab strip (with overflow / dropdown for many-lane projects); per-tab dashboards; template-aware column rendering; operator-controlled lane visibility + ordering; saved multi-lane composed views (pin N lanes side-by-side). No graphical surface yet (still markdown-only). Integration test against multi-lane fixture.
 5. **Lane + pipeline CRUD skills + studio management surfaces.** `/deskwork:lane` (list/show/create/update/archive/purge), `/deskwork:pipeline` (list/show/create/update/delete), and studio lane-management + pipeline-editor pages. Doctor rules for orphan pipeline references. Integration test: create a lane bound to a custom pipeline, add entries, archive the lane, restore.
-6. **Groups: members field + group CRUD skills + group review surface.** `/deskwork:group` skill family (list/show/create/update/add-member/remove-member/archive); group review surface with member panel; cross-lane membership; no propagation on approve; doctor rules for recursion + dangling members. Studio group-management page. Unit + integration tests.
-7. **Graphical entries — HTML review surface.** Iframe-based review for `html-mockup` and `single-file-html`; coordinate-pinned + DOM-anchored marginalia; iterate against HTML mockups (skill prose update + agent guidance for editing HTML/CSS/JS in response to marginalia). Integration test against a fixture mockup.
-8. **Graphical entries — image review surface + image iteration paths.** `<img>` review surface with pixel-coordinate marginalia (raster) + element-selector marginalia (SVG); iterate skill prose enumerates the regenerate / transform / replace / operator-supplied paths; agent guidance for picking the right path per comment + tooling. Manual dogfood: ingest one of the project's existing `docs/studio-design/` mockups as a `visual`-lane entry, iterate it, approve it; ingest a screenshot, iterate it via operator-supplied replacement.
+6. **Groups: members field + group CRUD skills + group review surface + group multi-lane composition.** `/deskwork:group` skill family (list/show/create/update/add-member/remove-member/archive); group review surface with member panel rendered as a multi-lane composition (members shown in their lane's stage position); cross-lane membership; no propagation on approve; doctor rules for recursion + dangling members. Studio group-management page. Unit + integration tests.
+7. **Annotation model extension: threaded replies + screenshot attachments.** Schema delta on the `comment` annotation: `replyTo` for threading; `attachments[]` for screenshot paths; `spatialAnchor` for graphical entries. Cross-cutting: markdown review benefits too. Studio sidebar renders threads expandable. Screenshot-capture mechanism in the studio (browser `getDisplayMedia()` / DOM-to-canvas + selection-rectangle UI). Sidecar storage at `<entryDir>/scrapbook/screenshots/`. Unit + integration tests.
+8. **/frontend-design pass for the graphical review surface.** Mockup the chrome-free render area, pin placement, thread expansion, screenshot capture affordance, screenshot attachment workflow. Two-three operator-picked directions per `/frontend-design` skill prose. Gate Phase 9 implementation on operator-picked mockup. **No implementation in this phase** — design only.
+9. **Graphical entries — HTML review surface.** Translate the picked mockup from Phase 8 into the live surface. Iframe-based chrome-free rendering for `html-mockup` and `single-file-html`; DOM-anchored + coordinate-pinned spatial comments; thread expansion on pin click; screenshot attachment workflow; iterate against HTML mockups (skill prose update + agent guidance for editing HTML/CSS/JS in response to marginalia + thread context). Integration test against a fixture mockup.
+10. **Graphical entries — image review surface + image iteration paths.** `<img>` chrome-free review surface with pixel-coordinate marginalia (raster) + element-selector marginalia (SVG); thread + screenshot affordances reuse Phase 7 + 9 work; iterate skill prose enumerates the regenerate / transform / replace / operator-supplied paths; agent guidance for picking the right path per comment thread + tooling. Manual dogfood: ingest one of the project's existing `docs/studio-design/` mockups as a `visual`-lane entry, iterate it, approve it; ingest a screenshot, iterate it via operator-supplied replacement; capture a screenshot of a pathological state and attach to a comment.
 
 ## Open questions
 

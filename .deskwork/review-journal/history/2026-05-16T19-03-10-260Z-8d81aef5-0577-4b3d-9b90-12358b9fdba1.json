@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-16T19:03:10.260Z",
+  "entryId": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+    "version": 1,
+    "range": {
+      "start": 8120,
+      "end": 8142
+    },
+    "text": "This implies that it’s possible to view the pipeline of multiple lanes at once on the deskwork studio desk",
+    "category": "other",
+    "anchor": "Members can span lanes",
+    "id": "d101d18b-5615-464d-8e2d-1178c75df128",
+    "createdAt": "2026-05-16T19:03:10.260Z"
+  }
+}
