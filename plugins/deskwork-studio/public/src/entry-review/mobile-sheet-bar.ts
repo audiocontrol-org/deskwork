@@ -51,13 +51,18 @@ interface SheetBarDeps {
 }
 
 export interface MobileSheetBarController {
-  /** Open any sheet programmatically. No-op on desktop (bar/sheet are
-   *  display:none above 48rem). Used by the annotations controller's
-   *  `unstowMarginalia` hook so the composer (relocated into the Notes
-   *  slot at boot) becomes visible when the operator hits Mark. */
+  /** Open any sheet programmatically. Toggles closed if the key
+   *  matches the currently-open sheet (matches the bar tabs' tap-
+   *  to-toggle UX). For composer-focus flows that must NEVER
+   *  toggle-close, use `requestComposerFocus`. No-op on desktop. */
   openSheet: (key: SheetKey) => void;
   /** True on phone widths. Callers gate behavior off this. */
   isMobile: () => boolean;
+  /** #269 composer-focus entry point. Idempotent open of Notes
+   *  (no toggle-close if already on notes) + `[data-mobile-sheet-
+   *  body]` scrollTop reset so the composer at the top of the slot
+   *  is visible regardless of prior scroll. No-op on desktop. */
+  requestComposerFocus: () => void;
 }
 
 export function initMobileSheetBar(deps: SheetBarDeps): MobileSheetBarController {
@@ -479,5 +484,19 @@ export function initMobileSheetBar(deps: SheetBarDeps): MobileSheetBarController
       requestAnimationFrame(() => openSheet(key));
     },
     isMobile: () => window.matchMedia(MOBILE_QUERY).matches,
+    requestComposerFocus: () => {
+      if (!window.matchMedia(MOBILE_QUERY).matches) return;
+      // #269 — open notes idempotently then reset scrollTop. Two
+      // rAFs: first lets caller's DOM mutations settle (composer.
+      // hidden=false), second waits past the slot-reveal layout
+      // so WebKit applies scrollTop to the post-reveal layout.
+      requestAnimationFrame(() => {
+        if (currentSheet !== 'notes') openSheet('notes');
+        requestAnimationFrame(() => {
+          const body = document.querySelector<HTMLElement>('[data-mobile-sheet-body]');
+          if (body) body.scrollTop = 0;
+        });
+      });
+    },
   };
 }

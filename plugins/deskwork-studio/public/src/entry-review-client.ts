@@ -200,9 +200,16 @@ function initPressCheckSurface(): void {
     // sheet (relocated at boot by `initMobileSheetBar`), so we ALSO open
     // that sheet — without it, `composer.hidden = false` flips a
     // never-displayed element under a hidden sheet.
+    //
+    // #269 — uses `requestComposerFocus` (NOT `openSheet`) so the
+    // composer-focus path is idempotent (already-open Notes stays open
+    // instead of toggle-closing) AND the sheet body's scrollTop is
+    // reset so the composer at the top of the slot is visible
+    // regardless of any prior scroll state from a previous Notes
+    // viewing session.
     unstowMarginalia: () => {
       marginaliaToggle.applyState(false);
-      if (mobileSheetBar.isMobile()) mobileSheetBar.openSheet('notes');
+      if (mobileSheetBar.isMobile()) mobileSheetBar.requestComposerFocus();
     },
   });
 
