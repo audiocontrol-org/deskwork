@@ -104,6 +104,26 @@ The 2026-05-16 `graphical-entries` brainstorm produced four iteration rounds in 
 
 This rule is a direct sibling of *"'Just for now' is bullshit"* (below). Both name a pattern where the agent's "discipline" hides real work behind a labeled deferral. The Just-for-now rule is about implementation IOUs; this rule is about spec-time IOUs.
 
+## Empty revisions beat missed changes — never skip a capture/snapshot because it might be a no-op
+
+When the operator invokes a capture or snapshot operation (`/deskwork:iterate`, `/deskwork:approve`, `/dw-lifecycle:review`, similar journal-append flows), the agent runs the operation as asked. The agent does NOT pre-decide "this would be a no-op, so I'll skip it." Doing so risks missing real changes — disk state the agent didn't notice, edits made outside the studio between the prior capture and now, or operator-side state the agent can't see.
+
+The operator's framing, verbatim: *"I'd rather have empty revisions than miss changes."*
+
+**Why:** capture operations are append-only and disk-cheap. An empty revision is journal noise (one extra file, one sidecar counter bump) — bounded, recoverable, easy to ignore on read. A missed change is unbounded: the agent's working assumption about disk state diverges from reality, and every subsequent operation builds on the wrong baseline until the operator catches the drift.
+
+**How to apply:**
+
+- When the operator says "run iterate" / "run approve" / "snapshot this", run it. Don't precondition on "but there's nothing pending."
+- When the agent's *own* judgment would skip a capture ("disk hasn't changed since last iterate; no point"), run it anyway. Cheap insurance.
+- The reverse failure mode — running captures the operator didn't ask for — still applies. The agent doesn't volunteer extra captures; but when asked, it doesn't second-guess.
+- If a capture flow ITSELF should warn / refuse on no-op state, that's a tool-design concern (file as a friction issue if the operator wants), not an agent-side filter.
+
+**What this rule does NOT mean:**
+
+- The agent doesn't run captures continuously just to be safe. Captures are operator-triggered; this rule governs how to respond when one is triggered, not how often to trigger.
+- The agent still surfaces what happened (e.g. "revision 6 — 0 addressed comments, no disk delta") so the operator sees the empty revision and understands why.
+
 ## The orchestrator session is separate from the implementation session
 
 The agent's role across the dw-lifecycle skills splits across **two distinct Claude Code sessions**, not one session with a sub-agent dispatch:
