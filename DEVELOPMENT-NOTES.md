@@ -2940,3 +2940,53 @@ Phase 4 (dogfood) is manual validation work the user should drive: install the p
 - **`@/` import alias doesn't work in plugin client code.** Project convention says "always use `@/`" but esbuild has no alias configured for `plugins/deskwork-studio/public/src/`. All existing files there use relative imports. TypeScript resolves `@/` via tsconfig paths (so type-check passes), but the runtime build fails. The first migration's implementer hit this; second migration's dispatch prompt called it out explicitly. Lesson reinforced for future dispatches that touch plugin client code: brief the implementer on the relative-imports convention explicitly.
 - **The probe flakiness is documented as pre-existing but not yet filed.** No reproducible cause yet — the dashboard's Planned-tile-expand sometimes works, sometimes doesn't; the editor probe's mid-test page navigation sometimes destroys the execution context. Same v0.20.0 baseline probe reproduces both flakes against the same studio. Worth investigating when a third probe-related signal accumulates — for now it's a known background.
 - **`dw-lifecycle:review` parallel-dispatch wasn't needed here.** The skill recommends 2-3 reviewers for substantial changes; a single `feature-dev:code-reviewer` dispatch handled both the probe-helpers refactor and the controller+migrations review cleanly. The work was scoped narrow enough (one small lib + small test + 2 consumer migrations) that one reviewer's focused attention beat parallel-dispatch's broader scope coverage. The threshold for parallel feels like "touches multiple architectural boundaries" — single boundary is single reviewer.
+
+## 2026-05-17: orchestrator session — graphical-entries brainstorm + capture-mode discipline correction
+### Feature: graphical-entries (spec only, not yet /dw-lifecycle:setup); command-shortcuts (carry-over from prior session)
+### Worktree: deskwork (main)
+
+**Goal:** drive `/dw-lifecycle:define` for a new feature (graphical-entries) — generalize deskwork to support graphical content as first-class workflow objects, plus the lane / group / pipeline-template primitives the operator anticipated needing. Continue carrying the command-shortcuts feature already in flight from earlier sessions.
+
+**Accomplished:**
+
+- **graphical-entries spec authored end-to-end** (`docs/superpowers/specs/2026-05-16-graphical-entries-design.md`, 522 lines): per-lane pipeline templates with five shipped presets (`editorial`, `visual`, `feature-doc`, `qa-plan`, `blog-post`); lanes as partitions of entries bound to a template; cross-lane groups with independent lifecycle; first-class graphical entries (`html-mockup`, `single-file-html`, `image` artifact kinds); chrome-free graphical review surface with coordinate-pinned spatial comments, threaded replies, and screenshot capture; W3C Web Annotation–aligned annotation model (informed by Phase 1 prior-art research deliverable); multi-lane composed views on the desk; full CRUD for lanes / groups / pipelines.
+- **graphical-entries iterated through five revisions of operator marginalia.** Eight comments addressed, including: removed the unilateral "image iterate refused" restriction (four supported iteration paths now captured); reframed templates as presets-not-the-bounding-space; added the prior-art-first phase (Annotorious / Recogito / Hypothes.is / W3C Web Annotation evaluation before build); added the chrome-free review surface section + screenshot-capture machinery; added multi-lane viewing.
+- **graphical-entries comprehensive capture-mode pass.** After operator correction (see Course Corrections), spec grew from 295 to 522 lines with a new § "Implied scope captured" enumerating ~50 design-surface items the spec had left implicit — search/filtering, tagging, bulk ops, lane/template lifecycle admin, group/member edge cases, comment thread lifecycle, screenshot lifecycle, migration details, studio render details, cross-lane operations, concurrent/multi-operator, deletion semantics, backup/export, doctor remediation, CLI defaults.
+- **Three new rules landed in `.claude/rules/agent-discipline.md`:**
+  - "The orchestrator session is separate from the implementation session" — rewritten twice across the session; final form correctly captures session-and-worktree split (not sub-agent dispatch). `5987f30` → `b200da9`.
+  - "Capture mode vs scope mode: specs capture everything we know; scoping is a later, explicit pass" — sibling to "'Just for now' is bullshit"; names spec-time scope-narrowing as the same failure shape at a different stage. `c9be4a8`.
+  - "Empty revisions beat missed changes — never skip a capture op" — operator preference codified after `/dwit` confusion produced a redundant iterate cycle. `a55a872`.
+- **graphical-entries-design ingested + advanced through deskwork.** Entry `2dbe2326`; iterated to revision 6 (5 substantive revisions + 1 no-op).
+- **No new friction issues filed this session;** all six issues from the prior `command-shortcuts` orchestrator pass (#247, #248, #249, #254, #255, #256) remain open. The `/deskwork:iterate` no-op-on-empty-state is a captured UX gap but operator declined to file it.
+
+**Didn't Work:**
+
+- **`/dwit` was a category error.** Operator typed `/dwit` intending it as their iterate shortcut; no such shortcut exists in `~/.claude/commands/` (only `dw-lifecycle:*` shortcuts are installed there per `command-shortcuts` scheme A). The intent was correct ("yes, land that as revision 5") and I executed it correctly the first time, but on the operator's follow-up "run deskwork:iterate" I misread the directive as a new request and ran iterate again — producing redundant revision 6.
+- **First two passes at the orchestrator-vs-implementer rule were wrong.** First draft cast the boundary as "delegate content authoring to documentation-engineer" (too broad — would have forbidden PRD/workplan/README authoring which IS orchestrator work). Second draft cast it as "dispatch feature-orchestrator at /dw-lifecycle:implement" (too lax — kept implementation in the same session). Operator corrected twice; third form locked the boundary at session+worktree.
+- **My scope-narrowing reflex.** Across four iterations of the graphical-entries spec, I inserted scope-pushback at every round ("scope is growing", "consider splitting", "smaller commitment", "not in v1", "YAGNI"). Operator's correction made the cost explicit: scope-pushback compounds with hallucination + forgetting to erode the documentation. The capture-mode rule is the codification.
+- **Calendar regen recurs on every deskwork mutation.** The `#247` bug (calendar.md drops Final + Cancelled stage entries on regen) is still present in v0.22.0; I restored calendar.md 5 separate times this session.
+
+**Course Corrections:**
+
+- **[PROCESS]** *"you are the orchestrator, not the implementer"* — and clarified twice: (a) you don't implement the feature; (b) implementation is a separate session in a separate worktree. Three rule-write attempts before convergence.
+- **[PROCESS]** *"I don't need you to push back on scope. I need you to help me find the hidden areas where undiscovered scope is implied but not specified. Your obsession with limiting scope added to your propensity to hallucinate and forget is wildly counterproductive. We MUST capture everything we know into the documentation."* Codified as the capture-mode rule.
+- **[PROCESS]** *"I'd rather have empty revisions than miss changes"* — codified as the empty-revisions-beat-missed-changes rule.
+- **[UX]** `/dwit` not installed — caught operator's category error; no shortcuts forward to `/deskwork:*`, only `/dw-lifecycle:*`.
+
+**Quantitative:**
+
+- Messages: ~50+
+- Commits on `main`: 11 (this session)
+- Features touched: 2 (graphical-entries new; command-shortcuts carry-over)
+- Friction issues filed: 0 this session (6 from prior session still open)
+- Rules added: 3
+- Iterate cycles on graphical-entries: 6 (5 substantive + 1 no-op)
+- Lines added to graphical-entries spec: ~520 (from 0 to 522)
+
+**Insights:**
+
+- The orchestrator-vs-implementer boundary is at the **session**, not the sub-agent dispatch. Cross-session isolation keeps context focused; in-session sub-agent dispatch pollutes either side. This rule is project-load-bearing and now durable.
+- Capture-mode discipline is the **same shape as the "just for now" failure mode**, applied at the spec stage instead of the implementation stage. Both hide real work behind a labeled deferral. The agent's scope-narrowing tendency compounds with hallucination + forgetting in a way that's not obvious turn-by-turn but is corrosive over a brainstorm.
+- The deskwork iterate cycle exercises *the* core deskwork workflow on its own spec (recursive dogfood). Each iterate cycle revealed new implied scope or new operator preferences, and the iterate revision count + journal entries make the conversation legible to a future reader walking the spec evolution.
+- The `/dw-lifecycle:setup` PRD/workplan/README seeding gaps (#248/#249) added significant overhead this session and on the previous one. A `feature-orchestrator` session opened against the `command-shortcuts` worktree won't notice these gaps because by then they're filled in — but every new `/dw-lifecycle:define` cycle pays the orchestrator-side cost.
+- The `command-shortcuts` feature's value proposition got validated mid-session when the operator typed `/dwit`: the shortcut machinery is real, in use, and a multi-plugin extension (covering `/deskwork:*` not just `/dw-lifecycle:*`) is a natural next ask. Captured implicitly in the spec's "Out (deferred)" — currently the feature ships dw-lifecycle-only.
