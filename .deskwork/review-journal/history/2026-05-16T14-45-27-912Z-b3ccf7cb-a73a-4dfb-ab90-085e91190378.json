@@ -1,0 +1,15 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-16T14:45:27.912Z",
+  "entryId": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+  "annotation": {
+    "type": "address",
+    "workflowId": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+    "commentId": "c5be7c36-7813-4e8f-9f4d-0ae383d786d3",
+    "version": 1,
+    "disposition": "addressed",
+    "reason": "Rewrote § Skill changes to add /deskwork:pipeline composite skill, expanded /deskwork:lane and /deskwork:group with full CRUD verbs (list/show/create/update/archive plus member-management for groups), added § CRUD support as a dedicated section above, and added Phases 5 and 6 to the task list to land CRUD + management surfaces explicitly.",
+    "id": "83cc061a-5c20-4c5c-8cf1-8cf55822dc21",
+    "createdAt": "2026-05-16T14:45:27.912Z"
+  }
+}

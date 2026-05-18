@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-16T19:33:31.395Z",
+  "entryId": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+    "version": 2,
+    "range": {
+      "start": 9877,
+      "end": 9895
+    },
+    "text": "We need to do some research into the state of the art for image and html review and comment mechanisms. This is something that we don’t want to build if it already exist and we don’t want to redesign if it exists but isn’t open source. We want to reinvent as little of this wheel as possible",
+    "category": "other",
+    "anchor": " a \"graphical\" mod",
+    "id": "f58d9f32-9fa1-4caa-a572-f8db8e261b94",
+    "createdAt": "2026-05-16T19:33:31.395Z"
+  }
+}

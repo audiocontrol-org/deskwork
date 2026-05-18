@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-16T19:14:31.821Z",
+  "entryId": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+    "version": 1,
+    "range": {
+      "start": 9984,
+      "end": 10017
+    },
+    "text": "We will need to use /frontend-design to iterate through designs for how this will work. It might be tricky to get right. For live html mockups especially, but also for static images, we’ll probably have to serve those without any chrome—but we *will* want to be able to attach comment threads to particular areas of the design/mockup (e.g. “this header takes up too much vertical space”). We will also need a way to take screenshots and attach screenshots to the comment threads—for example, to discuss an issue with a particular part of the image or snapshot a pathological behavior that only shows up under certain conditions",
+    "category": "other",
+    "anchor": "renders the artifact in an iframe",
+    "id": "2cbc8539-d91a-44c1-a7d2-da7334ef7dbb",
+    "createdAt": "2026-05-16T19:14:31.821Z"
+  }
+}

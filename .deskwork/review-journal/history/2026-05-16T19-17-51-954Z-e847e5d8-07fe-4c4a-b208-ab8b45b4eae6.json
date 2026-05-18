@@ -1,0 +1,15 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-16T19:17:51.954Z",
+  "entryId": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+  "annotation": {
+    "type": "address",
+    "workflowId": "2dbe2326-f237-4c23-8451-16f9257ae8fc",
+    "commentId": "2cbc8539-d91a-44c1-a7d2-da7334ef7dbb",
+    "version": 2,
+    "disposition": "addressed",
+    "reason": "Added a new § 'Graphical review surface — chrome-free rendering + threaded comments + screenshot capture' covering all five concerns the comment raised: (1) /frontend-design pass is required before Phase 9/10 implementation (mockup-first per the v0.17/v0.18 pattern); (2) chrome-free iframe rendering for HTML mockups + chrome-free <img> for images; (3) spatial comments anchor to coordinate / DOM selector / SVG element; (4) threaded replies via a new replyTo field on the comment annotation; (5) screenshot capture via browser-side getDisplayMedia()/DOM-to-canvas + selection-rectangle UI, stored at <entryDir>/scrapbook/screenshots/, attached to comments or replies via a new attachments[] field. The annotation schema extension is cross-cutting (markdown review benefits from threads + screenshot attachments too) — addressed in a dedicated subsection. New Phase 7 (annotation model extension), Phase 8 (/frontend-design pass — design only), Phase 9 (HTML review surface implementation), Phase 10 (image review surface) all land in the Tasks section.",
+    "id": "babeb3c1-4393-4aed-873a-aa38b65cf18a",
+    "createdAt": "2026-05-16T19:17:51.954Z"
+  }
+}
