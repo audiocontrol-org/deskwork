@@ -2360,3 +2360,43 @@ Each round followed the same pattern: third-party (operator-driven) audit doc la
 ### Closing thought
 
 This session is the longest end-to-end release arc to date — 5 sub-phases shipped + 3 audit-remediation rounds + ship-pass + release + marketplace-update + post-release SessionStart-hook verification, all in one continuous arc. The agent-discipline rules + the audit-driven remediation pattern + the `/release` skill's pause structure carried it without operator framing beyond the standard ones (`do it`, `commit and push`, `accept`, `yes, run the push`). The 3 audit-remediation rounds caught 5 real bugs that would otherwise have shipped silently. **The ship bar concept is worth keeping** — articulating a falsifiable post-fix condition (audit returns clean) makes "is the work done" a yes/no question rather than a vibe.
+
+---
+
+## 2026-05-22: shipping v0.22.2 against my own iPhone — release pipeline correct, post-install rebuild silent-fails
+
+**Arc:** Final pass on the `graphical-entries` design spec via iPhone (operator's primary review device) blocked by `Failed to load annotations: Pattern too long for this browser.` Traced, fixed via TDD, released v0.22.2 via the hard-gated `/release` skill. Verified against the released artifact — same banner on iPhone. Dug in, found `.runtime-cache` was serving the May-16 client bundle despite the marketplace clone having today's source. Manually nuked the cache; rebuild succeeded; fix took effect.
+
+This session is the closest end-to-end dogfood of `/release` we've run: ship a real bug fix, install via the public path, hit a post-install bug that the release pipeline didn't catch, file an issue, work around manually, verify final state.
+
+### Friction the operator drove out by reviewing on iPhone
+
+#### "Failed to load annotations: Pattern too long for this browser."
+
+- **friction** — iPhone-only error banner on the marginalia review surface for `graphical-entries-design`. The graphical-entries spec had grown long enough through 5 iteration rounds (8 comments total, three with anchors >32 chars: `" iterate is refused at the CLI leve"` (34), `"Per-stage columns are template-aware."` (37), `"renders the artifact in an iframe"` (33)) that the fuzzy anchor fallback added in v0.22.1 (`bca51ba`, #271) hit `diff-match-patch`'s `Match_MaxBits` (32) and threw. **insight**: this is exactly the kind of bug only real-content review surfaces. Earlier 1-2 marginalia per entry never triggered it; 5 iteration rounds on the graphical-entries spec produced anchors of arbitrary length and one of them eventually crossed the line. The previously-shipped W3C completion (`bca51ba`) passed every gate including the 597-test studio suite, but no test had a >32-char anchor.
+- **fix** — v0.22.2 (commits `a5b2fa4` + `5cd4846`). Guard at the boundary: `anchor.length > 32` → null (refuse to guess), matching the function's existing tuning rationale. Five regression tests cover the >32-char boundary explicitly.
+
+#### "the make publish command doesn't work in this worktree. There's a naked tsc command and tsc is not in the path; my guess is we need to run npm install everywhere."
+
+- **friction** — Operator ran `make publish` from `/Users/orion/work/deskwork` (main repo, on stale v0.22.0 manifests) instead of `/Users/orion/work/deskwork-studio-mobile-first` (the worktree carrying the v0.22.2 bump commit). prepack ran `tsc -b tsconfig.build.json` from `packages/core/` against v0.22.0 source; the workspace root's `node_modules/.bin/tsc` was absent because main hadn't been npm-installed recently. **insight**: the `/release` skill's preconditions check is FEATURE-worktree-side — it didn't catch that the operator's terminal was in a different tree. A `make publish` invocation that's silently in the wrong tree looks the same as a tooling problem. Worth documenting in Pause 3's prompt that the publish command must run from the same tree that just ran the bump.
+- **fix** — operator cd'd to the right worktree; publish succeeded with three OTPs.
+
+#### "still broken. i suspect a stale code cache"
+
+- **friction** — Verified v0.22.2 was on npm, marketplace clone bumped, `/plugin marketplace update deskwork` brought the new manifest in, bin shim auto-reinstalled `@deskwork/studio@0.22.2`. Restarted the studio. Tried iPhone. Same error banner. The fix-on-disk + correct-shipped-artifact + correct-installed-version + correct-running-process all checked out, but the client bundle was the May-16 build (pre-fix). The studio's startup banner — `built 0 client assets (12 cached)` — reads as success but encoded the failure.
+- **fix** — `rm -rf <pluginRoot>/.runtime-cache` then restart. The bundle rebuilt from current source. Fix took effect. Operator confirmed iOS works.
+- **filed** — #272: `.runtime-cache` freshness check misses transitively-imported source changes. The cache's per-bundle `.meta.json` lists entrypoint inputs only; transitively-imported files like `range-utils.ts` aren't in the list, so changes to them don't invalidate the cached bundle. Multiple fix options surfaced in the issue body — preferred: tie cache invalidation to the same signal (`@deskwork/studio` version) that drives the bin-shim's reinstall.
+- **insight** — this is the second post-release bug in this project family where the pipeline shipped a correct artifact but a post-install step lost the change before the adopter saw it. The first was #88 (marketplace `source.ref` not pinned correctly; v0.9.0 went out with empty vendor symlinks). The structural shape is the same: every gate passes, the published artifact is correct, but adopter-side install state diverges from what the release pipeline thought it was producing. The `/release` skill's smoke test runs against the published packages (correct) but inside its tmpdir — it never exercises the marketplace-clone + `.runtime-cache` path that real adopters hit on update.
+
+#### "the fix works"
+
+- **fix** — Operator confirmed v0.22.2 + manual cache-nuke verifies the iOS marginalia load path. Closure-eligible per `agent-discipline.md` *"issue closure requires verification in a formally-installed release."*
+- **insight** — Between the released artifact and the operator's iPhone there were FIVE layers: npm tarball → marketplace clone → plugin shell → `@deskwork/studio` install → `.runtime-cache` bundle. Each layer can independently diverge from "what was released." This session caught one of them (the bundle); the cache-nuke workaround is the recipe until #272 lands a structural fix.
+
+### Out-of-band: agent fabrication caught by TDD
+
+- **insight** — Mid-fix the agent proposed `dmp.Match_MaxBits = 0` confidently — recall about dmp's library internals presented as ground truth ("the documented escape hatch for long patterns"). dmp's docs don't say that; dmp's source doesn't support that interpretation (the throw guard is unconditional, not gated on `Match_MaxBits != 0`). The TDD tests written *before* applying the fix turned that fabrication into a 10-second test-failure feedback loop — 7 fuzzy tests failed with the same error string. Without the tests, the wrong fix could have shipped to v0.22.2 and been caught only on iPhone post-release. **The "Read documentation before quoting commands" rule applies to library internals too**; recall isn't safe even for "well-known" libraries.
+
+### Closing thought
+
+The release pipeline's design is correct — preconditions, version validate, bump, publish-with-OTPs, smoke against the registry, tag, atomic push, GitHub release. Every step worked. The bug surfaced ONE layer past the release pipeline's reach: the marketplace clone's `.runtime-cache/`, a post-install rebuild step the release flow doesn't simulate. **#272 names the structural fix** (extend freshness checking to transitive inputs, or invalidate-on-version-bump). Until it lands, the workaround is "delete `.runtime-cache` after `/plugin marketplace update deskwork`" — worth surfacing in the deskwork-studio plugin README as a known issue with a one-line repair recipe.
