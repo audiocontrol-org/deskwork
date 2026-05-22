@@ -252,12 +252,33 @@ export function rebaseAnchor(
  *     within 1000 chars of the original position get a similarity
  *     bonus.
  */
+// diff-match-patch's Bitap-based match_bitap_ throws
+// "Pattern too long for this browser." when the pattern's length
+// exceeds Match_MaxBits (default 32 — the JS bitwise-operator word
+// size). We can't safely raise Match_MaxBits without overflowing the
+// bit-vector math, so guard the call at the boundary instead: long
+// anchors fall back to "refuse to guess" (the same disposition the
+// algorithm already takes for tied-context candidates). This matches
+// the existing conservative tuning rationale documented above —
+// false positives are worse than missing a few real matches; operators
+// re-anchor manually if a long-anchor comment needs precise placement.
+//
+// Issue: long anchors (e.g. "Per-stage columns are template-aware." —
+// 37 chars) on the graphical-entries spec review surface caused an iOS
+// review banner: "Failed to load annotations: Pattern too long for
+// this browser." Surfaced on iOS specifically because Safari's
+// text-node concatenation drifts subtly from Chromium's, dropping
+// exact matches that would otherwise succeed on desktop. The bug is
+// browser-agnostic in source (dmp's JS throw); iOS just exercised it.
+const DMP_MATCH_MAX_BITS = 32;
+
 function fuzzyFallback(
   text: string,
   anchor: string,
   originalStart: number | undefined,
 ): DraftRange | null {
   if (typeof originalStart !== 'number') return null;
+  if (anchor.length > DMP_MATCH_MAX_BITS) return null;
   const dmp = new diff_match_patch();
   dmp.Match_Threshold = 0.4;
   dmp.Match_Distance = 1000;

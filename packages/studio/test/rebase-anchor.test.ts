@@ -233,4 +233,104 @@ describe('rebaseAnchor', () => {
       expect(r).toEqual({ start: 7, end: 15 });
     });
   });
+
+  describe('long-anchor handling (>32 chars, diff-match-patch Match_MaxBits)', () => {
+    // Regression coverage for the "Pattern too long for this browser."
+    // error raised by diff-match-patch's Bitap algorithm when a pattern
+    // exceeds Match_MaxBits (default 32) and the dmp instance hasn't
+    // opted out of the limit. The studio's marginalia review surface
+    // hits this whenever a captured anchor exceeds 32 characters and
+    // exact-match misses (e.g. text-normalization drift between
+    // capture-time and load-time, or any intervening edit). iOS Safari
+    // was the surfacing context (its text-node concatenation diverges
+    // from Chromium's just enough to drop exact matches that would
+    // succeed on desktop); the underlying behavior is browser-agnostic
+    // because the throw lives in dmp's JS source.
+    //
+    // Anchor strings used here are >=33 chars to exercise the boundary;
+    // the longest real-world anchor on the graphical-entries spec is
+    // 37 chars ("Per-stage columns are template-aware.").
+    it('does not throw on a >32-char anchor when fuzzy fallback fires', () => {
+      const longAnchor = 'Per-stage columns are template-aware.'; // 37 chars
+      // Body contains a slightly-edited variant (capitalization +
+      // trailing token), so exact indexOf misses → fuzzyFallback fires.
+      const root = rootWith(
+        'See § Render. Per-stage columns are template-aware now. End.',
+      );
+      expect(() =>
+        rebaseAnchor(
+          root,
+          longAnchor,
+          /* prefix */ 'See § Render. ',
+          /* suffix */ ' End.',
+          /* originalStart */ 14,
+        ),
+      ).not.toThrow();
+    });
+
+    it('returns null (refuse to guess) for a >32-char anchor when exact match fails', () => {
+      // dmp's Bitap can't handle patterns longer than Match_MaxBits (32);
+      // the fuzzy fallback refuses long anchors rather than throwing.
+      // The operator can re-anchor manually via edit-comment if precise
+      // placement matters.
+      const longAnchor = 'Per-stage columns are template-aware.'; // 37 chars
+      const root = rootWith(
+        'See § Render. Per-stage columns are template-aware now. End.',
+      );
+      const r = rebaseAnchor(
+        root,
+        longAnchor,
+        /* prefix */ 'See § Render. ',
+        /* suffix */ ' End.',
+        /* originalStart */ 14,
+      );
+      expect(r).toBeNull();
+    });
+
+    it('still returns the exact range for a >32-char anchor that matches exactly (no fuzzy fallback)', () => {
+      // Length-32-plus anchors should still work fine via the exact path —
+      // the dmp Bitap limit only matters for the fuzzy fallback.
+      const longAnchor = 'Per-stage columns are template-aware.'; // 37 chars
+      const root = rootWith(
+        'See § Render. Per-stage columns are template-aware. End.',
+      );
+      const r = rebaseAnchor(
+        root,
+        longAnchor,
+        /* prefix */ 'See § Render. ',
+        /* suffix */ ' End.',
+        /* originalStart */ 14,
+      );
+      expect(r).toEqual({ start: 14, end: 14 + longAnchor.length });
+    });
+
+    it('returns null (not throw) when a >32-char anchor has no plausible match', () => {
+      const longAnchor = 'alpha bravo charlie delta echo foxtrot'; // 38 chars
+      const root = rootWith(
+        'totally different content here, nothing similar at all',
+      );
+      let result: ReturnType<typeof rebaseAnchor> | undefined;
+      expect(() => {
+        result = rebaseAnchor(
+          root,
+          longAnchor,
+          /* prefix */ '',
+          /* suffix */ '',
+          /* originalStart */ 5,
+        );
+      }).not.toThrow();
+      expect(result).toBeNull();
+    });
+
+    it('handles a 33-char anchor at the Match_MaxBits boundary', () => {
+      // Exactly one character over the default 32-char limit.
+      const anchor = 'abcdefghijklmnopqrstuvwxyz0123456'; // 33 chars
+      const root = rootWith(
+        'leading text abcdefghijklmnopqrstuvwxyz0123457 trailing',
+      );
+      expect(() =>
+        rebaseAnchor(root, anchor, 'leading text ', ' trailing', 13),
+      ).not.toThrow();
+    });
+  });
 });
