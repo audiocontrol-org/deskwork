@@ -202,6 +202,49 @@ export interface RegimeHoldoutFindings {
 }
 
 /**
+ * Per-manifest adopter holdout summary emitted by the
+ * adopter-manifest-checker agent (Phase 4 Family C integration).
+ *
+ * Distinct from the regime-holdout-detector's adopter sub-pass: this
+ * agent runs as a standalone fleet slot, narrating only the adopter-
+ * manifest gate (no anti-pattern / editor-symmetry / deprecation
+ * fusion). Its findings flow into the same manifest section
+ * (`regime_holdouts.adopter_manifests[]`) as the regime-holdout
+ * detector's adopter findings — synthesis-derive-regime dedupes by
+ * `(file, id)` so running both agents on the same registry doesn't
+ * double-count.
+ */
+export interface AdopterManifestCheckerFinding {
+  /** Manifest entry id whose glob the file matched. */
+  readonly manifestId: string;
+  /** Primary canonical `from` path (entry.from[0]; non-empty per AUDIT-08). */
+  readonly canonicalImport: string;
+  /** Repo-relative POSIX path of the holdout file. */
+  readonly file: string;
+  /** One-line summary of the suggested replacement (entry.message). */
+  readonly replacementSummary: string;
+}
+
+export interface AdopterManifestCheckerFindings {
+  readonly agent: 'adopter-manifest-checker';
+  readonly featureSlug: string;
+  /**
+   * Repo-relative path of the registry the checker consulted. Default
+   * `.dw-lifecycle/scope-discovery/adopter-manifests.yaml`.
+   */
+  readonly registryPath: string;
+  readonly findings: ReadonlyArray<AdopterManifestCheckerFinding>;
+  readonly meta: {
+    /** Total entries in the registry. */
+    readonly entriesScanned: number;
+    /** Total unique files visited across all manifests. */
+    readonly filesVisited: number;
+    /** Total holdouts surfaced (= findings.length). */
+    readonly holdoutCount: number;
+  };
+}
+
+/**
  * Discriminated union covering every shape a discovery agent can emit.
  * Consumers branch on `finding.agent` for type-safe narrowing — no
  * `as` casts, no `any` bag of properties.
@@ -211,7 +254,8 @@ export type DiscoveryAgentFinding =
   | AstGrepMatrixFindings
   | CloneDetectorFindings
   | PrdThemedFindings
-  | RegimeHoldoutFindings;
+  | RegimeHoldoutFindings
+  | AdopterManifestCheckerFindings;
 
 /** Discriminator literal — exported so consumers can switch exhaustively. */
 export type DiscoveryAgentName = DiscoveryAgentFinding['agent'];
@@ -261,9 +305,20 @@ export function isRegimeHoldoutFindings(
   );
 }
 
+export function isAdopterManifestCheckerFindings(
+  v: unknown,
+): v is AdopterManifestCheckerFindings {
+  if (!isPlainObject(v)) return false;
+  return (
+    v['agent'] === 'adopter-manifest-checker' &&
+    Array.isArray(v['findings']) &&
+    isPlainObject(v['meta'])
+  );
+}
+
 /**
- * Combined predicate covering all five shapes. Returns true when the
- * value matches any agent's structural contract; the per-agent
+ * Combined predicate covering every agent shape. Returns true when
+ * the value matches any agent's structural contract; the per-agent
  * predicates above narrow further.
  */
 export function isDiscoveryAgentFinding(
@@ -274,6 +329,7 @@ export function isDiscoveryAgentFinding(
     isAstGrepMatrixFindings(v) ||
     isCloneDetectorFindings(v) ||
     isPrdThemedFindings(v) ||
-    isRegimeHoldoutFindings(v)
+    isRegimeHoldoutFindings(v) ||
+    isAdopterManifestCheckerFindings(v)
   );
 }

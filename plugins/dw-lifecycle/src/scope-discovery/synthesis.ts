@@ -20,6 +20,7 @@
  */
 
 import type {
+  AdopterManifestCheckerFindings,
   AstGrepMatrixFindings,
   CloneDetectorFindings,
   DiscoveryAgentFinding,
@@ -54,6 +55,7 @@ interface PartitionedFindings {
   readonly clones: ReadonlyArray<CloneDetectorFindings>;
   readonly themes: ReadonlyArray<PrdThemedFindings>;
   readonly regime: ReadonlyArray<RegimeHoldoutFindings>;
+  readonly adopterChecker: ReadonlyArray<AdopterManifestCheckerFindings>;
   readonly agentsConsumed: ReadonlyArray<DiscoveryAgentName>;
   readonly rawCount: number;
 }
@@ -66,6 +68,7 @@ function partition(
   const clones: CloneDetectorFindings[] = [];
   const themes: PrdThemedFindings[] = [];
   const regime: RegimeHoldoutFindings[] = [];
+  const adopterChecker: AdopterManifestCheckerFindings[] = [];
   const seenAgents = new Set<DiscoveryAgentName>();
   // rawCount counts the *signal* the agents handed us — individual
   // hits, clone members, route entries, theme matches — so dedupCount =
@@ -101,6 +104,10 @@ function partition(
         regime.push(f);
         rawCount += f.findings.length;
         break;
+      case 'adopter-manifest-checker':
+        adopterChecker.push(f);
+        rawCount += f.findings.length;
+        break;
     }
   }
   return {
@@ -109,6 +116,7 @@ function partition(
     clones,
     themes,
     regime,
+    adopterChecker,
     rawCount,
     agentsConsumed: Array.from(seenAgents).sort(),
   };
@@ -194,11 +202,15 @@ export async function synthesize(input: SynthesizeOptions): Promise<SynthesisOut
   });
   const referenceDocs = refDocsResult.refs;
   for (const w of refDocsResult.warnings) warnings.push(w);
-  const regimeHoldouts = deriveRegimeHoldouts(partitioned.regime);
+  const regimeHoldouts = deriveRegimeHoldouts(
+    partitioned.regime,
+    partitioned.adopterChecker,
+  );
   if (regimeHoldouts === null) {
     warnings.push(
-      'No regime-holdout-detector findings supplied; manifest omits `regime_holdouts:` section. ' +
-        'Run the agent to surface anti-pattern / adopter-manifest / editor-symmetry / deprecation holdouts.',
+      'No regime-holdout-detector or adopter-manifest-checker findings supplied; ' +
+        'manifest omits `regime_holdouts:` section. Run the agents to surface ' +
+        'anti-pattern / adopter-manifest / editor-symmetry / deprecation holdouts.',
     );
   }
   if (kind === 'ui' && partitioned.ui.length > 0) {

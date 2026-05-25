@@ -20,6 +20,7 @@ import { buildPatternMatrix } from './discovery-agents/pattern-matrix.js';
 import { readCloneDetectorOutput } from './discovery-agents/clone-detector-reader.js';
 import { huntPrdThemes } from './discovery-agents/prd-themed-pattern-hunter.js';
 import { detectRegimeHoldouts } from './discovery-agents/regime-holdout-detector.js';
+import { checkAdopterManifests } from './discovery-agents/adopter-manifest-checker.js';
 import { computeMatrix } from './editor-symmetry-matrix.js';
 import { renderMatrix } from './editor-symmetry-report.js';
 import type {
@@ -177,6 +178,7 @@ interface AgentRun {
 interface Phase4Activations {
   readonly regimeHoldout: boolean;
   readonly editorSymmetry: boolean;
+  readonly adopterManifestChecker: boolean;
 }
 
 /**
@@ -210,6 +212,7 @@ function decideActivations(repoRoot: string): Phase4Activations {
     regimeHoldout:
       haveAntiPatterns || haveAdopterManifests || haveEditorSymmetryArtifact,
     editorSymmetry: haveAdopterManifests,
+    adopterManifestChecker: haveAdopterManifests,
   };
 }
 
@@ -265,6 +268,19 @@ async function runAgents(
       'skipped regime-holdout-detector (no anti-patterns.yaml, ' +
         'adopter-manifests.yaml, or editor-symmetry.md found under ' +
         '.dw-lifecycle/scope-discovery/)',
+    );
+  }
+  if (activations.adopterManifestChecker) {
+    promises.push(
+      checkAdopterManifests(input).then((f) => ({
+        name: 'adopter-manifest-checker',
+        finding: f,
+      })),
+    );
+  } else {
+    emitNote(
+      'skipped adopter-manifest-checker (no adopter-manifests.yaml found ' +
+        'under .dw-lifecycle/scope-discovery/)',
     );
   }
   return Promise.all(promises);

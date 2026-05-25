@@ -9,6 +9,7 @@
  */
 
 import type {
+  AdopterManifestCheckerFindings,
   RegimeHoldoutFinding,
   RegimeHoldoutFindings,
   RegimeHoldoutSource,
@@ -19,36 +20,75 @@ import type {
 } from './synthesis-types.js';
 
 /**
- * Derive the manifest's `regime_holdouts:` section from one or more
- * `regime-holdout-detector` agent outputs. The detector emits all
- * findings in a single bucket discriminated by `source`; the manifest
- * fans them out into four per-source arrays so an operator reading
- * the YAML can scan one section at a time.
+ * Derive the manifest's `regime_holdouts:` section from regime-
+ * holdout-detector outputs AND/OR adopter-manifest-checker outputs.
  *
- * Returns null when no detector findings are supplied — the synthesis
- * pass omits the top-level `regime_holdouts:` key entirely in that
- * case (the schema marks the field optional). Returning an empty-but-
- * populated section would be a fallback shape the project's "no
- * fallbacks" rule forbids; null lets the caller decide.
+ * The regime-holdout-detector emits all findings in a single bucket
+ * discriminated by `source`; the manifest fans them out into four
+ * per-source arrays so an operator reading the YAML can scan one
+ * section at a time.
+ *
+ * The adopter-manifest-checker (Phase 4 Family C) emits an isolated
+ * adopter-manifest narration; its findings are spliced into the
+ * `adopter_manifests:` bucket with the same shape. Dedup is by
+ * `(file, id)`: running both agents on the same registry doesn't
+ * double-count entries.
+ *
+ * Returns null when NEITHER detector kind contributes findings — the
+ * synthesis pass omits the top-level `regime_holdouts:` key entirely
+ * in that case (the schema marks the field optional). Returning an
+ * empty-but-populated section would be a fallback shape the
+ * project's "no fallbacks" rule forbids; null lets the caller decide.
  */
 export function deriveRegimeHoldouts(
   detectorFindings: ReadonlyArray<RegimeHoldoutFindings>,
+  adopterCheckerFindings: ReadonlyArray<AdopterManifestCheckerFindings> = [],
 ): ManifestRegimeHoldouts | null {
-  if (detectorFindings.length === 0) return null;
+  if (detectorFindings.length === 0 && adopterCheckerFindings.length === 0) {
+    return null;
+  }
   const buckets: Record<RegimeHoldoutSource, ManifestRegimeHoldoutEntry[]> = {
     'anti-pattern': [],
     'adopter-manifest': [],
     'editor-symmetry': [],
     deprecation: [],
   };
+  // Dedup key for adopter-manifest entries: same (file, manifest id)
+  // means the same holdout regardless of which agent surfaced it.
+  const adopterKey = new Set<string>();
   for (const finding of detectorFindings) {
     for (const entry of finding.findings) {
-      buckets[entry.source].push(toManifestEntry(entry));
+      const manifestEntry = toManifestEntry(entry);
+      if (entry.source === 'adopter-manifest') {
+        const key = `${manifestEntry.file}::${manifestEntry.id}`;
+        if (adopterKey.has(key)) continue;
+        adopterKey.add(key);
+      }
+      buckets[entry.source].push(manifestEntry);
     }
   }
-  // Stable per-bucket ordering — already stable from the detector,
-  // but re-sort after fan-out so consumers can rely on the manifest
-  // shape directly even if multiple detector findings are merged.
+  for (const f of adopterCheckerFindings) {
+    for (const entry of f.findings) {
+      const key = `${entry.file}::${entry.manifestId}`;
+      if (adopterKey.has(key)) continue;
+      adopterKey.add(key);
+      buckets['adopter-manifest'].push({
+        id: entry.manifestId,
+        file: entry.file,
+        shape:
+          `expected adopter of '${entry.canonicalImport}' ` +
+          `(manifest '${entry.manifestId}') — no canonical import found`,
+        replacement: `import from '${entry.canonicalImport}' — ${entry.replacementSummary}`,
+        evidence: {
+          registry_path: f.registryPath,
+          registry_id: entry.manifestId,
+        },
+      });
+    }
+  }
+  // Stable per-bucket ordering — already stable from the agents, but
+  // re-sort after fan-out so consumers can rely on the manifest shape
+  // directly even if multiple agent outputs are merged.
   for (const list of Object.values(buckets)) {
     list.sort(compareEntries);
   }
