@@ -16,12 +16,14 @@
  * both `import ... from '<path>'` and `import('<path>')`, with single OR
  * double quotes accepted.
  *
- * Pre-commit hook (`.githooks/pre-commit`) invokes this via
- * `make check-adopters` whenever staged changes touch .ts/.tsx.
+ * Adopter wiring: invoked as the `check-adopters` subcommand on the
+ * `dw-lifecycle` CLI (post-Phase-2-Task-3 wire-up). Adopters who want a
+ * pre-commit gate run the subcommand from a hook that fires on staged
+ * .ts/.tsx changes.
  *
  * Usage:
- *   tsx tools/scope-discovery/check-adopters.ts [--root <path>]
- *     [--registry <path>] [--quiet] [--json]
+ *   dw-lifecycle check-adopters [--root <path>] [--registry <path>]
+ *                               [--quiet] [--json]
  *
  * Exit codes: 0 = empty registry OR no holdouts; 1 = holdouts; 2 = infra error.
  */
@@ -116,7 +118,7 @@ export function parseCli(argv: readonly string[]): CliOptions {
 function printHelp(): void {
   process.stdout.write(
     [
-      'tsx tools/scope-discovery/check-adopters.ts [options]',
+      'dw-lifecycle check-adopters [options]',
       '',
       'Options:',
       '  --registry <path>  Override registry path (default: docs/scope-discovery/adopter-manifests.yaml)',
