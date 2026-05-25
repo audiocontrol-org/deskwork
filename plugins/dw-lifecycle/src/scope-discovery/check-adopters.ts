@@ -2,7 +2,7 @@
  * plugins/dw-lifecycle/src/scope-discovery/check-adopters.ts
  *
  * Adopter-manifest gate (workplan T6.2). Walks
- * `docs/scope-discovery/adopter-manifests.yaml` and, for each manifest
+ * `.dw-lifecycle/scope-discovery/adopter-manifests.yaml` and, for each manifest
  * entry, finds files matching the entry's `expected_adopters_glob` and
  * reports any that do NOT import the canonical `from` path (and are not
  * listed as exceptions).
@@ -45,7 +45,7 @@ import {
 import { listFilesMatching, toPosix } from './util/glob.js';
 import { errorMessage } from './util/typeguards.js';
 
-const DEFAULT_REGISTRY = 'docs/scope-discovery/adopter-manifests.yaml';
+const DEFAULT_REGISTRY = '.dw-lifecycle/scope-discovery/adopter-manifests.yaml';
 const DEFAULT_ROOT = '.';
 const SCANNED_EXTENSIONS: ReadonlySet<string> = new Set(['.ts', '.tsx']);
 
@@ -121,7 +121,7 @@ function printHelp(): void {
       'dw-lifecycle check-adopters [options]',
       '',
       'Options:',
-      '  --registry <path>  Override registry path (default: docs/scope-discovery/adopter-manifests.yaml)',
+      '  --registry <path>  Override registry path (default: .dw-lifecycle/scope-discovery/adopter-manifests.yaml)',
       '  --root <path>      Override scan root (default: repo root cwd)',
       '  --quiet            Print summary only when zero real holdouts; if real holdouts exist, full report still prints (operator needs to act)',
       '  --json             Emit findings as JSON',

@@ -4,9 +4,9 @@ Machine-readable specs of the YAML wire formats produced and consumed by the sco
 
 | File | Spec for | Authoritative validator (runtime) |
 |---|---|---|
-| `clones.yaml.schema.json` | `docs/scope-discovery/clones.yaml` | `../clones-yaml.parse.ts` + `../clones-yaml.refactor.ts` (`validateRefactorPreconditions`) |
-| `anti-patterns.yaml.schema.json` | `docs/scope-discovery/anti-patterns.yaml` | `../anti-patterns-registry.ts` (`parseEntry`) |
-| `adopter-manifests.yaml.schema.json` | `docs/scope-discovery/adopter-manifests.yaml` | `../adopter-manifests-registry.ts` (`parseEntry`) |
+| `clones.yaml.schema.json` | `.dw-lifecycle/scope-discovery/clones.yaml` | `../clones-yaml.parse.ts` + `../clones-yaml.refactor.ts` (`validateRefactorPreconditions`) |
+| `anti-patterns.yaml.schema.json` | `.dw-lifecycle/scope-discovery/anti-patterns.yaml` | `../anti-patterns-registry.ts` (`parseEntry`) |
+| `adopter-manifests.yaml.schema.json` | `.dw-lifecycle/scope-discovery/adopter-manifests.yaml` | `../adopter-manifests-registry.ts` (`parseEntry`) |
 
 Phase 3 adds `annotated-trace.json.schema.json`.
 

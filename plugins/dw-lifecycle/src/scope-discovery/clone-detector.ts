@@ -5,7 +5,7 @@
  * protocol. Wraps `jscpd` (configured at `.jscpd.json` in the adopter
  * project's repo root), parses its JSON report into stable clone-group
  * records, and compares against the committed baseline at
- * `docs/scope-discovery/clones.yaml` (project-relative default;
+ * `.dw-lifecycle/scope-discovery/clones.yaml` (project-relative default;
  * configurable via `--baseline`).
  *
  * Engine choice — jscpd over AST-custom — rationale:
@@ -36,7 +36,7 @@
  *   --root <path>             override .jscpd.json `path` (default: read from config)
  *   --quiet                   suppress per-clone output; print summary + exit
  *   --json                    emit JSON for tooling instead of human text
- *   --baseline <path>         override default docs/scope-discovery/clones.yaml
+ *   --baseline <path>         override default .dw-lifecycle/scope-discovery/clones.yaml
  *   --refresh-baseline        rewrite the baseline from this run, carrying
  *                             forward operator-authored dispositions
  *   --diff                    print only NEW + DROPPED groups (subset of
@@ -66,7 +66,7 @@ import { JSCPD_REPORT_PATH, parseJscpdReport, runJscpd } from './jscpd-runner.js
 import { errorMessage, isEnoent } from './util/typeguards.js';
 
 const REPO_ROOT = process.cwd();
-const DEFAULT_BASELINE = 'docs/scope-discovery/clones.yaml';
+const DEFAULT_BASELINE = '.dw-lifecycle/scope-discovery/clones.yaml';
 
 interface Cli {
   readonly root: string | null;
@@ -157,7 +157,7 @@ function summaryLine(diff: CloneDiff): string {
 /**
  * Per-NEW-group operator hint: a pre-filled `dw-lifecycle batch-dispose`
  * command the operator can paste-and-edit instead of hand-writing a YAML
- * entry at the right insertion point in docs/scope-discovery/clones.yaml.
+ * entry at the right insertion point in .dw-lifecycle/scope-discovery/clones.yaml.
  *
  * The audiocontrol pilot named `tsx tools/scope-discovery/batch-dispose.ts`
  * directly. This port references the eventual subcommand shape

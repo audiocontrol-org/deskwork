@@ -2,7 +2,7 @@
  * plugins/dw-lifecycle/src/scope-discovery/clones-yaml.ts
  *
  * Shape, ser/deser, and comparison helpers for
- * docs/scope-discovery/clones.yaml. Used by clone-detector.ts; kept
+ * .dw-lifecycle/scope-discovery/clones.yaml. Used by clone-detector.ts; kept
  * separate so the CLI entry stays under the 300-line cap and so the
  * adversarial validator harness (Phase 1 Task 3) can reuse the same
  * primitives.

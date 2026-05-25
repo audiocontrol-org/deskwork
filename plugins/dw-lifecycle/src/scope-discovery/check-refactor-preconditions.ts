@@ -18,7 +18,7 @@
  * Invocation flags:
  *   --commit-msg-file <path>      read commit message from file
  *   --commit-msg <text>           inline message (test-only)
- *   --baseline <path>             override docs/scope-discovery/clones.yaml
+ *   --baseline <path>             override .dw-lifecycle/scope-discovery/clones.yaml
  *   --repo <path>                 override repo root (test-only)
  *   --test-timeout-seconds <n>    per-test timeout (default: 300)
  *   --skip-test-run               skip running tests (test-only)
@@ -45,7 +45,7 @@ import {
 } from './check-refactor-preconditions.runtime.js';
 import { errorMessage, isEnoent } from './util/typeguards.js';
 
-const DEFAULT_BASELINE = 'docs/scope-discovery/clones.yaml';
+const DEFAULT_BASELINE = '.dw-lifecycle/scope-discovery/clones.yaml';
 const DEFAULT_TEST_TIMEOUT_SECONDS = 300;
 /**
  * Marker grammar (workplan T5.3 + T5.2 docs):
@@ -196,7 +196,7 @@ function checkGroupForMarker(
         '<entry>',
         `refactor marker names clone-group ${id} but no entry exists in clones.yaml.`,
         `Either remove the marker (this commit does not close a clone) or ` +
-          `add the entry to docs/scope-discovery/clones.yaml first. Marker ` +
+          `add the entry to .dw-lifecycle/scope-discovery/clones.yaml first. Marker ` +
           `IDs are exactly 12 lowercase hex chars derived from the group's members.`,
       ),
     ];
@@ -209,7 +209,7 @@ function checkGroupForMarker(
         `marker names ${id} but its disposition is '${group.disposition}', not 'refactor'.`,
         `Update the entry's disposition to 'refactor' AND supply the ` +
           `precondition fields (canonical_side, canonical_reason, tests, ` +
-          `tests_proof — see docs/scope-discovery/README.md §Refactor Preconditions).`,
+          `tests_proof — see .dw-lifecycle/scope-discovery/README.md §Refactor Preconditions).`,
       ),
     ];
   }
@@ -231,8 +231,8 @@ function checkGroupForMarker(
         id,
         '<schema>',
         detail,
-        `Fix the entry in docs/scope-discovery/clones.yaml; see ` +
-          `docs/scope-discovery/README.md §Refactor Preconditions for field shapes.`,
+        `Fix the entry in .dw-lifecycle/scope-discovery/clones.yaml; see ` +
+          `.dw-lifecycle/scope-discovery/README.md §Refactor Preconditions for field shapes.`,
       ),
     );
   }

@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/clones-yaml.parse.ts
  *
- * Parse layer for `docs/scope-discovery/clones.yaml`. Extracted from
+ * Parse layer for `.dw-lifecycle/scope-discovery/clones.yaml`. Extracted from
  * `clones-yaml.ts` so the host file stays under the 300-500 line cap
  * after AUDIT-20260524-14's strict-parse helpers + structured
  * shape-error reasons + `ClonesYamlParseError` class were added.

@@ -46,7 +46,7 @@ import {
 import { toPosix } from './util/glob.js';
 import { errorMessage } from './util/typeguards.js';
 
-const DEFAULT_REGISTRY = 'docs/scope-discovery/anti-patterns.yaml';
+const DEFAULT_REGISTRY = '.dw-lifecycle/scope-discovery/anti-patterns.yaml';
 // Default scan root matches the deskwork project layout (source in
 // `src/`). Adopters with non-default trees override via `--root`. The
 // audiocontrol pilot defaulted to `modules/`; that was specific to its
@@ -126,7 +126,7 @@ function printHelp(): void {
       'dw-lifecycle check-anti-patterns [options]',
       '',
       'Options:',
-      '  --registry <path>  Override registry path (default: docs/scope-discovery/anti-patterns.yaml)',
+      '  --registry <path>  Override registry path (default: .dw-lifecycle/scope-discovery/anti-patterns.yaml)',
       '  --root <path>      Override scan root (default: src)',
       '  --quiet            Suppress per-match output; print summary only',
       '  --json             Emit findings as JSON',

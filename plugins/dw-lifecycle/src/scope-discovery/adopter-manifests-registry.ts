@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/adopter-manifests-registry.ts
  *
- * Parser + types for `docs/scope-discovery/adopter-manifests.yaml`
+ * Parser + types for `.dw-lifecycle/scope-discovery/adopter-manifests.yaml`
  * (workplan T6.2). Adopter manifests pair with anti-patterns: anti-
  * patterns find LEGACY shapes that should be REPLACED; adopter
  * manifests find FILES that should be USING a canonical primitive but
