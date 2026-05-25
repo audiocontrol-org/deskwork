@@ -30,14 +30,14 @@ describe('install-shortcuts (smoke)', () => {
   });
 
   describe('default install (scheme C)', () => {
-    it('writes all 16 shim files with the canonical body', () => {
+    it('writes all 17 shim files with the canonical body', () => {
       const result = runInstallShortcuts({
         home: tmp,
         scheme: 'C',
         pluginVersion: '0.0.0',
       });
 
-      expect(result.shimsWritten.length).toBe(16);
+      expect(result.shimsWritten.length).toBe(17);
 
       for (const [cmd, shim] of getScheme('C').entries()) {
         const path = join(commandsDir(tmp), `${shim}.md`);
@@ -61,7 +61,7 @@ describe('install-shortcuts (smoke)', () => {
         pluginVersion: '0.0.0',
       });
       const m = manifest as { shims: ReadonlyArray<{ command: string; shimName: string }> };
-      expect(m.shims.length).toBe(16);
+      expect(m.shims.length).toBe(17);
 
       for (const entry of m.shims) {
         expect(COMMANDS).toContain(entry.command);
@@ -112,7 +112,7 @@ describe('install-shortcuts (smoke)', () => {
       });
 
       expect(result.dryRun).toBe(true);
-      expect(result.shimsWritten.length).toBe(16);
+      expect(result.shimsWritten.length).toBe(17);
       expect(existsSync(commandsDir(tmp))).toBe(false);
       expect(existsSync(manifestPath(tmp))).toBe(false);
     });

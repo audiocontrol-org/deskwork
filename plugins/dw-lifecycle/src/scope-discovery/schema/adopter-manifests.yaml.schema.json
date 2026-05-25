@@ -1,0 +1,119 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://deskwork/dw-lifecycle/schema/adopter-manifests.yaml.schema.json",
+  "title": "adopter-manifests.yaml — registered canonical primitives whose declared adopters must import them",
+  "description": "Machine-readable spec of the .dw-lifecycle/scope-discovery/adopter-manifests.yaml wire format consumed by the scope-discovery `dw-lifecycle check-adopters` gate. Pairs with anti-patterns: anti-patterns detect LEGACY shapes that should be REPLACED; adopter manifests detect FILES that should be USING a canonical primitive but aren't (regime-holdout / missing-adopter case). Each entry names ONE canonical primitive (via `from`), declares the glob(s) of files expected to import it, and reports any file matching a glob that does NOT import the primitive. The runtime parser (plugins/dw-lifecycle/src/scope-discovery/adopter-manifests-registry.ts → parseEntry) is the authoritative validator; this schema mirrors its contract for editor autocomplete + inline validation and is referenced by the Phase 9 doctor rules. The `from:` field accepts either a single string OR a non-empty list of strings to support cross-module primitive promotion (AUDIT-20260524-08): list BOTH paths during a transition window so consumers importing via EITHER path count as adopters.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["adopter_manifests"],
+  "properties": {
+    "adopter_manifests": {
+      "description": "The registered canonical primitives. Order is not significant; ids must be unique. Empty list is valid (the scanner exits 0 with a `0 holdouts across 0 manifest(s)` summary).",
+      "type": "array",
+      "items": { "$ref": "#/definitions/AdopterManifestEntry" }
+    }
+  },
+  "definitions": {
+    "AdopterManifestEntry": {
+      "description": "One registered canonical primitive. `id` (kebab-case) is the primary key. `introduced_in` anchors the registration to a specific commit so reviewers can trace when the primitive was introduced. `from` names the canonical import path(s) — string for the single-path back-compat shape, list of strings for the multi-path cross-module promotion case (AUDIT-08). `expected_adopters_glob` is the non-empty list of POSIX glob patterns whose matches must import `from`. `exceptions` permanently opts files out of the holdout calculation (file legitimately bypasses the primitive); `tracked_holdouts` defers files that DO need to adopt but have a tracked follow-up issue (gate stays green when only these remain). `message` is the multi-line operator-facing replacement instruction shown beneath each holdout finding.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "introduced_in", "from", "expected_adopters_glob", "message"],
+      "properties": {
+        "id": {
+          "description": "Kebab-case primary key (lowercase letters, digits, hyphens; no leading/trailing/double hyphens). Unique across the registry. Operators reference this id when authoring `exceptions:` or `tracked_holdouts:` overrides or when filing follow-up issues.",
+          "type": "string",
+          "pattern": "^[a-z0-9](?:-?[a-z0-9]+)*$",
+          "minLength": 1
+        },
+        "introduced_in": {
+          "description": "Git short-or-full hash (7-40 lowercase hex characters) of the commit that introduced this primitive. Anchors the registration to a specific point in history so the operator can trace context.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{7,40}$"
+        },
+        "from": {
+          "description": "Canonical import path(s) the entry asserts. Either a single non-empty string (back-compat with pre-AUDIT-08 entries) OR a non-empty list of non-empty strings (post-AUDIT-08 multi-path form for cross-module primitive promotion, e.g. listing both `@/components/common/X` and `@audiocontrol/editor-core` during a relocation window so consumers importing via EITHER path count as adopters). When a list, ordering is preserved: index 0 is the primary canonical (used for display in the report); subsequent elements are transitional aliases. Adoption detection requires ANY listed path to appear in the consumer file.",
+          "oneOf": [
+            { "$ref": "#/definitions/ImportPath" },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/definitions/ImportPath" }
+            }
+          ]
+        },
+        "expected_adopters_glob": {
+          "description": "Non-empty list of glob patterns. Each candidate file's repo-relative POSIX path is tested against every pattern; a match makes the file an `expected adopter` of `from`. Glob syntax matches `util/glob.ts` (supports `**`, `*`, `?`, brace alternation).",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "exceptions": {
+          "description": "Optional list of permanent opt-outs. A file listed here is EXCLUDED from the holdout calculation (the file legitimately should not adopt `from`, typically because it predates or has a documented reason to diverge). Each entry's `path` must match at least one of the manifest's `expected_adopters_glob` patterns — an exception outside any glob is rejected at parse time as inert. Empty list / omitted field both mean no exceptions.",
+          "type": "array",
+          "items": { "$ref": "#/definitions/AdopterException" }
+        },
+        "tracked_holdouts": {
+          "description": "Optional list of deferred-but-known holdouts (AUDIT-20260522-06). A file listed here IS a holdout (it should adopt `from` but hasn't) AND has a tracked follow-up issue deferring the migration. The gate exits 0 when only tracked holdouts remain (vs. exit 1 for any regular holdout); these files surface in a dedicated `tracked holdouts (gate-passing, pending follow-up)` report section so the operator sees the work-to-do count. Each entry's `path` must match at least one of the manifest's `expected_adopters_glob` patterns. A path cannot appear in BOTH `exceptions` AND `tracked_holdouts` (the two dispositions are mutually exclusive — the parser rejects the contradiction at parse time).",
+          "type": "array",
+          "items": { "$ref": "#/definitions/TrackedHoldout" }
+        },
+        "message": {
+          "description": "Multi-line operator-facing replacement instruction. Surfaces beneath each holdout finding (indented by 2 spaces). Free-form prose; conventionally explains WHY this primitive was introduced and HOW to migrate.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "AdopterException": {
+      "description": "One permanent opt-out. `path` is the repo-relative POSIX path of the file excluded from holdout reporting; must match at least one of the parent entry's `expected_adopters_glob` patterns. `reason` is the non-empty justification rendered (or at least retained) so the disposition self-documents why this file legitimately bypasses the primitive.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "reason"],
+      "properties": {
+        "path": {
+          "description": "Exact repo-relative POSIX path of the excluded file. Must match at least one `expected_adopters_glob` pattern (else the entry would be inert).",
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "description": "Non-empty multi-line explanation for why this file legitimately bypasses the primitive.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "TrackedHoldout": {
+      "description": "One deferred-but-known holdout (AUDIT-20260522-06). The file IS a holdout but has a tracked follow-up; the gate passes when only tracked holdouts remain. The required `issue:` field prevents the field from becoming a `I'll fix it later` dumping ground.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "issue", "reason"],
+      "properties": {
+        "path": {
+          "description": "Exact repo-relative POSIX path of the deferred holdout file. Must match at least one `expected_adopters_glob` pattern (else the entry would be inert). Cannot also appear in `exceptions` (the two dispositions are mutually exclusive).",
+          "type": "string",
+          "minLength": 1
+        },
+        "issue": {
+          "description": "Tracking issue. Must be non-empty and either contain `://` (URL-shaped — typical GitHub issue URL) or start with `#` (GitHub-style cross-repo ref). The parser rejects any other shape so the field can't be filled with a free-text excuse.",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(.*://.*|#.+)$"
+        },
+        "reason": {
+          "description": "Non-empty multi-line explanation naming the deferral context (why is the migration deferred, what blocks closing it).",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "ImportPath": {
+      "description": "A non-empty import-path string. Match logic compares against the literal quoted-import specifier in TS/TSX source; the path is escaped before regex compilation so meta characters (slashes, `@`, etc.) match literally.",
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

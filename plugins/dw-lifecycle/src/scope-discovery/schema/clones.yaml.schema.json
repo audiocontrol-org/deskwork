@@ -1,0 +1,182 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://deskwork/dw-lifecycle/schema/clones.yaml.schema.json",
+  "title": "clones.yaml — dispositioned baseline of detected code-duplication groups",
+  "description": "Machine-readable spec of the .dw-lifecycle/scope-discovery/clones.yaml wire format produced by the scope-discovery clone-detector and curated by the operator. Each entry pairs a content-hashed group id (sha1 over sorted bare member paths + jscpd token-fingerprint) with one of four dispositions (pending | keep-with-reason | ignore-with-justification | refactor). Entries carrying `disposition: refactor` MUST satisfy five additional preconditions (canonical_side, canonical_reason, optional new_shape_summary, tests, tests_proof) that prevent the silent-regime-erasure + silent-behavior-regression failure modes the pilot's refactor-precondition validator catches. The runtime parser (plugins/dw-lifecycle/src/scope-discovery/clones-yaml.parse.ts → validateRefactorPreconditions) is the authoritative validator; this schema mirrors its contract for editor autocomplete + inline validation and is referenced by the Phase 9 doctor rules. Schema rules trace to Step 0a (4 type/presence branches) and Step 0b (3 conditional branches) of the refactor-preconditions check.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["generated_at", "clones"],
+  "properties": {
+    "generated_at": {
+      "description": "ISO-8601 timestamp of the most recent clone-detector run that produced this baseline. Set by the detector; not edited by hand.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "clones": {
+      "description": "All detected clone groups, sorted ascending by members[0] then by id. The detector preserves operator dispositions across refreshes by id (content-hashed, T7.1) so adjacent line shifts that leave content + membership unchanged keep the same row.",
+      "type": "array",
+      "items": { "$ref": "#/definitions/CloneGroup" }
+    }
+  },
+  "definitions": {
+    "Disposition": {
+      "description": "The operator's verdict for a clone group. `pending` is the default a fresh detection lands as; `keep-with-reason` and `ignore-with-justification` retire a group without code change; `refactor` commits to extracting the duplication and requires the five precondition fields encoded in RefactorPreconditions.",
+      "type": "string",
+      "enum": ["pending", "keep-with-reason", "ignore-with-justification", "refactor"]
+    },
+    "RefactorPreconditions": {
+      "description": "The five fields required when a clone group is dispositioned `refactor`. Codifies the deferral decision the operator would otherwise bury in a code comment: which side carries the canonical regime (canonical_side / canonical_reason), what the new shape looks like when there is no existing canonical side (new_shape_summary, required when canonical_side === 'new'), and which tests anchor a failing-then-passing commit pair that proves the safety net exists (tests / tests_proof). See plugins/dw-lifecycle/src/scope-discovery/clones-yaml.refactor.ts for the rationale.",
+      "type": "object",
+      "required": ["canonical_side", "canonical_reason", "tests", "tests_proof"],
+      "properties": {
+        "canonical_side": {
+          "description": "Which side carries the canonical regime. Either a repo-relative file-path of the canonical-side file, or the literal `all` (every side is correctly migrated; duplication is a missing-primitive gap with no behavior change at any consumer), or the literal `new` (no side is canonical; the refactor designs a brand-new shape from scratch; new_shape_summary becomes required). Parser is permissive at the string level; file existence is checked by the pre-commit gate.",
+          "type": "string",
+          "minLength": 1
+        },
+        "canonical_reason": {
+          "description": "Non-empty justification for the canonical_side choice. Names the regime delta or design intent so the disposition record itself documents why this side wins; absent this, the deferral decision gets buried in a code comment that nobody reads.",
+          "type": "string",
+          "minLength": 1
+        },
+        "new_shape_summary": {
+          "description": "Description of the new shape being designed when no side is canonical. Required when canonical_side === 'new' (the new-shape design must be named before extraction begins, otherwise the shape is invented in flight and inherits whichever side happened to be edited last). When present in any branch, must be a non-empty string; an explicit empty value is rejected as a malformed declaration.",
+          "type": "string",
+          "minLength": 1
+        },
+        "tests": {
+          "description": "Non-empty list of test ids / commands that anchor the refactor's safety net. Each entry is a non-empty string (test path, vitest id, shell command, etc.). The semantics of each entry are operator-defined; the schema enforces presence + non-emptiness so a refactor cannot land with an empty tests array.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "tests_proof": {
+          "description": "Anchors the tests[] array to a specific failing-then-passing commit pair so the disposition record itself proves the safety net detects the targeted regression.",
+          "type": "object",
+          "required": ["sha", "demonstration"],
+          "properties": {
+            "sha": {
+              "description": "Git short-or-full hash (7-40 lowercase hex characters) of the commit that demonstrates the test catching the would-be regression. Matches the runtime regex TESTS_PROOF_SHA_REGEX = /^[0-9a-f]{7,40}$/.",
+              "type": "string",
+              "pattern": "^[0-9a-f]{7,40}$"
+            },
+            "demonstration": {
+              "description": "Non-empty narrative describing how the named commit demonstrates the failing-then-passing pair — typically a one-paragraph note naming the broken behavior the test catches and how the operator confirmed it.",
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "CloneGroupBase": {
+      "description": "Fields common to every clone-group entry regardless of disposition.",
+      "type": "object",
+      "required": ["id", "lines", "members", "disposition", "reason"],
+      "properties": {
+        "id": {
+          "description": "Content-hashed group id (12 hex chars by convention; derived from sha1 over sorted bare member paths + jscpd fragment fingerprint, T7.1). Trusted on read — operators may hand-edit groups without the tool clobbering the id on refresh.",
+          "type": "string",
+          "minLength": 1
+        },
+        "lines": {
+          "description": "Line count of the duplicated block (jscpd's per-pair line count). Informational; the detector writes it on each refresh.",
+          "type": "number"
+        },
+        "members": {
+          "description": "Group members, each of the form '<repo-relative-path>:<startLine>:<endLine>', sorted ascending. A clone group has >= 2 members by construction (jscpd's duplicates[] entries are always pairs).",
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "reason": {
+          "description": "Operator-supplied justification or note. null/absent is permitted for `pending` (no decision yet); `keep-with-reason` and `ignore-with-justification` typically populate it; `refactor` uses the dedicated canonical_reason field for the per-disposition justification (this field remains free-text for additional context). Non-string values are coerced to null by the parser.",
+          "type": ["string", "null"]
+        },
+        "tokens": {
+          "description": "Legacy field from pre-T7.1 baselines. Silently ignored by the parser and not written by the current detector. Permitted here only so legacy baselines validate without edit.",
+          "type": "number"
+        }
+      }
+    },
+    "NonRefactorCloneGroup": {
+      "description": "A clone-group entry with any disposition other than `refactor`. Carries no refactor-preconditions block.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "lines", "members", "disposition", "reason"],
+      "properties": {
+        "id": { "$ref": "#/definitions/CloneGroupBase/properties/id" },
+        "lines": { "$ref": "#/definitions/CloneGroupBase/properties/lines" },
+        "members": { "$ref": "#/definitions/CloneGroupBase/properties/members" },
+        "disposition": {
+          "description": "Non-refactor disposition.",
+          "type": "string",
+          "enum": ["pending", "keep-with-reason", "ignore-with-justification"]
+        },
+        "reason": { "$ref": "#/definitions/CloneGroupBase/properties/reason" },
+        "tokens": { "$ref": "#/definitions/CloneGroupBase/properties/tokens" }
+      }
+    },
+    "RefactorCloneGroup": {
+      "description": "A clone-group entry dispositioned `refactor`. Adds the five required precondition fields inline at the entry level (mirrors the runtime — preconditions are top-level keys on the entry, not nested under a `refactor:` object).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "lines",
+        "members",
+        "disposition",
+        "reason",
+        "canonical_side",
+        "canonical_reason",
+        "tests",
+        "tests_proof"
+      ],
+      "properties": {
+        "id": { "$ref": "#/definitions/CloneGroupBase/properties/id" },
+        "lines": { "$ref": "#/definitions/CloneGroupBase/properties/lines" },
+        "members": { "$ref": "#/definitions/CloneGroupBase/properties/members" },
+        "disposition": {
+          "description": "Refactor disposition. Gates the five precondition fields.",
+          "type": "string",
+          "const": "refactor"
+        },
+        "reason": { "$ref": "#/definitions/CloneGroupBase/properties/reason" },
+        "tokens": { "$ref": "#/definitions/CloneGroupBase/properties/tokens" },
+        "canonical_side": { "$ref": "#/definitions/RefactorPreconditions/properties/canonical_side" },
+        "canonical_reason": { "$ref": "#/definitions/RefactorPreconditions/properties/canonical_reason" },
+        "new_shape_summary": { "$ref": "#/definitions/RefactorPreconditions/properties/new_shape_summary" },
+        "tests": { "$ref": "#/definitions/RefactorPreconditions/properties/tests" },
+        "tests_proof": { "$ref": "#/definitions/RefactorPreconditions/properties/tests_proof" }
+      },
+      "allOf": [
+        {
+          "$comment": "Step 0b — conditional: canonical_side === 'new' requires new_shape_summary. When canonical_side !== 'new', new_shape_summary is optional. The empty-string rejection in either branch is enforced by the underlying minLength: 1 on the field definition.",
+          "if": {
+            "properties": { "canonical_side": { "const": "new" } },
+            "required": ["canonical_side"]
+          },
+          "then": {
+            "required": ["new_shape_summary"]
+          }
+        }
+      ]
+    },
+    "CloneGroup": {
+      "description": "Discriminated union by disposition. RefactorCloneGroup carries the five preconditions; NonRefactorCloneGroup does not. Selection is driven by the `disposition` discriminator via if/then/else so validator error messages name the specific branch's failure rather than a generic `oneOf did not match`.",
+      "if": {
+        "properties": { "disposition": { "const": "refactor" } },
+        "required": ["disposition"]
+      },
+      "then": { "$ref": "#/definitions/RefactorCloneGroup" },
+      "else": { "$ref": "#/definitions/NonRefactorCloneGroup" }
+    }
+  }
+}

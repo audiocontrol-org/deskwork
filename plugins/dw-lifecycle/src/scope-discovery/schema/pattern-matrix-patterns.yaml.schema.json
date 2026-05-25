@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deskwork/dw-lifecycle/schema/pattern-matrix-patterns.yaml.schema.json",
+  "title": "Pattern-Matrix Patterns Registry",
+  "description": "Project-supplied override of the built-in pattern catalog for the pattern-matrix discovery agent. When .dw-lifecycle/scope-discovery/pattern-matrix-patterns.yaml exists, its `patterns:` list REPLACES the agent's built-in defaults (does not merge). Each entry declares a kebab-case id, a description, a regex source string, and optional extension filter.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["patterns"],
+  "properties": {
+    "patterns": {
+      "description": "Override list. Replaces the agent's built-in catalog when this file is present.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "description", "regex"],
+        "properties": {
+          "id": {
+            "description": "Stable kebab-case identifier surfaced in the agent's output.",
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$",
+            "minLength": 2,
+            "maxLength": 80
+          },
+          "description": {
+            "description": "Human-readable description of what the pattern catches.",
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 500
+          },
+          "regex": {
+            "description": "RegExp source string. Compiled with the 'g' flag by the agent.",
+            "type": "string",
+            "minLength": 1
+          },
+          "extensions": {
+            "description": "Optional file-extension filter. When set, the pattern only scans files whose name ends in one of these strings (e.g., ['.tsx', '.ts']).",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^\\.[A-Za-z0-9]+$",
+              "maxLength": 16
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          }
+        }
+      }
+    }
+  }
+}

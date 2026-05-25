@@ -17,7 +17,8 @@ Drive implementation through the workplan. Selects the next unchecked task, disp
    - If the task introduces or modifies tested code, follow `superpowers:test-driven-development` (write failing test → minimal impl → pass → commit).
    - If a step is independent of others, consider `superpowers:dispatching-parallel-agents` to fan out.
    - When the task body is complete, mark its checkboxes and commit.
-5. After each task, optionally run `/dw-lifecycle:review` (does NOT block; operator chooses cadence).
+5. After each task, optionally run `/dw-lifecycle:review` or `/dw-lifecycle:audit` (does NOT block; operator chooses cadence).
+   - They are synonyms. Both write findings into `audit-log.md` with stable IDs and explicit status transitions.
 6. Repeat until all tasks done or operator pauses.
 
 ## Error handling

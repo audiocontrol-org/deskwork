@@ -27,7 +27,8 @@ Show the lifecycle diagram and current state. Read-only; does not start any work
 /dw-lifecycle:implement Walk workplan tasks via subagents
         |
         v
-/dw-lifecycle:review    Delegate code review (feature-dev's reviewer)
+/dw-lifecycle:review    Three-track audit/review: verify, spec-review, code-review
+/dw-lifecycle:audit     Synonym of review; same durable audit-log workflow
         |
         v
 /dw-lifecycle:ship      Verify + open PR (stop at PR; operator merges)

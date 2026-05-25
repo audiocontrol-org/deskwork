@@ -19,6 +19,7 @@ const SCHEME_IDS: readonly SchemeId[] = ['A', 'B', 'C'];
 // They duplicate schemes.ts intentionally — an edit there without a
 // matching edit here fails this test, which is the point.
 const SCHEME_A_TABLE: ReadonlyArray<readonly [string, string]> = [
+  ['audit', 'dwa'],
   ['implement', 'dwi'],
   ['setup', 'dws'],
   ['ship', 'dwsh'],
@@ -38,6 +39,7 @@ const SCHEME_A_TABLE: ReadonlyArray<readonly [string, string]> = [
 ];
 
 const SCHEME_B_TABLE: ReadonlyArray<readonly [string, string]> = [
+  ['audit', 'dw-au'],
   ['implement', 'dw-im'],
   ['setup', 'dw-se'],
   ['define', 'dw-de'],
@@ -57,10 +59,34 @@ const SCHEME_B_TABLE: ReadonlyArray<readonly [string, string]> = [
 ];
 
 // Meta-commands intentionally excluded from COMMANDS: the shortcuts
-// skills install shortcuts FOR the 16 lifecycle commands; they are
+// skills install shortcuts FOR the 17 lifecycle commands; they are
 // themselves invoked via the namespaced `/dw-lifecycle:` form (the
-// chicken-and-egg moment), so they get no shim of their own.
-const META_COMMANDS = ['install-shortcuts', 'uninstall-shortcuts'] as const;
+// chicken-and-egg moment), so they get no shim of their own. The
+// scope-discovery verbs (and the install commands that scaffold their
+// CONFIG) also get no shim — they're operator-invoked but outside the
+// lifecycle command set the shortcuts install targets.
+const META_COMMANDS = [
+  'install-shortcuts',
+  'uninstall-shortcuts',
+  // scope-discovery verbs (Phase 6 + Phase 7 + Phase 8)
+  'batch-dispose',
+  'check-adopters',
+  'check-anti-patterns',
+  'check-deprecations',
+  'check-disposition-survivor',
+  'check-editor-symmetry',
+  'check-refactor-preconditions',
+  'dispose-clone',
+  'install-agent-prompts',
+  'install-scope-discovery',
+  'install-scope-discovery-hooks',
+  'refresh-clones-baseline',
+  'scope-export',
+  'scope-inventory',
+  'scope-summary',
+  'uninstall-scope-discovery-hooks',
+  'validate-scope-discovery',
+] as const;
 
 describe('COMMANDS canonical list', () => {
   it('matches the on-disk commands/ directory (plus meta-commands) exactly', () => {
@@ -74,8 +100,8 @@ describe('COMMANDS canonical list', () => {
     expect(expected).toEqual(onDisk);
   });
 
-  it('contains exactly 16 commands (meta-commands tracked separately)', () => {
-    expect(COMMANDS.length).toBe(16);
+  it('contains exactly 17 commands (meta-commands tracked separately)', () => {
+    expect(COMMANDS.length).toBe(17);
     for (const meta of META_COMMANDS) {
       expect(COMMANDS).not.toContain(meta);
     }
@@ -121,13 +147,13 @@ describe('no-duplicates invariant per scheme', () => {
       const scheme = getScheme(sid);
       const entries = scheme.entries();
 
-      it('produces exactly 16 entries', () => {
-        expect(entries.length).toBe(16);
+      it('produces exactly 17 entries', () => {
+        expect(entries.length).toBe(17);
       });
 
-      it('has 16 unique commands', () => {
+      it('has 17 unique commands', () => {
         const commands = new Set(entries.map(([cmd]) => cmd));
-        expect(commands.size).toBe(16);
+        expect(commands.size).toBe(17);
       });
 
       it('entry command set equals the canonical COMMANDS set', () => {
@@ -135,9 +161,9 @@ describe('no-duplicates invariant per scheme', () => {
         expect(entryCommands).toEqual(new Set(COMMANDS));
       });
 
-      it('has 16 unique shim names', () => {
+      it('has 17 unique shim names', () => {
         const shims = new Set(entries.map(([, shim]) => shim));
-        expect(shims.size).toBe(16);
+        expect(shims.size).toBe(17);
       });
     });
   }

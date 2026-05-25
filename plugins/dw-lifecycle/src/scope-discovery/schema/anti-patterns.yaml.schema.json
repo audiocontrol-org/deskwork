@@ -1,0 +1,91 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://deskwork/dw-lifecycle/schema/anti-patterns.yaml.schema.json",
+  "title": "anti-patterns.yaml — registered legacy-shape detection patterns",
+  "description": "Machine-readable spec of the .dw-lifecycle/scope-discovery/anti-patterns.yaml wire format consumed by the scope-discovery `dw-lifecycle check-anti-patterns` gate. Each entry registers ONE legacy code shape that a canonical primitive replaces; the scanner walks the source tree and reports every file matching the shape outside the canonical implementation file. The runtime parser (plugins/dw-lifecycle/src/scope-discovery/anti-patterns-registry.ts → parseEntry) is the authoritative validator; this schema mirrors its contract for editor autocomplete + inline validation and is referenced by the Phase 9 doctor rules. v1 implements ONLY the `regex` pattern type; the optional `type:` field accepts `regex` or absence (treated as `regex`). Extension to `glob` / `ast-grep` / `ts-morph` pattern types is tracked at audiocontrol-org/deskwork#285.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["anti_patterns"],
+  "properties": {
+    "anti_patterns": {
+      "description": "The registered legacy shapes. Order is not significant; ids must be unique. Empty list is valid (the scanner exits 0 with a `registry empty` acknowledgement).",
+      "type": "array",
+      "items": { "$ref": "#/definitions/AntiPatternEntry" }
+    }
+  },
+  "definitions": {
+    "AntiPatternEntry": {
+      "description": "One registered legacy shape. `id` (kebab-case) is the primary key. `added_in` anchors the registration to a specific commit so reviewers can trace when the pattern was added. `primitive` + `from` name the canonical replacement (used in the report's `replacement:` line). `shape_regex` may be a single regex string OR a list of regex strings (multi-pattern fingerprint — see `min_distance`). `excludes_paths` skips files matching the listed globs BEFORE applying the shape patterns. `canonical_implementation_file` names the canonical primitive's source-of-truth file; the scanner auto-excludes that file from the entry's match AND verifies the file exists at scan start (fails loud if missing — typically caused by a git rename without registry update). `message` is the multi-line operator-facing replacement instruction shown beneath each finding.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "added_in", "primitive", "from", "shape_regex", "message"],
+      "properties": {
+        "id": {
+          "description": "Kebab-case primary key (lowercase letters, digits, hyphens; no leading/trailing/double hyphens). Unique across the registry. Operators reference this id when authoring `excludes_paths:` overrides or when filing follow-up issues.",
+          "type": "string",
+          "pattern": "^[a-z0-9](?:-?[a-z0-9]+)*$",
+          "minLength": 1
+        },
+        "type": {
+          "description": "Pattern-type discriminator. v1 accepts `regex` or absence (treated as `regex`). Other types (`glob` / `ast-grep` / `ts-morph`) are reserved for the v2 dispatcher tracked at audiocontrol-org/deskwork#285 — the runtime parser rejects any other value loudly so adopters who pre-author v2 entries get an actionable error.",
+          "type": "string",
+          "enum": ["regex"]
+        },
+        "added_in": {
+          "description": "Git short-or-full hash (7-40 lowercase hex characters) of the commit that registered this anti-pattern. Anchors the registration to a specific point in history so the operator can trace context.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{7,40}$"
+        },
+        "primitive": {
+          "description": "Name of the canonical replacement (hook / component / function name). Surfaces in the report's `replacement:` line.",
+          "type": "string",
+          "minLength": 1
+        },
+        "from": {
+          "description": "Import path of the canonical replacement (e.g. `'@/hooks/useExportDialogLifecycle'`). Surfaces in the report's `replacement:` line.",
+          "type": "string",
+          "minLength": 1
+        },
+        "shape_regex": {
+          "description": "Regex(es) that fingerprint the legacy shape. Either a single regex string (single-pattern entry; any match flags the file) OR a non-empty list of regex strings (multi-pattern fingerprint; every pattern must occur within `min_distance` lines of a seed match in pattern 0). Patterns are compiled with `gm` flags (global + multi-line).",
+          "oneOf": [
+            { "$ref": "#/definitions/RegexString" },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": { "$ref": "#/definitions/RegexString" }
+            }
+          ]
+        },
+        "min_distance": {
+          "description": "Max line-gap between matches for a multi-pattern fingerprint to count as a hit. Defaults to 50 when omitted. Ignored for single-pattern entries. Must be a positive integer.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "excludes_paths": {
+          "description": "Optional list of literal-path-or-glob strings. Each candidate file's CWD-relative POSIX path is tested against every pattern; a match skips the file for THIS entry only. `excludes_paths` matching nothing is intentionally NOT an error — it keeps the registry tolerant to file renames the operator will fix on the next run. Empty list is equivalent to omitting the field. Glob syntax matches `util/glob.ts` (supports `**`, `*`, `?`, brace alternation).",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "canonical_implementation_file": {
+          "description": "Optional CWD-relative POSIX path of the primitive's source-of-truth file. When set, the scanner: (a) verifies the file exists at scan start (failing loud with the entry id + missing path if not — typically caused by a git rename without registry update); (b) auto-excludes that file from this entry's match (its body IS the legacy shape, by construction). Independent of `excludes_paths`: both apply when set together. Non-empty string or absent only — empty string is rejected as a malformed declaration.",
+          "type": "string",
+          "minLength": 1
+        },
+        "message": {
+          "description": "Multi-line operator-facing replacement instruction. Surfaces beneath each finding (indented by 2 spaces). Free-form prose; conventionally explains WHY this shape was retired and HOW to replace it.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "RegexString": {
+      "description": "Non-empty regex source string. Validated at parse time by attempting to compile it with the `gm` flags. The parser raises a descriptive error naming the entry, the offending field, and the underlying regex error if compilation fails.",
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

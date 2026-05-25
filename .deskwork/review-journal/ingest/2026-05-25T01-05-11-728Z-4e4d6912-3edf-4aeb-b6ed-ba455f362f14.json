@@ -1,0 +1,27 @@
+{
+  "id": "4e4d6912-3edf-4aeb-b6ed-ba455f362f14",
+  "timestamp": "2026-05-25T01:05:11.728Z",
+  "event": "ingest",
+  "slug": "scope-discovery/prd",
+  "entryId": "4e4d6912-3edf-4aeb-b6ed-ba455f362f14",
+  "site": "deskwork-internal",
+  "stage": "Drafting",
+  "sourceFile": "docs/1.0/001-IN-PROGRESS/scope-discovery/prd.md",
+  "frontmatterSnapshot": {
+    "slug": "scope-discovery",
+    "title": "Scope discovery — canonize audiocontrol pilot into dw-lifecycle",
+    "targetVersion": "1.0",
+    "date": "2026-05-25",
+    "parentIssue": "#273",
+    "deskwork": {
+      "id": "4e4d6912-3edf-4aeb-b6ed-ba455f362f14"
+    },
+    "designSpec": "docs/superpowers/specs/2026-05-24-scope-discovery-design.md",
+    "canary": "graphical-entries"
+  },
+  "derivation": {
+    "slug": "path",
+    "state": "default",
+    "date": "frontmatter"
+  }
+}

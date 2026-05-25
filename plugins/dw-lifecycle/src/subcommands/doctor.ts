@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import { CONFIG_RELATIVE_PATH, loadConfig } from '../config.js';
 import type { Config } from '../config.types.js';
 import { parseFrontmatter } from '../frontmatter.js';
+import { SCOPE_DISCOVERY_DOCTOR_RULES } from '../scope-discovery/doctor-rules/index.js';
 
 export interface Finding {
   rule: string;
@@ -304,6 +305,17 @@ export async function runDoctor(opts: DoctorOptions): Promise<Finding[]> {
         rule: 'journal-feature-mismatch',
         severity: 'warning',
         message: `Journal ${cfg.journal.path} references feature "${slug}" but no feature doc directory exists for that slug.`,
+      });
+    }
+  }
+
+  for (const rule of SCOPE_DISCOVERY_DOCTOR_RULES) {
+    const ruleFindings = await rule({ repoRoot: opts.projectRoot });
+    for (const finding of ruleFindings) {
+      findings.push({
+        rule: finding.rule,
+        severity: finding.severity,
+        message: finding.message,
       });
     }
   }

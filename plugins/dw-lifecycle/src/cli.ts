@@ -7,6 +7,24 @@ import { journalAppend } from './subcommands/journal-append.js';
 import { transition } from './subcommands/transition.js';
 import { issues } from './subcommands/issues.js';
 import { customize } from './subcommands/customize.js';
+import { detectClones } from './subcommands/detect-clones.js';
+import { checkAntiPatterns } from './subcommands/check-anti-patterns.js';
+import { checkAdopters } from './subcommands/check-adopters.js';
+import { checkEditorSymmetry } from './subcommands/check-editor-symmetry.js';
+import { checkRefactorPreconditions } from './subcommands/check-refactor-preconditions.js';
+import { scopeInventory } from './subcommands/scope-inventory.js';
+import { batchDispose } from './subcommands/batch-dispose.js';
+import { checkDispositionSurvivor } from './subcommands/check-disposition-survivor.js';
+import { scopeSummary } from './subcommands/scope-summary.js';
+import { checkDeprecations } from './subcommands/check-deprecations.js';
+import { validateScopeDiscovery } from './subcommands/validate-scope-discovery.js';
+import { scopeExport } from './subcommands/scope-export.js';
+import { refreshClonesBaseline } from './subcommands/refresh-clones-baseline.js';
+import { disposeClone } from './subcommands/dispose-clone.js';
+import { installScopeDiscovery } from './subcommands/install-scope-discovery.js';
+import { installScopeDiscoveryHooks } from './subcommands/install-scope-discovery-hooks.js';
+import { installAgentPrompts } from './subcommands/install-agent-prompts.js';
+import { uninstallScopeDiscoveryHooks } from './subcommands/uninstall-scope-discovery-hooks.js';
 
 const subcommand = process.argv[2];
 const args = process.argv.slice(3);
@@ -21,6 +39,24 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'journal-append': journalAppend,
   doctor,
   customize,
+  'detect-clones': detectClones,
+  'check-anti-patterns': checkAntiPatterns,
+  'check-adopters': checkAdopters,
+  'check-editor-symmetry': checkEditorSymmetry,
+  'check-refactor-preconditions': checkRefactorPreconditions,
+  'scope-inventory': scopeInventory,
+  'batch-dispose': batchDispose,
+  'check-disposition-survivor': checkDispositionSurvivor,
+  'scope-summary': scopeSummary,
+  'check-deprecations': checkDeprecations,
+  'validate-scope-discovery': validateScopeDiscovery,
+  'scope-export': scopeExport,
+  'refresh-clones-baseline': refreshClonesBaseline,
+  'dispose-clone': disposeClone,
+  'install-scope-discovery': installScopeDiscovery,
+  'install-scope-discovery-hooks': installScopeDiscoveryHooks,
+  'install-agent-prompts': installAgentPrompts,
+  'uninstall-scope-discovery-hooks': uninstallScopeDiscoveryHooks,
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {
