@@ -19,6 +19,7 @@ import { check as antiPatternsSchemaViolation } from './anti-patterns-yaml-schem
 import { check as refactorIncomplete } from './clones-yaml-refactor-incomplete.js';
 import { check as agentPromptMirrorDrift } from './agent-prompt-mirror-drift.js';
 import { check as overrideDrift } from './override-drift.js';
+import { check as hooksInstalledMissing } from './hooks-installed-missing.js';
 import type { DoctorRuleCheck } from './types.js';
 
 export const SCOPE_DISCOVERY_DOCTOR_RULES: ReadonlyArray<DoctorRuleCheck> = [
@@ -29,6 +30,7 @@ export const SCOPE_DISCOVERY_DOCTOR_RULES: ReadonlyArray<DoctorRuleCheck> = [
   refactorIncomplete,
   agentPromptMirrorDrift,
   overrideDrift,
+  hooksInstalledMissing,
 ];
 
 export type { DoctorRuleCheck, DoctorRuleOptions, ScopeDoctorFinding } from './types.js';
