@@ -273,8 +273,26 @@ export async function detectClones(args: string[]): Promise<void> {
     console.error(`jscpd invocation failed: ${errorMessage(err)}`);
     process.exit(2);
   }
-  const reportText = await readFile(join(REPO_ROOT, JSCPD_REPORT_PATH), 'utf8');
-  const detectedGroups = parseJscpdReport(reportText);
+  // Each I/O / parse step gets its own try/catch so the documented
+  // exit-code contract (1 = NEW clone groups exist; 2 = I/O or parse
+  // failure) holds. Letting these throws bubble up to the cli.ts
+  // main().catch(... exit(1)) would conflate "I/O failed" with "clones
+  // gate tripped" — a CI script reading exit-1-as-clones would false-
+  // positive on a missing report.
+  let reportText: string;
+  try {
+    reportText = await readFile(join(REPO_ROOT, JSCPD_REPORT_PATH), 'utf8');
+  } catch (err) {
+    console.error(`failed to read jscpd report: ${errorMessage(err)}`);
+    process.exit(2);
+  }
+  let detectedGroups: CloneGroup[];
+  try {
+    detectedGroups = parseJscpdReport(reportText);
+  } catch (err) {
+    console.error(`failed to parse jscpd report: ${errorMessage(err)}`);
+    process.exit(2);
+  }
 
   const baselineAbs = resolve(REPO_ROOT, cli.baselinePath);
   let baseline: ClonesYaml | null;
