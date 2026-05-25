@@ -15,6 +15,7 @@ import { checkRefactorPreconditions } from './subcommands/check-refactor-precond
 import { scopeInventory } from './subcommands/scope-inventory.js';
 import { batchDispose } from './subcommands/batch-dispose.js';
 import { checkDispositionSurvivor } from './subcommands/check-disposition-survivor.js';
+import { scopeSummary } from './subcommands/scope-summary.js';
 
 const subcommand = process.argv[2];
 const args = process.argv.slice(3);
@@ -37,6 +38,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'scope-inventory': scopeInventory,
   'batch-dispose': batchDispose,
   'check-disposition-survivor': checkDispositionSurvivor,
+  'scope-summary': scopeSummary,
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {
