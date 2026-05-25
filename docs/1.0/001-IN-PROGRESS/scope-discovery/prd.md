@@ -3,7 +3,7 @@ slug: scope-discovery
 title: Scope discovery — canonize audiocontrol pilot into dw-lifecycle
 targetVersion: "1.0"
 date: 2026-05-25
-parentIssue: 
+parentIssue: "#273"
 deskwork:
   id: 4e4d6912-3edf-4aeb-b6ed-ba455f362f14
 designSpec: docs/superpowers/specs/2026-05-24-scope-discovery-design.md

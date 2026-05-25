@@ -3,7 +3,7 @@ slug: scope-discovery
 targetVersion: "1.0"
 date: 2026-05-25
 branch: feature/scope-discovery
-parentIssue: 
+parentIssue: "#273"
 designSpec: docs/superpowers/specs/2026-05-24-scope-discovery-design.md
 canary: graphical-entries
 ---
