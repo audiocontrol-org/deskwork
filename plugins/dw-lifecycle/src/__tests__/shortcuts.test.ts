@@ -61,8 +61,32 @@ const SCHEME_B_TABLE: ReadonlyArray<readonly [string, string]> = [
 // Meta-commands intentionally excluded from COMMANDS: the shortcuts
 // skills install shortcuts FOR the 17 lifecycle commands; they are
 // themselves invoked via the namespaced `/dw-lifecycle:` form (the
-// chicken-and-egg moment), so they get no shim of their own.
-const META_COMMANDS = ['install-shortcuts', 'uninstall-shortcuts'] as const;
+// chicken-and-egg moment), so they get no shim of their own. The
+// scope-discovery verbs (and the install commands that scaffold their
+// CONFIG) also get no shim — they're operator-invoked but outside the
+// lifecycle command set the shortcuts install targets.
+const META_COMMANDS = [
+  'install-shortcuts',
+  'uninstall-shortcuts',
+  // scope-discovery verbs (Phase 6 + Phase 7 + Phase 8)
+  'batch-dispose',
+  'check-adopters',
+  'check-anti-patterns',
+  'check-deprecations',
+  'check-disposition-survivor',
+  'check-editor-symmetry',
+  'check-refactor-preconditions',
+  'dispose-clone',
+  'install-agent-prompts',
+  'install-scope-discovery',
+  'install-scope-discovery-hooks',
+  'refresh-clones-baseline',
+  'scope-export',
+  'scope-inventory',
+  'scope-summary',
+  'uninstall-scope-discovery-hooks',
+  'validate-scope-discovery',
+] as const;
 
 describe('COMMANDS canonical list', () => {
   it('matches the on-disk commands/ directory (plus meta-commands) exactly', () => {

@@ -174,7 +174,7 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
 ### Task 1: Inventory + widen + summary commands
 
 - [x] `scope-inventory <slug>` — landed in Phase 3; fans 4 universal agents in parallel + Phase 4 config-activated agents.
-- [ ] `scope-widen "<complaint>"` — pending.
+- [ ] `scope-widen "<complaint>"` — DEFERRED to a design-heavy follow-up; tracked at [#292](https://github.com/audiocontrol-org/deskwork/issues/292). The verb semantics need 2-3 mockup alternatives via `/frontend-design` before implementation (proposal-vs-direct-write, single-vs-multi-complaint, integration with `/dw-lifecycle:implement`).
 - [x] `scope-summary [--surface <glob>]` — ported verbatim from audiocontrol pilot (`tools/scope-discovery/summary.ts`). 4-field summary line (`total | pending-touching | pending-intra | dispositioned-touching`), `--json` + `--verbose` + `--clones` override; default clones path generalized to `.dw-lifecycle/scope-discovery/clones.yaml`. 15 vitest scenarios cover the pure compute math, programmatic + CLI surfaces, gutted-stub teeth (all-zero counter must fail mixed-fixture assertion).
 
 ### Task 2: Check-* gate commands
@@ -195,11 +195,11 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
 
 ### Task 4: Install / migrate / uninstall commands
 
-- [ ] `install-scope-discovery`
-- [ ] `install-scope-discovery-hooks`
-- [ ] `install-agent-prompts`
-- [ ] `migrate-from-pilot` (audiocontrol-specific)
-- [ ] `uninstall-scope-discovery-hooks`
+- [x] `install-scope-discovery` — landed Phase 8 Task 1 (commit `2737132`). Idempotent bootstrap of `.dw-lifecycle/scope-discovery/`; copies 4 templates + seeds 3 empty registries. 15 vitest scenarios.
+- [x] `install-scope-discovery-hooks` — landed Phase 8 Task 2 (commit `6cda930`). Auto-detects Husky vs `.githooks` vs greenfield; writes non-short-circuiting gate chain; manifest at `hooks-installed.json`. 30 vitest scenarios.
+- [x] `install-agent-prompts` — landed Phase 8 Task 3 (commit `48fdfdb`). Appends Step 0 fragment to `.claude/agents/code-reviewer.md` + `codebase-auditor.md`; refuses to auto-create agent files. 19 vitest scenarios.
+- [ ] `migrate-from-pilot` (audiocontrol-specific) — DEFERRED, tracked at [#291](https://github.com/audiocontrol-org/deskwork/issues/291). Out of scope for Phase 8 (audiocontrol-specific; the four universal install verbs cover the bulk of adopters).
+- [x] `uninstall-scope-discovery-hooks` — landed Phase 8 Task 5 (commit `b71fb8b`). Drift-checks each managed file via sha256; refuses on drift unless `--force-uninstall`; strips managed block from merged installs. 20 vitest scenarios.
 
 ### Task 5: Validator + export commands
 
@@ -232,12 +232,12 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
   - [x] `refresh-clones-baseline` — SKILL.md + commands/refresh-clones-baseline.md.
   - [x] `validate-scope-discovery` — SKILL.md + commands/validate-scope-discovery.md.
   - [ ] `check-clones` — DEFERRED. The Phase 6 rename of `detect-clones` → `check-clones` is itself deferred (Task 2 line cites it as a separate Phase 6 follow-up); authoring prose for a verb whose name is not yet final would create rot. Author when the rename lands.
-  - [ ] `scope-widen` — DEFERRED to Phase 8. Subcommand not yet implemented (Phase 6 Task 1 pending entry); behavior contract isn't fixed.
-  - [ ] `install-scope-discovery` — DEFERRED to Phase 8. Phase 8 Task 1 helper not yet implemented.
-  - [ ] `install-scope-discovery-hooks` — DEFERRED to Phase 8. Phase 8 Task 2 helper not yet implemented.
-  - [ ] `install-agent-prompts` — DEFERRED to Phase 8. Phase 8 Task 3 helper not yet implemented.
-  - [ ] `uninstall-scope-discovery-hooks` — DEFERRED to Phase 8. Phase 8 Task 5 helper not yet implemented.
-  - [ ] `migrate-from-pilot` — DEFERRED to Phase 8. Phase 8 Task 4 helper not yet implemented (audiocontrol-specific migration).
+  - [ ] `scope-widen` — DEFERRED, tracked at [#292](https://github.com/audiocontrol-org/deskwork/issues/292). Subcommand semantics need design via `/frontend-design`; prose blocked on that.
+  - [x] `install-scope-discovery` — SKILL.md + commands/install-scope-discovery.md landed Phase 8 commit 6 (this run).
+  - [x] `install-scope-discovery-hooks` — SKILL.md + commands/install-scope-discovery-hooks.md landed Phase 8 commit 6.
+  - [x] `install-agent-prompts` — SKILL.md + commands/install-agent-prompts.md landed Phase 8 commit 6.
+  - [x] `uninstall-scope-discovery-hooks` — SKILL.md + commands/uninstall-scope-discovery-hooks.md landed Phase 8 commit 6.
+  - [ ] `migrate-from-pilot` — DEFERRED, tracked at [#291](https://github.com/audiocontrol-org/deskwork/issues/291). Audiocontrol-specific; prose blocked on subcommand implementation.
 
 ### Task 2: Updated skill prose (5 skills)
 
@@ -286,10 +286,11 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
 - [ ] `--force-uninstall` overrides drift refusal
 
 **Acceptance Criteria:**
-- [ ] Greenfield install creates correct dir structure + schema files
-- [ ] Hook install works with absent/existing/Husky variants
-- [ ] Agent-prompt install works without trampling existing `.claude/agents/` content
-- [ ] migrate-from-pilot runs cleanly against audiocontrol's actual state
+- [x] Greenfield install creates correct dir structure + schema files — `install-scope-discovery` creates `.dw-lifecycle/scope-discovery/` with 4 templates + 3 empty-array seeds; 15 vitest scenarios verify greenfield + idempotent + dry-run + force + partial restore.
+- [x] Hook install works with absent/existing/Husky variants — `install-scope-discovery-hooks` detects Husky vs `.githooks` vs greenfield via `detectHusky` + `chooseMode`; 30 vitest scenarios cover all three branches plus merge / replace / refusal / dry-run.
+- [x] Agent-prompt install works without trampling existing `.claude/agents/` content — `install-agent-prompts` refuses to auto-create missing files (exit 2); marker-pair detection prevents duplicate blocks; operator content above/below the block is preserved; 19 vitest scenarios.
+- [ ] migrate-from-pilot runs cleanly against audiocontrol's actual state — DEFERRED, tracked at [#291](https://github.com/audiocontrol-org/deskwork/issues/291).
+- [x] Uninstall drift-checks each managed file via sha256; refuses to remove drifted files unless `--force-uninstall`; strips managed block from merged installs; 20 vitest scenarios.
 
 ## Phase 9: Doctor rule additions
 
