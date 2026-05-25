@@ -322,7 +322,7 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
 
 ## Phase 10: Canary install + graphical-entries paper-test deliverable
 
-**Deliverable:** Deskwork-as-adopter install complete; `graphical-entries` exercised end-to-end; paper-test coverage matrix produced. **v1 acceptance signal — measured 60.9%, BELOW the ~80% gate.**
+**Deliverable:** Deskwork-as-adopter install complete; `graphical-entries` exercised end-to-end; paper-test coverage matrix produced. **v1 acceptance signal — measured 60.9%; ship gate REFRAMED from coverage percentage to dogfood feedback per operator decision 2026-05-25.**
 
 ### Task 1: Install scope-discovery in deskwork
 
@@ -355,12 +355,19 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
   - scope_widen_caught: deferred (#292)
   - anti_patterns_caught: **4/35 = 11.4%** (starter set per Task 2 brief)
   - step0_enforcement_caught: **27/35 = 77.1%**
-- [x] **Combined non-deferred coverage: 60.9%.** Below the ~80% ship-gate.
+- [x] **Combined non-deferred coverage: 60.9%.** Operator decision 2026-05-25: ship v1 at measured coverage; reframe gate.
 - [x] 7 operator action items surfaced; 4 already filed as GH issues (#293, #294, #295, #296); 3 are pending operator triage (anti-pattern starter set expansion, scope-widen design at #292, spec References section).
+
+### Task 5: v1 ship + dogfood handoff to graphical-entries
+
+- [x] Tooling-feedback template authored at `plugins/dw-lifecycle/templates/scope-discovery/tooling-feedback.md` — mirrors audiocontrol pilot pattern (categories A/AM/CL/GATE/DSC/MISC; severity high/medium/low; Repro/Workaround/Suggested-fix; append-only).
+- [x] Pre-created `docs/1.0/001-IN-PROGRESS/graphical-entries/tooling-feedback.md` from template (empty of entries; graphical-entries team fills as friction surfaces).
+- [x] Pre-created `docs/1.0/001-IN-PROGRESS/graphical-entries/dogfood-handoff.md` — operator-facing one-page handoff README naming the dogfood goal, where to start, escalation criteria (TF-vs-GH-issue), closure protocol.
+- [x] Agent-discipline rule added: `.claude/rules/agent-discipline.md` § "scope-discovery v1 — dogfood feedback via tooling-feedback.md" documents the workflow for future implementers (template path, escalation, closure import to audit-log).
 
 **Acceptance Criteria:**
 - [x] Deskwork canary install completes cleanly — 4 install commands all exit 0; friction issues filed transparently.
 - [x] graphical-entries' scope-inventory exercises the protocol end-to-end — Task 3 deliverable.
 - [x] paper-test coverage matrix produced — Task 4 deliverable.
-- [ ] **Combined coverage > ~80%** — the v1 ship gate. **MEASURED 60.9% — FAIL.** Per operator-owns-scope-decisions rule, the agent surfaces the gap honestly; the operator decides whether to extend Phase 10 with additional anti-pattern authoring or ship v1 with documented gaps.
+- [x] Combined coverage > ~80% — REFRAMED as v1 ship gate. Measured 60.9% in paper-test (Phase 10 Task 4). Operator decision 2026-05-25: ship v1 at measured coverage; dogfood gate replaces percentage gate. graphical-entries implementation team logs friction in docs/1.0/001-IN-PROGRESS/graphical-entries/tooling-feedback.md; v1 hardens via audit cycle on that log (mirror of audiocontrol pilot pattern that produced TF-001..TF-016).
 - [x] No regressions in the existing dw-lifecycle skill set — `validate-scope-discovery` runs 401 tests, 398 pass; 3 pre-existing flakes on clone-detector tmpdir-jscpd-spawn timeouts (5s default vitest timeout vs ~1.7s actual per-test cost — unrelated to Phase 10 changes; the same tests pass individually with `--testTimeout=30000`).

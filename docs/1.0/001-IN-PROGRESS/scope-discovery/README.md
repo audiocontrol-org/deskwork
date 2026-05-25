@@ -25,7 +25,35 @@ Canonize the audiocontrol-piloted Scope Discovery Protocol into the `dw-lifecycl
 | 7 | Slash command skill prose (~18 new + 5 updated) | In progress (17 of 18 skills authored; 4 install-related landed in Phase 8; `scope-widen` skill deferred per [#292](https://github.com/audiocontrol-org/deskwork/issues/292) until verb design lands) |
 | 8 | Install / migrate / uninstall machinery | In progress — 4 of 5 install commands landed (`install-scope-discovery`, `install-scope-discovery-hooks`, `install-agent-prompts`, `uninstall-scope-discovery-hooks`); `migrate-from-pilot` deferred per [#291](https://github.com/audiocontrol-org/deskwork/issues/291) (audiocontrol-specific). 683/683 tests pass. |
 | 9 | Doctor rule additions | Complete (8 doctor rules added; repair hints + selective --fix support; 737/737 tests pass — 2 pre-existing failures unchanged) |
-| 10 | Canary install + graphical-entries paper-test deliverable (v1 acceptance signal) | Complete with documented gap — combined coverage 60.9%, below the ~80% gate; 7 follow-up action items surfaced (4 GH issues filed: #293, #294, #295, #296). 4 install commands all succeeded; scope-inventory exercises end-to-end; paper-test matrix produced at `paper-test-graphical-entries.md`. Operator decides whether to extend Phase 10 or ship v1 with gaps. |
+| 10 | Canary install + graphical-entries paper-test + v1 dogfood handoff | Shipped at v1 — 60.9% paper-test coverage measured; ship-gate reframed to dogfood feedback via graphical-entries (TF log). Friction tracked at issues [#293](https://github.com/audiocontrol-org/deskwork/issues/293)-[#296](https://github.com/audiocontrol-org/deskwork/issues/296); pilot-import follow-ups at [#284](https://github.com/audiocontrol-org/deskwork/issues/284) (amend), [#285](https://github.com/audiocontrol-org/deskwork/issues/285) (amend), [#288](https://github.com/audiocontrol-org/deskwork/issues/288)-[#290](https://github.com/audiocontrol-org/deskwork/issues/290). |
+
+## v1 Ship + Dogfood Handoff
+
+Phase 10 produced a 60.9% paper-test coverage measurement (33/35 surfaces caught by `scope-inventory`, 27/35 by Step 0 refactor-precondition enforcement, 4/35 by the deskwork-specific anti-pattern starter set; `scope-widen` deferred). Operator decision 2026-05-25: ship v1 at measured coverage with the ship gate reframed from "coverage percentage" to "dogfood feedback from the graphical-entries implementation team." This mirrors the audiocontrol pilot pattern that produced 16 TF entries over two months and hardened the protocol via the audit cycle on that log.
+
+- **Dogfood handoff README:** [`../graphical-entries/dogfood-handoff.md`](../graphical-entries/dogfood-handoff.md)
+- **Tooling-feedback log (graphical-entries team adds entries as friction surfaces):** [`../graphical-entries/tooling-feedback.md`](../graphical-entries/tooling-feedback.md)
+- **Template (for future adopters):** [`../../../../plugins/dw-lifecycle/templates/scope-discovery/tooling-feedback.md`](../../../../plugins/dw-lifecycle/templates/scope-discovery/tooling-feedback.md)
+- **Agent-discipline rule:** `.claude/rules/agent-discipline.md` § "scope-discovery v1 — dogfood feedback via tooling-feedback.md"
+
+### Open follow-ups (operator-visible)
+
+Phase 10 friction (newly filed):
+- [#293](https://github.com/audiocontrol-org/deskwork/issues/293) — `.jscpd.json` config-path mismatch on install
+- [#294](https://github.com/audiocontrol-org/deskwork/issues/294) — `install-scope-discovery-hooks` hardcodes binary path
+- [#295](https://github.com/audiocontrol-org/deskwork/issues/295) — hook chain writes unsupported `check-editor-symmetry --gate-mode` flag
+- [#296](https://github.com/audiocontrol-org/deskwork/issues/296) — anti-pattern starter-set expansion
+
+Pilot-import follow-ups (already-deferred):
+- [#284](https://github.com/audiocontrol-org/deskwork/issues/284) — batch-dispose paste-ready hint (amended from TF-014)
+- [#285](https://github.com/audiocontrol-org/deskwork/issues/285) — pattern-type dispatcher + `negative_match_classes:` schema (amended from TF-015)
+- [#288](https://github.com/audiocontrol-org/deskwork/issues/288) — anti-pattern `canonical_file` field (TF-002)
+- [#289](https://github.com/audiocontrol-org/deskwork/issues/289) — disposition-survivor gate hook-chain integration (TF-013)
+- [#290](https://github.com/audiocontrol-org/deskwork/issues/290) — primitive-extraction dispatch hygiene (TF-016)
+
+Operator-deferred:
+- [#291](https://github.com/audiocontrol-org/deskwork/issues/291) — `migrate-from-pilot` (audiocontrol-specific)
+- [#292](https://github.com/audiocontrol-org/deskwork/issues/292) — `scope-widen` verb design
 
 ## Key Links
 
