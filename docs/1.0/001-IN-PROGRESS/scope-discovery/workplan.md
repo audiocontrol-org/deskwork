@@ -179,19 +179,19 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
 
 ### Task 2: Check-* gate commands
 
-- [~] `check-clones [--gate-mode]` — subcommand registered as `detect-clones` in Phase 1; `--gate-mode` flag + rename to `check-clones` pending.
-- [~] `check-anti-patterns [--gate-mode]` — subcommand registered in Phase 2; `--gate-mode` flag pending. **Schema follow-up:** add optional `negative_match_classes:` array per pilot TF-015 (AUDIT-20260525-08); validator auto-generates negative-test scenarios. Pairs with #285 pattern-type dispatcher work.
+- [x] `check-clones [--gate-mode]` — subcommand registered as `detect-clones` in Phase 1; `--gate-mode` flag landed as a no-op-for-symmetry (`detect-clones` already exits 1 on NEW groups by default — the hook contract). Rename `detect-clones` → `check-clones` is a separate Phase 6 follow-up.
+- [x] `check-anti-patterns [--gate-mode]` — subcommand registered in Phase 2; `--gate-mode` flag landed. Default is informational (findings → exit 0, full report on stdout); `--gate-mode` flips to hook-friendly exit 1 on findings. **Schema follow-up:** add optional `negative_match_classes:` array per pilot TF-015 (AUDIT-20260525-08); validator auto-generates negative-test scenarios. Pairs with #285 pattern-type dispatcher work.
 - [ ] `check-deprecations [--write]` — pending; deprecation-scan port tracked at [#287](https://github.com/audiocontrol-org/deskwork/issues/287).
-- [~] `check-adopters [--gate-mode]` — subcommand registered in Phase 2; `--gate-mode` flag pending.
+- [x] `check-adopters [--gate-mode]` — subcommand registered in Phase 2; `--gate-mode` flag landed (default informational; flag flips to hook-friendly exit 1 on holdouts).
 - [x] `check-editor-symmetry [--write]` — landed in Phase 4 with `--write` flag honored; default writes to `docs/<v>/001-IN-PROGRESS/<slug>/scope-inventory/editor-symmetry.md`.
-- [~] `check-refactor-preconditions [--gate-mode]` — subcommand registered in Phase 2; `--gate-mode` flag pending.
+- [x] `check-refactor-preconditions [--gate-mode]` — subcommand registered in Phase 2; `--gate-mode` flag landed (default informational; flag flips to hook-friendly exit 1 on precondition failures).
 
 ### Task 3: Disposition + baseline commands
 
 - [ ] `dispose-clone <id> --as <refactor|keep-with-reason|ignore-with-justification> [args]` — refuses without Step 0a/0b flags on refactor disposition
 - [ ] `refresh-clones-baseline`
-- [ ] `batch-dispose <id> --disposition <D> --reason "<text>" [--refresh-baseline]` — port from audiocontrol pilot; close the TODO at `clone-detector.ts:182` (currently emits `TODO(scope-discovery #284)` in the hint string). Tracked at [#284](https://github.com/audiocontrol-org/deskwork/issues/284); pilot TF-014 (AUDIT-20260525-07) refinements amended onto #284 — implementer should cite the refresh-baseline prereq in errors OR auto-run it internally.
-- [ ] `check-disposition-survivor` — pre-commit gate that fails on any `keep-with-reason`/`refactor`/`ignore-with-justification` → `pending` transition without operator confirmation. Pilot reference: TF-013 (AUDIT-20260525-06); tracked at [#289](https://github.com/audiocontrol-org/deskwork/issues/289). Phase 8 hook-chain wires it in.
+- [x] `batch-dispose <id> --disposition <D> --reason "<text>"` — landed as `dw-lifecycle batch-dispose`. Closes the TODO at `clone-detector.ts:182` (now emits paste-ready `dw-lifecycle batch-dispose ...` command in the hint, no TODO referenced). Closes [#284](https://github.com/audiocontrol-org/deskwork/issues/284); pilot TF-014 (AUDIT-20260525-07) addressed via the Light option — unknown-id error cites the `dw-lifecycle detect-clones --refresh-baseline` prereq so the operator's recovery path is obvious.
+- [x] `check-disposition-survivor` — landed as `dw-lifecycle check-disposition-survivor`. Pre-commit gate that fails the commit on any `keep-with-reason`/`refactor`/`ignore-with-justification` → `pending` transition unless the operator passes `--allow-disposition-loss`. Compares HEAD's baseline (via `git show`) against the working tree. Closes [#289](https://github.com/audiocontrol-org/deskwork/issues/289); pilot reference: TF-013 (AUDIT-20260525-06). Phase 8 hook-chain wires it in.
 
 ### Task 4: Install / migrate / uninstall commands
 
@@ -208,7 +208,7 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
 
 **Acceptance Criteria:**
 - [ ] All ~20 CLI verbs invokable via `dw-lifecycle <verb>` + via skill prose
-- [ ] `--gate-mode` flag on check-* commands exits non-zero on violations
+- [x] `--gate-mode` flag on check-* commands exits non-zero on violations — landed across `check-anti-patterns`, `check-adopters`, `check-refactor-preconditions` (default informational; flag flips to hook-friendly exit 1) and `detect-clones` (already gate-by-default; flag is a no-op for symmetry). 10 new vitest scenarios cover the flag delta.
 - [ ] `--json` flag on summary/export commands emits structured output
 
 ## Phase 7: Slash command skill prose

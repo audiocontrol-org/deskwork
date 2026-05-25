@@ -126,11 +126,11 @@ Fix guidance:
 ### The feature docs still claim Phase 6 CLI work is “Not started” even though multiple Phase 6 subcommands are implemented and wired
 
 Finding-ID: AUDIT-20260525-04
-Status:     fixed-69449ff
+Status:     fixed-743f44c
 Severity:   medium
 Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/README.md`, `workplan.md`, `plugins/dw-lifecycle/src/cli.ts`
 
-Fix note (commit `69449ff`, 2026-05-25): reconciled the workplan Phase 6 checklist + README status table against the actual implemented surface. Six verbs across Phases 1-4 (`detect-clones`, `check-anti-patterns`, `check-adopters`, `check-refactor-preconditions`, `scope-inventory`, `check-editor-symmetry`) are now reflected in the docs. Workplan checkboxes that are fully done are `[x]`; subcommand-registered-but-flag-pending items use `[~]` (partial) with a per-item note explaining the gap (`--gate-mode` flag pending for 4 check-* commands, rename `detect-clones`→`check-clones` pending). `check-deprecations` stays unchecked pending the deprecation-scan port tracked at [#287](https://github.com/audiocontrol-org/deskwork/issues/287). README phase table line for Phase 6 changed from "Not started" to "In progress" with the 6-verb tally. Awaiting `verified-<date>` once `--gate-mode` flag rollout closes the partial items.
+Fix note (commits `69449ff` + `743f44c`, 2026-05-25): reconciled the workplan Phase 6 checklist + README status table against the actual implemented surface. The original fix at `69449ff` reflected the six Phase-1–4 verbs in the docs and introduced the `[~]` notation for "subcommand registered; --gate-mode flag pending." The follow-up Phase 6 sub-burndown commit `743f44c` lands the `--gate-mode` flag across all four check-* subcommands (`check-anti-patterns`, `check-adopters`, `check-refactor-preconditions`, plus the no-op-for-symmetry on `detect-clones`), flips the four `[~]` items to `[x]`, and checks the Phase 6 `--gate-mode` acceptance criterion. The earlier sibling commits `6dcd1d8`/`247a419`/`31f461f`/`aa6d680` landed `batch-dispose` + `check-disposition-survivor` and flip those two Phase-6 Task-3 items to `[x]`. `check-deprecations` stays unchecked pending the deprecation-scan port tracked at [#287](https://github.com/audiocontrol-org/deskwork/issues/287); the remaining Phase-6 verbs (`scope-widen`, `scope-summary`, `dispose-clone`, `refresh-clones-baseline`, install/migrate/uninstall, `validate-scope-discovery`, `scope-export`) are scoped for follow-up dispatches.
 
 The implementation now contains several Phase 6 CLI subcommands, but the feature README still presents Phase 6 as “Not started,” and the Phase 6 checklist in the workplan still leaves those same commands unchecked. That creates planning-state drift: the branch’s code surface and its operator-facing feature docs disagree about what has landed.
 
@@ -182,26 +182,26 @@ Deferred to: [#288](https://github.com/audiocontrol-org/deskwork/issues/288).
 ### TF-013 — clone-detector regen silently wipes operator dispositions
 
 Finding-ID: AUDIT-20260525-06
-Status:     acknowledged-#289
+Status:     fixed-aa6d680
 Severity:   medium
-Surface:    `plugins/dw-lifecycle/src/scope-discovery/clone-detector.ts`, `clones-yaml.parse.ts`
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/check-disposition-survivor.ts`, `plugins/dw-lifecycle/src/subcommands/check-disposition-survivor.ts`
 
-`clone-detector` regenerates `clones.yaml` in place. If the underlying clone group is re-detected with the same content hash, operator-curated `disposition: keep-with-reason` + multi-paragraph `reason:` fields can revert to `pending` + `null` — pre-commit baseline-diff reports `0 NEW, 0 DROPPED` (group is structurally the same), gate is happy, regen lands silently in the workdir. Documentation-loss bug, not a code-correctness bug.
-
-Pilot picked the "Heavy" fix option: a pre-commit `check-disposition-survivor` gate (`tools/scope-discovery/check-disposition-survivor.ts`, 309 lines) that fails the commit on any `keep-with-reason`/`refactor`/`ignore-with-justification` → `pending` transition without operator-conscious confirmation. The gate file is NOT in our port (we ported the production scanner files; this is a Phase 6/8 follow-up).
+Fix note (commit `aa6d680`, 2026-05-25): landed the "Heavy" option from the pilot — a `dw-lifecycle check-disposition-survivor` gate that compares HEAD's baseline (via `git show HEAD:<baseline>`) against the working-tree baseline and fails the commit (exit 1) on any `keep-with-reason`/`refactor`/`ignore-with-justification` → `pending` transition. `--allow-disposition-loss` accepts the losses with an explicit warning for the operator-conscious case. The exported `findDestructiveTransitions()` is the pure comparator; the gutted-stub teeth check in `disposition-survivor.test.ts` proves a stub comparator returning `[]` would silently pass the failure mode this gate exists to prevent. 9 scenarios cover: no-loss, single keep-with-reason loss, multi-loss, --allow-disposition-loss override, refactor loss, ignore-with-justification loss, pending → pending no-op, pending → keep-with-reason operator improvement, and the gutted-stub teeth check. Closes #289. Phase 8 will wire the gate into the install-scope-discovery-hooks pre-commit chain.
 
 Pilot reference: audiocontrol PR #463, commit `6a1f8365`. Audit-log entry AUDIT-20260524-14 (in scope-discovery-protocol repo).
 
-Deferred to: [#289](https://github.com/audiocontrol-org/deskwork/issues/289). Cross-references: Phase 6 (CLI subcommand registration), Phase 8 (install-scope-discovery-hooks wires it into pre-commit chain).
+Awaiting `verified-<date>` once Phase 8's hook installer wires the gate into a real adopter's pre-commit chain.
 
 ### TF-014 — `batch-dispose` requires IDs already in clones.yaml; refresh-baseline is a separate prereq step
 
 Finding-ID: AUDIT-20260525-07
-Status:     acknowledged-#284 (amended)
+Status:     fixed-6dcd1d8
 Severity:   low
-Surface:    Future `plugins/dw-lifecycle/src/scope-discovery/batch-dispose.ts`
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/batch-dispose.ts`
 
-Operator-facing UX gap in batch-dispose's two-step lifecycle. When batch-dispose lands (Phase 6 via [#284](https://github.com/audiocontrol-org/deskwork/issues/284)), the implementer should also fix the error message to cite the `refresh-baseline` prereq (Light option) or auto-run the check internally (Medium option). Amended onto #284 with the three suggested-fix options.
+Fix note (commit `6dcd1d8`, 2026-05-25): landed the Light option from the pilot's proposal — when batch-dispose rejects an unknown id, the stderr message now names the `dw-lifecycle detect-clones --refresh-baseline` prereq so the operator's recovery path is obvious. Specifically: `error: batch-dispose: id <X> not in <baseline>; run \`dw-lifecycle detect-clones --refresh-baseline\` first to add it as pending, then re-run this command.` The fix is covered by the "unknown id fails HARD" scenario in `batch-dispose.test.ts` which asserts the stderr substring `dw-lifecycle detect-clones --refresh-baseline`. Closes #284 (paste-ready hint loop) by commits `247a419` (clone-detector hint update) + `6dcd1d8` (batch-dispose port + TF-014 fix) + `31f461f` (subcommand wire-up).
+
+Awaiting `verified-<date>` once a real adopter hits the unknown-id path end-to-end.
 
 ### TF-015 — anti-pattern regex authoring trips on prefix-matching
 
