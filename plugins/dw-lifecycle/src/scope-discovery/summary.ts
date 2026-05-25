@@ -150,6 +150,28 @@ interface ParsedArgs {
   readonly verbose: boolean;
 }
 
+function printHelp(): void {
+  process.stdout.write(
+    [
+      'Usage: dw-lifecycle scope-summary --surface <glob> [options]',
+      '',
+      'Day-to-day reporter: how many clone groups touch a surface.',
+      '',
+      'Required:',
+      '  --surface <glob>   Surface glob (matched against bare member paths)',
+      '',
+      'Options:',
+      `  --clones <path>    Override clones.yaml path (default: ${DEFAULT_CLONES_PATH})`,
+      '  --json             Emit a JSON object with the four counts',
+      '  --verbose          Print each matching group id + match count to stderr',
+      '  --help, -h         Show this help',
+      '',
+      'Exit codes: 0 summary produced, 2 invalid args / missing clones.yaml.',
+      '',
+    ].join('\n'),
+  );
+}
+
 /**
  * CLI argument parser. Throws on missing required arg or unknown flag;
  * the caller catches and exits 2. Kept inline (rather than pulling a
@@ -163,7 +185,10 @@ function parseArgs(argv: readonly string[]): ParsedArgs {
   let verbose = false;
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
-    if (arg === '--surface') {
+    if (arg === '--help' || arg === '-h') {
+      printHelp();
+      process.exit(0);
+    } else if (arg === '--surface') {
       const next = argv[i + 1];
       if (next === undefined) throw new Error(`--surface requires a value`);
       surface = next;
