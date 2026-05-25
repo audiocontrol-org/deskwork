@@ -11,6 +11,7 @@ import { detectClones } from './subcommands/detect-clones.js';
 import { checkAntiPatterns } from './subcommands/check-anti-patterns.js';
 import { checkAdopters } from './subcommands/check-adopters.js';
 import { checkRefactorPreconditions } from './subcommands/check-refactor-preconditions.js';
+import { scopeInventory } from './subcommands/scope-inventory.js';
 
 const subcommand = process.argv[2];
 const args = process.argv.slice(3);
@@ -29,6 +30,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'check-anti-patterns': checkAntiPatterns,
   'check-adopters': checkAdopters,
   'check-refactor-preconditions': checkRefactorPreconditions,
+  'scope-inventory': scopeInventory,
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {
