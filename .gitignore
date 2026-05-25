@@ -71,3 +71,9 @@ yarn-error.log*
 ## jscpd duplication report — regenerated on every detect-clones run;
 ## the canonical baseline lives in .dw-lifecycle/scope-discovery/clones.yaml.
 /reports/
+
+## /loop scheduler lockfile — runtime artifact, never committed.
+/.claude/scheduled_tasks.lock
+
+## Stray pnpm lockfile — this project uses npm workspaces, not pnpm.
+/pnpm-lock.yaml
