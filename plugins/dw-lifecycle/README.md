@@ -1,6 +1,6 @@
 # dw-lifecycle
 
-Project lifecycle orchestration plugin for [Claude Code](https://claude.com/claude-code). Drives a managed-project feature through the full arc — **define → setup → issues → implement → review → ship → complete** — by composing two canonical Anthropic-shipped plugins (`superpowers` for process disciplines, `feature-dev` for specialist agents) instead of duplicating the practices they embody. The plugin owns the project-management substrate the canonical layer doesn't cover: PRD/workplan/README scaffolding, status-organized docs under `docs/<version>/<status>/<slug>/`, GitHub issue patterns, branch + worktree conventions, and session journal lifecycle.
+Project lifecycle orchestration plugin for [Claude Code](https://claude.com/claude-code). Drives a managed-project feature through the full arc — **define → setup → issues → implement → review/audit → ship → complete** — by composing two canonical Anthropic-shipped plugins (`superpowers` for process disciplines, `feature-dev` for specialist agents) instead of duplicating the practices they embody. The plugin owns the project-management substrate the canonical layer doesn't cover: PRD/workplan/README scaffolding, status-organized docs under `docs/<version>/<status>/<slug>/`, GitHub issue patterns, branch + worktree conventions, session journal lifecycle, and feature-local audit logs.
 
 ## Status
 
@@ -64,7 +64,8 @@ All commands are under the `/dw-lifecycle:` namespace. Grouped by lifecycle stag
 | Command | Purpose |
 |---|---|
 | `implement` | Walk workplan tasks, update progress, commit at task boundaries; uses `superpowers:subagent-driven-development`, `dispatching-parallel-agents`, `test-driven-development`; opens with `feature-dev:code-architect` for multi-proposal design and `feature-dev:code-explorer` for orientation |
-| `review` | Select scope, dispatch `feature-dev:code-reviewer`, collate findings; uses `superpowers:requesting-code-review` and `receiving-code-review` to integrate without performative agreement |
+| `review` | Run the three-track audit/review protocol: controller-side verification re-run, spec-compliance review, code-quality review; persist findings in `audit-log.md` with `superpowers:requesting-code-review` and `receiving-code-review` |
+| `audit` | Synonym of `review`; same three-track protocol and durable audit-log workflow |
 
 ### Ship
 
@@ -99,11 +100,11 @@ All commands are under the `/dw-lifecycle:` namespace. Grouped by lifecycle stag
 
 See [Shortcuts](#shortcuts) below for the schemes, manifest layout, and drift behavior.
 
-Eighteen commands total. Each is a single, composable action — UNIX-style — never a monolithic guided flow. See [`design.md` §3](../../docs/1.0/001-IN-PROGRESS/dw-lifecycle/design.md) for the full integration map (per-command Layer 2 / Layer 1 invocations).
+Nineteen commands total. Each is a single, composable action — UNIX-style — never a monolithic guided flow. See [`design.md` §3](../../docs/1.0/001-IN-PROGRESS/dw-lifecycle/design.md) for the full integration map (per-command Layer 2 / Layer 1 invocations).
 
 ## Shortcuts
 
-Claude Code requires plugin commands to be invoked as `/<plugin>:<command>` (e.g. `/dw-lifecycle:implement`). For day-to-day use across 18 commands, the `/dw-lifecycle:` prefix is friction-heavy. The opt-in `install-shortcuts` skill writes user-level shim files at `~/.claude/commands/<short>.md` that forward to the namespaced form, so the operator can type `/dw-implement` (or another scheme they pick) instead.
+Claude Code requires plugin commands to be invoked as `/<plugin>:<command>` (e.g. `/dw-lifecycle:implement`). For day-to-day use across 19 commands, the `/dw-lifecycle:` prefix is friction-heavy. The opt-in `install-shortcuts` skill writes user-level shim files at `~/.claude/commands/<short>.md` that forward to the namespaced form, so the operator can type `/dw-implement` (or another scheme they pick) instead.
 
 This is the documented workaround for upstream [anthropics/claude-code#15882](https://github.com/anthropics/claude-code/issues/15882) (plugin commands are always namespaced) and [#23589](https://github.com/anthropics/claude-code/issues/23589) (feature request for first-class shorthand aliases). The shortcuts feature retires when #23589 lands.
 
