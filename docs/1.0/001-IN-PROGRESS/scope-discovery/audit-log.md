@@ -122,3 +122,35 @@ Fix guidance:
 
 - Move the implementation defaults to `.dw-lifecycle/scope-discovery/` before the install/migration flows are built on top of the wrong path.
 - Treat the schema/readme text as part of the contract surface; leaving those on the old path will keep reproducing the mismatch even after code fixes.
+
+### The feature docs still claim Phase 6 CLI work is “Not started” even though multiple Phase 6 subcommands are implemented and wired
+
+Finding-ID: AUDIT-20260525-04
+Status:     fixed-69449ff
+Severity:   medium
+Surface:    `docs/1.0/001-IN-PROGRESS/scope-discovery/README.md`, `workplan.md`, `plugins/dw-lifecycle/src/cli.ts`
+
+Fix note (commit `69449ff`, 2026-05-25): reconciled the workplan Phase 6 checklist + README status table against the actual implemented surface. Six verbs across Phases 1-4 (`detect-clones`, `check-anti-patterns`, `check-adopters`, `check-refactor-preconditions`, `scope-inventory`, `check-editor-symmetry`) are now reflected in the docs. Workplan checkboxes that are fully done are `[x]`; subcommand-registered-but-flag-pending items use `[~]` (partial) with a per-item note explaining the gap (`--gate-mode` flag pending for 4 check-* commands, rename `detect-clones`→`check-clones` pending). `check-deprecations` stays unchecked pending the deprecation-scan port tracked at [#287](https://github.com/audiocontrol-org/deskwork/issues/287). README phase table line for Phase 6 changed from "Not started" to "In progress" with the 6-verb tally. Awaiting `verified-<date>` once `--gate-mode` flag rollout closes the partial items.
+
+The implementation now contains several Phase 6 CLI subcommands, but the feature README still presents Phase 6 as “Not started,” and the Phase 6 checklist in the workplan still leaves those same commands unchecked. That creates planning-state drift: the branch’s code surface and its operator-facing feature docs disagree about what has landed.
+
+Evidence:
+
+- The README phase table still says `Phase 6 | CLI subcommands (~20 new verbs) | Not started` at [README.md](/Users/orion/work/deskwork-work/scope-discovery/docs/1.0/001-IN-PROGRESS/scope-discovery/README.md:24).
+- The CLI dispatcher already registers five scope-discovery verbs at [cli.ts](/Users/orion/work/deskwork-work/scope-discovery/plugins/dw-lifecycle/src/cli.ts:29):
+  - `detect-clones`
+  - `check-anti-patterns`
+  - `check-adopters`
+  - `check-refactor-preconditions`
+  - `scope-inventory`
+- The workplan Phase 6 checklist still leaves the corresponding commands unchecked at [workplan.md](/Users/orion/work/deskwork-work/scope-discovery/docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:164) through [workplan.md](/Users/orion/work/deskwork-work/scope-discovery/docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:175), even though earlier phases already cite working command-level acceptance evidence for some of them at [workplan.md](/Users/orion/work/deskwork-work/scope-discovery/docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:36), [workplan.md](/Users/orion/work/deskwork-work/scope-discovery/docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:96), and [workplan.md](/Users/orion/work/deskwork-work/scope-discovery/docs/1.0/001-IN-PROGRESS/scope-discovery/workplan.md:98).
+
+Expected vs actual:
+
+- Expected: feature status docs reflect the branch’s actual implementation state, especially for major phase rollups and operator-facing command surfaces.
+- Actual: the code says “some CLI work has landed,” while the docs still say “Phase 6 not started.”
+
+Fix guidance:
+
+- Update the README phase table to reflect partial Phase 6 progress rather than “Not started.”
+- Reconcile the Phase 6 checklist with the commands already implemented, leaving only the genuinely unshipped verbs unchecked.
