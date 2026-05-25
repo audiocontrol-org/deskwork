@@ -33,6 +33,24 @@ After every implementation step — every commit that adds production code or mo
 
 This rule is paired with the `/frontend-design` rule above. Together they bracket the implementation cycle: **design via /frontend-design → implement → review via /dw-lifecycle:review → integrate or defer**. Skipping either side breaks the loop the operator-validated v0.18 cycle codified.
 
+## scope-discovery v1 — dogfood feedback via tooling-feedback.md
+
+For features that exercise scope-discovery (any feature whose `/dw-lifecycle:setup` invokes `/scope-inventory`), the implementation team logs friction surfaces in `docs/<v>/001-IN-PROGRESS/<slug>/tooling-feedback.md` as they go. The log is the v1 ship-gate signal in place of the original ~80% paper-test coverage gate (reframed by operator decision 2026-05-25 when Phase 10 measured 60.9%).
+
+The log mirrors the audiocontrol pilot's pattern (categories A/AM/CL/GATE/DSC/MISC; severity high/medium/low; Repro / Workaround used / Suggested fix per entry; append-only — closed entries get a `Status` line + closing-commit SHA but are never deleted). The starter template ships at `plugins/dw-lifecycle/templates/scope-discovery/tooling-feedback.md`; `/dw-lifecycle:setup` copies it into the new feature's docs directory.
+
+**How to apply:**
+
+- File a TF entry the moment friction surfaces — don't batch them at feature-end. The cumulative set teaches more than a single "audit" pass would.
+- Each entry is **one observable friction** with Repro / Workaround / Suggested-fix — the suggested-fix names an operator-recognizable shape (often Light / Medium / Heavy options), not a vague "make it better."
+- When a friction entry needs explicit operator triage (architecture-level concern, recurring pattern across audit cycles, design decision), promote it to a GH issue with the deferral rationale + acknowledge in the workplan, per the existing "Just for now is bullshit" rule. *"Code comment + TF entry"* is not a disposition when the issue is architectural.
+- Closure: when the feature ships, the tooling-feedback.md's final TF entry summarizes what worked / what didn't / what needs follow-up. The deskwork team imports the closure into the scope-discovery feature's audit-log as `AUDIT-<date>-<NN>` entries — mirror of how we imported audiocontrol pilot TF-001..TF-016 into AUDIT-20260525-05..09.
+
+**Cross-references:**
+- Audit log: [`docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md`](../../docs/1.0/001-IN-PROGRESS/scope-discovery/audit-log.md)
+- Dogfood handoff template (graphical-entries canary): [`docs/1.0/001-IN-PROGRESS/graphical-entries/dogfood-handoff.md`](../../docs/1.0/001-IN-PROGRESS/graphical-entries/dogfood-handoff.md)
+- Starter template (adopters): [`plugins/dw-lifecycle/templates/scope-discovery/tooling-feedback.md`](../../plugins/dw-lifecycle/templates/scope-discovery/tooling-feedback.md)
+
 ## Read documentation before quoting commands
 
 Before writing or speaking any install/setup command for a tool, plugin, library, or service: **read the tool's own documentation first**. Quote the documented command verbatim. Do not quote commands from memory or compose plausible-sounding CLI syntax.
