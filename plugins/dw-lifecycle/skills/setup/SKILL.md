@@ -37,5 +37,5 @@ The helper:
 ## Error handling
 
 - **Branch already exists with no checked-out worktree.** Helper aborts: pick a different slug, remove the orphan branch (`git branch -D <name>`), or check the branch out in a worktree before re-running.
-- **Doc directory already exists.** Helper aborts. Never overwrites — investigate the existing directory first.
+- **Template file already exists in the feature dir.** Helper aborts if any of `prd.md`, `workplan.md`, `README.md` already exists at the target path — those are authored content the helper must not overwrite. A pre-existing feature dir containing only non-template files (e.g. seeded handoff packages from a related feature) is tolerated; the helper scaffolds templates alongside.
 - **Version directory missing.** Helper creates it atomically. `/dw-lifecycle:doctor` flags any version directories present in the file tree but absent from `config.docs.knownVersions`.

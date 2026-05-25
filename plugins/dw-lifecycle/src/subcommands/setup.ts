@@ -313,12 +313,24 @@ export async function setup(args: string[]): Promise<void> {
 
   // Existence check for the feature dir runs against the resolved
   // worktreePath (where the docs will land), not against `root`.
+  // Tolerate a pre-existing directory (e.g. seeded handoff files from a
+  // related feature, scope-inventory dumps). Refuse only if a template
+  // file we'd write already exists — that's authored content that must
+  // not be overwritten silently.
   const dir = resolveFeatureDir(cfg, worktreePath, slug, {
     stage: 'inProgress',
     targetVersion: target,
   });
   if (existsSync(dir)) {
-    throw new Error(`Feature directory already exists: ${dir}. Refusing to overwrite.`);
+    const collisions = ['prd.md', 'workplan.md', 'README.md'].filter((name) =>
+      existsSync(join(dir, name)),
+    );
+    if (collisions.length > 0) {
+      throw new Error(
+        `Refusing to overwrite existing template file(s) in ${dir}: ${collisions.join(', ')}. ` +
+          `Move or rename the existing file(s) and re-run setup.`,
+      );
+    }
   }
 
   // Re-check inputs after dir-existence; the reuse path skips the

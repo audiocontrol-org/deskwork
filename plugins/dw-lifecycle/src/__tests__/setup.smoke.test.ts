@@ -241,6 +241,65 @@ Real content from writing-plans output here.
     expect(matches.length).toBe(1);
   });
 
+  it('tolerates a pre-existing feature dir containing non-template files', async () => {
+    await install([tmpRoot]);
+
+    // Pre-create the worktree + branch and seed the eventual docs dir
+    // with non-template files (e.g. a dogfood handoff package from a
+    // related feature). Setup must scaffold alongside, not abort.
+    const branchName = 'feature/seeded-feature';
+    const preCreated = join(dirname(tmpRoot), `${basename(tmpRoot)}-seeded-feature-pre`);
+    execSync(`git -C "${tmpRoot}" worktree add "${preCreated}" -b ${branchName} HEAD`);
+    worktreePath = preCreated;
+
+    const docsDir = join(preCreated, 'docs/1.0/001-IN-PROGRESS/seeded-feature');
+    execSync(`mkdir -p "${docsDir}/subdir"`);
+    writeFileSync(join(docsDir, 'handoff.md'), '# pre-seeded handoff\n', 'utf8');
+    writeFileSync(join(docsDir, 'subdir/notes.md'), 'notes\n', 'utf8');
+
+    const origCwd = process.cwd();
+    process.chdir(preCreated);
+    try {
+      await setup(['seeded-feature', '--target', '1.0', '--title', 'Seeded']);
+    } finally {
+      process.chdir(origCwd);
+    }
+
+    // Scaffolded templates landed alongside the seeded files.
+    expect(existsSync(join(docsDir, 'prd.md'))).toBe(true);
+    expect(existsSync(join(docsDir, 'workplan.md'))).toBe(true);
+    expect(existsSync(join(docsDir, 'README.md'))).toBe(true);
+    // Pre-existing files untouched.
+    expect(readFileSync(join(docsDir, 'handoff.md'), 'utf8')).toBe('# pre-seeded handoff\n');
+    expect(readFileSync(join(docsDir, 'subdir/notes.md'), 'utf8')).toBe('notes\n');
+  });
+
+  it('refuses overwrite when a template file already exists in the feature dir', async () => {
+    await install([tmpRoot]);
+
+    const branchName = 'feature/collision-feature';
+    const preCreated = join(dirname(tmpRoot), `${basename(tmpRoot)}-collision-feature-pre`);
+    execSync(`git -C "${tmpRoot}" worktree add "${preCreated}" -b ${branchName} HEAD`);
+    worktreePath = preCreated;
+
+    const docsDir = join(preCreated, 'docs/1.0/001-IN-PROGRESS/collision-feature');
+    execSync(`mkdir -p "${docsDir}"`);
+    writeFileSync(join(docsDir, 'prd.md'), '# authored PRD\n', 'utf8');
+
+    const origCwd = process.cwd();
+    process.chdir(preCreated);
+    try {
+      await expect(
+        setup(['collision-feature', '--target', '1.0', '--title', 'Collision']),
+      ).rejects.toThrow(/Refusing to overwrite existing template file\(s\).*prd\.md/);
+    } finally {
+      process.chdir(origCwd);
+    }
+
+    // PRD untouched.
+    expect(readFileSync(join(docsDir, 'prd.md'), 'utf8')).toBe('# authored PRD\n');
+  });
+
   it('rejects invalid target versions before creating a worktree', async () => {
     await install([tmpRoot]);
 
