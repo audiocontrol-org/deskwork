@@ -217,9 +217,27 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
 
 ### Task 1: New skill prose (18 skills)
 
-- [ ] For each new skill (scope-inventory, scope-widen, scope-summary, check-clones, check-anti-patterns, check-deprecations, check-adopters, check-editor-symmetry, check-refactor-preconditions, dispose-clone, refresh-clones-baseline, install-scope-discovery, install-scope-discovery-hooks, install-agent-prompts, uninstall-scope-discovery-hooks, migrate-from-pilot, validate-scope-discovery, scope-export):
-  - [ ] `plugins/dw-lifecycle/skills/<name>/SKILL.md` with operator-facing flow
-  - [ ] `plugins/dw-lifecycle/commands/<name>.md` command file
+- [ ] For each new skill — broken down per-skill below. 13 of 18 landed; the 5 install-related skills (scope-widen, install-scope-discovery, install-scope-discovery-hooks, install-agent-prompts, uninstall-scope-discovery-hooks, migrate-from-pilot) are deferred to Phase 8 because their behavior is defined by Phase 8 Task 1–5 (install / migrate / uninstall machinery) which has not yet landed — authoring skill prose before the helpers exist would either invent the contract or violate the "no fallbacks / no future-dispatch promises" rule from `agent-discipline.md`.
+  - [x] `scope-inventory` — SKILL.md + commands/scope-inventory.md.
+  - [x] `scope-summary` — SKILL.md + commands/scope-summary.md.
+  - [x] `scope-export` — SKILL.md + commands/scope-export.md.
+  - [x] `check-anti-patterns` — SKILL.md + commands/check-anti-patterns.md.
+  - [x] `check-adopters` — SKILL.md + commands/check-adopters.md.
+  - [x] `check-refactor-preconditions` — SKILL.md + commands/check-refactor-preconditions.md.
+  - [x] `check-editor-symmetry` — SKILL.md + commands/check-editor-symmetry.md.
+  - [x] `check-deprecations` — SKILL.md + commands/check-deprecations.md (documents pre-#287 shell behavior + the deferral).
+  - [x] `batch-dispose` — SKILL.md + commands/batch-dispose.md. (Not in the original Phase 7 enumeration; authored because the Phase 6 Task 3 verb landed and it pairs with dispose-clone + check-disposition-survivor.)
+  - [x] `dispose-clone` — SKILL.md + commands/dispose-clone.md.
+  - [x] `check-disposition-survivor` — SKILL.md + commands/check-disposition-survivor.md. (Not in the original Phase 7 enumeration; authored because the Phase 6 Task 3 verb landed and the pre-commit gate behavior is operator-facing.)
+  - [x] `refresh-clones-baseline` — SKILL.md + commands/refresh-clones-baseline.md.
+  - [x] `validate-scope-discovery` — SKILL.md + commands/validate-scope-discovery.md.
+  - [ ] `check-clones` — DEFERRED. The Phase 6 rename of `detect-clones` → `check-clones` is itself deferred (Task 2 line cites it as a separate Phase 6 follow-up); authoring prose for a verb whose name is not yet final would create rot. Author when the rename lands.
+  - [ ] `scope-widen` — DEFERRED to Phase 8. Subcommand not yet implemented (Phase 6 Task 1 pending entry); behavior contract isn't fixed.
+  - [ ] `install-scope-discovery` — DEFERRED to Phase 8. Phase 8 Task 1 helper not yet implemented.
+  - [ ] `install-scope-discovery-hooks` — DEFERRED to Phase 8. Phase 8 Task 2 helper not yet implemented.
+  - [ ] `install-agent-prompts` — DEFERRED to Phase 8. Phase 8 Task 3 helper not yet implemented.
+  - [ ] `uninstall-scope-discovery-hooks` — DEFERRED to Phase 8. Phase 8 Task 5 helper not yet implemented.
+  - [ ] `migrate-from-pilot` — DEFERRED to Phase 8. Phase 8 Task 4 helper not yet implemented (audiocontrol-specific migration).
 
 ### Task 2: Updated skill prose (5 skills)
 

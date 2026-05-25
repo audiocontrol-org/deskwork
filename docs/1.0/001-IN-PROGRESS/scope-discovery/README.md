@@ -22,7 +22,7 @@ Canonize the audiocontrol-piloted Scope Discovery Protocol into the `dw-lifecycl
 | 4 | Config-activated discovery agents | Complete (438/438 tests pass; regime-holdout-detector / editor-symmetry-scanner / adopter-manifest-checker config-activated; three Phase 4 agents pay zero cost when activator files are absent) |
 | 5 | Dispatch wrapper + skill-prose convention template | Complete (495/495 tests pass; `wrap()` library API + forbidden-deferral overrides + refactor-marker auto-prelude + skill-prose template shipped) |
 | 6 | CLI subcommands (~20 new verbs) | In progress — 14 of ~20 verbs landed (`detect-clones`, `check-anti-patterns`, `check-adopters`, `check-refactor-preconditions`, `scope-inventory`, `check-editor-symmetry`, `batch-dispose`, `check-disposition-survivor`, `scope-summary`, `check-deprecations` (shell; scan port pending [#287](https://github.com/audiocontrol-org/deskwork/issues/287)), `validate-scope-discovery`, `scope-export`, `refresh-clones-baseline`, `dispose-clone`); `--gate-mode` flag landed on all four check-* subcommands; `scope-widen` + Task 4 install/migrate/uninstall verbs pending. |
-| 7 | Slash command skill prose (~18 new + 5 updated) | Not started |
+| 7 | Slash command skill prose (~18 new + 5 updated) | In progress (13 of 18 skills authored; 5 install-related deferred to Phase 8) |
 | 8 | Install / migrate / uninstall machinery | Not started |
 | 9 | Doctor rule additions | Not started |
 | 10 | Canary install + graphical-entries paper-test deliverable (v1 acceptance signal) | Not started |
