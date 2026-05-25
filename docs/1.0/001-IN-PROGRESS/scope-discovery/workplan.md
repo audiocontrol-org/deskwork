@@ -103,23 +103,23 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
 
 ### Task 1: regime-holdout-detector
 
-- [ ] Port from pilot; synthesizes the four scan types into `regime_holdouts:` section on the scope manifest
-- [ ] Activates only if `anti-patterns.yaml` OR `adopter-manifests.yaml` has entries
+- [x] Port from pilot; synthesizes the four scan types into `regime_holdouts:` section on the scope manifest — landed at `plugins/dw-lifecycle/src/scope-discovery/discovery-agents/regime-holdout-detector.ts` (commit `362ce6d`). Deprecation gate stubbed; tracked at [#287](https://github.com/audiocontrol-org/deskwork/issues/287).
+- [x] Activates only if `anti-patterns.yaml` OR `adopter-manifests.yaml` has entries — orchestrator's `decideActivations` in `scope-inventory.ts` checks file presence; agent prints `scope-inventory: skipped regime-holdout-detector (...)` when none of the three gate files are present.
 
 ### Task 2: editor-symmetry-scanner
 
-- [ ] Port `check-editor-symmetry.ts` from pilot
-- [ ] Activates only if `.dw-lifecycle/scope-discovery/editor-symmetry.md` exists with manifest entries
+- [x] Port `check-editor-symmetry.ts` from pilot — landed at `plugins/dw-lifecycle/src/scope-discovery/check-editor-symmetry.ts` (commit `1322841`) with `--module-root` + `--write` + `--quiet` flags; subcommand registered in `cli.ts` as `dw-lifecycle check-editor-symmetry`.
+- [x] Activates only if `.dw-lifecycle/scope-discovery/adopter-manifests.yaml` exists with manifest entries — workplan's original phrasing referenced `editor-symmetry.md` (an OUTPUT) as the activator; the pilot-faithful implementation gates on `adopter-manifests.yaml` (the INPUT). Per the Phase 4 pilot map §3; documented in `scope-inventory.ts`'s `decideActivations`.
 
 ### Task 3: adopter-manifest-checker integration
 
-- [ ] Integrate the Phase 2 adopter-manifest scanner into the `/scope-inventory` agent fleet
-- [ ] Activates only if `adopter-manifests.yaml` has entries
+- [x] Integrate the Phase 2 adopter-manifest scanner into the `/scope-inventory` agent fleet — landed as a 6th `DiscoveryAgentFinding` variant at `plugins/dw-lifecycle/src/scope-discovery/discovery-agents/adopter-manifest-checker.ts` (commit `0288d15`). Synthesis-derive-regime dedupes `(file, id)` so running both this agent and the regime-holdout-detector's adopter sub-pass doesn't double-count.
+- [x] Activates only if `adopter-manifests.yaml` has entries — orchestrator gates on `existsSync` of the registry path; agent prints `scope-inventory: skipped adopter-manifest-checker (...)` when absent.
 
 **Acceptance Criteria:**
-- [ ] Three agents activate ONLY when project config has the relevant entries
-- [ ] Agents not activated cost zero (no scan time)
-- [ ] `regime_holdouts:` section on scope-manifest populated when active
+- [x] Three agents activate ONLY when project config has the relevant entries — verified via `/tmp/phase4-acceptance-c1-noop.sh` (empty tmpdir, all three skip notes print, no per-agent JSON or `editor-symmetry.md` artifact in evidence trail).
+- [x] Agents not activated cost zero (no scan time) — no-op run timed at 0.526s vs activated run at 0.603s (delta 77ms ≈ scan + matrix + JSON write cost); the skip notes print BEFORE the synthesis pass, confirming the gating is upstream of cost.
+- [x] `regime_holdouts:` section on scope-manifest populated when active — verified via `/tmp/phase4-acceptance-c2-activated.sh`; the section contains `anti_patterns` (2 entries), `adopter_manifests` (2), `editor_symmetry` (1), `deprecations: []` (stubbed per [#287](https://github.com/audiocontrol-org/deskwork/issues/287)), and `meta.total: 5`.
 
 ## Phase 5: Dispatch wrapper + skill-prose convention template
 
