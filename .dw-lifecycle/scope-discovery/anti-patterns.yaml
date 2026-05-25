@@ -1,2 +1,135 @@
 schemaVersion: 1
-anti_patterns: []
+# deskwork-specific anti-patterns. Authored Phase 10 against the
+# canonical references documented in DESKWORK-STATE-MACHINE.md (eight
+# stages, Commandments I + III) and .claude/CLAUDE.md ("Deskwork manages
+# collections, not websites — host is optional").
+#
+# Each entry's `shape_regex:` matches the LEGACY shape; the `message:`
+# names the canonical replacement. The scanner is informational by
+# default; `--gate-mode` makes it block commits.
+#
+# Per [#288](https://github.com/audiocontrol-org/deskwork/issues/288),
+# `canonical_implementation_file:` is the right field for the
+# canonical-side exclusion; `excludes_paths:` is the v1 mechanism for
+# the same effect. Entries below use `excludes_paths:` for that
+# purpose until #288 lands.
+anti_patterns:
+  - id: hardcoded-stage-name-array
+    added_in: e2b1750
+    primitive: PIPELINE_STAGES
+    from: '@deskwork/core/pipelines (canonical stage list)'
+    shape_regex: "'(Ideas|Outlining|Drafting|Final|Published|Cancelled)'\\s*,\\s*\\n\\s*'(Planned|Outlining|Drafting|Final|Published|Cancelled|Blocked)'"
+    excludes_paths:
+      - 'DESKWORK-STATE-MACHINE.md'
+      - 'packages/core/src/pipelines/**'
+      - 'packages/core/src/schema/**'
+      - '**/*.test.ts'
+      - '**/.runtime-cache/**'
+      - '**/dist/**'
+    message: |
+      Hardcoded stage name array detected.
+
+      Per DESKWORK-STATE-MACHINE.md Commandment I, the eight stages
+      (Ideas / Planned / Outlining / Drafting / Final / Published /
+      Blocked / Cancelled) are the canonical set. Per the
+      graphical-entries design (docs/superpowers/specs/
+      2026-05-16-graphical-entries-design.md), this set will
+      generalize into per-lane pipeline templates — hardcoded stage
+      lists block that migration.
+
+      Replace with a read from the lane's PipelineTemplate
+      (`packages/core/src/pipelines/<id>.json` shipped defaults, with
+      operator overrides at `<projectRoot>/.deskwork/pipelines/`).
+      The override resolver in `packages/core/src/overrides.ts` picks
+      the project's value when present and falls back to the plugin
+      default.
+
+  - id: review-state-write
+    added_in: e2b1750
+    primitive: workflowEvent / journal append
+    from: '@deskwork/core (workflow event recording)'
+    shape_regex: 'reviewState\s*[:=]\s*[''"](?:in-review|iterating|approved|finalized)[''"]'
+    excludes_paths:
+      - 'DESKWORK-STATE-MACHINE.md'
+      - 'DESIGN-STANDARDS.md'
+      - 'packages/core/src/doctor/migrate.ts'
+      - 'packages/core/src/doctor/validate.ts'
+      - 'packages/core/src/schema/entry.ts'
+      # Documentation-only reference (the file documents the retired
+      # semantics in a JSDoc block; the regex matches inside the
+      # comment text). False positive; ideally the regex should skip
+      # comment lines (#288 / future glob+ts-morph pattern dispatcher).
+      - 'packages/cli/src/commands/ingest.ts'
+      - '**/*.test.ts'
+      - '**/*.fixtures.ts'
+      - '**/.runtime-cache/**'
+      - '**/dist/**'
+    message: |
+      `reviewState` write detected.
+
+      Per DESKWORK-STATE-MACHINE.md Commandment III, `reviewState` is
+      RETIRED. New code does NOT write `reviewState` to sidecars. The
+      schema's `ReviewState` type exists only as a back-compat
+      read-side artifact for legacy sidecars on disk; the doctor
+      migration cleans legacy data.
+
+      Replace with a stage-derived view (read `currentStage`,
+      `iterationByStage[currentStage]`, and `frozenForReview` if
+      present). Do NOT compute or persist a separate review-state
+      field — the stage IS the review state under the new model.
+
+  - id: host-required-throw
+    added_in: e2b1750
+    primitive: deskwork.collections (host is optional)
+    from: '@deskwork/core (collection model)'
+    shape_regex: 'throw new \w*Error\([^)]*\b(host|hostname)\b[^)]*(?:required|missing|undefined)'
+    excludes_paths:
+      - 'DESKWORK-STATE-MACHINE.md'
+      - 'DESIGN-STANDARDS.md'
+      - '.claude/**'
+      - '**/*.test.ts'
+      - '**/.runtime-cache/**'
+      - '**/dist/**'
+    message: |
+      `host`-required throw detected on a collection-handling path.
+
+      Per .claude/CLAUDE.md "Deskwork manages collections of markdown
+      content, not websites": a collection without a `host` is fully
+      valid. Renderer-specific behavior (Astro / Next / Hugo /
+      Eleventy schema patches) is conditional on the collection
+      having a configured `host`; the calendar lifecycle, review
+      pipeline, frontmatter binding, and doctor rules all work
+      without one.
+
+      Replace the throw with: (a) early-return when `host` is absent
+      and the code path is renderer-specific, or (b) plumb the
+      renderer-agnostic version of the operation. The studio's
+      per-collection dashboard must work for any collection.
+
+  - id: single-pipeline-shape-assumption
+    added_in: e2b1750
+    primitive: PipelineTemplate / LaneConfig (per-lane pipeline shape)
+    from: '@deskwork/core (lane configuration)'
+    shape_regex: '(?:the only pipeline|single pipeline|exactly one pipeline)'
+    excludes_paths:
+      - 'DESKWORK-STATE-MACHINE.md'
+      - 'DESIGN-STANDARDS.md'
+      - 'docs/superpowers/specs/**'
+      - 'docs/1.0/**'
+      - '**/*.test.ts'
+      - '**/.runtime-cache/**'
+      - '**/dist/**'
+    message: |
+      Single-pipeline assumption language detected.
+
+      Per the graphical-entries design (docs/superpowers/specs/
+      2026-05-16-graphical-entries-design.md § Lanes), a project may
+      have multiple lanes each bound to its own PipelineTemplate.
+      Code that asserts "the only pipeline" or "single pipeline"
+      will need to change when graphical-entries lands.
+
+      If this language is in a docstring or comment describing
+      pre-graphical-entries behavior, edit to either name the
+      historical context explicitly or rewrite to be lane-aware.
+      If it's in operational code, refactor to read the entry's
+      lane and consult that lane's template.
