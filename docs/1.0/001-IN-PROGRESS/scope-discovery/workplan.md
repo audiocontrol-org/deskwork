@@ -68,34 +68,34 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
 
 ### Task 1: ui-route-enumerator (React-Router default, generalizable)
 
-- [ ] Port `discovery-agents/ui-route-enumerator.ts` from pilot
-- [ ] Extract router detection into a strategy interface; React-Router strategy is the default; Vue Router / Next.js / SvelteKit etc. are operator overrides via customize
+- [x] Port `discovery-agents/ui-route-enumerator.ts` from pilot
+- [x] Extract router detection into a strategy interface; React-Router strategy is the default; Vue Router / Next.js / SvelteKit etc. are operator overrides via customize — `RouterStrategy` interface + `DEFAULT_STRATEGIES` registry landed; multi-match throws asking the operator to disambiguate. Vue/Next/SvelteKit default strategies tracked in [#286](https://github.com/audiocontrol-org/deskwork/issues/286).
 
 ### Task 2: ast-grep-matrix
 
-- [ ] Port `discovery-agents/ast-grep-matrix.ts` from pilot
-- [ ] Curated default pattern list (any-type, ts-ignore, magic numbers); project override at `.dw-lifecycle/scope-discovery/ast-grep-patterns.yaml`
+- [x] Port `discovery-agents/ast-grep-matrix.ts` from pilot — renamed to `pattern-matrix.ts` (regex-only; no `ast-grep` binary). Runtime discriminator stays `'ast-grep-matrix'` for JSON wire-format stability.
+- [x] Curated default pattern list (any-type, ts-ignore, magic numbers); project override at `.dw-lifecycle/scope-discovery/pattern-matrix-patterns.yaml` — built-in catalog ships 4 CLAUDE.md-aligned patterns; the audiocontrol-specific `ac-class-consumer` was dropped; override loader honored (smoke-verified).
 
 ### Task 3: clone-detector-reader
 
-- [ ] Port `discovery-agents/clone-detector-reader.ts` from pilot
-- [ ] Reads project's `clones.yaml`; filters by feature scope
+- [x] Port `discovery-agents/clone-detector-reader.ts` from pilot
+- [x] Reads project's `clones.yaml`; filters by feature scope — `DEFAULT_BASELINE` migrated to `.dw-lifecycle/scope-discovery/clones.yaml`.
 
 ### Task 4: prd-themed-pattern-hunter
 
-- [ ] Port `discovery-agents/prd-themed-pattern-hunter.ts` from pilot
-- [ ] Tokenize PRD frontmatter + body; top-N keyword extraction
+- [x] Port `discovery-agents/prd-themed-pattern-hunter.ts` from pilot
+- [x] Tokenize PRD frontmatter + body; top-N keyword extraction — `tokenizePrd` strips URL/bare-host components before bag-of-words; covered by `prd-themed-pattern-hunter.test.ts` (gutted-stub teeth check confirms a regressed tokenizer leaks URL fragments).
 
 ### Task 5: Synthesis pass + scope-manifest schema
 
-- [ ] Port `synthesis.ts` + `synthesis-derive.ts` + `synthesis-types.ts`
-- [ ] Schema `scope-manifest.yaml.schema.json`
-- [ ] `manifest-validator.ts` enforces schema
+- [x] Port `synthesis.ts` + `synthesis-derive.ts` + `synthesis-types.ts` — split per the 300-500 cap: `synthesis.ts` (263) + `synthesis-cli.ts` (230) + `synthesis-derive.ts` (396) + `synthesis-derive-regime.ts` (100).
+- [x] Schema `scope-manifest.yaml.schema.json` — ported verbatim with deskwork-scoped `$id`.
+- [x] `manifest-validator.ts` enforces schema — ajv 2020 compiler + scenario-ref cross-check + `validateManifestOnce` cached entry point.
 
 **Acceptance Criteria:**
-- [ ] `dw-lifecycle scope-inventory <slug>` fans the four agents in parallel + writes validated scope-manifest.yaml
-- [ ] Operator overrides of any individual agent honored
-- [ ] Per-run evidence trail lands at `docs/<v>/001-IN-PROGRESS/<slug>/scope-inventory/runs/<stamp>-<runId>/`
+- [x] `dw-lifecycle scope-inventory <slug>` fans the four agents in parallel + writes validated scope-manifest.yaml — smoke-verified against a synthetic-but-substantive PRD against `plugins/dw-lifecycle/src` module-root; produced `kind=code`, 4 agents consumed, 1 module emitted, schema-valid.
+- [x] Operator overrides of any individual agent honored — `pattern-matrix.ts`'s YAML override loader at `.dw-lifecycle/scope-discovery/pattern-matrix-patterns.yaml` smoke-verified to replace the built-in catalog. Per-agent override resolution beyond `pattern-matrix` is scaffolded via the `RouterStrategy` interface (#286 tracks the additional default strategies).
+- [x] Per-run evidence trail lands at `docs/<v>/001-IN-PROGRESS/<slug>/scope-inventory/runs/<stamp>-<runId>/` — smoke-verified in an isolated tmpdir; trail contains the 4 agent JSONs + `synthesis.md` + `args.json` at the documented path shape.
 
 ## Phase 4: Config-activated discovery agents
 
