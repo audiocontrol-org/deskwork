@@ -15,7 +15,7 @@
     "prefix": "feature/"
   },
   "worktrees": {
-    "naming": "<repo>-<slug>"
+    "naming": "<repo>-work/<slug>"
   },
   "journal": {
     "path": "DEVELOPMENT-NOTES.md",
