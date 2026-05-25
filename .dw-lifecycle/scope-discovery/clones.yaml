@@ -1,9 +1,489 @@
-# Baseline scope: --root plugins/dw-lifecycle/src
-# Scan-time workaround in place (#293): .jscpd.json symlinked from
-# .dw-lifecycle/scope-discovery/ to repo root because the runner expects
-# the config at root. Remove symlink + this comment when #293 lands.
-generated_at: 2026-05-25T10:57:36.792Z
+generated_at: 2026-05-25T11:01:16.752Z
 clones:
+  - id: 014b49040fe1
+    lines: 13
+    members:
+      - packages/cli/src/commands/add.ts:45:57
+      - packages/cli/src/commands/ingest.ts:104:115
+    disposition: pending
+    reason: null
+  - id: 0fc38332b5ee
+    lines: 12
+    members:
+      - packages/cli/src/commands/approve.ts:110:121
+      - packages/cli/src/commands/block.ts:52:63
+      - packages/cli/src/commands/induct.ts:78:67
+    disposition: pending
+    reason: null
+  - id: 09fe516bb060
+    lines: 12
+    members:
+      - packages/cli/src/commands/approve.ts:121:132
+      - packages/cli/src/commands/publish.ts:111:122
+    disposition: pending
+    reason: null
+  - id: 62a9f3c52a49
+    lines: 17
+    members:
+      - packages/cli/src/commands/approve.ts:141:157
+      - packages/cli/src/commands/approve.ts:93:80
+    disposition: pending
+    reason: null
+  - id: fed80612d9af
+    lines: 11
+    members:
+      - packages/cli/src/commands/approve.ts:259:269
+      - packages/studio/src/pages/shortform-review.ts:62:72
+    disposition: pending
+    reason: null
+  - id: 1d80654deb70
+    lines: 15
+    members:
+      - packages/cli/src/commands/approve.ts:46:60
+      - packages/cli/src/commands/cancel.ts:26:40
+      - packages/cli/src/commands/publish.ts:51:65
+    disposition: pending
+    reason: null
+  - id: 24450692261b
+    lines: 11
+    members:
+      - packages/cli/src/commands/approve.ts:97:107
+      - packages/cli/src/commands/induct.ts:68:78
+    disposition: pending
+    reason: null
+  - id: "389500784322"
+    lines: 19
+    members:
+      - packages/cli/src/commands/block.ts:17:35
+      - packages/cli/src/commands/cancel.ts:22:65
+    disposition: pending
+    reason: null
+  - id: 5fcc7d54ef8a
+    lines: 17
+    members:
+      - packages/cli/src/commands/block.ts:35:51
+      - packages/cli/src/commands/cancel.ts:40:78
+    disposition: pending
+    reason: null
+  - id: b3ca8b5bdedf
+    lines: 17
+    members:
+      - packages/cli/src/commands/block.ts:63:79
+      - packages/cli/src/commands/cancel.ts:67:144
+    disposition: pending
+    reason: null
+  - id: 6e51c9681a1d
+    lines: 25
+    members:
+      - packages/cli/src/commands/cancel.ts:41:65
+      - packages/cli/src/commands/induct.ts:63:87
+    disposition: pending
+    reason: null
+  - id: 7826110a84e7
+    lines: 16
+    members:
+      - packages/cli/src/commands/cancel.ts:68:83
+      - packages/cli/src/commands/induct.ts:129:144
+    disposition: pending
+    reason: null
+  - id: 4b85626d608b
+    lines: 26
+    members:
+      - packages/cli/src/commands/distribute.ts:59:84
+      - packages/cli/src/commands/shortform-start.ts:55:80
+    disposition: pending
+    reason: null
+  - id: 76c90b0fef13
+    lines: 17
+    members:
+      - packages/cli/src/commands/distribute.ts:95:111
+      - packages/cli/src/commands/shortform-start.ts:81:97
+    disposition: pending
+    reason: null
+  - id: 89f8a99f8ce2
+    lines: 13
+    members:
+      - packages/cli/src/commands/induct.ts:130:142
+      - packages/cli/src/commands/publish.ts:110:122
+    disposition: pending
+    reason: null
+  - id: 99536ef5fb66
+    lines: 16
+    members:
+      - packages/cli/src/commands/induct.ts:47:62
+      - packages/cli/src/commands/iterate.ts:74:65
+    disposition: pending
+    reason: null
+  - id: 039be133bac2
+    lines: 13
+    members:
+      - packages/cli/src/commands/iterate.ts:77:89
+      - packages/cli/src/commands/publish.ts:53:65
+    disposition: pending
+    reason: null
+  - id: 44c103564dce
+    lines: 9
+    members:
+      - packages/core/src/calendar-mutations.ts:136:144
+      - packages/core/src/calendar-mutations.ts:186:194
+      - packages/core/src/calendar-mutations.ts:212:220
+    disposition: pending
+    reason: null
+  - id: c6f1287504cf
+    lines: 10
+    members:
+      - packages/core/src/calendar.ts:167:176
+      - packages/core/src/calendar.ts:92:101
+    disposition: pending
+    reason: null
+  - id: "800396267262"
+    lines: 28
+    members:
+      - packages/core/src/content-index.ts:120:147
+      - packages/core/src/doctor/rules/missing-frontmatter-id.ts:62:94
+    disposition: pending
+    reason: null
+  - id: aba391647f70
+    lines: 19
+    members:
+      - packages/core/src/doctor/repair.ts:22:40
+      - packages/core/src/doctor/validate.ts:170:198
+    disposition: pending
+    reason: null
+  - id: 2b7d648d9381
+    lines: 14
+    members:
+      - packages/core/src/doctor/rules/calendar-uuid-missing.ts:155:168
+      - packages/core/src/doctor/rules/missing-frontmatter-id.ts:282:295
+      - packages/core/src/doctor/rules/orphan-frontmatter-id.ts:95:108
+      - packages/core/src/doctor/rules/workflow-stale.ts:103:116
+    disposition: pending
+    reason: null
+  - id: 6ce82987b6bb
+    lines: 15
+    members:
+      - packages/core/src/doctor/rules/duplicate-id.ts:114:128
+      - packages/core/src/doctor/rules/missing-frontmatter-id.ts:281:116
+    disposition: pending
+    reason: null
+  - id: 2d803bd758f4
+    lines: 16
+    members:
+      - packages/core/src/doctor/rules/duplicate-id.ts:34:49
+      - packages/core/src/doctor/rules/orphan-frontmatter-id.ts:39:54
+    disposition: pending
+    reason: null
+  - id: 2ccdcd76762f
+    lines: 15
+    members:
+      - packages/core/src/doctor/rules/legacy-stage-artifact-path.ts:208:222
+      - packages/core/src/doctor/rules/workflow-stale.ts:103:116
+    disposition: pending
+    reason: null
+  - id: bf1260ae927f
+    lines: 18
+    members:
+      - packages/core/src/doctor/rules/legacy-stage-artifact-path.ts:97:104
+      - packages/core/src/entry/snapshot.ts:62:79
+    disposition: pending
+    reason: null
+  - id: 18718b4e0ad7
+    lines: 16
+    members:
+      - packages/core/src/doctor/rules/legacy-top-level-id-migration.ts:218:233
+      - packages/core/src/doctor/rules/workflow-stale.ts:103:296
+    disposition: pending
+    reason: null
+  - id: 98a17ac7f3a7
+    lines: 26
+    members:
+      - packages/core/src/doctor/rules/legacy-top-level-id-migration.ts:64:89
+      - packages/core/src/doctor/rules/missing-frontmatter-id.ts:59:84
+    disposition: pending
+    reason: null
+  - id: 8b1f12469501
+    lines: 13
+    members:
+      - packages/core/src/doctor/rules/legacy-top-level-id-migration.ts:89:101
+      - packages/core/src/doctor/rules/missing-frontmatter-id.ts:84:96
+    disposition: pending
+    reason: null
+  - id: 189be54baaa8
+    lines: 9
+    members:
+      - packages/core/src/doctor/runner.ts:180:188
+      - packages/core/src/doctor/runner.ts:207:215
+    disposition: pending
+    reason: null
+  - id: 41b3f9fce647
+    lines: 8
+    members:
+      - packages/core/src/doctor/validate.ts:148:155
+      - packages/core/src/doctor/validate.ts:44:51
+    disposition: pending
+    reason: null
+  - id: 5c72154b2f6d
+    lines: 9
+    members:
+      - packages/core/src/entry/annotations.ts:327:335
+      - packages/core/src/review/pipeline.ts:358:366
+    disposition: pending
+    reason: null
+  - id: 3e94d4b73301
+    lines: 11
+    members:
+      - packages/core/src/journal/read.ts:12:22
+      - packages/core/src/sidecar/read-all.ts:19:29
+    disposition: pending
+    reason: null
+  - id: 68e3966349bd
+    lines: 11
+    members:
+      - packages/core/src/review/start-handlers.ts:145:155
+      - packages/core/src/review/start-handlers.ts:54:65
+    disposition: pending
+    reason: null
+  - id: 1884e3dfff81
+    lines: 7
+    members:
+      - packages/core/src/review/start-handlers.ts:162:168
+      - packages/core/src/review/start-handlers.ts:65:71
+    disposition: pending
+    reason: null
+  - id: 0b03898d0cc8
+    lines: 8
+    members:
+      - packages/core/src/review/start-handlers.ts:232:239
+      - packages/core/src/review/start-handlers.ts:83:90
+    disposition: pending
+    reason: null
+  - id: 0e85f4a2e968
+    lines: 10
+    members:
+      - packages/core/src/review/start-handlers.ts:241:250
+      - packages/core/src/review/start-handlers.ts:90:99
+    disposition: pending
+    reason: null
+  - id: b59c3f6b4e1b
+    lines: 13
+    members:
+      - packages/core/src/review/workflow-paths.ts:138:150
+      - packages/core/src/review/workflow-paths.ts:97:109
+    disposition: pending
+    reason: null
+  - id: 13e80bf116fb
+    lines: 14
+    members:
+      - packages/core/src/scrapbook/crud-at-dir.ts:135:148
+      - packages/core/src/scrapbook/crud-slug.ts:136:149
+    disposition: pending
+    reason: null
+  - id: 9b6869f81d47
+    lines: 19
+    members:
+      - packages/core/src/scrapbook/crud-at-dir.ts:48:66
+      - packages/core/src/scrapbook/crud-slug.ts:49:64
+    disposition: pending
+    reason: null
+  - id: 8cc59074b6bc
+    lines: 16
+    members:
+      - packages/core/src/scrapbook/crud-at-dir.ts:73:88
+      - packages/core/src/scrapbook/crud-slug.ts:74:86
+    disposition: pending
+    reason: null
+  - id: e6d4559e9afb
+    lines: 19
+    members:
+      - packages/core/src/scrapbook/crud-at-dir.ts:96:114
+      - packages/core/src/scrapbook/crud-slug.ts:97:112
+    disposition: pending
+    reason: null
+  - id: 8d860c7659d4
+    lines: 7
+    members:
+      - packages/core/src/scrapbook/format.ts:13:19
+      - packages/studio/src/pages/dashboard/shortform-section.ts:105:111
+    disposition: pending
+    reason: null
+  - id: e7ea786add0a
+    lines: 11
+    members:
+      - packages/core/src/sidecar/read-all.ts:34:44
+      - packages/core/src/sidecar/read.ts:17:27
+    disposition: pending
+    reason: null
+  - id: 9dddadfc374d
+    lines: 12
+    members:
+      - packages/studio/src/pages/content-detail.ts:149:160
+      - packages/studio/src/pages/review-scrapbook-drawer.ts:71:82
+    disposition: pending
+    reason: null
+  - id: 21b4988332de
+    lines: 6
+    members:
+      - packages/studio/src/pages/content-detail.ts:277:282
+      - packages/studio/src/pages/content.ts:347:352
+    disposition: pending
+    reason: null
+  - id: a1cac4b2512f
+    lines: 15
+    members:
+      - packages/studio/src/pages/dashboard/shortform-section.ts:100:119
+      - packages/studio/src/pages/shortform.ts:55:69
+    disposition: pending
+    reason: null
+  - id: 6a86f85c95cd
+    lines: 14
+    members:
+      - packages/studio/src/pages/entry-review/index.ts:108:121
+      - packages/studio/src/pages/shortform-review.ts:92:105
+    disposition: pending
+    reason: null
+  - id: ddade15dffd2
+    lines: 12
+    members:
+      - packages/studio/src/routes/api.ts:259:270
+      - packages/studio/src/routes/api.ts:314:325
+    disposition: pending
+    reason: null
+  - id: b50718db746d
+    lines: 11
+    members:
+      - packages/studio/src/routes/api.ts:261:326
+      - packages/studio/src/routes/api.ts:354:364
+    disposition: pending
+    reason: null
+  - id: 918b3c68f28e
+    lines: 9
+    members:
+      - packages/studio/src/routes/api.ts:277:285
+      - packages/studio/src/routes/api.ts:338:346
+    disposition: pending
+    reason: null
+  - id: a858e789a3a1
+    lines: 10
+    members:
+      - packages/studio/src/routes/api.ts:299:308
+      - packages/studio/src/routes/api.ts:347:356
+    disposition: pending
+    reason: null
+  - id: 29e3abdb5a22
+    lines: 15
+    members:
+      - packages/studio/src/routes/api.ts:332:285
+      - packages/studio/src/routes/api.ts:366:380
+    disposition: pending
+    reason: null
+  - id: 87cabafecb0f
+    lines: 10
+    members:
+      - packages/studio/src/routes/api.ts:354:270
+      - packages/studio/src/routes/api.ts:416:425
+    disposition: pending
+    reason: null
+  - id: 3dac81177cbc
+    lines: 8
+    members:
+      - packages/studio/src/routes/scrapbook-mutation-envelope.ts:152:159
+      - packages/studio/src/routes/scrapbook-mutation-envelope.ts:98:105
+    disposition: pending
+    reason: null
+  - id: 62ed761d29fe
+    lines: 7
+    members:
+      - packages/studio/src/routes/scrapbook-mutations.ts:127:133
+      - packages/studio/src/routes/scrapbook-mutations.ts:167:173
+    disposition: pending
+    reason: null
+  - id: 88f659a4ab82
+    lines: 8
+    members:
+      - packages/studio/src/routes/scrapbook-mutations.ts:127:134
+      - packages/studio/src/routes/scrapbook-mutations.ts:232:239
+      - packages/studio/src/routes/scrapbook-mutations.ts:256:263
+    disposition: pending
+    reason: null
+  - id: dca3cfdbfe1a
+    lines: 11
+    members:
+      - packages/studio/src/routes/scrapbook-mutations.ts:134:144
+      - packages/studio/src/routes/scrapbook-mutations.ts:263:273
+    disposition: pending
+    reason: null
+  - id: 31ee5b67f429
+    lines: 9
+    members:
+      - packages/studio/src/routes/scrapbook-mutations.ts:144:152
+      - packages/studio/src/routes/scrapbook-mutations.ts:273:281
+      - packages/studio/src/routes/scrapbook-mutations.ts:310:318
+    disposition: pending
+    reason: null
+  - id: 127f4fb6c1ef
+    lines: 8
+    members:
+      - packages/studio/src/routes/scrapbook-mutations.ts:145:152
+      - packages/studio/src/routes/scrapbook-mutations.ts:221:228
+    disposition: pending
+    reason: null
+  - id: d6093f110268
+    lines: 10
+    members:
+      - packages/studio/src/server.ts:384:393
+      - packages/studio/src/server.ts:393:402
+    disposition: pending
+    reason: null
+  - id: 14579dae3bdf
+    lines: 20
+    members:
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:106:118
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:138:157
+    disposition: pending
+    reason: null
+  - id: 8a46fe453209
+    lines: 17
+    members:
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:107:118
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:471:487
+    disposition: pending
+    reason: null
+  - id: 82d6dc44c67e
+    lines: 11
+    members:
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:108:118
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:192:202
+    disposition: pending
+    reason: null
+  - id: f0e04e87d0e2
+    lines: 7
+    members:
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:159:165
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:80:86
+    disposition: pending
+    reason: null
+  - id: 7c1800068cfe
+    lines: 14
+    members:
+      - plugins/deskwork-studio/public/src/entry-review/comment-edit-delete.ts:116:129
+      - plugins/deskwork-studio/public/src/entry-review/comment-edit-delete.ts:146:159
+      - plugins/deskwork-studio/public/src/entry-review/comment-edit-delete.ts:97:110
+    disposition: pending
+    reason: null
+  - id: 4e82052075a8
+    lines: 6
+    members:
+      - plugins/deskwork-studio/public/src/entry-review/comment-edit-delete.ts:141:146
+      - plugins/deskwork-studio/public/src/entry-review/comment-edit-delete.ts:92:97
+    disposition: pending
+    reason: null
+  - id: 02612a02fc99
+    lines: 7
+    members:
+      - plugins/deskwork-studio/public/src/lightbox.ts:191:197
+      - plugins/deskwork-studio/public/src/scrapbook-mutations.ts:130:136
+    disposition: pending
+    reason: null
   - id: 2b94a9cef4a7
     lines: 13
     members:

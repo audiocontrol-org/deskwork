@@ -1,0 +1,12 @@
+{
+  "installed_at": "2026-05-25T10:58:34.974Z",
+  "installed_by": "dw-lifecycle install-scope-discovery-hooks v0.22.2",
+  "husky_detected": true,
+  "files": [
+    {
+      "path": "/Users/orion/work/deskwork-work/scope-discovery/.husky/pre-commit",
+      "sha256": "701b6d51e45d957843deb41dc2630fe6958214cccc497efe713a2b079a627ffb",
+      "managed": true
+    }
+  ]
+}
