@@ -227,3 +227,44 @@ The Phase 5 `dispatch-wrapper-prelude.md` skill-prose template (just shipped in 
 - Heavy: extend `wrap()` to inject the integration-layer audit prelude when the agent type is `ui-engineer` (mirrors the existing refactor-marker auto-prelude pattern).
 
 Deferred to: [#290](https://github.com/audiocontrol-org/deskwork/issues/290).
+
+### The standard scope-discovery test slice is red because clone-detector subprocess coverage now overruns Vitest's default timeout budget across multiple scenarios
+
+Finding-ID: AUDIT-20260525-10
+Status:     fixed-0aace86
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/clone-detector.*.test.ts`, `detect-clones.gate-mode.test.ts`
+
+Resolution note (2026-05-25T11:30Z): the symptom described here IS the cross-file jscpd-subprocess contention flake tracked at [#297](https://github.com/audiocontrol-org/deskwork/issues/297). Commit `0aace86` (PR [#298](https://github.com/audiocontrol-org/deskwork/pull/298)) routes all `clone-detector.*.test.ts` files to a single-fork vitest pool via `poolMatchGlobs`, eliminating the cross-worker contention that drove the timeouts. Re-ran the exact verification commands cited in this finding's evidence: `npm --workspace @deskwork/plugin-dw-lifecycle run test -- scope-discovery` returns `Test Files 48 passed (48) / Tests 401 passed (401)`; full-suite `npm test` returns `Test Files 67 passed (67) / Tests 737 passed (737)`. Zero timeouts; zero failing tests. Same intermediate-state-snapshot hypothesis as AUDIT-20260525-01: the audit was filed between #297's reporting and `0aace86`'s landing. Awaiting `verified-<date>` after the fix lives in a few CI runs / parallel-load contexts without resurfacing. If the symptom returns under a different code state, file a new finding with current SHA + repro environment.
+
+The branch's current load-bearing verification command fails because the clone-detector subprocess scenarios are now exceeding Vitest's default `5000ms` per-test timeout in multiple files. This is no longer isolated to one or two edge cases; the timeout budget is unstable across the main clone-detector coverage surface.
+
+Evidence:
+
+- Independent verification run on this branch:
+
+```text
+npm --workspace @deskwork/plugin-dw-lifecycle run test -- scope-discovery
+```
+
+- Aggregate result: `9` failing tests, all plain timeouts, with the rest of the slice green (`42` files passed, `392` tests passed).
+- Reproduced timeout sites:
+  - [clone-detector.error.test.ts](/Users/orion/work/deskwork-work/scope-discovery/plugins/dw-lifecycle/src/__tests__/scope-discovery/clone-detector.error.test.ts:113)
+  - [clone-detector.refresh.test.ts](/Users/orion/work/deskwork-work/scope-discovery/plugins/dw-lifecycle/src/__tests__/scope-discovery/clone-detector.refresh.test.ts:1)
+  - [clone-detector.baseline.test.ts](/Users/orion/work/deskwork-work/scope-discovery/plugins/dw-lifecycle/src/__tests__/scope-discovery/clone-detector.baseline.test.ts:1)
+  - [clone-detector.polish.test.ts](/Users/orion/work/deskwork-work/scope-discovery/plugins/dw-lifecycle/src/__tests__/scope-discovery/clone-detector.polish.test.ts:1)
+  - [clone-detector.batch-dispose.test.ts](/Users/orion/work/deskwork-work/scope-discovery/plugins/dw-lifecycle/src/__tests__/scope-discovery/clone-detector.batch-dispose.test.ts:74)
+  - [detect-clones.gate-mode.test.ts](/Users/orion/work/deskwork-work/scope-discovery/plugins/dw-lifecycle/src/__tests__/scope-discovery/detect-clones.gate-mode.test.ts:1)
+- Every failing case reports the same runtime failure:
+  - `Test timed out in 5000ms.`
+- The affected tests all route through the real CLI + `jscpd` subprocess path, so this is an end-to-end runtime-budget problem rather than an in-process assertion mismatch.
+
+Expected vs actual:
+
+- Expected: the standard scope-discovery test slice completes green under the repository's default per-test timeout budget.
+- Actual: a broad subset of clone-detector scenarios now exceed the default timeout and turn the standard verification command red.
+
+Fix guidance:
+
+- Treat this as a load-bearing verification defect until the timeout budget is made deterministic again.
+- Either reduce clone-detector subprocess runtime materially, or give the long-running clone-detector scenarios explicit per-test timeout budgets that match the real `jscpd` cost instead of relying on the global default.
