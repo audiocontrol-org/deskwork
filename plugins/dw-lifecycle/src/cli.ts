@@ -14,6 +14,7 @@ import { checkEditorSymmetry } from './subcommands/check-editor-symmetry.js';
 import { checkRefactorPreconditions } from './subcommands/check-refactor-preconditions.js';
 import { scopeInventory } from './subcommands/scope-inventory.js';
 import { batchDispose } from './subcommands/batch-dispose.js';
+import { checkDispositionSurvivor } from './subcommands/check-disposition-survivor.js';
 
 const subcommand = process.argv[2];
 const args = process.argv.slice(3);
@@ -35,6 +36,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'check-refactor-preconditions': checkRefactorPreconditions,
   'scope-inventory': scopeInventory,
   'batch-dispose': batchDispose,
+  'check-disposition-survivor': checkDispositionSurvivor,
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {
