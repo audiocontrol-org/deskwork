@@ -25,7 +25,7 @@ Canonize the audiocontrol-piloted Scope Discovery Protocol into the `dw-lifecycl
 | 7 | Slash command skill prose (~18 new + 5 updated) | In progress (17 of 18 skills authored; 4 install-related landed in Phase 8; `scope-widen` skill deferred per [#292](https://github.com/audiocontrol-org/deskwork/issues/292) until verb design lands) |
 | 8 | Install / migrate / uninstall machinery | In progress — 4 of 5 install commands landed (`install-scope-discovery`, `install-scope-discovery-hooks`, `install-agent-prompts`, `uninstall-scope-discovery-hooks`); `migrate-from-pilot` deferred per [#291](https://github.com/audiocontrol-org/deskwork/issues/291) (audiocontrol-specific). 683/683 tests pass. |
 | 9 | Doctor rule additions | Complete (8 doctor rules added; repair hints + selective --fix support; 737/737 tests pass — 2 pre-existing failures unchanged) |
-| 10 | Canary install + graphical-entries paper-test deliverable (v1 acceptance signal) | Not started |
+| 10 | Canary install + graphical-entries paper-test deliverable (v1 acceptance signal) | Complete with documented gap — combined coverage 60.9%, below the ~80% gate; 7 follow-up action items surfaced (4 GH issues filed: #293, #294, #295, #296). 4 install commands all succeeded; scope-inventory exercises end-to-end; paper-test matrix produced at `paper-test-graphical-entries.md`. Operator decides whether to extend Phase 10 or ship v1 with gaps. |
 
 ## Key Links
 

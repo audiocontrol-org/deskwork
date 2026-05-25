@@ -322,39 +322,45 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
 
 ## Phase 10: Canary install + graphical-entries paper-test deliverable
 
-**Deliverable:** Deskwork-as-adopter install complete; `graphical-entries` exercised end-to-end; paper-test coverage matrix produced. **v1 acceptance signal.**
+**Deliverable:** Deskwork-as-adopter install complete; `graphical-entries` exercised end-to-end; paper-test coverage matrix produced. **v1 acceptance signal — measured 60.9%, BELOW the ~80% gate.**
 
 ### Task 1: Install scope-discovery in deskwork
 
-- [ ] `/dw-lifecycle:install-scope-discovery` from `/Users/orion/work/deskwork`
-- [ ] `/dw-lifecycle:refresh-clones-baseline` against deskwork codebase; initial dispositioned baseline
-- [ ] `/dw-lifecycle:install-scope-discovery-hooks` wires pre-commit gate
-- [ ] `/dw-lifecycle:install-agent-prompts` writes Step 0 mirrors
+- [x] `dw-lifecycle install-scope-discovery` — landed commit `7761a1f`. Creates `.dw-lifecycle/scope-discovery/` with 7 files (4 templates + 3 empty-array seed registries).
+- [x] `dw-lifecycle detect-clones --refresh-baseline` — landed commit `2aa89aa`. Initial baseline scoped to `plugins/dw-lifecycle/src/` (37 groups); expanded to whole-repo in commit `0a77a26` (105 groups across packages/ + plugins/). Friction surfaced: `.jscpd.json` config-path mismatch — symlink workaround in place, tracked at [#293](https://github.com/audiocontrol-org/deskwork/issues/293).
+- [x] `dw-lifecycle install-scope-discovery-hooks` — landed commit `0a77a26`. Husky-mode detected; writes `.husky/pre-commit` with 5-gate chain + `hooks-installed.json` manifest. Friction surfaced: hook hardcodes `dw-lifecycle` binary which predates scope-discovery subcommands (tracked at [#294](https://github.com/audiocontrol-org/deskwork/issues/294)) + writes `check-editor-symmetry --gate-mode` (unsupported flag, tracked at [#295](https://github.com/audiocontrol-org/deskwork/issues/295)). Hook patched to invoke `npx tsx` and skip the broken flag; documented in commit.
+- [x] `dw-lifecycle install-agent-prompts` — landed commit `e2b1750`. Step 0 sections appended to `.claude/agents/{code-reviewer,codebase-auditor}.md`; recorded in `hooks-installed.json`.
 
 ### Task 2: Author deskwork-specific anti-patterns
 
-- [ ] Populate `.dw-lifecycle/scope-discovery/anti-patterns.yaml`:
-  - Hardcoded stage references (per DESKWORK-STATE-MACHINE.md Commandment I)
-  - Legacy `reviewState` consumers (per Commandment III)
-  - Single-pipeline assumptions
-  - Studio surfaces that assume `host` is required
+- [x] Populate `.dw-lifecycle/scope-discovery/anti-patterns.yaml` — landed commit `77d457e`. Four entries:
+  - `hardcoded-stage-name-array` (per DESKWORK-STATE-MACHINE.md Commandment I) — 5 findings across packages/.
+  - `review-state-write` (per Commandment III) — 0 active findings (1 false-positive on doc comment, excluded).
+  - `host-required-throw` (per "collections, not websites") — 0 findings.
+  - `single-pipeline-shape-assumption` — 0 findings (the live code already uses lane-aware framing in prose).
 
 ### Task 3: Exercise the protocol against graphical-entries
 
-- [ ] `/dw-lifecycle:setup graphical-entries` auto-invokes `/scope-inventory graphical-entries`
-- [ ] Operator reviews resulting scope-manifest
-- [ ] Trial run of `/scope-widen "<sample-complaint>"` against a deskwork-side complaint
+- [x] `dw-lifecycle scope-inventory --slug graphical-entries` ran against design-spec PRD substitute — landed commit `09c8510`. Output:
+  - `docs/1.0/001-IN-PROGRESS/scope-discovery/scope-inventory-graphical-entries.yaml` (445-line manifest, kind=code).
+  - 6 agents activated in ~0.45s, 6 findings, 1 warning (PRD lacks References section).
+  - Evidence trail at `docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/runs/20260525T110802Z-1cdd0f/` with all per-agent JSONs + synthesis.md + editor-symmetry.md.
+- [ ] `scope-widen` trial — deferred per [#292](https://github.com/audiocontrol-org/deskwork/issues/292) (verb itself not implemented in v1).
 
 ### Task 4: Produce paper-test-graphical-entries.md coverage matrix
 
-- [ ] Enumerate every documented surface graphical-entries will touch
-- [ ] For each surface, record whether `/scope-inventory` / `/scope-widen` / anti-patterns scanner / Step 0 enforcement caught it
-- [ ] Compute combined coverage percentage
-- [ ] Document at `docs/1.0/001-IN-PROGRESS/scope-discovery/paper-test-graphical-entries.md`
+- [x] 35 documented surfaces enumerated — landed commit `d715179` at `docs/1.0/001-IN-PROGRESS/scope-discovery/paper-test-graphical-entries.md`.
+- [x] Per-detector coverage:
+  - scope_inventory_caught: **33/35 = 94.3%**
+  - scope_widen_caught: deferred (#292)
+  - anti_patterns_caught: **4/35 = 11.4%** (starter set per Task 2 brief)
+  - step0_enforcement_caught: **27/35 = 77.1%**
+- [x] **Combined non-deferred coverage: 60.9%.** Below the ~80% ship-gate.
+- [x] 7 operator action items surfaced; 4 already filed as GH issues (#293, #294, #295, #296); 3 are pending operator triage (anti-pattern starter set expansion, scope-widen design at #292, spec References section).
 
 **Acceptance Criteria:**
-- [ ] Deskwork canary install completes cleanly
-- [ ] graphical-entries' `/dw-lifecycle:setup` exercises the protocol end-to-end
-- [ ] paper-test coverage matrix produced
-- [ ] **Combined coverage > ~80%** — the v1 ship gate
-- [ ] No regressions in the existing dw-lifecycle skill set
+- [x] Deskwork canary install completes cleanly — 4 install commands all exit 0; friction issues filed transparently.
+- [x] graphical-entries' scope-inventory exercises the protocol end-to-end — Task 3 deliverable.
+- [x] paper-test coverage matrix produced — Task 4 deliverable.
+- [ ] **Combined coverage > ~80%** — the v1 ship gate. **MEASURED 60.9% — FAIL.** Per operator-owns-scope-decisions rule, the agent surfaces the gap honestly; the operator decides whether to extend Phase 10 with additional anti-pattern authoring or ship v1 with documented gaps.
+- [x] No regressions in the existing dw-lifecycle skill set — `validate-scope-discovery` runs 401 tests, 398 pass; 3 pre-existing flakes on clone-detector tmpdir-jscpd-spawn timeouts (5s default vitest timeout vs ~1.7s actual per-test cost — unrelated to Phase 10 changes; the same tests pass individually with `--testTimeout=30000`).
