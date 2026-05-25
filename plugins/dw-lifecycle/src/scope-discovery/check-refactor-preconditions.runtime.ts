@@ -182,7 +182,7 @@ function testCommandSpawnError(
     cloneId,
     `tests[${index}]`,
     `test command failed to spawn: ${cmd} (${errMsg})`,
-    `Confirm the command is installed (pnpm/tsx/make on PATH) and the ` +
+    `Confirm the command is installed (npx/tsx/make on PATH) and the ` +
       `command string is valid shell.`,
   );
 }

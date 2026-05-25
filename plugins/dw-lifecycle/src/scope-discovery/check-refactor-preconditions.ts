@@ -275,10 +275,10 @@ function formatErrors(result: GateResult): string {
   return lines.join('\n') + '\n';
 }
 
-async function main(): Promise<number> {
+export async function main(argv: readonly string[] = process.argv.slice(2)): Promise<number> {
   let cli: Cli;
   try {
-    cli = parseCli(process.argv.slice(2));
+    cli = parseCli(argv);
   } catch (e) {
     process.stderr.write(`check-refactor-preconditions: ${errorMessage(e)}\n`);
     return 2;
