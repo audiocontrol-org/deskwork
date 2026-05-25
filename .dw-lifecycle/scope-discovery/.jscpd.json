@@ -1,0 +1,14 @@
+{
+  "languages": ["typescript"],
+  "pattern": "**/*.ts",
+  "ignore": [
+    "**/*.test.ts",
+    "**/dist/**",
+    "**/node_modules/**",
+    "**/.runtime-cache/**",
+    "**/coverage/**"
+  ],
+  "minTokens": 50,
+  "reporters": ["json"],
+  "output": "reports/duplication"
+}
