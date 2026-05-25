@@ -10,6 +10,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "ajv": "^8.17.0",
+    "ajv-formats": "^3.0.0",
     "jscpd": "^4.0.0",
     "tsx": "^4.21.0",
     "yaml": "^2.8.0",
