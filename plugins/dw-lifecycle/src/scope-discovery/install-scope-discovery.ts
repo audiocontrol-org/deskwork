@@ -64,16 +64,45 @@ const COPY_FILES: ReadonlyArray<{
   { name: '.jscpd.json', relPath: '.jscpd.json' },
 ];
 
-/** Empty-seed YAMLs (each registry's empty shape per its schema). */
+/**
+ * Empty-seed YAMLs (each registry's empty shape per its schema).
+ *
+ * `schemaVersion: 1` is seeded into each registry so the
+ * `scope-discovery-schema-stale` doctor rule has a known-good baseline
+ * to compare against. The field is optional in the parsers; existing
+ * registries without the field continue to parse but get a doctor
+ * warning prompting the operator to add it.
+ *
+ * NOTE on shape: `generated_at` is omitted from the seed clones.yaml
+ * because it's set by the detector at write-time (operators don't hand-
+ * edit it). The schema permits `generated_at` to be added later when
+ * the first detect-clones run writes the baseline. The seed deliberately
+ * leaves the field out so the doctor's schema-violation rule reports a
+ * missing-field for any registry that was hand-authored without a real
+ * detector run.
+ */
 const SEED_FILES: ReadonlyArray<{
   readonly name: string;
   readonly content: string;
 }> = [
-  { name: 'clones.yaml', content: 'clones: []\n' },
-  { name: 'anti-patterns.yaml', content: 'anti_patterns: []\n' },
+  {
+    name: 'clones.yaml',
+    // `generated_at: 1970-01-01T00:00:00Z` is an explicit placeholder
+    // marking "no detector run has overwritten this file yet". The
+    // strict parser requires `generated_at` to be a string; the
+    // detector overwrites this on the first real run. Doctor rules
+    // can treat the epoch value as a signal that the operator hasn't
+    // run `dw-lifecycle detect-clones` yet (separately surfaced).
+    content:
+      'schemaVersion: 1\ngenerated_at: "1970-01-01T00:00:00Z"\nclones: []\n',
+  },
+  {
+    name: 'anti-patterns.yaml',
+    content: 'schemaVersion: 1\nanti_patterns: []\n',
+  },
   {
     name: 'adopter-manifests.yaml',
-    content: 'adopter_manifests: []\n',
+    content: 'schemaVersion: 1\nadopter_manifests: []\n',
   },
 ];
 

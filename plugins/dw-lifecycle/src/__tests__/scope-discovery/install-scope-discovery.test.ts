@@ -125,21 +125,23 @@ describe('install-scope-discovery — install() against tmpdir', () => {
       COPY_FILE_NAMES.length + SEED_FILE_NAMES.length,
     );
     const seeded = readFileSync(clonesPath, 'utf8');
-    expect(seeded).toBe('clones: []\n');
+    expect(seeded).toBe(
+      'schemaVersion: 1\ngenerated_at: "1970-01-01T00:00:00Z"\nclones: []\n',
+    );
   });
 
   it('seeded YAMLs have the documented empty-array shape', () => {
     install({ target: tmp, force: false, dryRun: false });
     const configDir = join(tmp, CONFIG_REL);
     expect(readFileSync(join(configDir, 'clones.yaml'), 'utf8')).toBe(
-      'clones: []\n',
+      'schemaVersion: 1\ngenerated_at: "1970-01-01T00:00:00Z"\nclones: []\n',
     );
     expect(
       readFileSync(join(configDir, 'anti-patterns.yaml'), 'utf8'),
-    ).toBe('anti_patterns: []\n');
+    ).toBe('schemaVersion: 1\nanti_patterns: []\n');
     expect(
       readFileSync(join(configDir, 'adopter-manifests.yaml'), 'utf8'),
-    ).toBe('adopter_manifests: []\n');
+    ).toBe('schemaVersion: 1\nadopter_manifests: []\n');
   });
 
   it('copied templates have non-empty content', () => {
