@@ -67,3 +67,7 @@ yarn-error.log*
 # WebKit probe screenshots + JSON dumps written by scripts/probe-*.mjs.
 # Per-session output, never committed.
 /tmp/
+
+## jscpd duplication report — regenerated on every detect-clones run;
+## the canonical baseline lives in .dw-lifecycle/scope-discovery/clones.yaml.
+/reports/

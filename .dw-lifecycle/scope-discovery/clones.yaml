@@ -1,3 +1,265 @@
-schemaVersion: 1
-generated_at: "1970-01-01T00:00:00Z"
-clones: []
+# Baseline scope: --root plugins/dw-lifecycle/src
+# Scan-time workaround in place (#293): .jscpd.json symlinked from
+# .dw-lifecycle/scope-discovery/ to repo root because the runner expects
+# the config at root. Remove symlink + this comment when #293 lands.
+generated_at: 2026-05-25T10:57:36.792Z
+clones:
+  - id: 2b94a9cef4a7
+    lines: 13
+    members:
+      - plugins/dw-lifecycle/src/__tests__/scope-discovery/adopter-manifests.fixtures.ts:34:46
+      - plugins/dw-lifecycle/src/__tests__/scope-discovery/editor-symmetry.fixtures.ts:26:38
+    disposition: pending
+    reason: null
+  - id: a5072ecd4210
+    lines: 14
+    members:
+      - plugins/dw-lifecycle/src/__tests__/scope-discovery/adopter-manifests.fixtures.ts:70:83
+      - plugins/dw-lifecycle/src/__tests__/scope-discovery/editor-symmetry.fixtures.ts:61:74
+    disposition: pending
+    reason: null
+  - id: 2ec90a708a85
+    lines: 20
+    members:
+      - plugins/dw-lifecycle/src/__tests__/scope-discovery/adopter-manifests.fixtures.ts:85:104
+      - plugins/dw-lifecycle/src/__tests__/scope-discovery/editor-symmetry.fixtures.ts:76:91
+    disposition: pending
+    reason: null
+  - id: 86f6261378ca
+    lines: 11
+    members:
+      - plugins/dw-lifecycle/src/__tests__/scope-discovery/util/anti-patterns-harness.ts:14:24
+      - plugins/dw-lifecycle/src/__tests__/scope-discovery/util/detector-harness.ts:19:33
+    disposition: pending
+    reason: null
+  - id: 1801f1b7dd0b
+    lines: 8
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/batch-dispose.ts:109:116
+      - plugins/dw-lifecycle/src/scope-discovery/summary.ts:194:201
+    disposition: pending
+    reason: null
+  - id: f768a3b61874
+    lines: 17
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/check-adopters.ts:277:293
+      - plugins/dw-lifecycle/src/scope-discovery/editor-symmetry-matrix.ts:269:285
+    disposition: pending
+    reason: null
+  - id: 478402618ea8
+    lines: 6
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/check-adopters.ts:313:318
+      - plugins/dw-lifecycle/src/scope-discovery/check-anti-patterns.ts:362:367
+    disposition: pending
+    reason: null
+  - id: 2093cce5bb15
+    lines: 15
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/check-adopters.ts:322:336
+      - plugins/dw-lifecycle/src/scope-discovery/check-refactor-preconditions.ts:339:205
+    disposition: pending
+    reason: null
+  - id: b7ac4eca4f52
+    lines: 25
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/check-adopters.ts:53:77
+      - plugins/dw-lifecycle/src/scope-discovery/check-anti-patterns.ts:58:83
+    disposition: pending
+    reason: null
+  - id: 27201dd80c71
+    lines: 50
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/check-adopters.ts:87:136
+      - plugins/dw-lifecycle/src/scope-discovery/check-anti-patterns.ts:93:142
+    disposition: pending
+    reason: null
+  - id: 80a2dc36a69c
+    lines: 19
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/check-anti-patterns.ts:100:118
+      - plugins/dw-lifecycle/src/scope-discovery/check-editor-symmetry.ts:65:83
+    disposition: pending
+    reason: null
+  - id: b7568545fc19
+    lines: 12
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/check-anti-patterns.ts:125:136
+      - plugins/dw-lifecycle/src/scope-discovery/check-editor-symmetry.ts:101:115
+    disposition: pending
+    reason: null
+  - id: ab41f04d27a1
+    lines: 12
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/check-anti-patterns.ts:377:388
+      - plugins/dw-lifecycle/src/scope-discovery/check-refactor-preconditions.ts:342:205
+    disposition: pending
+    reason: null
+  - id: 2150135e911f
+    lines: 18
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts:72:89
+      - plugins/dw-lifecycle/src/scope-discovery/check-editor-symmetry.ts:86:103
+    disposition: pending
+    reason: null
+  - id: 94f54b37e331
+    lines: 12
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts:90:101
+      - plugins/dw-lifecycle/src/scope-discovery/uninstall-scope-discovery-hooks.ts:116:127
+    disposition: pending
+    reason: null
+  - id: f34c45cd009d
+    lines: 16
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/check-disposition-survivor.ts:348:363
+      - plugins/dw-lifecycle/src/scope-discovery/check-editor-symmetry.ts:191:205
+    disposition: pending
+    reason: null
+  - id: 3d67e7c57a62
+    lines: 12
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/check-editor-symmetry.ts:191:202
+      - plugins/dw-lifecycle/src/scope-discovery/check-refactor-preconditions.ts:339:350
+    disposition: pending
+    reason: null
+  - id: 70f04e0cb6d3
+    lines: 7
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-matrix.ts:200:206
+      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/prd-themed-pattern-hunter.ts:138:148
+    disposition: pending
+    reason: null
+  - id: d92bfb30bb82
+    lines: 18
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-matrix.ts:247:264
+      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/prd-themed-pattern-hunter.ts:181:200
+    disposition: pending
+    reason: null
+  - id: 0d9958faaf8f
+    lines: 7
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-matrix.ts:269:275
+      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/prd-themed-pattern-hunter.ts:234:240
+    disposition: pending
+    reason: null
+  - id: 7a91b6f37fe8
+    lines: 24
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper.ts:131:154
+      - plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper.ts:206:229
+    disposition: pending
+    reason: null
+  - id: 13667b2519b0
+    lines: 10
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/doctor-rules/agent-prompt-mirror-drift.ts:106:115
+      - plugins/dw-lifecycle/src/scope-discovery/doctor-rules/scope-discovery-schema-stale.ts:72:81
+    disposition: pending
+    reason: null
+  - id: 029d1d9f0044
+    lines: 10
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/doctor-rules/anti-patterns-yaml-schema-violation.ts:24:33
+      - plugins/dw-lifecycle/src/scope-discovery/doctor-rules/clones-yaml-schema-violation.ts:35:44
+    disposition: pending
+    reason: null
+  - id: b5fbb3493d82
+    lines: 14
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/doctor-rules/clones-yaml-refactor-incomplete.ts:146:159
+      - plugins/dw-lifecycle/src/scope-discovery/doctor-rules/clones-yaml-schema-violation.ts:44:56
+    disposition: pending
+    reason: null
+  - id: b55096bc507f
+    lines: 17
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/install-agent-prompts.ts:118:134
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:150:166
+    disposition: pending
+    reason: null
+  - id: ced608f5be46
+    lines: 18
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/install-agent-prompts.ts:132:149
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:167:184
+    disposition: pending
+    reason: null
+  - id: bc97e6ec2135
+    lines: 7
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/install-agent-prompts.ts:304:310
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:235:241
+    disposition: pending
+    reason: null
+  - id: 3c6b6627d081
+    lines: 14
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:150:163
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:147:112
+    disposition: pending
+    reason: null
+  - id: 92d75db1cad2
+    lines: 16
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:169:184
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:160:127
+    disposition: pending
+    reason: null
+  - id: 7698568d0d6c
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:323:331
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:343:351
+    disposition: pending
+    reason: null
+  - id: cd6cea43f755
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:461:469
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:257:265
+    disposition: pending
+    reason: null
+  - id: 0fbb9fcd1915
+    lines: 13
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:148:160
+      - plugins/dw-lifecycle/src/scope-discovery/uninstall-scope-discovery-hooks.ts:100:112
+    disposition: pending
+    reason: null
+  - id: 9746ccb605f4
+    lines: 15
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:161:175
+      - plugins/dw-lifecycle/src/scope-discovery/uninstall-scope-discovery-hooks.ts:113:127
+    disposition: pending
+    reason: null
+  - id: 8c1a1eaa3a28
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:201:209
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:216:224
+    disposition: pending
+    reason: null
+  - id: 653e6225d350
+    lines: 11
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/scope-inventory.ts:349:359
+      - plugins/dw-lifecycle/src/scope-discovery/synthesis-cli.ts:146:156
+    disposition: pending
+    reason: null
+  - id: 0a9bedfbb1cf
+    lines: 7
+    members:
+      - plugins/dw-lifecycle/src/subcommands/doctor.ts:109:115
+      - plugins/dw-lifecycle/src/subcommands/doctor.ts:94:100
+    disposition: pending
+    reason: null
+  - id: d7a6cf2d3473
+    lines: 10
+    members:
+      - plugins/dw-lifecycle/src/subcommands/install-shortcuts.ts:407:416
+      - plugins/dw-lifecycle/src/subcommands/uninstall-shortcuts.ts:276:285
+    disposition: pending
+    reason: null
