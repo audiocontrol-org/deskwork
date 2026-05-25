@@ -18,6 +18,7 @@ import { checkDispositionSurvivor } from './subcommands/check-disposition-surviv
 import { scopeSummary } from './subcommands/scope-summary.js';
 import { checkDeprecations } from './subcommands/check-deprecations.js';
 import { validateScopeDiscovery } from './subcommands/validate-scope-discovery.js';
+import { scopeExport } from './subcommands/scope-export.js';
 
 const subcommand = process.argv[2];
 const args = process.argv.slice(3);
@@ -43,6 +44,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'scope-summary': scopeSummary,
   'check-deprecations': checkDeprecations,
   'validate-scope-discovery': validateScopeDiscovery,
+  'scope-export': scopeExport,
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {
