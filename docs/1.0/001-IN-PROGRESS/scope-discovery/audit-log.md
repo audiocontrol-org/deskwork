@@ -154,3 +154,76 @@ Fix guidance:
 
 - Update the README phase table to reflect partial Phase 6 progress rather than “Not started.”
 - Reconcile the Phase 6 checklist with the commands already implemented, leaving only the genuinely unshipped verbs unchecked.
+
+---
+
+## 2026-05-25 Audiocontrol pilot tooling-feedback import
+
+The audiocontrol `feature/akai-harmonization` branch's `docs/1.0/001-IN-PROGRESS/akai-harmonization/tooling-feedback.md` enumerates 16 friction entries (TF-001..TF-016) from the scope-discovery pilot. Triaged 2026-05-25 against our port state:
+
+- ✅ Already in our port (verified by grep): TF-001 (`from:` string|list in adopter-manifests-registry.ts:121), TF-005 (`parseModuleRelevance` import in prd-themed-pattern-hunter), TF-006 (paste-ready PRD skeleton in synthesis-warnings), TF-010 (`--quiet` flag on check-adopters).
+- ✅ Closed by closure of an existing GH issue: TF-003 (paste-ready batch-dispose hint) — already tracked under [#284](https://github.com/audiocontrol-org/deskwork/issues/284) Phase 6 batch-dispose port; the hint string update lands when batch-dispose lands.
+- ✅ Out of scope for dw-lifecycle plugin (host-application concerns): TF-004 (pre-commit gate consolidation) belongs in the install-scope-discovery-hooks Phase 8 deliverable — addressed there.
+- ❌ Open gaps imported as new findings below: TF-002, TF-013, TF-014 (amended to #284), TF-015 (amended to #285), TF-016.
+
+### TF-002 — anti-pattern registry lacks `canonical_file` field
+
+Finding-ID: AUDIT-20260525-05
+Status:     acknowledged-#288
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/anti-patterns-registry.ts`, `schema/anti-patterns.yaml.schema.json`
+
+The anti-pattern registry's `AntiPatternEntry` shape has no `canonical_file:` field; the matcher relies on `excludes_paths:` pinned at known consumer paths. When a primitive's canonical implementation moves modules (`git mv`), the entry still matches the moved file because the matcher has no concept of "exclude the primitive's own implementation no matter where it lives."
+
+Pilot reference: audiocontrol PR #462, commit `fddbad06` (TF-002 closure). The pilot's anti-patterns-registry.ts and its scenario file `anti-patterns.canonical-file-scenarios.ts` are EMPTY of `canonical_file` references in the source-of-truth checkout — the fix appears to be documented in TF-002's closure note but not visibly present in the pilot file we ported from. Filing as new work for dw-lifecycle rather than re-port.
+
+Deferred to: [#288](https://github.com/audiocontrol-org/deskwork/issues/288).
+
+### TF-013 — clone-detector regen silently wipes operator dispositions
+
+Finding-ID: AUDIT-20260525-06
+Status:     acknowledged-#289
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/clone-detector.ts`, `clones-yaml.parse.ts`
+
+`clone-detector` regenerates `clones.yaml` in place. If the underlying clone group is re-detected with the same content hash, operator-curated `disposition: keep-with-reason` + multi-paragraph `reason:` fields can revert to `pending` + `null` — pre-commit baseline-diff reports `0 NEW, 0 DROPPED` (group is structurally the same), gate is happy, regen lands silently in the workdir. Documentation-loss bug, not a code-correctness bug.
+
+Pilot picked the "Heavy" fix option: a pre-commit `check-disposition-survivor` gate (`tools/scope-discovery/check-disposition-survivor.ts`, 309 lines) that fails the commit on any `keep-with-reason`/`refactor`/`ignore-with-justification` → `pending` transition without operator-conscious confirmation. The gate file is NOT in our port (we ported the production scanner files; this is a Phase 6/8 follow-up).
+
+Pilot reference: audiocontrol PR #463, commit `6a1f8365`. Audit-log entry AUDIT-20260524-14 (in scope-discovery-protocol repo).
+
+Deferred to: [#289](https://github.com/audiocontrol-org/deskwork/issues/289). Cross-references: Phase 6 (CLI subcommand registration), Phase 8 (install-scope-discovery-hooks wires it into pre-commit chain).
+
+### TF-014 — `batch-dispose` requires IDs already in clones.yaml; refresh-baseline is a separate prereq step
+
+Finding-ID: AUDIT-20260525-07
+Status:     acknowledged-#284 (amended)
+Severity:   low
+Surface:    Future `plugins/dw-lifecycle/src/scope-discovery/batch-dispose.ts`
+
+Operator-facing UX gap in batch-dispose's two-step lifecycle. When batch-dispose lands (Phase 6 via [#284](https://github.com/audiocontrol-org/deskwork/issues/284)), the implementer should also fix the error message to cite the `refresh-baseline` prereq (Light option) or auto-run the check internally (Medium option). Amended onto #284 with the three suggested-fix options.
+
+### TF-015 — anti-pattern regex authoring trips on prefix-matching
+
+Finding-ID: AUDIT-20260525-08
+Status:     acknowledged-#285 (amended)
+Severity:   low
+Surface:    Future pattern-type dispatcher work
+
+`\b` boundary doesn't help with `-` in CSS class names — sibling classes sharing a prefix silently over-match. The gutted-stub teeth check catches "returns empty" but NOT "matches sibling classes that share a prefix." Pilot's suggested Medium fix: add optional `negative_match_classes:` array; validator auto-generates negative scenarios. Amended onto [#285](https://github.com/audiocontrol-org/deskwork/issues/285) (pattern-type dispatcher) since both deal with anti-pattern schema/dispatcher evolution.
+
+### TF-016 — primitive-extraction dispatches recurrently land integration-layer regressions
+
+Finding-ID: AUDIT-20260525-09
+Status:     acknowledged-#290
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/templates/scope-discovery/dispatch-wrapper-prelude.md`, `plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper.ts`
+
+Open in pilot. Three audit cycles in one session (2026-05-24) caught integration-layer regressions after primitive-extraction dispatches: CSS class-name conflicts, invalid ARIA contracts, callback-index drift, wire-format regressions, silent 0-index clamps. Common shape: primitive's API surface changes (different value type, ARIA role, state contract); consumer adapter passes through what the legacy primitive accepted; semantic correctness is lost in the contract delta.
+
+The Phase 5 `dispatch-wrapper-prelude.md` skill-prose template (just shipped in `85f416d`) is the natural home for the Light + Medium options:
+- Light: extend the prelude with a "Primitive-extraction dispatch hygiene" section.
+- Medium: ship `primitive-extraction-checklist.md` template.
+- Heavy: extend `wrap()` to inject the integration-layer audit prelude when the agent type is `ui-engineer` (mirrors the existing refactor-marker auto-prelude pattern).
+
+Deferred to: [#290](https://github.com/audiocontrol-org/deskwork/issues/290).
