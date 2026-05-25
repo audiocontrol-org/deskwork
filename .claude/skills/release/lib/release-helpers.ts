@@ -272,17 +272,18 @@ export interface AtomicPushOptions {
  */
 export async function atomicPush(opts: AtomicPushOptions): Promise<void> {
   const cwd = opts.cwd ?? process.cwd();
+  // When the release branch IS main (e.g. solo-maintainer direct-to-main
+  // workflow), the HEAD:main refspec already covers the branch push.
+  // Including a second refspec for the same dst makes git reject with
+  // "dst ref refs/heads/main receives from more than one src".
+  const refspecs =
+    opts.branch === 'main'
+      ? ['HEAD:main']
+      : ['HEAD:main', `HEAD:refs/heads/${opts.branch}`];
   try {
     execFileSync(
       'git',
-      [
-        'push',
-        '--atomic',
-        '--follow-tags',
-        'origin',
-        'HEAD:main',
-        `HEAD:refs/heads/${opts.branch}`,
-      ],
+      ['push', '--atomic', '--follow-tags', 'origin', ...refspecs],
       { cwd, stdio: ['pipe', 'pipe', 'pipe'] },
     );
   } catch (err) {

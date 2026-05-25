@@ -342,4 +342,25 @@ describe('atomicPush', () => {
       rig.cleanup();
     }
   });
+
+  it('pushes when branch === main (no duplicate refspec)', async () => {
+    // Solo-maintainer direct-to-main workflow: the release branch IS main.
+    // The atomic-push call previously passed both 'HEAD:main' and
+    // 'HEAD:refs/heads/main', which git rejects with "dst ref
+    // refs/heads/main receives from more than one src".
+    const rig = createRig();
+    try {
+      rig.sh('git checkout main');
+      rig.sh('echo release > release.txt && git add release.txt && git commit -m "chore: release v0.0.1"');
+      rig.sh('git tag -a v0.0.1 -m "test release"');
+      await atomicPush({ tag: 'v0.0.1', branch: 'main', cwd: rig.localPath });
+      const remoteMainSha = rig.sh('git rev-parse origin/main').trim();
+      const localHeadSha = rig.sh('git rev-parse HEAD').trim();
+      expect(remoteMainSha).toBe(localHeadSha);
+      const remoteTagsRaw = rig.sh('git ls-remote --tags origin v0.0.1');
+      expect(remoteTagsRaw).toMatch(/refs\/tags\/v0\.0\.1/);
+    } finally {
+      rig.cleanup();
+    }
+  });
 });
