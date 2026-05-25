@@ -25,7 +25,11 @@
  *   dw-lifecycle check-anti-patterns [--root <path>] [--registry <path>]
  *                                    [--quiet] [--json]
  *
- * Exit codes: 0 = empty registry OR no matches; 1 = matches; 2 = infra error.
+ * Exit codes:
+ *   0 = empty registry, no matches, OR findings present without --gate-mode
+ *       (informational default — see --gate-mode for hook-friendly behavior).
+ *   1 = findings present AND --gate-mode is set.
+ *   2 = infra error (parse, I/O, invalid args).
  */
 
 import { readdir, readFile, stat } from 'node:fs/promises';
@@ -70,6 +74,14 @@ export interface CliOptions {
   readonly scanRoot: string;
   readonly quiet: boolean;
   readonly json: boolean;
+  /**
+   * Pre-commit-hook-friendly mode. When set, the scanner exits with
+   * code 1 on any findings (failing the commit). Default behavior
+   * (informational mode) prints findings but exits 0 so operators
+   * can run the scanner ad-hoc without their session being
+   * terminated. The pre-commit hook wires this flag explicitly.
+   */
+  readonly gateMode: boolean;
 }
 
 // Re-export shared types so the validator can import everything from
@@ -85,6 +97,7 @@ export function parseCli(argv: readonly string[]): CliOptions {
   let scanRoot = DEFAULT_ROOT;
   let quiet = false;
   let json = false;
+  let gateMode = false;
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     switch (arg) {
@@ -108,6 +121,9 @@ export function parseCli(argv: readonly string[]): CliOptions {
       case '--json':
         json = true;
         break;
+      case '--gate-mode':
+        gateMode = true;
+        break;
       case '--help':
       case '-h':
         printHelp();
@@ -117,7 +133,7 @@ export function parseCli(argv: readonly string[]): CliOptions {
         throw new Error(`unknown argument: ${arg}`);
     }
   }
-  return { registryPath, scanRoot, quiet, json };
+  return { registryPath, scanRoot, quiet, json, gateMode };
 }
 
 function printHelp(): void {
@@ -130,6 +146,9 @@ function printHelp(): void {
       '  --root <path>      Override scan root (default: src)',
       '  --quiet            Suppress per-match output; print summary only',
       '  --json             Emit findings as JSON',
+      '  --gate-mode        Pre-commit-hook-friendly: exit 1 on findings.',
+      '                     Default (without --gate-mode) is informational:',
+      '                     findings are printed but the process exits 0.',
       '  --help, -h         Show this help',
       '',
     ].join('\n'),
@@ -345,7 +364,11 @@ export async function main(argv: readonly string[]): Promise<number> {
   }
   const out = opts.json ? reportJson(result) : reportText(result, { quiet: opts.quiet });
   if (out.length > 0) process.stdout.write(out);
-  return result.findings.length === 0 ? 0 : 1;
+  // Default behavior is informational (exit 0 with findings reported).
+  // --gate-mode flips to hook-friendly (exit 1 on findings) so the
+  // pre-commit chain can fail the commit on a violation.
+  if (result.findings.length === 0) return 0;
+  return opts.gateMode ? 1 : 0;
 }
 
 // Entry-point detection — matches the pattern used by the sibling

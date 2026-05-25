@@ -114,6 +114,8 @@ async function collectAntiPatternFindings(
     scanRoot: moduleRootAbs(input),
     quiet: true,
     json: true,
+    // Internal scan call — `gateMode` only affects the CLI exit code.
+    gateMode: false,
   });
   const out: RegimeHoldoutFinding[] = [];
   for (const f of result.findings) {
@@ -151,6 +153,8 @@ async function collectAdopterManifestFindings(
     scanRoot: repoRoot,
     quiet: true,
     json: true,
+    // Internal scan call — `gateMode` only affects the CLI exit code.
+    gateMode: false,
   });
   const out: RegimeHoldoutFinding[] = [];
   for (const manifest of result.manifests) {

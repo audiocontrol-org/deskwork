@@ -25,7 +25,11 @@
  *   dw-lifecycle check-adopters [--root <path>] [--registry <path>]
  *                               [--quiet] [--json]
  *
- * Exit codes: 0 = empty registry OR no holdouts; 1 = holdouts; 2 = infra error.
+ * Exit codes:
+ *   0 = empty registry, no holdouts, OR holdouts present without --gate-mode
+ *       (informational default — see --gate-mode for hook-friendly behavior).
+ *   1 = holdouts present AND --gate-mode is set.
+ *   2 = infra error.
  */
 
 import { readFile, stat } from 'node:fs/promises';
@@ -65,6 +69,13 @@ export interface CliOptions {
   readonly scanRoot: string;
   readonly quiet: boolean;
   readonly json: boolean;
+  /**
+   * Pre-commit-hook-friendly mode. When set, the scanner exits with
+   * code 1 on any holdouts (failing the commit). Default behavior
+   * (informational mode) prints holdouts but exits 0 so operators
+   * can run the scanner ad-hoc without their session being terminated.
+   */
+  readonly gateMode: boolean;
 }
 
 // Re-export shared types so the validator can import everything from
@@ -80,6 +91,7 @@ export function parseCli(argv: readonly string[]): CliOptions {
   let scanRoot = DEFAULT_ROOT;
   let quiet = false;
   let json = false;
+  let gateMode = false;
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     switch (arg) {
@@ -103,6 +115,9 @@ export function parseCli(argv: readonly string[]): CliOptions {
       case '--json':
         json = true;
         break;
+      case '--gate-mode':
+        gateMode = true;
+        break;
       case '--help':
       case '-h':
         printHelp();
@@ -112,7 +127,7 @@ export function parseCli(argv: readonly string[]): CliOptions {
         throw new Error(`unknown argument: ${arg}`);
     }
   }
-  return { registryPath, scanRoot, quiet, json };
+  return { registryPath, scanRoot, quiet, json, gateMode };
 }
 
 function printHelp(): void {
@@ -125,6 +140,9 @@ function printHelp(): void {
       '  --root <path>      Override scan root (default: repo root cwd)',
       '  --quiet            Print summary only when zero real holdouts; if real holdouts exist, full report still prints (operator needs to act)',
       '  --json             Emit findings as JSON',
+      '  --gate-mode        Pre-commit-hook-friendly: exit 1 on holdouts.',
+      '                     Default (without --gate-mode) is informational:',
+      '                     holdouts are printed but the process exits 0.',
       '  --help, -h         Show this help',
       '',
     ].join('\n'),
@@ -298,7 +316,10 @@ export async function main(argv: readonly string[]): Promise<number> {
   const out = opts.json ? reportJson(result) : reportText(result, { quiet: opts.quiet });
   if (out.length > 0) process.stdout.write(out);
   const totalHoldouts = result.manifests.reduce((n, m) => n + m.holdouts.length, 0);
-  return totalHoldouts === 0 ? 0 : 1;
+  if (totalHoldouts === 0) return 0;
+  // Default informational mode → exit 0 with report; --gate-mode →
+  // exit 1 to fail a pre-commit hook on holdouts.
+  return opts.gateMode ? 1 : 0;
 }
 
 function isCliEntryPoint(): boolean {

@@ -22,8 +22,17 @@
  *   --repo <path>                 override repo root (test-only)
  *   --test-timeout-seconds <n>    per-test timeout (default: 300)
  *   --skip-test-run               skip running tests (test-only)
+ *   --gate-mode                   pre-commit-hook-friendly: exit 1 on
+ *                                 precondition failures. Default (informational
+ *                                 mode) prints failures but exits 0 so
+ *                                 operators can run the gate ad-hoc without
+ *                                 their session being terminated.
  *
- * Exit codes: 0 silent/clean, 1 precondition failure, 2 infra error.
+ * Exit codes:
+ *   0 = silent/clean, OR precondition failures present without --gate-mode
+ *       (informational default).
+ *   1 = precondition failures present AND --gate-mode is set.
+ *   2 = infra error.
  */
 
 import { readFile } from 'node:fs/promises';
@@ -63,6 +72,12 @@ export interface Cli {
   readonly repoRoot: string;
   readonly testTimeoutSeconds: number;
   readonly skipTestRun: boolean;
+  /**
+   * Pre-commit-hook-friendly mode. When set, the gate exits with code 1
+   * on precondition failures. Default (informational mode) prints
+   * failures but exits 0.
+   */
+  readonly gateMode: boolean;
 }
 
 function takeNext(argv: readonly string[], i: number, flag: string): string {
@@ -78,6 +93,7 @@ function parseCli(argv: readonly string[]): Cli {
   let repoRoot = process.cwd();
   let testTimeoutSeconds = DEFAULT_TEST_TIMEOUT_SECONDS;
   let skipTestRun = false;
+  let gateMode = false;
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === '--commit-msg-file') { commitMsgFile = takeNext(argv, i, a); i += 1; }
@@ -93,12 +109,21 @@ function parseCli(argv: readonly string[]): Cli {
       testTimeoutSeconds = parsed;
     }
     else if (a === '--skip-test-run') skipTestRun = true;
+    else if (a === '--gate-mode') gateMode = true;
     else throw new Error(`unknown arg: ${a}`);
   }
   if (commitMsgFile !== null && commitMsgInline !== null) {
     throw new Error('--commit-msg-file and --commit-msg are mutually exclusive');
   }
-  return { commitMsgFile, commitMsgInline, baselinePath, repoRoot, testTimeoutSeconds, skipTestRun };
+  return {
+    commitMsgFile,
+    commitMsgInline,
+    baselinePath,
+    repoRoot,
+    testTimeoutSeconds,
+    skipTestRun,
+    gateMode,
+  };
 }
 
 async function readCommitMessage(cli: Cli): Promise<string> {
@@ -308,7 +333,10 @@ export async function main(argv: readonly string[] = process.argv.slice(2)): Pro
     return 0;
   }
   process.stderr.write(formatErrors(result));
-  return 1;
+  // Default informational mode → exit 0 with errors reported on stderr;
+  // --gate-mode → exit 1 to fail the commit-msg hook on precondition
+  // failures.
+  return cli.gateMode ? 1 : 0;
 }
 
 function isCliEntryPoint(): boolean {

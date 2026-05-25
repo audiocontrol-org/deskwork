@@ -123,6 +123,10 @@ async function setupFixture(rootDir: string, fixture: ScenarioFixture): Promise<
     repoRoot: process.cwd(),
     testTimeoutSeconds: 60,
     skipTestRun: fixture.skipTestRun,
+    // gateMode is irrelevant to runGate (only affects main()'s exit code).
+    // Set false here so the Cli shape compiles; the Family B harness
+    // exercises runGate directly and asserts on errors[], not exit codes.
+    gateMode: false,
   };
 }
 

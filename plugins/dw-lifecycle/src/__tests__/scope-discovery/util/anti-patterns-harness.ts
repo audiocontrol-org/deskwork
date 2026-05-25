@@ -72,14 +72,25 @@ export async function makeAntiPatternsFixture(label: string): Promise<AntiPatter
  * canonical_implementation_file scenarios — both fields match against
  * CWD-relative POSIX paths, so anchoring CWD at the scan root makes the
  * paths render the way the registry fixtures expect.
+ *
+ * The harness passes `--gate-mode` by default so existing tests
+ * asserting exit-1-on-findings continue to hold. Tests exercising the
+ * default informational mode pass an `extra` array that includes
+ * `--no-gate-mode` (handled in the scanner) or invoke the scanner
+ * directly without this harness.
  */
-export function runAntiPatternsFromScanRoot(fixture: AntiPatternsFixture): Promise<ScannerRun> {
+export function runAntiPatternsFromScanRoot(
+  fixture: AntiPatternsFixture,
+  extra: readonly string[] = [],
+): Promise<ScannerRun> {
   const args = [
     'check-anti-patterns',
     '--registry',
     fixture.registryPath,
     '--root',
     '.',
+    '--gate-mode',
+    ...extra,
   ];
   return runScannerSubprocess(CLI_ENTRY, args, { cwd: fixture.scanRoot });
 }
@@ -90,8 +101,33 @@ export function runAntiPatternsFromScanRoot(fixture: AntiPatternsFixture): Promi
  * resolve --root to a fully-qualified fixture sub-path (e.g. the
  * "malformed registry" scenarios where the test asserts a parse error
  * without caring how findings render).
+ *
+ * `--gate-mode` is passed by default — see `runAntiPatternsFromScanRoot`.
  */
 export function runAntiPatterns(
+  fixture: AntiPatternsFixture,
+  extra: readonly string[] = [],
+): Promise<ScannerRun> {
+  const args = [
+    'check-anti-patterns',
+    '--registry',
+    fixture.registryPath,
+    '--root',
+    fixture.scanRoot,
+    '--gate-mode',
+    ...extra,
+  ];
+  return runScannerSubprocess(CLI_ENTRY, args);
+}
+
+/**
+ * Run the scanner WITHOUT --gate-mode so the default informational
+ * behavior (findings → exit 0 with report on stdout) is exercised.
+ * Used by the gate-mode flag rollout tests in
+ * `anti-patterns.gate-mode.test.ts` to assert the default vs.
+ * --gate-mode behavior delta.
+ */
+export function runAntiPatternsInformational(
   fixture: AntiPatternsFixture,
   extra: readonly string[] = [],
 ): Promise<ScannerRun> {

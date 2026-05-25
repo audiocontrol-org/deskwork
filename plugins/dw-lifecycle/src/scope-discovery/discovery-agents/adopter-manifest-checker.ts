@@ -84,6 +84,9 @@ export async function checkAdopterManifests(
     scanRoot: input.repoRoot,
     quiet: true,
     json: true,
+    // Internal scan call — `gateMode` only affects the CLI exit code,
+    // not the returned ScanResult, so the value is immaterial here.
+    gateMode: false,
   });
   const findings: AdopterManifestCheckerFinding[] = [];
   for (const manifest of result.manifests) {

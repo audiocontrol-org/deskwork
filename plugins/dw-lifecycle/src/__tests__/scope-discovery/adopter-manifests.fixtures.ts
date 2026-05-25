@@ -96,8 +96,33 @@ export async function cleanup(fixture: Fixture): Promise<void> {
  * check-adopters scanner expects. The returned array is the SCANNER's
  * argv only — `runScanner` adds the `check-adopters` subcommand prefix
  * when dispatching through the plugin CLI.
+ *
+ * `--gate-mode` is included by default so existing tests asserting
+ * exit-1-on-holdouts continue to hold after the Phase 6 informational-
+ * default flip. Tests exercising the default informational behavior
+ * use `argsInformational` instead.
  */
 export function args(fixture: Fixture, extra: readonly string[] = []): string[] {
+  return [
+    '--registry',
+    fixture.registryPath,
+    '--root',
+    fixture.scanRoot,
+    '--gate-mode',
+    ...extra,
+  ];
+}
+
+/**
+ * `args(fixture, extra)` WITHOUT `--gate-mode` so the default
+ * informational behavior (findings → exit 0 with report on stdout) is
+ * exercised. Used by `adopter-manifests.gate-mode.test.ts` to assert
+ * the flag toggle's effect on the exit code.
+ */
+export function argsInformational(
+  fixture: Fixture,
+  extra: readonly string[] = [],
+): string[] {
   return ['--registry', fixture.registryPath, '--root', fixture.scanRoot, ...extra];
 }
 

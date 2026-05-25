@@ -43,6 +43,11 @@
  *                             default output); useful for CI-style diffing.
  *                             Implies --quiet for the headline; full per-group
  *                             listing is replaced by NEW/DROPPED sections only.
+ *   --gate-mode               pre-commit-hook-friendly: exit 1 on NEW groups.
+ *                             For detect-clones, this is ALREADY the default
+ *                             contract (exit 1 = NEW exists); the flag is
+ *                             accepted for symmetry with the other check-*
+ *                             subcommands. No-op in effect.
  *
  * Exit code:
  *   0   no NEW clone groups (or first-run baseline written)
@@ -75,6 +80,12 @@ interface Cli {
   readonly baselinePath: string;
   readonly refreshBaseline: boolean;
   readonly diff: boolean;
+  /**
+   * Accepted for symmetry with the other check-* subcommands.
+   * detect-clones already exits 1 on NEW groups by default (the
+   * hook-friendly contract), so --gate-mode is a no-op here.
+   */
+  readonly gateMode: boolean;
 }
 
 function parseCli(argv: readonly string[]): Cli {
@@ -84,6 +95,7 @@ function parseCli(argv: readonly string[]): Cli {
   let baselinePath = DEFAULT_BASELINE;
   let refreshBaseline = false;
   let diff = false;
+  let gateMode = false;
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === '--root') {
@@ -98,9 +110,10 @@ function parseCli(argv: readonly string[]): Cli {
       if (next === undefined) throw new Error('--baseline requires a path');
       baselinePath = next;
     } else if (a === '--refresh-baseline') refreshBaseline = true;
+    else if (a === '--gate-mode') gateMode = true;
     else throw new Error(`unknown arg: ${a}`);
   }
-  return { root, quiet, json, baselinePath, refreshBaseline, diff };
+  return { root, quiet, json, baselinePath, refreshBaseline, diff, gateMode };
 }
 
 /**
