@@ -30,6 +30,12 @@ Run the `audiocontrol` three-track audit/review protocol on recent changes. The 
 8. Write or update the audit log. The audit log is the source of truth for current finding state, not commit messages or GitHub alone.
    - For a tracked feature, use the feature-local audit log at `docs/<version>/<status>/<slug>/audit-log.md`.
    - If the file does not exist, create it.
+   - New audit logs should start with a short operator header:
+     - findings are actionable work, not bookkeeping
+     - the audit log is the source of truth
+     - findings are never deleted; update entries in place
+     - `fixed-<sha>` is not `verified-<date>`
+     - include the canonical grep queue
    - If this is not a feature-scoped audit/review and there is no obvious existing audit log, stop and ask the operator where the durable log should live rather than inventing a hidden location.
    - New finding entry shape:
      - `Finding-ID: <stable-id>`
@@ -47,9 +53,9 @@ Run the `audiocontrol` three-track audit/review protocol on recent changes. The 
    - `informational` when no remediation is required
 10. Never delete audit-log findings. Update entries in place by changing `Status:` and appending resolution / verification notes under the same stable `Finding-ID`.
 11. End with the canonical queue check against the audit log:
-   - unfinished work: `grep -nE "^Status: (open|acknowledged|fixed-)" <audit-log>`
-   - new findings: `grep -nE "^Status: open" <audit-log>`
-   - awaiting verification: `grep -nE "^Status: fixed-" <audit-log>`
+   - unfinished work: `grep -nE "^Status:[[:space:]]+(open|acknowledged|fixed-)" <audit-log>`
+   - new findings: `grep -nE "^Status:[[:space:]]+open" <audit-log>`
+   - awaiting verification: `grep -nE "^Status:[[:space:]]+fixed-" <audit-log>`
 12. Report:
    - findings grouped by severity
    - the Track 1 verification gate that was independently re-run

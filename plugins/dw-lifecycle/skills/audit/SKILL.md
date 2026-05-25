@@ -28,6 +28,12 @@ Alias of `/dw-lifecycle:review`. Follow the exact same protocol: controller-side
    - For substantial or high-risk changes, dispatch Tracks 2 and 3 in parallel via `superpowers:dispatching-parallel-agents`.
 7. Integrate findings with rigor under `superpowers:receiving-code-review`. Push back on weak findings; fix or explicitly defer strong ones.
 8. Write or update the audit log. The audit log is the source of truth for current finding state, not commit messages or GitHub alone.
+   - New audit logs should start with a short operator header:
+     - findings are actionable work, not bookkeeping
+     - the audit log is the source of truth
+     - findings are never deleted; update entries in place
+     - `fixed-<sha>` is not `verified-<date>`
+     - include the canonical grep queue
    - New finding entry shape:
      - `Finding-ID: <stable-id>`
      - `Status:     open`
@@ -44,9 +50,9 @@ Alias of `/dw-lifecycle:review`. Follow the exact same protocol: controller-side
    - `informational` when no remediation is required
 10. Never delete audit-log findings. Update entries in place by changing `Status:` and appending resolution / verification notes under the same stable `Finding-ID`.
 11. End with the canonical queue check against the audit log:
-   - unfinished work: `grep -nE "^Status: (open|acknowledged|fixed-)" <audit-log>`
-   - new findings: `grep -nE "^Status: open" <audit-log>`
-   - awaiting verification: `grep -nE "^Status: fixed-" <audit-log>`
+   - unfinished work: `grep -nE "^Status:[[:space:]]+(open|acknowledged|fixed-)" <audit-log>`
+   - new findings: `grep -nE "^Status:[[:space:]]+open" <audit-log>`
+   - awaiting verification: `grep -nE "^Status:[[:space:]]+fixed-" <audit-log>`
 12. Report:
    - findings grouped by severity
    - the Track 1 verification gate that was independently re-run
