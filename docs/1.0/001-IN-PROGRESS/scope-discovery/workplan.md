@@ -298,26 +298,27 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
 
 ### Task 1: Config validation rules
 
-- [ ] `scope-discovery-config-missing` — install hint
-- [ ] `scope-discovery-schema-stale` — migration steps for stale `schemaVersion`
-- [ ] `clones-yaml-schema-violation`, `anti-patterns-yaml-schema-violation` — diff against schema
+- [x] `scope-discovery-config-missing` — install hint; fires when a project's feature docs reference scope-discovery but the config dir is absent. Landed at `plugins/dw-lifecycle/src/scope-discovery/doctor-rules/scope-discovery-config-missing.ts` (commit `29a1a17`).
+- [x] `scope-discovery-schema-stale` — migration steps for stale `schemaVersion`; checks clones.yaml / anti-patterns.yaml / adopter-manifests.yaml each for missing / mismatched `schemaVersion`. Plugin's current version published as `CURRENT_SCHEMA_VERSION = 1` in `doctor-rules/types.ts`. Seed YAMLs from `install-scope-discovery` now carry `schemaVersion: 1`. Commit `29a1a17`.
+- [x] `clones-yaml-schema-violation` — runs `parseClonesYamlStrict` against the project's clones.yaml; reports shape-error findings with a schema diff hint. Does NOT double-report on refactor-precondition errors (those go to the dedicated rule). Commit `29a1a17`.
+- [x] `anti-patterns-yaml-schema-violation` — same shape via `loadRegistry`; reports the registry parser's namespaced error with a schema pointer. Commit `29a1a17`.
 
 ### Task 2: Refactor-precondition validation
 
-- [ ] `clones-yaml-refactor-incomplete` — Step 0a/0b missing fields; per-branch repair hints
+- [x] `clones-yaml-refactor-incomplete` — walks clones.yaml looking for `disposition: refactor` entries; each missing Step 0a / Step 0b field becomes its own doctor finding with a per-branch repair hint (7 branch types covered: canonical_side / canonical_reason / new_shape_summary-required / new_shape_summary-empty-on-non-new / tests / tests_proof / tests_proof.sha). Commit `1fd6eab`.
 
 ### Task 3: Drift detection rules
 
-- [ ] `mirror-drift` — agent-prompt mirror diverges from canonical fragment; `--fix` regenerates
-- [ ] `override-drift` — project per-file scanner override diverges from plugin default by > N lines; operator advisory
+- [x] `agent-prompt-mirror-drift` — compares the Step 0 fragment in `.claude/agents/code-reviewer.md` + `codebase-auditor.md` against the canonical template; whitespace-normalized body compare; suppressed when `agent-prompt-overrides.md` is present. Repair hint: `install-agent-prompts --force`. Commit `275faef`.
+- [x] `override-drift` — operator advisory when a per-file scope-discovery override diverges from the plugin default by > 50 non-blank lines OR exported-symbol surface differs. Heuristic intentionally coarse; operator decides whether to converge. Commit `275faef`.
 
 ### Task 4: Install state rules
 
-- [ ] `hooks-installed-missing` — hooks-installed.json references files that no longer exist; re-install hint
+- [x] `hooks-installed-missing` — reads `hooks-installed.json`; warns when any managed file in the manifest no longer exists. Repair hints surface BOTH re-install and clean-uninstall paths. Commit `20fc0fa`.
 
 **Acceptance Criteria:**
-- [ ] All 7 new doctor rules implemented + tested against fixture projects
-- [ ] Repair hints actionable
+- [x] All 8 new doctor rules implemented + tested against fixture projects — 54 new vitest scenarios across 8 rule-test files; tests use on-disk tmpdir fixtures (no mock fs).
+- [x] Repair hints actionable — each rule's message names the exact `/dw-lifecycle:*` skill or file path the operator should target. Smoke against this repo fires `scope-discovery-config-missing` with a recognisable install hint.
 
 ## Phase 10: Canary install + graphical-entries paper-test deliverable
 
