@@ -20,6 +20,7 @@ import { checkDeprecations } from './subcommands/check-deprecations.js';
 import { validateScopeDiscovery } from './subcommands/validate-scope-discovery.js';
 import { scopeExport } from './subcommands/scope-export.js';
 import { refreshClonesBaseline } from './subcommands/refresh-clones-baseline.js';
+import { disposeClone } from './subcommands/dispose-clone.js';
 
 const subcommand = process.argv[2];
 const args = process.argv.slice(3);
@@ -47,6 +48,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'validate-scope-discovery': validateScopeDiscovery,
   'scope-export': scopeExport,
   'refresh-clones-baseline': refreshClonesBaseline,
+  'dispose-clone': disposeClone,
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {
