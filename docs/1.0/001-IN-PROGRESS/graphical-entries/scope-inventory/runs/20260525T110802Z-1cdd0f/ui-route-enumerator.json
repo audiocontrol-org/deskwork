@@ -1,0 +1,10 @@
+{
+  "agent": "ui-route-enumerator",
+  "featureSlug": "graphical-entries",
+  "modulesInScope": [
+    "cli",
+    "core",
+    "studio"
+  ],
+  "routes": []
+}
