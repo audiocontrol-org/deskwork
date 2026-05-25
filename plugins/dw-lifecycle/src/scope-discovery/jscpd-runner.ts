@@ -64,16 +64,27 @@ export async function runJscpd(opts: {
   // passing the path as a positional argument AFTER --config. jscpd's
   // CLI accepts `<path ...>` positional after options. The config still
   // contributes thresholds/ignores/reporters; only the scan root changes.
-  const jscpdArgs = ['jscpd', '--config', '.jscpd.json'];
+  //
+  // `--yes` is the first arg to npx so it doesn't prompt to install
+  // jscpd in non-TTY contexts (pre-commit hooks, CI, sub-agent
+  // dispatches). stdin is `'ignore'` below, so a prompt would hang
+  // indefinitely with no operator-visible indication of why.
+  const jscpdArgs = ['--yes', 'jscpd', '--config', '.jscpd.json'];
   if (opts.rootOverride !== null) {
     jscpdArgs.push(opts.rootOverride);
   }
+  // stderr is collected by the spawn promise but also surfaced in the
+  // ENOENT-on-stat branch below. Lifting the binding to outer scope lets
+  // the "ran but wrote no report" error name the actual failure (e.g.
+  // jscpd not installed, network failure during `npx --yes` fetch)
+  // instead of pointing at the .jscpd.json reporters list, which is
+  // actively misleading when the real cause is upstream of jscpd.
+  let stderr = '';
   await new Promise<void>((resolvePromise, rejectPromise) => {
     const proc = spawn('npx', jscpdArgs, {
       cwd: opts.repoRoot,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
-    let stderr = '';
     proc.stdout?.on('data', () => {
       /* swallow jscpd's progress output; we read the JSON instead */
     });
@@ -94,8 +105,9 @@ export async function runJscpd(opts: {
   } catch (err) {
     if (isEnoent(err)) {
       throw new Error(
-        `jscpd ran but did not write ${JSCPD_REPORT_PATH}. ` +
-          `The .jscpd.json reporters list must include "json".`,
+        `jscpd ran but did not write ${JSCPD_REPORT_PATH}.\n` +
+          `stderr from npx:\n${stderr || '(empty)'}\n` +
+          `If stderr is empty, verify .jscpd.json includes "json" in reporters.`,
       );
     }
     throw err;
@@ -142,9 +154,21 @@ export function parseJscpdReport(reportText: string): CloneGroup[] {
           'jscpd version in use surfaces the duplicated source text in its JSON report.',
       );
     }
+    // Project rule: no fallbacks outside test code. The previous default
+    // (`lines: 0`) is unreachable under jscpd v4, but a future jscpd
+    // format change that drops the `lines` field would silently produce
+    // CloneGroups with `lines: 0` — bypassing collapsePairsIntoGroups'
+    // lines-parity guard and merging unrelated clone pairs. Throw loud
+    // instead so the format drift is visible at the next run.
+    if (typeof lines !== 'number') {
+      throw new Error(
+        'jscpd-report.json duplicates[] entry missing numeric `lines` field; ' +
+          'cannot build CloneGroup without a line count.',
+      );
+    }
     pairs.push({
       members: [a, b].sort(),
-      lines: typeof lines === 'number' ? lines : 0,
+      lines,
       fragmentSha: sha1HexOfText(fragment),
     });
   }
