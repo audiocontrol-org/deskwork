@@ -248,19 +248,30 @@ function reportJson(groups: readonly CloneGroup[], diff: CloneDiff): void {
   process.stdout.write(`${JSON.stringify({ groups, ...diff }, null, 2)}\n`);
 }
 
-async function main(): Promise<number> {
+/**
+ * Run the clone-detection logic and exit the process with the
+ * appropriate code (0 = no new groups, 1 = new groups exist, 2 = I/O
+ * or parse error). Matches the dw-lifecycle subcommand-handler shape
+ * used by sibling subcommands (doctor, setup, etc.) — args[] replaces
+ * process.argv.slice(2); process.exit is called directly inside.
+ *
+ * Exported for the subcommands/detect-clones.ts dispatch shim; not
+ * intended to be invoked except via the `dw-lifecycle detect-clones`
+ * subcommand.
+ */
+export async function detectClones(args: string[]): Promise<void> {
   let cli: Cli;
   try {
-    cli = parseCli(process.argv.slice(2));
+    cli = parseCli(args);
   } catch (err) {
     console.error(errorMessage(err));
-    return 2;
+    process.exit(2);
   }
   try {
     await runJscpd({ repoRoot: REPO_ROOT, rootOverride: cli.root });
   } catch (err) {
     console.error(`jscpd invocation failed: ${errorMessage(err)}`);
-    return 2;
+    process.exit(2);
   }
   const reportText = await readFile(join(REPO_ROOT, JSCPD_REPORT_PATH), 'utf8');
   const detectedGroups = parseJscpdReport(reportText);
@@ -282,7 +293,7 @@ async function main(): Promise<number> {
           `Hand-fix the YAML and re-run, OR explicitly remove the file to ` +
           `regenerate from scratch.`,
       );
-      return 2;
+      process.exit(2);
     }
     throw err;
   }
@@ -321,7 +332,7 @@ async function main(): Promise<number> {
         process.stdout.write(`${summaryLine(diff)}\n`);
       }
     }
-    return 0;
+    process.exit(0);
   }
 
   if (cli.json) {
@@ -332,15 +343,5 @@ async function main(): Promise<number> {
     reportHuman({ groups: detectedGroups, diff, quiet: cli.quiet, baselineExisted });
   }
   const failing = diff.newGroups.length;
-  return failing > 0 ? 1 : 0;
+  process.exit(failing > 0 ? 1 : 0);
 }
-
-main().then(
-  (code) => {
-    process.exit(code);
-  },
-  (err) => {
-    console.error(`unexpected failure: ${errorMessage(err)}`);
-    process.exit(2);
-  },
-);

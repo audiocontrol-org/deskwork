@@ -7,6 +7,7 @@ import { journalAppend } from './subcommands/journal-append.js';
 import { transition } from './subcommands/transition.js';
 import { issues } from './subcommands/issues.js';
 import { customize } from './subcommands/customize.js';
+import { detectClones } from './subcommands/detect-clones.js';
 
 const subcommand = process.argv[2];
 const args = process.argv.slice(3);
@@ -21,6 +22,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'journal-append': journalAppend,
   doctor,
   customize,
+  'detect-clones': detectClones,
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {
