@@ -17,6 +17,7 @@ import { batchDispose } from './subcommands/batch-dispose.js';
 import { checkDispositionSurvivor } from './subcommands/check-disposition-survivor.js';
 import { scopeSummary } from './subcommands/scope-summary.js';
 import { checkDeprecations } from './subcommands/check-deprecations.js';
+import { validateScopeDiscovery } from './subcommands/validate-scope-discovery.js';
 
 const subcommand = process.argv[2];
 const args = process.argv.slice(3);
@@ -41,6 +42,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'check-disposition-survivor': checkDispositionSurvivor,
   'scope-summary': scopeSummary,
   'check-deprecations': checkDeprecations,
+  'validate-scope-discovery': validateScopeDiscovery,
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {
