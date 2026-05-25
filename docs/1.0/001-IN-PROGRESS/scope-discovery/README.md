@@ -16,7 +16,7 @@ Canonize the audiocontrol-piloted Scope Discovery Protocol into the `dw-lifecycl
 
 | Phase | Description | Status |
 |---|---|---|
-| 1 | Plugin-side scanner core (clone-detector) | Not started |
+| 1 | Plugin-side scanner core (clone-detector) | Complete (acceptance gate green; 347/347 tests pass) |
 | 2 | Anti-patterns + refactor-preconditions + adopter-manifests scanners | Not started |
 | 3 | Four universal discovery agents + synthesis pass | Not started |
 | 4 | Config-activated discovery agents | Not started |

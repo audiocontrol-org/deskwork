@@ -18,24 +18,24 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
 
 ### Task 1: Port clone-detector + jscpd-runner
 
-- [ ] Copy `tools/scope-discovery/{clone-detector,jscpd-runner,clones-yaml}.ts` from audiocontrol pilot to `plugins/dw-lifecycle/src/scope-discovery/`
-- [ ] Adjust import paths for dw-lifecycle's module layout
-- [ ] Resolve any audiocontrol-specific assumptions; generalize
+- [x] Copy `tools/scope-discovery/{clone-detector,jscpd-runner,clones-yaml}.ts` from audiocontrol pilot to `plugins/dw-lifecycle/src/scope-discovery/`
+- [x] Adjust import paths for dw-lifecycle's module layout
+- [x] Resolve any audiocontrol-specific assumptions; generalize
 
 ### Task 2: clones.yaml schema + validator
 
-- [ ] Author `plugins/dw-lifecycle/src/scope-discovery/schema/clones.yaml.schema.json`
-- [ ] Author `clones-yaml.refactor.ts` parse-time validator (Step 0a × 4 branches + Step 0b × 3 branches)
+- [x] Author `plugins/dw-lifecycle/src/scope-discovery/schema/clones.yaml.schema.json`
+- [x] Author `clones-yaml.refactor.ts` parse-time validator (Step 0a × 4 branches + Step 0b × 3 branches) — already satisfied by Task 1's verbatim port; `parseClonesYamlDetailed` invokes `validateRefactorPreconditions` at line 207.
 
 ### Task 3: Adversarial validator harness
 
-- [ ] Port `clone-detector.validate.ts` (4 scenarios incl. gutted-stub) verbatim
-- [ ] Validator runs via `npx vitest run scope-discovery/clone-detector.validate.ts`
+- [x] Port `clone-detector.validate.ts` (4 scenarios incl. gutted-stub) verbatim — split into 8 vitest files in `plugins/dw-lifecycle/src/__tests__/scope-discovery/` per the 300–500-line cap.
+- [x] Validator runs via `npm --workspace @deskwork/plugin-dw-lifecycle run test -- scope-discovery`
 
 **Acceptance Criteria:**
-- [ ] `dw-lifecycle check-clones` runs clone detector against a fixture project + emits disposition diff
-- [ ] Schema validator catches malformed `clones.yaml` entries at parse time
-- [ ] Gutted-stub self-check: harness FAILS if clone-detector's logic is gutted
+- [x] `dw-lifecycle detect-clones` runs clone detector against a fixture project + emits disposition diff (subprocess-based in `clone-detector.baseline.test.ts` et al.; `check-clones` is the Phase 6 rename)
+- [x] Schema validator catches malformed `clones.yaml` entries at parse time (`parseClonesYamlStrict` throws `ClonesYamlParseError`; JSON Schema documents the contract for adopters' editors)
+- [x] Gutted-stub self-check: harness FAILS if clone-detector's logic is gutted (verified: 7 of 17 scope-discovery tests fail when `detectClones` body is replaced with `process.stdout.write('0 groups; 0 NEW; 0 DROPPED\n'); process.exit(0);`)
 
 ## Phase 2: Anti-patterns + refactor-preconditions + adopter-manifests scanners
 
