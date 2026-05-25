@@ -59,6 +59,7 @@
  *     --feature <slug> --prd-path <path> [--repo-root <path>] [--module-root <path>]
  */
 
+import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { scan as scanAntiPatterns } from '../check-anti-patterns.js';
 import { scan as scanAdopters } from '../check-adopters.js';
@@ -102,8 +103,14 @@ async function collectAntiPatternFindings(
   input: DiscoveryAgentInput,
 ): Promise<readonly RegimeHoldoutFinding[]> {
   const repoRoot = input.repoRoot;
+  const registryPath = resolve(repoRoot, ANTI_PATTERNS_REGISTRY);
+  // Per-gate activation guard: the orchestrator's outer `runAgents`
+  // activates this agent when ANY of the three gate files exist;
+  // each individual sub-scan must guard its OWN registry file because
+  // the upstream scanner throws on a missing file (no silent fallback).
+  if (!existsSync(registryPath)) return [];
   const result = await scanAntiPatterns({
-    registryPath: resolve(repoRoot, ANTI_PATTERNS_REGISTRY),
+    registryPath,
     scanRoot: moduleRootAbs(input),
     quiet: true,
     json: true,
@@ -136,8 +143,11 @@ async function collectAdopterManifestFindings(
   input: DiscoveryAgentInput,
 ): Promise<readonly RegimeHoldoutFinding[]> {
   const repoRoot = input.repoRoot;
+  const registryPath = resolve(repoRoot, ADOPTER_MANIFESTS_REGISTRY);
+  // Per-gate activation guard — see `collectAntiPatternFindings`.
+  if (!existsSync(registryPath)) return [];
   const result = await scanAdopters({
-    registryPath: resolve(repoRoot, ADOPTER_MANIFESTS_REGISTRY),
+    registryPath,
     scanRoot: repoRoot,
     quiet: true,
     json: true,
@@ -178,8 +188,13 @@ async function collectEditorSymmetryFindings(
   input: DiscoveryAgentInput,
 ): Promise<readonly RegimeHoldoutFinding[]> {
   const repoRoot = input.repoRoot;
+  const registryPath = resolve(repoRoot, ADOPTER_MANIFESTS_REGISTRY);
+  // Per-gate activation guard — see `collectAntiPatternFindings`.
+  // The editor-symmetry matrix is derived from the adopter-manifests
+  // registry, so its guard mirrors the adopter sub-pass's gate.
+  if (!existsSync(registryPath)) return [];
   const matrix = await computeMatrix({
-    registryPath: resolve(repoRoot, ADOPTER_MANIFESTS_REGISTRY),
+    registryPath,
     scanRoot: repoRoot,
     moduleRoot: input.moduleRoot,
   });

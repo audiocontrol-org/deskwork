@@ -35,6 +35,7 @@
  * `adopter-manifest-checker.json`.
  */
 
+import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { scan as scanAdopters, type ScanResult } from '../check-adopters.js';
 import type {
@@ -64,6 +65,20 @@ export async function checkAdopterManifests(
   input: DiscoveryAgentInput,
 ): Promise<AdopterManifestCheckerFindings> {
   const registryPath = resolve(input.repoRoot, ADOPTER_MANIFESTS_REGISTRY);
+  // The orchestrator already gates this agent on `existsSync` of the
+  // same path, but mirror the check here so the agent is safe to call
+  // standalone (mirrors the pilot's "empty registry == 0 findings"
+  // contract without rewriting the upstream scanner's throw-on-ENOENT
+  // behavior).
+  if (!existsSync(registryPath)) {
+    return {
+      agent: 'adopter-manifest-checker',
+      featureSlug: input.featureSlug,
+      registryPath: ADOPTER_MANIFESTS_REGISTRY,
+      findings: [],
+      meta: { entriesScanned: 0, filesVisited: 0, holdoutCount: 0 },
+    };
+  }
   const result: ScanResult = await scanAdopters({
     registryPath,
     scanRoot: input.repoRoot,
