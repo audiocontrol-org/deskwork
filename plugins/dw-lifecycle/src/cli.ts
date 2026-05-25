@@ -9,6 +9,7 @@ import { issues } from './subcommands/issues.js';
 import { customize } from './subcommands/customize.js';
 import { detectClones } from './subcommands/detect-clones.js';
 import { checkAntiPatterns } from './subcommands/check-anti-patterns.js';
+import { checkAdopters } from './subcommands/check-adopters.js';
 import { checkRefactorPreconditions } from './subcommands/check-refactor-preconditions.js';
 
 const subcommand = process.argv[2];
@@ -26,6 +27,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   customize,
   'detect-clones': detectClones,
   'check-anti-patterns': checkAntiPatterns,
+  'check-adopters': checkAdopters,
   'check-refactor-preconditions': checkRefactorPreconditions,
 };
 
