@@ -21,7 +21,7 @@ Canonize the audiocontrol-piloted Scope Discovery Protocol into the `dw-lifecycl
 | 3 | Four universal discovery agents + synthesis pass | Complete (415/415 tests pass; scope-inventory orchestrates 4 agents + manifest-validator; YAML override loader honored) |
 | 4 | Config-activated discovery agents | Not started |
 | 5 | Dispatch wrapper + skill-prose convention template | Not started |
-| 6 | CLI subcommands (~20 new verbs) | Not started |
+| 6 | CLI subcommands (~20 new verbs) | In progress — 6 of ~20 verbs landed across Phases 1-4 (`detect-clones`, `check-anti-patterns`, `check-adopters`, `check-refactor-preconditions`, `scope-inventory`, `check-editor-symmetry`); `--gate-mode` flag + Task-1 (`scope-widen`/`scope-summary`) + Task-3/4/5 verbs pending. |
 | 7 | Slash command skill prose (~18 new + 5 updated) | Not started |
 | 8 | Install / migrate / uninstall machinery | Not started |
 | 9 | Doctor rule additions | Not started |

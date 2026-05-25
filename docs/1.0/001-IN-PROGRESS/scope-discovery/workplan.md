@@ -161,18 +161,18 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
 
 ### Task 1: Inventory + widen + summary commands
 
-- [ ] `scope-inventory <slug>`
-- [ ] `scope-widen "<complaint>"`
-- [ ] `scope-summary [--surface <glob>]`
+- [x] `scope-inventory <slug>` — landed in Phase 3; fans 4 universal agents in parallel + Phase 4 config-activated agents.
+- [ ] `scope-widen "<complaint>"` — pending.
+- [ ] `scope-summary [--surface <glob>]` — pending.
 
 ### Task 2: Check-* gate commands
 
-- [ ] `check-clones [--gate-mode]`
-- [ ] `check-anti-patterns [--gate-mode]`
-- [ ] `check-deprecations [--write]`
-- [ ] `check-adopters [--gate-mode]`
-- [ ] `check-editor-symmetry [--write]`
-- [ ] `check-refactor-preconditions [--gate-mode]`
+- [~] `check-clones [--gate-mode]` — subcommand registered as `detect-clones` in Phase 1; `--gate-mode` flag + rename to `check-clones` pending.
+- [~] `check-anti-patterns [--gate-mode]` — subcommand registered in Phase 2; `--gate-mode` flag pending.
+- [ ] `check-deprecations [--write]` — pending; deprecation-scan port tracked at [#287](https://github.com/audiocontrol-org/deskwork/issues/287).
+- [~] `check-adopters [--gate-mode]` — subcommand registered in Phase 2; `--gate-mode` flag pending.
+- [x] `check-editor-symmetry [--write]` — landed in Phase 4 with `--write` flag honored; default writes to `docs/<v>/001-IN-PROGRESS/<slug>/scope-inventory/editor-symmetry.md`.
+- [~] `check-refactor-preconditions [--gate-mode]` — subcommand registered in Phase 2; `--gate-mode` flag pending.
 
 ### Task 3: Disposition + baseline commands
 
