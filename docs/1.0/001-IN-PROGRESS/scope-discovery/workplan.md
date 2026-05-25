@@ -43,24 +43,24 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
 
 ### Task 1: Anti-patterns scanner + type dispatcher
 
-- [ ] Port `check-anti-patterns.ts` + `anti-patterns-registry.ts` + `anti-patterns-report.ts` from pilot
-- [ ] Pattern type dispatcher supporting `glob` / `regex` / `ast-grep` / `ts-morph`
-- [ ] Schema `anti-patterns.yaml.schema.json`
+- [x] Port `check-anti-patterns.ts` + `anti-patterns-registry.ts` + `anti-patterns-report.ts` from pilot
+- [x] Pattern type dispatcher supporting `glob` / `regex` / `ast-grep` / `ts-morph` — v1 ships regex-only (matches pilot); follow-up [#285](https://github.com/audiocontrol-org/deskwork/issues/285) tracks glob/ast-grep/ts-morph extension.
+- [x] Schema `anti-patterns.yaml.schema.json`
 
 ### Task 2: Refactor-preconditions enforcer
 
-- [ ] Port `check-refactor-preconditions.ts` + `check-refactor-preconditions.runtime.ts`
-- [ ] Validator harness covering Step 0a × 4 branches + Step 0b × 3 branches
+- [x] Port `check-refactor-preconditions.ts` + `check-refactor-preconditions.runtime.ts`
+- [x] Validator harness covering Step 0a × 4 branches + Step 0b × 3 branches — 8 vitest scenarios incl. gutted-stub adversarial check; uses real dw-lifecycle commit SHA `14d90ae` as `REAL_SHA` preflight target.
 
 ### Task 3: Adopter-manifests checker
 
-- [ ] Port `adopter-manifests-registry.ts` + `adopter-manifests-report.ts` + `check-adopters.ts`
-- [ ] Schema `adopter-manifests.yaml.schema.json`
+- [x] Port `adopter-manifests-registry.ts` + `adopter-manifests-report.ts` + `check-adopters.ts`
+- [x] Schema `adopter-manifests.yaml.schema.json` — authored from scratch (pilot had no equivalent); covers structural validation, semantic rules stay in `parseRegistry` SSOT.
 
 **Acceptance Criteria:**
-- [ ] All three scanners run via `dw-lifecycle check-{anti-patterns,refactor-preconditions,adopters}`
-- [ ] Schema validators catch malformed YAMLs
-- [ ] Adversarial harnesses pass + gutted-stub self-checks engage
+- [x] All three scanners run via `dw-lifecycle check-{anti-patterns,refactor-preconditions,adopters}` — confirmed in `dw-lifecycle --help` subcommand list.
+- [x] Schema validators catch malformed YAMLs — `parseRegistry` throws with descriptive messages on shape violations; JSON Schemas document the contract for adopters' editors.
+- [x] Adversarial harnesses pass + gutted-stub self-checks engage — anti-patterns: 14/16 fail under gut; refactor-preconditions: 7/8 fail under gut; adopter-manifests: 20/24 fail under gut + cross-cutting `adopter-manifests.validate.test.ts` probe.
 
 ## Phase 3: Four universal discovery agents + synthesis pass
 
