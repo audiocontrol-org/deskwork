@@ -5,6 +5,7 @@ Machine-readable specs of the YAML wire formats produced and consumed by the sco
 | File | Spec for | Authoritative validator (runtime) |
 |---|---|---|
 | `clones.yaml.schema.json` | `docs/scope-discovery/clones.yaml` | `../clones-yaml.parse.ts` + `../clones-yaml.refactor.ts` (`validateRefactorPreconditions`) |
+| `anti-patterns.yaml.schema.json` | `docs/scope-discovery/anti-patterns.yaml` | `../anti-patterns-registry.ts` (`parseEntry`) |
 
 Phase 2 / Phase 3 add `scope-manifest.yaml.schema.json` and `annotated-trace.json.schema.json` respectively.
 

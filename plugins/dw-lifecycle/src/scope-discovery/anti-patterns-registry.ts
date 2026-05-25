@@ -54,8 +54,13 @@
  *
  * Pattern type dispatcher follow-up: the pilot port (and this v1)
  * implement only the `regex` type. Extension to `glob` / `ast-grep` /
- * `ts-morph` pattern types is tracked as a separate enhancement; see
- * the workplan + the matching GitHub issue.
+ * `ts-morph` pattern types is tracked at audiocontrol-org/deskwork#285.
+ * The schema's optional `type:` field is accepted (and validated) by
+ * v1 — entries that set `type: regex` parse identically to entries
+ * that omit the field. Entries with any other `type:` value are
+ * rejected loudly so adopters who pre-author v2 entries against this
+ * v1 implementation get an actionable error rather than a silent
+ * regex-fallthrough.
  */
 
 import { globToRegex } from './util/glob.js';
@@ -167,6 +172,7 @@ export function parseRegistry(yamlText: string, sourcePath: string): ParsedRegis
 function parseEntry(raw: Record<string, unknown>, ctx: string): AntiPatternEntry {
   const id = requireString(raw, 'id', ctx, NAMESPACE);
   validateKebabId(id, ctx, NAMESPACE);
+  parseType(raw['type'], ctx);
   const addedIn = requireString(raw, 'added_in', ctx, NAMESPACE);
   validateGitSha(addedIn, 'added_in', ctx, NAMESPACE);
   const primitive = requireString(raw, 'primitive', ctx, NAMESPACE);
@@ -190,6 +196,31 @@ function parseEntry(raw: Record<string, unknown>, ctx: string): AntiPatternEntry
     canonicalImplementationFile,
     message,
   };
+}
+
+/**
+ * Parse the optional `type:` discriminator. v1 accepts `'regex'` or
+ * absence (treated as `'regex'`); rejects any other value loudly so
+ * adopters who pre-author v2 entries against the v1 implementation get
+ * an actionable error rather than silent regex fall-through.
+ *
+ * The extension to `glob` / `ast-grep` / `ts-morph` is tracked at
+ * audiocontrol-org/deskwork#285.
+ */
+function parseType(raw: unknown, ctx: string): void {
+  if (raw === undefined || raw === null) return;
+  if (typeof raw !== 'string') {
+    throw new Error(
+      `${NAMESPACE}: ${ctx} \`type\` must be a string; got ${typeof raw}`,
+    );
+  }
+  if (raw !== 'regex') {
+    throw new Error(
+      `${NAMESPACE}: ${ctx} \`type\` "${raw}" is not yet supported; v1 only implements ` +
+        `\`regex\`. Other pattern types (glob / ast-grep / ts-morph) are tracked at ` +
+        `audiocontrol-org/deskwork#285.`,
+    );
+  }
 }
 
 /**

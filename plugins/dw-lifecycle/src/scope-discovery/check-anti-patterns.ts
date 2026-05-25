@@ -47,7 +47,11 @@ import { toPosix } from './util/glob.js';
 import { errorMessage } from './util/typeguards.js';
 
 const DEFAULT_REGISTRY = 'docs/scope-discovery/anti-patterns.yaml';
-const DEFAULT_ROOT = 'modules';
+// Default scan root matches the deskwork project layout (source in
+// `src/`). Adopters with non-default trees override via `--root`. The
+// audiocontrol pilot defaulted to `modules/`; that was specific to its
+// pnpm workspace shape and not portable to deskwork projects.
+const DEFAULT_ROOT = 'src';
 const SCANNED_EXTENSIONS: ReadonlySet<string> = new Set(['.ts', '.tsx']);
 
 /** Default per-segment directory names to skip during the tree walk. */
@@ -119,11 +123,11 @@ export function parseCli(argv: readonly string[]): CliOptions {
 function printHelp(): void {
   process.stdout.write(
     [
-      'tsx tools/scope-discovery/check-anti-patterns.ts [options]',
+      'dw-lifecycle check-anti-patterns [options]',
       '',
       'Options:',
       '  --registry <path>  Override registry path (default: docs/scope-discovery/anti-patterns.yaml)',
-      '  --root <path>      Override scan root (default: modules)',
+      '  --root <path>      Override scan root (default: src)',
       '  --quiet            Suppress per-match output; print summary only',
       '  --json             Emit findings as JSON',
       '  --help, -h         Show this help',
