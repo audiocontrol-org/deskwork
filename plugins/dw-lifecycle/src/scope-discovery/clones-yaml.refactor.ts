@@ -1,5 +1,5 @@
 /**
- * tools/scope-discovery/clones-yaml.refactor.ts
+ * plugins/dw-lifecycle/src/scope-discovery/clones-yaml.refactor.ts
  *
  * Refactor-disposition precondition schema for clones.yaml entries
  * (T5.1, scope-discovery-protocol Phase 5). Extracted from
@@ -24,9 +24,9 @@
  *     anchors the test to a specific failing-then-passing commit pair,
  *     so the disposition record itself proves the safety net exists.
  *
- * Both failure modes were observed on feature/roland-bugfix and
- * surfaced in tooling-feedback.md as MUST-FIX before any refactor
- * disposition lands.
+ * Both failure modes were originally surfaced during the audiocontrol
+ * pilot's refactor-precondition validation work and codified here as
+ * MUST-FIX before any refactor disposition lands.
  */
 
 import { isPlainObject } from './util/typeguards.js';

@@ -1,5 +1,5 @@
 /**
- * tools/scope-discovery/clones-yaml.id.ts
+ * plugins/dw-lifecycle/src/scope-discovery/clones-yaml.id.ts
  *
  * Content-hashed clone-group ID derivation (T7.1). Extracted from
  * clones-yaml.ts so the host file stays under the 300-500 line cap

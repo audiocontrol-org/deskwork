@@ -1,5 +1,5 @@
 /**
- * tools/scope-discovery/clones-yaml.parse.ts
+ * plugins/dw-lifecycle/src/scope-discovery/clones-yaml.parse.ts
  *
  * Parse layer for `docs/scope-discovery/clones.yaml`. Extracted from
  * `clones-yaml.ts` so the host file stays under the 300-500 line cap

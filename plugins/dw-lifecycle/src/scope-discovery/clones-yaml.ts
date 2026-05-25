@@ -7,9 +7,9 @@
  * adversarial validator harness (Phase 1 Task 3) can reuse the same
  * primitives.
  *
- * File-size note: this file is 369 lines, which exceeds the project's
- * 300-line guideline. The exception is accepted because this file is an
- * umbrella re-exporter — type defs plus 5 thin helpers (compareCloneGroups,
+ * File-size note: this file exceeds the project's 300-line guideline.
+ * The exception is accepted because this file is an umbrella re-exporter
+ * — type defs plus a small set of thin helpers (compareCloneGroups,
  * makeCloneGroup, makeRefactorCloneGroup, hasRefactorDisposition,
  * serializeClonesYaml, diffClones, mergeDispositions) plus re-exports
  * from clones-yaml.id.ts, clones-yaml.refactor.ts, and clones-yaml.parse.ts.

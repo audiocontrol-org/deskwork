@@ -1,5 +1,5 @@
 /**
- * tools/scope-discovery/util/typeguards.ts
+ * plugins/dw-lifecycle/src/scope-discovery/util/typeguards.ts
  *
  * Tiny shared type-guard helpers used across the scope-discovery
  * tooling. Extracted from tools/scope-discovery/schema/validate.ts
