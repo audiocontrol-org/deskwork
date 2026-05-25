@@ -13,6 +13,7 @@ import { checkAdopters } from './subcommands/check-adopters.js';
 import { checkEditorSymmetry } from './subcommands/check-editor-symmetry.js';
 import { checkRefactorPreconditions } from './subcommands/check-refactor-preconditions.js';
 import { scopeInventory } from './subcommands/scope-inventory.js';
+import { batchDispose } from './subcommands/batch-dispose.js';
 
 const subcommand = process.argv[2];
 const args = process.argv.slice(3);
@@ -33,6 +34,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'check-editor-symmetry': checkEditorSymmetry,
   'check-refactor-preconditions': checkRefactorPreconditions,
   'scope-inventory': scopeInventory,
+  'batch-dispose': batchDispose,
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {
