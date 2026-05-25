@@ -1,11 +1,12 @@
 /**
- * tools/scope-discovery/clone-detector.ts
+ * plugins/dw-lifecycle/src/scope-discovery/clone-detector.ts
  *
  * General TypeScript/TSX clone-detection gate for the scope-discovery
- * protocol (T2.2). Wraps `jscpd` (already installed; configured at
- * `.jscpd.json`; scoped to `modules/`, ts+tsx, no tests/dist), parses
- * its JSON report into stable clone-group records, and compares
- * against the committed baseline at `docs/scope-discovery/clones.yaml`.
+ * protocol. Wraps `jscpd` (configured at `.jscpd.json` in the adopter
+ * project's repo root), parses its JSON report into stable clone-group
+ * records, and compares against the committed baseline at
+ * `docs/scope-discovery/clones.yaml` (project-relative default;
+ * configurable via `--baseline`).
  *
  * Engine choice — jscpd over AST-custom — rationale:
  *   1. Already installed and wired (root package.json devDep, .jscpd.json
@@ -154,19 +155,19 @@ function summaryLine(diff: CloneDiff): string {
 }
 
 /**
- * Per-NEW-group operator hint: a pre-filled `batch-dispose.ts` command
- * the operator can paste-and-edit instead of hand-writing a YAML entry
- * at the right insertion point in docs/scope-discovery/clones.yaml.
+ * Per-NEW-group operator hint: a pre-filled `dw-lifecycle batch-dispose`
+ * command the operator can paste-and-edit instead of hand-writing a YAML
+ * entry at the right insertion point in docs/scope-discovery/clones.yaml.
  *
- * Closes AUDIT-20260524-09 (TF-003 from akai-harmonization): the prior
- * NEW-group output named the id and member files but never cited the
- * existing `tools/scope-discovery/batch-dispose.ts` automation, so
- * operators reinvented the manual workflow each time.
+ * The audiocontrol pilot named `tsx tools/scope-discovery/batch-dispose.ts`
+ * directly. This port references the eventual subcommand shape
+ * (`dw-lifecycle batch-dispose ...`); the subcommand itself is filed for
+ * Phase 6 of the scope-discovery workplan.
  *
  * Emitted ADDITIVELY — every existing NEW-group line is preserved so
  * downstream consumers grepping for `NEW    <id>` or member paths
  * continue to work. DROPPED groups intentionally do NOT get this hint:
- * they are removed via the clones-yaml refresh (`make refresh-clones-baseline`),
+ * they are removed via the clones-yaml refresh (`dw-lifecycle refresh-clones-baseline`),
  * not via batch-dispose.
  *
  * The `indent` parameter matches each caller's existing per-group
@@ -178,8 +179,13 @@ function summaryLine(diff: CloneDiff): string {
 function batchDisposeHintLines(id: string, indent: string): readonly string[] {
   const lead = `${indent}  Run:  `;
   const cont = `${indent}          `;
+  // TODO(scope-discovery #284): wire to the actual `dw-lifecycle batch-dispose`
+  // subcommand once Phase 6 of the scope-discovery workplan lands. The
+  // hint string emitted here is forward-compatible with the eventual
+  // subcommand shape — adopters today read it and learn the workflow
+  // even if the subcommand isn't yet implemented.
   return [
-    `${lead}tsx tools/scope-discovery/batch-dispose.ts \\\n`,
+    `${lead}dw-lifecycle batch-dispose \\\n`,
     `${cont}--ids ${id} \\\n`,
     `${cont}--disposition <refactor|keep-with-reason|ignore-with-justification> \\\n`,
     `${cont}--reason "<one-line rationale>"\n`,

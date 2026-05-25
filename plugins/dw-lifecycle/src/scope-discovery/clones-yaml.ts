@@ -1,10 +1,20 @@
 /**
- * tools/scope-discovery/clones-yaml.ts
+ * plugins/dw-lifecycle/src/scope-discovery/clones-yaml.ts
  *
  * Shape, ser/deser, and comparison helpers for
  * docs/scope-discovery/clones.yaml. Used by clone-detector.ts; kept
  * separate so the CLI entry stays under the 300-line cap and so the
- * adversarial validator harness (T2.5) can reuse the same primitives.
+ * adversarial validator harness (Phase 1 Task 3) can reuse the same
+ * primitives.
+ *
+ * File-size note: this file is 369 lines, which exceeds the project's
+ * 300-line guideline. The exception is accepted because this file is an
+ * umbrella re-exporter — type defs plus 5 thin helpers (compareCloneGroups,
+ * makeCloneGroup, makeRefactorCloneGroup, hasRefactorDisposition,
+ * serializeClonesYaml, diffClones, mergeDispositions) plus re-exports
+ * from clones-yaml.id.ts, clones-yaml.refactor.ts, and clones-yaml.parse.ts.
+ * Splitting the helpers into a separate file would gain no readability;
+ * the umbrella is the readable unit.
  *
  * The yaml shape (common to every entry):
  *

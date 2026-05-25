@@ -1,5 +1,5 @@
 /**
- * tools/scope-discovery/jscpd-runner.ts
+ * plugins/dw-lifecycle/src/scope-discovery/jscpd-runner.ts
  *
  * Owns the subprocess invocation of `jscpd` and the parse of its JSON
  * report into stable CloneGroup records. Split out of clone-detector.ts
@@ -17,6 +17,14 @@
  * pairs (A↔B, A↔C, B↔C). We collapse those into a single group because
  * the operator-facing question is "which sites need refactoring," and
  * three files sharing the same fragment is one site, not three.
+ *
+ * Invocation note (dw-lifecycle port): the audiocontrol pilot shelled
+ * out via `pnpm exec jscpd`; this port uses `npx jscpd` so the runner
+ * works regardless of the adopter project's package manager. jscpd is
+ * a devDependency of @deskwork/plugin-dw-lifecycle and is also expected
+ * to be present (or resolvable via npx) in the adopter project — the
+ * `install-scope-discovery` skill (Phase 8) is responsible for making
+ * that true.
  */
 
 import { mkdir, rm, stat } from 'node:fs/promises';
@@ -33,9 +41,9 @@ export const JSCPD_REPORT_PATH = 'reports/duplication/jscpd-report.json';
  *   - The .jscpd.json config has reporters/output/threshold/ignore lists
  *     the operator can tweak; we want this tool to honor any change
  *     they make without code edits here.
- *   - `pnpm duplication:check` (which devs already run) IS this same
- *     subprocess invocation — keeping the invocation shape identical
- *     means "what the gate sees" matches "what the dev sees".
+ *   - The subprocess invocation shape matches what an operator would
+ *     type at the shell (`npx jscpd --config .jscpd.json`); "what the
+ *     gate sees" matches "what the dev sees".
  *   - jscpd exits non-zero when the duplication threshold trips; we
  *     interpret non-zero as "duplicates found" (treated as data, not
  *     error). Only a kill-signal is a real error.
@@ -56,12 +64,12 @@ export async function runJscpd(opts: {
   // passing the path as a positional argument AFTER --config. jscpd's
   // CLI accepts `<path ...>` positional after options. The config still
   // contributes thresholds/ignores/reporters; only the scan root changes.
-  const args = ['jscpd', '--config', '.jscpd.json'];
+  const jscpdArgs = ['jscpd', '--config', '.jscpd.json'];
   if (opts.rootOverride !== null) {
-    args.push(opts.rootOverride);
+    jscpdArgs.push(opts.rootOverride);
   }
   await new Promise<void>((resolvePromise, rejectPromise) => {
-    const proc = spawn('pnpm', ['exec', ...args], {
+    const proc = spawn('npx', jscpdArgs, {
       cwd: opts.repoRoot,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
