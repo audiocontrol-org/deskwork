@@ -20,6 +20,8 @@ import { buildPatternMatrix } from './discovery-agents/pattern-matrix.js';
 import { readCloneDetectorOutput } from './discovery-agents/clone-detector-reader.js';
 import { huntPrdThemes } from './discovery-agents/prd-themed-pattern-hunter.js';
 import { detectRegimeHoldouts } from './discovery-agents/regime-holdout-detector.js';
+import { computeMatrix } from './editor-symmetry-matrix.js';
+import { renderMatrix } from './editor-symmetry-report.js';
 import type {
   DiscoveryAgentFinding,
   DiscoveryAgentInput,
@@ -51,6 +53,15 @@ interface CliOptions {
   readonly moduleRoot: string;
   readonly evidenceTrail: boolean;
   readonly quiet: boolean;
+  /**
+   * Override path for the editor-symmetry.md artifact written by the
+   * Phase 4 Family B scanner. Default lands under the per-run
+   * evidence trail at
+   *   docs/<v>/001-IN-PROGRESS/<slug>/scope-inventory/editor-symmetry.md
+   * mirroring the rest of the run artifacts. Absolute paths are
+   * honored; relative paths resolve against `repoRoot`.
+   */
+  readonly editorSymmetryOut: string | null;
 }
 
 function parseCli(argv: ReadonlyArray<string>): CliOptions {
@@ -62,6 +73,7 @@ function parseCli(argv: ReadonlyArray<string>): CliOptions {
     '--repo-root',
     '--module-root',
     '--evidence-trail',
+    '--editor-symmetry-out',
   ]);
   let quiet = false;
   for (let i = 0; i < argv.length; i += 1) {
@@ -99,6 +111,13 @@ function parseCli(argv: ReadonlyArray<string>): CliOptions {
   if (evidenceFlag !== 'on' && evidenceFlag !== 'off') {
     throw new Error(`--evidence-trail must be 'on' or 'off' (got '${evidenceFlag}')`);
   }
+  const editorSymmetryOutRaw = scalars.get('--editor-symmetry-out');
+  const editorSymmetryOut =
+    editorSymmetryOutRaw === undefined
+      ? null
+      : isAbsolute(editorSymmetryOutRaw)
+        ? editorSymmetryOutRaw
+        : resolve(root, editorSymmetryOutRaw);
   return {
     featureSlug: slug,
     prdPath,
@@ -107,6 +126,7 @@ function parseCli(argv: ReadonlyArray<string>): CliOptions {
     moduleRoot: scalars.get('--module-root') ?? DEFAULT_MODULE_ROOT,
     evidenceTrail: evidenceFlag === 'on',
     quiet,
+    editorSymmetryOut,
   };
 }
 
@@ -118,6 +138,7 @@ const USAGE =
   '    [--repo-root <repo-root>] \\\n' +
   '    [--module-root <module-root>] \\\n' +
   '    [--evidence-trail on|off] \\\n' +
+  '    [--editor-symmetry-out <path>] \\\n' +
   '    [--quiet]\n';
 
 /**
@@ -155,6 +176,7 @@ interface AgentRun {
  */
 interface Phase4Activations {
   readonly regimeHoldout: boolean;
+  readonly editorSymmetry: boolean;
 }
 
 /**
@@ -169,6 +191,12 @@ interface Phase4Activations {
  * empty registries by returning 0 findings — the activation gate
  * only spares the cost on projects that haven't authored a registry
  * at all.
+ *
+ * Note: `editor-symmetry.md` is the OUTPUT of the editor-symmetry
+ * scanner, not its input. The scanner reads `adopter-manifests.yaml`
+ * (the input) and produces the .md (the output). Activation is gated
+ * on the input file's presence per the Phase 4 pilot map (workplan's
+ * phrasing was a mis-description of the input/output relationship).
  */
 function decideActivations(repoRoot: string): Phase4Activations {
   const haveAntiPatterns = existsSync(resolve(repoRoot, PHASE4_GATE_FILES.antiPatterns));
@@ -181,6 +209,7 @@ function decideActivations(repoRoot: string): Phase4Activations {
   return {
     regimeHoldout:
       haveAntiPatterns || haveAdopterManifests || haveEditorSymmetryArtifact,
+    editorSymmetry: haveAdopterManifests,
   };
 }
 
@@ -239,6 +268,34 @@ async function runAgents(
     );
   }
   return Promise.all(promises);
+}
+
+/**
+ * Phase 4 Family B: when adopter-manifests.yaml is present, build the
+ * cross-module symmetry matrix and write the markdown artifact to the
+ * configured path (default: under the per-run evidence trail). The
+ * agent does NOT emit a `DiscoveryAgentFinding` — its output is the
+ * markdown file itself; the regime-holdout-detector already consumes
+ * the matrix in-process for its `editor-symmetry` source bucket.
+ *
+ * Returns the absolute path of the written artifact, or null when
+ * skipped. Failures throw so the orchestrator surfaces them at exit
+ * code 2 (matches the standalone `check-editor-symmetry` semantics).
+ */
+async function writeEditorSymmetryArtifact(args: {
+  readonly repoRoot: string;
+  readonly moduleRoot: string;
+  readonly outPath: string;
+}): Promise<string> {
+  const matrix = await computeMatrix({
+    registryPath: resolve(args.repoRoot, PHASE4_GATE_FILES.adopterManifests),
+    scanRoot: args.repoRoot,
+    moduleRoot: args.moduleRoot,
+  });
+  const rendered = renderMatrix(matrix);
+  await mkdir(dirname(args.outPath), { recursive: true });
+  await writeFile(args.outPath, rendered, 'utf8');
+  return args.outPath;
 }
 
 async function writeEvidenceTrail(args: {
@@ -324,12 +381,43 @@ export async function scopeInventoryMain(
     await mkdir(dirname(opts.outPath), { recursive: true });
     await writeFile(opts.outPath, yamlText, 'utf8');
 
-    // Evidence trail (optional).
+    // Editor-symmetry artifact (Phase 4 Family B): activate when
+    // adopter-manifests.yaml exists. Default output lives under the
+    // per-run evidence trail; explicit --editor-symmetry-out
+    // overrides. Failures throw and exit code 2 (matches the
+    // standalone check-editor-symmetry's contract).
+    let runDir: string | null = null;
     if (opts.evidenceTrail) {
-      const runDir = makeRunDir({
+      runDir = makeRunDir({
         repoRoot: opts.repoRoot,
         featureSlug: opts.featureSlug,
       });
+    }
+    if (activations.editorSymmetry) {
+      const defaultPath =
+        runDir !== null
+          ? resolve(runDir, 'editor-symmetry.md')
+          : resolve(opts.repoRoot, PHASE4_GATE_FILES.editorSymmetryArtifact);
+      const symmetryOut = opts.editorSymmetryOut ?? defaultPath;
+      const written = await writeEditorSymmetryArtifact({
+        repoRoot: opts.repoRoot,
+        moduleRoot: opts.moduleRoot,
+        outPath: symmetryOut,
+      });
+      if (!opts.quiet) {
+        process.stderr.write(
+          `scope-inventory: editor-symmetry matrix at ${relative(opts.repoRoot, written)}\n`,
+        );
+      }
+    } else {
+      emitSkipNote(
+        'skipped editor-symmetry scanner (no adopter-manifests.yaml found ' +
+          'under .dw-lifecycle/scope-discovery/)',
+      );
+    }
+
+    // Evidence trail (optional).
+    if (opts.evidenceTrail && runDir !== null) {
       const allWarnings = [...skipNotes, ...output.metadata.warnings];
       const notes = renderSynthesizerNotes(allWarnings);
       await writeEvidenceTrail({ runDir, agents, notes, args: opts });

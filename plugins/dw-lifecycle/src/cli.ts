@@ -10,6 +10,7 @@ import { customize } from './subcommands/customize.js';
 import { detectClones } from './subcommands/detect-clones.js';
 import { checkAntiPatterns } from './subcommands/check-anti-patterns.js';
 import { checkAdopters } from './subcommands/check-adopters.js';
+import { checkEditorSymmetry } from './subcommands/check-editor-symmetry.js';
 import { checkRefactorPreconditions } from './subcommands/check-refactor-preconditions.js';
 import { scopeInventory } from './subcommands/scope-inventory.js';
 
@@ -29,6 +30,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'detect-clones': detectClones,
   'check-anti-patterns': checkAntiPatterns,
   'check-adopters': checkAdopters,
+  'check-editor-symmetry': checkEditorSymmetry,
   'check-refactor-preconditions': checkRefactorPreconditions,
   'scope-inventory': scopeInventory,
 };
