@@ -24,6 +24,7 @@ import { disposeClone } from './subcommands/dispose-clone.js';
 import { installScopeDiscovery } from './subcommands/install-scope-discovery.js';
 import { installScopeDiscoveryHooks } from './subcommands/install-scope-discovery-hooks.js';
 import { installAgentPrompts } from './subcommands/install-agent-prompts.js';
+import { uninstallScopeDiscoveryHooks } from './subcommands/uninstall-scope-discovery-hooks.js';
 
 const subcommand = process.argv[2];
 const args = process.argv.slice(3);
@@ -55,6 +56,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'install-scope-discovery': installScopeDiscovery,
   'install-scope-discovery-hooks': installScopeDiscoveryHooks,
   'install-agent-prompts': installAgentPrompts,
+  'uninstall-scope-discovery-hooks': uninstallScopeDiscoveryHooks,
 };
 
 function printUsage(stream: NodeJS.WriteStream): void {
