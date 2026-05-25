@@ -6,12 +6,11 @@
  * The hint is a pre-filled command line the operator can paste-and-
  * edit instead of hand-writing a YAML entry. The audiocontrol pilot
  * cited `tsx tools/scope-discovery/batch-dispose.ts ...`; this port
- * cites the forthcoming subcommand shape `dw-lifecycle batch-dispose
- * ...` — the subcommand itself is filed for Phase 6 of the
- * scope-discovery workplan (see TODO in
- * `clone-detector.ts#batchDisposeHintLines` referencing GH issue
- * #284). The assertion string here is updated to match the post-port
- * output.
+ * cites the now-shipping subcommand shape `dw-lifecycle batch-dispose
+ * ...`. The disposition alternation lists the two values batch-dispose
+ * actually accepts (`keep-with-reason|ignore-with-justification`) —
+ * `refactor` is rejected at the CLI argparse layer because it requires
+ * the five precondition fields. Closes #284 + TF-003.
  *
  * Four scenarios:
  *   1. --diff mode: NEW groups cite batch-dispose with the actual id.
@@ -53,10 +52,14 @@ export function batchhintGreet(g: BatchhintGreeter): string {
 
 // Post-port hint command — see `clone-detector.ts#batchDisposeHintLines`.
 // The pilot emitted `tsx tools/scope-discovery/batch-dispose.ts`; the
-// dw-lifecycle port emits `dw-lifecycle batch-dispose` as a forward-
-// compatible reference to the eventual subcommand (GH issue #284, Phase
-// 6 of the scope-discovery workplan).
+// dw-lifecycle port emits `dw-lifecycle batch-dispose` as a reference
+// to the now-shipping subcommand (GH issue #284 closed).
 const HINT_CITATION = 'dw-lifecycle batch-dispose';
+// The disposition alternation in the hint MUST match what batch-dispose
+// actually accepts. `refactor` is REJECTED at the argparse layer because
+// it requires five precondition fields; the hint reflects that.
+const HINT_DISPOSITION_ALTERNATION =
+  '--disposition <keep-with-reason|ignore-with-justification>';
 
 function extractNewIds(stdout: string): readonly string[] {
   const ids: string[] = [];
@@ -92,9 +95,8 @@ describe('clone-detector — batch-dispose hint citation', () => {
       for (const id of newIds) {
         expect(diffRun.stdout).toContain(`--ids ${id}`);
       }
-      expect(diffRun.stdout).toContain(
-        '--disposition <refactor|keep-with-reason|ignore-with-justification>',
-      );
+      expect(diffRun.stdout).toContain(HINT_DISPOSITION_ALTERNATION);
+      expect(diffRun.stdout).not.toContain('refactor');
       expect(diffRun.stdout).toContain('--reason "<one-line rationale>"');
     } finally {
       await fixture.cleanup();
@@ -127,6 +129,9 @@ describe('clone-detector — batch-dispose hint citation', () => {
         expect(defaultRun.stdout).toContain(`--ids ${id}`);
       }
       expect(defaultRun.stdout).toContain(HINT_CITATION);
+      expect(defaultRun.stdout).toContain(HINT_DISPOSITION_ALTERNATION);
+      // refactor is REJECTED by batch-dispose; the hint must not list it.
+      expect(defaultRun.stdout).not.toContain('refactor');
     } finally {
       await fixture.cleanup();
     }

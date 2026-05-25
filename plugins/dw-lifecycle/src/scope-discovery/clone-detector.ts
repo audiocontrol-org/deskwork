@@ -159,35 +159,33 @@ function summaryLine(diff: CloneDiff): string {
  * command the operator can paste-and-edit instead of hand-writing a YAML
  * entry at the right insertion point in .dw-lifecycle/scope-discovery/clones.yaml.
  *
- * The audiocontrol pilot named `tsx tools/scope-discovery/batch-dispose.ts`
- * directly. This port references the eventual subcommand shape
- * (`dw-lifecycle batch-dispose ...`); the subcommand itself is filed for
- * Phase 6 of the scope-discovery workplan.
- *
  * Emitted ADDITIVELY — every existing NEW-group line is preserved so
  * downstream consumers grepping for `NEW    <id>` or member paths
  * continue to work. DROPPED groups intentionally do NOT get this hint:
- * they are removed via the clones-yaml refresh (`dw-lifecycle refresh-clones-baseline`),
- * not via batch-dispose.
+ * they are removed via the clones-yaml refresh (`dw-lifecycle detect-clones
+ * --refresh-baseline`), not via batch-dispose.
  *
  * The `indent` parameter matches each caller's existing per-group
  * indentation: `reportHuman` indents NEW lines by 2 spaces (default
  * mode); `reportDiff` does not indent (--diff mode is the strict
  * subset). The hint is indented one level deeper than the `NEW` line
  * itself so the visual hierarchy stays consistent within each caller.
+ *
+ * The `keep-with-reason` disposition is named first in the alternation
+ * because it is the most common operator choice on a fresh NEW group;
+ * `refactor` requires the five precondition fields (canonical_side,
+ * canonical_reason, tests, tests_proof) that batch-dispose explicitly
+ * rejects, so it appears with a note in the help text rather than the
+ * command alternation. Closes #284 + TF-003 (AUDIT-20260525, pilot
+ * tooling-feedback import).
  */
 function batchDisposeHintLines(id: string, indent: string): readonly string[] {
   const lead = `${indent}  Run:  `;
   const cont = `${indent}          `;
-  // TODO(scope-discovery #284): wire to the actual `dw-lifecycle batch-dispose`
-  // subcommand once Phase 6 of the scope-discovery workplan lands. The
-  // hint string emitted here is forward-compatible with the eventual
-  // subcommand shape — adopters today read it and learn the workflow
-  // even if the subcommand isn't yet implemented.
   return [
     `${lead}dw-lifecycle batch-dispose \\\n`,
     `${cont}--ids ${id} \\\n`,
-    `${cont}--disposition <refactor|keep-with-reason|ignore-with-justification> \\\n`,
+    `${cont}--disposition <keep-with-reason|ignore-with-justification> \\\n`,
     `${cont}--reason "<one-line rationale>"\n`,
   ];
 }
