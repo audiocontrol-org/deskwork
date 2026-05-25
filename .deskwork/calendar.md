@@ -32,6 +32,7 @@
 | 04629697-716e-4203-acd1-c4b1f79c0c04 | design-archive-contract | Studio Design Proposal Archive — Contract |  |  | manual | 2026-05-10T04:33:58.476Z |
 | 0e8e8d37-9242-42f1-9c8c-cf70330e899f | design-standards | Deskwork Studio Design Standards |  |  | manual | 2026-05-10T04:32:36.808Z |
 | 10dcf2ca-cab0-477f-835d-d2fae18e243e | rejected-filing-tab-stamps | Rejected Filing Tab Stamps |  |  | manual | 2026-05-10T04:40:29.504Z |
+| 1e85ab1a-de87-456f-be79-bb626ae42c9f | graphical-entries/prd | Graphical Entries |  |  | manual | 2026-05-25T21:43:12.126Z |
 | 4b6878ea-ec26-4b32-b7f1-7b8c75b4faf6 | accepted-press-queue-removed | Accepted Press Queue Removed |  |  | manual | 2026-05-10T04:40:29.423Z |
 | 4dd47cee-a59b-4801-9ef3-7bb2cfda0a88 | command-shortcuts-design | Command shortcuts — design spec |  |  | manual | 2026-05-11T21:39:46.752Z |
 | 4e4d6912-3edf-4aeb-b6ed-ba455f362f14 | scope-discovery/prd | Scope discovery — canonize audiocontrol pilot into dw-lifecycle |  |  | manual | 2026-05-25T01:42:47.853Z |

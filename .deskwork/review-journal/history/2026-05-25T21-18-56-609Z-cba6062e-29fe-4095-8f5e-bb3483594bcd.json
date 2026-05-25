@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-25T21:18:56.609Z",
+  "entryId": "1e85ab1a-de87-456f-be79-bb626ae42c9f",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "1e85ab1a-de87-456f-be79-bb626ae42c9f",
+    "version": 1,
+    "range": {
+      "start": 7694,
+      "end": 7724
+    },
+    "text": "We should put screenshot drawing & markup UI in scope—it can be at the end, but we should scope it because it will be critical to the review process",
+    "category": "other",
+    "anchor": "Screenshot drawing / markup UI",
+    "id": "c3565e17-6314-4a72-991b-f2998a88ebfc",
+    "createdAt": "2026-05-25T21:18:56.609Z"
+  }
+}

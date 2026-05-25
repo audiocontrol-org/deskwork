@@ -1,0 +1,25 @@
+{
+  "id": "1e85ab1a-de87-456f-be79-bb626ae42c9f",
+  "timestamp": "2026-05-25T21:07:50.887Z",
+  "event": "ingest",
+  "slug": "graphical-entries/prd",
+  "entryId": "1e85ab1a-de87-456f-be79-bb626ae42c9f",
+  "site": "deskwork-internal",
+  "stage": "Drafting",
+  "sourceFile": "docs/1.0/001-IN-PROGRESS/graphical-entries/prd.md",
+  "frontmatterSnapshot": {
+    "slug": "graphical-entries",
+    "title": "Graphical Entries",
+    "targetVersion": "1.0",
+    "date": "2026-05-25",
+    "parentIssue": null,
+    "deskwork": {
+      "id": "1e85ab1a-de87-456f-be79-bb626ae42c9f"
+    }
+  },
+  "derivation": {
+    "slug": "path",
+    "state": "default",
+    "date": "frontmatter"
+  }
+}
