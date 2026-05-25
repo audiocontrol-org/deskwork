@@ -17,6 +17,8 @@ import { check as schemaStale } from './scope-discovery-schema-stale.js';
 import { check as clonesSchemaViolation } from './clones-yaml-schema-violation.js';
 import { check as antiPatternsSchemaViolation } from './anti-patterns-yaml-schema-violation.js';
 import { check as refactorIncomplete } from './clones-yaml-refactor-incomplete.js';
+import { check as agentPromptMirrorDrift } from './agent-prompt-mirror-drift.js';
+import { check as overrideDrift } from './override-drift.js';
 import type { DoctorRuleCheck } from './types.js';
 
 export const SCOPE_DISCOVERY_DOCTOR_RULES: ReadonlyArray<DoctorRuleCheck> = [
@@ -25,6 +27,8 @@ export const SCOPE_DISCOVERY_DOCTOR_RULES: ReadonlyArray<DoctorRuleCheck> = [
   clonesSchemaViolation,
   antiPatternsSchemaViolation,
   refactorIncomplete,
+  agentPromptMirrorDrift,
+  overrideDrift,
 ];
 
 export type { DoctorRuleCheck, DoctorRuleOptions, ScopeDoctorFinding } from './types.js';
