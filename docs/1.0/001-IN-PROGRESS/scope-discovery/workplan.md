@@ -57,6 +57,12 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
 - [x] Port `adopter-manifests-registry.ts` + `adopter-manifests-report.ts` + `check-adopters.ts`
 - [x] Schema `adopter-manifests.yaml.schema.json` — authored from scratch (pilot had no equivalent); covers structural validation, semantic rules stay in `parseRegistry` SSOT.
 
+### Task 4 (follow-up): Anti-patterns canonical_file field
+
+- [ ] Add `canonical_file?: string` field to `AntiPatternEntry` + thread through `isPathExcluded` so the matcher auto-excludes the primitive's own implementation regardless of `excludes_paths:` — surfaced by audiocontrol pilot TF-002 (AUDIT-20260525-05); tracked at [#288](https://github.com/audiocontrol-org/deskwork/issues/288).
+- [ ] Update `anti-patterns.yaml.schema.json` to include the field with description.
+- [ ] Adversarial scenario asserting `canonical_file` auto-excludes regardless of `excludes_paths:` shape.
+
 **Acceptance Criteria:**
 - [x] All three scanners run via `dw-lifecycle check-{anti-patterns,refactor-preconditions,adopters}` — confirmed in `dw-lifecycle --help` subcommand list.
 - [x] Schema validators catch malformed YAMLs — `parseRegistry` throws with descriptive messages on shape violations; JSON Schemas document the contract for adopters' editors.
@@ -149,6 +155,12 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
 
 - [x] Port `dispatch-wrapper.validate.ts` verbatim; covers all grammar-violation cases incl. two-level gutted-stub — landed at `plugins/dw-lifecycle/src/__tests__/scope-discovery/dispatch-wrapper.test.ts` as 57 vitest cases (42 canned scenarios + 4 gutted-stub self-check + 6 per-marker auto-prelude + 5 project-override tests) (commit `4386782`).
 
+### Task 6 (follow-up): Primitive-extraction dispatch hygiene
+
+- [ ] Extend `dispatch-wrapper-prelude.md` with a "Primitive-extraction dispatch hygiene" section enumerating the integration-layer audit concerns (CSS class-name conflicts, ARIA contract correctness, callback-index drift, wire-format rounding/clamping). Surfaced by audiocontrol pilot TF-016 (AUDIT-20260525-09); tracked at [#290](https://github.com/audiocontrol-org/deskwork/issues/290).
+- [ ] Ship `plugins/dw-lifecycle/templates/scope-discovery/primitive-extraction-checklist.md` — Medium-option deliverable, operators copy via `/dw-lifecycle:customize`.
+- [ ] (Optional, Heavy) Extend `wrap()` to optionally inject an integration-layer audit prelude when the agent type matches a `ui-engineer`-style marker; mirrors the existing refactor-marker auto-prelude pattern.
+
 **Acceptance Criteria:**
 - [x] `wrap()` rejects sub-agent returns missing any `Searched/Included/Excluded` label — exercised by 3 dedicated rejection scenarios + `missingBlocks` set-equality assertion.
 - [x] Forbidden-deferral phrases reject; project overrides honored — 21 phrase scenarios + 7 regex scenarios + 5 override-loader tests (REPLACE semantics; built-in phrase no longer rejects under override; override phrase DOES reject; malformed override file throws).
@@ -168,7 +180,7 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
 ### Task 2: Check-* gate commands
 
 - [~] `check-clones [--gate-mode]` — subcommand registered as `detect-clones` in Phase 1; `--gate-mode` flag + rename to `check-clones` pending.
-- [~] `check-anti-patterns [--gate-mode]` — subcommand registered in Phase 2; `--gate-mode` flag pending.
+- [~] `check-anti-patterns [--gate-mode]` — subcommand registered in Phase 2; `--gate-mode` flag pending. **Schema follow-up:** add optional `negative_match_classes:` array per pilot TF-015 (AUDIT-20260525-08); validator auto-generates negative-test scenarios. Pairs with #285 pattern-type dispatcher work.
 - [ ] `check-deprecations [--write]` — pending; deprecation-scan port tracked at [#287](https://github.com/audiocontrol-org/deskwork/issues/287).
 - [~] `check-adopters [--gate-mode]` — subcommand registered in Phase 2; `--gate-mode` flag pending.
 - [x] `check-editor-symmetry [--write]` — landed in Phase 4 with `--write` flag honored; default writes to `docs/<v>/001-IN-PROGRESS/<slug>/scope-inventory/editor-symmetry.md`.
@@ -178,6 +190,8 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
 
 - [ ] `dispose-clone <id> --as <refactor|keep-with-reason|ignore-with-justification> [args]` — refuses without Step 0a/0b flags on refactor disposition
 - [ ] `refresh-clones-baseline`
+- [ ] `batch-dispose <id> --disposition <D> --reason "<text>" [--refresh-baseline]` — port from audiocontrol pilot; close the TODO at `clone-detector.ts:182` (currently emits `TODO(scope-discovery #284)` in the hint string). Tracked at [#284](https://github.com/audiocontrol-org/deskwork/issues/284); pilot TF-014 (AUDIT-20260525-07) refinements amended onto #284 — implementer should cite the refresh-baseline prereq in errors OR auto-run it internally.
+- [ ] `check-disposition-survivor` — pre-commit gate that fails on any `keep-with-reason`/`refactor`/`ignore-with-justification` → `pending` transition without operator confirmation. Pilot reference: TF-013 (AUDIT-20260525-06); tracked at [#289](https://github.com/audiocontrol-org/deskwork/issues/289). Phase 8 hook-chain wires it in.
 
 ### Task 4: Install / migrate / uninstall commands
 
