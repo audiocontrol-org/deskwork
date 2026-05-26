@@ -3,7 +3,7 @@ slug: graphical-entries
 title: Graphical Entries
 targetVersion: "1.0"
 date: 2026-05-25
-parentIssue:
+parentIssue: "#301"
 deskwork:
   id: 1e85ab1a-de87-456f-be79-bb626ae42c9f
 ---
