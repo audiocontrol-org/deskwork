@@ -1,0 +1,25 @@
+{
+  "id": "52aa00c1-3391-470a-bb88-797bdf9d8007",
+  "timestamp": "2026-05-26T18:13:10.282Z",
+  "event": "ingest",
+  "slug": "visual-verification-gate/prd",
+  "entryId": "52aa00c1-3391-470a-bb88-797bdf9d8007",
+  "site": "deskwork-internal",
+  "stage": "Drafting",
+  "sourceFile": "docs/1.0/001-IN-PROGRESS/visual-verification-gate/prd.md",
+  "frontmatterSnapshot": {
+    "slug": "visual-verification-gate",
+    "title": "Visual Verification Gate",
+    "targetVersion": "1.0",
+    "date": "2026-05-26",
+    "parentIssue": null,
+    "deskwork": {
+      "id": "52aa00c1-3391-470a-bb88-797bdf9d8007"
+    }
+  },
+  "derivation": {
+    "slug": "path",
+    "state": "default",
+    "date": "frontmatter"
+  }
+}
