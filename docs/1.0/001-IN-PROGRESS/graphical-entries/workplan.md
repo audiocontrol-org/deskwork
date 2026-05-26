@@ -16,9 +16,15 @@ date: 2026-05-25
 
 ### Task 1.1: OSS candidate survey
 
-- [ ] Step 1.1.1: Author a candidate matrix at `docs/studio-design/PROPOSED/<date>-graphical-review-prior-art/candidates.md` with one row per project (Annotorious, Recogito, Hypothes.is client SDK, W3C Web Annotation Data Model, Penpot embeddable, Storybook addon-design-assets / addon-discuss, html2canvas, dom-to-image-more, MediaDevices.getDisplayMedia, Marker.io / Pastel / BugHerd as inform-only).
-- [ ] Step 1.1.2: For each: license, last-commit date, dependency footprint (size of bundle if adopted), self-hosting cost (where applicable), W3C Web Annotation Data Model alignment, browser-API surface used.
-- [ ] Step 1.1.3: Drop the matrix into the decision-doc draft as the "Survey" section.
+- [x] Step 1.1.1: Author a candidate matrix at `docs/studio-design/PROPOSED/2026-05-25-graphical-review-prior-art/candidates.md` — 17 candidates evaluated across 6 concerns (image annotation, HTML annotation, data model, screenshot capture, screenshot markup, closed-source inform-only).
+- [x] Step 1.1.2: License / last-commit / bundle weight / W3C alignment / browser-API surface / self-hosting cost / adoptable y/n captured per row; sources cited inline.
+- [ ] Step 1.1.3: Drop the matrix into the decision-doc draft as the "Survey" section. (Deferred to Task 1.6.)
+
+**Surprises surfaced that change the spike picks:**
+- **tldraw disqualified** — source-available licence, requires paid commercial use or "made with tldraw" watermark; incompatible with deskwork's OSS-dependency constraint. Excalidraw is the clean MIT alternative.
+- **html2canvas effectively unmaintained** (no release since 2022-01; 975+ open issues). **html-to-image** is the 2025/2026 consensus successor.
+- **recogito-js archived 2023-12.** Use **@recogito/text-annotator** from the same team.
+- **Hypothes.is client = library + service.** Embedding it drags in the API server surface. Adopt the data model + UX patterns; consider the runtime only if willing to self-host `h` or build an adapter.
 
 ### Task 1.2: Spike — image annotation library integration
 
