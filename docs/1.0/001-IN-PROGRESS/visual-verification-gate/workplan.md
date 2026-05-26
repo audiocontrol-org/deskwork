@@ -25,7 +25,8 @@ date: 2026-05-26
 - [ ] Step 9: **`.dw-lifecycle/visual-verify.config.json` schema** — adopter override surface for marker format, validator pattern, capture script path, mockup directory layout. Zod-validated.
 - [ ] Step 10: **`/dw-lifecycle:doctor` rule — visual-verification-stale** — audit closed UI tasks for fresh PNG existence; opt-in `--fix`.
 - [ ] Step 11: **Setup-skill enhancement** — when PRD's Visual Contract is non-empty, scaffold `docs/<v>/001-IN-PROGRESS/<feature>/mockups/` (TBD during PRD iteration whether opt-in or default).
-- [ ] Step 12: **Implement-skill precondition check** — refuse to start UI-touching tasks when Visual Contract is empty (TBD during PRD iteration whether opt-in or default).
+- [ ] Step 12: **Implement-skill precondition cycle** — when implement encounters a UI-touching task lacking a blessed mockup in the PRD's Visual Contract: (a) REFUSE to start the task, (b) automatically engage the operator in a structured mockup-development interview, (c) pass interview answers to `/frontend-design` to produce 2–3 directions, (d) iterate with the operator until selection, (e) require the operator to record the mockup approval in the PRD's Visual Contract before the task's code phase unlocks. Hard gate, not advisory.
+- [ ] Step 12a: **Mockup-approval mechanism** — define the PRD's Visual Contract approval format (frontmatter field vs. markdown-checkbox section vs. graphical-entries integration). Doctor rule audits it. Decided during PRD iteration.
 - [ ] Step 13: **Documentation** — README section + CHANGELOG entry explaining the new gates + the incident pattern they prevent + the customization surface.
 - [ ] Step 14: **Smoke test** — local-only (per project's no-test-infra-in-CI rule); exercises the marker validator + capture subcommand against a fixture project.
 - [ ] Step 15: **Cross-feature integration plan with graphical-entries** — TBD: simple mockups-as-files workflow ships day-1; upgrade path to graphical-entries-driven mockup review when graphical-entries lands. Captured as a known follow-up, not v1 scope.
@@ -33,7 +34,9 @@ date: 2026-05-26
 **Acceptance Criteria:**
 - [ ] PRD template carries a Visual Contract section
 - [ ] Workplan template carries visual-verification acceptance criteria (precondition + closure) for UI-touching tasks
-- [ ] `/dw-lifecycle:implement` skill includes the capture → Read → deliver loop
+- [ ] `/dw-lifecycle:implement` skill includes the capture → Read → deliver closure loop
+- [ ] `/dw-lifecycle:implement` skill includes the precondition cycle (refuse → interview → /frontend-design → operator approval → unlock)
+- [ ] PRD template's Visual Contract section carries an operator-approval marker that the precondition cycle reads
 - [ ] Agent-prompt fragment + `/dw-lifecycle:install-visual-verification-fragment` skill exist; mirrors install-agent-prompts structure
 - [ ] `Visual-verify:` commit-message marker is canonical (format + validator defaults ship with teeth)
 - [ ] Pre-commit hook enforces the marker on UI-touching commits; opt-in skipped-reason validator rejects bullshit

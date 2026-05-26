@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-26T18:39:38.738Z",
+  "entryId": "52aa00c1-3391-470a-bb88-797bdf9d8007",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "52aa00c1-3391-470a-bb88-797bdf9d8007",
+    "version": 1,
+    "range": {
+      "start": 7706,
+      "end": 7730
+    },
+    "text": "The mockup development and design review process must be an explicit part of the prd and workplan such that /dw-lifecycle:implement automatically engages the operator in an interview process to develop mockups and explicitly using /frontend-design tooling to create design options to the operator based on the interview process. Only when the operator approves the mockup is the orchestrating agent allowed to proceed toward implementation of production UI code",
+    "category": "other",
+    "anchor": "operator authors mockups",
+    "id": "b09080ee-908c-4289-8600-587667bf5ed7",
+    "createdAt": "2026-05-26T18:39:38.738Z"
+  }
+}

@@ -5,8 +5,10 @@
   "keywords": [],
   "source": "manual",
   "currentStage": "Drafting",
-  "iterationByStage": {},
+  "iterationByStage": {
+    "Drafting": 2
+  },
   "artifactPath": "docs/1.0/001-IN-PROGRESS/visual-verification-gate/prd.md",
   "createdAt": "2026-05-26T18:13:10.285Z",
-  "updatedAt": "2026-05-26T18:13:10.285Z"
+  "updatedAt": "2026-05-26T18:45:19.972Z"
 }
