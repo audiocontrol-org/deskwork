@@ -169,15 +169,13 @@ The audiocontrol `feature/akai-harmonization` branch's `docs/1.0/001-IN-PROGRESS
 ### TF-002 — anti-pattern registry lacks `canonical_file` field
 
 Finding-ID: AUDIT-20260525-05
-Status:     acknowledged-#288
+Status:     fixed-d849a6f
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/anti-patterns-registry.ts`, `schema/anti-patterns.yaml.schema.json`
 
-The anti-pattern registry's `AntiPatternEntry` shape has no `canonical_file:` field; the matcher relies on `excludes_paths:` pinned at known consumer paths. When a primitive's canonical implementation moves modules (`git mv`), the entry still matches the moved file because the matcher has no concept of "exclude the primitive's own implementation no matter where it lives."
+Fix note (commit `d849a6f`, 2026-05-26): renamed the auto-exclusion field from `canonical_implementation_file` (the pre-#288 name from an earlier scaffolding round in this branch) to `canonical_file` per the issue spec; field is OPTIONAL on every entry, existing entries don't need migration. Behavior: byte-exact path matching against the candidate file's CWD-relative POSIX path (no glob, no directory expansion); silent auto-exclusion (no log line); union semantics with `excludes_paths:` (both apply when set together). Scan-start guard still fails loud with the entry id + missing path when `canonical_file:` points at a path that doesn't exist. Adversarial coverage: 6/6 scenarios in `anti-patterns.canonical-file.test.ts` pass — including a new issue-#288-derived scenario that plants `canonical_file: 'modules/foo/canonical.tsx'`, places a canonical-shape regex match inside it, and asserts a sibling holdout at `modules/bar/holdout.tsx` STILL surfaces (auto-exclusion is scoped to the named file only, not a directory). Schema description updated to document the byte-exact + union semantics for adopters' editors. Awaiting `verified-<date>` once an adopter uses the field on a real primitive-relocation refactor.
 
-Pilot reference: audiocontrol PR #462, commit `fddbad06` (TF-002 closure). The pilot's anti-patterns-registry.ts and its scenario file `anti-patterns.canonical-file-scenarios.ts` are EMPTY of `canonical_file` references in the source-of-truth checkout — the fix appears to be documented in TF-002's closure note but not visibly present in the pilot file we ported from. Filing as new work for dw-lifecycle rather than re-port.
-
-Deferred to: [#288](https://github.com/audiocontrol-org/deskwork/issues/288).
+Pilot reference: audiocontrol PR #462, commit `fddbad06` (TF-002 closure). Fixed in: [#288](https://github.com/audiocontrol-org/deskwork/issues/288).
 
 ### TF-013 — clone-detector regen silently wipes operator dispositions
 

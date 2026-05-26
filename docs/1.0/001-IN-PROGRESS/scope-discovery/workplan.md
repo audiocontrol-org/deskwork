@@ -59,9 +59,9 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
 
 ### Task 4 (follow-up): Anti-patterns canonical_file field
 
-- [ ] Add `canonical_file?: string` field to `AntiPatternEntry` + thread through `isPathExcluded` so the matcher auto-excludes the primitive's own implementation regardless of `excludes_paths:` — surfaced by audiocontrol pilot TF-002 (AUDIT-20260525-05); tracked at [#288](https://github.com/audiocontrol-org/deskwork/issues/288).
-- [ ] Update `anti-patterns.yaml.schema.json` to include the field with description.
-- [ ] Adversarial scenario asserting `canonical_file` auto-excludes regardless of `excludes_paths:` shape.
+- [x] Add `canonical_file?: string` field to `AntiPatternEntry` + thread through `isPathExcluded` so the matcher auto-excludes the primitive's own implementation regardless of `excludes_paths:` — landed in commit `d849a6f`. Surfaced by audiocontrol pilot TF-002 (AUDIT-20260525-05); closes [#288](https://github.com/audiocontrol-org/deskwork/issues/288). Renamed the earlier-scaffolded `canonical_implementation_file` to match the issue spec; byte-exact path matching (no glob), silent auto-exclusion (no log line), union semantics with `excludes_paths:` (both apply together).
+- [x] Update `anti-patterns.yaml.schema.json` to include the field with description — description names the byte-exact + union semantics so adopters' editors document the contract inline.
+- [x] Adversarial scenario asserting `canonical_file` auto-excludes regardless of `excludes_paths:` shape — `anti-patterns.canonical-file.test.ts` now has 6/6 passing scenarios (5 renamed + 1 new issue-#288-derived: plants `canonical_file: 'modules/foo/canonical.tsx'`, asserts the named canonical is silently skipped AND a sibling holdout at `modules/bar/holdout.tsx` matching the same regex still surfaces — auto-exclusion is scoped to the named file only).
 
 **Acceptance Criteria:**
 - [x] All three scanners run via `dw-lifecycle check-{anti-patterns,refactor-preconditions,adopters}` — confirmed in `dw-lifecycle --help` subcommand list.
