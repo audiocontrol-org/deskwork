@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Annotorious image annotation spike</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <header class="masthead">
+      <h1>Annotorious image annotation spike</h1>
+      <p class="lede">
+        Phase 1 Task 1.2 — pin a region on the fixture image, observe the
+        W3C Web Annotation JSON-LD payload, download it.
+      </p>
+    </header>
+
+    <main class="grid">
+      <section class="canvas-pane" aria-label="Image annotation canvas">
+        <div class="toolbar" role="toolbar" aria-label="Drawing tools">
+          <button id="tool-rectangle" type="button" aria-pressed="true">Rectangle</button>
+          <button id="tool-polygon" type="button" aria-pressed="false">Polygon</button>
+          <button id="tool-clear" type="button">Clear all</button>
+        </div>
+        <img
+          id="fixture-image"
+          src="./fixture.svg"
+          alt="Synthetic deskwork dashboard mockup — fixture for the Annotorious image-annotation spike"
+        />
+        <p class="hint">
+          Click-and-drag to pin a rectangle. Switch tools above to test polygon
+          drawing. Press <kbd>Escape</kbd> to cancel a draw in progress.
+        </p>
+      </section>
+
+      <aside class="payload-pane" aria-label="W3C Web Annotation JSON-LD payload">
+        <div class="payload-head">
+          <h2>W3C JSON-LD payload</h2>
+          <button id="download" type="button">Download annotations.json</button>
+        </div>
+        <p class="payload-meta" id="payload-meta">No annotations yet.</p>
+        <pre id="payload" aria-live="polite">[]</pre>
+      </aside>
+    </main>
+
+    <footer class="footnotes">
+      <p>
+        Annotorious is initialised with <code>W3CImageFormat</code> as the
+        adapter, so every <code>createAnnotation</code> event delivers a
+        W3C-Web-Annotation-shaped object directly. See
+        <code>src/spike.js</code> for the integration.
+      </p>
+    </footer>
+
+    <script type="module" src="./src/spike.js"></script>
+  </body>
+</html>

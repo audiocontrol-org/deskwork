@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600" role="img" aria-label="Synthetic deskwork dashboard mockup fixture for the Annotorious image-annotation spike">
+  <title>Synthetic deskwork dashboard mockup</title>
+  <desc>A self-contained SVG fixture mimicking a deskwork dashboard with header, sidebar, and tiles. Used as the target image for the Annotorious image-annotation spike. No external dependencies.</desc>
+  <rect x="0" y="0" width="800" height="600" fill="#f5f1e8"/>
+  <rect x="0" y="0" width="800" height="60" fill="#1f1b16"/>
+  <text x="24" y="38" font-family="Georgia, serif" font-size="20" fill="#f5f1e8">deskwork / dashboard</text>
+  <text x="730" y="38" font-family="Georgia, serif" font-size="14" fill="#cbb98c">graphical</text>
+  <rect x="0" y="60" width="180" height="540" fill="#e7e0d0"/>
+  <text x="24" y="100" font-family="Georgia, serif" font-size="14" fill="#3d3528">Lanes</text>
+  <rect x="20" y="118" width="140" height="36" fill="#fff8e8" stroke="#bca275" stroke-width="1"/>
+  <text x="32" y="142" font-family="Georgia, serif" font-size="13" fill="#3d3528">Editorial</text>
+  <rect x="20" y="160" width="140" height="36" fill="#fff8e8" stroke="#bca275" stroke-width="1"/>
+  <text x="32" y="184" font-family="Georgia, serif" font-size="13" fill="#3d3528">Visual</text>
+  <rect x="20" y="202" width="140" height="36" fill="#fff8e8" stroke="#bca275" stroke-width="1"/>
+  <text x="32" y="226" font-family="Georgia, serif" font-size="13" fill="#3d3528">Feature docs</text>
+  <text x="220" y="100" font-family="Georgia, serif" font-size="16" fill="#1f1b16">Drafting</text>
+  <rect x="220" y="118" width="200" height="80" fill="#ffffff" stroke="#c4a868" stroke-width="1"/>
+  <text x="232" y="146" font-family="Georgia, serif" font-size="13" fill="#1f1b16">graphical-entries PRD</text>
+  <text x="232" y="170" font-family="Georgia, serif" font-size="11" fill="#7a6c50">html-mockup · 2 comments</text>
+  <rect x="220" y="210" width="200" height="80" fill="#ffffff" stroke="#c4a868" stroke-width="1"/>
+  <text x="232" y="238" font-family="Georgia, serif" font-size="13" fill="#1f1b16">studio mobile-first</text>
+  <text x="232" y="262" font-family="Georgia, serif" font-size="11" fill="#7a6c50">image · 1 comment</text>
+  <text x="440" y="100" font-family="Georgia, serif" font-size="16" fill="#1f1b16">Final</text>
+  <rect x="440" y="118" width="200" height="80" fill="#fff8e8" stroke="#8b7a4f" stroke-width="2"/>
+  <text x="452" y="146" font-family="Georgia, serif" font-size="13" fill="#1f1b16">deskwork v0.23.0</text>
+  <text x="452" y="170" font-family="Georgia, serif" font-size="11" fill="#7a6c50">longform · ready to publish</text>
+  <text x="660" y="100" font-family="Georgia, serif" font-size="16" fill="#1f1b16">Published</text>
+  <rect x="660" y="118" width="120" height="80" fill="#ffffff" stroke="#c4a868" stroke-width="1"/>
+  <text x="672" y="146" font-family="Georgia, serif" font-size="13" fill="#1f1b16">v0.22.2</text>
+  <text x="672" y="170" font-family="Georgia, serif" font-size="11" fill="#7a6c50">2026-05-22</text>
+  <rect x="220" y="320" width="560" height="220" fill="#ffffff" stroke="#bca275" stroke-width="1"/>
+  <text x="232" y="346" font-family="Georgia, serif" font-size="14" fill="#1f1b16">Scrapbook preview</text>
+  <rect x="240" y="360" width="120" height="80" fill="#e7e0d0"/>
+  <rect x="370" y="360" width="120" height="80" fill="#e7e0d0"/>
+  <rect x="500" y="360" width="120" height="80" fill="#e7e0d0"/>
+  <rect x="630" y="360" width="120" height="80" fill="#e7e0d0"/>
+  <text x="240" y="460" font-family="Georgia, serif" font-size="11" fill="#7a6c50">4 attachments · drag to reorder</text>
+  <text x="240" y="510" font-family="Georgia, serif" font-size="11" fill="#bca275">Pin a comment on any region to test the W3C JSON-LD payload.</text>
+</svg>

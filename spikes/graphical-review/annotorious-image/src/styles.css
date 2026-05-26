@@ -1,0 +1,148 @@
+:root {
+  color-scheme: light;
+  --ink: #1f1b16;
+  --paper: #f5f1e8;
+  --rule: #bca275;
+  --accent: #8b7a4f;
+  --soft: #7a6c50;
+  font-family: Georgia, "Iowan Old Style", "Apple Garamond", serif;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+body {
+  margin: 0;
+  padding: 1.5rem 2rem;
+}
+
+.masthead h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.5rem;
+}
+
+.masthead .lede {
+  margin: 0 0 1.25rem;
+  color: var(--soft);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 22rem);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.canvas-pane {
+  background: #fff;
+  border: 1px solid var(--rule);
+  padding: 1rem;
+}
+
+.toolbar {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.toolbar button {
+  font: inherit;
+  padding: 0.4rem 0.8rem;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.toolbar button[aria-pressed="true"] {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.toolbar button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+#fixture-image {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.hint {
+  margin: 0.75rem 0 0;
+  color: var(--soft);
+  font-size: 0.9rem;
+}
+
+.payload-pane {
+  background: #fff;
+  border: 1px solid var(--rule);
+  padding: 1rem;
+  position: sticky;
+  top: 1rem;
+}
+
+.payload-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.payload-head h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.payload-head button {
+  font: inherit;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  cursor: pointer;
+}
+
+.payload-meta {
+  margin: 0.5rem 0;
+  color: var(--soft);
+  font-size: 0.85rem;
+}
+
+#payload {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  padding: 0.6rem;
+  max-height: 24rem;
+  overflow: auto;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.footnotes {
+  margin-top: 1.5rem;
+  color: var(--soft);
+  font-size: 0.85rem;
+  border-top: 1px solid var(--rule);
+  padding-top: 0.75rem;
+}
+
+.footnotes code {
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.85em;
+}
+
+@media (max-width: 720px) {
+  body {
+    padding: 1rem;
+  }
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  .payload-pane {
+    position: static;
+  }
+}

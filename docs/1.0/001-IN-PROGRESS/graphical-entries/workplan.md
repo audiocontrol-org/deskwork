@@ -28,10 +28,10 @@ date: 2026-05-25
 
 ### Task 1.2: Spike — image annotation library integration
 
-- [ ] Step 1.2.1: Pick the top-2 image-annotation candidates from Task 1.1 (typically Annotorious + Recogito).
-- [ ] Step 1.2.2: Build a minimal spike at `spikes/graphical-review/<library>-image/` that loads a fixture image, lets the operator pin a region, persists the annotation as a W3C Web Annotation JSON-LD payload.
-- [ ] Step 1.2.3: Measure integration cost: lines of glue code, dependency-tree weight, theming overrides required, mobile support, accessibility (keyboard navigation, screen-reader labels).
-- [ ] Step 1.2.4: Record findings in the decision-doc draft as the "Image annotation spike" section.
+- [x] Step 1.2.1: Pick the top-2 image-annotation candidates from Task 1.1. **Library-of-one finding:** Annotorious is the lone viable embeddable image-annotation library (Recogito Studio is a Docker-deployed platform; `recogito-js` is archived 2023-12; `@recogito/text-annotator` is text-only). Spike narrowed to Annotorious; rationale recorded in `decision-draft.md`.
+- [x] Step 1.2.2: Built spike at [`spikes/graphical-review/annotorious-image/`](../../../../spikes/graphical-review/annotorious-image/) — vanilla JS + Vite dev server, self-contained SVG fixture, `W3CImageFormat` adapter wired so lifecycle events deliver W3C JSON-LD directly, payload mirrored to the page and downloadable as `annotations.json`. Verified at desktop (1280×800) and iPhone-13 viewport via `scripts/verify.mjs`.
+- [x] Step 1.2.3: Integration cost measured: 158 lines glue code in `src/spike.js` (403 LOC across all spike sources); Annotorious v3.8.2 + 10 transitive deps = 11 production packages / ~2.6 MB unpacked; zero theming overrides required (Annotorious default CSS imported as-is); touch code path verified at iPhone-13 viewport (renders `.a9s-touch-handle` + `.a9s-touch-halo`); keyboard/SR accessibility partial — host must add `tabindex`/`aria-label` for annotation traversal.
+- [x] Step 1.2.4: Findings recorded in [`docs/studio-design/PROPOSED/2026-05-25-graphical-review-prior-art/decision-draft.md`](../../../studio-design/PROPOSED/2026-05-25-graphical-review-prior-art/decision-draft.md) as the **Image annotation spike (Task 1.2)** section, with the actual emitted W3C JSON-LD payload pasted inline. v1 recommendation: adopt Annotorious + `W3CImageFormat` adapter as-is; do not fork.
 
 ### Task 1.3: Spike — HTML mockup annotation library integration
 
