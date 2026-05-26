@@ -3032,6 +3032,70 @@ Phase 4 (dogfood) is manual validation work the user should drive: install the p
 - **TDD reflexively turns library-recall fabrication into a 10-second feedback loop.** Without the tests, the wrong fix could have shipped to v0.22.2 and been caught only by a post-release iOS check. With the tests, the wrong fix surfaced as 7 failures in <5 seconds.
 - **The studio's cache-validity story is structurally weak.** mtime-based freshness on entrypoint-only inputs cannot survive transitive-import changes. Worth fixing for adopters even if no fixer is currently touching it.
 
+## 2026-05-25: graphical-entries — PRD finalize → ingest → iterate → approve → workplan + issues + scope-discovery hooks + Phase 1 Task 1.1
+### Feature: graphical-entries
+### Worktree: graphical-entries
+
+**Goal:** Finalize the graphical-entries PRD from the 522-line design spec; bring it through deskwork's review cycle to Final; elaborate the workplan; file GitHub issues; install scope-discovery hooks per the dogfood handoff; begin Phase 1 (prior-art research).
+
+**Accomplished:**
+
+- **PRD finalized end-to-end** — restructured from `/dw-lifecycle:setup` template into the full design (lanes / templates / groups / graphical entries / chrome-free review surface / annotation extensions / migration / doctor / CRUD / 12-phase implementation breakdown). Commit `7bdf026`.
+- **PRD ingested into deskwork.** Entry UUID `1e85ab1a-de87-456f-be79-bb626ae42c9f`, slug `graphical-entries/prd`, Drafting stage. New sidecar + ingest journal event.
+- **PRD iterated through 3 operator marginalia comments** (revision 1 of review history): screenshot markup moved in-scope as Phase 12; schema-migration risk removed (operator: "not a real risk; state is in git"); new "Secondary deliverable: scope-discovery v1 dogfood" section added. All three dispositions `addressed` with disposition annotations.
+- **Disposition-trace affordance (#299) bundled pre-approve per "don't defer" rule** — new acceptance criterion + Phase 8 task scope + annotation-model schema extension (`reason: string` field + diff-slice rendering).
+- **PRD approved Drafting → Final.** Sidecar + calendar regen + 4 approve-side journal events (stage transition + comment archives). Commit `1e31f06`.
+- **Issues #299 + #300 filed against deskwork itself** during the review cycle:
+  - **#299** (enhancement) — studio review surface lacks affordance for navigating from "addressed" badge to diff region in the new revision. Recommended fix A (per-comment inline diff expansion) + C (required disposition reason).
+  - **#300** (bug) — doctor's `orphan-frontmatter-id` rule reports false positives for every Final/Cancelled entry; reader-side counterpart to #247. Recommended fix B (UUID-set lookup).
+- **Workplan elaborated from 1 phase to 13 phases** (12 implementation + closing milestone), 77 tasks, 249 steps, acceptance criteria on every phase. Phase 4 scoped to close #247 + #300 as side effects. Commits `2a17d8d` (Phase 4 only) + `09e0764` (full elaboration of remaining 11).
+- **13 GitHub issues filed via `/dw-lifecycle:issues`**: parent #301 + per-phase #302–#313. Workplan headings + README Status table + Key Links manually back-filled (skill only back-fills frontmatter). Commit `d69a75c`.
+- **Scope-discovery hooks armed in this worktree** — `npm install` bootstrapped husky's `.husky/_` dispatcher; pre-commit hook fires for real now. All 5 gates pass cleanly on every commit (detect-clones, anti-patterns, adopters, disposition-survivor, editor-symmetry). 4 in-session commits exercised the gates. Commit `ee56c32`.
+- **Phase 1 Task 1.1 delivered** — 17-candidate OSS prior-art matrix at `docs/studio-design/PROPOSED/2026-05-25-graphical-review-prior-art/candidates.md`. Sourced via subagent with WebFetch + WebSearch. Per-concern top-2 shortlists feed Tasks 1.2 / 1.3 / 1.4 spike phases. Commit `da7d70f`.
+- **3 TF entries logged in `tooling-feedback.md`** capturing scope-discovery dogfood friction:
+  - TF-001 · GATE · high — `install-scope-discovery-hooks` reports success but hooks silently skipped when husky's `.husky/_` dispatcher isn't bootstrapped.
+  - TF-002 · GATE · medium — `hooks-installed.json` accumulates entries across worktrees because it's committed to the tree.
+  - TF-003 · MISC · medium — `/dw-lifecycle:issues` partial back-fill (only frontmatter); workplan phase headings + README Status table + Key Links require manual updates.
+- **Branch pushed to origin** with upstream tracking — `feature/graphical-entries` lives at https://github.com/audiocontrol-org/deskwork/tree/feature/graphical-entries.
+
+**Didn't Work:**
+
+- **Pre-commit hooks silently skipped on first 3 commits of the session** (`7bdf026`, `1e31f06`, `2a17d8d`). The managed `.husky/pre-commit` was inherited from the scope-discovery worktree's canary install, but `npm install` had never run here, so husky's `.husky/_` dispatcher didn't exist and git silently skipped hook execution. Filed as TF-001 high-severity.
+- **Stale PATH after `/plugin marketplace update`** — `which dw-lifecycle` returned the v0.22.2 cache binary after the update brought 0.23.0 on disk. Operator-clarified as a missing-step (`/reload-plugins` is required post-update; not a deskwork bug). My initial framing as "follow-up gap to #131" was wrong.
+- **Markdown-wrapped URL caused 404** — I sent `**http://...:47323/...c9f**` (URL inside bold syntax); operator copied the asterisks; the studio 404'd on the resulting path. Self-inflicted; the user-memory `feedback_plain_urls_only` covers link syntax but I extended-by-analogy to bold and broke it. Apologized, gave clean URL.
+- **Pre-decided scope twice during PRD iteration** — once putting "screenshot drawing / markup UI" in Out-of-Scope (operator: should be in scope, just at the end); once leaving "Schema migration on adopter projects" as a Risk (operator: not a real risk; state is in git). Both reverted after operator pushback.
+- **`dw-lifecycle install-scope-discovery-hooks` via PATH failed** with "Unknown subcommand" because PATH had v0.22.2 cached binary. Resolved by invoking v0.23.0 binary directly via the cache path.
+
+**Course Corrections:**
+
+- **[PROCESS]** *"do it now, don't defer"* — operator applied the rule to bundle #299 (disposition trace) into v1 acceptance criteria immediately rather than deferring to a follow-up. Same rule applied to screenshot markup (moved from Out-of-Scope to Phase 12) during the same iterate cycle.
+- **[PROCESS]** *"operator owns scope decisions"* — twice in one PRD iteration (markup deferral; risk dismissal). I pre-decided each. Reverted both. The capture-mode rule from `.claude/rules/agent-discipline.md` covers this; I still violated it twice in one cycle.
+- **[UX]** Bold-wrapped URL → 404. Extended the plain-URLs rule across all markdown wrappers (not just link syntax): bare URLs only.
+- **[PROCESS]** `/reload-plugins` is a required post-`/plugin marketplace update` step. Documented operator behavior, not a deskwork bug — my mistake to frame it as a follow-up to #131.
+- **[PROCESS]** "Capture friction over scope" applied to scope-discovery dogfood: 3 TF entries landed in-session as friction surfaced, not batched at feature-end.
+
+**Quantitative:**
+
+- Messages: ~70 user messages across the session
+- Commits on `feature/graphical-entries` this session: **7** (`7bdf026`, `1e31f06`, `2a17d8d`, `ee56c32`, `09e0764`, `d69a75c`, `da7d70f`)
+- Files changed across all commits: ~9 (prd, workplan, README, tooling-feedback, candidates matrix, calendar, sidecar, 11 journal files, hooks-installed manifest, package-lock)
+- GitHub issues filed: **15** new (#299, #300 against deskwork; #301 parent + #302–#313 phases for graphical-entries)
+- TF entries logged: **3** (TF-001 high, TF-002 medium, TF-003 medium)
+- Pre-commit gate executions: **4** (gates fired on commits after `npm install` bootstrapped husky)
+- Phase 1 progress: **1/6 tasks complete** (Task 1.1 OSS candidate matrix)
+- Decisions surfaced by Phase 1 research that change spike picks: **4** (tldraw disqualified, html2canvas dead, recogito-js archived, Hypothes.is heavyweight)
+- Workplan size: 13 phases / 77 tasks / 249 steps (was 1 phase / 1 task / 2 steps at session start)
+
+**Insights:**
+
+- **The PRD-iterate cycle in deskwork is genuinely valuable.** Three operator marginalia comments produced material spec changes that would have stayed baked-in assumptions otherwise: scope-discovery dogfood elevated to first-class deliverable; non-risk removed from Risks; screenshot markup moved from deferred to v1. The dogfood comment in particular was the kind of "the spec doesn't say it but the dogfood-handoff documents it" gap that only operator marginalia catches.
+- **"Don't defer" fires twice in one PRD cycle** — screenshot markup (Out-of-Scope → Phase 12) AND #299 disposition trace (would-be-follow-up → v1 acceptance criteria + Phase 8 scope). Pattern: when the agent identifies something as "captured but deferred to a follow-up," that's almost always the wrong call. Both deferrals would have shipped as user-visible gaps if the operator hadn't pushed.
+- **Phase 1 research saved real spike work.** Four candidate-changing findings (tldraw licence, html2canvas dead, recogito-js archived, Hypothes.is heavyweight) — every one of which would have surfaced as a failed spike if the matrix didn't go first. The workplan's "spike-then-decide" ordering is correctly ordered; doing the survey before integration is the right discipline.
+- **Sub-agent dispatch for bulk research is the right tool.** 17 candidates × 7 columns of researched-and-sourced facts = a clean delegation target. The agent's WebFetch + WebSearch in parallel landed the matrix in one shot with all sources cited. Doing this in-thread would have been ~30 sequential tool calls.
+- **Scope-discovery hooks silently skipping is the gnarliest dogfood failure mode** — 3 commits landed with the operator believing gates were firing. Without bash-testing `.husky/pre-commit` directly, the failure mode is invisible. The Medium fix (install detects missing `.husky/_` and runs `npm install` itself) is the right shape; the Light fix (warning at install) would still leave operators on the hook to notice.
+- **`/dw-lifecycle:issues` does ~40% of the back-fill it could do.** Frontmatter parentIssue lands; the prose-rendered surfaces (workplan headings + README Status table + Key Links) stay in their `/dw-lifecycle:setup` template state. The skill name implies "wires up issue tracking" but the operator does the visible wiring manually. Medium fix in TF-003.
+- **Multi-day session in one Claude context.** Started with the orchestrator-vs-implementer rule strict-reading suggesting a fresh session for implementation. Operator chose continuity. The session boundary blurred but the work landed cleanly — 7 commits, 15 issues, 3 TF entries, Phase 1 Task 1.1 deliverable, all pushed. Trade-off: long context vs setup-cost-per-session. For one-feature focused arcs, continuity wins.
+
 ## 2026-05-28: hygiene Phases 1–9 shipped — six new /dw-lifecycle skills + lifecycle integration + dogfood
 
 ### Feature: hygiene

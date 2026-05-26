@@ -14,7 +14,7 @@ Generalize deskwork's pipeline model so a project can host multiple **lanes** bo
 
 | Phase | Description | Issue | Status |
 |---|---|---|---|
-| 1 | Prior-art research + build-vs-reuse decision | [#302](https://github.com/audiocontrol-org/deskwork/issues/302) | Not started |
+| 1 | Prior-art research + build-vs-reuse decision | [#302](https://github.com/audiocontrol-org/deskwork/issues/302) | In progress — Task 1.1 done (candidate matrix; 17 candidates) |
 | 2 | Pipeline template loader + preset defaults + override resolver | [#303](https://github.com/audiocontrol-org/deskwork/issues/303) | Not started |
 | 3 | Lane data model + config loader + entry schema delta | [#304](https://github.com/audiocontrol-org/deskwork/issues/304) | Not started |
 | 4 | Verb refactor + stage-list reads through lane's template + tooling fixes (#247, #300) | [#305](https://github.com/audiocontrol-org/deskwork/issues/305) | Not started |
