@@ -1,0 +1,15 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-26T23:12:02.504Z",
+  "entryId": "4e4d6912-3edf-4aeb-b6ed-ba455f362f14",
+  "annotation": {
+    "type": "address",
+    "workflowId": "4e4d6912-3edf-4aeb-b6ed-ba455f362f14",
+    "commentId": "a45aa822-648e-4865-842e-16c5dda70886",
+    "version": 2,
+    "disposition": "addressed",
+    "reason": "Out of Scope item reframed: HTML/CSS/Markdown/YAML/JSON are covered by Phase 11's multi-content-type primitives (the polymorphic type-handler dispatcher operates on glob + shape, not on per-language compilers). The Out of Scope item now scopes itself to programming languages requiring AST-aware tooling beyond TypeScript.",
+    "id": "ab7f16a9-e5e4-485f-a665-a0be22e58a31",
+    "createdAt": "2026-05-26T23:12:02.504Z"
+  }
+}

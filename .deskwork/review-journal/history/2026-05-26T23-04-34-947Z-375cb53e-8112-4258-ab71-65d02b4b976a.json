@@ -1,0 +1,19 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-26T23:04:34.947Z",
+  "entryId": "4e4d6912-3edf-4aeb-b6ed-ba455f362f14",
+  "annotation": {
+    "type": "comment",
+    "workflowId": "4e4d6912-3edf-4aeb-b6ed-ba455f362f14",
+    "version": 1,
+    "range": {
+      "start": 15316,
+      "end": 15356
+    },
+    "text": "what about html, css, and markdown?",
+    "category": "other",
+    "anchor": "Per-language scanners beyond TypeScript.",
+    "id": "a45aa822-648e-4865-842e-16c5dda70886",
+    "createdAt": "2026-05-26T23:04:34.947Z"
+  }
+}
