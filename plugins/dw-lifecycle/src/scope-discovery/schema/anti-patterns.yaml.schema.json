@@ -15,7 +15,7 @@
   },
   "definitions": {
     "AntiPatternEntry": {
-      "description": "One registered legacy shape. `id` (kebab-case) is the primary key. `added_in` anchors the registration to a specific commit so reviewers can trace when the pattern was added. `primitive` + `from` name the canonical replacement (used in the report's `replacement:` line). `shape_regex` may be a single regex string OR a list of regex strings (multi-pattern fingerprint — see `min_distance`). `excludes_paths` skips files matching the listed globs BEFORE applying the shape patterns. `canonical_implementation_file` names the canonical primitive's source-of-truth file; the scanner auto-excludes that file from the entry's match AND verifies the file exists at scan start (fails loud if missing — typically caused by a git rename without registry update). `message` is the multi-line operator-facing replacement instruction shown beneath each finding.",
+      "description": "One registered legacy shape. `id` (kebab-case) is the primary key. `added_in` anchors the registration to a specific commit so reviewers can trace when the pattern was added. `primitive` + `from` name the canonical replacement (used in the report's `replacement:` line). `shape_regex` may be a single regex string OR a list of regex strings (multi-pattern fingerprint — see `min_distance`). `excludes_paths` skips files matching the listed globs BEFORE applying the shape patterns. `canonical_file` names the canonical primitive's source-of-truth file; the scanner auto-excludes that file from the entry's match AND verifies the file exists at scan start (fails loud if missing — typically caused by a git rename without registry update). `message` is the multi-line operator-facing replacement instruction shown beneath each finding.",
       "type": "object",
       "additionalProperties": false,
       "required": ["id", "added_in", "primitive", "from", "shape_regex", "message"],
@@ -70,8 +70,8 @@
             "minLength": 1
           }
         },
-        "canonical_implementation_file": {
-          "description": "Optional CWD-relative POSIX path of the primitive's source-of-truth file. When set, the scanner: (a) verifies the file exists at scan start (failing loud with the entry id + missing path if not — typically caused by a git rename without registry update); (b) auto-excludes that file from this entry's match (its body IS the legacy shape, by construction). Independent of `excludes_paths`: both apply when set together. Non-empty string or absent only — empty string is rejected as a malformed declaration.",
+        "canonical_file": {
+          "description": "Optional canonical implementation file path; auto-excluded from match regardless of excludes_paths. CWD-relative POSIX path of the primitive's source-of-truth file. When set, the scanner: (a) verifies the file exists at scan start (failing loud with the entry id + missing path if not — typically caused by a git rename without registry update); (b) auto-excludes that file from this entry's match (its body IS the legacy shape, by construction). Path matching is byte-exact — no glob, no directory expansion. Independent of `excludes_paths`: both apply when set together (union semantics). Non-empty string or absent only — empty string is rejected as a malformed declaration.",
           "type": "string",
           "minLength": 1
         },
