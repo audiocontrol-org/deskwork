@@ -374,6 +374,7 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
 
 ## Phase 11: Pattern discovery loop with self-correcting controller
 
+**Parent issue:** [#316](https://github.com/audiocontrol-org/deskwork/issues/316).
 **Source:** Issue [#315](https://github.com/audiocontrol-org/deskwork/issues/315) (first real-world dogfood-cycle finding). Operator design conversation 2026-05-26.
 
 **Problem the phase addresses (captured exhaustively per capture-mode rule; scoping is a separate pass):**
