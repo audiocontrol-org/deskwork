@@ -31,6 +31,7 @@ Running log of friction, pathologies, and improvement opportunities in the scope
 |---|---|---|
 | TF-001 | Open | — |
 | TF-002 | Open | — |
+| TF-003 | Open | — |
 
 ## How to add an entry
 
@@ -88,3 +89,32 @@ The manifest is a transactional record of where THIS install put managed files, 
 - **Heavy:** namespace the manifest by worktree — `.dw-lifecycle/scope-discovery/hooks-installed/<realpath-hash>.json`. Each worktree's install writes its own file. Inspectable + multi-worktree-aware. Heaviest; probably overkill.
 
 Recommended: **Light** (gitignore). The manifest is transactional state, not source-of-truth — exactly the shape that belongs outside version control. Closes the surface; the journal preserves any audit need.
+
+## TF-003 · MISC · medium · `/dw-lifecycle:issues` partial back-fill — phase headings + README Status table + Key Links not updated
+
+**Repro:**
+
+1. Set up a feature via `/dw-lifecycle:setup`; elaborate the workplan with phases.
+2. Run `dw-lifecycle issues <slug>` (v0.23.0). The helper creates the parent issue (`#301` in this case) + per-phase issues (`#302`..`#313`) and back-fills two things:
+   - PRD frontmatter `parentIssue: "#NNN"`
+   - README frontmatter `parentIssue: "#NNN"`
+3. What it does NOT back-fill:
+   - Workplan phase headings (`## Phase N: <name>`) — no issue link appended; tracking has to be hand-maintained.
+   - README's Status table (still shows the `/dw-lifecycle:setup` template placeholder: `| 1 | [Phase 1 name] | Not started |`, no rows for the rest of the phases, no issue column).
+   - README's Key Links "Parent Issue: " line (frontmatter is back-filled but the prose-rendered link in Key Links stays blank).
+
+Surfaced in this worktree on 2026-05-25 after invoking `dw-lifecycle issues graphical-entries`: 13 issues created (1 parent + 12 phase), only frontmatter back-filled, all the operator-visible tracking surfaces (workplan phase headings + README Status table + README Key Links parent link) stayed in their pre-issues-filing state.
+
+**Workaround used:**
+
+Hand-edited the workplan to append `· [#NNN](https://github.com/<org>/<repo>/issues/<NNN>)` to each phase heading; rewrote the README's Status table from scratch with a row per phase + issue link column + "Closing" milestone row + status column; hand-filled the Key Links parent issue line + a real description paragraph.
+
+That's ~50 lines of editing per feature, every time `/dw-lifecycle:issues` runs. For features with many phases (this one has 13 rows) the manual back-fill is non-trivial and easy to skip — which leaves the tracking surfaces visibly stale.
+
+**Suggested fix:**
+
+- **Light:** the skill's report at the end of run prints a list of the back-fills the operator still needs to make manually (workplan phase headings, README Status table rows, README Key Links parent link) with the specific edit strings to paste. Cheapest; relies on operator reading + executing.
+- **Medium:** the skill itself walks the workplan's `## Phase N: <name>` headings and appends `· [#NNN](<url>)` to each; walks the README's Status table and replaces / extends rows; updates the Key Links parent line. Closes the surface in one operator-recognizable invocation — the same atomic feel as the frontmatter back-fill already has.
+- **Heavy:** introduce a `--render-status` flag that re-renders the entire README from a template using the workplan + the issue tree as inputs; gives the operator the option to keep the README purely derived (per-task status badges, completion percentages, etc.). Heavier; couples the feature documentation tightly to the issues skill.
+
+Recommended: **Medium**. The frontmatter back-fill already happens; the operator-visible surfaces (workplan headings, README table, Key Links) are the same kind of back-fill at the prose layer. Closing that gap matches operator expectations ("`/dw-lifecycle:issues` ran; everything tracking-related is now wired up"). Light leaves the documentation drift open every cycle.

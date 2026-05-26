@@ -10,7 +10,7 @@ date: 2026-05-25
 
 > The workplan elaborates the PRD's Implementation Phases into tasks with acceptance criteria. Phase 4 carries scoped-in tooling fixes (#247, #300). Phase 1 is research-only (no production implementation). Phase 9 is design-only (no production implementation). All other phases ship code + tests; integration tests live in `packages/<workspace>/test/` and run locally per the project's "no test infrastructure in CI" rule.
 
-## Phase 1: Prior-art research + build-vs-reuse decision
+## Phase 1: Prior-art research + build-vs-reuse decision  ·  [#302](https://github.com/audiocontrol-org/deskwork/issues/302)
 
 **Deliverable:** Decision document at `docs/studio-design/ACCEPTED/<date>-graphical-review-prior-art/brief.md` recording the chosen stack (annotation data model, image annotation UI, HTML annotation UI, threading, screenshot capture, screenshot markup) with rationale + dependency footprint + adopter-facing impact. **No production implementation in this phase.**
 
@@ -62,7 +62,7 @@ date: 2026-05-25
 - [ ] DESIGN-STANDARDS.md change log has an entry for this decision; the archive directory has both ACCEPTED and REJECTED entries.
 - [ ] No production code in `packages/` or `plugins/` modified — research-only phase.
 
-## Phase 2: Pipeline template loader + preset defaults + override resolver
+## Phase 2: Pipeline template loader + preset defaults + override resolver  ·  [#303](https://github.com/audiocontrol-org/deskwork/issues/303)
 
 **Deliverable:** JSON load + schema validation; five preset templates ship at `packages/core/src/pipelines/{editorial,visual,feature-doc,qa-plan,blog-post}.json`; override resolver picks per-project overrides under `<projectRoot>/.deskwork/pipelines/`. Unit tests.
 
@@ -95,7 +95,7 @@ date: 2026-05-25
 - [ ] `listAvailablePipelineTemplates` returns the union of plugin defaults + project overrides with no duplicates.
 - [ ] All five preset JSON files carry header comments documenting their lifecycle rationale (operator-authored custom pipelines have a working exemplar to copy from).
 
-## Phase 3: Lane data model + config loader + entry schema delta
+## Phase 3: Lane data model + config loader + entry schema delta  ·  [#304](https://github.com/audiocontrol-org/deskwork/issues/304)
 
 **Deliverable:** `.deskwork/lanes/<id>.json` schema + loader; entry sidecar gains `lane` + `artifactKind`; doctor migration creates `default` lane and back-fills entries on first run. Unit tests.
 
@@ -136,7 +136,7 @@ date: 2026-05-25
 - [ ] `detectArtifactKind` covers all four supported kinds plus the rejection path.
 - [ ] Auto-bootstrap of `default` lane happens transparently on first invocation under the new model for any pre-feature project.
 
-## Phase 4: Verb refactor + stage-list reads through lane's template + tooling fixes
+## Phase 4: Verb refactor + stage-list reads through lane's template + tooling fixes  ·  [#305](https://github.com/audiocontrol-org/deskwork/issues/305)
 
 **Deliverable:** `approve`, `iterate`, `cancel`, `induct` consult the entry's lane template. Existing behavior preserved when lane = `default`. Calendar regen + doctor parser stop hardcoding stage lists; #247 and #300 close as side effects.
 
@@ -189,7 +189,7 @@ date: 2026-05-25
 - [ ] Every legacy entry post-migration has `lane: "default"` and a correct `artifactKind`.
 - [ ] No data loss — all existing frontmatter, scrapbook content, marginalia, journal events preserved.
 
-## Phase 5: Studio render — per-lane tabs + template stage columns + combined overview + lane-visibility panel + multi-lane composed views
+## Phase 5: Studio render — per-lane tabs + template stage columns + combined overview + lane-visibility panel + multi-lane composed views  ·  [#306](https://github.com/audiocontrol-org/deskwork/issues/306)
 
 **Deliverable:** Markdown-only studio render that's lane-aware. Tab strip + Combined overview + lane visibility panel + multi-lane composed views. Integration test against multi-lane fixture.
 
@@ -237,7 +237,7 @@ date: 2026-05-25
 - [ ] Multi-lane composed views are saveable and reopenable via deep link.
 - [ ] Phone + desktop viewports both render correctly (dual-viewport verification protocol passes for all changed surfaces).
 
-## Phase 6: Lane + pipeline CRUD skills + studio management surfaces
+## Phase 6: Lane + pipeline CRUD skills + studio management surfaces  ·  [#307](https://github.com/audiocontrol-org/deskwork/issues/307)
 
 **Deliverable:** `/deskwork:lane` and `/deskwork:pipeline` skill families; studio lane-management + pipeline-editor pages; doctor rules for orphan pipeline references.
 
@@ -288,7 +288,7 @@ date: 2026-05-25
 - [ ] Doctor surfaces orphan pipeline references with actionable repair.
 - [ ] Studio writes nothing to sidecar state — every action clipboard-copies the equivalent CLI invocation per THESIS Consequence 2.
 
-## Phase 7: Groups — members field + CRUD + review surface + multi-lane composition
+## Phase 7: Groups — members field + CRUD + review surface + multi-lane composition  ·  [#308](https://github.com/audiocontrol-org/deskwork/issues/308)
 
 **Deliverable:** `/deskwork:group` skill family; group review surface with member panel (multi-lane composition); doctor rules for recursion + dangling members.
 
@@ -351,7 +351,7 @@ date: 2026-05-25
 - [ ] Recursive groups refused via `group-recursive` doctor rule; dangling members surfaced via `group-member-missing`.
 - [ ] Group review surface renders multi-lane member composition; member entries show "Member of:" badges.
 
-## Phase 8: Annotation model extension — threads + screenshot attachments + spatial anchors + disposition-trace affordance
+## Phase 8: Annotation model extension — threads + screenshot attachments + spatial anchors + disposition-trace affordance  ·  [#309](https://github.com/audiocontrol-org/deskwork/issues/309)
 
 **Deliverable:** Threaded replies (`replyTo`), screenshot attachments (`attachments[]`), spatial anchors (`spatialAnchor`), and per-comment disposition-trace affordance (inline diff expansion on "addressed" badge + required free-text disposition reason at iterate time). Cross-cutting; markdown review benefits too. Sidecar storage at `<entryDir>/scrapbook/screenshots/`. Closes #299.
 
@@ -412,7 +412,7 @@ date: 2026-05-25
 - [ ] Markdown review benefits from threads + attachments + inline diff for free (no additional render-layer work).
 - [ ] Issue #299 closes.
 
-## Phase 9: `/frontend-design` pass for the graphical review surface + screenshot markup co-design
+## Phase 9: `/frontend-design` pass for the graphical review surface + screenshot markup co-design  ·  [#310](https://github.com/audiocontrol-org/deskwork/issues/310)
 
 **Deliverable:** 2–3 operator-pickable mockup directions covering chrome-free render area, pin placement, thread expansion, screenshot capture affordance, screenshot attachment workflow, **and screenshot markup UI** (arrow / box / freehand / text-label / blur tools). Operator picks; gates Phase 10–12. **No implementation in this phase.**
 
@@ -460,7 +460,7 @@ date: 2026-05-25
 - [ ] No production code in `packages/` or `plugins/` modified — design-only phase.
 - [ ] Phase 10 and Phase 11 implementation can translate the picked mockup directly (no further design ambiguity).
 
-## Phase 10: Graphical entries — HTML review surface
+## Phase 10: Graphical entries — HTML review surface  ·  [#311](https://github.com/audiocontrol-org/deskwork/issues/311)
 
 **Deliverable:** Iframe-based chrome-free rendering for `html-mockup` + `single-file-html`; DOM-anchored + coordinate-pinned spatial comments; thread expansion; screenshot attachment workflow; iterate against HTML mockups.
 
@@ -513,7 +513,7 @@ date: 2026-05-25
 - [ ] Iterate edits HTML/CSS/JS to address marginalia; revision history captures pre/post state.
 - [ ] Stale anchors surface inline with distinct chrome + doctor warning.
 
-## Phase 11: Graphical entries — image review surface + iteration paths
+## Phase 11: Graphical entries — image review surface + iteration paths  ·  [#312](https://github.com/audiocontrol-org/deskwork/issues/312)
 
 **Deliverable:** Chrome-free image review surface; region-anchored marginalia (raster) + element-anchored marginalia (SVG); iterate skill prose enumerates the four image-iteration paths.
 
@@ -576,7 +576,7 @@ date: 2026-05-25
 - [ ] Doctor surfaces image-locked-stage drift.
 - [ ] Manual dogfood successfully exercises ingest + iterate + approve on at least one existing `docs/studio-design/` mockup.
 
-## Phase 12: Screenshot markup / drawing UI
+## Phase 12: Screenshot markup / drawing UI  ·  [#313](https://github.com/audiocontrol-org/deskwork/issues/313)
 
 **Deliverable:** Operator-side annotation of captured screenshots before attaching: arrow, box, freehand, text-label, blur-region tools. Markup persists as `<comment-id>-<timestamp>-marked.png` alongside the raw capture; comment annotation's `attachments[]` references the marked file with `originalAttachment` linking back to the raw.
 
