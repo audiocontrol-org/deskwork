@@ -371,3 +371,200 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
 - [x] paper-test coverage matrix produced — Task 4 deliverable.
 - [x] Combined coverage > ~80% — REFRAMED as v1 ship gate. Measured 60.9% in paper-test (Phase 10 Task 4). Operator decision 2026-05-25: ship v1 at measured coverage; dogfood gate replaces percentage gate. graphical-entries implementation team logs friction in docs/1.0/001-IN-PROGRESS/graphical-entries/tooling-feedback.md; v1 hardens via audit cycle on that log (mirror of audiocontrol pilot pattern that produced TF-001..TF-016).
 - [x] No regressions in the existing dw-lifecycle skill set — `validate-scope-discovery` runs 401 tests, 398 pass; 3 pre-existing flakes on clone-detector tmpdir-jscpd-spawn timeouts (5s default vitest timeout vs ~1.7s actual per-test cost — unrelated to Phase 10 changes; the same tests pass individually with `--testTimeout=30000`).
+
+## Phase 11: Pattern discovery loop with self-correcting controller
+
+**Source:** Issue [#315](https://github.com/audiocontrol-org/deskwork/issues/315) (first real-world dogfood-cycle finding). Operator design conversation 2026-05-26.
+
+**Problem the phase addresses (captured exhaustively per capture-mode rule; scoping is a separate pass):**
+
+The current scope-discovery surface is **INVENTORY masquerading as DISCOVERY**. The agents match against a fixed hardcoded vocabulary and surface only what's pre-registered. Concrete dogfood failure: an editor component consumed ZERO canonical design-system primitives + ≥14 utility-class hits, survived every scanner run + every audit, was caught only when the operator inspected a screenshot. The structural gap is general: any project using scope-discovery has a registry that can grow stale; the tooling cannot surface novel anti-patterns; the operator-trust failure mode is "green discovery report read as evidence-of-no-novel-anti-patterns."
+
+The phase introduces:
+- **Pattern-type vocabulary widening** beyond positive-match regex.
+- **The Loop** — a continuous discovery cycle with status-marked catalog entries, orchestrator-mediated dispositions, and a measurement-driven self-correcting controller.
+- **Autonomous orchestration** via `/dw-lifecycle:implement` augmented with per-turn audit/judge stack + LLM-judge in-band + external LLM auditor + audit-log memory.
+- **Wrong-decision recovery primitives** so the orchestrator can self-correct without dragging the human into every decision.
+
+### Task 1: Pattern-type vocabulary widening (G1–G7)
+
+Today only `type: regex` is expressible. Add type-handler dispatcher in the scan engine; ship as polymorphic catalog with per-project YAML override (existing Phase 3 design supports this for the catalog file but not the type space).
+
+- [ ] **G1**: Polymorphic pattern catalog — type-handler dispatcher; catalog is data, handlers are code, both extensible per-project.
+- [ ] **G2**: Negative-match primitive — `{ type: 'negative-space', match_glob, must_contain, threshold }` (the operator-named cheapest fix from #315).
+- [ ] **G3**: Coverage-metric primitive — `glob × shape → ratio`; per-directory adoption percentage.
+- [ ] **G4**: Statistical-outlier primitive — `glob × distance metric → anomaly score per file`.
+- [ ] **G5**: Unmatched-shape clustering pass — synthesis-layer; cluster un-matched content by shape similarity, rank by frequency.
+- [ ] **G6**: Semantic primitive (LLM-augmented) — opt-in; gated on cheaper signals.
+- [ ] **G7**: Provenance field on findings — `provenance: 'registered-pattern' | 'negative-space' | 'coverage-gap' | 'discovered-candidate' | 'outlier' | 'semantic' | 'prd-theme'`.
+
+### Task 2: The Loop foundation — status markers + disposition lifecycle
+
+The Loop closes by extending existing catalogs with disposition state, not by creating a separate ledger (operator decision 2026-05-26).
+
+- [ ] Add `status:` field to every catalog entry type: `pending | blessed | cursed | ignore | tracked-holdout | withdrawn`.
+- [ ] Add `provenance:` block to every catalog entry — `{ source: 'operator-authored' | 'orchestrator-agent' | 'llm-judge-proposed' | 'install-seed' | 'promoted-from-candidate', authored_at, authored_by, context, evidence_link }`.
+- [ ] Reversibility primitive: `withdrawn-<finding-id>` status on auto-dispositions overturned by auditor; existing audit-log convention extends to catalog entries.
+- [ ] Cross-surface application: anti-patterns / adopter-manifests / editor-symmetry / deprecations / pattern-matrix / regime-holdout-detector ALL gain the status + provenance fields uniformly.
+
+### Task 3: Orchestrator-agent mediation surface
+
+Operator dispositions at architecture-scale; the orchestrator-agent translates to line-level catalog edits (operator decision 2026-05-26: ONE user-level concept, the agent figures out novelty vs refinement vs suppression).
+
+- [ ] Architectural summary of candidates at scan completion — orchestrator clusters raw findings, writes 1-2-sentence operator-readable summaries to a "discovered_candidates" section of the scope-manifest (or sibling artifact).
+- [ ] Catalog-edit diff proposal — orchestrator surfaces the line-level catalog changes it would make; operator approves at architecture-level; orchestrator commits the changes.
+- [ ] Append-vs-edit autonomy — orchestrator decides whether a disposition implies a new catalog entry (novelty) or refinement of an existing entry (tightening/widening); the operator never makes this choice manually.
+
+### Task 4: Codebase-state metrics
+
+The controller can only adjust based on what it measures. These are observable properties of the codebase; their derivatives become drift/correction signals.
+
+- [ ] **Classification completeness**: fraction of distinct shapes that are catalogued (blessed/cursed/ignore) vs uncatalogued.
+- [ ] **Coverage**: per BLESSED pattern, fraction of expected adopters actually adopting.
+- [ ] **Violation density**: per CURSED pattern, hit count + concentration (per-directory).
+- [ ] **Surface uniformity / outlier presence**: variance in shape across sibling files per directory.
+- [ ] **Catalog stability**: edit rate over time.
+- [ ] **Discovered-candidate rate**: new shapes surfacing per unit code change.
+- [ ] **Disposition latency**: time candidates remain `pending` before triage.
+
+### Task 5: Self-correcting controller
+
+Cadence + intensity are NOT pre-decided. The controller observes drift / correction / auditor-correction signals; adjusts itself.
+
+- [ ] Drift signal = derivative-toward-worse of codebase-state metrics.
+- [ ] Correction signal = derivative-toward-better of codebase-state metrics.
+- [ ] **Auditor-correction-rate**: count of audit-driven catalog edits (provenance.context: `audit-finding-<id>`) per unit work. The TRUTH SIGNAL — codebase-state metrics can lie when the catalog is incomplete; auditor-correction rate exposes when the model is undercounting drift.
+- [ ] Cadence-adjust policy: high drift OR high auditor-correction → tighter cadence, more intensive analysis. Low drift + low auditor-correction → loosen.
+- [ ] Sensible defaults shipped from day one (operator decision 2026-05-26: don't pre-decide; ship defaults + telemetry + parameter tuning).
+- [ ] Cold-start behavior: fresh install with no measurements defaults to maximum frequency/intensity; ratchets down as the controller earns confidence.
+- [ ] Anti-thrashing: bounded oscillation; the controller observes whether its own adjustments are stable.
+- [ ] Telemetry: controller decisions are auditable (the operator can inspect "why did frequency go up at scan #47").
+
+### Task 6: `/dw-lifecycle:implement` augmentation — the autonomous loop
+
+The existing implement skill walks the workplan. The augmentation embeds the audit/judge stack and the controller as inline machinery (operator decision 2026-05-26: implement is the entry point; no new `/dw-lifecycle:iterate` skill).
+
+- [ ] Per-turn audit/judge stack inside implement:
+  1. Read audit log (catch external auditor updates since last turn).
+  2. Internal LLM-judge pass — judges recent work (last commit, last sub-agent dispatch, last catalog edit) for missed candidates / drift / refinement opportunities.
+  3. Decide next action via skills + policies + metrics.
+  4. Take ONE action.
+  5. Fire external LLM auditor prompt (queued for next turn's audit-log read).
+- [ ] Hook-cadence is workplan-dependent + controller-tuned (NOT pre-decided per operator 2026-05-26): initial setpoint emerges from workplan metadata + risk markers; controller tunes from there.
+- [ ] Termination criteria negotiated per-cycle (NOT pre-decided per operator 2026-05-26): goal-achieved (workplan + acceptance criteria) | escalation (orchestrator queues a needs-human-decision) | budget (cost-cap per cycle) | hard-policy-violation (immediate halt). The orchestrator and operator agree on the cycle's termination contract at the start of each invocation.
+- [ ] Resumability state: durable in catalogs + audit log + new `.dw-lifecycle/orchestrator-runtime/` for true mid-flight scratch (operator decision 2026-05-26: durability-first; ephemeral scratch is the exception).
+
+### Task 7: LLM-judge / external-auditor / audit-log integration
+
+Multi-source ensemble: internal judge (in-band, every turn) + external auditor (out-of-band, fired by orchestrator every turn, results read next turn) + audit-log (durable memory). Human is escalation-only target (operator decision 2026-05-26: as little human intervention as possible).
+
+- [ ] Internal LLM-judge implementation — runs as part of `/dw-lifecycle:implement`'s per-turn cycle; reads recent work + catalog state + open candidates; emits per-decision confidence score + proposed dispositions.
+- [ ] External LLM auditor invocation — orchestrator fires a third-party LLM audit prompt each turn; results materialize in the audit log; the orchestrator reads them next turn.
+- [ ] Audit-log read automation — orchestrator reads audit-log for updates since last turn as routine; no operator action required.
+- [ ] Judge-vs-auditor independence — different model/prompt scaffolds; auditor cannot self-grade the judge's work.
+- [ ] Confidence calibration — composite signal: judge-confidence × policy-match × skills-exhaustion × auditor-correction-rate; threshold tuned by the controller.
+
+### Task 8: Wrong-decision recovery primitives
+
+If the orchestrator commits a wrong disposition / catalog edit, the system must detect and recover without operator intervention (where possible).
+
+- [ ] Reversible disposition flow: auditor disagreement transitions catalog entry to `pending`; provenance gains `overturned_by: <auditor-finding-id>`.
+- [ ] Catalog-edit rollback via `withdrawn-<finding-id>` status — entries are never deleted (preservation rule mirrors audit-log).
+- [ ] Trust-calibration updates per auditor-correction event — orchestrator confidence threshold rises after wrong decisions; ratchets down as auditor-correction-rate falls.
+- [ ] Systematic-wrongness response: if a CLASS of decisions is consistently wrong, controller routes that class to escalation by default until evidence improves.
+- [ ] Initial wrong-decision per session is escalated to human; subsequent ones use calibration-adjusted threshold; if the auditor disagrees AGAIN, escalation re-fires.
+
+### Task 9: Operator escalation surface
+
+Escalation should be rare, high-information, asynchronous-friendly (operator decision 2026-05-26: the rare-but-clear shape).
+
+- [ ] Escalation queue — orchestrator writes a `pending-decision` artifact when confidence is below threshold; the artifact contains the proposed action, the evidence, the orchestrator's reasoning, the question for the operator.
+- [ ] Resumption mechanics — next `/dw-lifecycle:implement` invocation reads queued decisions; operator's response in chat (or in-place edit of the artifact) is the input.
+- [ ] Visibility surface — orchestrator's per-turn report includes (a) actions taken silently (count + brief summary), (b) escalations queued (with quick-link to the pending-decision artifact), (c) controller adjustments made.
+
+### Task 10: Provenance + audit-log linkage
+
+Every catalog edit traces back to its origin. Audit-log entries link to specific catalog edits. Cross-references navigable in both directions.
+
+- [ ] Provenance field schema standardized across all catalog types.
+- [ ] Audit-log entries gain `affects:` links naming catalog entries they touch.
+- [ ] Catalog entries gain `audit_history:` listing audit-log findings against them.
+- [ ] Doctor rule: `provenance-orphaned-entries` — catalog entries with provenance pointing at audit-findings that don't exist; surfaces broken cross-references.
+
+### Task 11: Cross-surface application
+
+The pattern-type widening + Loop primitives + status/provenance fields apply uniformly to ALL registry-driven scanners, not just `pattern-matrix.ts`.
+
+- [ ] anti-patterns.yaml — schema gains `status`, `provenance`; auto-disposition flow integrates.
+- [ ] adopter-manifests.yaml — same.
+- [ ] editor-symmetry.md — same (or its underlying registry).
+- [ ] deprecations registry — same.
+- [ ] regime-holdout-detector — fuses the above with the new types from Task 1.
+- [ ] clones.yaml — already has dispositions; align with the new provenance schema for consistency.
+
+### Task 12: Naming alignment
+
+The operator-trust failure mode (green "discovery" report read as no-novel-anti-patterns) is a naming problem (#315 problem space). Decide and apply.
+
+- [ ] Option: rename "discovery agents" → "inventory agents"; add separate `scope-discover` surface for the Loop. OR
+- [ ] Option: keep names; make provenance visible enough at the operator surface that the distinction can't be missed. OR
+- [ ] Option: hybrid — keep `scope-inventory` (the orchestrator entry-point); rename internal "discovery agents" terminology to "inventory agents"; the Loop's surface becomes the architectural discovery layer.
+
+(Decision deferred to scoping pass per operator 2026-05-26.)
+
+### Task 13: Multi-content-type generality
+
+Today the tooling walks TypeScript source. Deskwork manages content collections, configs, schemas, anything. The pattern catalog + glob + shape model should be content-type-agnostic.
+
+- [ ] Glob + shape primitives content-type-neutral; no TS-coupling in core types.
+- [ ] Per-content-type handlers (`.md`, `.yaml`, `.json`) pluggable into the scan engine.
+- [ ] Markdown-specific patterns (e.g., frontmatter shape, heading conventions, link patterns) authorable.
+
+(Likely a scoping-pass decision: deferred initial-ship vs designed-in from start.)
+
+### Task 14: Tooling-feedback closure → audit-log import workflow
+
+The existing `tooling-feedback.md` pattern from Phase 10 v1 ship is a feedback-loop primitive for the TOOLING; this task formalizes the closure workflow.
+
+- [ ] TF closure entries (`Status: addressed-<commit>` or `Status: superseded-by-<TF-NN>`) auto-import into the scope-discovery audit-log as `AUDIT-<date>-<NN>` entries with cross-reference.
+- [ ] Doctor rule: surface TF entries that have been open > N days without status updates (configurable).
+- [ ] Skill: `/dw-lifecycle:tooling-feedback-import` — walks closure-marked TF entries; promotes them to audit-log; closes the TF entry with the new audit-log ID as forwarding pointer.
+
+### Acceptance criteria (captured promises; scoping pass decides what ships when)
+
+- [ ] The Loop runs on every `/dw-lifecycle:implement` turn without operator invocation.
+- [ ] Orchestrator auto-dispositions candidates at high confidence; escalates at low confidence.
+- [ ] Controller measures codebase-state metrics + auditor-correction-rate; adjusts cadence + intensity accordingly; defaults shipped sensibly per Task 5.
+- [ ] Wrong-decision events detectable + reversible; trust calibration adjusts in response.
+- [ ] Pattern-type vocabulary supports at minimum the 4 v1 operator-named patterns from #315 (Tailwind/utility-class catch-all, hardcoded-color, hover-only-affordance, negative-space-no-canonical-consumer).
+- [ ] The full Loop applies uniformly across the registry-driven surfaces (Task 11).
+- [ ] Pre-existing user-visible behavior of `/dw-lifecycle:implement` is preserved; no regressions in completed phase tests.
+- [ ] KeygroupSummary-shape repro fixture (anonymized) commits to test suite + passes (negative-space pattern fires on a synthetic component with ZERO canonical primitives + ≥5 utility-class hits).
+- [ ] First dogfood cycle (graphical-entries team) reports the gap is closed via the v1.1 tooling-feedback log.
+
+### Open scoping decisions (intentionally NOT pre-decided)
+
+- Which of Tasks 1–14 ship in v1.1 vs deferred to v1.2 / future?
+- Which of G1–G7 pattern types ship at minimum (operator named negative-space as the cheapest fix; G3/G4/G5/G6 are stretch).
+- Task 12 naming alignment: which option?
+- Task 13 multi-content-type: designed-in or deferred?
+- LLM-judge cost ceilings + model selection.
+- Task 9 escalation-surface UX (artifact format, edit-in-place vs chat-resume).
+
+### Risks and unknowns
+
+- LLM-judge cost predictability — per-turn LLM calls multiply across long sessions.
+- Auditor-correction-rate noise — false positives in the truth signal would push the controller toward over-tight cadence; needs validation discipline.
+- Thrashing — controller's cadence adjustments oscillating; anti-thrashing must be measurable.
+- Catalog-state explosion — large `pending` ledger; needs ranking + bounded triage surface.
+- Performance — per-turn audit/judge stack overhead; needs profiling baseline before architecture lock-in.
+- Confidence calibration cold-start — first session has no measurements; defaults must be conservative without paralyzing the orchestrator.
+
+### Existing primitives to build on (not greenfield)
+
+- `clones.yaml` dispositions — closest existing analog of status-marked catalog with operator-curated triage.
+- audit-log workflow + statuses (open / acknowledged / fixed / verified / withdrawn) — provides the disposition state machine + provenance pattern.
+- `tooling-feedback.md` pattern — feedback-loop primitive ready to extend.
+- dispatch-wrapper (Phase 5) — sub-agent dispatch mediation; extension point for the orchestrator-agent.
+- pattern-matrix YAML override (Phase 3) — already supports per-project pattern catalog; needs schema extension for new types.
+- agent-discipline rule § "scope-discovery v1 — dogfood feedback via tooling-feedback.md" — already documents the closure-feedback workflow.
