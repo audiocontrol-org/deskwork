@@ -91,7 +91,8 @@ function readAndValidate(path: string, expectedId: string): PipelineTemplate {
   if (result.data.id !== expectedId) {
     throw new Error(
       `Pipeline template at ${path} declares id "${result.data.id}" but was loaded as "${expectedId}" — `
-      + `the JSON \`id\` field must equal the filename basename`,
+      + `the JSON \`id\` field must equal the filename basename. `
+      + `Either rename the file to "${result.data.id}.json", or change the JSON's id to "${expectedId}".`,
     );
   }
   return result.data;
@@ -109,8 +110,10 @@ function readAndValidate(path: string, expectedId: string): PipelineTemplate {
  *   the JSON's `id` field disagrees with the filename basename.
  */
 export function loadPipelineTemplate(id: string, projectRoot: string): PipelineTemplate {
-  if (id.length === 0) {
-    throw new Error('loadPipelineTemplate requires a non-empty id');
+  if (id.trim().length === 0) {
+    throw new Error(
+      `loadPipelineTemplate requires a non-empty id; received ${JSON.stringify(id)}`,
+    );
   }
   // Override-takes-precedence: project path wins when present.
   const overridePath = join(projectOverridesDir(projectRoot), `${id}.json`);

@@ -149,6 +149,11 @@ describe('loadPipelineTemplate', () => {
     expect(() => loadPipelineTemplate('', projectRoot))
       .toThrow(/non-empty id/);
   });
+
+  it('throws on a whitespace-only id rather than searching for a whitespace-named file', () => {
+    expect(() => loadPipelineTemplate('   ', projectRoot))
+      .toThrow(/non-empty id/);
+  });
 });
 
 describe('listAvailablePipelineTemplates', () => {

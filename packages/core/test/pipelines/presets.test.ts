@@ -23,8 +23,15 @@ import {
 import { PipelineTemplateSchema } from '../../src/pipelines/types.ts';
 
 /**
- * Expected shipped shape per preset (PRD § Preset templates).
- * Keep this table in sync with the workplan + JSON.
+ * Expected shipped shape per preset.
+ *
+ * Source of truth: graphical-entries PRD § "Default templates shipped
+ * in v1 — presets, not the bounding space" at
+ * `docs/1.0/001-IN-PROGRESS/graphical-entries/prd.md` (the table
+ * around lines 105-111 of the PRD with linearStages / lockedStages /
+ * offPipelineStages per preset id). This duplication is intentional —
+ * the JSON files are the implementation; this table is the spec, and
+ * silent drift between them fails the test loudly.
  */
 const EXPECTED_PRESETS: Record<
   string,

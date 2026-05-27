@@ -115,6 +115,8 @@ date: 2026-05-25
 
 ### Task 3.2: Entry sidecar schema delta — lane + artifactKind
 
+> **Phase 2 follow-up (from code-quality review 2026-05-27, I-3):** `PipelineTemplateSchema` uses `.passthrough()` to admit the `$rationale` field; this widens the inferred `PipelineTemplate` type to admit arbitrary string-keyed fields. Phase 3 consumers (`LaneConfig`, sidecar readers) should `import { PipelineTemplate } from '@deskwork/core/pipelines'` AND consider exporting a narrower `StrictPipelineTemplate = Pick<PipelineTemplate, 'id' | 'name' | 'description' | 'linearStages' | 'lockedStages' | 'offPipelineStages'>` at the consumption boundary so typos like `template.lockedSatges` don't compile cleanly. Decision: Phase 3 introduces the narrow type when the first consumer lands; until then, the runtime contract holds via Zod validation.
+
 - [ ] Step 3.2.1: Extend `EntrySidecar` Zod schema at `packages/core/src/entries/schema.ts` (or wherever the schema lives) with `lane: string` (required after migration) and `artifactKind: 'markdown' | 'html-mockup' | 'single-file-html' | 'image'` (required after migration).
 - [ ] Step 3.2.2: Make `currentStage` accept any string drawn from the lane's template (linearStages ∪ offPipelineStages); the runtime validates against the resolved template, not a global enum.
 - [ ] Step 3.2.3: Make both new fields optional in the schema during the migration window; doctor enforces them after migration runs.
@@ -271,6 +273,8 @@ date: 2026-05-25
 - [ ] Step 6.3.4: Archive / restore actions: clipboard-copy `/deskwork:lane archive <id>` or `/deskwork:lane restore <id>` — studio never mutates sidecar state.
 
 ### Task 6.4: Studio pipeline-editor page
+
+> **Phase 2 follow-up (from code-quality review 2026-05-27, I-1):** `listAvailablePipelineTemplates` returns id strings without pre-validating each template. The picker UI in this task surfaces ids that may fail to load when selected (e.g. an operator-authored `.deskwork/pipelines/<id>.json` with malformed JSON). Add an acceptance criterion that selection-time load errors surface as an inline error message naming the offending file path + the specific failure (parse / Zod / id-mismatch). Do NOT silently filter the picker; the operator should see "this id exists but won't load — fix it" rather than "this id is missing." See `packages/core/src/pipelines/loader.ts` for the thrown error shapes the UI should render.
 
 - [ ] Step 6.4.1: Server-render page at `/dev/pipelines/` listing every template with view / edit / create / delete buttons.
 - [ ] Step 6.4.2: Pipeline-editor form: visualize linearStages as a horizontal flow with `lockedStages` and `offPipelineStages` distinguished by chrome; operator can add / rename / remove / reorder stages.
