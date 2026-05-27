@@ -313,7 +313,7 @@ Fix guidance:
 ### The #287 port landed, but several comments and test names still describe `check-deprecations` as a stubbed Phase 4 shell
 
 Finding-ID: AUDIT-20260526-02
-Status:     fixed-<pending-commit>
+Status:     fixed-16734ac
 Severity:   low
 Surface:    `plugins/dw-lifecycle/src/subcommands/check-deprecations.ts`, `plugins/dw-lifecycle/src/__tests__/scope-discovery/discovery-agents/regime-holdout-detector.test.ts`, `regime-holdout-detector.fixtures.ts`
 
