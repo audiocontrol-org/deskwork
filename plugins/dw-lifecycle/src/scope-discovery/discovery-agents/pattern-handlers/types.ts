@@ -34,14 +34,25 @@
 
 import type { PatternFinding } from '../types.js';
 import type { SourceFileView } from '../shared.js';
+import type { CatalogStatus, Provenance } from '../../util/catalog-status.js';
 
 /**
  * Common metadata every catalog entry carries, regardless of type.
+ *
+ * Phase 11 Task 2 — every catalog entry now also carries Loop
+ * metadata (status + provenance). The dispatcher filters out non-
+ * actively-enforced entries at the entry-point boundary
+ * (`pattern-matrix.ts` → `buildPatternMatrix`) BEFORE handlers run,
+ * so handlers themselves see only blessed/cursed entries.
  */
 interface BaseCatalogEntry {
   readonly id: string;
   readonly description: string;
   readonly extensions?: ReadonlyArray<string>;
+  /** Phase 11 Task 2 — Loop status. Default `blessed` for pre-Loop entries. */
+  readonly status: CatalogStatus;
+  /** Phase 11 Task 2 — provenance block; synthesized when absent. */
+  readonly provenance: Provenance;
 }
 
 /**

@@ -79,6 +79,11 @@ import {
   type ParsedKeyedListRegistry,
   type RegistrySchema,
 } from './util/registry-yaml.js';
+import {
+  parseCatalogEntryMetadata,
+  type CatalogStatus,
+  type Provenance,
+} from './util/catalog-status.js';
 
 /** Default max line gap between regex matches when `shape_regex` is a list. */
 export const DEFAULT_MIN_DISTANCE = 50;
@@ -124,6 +129,26 @@ export interface AntiPatternEntry {
    */
   readonly canonicalFile: string | null;
   readonly message: string;
+  /**
+   * Phase 11 Task 2 — The Loop foundation. Status discriminator (one
+   * of pending / blessed / cursed / ignore / tracked-holdout /
+   * withdrawn) determining whether the scanner actively enforces this
+   * entry. Entries with `status: blessed` (the default for hand-
+   * authored pre-Loop entries) or `status: cursed` are enforced;
+   * every other status is skipped (pending awaiting triage, ignore
+   * acknowledged false-positive, tracked-holdout deferred, withdrawn
+   * overturned by auditor). See `util/catalog-status.ts` for the full
+   * lifecycle spec.
+   */
+  readonly status: CatalogStatus;
+  /**
+   * Phase 11 Task 2 — provenance block tracking where the entry came
+   * from. Synthesized to `{ source: 'install-seed', authored_at: <epoch> }`
+   * when the entry omits the field (back-compat with pre-Loop registries;
+   * the `catalog-entry-missing-status` doctor rule surfaces these as
+   * warnings).
+   */
+  readonly provenance: Provenance;
 }
 
 /**
@@ -186,6 +211,7 @@ function parseEntry(raw: Record<string, unknown>, ctx: string): AntiPatternEntry
   const minDistance = parseMinDistance(raw['min_distance'], ctx);
   const excludesPaths = parseExcludesPaths(raw['excludes_paths'], ctx);
   const canonicalFile = parseCanonicalFile(raw['canonical_file'], ctx);
+  const { metadata } = parseCatalogEntryMetadata(raw, ctx, NAMESPACE);
   return {
     id,
     addedIn,
@@ -196,6 +222,8 @@ function parseEntry(raw: Record<string, unknown>, ctx: string): AntiPatternEntry
     excludesPaths,
     canonicalFile,
     message,
+    status: metadata.status,
+    provenance: metadata.provenance,
   };
 }
 

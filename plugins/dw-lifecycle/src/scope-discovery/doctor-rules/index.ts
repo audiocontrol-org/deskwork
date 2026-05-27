@@ -20,6 +20,7 @@ import { check as refactorIncomplete } from './clones-yaml-refactor-incomplete.j
 import { check as agentPromptMirrorDrift } from './agent-prompt-mirror-drift.js';
 import { check as overrideDrift } from './override-drift.js';
 import { check as hooksInstalledMissing } from './hooks-installed-missing.js';
+import { check as catalogEntryMissingStatus } from './catalog-entry-missing-status.js';
 import type { DoctorRuleCheck } from './types.js';
 
 export const SCOPE_DISCOVERY_DOCTOR_RULES: ReadonlyArray<DoctorRuleCheck> = [
@@ -31,6 +32,7 @@ export const SCOPE_DISCOVERY_DOCTOR_RULES: ReadonlyArray<DoctorRuleCheck> = [
   agentPromptMirrorDrift,
   overrideDrift,
   hooksInstalledMissing,
+  catalogEntryMissingStatus,
 ];
 
 export type { DoctorRuleCheck, DoctorRuleOptions, ScopeDoctorFinding } from './types.js';

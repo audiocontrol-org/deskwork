@@ -12,6 +12,10 @@
  */
 
 import type { SourceFileView } from '../../../../scope-discovery/discovery-agents/shared.js';
+import type {
+  CatalogStatus,
+  Provenance,
+} from '../../../../scope-discovery/util/catalog-status.js';
 
 export function makeScan(file: string, text: string): SourceFileView {
   return {
@@ -20,3 +24,16 @@ export function makeScan(file: string, text: string): SourceFileView {
     lines: text.split(/\r?\n/),
   };
 }
+
+/**
+ * Default Loop metadata for synthetic pattern entries (Phase 11
+ * Task 2). Test fixtures default to `blessed` status + install-seed
+ * provenance so the pattern matches the loader's default-synthesis
+ * path. Tests that exercise the status discriminator (e.g.,
+ * loop-foundation.test.ts) override the values explicitly.
+ */
+export const TEST_CATALOG_STATUS: CatalogStatus = 'blessed';
+export const TEST_CATALOG_PROVENANCE: Provenance = {
+  source: 'install-seed',
+  authored_at: '1970-01-01T00:00:00Z',
+};

@@ -19,7 +19,7 @@ import { describe, it, expect } from 'vitest';
 import { semanticHandler } from '../../../../scope-discovery/discovery-agents/pattern-handlers/semantic.js';
 import type { SemanticEntry } from '../../../../scope-discovery/discovery-agents/pattern-handlers/types.js';
 import { registeredPatternTypes } from '../../../../scope-discovery/discovery-agents/pattern-handlers/index.js';
-import { makeScan } from './fixtures.js';
+import { makeScan, TEST_CATALOG_PROVENANCE, TEST_CATALOG_STATUS } from './fixtures.js';
 
 function stubEntry(): SemanticEntry {
   return {
@@ -29,6 +29,8 @@ function stubEntry(): SemanticEntry {
     matchGlob: 'modules/*-editor/src/**/*Summary.tsx',
     promptTemplate: 'Does this file consume the canonical primitive?',
     confidenceThreshold: 0.7,
+    status: TEST_CATALOG_STATUS,
+    provenance: TEST_CATALOG_PROVENANCE,
   };
 }
 

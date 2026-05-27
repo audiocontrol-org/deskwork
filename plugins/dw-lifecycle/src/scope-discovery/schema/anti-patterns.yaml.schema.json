@@ -79,6 +79,57 @@
           "description": "Multi-line operator-facing replacement instruction. Surfaces beneath each finding (indented by 2 spaces). Free-form prose; conventionally explains WHY this shape was retired and HOW to replace it.",
           "type": "string",
           "minLength": 1
+        },
+        "status": {
+          "description": "Phase 11 Task 2 — Loop status. One of pending / blessed / cursed / ignore / tracked-holdout / withdrawn. Default `blessed` for hand-authored entries (the pre-Loop behavior). Scanners enforce `blessed` + `cursed` entries; every other status is skipped (pending awaiting triage, ignore acknowledged false-positive, tracked-holdout deferred to a tracked issue, withdrawn overturned by an audit finding). See plugins/dw-lifecycle/src/scope-discovery/util/catalog-status.ts for the full lifecycle spec.",
+          "$ref": "#/definitions/CatalogStatus"
+        },
+        "provenance": {
+          "description": "Phase 11 Task 2 — provenance block tracking where the entry came from. Synthesized to install-seed when absent (back-compat with pre-Loop registries). REQUIRED when `status:` is set to anything other than `blessed`. The `withdrawn` status carries an additional invariant: `provenance.context` MUST start with `audit-finding-` (the reversibility primitive's contract).",
+          "$ref": "#/definitions/Provenance"
+        }
+      }
+    },
+    "CatalogStatus": {
+      "description": "Shared Loop-status discriminator (Phase 11 Task 2). Applied uniformly to every catalog entry type so scanners can filter on it without learning per-registry semantics. See util/catalog-status.ts for the canonical spec.",
+      "type": "string",
+      "enum": ["pending", "blessed", "cursed", "ignore", "tracked-holdout", "withdrawn"]
+    },
+    "Provenance": {
+      "description": "Shared Loop-provenance shape (Phase 11 Task 2). Tracks where the entry came from (operator-authored / orchestrator-agent / llm-judge-proposed / install-seed / promoted-from-candidate), when it was authored, by whom, in what context, and an optional evidence link. The `context` field carries a tracking ref (typically `scan-run-id-<id>` or `audit-finding-<id>`); for `withdrawn` status, the value MUST start with `audit-finding-`.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "authored_at"],
+      "properties": {
+        "source": {
+          "type": "string",
+          "enum": [
+            "operator-authored",
+            "orchestrator-agent",
+            "llm-judge-proposed",
+            "install-seed",
+            "promoted-from-candidate"
+          ]
+        },
+        "authored_at": {
+          "type": "string",
+          "minLength": 1,
+          "description": "ISO-8601 timestamp of authorship."
+        },
+        "authored_by": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional human or agent identifier."
+        },
+        "context": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Tracking ref (e.g., `scan-run-id-<id>`, `audit-finding-<id>`). REQUIRED when status === 'withdrawn'; value must start with `audit-finding-` in that case."
+        },
+        "evidence_link": {
+          "type": "string",
+          "minLength": 1,
+          "description": "URL or repo-relative path to justifying evidence."
         }
       }
     },

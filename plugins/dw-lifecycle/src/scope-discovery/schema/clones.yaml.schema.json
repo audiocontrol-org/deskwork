@@ -103,7 +103,41 @@
         "tokens": {
           "description": "Legacy field from pre-T7.1 baselines. Silently ignored by the parser and not written by the current detector. Permitted here only so legacy baselines validate without edit.",
           "type": "number"
+        },
+        "status": {
+          "description": "Phase 11 Task 2 — Loop status. clones.yaml entries carry BOTH `disposition:` (the clone-specific operator decision) and `status:` (the Loop-wide enforcement discriminator). The mapping is fixed: pending → pending; keep-with-reason / refactor → blessed; ignore-with-justification → ignore. New code reads `status:` for Loop-wide filtering; the disposition-survivor gate continues to operate on `disposition:` (its semantic is clones-specific). Synthesized from `disposition:` when absent.",
+          "$ref": "#/definitions/CatalogStatus"
+        },
+        "provenance": {
+          "description": "Phase 11 Task 2 — provenance block. Synthesized to install-seed when absent.",
+          "$ref": "#/definitions/Provenance"
         }
+      }
+    },
+    "CatalogStatus": {
+      "description": "Shared Loop-status discriminator (Phase 11 Task 2).",
+      "type": "string",
+      "enum": ["pending", "blessed", "cursed", "ignore", "tracked-holdout", "withdrawn"]
+    },
+    "Provenance": {
+      "description": "Shared Loop-provenance shape (Phase 11 Task 2).",
+      "type": "object",
+      "required": ["source", "authored_at"],
+      "properties": {
+        "source": {
+          "type": "string",
+          "enum": [
+            "operator-authored",
+            "orchestrator-agent",
+            "llm-judge-proposed",
+            "install-seed",
+            "promoted-from-candidate"
+          ]
+        },
+        "authored_at": { "type": "string", "minLength": 1 },
+        "authored_by": { "type": "string", "minLength": 1 },
+        "context": { "type": "string", "minLength": 1 },
+        "evidence_link": { "type": "string", "minLength": 1 }
       }
     },
     "NonRefactorCloneGroup": {
@@ -121,7 +155,9 @@
           "enum": ["pending", "keep-with-reason", "ignore-with-justification"]
         },
         "reason": { "$ref": "#/definitions/CloneGroupBase/properties/reason" },
-        "tokens": { "$ref": "#/definitions/CloneGroupBase/properties/tokens" }
+        "tokens": { "$ref": "#/definitions/CloneGroupBase/properties/tokens" },
+        "status": { "$ref": "#/definitions/CloneGroupBase/properties/status" },
+        "provenance": { "$ref": "#/definitions/CloneGroupBase/properties/provenance" }
       }
     },
     "RefactorCloneGroup": {
@@ -150,6 +186,8 @@
         },
         "reason": { "$ref": "#/definitions/CloneGroupBase/properties/reason" },
         "tokens": { "$ref": "#/definitions/CloneGroupBase/properties/tokens" },
+        "status": { "$ref": "#/definitions/CloneGroupBase/properties/status" },
+        "provenance": { "$ref": "#/definitions/CloneGroupBase/properties/provenance" },
         "canonical_side": { "$ref": "#/definitions/RefactorPreconditions/properties/canonical_side" },
         "canonical_reason": { "$ref": "#/definitions/RefactorPreconditions/properties/canonical_reason" },
         "new_shape_summary": { "$ref": "#/definitions/RefactorPreconditions/properties/new_shape_summary" },

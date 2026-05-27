@@ -48,7 +48,42 @@
           "description": "External importers of the deprecated file. Each entry is a repo-relative POSIX path + 1-based line number of the first import statement matching the deprecated file's `@/` alias OR its basename via a relative path. The deprecated file's own contents are NOT included (internal re-exports don't count as external importers). Empty list means the file is safe to delete.",
           "type": "array",
           "items": { "$ref": "#/definitions/Importer" }
+        },
+        "status": {
+          "description": "Phase 11 Task 2 — Loop status. See plugins/dw-lifecycle/src/scope-discovery/util/catalog-status.ts. Reserved for future use (v1 deprecation scanner discovers entries from source markers; the YAML is a placeholder for future persistence).",
+          "$ref": "#/definitions/CatalogStatus"
+        },
+        "provenance": {
+          "description": "Phase 11 Task 2 — provenance block. Reserved for future use.",
+          "$ref": "#/definitions/Provenance"
         }
+      }
+    },
+    "CatalogStatus": {
+      "description": "Shared Loop-status discriminator (Phase 11 Task 2).",
+      "type": "string",
+      "enum": ["pending", "blessed", "cursed", "ignore", "tracked-holdout", "withdrawn"]
+    },
+    "Provenance": {
+      "description": "Shared Loop-provenance shape (Phase 11 Task 2).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "authored_at"],
+      "properties": {
+        "source": {
+          "type": "string",
+          "enum": [
+            "operator-authored",
+            "orchestrator-agent",
+            "llm-judge-proposed",
+            "install-seed",
+            "promoted-from-candidate"
+          ]
+        },
+        "authored_at": { "type": "string", "minLength": 1 },
+        "authored_by": { "type": "string", "minLength": 1 },
+        "context": { "type": "string", "minLength": 1 },
+        "evidence_link": { "type": "string", "minLength": 1 }
       }
     },
     "Importer": {

@@ -53,7 +53,13 @@ import {
   validateRefactorPreconditions,
 } from './clones-yaml.refactor.js';
 import type { CloneGroup, ClonesYaml, Disposition, RefactorCloneGroup } from './clones-yaml.js';
+import { dispositionToStatus } from './clones-yaml.js';
 import { isPlainObject } from './util/typeguards.js';
+import {
+  parseCatalogEntryMetadata,
+  synthesizeDefaultProvenance,
+  type CatalogEntryMetadata,
+} from './util/catalog-status.js';
 
 const DISPOSITIONS: readonly Disposition[] = [
   'pending',
@@ -156,6 +162,51 @@ type EntryResult =
   | { kind: 'shape-error'; reason: string }
   | { kind: 'refactor-error'; errors: readonly string[] };
 
+/**
+ * Phase 11 Task 2 — parse status + provenance from a clone-group
+ * entry. Returns the metadata pair plus a `synthesizedFromDisposition`
+ * flag so the caller knows whether to synthesize from disposition
+ * (legacy path) or honor the operator-authored value.
+ *
+ * Default behavior: when `status:` is absent, derive it from
+ * `disposition:` per the mapping in clones-yaml.ts. When `provenance:`
+ * is absent, synthesize the install-seed default.
+ *
+ * The throw path delegates to `parseCatalogEntryMetadata` which raises
+ * a namespaced error. The `withdrawn` invariant (provenance.context
+ * starting with `audit-finding-`) applies uniformly.
+ */
+function parseCloneLoopMetadata(
+  entry: Record<string, unknown>,
+  disposition: Disposition,
+  ctx: string,
+): CatalogEntryMetadata {
+  const statusRaw = entry['status'];
+  const provenanceRaw = entry['provenance'];
+  // Fast path: both fields absent → synthesize from disposition.
+  if ((statusRaw === undefined || statusRaw === null) &&
+      (provenanceRaw === undefined || provenanceRaw === null)) {
+    return {
+      status: dispositionToStatus(disposition),
+      provenance: synthesizeDefaultProvenance(),
+    };
+  }
+  // At least one field present → delegate to the shared parser. The
+  // shared parser still synthesizes the missing half; we override the
+  // status default with the disposition-derived one when status is
+  // absent (the shared parser defaults to `blessed`, which is wrong
+  // for clones where `disposition: pending` should map to `status:
+  // pending`).
+  const result = parseCatalogEntryMetadata(entry, ctx, 'clones');
+  if (result.statusSynthesized) {
+    return {
+      status: dispositionToStatus(disposition),
+      provenance: result.metadata.provenance,
+    };
+  }
+  return result.metadata;
+}
+
 function entryToGroup(entry: unknown): EntryResult {
   if (!isPlainObject(entry)) {
     return { kind: 'shape-error', reason: 'entry is not a mapping' };
@@ -203,6 +254,15 @@ function entryToGroup(entry: unknown): EntryResult {
   // We intentionally do NOT re-derive the id from members here — we
   // trust the on-disk value so operators can hand-edit groups without
   // the tool clobbering their work on the next refresh.
+  let loopMetadata: CatalogEntryMetadata;
+  try {
+    loopMetadata = parseCloneLoopMetadata(entry, disposition, `id=${id}`);
+  } catch (err) {
+    return {
+      kind: 'shape-error',
+      reason: err instanceof Error ? err.message : String(err),
+    };
+  }
   if (disposition === 'refactor') {
     const preconds = validateRefactorPreconditions(entry, id);
     if (!preconds.ok) {
@@ -218,6 +278,8 @@ function entryToGroup(entry: unknown): EntryResult {
       canonical_reason: preconds.value.canonical_reason,
       tests: preconds.value.tests,
       tests_proof: preconds.value.tests_proof,
+      status: loopMetadata.status,
+      provenance: loopMetadata.provenance,
       ...(preconds.value.new_shape_summary !== undefined
         ? { new_shape_summary: preconds.value.new_shape_summary }
         : {}),
@@ -232,6 +294,8 @@ function entryToGroup(entry: unknown): EntryResult {
       members: memberStrs,
       disposition,
       reason: reasonValue,
+      status: loopMetadata.status,
+      provenance: loopMetadata.provenance,
     },
   };
 }

@@ -15,7 +15,7 @@
 import { describe, it, expect } from 'vitest';
 import { outlierHandler } from '../../../../scope-discovery/discovery-agents/pattern-handlers/outlier.js';
 import type { OutlierEntry } from '../../../../scope-discovery/discovery-agents/pattern-handlers/types.js';
-import { makeScan } from './fixtures.js';
+import { makeScan, TEST_CATALOG_PROVENANCE, TEST_CATALOG_STATUS } from './fixtures.js';
 
 function classNameOutlierEntry(): OutlierEntry {
   return {
@@ -25,6 +25,8 @@ function classNameOutlierEntry(): OutlierEntry {
     matchGlob: 'modules/**/*.tsx',
     distanceMetric: 'className-composition',
     thresholdSigma: 1.5,
+    status: TEST_CATALOG_STATUS,
+    provenance: TEST_CATALOG_PROVENANCE,
   };
 }
 
@@ -122,6 +124,8 @@ describe('outlier handler — className-composition', () => {
       matchGlob: 'modules/**/*.tsx',
       distanceMetric: 'token-composition',
       thresholdSigma: 1.0,
+      status: TEST_CATALOG_STATUS,
+      provenance: TEST_CATALOG_PROVENANCE,
     };
     const sib1 = makeScan(
       'modules/x/src/A.tsx',

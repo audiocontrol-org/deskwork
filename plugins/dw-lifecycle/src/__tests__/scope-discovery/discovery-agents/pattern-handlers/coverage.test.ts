@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import { coverageHandler } from '../../../../scope-discovery/discovery-agents/pattern-handlers/coverage.js';
 import type { CoverageEntry } from '../../../../scope-discovery/discovery-agents/pattern-handlers/types.js';
-import { makeScan } from './fixtures.js';
+import { makeScan, TEST_CATALOG_PROVENANCE, TEST_CATALOG_STATUS } from './fixtures.js';
 
 function adoptionEntry(): CoverageEntry {
   return {
@@ -18,6 +18,8 @@ function adoptionEntry(): CoverageEntry {
     description: 'Fraction of editor summary files consuming the canonical primitive',
     matchGlob: 'modules/*-editor/src/**/*Summary.tsx',
     mustContain: /\bac-[a-z]+/g,
+    status: TEST_CATALOG_STATUS,
+    provenance: TEST_CATALOG_PROVENANCE,
   };
 }
 

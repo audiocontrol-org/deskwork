@@ -29,6 +29,10 @@ import type {
   RegexEntry,
   SemanticEntry,
 } from './types.js';
+import {
+  parseCatalogEntryMetadata,
+  type CatalogEntryMetadata,
+} from '../../util/catalog-status.js';
 
 export const OVERRIDE_PATH =
   '.dw-lifecycle/scope-discovery/pattern-matrix-patterns.yaml';
@@ -104,6 +108,7 @@ function parseExtensions(
 function parseRegexEntry(
   ctx: ParseContext,
   raw: Record<string, unknown>,
+  meta: CatalogEntryMetadata,
 ): RegexEntry {
   const id = requireString(ctx, raw, 'id');
   const description = requireString(ctx, raw, 'description');
@@ -115,6 +120,8 @@ function parseRegexEntry(
     id,
     description,
     regex,
+    status: meta.status,
+    provenance: meta.provenance,
     ...(extensions !== undefined ? { extensions } : {}),
   };
 }
@@ -122,6 +129,7 @@ function parseRegexEntry(
 function parseNegativeSpaceEntry(
   ctx: ParseContext,
   raw: Record<string, unknown>,
+  meta: CatalogEntryMetadata,
 ): NegativeSpaceEntry {
   const id = requireString(ctx, raw, 'id');
   const description = requireString(ctx, raw, 'description');
@@ -146,6 +154,8 @@ function parseNegativeSpaceEntry(
     matchGlob,
     mustContain,
     threshold,
+    status: meta.status,
+    provenance: meta.provenance,
     ...(secondaryContains !== undefined ? { secondaryContains } : {}),
     ...(extensions !== undefined ? { extensions } : {}),
   };
@@ -154,6 +164,7 @@ function parseNegativeSpaceEntry(
 function parseCoverageEntry(
   ctx: ParseContext,
   raw: Record<string, unknown>,
+  meta: CatalogEntryMetadata,
 ): CoverageEntry {
   const id = requireString(ctx, raw, 'id');
   const description = requireString(ctx, raw, 'description');
@@ -167,6 +178,8 @@ function parseCoverageEntry(
     description,
     matchGlob,
     mustContain,
+    status: meta.status,
+    provenance: meta.provenance,
     ...(extensions !== undefined ? { extensions } : {}),
   };
 }
@@ -174,6 +187,7 @@ function parseCoverageEntry(
 function parseOutlierEntry(
   ctx: ParseContext,
   raw: Record<string, unknown>,
+  meta: CatalogEntryMetadata,
 ): OutlierEntry {
   const id = requireString(ctx, raw, 'id');
   const description = requireString(ctx, raw, 'description');
@@ -195,6 +209,8 @@ function parseOutlierEntry(
     matchGlob,
     distanceMetric,
     thresholdSigma,
+    status: meta.status,
+    provenance: meta.provenance,
     ...(extensions !== undefined ? { extensions } : {}),
   };
 }
@@ -202,6 +218,7 @@ function parseOutlierEntry(
 function parseSemanticEntry(
   ctx: ParseContext,
   raw: Record<string, unknown>,
+  meta: CatalogEntryMetadata,
 ): SemanticEntry {
   const id = requireString(ctx, raw, 'id');
   const description = requireString(ctx, raw, 'description');
@@ -230,6 +247,8 @@ function parseSemanticEntry(
     matchGlob,
     promptTemplate,
     confidenceThreshold,
+    status: meta.status,
+    provenance: meta.provenance,
     ...(model !== undefined ? { model } : {}),
     ...(extensions !== undefined ? { extensions } : {}),
   };
@@ -270,17 +289,26 @@ function parseEntry(
     }
     type = matched;
   }
+  // Phase 11 Task 2 — parse the shared Loop metadata once per entry,
+  // before dispatching to the variant parser. The shared parser
+  // synthesizes defaults when status/provenance are absent and
+  // enforces the `withdrawn` invariant.
+  const { metadata } = parseCatalogEntryMetadata(
+    raw,
+    `override ${path} patterns[${index}]`,
+    'pattern-matrix',
+  );
   switch (type) {
     case 'regex':
-      return parseRegexEntry(ctx, raw);
+      return parseRegexEntry(ctx, raw, metadata);
     case 'negative-space':
-      return parseNegativeSpaceEntry(ctx, raw);
+      return parseNegativeSpaceEntry(ctx, raw, metadata);
     case 'coverage':
-      return parseCoverageEntry(ctx, raw);
+      return parseCoverageEntry(ctx, raw, metadata);
     case 'outlier':
-      return parseOutlierEntry(ctx, raw);
+      return parseOutlierEntry(ctx, raw, metadata);
     case 'semantic':
-      return parseSemanticEntry(ctx, raw);
+      return parseSemanticEntry(ctx, raw, metadata);
   }
 }
 

@@ -41,6 +41,7 @@ import {
   isPathExcluded,
   loadRegistry,
 } from './anti-patterns-registry.js';
+import { filterActiveEntries } from './util/catalog-status.js';
 import {
   type Finding,
   type ScanResult,
@@ -273,7 +274,16 @@ function positionToLine(content: string, position: number): number {
 
 export async function scan(opts: CliOptions): Promise<ScanResult> {
   const registry = await loadRegistry(opts.registryPath);
-  if (registry.entries.length === 0) {
+  // Phase 11 Task 2 — filter to actively-enforced entries only.
+  // `blessed` and `cursed` entries fire; `pending`, `ignore`,
+  // `tracked-holdout`, and `withdrawn` entries are skipped (they are
+  // either awaiting triage, acknowledged-as-noise, deferred to a
+  // tracked issue, or overturned by an auditor — none should produce
+  // findings). Pre-Loop registries without explicit status default to
+  // `blessed` so this filter preserves the pre-Loop enforcement
+  // surface.
+  const activeEntries = filterActiveEntries(registry.entries);
+  if (activeEntries.length === 0) {
     return { findings: [], filesScanned: 0, entriesScanned: 0 };
   }
   // Every entry with `canonical_file:` must point at a file that
@@ -284,7 +294,7 @@ export async function scan(opts: CliOptions): Promise<ScanResult> {
   // holdout against its own anti-pattern. Fail loud at scan start
   // with the entry id + the missing path so the operator can update
   // `canonical_file:` in one step.
-  assertCanonicalFilesExist(registry.entries);
+  assertCanonicalFilesExist(activeEntries);
   const files = await listSourceFiles(opts.scanRoot);
   const findings: Finding[] = [];
   const cwd = process.cwd();
@@ -294,7 +304,7 @@ export async function scan(opts: CliOptions): Promise<ScanResult> {
     // operator copying a flagged path into `excludes_paths:` works as-is.
     const relPath = toPosix(relative(cwd, file));
     let content: string | null = null;
-    for (const entry of registry.entries) {
+    for (const entry of activeEntries) {
       if (isPathExcluded(entry, relPath)) continue;
       if (content === null) {
         try {
@@ -312,7 +322,7 @@ export async function scan(opts: CliOptions): Promise<ScanResult> {
       if (line !== null) findings.push({ file, line, entry });
     }
   }
-  return { findings, filesScanned: files.length, entriesScanned: registry.entries.length };
+  return { findings, filesScanned: files.length, entriesScanned: activeEntries.length };
 }
 
 /**

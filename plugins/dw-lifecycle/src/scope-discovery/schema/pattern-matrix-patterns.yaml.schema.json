@@ -47,6 +47,33 @@
       "uniqueItems": true,
       "description": "Optional file-extension filter."
     },
+    "catalogStatus": {
+      "description": "Phase 11 Task 2 — Loop status. See plugins/dw-lifecycle/src/scope-discovery/util/catalog-status.ts. Default `blessed` when omitted.",
+      "type": "string",
+      "enum": ["pending", "blessed", "cursed", "ignore", "tracked-holdout", "withdrawn"]
+    },
+    "provenance": {
+      "description": "Phase 11 Task 2 — provenance block. Synthesized to install-seed when absent.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "authored_at"],
+      "properties": {
+        "source": {
+          "type": "string",
+          "enum": [
+            "operator-authored",
+            "orchestrator-agent",
+            "llm-judge-proposed",
+            "install-seed",
+            "promoted-from-candidate"
+          ]
+        },
+        "authored_at": { "type": "string", "minLength": 1 },
+        "authored_by": { "type": "string", "minLength": 1 },
+        "context": { "type": "string", "minLength": 1 },
+        "evidence_link": { "type": "string", "minLength": 1 }
+      }
+    },
     "regexSource": {
       "type": "string",
       "minLength": 1,
@@ -66,7 +93,9 @@
         "id": { "$ref": "#/$defs/patternId" },
         "description": { "$ref": "#/$defs/description" },
         "regex": { "$ref": "#/$defs/regexSource" },
-        "extensions": { "$ref": "#/$defs/extensions" }
+        "extensions": { "$ref": "#/$defs/extensions" },
+        "status": { "$ref": "#/$defs/catalogStatus" },
+        "provenance": { "$ref": "#/$defs/provenance" }
       }
     },
     "negativeSpaceEntry": {
@@ -91,7 +120,9 @@
           "$ref": "#/$defs/regexSource",
           "description": "Optional secondary regex that strengthens the finding (e.g., utility-class consumption in a file that should consume design-system classes)."
         },
-        "extensions": { "$ref": "#/$defs/extensions" }
+        "extensions": { "$ref": "#/$defs/extensions" },
+        "status": { "$ref": "#/$defs/catalogStatus" },
+        "provenance": { "$ref": "#/$defs/provenance" }
       }
     },
     "coverageEntry": {
@@ -107,7 +138,9 @@
           "$ref": "#/$defs/regexSource",
           "description": "Regex whose presence in a glob-matched file counts as adoption. The handler emits the adoption ratio as a synthesis-layer metric."
         },
-        "extensions": { "$ref": "#/$defs/extensions" }
+        "extensions": { "$ref": "#/$defs/extensions" },
+        "status": { "$ref": "#/$defs/catalogStatus" },
+        "provenance": { "$ref": "#/$defs/provenance" }
       }
     },
     "outlierEntry": {
@@ -129,7 +162,9 @@
           "exclusiveMinimum": 0,
           "description": "Sigma threshold for outlier firing. Default 2.0 (~95th percentile per direction)."
         },
-        "extensions": { "$ref": "#/$defs/extensions" }
+        "extensions": { "$ref": "#/$defs/extensions" },
+        "status": { "$ref": "#/$defs/catalogStatus" },
+        "provenance": { "$ref": "#/$defs/provenance" }
       }
     },
     "semanticEntry": {
@@ -156,7 +191,9 @@
           "maximum": 1.0,
           "description": "Confidence below which a violation fires. Default 0.5."
         },
-        "extensions": { "$ref": "#/$defs/extensions" }
+        "extensions": { "$ref": "#/$defs/extensions" },
+        "status": { "$ref": "#/$defs/catalogStatus" },
+        "provenance": { "$ref": "#/$defs/provenance" }
       }
     }
   }

@@ -320,6 +320,14 @@ describe('batch-dispose — core scenarios', () => {
           members: [`${R}A.tsx:1:10`, `${R}B.tsx:1:10`, `${R}C.tsx:1:10`],
           disposition: 'pending',
           reason: null,
+          // Phase 11 Task 2 — pending → status: pending; install-seed
+          // provenance so the synthesized-suppression branch of
+          // serializeClonesYaml fires (no Loop fields written).
+          status: 'pending',
+          provenance: {
+            source: 'install-seed',
+            authored_at: '1970-01-01T00:00:00Z',
+          },
         },
       ];
       await writeClonesYaml(fixture.path, clones);

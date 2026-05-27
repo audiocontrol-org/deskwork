@@ -64,6 +64,10 @@ describe('clone-detector — dispositioned entries honored across runs', () => {
             members: g.members,
             disposition: 'ignore-with-justification',
             reason: 'harness: legitimate near-duplicate, not refactor candidate',
+            // Phase 11 Task 2 — preserve existing Loop fields; the
+            // disposition transition does not silently rewrite them.
+            status: g.status,
+            provenance: g.provenance,
           }),
         ),
       };

@@ -12,7 +12,7 @@
 import { describe, it, expect } from 'vitest';
 import { regexHandler } from '../../../../scope-discovery/discovery-agents/pattern-handlers/regex.js';
 import type { RegexEntry } from '../../../../scope-discovery/discovery-agents/pattern-handlers/types.js';
-import { makeScan } from './fixtures.js';
+import { makeScan, TEST_CATALOG_PROVENANCE, TEST_CATALOG_STATUS } from './fixtures.js';
 
 const AS_CAST_REGEX = /\bas\s+(?!const\b|unknown\b)[A-Z][A-Za-z0-9_]*/g;
 
@@ -22,6 +22,8 @@ function asCastEntry(extensions?: ReadonlyArray<string>): RegexEntry {
     id: 'as-type-cast',
     description: '`as <TypeName>` cast',
     regex: AS_CAST_REGEX,
+    status: TEST_CATALOG_STATUS,
+    provenance: TEST_CATALOG_PROVENANCE,
     ...(extensions !== undefined ? { extensions } : {}),
   };
 }

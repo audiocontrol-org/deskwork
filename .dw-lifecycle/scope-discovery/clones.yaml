@@ -1,4 +1,4 @@
-generated_at: 2026-05-27T01:14:07.858Z
+generated_at: 2026-05-27T01:44:28.857Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -536,21 +536,21 @@ clones:
   - id: f768a3b61874
     lines: 17
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/check-adopters.ts:277:293
+      - plugins/dw-lifecycle/src/scope-discovery/check-adopters.ts:284:300
       - plugins/dw-lifecycle/src/scope-discovery/editor-symmetry-matrix.ts:269:285
     disposition: pending
     reason: null
   - id: 478402618ea8
     lines: 6
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/check-adopters.ts:313:318
-      - plugins/dw-lifecycle/src/scope-discovery/check-anti-patterns.ts:362:367
+      - plugins/dw-lifecycle/src/scope-discovery/check-adopters.ts:320:325
+      - plugins/dw-lifecycle/src/scope-discovery/check-anti-patterns.ts:372:377
     disposition: pending
     reason: null
   - id: c8cc74778e0e
     lines: 15
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/check-adopters.ts:322:336
+      - plugins/dw-lifecycle/src/scope-discovery/check-adopters.ts:329:343
       - plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts:199:213
       - plugins/dw-lifecycle/src/scope-discovery/check-refactor-preconditions.ts:339:205
     disposition: keep-with-reason
@@ -558,35 +558,35 @@ clones:
   - id: b7ac4eca4f52
     lines: 25
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/check-adopters.ts:53:77
-      - plugins/dw-lifecycle/src/scope-discovery/check-anti-patterns.ts:58:83
+      - plugins/dw-lifecycle/src/scope-discovery/check-adopters.ts:54:78
+      - plugins/dw-lifecycle/src/scope-discovery/check-anti-patterns.ts:59:84
     disposition: pending
     reason: null
   - id: 27201dd80c71
     lines: 50
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/check-adopters.ts:87:136
-      - plugins/dw-lifecycle/src/scope-discovery/check-anti-patterns.ts:93:142
+      - plugins/dw-lifecycle/src/scope-discovery/check-adopters.ts:88:137
+      - plugins/dw-lifecycle/src/scope-discovery/check-anti-patterns.ts:94:143
     disposition: pending
     reason: null
   - id: 80a2dc36a69c
     lines: 19
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/check-anti-patterns.ts:100:118
+      - plugins/dw-lifecycle/src/scope-discovery/check-anti-patterns.ts:101:119
       - plugins/dw-lifecycle/src/scope-discovery/check-editor-symmetry.ts:65:83
     disposition: pending
     reason: null
   - id: b7568545fc19
     lines: 12
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/check-anti-patterns.ts:125:136
+      - plugins/dw-lifecycle/src/scope-discovery/check-anti-patterns.ts:126:137
       - plugins/dw-lifecycle/src/scope-discovery/check-editor-symmetry.ts:101:115
     disposition: pending
     reason: null
   - id: ab41f04d27a1
     lines: 12
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/check-anti-patterns.ts:377:388
+      - plugins/dw-lifecycle/src/scope-discovery/check-anti-patterns.ts:387:398
       - plugins/dw-lifecycle/src/scope-discovery/check-refactor-preconditions.ts:342:205
     disposition: pending
     reason: null
@@ -635,8 +635,8 @@ clones:
   - id: 3be061e8961a
     lines: 7
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-handlers/loader.ts:125:131
-      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-handlers/loader.ts:157:163
+      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-handlers/loader.ts:133:139
+      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-handlers/loader.ts:168:174
     disposition: keep-with-reason
     reason: intentional shared scaffolding across new scope-discovery surfaces from Wave 3 (migrate-from-pilot CLI shell, pattern-handler test fixtures, dispatcher boilerplate, scope-widen+migrate planning patterns). Extracting would create cross-surface coupling; the duplication is short and intentional.
   - id: 32701f9a06dc
@@ -649,17 +649,17 @@ clones:
   - id: ce94eda7ed31
     lines: 23
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-matrix.ts:128:150
+      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-matrix.ts:145:167
       - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/prd-themed-pattern-hunter.ts:181:200
     disposition: keep-with-reason
     reason: intentional shared scaffolding across new scope-discovery surfaces from Wave 3 (migrate-from-pilot CLI shell, pattern-handler test fixtures, dispatcher boilerplate, scope-widen+migrate planning patterns). Extracting would create cross-surface coupling; the duplication is short and intentional.
-  - id: 0d9958faaf8f
+  - id: 76e15e6eb177
     lines: 7
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-matrix.ts:156:162
+      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-matrix.ts:179:185
       - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/prd-themed-pattern-hunter.ts:234:240
-    disposition: pending
-    reason: null
+    disposition: keep-with-reason
+    reason: Tail-end scaffolding of two unrelated discovery agents (pattern-matrix builds the matrix; prd-themed-pattern-hunter wraps the hunter). The 7-line shared shape is each agent's main() runIfMain footer plus throw-on-error guard. Extracting a wrapper would couple unrelated agents through a shared error type.
   - id: 7a91b6f37fe8
     lines: 24
     members:
@@ -667,13 +667,14 @@ clones:
       - plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper.ts:206:229
     disposition: pending
     reason: null
-  - id: 13667b2519b0
+  - id: 27ac56e8da33
     lines: 10
     members:
       - plugins/dw-lifecycle/src/scope-discovery/doctor-rules/agent-prompt-mirror-drift.ts:106:115
+      - plugins/dw-lifecycle/src/scope-discovery/doctor-rules/catalog-entry-missing-status.ts:105:114
       - plugins/dw-lifecycle/src/scope-discovery/doctor-rules/scope-discovery-schema-stale.ts:72:81
-    disposition: pending
-    reason: null
+    disposition: keep-with-reason
+    reason: Doctor-rule scaffolding (init + readFile + parseYaml + early-return on missing config). The shared pattern is intentional symmetry across rules — each rule rebuilds its own context to avoid coupling through a shared schema. Extracting a helper would couple unrelated rules through their YAML registries.
   - id: 029d1d9f0044
     lines: 10
     members:

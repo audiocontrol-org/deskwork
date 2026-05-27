@@ -76,6 +76,10 @@ import { dispatchPattern } from './pattern-handlers/index.js';
 import { loadOverridePatterns } from './pattern-handlers/loader.js';
 import type { PatternCatalogEntry, RegexEntry } from './pattern-handlers/types.js';
 import { clusterUnmatchedShapes } from './synthesis-discovered-candidates.js';
+import {
+  filterActiveEntries,
+  synthesizeDefaultProvenance,
+} from '../util/catalog-status.js';
 
 /**
  * Built-in pattern catalog. Each entry has a stable kebab-case `id`
@@ -89,24 +93,35 @@ import { clusterUnmatchedShapes } from './synthesis-discovered-candidates.js';
  * All built-ins are `type: 'regex'`. Project overrides can mix any of
  * the dispatcher's supported types.
  */
+// Phase 11 Task 2 — built-ins are `status: 'blessed'` (actively
+// enforced) with synthesized install-seed provenance. Operators who
+// override the catalog can mark entries with any status they choose;
+// the dispatcher filters on status before running handlers.
+const BUILTIN_PROVENANCE = synthesizeDefaultProvenance();
 const BUILTIN_PATTERNS: ReadonlyArray<RegexEntry> = [
   {
     type: 'regex',
     id: 'as-type-cast',
     description: '`as <TypeName>` cast (banned per CLAUDE.md "never bypass typing")',
     regex: /\bas\s+(?!const\b|unknown\b)[A-Z][A-Za-z0-9_]*/g,
+    status: 'blessed',
+    provenance: BUILTIN_PROVENANCE,
   },
   {
     type: 'regex',
     id: 'any-annotation',
     description: '`: any` type annotation (banned per CLAUDE.md)',
     regex: /:\s*any\b(?![A-Za-z0-9_])/g,
+    status: 'blessed',
+    provenance: BUILTIN_PROVENANCE,
   },
   {
     type: 'regex',
     id: 'ts-ignore-pragma',
     description: '`@ts-ignore` or `@ts-expect-error` (banned per CLAUDE.md)',
     regex: /@ts-(?:ignore|expect-error)\b/g,
+    status: 'blessed',
+    provenance: BUILTIN_PROVENANCE,
   },
   {
     type: 'regex',
@@ -114,6 +129,8 @@ const BUILTIN_PATTERNS: ReadonlyArray<RegexEntry> = [
     description:
       'Inline numeric literal >= 10 not bound to a const/named identifier (heuristic — synthesis layer + operator curate)',
     regex: /(?<![A-Za-z0-9_.=])\d{2,}\b/g,
+    status: 'blessed',
+    provenance: BUILTIN_PROVENANCE,
   },
 ];
 
@@ -152,8 +169,14 @@ export async function buildPatternMatrix(
   input: DiscoveryAgentInput,
 ): Promise<AstGrepMatrixFindings> {
   const override = await loadOverridePatterns(input.repoRoot);
-  const patterns: ReadonlyArray<PatternCatalogEntry> =
+  const allPatterns: ReadonlyArray<PatternCatalogEntry> =
     override ?? BUILTIN_PATTERNS;
+  // Phase 11 Task 2 — filter to actively-enforced entries before
+  // dispatching. Operators can plant `status: pending` entries in
+  // their override YAML (e.g., promoted-from-candidate proposals
+  // pending triage) without those entries firing as findings until
+  // the operator transitions them to `blessed` or `cursed`.
+  const patterns = filterActiveEntries(allPatterns);
   const files = await gatherInScopeFiles(input);
   const scans: SourceFileView[] = [];
   for (const f of files) {

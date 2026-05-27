@@ -25,7 +25,7 @@
 import { describe, it, expect } from 'vitest';
 import { negativeSpaceHandler } from '../../../../scope-discovery/discovery-agents/pattern-handlers/negative-space.js';
 import type { NegativeSpaceEntry } from '../../../../scope-discovery/discovery-agents/pattern-handlers/types.js';
-import { makeScan } from './fixtures.js';
+import { makeScan, TEST_CATALOG_PROVENANCE, TEST_CATALOG_STATUS } from './fixtures.js';
 
 const CANONICAL_RE = /\bac-[a-z]+/g;
 // Stand-in for utility-class consumption — matches several common
@@ -43,6 +43,8 @@ function keygroupSummaryReproEntry(): NegativeSpaceEntry {
     mustContain: CANONICAL_RE,
     threshold: 5,
     secondaryContains: UTILITY_RE,
+    status: TEST_CATALOG_STATUS,
+    provenance: TEST_CATALOG_PROVENANCE,
   };
 }
 
@@ -167,6 +169,8 @@ describe('negative-space handler — variants', () => {
       matchGlob: 'modules/*-editor/src/**/*Summary.tsx',
       mustContain: CANONICAL_RE,
       threshold: 1, // ignored without secondary
+      status: TEST_CATALOG_STATUS,
+      provenance: TEST_CATALOG_PROVENANCE,
     };
     const quiet = makeScan(
       'modules/keygroup-editor/src/components/QuietSummary.tsx',
@@ -185,6 +189,8 @@ describe('negative-space handler — variants', () => {
       mustContain: CANONICAL_RE,
       threshold: 3,
       secondaryContains: UTILITY_RE,
+      status: TEST_CATALOG_STATUS,
+      provenance: TEST_CATALOG_PROVENANCE,
     };
     const exactly = makeScan(
       'modules/x/test.tsx',

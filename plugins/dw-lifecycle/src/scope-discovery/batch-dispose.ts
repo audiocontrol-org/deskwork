@@ -46,6 +46,7 @@ import {
   type CloneGroup,
   type ClonesYaml,
   type Disposition,
+  dispositionToStatus,
   hasRefactorDisposition,
   parseClonesYaml,
   serializeClonesYaml,
@@ -404,12 +405,23 @@ function applyDispositions(
           `internal error: tried to apply non-refactor disposition to refactor group ${g.id}`,
         );
       }
+      // Phase 11 Task 2 — re-derive `status` from the new
+      // disposition per the fixed mapping in `dispositionToStatus()`
+      // (the operator is explicitly transitioning the disposition;
+      // status should track unless the operator has authored an
+      // explicit non-default status). Preserve provenance verbatim —
+      // it records authorship history regardless of the disposition
+      // transition. If the operator wants to keep the previous
+      // status (e.g., transition to keep-with-reason while keeping
+      // status: tracked-holdout), they hand-edit the file.
       return {
         id: g.id,
         lines: g.lines,
         members: g.members,
         disposition: args.disposition,
         reason: args.reason,
+        status: dispositionToStatus(args.disposition),
+        provenance: g.provenance,
       };
     }),
   };

@@ -65,7 +65,42 @@
           "description": "Multi-line operator-facing replacement instruction. Surfaces beneath each holdout finding (indented by 2 spaces). Free-form prose; conventionally explains WHY this primitive was introduced and HOW to migrate.",
           "type": "string",
           "minLength": 1
+        },
+        "status": {
+          "description": "Phase 11 Task 2 — Loop status. See plugins/dw-lifecycle/src/scope-discovery/util/catalog-status.ts for the full lifecycle spec.",
+          "$ref": "#/definitions/CatalogStatus"
+        },
+        "provenance": {
+          "description": "Phase 11 Task 2 — provenance block. Synthesized to install-seed when absent.",
+          "$ref": "#/definitions/Provenance"
         }
+      }
+    },
+    "CatalogStatus": {
+      "description": "Shared Loop-status discriminator (Phase 11 Task 2).",
+      "type": "string",
+      "enum": ["pending", "blessed", "cursed", "ignore", "tracked-holdout", "withdrawn"]
+    },
+    "Provenance": {
+      "description": "Shared Loop-provenance shape (Phase 11 Task 2).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "authored_at"],
+      "properties": {
+        "source": {
+          "type": "string",
+          "enum": [
+            "operator-authored",
+            "orchestrator-agent",
+            "llm-judge-proposed",
+            "install-seed",
+            "promoted-from-candidate"
+          ]
+        },
+        "authored_at": { "type": "string", "minLength": 1 },
+        "authored_by": { "type": "string", "minLength": 1 },
+        "context": { "type": "string", "minLength": 1 },
+        "evidence_link": { "type": "string", "minLength": 1 }
       }
     },
     "AdopterException": {
