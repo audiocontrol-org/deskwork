@@ -69,11 +69,16 @@
   }
   .rail-lane {
     display: flex; align-items: baseline; gap: 0.5rem;
+    min-height: 32px;
     padding: 0.55rem 0.4rem;
     border-bottom: 1px dashed var(--paper-3);
     cursor: pointer; position: relative;
   }
   .rail-lane:hover { background: var(--paper); }
+  .rail-lane:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: -2px;
+  }
   .rail-lane.focused {
     background: var(--paper);
     border-left: 3px solid var(--red);
@@ -108,15 +113,23 @@
     padding: 0.2rem 0.3rem 0.4rem;
   }
   .rail-views .v-pill {
-    display: block; margin: 0.2rem 0;
-    padding: 0.3rem 0.5rem;
+    display: flex; align-items: center;
+    width: 100%;
+    min-height: 28px;
+    margin: 0.2rem 0;
+    padding: 0.4rem 0.55rem;
     background: var(--paper);
     border: 1px solid var(--paper-3);
     font-family: var(--mono); font-size: 0.7rem;
     color: var(--ink-soft); cursor: pointer;
+    text-align: left;
   }
   .rail-views .v-pill.active {
     background: var(--ink); color: var(--paper); border-color: var(--ink);
+  }
+  .rail-views .v-pill:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 1px;
   }
   .rail-views .v-pill.new {
     font-style: italic; font-family: var(--display);
@@ -161,8 +174,9 @@
     margin-right: 0.35rem;
   }
   .focus-chip {
-    display: inline-flex; align-items: baseline; gap: 0.35rem;
-    padding: 0.32rem 0.65rem;
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    min-height: 28px;
+    padding: 0.36rem 0.7rem;
     background: var(--paper-2);
     border: 1px solid var(--paper-3);
     border-radius: 99px;
@@ -172,6 +186,10 @@
     transition: background 0.1s ease, border-color 0.1s ease;
   }
   .focus-chip:hover { background: var(--paper); border-color: var(--ink-soft); }
+  .focus-chip:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 2px;
+  }
   .focus-chip .fc-glyph {
     font-family: var(--display); font-style: italic;
     color: var(--ink-soft); font-size: 0.95rem;
@@ -262,9 +280,25 @@
     margin-left: auto; font-family: var(--mono); font-size: 0.65rem;
     color: var(--ink-soft); letter-spacing: 0.1em;
   }
+  /* Per-lane overflow ⋮: 24×24 hit area, ink-soft contrast (9.93:1 vs
+     paper-2), focus-visible ring. Same shape as `.collapse-chev`. */
   .swim-head .overflow {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 24px; min-height: 24px;
     font-family: var(--mono); color: var(--ink-soft); font-size: 0.95rem;
-    cursor: pointer; padding: 0.15rem 0.45rem; margin-left: 0.6rem;
+    cursor: pointer; user-select: none;
+    background: transparent; border: none; padding: 0;
+    border-radius: 2px;
+    margin-left: 0.6rem;
+    transition: color 0.12s ease, background 0.12s ease;
+  }
+  .swim-head .overflow:hover {
+    color: var(--red);
+    background: rgba(184, 54, 42, 0.08);
+  }
+  .swim-head .overflow:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 1px;
   }
   /* ===== Universal `.collapse-chev` accessibility primitives =====
      Standards (per DESIGN-STANDARDS § Accessibility — Contrast):
@@ -315,17 +349,18 @@
   }
   .swim-head:hover .collapse-chev { color: var(--red); }
 
-  /* ===== View toggle (kanban ↔ list) — segmented, lives in swim-head ===== */
+  /* ===== View toggle (kanban ↔ list) — segmented, lives in swim-head =====
+     Each cell is 24px tall minimum (WCAG 2.2 SC 2.5.8 AA target size). */
   .view-toggle {
     display: inline-flex; align-items: stretch;
     border: 1px solid var(--paper-3);
     border-radius: 2px;
     overflow: hidden;
     background: var(--paper);
-    height: 1.55rem;
     margin-left: 0.4rem;
   }
   .view-toggle .vt-cell {
+    min-height: 24px;
     padding: 0 0.55rem;
     display: inline-flex; align-items: center; gap: 0.3rem;
     background: transparent; border: none;
@@ -337,6 +372,10 @@
   }
   .view-toggle .vt-cell:last-child { border-right: none; }
   .view-toggle .vt-cell:hover { background: var(--paper-2); }
+  .view-toggle .vt-cell:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: -1px;
+  }
   .view-toggle .vt-cell .vt-icon {
     font-family: var(--display); font-size: 0.95rem;
     color: var(--ink-soft);
@@ -423,9 +462,25 @@
   }
   .list-body .lb-row .lb-state.iter { color: var(--red); }
   .list-body .lb-row .lb-state.ready { color: var(--green); }
+  /* List-row overflow ⋮: bumped from --faded (3.42:1) to --ink-soft
+     (9.93:1) per the v0.20 row-affordance fix pattern (DESIGN-STANDARDS
+     § Accessibility — Contrast). 24×24 hit area + focus-visible. */
   .list-body .lb-row .lb-overflow {
-    font-family: var(--mono); color: var(--faded); font-size: 0.95rem;
-    padding: 0 0.3rem;
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 24px; min-height: 24px;
+    font-family: var(--mono); color: var(--ink-soft); font-size: 0.95rem;
+    cursor: pointer; user-select: none;
+    background: transparent; border: none; padding: 0;
+    border-radius: 2px;
+    transition: color 0.12s ease, background 0.12s ease;
+  }
+  .list-body .lb-row .lb-overflow:hover {
+    color: var(--red);
+    background: rgba(184, 54, 42, 0.08);
+  }
+  .list-body .lb-row .lb-overflow:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 1px;
   }
   .list-body .lb-row.empty-state {
     color: var(--faded); cursor: default;
@@ -599,15 +654,20 @@
   .swim-stub {
     display: flex; align-items: center; gap: 0.6rem;
     width: 100%; margin-bottom: 1.2rem;
-    padding: 0.55rem 0.85rem;
+    min-height: 36px;
+    padding: 0.65rem 0.85rem;
     background: var(--paper-2);
     border: 1px dashed var(--paper-3);
     border-left: 4px solid var(--paper-3);
-    color: var(--faded);
+    color: var(--ink-soft);
     font-family: var(--display); font-style: italic; font-size: 0.92rem;
     cursor: pointer;
   }
-  .swim-stub:hover { background: var(--paper); color: var(--ink-soft); border-left-color: var(--ink-soft); }
+  .swim-stub:hover { background: var(--paper); border-left-color: var(--red); }
+  .swim-stub:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 2px;
+  }
   .swim-stub .ss-glyph { font-size: 1.1rem; color: var(--ink-soft); }
   .swim-stub .ss-meta {
     margin-left: auto;
@@ -624,10 +684,16 @@
   /* Compose FAB */
   .compose-fab {
     position: absolute; right: 1rem; bottom: 1rem;
-    padding: 0.6rem 0.9rem; background: var(--red); color: var(--paper);
+    min-height: 44px;
+    padding: 0.7rem 1.1rem; background: var(--red); color: var(--paper);
     font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.15em;
     text-transform: uppercase; border: none; border-radius: 99px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.18); cursor: pointer;
+  }
+  .compose-fab:hover { background: #9c2d22; }
+  .compose-fab:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 2px;
   }
 
   /* === Phone (mobile): collapses to lane-stack === */
@@ -696,16 +762,18 @@
   .phone .lane-section .swim-compact .sc-stage.empty .sc-count { color: var(--faded); }
   .phone .lane-section .swim-compact .sc-stage.locked .sc-count { color: var(--blue); }
 
-  /* Mobile view toggle — smaller than desktop; fits in the lane-head row. */
+  /* Mobile view toggle — same 24px floor as desktop; icon-only to fit in
+     the narrower lane-head. WCAG 2.2 SC 2.5.8 AA target size. */
   .phone .lane-head .view-toggle {
-    height: 1.3rem; margin-left: 0.3rem;
+    margin-left: 0.3rem;
     border-color: var(--paper-3);
   }
   .phone .lane-head .view-toggle .vt-cell {
-    padding: 0 0.4rem;
-    font-size: 0.5rem; letter-spacing: 0.1em;
+    min-height: 24px;
+    padding: 0 0.5rem;
+    font-size: 0.55rem; letter-spacing: 0.1em;
   }
-  .phone .lane-head .view-toggle .vt-cell .vt-icon { font-size: 0.78rem; }
+  .phone .lane-head .view-toggle .vt-cell .vt-icon { font-size: 0.85rem; }
   /* Collapsed lane greys mobile toggle too — collapse precedence. */
   .phone .lane-section.collapsed .view-toggle { opacity: 0.5; pointer-events: none; }
   /* Mobile list-view body: same .list-body markup, narrower paddings. */
@@ -797,9 +865,16 @@
   .phone .m-stage-tile .stage-count { margin-left: auto; font-family: var(--mono); font-size: 0.7rem; color: var(--ink-soft); }
   .phone .m-stage-tile.empty .stage-glyph { color: var(--faded); }
   .phone .mobile-rail-trigger {
+    display: inline-flex; align-items: center;
+    min-height: 28px;
     font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.15em;
     text-transform: uppercase; color: var(--ink-soft);
-    padding: 0.3rem 0.5rem; border: 1px solid var(--paper-3); background: var(--paper);
+    padding: 0.4rem 0.6rem; border: 1px solid var(--paper-3); background: var(--paper);
+    cursor: pointer;
+  }
+  .phone .mobile-rail-trigger:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 1px;
   }
 
   /* Deviation note */
@@ -818,8 +893,8 @@
 </head>
 <body>
   <div class="meta">Direction 3 · <a href="./index.html">↩ all directions</a></div>
-  <h1 class="demo-title">Press Bay <span style="font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.2em; color: var(--green); margin-left: 0.5rem; vertical-align: middle;">v8 · ACCESSIBLE CHEVRONS</span></h1>
-  <div class="demo-sub">All collapse chevrons now meet WCAG 2.2 AA target size (≥24×24 px), WCAG 2.1 AA non-text contrast (≥3:1), and AA focus visibility — with keyboard semantics (role=button, tabindex, aria-expanded).</div>
+  <h1 class="demo-title">Press Bay <span style="font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.2em; color: var(--green); margin-left: 0.5rem; vertical-align: middle;">v9 · FULL ACCESSIBILITY PASS</span></h1>
+  <div class="demo-sub">Every interactive affordance (chevrons, ⋮ overflows, view toggle, focus chips, saved-view pills, lane rail rows, mobile rail trigger, compose FAB, swim stubs) now meets WCAG 2.2 AA target size, WCAG 2.1 AA non-text contrast + focus visibility, and carries keyboard semantics (role/tabindex/aria-* where applicable).</div>
 
   <div class="deviation-note">
     <span class="label">Standards-compliant</span> Two granularities of collapse, each with its own chevron: <strong>lane-level</strong> (chevron in swim-head / lane-head) hides the entire lane body, leaves the swim-head + a compact per-stage count strip; <strong>stage-level</strong> (chevron in stage-head for kanban / lb-group-head for list) hides one stage's content within an expanded lane. In kanban, collapsed columns shrink to a narrow vertical strip (~42px wide) with the stage name rotated; remaining columns redistribute via flex to fill the freed space. In list, collapsed groups show just the group-head (with the entry count + tag) and hide their rows. Mockup demonstrates: Editorial swim has <strong>Published collapsed as a vertical strip</strong>; Press Releases list has <strong>Published collapsed as a head-only row</strong>; mobile Editorial list has <strong>Planned collapsed</strong>. The collapse-chev convention is universal — same `▾` glyph rotated 90° clockwise to indicate collapsed, same hover-to-red-pencil affordance, click anywhere on the head (or chevron) to toggle.<br><br>
@@ -849,25 +924,25 @@
           <aside class="lane-rail">
             <div class="rail-head">Lanes <span style="font-family: var(--mono); font-size: 0.55rem; color: var(--faded); margin-left: 0.3rem; letter-spacing: 0.1em;">4 visible</span></div>
 
-            <div class="rail-lane focused">
+            <div class="rail-lane focused" role="button" tabindex="0" aria-pressed="true">
               <span class="r-eye">●</span>
               <span class="r-glyph">§</span>
               <span class="r-name">Editorial</span>
               <span class="r-count">12</span>
             </div>
-            <div class="rail-lane">
+            <div class="rail-lane" role="button" tabindex="0" aria-pressed="false">
               <span class="r-eye">●</span>
               <span class="r-glyph">◆</span>
               <span class="r-name">Mockups</span>
               <span class="r-count">5</span>
             </div>
-            <div class="rail-lane focused">
+            <div class="rail-lane focused" role="button" tabindex="0" aria-pressed="true">
               <span class="r-eye">●</span>
               <span class="r-glyph">⊕</span>
               <span class="r-name">QA</span>
               <span class="r-count">3</span>
             </div>
-            <div class="rail-lane focused">
+            <div class="rail-lane focused" role="button" tabindex="0" aria-pressed="true">
               <span class="r-eye">●</span>
               <span class="r-glyph" style="color: var(--kraft);">⌘</span>
               <span class="r-name">Press Releases</span>
@@ -949,7 +1024,7 @@
                   <button class="vt-cell" title="List view (vertical grouped by stage)"><span class="vt-icon">≡</span><span>List</span></button>
                 </div>
                 <span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse this lane" title="Collapse this lane">▾</span>
-                <span class="overflow">⋮</span>
+                <span class="overflow" role="button" tabindex="0" aria-label="Lane actions">⋮</span>
               </div>
               <!-- Each stage-head carries its own chevron — per-stage collapse.
                    Click anywhere on the stage-head (or the chevron) to toggle.
@@ -1016,7 +1091,7 @@
                   <button class="vt-cell"><span class="vt-icon">≡</span><span>List</span></button>
                 </div>
                 <span class="collapse-chev" role="button" tabindex="0" aria-expanded="false" aria-label="Expand this lane" title="Expand this lane">▾</span>
-                <span class="overflow">⋮</span>
+                <span class="overflow" role="button" tabindex="0" aria-label="Lane actions">⋮</span>
               </div>
               <div class="swim-compact">
                 <div class="sc-stage">
@@ -1056,7 +1131,7 @@
                   <button class="vt-cell active" title="Currently in list view"><span class="vt-icon">≡</span><span>List</span></button>
                 </div>
                 <span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse this lane" title="Collapse this lane">▾</span>
-                <span class="overflow">⋮</span>
+                <span class="overflow" role="button" tabindex="0" aria-label="Lane actions">⋮</span>
               </div>
               <!-- Each lb-group-head carries its own chevron — per-stage
                    collapse, independent of per-lane collapse. Click toggles
@@ -1075,13 +1150,13 @@
                     <span class="lb-title">v0.30 release announcement</span>
                     <span class="lb-version">v1</span>
                     <span class="lb-state">today</span>
-                    <span class="lb-overflow">⋮</span>
+                    <span class="lb-overflow" role="button" tabindex="0" aria-label="Entry actions">⋮</span>
                   </div>
                   <div class="lb-row">
                     <span class="lb-title">Q3 retrospective post</span>
                     <span class="lb-version">v1</span>
                     <span class="lb-state">2 days ago</span>
-                    <span class="lb-overflow">⋮</span>
+                    <span class="lb-overflow" role="button" tabindex="0" aria-label="Entry actions">⋮</span>
                   </div>
                 </div>
                 <div class="lb-group">
@@ -1096,19 +1171,19 @@
                     <span class="lb-title">Graphical-entries feature announcement</span>
                     <span class="lb-version">v2</span>
                     <span class="lb-state iter">iterating</span>
-                    <span class="lb-overflow">⋮</span>
+                    <span class="lb-overflow" role="button" tabindex="0" aria-label="Entry actions">⋮</span>
                   </div>
                   <div class="lb-row">
                     <span class="lb-title">Press-check editorial pipeline — what we learned</span>
                     <span class="lb-version">v1</span>
                     <span class="lb-state">drafting</span>
-                    <span class="lb-overflow">⋮</span>
+                    <span class="lb-overflow" role="button" tabindex="0" aria-label="Entry actions">⋮</span>
                   </div>
                   <div class="lb-row">
                     <span class="lb-title">Multi-lane support landing in v0.30</span>
                     <span class="lb-version">v3</span>
                     <span class="lb-state iter">iterating</span>
-                    <span class="lb-overflow">⋮</span>
+                    <span class="lb-overflow" role="button" tabindex="0" aria-label="Entry actions">⋮</span>
                   </div>
                 </div>
                 <div class="lb-group locked">
@@ -1123,7 +1198,7 @@
                     <span class="lb-title">Hello, Lanes — the multi-pipeline rationale</span>
                     <span class="lb-version">v4</span>
                     <span class="lb-state ready">final</span>
-                    <span class="lb-overflow">⋮</span>
+                    <span class="lb-overflow" role="button" tabindex="0" aria-label="Entry actions">⋮</span>
                   </div>
                 </div>
                 <!-- Published: COLLAPSED — only the head visible -->
@@ -1139,7 +1214,7 @@
                     <span class="lb-title">v0.29 release — Phase 4 lands</span>
                     <span class="lb-version">v2</span>
                     <span class="lb-state">last sprint</span>
-                    <span class="lb-overflow">⋮</span>
+                    <span class="lb-overflow" role="button" tabindex="0" aria-label="Entry actions">⋮</span>
                   </div>
                 </div>
                 <div class="lb-group empty">
