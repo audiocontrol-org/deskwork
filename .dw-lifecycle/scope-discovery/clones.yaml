@@ -69,7 +69,7 @@ clones:
     lines: 17
     members:
       - packages/cli/src/commands/block.ts:63:79
-      - packages/cli/src/commands/cancel.ts:67:144
+      - packages/cli/src/commands/cancel.ts:67:152
     disposition: pending
     reason: null
   - id: 6e51c9681a1d
@@ -83,7 +83,7 @@ clones:
     lines: 16
     members:
       - packages/cli/src/commands/cancel.ts:68:83
-      - packages/cli/src/commands/induct.ts:129:144
+      - packages/cli/src/commands/induct.ts:137:152
     disposition: pending
     reason: null
   - id: 4b85626d608b
@@ -103,7 +103,7 @@ clones:
   - id: 89f8a99f8ce2
     lines: 13
     members:
-      - packages/cli/src/commands/induct.ts:130:142
+      - packages/cli/src/commands/induct.ts:138:150
       - packages/cli/src/commands/publish.ts:110:122
     disposition: pending
     reason: null
@@ -147,7 +147,7 @@ clones:
     lines: 23
     members:
       - packages/core/src/doctor/repair.ts:23:45
-      - packages/core/src/doctor/validate.ts:173:205
+      - packages/core/src/doctor/validate.ts:172:204
     disposition: keep-with-reason
     reason: pre-existing duplication of artifactPathForStage between doctor/repair.ts and doctor/validate.ts; the file-internal comments document the intentional copy to avoid a cross-import cycle; Phase 4 will replace both with template-driven path resolution
   - id: 2b7d648d9381
@@ -155,7 +155,7 @@ clones:
     members:
       - packages/core/src/doctor/rules/calendar-uuid-missing.ts:155:168
       - packages/core/src/doctor/rules/missing-frontmatter-id.ts:282:295
-      - packages/core/src/doctor/rules/orphan-frontmatter-id.ts:95:108
+      - packages/core/src/doctor/rules/orphan-frontmatter-id.ts:160:173
       - packages/core/src/doctor/rules/workflow-stale.ts:103:116
     disposition: pending
     reason: null
@@ -170,7 +170,7 @@ clones:
     lines: 16
     members:
       - packages/core/src/doctor/rules/duplicate-id.ts:34:49
-      - packages/core/src/doctor/rules/orphan-frontmatter-id.ts:39:54
+      - packages/core/src/doctor/rules/orphan-frontmatter-id.ts:96:111
     disposition: pending
     reason: null
   - id: 2ccdcd76762f
@@ -184,7 +184,7 @@ clones:
     lines: 18
     members:
       - packages/core/src/doctor/rules/legacy-stage-artifact-path.ts:97:104
-      - packages/core/src/entry/snapshot.ts:62:79
+      - packages/core/src/entry/snapshot.ts:63:80
     disposition: pending
     reason: null
   - id: 18718b4e0ad7
@@ -218,8 +218,8 @@ clones:
   - id: 41b3f9fce647
     lines: 8
     members:
-      - packages/core/src/doctor/validate.ts:148:155
-      - packages/core/src/doctor/validate.ts:44:51
+      - packages/core/src/doctor/validate.ts:147:154
+      - packages/core/src/doctor/validate.ts:43:50
     disposition: pending
     reason: null
   - id: 5c72154b2f6d
@@ -227,6 +227,20 @@ clones:
     members:
       - packages/core/src/entry/annotations.ts:327:335
       - packages/core/src/review/pipeline.ts:358:366
+    disposition: pending
+    reason: null
+  - id: fe9d16f3c59f
+    lines: 11
+    members:
+      - packages/core/src/entry/approve.ts:1:11
+      - packages/core/src/entry/induct.ts:1:11
+    disposition: ignore-with-justification
+    reason: Phase 4 verb refactor — shared import block (sidecar/journal/calendar/lane-resolve/pipeline-helpers). Verbs sharing imports is the verb-shape contract, not structural duplication worth extracting.
+  - id: f176f885355a
+    lines: 13
+    members:
+      - packages/core/src/entry/block.ts:1:13
+      - packages/core/src/entry/cancel.ts:1:13
     disposition: pending
     reason: null
   - id: 3e94d4b73301
