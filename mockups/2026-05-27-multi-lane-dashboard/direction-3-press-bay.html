@@ -274,6 +274,117 @@
   }
   .swim-head:hover .collapse-chev { color: var(--red); }
 
+  /* ===== View toggle (kanban ↔ list) — segmented, lives in swim-head ===== */
+  .view-toggle {
+    display: inline-flex; align-items: stretch;
+    border: 1px solid var(--paper-3);
+    border-radius: 2px;
+    overflow: hidden;
+    background: var(--paper);
+    height: 1.55rem;
+    margin-left: 0.4rem;
+  }
+  .view-toggle .vt-cell {
+    padding: 0 0.55rem;
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    background: transparent; border: none;
+    cursor: pointer;
+    font-family: var(--mono); font-size: 0.6rem;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--ink-soft);
+    border-right: 1px solid var(--paper-3);
+  }
+  .view-toggle .vt-cell:last-child { border-right: none; }
+  .view-toggle .vt-cell:hover { background: var(--paper-2); }
+  .view-toggle .vt-cell .vt-icon {
+    font-family: var(--display); font-size: 0.95rem;
+    color: var(--ink-soft);
+  }
+  .view-toggle .vt-cell.active {
+    background: var(--ink); color: var(--paper);
+  }
+  .view-toggle .vt-cell.active .vt-icon { color: var(--paper); }
+  /* Collapsed lane greys out the view toggle — collapse takes precedence
+     until the operator re-expands. */
+  .swim.collapsed .view-toggle { opacity: 0.5; pointer-events: none; }
+
+  /* ===== List-view body (alternative to stage-grid) ===== */
+  .swim.list-view .stage-grid { display: none; }
+  .list-body { display: none; padding: 0; background: var(--paper); }
+  .swim.list-view .list-body { display: block; }
+  .list-body .lb-group {
+    padding: 0; margin: 0;
+    border-bottom: 1px dashed var(--paper-3);
+  }
+  .list-body .lb-group:last-child { border-bottom: none; }
+  .list-body .lb-group-head {
+    display: flex; align-items: baseline; gap: 0.5rem;
+    padding: 0.45rem 0.85rem 0.35rem;
+    background: var(--paper-2);
+    border-bottom: 1px dashed var(--paper-3);
+  }
+  .list-body .lb-group-head .lb-glyph {
+    font-family: var(--display); font-style: italic; font-size: 1.05rem;
+    color: var(--red);
+  }
+  .list-body .lb-group.empty .lb-glyph { color: var(--faded); }
+  .list-body .lb-group.locked .lb-glyph { color: var(--blue); }
+  .list-body .lb-group-head .lb-name {
+    font-family: var(--display); font-style: italic; font-size: 0.95rem;
+  }
+  .list-body .lb-group.empty .lb-name { color: var(--ink-soft); }
+  .list-body .lb-group-head .lb-tag {
+    font-family: var(--mono); font-size: 0.58rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--faded);
+  }
+  .list-body .lb-group-head .lb-count {
+    margin-left: auto;
+    font-family: var(--mono); font-size: 0.7rem; color: var(--ink-soft);
+    letter-spacing: 0.1em;
+  }
+  .list-body .lb-row {
+    display: flex; align-items: center; gap: 0.7rem;
+    padding: 0.4rem 0.85rem;
+    border-bottom: 1px solid var(--paper-3);
+    cursor: pointer;
+  }
+  .list-body .lb-row:last-child { border-bottom: none; }
+  .list-body .lb-row:hover { background: var(--paper-2); }
+  .list-body .lb-row .lb-title {
+    font-family: var(--display); font-style: italic; font-size: 0.95rem;
+    color: var(--ink);
+    flex: 1; min-width: 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .list-body .lb-row .lb-version {
+    font-family: var(--mono); font-size: 0.62rem;
+    letter-spacing: 0.1em; color: var(--ink-soft);
+    padding: 0.08rem 0.35rem;
+    background: var(--paper-2);
+    border: 1px solid var(--paper-3); border-radius: 99px;
+    white-space: nowrap;
+  }
+  .list-body .lb-row .lb-state {
+    font-family: var(--mono); font-size: 0.58rem;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--faded); white-space: nowrap;
+    min-width: 95px; text-align: right;
+  }
+  .list-body .lb-row .lb-state.iter { color: var(--red); }
+  .list-body .lb-row .lb-state.ready { color: var(--green); }
+  .list-body .lb-row .lb-overflow {
+    font-family: var(--mono); color: var(--faded); font-size: 0.95rem;
+    padding: 0 0.3rem;
+  }
+  .list-body .lb-row.empty-state {
+    color: var(--faded); cursor: default;
+    font-family: var(--mono); font-size: 0.62rem;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    justify-content: center;
+  }
+  .list-body .lb-row.empty-state:hover { background: var(--paper); }
+
   /* === Collapsed lane state ===
      - stage-grid is hidden
      - a compact per-stage strip renders inside the swim-head's bottom edge
@@ -517,11 +628,11 @@
 </head>
 <body>
   <div class="meta">Direction 3 · <a href="./index.html">↩ all directions</a></div>
-  <h1 class="demo-title">Press Bay <span style="font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.2em; color: var(--green); margin-left: 0.5rem; vertical-align: middle;">v3 · COLLAPSIBLE LANES</span></h1>
-  <div class="demo-sub">Each lane is independently collapsible. Collapsed lanes still surface per-stage counts via a compact strip so the pipeline shape stays visible.</div>
+  <h1 class="demo-title">Press Bay <span style="font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.2em; color: var(--green); margin-left: 0.5rem; vertical-align: middle;">v4 · KANBAN ↔ LIST PER LANE</span></h1>
+  <div class="demo-sub">Each lane independently toggles between kanban (columnar stages with cards) and list (vertical, grouped by stage). Per-lane setting persists across sessions.</div>
 
   <div class="deviation-note">
-    <span class="label">Standards-compliant</span> Now three states per lane on the bay: <strong>Expanded</strong> (full stage-grid with cards), <strong>Collapsed</strong> (head + compact per-stage count strip; chevron rotated 90°), <strong>Filtered out</strong> (compact stub, click to restore). Plus the rail-controlled <strong>Hidden</strong> state (persistent — absent from the chip strip entirely). The compact strip on a collapsed lane is intentional, not lossy: per <code>DESIGN-STANDARDS.md § Favor structure over scrolling</code>, collapsing a lane should NOT erase the structural signal — operators still need to see "Editorial has 4 in Drafting" at-a-glance without re-expanding. The strip also surfaces locked-stage (proof-blue) and empty-stage (faded) palettes so the lane shape reads even at the collapsed density. Click the chevron OR anywhere on the swim-head to toggle. Mockup demonstrates all states: Editorial expanded, Mockups filtered out, QA collapsed; Press Releases hidden via rail.
+    <span class="label">Standards-compliant</span> A segmented toggle in each swim-head (<code>▦ Kanban</code> / <code>≡ List</code>) flips the lane between the two views. Both views show the same underlying entries — only the spatial arrangement differs. Kanban is the default; list view is preferable when a lane has many entries (kanban columns get tall + hard to scan) or when comparing entries by attribute (title, version, state) matters more than the spatial stage progression. Per-lane setting because lanes have different scales — Editorial may stay kanban while a busy Press Releases lane goes list. When a lane is collapsed, the toggle greys out (collapse precedence). Mockup demonstrates four lane states at once: <strong>Editorial</strong> (kanban, expanded), <strong>Mockups</strong> (filtered out), <strong>QA</strong> (collapsed), <strong>Press Releases</strong> (list view, expanded). The list-view stage groups carry the same stage-name + count + tag pattern as the kanban stage-grid heads; rows are dense (one-liner: title + version-pill + state + ⋮ overflow); locked stages render the group-head glyph in proof-blue (matches the lane template's locked-stage convention).
   </div>
 
   <div class="frames" style="margin-top:1.4rem;">
@@ -545,7 +656,7 @@
                focus filter from the chip strip; rail + chip strip are two
                views of the same state. Drag the dotted handle to reorder. -->
           <aside class="lane-rail">
-            <div class="rail-head">Lanes <span style="font-family: var(--mono); font-size: 0.55rem; color: var(--faded); margin-left: 0.3rem; letter-spacing: 0.1em;">3 visible · 1 hidden</span></div>
+            <div class="rail-head">Lanes <span style="font-family: var(--mono); font-size: 0.55rem; color: var(--faded); margin-left: 0.3rem; letter-spacing: 0.1em;">4 visible</span></div>
 
             <div class="rail-lane focused">
               <span class="r-eye">●</span>
@@ -565,11 +676,11 @@
               <span class="r-name">QA</span>
               <span class="r-count">3</span>
             </div>
-            <div class="rail-lane hidden">
-              <span class="r-eye">○</span>
-              <span class="r-glyph">⌘</span>
+            <div class="rail-lane focused">
+              <span class="r-eye">●</span>
+              <span class="r-glyph" style="color: var(--kraft);">⌘</span>
               <span class="r-name">Press Releases</span>
-              <span class="r-count">2</span>
+              <span class="r-count">7</span>
             </div>
 
             <div class="rail-views">
@@ -586,7 +697,7 @@
             <div class="bay-head">
               <div class="bh-row-1">
                 <span>The Press Bay</span>
-                <span class="bh-meta"><span class="filter-active">Filtered · </span>2 of 4 lanes shown · 15 entries</span>
+                <span class="bh-meta"><span class="filter-active">Filtered · </span>3 of 4 lanes shown · 22 entries</span>
               </div>
               <!--
                 Focus chip strip — the lane filter affordance.
@@ -604,7 +715,7 @@
                 <span class="strip-label">Focus</span>
                 <button class="focus-chip all">
                   <span>All</span>
-                  <span class="fc-count">3</span>
+                  <span class="fc-count">4</span>
                 </button>
                 <div class="strip-divider"></div>
                 <button class="focus-chip active">
@@ -622,21 +733,30 @@
                   <span>QA</span>
                   <span class="fc-count">3</span>
                 </button>
+                <button class="focus-chip active">
+                  <span class="fc-glyph" style="color: var(--kraft);">⌘</span>
+                  <span>Press Releases</span>
+                  <span class="fc-count">7</span>
+                </button>
                 <div class="strip-divider"></div>
                 <button class="focus-chip saved">In review</button>
                 <button class="focus-chip saved">Active only</button>
-                <button class="focus-chip save" title="Save current 2-lane selection as a named view">+ Save view</button>
+                <button class="focus-chip save" title="Save current 3-lane selection as a named view">+ Save view</button>
                 <span class="strip-hint"><kbd>1</kbd><kbd>2</kbd>⋯ to focus · <kbd>0</kbd> for all</span>
               </nav>
             </div>
 
-            <!-- Lane 1: Editorial (6 stages) — EXPANDED -->
+            <!-- Lane 1: Editorial (6 stages) — EXPANDED · KANBAN VIEW -->
             <article class="swim editorial">
               <div class="swim-head">
                 <span class="glyph">§</span>
                 <span class="name">Editorial</span>
                 <span class="tag">editorial · 6 stages</span>
                 <span class="quick-meta">12 entries · 4 drafting · 1 final</span>
+                <div class="view-toggle" role="radiogroup" aria-label="View mode">
+                  <button class="vt-cell active" title="Kanban view (columnar stages with cards)"><span class="vt-icon">▦</span><span>Kanban</span></button>
+                  <button class="vt-cell" title="List view (vertical grouped by stage)"><span class="vt-icon">≡</span><span>List</span></button>
+                </div>
                 <span class="collapse-chev" title="Collapse this lane">▾</span>
                 <span class="overflow">⋮</span>
               </div>
@@ -686,16 +806,17 @@
               <span class="ss-action">+</span>
             </button>
 
-            <!-- Lane 3: QA (4 stages) — COLLAPSED
-                 The chevron rotated 90°. Stage-grid hidden. The compact strip
-                 below the head surfaces per-stage counts so the pipeline shape
-                 stays visible without consuming card-grid vertical space. -->
+            <!-- Lane 3: QA (4 stages) — COLLAPSED · view toggle greyed -->
             <article class="swim qa collapsed">
               <div class="swim-head">
                 <span class="glyph">⊕</span>
                 <span class="name">QA</span>
                 <span class="tag">qa-plan · 4 stages</span>
                 <span class="quick-meta">3 entries · collapsed</span>
+                <div class="view-toggle" role="radiogroup" aria-label="View mode">
+                  <button class="vt-cell active"><span class="vt-icon">▦</span><span>Kanban</span></button>
+                  <button class="vt-cell"><span class="vt-icon">≡</span><span>List</span></button>
+                </div>
                 <span class="collapse-chev" title="Expand this lane">▾</span>
                 <span class="overflow">⋮</span>
               </div>
@@ -715,6 +836,113 @@
                 <div class="sc-stage empty">
                   <span class="sc-name">Approved</span>
                   <span class="sc-count">0</span>
+                </div>
+              </div>
+            </article>
+
+            <!-- Lane 4: Press Releases (5 stages) — LIST VIEW
+                 Same content the kanban would show, presented as a vertical
+                 list grouped by stage. Stage groups act as section heads;
+                 entries become single rows with title, version-pill, state
+                 indicator, and per-row overflow. Useful when a lane has
+                 lots of entries (kanban columns get tall + hard to scan),
+                 or when the operator wants to scan entries by attribute. -->
+            <article class="swim press-releases list-view" style="border-left-color: var(--kraft);">
+              <div class="swim-head">
+                <span class="glyph" style="color: var(--kraft);">⌘</span>
+                <span class="name">Press Releases</span>
+                <span class="tag">blog-post · 5 stages</span>
+                <span class="quick-meta">7 entries · 3 drafting</span>
+                <div class="view-toggle" role="radiogroup" aria-label="View mode">
+                  <button class="vt-cell"><span class="vt-icon">▦</span><span>Kanban</span></button>
+                  <button class="vt-cell active" title="Currently in list view"><span class="vt-icon">≡</span><span>List</span></button>
+                </div>
+                <span class="collapse-chev" title="Collapse this lane">▾</span>
+                <span class="overflow">⋮</span>
+              </div>
+              <div class="list-body">
+                <div class="lb-group">
+                  <div class="lb-group-head">
+                    <span class="lb-glyph">◇</span>
+                    <span class="lb-name">Idea</span>
+                    <span class="lb-tag">2 captured</span>
+                    <span class="lb-count">2</span>
+                  </div>
+                  <div class="lb-row">
+                    <span class="lb-title">v0.30 release announcement</span>
+                    <span class="lb-version">v1</span>
+                    <span class="lb-state">today</span>
+                    <span class="lb-overflow">⋮</span>
+                  </div>
+                  <div class="lb-row">
+                    <span class="lb-title">Q3 retrospective post</span>
+                    <span class="lb-version">v1</span>
+                    <span class="lb-state">2 days ago</span>
+                    <span class="lb-overflow">⋮</span>
+                  </div>
+                </div>
+                <div class="lb-group">
+                  <div class="lb-group-head">
+                    <span class="lb-glyph">✎</span>
+                    <span class="lb-name">Drafting</span>
+                    <span class="lb-tag">3 in progress</span>
+                    <span class="lb-count">3</span>
+                  </div>
+                  <div class="lb-row">
+                    <span class="lb-title">Graphical-entries feature announcement</span>
+                    <span class="lb-version">v2</span>
+                    <span class="lb-state iter">iterating</span>
+                    <span class="lb-overflow">⋮</span>
+                  </div>
+                  <div class="lb-row">
+                    <span class="lb-title">Press-check editorial pipeline — what we learned</span>
+                    <span class="lb-version">v1</span>
+                    <span class="lb-state">drafting</span>
+                    <span class="lb-overflow">⋮</span>
+                  </div>
+                  <div class="lb-row">
+                    <span class="lb-title">Multi-lane support landing in v0.30</span>
+                    <span class="lb-version">v3</span>
+                    <span class="lb-state iter">iterating</span>
+                    <span class="lb-overflow">⋮</span>
+                  </div>
+                </div>
+                <div class="lb-group locked">
+                  <div class="lb-group-head">
+                    <span class="lb-glyph">⌕</span>
+                    <span class="lb-name">Edited</span>
+                    <span class="lb-tag">locked · ready to publish</span>
+                    <span class="lb-count">1</span>
+                  </div>
+                  <div class="lb-row">
+                    <span class="lb-title">Hello, Lanes — the multi-pipeline rationale</span>
+                    <span class="lb-version">v4</span>
+                    <span class="lb-state ready">final</span>
+                    <span class="lb-overflow">⋮</span>
+                  </div>
+                </div>
+                <div class="lb-group">
+                  <div class="lb-group-head">
+                    <span class="lb-glyph">✓</span>
+                    <span class="lb-name">Published</span>
+                    <span class="lb-tag">live</span>
+                    <span class="lb-count">1</span>
+                  </div>
+                  <div class="lb-row">
+                    <span class="lb-title">v0.29 release — Phase 4 lands</span>
+                    <span class="lb-version">v2</span>
+                    <span class="lb-state">last sprint</span>
+                    <span class="lb-overflow">⋮</span>
+                  </div>
+                </div>
+                <div class="lb-group empty">
+                  <div class="lb-group-head">
+                    <span class="lb-glyph">⊘</span>
+                    <span class="lb-name">Blocked</span>
+                    <span class="lb-tag">cul-de-sac</span>
+                    <span class="lb-count">0</span>
+                  </div>
+                  <div class="lb-row empty-state">no blocked entries</div>
                 </div>
               </div>
             </article>
@@ -740,10 +968,11 @@
           <!-- Focus strip — horizontally scrollable on mobile -->
           <nav class="focus-strip mobile" aria-label="Lane focus filter">
             <span class="strip-label">Focus</span>
-            <button class="focus-chip all"><span>All</span><span class="fc-count">3</span></button>
+            <button class="focus-chip all"><span>All</span><span class="fc-count">4</span></button>
             <button class="focus-chip active"><span class="fc-glyph">§</span><span>Editorial</span></button>
             <button class="focus-chip"><span class="fc-glyph">◆</span><span>Mockups</span></button>
             <button class="focus-chip active"><span class="fc-glyph">⊕</span><span>QA</span></button>
+            <button class="focus-chip active"><span class="fc-glyph" style="color: var(--kraft);">⌘</span><span>Press</span></button>
           </nav>
 
           <div class="lane-stack" style="padding-top: 0;">
@@ -788,12 +1017,29 @@
                 <div class="sc-stage empty"><span class="sc-name">App'd</span><span class="sc-count">0</span></div>
               </div>
             </section>
+
+            <!-- Press Releases — mobile keeps the tile pattern; the
+                 kanban↔list toggle is desktop-only (see caption). -->
+            <section class="lane-section">
+              <div class="lane-head">
+                <span class="glyph" style="color: var(--kraft);">⌘</span>
+                <span class="name">Press Releases</span>
+                <span class="count">7</span>
+                <span class="collapse-chev">▾</span>
+              </div>
+              <div class="stage-row">
+                <div class="m-stage-tile"><span class="stage-glyph">◇</span><span class="stage-name">Idea</span><span class="stage-count">2</span></div>
+                <div class="m-stage-tile" style="background: var(--paper-2); border-top: 2px solid var(--red);"><span class="stage-glyph" style="color: var(--red);">✎</span><span class="stage-name" style="color: var(--red);">Drafting</span><span class="stage-count">3</span></div>
+                <div class="m-stage-tile" style="border-top: 2px solid var(--blue);"><span class="stage-glyph" style="color: var(--blue);">⌕</span><span class="stage-name">Edited</span><span class="stage-count">1</span></div>
+                <div class="m-stage-tile"><span class="stage-glyph">✓</span><span class="stage-name">Pub'd</span><span class="stage-count">1</span></div>
+              </div>
+            </section>
           </div>
 
           <button class="compose-fab">+ Compose</button>
         </div>
       </div>
-      <div class="caption">Mobile · iPhone 13 · focus strip below masthead; filtered lane renders as a stub for one-tap restore</div>
+      <div class="caption">Mobile · iPhone 13 · focus strip below masthead; collapsible per-lane; kanban↔list toggle is desktop-only (mobile keeps the tile pattern, which is already list-like per the established v0.19 mobile dashboard idiom)</div>
     </div>
 
   </div>
