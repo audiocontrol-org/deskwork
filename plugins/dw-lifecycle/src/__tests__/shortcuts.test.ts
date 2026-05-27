@@ -84,6 +84,7 @@ const META_COMMANDS = [
   'install-agent-prompts',
   'install-scope-discovery',
   'install-scope-discovery-hooks',
+  'migrate-from-pilot',
   'refresh-clones-baseline',
   'scope-export',
   'scope-inventory',

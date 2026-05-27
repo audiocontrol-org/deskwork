@@ -1,4 +1,4 @@
-generated_at: 2026-05-27T00:43:31.853Z
+generated_at: 2026-05-27T01:14:07.858Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -625,24 +625,38 @@ clones:
       - plugins/dw-lifecycle/src/scope-discovery/editor-symmetry-matrix.ts:270:285
     disposition: keep-with-reason
     reason: intentional shared scaffolding across sibling scope-discovery scanners (test-harness pattern, CLI parseCli boilerplate, scan-and-write output pattern). Each clone group is short-and-shaped-the-same intentionally; extracting would create cross-scanner coupling that hurts more than the duplication costs.
-  - id: 70f04e0cb6d3
+  - id: 9a9e297ef540
+    lines: 8
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-handlers/coverage.ts:40:47
+      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-handlers/semantic.ts:73:92
+    disposition: keep-with-reason
+    reason: intentional shared scaffolding across new scope-discovery surfaces from Wave 3 (migrate-from-pilot CLI shell, pattern-handler test fixtures, dispatcher boilerplate, scope-widen+migrate planning patterns). Extracting would create cross-surface coupling; the duplication is short and intentional.
+  - id: 3be061e8961a
     lines: 7
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-matrix.ts:200:206
-      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/prd-themed-pattern-hunter.ts:138:148
-    disposition: pending
-    reason: null
-  - id: d92bfb30bb82
-    lines: 18
+      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-handlers/loader.ts:125:131
+      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-handlers/loader.ts:157:163
+    disposition: keep-with-reason
+    reason: intentional shared scaffolding across new scope-discovery surfaces from Wave 3 (migrate-from-pilot CLI shell, pattern-handler test fixtures, dispatcher boilerplate, scope-widen+migrate planning patterns). Extracting would create cross-surface coupling; the duplication is short and intentional.
+  - id: 32701f9a06dc
+    lines: 11
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-matrix.ts:247:264
+      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-handlers/regex.ts:27:33
+      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/prd-themed-pattern-hunter.ts:138:148
+    disposition: keep-with-reason
+    reason: intentional shared scaffolding across new scope-discovery surfaces from Wave 3 (migrate-from-pilot CLI shell, pattern-handler test fixtures, dispatcher boilerplate, scope-widen+migrate planning patterns). Extracting would create cross-surface coupling; the duplication is short and intentional.
+  - id: ce94eda7ed31
+    lines: 23
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-matrix.ts:128:150
       - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/prd-themed-pattern-hunter.ts:181:200
-    disposition: pending
-    reason: null
+    disposition: keep-with-reason
+    reason: intentional shared scaffolding across new scope-discovery surfaces from Wave 3 (migrate-from-pilot CLI shell, pattern-handler test fixtures, dispatcher boilerplate, scope-widen+migrate planning patterns). Extracting would create cross-surface coupling; the duplication is short and intentional.
   - id: 0d9958faaf8f
     lines: 7
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-matrix.ts:269:275
+      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-matrix.ts:156:162
       - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/prd-themed-pattern-hunter.ts:234:240
     disposition: pending
     reason: null
@@ -744,6 +758,20 @@ clones:
       - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:226:234
     disposition: pending
     reason: null
+  - id: 8f81364fec2d
+    lines: 13
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/migrate-from-pilot.ts:208:220
+      - plugins/dw-lifecycle/src/scope-discovery/scope-widen.ts:242:254
+    disposition: keep-with-reason
+    reason: intentional shared scaffolding across new scope-discovery surfaces from Wave 3 (migrate-from-pilot CLI shell, pattern-handler test fixtures, dispatcher boilerplate, scope-widen+migrate planning patterns). Extracting would create cross-surface coupling; the duplication is short and intentional.
+  - id: 97a13859c01e
+    lines: 6
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/migrate-from-pilot.ts:90:95
+      - plugins/dw-lifecycle/src/scope-discovery/scope-inventory.ts:78:83
+    disposition: keep-with-reason
+    reason: intentional shared scaffolding across new scope-discovery surfaces from Wave 3 (migrate-from-pilot CLI shell, pattern-handler test fixtures, dispatcher boilerplate, scope-widen+migrate planning patterns). Extracting would create cross-surface coupling; the duplication is short and intentional.
   - id: c86cf0b21100
     lines: 11
     members:

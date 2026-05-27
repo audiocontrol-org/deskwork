@@ -76,6 +76,27 @@ The directory name `.dw-lifecycle/scope-discovery/` is deliberate:
   the directory tree sees what's there without reading the plugin's
   source.
 
+## Pattern-matrix overrides — polymorphic catalog
+
+The pattern-matrix discovery agent supports a polymorphic catalog of
+pattern types beyond plain regex (Phase 11 Task 1). When the file
+`.dw-lifecycle/scope-discovery/pattern-matrix-patterns.yaml` is present,
+its `patterns:` list REPLACES the built-in catalog. Each entry carries
+a `type` discriminator selecting the handler:
+
+| `type:` | Behavior |
+|---|---|
+| `regex` (default — backward-compat for entries without `type:`) | Line-grep regex matcher. |
+| `negative-space` | Fires when a file matching `match_glob` does NOT contain `must_contain`. The "expected adopter that didn't adopt" detector. |
+| `coverage` | Emits an adoption-ratio metric (`numerator/denominator`). NOT a finding generator. |
+| `outlier` | Statistical outlier detection — files whose `distance_metric` distance from directory-sibling centroid exceeds `threshold_sigma`. |
+| `semantic` | LLM-augmented (STUB in v1.1; wiring tracked at #319). |
+
+The full schema is at
+`plugins/dw-lifecycle/src/scope-discovery/schema/pattern-matrix-patterns.yaml.schema.json`
+and an example showing all five types is at
+`plugins/dw-lifecycle/templates/scope-discovery/pattern-matrix-patterns.example.yaml`.
+
 ## What the protocol does NOT assume
 
 - The project does not have to be a TS monorepo. The default is `src/`

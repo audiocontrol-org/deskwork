@@ -1,6 +1,6 @@
 ---
 name: implement
-description: "Walk workplan tasks; delegate to subagents; commit at task boundaries"
+description: "Walk workplan tasks; delegate to subagents; commit at task boundaries; auto-invokes scope-widen between tasks unless --no-scope-widen"
 ---
 
 # /dw-lifecycle:implement
@@ -16,13 +16,60 @@ Drive implementation through the workplan. Selects the next unchecked task, disp
    - If the task involves architecture decisions, dispatch `code-architect` (from `feature-dev`) to propose 2–3 approaches before coding. Skip if feature-dev not installed.
    - If the task introduces or modifies tested code, follow `superpowers:test-driven-development` (write failing test → minimal impl → pass → commit).
    - If a step is independent of others, consider `superpowers:dispatching-parallel-agents` to fan out.
+   - Every sub-agent dispatched in this loop (implementer, reviewer, code-explorer, code-architect, etc.) MUST be routed through the dispatch wrapper — see "Dispatch-wrapper engagement" below.
    - When the task body is complete, mark its checkboxes and commit.
-5. After each task, optionally run `/dw-lifecycle:review` or `/dw-lifecycle:audit` (does NOT block; operator chooses cadence).
+5. Auto-invoke scope-widen between tasks (default behavior) unless `--no-scope-widen` was passed:
+   - Runs after the task-completion commit lands and BEFORE the next task starts.
+   - When the completed task introduced NEW shapes / surfaces / primitives not enumerated in the project's existing `.dw-lifecycle/scope-discovery/scope-manifest.yaml`, invoke `dw-lifecycle scope-widen <slug> "<task brief as complaint>"` to expand the manifest. The "complaint" is the task title or workplan brief reframed as the unmet-coverage observation (e.g. `"new <NewPrimitive> surface introduced by Task N; scope-manifest needs the additional theme"`).
+   - The widened scope-manifest is read by the next task's implementer brief so its dispatch sees the augmented scope context.
+   - If `.dw-lifecycle/scope-discovery/` is not present in the project, the auto-invocation is silently skipped. No warning, no error — scope-discovery is opt-in per project.
+6. After each task, optionally run `/dw-lifecycle:review` or `/dw-lifecycle:audit` (does NOT block; operator chooses cadence).
    - They are synonyms. Both write findings into `audit-log.md` with stable IDs and explicit status transitions.
-6. Repeat until all tasks done or operator pauses.
+7. Repeat from step 4 until all tasks done or operator pauses.
+
+## Flags
+
+| Flag | Purpose |
+|---|---|
+| `--no-scope-widen` | Skip the Step 5 between-tasks auto-invocation of `scope-widen`. Use when the operator has already widened the manifest explicitly, or when the feature's tasks are all purely-additive against an already-comprehensive scope-manifest. |
+
+## When to use `--no-scope-widen`
+
+- The operator has already widened the manifest by hand or by an explicit `/dw-lifecycle:scope-widen` invocation against the relevant tasks.
+- The feature is purely additive (new files only, no new primitives) against a scope-manifest that already enumerates every existing shape the work touches.
+- The implementation is short enough (one or two tasks) that running widen between every task is more noise than signal.
+
+Default = run scope-widen between tasks. Skipping is the exception, not the rule.
+
+## Dispatch-wrapper engagement
+
+Every sub-agent dispatch fired by this skill — implementer, reviewer, code-explorer, code-architect, parallel fan-out workers — MUST be routed through `wrap()` from `plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper.ts` (the Phase 5 library API). The wrapper enforces three contracts on the sub-agent's return:
+
+- **Return grammar.** Every dispatched response MUST conclude with three labelled blocks:
+
+  ```text
+  Searched: <pattern> — <N matches>
+  Included: <file:line>, <file:line>, ...
+  Excluded: <file:line> — <one-line non-deferral reason>
+  ```
+
+  `parseReturn()` extracts the blocks; `validateParsed()` rejects on missing blocks AND on the "skipped same-class audit" shape (Searched count > 1, Included covers exactly 1 match, Excluded empty).
+
+- **Forbidden-deferral phrases.** Any `Excluded` reason containing a deferral substring or matching a deferral regex (per `FORBIDDEN_DEFERRAL_PHRASES` / `FORBIDDEN_DEFERRAL_REGEXES`) is rejected. Project overrides at `.dw-lifecycle/scope-discovery/forbidden-deferral-phrases.yaml` are honored.
+
+- **Refactor-marker auto-prelude.** When the task prompt contains a refactor marker (`refactor`, `extraction`, `clones.yaml`, `canonical_side`, `tests_proof`, or any project-supplied marker from `.dw-lifecycle/scope-discovery/refactor-markers.yaml`), `wrap()` automatically appends the REFACTOR-CONTEXT PRECONDITIONS prelude to the dispatched prompt. Refactor dispatches without the Step 0 obligation are the failure mode the prelude exists to prevent; the marker set is intentionally narrow so false positives stay cheap.
+
+The wrapper is library-only — `wrap(agentType, taskPrompt, { dispatchFn })`. The controller (this skill's orchestrating agent) supplies the `dispatchFn` callback that drives the Agent tool. On `DispatchRejected`, the controller re-prompts the sub-agent with the violation reason in the next iteration; persistent rejection escalates to the operator with the parsed-return excerpt.
+
+Cross-reference: `plugins/dw-lifecycle/templates/scope-discovery/dispatch-wrapper-prelude.md` documents the convention and the override files in full.
+
+If `.dw-lifecycle/scope-discovery/` is not present in the project, the dispatch-wrapper still runs — the wrapper itself is plugin code, not project config — but it falls back to the built-in `FORBIDDEN_DEFERRAL_PHRASES` / `REFACTOR_CONTEXT_MARKERS` defaults. Project overrides are the only thing the project-side install gates.
 
 ## Error handling
 
-- **feature-dev not installed.** Print one-line warning at start; agent dispatch steps are skipped. Skill continues with single-agent fallback.
+- **feature-dev not installed.** Print one-line warning at start; agent dispatch steps that depend on it are skipped. Skill continues with single-agent fallback. Dispatch-wrapper engagement still applies to the remaining dispatches.
 - **Bug surfaces during a task.** Invoke `superpowers:systematic-debugging` before continuing the task. Don't push through with a known bug.
 - **Test failures during TDD.** Per the TDD discipline: failing test is expected before implementation. Failing tests AFTER implementation means the impl is wrong; iterate, don't bypass the test.
+- **Auto-invocation behavior (scope-widen).** When `.dw-lifecycle/scope-discovery/` is absent, the Step 5 auto-invocation is silently skipped. When present, `scope-widen` runs with default flags (dry-run is its default; `--apply` is passed when this skill invokes it because the merged manifest must be readable by the next task's implementer brief). The widen run's resulting `scope-manifest.yaml` path AND the additive-delta summary are passed into the next task's dispatched-agent context so the implementer sees the augmented scope before starting.
+- **`scope-widen` fails.** Surface the error in the next task's brief; the task still proceeds. The operator can re-run scope-widen manually (`/dw-lifecycle:scope-widen <slug> "<complaint>"`) after addressing the cause.
+- **`DispatchRejected` from `wrap()`.** Re-prompt the sub-agent with the violation reason (missing block / forbidden phrase / skipped-audit signal). After two consecutive rejections on the same dispatch, surface the parsed-return excerpt to the operator and pause the task.

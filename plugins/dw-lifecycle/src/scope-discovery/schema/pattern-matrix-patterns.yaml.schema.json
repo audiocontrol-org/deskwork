@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://deskwork/dw-lifecycle/schema/pattern-matrix-patterns.yaml.schema.json",
   "title": "Pattern-Matrix Patterns Registry",
-  "description": "Project-supplied override of the built-in pattern catalog for the pattern-matrix discovery agent. When .dw-lifecycle/scope-discovery/pattern-matrix-patterns.yaml exists, its `patterns:` list REPLACES the agent's built-in defaults (does not merge). Each entry declares a kebab-case id, a description, a regex source string, and optional extension filter.",
+  "description": "Project-supplied override of the built-in pattern catalog for the pattern-matrix discovery agent. When .dw-lifecycle/scope-discovery/pattern-matrix-patterns.yaml exists, its `patterns:` list REPLACES the agent's built-in defaults (does not merge). Each entry declares a kebab-case id, a description, and a `type` discriminator selecting the handler: regex (default; legacy), negative-space, coverage, outlier, or semantic. Phase 11 Task 1 extended the schema to a discriminated union. Entries WITHOUT a `type` field default to `regex` for backward compatibility with pre-Phase-11 registries.",
   "type": "object",
   "additionalProperties": false,
   "required": ["patterns"],
@@ -12,40 +12,151 @@
       "type": "array",
       "minItems": 1,
       "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["id", "description", "regex"],
-        "properties": {
-          "id": {
-            "description": "Stable kebab-case identifier surfaced in the agent's output.",
-            "type": "string",
-            "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$",
-            "minLength": 2,
-            "maxLength": 80
-          },
-          "description": {
-            "description": "Human-readable description of what the pattern catches.",
-            "type": "string",
-            "minLength": 4,
-            "maxLength": 500
-          },
-          "regex": {
-            "description": "RegExp source string. Compiled with the 'g' flag by the agent.",
-            "type": "string",
-            "minLength": 1
-          },
-          "extensions": {
-            "description": "Optional file-extension filter. When set, the pattern only scans files whose name ends in one of these strings (e.g., ['.tsx', '.ts']).",
-            "type": "array",
-            "items": {
-              "type": "string",
-              "pattern": "^\\.[A-Za-z0-9]+$",
-              "maxLength": 16
-            },
-            "minItems": 1,
-            "uniqueItems": true
-          }
-        }
+        "oneOf": [
+          { "$ref": "#/$defs/regexEntry" },
+          { "$ref": "#/$defs/negativeSpaceEntry" },
+          { "$ref": "#/$defs/coverageEntry" },
+          { "$ref": "#/$defs/outlierEntry" },
+          { "$ref": "#/$defs/semanticEntry" }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "patternId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$",
+      "minLength": 2,
+      "maxLength": 80,
+      "description": "Stable kebab-case identifier surfaced in the agent's output."
+    },
+    "description": {
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 500,
+      "description": "Human-readable description of what the pattern catches."
+    },
+    "extensions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^\\.[A-Za-z0-9]+$",
+        "maxLength": 16
+      },
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "Optional file-extension filter."
+    },
+    "regexSource": {
+      "type": "string",
+      "minLength": 1,
+      "description": "RegExp source string. Compiled with the 'g' flag by the agent."
+    },
+    "matchGlob": {
+      "type": "string",
+      "minLength": 1,
+      "description": "POSIX-style relative-path glob. Supports `*`, `**`, and `?`."
+    },
+    "regexEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description", "regex"],
+      "properties": {
+        "type": { "const": "regex", "description": "Discriminator. Optional — entries omitting `type` default to 'regex' for backward compatibility." },
+        "id": { "$ref": "#/$defs/patternId" },
+        "description": { "$ref": "#/$defs/description" },
+        "regex": { "$ref": "#/$defs/regexSource" },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      }
+    },
+    "negativeSpaceEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id", "description", "match_glob", "must_contain"],
+      "properties": {
+        "type": { "const": "negative-space" },
+        "id": { "$ref": "#/$defs/patternId" },
+        "description": { "$ref": "#/$defs/description" },
+        "match_glob": { "$ref": "#/$defs/matchGlob" },
+        "must_contain": {
+          "$ref": "#/$defs/regexSource",
+          "description": "Regex that MUST be present in each glob-matched file. Files matching the glob but containing zero matches for this regex are holdouts."
+        },
+        "threshold": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Minimum number of secondary-signal hits required to escalate a holdout to a finding (when secondary_contains is set). Defaults to 1."
+        },
+        "secondary_contains": {
+          "$ref": "#/$defs/regexSource",
+          "description": "Optional secondary regex that strengthens the finding (e.g., utility-class consumption in a file that should consume design-system classes)."
+        },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      }
+    },
+    "coverageEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id", "description", "match_glob", "must_contain"],
+      "properties": {
+        "type": { "const": "coverage" },
+        "id": { "$ref": "#/$defs/patternId" },
+        "description": { "$ref": "#/$defs/description" },
+        "match_glob": { "$ref": "#/$defs/matchGlob" },
+        "must_contain": {
+          "$ref": "#/$defs/regexSource",
+          "description": "Regex whose presence in a glob-matched file counts as adoption. The handler emits the adoption ratio as a synthesis-layer metric."
+        },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      }
+    },
+    "outlierEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id", "description", "match_glob", "distance_metric"],
+      "properties": {
+        "type": { "const": "outlier" },
+        "id": { "$ref": "#/$defs/patternId" },
+        "description": { "$ref": "#/$defs/description" },
+        "match_glob": { "$ref": "#/$defs/matchGlob" },
+        "distance_metric": {
+          "type": "string",
+          "enum": ["token-composition", "className-composition"],
+          "description": "Feature vector to compare. token-composition: bag-of-words over alphanumeric tokens. className-composition: bag-of-words over JSX className attribute payloads."
+        },
+        "threshold_sigma": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Sigma threshold for outlier firing. Default 2.0 (~95th percentile per direction)."
+        },
+        "extensions": { "$ref": "#/$defs/extensions" }
+      }
+    },
+    "semanticEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id", "description", "match_glob", "prompt_template"],
+      "properties": {
+        "type": { "const": "semantic" },
+        "id": { "$ref": "#/$defs/patternId" },
+        "description": { "$ref": "#/$defs/description" },
+        "match_glob": { "$ref": "#/$defs/matchGlob" },
+        "prompt_template": {
+          "type": "string",
+          "minLength": 4,
+          "description": "Template injected into the LLM prompt. The handler renders this with the file content + catalog metadata before dispatch. STUB in v1.1 Task 1 — the LLM wiring lands under Phase 11 Task 7."
+        },
+        "model": {
+          "type": "string",
+          "description": "Optional model identifier; the handler picks a default when unspecified."
+        },
+        "confidence_threshold": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Confidence below which a violation fires. Default 0.5."
+        },
+        "extensions": { "$ref": "#/$defs/extensions" }
       }
     }
   }
