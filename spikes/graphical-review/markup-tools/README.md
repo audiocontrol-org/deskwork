@@ -15,15 +15,13 @@ npm run dev
 ```
 
 Vite prints a local URL (default `http://localhost:5173`). Open it in a
-browser. Excalidraw mounts; click the top-level **Add fixture** path
-exposed via the developer console (`window.__spike.addFixtureImage()`) or
-use Excalidraw's own image tool to embed the fixture from
-`/fixture.svg`. Then draw on top of the fixture using Excalidraw's
-toolbar.
+browser. Excalidraw mounts; click **Add fixture image** to load the
+fixture SVG into the scene. Then draw on top of it using Excalidraw's
+native toolbar (arrow / rectangle / freehand / text / image / eraser).
 
-Click **Save markup (PNG)** to export the composed scene as a PNG; the
-preview pane below shows the result. Click **Reset scene** to clear
-everything and start over.
+Click **Save markup (PNG)** to export the composed scene (fixture +
+markup) as a PNG; the preview pane below shows the result. Click
+**Reset scene** to clear everything and start over.
 
 ## How to verify
 

@@ -178,7 +178,14 @@ async function run() {
 
   console.log('\nassertions [initial DOM + API-availability]:');
   assert('capture button exists', initial.hasCaptureBtn === true, initial);
-  assert('capture button label is "Capture screen"', initial.captureBtnText === 'Capture screen', initial.captureBtnText);
+  // Existence is the spec claim; the literal label is implementation detail
+  // and free to change in UX iteration. A regex floor avoids the label-
+  // pinning anti-pattern flagged in the Task 1.4 review (M-3).
+  assert(
+    'capture button label begins with "Capture"',
+    typeof initial.captureBtnText === 'string' && /^Capture/i.test(initial.captureBtnText),
+    initial.captureBtnText
+  );
   assert('download button exists', initial.hasDownloadBtn === true, initial);
   assert('download button starts disabled', initial.downloadBtnInitiallyDisabled === true, initial);
   assert('clear button exists', initial.hasClearBtn === true, initial);
@@ -226,19 +233,27 @@ async function run() {
   const sim = await simulateSuccessfulCapture(page);
   console.log(JSON.stringify(sim, null, 2));
 
-  console.log('\nassertions [post-capture wiring]:');
-  assert('lastPath transitions to "captured" on success', sim.lastPath === 'captured', sim);
-  assert('captured dimensions populate state (320x180)', sim.capturedWidth === 320 && sim.capturedHeight === 180, sim);
+  // All assertions below are tagged [synthetic] — they verify the
+  // downstream WIRING (state mutations, button enablement, preview canvas
+  // sizing, status text) that the operator would see after a real
+  // capture. The success-path JS in onCaptureClick/captureOneFrame/
+  // renderToPreview is NOT exercised by this probe (headless cannot
+  // satisfy the user-activation gate on getDisplayMedia). The README's
+  // "How to verify" section documents which paths require manual
+  // cross-browser testing.
+  console.log('\nassertions [post-capture wiring — synthetic simulation, not real-capture exercise]:');
+  assert('[synthetic] state.lastPath transitions to "captured"', sim.lastPath === 'captured', sim);
+  assert('[synthetic] state captures dimensions (320x180)', sim.capturedWidth === 320 && sim.capturedHeight === 180, sim);
   assert(
-    'capturedDataUrl is a PNG data URL (begins with data:image/png;base64,)',
+    '[synthetic] capturedDataUrl is a PNG data URL (begins with data:image/png;base64,)',
     sim.capturedDataUrlPrefix === 'data:image/png;base64,',
     sim.capturedDataUrlPrefix
   );
-  assert('download button enables after successful capture', sim.downloadDisabled === false, sim);
-  assert('clear button enables after successful capture', sim.clearDisabled === false, sim);
-  assert('preview canvas resizes to captured dimensions', sim.previewWidth === 320 && sim.previewHeight === 180, sim);
-  assert('meta line reports dimensions + format', sim.metaText.includes('320×180') && sim.metaText.includes('PNG'), sim.metaText);
-  assert('status text reports capture success', sim.statusText.includes('Captured 320×180'), sim.statusText);
+  assert('[synthetic] download button enables after capture-state mutation', sim.downloadDisabled === false, sim);
+  assert('[synthetic] clear button enables after capture-state mutation', sim.clearDisabled === false, sim);
+  assert('[synthetic] preview canvas resizes to captured dimensions', sim.previewWidth === 320 && sim.previewHeight === 180, sim);
+  assert('[synthetic] meta line reports dimensions + format', sim.metaText.includes('320×180') && sim.metaText.includes('PNG'), sim.metaText);
+  assert('[synthetic] status text reports capture success', sim.statusText.includes('Captured 320×180'), sim.statusText);
 
   console.log('\n=== clear after capture ===');
   const cleared = await clickClearAndSnapshot(page);
