@@ -49,9 +49,9 @@ date: 2026-05-25
 
 ### Task 1.5: Threading + W3C alignment decision
 
-- [ ] Step 1.5.1: Document whether each picked library has native threading (`replyTo` / reply-chain) or whether we extend our own per the schema in PRD § Annotation model extensions.
-- [ ] Step 1.5.2: Decide whether the project's `CommentAnnotation` shape adopts W3C Web Annotation Data Model directly, extends it, or stays a project-internal schema (with W3C alignment as future-interop guarantee).
-- [ ] Step 1.5.3: Record decision in the doc with migration sketch from current `comment` annotation type.
+- [x] Step 1.5.1: Documented per-library threading capability in `decision-draft.md` § "Threading + W3C alignment decision (Task 1.5)" → "Threading capability — by picked library." Finding: **none** of the picked libraries (Annotorious / `@recogito/text-annotator` / Excalidraw / `html-to-image`) ship native threading. All defer to host-supplied comment UI per the W3C Web Annotation Data Model pattern.
+- [x] Step 1.5.2: Decision: **adopt W3C as the structural base; extend with the `deskwork:` namespace for project-specific fields** (Option B). Rationale recorded in `decision-draft.md` § "W3C Web Annotation Data Model adoption — three options considered" — the picked libraries already emit W3C-shaped JSON, Phase 8's planned fields fit the JSON-LD extension pattern, threaded replies land natively via `motivation: replying`.
+- [x] Step 1.5.3: Migration sketch landed in `decision-draft.md` § "Migration sketch from the current `comment` annotation shape" — per-field mapping (`range` → `[TextPositionSelector, TextQuoteSelector]`, `comment` → `[TextualBody]`, `iteration` → `deskwork:revisionId`, parent-comment-id → reply annotation's `target` with `motivation: replying`), doctor-managed migration with audit-preserving cutover window.
 
 ### Task 1.6: Write decision document
 

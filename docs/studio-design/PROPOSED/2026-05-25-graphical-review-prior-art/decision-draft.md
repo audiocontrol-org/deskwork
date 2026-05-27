@@ -23,7 +23,7 @@ in Task 1.6.**
 | Image annotation spike | DONE — see below | 1.2 |
 | HTML annotation spike | DONE — see below | 1.3 |
 | Screenshot capture + markup spike | DONE — see below | 1.4 |
-| Threading + W3C alignment | pending | 1.5 |
+| Threading + W3C alignment | DONE — see below | 1.5 |
 
 ## Image annotation spike (Task 1.2)
 
@@ -925,3 +925,178 @@ any external service. The findings hold under Architecture A's no-cloud
   shape — likely an annotation's `body[]` carries both the rendered
   PNG (as a `TextualBody` with `format: 'image/png'`) and the
   re-editable Excalidraw JSON (as a separate body part).
+
+## Threading + W3C alignment decision (Task 1.5)
+
+This is a documentation task — no new spike. The decision synthesises
+what Tasks 1.2-1.4 already surfaced about each picked library's
+threading capabilities and how deskwork's annotation schema should
+align with the W3C Web Annotation Data Model.
+
+### Threading capability — by picked library
+
+| Library | Native threading | Notes |
+|---|---|---|
+| **Annotorious** (Task 1.2) | **No** — host supplies | Per candidates matrix row 1: "Threading NOT built in — host app supplies comment UI on top of the annotation body." The `W3CImageFormat` adapter emits W3C-shaped annotations whose `body` can carry any host-defined structure including a reply chain, but the library renders pins and selection only; the marginalia / comment-list UI is host responsibility. |
+| **`@recogito/text-annotator`** (Task 1.3) | **No** — host supplies | Same family as Annotorious; same shape. The library emits text-range annotations; the host owns the marginalia sidebar, comment composer, and reply chain. The spike confirmed this — text-range pins arrive at the host with `body: []` and the host adds whatever shape we want. |
+| **Hand-rolled DOM-selector layer** (Task 1.3) | **No** — host supplies | This is deskwork's own code; threading lands wherever the host wires it. |
+| **Excalidraw** (Task 1.4) | **No** — drawing only | Excalidraw is a markup editor, not an annotation-with-comment surface. Threading is meaningless at this layer; the markup IS the body content (a PNG / SVG / `.excalidraw` JSON). Comment threads attach to a screenshot annotation at the marginalia layer, not inside Excalidraw. |
+| **`html-to-image`** (Task 1.4) | **n/a** — capture only | Captures rendered DOM as PNG. No annotation model. Threading lives at the layer that owns the captured image as an annotation body part. |
+
+**Decision: deskwork supplies threading at the marginalia layer.** Every
+picked library punts threading to the host. This is the documented
+pattern in the W3C Web Annotation Data Model — replies are
+*annotations on annotations*. The library layer emits pins; the
+marginalia layer wires comment bodies and reply chains; the studio
+surface renders both.
+
+### W3C Web Annotation Data Model adoption — three options considered
+
+The W3C Web Annotation Data Model (Recommendation 2017-02-23) is the
+canonical schema for annotations on web resources. The model defines:
+
+- An `Annotation` carries an `@context`, a `target` (what it pins to,
+  with `selector` describing the region), and a `body` (the comment
+  content).
+- `motivation` describes the annotation's purpose: `commenting`,
+  `replying`, `tagging`, `assessing`, etc.
+- Reply chains land as annotations with `motivation: replying` whose
+  `target` is the parent annotation's `id`.
+- Selectors include `FragmentSelector` (pixel regions), `CssSelector`
+  (DOM paths), `TextQuoteSelector` (text fragments with prefix /
+  suffix context), `TextPositionSelector` (character offsets), and
+  others — all of which the spikes' libraries already emit.
+
+The three options for deskwork's `CommentAnnotation` shape:
+
+| Option | Description | Pro | Con |
+|---|---|---|---|
+| **A. Adopt W3C directly** | `CommentAnnotation` IS a W3C Annotation; deskwork's persistence layer reads / writes the canonical JSON-LD shape unmodified. | Interop for free — adopters with a future Hypothes.is integration or an annotation-import workflow can use the on-disk JSON without transformation. The data model is mature (8+ years stable). | Locks deskwork to W3C's vocabulary; future deskwork-specific fields (e.g. a `disposition` per Phase 8 plan) must be encoded as additional `body` parts or `motivation` values that may bend the spec. |
+| **B. Extend W3C** | Adopt W3C as the structural base; add deskwork-namespaced fields (`deskwork:disposition`, `deskwork:reason`, `deskwork:relatedEntryId`, etc.) per the JSON-LD `@context` extension mechanism. | Interop preserved — W3C-aware consumers ignore unknown properties (JSON-LD's open-vocabulary rules); deskwork-aware consumers read the extra fields. Idiomatic W3C extension pattern. | Slightly more verbose than option A; adopters who write tooling against the on-disk JSON need to know about the deskwork namespace. |
+| **C. Internal schema with W3C-export crosswalk** | Persist deskwork's own annotation shape; convert to W3C only for external interop (e.g. a future export-to-Hypothes.is path). | Maximum flexibility for deskwork-internal evolution; no W3C-spec constraints on field names. | Two schemas to maintain; the crosswalk becomes a permanent maintenance burden; "but the on-disk format isn't the standard one" is exactly the friction that erodes interop value. |
+
+**Decision: Option B — adopt W3C as the structural base, extend with
+the `deskwork:` namespace for project-specific fields.** Reasoning:
+
+1. **The spikes already emit W3C-shaped JSON.** Annotorious's
+   `W3CImageFormat` adapter, `@recogito/text-annotator`'s `W3CTextFormat`
+   adapter, and the hand-rolled DOM-selector layer all produce
+   W3C-canonical `@context` + `type: "Annotation"` + `target.selector`
+   + `target.source` payloads. The persistence layer can write what
+   the libraries already emit, with no crosswalk.
+2. **Phase 8's planned fields fit the extension pattern.** Phase 8
+   adds `replyTo` (already covered by W3C `motivation: replying`),
+   `attachments[]` (extends `body[]` with W3C-allowed `format` /
+   `value` / `purpose`), `spatialAnchor` (extends `target.selector`),
+   and a required `reason` on the disposition annotation
+   (`deskwork:reason` per option B). None of these break W3C; all of
+   them benefit from the W3C base.
+3. **Threaded replies land natively.** A reply annotation has
+   `motivation: replying`, `target` pointing at the parent
+   annotation's `id`, and `body` carrying the reply text — directly
+   per W3C § 3.2.7. No deskwork-specific shape needed for the basic
+   reply chain.
+4. **Cross-system migration becomes plausible later.** If deskwork
+   ever wants to import / export annotations from a Hypothes.is-shaped
+   store, an industry-standard annotation tool, or an academic
+   annotation corpus, the W3C base means it's a metadata-level
+   exercise instead of a full data migration.
+
+**The hand-rolled DOM-selector layer (Task 1.3) extends W3C correctly.**
+The CssSelector + TextQuoteSelector + FragmentSelector chain is
+the documented W3C pattern for resilient DOM anchoring. Phase 10
+inherits this directly.
+
+### Migration sketch from the current `comment` annotation shape
+
+The current deskwork marginalia schema (per `packages/core/src/annotations/types.ts`
+or equivalent — verify file path at Phase 8 implementation time) uses
+an internal shape with fields like `id`, `range` (text offsets),
+`comment` (body text), `iteration`, etc.
+
+Phase 8's migration path:
+
+1. **Add the W3C-shape side-by-side, not in-place.** A new
+   `CommentAnnotation` type (extending W3C) ships alongside the
+   existing comment shape. Doctor's `comment-w3c-migration` rule
+   surfaces legacy annotations that need migration.
+2. **Migration mapping (per-field):**
+   - existing `id` → `id` (canonical URI; recommend `urn:uuid:<v4>`
+     per the spike's pattern).
+   - existing `range` (text offsets) → `target.selector` =
+     `[TextPositionSelector, TextQuoteSelector]` for stability.
+     `TextQuoteSelector` adds prefix / suffix context (the W3C
+     mechanism for resilience against unrelated edits).
+   - existing `comment` (body text) → `body` =
+     `[{ type: "TextualBody", value: "...", purpose: "commenting" }]`.
+   - existing `iteration` → `deskwork:revisionId` (preserves
+     the deskwork-internal concept under the namespace).
+   - existing parent-comment-id (for replies, if present) → reply
+     annotation's `target` = parent annotation's `id`,
+     `motivation: "replying"`.
+3. **Doctor-managed migration.** Per the project's append-only
+   journal: doctor writes the W3C-shaped annotation as a new entry
+   referencing the legacy one via `deskwork:migratedFrom`. The legacy
+   annotation stays on disk for audit. The studio reads both shapes
+   during the migration window; new writes are W3C-only.
+4. **Cutover window.** Phase 8 ships migration tooling but doesn't
+   delete legacy entries. Phase 8.1 (or a follow-up) flips the studio
+   write path to W3C-only once doctor reports zero unmigrated
+   entries on the canary project (this repo) + audiocontrol +
+   writingcontrol.
+5. **Validation.** Doctor's W3C-validation rule checks every new
+   annotation against the schema: `@context`, `type`, `target` with
+   resolvable `source`, `selector` matching one of the documented
+   selector types, `body` shape, `motivation` from the W3C vocabulary
+   plus the deskwork-extension set.
+
+### v1 scope — what lands in Phase 8 vs. later
+
+**v1 (Phase 8) ships:**
+
+- W3C-shaped `CommentAnnotation` with `deskwork:` namespace for
+  project-specific fields.
+- W3C `motivation: replying` for reply chains.
+- W3C `TextualBody` for comment text + reply text.
+- W3C selectors emitted by the picked libraries unchanged.
+- Doctor migration rule + tooling (legacy → W3C).
+- Per the Phase 8 PRD: required `deskwork:reason` on
+  `disposition`-motivation annotations; `attachments[]` on `body`;
+  `replyTo` (the W3C target-pointing-at-parent pattern); spatial
+  anchors via existing selector shapes.
+
+**Later (Phase 10+ or v2):**
+
+- Phase 10's HTML-resolver cross-check against TextQuote (per
+  Task 1.3 § Open questions).
+- A future export-to-Hypothes.is adapter (Architecture B if the
+  operator ever decides multi-operator real-time review matters).
+- Custom blur element type for Excalidraw (per Task 1.4).
+- IIIF / zoomable-image annotation via `@recogito/annotorious-openseadragon`
+  (per Task 1.2 broader survey).
+
+### Open questions for Phase 8
+
+- **`deskwork:` JSON-LD context URI.** Where does deskwork's namespace
+  resolve to? Options: (1) host a stable JSON-LD context file under
+  the deskwork.dev domain (or wherever the canonical project URL
+  lands), (2) inline the context object in every annotation (verbose
+  but no external dependency), (3) use a `vocab` prefix per
+  JSON-LD 1.1's vocabulary-default mechanism. Recommend option 1 for
+  spec cleanliness, option 2 as a fallback if the project doesn't yet
+  have a stable domain. Phase 8 decision.
+- **`creator` field.** The Annotorious spike emitted
+  `creator.isGuest: true` as a library-specific convenience. Phase 8
+  needs to spec how deskwork populates `creator` — likely from the
+  studio's operator-identity layer (existing pattern in
+  `packages/studio/`); strip the `isGuest` flag on persist.
+- **Annotation-on-annotation resolution.** When a reply annotation's
+  `target.id` references a parent annotation that has been moved /
+  cancelled / migrated, the resolver needs to handle the dangling
+  reference. Doctor rule + repair flow per the established pattern
+  (`group-member-missing` per Phase 7).
+- **W3C-spec-version pinning.** The model was published 2017; the
+  spec is stable. But the `@context` URI
+  (`http://www.w3.org/ns/anno.jsonld`) is what consumers parse
+  against. Confirm the URI is still served + cacheable before Phase 8
+  cuts the schema.
