@@ -1,0 +1,39 @@
+{
+  "description": "Expected findings Phase 11 SHOULD surface against the KeygroupSummary-shape fixture. See keygroup-summary-repro.test.ts for the assertions that pin each expectation.",
+  "before": {
+    "label": "Inventory-only state (Phase 1-10) — BEFORE the gap was closed",
+    "patternMatrix": {
+      "expectedFindingsOnKeygroupSummary": 0,
+      "rationale": "Legacy regex catalog matches none of the shapes that distinguish KeygroupSummary (zero canonical-primitive imports + many utility-class hits) from any other tsx file. Issue #315 shipped in this state."
+    },
+    "discoveredCandidates": {
+      "expected": 0
+    }
+  },
+  "after": {
+    "label": "Phase 11 loop state — AFTER the gap was closed",
+    "patternMatrix": {
+      "expectedKeygroupSummaryFires": [
+        {
+          "patternId": "editor-component-no-canonical-primitive",
+          "patternType": "negative-space",
+          "rationale": "File matches components/**/*.tsx glob, zero @/components/common/* imports, >= 14 utility-class hits clears the secondary threshold."
+        },
+        {
+          "patternId": "components-className-outlier",
+          "patternType": "outlier",
+          "rationale": "KeygroupSummary's className composition diverges from healthy siblings by > thresholdSigma standard deviations."
+        }
+      ],
+      "expectedCoverageRatioLessThanOne": {
+        "patternId": "canonical-primitive-coverage-ratio",
+        "patternType": "coverage",
+        "rationale": "1 of 3 directory files contains a canonical-primitive import (HealthySummary + SiblingPanel do; KeygroupSummary does not)."
+      }
+    },
+    "discoveredCandidates": {
+      "expectedMinimumClusters": 1,
+      "rationale": "Mediation layer clusters the negative-space + outlier hits on KeygroupSummary.tsx into at least one architectural-scale candidate; orchestrator-agent translates to discovered_candidates: manifest section."
+    }
+  }
+}
