@@ -322,7 +322,19 @@
     padding: 0.45rem 0.85rem 0.35rem;
     background: var(--paper-2);
     border-bottom: 1px dashed var(--paper-3);
+    cursor: pointer; user-select: none;
   }
+  .list-body .lb-group-head:hover { background: var(--paper-3); }
+  .list-body .lb-group-head .collapse-chev {
+    font-family: var(--mono); color: var(--ink-soft); font-size: 0.65rem;
+    padding: 0 0.2rem; user-select: none;
+    transition: transform 0.18s ease;
+    margin-left: 0.4rem;
+  }
+  .list-body .lb-group-head:hover .collapse-chev { color: var(--red); }
+  .list-body .lb-group.collapsed .lb-row { display: none; }
+  .list-body .lb-group.collapsed .lb-group-head { border-bottom: none; }
+  .list-body .lb-group.collapsed .lb-group-head .collapse-chev { transform: rotate(-90deg); }
   .list-body .lb-group-head .lb-glyph {
     font-family: var(--display); font-style: italic; font-size: 1.05rem;
     color: var(--red);
@@ -434,14 +446,18 @@
   .swim-compact .sc-stage.attention .sc-count { color: var(--red); }
   .swim-compact .sc-stage.locked .sc-count { color: var(--blue); }
 
-  /* Per-swimlane stage columns */
+  /* Per-swimlane stage columns. FLEX (not grid) so collapsed columns can
+     opt out of the equal-width sharing — narrow strip when collapsed,
+     expanded columns redistribute to fill the freed horizontal space. */
   .stage-grid {
-    display: grid;
+    display: flex;
     gap: 1px;
     background: var(--paper-3);
     border-top: none;
   }
   .stage-col {
+    flex: 1 1 0;
+    min-width: 0;
     background: var(--paper);
     padding: 0.5rem 0.55rem;
     min-height: 100px;
@@ -451,7 +467,16 @@
     display: flex; align-items: baseline; gap: 0.4rem;
     border-bottom: 1px dashed var(--paper-3);
     padding-bottom: 0.3rem; margin-bottom: 0.2rem;
+    cursor: pointer; user-select: none;
   }
+  .stage-col .stage-head:hover { color: var(--red); }
+  .stage-col .stage-head .collapse-chev {
+    font-family: var(--mono); color: var(--ink-soft); font-size: 0.65rem;
+    padding: 0 0.2rem; user-select: none;
+    margin-left: 0.2rem;
+    transition: transform 0.18s ease;
+  }
+  .stage-col .stage-head:hover .collapse-chev { color: var(--red); }
   .stage-col .stage-glyph {
     font-family: var(--display); font-style: italic; font-size: 0.95rem;
     color: var(--red);
@@ -485,10 +510,51 @@
     color: var(--faded); text-transform: uppercase;
   }
 
-  /* Per-lane template-driven column counts */
-  .swim.editorial .stage-grid { grid-template-columns: repeat(6, 1fr); }
-  .swim.mockups .stage-grid { grid-template-columns: repeat(4, 1fr); }
-  .swim.qa .stage-grid { grid-template-columns: repeat(4, 1fr); }
+  /* Per-lane template-driven column counts handled by flex — each
+     .stage-col has flex: 1 1 0 so N columns auto-share equally,
+     regardless of N. Collapsed cols opt out via flex-basis override. */
+
+  /* Collapsed stage column: narrow vertical strip with the stage name
+     rotated, count + glyph stacked vertically. Cards hidden. Clicking
+     anywhere on the strip re-expands the column. */
+  .stage-col.collapsed {
+    flex: 0 0 42px;
+    padding: 0.5rem 0;
+    background: var(--paper-2);
+    cursor: pointer;
+  }
+  .stage-col.collapsed .stage-head {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    border-bottom: none;
+    padding: 0;
+    margin: 0;
+  }
+  .stage-col.collapsed .stage-head .stage-glyph {
+    margin: 0;
+  }
+  .stage-col.collapsed .stage-head .stage-name {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    margin: 0.3rem 0;
+    white-space: nowrap;
+  }
+  .stage-col.collapsed .stage-head .stage-count {
+    font-size: 0.78rem;
+    color: var(--ink-soft);
+    margin-left: 0;
+  }
+  .stage-col.collapsed .stage-head .collapse-chev {
+    transform: rotate(-90deg);
+    margin: 0;
+  }
+  .stage-col.collapsed .card,
+  .stage-col.collapsed .empty-state {
+    display: none;
+  }
 
   /* Filtered-out lane stub: shown when a focus filter hides a lane that
      ISN'T permanently hidden in the rail. Keeps the operator aware of
@@ -621,7 +687,16 @@
     padding: 0.35rem 0.55rem 0.3rem;
     background: var(--paper-2); border-bottom: 1px dashed var(--paper-3);
     display: flex; align-items: baseline; gap: 0.4rem;
+    cursor: pointer; user-select: none;
   }
+  .phone .lane-section .list-body .lb-group-head .collapse-chev {
+    font-family: var(--mono); color: var(--ink-soft); font-size: 0.6rem;
+    margin-left: 0.3rem; padding: 0 0.2rem;
+    transition: transform 0.18s ease;
+  }
+  .phone .lane-section .list-body .lb-group.collapsed .lb-row { display: none; }
+  .phone .lane-section .list-body .lb-group.collapsed .lb-group-head { border-bottom: none; }
+  .phone .lane-section .list-body .lb-group.collapsed .lb-group-head .collapse-chev { transform: rotate(-90deg); }
   .phone .lane-section .list-body .lb-group-head .lb-glyph {
     font-family: var(--display); font-style: italic; font-size: 0.9rem;
     color: var(--red);
@@ -710,11 +785,12 @@
 </head>
 <body>
   <div class="meta">Direction 3 · <a href="./index.html">↩ all directions</a></div>
-  <h1 class="demo-title">Press Bay <span style="font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.2em; color: var(--green); margin-left: 0.5rem; vertical-align: middle;">v6 · MOBILE DEFAULTS TO LIST</span></h1>
-  <div class="demo-sub">Each lane independently toggles between kanban (columnar) and list (vertical, grouped by stage). Desktop defaults to kanban; mobile defaults to list. Both views preserve the linear stage sequence.</div>
+  <h1 class="demo-title">Press Bay <span style="font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.2em; color: var(--green); margin-left: 0.5rem; vertical-align: middle;">v7 · PER-STAGE COLLAPSE</span></h1>
+  <div class="demo-sub">Each stage (column in kanban, group in list) is independently collapsible. Two granularities of collapse: lane-level (in swim-head) hides the entire lane body; stage-level (in stage-head / lb-group-head) hides one stage's content within an expanded lane.</div>
 
   <div class="deviation-note">
-    <span class="label">Standards-compliant</span> Per-lane segmented toggle (<code>▦ Kanban</code> / <code>≡ List</code>) flips the body between the two views. Both views show the same entries — only the spatial arrangement differs. <strong>Defaults are viewport-aware:</strong> desktop defaults to kanban (wide viewport → multi-column real estate); mobile defaults to list (narrow viewport → vertical sequence is the natural fit, AND list view preserves the linear stage relationship more honestly than the tile-stack does). The operator can flip either default per-lane via the toggle. When collapsed, the toggle greys out (collapse precedence). The kanban tile view on mobile is the established v0.19 collapsible-stage-tile pattern — single-column vertical stack of one-line tile strips (per <code>DESIGN-STANDARDS.md § Collapsible stage tiles</code>), NOT a 2-column wrap (which would break the stage sequence visually). Mockup demonstrates four lane states at once: <strong>Editorial</strong> (kanban on desktop / list on mobile), <strong>Mockups</strong> (filtered out), <strong>QA</strong> (collapsed — view-toggle greyed), <strong>Press Releases</strong> (list on desktop / kanban-tile on mobile). The list-view stage groups carry the same stage-name + count + tag pattern as the kanban stage-grid heads; rows are dense (one-liner: title + version-pill + state + ⋮ overflow); locked stages render the group-head glyph in proof-blue.
+    <span class="label">Standards-compliant</span> Two granularities of collapse, each with its own chevron: <strong>lane-level</strong> (chevron in swim-head / lane-head) hides the entire lane body, leaves the swim-head + a compact per-stage count strip; <strong>stage-level</strong> (chevron in stage-head for kanban / lb-group-head for list) hides one stage's content within an expanded lane. In kanban, collapsed columns shrink to a narrow vertical strip (~42px wide) with the stage name rotated; remaining columns redistribute via flex to fill the freed space. In list, collapsed groups show just the group-head (with the entry count + tag) and hide their rows. Mockup demonstrates: Editorial swim has <strong>Published collapsed as a vertical strip</strong>; Press Releases list has <strong>Published collapsed as a head-only row</strong>; mobile Editorial list has <strong>Planned collapsed</strong>. The collapse-chev convention is universal — same `▾` glyph rotated 90° clockwise to indicate collapsed, same hover-to-red-pencil affordance, click anywhere on the head (or chevron) to toggle.<br><br>
+    Per-lane segmented toggle (<code>▦ Kanban</code> / <code>≡ List</code>) flips the body between the two views. Both views show the same entries — only the spatial arrangement differs. <strong>Defaults are viewport-aware:</strong> desktop defaults to kanban (wide viewport → multi-column real estate); mobile defaults to list (narrow viewport → vertical sequence is the natural fit, AND list view preserves the linear stage relationship more honestly than the tile-stack does). The operator can flip either default per-lane via the toggle. When collapsed, the toggle greys out (collapse precedence). The kanban tile view on mobile is the established v0.19 collapsible-stage-tile pattern — single-column vertical stack of one-line tile strips (per <code>DESIGN-STANDARDS.md § Collapsible stage tiles</code>), NOT a 2-column wrap (which would break the stage sequence visually). Mockup demonstrates four lane states at once: <strong>Editorial</strong> (kanban on desktop / list on mobile), <strong>Mockups</strong> (filtered out), <strong>QA</strong> (collapsed — view-toggle greyed), <strong>Press Releases</strong> (list on desktop / kanban-tile on mobile). The list-view stage groups carry the same stage-name + count + tag pattern as the kanban stage-grid heads; rows are dense (one-liner: title + version-pill + state + ⋮ overflow); locked stages render the group-head glyph in proof-blue.
   </div>
 
   <div class="frames" style="margin-top:1.4rem;">
@@ -842,35 +918,42 @@
                 <span class="collapse-chev" title="Collapse this lane">▾</span>
                 <span class="overflow">⋮</span>
               </div>
+              <!-- Each stage-head carries its own chevron — per-stage collapse.
+                   Click anywhere on the stage-head (or the chevron) to toggle.
+                   Collapsed columns shrink to a narrow vertical strip with the
+                   stage name rotated; expanded columns redistribute to fill
+                   the freed horizontal space. The Published column below
+                   demonstrates the collapsed state. -->
               <div class="stage-grid">
                 <div class="stage-col">
-                  <div class="stage-head"><span class="stage-glyph">◇</span><span class="stage-name">Ideas</span><span class="stage-count">3</span></div>
+                  <div class="stage-head"><span class="stage-glyph">◇</span><span class="stage-name">Ideas</span><span class="stage-count">3</span><span class="collapse-chev">▾</span></div>
                   <div class="card">Mobile-first scrapbook reflow<span class="e-meta">v1 · today</span></div>
                   <div class="card">Marginalia keyboard nav<span class="e-meta">v1 · yesterday</span></div>
                   <div class="card">Pipeline custom rationale<span class="e-meta">v1</span></div>
                 </div>
                 <div class="stage-col">
-                  <div class="stage-head"><span class="stage-glyph">§</span><span class="stage-name">Planned</span><span class="stage-count">2</span></div>
+                  <div class="stage-head"><span class="stage-glyph">§</span><span class="stage-name">Planned</span><span class="stage-count">2</span><span class="collapse-chev">▾</span></div>
                   <div class="card">Phase 5 retrospective<span class="e-meta">v1</span></div>
                   <div class="card">Studio mobile-first v2<span class="e-meta">v1</span></div>
                 </div>
                 <div class="stage-col">
-                  <div class="stage-head"><span class="stage-glyph">⊹</span><span class="stage-name">Outlining</span><span class="stage-count">1</span></div>
+                  <div class="stage-head"><span class="stage-glyph">⊹</span><span class="stage-name">Outlining</span><span class="stage-count">1</span><span class="collapse-chev">▾</span></div>
                   <div class="card">Annotation model deep-dive<span class="e-meta">v1</span></div>
                 </div>
                 <div class="stage-col">
-                  <div class="stage-head"><span class="stage-glyph">✎</span><span class="stage-name">Drafting</span><span class="stage-count">4</span></div>
+                  <div class="stage-head"><span class="stage-glyph">✎</span><span class="stage-name">Drafting</span><span class="stage-count">4</span><span class="collapse-chev">▾</span></div>
                   <div class="card">Graphical-entries PRD<span class="e-meta">v3 · iterating</span></div>
                   <div class="card">Editor retrospective<span class="e-meta">v1</span></div>
                   <div class="card">Templates rationale<span class="e-meta">v1</span></div>
                   <div class="card">Phase 4 closeout<span class="e-meta">v2</span></div>
                 </div>
                 <div class="stage-col">
-                  <div class="stage-head"><span class="stage-glyph">※</span><span class="stage-name">Final</span><span class="stage-count">1</span></div>
+                  <div class="stage-head"><span class="stage-glyph">※</span><span class="stage-name">Final</span><span class="stage-count">1</span><span class="collapse-chev">▾</span></div>
                   <div class="card">v0.20 row-affordance<span class="e-meta">ready</span></div>
                 </div>
-                <div class="stage-col">
-                  <div class="stage-head"><span class="stage-glyph">✓</span><span class="stage-name">Published</span><span class="stage-count">1</span></div>
+                <!-- Published: COLLAPSED — narrow vertical strip with rotated name -->
+                <div class="stage-col collapsed">
+                  <div class="stage-head"><span class="stage-glyph">✓</span><span class="stage-name">Published</span><span class="stage-count">1</span><span class="collapse-chev">▾</span></div>
                   <div class="card">v0.19 mobile-first<span class="e-meta">last sprint</span></div>
                 </div>
               </div>
@@ -942,6 +1025,10 @@
                 <span class="collapse-chev" title="Collapse this lane">▾</span>
                 <span class="overflow">⋮</span>
               </div>
+              <!-- Each lb-group-head carries its own chevron — per-stage
+                   collapse, independent of per-lane collapse. Click toggles
+                   the group's row list. Published below demonstrates
+                   the collapsed state. -->
               <div class="list-body">
                 <div class="lb-group">
                   <div class="lb-group-head">
@@ -949,6 +1036,7 @@
                     <span class="lb-name">Idea</span>
                     <span class="lb-tag">2 captured</span>
                     <span class="lb-count">2</span>
+                    <span class="collapse-chev">▾</span>
                   </div>
                   <div class="lb-row">
                     <span class="lb-title">v0.30 release announcement</span>
@@ -969,6 +1057,7 @@
                     <span class="lb-name">Drafting</span>
                     <span class="lb-tag">3 in progress</span>
                     <span class="lb-count">3</span>
+                    <span class="collapse-chev">▾</span>
                   </div>
                   <div class="lb-row">
                     <span class="lb-title">Graphical-entries feature announcement</span>
@@ -995,6 +1084,7 @@
                     <span class="lb-name">Edited</span>
                     <span class="lb-tag">locked · ready to publish</span>
                     <span class="lb-count">1</span>
+                    <span class="collapse-chev">▾</span>
                   </div>
                   <div class="lb-row">
                     <span class="lb-title">Hello, Lanes — the multi-pipeline rationale</span>
@@ -1003,12 +1093,14 @@
                     <span class="lb-overflow">⋮</span>
                   </div>
                 </div>
-                <div class="lb-group">
+                <!-- Published: COLLAPSED — only the head visible -->
+                <div class="lb-group collapsed">
                   <div class="lb-group-head">
                     <span class="lb-glyph">✓</span>
                     <span class="lb-name">Published</span>
-                    <span class="lb-tag">live</span>
+                    <span class="lb-tag">live · 1 hidden</span>
                     <span class="lb-count">1</span>
+                    <span class="collapse-chev">▾</span>
                   </div>
                   <div class="lb-row">
                     <span class="lb-title">v0.29 release — Phase 4 lands</span>
@@ -1023,6 +1115,7 @@
                     <span class="lb-name">Blocked</span>
                     <span class="lb-tag">cul-de-sac</span>
                     <span class="lb-count">0</span>
+                    <span class="collapse-chev">▾</span>
                   </div>
                   <div class="lb-row empty-state">no blocked entries</div>
                 </div>
@@ -1079,6 +1172,7 @@
                     <span class="lb-glyph">◇</span>
                     <span class="lb-name">Ideas</span>
                     <span class="lb-count">3</span>
+                    <span class="collapse-chev">▾</span>
                   </div>
                   <div class="lb-row">
                     <span class="lb-title">Mobile-first scrapbook reflow</span>
@@ -1096,11 +1190,13 @@
                     <span class="lb-state">3d</span>
                   </div>
                 </div>
-                <div class="lb-group">
+                <!-- Planned: COLLAPSED on mobile to demo per-stage collapse there too -->
+                <div class="lb-group collapsed">
                   <div class="lb-group-head">
                     <span class="lb-glyph">§</span>
                     <span class="lb-name">Planned</span>
                     <span class="lb-count">2</span>
+                    <span class="collapse-chev">▾</span>
                   </div>
                   <div class="lb-row">
                     <span class="lb-title">Phase 5 retrospective</span>
@@ -1113,6 +1209,7 @@
                     <span class="lb-glyph">✎</span>
                     <span class="lb-name">Drafting</span>
                     <span class="lb-count">4</span>
+                    <span class="collapse-chev">▾</span>
                   </div>
                   <div class="lb-row">
                     <span class="lb-title">Graphical-entries PRD</span>
