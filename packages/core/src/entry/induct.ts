@@ -8,10 +8,12 @@ import type { Entry, Stage } from '../schema/entry.ts';
 interface InductOptions {
   readonly uuid: string;
   /**
-   * Linear-pipeline stage to teleport the entry into. Must be one of:
-   * Ideas, Planned, Outlining, Drafting, Final, Published. (Blocked /
-   * Cancelled are not valid induction targets — use `blockEntry` /
-   * `cancelEntry` for those.)
+   * Linear-pipeline stage to teleport the entry into. The editorial
+   * default vocabulary is Ideas / Planned / Outlining / Drafting /
+   * Final / Published. Phase 4 makes this lane-template-driven; for
+   * now the parameter accepts the editorial-narrow `Stage` enum
+   * (callers in other lane templates should widen at the call boundary
+   * once the lane-aware API ships).
    */
   readonly targetStage: Stage;
   readonly reason?: string;
@@ -19,7 +21,13 @@ interface InductOptions {
 
 interface InductResult {
   readonly entryId: string;
-  readonly fromStage: Stage;
+  /**
+   * Per Phase 3 (graphical-entries) the sidecar's currentStage is now a
+   * plain string. `fromStage` reports whatever value the sidecar
+   * carried (any lane-template stage); `toStage` echoes the verb's
+   * `targetStage` argument which is still editorial-narrow today.
+   */
+  readonly fromStage: string;
   readonly toStage: Stage;
 }
 

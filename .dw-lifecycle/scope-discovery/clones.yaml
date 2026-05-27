@@ -143,13 +143,13 @@ clones:
       - packages/core/src/doctor/rules/missing-frontmatter-id.ts:62:94
     disposition: pending
     reason: null
-  - id: aba391647f70
-    lines: 19
+  - id: d90106a0fd59
+    lines: 23
     members:
-      - packages/core/src/doctor/repair.ts:22:40
-      - packages/core/src/doctor/validate.ts:170:198
-    disposition: pending
-    reason: null
+      - packages/core/src/doctor/repair.ts:23:45
+      - packages/core/src/doctor/validate.ts:173:205
+    disposition: keep-with-reason
+    reason: pre-existing duplication of artifactPathForStage between doctor/repair.ts and doctor/validate.ts; the file-internal comments document the intentional copy to avoid a cross-import cycle; Phase 4 will replace both with template-driven path resolution
   - id: 2b7d648d9381
     lines: 14
     members:
@@ -236,6 +236,20 @@ clones:
       - packages/core/src/sidecar/read-all.ts:19:29
     disposition: pending
     reason: null
+  - id: c20b4e4f0469
+    lines: 9
+    members:
+      - packages/core/src/lanes/loader.ts:59:67
+      - packages/core/src/pipelines/loader.ts:72:80
+    disposition: keep-with-reason
+    reason: "lanes/loader mirrors pipelines/loader by workplan design: JSON-read+Zod-validate+id-match-filename idiom across two parallel module-shaped readers; extracting a shared helper would couple lane evolution to pipeline evolution"
+  - id: b223f2def90d
+    lines: 7
+    members:
+      - packages/core/src/lanes/loader.ts:69:75
+      - packages/core/src/pipelines/loader.ts:82:88
+    disposition: keep-with-reason
+    reason: second half of the lanes/loader vs pipelines/loader mirroring (Zod-validate + id-mismatch refusal); same rationale as c20b4e4f0469
   - id: 68e3966349bd
     lines: 11
     members:

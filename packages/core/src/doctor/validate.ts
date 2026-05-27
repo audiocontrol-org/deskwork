@@ -163,11 +163,14 @@ async function loadSidecars(projectRoot: string): Promise<LoadedSidecar[]> {
 
 /**
  * Stage-conventional artifact path. Returns null when a stage does not have a
- * primary on-disk artifact (e.g. Blocked / Cancelled).
+ * primary on-disk artifact (e.g. Blocked / Cancelled) OR when the stage is
+ * outside the editorial pipeline's eight known values (per Phase 3 / Phase
+ * 4 — lane-aware path conventions land in the lane code, not in this
+ * editorial-specific heuristic).
  *
  * Note: Published shares the Drafting/Final path (`docs/<slug>/index.md`).
  */
-function artifactPathForStage(projectRoot: string, slug: string, stage: Stage): string | null {
+function artifactPathForStage(projectRoot: string, slug: string, stage: string): string | null {
   switch (stage) {
     case 'Ideas':
       return join(projectRoot, 'docs', slug, 'scrapbook', 'idea.md');
@@ -181,6 +184,10 @@ function artifactPathForStage(projectRoot: string, slug: string, stage: Stage): 
       return join(projectRoot, 'docs', slug, 'index.md');
     case 'Blocked':
     case 'Cancelled':
+      return null;
+    default:
+      // Lane-specific or unrecognized stage; no editorial-default path
+      // applies. Phase 4 introduces template-driven path resolution.
       return null;
   }
 }

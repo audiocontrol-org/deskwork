@@ -137,6 +137,10 @@
       "types": "./dist/journal.d.ts",
       "default": "./dist/journal.js"
     },
+    "./lanes": {
+      "types": "./dist/lanes/index.d.ts",
+      "default": "./dist/lanes/index.js"
+    },
     "./outline-split": {
       "types": "./dist/outline-split.d.ts",
       "default": "./dist/outline-split.js"

@@ -16,8 +16,17 @@ function renderRow(e: Entry): string {
   return `| ${e.uuid} | ${escapePipe(e.slug)} | ${escapePipe(e.title)} | ${escapePipe(e.description ?? '')} | ${escapePipe(e.keywords.join(', '))} | ${escapePipe(e.source)} | ${e.updatedAt} |`;
 }
 
-function bucketize(entries: Entry[]): Map<Stage, Entry[]> {
-  const byStage = new Map<Stage, Entry[]>();
+/**
+ * Bucketize entries by stage. The map key is `string` rather than the
+ * legacy `Stage` enum so this function handles entries from any lane
+ * template — entries whose `currentStage` is outside the editorial
+ * pipeline's eight known stages simply don't land in any bucket here
+ * (the editorial calendar surface is intentionally editorial-only).
+ * Phase 4's lane-aware calendar rendering replaces this with a
+ * template-driven bucketization; see graphical-entries workplan.
+ */
+function bucketize(entries: Entry[]): Map<string, Entry[]> {
+  const byStage = new Map<string, Entry[]>();
   for (const stage of STAGE_ORDER) byStage.set(stage, []);
   for (const e of entries) {
     const bucket = byStage.get(e.currentStage);

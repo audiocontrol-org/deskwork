@@ -2,7 +2,7 @@ import { readSidecar } from '../sidecar/read.ts';
 import { writeSidecar } from '../sidecar/write.ts';
 import { appendJournalEvent } from '../journal/append.ts';
 import { regenerateCalendar } from '../calendar/regenerate.ts';
-import type { Entry, Stage } from '../schema/entry.ts';
+import type { Entry } from '../schema/entry.ts';
 
 interface CancelOptions {
   readonly uuid: string;
@@ -11,7 +11,13 @@ interface CancelOptions {
 
 interface CancelResult {
   readonly entryId: string;
-  readonly fromStage: Stage;
+  /**
+   * Per Phase 3 (graphical-entries) the sidecar's currentStage is now a
+   * plain string. Phase 4 introduces lane-template-driven verb gating;
+   * for now the cancel verb refuses the literal `'Blocked' | 'Cancelled'`
+   * stages and writes the literal `'Cancelled'` target.
+   */
+  readonly fromStage: string;
   readonly toStage: 'Cancelled';
 }
 

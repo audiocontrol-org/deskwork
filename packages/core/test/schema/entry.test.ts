@@ -72,14 +72,33 @@ describe('EntrySchema', () => {
     expect(EntrySchema.safeParse(valid).success).toBe(true);
   });
 
-  it('rejects an entry with unknown stage', () => {
+  it('accepts an entry whose stage is not in the legacy editorial enum (Phase 3 graphical-entries)', () => {
+    // Per Phase 3 Task 3.2.2 the schema's `currentStage` accepts any
+    // non-empty string; runtime validation against the lane's pipeline
+    // template happens outside the schema. A stage value like
+    // `'Reviewing'` (legitimate in a custom template) must parse.
+    const customStage = {
+      uuid: '550e8400-e29b-41d4-a716-446655440002',
+      slug: 'x',
+      title: 'X',
+      keywords: [],
+      source: 'manual',
+      currentStage: 'Reviewing',
+      iterationByStage: {},
+      createdAt: '2026-04-30T10:00:00.000Z',
+      updatedAt: '2026-04-30T10:00:00.000Z',
+    };
+    expect(EntrySchema.safeParse(customStage).success).toBe(true);
+  });
+
+  it('rejects an entry with an empty-string stage', () => {
     const invalid = {
       uuid: '550e8400-e29b-41d4-a716-446655440002',
       slug: 'x',
       title: 'X',
       keywords: [],
       source: 'manual',
-      currentStage: 'Reviewing',  // not a real stage
+      currentStage: '',
       iterationByStage: {},
       createdAt: '2026-04-30T10:00:00.000Z',
       updatedAt: '2026-04-30T10:00:00.000Z',

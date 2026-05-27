@@ -36,7 +36,7 @@ import {
   writeFile,
 } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
-import type { Entry, Stage } from '../schema/entry.ts';
+import type { Entry } from '../schema/entry.ts';
 
 export interface SnapshotResult {
   /** True when a snapshot file was written (or already matched on disk). */
@@ -80,7 +80,10 @@ async function atomicWrite(absPath: string, content: string): Promise<void> {
 export async function snapshotIndexForStage(
   projectRoot: string,
   entry: Entry,
-  priorStage: Stage,
+  // Per Phase 3 (graphical-entries) Entry.currentStage is now any string
+  // (lane-template-driven). The snapshot filename is the lowercased
+  // stage name, so any non-empty string works.
+  priorStage: string,
 ): Promise<SnapshotResult> {
   if (!entry.artifactPath) {
     // Legacy entries without an artifactPath: no anchor for the

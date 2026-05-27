@@ -9,6 +9,7 @@
 export {
   PipelineTemplateSchema,
   type PipelineTemplate,
+  type StrictPipelineTemplate,
 } from './types.ts';
 
 export {

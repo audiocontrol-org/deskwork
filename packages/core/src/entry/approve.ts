@@ -3,7 +3,7 @@ import { writeSidecar } from '../sidecar/write.ts';
 import { appendJournalEvent } from '../journal/append.ts';
 import { regenerateCalendar } from '../calendar/regenerate.ts';
 import { nextStage } from '../schema/entry.ts';
-import type { Entry, Stage } from '../schema/entry.ts';
+import type { Entry } from '../schema/entry.ts';
 import { snapshotIndexForStage } from './snapshot.ts';
 import {
   addEntryAnnotation,
@@ -18,8 +18,17 @@ interface ApproveOptions {
 
 interface ApproveResult {
   readonly entryId: string;
-  readonly fromStage: Stage;
-  readonly toStage: Stage;
+  /**
+   * Per Phase 3 (graphical-entries) the sidecar's currentStage is now a
+   * plain string. The approve verb today is editorial-only — `nextStage`
+   * uses the hardcoded editorial successor map — but the result-type
+   * reports the raw sidecar string so non-editorial sidecars don't
+   * silently fail the `Stage`-narrow type check. Phase 4 introduces a
+   * lane-template-driven `nextStage` and the result type narrows to
+   * the per-lane stage union at that point.
+   */
+  readonly fromStage: string;
+  readonly toStage: string;
   /** True when an `index.md` snapshot was preserved at
    *  `<dir>/scrapbook/<priorStage>.md`. False when there was no
    *  `index.md` to snapshot (common at Ideas) or the entry has no

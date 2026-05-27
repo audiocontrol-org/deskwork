@@ -133,3 +133,29 @@ export const PipelineTemplateSchema = z.object({
  * contract and ignore any extras.
  */
 export type PipelineTemplate = z.infer<typeof PipelineTemplateSchema>;
+
+/**
+ * Narrower projection of `PipelineTemplate` exposing only the named
+ * fields the runtime contract documents. `PipelineTemplate` itself is
+ * widened by the schema's `.passthrough()` (which admits unknown extra
+ * keys like `$rationale`); downstream consumers that index named fields
+ * should accept this strict type instead so typos like
+ * `template.lockedSatges` fail at compile time rather than silently
+ * resolving to `unknown`.
+ *
+ * The runtime VALUES are the same — `PipelineTemplate` and
+ * `StrictPipelineTemplate` describe the same JSON. The only difference
+ * is the type-level surface: `StrictPipelineTemplate` lists exactly the
+ * keys the contract names, no more.
+ *
+ * Convention: loader functions return `PipelineTemplate` (the wide
+ * type). Functions whose parameter is the resolved template and which
+ * read its named fields should declare `StrictPipelineTemplate`; pass a
+ * `PipelineTemplate` to such a function with no conversion (the wide
+ * type is assignable to the narrow one through structural subtyping at
+ * the property set, since `Pick` drops keys without renaming).
+ */
+export type StrictPipelineTemplate = Pick<
+  PipelineTemplate,
+  'id' | 'name' | 'description' | 'linearStages' | 'lockedStages' | 'offPipelineStages'
+>;

@@ -5,7 +5,7 @@ import { readSidecar } from '../sidecar/read.ts';
 import { writeSidecar } from '../sidecar/write.ts';
 import { appendJournalEvent } from '../journal/append.ts';
 import { getContentDir } from '../config.ts';
-import type { Entry, Stage } from '../schema/entry.ts';
+import type { Entry } from '../schema/entry.ts';
 
 interface IterateOptions {
   uuid: string;
@@ -14,7 +14,11 @@ interface IterateOptions {
 
 interface IterateResult {
   entryId: string;
-  stage: Stage;
+  /**
+   * Per Phase 3 (graphical-entries) the sidecar's currentStage is now a
+   * plain string. `stage` echoes the sidecar value untouched.
+   */
+  stage: string;
   version: number;
 }
 
