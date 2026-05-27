@@ -1,68 +1,72 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-handlers/semantic.ts
  *
- * Semantic (LLM-augmented) pattern handler — Phase 11 G6 STUB.
+ * Semantic (LLM-augmented) pattern handler — Phase 11 G6.
  *
- * STATUS: stub-shipped in v1.1 Task 1. The TYPE + dispatcher routing
- * are complete; the LLM invocation itself is NOT wired. The handler
- * returns zero findings and emits a one-line stderr advisory naming
- * the deferral. The actual LLM-judge wiring lands under Phase 11
- * Task 7's LLM-judge work; tracked at #319 (filed alongside Phase 11
- * Task 1).
+ * # Two code paths
  *
- * Tracking issue: https://github.com/audiocontrol-org/deskwork/issues/319
+ * The `semanticHandler` (the PatternHandler<SemanticEntry> exported
+ * below) is SYNCHRONOUS — it preserves the polymorphic dispatcher's
+ * sync contract. The sync path is the file-enumeration stub: it
+ * counts glob-matched files + returns zero hits + sets `metrics.stub`.
+ * Adopters who haven't wired a judge dispatcher (the default case) see
+ * this stub output and a one-line stderr advisory.
  *
- * WHY a stub in this dispatch:
+ * The `enrichSemanticFinding` async helper takes the sync stub output
+ * + a judge `DispatchFn` and upgrades it to a real LLM-judge-driven
+ * finding. This is the wired path the orchestrator uses when running
+ * scope-inventory with the per-turn judge active.
  *
- *   - The polymorphic dispatcher is the shipped surface area of Task 1.
- *   - The schema + type definition need to be in place so adopters can
- *     author semantic catalog entries without waiting for the
- *     LLM-judge cycle to land.
- *   - The wrap()-mediated dispatch wrapper from Phase 5 is the
- *     intended invocation site; wiring it in here would force
- *     premature decisions about model selection + per-file cost-
- *     ceilings that belong in the Task 7 LLM-judge surface.
+ * Splitting sync (stub) from async (wired) keeps the sync dispatch
+ * contract intact + enables the LLM path without forcing every
+ * scope-inventory caller to thread a dispatcher through. Per the
+ * Phase 11 Task 7 pre-made decision: the library defines the SHAPE of
+ * the call; the orchestrator-agent performs the actual dispatch.
  *
- * Cross-reference: TF-016 / AUDIT-20260525-09 (dispatch-hygiene)
- * applies if/when this handler engages wrap() — the integration-layer
- * audit concerns (callback-index drift, wire-format rounding) are the
- * relevant checklist.
+ * # Issue #319 closure
  *
- * The stub honors the contract surface:
- *   - Files matching the glob are enumerated (so the metric
- *     `glob_matched_files` is meaningful).
- *   - No findings are emitted (zero hits).
- *   - `metrics.stub` is set to 1 so the synthesis layer can
- *     distinguish a stubbed-no-findings from a real-LLM-found-zero.
+ * Phase 11 Task 1 shipped the polymorphic dispatcher + the sync stub
+ * with a tracking link at https://github.com/audiocontrol-org/deskwork/issues/319.
+ * This dispatch closes the wiring gap: the sync path stays for
+ * backward compatibility; the async `enrichSemanticFinding` path is
+ * the wired LLM-judge invocation.
  *
- * Adopters who try to use semantic entries today will see them appear
- * in the manifest with `provenance: 'semantic'`, `hits: []`, and the
- * stub metric — a clear signal the wiring is pending without a silent
- * fallback (per CLAUDE.md "no fallbacks outside test code").
+ * # When LLM judging fires a finding
+ *
+ * Per-file: render the entry's `promptTemplate` with the file content;
+ * dispatch via the judge; parse the judge's confidence on whether the
+ * file ADHERES to the semantic constraint. When the judge's confidence
+ * is BELOW the entry's `confidenceThreshold`, surface a finding hit
+ * for that file.
+ *
+ * The signal direction is "the judge is unsure the file adheres" — NOT
+ * "the judge thinks the file violates." This sidesteps a class of model-
+ * miscalibration failures where a confident-but-wrong "passes" gets read
+ * as a clean check. Low confidence = surface for operator triage.
  */
 
-import type { PatternFinding } from '../types.js';
+import { wrap, type DispatchFn } from '../../dispatch-wrapper.js';
+import type { PatternFinding, PatternHit } from '../types.js';
+import type { SourceFileView } from '../shared.js';
 import type {
   PatternHandler,
   PatternHandlerInput,
   SemanticEntry,
 } from './types.js';
 import { matchesGlob } from './glob.js';
+import { loadLlmConfig } from '../../llm/config.js';
+import type { LlmConfig } from '../../llm/types.js';
+import { errorMessage } from '../../util/typeguards.js';
 
 let warnedOnceForStub = false;
 
 function warnOnce(): void {
   if (warnedOnceForStub) return;
   warnedOnceForStub = true;
-  // Stderr advisory so the operator running scope-inventory sees the
-  // stub explicitly. Not a throw — the dispatcher continues so other
-  // pattern types in the same catalog still run.
   process.stderr.write(
-    'pattern-handlers/semantic: STUB (#319) — LLM invocation not yet ' +
-      'wired. Catalog entries with type=semantic emit zero findings ' +
-      'until the Phase 11 Task 7 LLM-judge integration lands. See ' +
-      'https://github.com/audiocontrol-org/deskwork/issues/319 for ' +
-      'status.\n',
+    'pattern-handlers/semantic: STUB path — no judge dispatcher in scope. ' +
+      'Wire `enrichSemanticFinding()` with a judge `DispatchFn` to engage ' +
+      'the LLM-judge path (Phase 11 Task 7).\n',
   );
 }
 
@@ -78,16 +82,6 @@ export const semanticHandler: PatternHandler<SemanticEntry> = {
       }
       if (matchesGlob(scan.file, input.entry.matchGlob)) globMatchedFiles += 1;
     }
-    // TODO(#319 — LLM-judge wiring; aligns with Phase 11 Task 7):
-    // replace the stub body with a wrap()-mediated dispatch that:
-    //   1. Reads each glob-matched file's contents.
-    //   2. Renders `promptTemplate` with the file content + relevant
-    //      catalog metadata.
-    //   3. Dispatches via the Phase 5 wrap() to an LLM agent type.
-    //   4. Parses the agent's verdict (confidence score 0.0–1.0).
-    //   5. Emits a finding when confidence < `confidenceThreshold`.
-    // The actual wrap() engagement should also cite TF-016 / AUDIT-
-    // 20260525-09 (dispatch-hygiene checklist) per the workplan.
     return {
       id: input.entry.id,
       description: input.entry.description,
@@ -102,3 +96,137 @@ export const semanticHandler: PatternHandler<SemanticEntry> = {
     };
   },
 };
+
+/**
+ * Parse the judge's response for the confidence value. The wired
+ * dispatch expects the judge's prompt to elicit a structured block of
+ * the form:
+ *
+ *     ADHERENCE: <0.0-1.0>
+ *     REASONING: <one-line explanation>
+ *
+ * Returns the confidence or throws when the block is missing /
+ * malformed. We do NOT clamp out-of-range values — the Phase 11
+ * controller wants the raw signal (see judge.ts for the same rule).
+ */
+function parseAdherenceConfidence(narrative: string, filePath: string): number {
+  const lines = narrative.split(/\r?\n/);
+  for (const line of lines) {
+    const m = /^\s*ADHERENCE:\s*([0-9.]+)\s*$/i.exec(line);
+    if (m === null) continue;
+    const tok = m[1] ?? '';
+    const n = Number(tok);
+    if (!Number.isFinite(n)) {
+      throw new Error(
+        `semantic-judge: ${filePath} — ADHERENCE value "${tok}" is not finite`,
+      );
+    }
+    if (n < 0 || n > 1) {
+      throw new Error(
+        `semantic-judge: ${filePath} — ADHERENCE ${n} is outside [0.0, 1.0]`,
+      );
+    }
+    return n;
+  }
+  throw new Error(
+    `semantic-judge: ${filePath} — response missing required ADHERENCE: <n> block`,
+  );
+}
+
+export interface EnrichSemanticFindingOptions {
+  /** Judge dispatch callback (orchestrator-supplied). */
+  readonly dispatchFn: DispatchFn;
+  /** Repo root to resolve config overrides against. */
+  readonly repoRoot: string;
+  /** Optional explicit config (test entry point; skips disk load). */
+  readonly configOverride?: LlmConfig;
+}
+
+/**
+ * Wired LLM-judge path. Takes the entry + scans + a dispatcher and
+ * returns a finding with real hits (sub-confidence files surfaced).
+ *
+ * Drop-in async sibling of `semanticHandler.apply` — same input shape,
+ * same output shape minus `metrics.stub`.
+ */
+export async function enrichSemanticFinding(
+  entry: SemanticEntry,
+  scans: ReadonlyArray<SourceFileView>,
+  options: EnrichSemanticFindingOptions,
+): Promise<PatternFinding> {
+  const config =
+    options.configOverride ?? (await loadLlmConfig(options.repoRoot));
+  const model = entry.model ?? config.judge.model;
+  const hits: PatternHit[] = [];
+  let globMatchedFiles = 0;
+  const confidences: number[] = [];
+
+  for (const scan of scans) {
+    if (entry.extensions !== undefined) {
+      const lower = scan.file.toLowerCase();
+      if (!entry.extensions.some((e) => lower.endsWith(e))) continue;
+    }
+    if (!matchesGlob(scan.file, entry.matchGlob)) continue;
+    globMatchedFiles += 1;
+
+    const filePrompt =
+      `${entry.promptTemplate}\n\n` +
+      `--- FILE: ${scan.file} ---\n` +
+      `${scan.text}\n` +
+      `--- END FILE ---\n\n` +
+      `Respond with a block of the form:\n\n` +
+      `    ADHERENCE: <0.0-1.0>\n` +
+      `    REASONING: <one-line explanation>\n\n` +
+      `Then end with the standard Searched/Included/Excluded grammar block ` +
+      `the dw-lifecycle dispatch wrapper enforces.`;
+
+    let narrative: string;
+    try {
+      const parsed = await wrap(config.judge.agentType, filePrompt, {
+        dispatchFn: options.dispatchFn,
+        repoRoot: options.repoRoot,
+      });
+      narrative = parsed.rawText;
+    } catch (err) {
+      throw new Error(
+        `enrichSemanticFinding: judge dispatch failed for ${scan.file}: ${errorMessage(err)}`,
+      );
+    }
+    const confidence = parseAdherenceConfidence(narrative, scan.file);
+    confidences.push(confidence);
+    if (confidence < entry.confidenceThreshold) {
+      hits.push({
+        file: scan.file,
+        line: 0,
+        snippet: `judge adherence confidence ${confidence.toFixed(2)} below threshold ${entry.confidenceThreshold.toFixed(2)}`,
+      });
+    }
+  }
+
+  const meanConfidence =
+    confidences.length === 0
+      ? 0
+      : confidences.reduce((a, b) => a + b, 0) / confidences.length;
+
+  return {
+    id: entry.id,
+    description: entry.description,
+    regex: `semantic:${entry.promptTemplate.slice(0, 40)}`,
+    hits,
+    provenance: 'semantic',
+    metrics: {
+      glob_matched_files: globMatchedFiles,
+      confidence_threshold: entry.confidenceThreshold,
+      mean_judge_confidence: meanConfidence,
+      // Mark as judge-active so the synthesis layer can tell wired
+      // findings apart from stub findings (which set `stub: 1`).
+      judge_active: 1,
+      // Surface the model identifier's character length as a synthetic
+      // numeric metric so the wire-format `Record<string, number>`
+      // stays satisfied. The actual model identifier is surfaced by
+      // the orchestrator's per-turn report rather than the metrics
+      // block.
+      model_token_len: model.length,
+    },
+  };
+}

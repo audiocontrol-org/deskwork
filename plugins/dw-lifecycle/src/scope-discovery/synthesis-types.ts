@@ -15,6 +15,18 @@
  */
 
 import type { DiscoveryAgentFinding } from './discovery-agents/types.js';
+import type { CodebaseStateMetrics } from './discovery-agents/codebase-state-metrics-types.js';
+
+export type {
+  ClassificationCompletenessMetric,
+  CodebaseStateMetrics,
+  CoveragePerBlessedPattern,
+  ViolationDensityPerCursedPattern,
+  SurfaceUniformityEntry,
+  CatalogStabilityMetric,
+  DiscoveredCandidateRateMetric,
+  DispositionLatencyMetric,
+} from './discovery-agents/codebase-state-metrics-types.js';
 
 export type ManifestKind = 'ui' | 'code' | 'hybrid';
 
@@ -153,6 +165,14 @@ export interface ScopeManifest {
   readonly routes?: ReadonlyArray<ManifestRoute>;
   readonly modules?: ReadonlyArray<ManifestModule>;
   readonly regime_holdouts?: ManifestRegimeHoldouts;
+  /**
+   * Phase 11 Task 4 — codebase-state metrics block. Optional at the
+   * manifest level (legacy manifests omit it); when emitted, every
+   * sub-metric is present on the value. The synthesis pass populates
+   * this when at least one catalog file is present under
+   * `.dw-lifecycle/scope-discovery/`.
+   */
+  readonly codebase_state_metrics?: CodebaseStateMetrics;
   readonly notes?: string;
 }
 

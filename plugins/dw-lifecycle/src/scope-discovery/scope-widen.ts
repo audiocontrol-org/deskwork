@@ -280,6 +280,7 @@ export async function scopeWidenMain(
       prdPath: staged.augmentedPrdPath,
       prdRelPath: relative(opts.repoRoot, staged.augmentedPrdPath),
       moduleRoot: opts.moduleRoot,
+      repoRoot: opts.repoRoot,
     });
     nextManifest = out.manifest;
     synthesisWarnings = out.metadata.warnings;

@@ -90,6 +90,7 @@ const META_COMMANDS = [
   'scope-inventory',
   'scope-summary',
   'scope-widen',
+  'tooling-feedback-import',
   'uninstall-scope-discovery-hooks',
   'validate-scope-discovery',
 ] as const;

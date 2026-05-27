@@ -13,7 +13,7 @@
 import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname, isAbsolute, relative, resolve } from 'node:path';
+import { dirname, relative, resolve } from 'node:path';
 import { stringify as stringifyYaml } from 'yaml';
 import { enumerateUiRoutes } from './discovery-agents/ui-route-enumerator.js';
 import { buildPatternMatrix } from './discovery-agents/pattern-matrix.js';
@@ -30,6 +30,17 @@ import type {
 import { synthesize } from './synthesis.js';
 import { renderSynthesizerNotes } from './synthesis-cli.js';
 import { errorMessage } from './util/typeguards.js';
+import {
+  parseCli,
+  USAGE,
+  type CliOptions,
+} from './scope-inventory-cli.js';
+import {
+  emptyCatalogState as emptyLoopCatalogState,
+  fireAuditForInventory,
+  persistInventoryWatermark,
+  readPendingAuditUpdatesForInventory,
+} from './llm/inventory-integration.js';
 
 /**
  * Config-activated agent gate files (Phase 4). The orchestrator
@@ -43,104 +54,11 @@ const PHASE4_GATE_FILES = {
   editorSymmetryArtifact: '.dw-lifecycle/scope-discovery/editor-symmetry.md',
 } as const;
 
-const FEATURE_SLUG_REGEX = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
-const DEFAULT_MODULE_ROOT = 'src';
-
-interface CliOptions {
-  readonly featureSlug: string;
-  readonly prdPath: string;
-  readonly outPath: string;
-  readonly repoRoot: string;
-  readonly moduleRoot: string;
-  readonly evidenceTrail: boolean;
-  readonly quiet: boolean;
-  /**
-   * Override path for the editor-symmetry.md artifact written by the
-   * Phase 4 Family B scanner. Default lands under the per-run
-   * evidence trail at
-   *   docs/<v>/001-IN-PROGRESS/<slug>/scope-inventory/editor-symmetry.md
-   * mirroring the rest of the run artifacts. Absolute paths are
-   * honored; relative paths resolve against `repoRoot`.
-   */
-  readonly editorSymmetryOut: string | null;
-}
-
-function parseCli(argv: ReadonlyArray<string>): CliOptions {
-  const scalars = new Map<string, string>();
-  const SCALAR_FLAGS = new Set([
-    '--slug',
-    '--out',
-    '--prd-path',
-    '--repo-root',
-    '--module-root',
-    '--evidence-trail',
-    '--editor-symmetry-out',
-  ]);
-  let quiet = false;
-  for (let i = 0; i < argv.length; i += 1) {
-    const a = argv[i];
-    if (a === '--help' || a === '-h') throw new Error('HELP');
-    if (a === '--quiet') {
-      quiet = true;
-      continue;
-    }
-    if (a !== undefined && SCALAR_FLAGS.has(a)) {
-      const v = argv[++i];
-      if (v === undefined) throw new Error(`${a} requires a value`);
-      scalars.set(a, v);
-      continue;
-    }
-    throw new Error(`unknown arg: ${a}`);
-  }
-  const slug = scalars.get('--slug');
-  if (slug === undefined) throw new Error('--slug is required');
-  if (!FEATURE_SLUG_REGEX.test(slug)) {
-    throw new Error(
-      `--slug '${slug}' is not a valid feature slug ` +
-        '(must match ^[a-z0-9][a-z0-9-]*[a-z0-9]$ — lowercase alphanumeric ' +
-        '+ dashes, no leading/trailing dash, min 2 chars)',
-    );
-  }
-  const root = resolve(scalars.get('--repo-root') ?? process.cwd());
-  const prdPathRaw =
-    scalars.get('--prd-path') ?? `docs/1.0/001-IN-PROGRESS/${slug}/prd.md`;
-  const prdPath = isAbsolute(prdPathRaw) ? prdPathRaw : resolve(root, prdPathRaw);
-  const outPathRaw =
-    scalars.get('--out') ?? `docs/1.0/001-IN-PROGRESS/${slug}/scope-manifest.yaml`;
-  const outPath = isAbsolute(outPathRaw) ? outPathRaw : resolve(root, outPathRaw);
-  const evidenceFlag = scalars.get('--evidence-trail') ?? 'on';
-  if (evidenceFlag !== 'on' && evidenceFlag !== 'off') {
-    throw new Error(`--evidence-trail must be 'on' or 'off' (got '${evidenceFlag}')`);
-  }
-  const editorSymmetryOutRaw = scalars.get('--editor-symmetry-out');
-  const editorSymmetryOut =
-    editorSymmetryOutRaw === undefined
-      ? null
-      : isAbsolute(editorSymmetryOutRaw)
-        ? editorSymmetryOutRaw
-        : resolve(root, editorSymmetryOutRaw);
-  return {
-    featureSlug: slug,
-    prdPath,
-    outPath,
-    repoRoot: root,
-    moduleRoot: scalars.get('--module-root') ?? DEFAULT_MODULE_ROOT,
-    evidenceTrail: evidenceFlag === 'on',
-    quiet,
-    editorSymmetryOut,
-  };
-}
-
-const USAGE =
-  'Usage: dw-lifecycle scope-inventory \\\n' +
-  '    --slug <feature-slug> \\\n' +
-  '    [--out <manifest-path>] \\\n' +
-  '    [--prd-path <prd-path>] \\\n' +
-  '    [--repo-root <repo-root>] \\\n' +
-  '    [--module-root <module-root>] \\\n' +
-  '    [--evidence-trail on|off] \\\n' +
-  '    [--editor-symmetry-out <path>] \\\n' +
-  '    [--quiet]\n';
+// `CliOptions`, `parseCli`, `USAGE`, `FEATURE_SLUG_REGEX`, and
+// `DEFAULT_MODULE_ROOT` live in `scope-inventory-cli.ts` so this
+// orchestrator file stays under the 300–500 line cap after the Phase
+// 11 Task 7 LLM-ensemble integration. The split is mechanical — the
+// behavior, flag set, exit codes are unchanged.
 
 /**
  * Allocate a per-run evidence directory at
@@ -375,6 +293,34 @@ export async function scopeInventoryMain(
       process.stderr.write(`scope-inventory: ${msg}\n`);
     }
   };
+
+  // Phase 11 Task 7 — read audit-log updates BEFORE the agent fan-out
+  // so any auditor findings since the last run surface in the run's
+  // notes. Silent-skip when scope-discovery isn't installed or when
+  // the operator passed --no-audit-read.
+  const auditLogPath = resolve(
+    opts.repoRoot,
+    'docs',
+    '1.0',
+    '001-IN-PROGRESS',
+    opts.featureSlug,
+    'audit-log.md',
+  );
+  const auditRead = await readPendingAuditUpdatesForInventory({
+    repoRoot: opts.repoRoot,
+    options: {
+      auditLogPath,
+      skip: opts.noAuditRead,
+      emitNote: emitSkipNote,
+    },
+  });
+  for (const entry of auditRead.entries) {
+    emitSkipNote(
+      `audit-log update: ${entry.findingId} (status: ${entry.status})` +
+        (entry.provenance !== undefined ? ` [${entry.provenance}]` : ''),
+    );
+  }
+
   let agents: ReadonlyArray<AgentRun>;
   try {
     agents = await runAgents(input, activations, emitSkipNote);
@@ -390,6 +336,7 @@ export async function scopeInventoryMain(
       prdPath: opts.prdPath,
       prdRelPath: relative(opts.repoRoot, opts.prdPath),
       moduleRoot: opts.moduleRoot,
+      repoRoot: opts.repoRoot,
     });
     // Validation happened inside synthesize(); if we got here, the
     // manifest is schema-valid. Write the YAML to --out.
@@ -455,6 +402,24 @@ export async function scopeInventoryMain(
         process.stderr.write(`scope-inventory: note: ${w}\n`);
       }
     }
+
+    // Phase 11 Task 7 — fire the external audit AFTER synthesis. The
+    // auditor process picks up the audit-request artifact + writes
+    // findings back to the audit-log for the NEXT scope-inventory run.
+    await fireAuditForInventory({
+      repoRoot: opts.repoRoot,
+      options: {
+        skip: opts.noAuditFire,
+        emitNote: emitSkipNote,
+        catalogState: emptyLoopCatalogState(),
+        featureSlug: opts.featureSlug,
+      },
+    });
+    // Persist the watermark advanced by the pre-run audit read.
+    await persistInventoryWatermark({
+      repoRoot: opts.repoRoot,
+      newWatermark: auditRead.newWatermark,
+    });
     return 0;
   } catch (err) {
     const msg = errorMessage(err);
