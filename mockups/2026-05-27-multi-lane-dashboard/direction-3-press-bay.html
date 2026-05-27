@@ -135,14 +135,101 @@
       );
   }
   .bay-head {
-    font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.22em;
-    text-transform: uppercase; color: var(--faded);
     padding: 0.3rem 0.2rem 0.6rem;
     border-bottom: 1px solid var(--paper-3);
     margin-bottom: 0.8rem;
+  }
+  .bay-head .bh-row-1 {
     display: flex; align-items: baseline; gap: 0.5rem;
+    font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--faded);
+    margin-bottom: 0.5rem;
   }
   .bay-head .bh-meta { margin-left: auto; color: var(--ink-soft); }
+  .bay-head .bh-meta .filter-active {
+    color: var(--red); font-weight: 500;
+  }
+
+  /* === Focus chip strip — the lane filter affordance === */
+  .focus-strip {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem;
+    padding: 0.4rem 0;
+  }
+  .focus-strip .strip-label {
+    font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--faded);
+    margin-right: 0.35rem;
+  }
+  .focus-chip {
+    display: inline-flex; align-items: baseline; gap: 0.35rem;
+    padding: 0.32rem 0.65rem;
+    background: var(--paper-2);
+    border: 1px solid var(--paper-3);
+    border-radius: 99px;
+    font-family: var(--display); font-style: italic; font-size: 0.88rem;
+    color: var(--ink-soft);
+    cursor: pointer;
+    transition: background 0.1s ease, border-color 0.1s ease;
+  }
+  .focus-chip:hover { background: var(--paper); border-color: var(--ink-soft); }
+  .focus-chip .fc-glyph {
+    font-family: var(--display); font-style: italic;
+    color: var(--ink-soft); font-size: 0.95rem;
+  }
+  .focus-chip .fc-count {
+    font-family: var(--mono); font-size: 0.6rem;
+    color: var(--faded); letter-spacing: 0.1em;
+    padding: 0.05rem 0.3rem;
+    background: var(--paper); border-radius: 99px;
+  }
+  /* Active (focused) chip: stage-colored to match the lane's swimlane edge */
+  .focus-chip.active {
+    background: var(--ink); color: var(--paper); border-color: var(--ink);
+  }
+  .focus-chip.active .fc-glyph { color: var(--paper); }
+  .focus-chip.active .fc-count { background: rgba(245,241,232,0.18); color: var(--paper); }
+  /* "All" chip — special; resets the focus */
+  .focus-chip.all { background: var(--paper); }
+  .focus-chip.all.active {
+    background: var(--ink); color: var(--paper);
+  }
+  /* Save-current-view chip — surfaces ONLY when a partial subset is selected */
+  .focus-chip.save {
+    background: transparent; border-style: dashed;
+    color: var(--faded); font-family: var(--mono); font-style: normal;
+    font-size: 0.65rem; letter-spacing: 0.16em; text-transform: uppercase;
+  }
+  .focus-chip.save:hover { color: var(--ink); border-color: var(--ink-soft); }
+  /* Saved-view chips: distinct from per-lane chips so the operator can tell them apart */
+  .focus-chip.saved {
+    background: var(--paper); border-style: dotted; border-color: var(--kraft);
+    color: var(--kraft);
+  }
+  .focus-chip.saved::before {
+    content: '⌘';
+    color: var(--kraft); margin-right: 0.2rem;
+    font-family: var(--display); font-style: italic;
+  }
+  .focus-chip.saved.active {
+    background: var(--kraft); color: var(--paper); border-style: solid;
+  }
+  .focus-chip.saved.active::before { color: var(--paper); }
+  .focus-strip .strip-divider {
+    width: 1px; height: 1.4rem; align-self: center;
+    background: var(--paper-3); margin: 0 0.25rem;
+  }
+  .focus-strip .strip-hint {
+    margin-left: auto;
+    font-family: var(--mono); font-size: 0.58rem; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--faded);
+  }
+  .focus-strip .strip-hint kbd {
+    font-family: var(--mono); font-size: 0.6rem;
+    padding: 0.05rem 0.3rem;
+    border: 1px solid var(--paper-3); border-radius: 2px;
+    background: var(--paper); color: var(--ink-soft);
+    letter-spacing: 0;
+  }
 
   /* === Swimlanes === */
   .swim {
@@ -236,6 +323,34 @@
   .swim.mockups .stage-grid { grid-template-columns: repeat(4, 1fr); }
   .swim.qa .stage-grid { grid-template-columns: repeat(4, 1fr); }
 
+  /* Filtered-out lane stub: shown when a focus filter hides a lane that
+     ISN'T permanently hidden in the rail. Keeps the operator aware of
+     what they've excluded without rendering the full swimlane. */
+  .swim-stub {
+    display: flex; align-items: center; gap: 0.6rem;
+    width: 100%; margin-bottom: 1.2rem;
+    padding: 0.55rem 0.85rem;
+    background: var(--paper-2);
+    border: 1px dashed var(--paper-3);
+    border-left: 4px solid var(--paper-3);
+    color: var(--faded);
+    font-family: var(--display); font-style: italic; font-size: 0.92rem;
+    cursor: pointer;
+  }
+  .swim-stub:hover { background: var(--paper); color: var(--ink-soft); border-left-color: var(--ink-soft); }
+  .swim-stub .ss-glyph { font-size: 1.1rem; color: var(--ink-soft); }
+  .swim-stub .ss-meta {
+    margin-left: auto;
+    font-family: var(--mono); font-size: 0.62rem;
+    letter-spacing: 0.14em; text-transform: uppercase;
+  }
+  .swim-stub .ss-action {
+    font-family: var(--mono); font-size: 1.1rem;
+    color: var(--faded); margin-left: 0.3rem;
+    width: 22px; text-align: center;
+  }
+  .swim-stub:hover .ss-action { color: var(--red); }
+
   /* Compose FAB */
   .compose-fab {
     position: absolute; right: 1rem; bottom: 1rem;
@@ -246,8 +361,22 @@
   }
 
   /* === Phone (mobile): collapses to lane-stack === */
+  .phone .focus-strip.mobile {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 0.45rem 1rem;
+    background: var(--paper);
+    border-bottom: 1px solid var(--paper-3);
+    gap: 0.3rem;
+  }
+  .phone .focus-strip.mobile .focus-chip {
+    padding: 0.28rem 0.55rem;
+    font-size: 0.82rem; flex-shrink: 0;
+  }
+  .phone .focus-strip.mobile .strip-label { flex-shrink: 0; font-size: 0.55rem; }
   .phone .lane-stack {
-    padding: 90px 1rem 1rem; height: 100%; overflow-y: auto;
+    padding: 1rem 1rem 5rem; overflow-y: auto;
+    max-height: calc(100% - 180px);
   }
   .phone .lane-section { margin-bottom: 1.3rem; }
   .phone .lane-head {
@@ -300,11 +429,11 @@
 </head>
 <body>
   <div class="meta">Direction 3 · <a href="./index.html">↩ all directions</a></div>
-  <h1 class="demo-title">Press Bay</h1>
-  <div class="demo-sub">Desktop: all lanes visible at once as horizontal swimlanes with their own stage columns. Mobile: collapses to the lane-stack.</div>
+  <h1 class="demo-title">Press Bay <span style="font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.2em; color: var(--green); margin-left: 0.5rem; vertical-align: middle;">v2 · LANE FILTERING</span></h1>
+  <div class="demo-sub">Desktop: all lanes visible at once as horizontal swimlanes with their own stage columns. Mobile: collapses to the lane-stack. v2 adds an explicit Focus chip strip for quick lane filtering.</div>
 
   <div class="deviation-note">
-    <span class="label">Standards-compliant</span> No top-level tab bar. On desktop, the lane-visibility rail on the left (mirrors the entry-review side-rail pattern); the bay shows every visible lane simultaneously with template-driven column counts (editorial 6 cols, visual 4 cols, qa-plan 4 cols). Cards in stage columns are direct entry rows; per-row <code>⋮</code> overflow still applies. On mobile, lanes collapse to the existing stacked-section pattern (Direction 1) since horizontal swimlanes don't fit a phone viewport.
+    <span class="label">Standards-compliant</span> Two layers of lane-state: <strong>Visibility</strong> (persistent, set in the left rail's eye-toggle) controls whether a lane appears in the focus strip at all; <strong>Focus</strong> (transient, set in the chip strip) controls which of the visible lanes the bay currently renders. Filtered-out lanes render as a compact stub (single click restores them) so the operator stays aware of what they've excluded. Single-click a chip = focus only that lane; cmd/ctrl-click multiple chips = combine. Saved-view chips (kraft-bordered, ⌘ prefix) re-apply named focus configurations. The mockup below shows a 2-of-3-lane focus (Editorial + QA, Mockups stubbed); Press Releases is persistently hidden via the rail so it doesn't appear in the chip strip at all. Keyboard hint: <kbd>1</kbd> / <kbd>2</kbd> / <kbd>0</kbd> for one-key focus on lane 1, lane 2, or all.
   </div>
 
   <div class="frames" style="margin-top:1.4rem;">
@@ -321,9 +450,14 @@
         </div>
 
         <div class="bay-shell">
-          <!-- Left rail: lane visibility + saved views -->
+          <!-- Left rail: lane visibility + saved views.
+               The eye-toggle ("●" = visible, "○" = persistently hidden) sets
+               VISIBILITY — whether a lane appears in the focus chip strip at
+               all. The "focused" highlight (left edge) reflects the active
+               focus filter from the chip strip; rail + chip strip are two
+               views of the same state. Drag the dotted handle to reorder. -->
           <aside class="lane-rail">
-            <div class="rail-head">Lanes</div>
+            <div class="rail-head">Lanes <span style="font-family: var(--mono); font-size: 0.55rem; color: var(--faded); margin-left: 0.3rem; letter-spacing: 0.1em;">3 visible · 1 hidden</span></div>
 
             <div class="rail-lane focused">
               <span class="r-eye">●</span>
@@ -337,7 +471,7 @@
               <span class="r-name">Mockups</span>
               <span class="r-count">5</span>
             </div>
-            <div class="rail-lane">
+            <div class="rail-lane focused">
               <span class="r-eye">●</span>
               <span class="r-glyph">⊕</span>
               <span class="r-name">QA</span>
@@ -352,18 +486,60 @@
 
             <div class="rail-views">
               <div class="vh">Saved Views</div>
-              <button class="v-pill active">All visible</button>
+              <button class="v-pill">All visible (default)</button>
+              <button class="v-pill">In review</button>
               <button class="v-pill">Active only</button>
-              <button class="v-pill">Editorial + QA</button>
-              <button class="v-pill new">+ New view</button>
+              <button class="v-pill new">+ Save current</button>
             </div>
           </aside>
 
           <!-- The press bay itself -->
           <main class="bay">
             <div class="bay-head">
-              <span>The Press Bay</span>
-              <span class="bh-meta">3 lanes shown · 20 entries</span>
+              <div class="bh-row-1">
+                <span>The Press Bay</span>
+                <span class="bh-meta"><span class="filter-active">Filtered · </span>2 of 4 lanes shown · 15 entries</span>
+              </div>
+              <!--
+                Focus chip strip — the lane filter affordance.
+                Click an "All" chip = show everything.
+                Click a single lane chip = focus only that lane.
+                Cmd/Ctrl-click multiple lane chips = combine into a subset.
+                Saved-view chips (kraft-bordered with ⌘ prefix) are pre-saved
+                multi-lane compositions; clicking re-applies them.
+                "+ Save view" surfaces when a non-default subset is active so the
+                operator can pin the current selection for later.
+                The left rail's eye-toggles + saved-views section are the same
+                state surfaced two ways — they sync.
+              -->
+              <nav class="focus-strip" aria-label="Lane focus filter">
+                <span class="strip-label">Focus</span>
+                <button class="focus-chip all">
+                  <span>All</span>
+                  <span class="fc-count">3</span>
+                </button>
+                <div class="strip-divider"></div>
+                <button class="focus-chip active">
+                  <span class="fc-glyph">§</span>
+                  <span>Editorial</span>
+                  <span class="fc-count">12</span>
+                </button>
+                <button class="focus-chip">
+                  <span class="fc-glyph">◆</span>
+                  <span>Mockups</span>
+                  <span class="fc-count">5</span>
+                </button>
+                <button class="focus-chip active">
+                  <span class="fc-glyph">⊕</span>
+                  <span>QA</span>
+                  <span class="fc-count">3</span>
+                </button>
+                <div class="strip-divider"></div>
+                <button class="focus-chip saved">In review</button>
+                <button class="focus-chip saved">Active only</button>
+                <button class="focus-chip save" title="Save current 2-lane selection as a named view">+ Save view</button>
+                <span class="strip-hint"><kbd>1</kbd><kbd>2</kbd>⋯ to focus · <kbd>0</kbd> for all</span>
+              </nav>
             </div>
 
             <!-- Lane 1: Editorial (6 stages) -->
@@ -409,36 +585,17 @@
               </div>
             </article>
 
-            <!-- Lane 2: Mockups (4 stages) -->
-            <article class="swim mockups">
-              <div class="swim-head">
-                <span class="glyph">◆</span>
-                <span class="name">Mockups</span>
-                <span class="tag">visual · 4 stages</span>
-                <span class="quick-meta">5 entries · 2 iterating</span>
-                <span class="overflow">⋮</span>
-              </div>
-              <div class="stage-grid">
-                <div class="stage-col">
-                  <div class="stage-head"><span class="stage-glyph">✏</span><span class="stage-name">Sketched</span><span class="stage-count">2</span></div>
-                  <div class="card">Lane bar — direction 2<span class="e-meta">v1</span></div>
-                  <div class="card">Empty-lane CTA shapes<span class="e-meta">v1</span></div>
-                </div>
-                <div class="stage-col">
-                  <div class="stage-head"><span class="stage-glyph">◴</span><span class="stage-name">Iterating</span><span class="stage-count">2</span></div>
-                  <div class="card">Multi-lane composed view<span class="e-meta">v3</span></div>
-                  <div class="card">Lane-visibility rail<span class="e-meta">v2</span></div>
-                </div>
-                <div class="stage-col">
-                  <div class="stage-head"><span class="stage-glyph">✓</span><span class="stage-name">Approved</span><span class="stage-count">1</span></div>
-                  <div class="card">Press bay grid<span class="e-meta">approved</span></div>
-                </div>
-                <div class="stage-col empty">
-                  <div class="stage-head"><span class="stage-glyph">⌖</span><span class="stage-name">Shipped</span><span class="stage-count">0</span></div>
-                  <div class="empty-state">No entries</div>
-                </div>
-              </div>
-            </article>
+            <!-- Lane 2: Mockups — FILTERED OUT in current view (focus is Editorial + QA) -->
+            <!-- A compact stub renders so the operator can SEE which lanes are
+                 hidden by the active filter; clicking it re-adds Mockups to focus.
+                 If the operator wanted Mockups permanently hidden, they would
+                 toggle it off in the left rail instead, and no stub would render. -->
+            <button class="swim-stub" aria-label="Restore Mockups to focus">
+              <span class="ss-glyph">◆</span>
+              <span class="ss-name">Mockups</span>
+              <span class="ss-meta">hidden by focus · 5 entries · click to restore</span>
+              <span class="ss-action">+</span>
+            </button>
 
             <!-- Lane 3: QA (4 stages) -->
             <article class="swim qa">
@@ -487,7 +644,16 @@
             <button class="mobile-rail-trigger">Lanes ▾</button>
           </div>
 
-          <div class="lane-stack">
+          <!-- Focus strip — horizontally scrollable on mobile -->
+          <nav class="focus-strip mobile" aria-label="Lane focus filter">
+            <span class="strip-label">Focus</span>
+            <button class="focus-chip all"><span>All</span><span class="fc-count">3</span></button>
+            <button class="focus-chip active"><span class="fc-glyph">§</span><span>Editorial</span></button>
+            <button class="focus-chip"><span class="fc-glyph">◆</span><span>Mockups</span></button>
+            <button class="focus-chip active"><span class="fc-glyph">⊕</span><span>QA</span></button>
+          </nav>
+
+          <div class="lane-stack" style="padding-top: 0;">
             <section class="lane-section">
               <div class="lane-head">
                 <span class="glyph">§</span>
@@ -503,19 +669,15 @@
                 <div class="m-stage-tile"><span class="stage-glyph">✓</span><span class="stage-name">Pub'd</span><span class="stage-count">1</span></div>
               </div>
             </section>
-            <section class="lane-section">
-              <div class="lane-head">
-                <span class="glyph">◆</span>
-                <span class="name">Mockups</span>
-                <span class="count">5</span>
-              </div>
-              <div class="stage-row">
-                <div class="m-stage-tile"><span class="stage-glyph">✏</span><span class="stage-name">Sketched</span><span class="stage-count">2</span></div>
-                <div class="m-stage-tile"><span class="stage-glyph">◴</span><span class="stage-name">Iterating</span><span class="stage-count">2</span></div>
-                <div class="m-stage-tile"><span class="stage-glyph">✓</span><span class="stage-name">Approved</span><span class="stage-count">1</span></div>
-                <div class="m-stage-tile empty"><span class="stage-glyph">⌖</span><span class="stage-name">Shipped</span><span class="stage-count">0</span></div>
-              </div>
-            </section>
+
+            <!-- Mockups is filtered out; show the compact stub -->
+            <button class="swim-stub" style="width: 100%; margin-bottom: 0.8rem; padding: 0.5rem 0.7rem; font-size: 0.85rem;">
+              <span class="ss-glyph">◆</span>
+              <span style="font-family: var(--display); font-style: italic;">Mockups</span>
+              <span class="ss-meta" style="font-size: 0.55rem;">hidden · tap to restore</span>
+              <span class="ss-action">+</span>
+            </button>
+
             <section class="lane-section">
               <div class="lane-head">
                 <span class="glyph">⊕</span>
@@ -534,7 +696,7 @@
           <button class="compose-fab">+ Compose</button>
         </div>
       </div>
-      <div class="caption">Mobile · iPhone 13 · Press Bay collapses to the lane-stack (Direction 1's mobile shape)</div>
+      <div class="caption">Mobile · iPhone 13 · focus strip below masthead; filtered lane renders as a stub for one-tap restore</div>
     </div>
 
   </div>
