@@ -129,6 +129,11 @@
         }
       }
     },
+    "discovered_candidates": {
+      "description": "Phase 11 Task 3 — orchestrator-agent-mediated candidate clusters. Each entry is one cluster of shape-similar findings that the operator triages at architecture-scale (BLESSED / CURSED / IGNORE). The orchestrator-agent translates each disposition into line-level catalog edits via the mediation library; the operator never edits regex. Optional (older manifests + clean-codebase scans both legitimately omit the section).",
+      "type": "array",
+      "items": { "$ref": "#/$defs/discovered_candidate_entry" }
+    },
     "codebase_state_metrics": {
       "description": "Phase 11 Task 4 — codebase-state metrics computed during the synthesis pass. Informational: feeds the Phase 11 Task 5 self-correcting controller and operator-visible dashboards. Optional at the manifest level (legacy manifests omit it).",
       "type": "object",
@@ -526,6 +531,40 @@
           "type": "array",
           "items": { "$ref": "#/$defs/disposition_latency_entry" },
           "maxItems": 5
+        }
+      }
+    },
+    "discovered_candidate_entry": {
+      "description": "One operator-facing candidate cluster summary surfaced by the Phase 11 Task 3 orchestrator-agent mediation layer. Each cluster is a group of shape-similar findings clustered via Jaccard n-gram similarity. The operator triages clusters at architecture-scale; the agent translates the disposition into line-level catalog edits.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cluster_id", "summary", "member_count", "exemplar_files"],
+      "properties": {
+        "cluster_id": {
+          "description": "Stable cluster id (deterministic from the cluster's member set). Format `cluster-NNNN`. Operator dispositions reference this id.",
+          "type": "string",
+          "pattern": "^cluster-[0-9]{4,}$"
+        },
+        "summary": {
+          "description": "1-2 sentence operator-readable summary of the cluster's shape, member count, file count, and provenance distribution.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "member_count": {
+          "description": "Number of findings that joined this cluster. Load-bearing for the operator's prioritization.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "exemplar_files": {
+          "description": "First three (deterministic, sorted) unique file paths in the cluster — navigation landmarks for the operator. The full member list lives in the per-run evidence trail.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
     },

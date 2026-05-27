@@ -173,6 +173,19 @@ export interface ManifestRegimeHoldouts {
 }
 
 /**
+ * Phase 11 Task 3 — one operator-facing candidate cluster summary
+ * surfaced by the orchestrator-agent mediation layer in the manifest's
+ * `discovered_candidates:` section. Snake-case to mirror the YAML wire
+ * format; produced by `mediation.toManifestSection`.
+ */
+export interface ManifestDiscoveredCandidate {
+  readonly cluster_id: string;
+  readonly summary: string;
+  readonly member_count: number;
+  readonly exemplar_files: ReadonlyArray<string>;
+}
+
+/**
  * In-memory manifest shape. JSON-serializable; `yaml.stringify()`
  * produces the canonical scope-manifest.yaml output. snake_case field
  * names mirror the schema verbatim so the YAML output stays readable
@@ -190,6 +203,12 @@ export interface ScopeManifest {
   readonly routes?: ReadonlyArray<ManifestRoute>;
   readonly modules?: ReadonlyArray<ManifestModule>;
   readonly regime_holdouts?: ManifestRegimeHoldouts;
+  /**
+   * Phase 11 Task 3 — discovered candidate clusters surfaced by the
+   * orchestrator-agent mediation layer. Optional (legacy manifests +
+   * clean-codebase scans both legitimately omit it).
+   */
+  readonly discovered_candidates?: ReadonlyArray<ManifestDiscoveredCandidate>;
   /**
    * Phase 11 Task 4 — codebase-state metrics block. Optional at the
    * manifest level (legacy manifests omit it); when emitted, every

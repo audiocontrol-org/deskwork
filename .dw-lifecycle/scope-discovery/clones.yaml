@@ -1,4 +1,4 @@
-generated_at: 2026-05-27T03:05:06.758Z
+generated_at: 2026-05-27T03:24:44.203Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -632,6 +632,27 @@ clones:
       - plugins/dw-lifecycle/src/scope-discovery/controller/controller-policies.ts:213:228
     disposition: keep-with-reason
     reason: intentional shared scaffolding from Phase 11 Wave 6 (controller library + audit-log parser + cross-surface filter scaffolds share boilerplate). Extracting hurts more than the duplication costs.
+  - id: 9a9bc23a9689
+    lines: 12
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/controller/controller-state.ts:151:162
+      - plugins/dw-lifecycle/src/scope-discovery/escalation/escalation-parse.ts:63:74
+    disposition: pending
+    reason: null
+  - id: 3adf9dc3205a
+    lines: 10
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/controller/controller-state.ts:321:330
+      - plugins/dw-lifecycle/src/scope-discovery/recovery/trust-calibration.ts:337:346
+    disposition: pending
+    reason: null
+  - id: 901289cce185
+    lines: 11
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/controller/controller-state.ts:346:356
+      - plugins/dw-lifecycle/src/scope-discovery/recovery/trust-calibration.ts:359:369
+    disposition: pending
+    reason: null
   - id: afeee722255a
     lines: 16
     members:
@@ -717,6 +738,13 @@ clones:
       - plugins/dw-lifecycle/src/scope-discovery/doctor-rules/clones-yaml-schema-violation.ts:44:56
     disposition: pending
     reason: null
+  - id: ca57edf2ddb1
+    lines: 12
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/escalation/escalation-queue.ts:134:145
+      - plugins/dw-lifecycle/src/scope-discovery/llm/auditor.ts:109:120
+    disposition: pending
+    reason: null
   - id: b55096bc507f
     lines: 17
     members:
@@ -794,6 +822,13 @@ clones:
       - plugins/dw-lifecycle/src/scope-discovery/scope-widen.ts:242:254
     disposition: keep-with-reason
     reason: intentional shared scaffolding across new scope-discovery surfaces from Wave 3 (migrate-from-pilot CLI shell, pattern-handler test fixtures, dispatcher boilerplate, scope-widen+migrate planning patterns). Extracting would create cross-surface coupling; the duplication is short and intentional.
+  - id: d724eab25113
+    lines: 8
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/recovery/trust-calibration.ts:140:147
+      - plugins/dw-lifecycle/src/scope-discovery/recovery/trust-calibration.ts:186:193
+    disposition: pending
+    reason: null
   - id: 273e4dce882b
     lines: 13
     members:

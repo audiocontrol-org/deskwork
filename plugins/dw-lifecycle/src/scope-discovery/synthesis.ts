@@ -52,6 +52,7 @@ import { computeCodebaseStateMetrics } from './discovery-agents/codebase-state-m
 import { gatherMetricsInput } from './discovery-agents/codebase-state-metrics-gather.js';
 import { errorMessage } from './util/typeguards.js';
 import type { CodebaseStateMetrics } from './discovery-agents/codebase-state-metrics-types.js';
+import { mediate, toManifestSection } from './mediation/mediation.js';
 import { resolve } from 'node:path';
 import { existsSync } from 'node:fs';
 
@@ -268,6 +269,17 @@ export async function synthesize(input: SynthesizeOptions): Promise<SynthesisOut
     warnings,
   });
 
+  // Phase 11 Task 3 — orchestrator-agent mediation: cluster raw
+  // findings into architectural-scale candidate classes. PHASE 1
+  // invocation (no dispositions) — surfaces clusters + summaries
+  // for the operator to triage. The dispositions + line-level edits
+  // happen later via `/dw-lifecycle:implement`'s autonomous loop.
+  const mediationOutput = mediate({ findings: input.findings });
+  const discoveredCandidates =
+    mediationOutput.summaries.length > 0
+      ? toManifestSection(mediationOutput.summaries)
+      : null;
+
   const manifest: ScopeManifest = {
     kind,
     feature_slug: input.featureSlug,
@@ -279,6 +291,9 @@ export async function synthesize(input: SynthesizeOptions): Promise<SynthesisOut
     ...(routes !== undefined ? { routes } : {}),
     ...(modules !== undefined ? { modules } : {}),
     ...(regimeHoldouts !== null ? { regime_holdouts: regimeHoldouts } : {}),
+    ...(discoveredCandidates !== null
+      ? { discovered_candidates: discoveredCandidates }
+      : {}),
     ...(codebaseStateMetrics !== null
       ? { codebase_state_metrics: codebaseStateMetrics }
       : {}),
