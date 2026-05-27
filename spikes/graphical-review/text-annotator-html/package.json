@@ -1,0 +1,22 @@
+{
+  "name": "text-annotator-html-spike",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Phase 1 Task 1.3 spike — @recogito/text-annotator pinned to an iframe HTML mockup, plus a thin DOM-selector layer for non-text regions, W3C Web Annotation JSON-LD output. Vanilla JS, not part of the workspace.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "verify": "node scripts/verify.mjs",
+    "a11y": "node scripts/a11y-keyboard.mjs",
+    "anchor-resilience": "node scripts/anchor-resilience.mjs"
+  },
+  "dependencies": {
+    "@recogito/text-annotator": "^4.1.1"
+  },
+  "devDependencies": {
+    "playwright": "^1.60.0",
+    "vite": "^5.4.0"
+  }
+}
