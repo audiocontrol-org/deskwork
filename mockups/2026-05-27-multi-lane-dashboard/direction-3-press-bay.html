@@ -266,6 +266,62 @@
     font-family: var(--mono); color: var(--ink-soft); font-size: 0.95rem;
     cursor: pointer; padding: 0.15rem 0.45rem; margin-left: 0.6rem;
   }
+  .swim-head .collapse-chev {
+    font-family: var(--mono); color: var(--ink-soft); font-size: 0.7rem;
+    cursor: pointer; padding: 0.15rem 0.4rem;
+    width: 22px; text-align: center; user-select: none;
+    transition: transform 0.18s ease;
+  }
+  .swim-head:hover .collapse-chev { color: var(--red); }
+
+  /* === Collapsed lane state ===
+     - stage-grid is hidden
+     - a compact per-stage strip renders inside the swim-head's bottom edge
+       so the pipeline shape stays visible (favor structure over scrolling)
+     - chevron rotates to indicate state
+     - left-edge accent bar stays so the lane's presence + color is preserved
+  */
+  .swim.collapsed { margin-bottom: 0.6rem; }
+  .swim.collapsed .stage-grid { display: none; }
+  .swim.collapsed .swim-head {
+    border-bottom: none;
+    background: var(--paper);
+  }
+  .swim.collapsed .swim-head .collapse-chev {
+    transform: rotate(-90deg);
+    color: var(--faded);
+  }
+  .swim.collapsed .swim-head:hover .collapse-chev { color: var(--red); }
+  /* Compact per-stage strip — shown only when collapsed. Visually
+     attached to the bottom of the head with a hairline. */
+  .swim.collapsed .swim-compact {
+    display: flex;
+  }
+  .swim-compact {
+    display: none;
+    align-items: stretch;
+    border-top: 1px dashed var(--paper-3);
+    background: var(--paper-2);
+  }
+  .swim-compact .sc-stage {
+    flex: 1;
+    padding: 0.4rem 0.55rem;
+    display: flex; flex-direction: column; gap: 0.15rem;
+    border-right: 1px dashed var(--paper-3);
+  }
+  .swim-compact .sc-stage:last-child { border-right: none; }
+  .swim-compact .sc-name {
+    font-family: var(--mono); font-size: 0.55rem;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--faded);
+  }
+  .swim-compact .sc-count {
+    font-family: var(--display); font-style: italic; font-size: 1.05rem;
+    color: var(--ink-soft);
+  }
+  .swim-compact .sc-stage.empty .sc-count { color: var(--faded); }
+  .swim-compact .sc-stage.attention .sc-count { color: var(--red); }
+  .swim-compact .sc-stage.locked .sc-count { color: var(--blue); }
 
   /* Per-swimlane stage columns */
   .stage-grid {
@@ -395,6 +451,38 @@
     margin-left: auto;
     font-family: var(--mono); font-size: 0.7rem; color: var(--ink-soft);
   }
+  .phone .lane-head .collapse-chev {
+    font-family: var(--mono); color: var(--ink-soft); font-size: 0.7rem;
+    padding: 0.1rem 0.4rem;
+    cursor: pointer; user-select: none;
+  }
+  .phone .lane-section.collapsed .stage-row { display: none; }
+  .phone .lane-section.collapsed .lane-head { margin-bottom: 0; }
+  .phone .lane-section.collapsed .lane-head .collapse-chev { transform: rotate(-90deg); display: inline-block; color: var(--faded); }
+  .phone .lane-section.collapsed .swim-compact { display: flex; }
+  .phone .lane-section .swim-compact {
+    display: none;
+    align-items: stretch;
+    background: var(--paper-2);
+    border: 1px dashed var(--paper-3);
+    border-top: none;
+  }
+  .phone .lane-section .swim-compact .sc-stage {
+    flex: 1; padding: 0.3rem 0.4rem;
+    border-right: 1px dashed var(--paper-3);
+    display: flex; flex-direction: column; gap: 0.1rem;
+  }
+  .phone .lane-section .swim-compact .sc-stage:last-child { border-right: none; }
+  .phone .lane-section .swim-compact .sc-name {
+    font-family: var(--mono); font-size: 0.5rem;
+    letter-spacing: 0.12em; text-transform: uppercase; color: var(--faded);
+  }
+  .phone .lane-section .swim-compact .sc-count {
+    font-family: var(--display); font-style: italic; font-size: 0.9rem;
+    color: var(--ink-soft);
+  }
+  .phone .lane-section .swim-compact .sc-stage.empty .sc-count { color: var(--faded); }
+  .phone .lane-section .swim-compact .sc-stage.locked .sc-count { color: var(--blue); }
   .phone .stage-row {
     display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem;
   }
@@ -429,11 +517,11 @@
 </head>
 <body>
   <div class="meta">Direction 3 · <a href="./index.html">↩ all directions</a></div>
-  <h1 class="demo-title">Press Bay <span style="font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.2em; color: var(--green); margin-left: 0.5rem; vertical-align: middle;">v2 · LANE FILTERING</span></h1>
-  <div class="demo-sub">Desktop: all lanes visible at once as horizontal swimlanes with their own stage columns. Mobile: collapses to the lane-stack. v2 adds an explicit Focus chip strip for quick lane filtering.</div>
+  <h1 class="demo-title">Press Bay <span style="font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.2em; color: var(--green); margin-left: 0.5rem; vertical-align: middle;">v3 · COLLAPSIBLE LANES</span></h1>
+  <div class="demo-sub">Each lane is independently collapsible. Collapsed lanes still surface per-stage counts via a compact strip so the pipeline shape stays visible.</div>
 
   <div class="deviation-note">
-    <span class="label">Standards-compliant</span> Two layers of lane-state: <strong>Visibility</strong> (persistent, set in the left rail's eye-toggle) controls whether a lane appears in the focus strip at all; <strong>Focus</strong> (transient, set in the chip strip) controls which of the visible lanes the bay currently renders. Filtered-out lanes render as a compact stub (single click restores them) so the operator stays aware of what they've excluded. Single-click a chip = focus only that lane; cmd/ctrl-click multiple chips = combine. Saved-view chips (kraft-bordered, ⌘ prefix) re-apply named focus configurations. The mockup below shows a 2-of-3-lane focus (Editorial + QA, Mockups stubbed); Press Releases is persistently hidden via the rail so it doesn't appear in the chip strip at all. Keyboard hint: <kbd>1</kbd> / <kbd>2</kbd> / <kbd>0</kbd> for one-key focus on lane 1, lane 2, or all.
+    <span class="label">Standards-compliant</span> Now three states per lane on the bay: <strong>Expanded</strong> (full stage-grid with cards), <strong>Collapsed</strong> (head + compact per-stage count strip; chevron rotated 90°), <strong>Filtered out</strong> (compact stub, click to restore). Plus the rail-controlled <strong>Hidden</strong> state (persistent — absent from the chip strip entirely). The compact strip on a collapsed lane is intentional, not lossy: per <code>DESIGN-STANDARDS.md § Favor structure over scrolling</code>, collapsing a lane should NOT erase the structural signal — operators still need to see "Editorial has 4 in Drafting" at-a-glance without re-expanding. The strip also surfaces locked-stage (proof-blue) and empty-stage (faded) palettes so the lane shape reads even at the collapsed density. Click the chevron OR anywhere on the swim-head to toggle. Mockup demonstrates all states: Editorial expanded, Mockups filtered out, QA collapsed; Press Releases hidden via rail.
   </div>
 
   <div class="frames" style="margin-top:1.4rem;">
@@ -542,13 +630,14 @@
               </nav>
             </div>
 
-            <!-- Lane 1: Editorial (6 stages) -->
+            <!-- Lane 1: Editorial (6 stages) — EXPANDED -->
             <article class="swim editorial">
               <div class="swim-head">
                 <span class="glyph">§</span>
                 <span class="name">Editorial</span>
                 <span class="tag">editorial · 6 stages</span>
                 <span class="quick-meta">12 entries · 4 drafting · 1 final</span>
+                <span class="collapse-chev" title="Collapse this lane">▾</span>
                 <span class="overflow">⋮</span>
               </div>
               <div class="stage-grid">
@@ -597,31 +686,35 @@
               <span class="ss-action">+</span>
             </button>
 
-            <!-- Lane 3: QA (4 stages) -->
-            <article class="swim qa">
+            <!-- Lane 3: QA (4 stages) — COLLAPSED
+                 The chevron rotated 90°. Stage-grid hidden. The compact strip
+                 below the head surfaces per-stage counts so the pipeline shape
+                 stays visible without consuming card-grid vertical space. -->
+            <article class="swim qa collapsed">
               <div class="swim-head">
                 <span class="glyph">⊕</span>
                 <span class="name">QA</span>
                 <span class="tag">qa-plan · 4 stages</span>
-                <span class="quick-meta">3 entries</span>
+                <span class="quick-meta">3 entries · collapsed</span>
+                <span class="collapse-chev" title="Expand this lane">▾</span>
                 <span class="overflow">⋮</span>
               </div>
-              <div class="stage-grid">
-                <div class="stage-col">
-                  <div class="stage-head"><span class="stage-glyph">✎</span><span class="stage-name">Drafted</span><span class="stage-count">1</span></div>
-                  <div class="card">Annotation backfill test<span class="e-meta">v1</span></div>
+              <div class="swim-compact">
+                <div class="sc-stage">
+                  <span class="sc-name">Drafted</span>
+                  <span class="sc-count">1</span>
                 </div>
-                <div class="stage-col">
-                  <div class="stage-head"><span class="stage-glyph">⌕</span><span class="stage-name">Reviewed</span><span class="stage-count">1</span></div>
-                  <div class="card">Lane migration smoke<span class="e-meta">v2</span></div>
+                <div class="sc-stage locked">
+                  <span class="sc-name">Reviewed (locked)</span>
+                  <span class="sc-count">1</span>
                 </div>
-                <div class="stage-col">
-                  <div class="stage-head"><span class="stage-glyph">⊝</span><span class="stage-name">Tested</span><span class="stage-count">1</span></div>
-                  <div class="card">Template loader smoke<span class="e-meta">v1</span></div>
+                <div class="sc-stage">
+                  <span class="sc-name">Tested</span>
+                  <span class="sc-count">1</span>
                 </div>
-                <div class="stage-col empty">
-                  <div class="stage-head"><span class="stage-glyph">✓</span><span class="stage-name">Approved</span><span class="stage-count">0</span></div>
-                  <div class="empty-state">No entries</div>
+                <div class="sc-stage empty">
+                  <span class="sc-name">Approved</span>
+                  <span class="sc-count">0</span>
                 </div>
               </div>
             </article>
@@ -654,11 +747,13 @@
           </nav>
 
           <div class="lane-stack" style="padding-top: 0;">
+            <!-- Editorial: EXPANDED -->
             <section class="lane-section">
               <div class="lane-head">
                 <span class="glyph">§</span>
                 <span class="name">Editorial</span>
                 <span class="count">12</span>
+                <span class="collapse-chev">▾</span>
               </div>
               <div class="stage-row">
                 <div class="m-stage-tile"><span class="stage-glyph">◇</span><span class="stage-name">Ideas</span><span class="stage-count">3</span></div>
@@ -678,17 +773,19 @@
               <span class="ss-action">+</span>
             </button>
 
-            <section class="lane-section">
+            <!-- QA: COLLAPSED — compact strip surfaces per-stage counts -->
+            <section class="lane-section collapsed">
               <div class="lane-head">
                 <span class="glyph">⊕</span>
                 <span class="name">QA</span>
                 <span class="count">3</span>
+                <span class="collapse-chev">▾</span>
               </div>
-              <div class="stage-row">
-                <div class="m-stage-tile"><span class="stage-glyph">✎</span><span class="stage-name">Drafted</span><span class="stage-count">1</span></div>
-                <div class="m-stage-tile"><span class="stage-glyph">⌕</span><span class="stage-name">Reviewed</span><span class="stage-count">1</span></div>
-                <div class="m-stage-tile"><span class="stage-glyph">⊝</span><span class="stage-name">Tested</span><span class="stage-count">1</span></div>
-                <div class="m-stage-tile empty"><span class="stage-glyph">✓</span><span class="stage-name">Approved</span><span class="stage-count">0</span></div>
+              <div class="swim-compact">
+                <div class="sc-stage"><span class="sc-name">Drafted</span><span class="sc-count">1</span></div>
+                <div class="sc-stage locked"><span class="sc-name">Rev'd</span><span class="sc-count">1</span></div>
+                <div class="sc-stage"><span class="sc-name">Tested</span><span class="sc-count">1</span></div>
+                <div class="sc-stage empty"><span class="sc-name">App'd</span><span class="sc-count">0</span></div>
               </div>
             </section>
           </div>
