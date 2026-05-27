@@ -670,13 +670,19 @@
     letter-spacing: 0.12em; text-transform: uppercase;
     color: var(--faded); justify-content: center;
   }
+  /* Mobile kanban view: single-column vertical stack per DESIGN-STANDARDS
+     § "Collapsible stage tiles — mobile-only navigation." Each tile is
+     a one-line strip; tapping (in production) expands the tile to reveal
+     entries inline. The single-column stack preserves the linear stage
+     sequence (top-to-bottom = pipeline order). The previously-drawn
+     2-column grid broke this — corrected here. */
   .phone .stage-row {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem;
+    display: flex; flex-direction: column; gap: 0.3rem;
   }
   .phone .m-stage-tile {
     background: var(--paper); border: 1px solid var(--paper-3);
-    padding: 0.5rem 0.6rem;
-    display: flex; align-items: center; gap: 0.4rem;
+    padding: 0.5rem 0.7rem;
+    display: flex; align-items: center; gap: 0.5rem;
   }
   .phone .m-stage-tile .stage-glyph { color: var(--red); font-family: var(--display); font-style: italic; font-size: 1rem; }
   .phone .m-stage-tile .stage-name { font-family: var(--display); font-style: italic; font-size: 0.85rem; }
@@ -704,11 +710,11 @@
 </head>
 <body>
   <div class="meta">Direction 3 · <a href="./index.html">↩ all directions</a></div>
-  <h1 class="demo-title">Press Bay <span style="font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.2em; color: var(--green); margin-left: 0.5rem; vertical-align: middle;">v5 · KANBAN ↔ LIST · DESKTOP + MOBILE</span></h1>
-  <div class="demo-sub">Each lane independently toggles between kanban (columnar stages with cards) and list (vertical, grouped by stage). On desktop AND mobile. Per-lane setting persists across sessions.</div>
+  <h1 class="demo-title">Press Bay <span style="font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.2em; color: var(--green); margin-left: 0.5rem; vertical-align: middle;">v6 · MOBILE DEFAULTS TO LIST</span></h1>
+  <div class="demo-sub">Each lane independently toggles between kanban (columnar) and list (vertical, grouped by stage). Desktop defaults to kanban; mobile defaults to list. Both views preserve the linear stage sequence.</div>
 
   <div class="deviation-note">
-    <span class="label">Standards-compliant</span> A segmented toggle in each swim-head / lane-head (<code>▦ Kanban</code> / <code>≡ List</code>) flips the lane between the two views. Both views show the same underlying entries — only the spatial arrangement differs. Kanban is the default; list view is preferable when a lane has many entries (kanban columns get tall + hard to scan) or when comparing entries by attribute (title, version, state) matters more than the spatial stage progression. Per-lane setting because lanes have different scales — Editorial may stay kanban while a busy Press Releases lane goes list. When a lane is collapsed, the toggle greys out (collapse precedence). Both viewports get the toggle — the mobile tile pattern is great for "scan the stages with counts" but doesn't help if the operator wants to scan ALL the lane's entries in one stream; list view fills that gap on mobile too. Mockup demonstrates four lane states at once: <strong>Editorial</strong> (kanban, expanded), <strong>Mockups</strong> (filtered out), <strong>QA</strong> (collapsed), <strong>Press Releases</strong> (list view, expanded). The list-view stage groups carry the same stage-name + count + tag pattern as the kanban stage-grid heads; rows are dense (one-liner: title + version-pill + state + ⋮ overflow); locked stages render the group-head glyph in proof-blue (matches the lane template's locked-stage convention).
+    <span class="label">Standards-compliant</span> Per-lane segmented toggle (<code>▦ Kanban</code> / <code>≡ List</code>) flips the body between the two views. Both views show the same entries — only the spatial arrangement differs. <strong>Defaults are viewport-aware:</strong> desktop defaults to kanban (wide viewport → multi-column real estate); mobile defaults to list (narrow viewport → vertical sequence is the natural fit, AND list view preserves the linear stage relationship more honestly than the tile-stack does). The operator can flip either default per-lane via the toggle. When collapsed, the toggle greys out (collapse precedence). The kanban tile view on mobile is the established v0.19 collapsible-stage-tile pattern — single-column vertical stack of one-line tile strips (per <code>DESIGN-STANDARDS.md § Collapsible stage tiles</code>), NOT a 2-column wrap (which would break the stage sequence visually). Mockup demonstrates four lane states at once: <strong>Editorial</strong> (kanban on desktop / list on mobile), <strong>Mockups</strong> (filtered out), <strong>QA</strong> (collapsed — view-toggle greyed), <strong>Press Releases</strong> (list on desktop / kanban-tile on mobile). The list-view stage groups carry the same stage-name + count + tag pattern as the kanban stage-grid heads; rows are dense (one-liner: title + version-pill + state + ⋮ overflow); locked stages render the group-head glyph in proof-blue.
   </div>
 
   <div class="frames" style="margin-top:1.4rem;">
@@ -1052,25 +1058,73 @@
           </nav>
 
           <div class="lane-stack" style="padding-top: 0;">
-            <!-- Editorial: EXPANDED · KANBAN VIEW -->
-            <section class="lane-section">
+            <!-- Editorial: EXPANDED · LIST VIEW (mobile default).
+                 List view preserves the linear stage sequence (top-to-bottom
+                 = pipeline order) better than the tile-stack since each row
+                 is a real entry the operator can act on directly. -->
+            <section class="lane-section list-view">
               <div class="lane-head">
                 <span class="glyph">§</span>
                 <span class="name">Editorial</span>
                 <div class="view-toggle">
-                  <button class="vt-cell active"><span class="vt-icon">▦</span></button>
-                  <button class="vt-cell"><span class="vt-icon">≡</span></button>
+                  <button class="vt-cell"><span class="vt-icon">▦</span></button>
+                  <button class="vt-cell active"><span class="vt-icon">≡</span></button>
                 </div>
                 <span class="count">12</span>
                 <span class="collapse-chev">▾</span>
               </div>
-              <div class="stage-row">
-                <div class="m-stage-tile"><span class="stage-glyph">◇</span><span class="stage-name">Ideas</span><span class="stage-count">3</span></div>
-                <div class="m-stage-tile"><span class="stage-glyph">§</span><span class="stage-name">Planned</span><span class="stage-count">2</span></div>
-                <div class="m-stage-tile"><span class="stage-glyph">⊹</span><span class="stage-name">Outline</span><span class="stage-count">1</span></div>
-                <div class="m-stage-tile" style="background: var(--paper-2); border-top: 2px solid var(--red);"><span class="stage-glyph">✎</span><span class="stage-name" style="color: var(--red);">Drafting</span><span class="stage-count">4</span></div>
-                <div class="m-stage-tile"><span class="stage-glyph">※</span><span class="stage-name">Final</span><span class="stage-count">1</span></div>
-                <div class="m-stage-tile"><span class="stage-glyph">✓</span><span class="stage-name">Pub'd</span><span class="stage-count">1</span></div>
+              <div class="list-body">
+                <div class="lb-group">
+                  <div class="lb-group-head">
+                    <span class="lb-glyph">◇</span>
+                    <span class="lb-name">Ideas</span>
+                    <span class="lb-count">3</span>
+                  </div>
+                  <div class="lb-row">
+                    <span class="lb-title">Mobile-first scrapbook reflow</span>
+                    <span class="lb-version">v1</span>
+                    <span class="lb-state">today</span>
+                  </div>
+                  <div class="lb-row">
+                    <span class="lb-title">Marginalia keyboard nav</span>
+                    <span class="lb-version">v1</span>
+                    <span class="lb-state">yest</span>
+                  </div>
+                  <div class="lb-row">
+                    <span class="lb-title">Pipeline custom rationale</span>
+                    <span class="lb-version">v1</span>
+                    <span class="lb-state">3d</span>
+                  </div>
+                </div>
+                <div class="lb-group">
+                  <div class="lb-group-head">
+                    <span class="lb-glyph">§</span>
+                    <span class="lb-name">Planned</span>
+                    <span class="lb-count">2</span>
+                  </div>
+                  <div class="lb-row">
+                    <span class="lb-title">Phase 5 retrospective</span>
+                    <span class="lb-version">v1</span>
+                    <span class="lb-state">today</span>
+                  </div>
+                </div>
+                <div class="lb-group">
+                  <div class="lb-group-head">
+                    <span class="lb-glyph">✎</span>
+                    <span class="lb-name">Drafting</span>
+                    <span class="lb-count">4</span>
+                  </div>
+                  <div class="lb-row">
+                    <span class="lb-title">Graphical-entries PRD</span>
+                    <span class="lb-version">v3</span>
+                    <span class="lb-state iter">iter</span>
+                  </div>
+                  <div class="lb-row">
+                    <span class="lb-title">Editor retrospective</span>
+                    <span class="lb-version">v1</span>
+                    <span class="lb-state">drafting</span>
+                  </div>
+                </div>
               </div>
             </section>
 
@@ -1102,65 +1156,31 @@
               </div>
             </section>
 
-            <!-- Press Releases: LIST VIEW — same toggle as desktop -->
-            <section class="lane-section list-view">
+            <!-- Press Releases: KANBAN TILE VIEW — demonstrates the
+                 NON-default option on mobile. Single-column vertical stack
+                 of stage-tile strips (per DESIGN-STANDARDS § Collapsible
+                 stage tiles), which is also linear top-to-bottom. The tap-
+                 to-expand pattern from v0.19 would render entries inline
+                 below an expanded tile. Useful when the operator wants
+                 "how many in each stage" at-a-glance without scanning
+                 entry rows. -->
+            <section class="lane-section">
               <div class="lane-head">
                 <span class="glyph" style="color: var(--kraft);">⌘</span>
                 <span class="name">Press</span>
                 <div class="view-toggle">
-                  <button class="vt-cell"><span class="vt-icon">▦</span></button>
-                  <button class="vt-cell active"><span class="vt-icon">≡</span></button>
+                  <button class="vt-cell active"><span class="vt-icon">▦</span></button>
+                  <button class="vt-cell"><span class="vt-icon">≡</span></button>
                 </div>
                 <span class="count">7</span>
                 <span class="collapse-chev">▾</span>
               </div>
-              <div class="list-body">
-                <div class="lb-group">
-                  <div class="lb-group-head">
-                    <span class="lb-glyph">◇</span>
-                    <span class="lb-name">Idea</span>
-                    <span class="lb-count">2</span>
-                  </div>
-                  <div class="lb-row">
-                    <span class="lb-title">v0.30 release announcement</span>
-                    <span class="lb-version">v1</span>
-                    <span class="lb-state">today</span>
-                  </div>
-                  <div class="lb-row">
-                    <span class="lb-title">Q3 retrospective post</span>
-                    <span class="lb-version">v1</span>
-                    <span class="lb-state">2d</span>
-                  </div>
-                </div>
-                <div class="lb-group">
-                  <div class="lb-group-head">
-                    <span class="lb-glyph">✎</span>
-                    <span class="lb-name">Drafting</span>
-                    <span class="lb-count">3</span>
-                  </div>
-                  <div class="lb-row">
-                    <span class="lb-title">Graphical-entries announcement</span>
-                    <span class="lb-version">v2</span>
-                    <span class="lb-state iter">iter</span>
-                  </div>
-                  <div class="lb-row">
-                    <span class="lb-title">Multi-lane support in v0.30</span>
-                    <span class="lb-version">v3</span>
-                    <span class="lb-state iter">iter</span>
-                  </div>
-                </div>
-                <div class="lb-group locked">
-                  <div class="lb-group-head">
-                    <span class="lb-glyph">⌕</span>
-                    <span class="lb-name">Edited</span>
-                    <span class="lb-count">1</span>
-                  </div>
-                  <div class="lb-row">
-                    <span class="lb-title">Hello, Lanes — multi-pipeline rationale</span>
-                    <span class="lb-version">v4</span>
-                    <span class="lb-state ready">final</span>
-                  </div>
-                </div>
+              <div class="stage-row">
+                <div class="m-stage-tile"><span class="stage-glyph">◇</span><span class="stage-name">Idea</span><span class="stage-count">2</span></div>
+                <div class="m-stage-tile" style="background: var(--paper-2); border-top: 2px solid var(--red);"><span class="stage-glyph" style="color: var(--red);">✎</span><span class="stage-name" style="color: var(--red);">Drafting</span><span class="stage-count">3</span></div>
+                <div class="m-stage-tile" style="border-top: 2px solid var(--blue);"><span class="stage-glyph" style="color: var(--blue);">⌕</span><span class="stage-name">Edited</span><span class="stage-count">1</span></div>
+                <div class="m-stage-tile"><span class="stage-glyph">✓</span><span class="stage-name">Published</span><span class="stage-count">1</span></div>
+                <div class="m-stage-tile empty"><span class="stage-glyph" style="color: var(--faded);">⊘</span><span class="stage-name" style="color: var(--ink-soft);">Blocked</span><span class="stage-count">0</span></div>
               </div>
             </section>
           </div>
@@ -1168,7 +1188,7 @@
           <button class="compose-fab">+ Compose</button>
         </div>
       </div>
-      <div class="caption">Mobile · iPhone 13 · same lane states as desktop. View toggle in lane-head (icon-only on mobile to fit). Press Releases shown in list view to demo; QA still collapsed with view-toggle greyed.</div>
+      <div class="caption">Mobile · iPhone 13 · Editorial defaults to list view (the linear mobile-natural fit); Press Releases shown in kanban tile view (single-column vertical stack per v0.19 standards) to demo the toggle. Both views preserve linear stage sequence top-to-bottom.</div>
     </div>
 
   </div>
