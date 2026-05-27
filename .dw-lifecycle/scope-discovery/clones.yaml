@@ -1,5 +1,4 @@
-schemaVersion: 1
-generated_at: 2026-05-25T11:01:16.752Z
+generated_at: 2026-05-27T00:17:35.562Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -506,11 +505,25 @@ clones:
       - plugins/dw-lifecycle/src/__tests__/scope-discovery/editor-symmetry.fixtures.ts:76:91
     disposition: pending
     reason: null
-  - id: 86f6261378ca
+  - id: 523d648db155
     lines: 11
     members:
       - plugins/dw-lifecycle/src/__tests__/scope-discovery/util/anti-patterns-harness.ts:14:24
-      - plugins/dw-lifecycle/src/__tests__/scope-discovery/util/detector-harness.ts:19:33
+      - plugins/dw-lifecycle/src/__tests__/scope-discovery/util/detector-harness.ts:22:20
+    disposition: pending
+    reason: null
+  - id: f710aa4e7695
+    lines: 24
+    members:
+      - plugins/dw-lifecycle/src/__tests__/scope-discovery/util/anti-patterns-harness.ts:58:81
+      - plugins/dw-lifecycle/src/__tests__/scope-discovery/util/check-deprecations-harness.ts:47:61
+    disposition: keep-with-reason
+    reason: intentional shared scaffolding across sibling scope-discovery scanners (test-harness pattern, CLI parseCli boilerplate, scan-and-write output pattern). Each clone group is short-and-shaped-the-same intentionally; extracting would create cross-scanner coupling that hurts more than the duplication costs.
+  - id: e0a5996fbd25
+    lines: 11
+    members:
+      - plugins/dw-lifecycle/src/__tests__/scope-discovery/util/check-deprecations-harness.ts:10:20
+      - plugins/dw-lifecycle/src/__tests__/scope-discovery/util/detector-harness.ts:22:36
     disposition: pending
     reason: null
   - id: 1801f1b7dd0b
@@ -534,13 +547,14 @@ clones:
       - plugins/dw-lifecycle/src/scope-discovery/check-anti-patterns.ts:362:367
     disposition: pending
     reason: null
-  - id: 2093cce5bb15
+  - id: c8cc74778e0e
     lines: 15
     members:
       - plugins/dw-lifecycle/src/scope-discovery/check-adopters.ts:322:336
+      - plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts:199:213
       - plugins/dw-lifecycle/src/scope-discovery/check-refactor-preconditions.ts:339:205
-    disposition: pending
-    reason: null
+    disposition: keep-with-reason
+    reason: intentional shared scaffolding across sibling scope-discovery scanners (test-harness pattern, CLI parseCli boilerplate, scan-and-write output pattern). Each clone group is short-and-shaped-the-same intentionally; extracting would create cross-scanner coupling that hurts more than the duplication costs.
   - id: b7ac4eca4f52
     lines: 25
     members:
@@ -576,20 +590,20 @@ clones:
       - plugins/dw-lifecycle/src/scope-discovery/check-refactor-preconditions.ts:342:205
     disposition: pending
     reason: null
-  - id: 2150135e911f
-    lines: 18
-    members:
-      - plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts:72:89
-      - plugins/dw-lifecycle/src/scope-discovery/check-editor-symmetry.ts:86:103
-    disposition: pending
-    reason: null
   - id: 94f54b37e331
     lines: 12
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts:90:101
+      - plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts:119:130
       - plugins/dw-lifecycle/src/scope-discovery/uninstall-scope-discovery-hooks.ts:116:127
     disposition: pending
     reason: null
+  - id: 9e85fb0f675e
+    lines: 28
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts:91:118
+      - plugins/dw-lifecycle/src/scope-discovery/check-editor-symmetry.ts:76:103
+    disposition: keep-with-reason
+    reason: intentional shared scaffolding across sibling scope-discovery scanners (test-harness pattern, CLI parseCli boilerplate, scan-and-write output pattern). Each clone group is short-and-shaped-the-same intentionally; extracting would create cross-scanner coupling that hurts more than the duplication costs.
   - id: f34c45cd009d
     lines: 16
     members:
@@ -604,6 +618,13 @@ clones:
       - plugins/dw-lifecycle/src/scope-discovery/check-refactor-preconditions.ts:339:350
     disposition: pending
     reason: null
+  - id: afeee722255a
+    lines: 16
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/deprecation-scan.ts:411:426
+      - plugins/dw-lifecycle/src/scope-discovery/editor-symmetry-matrix.ts:270:285
+    disposition: keep-with-reason
+    reason: intentional shared scaffolding across sibling scope-discovery scanners (test-harness pattern, CLI parseCli boilerplate, scan-and-write output pattern). Each clone group is short-and-shaped-the-same intentionally; extracting would create cross-scanner coupling that hurts more than the duplication costs.
   - id: 70f04e0cb6d3
     lines: 7
     members:
@@ -657,70 +678,70 @@ clones:
     lines: 17
     members:
       - plugins/dw-lifecycle/src/scope-discovery/install-agent-prompts.ts:118:134
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:150:166
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:154:170
     disposition: pending
     reason: null
   - id: ced608f5be46
     lines: 18
     members:
       - plugins/dw-lifecycle/src/scope-discovery/install-agent-prompts.ts:132:149
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:167:184
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:171:188
     disposition: pending
     reason: null
   - id: bc97e6ec2135
     lines: 7
     members:
       - plugins/dw-lifecycle/src/scope-discovery/install-agent-prompts.ts:304:310
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:235:241
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:245:251
     disposition: pending
     reason: null
   - id: 3c6b6627d081
     lines: 14
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:150:163
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:147:112
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:154:167
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:157:112
     disposition: pending
     reason: null
   - id: 92d75db1cad2
     lines: 16
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:169:184
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:160:127
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:173:188
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:170:127
     disposition: pending
     reason: null
   - id: 7698568d0d6c
     lines: 9
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:323:331
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:343:351
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:327:335
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:347:355
     disposition: pending
     reason: null
   - id: cd6cea43f755
     lines: 9
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:461:469
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:257:265
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:465:473
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:267:275
     disposition: pending
     reason: null
   - id: 0fbb9fcd1915
     lines: 13
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:148:160
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:158:170
       - plugins/dw-lifecycle/src/scope-discovery/uninstall-scope-discovery-hooks.ts:100:112
     disposition: pending
     reason: null
   - id: 9746ccb605f4
     lines: 15
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:161:175
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:171:185
       - plugins/dw-lifecycle/src/scope-discovery/uninstall-scope-discovery-hooks.ts:113:127
     disposition: pending
     reason: null
   - id: 8c1a1eaa3a28
     lines: 9
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:201:209
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:216:224
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:211:219
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:226:234
     disposition: pending
     reason: null
   - id: 653e6225d350
