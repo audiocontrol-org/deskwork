@@ -12,8 +12,9 @@
  *   2. anti-pattern catch — registry has one entry; source matches.
  *   3. adopter-manifest holdout catch.
  *   4. editor-symmetry partial/missing cell.
- *   5. deprecation gate STUBBED in Phase 4 — assert count === 0.
- *      Tracked at https://github.com/audiocontrol-org/deskwork/issues/287.
+ *   5. deprecation gate live — port landed in commit 4da4660 (closes #287);
+ *      asserts the scanner surfaces an importer-line finding against a
+ *      `@deprecated`-marked file.
  *   6. mixed sources — three contribute; meta counts reconcile.
  *   7. evidence back-pointers valid (destination path: .dw-lifecycle/...).
  *   8. JSON output passes the `isRegimeHoldoutFindings` type-predicate.
@@ -150,16 +151,14 @@ describe('regime-holdout-detector — core scenarios', () => {
     }
   });
 
-  it('deprecation gate stubbed in Phase 4 → deprecation_count === 0 (issue #287)', async () => {
-    // Pilot Scenario 5 (`scenarioDeprecationCatch`) expected the
-    // deprecation-scan gate to surface importer-line findings against
-    // a `@deprecated`-marked file. Phase 4 deferred that gate per the
-    // pilot map §3; the agent's `collectDeprecationFindings` returns
-    // an empty array, so `deprecation_count` is always 0. This
-    // scenario asserts the deferred contract — when issue
-    // https://github.com/audiocontrol-org/deskwork/issues/287 lands,
-    // the assertion flips back to === 1 and the file structure below
-    // matches the original pilot scenario.
+  it('deprecation gate surfaces importer-line findings against a @deprecated file (#287 closure)', async () => {
+    // Pilot Scenario 5 (`scenarioDeprecationCatch`): the deprecation-
+    // scan gate surfaces importer-line findings against a
+    // `@deprecated`-marked file. Port landed in commit 4da4660
+    // (closes https://github.com/audiocontrol-org/deskwork/issues/287);
+    // basename-relative resolution catches the `@/components/OldEnvelope`
+    // importer against the `modules/foo-editor/src/components/OldEnvelope.ts`
+    // candidate.
     const fixture = await makeFixture('deprecation');
     try {
       await plantEmptyRegistries(fixture);
@@ -179,13 +178,13 @@ describe('regime-holdout-detector — core scenarios', () => {
       if (!isRegimeHoldoutFindings(payload)) return;
       expect(
         payload.meta.deprecation_count,
-        'deprecation gate is STUBBED in Phase 4 (issue #287); expected 0',
-      ).toBe(0);
+        `expected at least 1 deprecation finding; got ${payload.meta.deprecation_count}`,
+      ).toBeGreaterThanOrEqual(1);
       const deprecationFinding = payload.findings.find((x) => x.source === 'deprecation');
       expect(
         deprecationFinding,
-        'stubbed gate must not emit any deprecation findings',
-      ).toBeUndefined();
+        'expected a deprecation finding from the post-port scanner',
+      ).toBeDefined();
     } finally {
       await cleanup(fixture);
     }
@@ -208,8 +207,8 @@ describe('regime-holdout-detector — core scenarios', () => {
         'modules/foo-editor/src/PatchEditor.tsx',
         payloads.ADOPTER_HOLDOUT_SOURCE,
       );
-      // Deprecation source files are planted but the stubbed gate
-      // contributes nothing (issue #287); other gates still surface.
+      // Deprecation source files contribute one finding via the
+      // post-port scanner (#287 closure in commit 4da4660).
       await writeSource(
         fixture,
         'modules/foo-editor/src/components/OldEnvelope.ts',
@@ -226,8 +225,7 @@ describe('regime-holdout-detector — core scenarios', () => {
       if (!isRegimeHoldoutFindings(payload)) return;
       expect(payload.meta.anti_pattern_count).toBe(1);
       expect(payload.meta.adopter_manifest_count).toBe(1);
-      // Deferred per issue #287 — stubbed gate emits 0.
-      expect(payload.meta.deprecation_count).toBe(0);
+      expect(payload.meta.deprecation_count).toBeGreaterThanOrEqual(1);
       const expectedTotal =
         payload.meta.anti_pattern_count +
         payload.meta.adopter_manifest_count +

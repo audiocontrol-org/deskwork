@@ -2,12 +2,11 @@
 // + exit-code contract. Routes the `dw-lifecycle check-deprecations`
 // subcommand to the scanner's `main(argv)` and bridges its numeric return
 // code into a process.exit so the dispatcher's contract (handlers exit
-// the process) matches the other subcommands.
-//
-// The underlying check-deprecations is currently a SUBCOMMAND SHELL —
-// see https://github.com/audiocontrol-org/deskwork/issues/287 for the
-// full deprecation-scan port. The shim contract is forward-compatible:
-// when #287 lands, the shim does not change.
+// the process) matches the other subcommands. The deprecation-scan port
+// landed in commit 4da4660 (closes #287); the underlying main() walks
+// `.ts`/`.tsx` for `@deprecated` JSDoc tags + `// DEPRECATED:` line
+// comments within the first 20 lines and resolves importers via the
+// configurable `@/` alias + basename-relative path forms.
 
 import { main } from '../scope-discovery/check-deprecations.js';
 
