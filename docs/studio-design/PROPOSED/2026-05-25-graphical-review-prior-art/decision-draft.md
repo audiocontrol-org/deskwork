@@ -316,7 +316,7 @@ Spike location: [`spikes/graphical-review/text-annotator-html/`](../../../../spi
 | **Library + production deps disk size** | **~6.4 MB unpacked** | `@recogito/text-annotator` (688K) + `@annotorious/core` (392K) + `hotkeys-js` (**4.4 MB unpacked** — surprising; the library's hotkey handling is a meaningful chunk of the install) + transitive (~900K combined). |
 | **Dev tooling footprint (Vite, not shipped)** | adds Vite v5 + transitive | Brings total `node_modules/` for the spike to 42 MB. Vite is spike-only; production integration in `packages/studio/` uses the studio's existing esbuild pass. |
 | **Theming overrides required** | **0 (zero)** | The spike imports `@recogito/text-annotator/text-annotator.css` as-is. The custom CSS in `src/styles.css` styles only the surrounding page chrome (masthead, payload pane, toolbar) — none of it overrides any `.r6o-*` class. Library defaults render usable highlights out of the box. |
-| **Mobile / touch support** | **verified hands-on** at iPhone 13 viewport via Playwright (`scripts/verify.mjs`) | DOM-region pins (the spike's own click handler) work identically on touch and pointer contexts. Text-range pins require the library's selection-driven path — Playwright's synthetic events did not finalize selections on either viewport, so the probe falls back to the library's imperative `addAnnotation(...)` API for the text-range path. Real-device touch validation of text-range selection is a follow-on; the imperative path is what deskwork's production review surface will likely call anyway (annotations restored from disk go through the same imperative entry point). |
+| **Mobile / touch support** | **verified hands-on** at iPhone 13 viewport via Playwright (`scripts/verify.mjs`) | DOM-region pins (the spike's own click handler) work identically on touch and pointer contexts. Text-range pins via the library's event-driven path also work under Playwright's synthetic-event emulation — the probe's `pinTextRangeInIframe` helper synthesizes pointerdown / selectstart / selectionchange / pointerup sequence inside the iframe document; `addAnnotation` fires from the library's own listener. (Earlier drafts of this finding claimed the imperative-API fallback was load-bearing; the I-5 assertion landed in the Task 1.3 review revision falsified that claim by asserting `usedFallback === false`. The imperative-API fallback is retained as a guardrail in case a future Playwright or library change breaks the synthetic-event path.) Real-device touch validation of text-range selection is still a follow-on — Playwright's emulation is not a substitute for a real touchscreen. |
 | **Accessibility — keyboard** | **partial — host must extend** | The iframe body carries `class="r6o-annotatable"` + `tabindex="-1"` (container-level mark for keyboard-event capture, NOT per-annotation tab order). Per-annotation overlay spans (`.r6o-annotation`) have NO `tabindex`, NO `role`, NO `aria-label` — keyboard users cannot Tab between annotations. Tab from the iframe body lands on the next interactive content element (e.g. the `<button>` chrome), bypassing all highlights. |
 | **Accessibility — screen reader** | **inadequate out of the box** | Per the DOM snapshot, `.r6o-annotation` overlay spans have no `aria-label` / `aria-describedby`. The annotation body text would need to be surfaced into an `aria-label` by the host integrator, or via a parallel ARIA-friendly DOM tree adjacent to the highlights. Same shape as Annotorious's accessibility gap; same host-side scaffolding pattern is the answer. |
 
@@ -390,25 +390,28 @@ gap is real; the spike's hand-rolled DOM-selector layer is what fills it.
 
 #### Anchor-resilience results (Step 1.3.3)
 
-The `anchor-resilience.mjs` probe pins three regions, then mutates the
-iframe DOM and verifies the resolver chain. Results:
+The `anchor-resilience.mjs` probe pins four regions (three id-anchored
+plus one nth-of-type-anchored — a `<p>` inside the drafting lane), then
+mutates the iframe DOM and verifies the resolver chain. Results:
 
 | Mutation | Annotation | Resolver outcome | Note |
 |---|---|---|---|
-| (baseline, no mutation) | `#page-title` | resolves via `css` | All three CssSelectors hit. |
+| (baseline, no mutation) | `#page-title` | resolves via `css` | All four CssSelectors hit. |
 | (baseline) | `#thumb-hero` | resolves via `css` | |
 | (baseline) | `#decorative-rule` | resolves via `css` | |
-| Rename `#page-title` → `#page-title-renamed` | `#page-title` | **falls back to `quote`** | CssSelector broken; TextQuoteSelector finds the renamed element by its unchanged text content. |
+| (baseline) | drafting-lane `<p>` (nth-of-type selector) | resolves via `css` | Path-based selector resolves correctly when sibling order is unchanged. |
+| Rename `#page-title` → `#page-title-renamed` | `#page-title` | **falls back to `quote`** | CssSelector broken; TextQuote lands on the deepest matching element (the renamed `<h1>`), not on `<body>` or `<main>` even though their `textContent` also starts with the quoted text. The resolver's deepest-match preference is what makes this finding hold. |
 | Insert sibling `<h2>` before published-lane heading | `#thumb-hero` | resolves via `css` | id-based CssSelectors survive sibling shifts. |
 | Rename `#decorative-rule`'s class | `#decorative-rule` | resolves via `css` | id-based CssSelectors survive class renames. |
-| Total teardown: rename id + change text content | `#page-title` (already renamed) | **falls back to `fragment`** | Both CSS and TextQuote broken; FragmentSelector pixel-offset returns the topmost element at the original coordinates. Resolution is "graceful" — it finds *some* element (may not be the original target if layout reflowed). |
+| **Pure-reorder of same-tag siblings** (swap drafting & published sections) | drafting `<p>` (nth-of-type) | **silently mis-targets via `css`** | nth-of-type CSS selector remains a *valid* query — it just resolves to a different element (the new first section's `<p>`, which is now the published lane). The resolver does NOT cross-check the resolved element against the TextQuoteSelector, so the mis-target is silent: `resolvedVia === 'css'` (not `quote`) and the wrong element is returned. **This is a real failure mode the spike surfaces.** Phase 10's production resolver MUST add a verification step: after CSS resolves, check `element.textContent.trim().slice(0, 80)` against the TextQuoteSelector's `exact` value; if mismatch, fall through to TextQuote search. |
+| Total teardown: rename id + change text content | `#page-title` (already renamed) | **falls back to `fragment`** | Both CSS and TextQuote broken; FragmentSelector pixel-offset returns the topmost element at the original coordinates AND the recorded bbox center remains within the iframe viewport (spatial marker is meaningful). Resolution is "graceful" — it finds *some* element (may not be the original target if layout reflowed). |
 
-**The fallback chain works.** The probe verifies that each layer is
-exercised when the layer above breaks. The third-layer FragmentSelector
-fallback returns "some element at the original coordinates" — useful as
-a "stale anchor" warning surface for the operator, NOT a reliable
-re-anchor. Phase 10's HTML review surface will need a UI affordance
-for "this anchor is stale, please re-pin."
+**11 spec-derived runtime assertions, all pass.** The probe verifies that
+each layer is exercised when the layer above breaks. The third-layer
+FragmentSelector fallback returns "some element at the original
+coordinates" — useful as a "stale anchor" warning surface for the
+operator, NOT a reliable re-anchor. Phase 10's HTML review surface
+will need a UI affordance for "this anchor is stale, please re-pin."
 
 ### W3C alignment — actual emitted payload
 
@@ -541,6 +544,25 @@ layer is a sibling module, not a fork.
 
 ### Open questions
 
+- **Iframe-annotator injection mechanism.** The spike's iframe HTML loads
+  `/src/iframe-annotator.js` via an absolute path that only resolves
+  because Vite serves the project root. Production code in
+  `packages/studio/` will NOT have Vite at runtime. Phase 10 needs to
+  spec the injection mechanism — build-time inline of the iframe
+  annotator into the iframe HTML; serve the annotator from a stable
+  studio-served URL; blob-URL injection by the host; or `postMessage`
+  with a host-side fallback. The spike does NOT solve this; it surfaces
+  the constraint.
+- **CSS-resolver cross-check against TextQuote.** The spike's resolver
+  accepts whatever `doc.querySelector(cssSelector)` returns without
+  verifying that the resolved element's textContent matches the
+  TextQuoteSelector. The anchor-resilience probe's pure-reorder case
+  surfaces this: nth-of-type selectors silently mis-target after sibling
+  reorder. Phase 10's resolver must add a verification step (compare
+  `element.textContent.trim().slice(0, 80)` against the TextQuote
+  `exact` value; on mismatch, fall through to TextQuote search). Without
+  it, "the operator's pin landed on the wrong element after a mockup
+  edit" is a UX bug the spike has already named.
 - **Iframe boundary policy.** The spike same-origins host + iframe so
   `window.parent` direct access works. Production may need cross-origin
   isolation for sandbox reasons; the iframe-side annotator pattern

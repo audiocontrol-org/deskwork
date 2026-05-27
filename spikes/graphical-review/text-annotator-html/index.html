@@ -65,8 +65,9 @@
       <p>
         Text-range pins flow through <code>createTextAnnotator(iframeDoc.body)</code>
         with <code>W3CTextFormat</code> as the adapter. DOM-region pins flow
-        through a thin hand-rolled layer (~80 LOC) in <code>src/dom-anchor.js</code>
-        because <code>@recogito/text-annotator</code> is a text-range annotator and
+        through a thin hand-rolled layer in <code>src/dom-anchor.js</code> (size
+        in the findings doc — under 250 LOC) because
+        <code>@recogito/text-annotator</code> is a text-range annotator and
         cannot natively pin to icon buttons / images / empty decorative divs.
       </p>
     </footer>

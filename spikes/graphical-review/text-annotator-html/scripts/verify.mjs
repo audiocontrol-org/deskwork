@@ -110,8 +110,10 @@ async function pinTextRangeInIframe(page, selectorInIframe) {
     // under Playwright but the library's own addAnnotation API works, that's
     // the finding the spike should report. addAnnotation accepts W3C-shaped
     // input because W3CTextFormat is the configured adapter.
-    let counts = window.__spikeIframe.state.annotations.length;
-    if (counts === 0 && window.__spikeIframe.anno?.addAnnotation) {
+    const countsBeforeFallback = window.__spikeIframe.state.annotations.length;
+    let usedFallback = false;
+    if (countsBeforeFallback === 0 && window.__spikeIframe.anno?.addAnnotation) {
+      usedFallback = true;
       const exact = selection.toString();
       window.__spikeIframe.anno.addAnnotation({
         '@context': 'http://www.w3.org/ns/anno.jsonld',
@@ -128,12 +130,13 @@ async function pinTextRangeInIframe(page, selectorInIframe) {
         }
       });
       window.__spikeIframe.refresh();
-      counts = window.__spikeIframe.state.annotations.length;
     }
+    const iframeCount = window.__spikeIframe.state.annotations.length;
 
     return {
       selectionText: selection.toString(),
-      iframeCount: counts
+      iframeCount,
+      usedFallback
     };
   }, selectorInIframe);
 }
@@ -187,6 +190,9 @@ async function run() {
     const textResult = await pinTextRangeInIframe(page, '[data-lane="drafting"] p');
     console.log(`text selection captured: "${textResult.selectionText.slice(0, 60)}..."`);
     console.log(`iframe-side annotator count after text pin: ${textResult.iframeCount}`);
+    console.log(
+      `text-range pin path: ${textResult.usedFallback ? 'imperative addAnnotation (synthetic events did NOT finalize selection)' : 'event-driven (library selection→pointerup path)'}`
+    );
     await page.waitForTimeout(150);
 
     // ---- DOM REGION PINS ----
@@ -234,6 +240,19 @@ async function run() {
         'text-range pin sets target.source to the fixture URI',
         payload.includes('urn:deskwork-spike:fixture-html-mockup'),
         payload.slice(0, 500)
+      );
+      // Per findings doc § "Integration cost — measured" → Mobile / touch
+      // support row: the spike's synthesized pointerdown/selectstart/
+      // selectionchange/pointerup sequence DOES finalize the selection
+      // via the library's event-driven path (no imperative fallback
+      // needed). The `pinTextRangeInIframe` helper still carries the
+      // imperative-API fallback as a guardrail for future Playwright
+      // versions or library changes; if `usedFallback` ever flips true,
+      // the finding needs re-verification.
+      assert(
+        'text-range pin completes via the library event-driven path (synthetic pointerup finalizes addAnnotation; no imperative fallback used)',
+        textResult.usedFallback === false,
+        { usedFallback: textResult.usedFallback, iframeCount: textResult.iframeCount }
       );
     } else {
       // Text selection inside cross-origin iframes / via Playwright's mouse

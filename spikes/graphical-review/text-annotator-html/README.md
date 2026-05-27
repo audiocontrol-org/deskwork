@@ -115,6 +115,15 @@ events. Annotations from the iframe are exposed to the host page via
 Same-origin (Vite serves both host + fixture) so cross-frame access is
 allowed; postMessage is unnecessary.
 
+**Spike-specific injection mechanism — Vite-coupled.** The fixture's
+`<script type="module" src="/src/iframe-annotator.js">` is an absolute
+path that only resolves because Vite serves the project root. Phase 10
+will need a different injection mechanism — build-time inline of the
+iframe annotator into the iframe HTML, a stable studio-served URL, a
+blob URL injected by the host, or postMessage with a host-side
+fallback. The spike does NOT solve this; it surfaces the constraint so
+the Phase 10 PRD can spec the production-grade injection path.
+
 ### Hand-rolled DOM-selector layer for non-text regions
 
 `@recogito/text-annotator` is a text-range annotator. It has no concept

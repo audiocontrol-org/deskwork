@@ -16,14 +16,9 @@
 // annotation's `__resolvedVia` field so the spike's findings can report
 // which fallback path actually triggered.
 
-const CSS_INVALID_TOKEN_CHARS = /[^a-zA-Z0-9_-]/;
-
 function escapeCssIdent(token) {
   if (!token) return token;
-  if (CSS_INVALID_TOKEN_CHARS.test(token)) {
-    return token.replace(/([^a-zA-Z0-9_-])/g, '\\$1');
-  }
-  return token;
+  return token.replace(/([^a-zA-Z0-9_-])/g, '\\$1');
 }
 
 /**
@@ -180,15 +175,25 @@ export function resolveDomAnnotation(doc, annotation) {
   }
   const quote = selectors.find((s) => s.type === 'TextQuoteSelector');
   if (quote && quote.exact) {
+    // Walk all elements; collect candidates whose trimmed textContent starts
+    // with the quoted text. Prefer the deepest (no candidate descendant), so
+    // we don't resolve to `<body>` when body's textContent merely begins with
+    // the quote. The TreeWalker's SHOW_ELEMENT visits depth-first in document
+    // order, so an ancestor is always visited before its descendants.
+    const candidates = [];
     const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_ELEMENT);
     let node = walker.currentNode;
     while (node) {
       const txt = (node.textContent ?? '').trim();
-      if (txt.startsWith(quote.exact) || txt === quote.exact) {
-        return { element: node, resolvedVia: 'quote' };
+      if (txt.length >= quote.exact.length && txt.startsWith(quote.exact)) {
+        candidates.push(node);
       }
       node = walker.nextNode();
     }
+    const deepest = candidates.find(
+      (cand) => !candidates.some((other) => other !== cand && cand.contains(other))
+    );
+    if (deepest) return { element: deepest, resolvedVia: 'quote' };
   }
   const frag = selectors.find((s) => s.type === 'FragmentSelector');
   if (frag && /^xywh=pixel:(\d+),(\d+),(\d+),(\d+)$/.test(frag.value)) {
