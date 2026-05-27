@@ -14,6 +14,15 @@ build/
 ## Never committed; populated on first run, reused on warm boots.
 plugins/deskwork-studio/.runtime-cache/
 
+## Plugin shell runtime install artifacts. The bin shim runs
+## `npm install --omit=dev` at first invocation to materialize
+## @deskwork/<pkg>@<version> into the plugin's own node_modules tree,
+## which generates a package-lock.json next to the plugin's
+## package.json. The shell's package.json is intentionally empty (no
+## deps); the lockfile describes the runtime-installed graph and
+## should never be committed.
+plugins/*/package-lock.json
+
 ## Runtime / local state
 .env
 .env.*
