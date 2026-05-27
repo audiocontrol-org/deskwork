@@ -150,14 +150,25 @@ date: 2026-05-25
 
 ### Task 4.1: Refactor verb stage-list reads to template-driven
 
+> **Phase 3 follow-ups (from code-quality review 2026-05-27):**
+>
+> - **I-2** — `packages/core/src/entry/induct.ts:18` `targetStage: Stage` is still editorial-narrow. Widen to `string` and gate the runtime check on the resolved lane template (`linearStages` membership). Removes the type-cast surface area that would otherwise infect Phase-4 callers.
+> - **I-3** — `StrictPipelineTemplate` (declared in `packages/core/src/pipelines/types.ts:158`) and `StrictLaneConfig` (`packages/core/src/lanes/types.ts:68`) are exported but currently have zero consumers. Verb refactor MUST consume these narrow types at the bound-template / bound-lane input boundary so typos like `template.lockedSatges` fail at compile time.
+> - **M-8** — `packages/core/src/entry/snapshot.ts:115` blindly lowercases the stage name for the snapshot filename. Editorial stages (`Drafting` → `drafting.md`) work; a custom-template stage like `"My Stage"` would produce `my stage.md` (filesystem-fragile). Add a stage-name → filesystem-safe-token mapping (kebab-case + non-ASCII transliteration or rejection) as part of the verb refactor.
+
 - [ ] Step 4.1.1: Identify every hardcoded stage list across the CLI (`approve`, `iterate`, `cancel`, `induct`, doctor rules) — produce a grep manifest.
 - [ ] Step 4.1.2: Plumb the entry's lane → template through each verb's stage-gate logic; replace hardcoded lists with template reads.
 - [ ] Step 4.1.3: Unit tests covering each verb against both the `editorial` preset (legacy default) and a non-editorial preset (`visual`) — confirm stage advancement, locked-stage refusal, cul-de-sac transitions.
+- [ ] Step 4.1.4: Widen `inductEntry`'s `targetStage` parameter to `string` (Phase 3 I-2); add runtime `linearStages.includes(targetStage)` check that throws with the bound template's allowed stage list on mismatch.
+- [ ] Step 4.1.5: Convert every verb signature that takes a bound template / lane to consume `StrictPipelineTemplate` / `StrictLaneConfig` (Phase 3 I-3). The narrow types exist; the verb refactor is the consumption boundary.
+- [ ] Step 4.1.6: Author `stageNameToFilesystemToken(stage: string): string` helper for snapshot path resolution (Phase 3 M-8). Tokenize: lowercase + kebab-case + reject non-ASCII (or fold via a stable mapping); throw with a clear error if the stage name can't be safely tokenized. Update `snapshot.ts:115` and any other filesystem-path producers that consume stage names.
 
 **Acceptance Criteria:**
 
 - [ ] All four verbs consult the entry's lane template; no hardcoded stage list remains in verb logic.
 - [ ] Existing single-lane projects (legacy `editorial` semantics) continue to work unchanged.
+- [ ] `StrictPipelineTemplate` + `StrictLaneConfig` are consumed at every verb input boundary; the declared-but-unused state from Phase 3 is closed.
+- [ ] Snapshot filenames + any other filesystem-path-from-stage-name producers use the `stageNameToFilesystemToken` helper.
 
 ### Task 4.2: Calendar regen — fix #247 (writer-side)
 

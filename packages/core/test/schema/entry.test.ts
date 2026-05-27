@@ -56,8 +56,15 @@ describe('EntrySchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('parses a valid Drafting entry with reviewState', () => {
-    const valid: Entry = {
+  it('silently drops a vestigial reviewState field on read (Commandment III back-compat)', () => {
+    // Per DESKWORK-STATE-MACHINE.md Commandment III, `reviewState` is
+    // retired from the Entry type. Legacy sidecars still on disk may
+    // carry a vestigial `reviewState` key; the schema's non-strict
+    // mode drops it silently on read, and the parsed Entry has no
+    // such field. The test uses a runtime-typed literal (rather than
+    // the `Entry` type) because TypeScript's type-system correctly
+    // forbids the extra key on the inferred type.
+    const legacy: Record<string, unknown> = {
       uuid: '550e8400-e29b-41d4-a716-446655440001',
       slug: 'my-second-article',
       title: 'My Second',
@@ -65,11 +72,17 @@ describe('EntrySchema', () => {
       source: 'manual',
       currentStage: 'Drafting',
       iterationByStage: { Ideas: 3, Planned: 2, Outlining: 4, Drafting: 7 },
-      reviewState: 'in-review',
+      reviewState: 'in-review', // vestigial — schema drops this
       createdAt: '2026-04-30T10:00:00.000Z',
       updatedAt: '2026-04-30T11:00:00.000Z',
     };
-    expect(EntrySchema.safeParse(valid).success).toBe(true);
+    const result = EntrySchema.safeParse(legacy);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      // The parsed object must NOT carry `reviewState` — Commandment III
+      // requires the field be invisible to consumers post-parse.
+      expect('reviewState' in result.data).toBe(false);
+    }
   });
 
   it('accepts an entry whose stage is not in the legacy editorial enum (Phase 3 graphical-entries)', () => {

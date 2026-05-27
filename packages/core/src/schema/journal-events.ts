@@ -47,6 +47,12 @@ const AnnotationEvent = z.object({
   annotation: AnnotationSchema,
 });
 
+// LEGACY READ-ONLY. Per `DESKWORK-STATE-MACHINE.md` Commandment III,
+// review-state is retired — new code MUST NOT emit `review-state-change`
+// events. This variant remains in the discriminated union solely so
+// historical journals parse cleanly for read paths (calendar render,
+// audit-log import, etc.). Any new code path that appends a journal
+// event of this kind should be rejected in code review.
 const ReviewStateChangeEvent = z.object({
   kind: z.literal('review-state-change'),
   at: z.string().datetime(),
@@ -101,7 +107,13 @@ const LaneMigrationEvent = z.object({
   migration: z.string().min(1),
   source: z.string().min(1),
   target: z.string().min(1),
-  details: z.record(z.string(), z.string()).optional(),
+  // `details` is an intentionally free-form context bag. Lane bootstrap
+  // carries strings (siteId, contentDir, templateId); future migration
+  // kinds may need numbers (entry counts), booleans (dry-run flags),
+  // or nested arrays (per-entry results). `z.unknown()` so the schema
+  // doesn't churn each time a migration variant lands; readers walk the
+  // shape they need.
+  details: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const JournalEventSchema = z.discriminatedUnion('kind', [

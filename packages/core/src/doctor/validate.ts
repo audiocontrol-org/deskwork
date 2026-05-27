@@ -5,7 +5,6 @@ import {
   isLinearPipelineStage,
   isOffPipelineStage,
   type Entry,
-  type Stage,
 } from '../schema/entry.ts';
 import { extractEntriesForMigration } from '../calendar/parse.ts';
 import { readJournalEvents } from '../journal/read.ts';
@@ -334,7 +333,7 @@ async function validateIterationHistory(projectRoot: string): Promise<Validation
     // entries. Treating that as drift would flag every migrated entry.
     const allStages = new Set<string>([...stages, ...Object.keys(journalCount)]);
     for (const stage of allStages) {
-      const sidecarN = entry.iterationByStage[stage as Stage] ?? 0;
+      const sidecarN = entry.iterationByStage[stage] ?? 0;
       const journalN = journalCount[stage] ?? 0;
       if (sidecarN === 0) continue; // migration tolerance: only flag stages the sidecar tracks
       if (journalN > sidecarN) {

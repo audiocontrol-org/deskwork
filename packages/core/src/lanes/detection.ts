@@ -26,9 +26,6 @@ import { existsSync, statSync } from 'node:fs';
 import { extname, join } from 'node:path';
 import type { ArtifactKind } from './types.ts';
 
-const SUPPORTED_EXTENSIONS_HELP =
-  '.md, <dir>/index.html, .html, .png, .jpg, .jpeg, .gif, .webp, .svg';
-
 const IMAGE_EXTENSIONS = new Set([
   '.png',
   '.jpg',
@@ -37,6 +34,15 @@ const IMAGE_EXTENSIONS = new Set([
   '.webp',
   '.svg',
 ]);
+
+// Derived from IMAGE_EXTENSIONS so a future image-extension addition
+// auto-updates the error message. Sorted for deterministic test output.
+const SUPPORTED_EXTENSIONS_HELP = [
+  '.md',
+  '<dir>/index.html',
+  '.html',
+  ...[...IMAGE_EXTENSIONS].sort(),
+].join(', ');
 
 /**
  * Classify `artifactPath` into one of the four supported artifact

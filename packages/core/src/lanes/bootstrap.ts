@@ -76,6 +76,10 @@ export async function bootstrapDefaultLaneIfMissing(
   if (!existsSync(cfgPath)) {
     return { created: false, reason: 'no-config', path: targetPath };
   }
+  // readConfig validates the config against its Zod schema before
+  // returning, so `defaultSite` and `sites` are guaranteed present and
+  // typed. The schema contract lives in `packages/core/src/config.ts`;
+  // if it ever loosens, the `site` check below must widen accordingly.
   const config = readConfig(projectRoot);
   const defaultSiteId = config.defaultSite;
   const site = config.sites[defaultSiteId];
@@ -83,7 +87,10 @@ export async function bootstrapDefaultLaneIfMissing(
     throw new Error(
       `bootstrapDefaultLaneIfMissing: config at ${cfgPath} declares `
       + `defaultSite="${defaultSiteId}" but no matching site under "sites". `
-      + `Run /deskwork:install to fix the config.`,
+      + `Repair the config by adding a "sites.${defaultSiteId}" entry, or `
+      + `updating "defaultSite" to a site that exists. The deskwork plugin's `
+      + `/deskwork:install slash command can rewrite this from scratch if it `
+      + `is loaded in the session.`,
     );
   }
 
