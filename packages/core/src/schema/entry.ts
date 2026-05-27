@@ -57,13 +57,26 @@ const OFF_PIPELINE: readonly Stage[] = ['Blocked', 'Cancelled'] as const;
  * `Stage` union — callers can pass an `Entry.currentStage` without
  * narrowing first. The semantic question being answered is
  * "is this stage one of the editorial lane's linear / off-pipeline
- * stages?" — a non-editorial stage name returns false. Phase 4's
- * lane-aware helpers replace these with template-driven equivalents.
+ * stages?" — a non-editorial stage name returns false.
+ *
+ * @deprecated Phase 4 replaces these with template-driven equivalents
+ *   in `../pipelines/helpers.ts`
+ *   (`isLinearPipelineStageInTemplate`,
+ *   `isOffPipelineStageInTemplate`). New code should resolve the
+ *   entry's lane template via `resolveEntryTemplate` and call the
+ *   template-aware helper. These editorial-narrow forms are kept for
+ *   back-compat with non-verb callers and for the legacy migration
+ *   parser that knows about the editorial vocabulary only.
  */
 export function isLinearPipelineStage(s: string): boolean {
   return (LINEAR_PIPELINE as readonly string[]).includes(s);
 }
 
+/**
+ * @deprecated Phase 4 — see `isLinearPipelineStage` deprecation note.
+ *   Use `isOffPipelineStageInTemplate` against the entry's resolved
+ *   lane template instead.
+ */
 export function isOffPipelineStage(s: string): boolean {
   return (OFF_PIPELINE as readonly string[]).includes(s);
 }
@@ -84,8 +97,15 @@ const SUCCESSOR: Record<Stage, Stage | null> = {
  * to `string` (lane-template-driven `currentStage` values); inputs
  * outside the editorial pipeline's eight known stages return `null`
  * rather than throwing — callers handle the "no successor" case
- * already, and Phase 4 introduces a lane-template-driven successor
- * API that supersedes this editorial-only helper.
+ * already.
+ *
+ * @deprecated Phase 4 replaces this with `nextStageInTemplate` in
+ *   `../pipelines/helpers.ts`. New code should resolve the entry's
+ *   lane template via `resolveEntryTemplate` and call the template-
+ *   aware successor instead. This editorial-narrow form is kept for
+ *   back-compat with non-verb callers that operate on the editorial
+ *   vocabulary specifically (e.g. the legacy calendar migration
+ *   parser).
  */
 export function nextStage(s: string): Stage | null {
   if (

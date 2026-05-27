@@ -84,8 +84,16 @@ export async function run(argv: string[]): Promise<void> {
     fail(err instanceof Error ? err.message : String(err));
   }
 
-  // Resolve target stage — explicit flag overrides defaults.
-  let targetStage: Stage;
+  // Resolve target stage — explicit flag overrides defaults. Per Phase
+  // 4 (graphical-entries) `inductEntry`'s `targetStage` is a `string`
+  // gated by the entry's lane-template `linearStages` membership; the
+  // CLI's editorial-narrow `Stage` check below remains as a CLI-side
+  // convenience for editorial users but the value flows to the core
+  // verb as a plain string. Lane-template stages outside the editorial
+  // vocabulary will fail the CLI-side guard; operators using
+  // non-editorial templates should invoke the core helper directly
+  // until a lane-aware CLI lands.
+  let targetStage: string;
   if (flags.to !== undefined) {
     if (!isLinearPipelineTarget(flags.to)) {
       fail(

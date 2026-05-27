@@ -37,6 +37,7 @@ import {
 } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import type { Entry } from '../schema/entry.ts';
+import { stageNameToFilesystemToken } from '../lanes/stage-token.ts';
 
 export interface SnapshotResult {
   /** True when a snapshot file was written (or already matched on disk). */
@@ -109,10 +110,17 @@ export async function snapshotIndexForStage(
     return { snapshotted: false, skipReason: 'no-index-md' };
   }
   const content = await readFile(indexPath, 'utf8');
+  // Phase 4 Task 4.1.6: use the filesystem-safe tokenizer rather than a
+  // raw `toLowerCase()`. Editorial stages happen to lowercase cleanly
+  // (`Drafting` -> `drafting`), but lane-template stages may contain
+  // whitespace or characters that the lowercase form alone doesn't
+  // sanitize. The tokenizer enforces the filesystem-safe contract and
+  // throws with a descriptive error if a custom stage name cannot be
+  // safely represented.
   const targetPath = join(
     dir,
     'scrapbook',
-    `${priorStage.toLowerCase()}.md`,
+    `${stageNameToFilesystemToken(priorStage)}.md`,
   );
 
   if (await fileExists(targetPath)) {

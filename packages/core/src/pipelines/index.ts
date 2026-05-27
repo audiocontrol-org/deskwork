@@ -16,3 +16,14 @@ export {
   loadPipelineTemplate,
   listAvailablePipelineTemplates,
 } from './loader.ts';
+
+export {
+  isLinearPipelineStageInTemplate,
+  isOffPipelineStageInTemplate,
+  isLockedStageInTemplate,
+  isKnownStageInTemplate,
+  nextStageInTemplate,
+  assertStageInTemplate,
+  terminalLinearStage,
+  preTerminalLinearStage,
+} from './helpers.ts';

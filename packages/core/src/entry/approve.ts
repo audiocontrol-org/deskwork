@@ -2,8 +2,15 @@ import { readSidecar } from '../sidecar/read.ts';
 import { writeSidecar } from '../sidecar/write.ts';
 import { appendJournalEvent } from '../journal/append.ts';
 import { regenerateCalendar } from '../calendar/regenerate.ts';
-import { nextStage } from '../schema/entry.ts';
 import type { Entry } from '../schema/entry.ts';
+import { resolveEntryStrictTemplate } from '../lanes/resolve.ts';
+import {
+  assertStageInTemplate,
+  isLinearPipelineStageInTemplate,
+  isOffPipelineStageInTemplate,
+  nextStageInTemplate,
+  preTerminalLinearStage,
+} from '../pipelines/helpers.ts';
 import { snapshotIndexForStage } from './snapshot.ts';
 import {
   addEntryAnnotation,
@@ -19,13 +26,10 @@ interface ApproveOptions {
 interface ApproveResult {
   readonly entryId: string;
   /**
-   * Per Phase 3 (graphical-entries) the sidecar's currentStage is now a
-   * plain string. The approve verb today is editorial-only — `nextStage`
-   * uses the hardcoded editorial successor map — but the result-type
-   * reports the raw sidecar string so non-editorial sidecars don't
-   * silently fail the `Stage`-narrow type check. Phase 4 introduces a
-   * lane-template-driven `nextStage` and the result type narrows to
-   * the per-lane stage union at that point.
+   * Per Phase 4 (graphical-entries) the verb is template-driven; both
+   * stages are reported as plain strings echoing the lane template's
+   * vocabulary (`Drafting` / `Final` for editorial, `Sketched` /
+   * `Iterating` / `Approved` for visual, etc.).
    */
   readonly fromStage: string;
   readonly toStage: string;
@@ -43,10 +47,19 @@ interface ApproveResult {
 /**
  * Graduate an entry to the next linear-pipeline stage.
  *
+ * Per Phase 4 (graphical-entries) the verb is lane-template-aware:
+ * the entry's `lane` resolves to a `LaneConfig`, which binds a
+ * `PipelineTemplate`; the template's `linearStages` defines the
+ * forward-progress sequence. The verb advances `currentStage` to the
+ * next entry in that list.
+ *
  * Refuses:
- *   - Final → Published (use `publish`, not `approve`)
- *   - Published (terminal)
- *   - Blocked / Cancelled (off-pipeline; induct first)
+ *   - pre-terminal linear stage (e.g. `Final`) — use `publish`, not
+ *     `approve`. The pre-terminal stage is identified positionally as
+ *     `linearStages[length - 2]`.
+ *   - terminal linear stage (e.g. `Published`) — no successor exists.
+ *   - off-pipeline stages (e.g. `Blocked`, `Cancelled`) — induct first.
+ *   - unknown stages — surfaces the template's allowed stage list.
  *
  * On success, in this order (so a kill-power between any two steps
  * leaves a recoverable state):
@@ -58,7 +71,7 @@ interface ApproveResult {
  *     stability under document evolution; comments authored against
  *     the just-archived content cannot reliably rebase).
  *   - Append a `stage-transition` journal event.
- *   - Mutate the sidecar (currentStage advances; reviewState clears).
+ *   - Mutate the sidecar (currentStage advances).
  *   - Regenerate `calendar.md` (issue #148).
  */
 export async function approveEntryStage(
@@ -66,21 +79,47 @@ export async function approveEntryStage(
   opts: ApproveOptions,
 ): Promise<ApproveResult> {
   const sidecar = await readSidecar(projectRoot, opts.uuid);
+  const template = resolveEntryStrictTemplate(sidecar, projectRoot);
   const from = sidecar.currentStage;
-  if (from === 'Final') {
-    throw new Error('Final → Published uses `publish`, not `approve`.');
-  }
-  if (from === 'Published') {
-    throw new Error('Cannot approve: Published is terminal.');
-  }
-  if (from === 'Blocked' || from === 'Cancelled') {
+
+  // Validate the current stage belongs to the template's vocabulary
+  // before any state mutation. Surfaces lane / template misconfiguration
+  // (entry's lane was renamed, template was edited to drop a stage that
+  // entries still reference, etc.) with the full allowed list.
+  assertStageInTemplate(template, from, 'approveEntryStage');
+
+  if (isOffPipelineStageInTemplate(template, from)) {
     throw new Error(
-      `Cannot approve: entry is ${from}; induct it back into the pipeline first.`,
+      `Cannot approve: entry is ${from} (off-pipeline); induct it back into the pipeline first.`,
     );
   }
-  const to = nextStage(from);
+  if (!isLinearPipelineStageInTemplate(template, from)) {
+    // Defensive: assertStageInTemplate succeeded, so `from` is either
+    // linear or off-pipeline. The off-pipeline case is handled above.
+    // This branch is unreachable in practice; the throw exists so a
+    // future template schema with additional stage categories surfaces
+    // the gap rather than silently mis-routing.
+    throw new Error(
+      `Cannot approve from stage ${from}: stage is in template "${template.id}" ` +
+        `but is neither linear nor off-pipeline. This indicates a template-schema ` +
+        `bug — investigate ${template.id}'s definition.`,
+    );
+  }
+
+  const preTerminal = preTerminalLinearStage(template);
+  if (preTerminal !== null && from === preTerminal) {
+    throw new Error(
+      `Cannot approve from ${from}: ${from} is the pre-terminal stage of pipeline ` +
+        `"${template.id}". Use \`publish\`, not \`approve\`, to graduate to the ` +
+        `terminal stage.`,
+    );
+  }
+  const to = nextStageInTemplate(template, from);
   if (to === null) {
-    throw new Error(`Cannot approve from stage ${from} (no successor).`);
+    throw new Error(
+      `Cannot approve from stage ${from}: ${from} is the terminal stage of pipeline ` +
+        `"${template.id}" (no successor).`,
+    );
   }
   const at = new Date().toISOString();
 
@@ -108,8 +147,7 @@ export async function approveEntryStage(
   // 3. Update sidecar with the new stage. Per DESKWORK-STATE-MACHINE.md
   //    Commandment III, reviewState is RETIRED — the schema field is
   //    gone, so no strip-on-transition is needed and no
-  //    `review-state-change` journal event is emitted (the doctor's
-  //    journal-sidecar rule that gated on this invariant is also gone).
+  //    `review-state-change` journal event is emitted.
   const updated: Entry = {
     ...sidecar,
     currentStage: to,
@@ -124,9 +162,7 @@ export async function approveEntryStage(
     from,
     to,
   });
-  // #148: keep calendar.md in sync after every transition. Without
-  // this, the canonical visible representation of the pipeline lags
-  // the SSOT until `doctor --fix=all` is run.
+  // #148: keep calendar.md in sync after every transition.
   await regenerateCalendar(projectRoot);
   return {
     entryId: sidecar.uuid,
@@ -142,11 +178,6 @@ export async function approveEntryStage(
  * that is still active at the moment of approve — a comment is "active"
  * if it has not already been deleted, archived, or implicitly resolved
  * earlier in the journal.
- *
- * The fold is one-pass: we record delete/archive/resolve sets first,
- * then the second loop emits comment ids that are not in any kill set.
- * (resolve != deleted/archived — a resolved comment is still a comment;
- * we only avoid double-archiving a comment that was already archived.)
  */
 function collectActiveCommentIds(raw: DraftAnnotation[]): string[] {
   const deleted = new Set<string>();

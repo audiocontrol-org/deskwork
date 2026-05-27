@@ -76,14 +76,26 @@ describe('iterateEntry', () => {
     // Per DESKWORK-STATE-MACHINE.md Commandment III, iterate does NOT
     // write reviewState. Vestigial reviewState (if present from legacy
     // sidecars) is stripped on the iterate write.
-    expect(updated.reviewState).toBeUndefined();
+    expect('reviewState' in updated).toBe(false);
   });
 
   it('strips vestigial reviewState from legacy sidecars on iterate', async () => {
     const entry = await setupEntry('Drafting');
-    // Simulate a legacy sidecar carrying a reviewState field.
-    const legacySidecar = { ...entry, reviewState: 'in-review' as const };
-    await writeSidecar(projectRoot, legacySidecar);
+    // Simulate a legacy sidecar carrying a reviewState field. Per
+    // DESKWORK-STATE-MACHINE.md Commandment III the schema no longer
+    // carries `reviewState`; we use a runtime-typed record to attach
+    // the vestigial key for the fixture and pass through writeSidecar
+    // via its schema-validating round-trip (the field is dropped on
+    // parse).
+    const legacyRecord: Record<string, unknown> = { ...entry, reviewState: 'in-review' };
+    // writeSidecar's argument is `Entry`; the schema's non-strict mode
+    // drops the vestigial key on parse, so we re-parse here to obtain
+    // a strict Entry before the write. The result is an Entry-typed
+    // value with reviewState absent — exactly what the legacy sidecar
+    // would look like AFTER one read/write round-trip. To test the
+    // legacy-on-disk path, we write the raw JSON directly to disk.
+    const sidecarPathStr = join(projectRoot, '.deskwork', 'entries', `${uuid}.json`);
+    await writeFile(sidecarPathStr, JSON.stringify(legacyRecord));
     await writeFile(
       join(projectRoot, 'docs', slug, 'index.md'),
       `---\ndeskwork:\n  id: ${uuid}\n---\n\n# body\n`,
@@ -91,7 +103,7 @@ describe('iterateEntry', () => {
 
     await iterateEntry(projectRoot, { uuid });
     const updated = await readSidecar(projectRoot, uuid);
-    expect(updated.reviewState).toBeUndefined();
+    expect('reviewState' in updated).toBe(false);
   });
 
   it('produces v(N+1) from existing iteration N', async () => {

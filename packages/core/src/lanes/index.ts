@@ -29,3 +29,10 @@ export {
   bootstrapDefaultLaneIfMissing,
   type BootstrapResult,
 } from './bootstrap.ts';
+
+export {
+  resolveEntryTemplate,
+  resolveEntryStrictTemplate,
+} from './resolve.ts';
+
+export { stageNameToFilesystemToken } from './stage-token.ts';

@@ -55,15 +55,17 @@ describe('approveEntryStage', () => {
   });
 
   it('graduates Drafting → Final', async () => {
-    await setupEntry({ currentStage: 'Drafting', reviewState: 'in-review' });
+    await setupEntry({ currentStage: 'Drafting' });
     const result = await approveEntryStage(projectRoot, { uuid });
     expect(result.toStage).toBe('Final');
     const sidecar = await readSidecar(projectRoot, uuid);
     expect(sidecar.currentStage).toBe('Final');
     // Per DESKWORK-STATE-MACHINE.md Commandment III, reviewState is
     // RETIRED — the schema field is gone, so it's necessarily absent
-    // from any read sidecar.
-    expect(sidecar.reviewState).toBeUndefined();
+    // from any read sidecar. We assert via `in` against a runtime
+    // shape rather than via the typed property access, since the
+    // typed shape no longer carries the field.
+    expect('reviewState' in sidecar).toBe(false);
   });
 
   it('does NOT emit a review-state-change journal event on approve (Commandment III — reviewState is retired)', async () => {

@@ -11,10 +11,35 @@
  * intent, the rule reports findings and presents a prompt; with
  * `--yes`, the safest action is "do nothing" — auto-creating
  * calendar rows or auto-deleting frontmatter is destructive.
+ *
+ * Issue #300 (closed Phase 4):
+ *
+ *   The legacy `parseCalendar` helper that feeds `ctx.calendar.entries`
+ *   only recognized the pre-graphical-entries 7-stage section list
+ *   (`Ideas / Planned / Outlining / Drafting / Review / Paused /
+ *   Published`). Entries under `## Final`, `## Blocked`, or
+ *   `## Cancelled` sections never made it into the parsed entry list,
+ *   so this rule produced false-positive "orphan" findings against
+ *   every Final / Blocked / Cancelled entry in the project.
+ *
+ *   The fix (per #300's recommended option B): do a UUID-set scan of
+ *   every table row across every section in the calendar markdown,
+ *   independent of the section heading. The UUID set is the
+ *   authoritative ground truth — if the UUID appears in ANY table row
+ *   anywhere in the calendar, the file is not orphaned.
+ *
+ *   The scan is permissive about section headers (it doesn't care
+ *   whether the section is `## Final`, `## Blocked`, `## Cancelled`,
+ *   `# Lane: feature-doc` followed by `## Drafting`, or any other
+ *   shape). The cost is potentially over-counting: a UUID that
+ *   appears in a multi-lane composed view's rendered preview table
+ *   would also be in the set. The over-counting is the correct
+ *   bias — we'd rather miss an orphan finding than file a
+ *   false-positive against a real entry.
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
-import { relative } from 'node:path';
+import { join, relative } from 'node:path';
 import { parseFrontmatter, removeFrontmatterPaths } from '../../frontmatter.ts';
 import type {
   DoctorContext,
@@ -25,6 +50,38 @@ import type {
 } from '../types.ts';
 
 const RULE_ID = 'orphan-frontmatter-id';
+
+/**
+ * Pattern matching a UUID-v4 in a markdown table row. Pins on a
+ * leading `|` to anchor the first column (the UUID column in every
+ * deskwork-emitted table). Permissive about surrounding whitespace.
+ */
+const UUID_IN_ROW_RE = /^\|\s*([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\s*\|/gim;
+
+/**
+ * Scan the raw `calendar.md` markdown and collect every UUID that
+ * appears in a table row (first column). The scan is section-agnostic
+ * — it accepts UUIDs under any heading at any depth.
+ *
+ * Falls back to an empty set when the file doesn't exist (a project
+ * that has only just been bootstrapped has no calendar yet; orphan
+ * detection against an empty set produces a finding for every indexed
+ * file, which is the correct behavior — they ARE orphans).
+ */
+function readCalendarUuidSet(projectRoot: string): Set<string> {
+  const calendarPath = join(projectRoot, '.deskwork', 'calendar.md');
+  let raw: string;
+  try {
+    raw = readFileSync(calendarPath, 'utf-8');
+  } catch {
+    return new Set();
+  }
+  const out = new Set<string>();
+  for (const match of raw.matchAll(UUID_IN_ROW_RE)) {
+    out.add(match[1].toLowerCase());
+  }
+  return out;
+}
 
 /**
  * Clear the `deskwork.id` field from a markdown file's frontmatter.
@@ -57,12 +114,20 @@ const rule: DoctorRule = {
 
   async audit(ctx: DoctorContext): Promise<Finding[]> {
     const findings: Finding[] = [];
+    // Issue #300: union the parser-derived UUID set with the
+    // section-agnostic UUID set scraped from the raw calendar markdown.
+    // The parser misses sections it doesn't recognize (Final, Blocked,
+    // Cancelled, and any future lane-template stages); the raw scan
+    // picks them up regardless of section heading.
     const calendarIds = new Set<string>();
     for (const e of ctx.calendar.entries) {
-      if (e.id) calendarIds.add(e.id);
+      if (e.id) calendarIds.add(e.id.toLowerCase());
+    }
+    for (const id of readCalendarUuidSet(ctx.projectRoot)) {
+      calendarIds.add(id);
     }
     for (const [id, absPath] of ctx.index.byId) {
-      if (calendarIds.has(id)) continue;
+      if (calendarIds.has(id.toLowerCase())) continue;
       findings.push({
         ruleId: RULE_ID,
         site: ctx.site,

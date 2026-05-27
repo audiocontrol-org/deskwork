@@ -10,6 +10,13 @@ import { renderCalendar } from './render.ts';
  * if no sidecars exist, calendar.md is rewritten with empty stage
  * sections.
  *
+ * Per Phase 4 (graphical-entries) the renderer is lane-template-aware:
+ * `projectRoot` is now passed through to `renderCalendar` so the
+ * render layer can read the lane configs and emit per-lane sections
+ * for multi-lane projects. Legacy single-lane projects (no
+ * `.deskwork/lanes/` directory) keep their existing render shape — a
+ * single set of editorial stage sections.
+ *
  * Used by:
  *   - the doctor's repair pass (canonical SSOT reconciliation),
  *   - every entry stage-transition helper (#148: keep calendar.md
@@ -41,7 +48,11 @@ export async function regenerateCalendar(projectRoot: string): Promise<void> {
     }
   }
 
-  const md = renderCalendar(entries);
+  // Phase 4 Task 4.2.2: thread projectRoot into renderCalendar so the
+  // lane-aware code path activates when `.deskwork/lanes/*.json` is
+  // present. Single-lane projects fall back to the editorial shape
+  // unchanged.
+  const md = renderCalendar(entries, projectRoot);
   const calendarPath = join(projectRoot, '.deskwork', 'calendar.md');
   await mkdir(dirname(calendarPath), { recursive: true });
   await writeFile(calendarPath, md);
