@@ -174,7 +174,7 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
 ### Task 1: Inventory + widen + summary commands
 
 - [x] `scope-inventory <slug>` — landed in Phase 3; fans 4 universal agents in parallel + Phase 4 config-activated agents.
-- [ ] `scope-widen "<complaint>"` — DEFERRED to a design-heavy follow-up; tracked at [#292](https://github.com/audiocontrol-org/deskwork/issues/292). The verb semantics need 2-3 mockup alternatives via `/frontend-design` before implementation (proposal-vs-direct-write, single-vs-multi-complaint, integration with `/dw-lifecycle:implement`).
+- [x] `scope-widen "<complaint>"` — landed (closes [#292](https://github.com/audiocontrol-org/deskwork/issues/292)). Library API + thin subcommand shim + 15 vitest scenarios. Required positional complaint + `--slug`; optional `--manifest`, `--prd-path`, `--apply`, `--evidence-trail`, `--module-root`, `--quiet`. Default behavior is dry-run (prints delta to stderr, exits 0 without modifying the manifest). Complaint injection strategy: appended as `## Operator complaint (scope-widen)` section to a per-run augmented PRD; the PRD-themed pattern hunter tokenizes the complaint alongside the PRD body so operator words become themed keywords without bespoke parsing. Evidence trail under `docs/<v>/001-IN-PROGRESS/<slug>/scope-inventory/widen-runs/<stamp>-<runId>/`. Delta computation is purely additive; theme keys strip the `<term> (N occurrences)` suffix so occurrence-count shifts don't false-positive as additions. `--apply` merges the delta into the manifest; `generated_by` (e.g., `curated`) is preserved. Smarter complaint parsing (noun phrases, identifiers, additional grep patterns) is deferred to Phase 11's orchestrator-agent work; v1 is plumbing.
 - [x] `scope-summary [--surface <glob>]` — ported verbatim from audiocontrol pilot (`tools/scope-discovery/summary.ts`). 4-field summary line (`total | pending-touching | pending-intra | dispositioned-touching`), `--json` + `--verbose` + `--clones` override; default clones path generalized to `.dw-lifecycle/scope-discovery/clones.yaml`. 15 vitest scenarios cover the pure compute math, programmatic + CLI surfaces, gutted-stub teeth (all-zero counter must fail mixed-fixture assertion).
 
 ### Task 2: Check-* gate commands
@@ -217,7 +217,7 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
 
 ### Task 1: New skill prose (18 skills)
 
-- [ ] For each new skill — broken down per-skill below. 13 of 18 landed; the 5 install-related skills (scope-widen, install-scope-discovery, install-scope-discovery-hooks, install-agent-prompts, uninstall-scope-discovery-hooks, migrate-from-pilot) are deferred to Phase 8 because their behavior is defined by Phase 8 Task 1–5 (install / migrate / uninstall machinery) which has not yet landed — authoring skill prose before the helpers exist would either invent the contract or violate the "no fallbacks / no future-dispatch promises" rule from `agent-discipline.md`.
+- [ ] For each new skill — broken down per-skill below. 18 of 18 landed (`scope-widen` shipped post-#292 closure); the 4 Phase-8 install-related skills (install-scope-discovery, install-scope-discovery-hooks, install-agent-prompts, uninstall-scope-discovery-hooks) landed in Phase 8 commit 6; `migrate-from-pilot` remains deferred per [#291](https://github.com/audiocontrol-org/deskwork/issues/291) (audiocontrol-specific subcommand work).
   - [x] `scope-inventory` — SKILL.md + commands/scope-inventory.md.
   - [x] `scope-summary` — SKILL.md + commands/scope-summary.md.
   - [x] `scope-export` — SKILL.md + commands/scope-export.md.
@@ -232,7 +232,7 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
   - [x] `refresh-clones-baseline` — SKILL.md + commands/refresh-clones-baseline.md.
   - [x] `validate-scope-discovery` — SKILL.md + commands/validate-scope-discovery.md.
   - [x] `check-clones` — SKILL.md + commands/check-clones.md authored in the Phase 6 Task 2 rename pass; sibling `detect-clones` SKILL.md + commands/detect-clones.md are thin redirectors documenting the back-compat alias.
-  - [ ] `scope-widen` — DEFERRED, tracked at [#292](https://github.com/audiocontrol-org/deskwork/issues/292). Subcommand semantics need design via `/frontend-design`; prose blocked on that.
+  - [x] `scope-widen` — SKILL.md + commands/scope-widen.md landed alongside the Phase 6 verb implementation (closes [#292](https://github.com/audiocontrol-org/deskwork/issues/292)). Mirrors `scope-inventory` skill prose style: Steps + Flags + Error handling + When-to-use sections.
   - [x] `install-scope-discovery` — SKILL.md + commands/install-scope-discovery.md landed Phase 8 commit 6 (this run).
   - [x] `install-scope-discovery-hooks` — SKILL.md + commands/install-scope-discovery-hooks.md landed Phase 8 commit 6.
   - [x] `install-agent-prompts` — SKILL.md + commands/install-agent-prompts.md landed Phase 8 commit 6.
@@ -241,11 +241,11 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
 
 ### Task 2: Updated skill prose (5 skills)
 
-- [ ] `/dw-lifecycle:define` — document auto-scope-inventory + `--no-scope-inventory`
+- [x] `/dw-lifecycle:define` — document auto-scope-inventory + `--no-scope-inventory`
 - [ ] `/dw-lifecycle:implement` — document auto-scope-widen + dispatch-wrapper engagement + `--no-scope-widen`
-- [ ] `/dw-lifecycle:review` — document auto-clone-detector + `--no-clone-check`
-- [ ] `/dw-lifecycle:doctor` — document new doctor rules
-- [ ] `/dw-lifecycle:customize` — document `scope-discovery <name>` category
+- [x] `/dw-lifecycle:review` — document auto-clone-detector + `--no-clone-check`
+- [x] `/dw-lifecycle:doctor` — document new doctor rules
+- [x] `/dw-lifecycle:customize` — document `scope-discovery <name>` category
 
 **Acceptance Criteria:**
 - [ ] All ~23 skills discoverable via slash-command picker

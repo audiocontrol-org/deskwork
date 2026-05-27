@@ -13,6 +13,7 @@ import { checkAdopters } from './subcommands/check-adopters.js';
 import { checkEditorSymmetry } from './subcommands/check-editor-symmetry.js';
 import { checkRefactorPreconditions } from './subcommands/check-refactor-preconditions.js';
 import { scopeInventory } from './subcommands/scope-inventory.js';
+import { scopeWiden } from './subcommands/scope-widen.js';
 import { batchDispose } from './subcommands/batch-dispose.js';
 import { checkDispositionSurvivor } from './subcommands/check-disposition-survivor.js';
 import { scopeSummary } from './subcommands/scope-summary.js';
@@ -52,6 +53,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'check-editor-symmetry': checkEditorSymmetry,
   'check-refactor-preconditions': checkRefactorPreconditions,
   'scope-inventory': scopeInventory,
+  'scope-widen': scopeWiden,
   'batch-dispose': batchDispose,
   'check-disposition-survivor': checkDispositionSurvivor,
   'scope-summary': scopeSummary,

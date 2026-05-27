@@ -1,4 +1,4 @@
-generated_at: 2026-05-27T00:17:35.562Z
+generated_at: 2026-05-27T00:43:31.853Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -744,6 +744,20 @@ clones:
       - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:226:234
     disposition: pending
     reason: null
+  - id: c86cf0b21100
+    lines: 11
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/scope-inventory.ts:153:163
+      - plugins/dw-lifecycle/src/scope-discovery/scope-widen.ts:74:84
+    disposition: keep-with-reason
+    reason: scope-widen mirrors scope-inventory's CLI-shell boilerplate (slug-regex validation, makeRunDir, scopeWidenMain's parseCli try/catch). Extracting shared helpers would tangle two subcommands' control flow for marginal de-duplication benefit; the symmetry is desirable for operator UX consistency.
+  - id: babc9b39137a
+    lines: 10
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/scope-inventory.ts:347:356
+      - plugins/dw-lifecycle/src/scope-discovery/scope-widen.ts:242:251
+    disposition: keep-with-reason
+    reason: scope-widen mirrors scope-inventory's CLI-shell boilerplate (slug-regex validation, makeRunDir, scopeWidenMain's parseCli try/catch). Extracting shared helpers would tangle two subcommands' control flow for marginal de-duplication benefit; the symmetry is desirable for operator UX consistency.
   - id: 653e6225d350
     lines: 11
     members:
@@ -751,6 +765,13 @@ clones:
       - plugins/dw-lifecycle/src/scope-discovery/synthesis-cli.ts:146:156
     disposition: pending
     reason: null
+  - id: aedb466ddbbf
+    lines: 13
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/scope-inventory.ts:93:105
+      - plugins/dw-lifecycle/src/scope-discovery/scope-widen-cli.ts:104:116
+    disposition: keep-with-reason
+    reason: scope-widen mirrors scope-inventory's CLI-shell boilerplate (slug-regex validation, makeRunDir, scopeWidenMain's parseCli try/catch). Extracting shared helpers would tangle two subcommands' control flow for marginal de-duplication benefit; the symmetry is desirable for operator UX consistency.
   - id: 0a9bedfbb1cf
     lines: 7
     members:
