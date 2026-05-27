@@ -55,10 +55,10 @@ date: 2026-05-25
 
 ### Task 1.6: Write decision document
 
-- [ ] Step 1.6.1: Move the draft to `docs/studio-design/ACCEPTED/<date>-graphical-review-prior-art/brief.md` per the project's design-archive contract.
-- [ ] Step 1.6.2: For each concern (annotation data model / image annotation UI / HTML annotation UI / threading / screenshot capture / screenshot markup), record: chosen approach, rationale, dependency footprint, adopter-facing impact (new peer dep, bundle size delta), v1 scope vs deferred.
-- [ ] Step 1.6.3: Add a "Reject log" section listing every candidate considered + the specific reason rejected (per the design-archive convention's REJECTED tracking).
-- [ ] Step 1.6.4: Append a one-line entry to `DESIGN-STANDARDS.md`'s change log per the project rule (design decisions with global impact land in the standards doc + an archive entry).
+- [x] Step 1.6.1: Decision brief landed at [`docs/studio-design/ACCEPTED/2026-05-26-graphical-review-prior-art/brief.md`](../../../studio-design/ACCEPTED/2026-05-26-graphical-review-prior-art/brief.md) per the project's design-archive contract. The prior `PROPOSED/2026-05-25-graphical-review-prior-art/` directory is retired — `candidates.md` (Task 1.1 matrix) moved into the ACCEPTED entry alongside `evidence.md` (the verbose backing, formerly `decision-draft.md`) and the new `brief.md` (focused summary per the design-standards convention).
+- [x] Step 1.6.2: Each of the six concerns (annotation data model / image annotation UI / HTML annotation UI / threading / screenshot capture / screenshot markup) records chosen approach + rationale + dependency footprint + adopter-facing impact + v1 scope vs. deferred in `brief.md` § "Decisions — by concern."
+- [x] Step 1.6.3: Reject log lives as a companion entry at [`docs/studio-design/REJECTED/2026-05-26-graphical-review-alternatives/brief.md`](../../../studio-design/REJECTED/2026-05-26-graphical-review-alternatives/brief.md) — consolidates 25+ rejected candidates across the six concerns (Hypothes.is excluded under Architecture A; tldraw licence-disqualified; html2canvas unmaintained; marker.js2 Linkware; react-image-annotate stale; LabelStudio server-required; BugHerd/Marker.io/Pastel/Frame.io/Loom/Penpot Cloud closed appliances; SVG.js / Pixi.js / Paper.js wrong-shape primitives; etc.) with specific reasons for each.
+- [x] Step 1.6.4: `DESIGN-STANDARDS.md` change log appended with a 2026-05-26 entry naming the picked libraries, the Architecture A confirmation, the five spike directories, and links to the ACCEPTED + REJECTED briefs.
 
 **Acceptance Criteria:**
 
