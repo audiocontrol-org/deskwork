@@ -1,0 +1,9 @@
+{
+  "$rationale": "Editorial pipeline — the legacy single-pipeline workflow for blog posts, essays, and long-form writing. Stages exactly match the pre-feature `Stage` enum so a pre-graphical-entries project with no operator-authored config maps cleanly into this template (the auto-migration in Phase 4 attaches every existing entry to id=editorial without renaming stages). Ideas captures a raw note; Planned commits to writing it; Outlining is the structural pass; Drafting is the prose pass; Final is the pre-publication review lock (iterate refused, content immutable, awaiting publish verb); Published is the terminal stage with public commit + version assigned. Blocked / Cancelled are the off-pipeline cul-de-sacs.",
+  "id": "editorial",
+  "name": "Editorial",
+  "description": "Long-form writing pipeline (blog posts, essays, manuscripts). Mirrors the pre-graphical-entries single-pipeline lifecycle.",
+  "linearStages": ["Ideas", "Planned", "Outlining", "Drafting", "Final", "Published"],
+  "lockedStages": ["Final"],
+  "offPipelineStages": ["Blocked", "Cancelled"]
+}

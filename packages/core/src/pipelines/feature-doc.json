@@ -1,0 +1,9 @@
+{
+  "$rationale": "Feature-doc pipeline — for engineering feature documentation (PRDs, design specs, ADRs, internal RFCs). Defined captures problem + scope agreed at the operator level; Drafting is the spec author's pass; Approved is the design-locked state (spec finalized, ready for implementation kickoff); Implemented is the doubly-locked state where the spec is committed AND the implementation has shipped (post-merge, post-release); Complete is the terminal stage (artifact retired or archived after its implementation lifecycle is fully closed out). Two locked stages because both Approved and Implemented are review-frozen: Approved freezes the spec text against re-iteration during build; Implemented freezes the post-ship state against drive-by edits. Cancel + Block apply to abandoned or paused work.",
+  "id": "feature-doc",
+  "name": "Feature Documentation",
+  "description": "Engineering feature documentation pipeline (PRDs, design specs, ADRs, internal RFCs). Approved locks the spec for implementation; Implemented locks the post-ship state.",
+  "linearStages": ["Defined", "Drafting", "Approved", "Implemented", "Complete"],
+  "lockedStages": ["Approved", "Implemented"],
+  "offPipelineStages": ["Blocked", "Cancelled"]
+}

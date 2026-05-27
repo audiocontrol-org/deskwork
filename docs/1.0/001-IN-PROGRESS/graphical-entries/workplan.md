@@ -74,32 +74,32 @@ date: 2026-05-25
 
 ### Task 2.1: PipelineTemplate type + JSON schema
 
-- [ ] Step 2.1.1: Author the `PipelineTemplate` type at `packages/core/src/pipelines/types.ts` matching the PRD's interface (id, name, description, linearStages, lockedStages?, offPipelineStages).
-- [ ] Step 2.1.2: Author a Zod schema for `PipelineTemplate` at the same location; export schema + inferred type.
-- [ ] Step 2.1.3: Invariant tests: linearStages must be non-empty; lockedStages must be a subset of linearStages; `Cancelled` is reserved if present in offPipelineStages.
+- [x] Step 2.1.1: Author the `PipelineTemplate` type at `packages/core/src/pipelines/types.ts` matching the PRD's interface (id, name, description, linearStages, lockedStages?, offPipelineStages).
+- [x] Step 2.1.2: Author a Zod schema for `PipelineTemplate` at the same location; export schema + inferred type.
+- [x] Step 2.1.3: Invariant tests: linearStages must be non-empty; lockedStages must be a subset of linearStages; `Cancelled` is reserved if present in offPipelineStages.
 
 ### Task 2.2: Override resolver extension
 
-- [ ] Step 2.2.1: Locate the existing override-resolver infrastructure at `packages/core/src/overrides.ts` (THESIS Consequence 3 machinery).
-- [ ] Step 2.2.2: Add a `loadPipelineTemplate(id: string, projectRoot: string)` function that checks `<projectRoot>/.deskwork/pipelines/<id>.json` first, falls back to `packages/core/src/pipelines/<id>.json`.
-- [ ] Step 2.2.3: Add a `listAvailablePipelineTemplates(projectRoot: string)` function that returns every template found in project overrides + plugin defaults, de-duplicated by id.
-- [ ] Step 2.2.4: Unit tests covering override-takes-precedence + plugin-default-fallback + listing-deduplication.
+- [x] Step 2.2.1: Locate the existing override-resolver infrastructure at `packages/core/src/overrides.ts` (THESIS Consequence 3 machinery).
+- [x] Step 2.2.2: Add a `loadPipelineTemplate(id: string, projectRoot: string)` function that checks `<projectRoot>/.deskwork/pipelines/<id>.json` first, falls back to `packages/core/src/pipelines/<id>.json`.
+- [x] Step 2.2.3: Add a `listAvailablePipelineTemplates(projectRoot: string)` function that returns every template found in project overrides + plugin defaults, de-duplicated by id.
+- [x] Step 2.2.4: Unit tests covering override-takes-precedence + plugin-default-fallback + listing-deduplication.
 
 ### Task 2.3: Ship five preset templates
 
-- [ ] Step 2.3.1: Author `packages/core/src/pipelines/editorial.json` matching the legacy single-pipeline stage names exactly: linearStages `["Ideas","Planned","Outlining","Drafting","Final","Published"]`, lockedStages `["Final"]`, offPipelineStages `["Blocked","Cancelled"]`. Include a header comment block documenting the lifecycle rationale.
-- [ ] Step 2.3.2: Author `packages/core/src/pipelines/visual.json` (Sketched / Iterating / Approved / Shipped; locked: Approved; off: Blocked / Cancelled / Archived) with rationale.
-- [ ] Step 2.3.3: Author `packages/core/src/pipelines/feature-doc.json` (Defined / Drafting / Approved / Implemented / Complete; locked: Approved / Implemented; off: Blocked / Cancelled) with rationale.
-- [ ] Step 2.3.4: Author `packages/core/src/pipelines/qa-plan.json` (Drafted / Reviewed / Tested / Approved; locked: Reviewed; off: Blocked / Cancelled / Archived) with rationale.
-- [ ] Step 2.3.5: Author `packages/core/src/pipelines/blog-post.json` (Idea / Drafting / Edited / Published; locked: Edited; off: Blocked / Cancelled) with rationale.
-- [ ] Step 2.3.6: Validate each preset against the Zod schema in a unit test; assert all five load cleanly via the resolver.
+- [x] Step 2.3.1: Author `packages/core/src/pipelines/editorial.json` matching the legacy single-pipeline stage names exactly: linearStages `["Ideas","Planned","Outlining","Drafting","Final","Published"]`, lockedStages `["Final"]`, offPipelineStages `["Blocked","Cancelled"]`. Include a header comment block documenting the lifecycle rationale.
+- [x] Step 2.3.2: Author `packages/core/src/pipelines/visual.json` (Sketched / Iterating / Approved / Shipped; locked: Approved; off: Blocked / Cancelled / Archived) with rationale.
+- [x] Step 2.3.3: Author `packages/core/src/pipelines/feature-doc.json` (Defined / Drafting / Approved / Implemented / Complete; locked: Approved / Implemented; off: Blocked / Cancelled) with rationale.
+- [x] Step 2.3.4: Author `packages/core/src/pipelines/qa-plan.json` (Drafted / Reviewed / Tested / Approved; locked: Reviewed; off: Blocked / Cancelled / Archived) with rationale.
+- [x] Step 2.3.5: Author `packages/core/src/pipelines/blog-post.json` (Idea / Drafting / Edited / Published; locked: Edited; off: Blocked / Cancelled) with rationale.
+- [x] Step 2.3.6: Validate each preset against the Zod schema in a unit test; assert all five load cleanly via the resolver.
 
 **Acceptance Criteria:**
 
-- [ ] Each preset is loadable via `loadPipelineTemplate(id, anyProjectRoot)` and passes schema validation.
-- [ ] Project overrides at `<root>/.deskwork/pipelines/<id>.json` take precedence over the plugin default.
-- [ ] `listAvailablePipelineTemplates` returns the union of plugin defaults + project overrides with no duplicates.
-- [ ] All five preset JSON files carry header comments documenting their lifecycle rationale (operator-authored custom pipelines have a working exemplar to copy from).
+- [x] Each preset is loadable via `loadPipelineTemplate(id, anyProjectRoot)` and passes schema validation.
+- [x] Project overrides at `<root>/.deskwork/pipelines/<id>.json` take precedence over the plugin default.
+- [x] `listAvailablePipelineTemplates` returns the union of plugin defaults + project overrides with no duplicates.
+- [x] All five preset JSON files carry header comments documenting their lifecycle rationale (operator-authored custom pipelines have a working exemplar to copy from). [Note: JSON lacks `//` comments; rationale is carried as a top-level `"$rationale"` string field, ignored by the Zod schema via `.passthrough()` and documented in `loader.ts` JSDoc.]
 
 ## Phase 3: Lane data model + config loader + entry schema delta  ·  [#304](https://github.com/audiocontrol-org/deskwork/issues/304)
 

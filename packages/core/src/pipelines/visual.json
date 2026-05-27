@@ -1,0 +1,9 @@
+{
+  "$rationale": "Visual pipeline — for graphical / design artifacts (diagrams, illustrations, mockups, asset cuts). Sketched is the initial rough; Iterating is the operator-feedback loop where successive revisions land; Approved is the pre-ship lock (the visual is accepted, awaiting integration into a publication target); Shipped is the terminal stage (asset committed, version assigned). The off-pipeline set adds Archived alongside Blocked / Cancelled — old asset cuts that are superseded but kept for provenance live there.",
+  "id": "visual",
+  "name": "Visual",
+  "description": "Graphical / design artifact pipeline (diagrams, illustrations, mockups). Approved is the pre-ship lock; Shipped is the terminal commit.",
+  "linearStages": ["Sketched", "Iterating", "Approved", "Shipped"],
+  "lockedStages": ["Approved"],
+  "offPipelineStages": ["Blocked", "Cancelled", "Archived"]
+}

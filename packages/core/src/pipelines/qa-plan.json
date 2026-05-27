@@ -1,0 +1,9 @@
+{
+  "$rationale": "QA-plan pipeline — for test plans and verification artifacts attached to features or releases. Drafted is the initial enumeration of cases; Reviewed is the locked state after peer / lead review (no further edits to the plan body without re-iteration); Tested is the executed state where each case has a recorded outcome; Approved is the terminal stage where the plan is ratified as the record of what was verified. Reviewed is the locked stage because between review and execution the plan must not silently mutate — otherwise the executed-vs-planned audit trail breaks. Archived joins Blocked / Cancelled in the off-pipeline set for retired plans superseded by newer test scopes.",
+  "id": "qa-plan",
+  "name": "QA Plan",
+  "description": "Test plan / verification pipeline (release QA, feature QA, regression batches). Reviewed locks the plan body before execution.",
+  "linearStages": ["Drafted", "Reviewed", "Tested", "Approved"],
+  "lockedStages": ["Reviewed"],
+  "offPipelineStages": ["Blocked", "Cancelled", "Archived"]
+}

@@ -149,6 +149,10 @@
       "types": "./dist/paths.d.ts",
       "default": "./dist/paths.js"
     },
+    "./pipelines": {
+      "types": "./dist/pipelines/index.d.ts",
+      "default": "./dist/pipelines/index.js"
+    },
     "./rename-slug": {
       "types": "./dist/rename-slug.d.ts",
       "default": "./dist/rename-slug.js"
@@ -207,8 +211,8 @@
     }
   },
   "scripts": {
-    "build": "tsc -b tsconfig.build.json && cp src/*.mjs dist/ && mkdir -p dist/doctor/rules && cp src/doctor/rules/*.ts dist/doctor/rules/",
-    "prepack": "tsc -b tsconfig.build.json && cp src/*.mjs dist/ && mkdir -p dist/doctor/rules && cp src/doctor/rules/*.ts dist/doctor/rules/",
+    "build": "tsc -b tsconfig.build.json && cp src/*.mjs dist/ && mkdir -p dist/doctor/rules && cp src/doctor/rules/*.ts dist/doctor/rules/ && mkdir -p dist/pipelines && cp src/pipelines/*.json dist/pipelines/",
+    "prepack": "tsc -b tsconfig.build.json && cp src/*.mjs dist/ && mkdir -p dist/doctor/rules && cp src/doctor/rules/*.ts dist/doctor/rules/ && mkdir -p dist/pipelines && cp src/pipelines/*.json dist/pipelines/",
     "dev": "npm run build && tsc -b tsconfig.build.json --watch",
     "test": "vitest run",
     "test:watch": "vitest",
