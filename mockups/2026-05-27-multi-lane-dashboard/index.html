@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Multi-lane dashboard · Phase 5 mockup directions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F5F1E8;
+    --paper-2: #ECE6D4;
+    --paper-3: #DFD7BF;
+    --ink: #1A1614;
+    --ink-soft: #3D3530;
+    --faded: #8A7F70;
+    --faded-2: #C7BEAE;
+    --red: #B8362A;
+    --blue: #2A4B7C;
+    --green: #2E5D45;
+    --kraft: #8A7250;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #2C2823;
+    background-image:
+      radial-gradient(circle at 30% 20%, rgba(184, 54, 42, 0.08), transparent 50%),
+      radial-gradient(circle at 70% 80%, rgba(42, 75, 124, 0.06), transparent 50%);
+    color: var(--paper);
+    font-family: var(--display);
+    min-height: 100vh;
+    padding: 3rem 1.5rem 5rem;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; }
+  .top { text-align: center; margin-bottom: 2.5rem; }
+  .kicker {
+    color: var(--faded-2); font-family: var(--mono);
+    font-size: 0.7rem; letter-spacing: 0.22em; text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+  h1 {
+    font-family: var(--display); font-style: italic;
+    font-variation-settings: "opsz" 48, "wght" 500;
+    font-size: 2.4rem; color: var(--paper);
+    margin-bottom: 0.8rem;
+  }
+  .lede {
+    font-family: var(--display); color: var(--faded-2);
+    font-size: 1.05rem; line-height: 1.6;
+    max-width: 60ch; margin: 0 auto;
+  }
+
+  /* The question card — drives the operator's decision */
+  .question-card {
+    background: rgba(245,241,232,0.04);
+    border: 1px solid rgba(245,241,232,0.12);
+    border-left: 3px solid var(--red);
+    padding: 1.4rem 1.6rem;
+    margin: 2.5rem 0 2.8rem;
+    font-family: var(--display);
+    color: var(--paper);
+  }
+  .question-card .qh {
+    font-family: var(--mono);
+    font-size: 0.65rem; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--red);
+    margin-bottom: 0.6rem;
+  }
+  .question-card h2 {
+    font-family: var(--display); font-style: italic;
+    font-size: 1.5rem; font-weight: 500;
+    font-variation-settings: "opsz" 36, "wght" 500;
+    margin-bottom: 0.6rem;
+  }
+  .question-card p {
+    font-size: 0.95rem; line-height: 1.65; color: var(--faded-2);
+    margin-bottom: 0.5rem;
+  }
+  .question-card .axis {
+    margin-top: 1rem;
+    font-family: var(--mono); font-size: 0.78rem;
+    letter-spacing: 0.05em; line-height: 1.6;
+    color: var(--paper);
+  }
+  .question-card .axis strong {
+    display: inline-block; min-width: 110px;
+    color: var(--red); font-weight: 500;
+  }
+
+  /* Direction cards */
+  .cards { display: grid; gap: 1.6rem; grid-template-columns: 1fr; margin-bottom: 2.8rem; }
+  @media (min-width: 900px) { .cards { grid-template-columns: repeat(3, 1fr); } }
+
+  .card {
+    background: var(--paper);
+    border-radius: 4px;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    color: var(--ink);
+    box-shadow: 0 18px 40px rgba(0,0,0,0.35);
+    border: 1px solid rgba(0,0,0,0.1);
+  }
+  .card .card-head {
+    background: var(--paper-2);
+    padding: 0.9rem 1.1rem;
+    border-bottom: 2px solid var(--ink);
+    display: flex; align-items: baseline; gap: 0.55rem;
+  }
+  .card .card-head .num {
+    font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em;
+    color: var(--faded); text-transform: uppercase;
+  }
+  .card .card-head .name {
+    font-family: var(--display); font-style: italic; font-size: 1.4rem;
+    font-variation-settings: "opsz" 28, "wght" 500;
+    color: var(--ink);
+  }
+  .card .card-head .badge {
+    margin-left: auto;
+    font-family: var(--mono); font-size: 0.58rem; letter-spacing: 0.16em;
+    text-transform: uppercase;
+    padding: 0.18rem 0.45rem; border-radius: 2px;
+  }
+  .card .card-head .badge.compliant {
+    background: var(--green); color: var(--paper);
+  }
+  .card .card-head .badge.proposes {
+    background: var(--red); color: var(--paper);
+  }
+  .card .body {
+    padding: 1rem 1.2rem 1.2rem;
+    flex: 1;
+    display: flex; flex-direction: column;
+  }
+  .card .one-liner {
+    font-family: var(--display); font-style: italic;
+    font-size: 1.05rem; line-height: 1.4;
+    color: var(--ink); margin-bottom: 0.7rem;
+    border-bottom: 1px dashed var(--paper-3);
+    padding-bottom: 0.7rem;
+  }
+  .card dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.45rem 0.7rem; }
+  .card dt {
+    font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.15em;
+    text-transform: uppercase; color: var(--faded);
+    padding-top: 0.15rem;
+  }
+  .card dd { font-family: var(--display); font-size: 0.92rem; line-height: 1.5; color: var(--ink-soft); }
+  .card .open {
+    margin-top: 1.1rem; display: block;
+    text-align: center;
+    padding: 0.7rem 0.9rem;
+    background: var(--ink); color: var(--paper);
+    font-family: var(--mono); font-size: 0.72rem;
+    letter-spacing: 0.16em; text-transform: uppercase;
+    text-decoration: none; cursor: pointer;
+    border-radius: 2px;
+  }
+  .card .open:hover { background: var(--red); }
+
+  /* Comparison rows */
+  .compare-section {
+    margin-top: 3rem;
+  }
+  .compare-section h2 {
+    font-family: var(--display); font-style: italic; font-size: 1.6rem;
+    color: var(--paper); margin-bottom: 1rem;
+  }
+  table.compare {
+    width: 100%; border-collapse: collapse;
+    color: var(--ink); background: var(--paper);
+    border-radius: 4px; overflow: hidden;
+    box-shadow: 0 10px 24px rgba(0,0,0,0.25);
+  }
+  table.compare th, table.compare td {
+    padding: 0.7rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--paper-3);
+    font-family: var(--display); font-size: 0.92rem;
+    vertical-align: top;
+  }
+  table.compare th {
+    background: var(--paper-2);
+    font-family: var(--mono); font-weight: 500;
+    font-size: 0.7rem; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--ink-soft);
+  }
+  table.compare td:first-child {
+    font-family: var(--mono); font-size: 0.7rem;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--faded); white-space: nowrap;
+  }
+  table.compare .y { color: var(--green); font-weight: 500; }
+  table.compare .n { color: var(--red); font-weight: 500; }
+  table.compare .m { color: var(--blue); font-weight: 500; }
+
+  .next-steps {
+    margin-top: 2.6rem;
+    background: rgba(245,241,232,0.04);
+    border: 1px solid rgba(245,241,232,0.12);
+    padding: 1.4rem 1.6rem;
+    font-family: var(--display); color: var(--paper);
+  }
+  .next-steps h2 {
+    font-family: var(--mono); font-size: 0.7rem;
+    letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--red); margin-bottom: 0.7rem;
+  }
+  .next-steps p {
+    line-height: 1.7; color: var(--faded-2); margin-bottom: 0.6rem; font-size: 0.95rem;
+  }
+  .next-steps code {
+    font-family: var(--mono); font-size: 0.85rem;
+    background: rgba(245,241,232,0.08); padding: 0.05rem 0.3rem; border-radius: 2px;
+  }
+  .next-steps strong { color: var(--paper); font-weight: 500; font-family: var(--display); font-style: italic; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div class="kicker">graphical-entries · phase 5 · 2026-05-27</div>
+      <h1>Multi-lane dashboard — three structural directions</h1>
+      <p class="lede">Phase 4 made the verbs template-aware. Phase 5 surfaces multiple lanes in the studio. These three mockups resolve the same problem differently within the established press-check aesthetic.</p>
+    </div>
+
+    <div class="question-card">
+      <div class="qh">The decision</div>
+      <h2>How should N lanes be surfaced in one viewport?</h2>
+      <p>The existing Desk surface is a stack of sections. With multi-lane, the Longform domain now has multiple parallel pipelines, each with its own stage list. The structural question: do lanes stack vertically (more sections), switch laterally (sub-navigation), or co-exist as horizontal swimlanes (kanban-of-kanbans)?</p>
+      <p>Each direction picks one answer. Tap through to see fixture data: 3 lanes (Editorial 6-stage, Mockups 4-stage, QA 4-stage) at desktop + mobile breakpoints, with empty-lane states, the lane-visibility affordance, and saved composed-view controls.</p>
+      <div class="axis">
+        <div><strong>Density →</strong> Direction 3 is densest (everything visible); Direction 2 is most focused (one lane at a time); Direction 1 is in between (lanes scroll).</div>
+        <div><strong>Standards →</strong> Directions 1 + 3 honor every existing rule. Direction 2 explicitly proposes amending the no-top-level-tab-bar rule to allow per-section sub-navigation.</div>
+      </div>
+    </div>
+
+    <div class="cards">
+      <!-- Direction 1 -->
+      <article class="card">
+        <div class="card-head">
+          <span class="num">D1</span>
+          <span class="name">Lane Stack</span>
+          <span class="badge compliant">Compliant</span>
+        </div>
+        <div class="body">
+          <div class="one-liner">Each lane is a section. Sections stack vertically.</div>
+          <dl>
+            <dt>Density</dt><dd>Medium — operator scrolls between lanes; one lane's expanded entries visible at a time.</dd>
+            <dt>Mental model</dt><dd>Extension of existing Desk IA (Longform / Shortform / Adjacent + N lane sections).</dd>
+            <dt>Lane visibility</dt><dd>Right-rail panel (desktop) / bottom-sheet trigger (mobile).</dd>
+            <dt>Many lanes</dt><dd>Vertical scroll + collapse-to-header per lane.</dd>
+            <dt>Composed views</dt><dd>"Saved views" pill bar in the right rail.</dd>
+            <dt>Standards</dt><dd>No deviation. Mirrors the existing stacked-section pattern.</dd>
+          </dl>
+          <a class="open" href="./direction-1-lane-stack.html">Open Direction 1 →</a>
+        </div>
+      </article>
+
+      <!-- Direction 2 -->
+      <article class="card">
+        <div class="card-head">
+          <span class="num">D2</span>
+          <span class="name">Lane Bar</span>
+          <span class="badge proposes">Proposes change</span>
+        </div>
+        <div class="body">
+          <div class="one-liner">Per-section chip strip switches between lanes. One lane visible at a time.</div>
+          <dl>
+            <dt>Density</dt><dd>Low — most focus on the active lane; chrome cost is the chip strip.</dd>
+            <dt>Mental model</dt><dd>Filing tabs / chip nav within the Longform section.</dd>
+            <dt>Lane visibility</dt><dd>⋮ on each chip; persistent reorder via drag.</dd>
+            <dt>Many lanes</dt><dd>Horizontal scroll on the chip strip; "Combined" chip aggregates.</dd>
+            <dt>Composed views</dt><dd>"+ View" chip in the strip saves a multi-lane composition.</dd>
+            <dt>Standards</dt><dd>Proposes amending § Studio navigation model to allow sub-section chip-bar sub-navigation (NOT top-level — content switcher within a section).</dd>
+          </dl>
+          <a class="open" href="./direction-2-lane-bar.html">Open Direction 2 →</a>
+        </div>
+      </article>
+
+      <!-- Direction 3 -->
+      <article class="card">
+        <div class="card-head">
+          <span class="num">D3</span>
+          <span class="name">Press Bay</span>
+          <span class="badge compliant">Compliant</span>
+        </div>
+        <div class="body">
+          <div class="one-liner">All lanes visible at once as horizontal swimlanes (desktop). Mobile collapses to D1.</div>
+          <dl>
+            <dt>Density</dt><dd>Highest — every lane's pipeline shape visible simultaneously; entries are cards in stage columns.</dd>
+            <dt>Mental model</dt><dd>Kanban-of-kanbans; an actual press bay laid out flat.</dd>
+            <dt>Lane visibility</dt><dd>Left rail with eye-toggle + drag-to-reorder.</dd>
+            <dt>Many lanes</dt><dd>Vertical scroll between swimlanes; horizontal lane-width is template-driven.</dd>
+            <dt>Composed views</dt><dd>"Saved views" pills in the left rail.</dd>
+            <dt>Standards</dt><dd>No deviation. Mobile collapses to D1's lane-stack since horizontal swimlanes don't fit phone viewports.</dd>
+          </dl>
+          <a class="open" href="./direction-3-press-bay.html">Open Direction 3 →</a>
+        </div>
+      </article>
+    </div>
+
+    <div class="compare-section">
+      <h2>Quick comparison</h2>
+      <table class="compare">
+        <thead>
+          <tr>
+            <th>Concern</th>
+            <th>D1 · Lane Stack</th>
+            <th>D2 · Lane Bar</th>
+            <th>D3 · Press Bay</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Lanes visible at once (desktop)</td><td>All (scrolled)</td><td>One (+ Combined)</td><td>All (visible)</td></tr>
+          <tr><td>First-row visible (with activity)</td><td>~120px</td><td>~200px</td><td>~140px (across 3 lanes)</td></tr>
+          <tr><td>Entry detail at glance</td><td class="m">Stage tiles</td><td class="m">Stage tiles + tile-meta line</td><td class="y">Cards in columns</td></tr>
+          <tr><td>Cross-lane comparison</td><td class="m">Scroll required</td><td class="y">Combined matrix view</td><td class="y">Side-by-side swimlanes</td></tr>
+          <tr><td>Many-lane scaling</td><td class="y">Vertical scroll + collapse</td><td class="m">Horizontal chip scroll</td><td class="m">Vertical scroll (taller bay)</td></tr>
+          <tr><td>Mobile shape</td><td class="y">Native — sections stack</td><td class="m">Carousel-style chip switcher</td><td class="y">Collapses to D1 stack</td></tr>
+          <tr><td>Standards rule change?</td><td class="y">None</td><td class="n">Amend § Studio nav (sub-section)</td><td class="y">None</td></tr>
+          <tr><td>Implementation cost</td><td class="y">Lowest — extends existing IA</td><td class="m">Medium — new chip-bar component + Combined matrix view</td><td class="n">Highest — new swimlane layout + per-lane template-driven column counts</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="next-steps">
+      <h2>What I need from you</h2>
+      <p><strong>Pick a direction</strong> (or a hybrid — e.g. "D1 desktop + D2 mobile" / "D3 with D2's Combined-matrix view as a secondary mode"). Comments on what works and what doesn't are useful; I'll iterate based on what you flag.</p>
+      <p>Once a direction is picked, I'll: <code>(a)</code> file the ACCEPTED brief at <code>docs/studio-design/ACCEPTED/2026-05-27-multi-lane-dashboard/brief.md</code> citing this mockup; <code>(b)</code> file REJECTED entries for the unchosen directions at <code>docs/studio-design/REJECTED/</code> with rationale; <code>(c)</code> if D2 wins, amend <code>DESIGN-STANDARDS.md § Studio navigation model</code> in the same commit; <code>(d)</code> hand off to Phase 5 implementation (Task 5.1+).</p>
+      <p>The fixture data uses the three presets shipped in Phase 2 — Editorial (6 stages), Visual (4 stages), QA-plan (4 stages) — so each direction is grounded in what the loader can actually produce.</p>
+    </div>
+  </div>
+</body>
+</html>

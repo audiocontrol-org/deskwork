@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Direction 3 · Press Bay — Phase 5 mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #F5F1E8;
+    --paper-2: #ECE6D4;
+    --paper-3: #DFD7BF;
+    --kraft: #8A7250;
+    --ink: #1A1614;
+    --ink-soft: #3D3530;
+    --faded: #8A7F70;
+    --faded-2: #C7BEAE;
+    --red: #B8362A;
+    --blue: #2A4B7C;
+    --green: #2E5D45;
+    --highlight: #FAEABF;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #2C2823;
+    background-image:
+      radial-gradient(circle at 30% 20%, rgba(184, 54, 42, 0.08), transparent 50%),
+      radial-gradient(circle at 70% 80%, rgba(42, 75, 124, 0.06), transparent 50%);
+    color: var(--ink);
+    font-family: var(--display);
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 2rem 1.5rem 4rem;
+  }
+  .meta { color: #C7BEAE; font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 0.5rem; }
+  .meta a { color: var(--paper); border-bottom: 1px solid rgba(245,241,232,0.4); text-decoration: none; }
+  h1.demo-title { color: var(--paper); font-family: var(--display); font-style: italic; font-variation-settings: "opsz" 36, "wght" 500; font-size: 1.7rem; margin-bottom: 0.4rem; text-align: center; }
+  .demo-sub { color: var(--faded-2); font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 1.6rem; text-align: center; max-width: 64ch; }
+  .frames { display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center; align-items: flex-start; }
+  .frame-wrap { display: flex; flex-direction: column; align-items: center; }
+  .caption { color: #C7BEAE; font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.16em; text-transform: uppercase; margin-top: 0.8rem; text-align: center; max-width: 410px; }
+  .desktop { width: 1280px; min-height: 880px; background: var(--paper); box-shadow: 0 30px 60px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.04); border-radius: 6px; overflow: hidden; position: relative; }
+  .phone { width: 410px; height: 880px; background: #050505; border-radius: 50px; padding: 12px; box-shadow: 0 30px 60px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.04); position: relative; }
+  .phone::before { content: ''; position: absolute; top: 22px; left: 50%; transform: translateX(-50%); width: 110px; height: 30px; background: #000; border-radius: 16px; z-index: 100; }
+  .screen { width: 100%; height: 100%; background: var(--paper); border-radius: 38px; overflow: hidden; position: relative; }
+
+  .masthead { display: flex; justify-content: space-between; align-items: baseline; padding: 1rem 1.25rem 0.5rem; border-bottom: 2px solid var(--red); }
+  .masthead .title { font-family: var(--display); font-style: italic; font-size: 1.5rem; font-variation-settings: "opsz" 36, "wght" 500; }
+  .masthead .kicker { font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--faded); }
+  .masthead .star { font-family: var(--mono); color: var(--ink-soft); font-size: 0.95rem; cursor: pointer; padding: 0.2rem 0.4rem; }
+
+  /* ===== Press-bay layout (desktop): left rail + bay ===== */
+  .bay-shell { display: grid; grid-template-columns: 180px 1fr; min-height: 700px; }
+  .lane-rail {
+    background: var(--paper-2);
+    border-right: 1px solid var(--paper-3);
+    padding: 1rem 0.7rem 1.5rem;
+  }
+  .rail-head {
+    font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--faded);
+    padding: 0.4rem 0.3rem 0.5rem;
+    border-bottom: 1px dashed var(--paper-3);
+    margin-bottom: 0.5rem;
+  }
+  .rail-lane {
+    display: flex; align-items: baseline; gap: 0.5rem;
+    padding: 0.55rem 0.4rem;
+    border-bottom: 1px dashed var(--paper-3);
+    cursor: pointer; position: relative;
+  }
+  .rail-lane:hover { background: var(--paper); }
+  .rail-lane.focused {
+    background: var(--paper);
+    border-left: 3px solid var(--red);
+    padding-left: 0.55rem;
+  }
+  .rail-lane.hidden { color: var(--faded); }
+  .rail-lane.hidden .r-name { text-decoration: line-through; }
+  .rail-lane .r-eye {
+    font-family: var(--mono); width: 14px; text-align: center;
+    color: var(--ink-soft); font-size: 0.85rem;
+  }
+  .rail-lane.hidden .r-eye { color: var(--faded); }
+  .rail-lane .r-glyph {
+    font-family: var(--display); font-style: italic;
+    color: var(--red); font-size: 1.05rem;
+  }
+  .rail-lane.hidden .r-glyph { color: var(--faded); }
+  .rail-lane .r-name {
+    font-family: var(--display); font-style: italic; font-size: 0.95rem;
+  }
+  .rail-lane .r-count {
+    margin-left: auto;
+    font-family: var(--mono); font-size: 0.65rem; color: var(--faded);
+  }
+  .rail-views {
+    margin-top: 1.2rem; padding-top: 0.7rem;
+    border-top: 1px solid var(--paper-3);
+  }
+  .rail-views .vh {
+    font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--faded);
+    padding: 0.2rem 0.3rem 0.4rem;
+  }
+  .rail-views .v-pill {
+    display: block; margin: 0.2rem 0;
+    padding: 0.3rem 0.5rem;
+    background: var(--paper);
+    border: 1px solid var(--paper-3);
+    font-family: var(--mono); font-size: 0.7rem;
+    color: var(--ink-soft); cursor: pointer;
+  }
+  .rail-views .v-pill.active {
+    background: var(--ink); color: var(--paper); border-color: var(--ink);
+  }
+  .rail-views .v-pill.new {
+    font-style: italic; font-family: var(--display);
+    color: var(--faded); text-align: center;
+    border-style: dashed;
+  }
+
+  /* The bay itself */
+  .bay {
+    overflow: auto; padding: 0.6rem 1rem 1.6rem;
+    background:
+      repeating-linear-gradient(
+        180deg,
+        transparent 0 calc((100% - 3 * 1rem) / 3),
+        var(--paper-3) calc((100% - 3 * 1rem) / 3) calc((100% - 3 * 1rem) / 3 + 1px)
+      );
+  }
+  .bay-head {
+    font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--faded);
+    padding: 0.3rem 0.2rem 0.6rem;
+    border-bottom: 1px solid var(--paper-3);
+    margin-bottom: 0.8rem;
+    display: flex; align-items: baseline; gap: 0.5rem;
+  }
+  .bay-head .bh-meta { margin-left: auto; color: var(--ink-soft); }
+
+  /* === Swimlanes === */
+  .swim {
+    margin-bottom: 1.2rem;
+    background: var(--paper);
+    border: 1px solid var(--paper-3);
+    border-left: 4px solid var(--red);
+  }
+  .swim:nth-child(2) { border-left-color: var(--blue); }
+  .swim:nth-child(3) { border-left-color: var(--green); }
+  .swim-head {
+    padding: 0.6rem 0.85rem;
+    display: flex; align-items: baseline; gap: 0.6rem;
+    background: var(--paper-2);
+    border-bottom: 1px dashed var(--paper-3);
+  }
+  .swim-head .glyph {
+    font-family: var(--display); font-style: italic; font-size: 1.25rem;
+    color: var(--red);
+  }
+  .swim-head .name {
+    font-family: var(--display); font-style: italic; font-size: 1.15rem;
+  }
+  .swim-head .tag {
+    font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--faded);
+    padding: 0.1rem 0.4rem; border: 1px solid var(--paper-3); border-radius: 2px;
+  }
+  .swim-head .quick-meta {
+    margin-left: auto; font-family: var(--mono); font-size: 0.65rem;
+    color: var(--ink-soft); letter-spacing: 0.1em;
+  }
+  .swim-head .overflow {
+    font-family: var(--mono); color: var(--ink-soft); font-size: 0.95rem;
+    cursor: pointer; padding: 0.15rem 0.45rem; margin-left: 0.6rem;
+  }
+
+  /* Per-swimlane stage columns */
+  .stage-grid {
+    display: grid;
+    gap: 1px;
+    background: var(--paper-3);
+    border-top: none;
+  }
+  .stage-col {
+    background: var(--paper);
+    padding: 0.5rem 0.55rem;
+    min-height: 100px;
+    display: flex; flex-direction: column; gap: 0.35rem;
+  }
+  .stage-col .stage-head {
+    display: flex; align-items: baseline; gap: 0.4rem;
+    border-bottom: 1px dashed var(--paper-3);
+    padding-bottom: 0.3rem; margin-bottom: 0.2rem;
+  }
+  .stage-col .stage-glyph {
+    font-family: var(--display); font-style: italic; font-size: 0.95rem;
+    color: var(--red);
+  }
+  .stage-col .stage-name {
+    font-family: var(--display); font-style: italic; font-size: 0.85rem;
+  }
+  .stage-col .stage-count {
+    margin-left: auto;
+    font-family: var(--mono); font-size: 0.7rem; color: var(--ink-soft);
+  }
+  .stage-col.empty .stage-glyph { color: var(--faded); }
+  .stage-col.empty .stage-name { color: var(--ink-soft); }
+  .stage-col .card {
+    background: var(--paper-2);
+    padding: 0.35rem 0.45rem;
+    font-family: var(--display); font-style: italic; font-size: 0.82rem;
+    line-height: 1.25;
+    border-left: 2px solid var(--paper-3);
+    cursor: pointer;
+  }
+  .stage-col .card .e-meta {
+    display: block;
+    font-family: var(--mono); font-style: normal;
+    font-size: 0.58rem; letter-spacing: 0.1em; color: var(--faded);
+    margin-top: 0.2rem;
+    text-transform: uppercase;
+  }
+  .stage-col .empty-state {
+    font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.1em;
+    color: var(--faded); text-transform: uppercase;
+  }
+
+  /* Per-lane template-driven column counts */
+  .swim.editorial .stage-grid { grid-template-columns: repeat(6, 1fr); }
+  .swim.mockups .stage-grid { grid-template-columns: repeat(4, 1fr); }
+  .swim.qa .stage-grid { grid-template-columns: repeat(4, 1fr); }
+
+  /* Compose FAB */
+  .compose-fab {
+    position: absolute; right: 1rem; bottom: 1rem;
+    padding: 0.6rem 0.9rem; background: var(--red); color: var(--paper);
+    font-family: var(--mono); font-size: 0.7rem; letter-spacing: 0.15em;
+    text-transform: uppercase; border: none; border-radius: 99px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.18); cursor: pointer;
+  }
+
+  /* === Phone (mobile): collapses to lane-stack === */
+  .phone .lane-stack {
+    padding: 90px 1rem 1rem; height: 100%; overflow-y: auto;
+  }
+  .phone .lane-section { margin-bottom: 1.3rem; }
+  .phone .lane-head {
+    display: flex; align-items: baseline; gap: 0.5rem;
+    border-bottom: 1px dashed var(--paper-3);
+    padding: 0.4rem 0 0.5rem; margin-bottom: 0.5rem;
+  }
+  .phone .lane-head .glyph {
+    font-family: var(--display); font-style: italic; font-size: 1.15rem;
+    color: var(--red);
+  }
+  .phone .lane-head .name {
+    font-family: var(--display); font-style: italic; font-size: 1.05rem;
+  }
+  .phone .lane-head .count {
+    margin-left: auto;
+    font-family: var(--mono); font-size: 0.7rem; color: var(--ink-soft);
+  }
+  .phone .stage-row {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem;
+  }
+  .phone .m-stage-tile {
+    background: var(--paper); border: 1px solid var(--paper-3);
+    padding: 0.5rem 0.6rem;
+    display: flex; align-items: center; gap: 0.4rem;
+  }
+  .phone .m-stage-tile .stage-glyph { color: var(--red); font-family: var(--display); font-style: italic; font-size: 1rem; }
+  .phone .m-stage-tile .stage-name { font-family: var(--display); font-style: italic; font-size: 0.85rem; }
+  .phone .m-stage-tile .stage-count { margin-left: auto; font-family: var(--mono); font-size: 0.7rem; color: var(--ink-soft); }
+  .phone .m-stage-tile.empty .stage-glyph { color: var(--faded); }
+  .phone .mobile-rail-trigger {
+    font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.15em;
+    text-transform: uppercase; color: var(--ink-soft);
+    padding: 0.3rem 0.5rem; border: 1px solid var(--paper-3); background: var(--paper);
+  }
+
+  /* Deviation note */
+  .deviation-note {
+    margin: 1rem auto 0; max-width: 720px;
+    background: rgba(245,241,232,0.06); color: var(--paper);
+    font-family: var(--mono); font-size: 0.72rem; line-height: 1.6;
+    padding: 0.9rem 1.1rem; border: 1px solid rgba(245,241,232,0.18);
+    border-left: 3px solid var(--green);
+  }
+  .deviation-note .label {
+    color: var(--green); letter-spacing: 0.18em; text-transform: uppercase;
+    font-weight: 600; font-size: 0.62rem; margin-right: 0.4rem;
+  }
+</style>
+</head>
+<body>
+  <div class="meta">Direction 3 · <a href="./index.html">↩ all directions</a></div>
+  <h1 class="demo-title">Press Bay</h1>
+  <div class="demo-sub">Desktop: all lanes visible at once as horizontal swimlanes with their own stage columns. Mobile: collapses to the lane-stack.</div>
+
+  <div class="deviation-note">
+    <span class="label">Standards-compliant</span> No top-level tab bar. On desktop, the lane-visibility rail on the left (mirrors the entry-review side-rail pattern); the bay shows every visible lane simultaneously with template-driven column counts (editorial 6 cols, visual 4 cols, qa-plan 4 cols). Cards in stage columns are direct entry rows; per-row <code>⋮</code> overflow still applies. On mobile, lanes collapse to the existing stacked-section pattern (Direction 1) since horizontal swimlanes don't fit a phone viewport.
+  </div>
+
+  <div class="frames" style="margin-top:1.4rem;">
+
+    <!-- DESKTOP -->
+    <div class="frame-wrap">
+      <div class="desktop">
+        <div class="masthead">
+          <div>
+            <div class="kicker">The Desk · multi-lane</div>
+            <div class="title">deskwork — editorial studio</div>
+          </div>
+          <div class="star">⋮</div>
+        </div>
+
+        <div class="bay-shell">
+          <!-- Left rail: lane visibility + saved views -->
+          <aside class="lane-rail">
+            <div class="rail-head">Lanes</div>
+
+            <div class="rail-lane focused">
+              <span class="r-eye">●</span>
+              <span class="r-glyph">§</span>
+              <span class="r-name">Editorial</span>
+              <span class="r-count">12</span>
+            </div>
+            <div class="rail-lane">
+              <span class="r-eye">●</span>
+              <span class="r-glyph">◆</span>
+              <span class="r-name">Mockups</span>
+              <span class="r-count">5</span>
+            </div>
+            <div class="rail-lane">
+              <span class="r-eye">●</span>
+              <span class="r-glyph">⊕</span>
+              <span class="r-name">QA</span>
+              <span class="r-count">3</span>
+            </div>
+            <div class="rail-lane hidden">
+              <span class="r-eye">○</span>
+              <span class="r-glyph">⌘</span>
+              <span class="r-name">Press Releases</span>
+              <span class="r-count">2</span>
+            </div>
+
+            <div class="rail-views">
+              <div class="vh">Saved Views</div>
+              <button class="v-pill active">All visible</button>
+              <button class="v-pill">Active only</button>
+              <button class="v-pill">Editorial + QA</button>
+              <button class="v-pill new">+ New view</button>
+            </div>
+          </aside>
+
+          <!-- The press bay itself -->
+          <main class="bay">
+            <div class="bay-head">
+              <span>The Press Bay</span>
+              <span class="bh-meta">3 lanes shown · 20 entries</span>
+            </div>
+
+            <!-- Lane 1: Editorial (6 stages) -->
+            <article class="swim editorial">
+              <div class="swim-head">
+                <span class="glyph">§</span>
+                <span class="name">Editorial</span>
+                <span class="tag">editorial · 6 stages</span>
+                <span class="quick-meta">12 entries · 4 drafting · 1 final</span>
+                <span class="overflow">⋮</span>
+              </div>
+              <div class="stage-grid">
+                <div class="stage-col">
+                  <div class="stage-head"><span class="stage-glyph">◇</span><span class="stage-name">Ideas</span><span class="stage-count">3</span></div>
+                  <div class="card">Mobile-first scrapbook reflow<span class="e-meta">v1 · today</span></div>
+                  <div class="card">Marginalia keyboard nav<span class="e-meta">v1 · yesterday</span></div>
+                  <div class="card">Pipeline custom rationale<span class="e-meta">v1</span></div>
+                </div>
+                <div class="stage-col">
+                  <div class="stage-head"><span class="stage-glyph">§</span><span class="stage-name">Planned</span><span class="stage-count">2</span></div>
+                  <div class="card">Phase 5 retrospective<span class="e-meta">v1</span></div>
+                  <div class="card">Studio mobile-first v2<span class="e-meta">v1</span></div>
+                </div>
+                <div class="stage-col">
+                  <div class="stage-head"><span class="stage-glyph">⊹</span><span class="stage-name">Outlining</span><span class="stage-count">1</span></div>
+                  <div class="card">Annotation model deep-dive<span class="e-meta">v1</span></div>
+                </div>
+                <div class="stage-col">
+                  <div class="stage-head"><span class="stage-glyph">✎</span><span class="stage-name">Drafting</span><span class="stage-count">4</span></div>
+                  <div class="card">Graphical-entries PRD<span class="e-meta">v3 · iterating</span></div>
+                  <div class="card">Editor retrospective<span class="e-meta">v1</span></div>
+                  <div class="card">Templates rationale<span class="e-meta">v1</span></div>
+                  <div class="card">Phase 4 closeout<span class="e-meta">v2</span></div>
+                </div>
+                <div class="stage-col">
+                  <div class="stage-head"><span class="stage-glyph">※</span><span class="stage-name">Final</span><span class="stage-count">1</span></div>
+                  <div class="card">v0.20 row-affordance<span class="e-meta">ready</span></div>
+                </div>
+                <div class="stage-col">
+                  <div class="stage-head"><span class="stage-glyph">✓</span><span class="stage-name">Published</span><span class="stage-count">1</span></div>
+                  <div class="card">v0.19 mobile-first<span class="e-meta">last sprint</span></div>
+                </div>
+              </div>
+            </article>
+
+            <!-- Lane 2: Mockups (4 stages) -->
+            <article class="swim mockups">
+              <div class="swim-head">
+                <span class="glyph">◆</span>
+                <span class="name">Mockups</span>
+                <span class="tag">visual · 4 stages</span>
+                <span class="quick-meta">5 entries · 2 iterating</span>
+                <span class="overflow">⋮</span>
+              </div>
+              <div class="stage-grid">
+                <div class="stage-col">
+                  <div class="stage-head"><span class="stage-glyph">✏</span><span class="stage-name">Sketched</span><span class="stage-count">2</span></div>
+                  <div class="card">Lane bar — direction 2<span class="e-meta">v1</span></div>
+                  <div class="card">Empty-lane CTA shapes<span class="e-meta">v1</span></div>
+                </div>
+                <div class="stage-col">
+                  <div class="stage-head"><span class="stage-glyph">◴</span><span class="stage-name">Iterating</span><span class="stage-count">2</span></div>
+                  <div class="card">Multi-lane composed view<span class="e-meta">v3</span></div>
+                  <div class="card">Lane-visibility rail<span class="e-meta">v2</span></div>
+                </div>
+                <div class="stage-col">
+                  <div class="stage-head"><span class="stage-glyph">✓</span><span class="stage-name">Approved</span><span class="stage-count">1</span></div>
+                  <div class="card">Press bay grid<span class="e-meta">approved</span></div>
+                </div>
+                <div class="stage-col empty">
+                  <div class="stage-head"><span class="stage-glyph">⌖</span><span class="stage-name">Shipped</span><span class="stage-count">0</span></div>
+                  <div class="empty-state">No entries</div>
+                </div>
+              </div>
+            </article>
+
+            <!-- Lane 3: QA (4 stages) -->
+            <article class="swim qa">
+              <div class="swim-head">
+                <span class="glyph">⊕</span>
+                <span class="name">QA</span>
+                <span class="tag">qa-plan · 4 stages</span>
+                <span class="quick-meta">3 entries</span>
+                <span class="overflow">⋮</span>
+              </div>
+              <div class="stage-grid">
+                <div class="stage-col">
+                  <div class="stage-head"><span class="stage-glyph">✎</span><span class="stage-name">Drafted</span><span class="stage-count">1</span></div>
+                  <div class="card">Annotation backfill test<span class="e-meta">v1</span></div>
+                </div>
+                <div class="stage-col">
+                  <div class="stage-head"><span class="stage-glyph">⌕</span><span class="stage-name">Reviewed</span><span class="stage-count">1</span></div>
+                  <div class="card">Lane migration smoke<span class="e-meta">v2</span></div>
+                </div>
+                <div class="stage-col">
+                  <div class="stage-head"><span class="stage-glyph">⊝</span><span class="stage-name">Tested</span><span class="stage-count">1</span></div>
+                  <div class="card">Template loader smoke<span class="e-meta">v1</span></div>
+                </div>
+                <div class="stage-col empty">
+                  <div class="stage-head"><span class="stage-glyph">✓</span><span class="stage-name">Approved</span><span class="stage-count">0</span></div>
+                  <div class="empty-state">No entries</div>
+                </div>
+              </div>
+            </article>
+          </main>
+        </div>
+        <button class="compose-fab">+ Compose</button>
+      </div>
+      <div class="caption">Desktop · 1280px · entire press bay visible at once; each lane's column count is template-driven</div>
+    </div>
+
+    <!-- MOBILE -->
+    <div class="frame-wrap">
+      <div class="phone">
+        <div class="screen">
+          <div class="masthead" style="margin-top:2.4rem;">
+            <div>
+              <div class="kicker">The Desk · multi-lane</div>
+              <div class="title" style="font-size:1.1rem;">editorial studio</div>
+            </div>
+            <button class="mobile-rail-trigger">Lanes ▾</button>
+          </div>
+
+          <div class="lane-stack">
+            <section class="lane-section">
+              <div class="lane-head">
+                <span class="glyph">§</span>
+                <span class="name">Editorial</span>
+                <span class="count">12</span>
+              </div>
+              <div class="stage-row">
+                <div class="m-stage-tile"><span class="stage-glyph">◇</span><span class="stage-name">Ideas</span><span class="stage-count">3</span></div>
+                <div class="m-stage-tile"><span class="stage-glyph">§</span><span class="stage-name">Planned</span><span class="stage-count">2</span></div>
+                <div class="m-stage-tile"><span class="stage-glyph">⊹</span><span class="stage-name">Outline</span><span class="stage-count">1</span></div>
+                <div class="m-stage-tile" style="background: var(--paper-2); border-top: 2px solid var(--red);"><span class="stage-glyph">✎</span><span class="stage-name" style="color: var(--red);">Drafting</span><span class="stage-count">4</span></div>
+                <div class="m-stage-tile"><span class="stage-glyph">※</span><span class="stage-name">Final</span><span class="stage-count">1</span></div>
+                <div class="m-stage-tile"><span class="stage-glyph">✓</span><span class="stage-name">Pub'd</span><span class="stage-count">1</span></div>
+              </div>
+            </section>
+            <section class="lane-section">
+              <div class="lane-head">
+                <span class="glyph">◆</span>
+                <span class="name">Mockups</span>
+                <span class="count">5</span>
+              </div>
+              <div class="stage-row">
+                <div class="m-stage-tile"><span class="stage-glyph">✏</span><span class="stage-name">Sketched</span><span class="stage-count">2</span></div>
+                <div class="m-stage-tile"><span class="stage-glyph">◴</span><span class="stage-name">Iterating</span><span class="stage-count">2</span></div>
+                <div class="m-stage-tile"><span class="stage-glyph">✓</span><span class="stage-name">Approved</span><span class="stage-count">1</span></div>
+                <div class="m-stage-tile empty"><span class="stage-glyph">⌖</span><span class="stage-name">Shipped</span><span class="stage-count">0</span></div>
+              </div>
+            </section>
+            <section class="lane-section">
+              <div class="lane-head">
+                <span class="glyph">⊕</span>
+                <span class="name">QA</span>
+                <span class="count">3</span>
+              </div>
+              <div class="stage-row">
+                <div class="m-stage-tile"><span class="stage-glyph">✎</span><span class="stage-name">Drafted</span><span class="stage-count">1</span></div>
+                <div class="m-stage-tile"><span class="stage-glyph">⌕</span><span class="stage-name">Reviewed</span><span class="stage-count">1</span></div>
+                <div class="m-stage-tile"><span class="stage-glyph">⊝</span><span class="stage-name">Tested</span><span class="stage-count">1</span></div>
+                <div class="m-stage-tile empty"><span class="stage-glyph">✓</span><span class="stage-name">Approved</span><span class="stage-count">0</span></div>
+              </div>
+            </section>
+          </div>
+
+          <button class="compose-fab">+ Compose</button>
+        </div>
+      </div>
+      <div class="caption">Mobile · iPhone 13 · Press Bay collapses to the lane-stack (Direction 1's mobile shape)</div>
+    </div>
+
+  </div>
+</body>
+</html>
