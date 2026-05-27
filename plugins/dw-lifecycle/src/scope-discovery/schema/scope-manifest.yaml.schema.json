@@ -95,7 +95,7 @@
           "items": { "$ref": "#/$defs/regime_holdout_entry" }
         },
         "meta": {
-          "description": "Per-source counts + total. Useful for at-a-glance burndown without iterating the per-bucket arrays.",
+          "description": "Per-source counts + total. Useful for at-a-glance burndown without iterating the per-bucket arrays. Phase 11 Task 11 adds `by_status` rollup so operators can see actively-enforced vs. candidate counts at-a-glance.",
           "type": "object",
           "additionalProperties": false,
           "required": ["total", "by_source"],
@@ -113,6 +113,16 @@
                 "adopter_manifest": { "type": "integer", "minimum": 0 },
                 "editor_symmetry": { "type": "integer", "minimum": 0 },
                 "deprecation": { "type": "integer", "minimum": 0 }
+              }
+            },
+            "by_status": {
+              "description": "Phase 11 Task 11 — per-status rollup. `actively_enforced` are findings sourced from `blessed`/`cursed` catalog entries (gate-blocking). `candidate` are findings from `pending` entries (operator-triage surface; non-gate-blocking). Suppressed statuses (ignore / tracked-holdout / withdrawn) never surface — they are filtered upstream at the scanner level.",
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["actively_enforced", "candidate"],
+              "properties": {
+                "actively_enforced": { "type": "integer", "minimum": 0 },
+                "candidate": { "type": "integer", "minimum": 0 }
               }
             }
           }
@@ -520,10 +530,10 @@
       }
     },
     "regime_holdout_entry": {
-      "description": "One regime-holdout finding. Emitted by the T6.5 regime-holdout-detector and grouped by source bucket in the manifest's regime_holdouts section.",
+      "description": "One regime-holdout finding. Emitted by the T6.5 regime-holdout-detector and grouped by source bucket in the manifest's regime_holdouts section. Phase 11 Task 11 adds `status_provenance` so each finding traces back to the catalog entry's status + provenance.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "file", "shape", "replacement", "evidence"],
+      "required": ["id", "file", "shape", "replacement", "evidence", "status_provenance"],
       "properties": {
         "id": {
           "description": "Identifier within the source bucket. Anti-pattern id, adopter-manifest id, '<manifest-id>:<editor>' composite, or path of the deprecated file.",
@@ -568,6 +578,28 @@
               "description": "Stable identifier within the registry (anti-pattern id, manifest id, '@deprecated' marker, etc.).",
               "type": "string",
               "minLength": 1
+            }
+          }
+        },
+        "status_provenance": {
+          "description": "Phase 11 Task 11 — inherited status + provenance from the catalog entry that produced the finding. `source_status` is the catalog `status:` literal (pending / blessed / cursed / ignore / tracked-holdout / withdrawn). `provenance_source` is the catalog `provenance.source` literal. Deprecation findings synthesize `blessed` + `install-seed` (the marker IS the registry; there is no Loop field).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["source_status", "provenance_source"],
+          "properties": {
+            "source_status": {
+              "type": "string",
+              "enum": ["pending", "blessed", "cursed", "ignore", "tracked-holdout", "withdrawn"]
+            },
+            "provenance_source": {
+              "type": "string",
+              "enum": [
+                "operator-authored",
+                "orchestrator-agent",
+                "llm-judge-proposed",
+                "install-seed",
+                "promoted-from-candidate"
+              ]
             }
           }
         }

@@ -56,6 +56,11 @@
         "provenance": {
           "description": "Phase 11 Task 2 — provenance block. Reserved for future use.",
           "$ref": "#/definitions/Provenance"
+        },
+        "audit_history": {
+          "description": "Phase 11 Task 10 — REVERSE provenance link to the audit-log. Reserved for future use.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
         }
       }
     },

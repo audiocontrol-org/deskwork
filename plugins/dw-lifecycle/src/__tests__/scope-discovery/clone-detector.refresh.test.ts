@@ -68,6 +68,8 @@ describe('clone-detector — dispositioned entries honored across runs', () => {
             // disposition transition does not silently rewrite them.
             status: g.status,
             provenance: g.provenance,
+            // Phase 11 Task 10 — preserve audit history across the mutation.
+            auditHistory: g.auditHistory,
           }),
         ),
       };

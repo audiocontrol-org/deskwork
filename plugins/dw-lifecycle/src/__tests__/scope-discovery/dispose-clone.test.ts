@@ -55,6 +55,8 @@ function syntheticGroup(args: {
       source: 'install-seed',
       authored_at: '1970-01-01T00:00:00Z',
     },
+    // Phase 11 Task 10 — empty audit history (no auditor findings against fixture).
+    auditHistory: [],
   };
 }
 

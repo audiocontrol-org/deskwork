@@ -140,6 +140,11 @@ interface CloneGroupBase {
   readonly status: CatalogStatus;
   /** Phase 11 Task 2 — provenance block; synthesized when absent. */
   readonly provenance: Provenance;
+  /**
+   * Phase 11 Task 10 — REVERSE provenance link to the audit-log.
+   * Empty when no audit finding has touched this group.
+   */
+  readonly auditHistory: readonly string[];
 }
 
 interface NonRefactorCloneGroup extends CloneGroupBase {
@@ -216,6 +221,9 @@ export function makeCloneGroup(args: {
     // scanners will skip them until an operator dispositions them.
     status: dispositionToStatus(args.disposition),
     provenance: { source: 'install-seed', authored_at: '1970-01-01T00:00:00Z' },
+    // Phase 11 Task 10 — detector-written entries start with an empty
+    // audit history; auditor findings populate this list over time.
+    auditHistory: [],
   };
 }
 
@@ -265,6 +273,9 @@ export function makeRefactorCloneGroup(args: {
     // to explicit provenance later if they choose.
     status: 'blessed',
     provenance: { source: 'install-seed', authored_at: '1970-01-01T00:00:00Z' },
+    // Phase 11 Task 10 — empty audit history at construction; auditor
+    // findings populate over time via operator-curated edits.
+    auditHistory: [],
   };
   // exactOptionalPropertyTypes: only add new_shape_summary key when supplied.
   return args.new_shape_summary !== undefined
@@ -331,6 +342,11 @@ export function serializeClonesYaml(doc: ClonesYaml): string {
         const loopFields = isSynthesized
           ? {}
           : { status: g.status, provenance: g.provenance };
+        // Phase 11 Task 10 — only emit `audit_history:` when non-empty
+        // (back-compat: pre-Task-10 baselines omit the field; we don't
+        // surprise the operator with an empty list on roundtrip).
+        const auditHistoryField =
+          g.auditHistory.length > 0 ? { audit_history: [...g.auditHistory] } : {};
         const base = {
           id: g.id,
           lines: g.lines,
@@ -338,6 +354,7 @@ export function serializeClonesYaml(doc: ClonesYaml): string {
           disposition: g.disposition,
           reason: g.reason,
           ...loopFields,
+          ...auditHistoryField,
         };
         if (!hasRefactorDisposition(g)) return base;
         return {
@@ -440,6 +457,9 @@ export function mergeDispositions(
         // provenance; the operator's authored value is the SSOT.
         status: existing.status,
         provenance: existing.provenance,
+        // Phase 11 Task 10 — carry forward audit history from the
+        // baseline; refresh never invents new audit references.
+        auditHistory: existing.auditHistory,
         ...(existing.new_shape_summary !== undefined
           ? { new_shape_summary: existing.new_shape_summary }
           : {}),
@@ -455,6 +475,8 @@ export function mergeDispositions(
       // Phase 11 Task 2 — carry forward operator-authored Loop fields.
       status: existing.status,
       provenance: existing.provenance,
+      // Phase 11 Task 10 — carry forward audit history.
+      auditHistory: existing.auditHistory,
     };
   });
 }

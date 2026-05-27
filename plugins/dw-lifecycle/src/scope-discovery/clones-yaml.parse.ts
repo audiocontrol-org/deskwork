@@ -56,6 +56,7 @@ import type { CloneGroup, ClonesYaml, Disposition, RefactorCloneGroup } from './
 import { dispositionToStatus } from './clones-yaml.js';
 import { isPlainObject } from './util/typeguards.js';
 import {
+  parseAuditHistory,
   parseCatalogEntryMetadata,
   synthesizeDefaultProvenance,
   type CatalogEntryMetadata,
@@ -263,6 +264,15 @@ function entryToGroup(entry: unknown): EntryResult {
       reason: err instanceof Error ? err.message : String(err),
     };
   }
+  let auditHistory: readonly string[];
+  try {
+    auditHistory = parseAuditHistory(entry['audit_history'], `id=${id}`, 'clones');
+  } catch (err) {
+    return {
+      kind: 'shape-error',
+      reason: err instanceof Error ? err.message : String(err),
+    };
+  }
   if (disposition === 'refactor') {
     const preconds = validateRefactorPreconditions(entry, id);
     if (!preconds.ok) {
@@ -280,6 +290,7 @@ function entryToGroup(entry: unknown): EntryResult {
       tests_proof: preconds.value.tests_proof,
       status: loopMetadata.status,
       provenance: loopMetadata.provenance,
+      auditHistory,
       ...(preconds.value.new_shape_summary !== undefined
         ? { new_shape_summary: preconds.value.new_shape_summary }
         : {}),
@@ -296,6 +307,7 @@ function entryToGroup(entry: unknown): EntryResult {
       reason: reasonValue,
       status: loopMetadata.status,
       provenance: loopMetadata.provenance,
+      auditHistory,
     },
   };
 }

@@ -106,6 +106,7 @@ const BUILTIN_PATTERNS: ReadonlyArray<RegexEntry> = [
     regex: /\bas\s+(?!const\b|unknown\b)[A-Z][A-Za-z0-9_]*/g,
     status: 'blessed',
     provenance: BUILTIN_PROVENANCE,
+    auditHistory: [],
   },
   {
     type: 'regex',
@@ -114,6 +115,7 @@ const BUILTIN_PATTERNS: ReadonlyArray<RegexEntry> = [
     regex: /:\s*any\b(?![A-Za-z0-9_])/g,
     status: 'blessed',
     provenance: BUILTIN_PROVENANCE,
+    auditHistory: [],
   },
   {
     type: 'regex',
@@ -122,6 +124,7 @@ const BUILTIN_PATTERNS: ReadonlyArray<RegexEntry> = [
     regex: /@ts-(?:ignore|expect-error)\b/g,
     status: 'blessed',
     provenance: BUILTIN_PROVENANCE,
+    auditHistory: [],
   },
   {
     type: 'regex',
@@ -131,6 +134,7 @@ const BUILTIN_PATTERNS: ReadonlyArray<RegexEntry> = [
     regex: /(?<![A-Za-z0-9_.=])\d{2,}\b/g,
     status: 'blessed',
     provenance: BUILTIN_PROVENANCE,
+    auditHistory: [],
   },
 ];
 

@@ -80,6 +80,7 @@ import {
   type RegistrySchema,
 } from './util/registry-yaml.js';
 import {
+  parseAuditHistory,
   parseCatalogEntryMetadata,
   type CatalogStatus,
   type Provenance,
@@ -149,6 +150,14 @@ export interface AntiPatternEntry {
    * warnings).
    */
   readonly provenance: Provenance;
+  /**
+   * Phase 11 Task 10 — REVERSE provenance link. Lists every audit-log
+   * Finding-ID that referenced this entry over time. Empty when the
+   * entry has never been touched by an auditor. The doctor rule
+   * `provenance-orphaned-entries` cross-checks each id against the
+   * audit-log to surface broken references.
+   */
+  readonly auditHistory: readonly string[];
 }
 
 /**
@@ -212,6 +221,7 @@ function parseEntry(raw: Record<string, unknown>, ctx: string): AntiPatternEntry
   const excludesPaths = parseExcludesPaths(raw['excludes_paths'], ctx);
   const canonicalFile = parseCanonicalFile(raw['canonical_file'], ctx);
   const { metadata } = parseCatalogEntryMetadata(raw, ctx, NAMESPACE);
+  const auditHistory = parseAuditHistory(raw['audit_history'], ctx, NAMESPACE);
   return {
     id,
     addedIn,
@@ -224,6 +234,7 @@ function parseEntry(raw: Record<string, unknown>, ctx: string): AntiPatternEntry
     message,
     status: metadata.status,
     provenance: metadata.provenance,
+    auditHistory,
   };
 }
 

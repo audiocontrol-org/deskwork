@@ -87,6 +87,11 @@
         "provenance": {
           "description": "Phase 11 Task 2 — provenance block tracking where the entry came from. Synthesized to install-seed when absent (back-compat with pre-Loop registries). REQUIRED when `status:` is set to anything other than `blessed`. The `withdrawn` status carries an additional invariant: `provenance.context` MUST start with `audit-finding-` (the reversibility primitive's contract).",
           "$ref": "#/definitions/Provenance"
+        },
+        "audit_history": {
+          "description": "Phase 11 Task 10 — REVERSE provenance link to the audit-log. List of audit-log Finding-IDs that referenced this entry over time. Optional (back-compat: pre-Task-10 entries omit it). The `provenance-orphaned-entries` doctor rule cross-checks each id against in-progress feature audit-logs to surface broken references.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
         }
       }
     },

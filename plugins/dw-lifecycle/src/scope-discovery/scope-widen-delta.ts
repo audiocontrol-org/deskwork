@@ -247,6 +247,20 @@ export function mergeDelta(
       ...(mergedRegime?.deprecations ?? []),
       ...delta.regimeHoldouts.deprecations,
     ];
+    // Phase 11 Task 11 — re-derive `by_status` rollup over the merged
+    // entries. The synthesis-derive-regime helper computes this from
+    // first principles; we mirror that derivation here so the merge
+    // produces a manifest with the same shape (operators reading the
+    // merged manifest see by_status counts regardless of merge path).
+    let activelyEnforced = 0;
+    let candidate = 0;
+    for (const list of [ap, am, es, dp]) {
+      for (const e of list) {
+        const s = e.status_provenance.source_status;
+        if (s === 'blessed' || s === 'cursed') activelyEnforced += 1;
+        else if (s === 'pending') candidate += 1;
+      }
+    }
     mergedRegime = {
       anti_patterns: ap,
       adopter_manifests: am,
@@ -259,6 +273,10 @@ export function mergeDelta(
           adopter_manifest: am.length,
           editor_symmetry: es.length,
           deprecation: dp.length,
+        },
+        by_status: {
+          actively_enforced: activelyEnforced,
+          candidate,
         },
       },
     };

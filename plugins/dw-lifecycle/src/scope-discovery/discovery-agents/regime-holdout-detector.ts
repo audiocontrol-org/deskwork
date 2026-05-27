@@ -66,12 +66,18 @@ import { computeMatrix } from '../editor-symmetry-matrix.js';
 import { scan as scanDeprecations } from '../deprecation-scan.js';
 import type {
   DiscoveryAgentInput,
+  FindingStatusProvenance,
   RegimeHoldoutFinding,
   RegimeHoldoutFindings,
   RegimeHoldoutMeta,
 } from './types.js';
 import { runIfMain } from './shared.js';
 import { errorMessage } from '../util/typeguards.js';
+import {
+  isActivelyEnforced,
+  type CatalogStatus,
+  type Provenance,
+} from '../util/catalog-status.js';
 
 /**
  * Default registry paths — match the upstream gates' defaults. Per
@@ -91,6 +97,37 @@ const ADOPTER_MANIFESTS_REGISTRY = '.dw-lifecycle/scope-discovery/adopter-manife
 function moduleRootAbs(input: DiscoveryAgentInput): string {
   return resolve(input.repoRoot, input.moduleRoot);
 }
+
+/**
+ * Phase 11 Task 11 — extract the FindingStatusProvenance wire shape
+ * from a catalog entry's `status` + `provenance` pair. Uniform across
+ * every scanner so the synthesizer + the operator surface see one
+ * consistent field regardless of which catalog the finding originated
+ * from.
+ */
+function statusProvenance(
+  status: CatalogStatus,
+  provenance: Provenance,
+): FindingStatusProvenance {
+  return {
+    source_status: status,
+    provenance_source: provenance.source,
+  };
+}
+
+/**
+ * Phase 11 Task 11 — implicit Loop metadata for sources that have NO
+ * underlying catalog entry. The deprecation scanner reads markers
+ * embedded in source files; the markers themselves are the registry,
+ * and they carry no Loop fields. We synthesize `blessed` + `install-
+ * seed` so the wire shape is uniform; the doctor rule
+ * `catalog-entry-missing-status` does NOT fire on deprecation markers
+ * (they're a different concept from registry catalog entries).
+ */
+const IMPLICIT_BLESSED: FindingStatusProvenance = {
+  source_status: 'blessed',
+  provenance_source: 'install-seed',
+};
 
 /**
  * Run the anti-pattern gate and convert each finding into a regime-
@@ -119,6 +156,20 @@ async function collectAntiPatternFindings(
   });
   const out: RegimeHoldoutFinding[] = [];
   for (const f of result.findings) {
+    // Phase 11 Task 11 — the scanner has already filtered to
+    // actively-enforced entries; this assertion documents the
+    // invariant (and protects against a future scanner refactor that
+    // forgets the filter). If a non-active entry leaked through, the
+    // detector throws loudly rather than silently surfacing
+    // suppressed findings.
+    if (!isActivelyEnforced(f.entry.status)) {
+      throw new Error(
+        `regime-holdout-detector: anti-pattern scanner returned a finding for ` +
+          `entry '${f.entry.id}' with status '${f.entry.status}'. The scanner ` +
+          `is expected to filter to blessed/cursed entries at its registry ` +
+          `boundary; this finding should never have surfaced.`,
+      );
+    }
     out.push({
       source: 'anti-pattern',
       id: f.entry.id,
@@ -130,6 +181,7 @@ async function collectAntiPatternFindings(
         registryPath: ANTI_PATTERNS_REGISTRY,
         registryId: f.entry.id,
       },
+      status_provenance: statusProvenance(f.entry.status, f.entry.provenance),
     });
   }
   return out;
@@ -159,6 +211,14 @@ async function collectAdopterManifestFindings(
   const out: RegimeHoldoutFinding[] = [];
   for (const manifest of result.manifests) {
     const primary = manifest.entry.from[0] ?? '';
+    if (!isActivelyEnforced(manifest.entry.status)) {
+      throw new Error(
+        `regime-holdout-detector: adopter scanner returned a manifest entry ` +
+          `'${manifest.entry.id}' with status '${manifest.entry.status}'. The ` +
+          `scanner is expected to filter to blessed/cursed entries at its ` +
+          `registry boundary; this manifest should never have surfaced.`,
+      );
+    }
     for (const holdout of manifest.holdouts) {
       out.push({
         source: 'adopter-manifest',
@@ -174,6 +234,10 @@ async function collectAdopterManifestFindings(
           registryPath: ADOPTER_MANIFESTS_REGISTRY,
           registryId: manifest.entry.id,
         },
+        status_provenance: statusProvenance(
+          manifest.entry.status,
+          manifest.entry.provenance,
+        ),
       });
     }
   }
@@ -205,6 +269,16 @@ async function collectEditorSymmetryFindings(
   const out: RegimeHoldoutFinding[] = [];
   for (const row of matrix.rows) {
     const primary = row.entry.from[0] ?? '';
+    // Phase 11 Task 11 — matrix rows are already filtered to actively-
+    // enforced entries by `computeMatrix`; assert the invariant.
+    if (!isActivelyEnforced(row.status)) {
+      throw new Error(
+        `regime-holdout-detector: editor-symmetry matrix surfaced row ` +
+          `'${row.entry.id}' with status '${row.status}'. computeMatrix is ` +
+          `expected to filter to blessed/cursed entries; this row should ` +
+          `never have surfaced.`,
+      );
+    }
     matrix.editors.forEach((editor, idx) => {
       const cell = row.cells[idx];
       if (cell === undefined) return;
@@ -224,6 +298,7 @@ async function collectEditorSymmetryFindings(
           registryPath: ADOPTER_MANIFESTS_REGISTRY,
           registryId: row.entry.id,
         },
+        status_provenance: statusProvenance(row.status, row.entry.provenance),
       });
     });
   }
@@ -274,6 +349,10 @@ async function collectDeprecationFindings(
           registryPath: deprecated.path,
           registryId: deprecated.markerKind,
         },
+        // Phase 11 Task 11 — deprecation markers have no Loop fields
+        // (they're embedded in source code, not a catalog YAML); we
+        // surface implicit `blessed` so the wire shape is uniform.
+        status_provenance: IMPLICIT_BLESSED,
       });
     }
   }
@@ -307,6 +386,8 @@ function deriveMeta(findings: readonly RegimeHoldoutFinding[]): RegimeHoldoutMet
   let adopter = 0;
   let symmetry = 0;
   let deprecation = 0;
+  let activelyEnforced = 0;
+  let candidate = 0;
   for (const f of findings) {
     switch (f.source) {
       case 'anti-pattern':
@@ -322,6 +403,15 @@ function deriveMeta(findings: readonly RegimeHoldoutFinding[]): RegimeHoldoutMet
         deprecation += 1;
         break;
     }
+    // Phase 11 Task 11 — per-status rollup.
+    if (
+      f.status_provenance.source_status === 'blessed' ||
+      f.status_provenance.source_status === 'cursed'
+    ) {
+      activelyEnforced += 1;
+    } else if (f.status_provenance.source_status === 'pending') {
+      candidate += 1;
+    }
   }
   return {
     anti_pattern_count: antiPattern,
@@ -329,6 +419,8 @@ function deriveMeta(findings: readonly RegimeHoldoutFinding[]): RegimeHoldoutMet
     editor_symmetry_holdout_count: symmetry,
     deprecation_count: deprecation,
     total: findings.length,
+    actively_enforced_count: activelyEnforced,
+    candidate_count: candidate,
   };
 }
 

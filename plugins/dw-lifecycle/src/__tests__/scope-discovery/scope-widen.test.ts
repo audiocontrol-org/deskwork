@@ -591,6 +591,13 @@ describe('scope-widen — computeDelta + mergeDelta unit tests', () => {
   });
 
   it('mergeDelta recomputes regime-holdout meta from merged section lengths', () => {
+    // Phase 11 Task 11 — fixture entries carry `status_provenance:`
+    // (default blessed + install-seed) so the merge path's by_status
+    // rollup has well-typed inputs.
+    const SP = {
+      source_status: 'blessed',
+      provenance_source: 'install-seed',
+    } as const;
     const prior: ScopeManifest = {
       ...baseManifest,
       regime_holdouts: {
@@ -601,6 +608,7 @@ describe('scope-widen — computeDelta + mergeDelta unit tests', () => {
             shape: 'legacy',
             replacement: 'modern',
             evidence: { registry_path: '.dw/anti.yaml', registry_id: 'ap-1' },
+            status_provenance: SP,
           },
         ],
         adopter_manifests: [],
@@ -614,6 +622,7 @@ describe('scope-widen — computeDelta + mergeDelta unit tests', () => {
             editor_symmetry: 0,
             deprecation: 0,
           },
+          by_status: { actively_enforced: 1, candidate: 0 },
         },
       },
     };
@@ -629,6 +638,7 @@ describe('scope-widen — computeDelta + mergeDelta unit tests', () => {
             shape: 'legacy',
             replacement: 'modern',
             evidence: { registry_path: '.dw/anti.yaml', registry_id: 'ap-2' },
+            status_provenance: SP,
           },
         ],
         adopter_manifests: [],
@@ -641,5 +651,6 @@ describe('scope-widen — computeDelta + mergeDelta unit tests', () => {
     expect(merged.regime_holdouts?.anti_patterns.length).toBe(2);
     expect(merged.regime_holdouts?.meta.total).toBe(2);
     expect(merged.regime_holdouts?.meta.by_source.anti_pattern).toBe(2);
+    expect(merged.regime_holdouts?.meta.by_status.actively_enforced).toBe(2);
   });
 });

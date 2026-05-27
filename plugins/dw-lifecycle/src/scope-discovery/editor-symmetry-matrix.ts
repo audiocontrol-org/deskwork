@@ -66,6 +66,10 @@ import {
 } from './util/editors.js';
 import { listFilesMatching, toPosix } from './util/glob.js';
 import { errorMessage } from './util/typeguards.js';
+import {
+  filterActiveEntries,
+  type CatalogStatus,
+} from './util/catalog-status.js';
 
 const SCANNED_EXTENSIONS: ReadonlySet<string> = new Set(['.ts', '.tsx']);
 
@@ -106,6 +110,18 @@ export interface MatrixRow {
   readonly entry: AdopterManifestEntry;
   /** One cell per editor, in `editors` order. */
   readonly cells: readonly MatrixCell[];
+  /**
+   * Phase 11 Task 11 — Loop status inherited verbatim from the
+   * adopter-manifest entry that drives this row. The matrix renderer
+   * surfaces this on the row label so operators see whether a row is
+   * actively enforced (`blessed` / `cursed`), pending triage, or
+   * suppressed. Rows with status outside `{blessed, cursed}` are NEVER
+   * present in the matrix because `computeMatrix` filters them at the
+   * registry boundary — this field is exposed here so downstream
+   * consumers (the renderer + the regime-holdout-detector) can read
+   * the inherited status without re-reading the entry.
+   */
+  readonly status: CatalogStatus;
 }
 
 export interface SymmetryMatrix {
@@ -134,12 +150,20 @@ export async function computeMatrix(opts: ComputeOptions): Promise<SymmetryMatri
   const moduleRoot = opts.moduleRoot ?? DEFAULT_MODULE_ROOT;
   const editors = await discoverEditors(rootAbs, moduleRoot);
   const registry = await loadRegistry(opts.registryPath);
-  if (registry.entries.length === 0) {
+  // Phase 11 Task 11 — filter to actively-enforced entries before
+  // building the matrix. Adopter-manifest entries with `status:
+  // pending | ignore | tracked-holdout | withdrawn` are skipped so the
+  // matrix doesn't surface withdrawn / pending rows alongside
+  // actively-enforced ones. Pre-Loop registries without explicit
+  // status default to `blessed` so the legacy enforcement surface is
+  // preserved (back-compat with all pre-Phase-11 baselines).
+  const activeEntries = filterActiveEntries(registry.entries);
+  if (activeEntries.length === 0) {
     return { editors, rows: [], filesVisited: 0, moduleRoot };
   }
   const visited = new Set<string>();
   const rows: MatrixRow[] = [];
-  for (const entry of registry.entries) {
+  for (const entry of activeEntries) {
     rows.push(await computeRow(entry, rootAbs, editors, moduleRoot, visited));
   }
   return { editors, rows, filesVisited: visited.size, moduleRoot };
@@ -239,7 +263,7 @@ async function computeRow(
     return { status, expected, actual, exempted, holdouts, trackedHoldouts };
   });
 
-  return { entry, cells };
+  return { entry, cells, status: entry.status };
 }
 
 function deriveStatus(

@@ -422,6 +422,11 @@ function applyDispositions(
         reason: args.reason,
         status: dispositionToStatus(args.disposition),
         provenance: g.provenance,
+        // Phase 11 Task 10 — preserve the existing audit history when
+        // transitioning the disposition. The auditor's record of past
+        // findings against this group is provenance, not operational
+        // state.
+        auditHistory: g.auditHistory,
       };
     }),
   };

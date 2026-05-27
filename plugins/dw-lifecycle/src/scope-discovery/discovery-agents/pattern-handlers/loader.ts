@@ -30,6 +30,7 @@ import type {
   SemanticEntry,
 } from './types.js';
 import {
+  parseAuditHistory,
   parseCatalogEntryMetadata,
   type CatalogEntryMetadata,
 } from '../../util/catalog-status.js';
@@ -109,6 +110,7 @@ function parseRegexEntry(
   ctx: ParseContext,
   raw: Record<string, unknown>,
   meta: CatalogEntryMetadata,
+  auditHistory: ReadonlyArray<string>,
 ): RegexEntry {
   const id = requireString(ctx, raw, 'id');
   const description = requireString(ctx, raw, 'description');
@@ -122,6 +124,7 @@ function parseRegexEntry(
     regex,
     status: meta.status,
     provenance: meta.provenance,
+    auditHistory,
     ...(extensions !== undefined ? { extensions } : {}),
   };
 }
@@ -130,6 +133,7 @@ function parseNegativeSpaceEntry(
   ctx: ParseContext,
   raw: Record<string, unknown>,
   meta: CatalogEntryMetadata,
+  auditHistory: ReadonlyArray<string>,
 ): NegativeSpaceEntry {
   const id = requireString(ctx, raw, 'id');
   const description = requireString(ctx, raw, 'description');
@@ -156,6 +160,7 @@ function parseNegativeSpaceEntry(
     threshold,
     status: meta.status,
     provenance: meta.provenance,
+    auditHistory,
     ...(secondaryContains !== undefined ? { secondaryContains } : {}),
     ...(extensions !== undefined ? { extensions } : {}),
   };
@@ -165,6 +170,7 @@ function parseCoverageEntry(
   ctx: ParseContext,
   raw: Record<string, unknown>,
   meta: CatalogEntryMetadata,
+  auditHistory: ReadonlyArray<string>,
 ): CoverageEntry {
   const id = requireString(ctx, raw, 'id');
   const description = requireString(ctx, raw, 'description');
@@ -180,6 +186,7 @@ function parseCoverageEntry(
     mustContain,
     status: meta.status,
     provenance: meta.provenance,
+    auditHistory,
     ...(extensions !== undefined ? { extensions } : {}),
   };
 }
@@ -188,6 +195,7 @@ function parseOutlierEntry(
   ctx: ParseContext,
   raw: Record<string, unknown>,
   meta: CatalogEntryMetadata,
+  auditHistory: ReadonlyArray<string>,
 ): OutlierEntry {
   const id = requireString(ctx, raw, 'id');
   const description = requireString(ctx, raw, 'description');
@@ -211,6 +219,7 @@ function parseOutlierEntry(
     thresholdSigma,
     status: meta.status,
     provenance: meta.provenance,
+    auditHistory,
     ...(extensions !== undefined ? { extensions } : {}),
   };
 }
@@ -219,6 +228,7 @@ function parseSemanticEntry(
   ctx: ParseContext,
   raw: Record<string, unknown>,
   meta: CatalogEntryMetadata,
+  auditHistory: ReadonlyArray<string>,
 ): SemanticEntry {
   const id = requireString(ctx, raw, 'id');
   const description = requireString(ctx, raw, 'description');
@@ -249,6 +259,7 @@ function parseSemanticEntry(
     confidenceThreshold,
     status: meta.status,
     provenance: meta.provenance,
+    auditHistory,
     ...(model !== undefined ? { model } : {}),
     ...(extensions !== undefined ? { extensions } : {}),
   };
@@ -298,17 +309,23 @@ function parseEntry(
     `override ${path} patterns[${index}]`,
     'pattern-matrix',
   );
+  // Phase 11 Task 10 — reverse provenance link (audit-log).
+  const auditHistory = parseAuditHistory(
+    raw['audit_history'],
+    `override ${path} patterns[${index}]`,
+    'pattern-matrix',
+  );
   switch (type) {
     case 'regex':
-      return parseRegexEntry(ctx, raw, metadata);
+      return parseRegexEntry(ctx, raw, metadata, auditHistory);
     case 'negative-space':
-      return parseNegativeSpaceEntry(ctx, raw, metadata);
+      return parseNegativeSpaceEntry(ctx, raw, metadata, auditHistory);
     case 'coverage':
-      return parseCoverageEntry(ctx, raw, metadata);
+      return parseCoverageEntry(ctx, raw, metadata, auditHistory);
     case 'outlier':
-      return parseOutlierEntry(ctx, raw, metadata);
+      return parseOutlierEntry(ctx, raw, metadata, auditHistory);
     case 'semantic':
-      return parseSemanticEntry(ctx, raw, metadata);
+      return parseSemanticEntry(ctx, raw, metadata, auditHistory);
   }
 }
 

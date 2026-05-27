@@ -354,6 +354,50 @@ export function isActivelyEnforced(status: CatalogStatus): boolean {
 }
 
 /**
+ * Phase 11 Task 10 — Parse the OPTIONAL `audit_history:` field from a
+ * raw catalog entry. The field is the REVERSE provenance link: it
+ * names every audit-log Finding-ID that referenced this entry over
+ * time. Forward provenance (`provenance.context: audit-finding-<id>`)
+ * names the SINGLE event that produced the current state; this list
+ * preserves the cumulative history.
+ *
+ * Wire shape — list of non-empty strings:
+ *
+ *   audit_history:
+ *     - AUDIT-20260526-01
+ *     - AUDIT-20260527-03
+ *
+ * Returns an empty array when absent (back-compat). Throws on shape
+ * violation (non-array OR non-string element OR empty string) — same
+ * loud-failure stance as the other parser helpers.
+ *
+ * The doctor rule `provenance-orphaned-entries` cross-checks each
+ * entry's `audit_history:` against the audit-log to surface broken
+ * references.
+ */
+export function parseAuditHistory(
+  raw: unknown,
+  ctx: string,
+  namespace: string,
+): readonly string[] {
+  if (raw === undefined || raw === null) return [];
+  if (!Array.isArray(raw)) {
+    throw new Error(
+      `${namespace}: ${ctx} \`audit_history\` must be a list of strings; got ${typeof raw}`,
+    );
+  }
+  return raw.map((value, index) => {
+    if (typeof value !== 'string' || value.length === 0) {
+      throw new Error(
+        `${namespace}: ${ctx} \`audit_history[${index}]\` must be a non-empty string; ` +
+          `got ${typeof value}`,
+      );
+    }
+    return value;
+  });
+}
+
+/**
  * Convenience filter: returns the subset of entries with actively-
  * enforced status. Generic over entry shape; each scanner uses this
  * with its own entry interface that embeds `CatalogEntryMetadata`.

@@ -1,4 +1,4 @@
-generated_at: 2026-05-27T02:33:45.859Z
+generated_at: 2026-05-27T03:05:06.758Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -537,7 +537,7 @@ clones:
     lines: 17
     members:
       - plugins/dw-lifecycle/src/scope-discovery/check-adopters.ts:284:300
-      - plugins/dw-lifecycle/src/scope-discovery/editor-symmetry-matrix.ts:269:285
+      - plugins/dw-lifecycle/src/scope-discovery/editor-symmetry-matrix.ts:293:309
     disposition: pending
     reason: null
   - id: 478402618ea8
@@ -625,11 +625,18 @@ clones:
       - plugins/dw-lifecycle/src/scope-discovery/tooling-feedback-import.ts:403:416
     disposition: keep-with-reason
     reason: intentional shared scaffolding across Phase 11 Wave 5 surfaces (codebase-state metrics computation + gather pattern, LLM judge/auditor library boilerplate, tooling-feedback import + doctor rule scaffolding). Extracting would create cross-surface coupling that hurts more than the duplication costs.
+  - id: 457b0a7e316e
+    lines: 16
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/controller/controller-policies.ts:155:170
+      - plugins/dw-lifecycle/src/scope-discovery/controller/controller-policies.ts:213:228
+    disposition: keep-with-reason
+    reason: intentional shared scaffolding from Phase 11 Wave 6 (controller library + audit-log parser + cross-surface filter scaffolds share boilerplate). Extracting hurts more than the duplication costs.
   - id: afeee722255a
     lines: 16
     members:
       - plugins/dw-lifecycle/src/scope-discovery/deprecation-scan.ts:411:426
-      - plugins/dw-lifecycle/src/scope-discovery/editor-symmetry-matrix.ts:270:285
+      - plugins/dw-lifecycle/src/scope-discovery/editor-symmetry-matrix.ts:294:309
     disposition: keep-with-reason
     reason: intentional shared scaffolding across sibling scope-discovery scanners (test-harness pattern, CLI parseCli boilerplate, scan-and-write output pattern). Each clone group is short-and-shaped-the-same intentionally; extracting would create cross-scanner coupling that hurts more than the duplication costs.
   - id: 07ee065dbf2f
@@ -649,8 +656,8 @@ clones:
   - id: 3be061e8961a
     lines: 7
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-handlers/loader.ts:133:139
-      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-handlers/loader.ts:168:174
+      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-handlers/loader.ts:137:143
+      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-handlers/loader.ts:174:180
     disposition: keep-with-reason
     reason: intentional shared scaffolding across new scope-discovery surfaces from Wave 3 (migrate-from-pilot CLI shell, pattern-handler test fixtures, dispatcher boilerplate, scope-widen+migrate planning patterns). Extracting would create cross-surface coupling; the duplication is short and intentional.
   - id: 334c25cf2f41
@@ -670,14 +677,14 @@ clones:
   - id: ce94eda7ed31
     lines: 23
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-matrix.ts:145:167
+      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-matrix.ts:149:171
       - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/prd-themed-pattern-hunter.ts:181:200
     disposition: keep-with-reason
     reason: intentional shared scaffolding across new scope-discovery surfaces from Wave 3 (migrate-from-pilot CLI shell, pattern-handler test fixtures, dispatcher boilerplate, scope-widen+migrate planning patterns). Extracting would create cross-surface coupling; the duplication is short and intentional.
   - id: 76e15e6eb177
     lines: 7
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-matrix.ts:179:185
+      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-matrix.ts:183:189
       - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/prd-themed-pattern-hunter.ts:234:240
     disposition: keep-with-reason
     reason: Tail-end scaffolding of two unrelated discovery agents (pattern-matrix builds the matrix; prd-themed-pattern-hunter wraps the hunter). The 7-line shared shape is each agent's main() runIfMain footer plus throw-on-error guard. Extracting a wrapper would couple unrelated agents through a shared error type.

@@ -137,6 +137,8 @@ function group(args: {
       source: 'install-seed' as const,
       authored_at: '1970-01-01T00:00:00Z',
     },
+    // Phase 11 Task 10 — empty audit history (no auditor findings against fixture).
+    auditHistory: [] as readonly string[],
   };
 }
 
@@ -164,6 +166,8 @@ function refactorGroup(args: {
       source: 'install-seed' as const,
       authored_at: '1970-01-01T00:00:00Z',
     },
+    // Phase 11 Task 10 — empty audit history (no auditor findings against fixture).
+    auditHistory: [] as readonly string[],
   };
 }
 

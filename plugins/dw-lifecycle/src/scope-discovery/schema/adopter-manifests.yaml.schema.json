@@ -73,6 +73,11 @@
         "provenance": {
           "description": "Phase 11 Task 2 — provenance block. Synthesized to install-seed when absent.",
           "$ref": "#/definitions/Provenance"
+        },
+        "audit_history": {
+          "description": "Phase 11 Task 10 — REVERSE provenance link to the audit-log. List of audit-log Finding-IDs that referenced this entry over time. Optional.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
         }
       }
     },

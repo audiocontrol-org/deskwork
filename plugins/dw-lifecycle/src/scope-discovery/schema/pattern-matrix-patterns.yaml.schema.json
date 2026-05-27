@@ -74,6 +74,11 @@
         "evidence_link": { "type": "string", "minLength": 1 }
       }
     },
+    "auditHistory": {
+      "description": "Phase 11 Task 10 — REVERSE provenance link to the audit-log. List of audit-log Finding-IDs that referenced this entry over time. Optional.",
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
     "regexSource": {
       "type": "string",
       "minLength": 1,
@@ -95,7 +100,8 @@
         "regex": { "$ref": "#/$defs/regexSource" },
         "extensions": { "$ref": "#/$defs/extensions" },
         "status": { "$ref": "#/$defs/catalogStatus" },
-        "provenance": { "$ref": "#/$defs/provenance" }
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "audit_history": { "$ref": "#/$defs/auditHistory" }
       }
     },
     "negativeSpaceEntry": {
@@ -122,7 +128,8 @@
         },
         "extensions": { "$ref": "#/$defs/extensions" },
         "status": { "$ref": "#/$defs/catalogStatus" },
-        "provenance": { "$ref": "#/$defs/provenance" }
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "audit_history": { "$ref": "#/$defs/auditHistory" }
       }
     },
     "coverageEntry": {
@@ -140,7 +147,8 @@
         },
         "extensions": { "$ref": "#/$defs/extensions" },
         "status": { "$ref": "#/$defs/catalogStatus" },
-        "provenance": { "$ref": "#/$defs/provenance" }
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "audit_history": { "$ref": "#/$defs/auditHistory" }
       }
     },
     "outlierEntry": {
@@ -164,7 +172,8 @@
         },
         "extensions": { "$ref": "#/$defs/extensions" },
         "status": { "$ref": "#/$defs/catalogStatus" },
-        "provenance": { "$ref": "#/$defs/provenance" }
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "audit_history": { "$ref": "#/$defs/auditHistory" }
       }
     },
     "semanticEntry": {
@@ -193,7 +202,8 @@
         },
         "extensions": { "$ref": "#/$defs/extensions" },
         "status": { "$ref": "#/$defs/catalogStatus" },
-        "provenance": { "$ref": "#/$defs/provenance" }
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "audit_history": { "$ref": "#/$defs/auditHistory" }
       }
     }
   }

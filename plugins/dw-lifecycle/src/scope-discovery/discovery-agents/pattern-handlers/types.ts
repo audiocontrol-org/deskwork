@@ -53,6 +53,11 @@ interface BaseCatalogEntry {
   readonly status: CatalogStatus;
   /** Phase 11 Task 2 — provenance block; synthesized when absent. */
   readonly provenance: Provenance;
+  /**
+   * Phase 11 Task 10 — REVERSE provenance link to the audit-log.
+   * Empty when no audit finding has referenced this entry.
+   */
+  readonly auditHistory: ReadonlyArray<string>;
 }
 
 /**
