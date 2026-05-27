@@ -10,7 +10,11 @@
 //  - Use the W3CImageFormat adapter so lifecycle events receive W3C
 //    objects directly, not Annotorious's internal model.
 
-import { createImageAnnotator, W3CImageFormat } from '@annotorious/annotorious';
+import {
+  createImageAnnotator,
+  UserSelectAction,
+  W3CImageFormat
+} from '@annotorious/annotorious';
 import '@annotorious/annotorious/annotorious.css';
 
 const FIXTURE_ELEMENT_ID = 'fixture-image';
@@ -109,7 +113,9 @@ function wireGlobalKeyboardShortcuts(anno) {
 function snapshotAnnotations(anno) {
   // anno.getAnnotations() returns adapter-serialized (W3C) objects when
   // an adapter is configured. Capturing via the getter avoids drifting
-  // out of sync with internal state on update/delete events.
+  // out of sync with internal state on update/delete events. See the
+  // findings doc § "W3C alignment — actual emitted payload" for the
+  // empirical confirmation on both create and read paths.
   return anno.getAnnotations();
 }
 
@@ -121,7 +127,7 @@ async function main() {
     adapter: W3CImageFormat(FIXTURE_SOURCE_URI),
     drawingEnabled: true,
     theme: 'light',
-    userSelectAction: 'EDIT'
+    userSelectAction: UserSelectAction.EDIT
   });
 
   anno.setDrawingTool('rectangle');

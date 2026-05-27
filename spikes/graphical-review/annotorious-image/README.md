@@ -14,13 +14,44 @@ npm run dev
 ```
 
 Vite prints a local URL (default `http://localhost:5173`). Open it in a
-browser.
+browser. Vite is in use because Annotorious ships as ESM with
+bare-specifier imports (`@annotorious/annotorious`); Vite resolves the
+imports for the dev server without a separate build step.
 
 To pin a region: click-and-drag on the fixture. To draw a polygon:
 click the **Polygon** toolbar button, then click vertices and press
-Enter to close. Press **Escape** to abort a draw in progress. The
-right-hand pane mirrors the current set of annotations as W3C-shaped
-JSON-LD; the **Download annotations.json** button persists it to disk.
+Enter (handled natively by Annotorious) to close. Press **Escape** to
+abort a draw in progress. The right-hand pane mirrors the current set
+of annotations as W3C-shaped JSON-LD; the **Download annotations.json**
+button persists it to disk.
+
+## How to verify
+
+The spike ships two Playwright probes that produce the evidence cited
+in the findings doc. First-time setup: `npx playwright install chromium`
+downloads the headless-shell binary the probes drive (skipped if a
+matching binary is already cached under `~/Library/Caches/ms-playwright/`).
+Start the dev server in one terminal (`npm run dev`); from another
+terminal in this directory:
+
+```
+npm run verify   # drives the spike at desktop (1280x800) and iPhone 13
+                 # viewports; asserts every clause of the findings doc's
+                 # § "W3C alignment — actual emitted payload" + the
+                 # mobile touch-handle claim.
+npm run a11y     # focuses the SVG overlay; asserts the gaps documented
+                 # in § "Accessibility — keyboard" (annotation <g>
+                 # elements have no tabindex / role / aria-label).
+```
+
+Both probes exit non-zero on assertion failure. They log payload +
+DOM snapshots before each assertion section so a failure is
+diagnosable without re-running.
+
+If Annotorious upgrades and the findings doc's claims no longer hold
+(e.g. they add `aria-label` to annotation `<g>` elements), the relevant
+probe will fail — re-verify the findings against the new version
+before relaxing the assertion.
 
 ## What to look at to verify the W3C payload
 
