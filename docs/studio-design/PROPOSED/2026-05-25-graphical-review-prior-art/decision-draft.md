@@ -22,7 +22,7 @@ in Task 1.6.**
 |---|---|---|
 | Image annotation spike | DONE — see below | 1.2 |
 | HTML annotation spike | DONE — see below | 1.3 |
-| Screenshot capture + markup spike | pending | 1.4 |
+| Screenshot capture + markup spike | DONE — see below | 1.4 |
 | Threading + W3C alignment | pending | 1.5 |
 
 ## Image annotation spike (Task 1.2)
@@ -580,3 +580,348 @@ layer is a sibling module, not a fork.
   rendering paths share the same W3C output but the DOM inspection
   differs. The probe's a11y assertions handle both paths; production
   code shouldn't depend on overlay-span presence.
+
+## Screenshot capture + markup spike (Task 1.4)
+
+Three sub-spikes, each focused on one mechanism. All three are
+library-only / filesystem-native per Architecture A — captures stay
+in-memory, exports are PNG data URLs downloaded via Blob URL, no uploads
+to any external service.
+
+### Sub-spike 1: `getDisplayMedia()` capture
+
+Spike location: [`spikes/graphical-review/capture-getdisplaymedia/`](../../../../spikes/graphical-review/capture-getdisplaymedia/).
+
+The browser's Screen Capture API. Operator clicks "Capture screen" → OS
+chooser opens → operator picks tab / window / screen → spike grabs one
+frame from the resulting MediaStream into a `<canvas>`, immediately
+stops the stream's tracks (clears the browser's "is being shared"
+indicator), renders the frame, offers PNG download.
+
+**Browser support (per caniuse + the spike's runtime probe):**
+
+| Browser | Desktop support | Mobile support | Notes |
+|---|---|---|---|
+| Chromium / Chrome | Yes (since 72) | No (Android Chrome lacks `getDisplayMedia`) | Native dialog selects tab / window / screen. The spike's headless probe sees `apiAvailable === true` but the call rejects with `NotSupportedError` because headless cannot satisfy user-activation. |
+| Firefox | Yes (since 66) | No | Same dialog UX. |
+| Safari | Yes (since 13) | No (iOS Safari does not implement the API) | Safari's chooser is OS-level. Permission scope is per-tab. |
+| Headless Chromium (Playwright default) | Reports API available; rejects with `NotSupportedError: Not supported` at call time | n/a | Documented honestly; the spike's verify probe asserts the rejection path. |
+
+**Permission-prompt UX cost:** every capture surfaces a fresh OS-level
+permission prompt — there is no "remember this choice for this site"
+affordance equivalent to camera / microphone permissions. Each capture
+re-prompts. This is the central UX cost: a review workflow that captures
+N regions of a mockup costs N prompts. For an operator marking up a
+single full-window screenshot the cost is one prompt; for repeated
+captures the friction compounds.
+
+**Resolution / fidelity:** the captured frame is at the source's native
+resolution (e.g. retina displays capture at devicePixelRatio-adjusted
+resolution). The spike captures `video.videoWidth × video.videoHeight`
+without scaling; the result is a faithful pixel-for-pixel render of the
+source area.
+
+**What you can capture:** the operator chooses at prompt time — entire
+screen (multi-monitor: one screen at a time), a window (any visible
+top-level window — including non-browser windows), or a tab (rendered
+content of any open browser tab). The choice is exposed at the OS-prompt
+level; the spike cannot pre-select.
+
+**Integration cost:**
+
+| Dimension | Measurement | Notes |
+|---|---|---|
+| Glue-code LOC | **219 lines** | `src/spike.js` — element wiring + capture flow + state machine + error handling. |
+| Spike total LOC | 761 lines | Adds 120 CSS + 53 HTML + 270 probe + 99 README. |
+| Production deps | **0** | Pure browser API. No npm package needed. |
+| Production deps disk size | **0** | The spike's `node_modules/` (35 MB / 34 packages) is entirely devDependencies (Vite + Playwright). |
+
+**Probe assertion summary (all PASS):**
+
+```
+=== summary ===
+All assertions passed.   (28 assertions across initial DOM,
+                          API-availability, headless capture rejection,
+                          post-capture wiring, clear lifecycle)
+```
+
+**v1 recommendation:** keep `getDisplayMedia` as a **secondary** capture
+path, NOT the primary. Use it specifically for cases the DOM-to-canvas
+path can't render (WebGL contexts, video frames, OS-level chrome the
+mockup includes, anything outside the studio's DOM tree). The
+per-capture permission prompt is a real friction surface that
+disqualifies it as the default; the DOM-to-canvas path (Sub-spike 2)
+runs with zero prompts.
+
+The spike's automated probe cannot simulate the OS permission prompt;
+manual cross-browser validation is documented in the README. The
+findings here trust caniuse + MDN for the cross-browser claims and the
+spike's runtime measurements for the headless / programmatic behaviour.
+
+### Sub-spike 2: DOM-to-canvas (`html-to-image`)
+
+Spike location: [`spikes/graphical-review/capture-dom-to-canvas/`](../../../../spikes/graphical-review/capture-dom-to-canvas/).
+
+`html-to-image` v1.11.13 — MIT, zero runtime dependencies, last release
+2025-02. The matrix flagged this as the 2025/2026 consensus successor
+to `html2canvas` (which is effectively unmaintained — no release since
+2022-01, 975+ open issues). This spike validates the matrix claim.
+
+**Why `html-to-image` over `html2canvas`** (per the candidates matrix
+§ "Screenshot capture (DOM → image)"): `html2canvas` has not shipped a
+release since January 2022, carries ~975 open issues, and the README
+still labels it "experimental." `html-to-image` is the active
+2025/2026 consensus pick — better TypeScript story, configurable
+shadow-DOM, modern SVG `foreignObject` render path. Crucially,
+`html-to-image` has **zero runtime dependencies** (verified by
+`npm ls --all --omit=dev` in the spike: 2 packages total — html-to-image
+itself + its single transitive descendant).
+
+**Integration cost:**
+
+| Dimension | Measurement | Notes |
+|---|---|---|
+| Glue-code LOC | **247 lines** | `src/spike.js` — render + state machine + error handling + fidelity recording. |
+| Spike total LOC | 1,177 lines | Adds 333 CSS + 113 HTML + 401 probe + 83 README. The probe is the largest file because pixel-fidelity testing requires real PNG decoding (pngjs) and per-feature assertions. |
+| Production deps | **2 packages** | html-to-image (500 KB unpacked) + 1 transitive. |
+| Production disk size | **~500 KB** | The library itself. The spike's `node_modules/` (36 MB / 41 packages) is dominated by Vite + Playwright + pngjs (devDependencies). |
+
+**Rendering-fidelity findings** — the fidelity-stress fixture
+deliberately exercises features known to challenge DOM-to-canvas
+rasterizers. Each row is a CSS feature; each verdict is from the
+probe's pixel-sampling assertions (operator-perceivable: probe samples
+the captured PNG at known coordinates and verifies the rendered color
+matches the CSS-declared color within tolerance).
+
+| Feature | Verdict | Evidence |
+|---|---|---|
+| **`@font-face` web font with broken `url(...)` (404)** | **Renders via CSS fallback chain.** The fixture declares `font-family: 'LoraTest', Georgia, serif` where `LoraTest`'s woff2 URL deliberately 404s. Capture does NOT throw; the captured PNG renders the title using the fallback (`Georgia, serif`). | computed-style first-in-stack is still `'LoraTest, Georgia, serif'` (CSS-cascade-level claim); the rasterized output uses the fallback font since the web font is unavailable. |
+| **CSS `grid`** | **Faithful.** Three lane cards in a 3-column grid render at the documented pixel offsets (`publishedCard.x = 26`, `draftingCard.x = 226`, `ideasCard.x = 426` per the probe's layout snapshot). | Probe's layout snapshot matches expected grid spacing. |
+| **CSS `flex`** | **Faithful.** The aside + svg-icon flex pair renders with the documented sub-pixel positioning. | Multi-line aside paragraph reports `heightPx = 65` (~5 lines at the fixture width). |
+| **`::before` pseudo-element backgrounds** | **Faithful.** Each card's left-edge ribbon stripe (`::before` with `background: var(--c-published)`) is captured at the expected color: published #2f5d3a, drafting #b07a1a, ideas #4a4a8a. | Probe samples pixel at `(card.x + 2, card.y + h/2)` for each card; color distance < 40 in all three cases (probe output: green ribbon dist=0, ochre ribbon dist=0, purple ribbon dist=0). |
+| **`::after` pseudo-element content** | **Faithful.** The divider's `::after { content: '◆'; color: #6d3a1f }` glyph rasterizes at the divider center; the LANE label glyph (`::after { content: 'LANE'; }` on each card) renders correctly. | Probe scans a ±12px window around the divider center; finds a pixel matching #6d3a1f with `dist = 0`. |
+| **`box-shadow`** | **Faithful.** The fixture's outer `box-shadow: 0 4px 16px rgba(0,0,0,0.18)` rasterizes; cards' inner `box-shadow: 0 2px 4px rgba(0,0,0,0.08)` also visible in the export. | Visible in downloaded PNG; not pixel-sampled (shadow is anti-aliased gradient, hard to assert precisely). |
+| **`border-radius`** | **Faithful.** Card corners and the fixture's outer 12px radius render correctly. | Visible in downloaded PNG. |
+| **Inline `<svg>`** | **Faithful.** The decorative diamond icon's `<polygon fill="#6d3a1f">` rasterizes at the fixture-relative coordinates `(554, 190)` with the expected fill color. | Probe samples a pixel at `(svgIcon.x + svgIcon.w*0.3, svgIcon.y + svgIcon.h/2)`; color distance from #6d3a1f = 0. |
+| **Multi-line text wrapping** | **Faithful.** The aside paragraph wraps at the same column width as the live DOM (verified by `heightPx` being identical between live and captured). | Probe records rendered height = 65px; the captured PNG inherits this. |
+| **CSS `var(...)` custom properties** | **Faithful.** All `--c-published`, `--c-drafting`, `--c-ideas`, `--accent` references resolve correctly in the captured PNG. | All pixel-sample assertions on these colors pass. |
+| **System-font fallback paragraph (`font-family: -apple-system, ...`)** | **Faithful** (qualitative — not pixel-sampled because font rendering across systems varies). | Visible in downloaded PNG. |
+
+**Probe assertion summary (all PASS):**
+
+```
+=== summary ===
+All assertions passed.   (~30 assertions across initial state, capture
+                          run, fidelity snapshot, pixel-fidelity sampling
+                          of three ribbon colors + divider glyph + SVG
+                          polygon, clear lifecycle)
+```
+
+**Captured PNG dimensions vs. live DOM:** the probe verifies
+`capturedNaturalWidth === capturedRenderedWidth === 640` and
+`capturedNaturalHeight === capturedRenderedHeight === 394`. The capture
+is 1:1 with the live rendered fixture at `pixelRatio: 1`.
+
+**Known gaps (not blocking adoption, but should be tracked for Phase
+12):**
+
+1. **Cross-origin assets.** The spike's fixture is fully same-origin
+   (SVG, fonts, no external assets). Adopters who include cross-origin
+   `<img>` or external font URLs will hit `html-to-image`'s CORS
+   handling — the library serializes external assets to data URLs at
+   capture time, requiring CORS-permissive responses. Adopter-facing:
+   if a mockup includes a remote image without `Access-Control-Allow-Origin`,
+   the capture either fails or omits the image (depending on the asset
+   type). Not exercised by this spike; Phase 12 to budget for the
+   adopter-facing CORS error UX.
+2. **CSS `transform` + `clip-path`.** Not exercised by the fixture.
+   Anecdotal reports in the html-to-image issue tracker suggest these
+   can produce slight mis-renders; Phase 12 to add fidelity tests if
+   the studio's review surface uses them.
+3. **Shadow DOM.** `html-to-image` has a `shadowRootClone` option;
+   the spike does not exercise it. If Phase 10's HTML-mockup iframe
+   ever uses shadow roots, an additional fidelity probe is needed.
+
+**v1 recommendation:** **adopt `html-to-image` as the primary capture
+path.** Zero runtime deps, faithful CSS rendering against the
+fidelity-stress fixture, no permission prompts, deterministic capture
+size. The known gaps (cross-origin assets, transform / clip-path,
+shadow DOM) are Phase 12 budget concerns, not blockers.
+
+### Sub-spike 3: Markup tools (Excalidraw)
+
+Spike location: [`spikes/graphical-review/markup-tools/`](../../../../spikes/graphical-review/markup-tools/).
+
+**Build-vs-adopt decision: ADOPT Excalidraw.**
+
+Per the candidates matrix § "Screenshot markup / drawing": Excalidraw
+is MIT-licensed, ships PNG/SVG export, supports touch and mobile,
+124k+ GitHub stars. tldraw is **disqualified** — source-available
+licence requires either a $6k/yr commercial licence or a "made with
+tldraw" watermark on the canvas; incompatible with deskwork's
+OSS-dependency stance. Konva.js is a credible compositional
+alternative — see "considered but not spiked" below.
+
+**Integration cost:**
+
+| Dimension | Measurement | Notes |
+|---|---|---|
+| Glue-code LOC | **345 lines** | `src/main.jsx` — React mount + Excalidraw API wiring + fixture loader + box-annotation builder + export flow + state machine. |
+| Spike total LOC | 1,034 lines | Adds 132 CSS + 54 HTML + 13 vite.config + 319 probe + 124 README + 47 SVG fixture. |
+| Production deps | **259 packages** | `@excalidraw/excalidraw` + React + react-dom + their full transitive trees. Verified via `npm ls --all --omit=dev --parseable \| wc -l`. |
+| Per-library unpacked sizes | `@excalidraw/excalidraw` **48 MB**, `react` 368 KB, `react-dom` 4.4 MB | Excalidraw ships its full whiteboard (icons, fonts, themes); the shipped bundle is tree-shakeable but the dev-install is heavy. |
+| Spike `node_modules/` total | **312 MB / 539 directories** | Vite + Playwright + pngjs add to the above; this is the entire dev install size. |
+
+**Tool palette exposed by Excalidraw out of the box** (queried via
+`data-testid="toolbar-*"` against the rendered DOM in the probe):
+
+| Tool | Excalidraw testid | aria-label | Maps to spec's required tools |
+|---|---|---|---|
+| Selection | `toolbar-selection` | "Selection" | (transport) |
+| Rectangle | `toolbar-rectangle` | "Rectangle" | **box** |
+| Arrow | `toolbar-arrow` | "Arrow" | **arrow** |
+| Line | `toolbar-line` | "Line" | (no spec equivalent; complementary) |
+| Freedraw | `toolbar-freedraw` | "Draw" | **freehand** |
+| Text | `toolbar-text` | "Text" | **text-label** |
+| Image | `toolbar-image` | "Insert image" | (transport — used by the spike to embed the fixture) |
+| Eraser | `toolbar-eraser` | "Eraser" | (housekeeping) |
+
+**The workplan's "arrow / box / freehand / text-label / blur" tool list
+maps 4-of-5 cleanly to Excalidraw's native primitives.** The fifth —
+**blur** — is NOT a built-in Excalidraw tool. See § "Blur limitation"
+below.
+
+**Touch / mobile story:** Excalidraw is actively touch-first. The
+library's input handling uses Pointer Events (`pointerdown`/`pointermove`)
+with multi-touch support for pan/zoom; documented mobile support in
+upstream issues + release notes. Not exercised by this spike's
+automated probe (Playwright's mouse-event emulation is sufficient for
+desktop assertions but doesn't validate real touch gestures); manual
+mobile validation is a Phase 12 follow-on.
+
+**Export quality:** the probe exports the composed scene (fixture image
++ programmatic box annotation) via `exportToBlob({ mimeType: 'image/png',
+appState: { exportBackground: true, viewBackgroundColor: '#ffffff' } })`.
+The exported PNG is 620×420px (Excalidraw frames the export to the
+scene bounds + padding), 44–46 KB, contains the box-stroke color
+(#e03131) at 139 sampled pixel positions (proves the markup layer
+composes into the export, not just into the live editor).
+
+**Probe assertion summary (all PASS):**
+
+```
+=== summary ===
+All assertions passed.   (32 assertions across mount + tool-palette
+                          enumeration, fixture-image add, box-annotation
+                          add, scene export with pixel-color sampling of
+                          the box stroke, reset lifecycle)
+```
+
+**Blur limitation:** Excalidraw does not ship a native "blur this
+region" primitive. The workplan calls for blur as one of five markup
+tools. Three v1.x paths to close the gap:
+
+1. **Two-pass workflow.** Operator captures the region to blur via
+   `html-to-image` on a CSS-blurred clone, then re-inserts the blurred
+   image as an Excalidraw image element on top of the original. Works
+   today; ugly UX (operator runs the blur outside Excalidraw's toolbar).
+2. **Custom Excalidraw element type.** Excalidraw supports user-extended
+   element types via its plugin API. Phase 12 to scope adding a `blur`
+   element that renders as a CSS-blur overlay in the editor + as a
+   pre-rendered blurred image on export. Estimated cost: ~200-400 LOC
+   of TypeScript + the Excalidraw-element-API documentation work.
+3. **Reconsider Konva.js.** Konva ships `Konva.Filters.Blur` as a
+   one-line filter. If blur is load-bearing for v1 and option (2)
+   surfaces unforeseen integration cost, Konva becomes the credible
+   path — but at the cost of ~1,000-1,200 LOC of arrow/box/text/freehand
+   tooling we'd be building from scratch.
+
+The recommendation is option (2) — extend Excalidraw — because the
+v1 markup surface is small and Excalidraw's adopter ergonomics
+(stamps, hand-drawn aesthetic, mobile-first input) are worth the
+custom-element work.
+
+**Considered but not spiked: Konva.js compositional alternative.**
+
+Per the Task 1.2 broader survey's "compositional path" analysis (also
+recorded in `decision-draft.md` § "Image annotation spike" survey
+section): Konva.js is the credible alternative if Excalidraw proves
+stylistically wrong or its React dependency proves architecturally
+incompatible with `packages/studio/`. Konva is MIT, ~55 KB gzipped,
+canvas-primitive-only (no built-in markup tools). Building a markup
+editor on Konva would be ~1,000-1,200 LOC of arrow/box/freehand/text/
+blur tooling — a meaningful investment relative to the 345-LOC
+Excalidraw integration this spike measured. **NOT spiked because the
+matrix's recommendation (Excalidraw) holds against this spike's
+findings**; Konva remains documented as the v2 escape hatch if
+Excalidraw goes dormant or its stylistic direction diverges from
+deskwork's needs.
+
+**The React dependency cost.** `packages/studio/` does NOT currently
+depend on React (it's a Hono server with a vanilla-TS client bundle
+built via esbuild). Adopting Excalidraw forces React into the studio's
+runtime. Two integration shapes for Phase 12 to evaluate:
+
+1. **Isolated React sub-bundle.** Excalidraw mounts into a single
+   container; the rest of the studio remains vanilla TS. React is
+   loaded only on the screenshot-markup surface. Bundle weight is
+   gated by route — operators who never open the markup tool never
+   pay the cost.
+2. **Whole-studio React migration.** Out of scope for v1; would be a
+   substantially larger feature than the screenshot-markup work
+   itself.
+
+The recommendation is option (1) — isolate React to the markup
+surface. The spike's `main.jsx` already demonstrates the shape
+(createRoot mount into a single DOM node; rest of the page is
+vanilla DOM).
+
+**v1 recommendation:** **adopt Excalidraw, isolated React sub-bundle,
+defer blur primitive to a v1.x custom-element extension.** Excalidraw
+delivers 4-of-5 spec'd markup tools natively, has mature touch / mobile
+support, ships PNG export that composes cleanly with the fixture
+image, and the licence is unambiguous MIT.
+
+### Architectural fit with Architecture A
+
+All three sub-spikes are **library-only / filesystem-native** — captures
+and exports stay in-memory as PNG data URLs / Blobs; downloads happen
+through in-process Blob URLs the operator saves to disk; no upload to
+any external service. The findings hold under Architecture A's no-cloud
+/ no-DB constraint.
+
+### Open questions for Phase 12 (screenshot markup) implementation
+
+- **Capture-path routing.** The studio surface should default to
+  `html-to-image` (no prompt, faithful CSS) and offer `getDisplayMedia`
+  only when the operator explicitly opts in (toggle: "Capture screen
+  with system dialog" — for WebGL / video / OS-chrome cases). Phase 12
+  UX decision.
+- **Cross-origin assets in mockups.** Adopters who include remote
+  images / fonts in their HTML mockups will hit `html-to-image`'s CORS
+  handling. The studio needs an operator-visible warning surface when
+  a capture omits an external asset (rather than silently rendering a
+  broken-image placeholder in the captured PNG).
+- **Custom blur element for Excalidraw.** Estimate the cost of
+  extending Excalidraw with a `blur` element type before committing
+  to the path. The custom-element API is documented but
+  feature-incomplete in older Excalidraw versions; Phase 12 to verify
+  against v0.18.x at implementation time.
+- **React-isolation architecture.** How the studio builds + loads the
+  markup React sub-bundle. esbuild can produce the bundle; the host
+  page mounts it via dynamic import only on the markup surface.
+  Bundle-weight target: Excalidraw + React + react-dom production
+  builds total ~3-5 MB minified (un-gzipped, including Excalidraw's
+  shipped fonts). Phase 12 to measure the gzip + adopter-impact
+  numbers.
+- **Mobile validation.** Both `html-to-image` and Excalidraw claim
+  mobile support; neither was validated against a real touchscreen in
+  this task. Phase 12 acceptance criterion: real-device mobile capture +
+  markup smoke test on iOS Safari and Android Chrome.
+- **Annotation persistence.** Excalidraw exports `.excalidraw` JSON
+  alongside PNG; deskwork's filesystem-native model can persist both
+  (the JSON for "re-editable markup" reopening, the PNG for the
+  rendered review-surface attachment). Phase 12 to spec the storage
+  shape — likely an annotation's `body[]` carries both the rendered
+  PNG (as a `TextualBody` with `format: 'image/png'`) and the
+  re-editable Excalidraw JSON (as a separate body part).

@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DOM-to-canvas capture spike (html-to-image)</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <header class="masthead">
+      <h1>DOM-to-canvas capture spike (html-to-image)</h1>
+      <p class="lede">
+        Phase 1 Task 1.4.2 — render the fidelity-stress fixture below to a
+        PNG via html-to-image, surface what gets rendered correctly vs
+        what diverges from the live DOM.
+      </p>
+    </header>
+
+    <main class="grid">
+      <section class="controls-pane" aria-label="Capture controls">
+        <div class="toolbar" role="toolbar" aria-label="Capture tools">
+          <button id="capture-btn" type="button">Capture rendered fixture</button>
+          <button id="download-btn" type="button" disabled>Download PNG</button>
+          <button id="clear-btn" type="button" disabled>Clear</button>
+        </div>
+        <p class="status" id="status" aria-live="polite">Ready. Click "Capture rendered fixture" to start.</p>
+        <p class="meta" id="capture-meta">Dimensions: not captured yet.</p>
+        <p class="hint">
+          html-to-image clones the target DOM into an SVG
+          <code>&lt;foreignObject&gt;</code>, rasterizes it onto a canvas, and
+          returns a PNG data URL. Inspect the captured image below to see
+          what the rasterizer rendered.
+        </p>
+      </section>
+
+      <section class="preview-pane" aria-label="Captured frame preview">
+        <h2>Captured frame</h2>
+        <div id="preview-container">
+          <p class="placeholder">No capture yet — click the button.</p>
+        </div>
+      </section>
+    </main>
+
+    <section class="fixture-pane" aria-label="Fidelity-stress fixture target">
+      <h2>Fidelity-stress fixture (target of capture)</h2>
+      <div id="capture-target" class="fixture">
+        <!-- 1. Custom @font-face web font (Lora, served from Google Fonts) -->
+        <header class="fx-head">
+          <h3 class="fx-title">Editorial Lane Dashboard</h3>
+          <p class="fx-tagline">A press-check stress fixture for html-to-image.</p>
+        </header>
+
+        <!-- 2. CSS grid with pseudo-elements before/after on the cards -->
+        <div class="fx-grid">
+          <article class="fx-card fx-card--published">
+            <h4>Published</h4>
+            <p>12 entries</p>
+          </article>
+          <article class="fx-card fx-card--drafting">
+            <h4>Drafting</h4>
+            <p>5 entries</p>
+          </article>
+          <article class="fx-card fx-card--ideas">
+            <h4>Ideas</h4>
+            <p>23 entries</p>
+          </article>
+        </div>
+
+        <!-- 3. Flex layout with multi-line text + box-shadow + border-radius -->
+        <div class="fx-flex">
+          <aside class="fx-aside">
+            <p>
+              This paragraph contains <strong>multiple lines</strong> of
+              text wrapping naturally across the column. It tests whether
+              html-to-image preserves <em>line-break positioning</em> at
+              the same rendered width as the live DOM.
+            </p>
+          </aside>
+
+          <!-- 4. Inline SVG icon -->
+          <figure class="fx-icon" aria-label="Decorative inline SVG">
+            <svg viewBox="0 0 60 60" width="60" height="60" role="img" aria-label="Diamond icon">
+              <polygon points="30,4 56,30 30,56 4,30" fill="#6d3a1f" stroke="#1c1c1c" stroke-width="2" />
+              <circle cx="30" cy="30" r="8" fill="#fffaf0" />
+            </svg>
+            <figcaption>Inline SVG</figcaption>
+          </figure>
+        </div>
+
+        <!-- 5. Pseudo-element-driven divider -->
+        <div class="fx-divider"></div>
+
+        <!-- 6. Text with system font fallback -->
+        <p class="fx-system">
+          System-font fallback: this paragraph uses the platform default
+          family (<code>-apple-system</code>, <code>Segoe UI</code>,
+          <code>Roboto</code>) to test font-substitution behaviour.
+        </p>
+      </div>
+    </section>
+
+    <footer class="footnotes">
+      <p>
+        Fixture deliberately exercises web fonts, flex/grid, pseudo-elements
+        (<code>::before</code> / <code>::after</code>), box-shadow, border-radius,
+        inline SVG, multi-line text wrapping. See <code>src/spike.js</code>
+        for the capture wiring.
+      </p>
+    </footer>
+
+    <script type="module" src="./src/spike.js"></script>
+  </body>
+</html>
