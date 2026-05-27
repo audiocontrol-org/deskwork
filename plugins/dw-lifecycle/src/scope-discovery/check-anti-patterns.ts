@@ -41,6 +41,7 @@ import {
   isPathExcluded,
   loadRegistry,
 } from './anti-patterns-registry.js';
+import { filterActiveEntries } from './util/catalog-status.js';
 import {
   type Finding,
   type ScanResult,
@@ -273,18 +274,27 @@ function positionToLine(content: string, position: number): number {
 
 export async function scan(opts: CliOptions): Promise<ScanResult> {
   const registry = await loadRegistry(opts.registryPath);
-  if (registry.entries.length === 0) {
+  // Phase 11 Task 2 — filter to actively-enforced entries only.
+  // `blessed` and `cursed` entries fire; `pending`, `ignore`,
+  // `tracked-holdout`, and `withdrawn` entries are skipped (they are
+  // either awaiting triage, acknowledged-as-noise, deferred to a
+  // tracked issue, or overturned by an auditor — none should produce
+  // findings). Pre-Loop registries without explicit status default to
+  // `blessed` so this filter preserves the pre-Loop enforcement
+  // surface.
+  const activeEntries = filterActiveEntries(registry.entries);
+  if (activeEntries.length === 0) {
     return { findings: [], filesScanned: 0, entriesScanned: 0 };
   }
-  // Every entry with `canonical_implementation_file:` must point at a
-  // file that exists RIGHT NOW. If it doesn't, the primitive was likely
+  // Every entry with `canonical_file:` must point at a file that
+  // exists RIGHT NOW. If it doesn't, the primitive was likely
   // git-renamed without updating the registry — the entry would
   // silently miss its auto-exclusion and flag the NEW canonical
   // location (whichever file now carries the legacy shape) as a
   // holdout against its own anti-pattern. Fail loud at scan start
   // with the entry id + the missing path so the operator can update
-  // `canonical_implementation_file:` in one step.
-  assertCanonicalImplementationFilesExist(registry.entries);
+  // `canonical_file:` in one step.
+  assertCanonicalFilesExist(activeEntries);
   const files = await listSourceFiles(opts.scanRoot);
   const findings: Finding[] = [];
   const cwd = process.cwd();
@@ -294,7 +304,7 @@ export async function scan(opts: CliOptions): Promise<ScanResult> {
     // operator copying a flagged path into `excludes_paths:` works as-is.
     const relPath = toPosix(relative(cwd, file));
     let content: string | null = null;
-    for (const entry of registry.entries) {
+    for (const entry of activeEntries) {
       if (isPathExcluded(entry, relPath)) continue;
       if (content === null) {
         try {
@@ -312,32 +322,32 @@ export async function scan(opts: CliOptions): Promise<ScanResult> {
       if (line !== null) findings.push({ file, line, entry });
     }
   }
-  return { findings, filesScanned: files.length, entriesScanned: registry.entries.length };
+  return { findings, filesScanned: files.length, entriesScanned: activeEntries.length };
 }
 
 /**
- * Guard against stale `canonical_implementation_file:` entries. The
- * check runs once at scan start (not per-file) and throws on the first
- * missing canonical so the operator gets a single actionable error
- * instead of a per-finding cascade.
+ * Guard against stale `canonical_file:` entries. The check runs once
+ * at scan start (not per-file) and throws on the first missing
+ * canonical so the operator gets a single actionable error instead
+ * of a per-finding cascade.
  *
  * The path resolves against the scanner's CWD — matches how
  * `isPathExcluded` compares the canonical to each candidate file
  * (CWD-relative POSIX), so an entry that passes this check will
  * actually self-exclude during the per-file loop.
  */
-function assertCanonicalImplementationFilesExist(
+function assertCanonicalFilesExist(
   entries: readonly AntiPatternEntry[],
 ): void {
   for (const entry of entries) {
-    if (entry.canonicalImplementationFile === null) continue;
-    const abs = resolve(process.cwd(), entry.canonicalImplementationFile);
+    if (entry.canonicalFile === null) continue;
+    const abs = resolve(process.cwd(), entry.canonicalFile);
     if (!existsSync(abs)) {
       throw new Error(
-        `anti-pattern ${entry.id}: canonical_implementation_file ` +
-          `'${entry.canonicalImplementationFile}' does not exist; ` +
+        `anti-pattern ${entry.id}: canonical_file ` +
+          `'${entry.canonicalFile}' does not exist; ` +
           `the primitive may have been renamed. Update ` +
-          `canonical_implementation_file: in ${entry.id} or remove the field.`,
+          `canonical_file: in ${entry.id} or remove the field.`,
       );
     }
   }

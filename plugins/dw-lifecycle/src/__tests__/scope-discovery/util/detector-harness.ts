@@ -1,6 +1,9 @@
 /**
  * Test-side harness for spawning the plugin CLI dispatcher at
- * `dw-lifecycle detect-clones ...` against a per-test fixture.
+ * `dw-lifecycle check-clones ...` against a per-test fixture. (The
+ * legacy `dw-lifecycle detect-clones` alias still resolves to the
+ * same handler; the rename is covered by a dedicated alias-symmetry
+ * test in `check-clones.alias.test.ts`.)
  *
  * Each fixture is self-contained:
  *   - A unique directory under the OS tmpdir holds the fixture files,
@@ -80,17 +83,23 @@ export async function makeFixture(label: string): Promise<Fixture> {
 
 /**
  * Build the argv vector for invoking the CLI dispatcher at
- * `cli.ts detect-clones ...`. By default the `--quiet` flag is
+ * `cli.ts check-clones ...`. By default the `--quiet` flag is
  * appended (matches the pre-commit hook's invocation shape); pass
  * `{ quiet: false }` to drop it and exercise the non-quiet output.
+ *
+ * `subcommandOverride` swaps the leading `check-clones` for an
+ * arbitrary subcommand name — used by `check-clones.alias.test.ts`
+ * to drive the same fixture under the legacy `detect-clones` alias
+ * and prove the two names produce identical exit codes + output.
  */
 export function detectorArgs(
   fixture: Fixture,
-  options: { readonly quiet?: boolean } = {},
+  options: { readonly quiet?: boolean; readonly subcommandOverride?: string } = {},
   extra: readonly string[] = [],
 ): readonly string[] {
+  const subcommand = options.subcommandOverride ?? 'check-clones';
   const args: string[] = [
-    'detect-clones',
+    subcommand,
     '--root',
     fixture.dir,
     '--baseline',
@@ -103,8 +112,8 @@ export function detectorArgs(
 
 /**
  * Spawn the CLI dispatcher with the fixture as cwd. The dispatcher
- * routes `detect-clones` to the detectClones() function inside
- * scope-discovery/clone-detector.ts.
+ * routes both `check-clones` (canonical) and `detect-clones` (alias)
+ * to the checkClones() function inside scope-discovery/clone-detector.ts.
  */
 export function runDetector(
   args: readonly string[],

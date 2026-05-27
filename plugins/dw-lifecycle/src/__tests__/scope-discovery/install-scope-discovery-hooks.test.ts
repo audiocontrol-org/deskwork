@@ -224,7 +224,7 @@ describe('install-scope-discovery-hooks — install() against tmpdir', () => {
     expect(existsSync(hookPath)).toBe(true);
     const content = readFileSync(hookPath, 'utf8');
     expect(content).toContain('#!/usr/bin/env bash');
-    expect(content).toContain('dw-lifecycle detect-clones --gate-mode');
+    expect(content).toContain('dw-lifecycle check-clones --gate-mode');
     expect(content).toContain('dw-lifecycle check-anti-patterns --gate-mode');
     expect(content).toContain('dw-lifecycle check-adopters --gate-mode');
     expect(content).toContain('dw-lifecycle check-disposition-survivor');
@@ -262,7 +262,7 @@ describe('install-scope-discovery-hooks — install() against tmpdir', () => {
     const huskyPath = join(tmp, '.husky', 'pre-commit');
     expect(existsSync(huskyPath)).toBe(true);
     const content = readFileSync(huskyPath, 'utf8');
-    expect(content).toContain('dw-lifecycle detect-clones --gate-mode');
+    expect(content).toContain('dw-lifecycle check-clones --gate-mode');
   });
 
   it('merge mode: existing hook content preserved + managed block appended', () => {

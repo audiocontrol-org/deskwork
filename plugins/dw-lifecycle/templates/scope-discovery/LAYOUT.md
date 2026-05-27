@@ -46,7 +46,7 @@ override path. The complete list:
 
 | Scanner | Flag | Default |
 |---|---|---|
-| `detect-clones` | jscpd's `pattern:` (in `.jscpd.json`) | `**/*.ts` |
+| `check-clones` | jscpd's `pattern:` (in `.jscpd.json`) | `**/*.ts` |
 | `check-anti-patterns` | `--root <path>` | `src/` |
 | `check-adopters` | `--root <path>` | `src/` |
 | `check-refactor-preconditions` | (operates on `clones.yaml` directly) | n/a |
@@ -76,6 +76,132 @@ The directory name `.dw-lifecycle/scope-discovery/` is deliberate:
   the directory tree sees what's there without reading the plugin's
   source.
 
+## Pattern-matrix overrides — polymorphic catalog
+
+The pattern-matrix discovery agent supports a polymorphic catalog of
+pattern types beyond plain regex (Phase 11 Task 1). When the file
+`.dw-lifecycle/scope-discovery/pattern-matrix-patterns.yaml` is present,
+its `patterns:` list REPLACES the built-in catalog. Each entry carries
+a `type` discriminator selecting the handler:
+
+| `type:` | Behavior |
+|---|---|
+| `regex` (default — backward-compat for entries without `type:`) | Line-grep regex matcher. |
+| `negative-space` | Fires when a file matching `match_glob` does NOT contain `must_contain`. The "expected adopter that didn't adopt" detector. |
+| `coverage` | Emits an adoption-ratio metric (`numerator/denominator`). NOT a finding generator. |
+| `outlier` | Statistical outlier detection — files whose `distance_metric` distance from directory-sibling centroid exceeds `threshold_sigma`. |
+| `semantic` | LLM-augmented (STUB in v1.1; wiring tracked at #319). |
+
+The full schema is at
+`plugins/dw-lifecycle/src/scope-discovery/schema/pattern-matrix-patterns.yaml.schema.json`
+and an example showing all five types is at
+`plugins/dw-lifecycle/templates/scope-discovery/pattern-matrix-patterns.example.yaml`.
+
+## Content type support
+
+Phase 11 Task 13 generalized the scan engine beyond TypeScript. The
+pattern catalog + glob + shape model is content-type-agnostic; the same
+primitives operate uniformly on every content type listed below.
+
+| Extension | Walker support | Outlier `content_type:` token unit |
+|---|---|---|
+| `.ts` / `.tsx` | yes (default) | `ts` — alphanumeric identifiers |
+| `.md` / `.markdown` | yes (NEW Phase 11 Task 13) | `markdown` — alphanumeric words |
+| `.css` / `.scss` | yes (NEW Phase 11 Task 13) | `css` — property names + class/id selectors |
+| `.html` / `.htm` | yes (NEW Phase 11 Task 13) | `html` — tag names + attribute names |
+| `.yaml` / `.yml` | yes (NEW Phase 11 Task 13) | `yaml` — top-level + nested key names |
+| `.json` | yes (NEW Phase 11 Task 13) | `json` — JSON key names |
+
+### How extension support actually works
+
+The `pattern-matrix` agent reads the catalog and derives the **union**
+of every entry's `extensions:` field. The file walker then traverses
+every file whose extension is in that union (plus the default `.ts/.tsx`).
+A catalog with zero `extensions:` declarations walks only TS files;
+adding `extensions: ['.md']` to even one entry expands the walk to
+include markdown files for every entry that day.
+
+The per-entry `extensions:` filter still applies at evaluation time —
+a regex entry declaring `extensions: ['.md']` will skip non-`.md` files
+even if the walker handed them in. This lets a single catalog mix per-
+content-type patterns without bleeding across content types.
+
+### Authoring per-content-type entries
+
+Every pattern type in the catalog accepts an optional `extensions:`
+filter. The recommended shape for content-type-specific entries:
+
+```yaml
+patterns:
+  # Markdown-specific anti-pattern:
+  - type: regex
+    id: markdown-setext-heading-retired
+    description: 'Setext-style headings are retired in favor of ATX `#`.'
+    regex: '^={3,}\s*$'
+    extensions: ['.md', '.markdown']
+
+  # CSS-specific negative-space detection:
+  - type: negative-space
+    id: css-without-canonical-namespace
+    description: 'CSS files lacking the `.ac-*` namespace prefix.'
+    match_glob: 'src/**/*.css'
+    must_contain: '\.ac-[a-z]'
+    threshold: 1
+    extensions: ['.css', '.scss']
+
+  # JSON-schema coverage metric:
+  - type: coverage
+    id: package-license-adoption
+    description: 'Fraction of package.json files carrying a `license` field.'
+    match_glob: 'packages/**/package.json'
+    must_contain: '"license"\s*:\s*"'
+    extensions: ['.json']
+```
+
+### Outlier `content_type:` discriminator
+
+The `outlier` primitive's `token-composition` distance metric tokenizes
+file content. Different content types call for different tokenizers:
+markdown words are not TypeScript identifiers, CSS selectors are not
+YAML keys. The `content_type:` field selects the tokenizer:
+
+| Value | Tokenizer |
+|---|---|
+| `auto` (default) | Inferred from file extension (see table above). Unknown extensions fall back to `ts` (alphanumeric tokens). |
+| `ts` | Alphanumeric identifier tokens (length ≥ 3, lowercased). |
+| `markdown` | Alphanumeric word tokens (shares the `ts` tokenizer today; explicit dispatcher leaves room for per-content tuning). |
+| `css` | Property names + `.class`/`#id` selectors. |
+| `html` | Tag names + attribute names. |
+| `yaml` | Top-level + nested key names (per `^name:` regex). |
+| `json` | JSON key names (per `"name":` regex). |
+
+The `className-composition` distance metric is JSX-specific (parses
+`className="..."` attribute payloads). For non-TS content the operator
+should pick `token-composition` with an appropriate `content_type:`
+instead. See `pattern-matrix-patterns.example.yaml` for end-to-end
+examples for each content type.
+
+### Limitations + practical guidance
+
+- **Glob semantics.** The handlers' glob compiler treats `**` as
+  "one or more path segments" (matches `pages/sub/a.html` but NOT
+  `pages/a.html`). Author globs accordingly — use
+  `pages/**/*.html` for nested layouts, `pages/*.html` for flat ones.
+- **Outlier needs population.** The outlier handler buckets files by
+  parent directory and skips buckets with fewer than 2 siblings. A
+  population of N=1 produces zero findings even if the file is
+  visually divergent. Layout fixtures with at least 2 siblings per
+  directory to exercise the primitive.
+- **Outlier needs variance.** A directory of byte-identical files has
+  zero standard deviation; the handler skips it (the alternative
+  would be noise). Real codebases supply natural variance; synthetic
+  test fixtures should vary the siblings slightly (a single extra
+  key, an extra property) to keep stddev > 0.
+- **The synthesis layer + operator curate.** Per-content-type regexes
+  are heuristics, not parsers. False positives at the discovery layer
+  are cheaper than false negatives; the synthesis layer + operator
+  triage.
+
 ## What the protocol does NOT assume
 
 - The project does not have to be a TS monorepo. The default is `src/`
@@ -83,7 +209,7 @@ The directory name `.dw-lifecycle/scope-discovery/` is deliberate:
 - The project does not have to have a single source tree. Operators
   with multi-tree layouts run the scanners with explicit `--root`
   per tree and aggregate findings via standard shell composition.
-- The project does not have to use jscpd. `detect-clones` uses jscpd
+- The project does not have to use jscpd. `check-clones` uses jscpd
   internally, but the registries (`anti-patterns.yaml`,
   `adopter-manifests.yaml`) are independent of any duplicate-detection
   engine.

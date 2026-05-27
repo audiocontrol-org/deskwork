@@ -117,7 +117,15 @@ function renderRow(row: MatrixRow): string[] {
   // narrow. The detail block below renders the full list for entries
   // that have multiple paths.
   const primary = row.entry.from[0] ?? '';
-  const label = `${row.entry.id} (\`${primary}\`)`;
+  // Phase 11 Task 11 — append a status badge when the row was promoted
+  // via a non-`blessed` actively-enforced status (currently only
+  // `cursed`). `blessed` is the default; surfacing the badge for every
+  // row would add visual noise without signal. The matrix never
+  // contains pending / ignore / tracked-holdout / withdrawn rows (those
+  // are filtered upstream at `computeMatrix`); when they could appear
+  // here a future contract change is needed.
+  const statusBadge = row.status === 'blessed' ? '' : ` (status: ${row.status})`;
+  const label = `${row.entry.id} (\`${primary}\`)${statusBadge}`;
   return [label, ...row.cells.map(renderCell)];
 }
 

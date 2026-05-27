@@ -1,56 +1,77 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts
  *
- * Deprecation-driven scan SUBCOMMAND SURFACE — informational gate that
- * surfaces "this file is marked @deprecated; here are the importers
- * still holding it in place." When the importer count reaches zero, the
- * operator can safely delete the file in the next refactor commit.
+ * Deprecation-driven scan SUBCOMMAND SURFACE. Walks the source tree
+ * for file-level `@deprecated` JSDoc tags + inline `// DEPRECATED:`
+ * markers, counts remaining importers per deprecated file, and emits a
+ * status report split into:
  *
- * Status (v1): SUBCOMMAND SHELL ONLY. The underlying `deprecation-scan`
- * port from the audiocontrol pilot is tracked at
- * https://github.com/audiocontrol-org/deskwork/issues/287 and is NOT
- * shipped in this commit. Until that lands, this subcommand:
+ *   - "blocked" (importers > 0 — deletion is blocked until every
+ *     importer migrates; the report names every importer with
+ *     file:line),
+ *   - "safe-to-delete" (importers === 0 — the next refactor commit
+ *     can remove the file).
  *
- *   - validates its flags and prints help on `--help`,
- *   - reports an empty registry on stdout (no markers found, summary
- *     line cites 0 deprecated files, 0 blocked, 0 safe-to-delete),
- *   - exits 0 (informational gate; "0 markers" is not a failure).
+ * Two outputs:
  *
- * This mirrors the pattern-matrix empty-registry contract: an empty
- * registry is a healthy no-op, not a misconfiguration. The shell lets
- * operators wire the verb into their tooling NOW (skill prose,
- * documentation, hooks scaffold) without blocking on the full scan port.
+ *   - stdout (always, unless `--quiet`): the rendered markdown body +
+ *     a summary line. The summary line + counts let an operator scan
+ *     the terminal without parsing the markdown.
+ *   - `.dw-lifecycle/scope-discovery/deprecation-queue.md` (only with
+ *     `--write`): the operator-readable artifact committed to the
+ *     repo. Mirrors `check-editor-symmetry --write`'s contract.
  *
  * Exit codes:
- *   0   scan completed (always — gate is informational; non-zero importer
- *       count is NOT an error, it's a tracked status).
- *   2   invalid CLI args or scanner internal error.
  *
- * CLI:
- *   --write            (no-op until #287) write rendered markdown to
- *                       --artifact path. Accepted for symmetry with
- *                       check-editor-symmetry.
- *   --artifact <path>  (no-op until #287) artifact override.
- *   --root <path>      (no-op until #287) scan-root override.
- *   --quiet            suppress the empty-registry status line.
- *   --json             emit `{ "blocked": [], "safeToDelete": [], "deprecation_count": 0 }`.
- *   --help, -h         show help and exit 0.
+ *   0   scan completed successfully (the gate is informational; a
+ *       non-zero importer count is NOT an error — it's a tracked
+ *       in-flight status).
+ *   2   scanner internal / IO error.
  *
- * The flag surface mirrors the pilot so that when #287 lands the port can
- * back-fill the scan logic without changing the CLI contract.
+ * Note: this gate intentionally does NOT exit 1 when importers exist.
+ * The other Phase 6 gates (anti-patterns, adopters, editor-symmetry)
+ * DO block commits because they surface "you regressed the regime"
+ * conditions. Deprecation is the dual — "someone marked this for
+ * deletion; here's who's still holding it in place" — which is
+ * information, not a regression to block. The operator drains the
+ * queue when ready; the gate's job is to make "ready" observable.
+ *
+ * # DRY
+ *
+ * Re-uses the walker (`util/glob.ts`'s `listFilesMatching`) via
+ * `deprecation-scan.ts`, mirrors the CLI shape of
+ * `check-editor-symmetry.ts` for parity, and shares the `errorMessage`
+ * type-guard from `util/typeguards.ts`. No copy-paste of subprocess /
+ * glob / regex utilities.
+ *
+ * # Ports
+ *
+ * The scan logic + report rendering ported from the audiocontrol pilot
+ * (`tools/scope-discovery/check-deprecations.ts` +
+ * `deprecation-scan.ts` + `deprecation-report.ts`). Closes issue #287.
+ * The pre-port shell at this path had a forward-compatible CLI surface
+ * (flag names + exit codes) so adopter wiring didn't churn when this
+ * port landed.
  */
 
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { scan, type ScanResult } from './deprecation-scan.js';
+import {
+  ARTIFACT_PATH,
+  renderJson,
+  renderMarkdown,
+  summaryLine,
+} from './deprecation-report.js';
 import { errorMessage } from './util/typeguards.js';
 
-const DEFAULT_ARTIFACT = 'docs/scope-discovery/deprecation-queue.md';
 const DEFAULT_ROOT = '.';
-const EMPTY_REGISTRY_LINE =
-  'check-deprecations: registry empty; nothing to scan. ' +
-  '(deprecation-scan port pending — see ' +
-  'https://github.com/audiocontrol-org/deskwork/issues/287)';
+const DEFAULT_MODULE_ROOT = 'src';
 
 export interface CliOptions {
   readonly scanRoot: string;
+  readonly moduleRoot: string;
   readonly writeArtifact: boolean;
   readonly artifactPath: string;
   readonly quiet: boolean;
@@ -59,8 +80,9 @@ export interface CliOptions {
 
 export function parseCli(argv: readonly string[]): CliOptions {
   let scanRoot = DEFAULT_ROOT;
+  let moduleRoot = DEFAULT_MODULE_ROOT;
   let writeArtifact = false;
-  let artifactPath = DEFAULT_ARTIFACT;
+  let artifactPath = ARTIFACT_PATH;
   let quiet = false;
   let json = false;
   for (let i = 0; i < argv.length; i += 1) {
@@ -70,6 +92,13 @@ export function parseCli(argv: readonly string[]): CliOptions {
         const next = argv[i + 1];
         if (next === undefined) throw new Error('--root requires a path argument');
         scanRoot = next;
+        i += 1;
+        break;
+      }
+      case '--module-root': {
+        const next = argv[i + 1];
+        if (next === undefined) throw new Error('--module-root requires a path argument');
+        moduleRoot = next;
         i += 1;
         break;
       }
@@ -98,7 +127,7 @@ export function parseCli(argv: readonly string[]): CliOptions {
         throw new Error(`unknown argument: ${arg ?? '<empty>'}`);
     }
   }
-  return { scanRoot, writeArtifact, artifactPath, quiet, json };
+  return { scanRoot, moduleRoot, writeArtifact, artifactPath, quiet, json };
 }
 
 function printHelp(): void {
@@ -109,15 +138,15 @@ function printHelp(): void {
       'Informational gate: surfaces @deprecated files + remaining importers.',
       '',
       'Options:',
-      '  --root <path>      Override scan root (default: cwd)',
-      '  --write            Write the rendered markdown to --artifact path',
-      `  --artifact <path>  Override artifact path (default: ${DEFAULT_ARTIFACT})`,
-      '  --quiet            Suppress the empty-registry status line',
-      '  --json             Emit JSON instead of human text',
-      '  --help, -h         Show this help',
+      '  --root <path>         Override scan root (default: cwd)',
+      `  --module-root <path>  Module root for the @/ alias (default: ${DEFAULT_MODULE_ROOT})`,
+      '  --write               Write the rendered markdown to --artifact path',
+      `  --artifact <path>     Override artifact path (default: ${ARTIFACT_PATH})`,
+      '  --quiet               Suppress markdown body on stdout; summary line only',
+      '  --json                Emit JSON to stdout instead of the markdown body',
+      '  --help, -h            Show this help',
       '',
-      'Status: subcommand shell. Full scan port tracked at',
-      '  https://github.com/audiocontrol-org/deskwork/issues/287',
+      'Exit codes: 0 success (gate is informational); 2 args / I/O error.',
       '',
     ].join('\n'),
   );
@@ -125,8 +154,8 @@ function printHelp(): void {
 
 /**
  * Programmatic entrypoint. Exported so tests can drive it without
- * spawning a subprocess. Until #287 lands this always reports an
- * empty registry; callers should treat exit 0 as "scan ran cleanly."
+ * spawning a subprocess. Returns the numeric exit code; the subcommand
+ * shim forwards it via `process.exit`.
  */
 export async function main(argv: readonly string[]): Promise<number> {
   let opts: CliOptions;
@@ -136,27 +165,53 @@ export async function main(argv: readonly string[]): Promise<number> {
     process.stderr.write(`check-deprecations: ${errorMessage(err)}\n`);
     return 2;
   }
+  let result: ScanResult;
+  try {
+    result = await scan({ scanRoot: opts.scanRoot, moduleRoot: opts.moduleRoot });
+  } catch (err) {
+    process.stderr.write(`check-deprecations: ${errorMessage(err)}\n`);
+    return 2;
+  }
+  if (opts.writeArtifact) {
+    try {
+      const markdown = renderMarkdown(result);
+      const dest = resolve(opts.scanRoot, opts.artifactPath);
+      await mkdir(dirname(dest), { recursive: true });
+      await writeFile(dest, markdown, 'utf8');
+    } catch (err) {
+      process.stderr.write(
+        `check-deprecations: write artifact failed: ${errorMessage(err)}\n`,
+      );
+      return 2;
+    }
+  }
   if (opts.json) {
-    process.stdout.write(
-      JSON.stringify({
-        blocked: [],
-        safeToDelete: [],
-        deprecation_count: 0,
-        note:
-          'deprecation-scan port pending; see ' +
-          'https://github.com/audiocontrol-org/deskwork/issues/287',
-      }) + '\n',
-    );
+    // JSON mode: stdout is pure JSON so downstream tools (jq, etc.)
+    // can consume it. The summary line + markdown body go nowhere
+    // — the JSON object carries the same counts.
+    process.stdout.write(renderJson(result) + '\n');
     return 0;
   }
   if (!opts.quiet) {
-    process.stdout.write(`${EMPTY_REGISTRY_LINE}\n`);
+    process.stdout.write(renderMarkdown(result));
   }
-  // --write + --artifact are accepted but no-op until #287 lands. Callers
-  // wiring this into operator scripts NOW won't break when the full port
-  // arrives — the contract widens from "no-op" to "write the markdown."
-  void opts.writeArtifact;
-  void opts.artifactPath;
-  void opts.scanRoot;
+  process.stdout.write(summaryLine(result) + '\n');
   return 0;
+}
+
+function isCliEntryPoint(): boolean {
+  if (typeof process === 'undefined' || process.argv.length < 2) return false;
+  const invoked = process.argv[1];
+  if (invoked === undefined) return false;
+  return invoked === fileURLToPath(import.meta.url);
+}
+
+if (isCliEntryPoint()) {
+  main(process.argv.slice(2)).then(
+    (code) => process.exit(code),
+    (err: unknown) => {
+      process.stderr.write(`check-deprecations: fatal: ${errorMessage(err)}\n`);
+      process.exit(2);
+    },
+  );
 }

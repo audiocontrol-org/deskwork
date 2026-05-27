@@ -156,7 +156,7 @@ describe('batch-dispose — core scenarios', () => {
       // TF-014 (AUDIT-20260525-07): unknown-id error MUST cite the
       // refresh-baseline prereq so the operator's recovery path is
       // discoverable.
-      expect(stderr).toContain('dw-lifecycle detect-clones --refresh-baseline');
+      expect(stderr).toContain('dw-lifecycle check-clones --refresh-baseline');
       expect(stderr).toContain('pending');
       // File must not be modified despite the unknown id.
       const afterText = await readFile(fixture.path, 'utf8');
@@ -320,6 +320,16 @@ describe('batch-dispose — core scenarios', () => {
           members: [`${R}A.tsx:1:10`, `${R}B.tsx:1:10`, `${R}C.tsx:1:10`],
           disposition: 'pending',
           reason: null,
+          // Phase 11 Task 2 — pending → status: pending; install-seed
+          // provenance so the synthesized-suppression branch of
+          // serializeClonesYaml fires (no Loop fields written).
+          status: 'pending',
+          provenance: {
+            source: 'install-seed',
+            authored_at: '1970-01-01T00:00:00Z',
+          },
+          // Phase 11 Task 10 — empty audit history (synthetic fixture).
+          auditHistory: [],
         },
       ];
       await writeClonesYaml(fixture.path, clones);

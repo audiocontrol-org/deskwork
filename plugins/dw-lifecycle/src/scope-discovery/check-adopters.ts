@@ -40,6 +40,7 @@ import {
   type AdopterManifestEntry,
   type TrackedHoldout,
 } from './adopter-manifests-registry.js';
+import { filterActiveEntries } from './util/catalog-status.js';
 import {
   type ManifestResult,
   type ScanResult,
@@ -203,19 +204,25 @@ function escapeRegex(s: string): string {
 
 export async function scan(opts: CliOptions): Promise<ScanResult> {
   const registry = await loadRegistry(opts.registryPath);
-  if (registry.entries.length === 0) {
+  // Phase 11 Task 2 — filter to actively-enforced entries only.
+  // Entries with `status: pending | ignore | tracked-holdout | withdrawn`
+  // are skipped at the registry level so the scanner does not produce
+  // findings for them. Pre-Loop registries without explicit status
+  // default to `blessed`, preserving the pre-Loop surface.
+  const activeEntries = filterActiveEntries(registry.entries);
+  if (activeEntries.length === 0) {
     return { manifests: [], entriesScanned: 0, filesVisited: 0 };
   }
   const rootAbs = resolve(opts.scanRoot);
   const visited = new Set<string>();
   const manifests: ManifestResult[] = [];
-  for (const entry of registry.entries) {
+  for (const entry of activeEntries) {
     const result = await scanEntry(entry, rootAbs, visited);
     manifests.push(result);
   }
   return {
     manifests,
-    entriesScanned: registry.entries.length,
+    entriesScanned: activeEntries.length,
     filesVisited: visited.size,
   };
 }

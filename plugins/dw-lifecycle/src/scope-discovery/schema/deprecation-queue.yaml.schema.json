@@ -1,0 +1,113 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://deskwork/dw-lifecycle/schema/deprecation-queue.yaml.schema.json",
+  "title": "deprecation-queue.yaml — baseline of file-level deprecation markers and remaining importers",
+  "description": "Machine-readable spec of the .dw-lifecycle/scope-discovery/deprecation-queue.yaml wire format. The deprecation scanner (`dw-lifecycle check-deprecations`) discovers entries by walking the source tree for file-level `@deprecated` JSDoc tags and `// DEPRECATED:` line comments — the YAML is NOT the source of truth for which files are deprecated (the markers in source are). The file is seeded empty by `install-scope-discovery` and may be populated by a future enhancement that persists scan baselines (mirroring `clones.yaml`'s role for the clone detector). v1 readers tolerate an empty file or an empty `deprecations: []` array. Runtime behavior: the scanner ignores this file; `--write` emits the rendered markdown to `deprecation-queue.md` (NOT this YAML). The schema is provided for editor autocomplete + Phase 9 doctor rule symmetry with the sibling registries.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["deprecations"],
+  "properties": {
+    "schemaVersion": {
+      "description": "Schema version. Seeded as 1; bump on backward-incompatible changes to the shape. The seed always sets this so the doctor's schema-stale rule has a known-good baseline.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "generated_at": {
+      "description": "ISO-8601 timestamp of the most recent scan that produced this baseline. Optional in v1 (the v1 scanner does not write this file); reserved for a future enhancement that persists scan results.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "deprecations": {
+      "description": "All deprecated files surfaced by the most recent scan. Empty list is the seeded state and is valid (the scanner discovers markers in source; the YAML is informational). Order is not significant; paths must be unique.",
+      "type": "array",
+      "items": { "$ref": "#/definitions/DeprecationEntry" }
+    }
+  },
+  "definitions": {
+    "DeprecationEntry": {
+      "description": "One deprecated source file. `path` is repo-relative POSIX. `marker_kind` discriminates the two v1 detection paths (top-of-file JSDoc `@deprecated` vs. `// DEPRECATED:` line comment within the first 20 lines). `message` is the trimmed text after the marker (empty string when the marker carries no inline message). `importers` is the resolved set of external importers; each importer is a repo-relative POSIX path + 1-based line number of the first matching import statement.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "marker_kind", "message", "importers"],
+      "properties": {
+        "path": {
+          "description": "Repo-relative POSIX path of the deprecated file.",
+          "type": "string",
+          "minLength": 1
+        },
+        "marker_kind": {
+          "description": "Detection path. `jsdoc` = top-of-file JSDoc `@deprecated` tag; `inline` = `// DEPRECATED:` line comment within the first 20 lines.",
+          "type": "string",
+          "enum": ["jsdoc", "inline"]
+        },
+        "message": {
+          "description": "Trimmed message text after the marker. Empty string when the marker carries no inline content (e.g., a bare `@deprecated` tag with no following prose).",
+          "type": "string"
+        },
+        "importers": {
+          "description": "External importers of the deprecated file. Each entry is a repo-relative POSIX path + 1-based line number of the first import statement matching the deprecated file's `@/` alias OR its basename via a relative path. The deprecated file's own contents are NOT included (internal re-exports don't count as external importers). Empty list means the file is safe to delete.",
+          "type": "array",
+          "items": { "$ref": "#/definitions/Importer" }
+        },
+        "status": {
+          "description": "Phase 11 Task 2 — Loop status. See plugins/dw-lifecycle/src/scope-discovery/util/catalog-status.ts. Reserved for future use (v1 deprecation scanner discovers entries from source markers; the YAML is a placeholder for future persistence).",
+          "$ref": "#/definitions/CatalogStatus"
+        },
+        "provenance": {
+          "description": "Phase 11 Task 2 — provenance block. Reserved for future use.",
+          "$ref": "#/definitions/Provenance"
+        },
+        "audit_history": {
+          "description": "Phase 11 Task 10 — REVERSE provenance link to the audit-log. Reserved for future use.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "CatalogStatus": {
+      "description": "Shared Loop-status discriminator (Phase 11 Task 2).",
+      "type": "string",
+      "enum": ["pending", "blessed", "cursed", "ignore", "tracked-holdout", "withdrawn"]
+    },
+    "Provenance": {
+      "description": "Shared Loop-provenance shape (Phase 11 Task 2).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "authored_at"],
+      "properties": {
+        "source": {
+          "type": "string",
+          "enum": [
+            "operator-authored",
+            "orchestrator-agent",
+            "llm-judge-proposed",
+            "install-seed",
+            "promoted-from-candidate"
+          ]
+        },
+        "authored_at": { "type": "string", "minLength": 1 },
+        "authored_by": { "type": "string", "minLength": 1 },
+        "context": { "type": "string", "minLength": 1 },
+        "evidence_link": { "type": "string", "minLength": 1 }
+      }
+    },
+    "Importer": {
+      "description": "One external importer of a deprecated file.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "line"],
+      "properties": {
+        "path": {
+          "description": "Repo-relative POSIX path of the importer.",
+          "type": "string",
+          "minLength": 1
+        },
+        "line": {
+          "description": "1-based line number of the first matching import statement in the importer file.",
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}

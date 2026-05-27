@@ -1,0 +1,10 @@
+# Phase 11 acceptance fixture — adopter-manifests catalog.
+#
+# Intentionally EMPTY. The KeygroupSummary regression shipped because no
+# adopter-manifest existed describing the canonical-primitive-consumer
+# expectation for editor-summary components. The negative-space + outlier
+# + coverage handlers in pattern-matrix-patterns.yaml are the Phase 11
+# escape hatch that surfaces the shape WITHOUT requiring the operator to
+# author an adopter-manifest entry up front.
+
+manifests: []

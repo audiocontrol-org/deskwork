@@ -55,6 +55,21 @@ function syntheticGroup(args: {
     members: [...args.members].sort(),
     disposition: args.disposition,
     reason: args.reason ?? null,
+    // Phase 11 Task 2 — synthetic test groups carry the install-seed
+    // defaults so serialization roundtrips cleanly. The summary math
+    // does not exercise the Loop fields; this is shape-only padding.
+    status:
+      args.disposition === 'pending'
+        ? 'pending'
+        : args.disposition === 'keep-with-reason'
+          ? 'blessed'
+          : 'ignore',
+    provenance: {
+      source: 'install-seed',
+      authored_at: '1970-01-01T00:00:00Z',
+    },
+    // Phase 11 Task 10 — empty audit history (no auditor findings against fixture).
+    auditHistory: [],
   };
 }
 

@@ -48,6 +48,13 @@ import {
   compileManifestValidator,
   validateManifest,
 } from './schema/manifest-validator.js';
+import { computeCodebaseStateMetrics } from './discovery-agents/codebase-state-metrics.js';
+import { gatherMetricsInput } from './discovery-agents/codebase-state-metrics-gather.js';
+import { errorMessage } from './util/typeguards.js';
+import type { CodebaseStateMetrics } from './discovery-agents/codebase-state-metrics-types.js';
+import { mediate, toManifestSection } from './mediation/mediation.js';
+import { resolve } from 'node:path';
+import { existsSync } from 'node:fs';
 
 interface PartitionedFindings {
   readonly ui: ReadonlyArray<UiRouteFindings>;
@@ -149,6 +156,18 @@ function determineKind(p: PartitionedFindings): ManifestKind {
 export interface SynthesizeOptions extends SynthesisInput {
   /** Module-root directory name (relative to repoRoot). Default 'src'. */
   readonly moduleRoot: string;
+  /**
+   * Repo root used for gathering codebase-state metrics. Defaults to
+   * undefined when omitted; passed explicitly by the scope-inventory
+   * subcommand for predictability.
+   */
+  readonly repoRoot?: string;
+  /**
+   * When true, skip the git-history read used by the catalog-stability
+   * metric. Lets adopters opt out when their `git log` invocation is
+   * problematic (slow remote, large monorepo, etc.).
+   */
+  readonly noGitHistory?: boolean;
 }
 
 /** Public synthesis entrypoint. Throws on derivation/validation failure (no silent fallback). */
@@ -238,6 +257,29 @@ export async function synthesize(input: SynthesizeOptions): Promise<SynthesisOut
     );
   }
 
+  // Phase 11 Task 4 — gather + compute codebase-state metrics when
+  // the project ships any catalog files. Informational: failures
+  // surface as warnings, not throws, so a broken git history doesn't
+  // take down an otherwise-healthy synthesis run.
+  const codebaseStateMetrics = await gatherCodebaseStateMetrics({
+    repoRoot: input.repoRoot,
+    patternMatrixFindings: partitioned.ast[0],
+    noGitHistory: input.noGitHistory === true,
+    generatedAt,
+    warnings,
+  });
+
+  // Phase 11 Task 3 — orchestrator-agent mediation: cluster raw
+  // findings into architectural-scale candidate classes. PHASE 1
+  // invocation (no dispositions) — surfaces clusters + summaries
+  // for the operator to triage. The dispositions + line-level edits
+  // happen later via `/dw-lifecycle:implement`'s autonomous loop.
+  const mediationOutput = mediate({ findings: input.findings });
+  const discoveredCandidates =
+    mediationOutput.summaries.length > 0
+      ? toManifestSection(mediationOutput.summaries)
+      : null;
+
   const manifest: ScopeManifest = {
     kind,
     feature_slug: input.featureSlug,
@@ -249,6 +291,12 @@ export async function synthesize(input: SynthesizeOptions): Promise<SynthesisOut
     ...(routes !== undefined ? { routes } : {}),
     ...(modules !== undefined ? { modules } : {}),
     ...(regimeHoldouts !== null ? { regime_holdouts: regimeHoldouts } : {}),
+    ...(discoveredCandidates !== null
+      ? { discovered_candidates: discoveredCandidates }
+      : {}),
+    ...(codebaseStateMetrics !== null
+      ? { codebase_state_metrics: codebaseStateMetrics }
+      : {}),
     notes:
       `Strawman synthesized from ${partitioned.agentsConsumed.length} discovery agent(s) ` +
       `(${partitioned.agentsConsumed.join(', ')}). Operator curates devices/scenarios/primitives.`,
@@ -272,4 +320,56 @@ export async function synthesize(input: SynthesizeOptions): Promise<SynthesisOut
       warnings,
     },
   };
+}
+
+interface GatherCodebaseStateMetricsArgs {
+  readonly repoRoot: string | undefined;
+  readonly patternMatrixFindings: AstGrepMatrixFindings | undefined;
+  readonly noGitHistory: boolean;
+  readonly generatedAt: string;
+  readonly warnings: string[];
+}
+
+/**
+ * Compute the codebase-state metrics section. Returns null when no
+ * catalog files are present under .dw-lifecycle/scope-discovery/ (the
+ * project hasn't authored a regime) — the synthesis layer omits the
+ * section entirely in that case so the manifest stays clean for
+ * pre-Loop adopters.
+ *
+ * Throws are caught + surfaced as warnings: the metrics are informa-
+ * tional and shouldn't take down an otherwise-healthy synthesis run.
+ */
+async function gatherCodebaseStateMetrics(
+  args: GatherCodebaseStateMetricsArgs,
+): Promise<CodebaseStateMetrics | null> {
+  if (args.repoRoot === undefined) return null;
+  const configDir = resolve(args.repoRoot, '.dw-lifecycle/scope-discovery');
+  if (!existsSync(configDir)) return null;
+  try {
+    const baseArgs = {
+      repoRoot: args.repoRoot,
+      noGitHistory: args.noGitHistory,
+      generatedAt: args.generatedAt,
+    };
+    const gatheredInput = await gatherMetricsInput(
+      args.patternMatrixFindings !== undefined
+        ? { ...baseArgs, patternMatrixFindings: args.patternMatrixFindings }
+        : baseArgs,
+    );
+    if (
+      gatheredInput.entries.length === 0 &&
+      !gatheredInput.gitAvailable
+    ) {
+      return null;
+    }
+    return computeCodebaseStateMetrics(gatheredInput);
+  } catch (err) {
+    args.warnings.push(
+      `codebase-state-metrics: gather failed — ${errorMessage(err)}. ` +
+        'Section omitted from manifest. This is informational; the rest of ' +
+        'the manifest is valid.',
+    );
+    return null;
+  }
 }

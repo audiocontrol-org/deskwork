@@ -32,7 +32,7 @@
  *
  * Unknown ids fail HARD (exit 2) — silent-skipping a typoed id would let
  * the typo slip through. TF-014 (AUDIT-20260525-07): the unknown-id error
- * message cites the `dw-lifecycle detect-clones --refresh-baseline`
+ * message cites the `dw-lifecycle check-clones --refresh-baseline`
  * prereq so the operator's recovery path is obvious.
  *
  * DRY: reuses `parseClonesYaml`, `serializeClonesYaml`, and the
@@ -46,6 +46,7 @@ import {
   type CloneGroup,
   type ClonesYaml,
   type Disposition,
+  dispositionToStatus,
   hasRefactorDisposition,
   parseClonesYaml,
   serializeClonesYaml,
@@ -233,13 +234,13 @@ export async function runBatchDispose(
     // TF-014 (AUDIT-20260525-07): cite the refresh-baseline prereq so
     // the operator's recovery path is obvious. The pilot's error message
     // referenced the bare clones.yaml file path; the dw-lifecycle port
-    // names the canonical subcommand instead — `dw-lifecycle detect-clones
+    // names the canonical subcommand instead — `dw-lifecycle check-clones
     // --refresh-baseline` is the supported way to add detected groups as
     // `pending` to the baseline before batch-dispose can act on them.
     const subject = unknownIds.length === 1 ? 'id' : 'ids';
     io.stderr(
       `error: batch-dispose: ${subject} ${unknownIds.join(', ')} not in ${args.clonesPath}; ` +
-        `run \`dw-lifecycle detect-clones --refresh-baseline\` first to add ${unknownIds.length === 1 ? 'it' : 'them'} as pending, ` +
+        `run \`dw-lifecycle check-clones --refresh-baseline\` first to add ${unknownIds.length === 1 ? 'it' : 'them'} as pending, ` +
         `then re-run this command.\n`,
     );
     return {
@@ -404,12 +405,28 @@ function applyDispositions(
           `internal error: tried to apply non-refactor disposition to refactor group ${g.id}`,
         );
       }
+      // Phase 11 Task 2 — re-derive `status` from the new
+      // disposition per the fixed mapping in `dispositionToStatus()`
+      // (the operator is explicitly transitioning the disposition;
+      // status should track unless the operator has authored an
+      // explicit non-default status). Preserve provenance verbatim —
+      // it records authorship history regardless of the disposition
+      // transition. If the operator wants to keep the previous
+      // status (e.g., transition to keep-with-reason while keeping
+      // status: tracked-holdout), they hand-edit the file.
       return {
         id: g.id,
         lines: g.lines,
         members: g.members,
         disposition: args.disposition,
         reason: args.reason,
+        status: dispositionToStatus(args.disposition),
+        provenance: g.provenance,
+        // Phase 11 Task 10 — preserve the existing audit history when
+        // transitioning the disposition. The auditor's record of past
+        // findings against this group is provenance, not operational
+        // state.
+        auditHistory: g.auditHistory,
       };
     }),
   };

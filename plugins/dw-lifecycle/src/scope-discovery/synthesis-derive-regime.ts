@@ -72,6 +72,16 @@ export function deriveRegimeHoldouts(
       const key = `${entry.file}::${entry.manifestId}`;
       if (adopterKey.has(key)) continue;
       adopterKey.add(key);
+      // Phase 11 Task 11 — the adopter-manifest-checker emits findings
+      // without preserving the catalog entry's status/provenance on
+      // the finding shape. The scanner has already filtered to
+      // actively-enforced entries (per Task 2's plumbing), so every
+      // finding here originates from a `blessed`/`cursed` entry; we
+      // synthesize `blessed` + `install-seed` since we lack the
+      // catalog entry handle. A future refactor that threads
+      // status/provenance through `AdopterManifestCheckerFinding`
+      // would let this be inherited verbatim; we keep the implicit
+      // synthesis here so the wire shape is uniform.
       buckets['adopter-manifest'].push({
         id: entry.manifestId,
         file: entry.file,
@@ -82,6 +92,10 @@ export function deriveRegimeHoldouts(
         evidence: {
           registry_path: f.registryPath,
           registry_id: entry.manifestId,
+        },
+        status_provenance: {
+          source_status: 'blessed',
+          provenance_source: 'install-seed',
         },
       });
     }
@@ -97,6 +111,20 @@ export function deriveRegimeHoldouts(
     buckets['adopter-manifest'].length +
     buckets['editor-symmetry'].length +
     buckets.deprecation.length;
+  // Phase 11 Task 11 — per-status rollup across the entire
+  // post-merge manifest section. We re-derive this from the materi-
+  // alized entries rather than summing the per-detector meta blocks
+  // because adopter-manifest-checker findings (which lack a per-meta
+  // status rollup) need to be folded in too.
+  let activelyEnforced = 0;
+  let candidate = 0;
+  for (const list of Object.values(buckets)) {
+    for (const e of list) {
+      const s = e.status_provenance.source_status;
+      if (s === 'blessed' || s === 'cursed') activelyEnforced += 1;
+      else if (s === 'pending') candidate += 1;
+    }
+  }
   return {
     anti_patterns: buckets['anti-pattern'],
     adopter_manifests: buckets['adopter-manifest'],
@@ -109,6 +137,10 @@ export function deriveRegimeHoldouts(
         adopter_manifest: buckets['adopter-manifest'].length,
         editor_symmetry: buckets['editor-symmetry'].length,
         deprecation: buckets.deprecation.length,
+      },
+      by_status: {
+        actively_enforced: activelyEnforced,
+        candidate,
       },
     },
   };
@@ -124,6 +156,10 @@ function toManifestEntry(f: RegimeHoldoutFinding): ManifestRegimeHoldoutEntry {
     evidence: {
       registry_path: f.evidence.registryPath,
       registry_id: f.evidence.registryId,
+    },
+    status_provenance: {
+      source_status: f.status_provenance.source_status,
+      provenance_source: f.status_provenance.provenance_source,
     },
   };
 }

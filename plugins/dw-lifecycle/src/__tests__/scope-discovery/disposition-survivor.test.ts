@@ -126,6 +126,19 @@ function group(args: {
     members: [...(args.members ?? ['src/a.ts:1:8', 'src/b.ts:1:8'])].sort(),
     disposition: args.disposition,
     reason: args.reason ?? null,
+    // Phase 11 Task 2 — derived status; install-seed provenance.
+    status:
+      args.disposition === 'pending'
+        ? ('pending' as const)
+        : args.disposition === 'keep-with-reason'
+          ? ('blessed' as const)
+          : ('ignore' as const),
+    provenance: {
+      source: 'install-seed' as const,
+      authored_at: '1970-01-01T00:00:00Z',
+    },
+    // Phase 11 Task 10 — empty audit history (no auditor findings against fixture).
+    auditHistory: [] as readonly string[],
   };
 }
 
@@ -147,6 +160,14 @@ function refactorGroup(args: {
       sha: 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
       demonstration: 'tests pass against the new primitive',
     },
+    // Phase 11 Task 2 — refactor → blessed; install-seed provenance.
+    status: 'blessed' as const,
+    provenance: {
+      source: 'install-seed' as const,
+      authored_at: '1970-01-01T00:00:00Z',
+    },
+    // Phase 11 Task 10 — empty audit history (no auditor findings against fixture).
+    auditHistory: [] as readonly string[],
   };
 }
 

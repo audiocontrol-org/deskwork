@@ -34,7 +34,6 @@
 | 10dcf2ca-cab0-477f-835d-d2fae18e243e | rejected-filing-tab-stamps | Rejected Filing Tab Stamps |  |  | manual | 2026-05-10T04:40:29.504Z |
 | 4b6878ea-ec26-4b32-b7f1-7b8c75b4faf6 | accepted-press-queue-removed | Accepted Press Queue Removed |  |  | manual | 2026-05-10T04:40:29.423Z |
 | 4dd47cee-a59b-4801-9ef3-7bb2cfda0a88 | command-shortcuts-design | Command shortcuts — design spec |  |  | manual | 2026-05-11T21:39:46.752Z |
-| 4e4d6912-3edf-4aeb-b6ed-ba455f362f14 | scope-discovery/prd | Scope discovery — canonize audiocontrol pilot into dw-lifecycle |  |  | manual | 2026-05-25T01:42:47.853Z |
 | 7306087a-f412-4c33-901f-f0173ae36646 | deskwork-state-machine | Deskwork State Machine |  |  | manual | 2026-05-10T02:39:23.868Z |
 | 738b5007-c16e-4b57-9127-8184110b87dc | design-standards-rule | Design Standards Rule |  |  | manual | 2026-05-10T04:38:05.971Z |
 | 9845c268-670f-4793-b986-0433e9ef4fb9 | deskwork-plugin/prd | Prd |  | deskwork-plugin, prd, feature-tracking, internal-doc | manual | 2026-05-03T18:18:46.400Z |
@@ -47,6 +46,7 @@
 | UUID | Slug | Title | Description | Keywords | Source | Updated |
 |------|------|------|------|------|------|------|
 | 49cb7baf-dc4f-4acc-a860-1fc2d2681831 | command-shortcuts/prd | Command shortcuts for dw-lifecycle |  |  | manual | 2026-05-12T04:20:48.532Z |
+| 4e4d6912-3edf-4aeb-b6ed-ba455f362f14 | scope-discovery/prd | Scope discovery — canonize audiocontrol pilot into dw-lifecycle |  |  | manual | 2026-05-26T23:38:36.086Z |
 
 ## Blocked
 

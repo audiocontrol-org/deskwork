@@ -95,7 +95,7 @@
           "items": { "$ref": "#/$defs/regime_holdout_entry" }
         },
         "meta": {
-          "description": "Per-source counts + total. Useful for at-a-glance burndown without iterating the per-bucket arrays.",
+          "description": "Per-source counts + total. Useful for at-a-glance burndown without iterating the per-bucket arrays. Phase 11 Task 11 adds `by_status` rollup so operators can see actively-enforced vs. candidate counts at-a-glance.",
           "type": "object",
           "additionalProperties": false,
           "required": ["total", "by_source"],
@@ -114,9 +114,62 @@
                 "editor_symmetry": { "type": "integer", "minimum": 0 },
                 "deprecation": { "type": "integer", "minimum": 0 }
               }
+            },
+            "by_status": {
+              "description": "Phase 11 Task 11 — per-status rollup. `actively_enforced` are findings sourced from `blessed`/`cursed` catalog entries (gate-blocking). `candidate` are findings from `pending` entries (operator-triage surface; non-gate-blocking). Suppressed statuses (ignore / tracked-holdout / withdrawn) never surface — they are filtered upstream at the scanner level.",
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["actively_enforced", "candidate"],
+              "properties": {
+                "actively_enforced": { "type": "integer", "minimum": 0 },
+                "candidate": { "type": "integer", "minimum": 0 }
+              }
             }
           }
         }
+      }
+    },
+    "discovered_candidates": {
+      "description": "Phase 11 Task 3 — orchestrator-agent-mediated candidate clusters. Each entry is one cluster of shape-similar findings that the operator triages at architecture-scale (BLESSED / CURSED / IGNORE). The orchestrator-agent translates each disposition into line-level catalog edits via the mediation library; the operator never edits regex. Optional (older manifests + clean-codebase scans both legitimately omit the section).",
+      "type": "array",
+      "items": { "$ref": "#/$defs/discovered_candidate_entry" }
+    },
+    "codebase_state_metrics": {
+      "description": "Phase 11 Task 4 — codebase-state metrics computed during the synthesis pass. Informational: feeds the Phase 11 Task 5 self-correcting controller and operator-visible dashboards. Optional at the manifest level (legacy manifests omit it).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generated_at",
+        "classification_completeness",
+        "coverage_per_blessed_pattern",
+        "violation_density_per_cursed_pattern",
+        "surface_uniformity",
+        "catalog_stability",
+        "discovered_candidate_rate",
+        "disposition_latency"
+      ],
+      "properties": {
+        "generated_at": {
+          "description": "ISO-8601 timestamp of metric computation.",
+          "type": "string",
+          "format": "date-time"
+        },
+        "classification_completeness": { "$ref": "#/$defs/classification_completeness" },
+        "coverage_per_blessed_pattern": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/coverage_per_blessed_pattern" }
+        },
+        "violation_density_per_cursed_pattern": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/violation_density_per_cursed_pattern" }
+        },
+        "surface_uniformity": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/surface_uniformity_entry" }
+        },
+        "catalog_stability": { "$ref": "#/$defs/catalog_stability" },
+        "discovered_candidate_rate": { "$ref": "#/$defs/discovered_candidate_rate" },
+        "disposition_latency": { "$ref": "#/$defs/disposition_latency" }
       }
     },
     "notes": {
@@ -326,11 +379,200 @@
         }
       }
     },
-    "regime_holdout_entry": {
-      "description": "One regime-holdout finding. Emitted by the T6.5 regime-holdout-detector and grouped by source bucket in the manifest's regime_holdouts section.",
+    "blessed_pattern_catalog": {
+      "type": "string",
+      "enum": ["anti-patterns", "adopter-manifests", "pattern-matrix", "clones"]
+    },
+    "classification_completeness": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "file", "shape", "replacement", "evidence"],
+      "required": [
+        "catalogued_distinct_shapes",
+        "pending_distinct_shapes",
+        "uncatalogued_candidates",
+        "total_distinct_shapes",
+        "ratio"
+      ],
+      "properties": {
+        "catalogued_distinct_shapes": { "type": "integer", "minimum": 0 },
+        "pending_distinct_shapes": { "type": "integer", "minimum": 0 },
+        "uncatalogued_candidates": { "type": "integer", "minimum": 0 },
+        "total_distinct_shapes": { "type": "integer", "minimum": 0 },
+        "ratio": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "coverage_per_blessed_pattern": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entry_id",
+        "catalog",
+        "match_glob",
+        "files_matching_glob",
+        "files_with_primitive",
+        "ratio"
+      ],
+      "properties": {
+        "entry_id": { "type": "string", "minLength": 1 },
+        "catalog": { "$ref": "#/$defs/blessed_pattern_catalog" },
+        "match_glob": { "type": "string", "minLength": 1 },
+        "files_matching_glob": { "type": "integer", "minimum": 0 },
+        "files_with_primitive": { "type": "integer", "minimum": 0 },
+        "ratio": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "per_directory_hit_count": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["directory", "hit_count"],
+      "properties": {
+        "directory": { "type": "string", "minLength": 1 },
+        "hit_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "violation_density_per_cursed_pattern": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entry_id", "catalog", "total_hits", "per_directory_hits", "concentration"],
+      "properties": {
+        "entry_id": { "type": "string", "minLength": 1 },
+        "catalog": { "$ref": "#/$defs/blessed_pattern_catalog" },
+        "total_hits": { "type": "integer", "minimum": 0 },
+        "per_directory_hits": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/per_directory_hit_count" }
+        },
+        "concentration": {
+          "description": "Gini-style concentration on [0,1]; null when total_hits < 2.",
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "surface_uniformity_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["directory", "population", "outlier_count", "variance"],
+      "properties": {
+        "directory": { "type": "string", "minLength": 1 },
+        "population": { "type": "integer", "minimum": 0 },
+        "outlier_count": { "type": "integer", "minimum": 0 },
+        "variance": { "type": "number", "minimum": 0 }
+      }
+    },
+    "catalog_stability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "git_available",
+        "lookback_commits",
+        "commits_with_edits",
+        "total_catalog_edits",
+        "edits_per_commit_avg",
+        "trend"
+      ],
+      "properties": {
+        "git_available": { "type": "boolean" },
+        "lookback_commits": { "type": "integer", "minimum": 0 },
+        "commits_with_edits": { "type": "integer", "minimum": 0 },
+        "total_catalog_edits": { "type": "integer", "minimum": 0 },
+        "edits_per_commit_avg": { "type": "number", "minimum": 0 },
+        "trend": { "type": "string", "enum": ["increasing", "decreasing", "stable"] }
+      }
+    },
+    "scan_run_pending_count": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scan_run_id", "pending_count"],
+      "properties": {
+        "scan_run_id": { "type": "string", "minLength": 1 },
+        "pending_count": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "discovered_candidate_rate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pending_entries_total", "unattributed_pending", "by_scan_run", "trend"],
+      "properties": {
+        "pending_entries_total": { "type": "integer", "minimum": 0 },
+        "unattributed_pending": { "type": "integer", "minimum": 0 },
+        "by_scan_run": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/scan_run_pending_count" }
+        },
+        "trend": {
+          "type": ["string", "null"],
+          "enum": ["increasing", "decreasing", "stable", null]
+        }
+      }
+    },
+    "disposition_latency_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entry_id", "catalog", "authored_at", "transitioned_at", "latency_ms"],
+      "properties": {
+        "entry_id": { "type": "string", "minLength": 1 },
+        "catalog": { "$ref": "#/$defs/blessed_pattern_catalog" },
+        "authored_at": { "type": "string", "minLength": 1 },
+        "transitioned_at": { "type": "string", "minLength": 1 },
+        "latency_ms": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "disposition_latency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transitioned_count", "median_latency_ms", "p90_latency_ms", "slowest_five"],
+      "properties": {
+        "transitioned_count": { "type": "integer", "minimum": 0 },
+        "median_latency_ms": { "type": ["number", "null"], "minimum": 0 },
+        "p90_latency_ms": { "type": ["number", "null"], "minimum": 0 },
+        "slowest_five": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/disposition_latency_entry" },
+          "maxItems": 5
+        }
+      }
+    },
+    "discovered_candidate_entry": {
+      "description": "One operator-facing candidate cluster summary surfaced by the Phase 11 Task 3 orchestrator-agent mediation layer. Each cluster is a group of shape-similar findings clustered via Jaccard n-gram similarity. The operator triages clusters at architecture-scale; the agent translates the disposition into line-level catalog edits.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cluster_id", "summary", "member_count", "exemplar_files"],
+      "properties": {
+        "cluster_id": {
+          "description": "Stable cluster id (deterministic from the cluster's member set). Format `cluster-NNNN`. Operator dispositions reference this id.",
+          "type": "string",
+          "pattern": "^cluster-[0-9]{4,}$"
+        },
+        "summary": {
+          "description": "1-2 sentence operator-readable summary of the cluster's shape, member count, file count, and provenance distribution.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "member_count": {
+          "description": "Number of findings that joined this cluster. Load-bearing for the operator's prioritization.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "exemplar_files": {
+          "description": "First three (deterministic, sorted) unique file paths in the cluster — navigation landmarks for the operator. The full member list lives in the per-run evidence trail.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "regime_holdout_entry": {
+      "description": "One regime-holdout finding. Emitted by the T6.5 regime-holdout-detector and grouped by source bucket in the manifest's regime_holdouts section. Phase 11 Task 11 adds `status_provenance` so each finding traces back to the catalog entry's status + provenance.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "file", "shape", "replacement", "evidence", "status_provenance"],
       "properties": {
         "id": {
           "description": "Identifier within the source bucket. Anti-pattern id, adopter-manifest id, '<manifest-id>:<editor>' composite, or path of the deprecated file.",
@@ -375,6 +617,28 @@
               "description": "Stable identifier within the registry (anti-pattern id, manifest id, '@deprecated' marker, etc.).",
               "type": "string",
               "minLength": 1
+            }
+          }
+        },
+        "status_provenance": {
+          "description": "Phase 11 Task 11 — inherited status + provenance from the catalog entry that produced the finding. `source_status` is the catalog `status:` literal (pending / blessed / cursed / ignore / tracked-holdout / withdrawn). `provenance_source` is the catalog `provenance.source` literal. Deprecation findings synthesize `blessed` + `install-seed` (the marker IS the registry; there is no Loop field).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["source_status", "provenance_source"],
+          "properties": {
+            "source_status": {
+              "type": "string",
+              "enum": ["pending", "blessed", "cursed", "ignore", "tracked-holdout", "withdrawn"]
+            },
+            "provenance_source": {
+              "type": "string",
+              "enum": [
+                "operator-authored",
+                "orchestrator-agent",
+                "llm-judge-proposed",
+                "install-seed",
+                "promoted-from-candidate"
+              ]
             }
           }
         }

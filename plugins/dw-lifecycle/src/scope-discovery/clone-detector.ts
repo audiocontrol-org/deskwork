@@ -44,7 +44,7 @@
  *                             Implies --quiet for the headline; full per-group
  *                             listing is replaced by NEW/DROPPED sections only.
  *   --gate-mode               pre-commit-hook-friendly: exit 1 on NEW groups.
- *                             For detect-clones, this is ALREADY the default
+ *                             For check-clones, this is ALREADY the default
  *                             contract (exit 1 = NEW exists); the flag is
  *                             accepted for symmetry with the other check-*
  *                             subcommands. No-op in effect.
@@ -82,7 +82,7 @@ interface Cli {
   readonly diff: boolean;
   /**
    * Accepted for symmetry with the other check-* subcommands.
-   * detect-clones already exits 1 on NEW groups by default (the
+   * check-clones already exits 1 on NEW groups by default (the
    * hook-friendly contract), so --gate-mode is a no-op here.
    */
   readonly gateMode: boolean;
@@ -175,8 +175,9 @@ function summaryLine(diff: CloneDiff): string {
  * Emitted ADDITIVELY — every existing NEW-group line is preserved so
  * downstream consumers grepping for `NEW    <id>` or member paths
  * continue to work. DROPPED groups intentionally do NOT get this hint:
- * they are removed via the clones-yaml refresh (`dw-lifecycle detect-clones
- * --refresh-baseline`), not via batch-dispose.
+ * they are removed via the clones-yaml refresh (`dw-lifecycle check-clones
+ * --refresh-baseline`, or the legacy `detect-clones` alias), not via
+ * batch-dispose.
  *
  * The `indent` parameter matches each caller's existing per-group
  * indentation: `reportHuman` indents NEW lines by 2 spaces (default
@@ -266,11 +267,12 @@ function reportJson(groups: readonly CloneGroup[], diff: CloneDiff): void {
  * used by sibling subcommands (doctor, setup, etc.) — args[] replaces
  * process.argv.slice(2); process.exit is called directly inside.
  *
- * Exported for the subcommands/detect-clones.ts dispatch shim; not
- * intended to be invoked except via the `dw-lifecycle detect-clones`
+ * Exported for the subcommands/check-clones.ts dispatch shim (and its
+ * `detect-clones` back-compat alias); not intended to be invoked except
+ * via the `dw-lifecycle check-clones` (or legacy `detect-clones`)
  * subcommand.
  */
-export async function detectClones(args: string[]): Promise<void> {
+export async function checkClones(args: string[]): Promise<void> {
   let cli: Cli;
   try {
     cli = parseCli(args);

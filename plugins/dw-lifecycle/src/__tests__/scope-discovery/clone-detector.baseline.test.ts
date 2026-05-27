@@ -10,9 +10,10 @@
  * gutted-stub self-check that pairs with this scenario.
  *
  * Subprocess invocation goes through the plugin CLI dispatcher
- * (`cli.ts detect-clones ...`) — same path adopters trigger via the
- * `dw-lifecycle detect-clones` subcommand. The detector library
- * (clone-detector.ts) is intentionally not a standalone entry point.
+ * (`cli.ts check-clones ...`) — same path adopters trigger via the
+ * `dw-lifecycle check-clones` subcommand (or the legacy `detect-clones`
+ * alias). The detector library (clone-detector.ts) is intentionally not
+ * a standalone entry point.
  *
  * Each fixture is self-contained: subprocess cwd is set to the
  * fixture directory, a per-fixture `.jscpd.json` is staged there, and

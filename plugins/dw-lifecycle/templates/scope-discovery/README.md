@@ -23,7 +23,7 @@ left untouched unless `--force` is passed.
 | `README.md` | This file. |
 | `LAYOUT.md` | Project-side layout conventions (modules, src/, module-root flag). |
 | `refactor-preconditions-checklist.md` | Step 0a + Step 0b checklist for refactor commits. |
-| `.jscpd.json` | jscpd config consumed by `dw-lifecycle detect-clones`. |
+| `.jscpd.json` | jscpd config consumed by `dw-lifecycle check-clones`. |
 | `clones.yaml` | The clone-detector baseline. Operator-curated dispositions. |
 | `anti-patterns.yaml` | Registry of LEGACY shapes the project has retired. |
 | `adopter-manifests.yaml` | Registry of canonical primitives that adopters MUST use. |

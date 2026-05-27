@@ -5,49 +5,61 @@
  *
  * Renamed from `ast-grep-matrix.ts` (the pilot's name) because the
  * agent does NOT shell out to the `ast-grep` binary — it uses pure-JS
- * line-grep with carefully-tuned regexes. The misleading file name has
- * been fixed; the runtime discriminator stays `'ast-grep-matrix'` for
- * JSON wire-format stability.
+ * line-grep + glob-based scanners for the polymorphic pattern catalog.
  *
- * What it does: walks the configured module-root for `.ts`/`.tsx`
- * files and produces a matrix of `{ pattern, file:line }` for a
- * curated set of cross-cutting CLAUDE.md violations:
+ * # Phase 11 Task 1 — polymorphic dispatcher
  *
- *   - as-type-cast            — `as <TypeName>` casts
- *   - any-annotation          — `: any` type annotations
- *   - ts-ignore-pragma        — `@ts-ignore` / `@ts-expect-error`
- *   - magic-number            — inline numeric literals not bound to const/named (heuristic)
+ * The agent now routes catalog entries by `type` discriminator to
+ * type-specific handlers under `./pattern-handlers/`. The supported
+ * types in v1.1 Task 1:
  *
- * The audiocontrol-specific `ac-class-consumer` pattern has been
- * dropped (it's a `className="ac-*"` consumer scan tied to one
- * project's CSS prefix).
+ *   - `regex` (legacy default; pre-Phase-11 backward-compat)
+ *   - `negative-space` (NEW; the audiocontrol #315 KeygroupSummary
+ *     repro shape — file matches the expected-adopter glob but does
+ *     NOT contain the canonical primitive)
+ *   - `coverage` (NEW; emits a synthesis-layer adoption metric)
+ *   - `outlier` (NEW; statistical outlier detection)
+ *   - `semantic` (NEW; LLM-augmented — STUB in this dispatch; the
+ *     wiring lands under Phase 11 Task 7)
  *
- * Project override: when
- * `.dw-lifecycle/scope-discovery/pattern-matrix-patterns.yaml` exists,
- * its `patterns:` list REPLACES the built-in catalog (no merge — the
- * project owns the catalog). The schema is documented at
- * `plugins/dw-lifecycle/src/scope-discovery/schema/pattern-matrix-patterns.yaml.schema.json`.
+ * The dispatcher in `pattern-handlers/index.ts` is the registry of
+ * record. Adding a new type requires a new handler file there + a
+ * schema extension.
  *
- * Engine choice: line-grep with carefully-tuned regexes. A true AST
- * walk (via the `typescript` compiler API or `ts-morph`) would catch
- * fewer false-positives on the `magic-number` rule, but the cost is a
- * new dependency, ~10× the wall-clock, and significantly more code.
- * Line-grep produces usable signal at low cost — the synthesis layer +
- * operator curation prunes false positives.
+ * # Built-in catalog
  *
- * CLI:
+ * The four CLAUDE.md-aligned regex patterns ship as the default
+ * built-in catalog (as-type-cast, any-annotation, ts-ignore-pragma,
+ * magic-number). Projects override the entire catalog via
+ * `.dw-lifecycle/scope-discovery/pattern-matrix-patterns.yaml` — the
+ * loader parses every supported `type` and returns a typed catalog.
+ *
+ * # Engine choice
+ *
+ * Line-grep + glob for handler implementations. A true AST walk (via
+ * the `typescript` compiler API or `ts-morph`) would catch fewer
+ * false-positives, but the cost is a new dependency, ~10× the wall-
+ * clock, and significantly more code. Line-grep produces usable
+ * signal at low cost — the synthesis layer + operator curation prunes
+ * false positives.
+ *
+ * # G5 — unmatched-shape clustering (stub here)
+ *
+ * The synthesis-layer unmatched-shape clustering pass (G5) is NOT a
+ * per-file pattern type and does not route through this dispatcher.
+ * Its stub lives in `synthesis-discovered-candidates.ts`.
+ *
+ * # CLI
+ *
  *   tsx plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-matrix.ts \
  *     --feature <slug> --prd-path <path> [--repo-root <path>] [--module-root <path>]
  */
 
-import { readFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
-import { parse as parseYaml } from 'yaml';
+import { join } from 'node:path';
 import type {
   AstGrepMatrixFindings,
   DiscoveryAgentInput,
   PatternFinding,
-  PatternHit,
 } from './types.js';
 import {
   type SourceFileView,
@@ -59,7 +71,15 @@ import {
   runIfMain,
   walkSourceFiles,
 } from './shared.js';
-import { errorMessage, isEnoent, isPlainObject } from '../util/typeguards.js';
+import { errorMessage } from '../util/typeguards.js';
+import { dispatchPattern } from './pattern-handlers/index.js';
+import { loadOverridePatterns } from './pattern-handlers/loader.js';
+import type { PatternCatalogEntry, RegexEntry } from './pattern-handlers/types.js';
+import { clusterUnmatchedShapes } from './synthesis-discovered-candidates.js';
+import {
+  filterActiveEntries,
+  synthesizeDefaultProvenance,
+} from '../util/catalog-status.js';
 
 /**
  * Built-in pattern catalog. Each entry has a stable kebab-case `id`
@@ -69,175 +89,84 @@ import { errorMessage, isEnoent, isPlainObject } from '../util/typeguards.js';
  * The regexes are intentionally conservative — the synthesis layer
  * deduplicates and ranks; false positives at this layer are cheaper
  * than false negatives.
+ *
+ * All built-ins are `type: 'regex'`. Project overrides can mix any of
+ * the dispatcher's supported types.
  */
-interface PatternDef {
-  readonly id: string;
-  readonly description: string;
-  readonly regex: RegExp;
-  readonly extensions?: ReadonlyArray<string>;
-}
-
-const BUILTIN_PATTERNS: ReadonlyArray<PatternDef> = [
+// Phase 11 Task 2 — built-ins are `status: 'blessed'` (actively
+// enforced) with synthesized install-seed provenance. Operators who
+// override the catalog can mark entries with any status they choose;
+// the dispatcher filters on status before running handlers.
+const BUILTIN_PROVENANCE = synthesizeDefaultProvenance();
+const BUILTIN_PATTERNS: ReadonlyArray<RegexEntry> = [
   {
+    type: 'regex',
     id: 'as-type-cast',
     description: '`as <TypeName>` cast (banned per CLAUDE.md "never bypass typing")',
-    // Match `as <PascalCase>` not followed by a comparison/word char.
-    // Excludes `as const` (legal narrowing) and `as unknown` (allowed bridge).
     regex: /\bas\s+(?!const\b|unknown\b)[A-Z][A-Za-z0-9_]*/g,
+    status: 'blessed',
+    provenance: BUILTIN_PROVENANCE,
+    auditHistory: [],
   },
   {
+    type: 'regex',
     id: 'any-annotation',
     description: '`: any` type annotation (banned per CLAUDE.md)',
-    // Match `: any` followed by terminator. Tolerates `Array<any>` etc.
     regex: /:\s*any\b(?![A-Za-z0-9_])/g,
+    status: 'blessed',
+    provenance: BUILTIN_PROVENANCE,
+    auditHistory: [],
   },
   {
+    type: 'regex',
     id: 'ts-ignore-pragma',
     description: '`@ts-ignore` or `@ts-expect-error` (banned per CLAUDE.md)',
     regex: /@ts-(?:ignore|expect-error)\b/g,
+    status: 'blessed',
+    provenance: BUILTIN_PROVENANCE,
+    auditHistory: [],
   },
   {
+    type: 'regex',
     id: 'magic-number',
     description:
       'Inline numeric literal >= 10 not bound to a const/named identifier (heuristic — synthesis layer + operator curate)',
-    // Match a numeric literal that is NOT preceded by `=` (i.e., NOT a
-    // binding). We can't robustly detect strings/comments without an AST,
-    // so this regex surfaces candidates and the operator prunes. We
-    // require >= 2 digits to skip the noisiest cases.
     regex: /(?<![A-Za-z0-9_.=])\d{2,}\b/g,
+    status: 'blessed',
+    provenance: BUILTIN_PROVENANCE,
+    auditHistory: [],
   },
 ];
 
-const OVERRIDE_PATH = '.dw-lifecycle/scope-discovery/pattern-matrix-patterns.yaml';
-
 /**
- * Load the project-supplied override list when present. Returns null
- * when the override file doesn't exist (use built-ins). Throws on
- * malformed override files — no silent fallback.
+ * Phase 11 Task 13 — derive the union of file extensions the file walker
+ * must traverse from the pattern catalog. When ANY entry declares an
+ * `extensions` filter, those extensions are added to the walker's
+ * extension set so files matching the per-entry filter are actually
+ * walked (not silently skipped because the default walker ignored them).
+ *
+ * The default set `.ts/.tsx` is always included so legacy regex
+ * catalogs that omit `extensions` continue to walk TypeScript files
+ * unchanged.
+ *
+ * Per Phase 11 acceptance criterion "Multi-content-type generality":
+ * scan engine + catalog schema not TS-coupled; markdown / configs /
+ * schemas use the same glob + shape primitives.
  */
-async function loadOverridePatterns(
-  repoRoot: string,
-): Promise<ReadonlyArray<PatternDef> | null> {
-  const absPath = resolve(repoRoot, OVERRIDE_PATH);
-  let text: string;
-  try {
-    text = await readFile(absPath, 'utf8');
-  } catch (err) {
-    if (isEnoent(err)) return null;
-    throw new Error(`pattern-matrix: cannot read override ${absPath}: ${errorMessage(err)}`);
+function deriveScannedExtensions(
+  patterns: ReadonlyArray<PatternCatalogEntry>,
+): ReadonlyArray<string> {
+  const set = new Set<string>(['.ts', '.tsx']);
+  for (const entry of patterns) {
+    if (entry.extensions === undefined) continue;
+    for (const ext of entry.extensions) set.add(ext.toLowerCase());
   }
-  let parsed: unknown;
-  try {
-    parsed = parseYaml(text);
-  } catch (err) {
-    throw new Error(`pattern-matrix: cannot parse override ${absPath}: ${errorMessage(err)}`);
-  }
-  if (!isPlainObject(parsed)) {
-    throw new Error(`pattern-matrix: override ${absPath} did not parse to a YAML object`);
-  }
-  const patterns = parsed['patterns'];
-  if (!Array.isArray(patterns)) {
-    throw new Error(`pattern-matrix: override ${absPath} missing required 'patterns:' list`);
-  }
-  const out: PatternDef[] = [];
-  patterns.forEach((raw: unknown, idx: number) => {
-    if (!isPlainObject(raw)) {
-      throw new Error(`pattern-matrix: override ${absPath} patterns[${idx}] is not an object`);
-    }
-    const id = raw['id'];
-    const description = raw['description'];
-    const regexSrc = raw['regex'];
-    const extensions = raw['extensions'];
-    if (typeof id !== 'string' || id.length === 0) {
-      throw new Error(`pattern-matrix: override ${absPath} patterns[${idx}].id missing or non-string`);
-    }
-    if (typeof description !== 'string' || description.length === 0) {
-      throw new Error(`pattern-matrix: override ${absPath} patterns[${idx}].description missing or non-string`);
-    }
-    if (typeof regexSrc !== 'string' || regexSrc.length === 0) {
-      throw new Error(`pattern-matrix: override ${absPath} patterns[${idx}].regex missing or non-string`);
-    }
-    let regex: RegExp;
-    try {
-      regex = new RegExp(regexSrc, 'g');
-    } catch (err) {
-      throw new Error(
-        `pattern-matrix: override ${absPath} patterns[${idx}].regex is not a valid RegExp: ${errorMessage(err)}`,
-      );
-    }
-    const extArr =
-      extensions === undefined
-        ? undefined
-        : Array.isArray(extensions)
-          ? extensions.map((e: unknown, ei: number) => {
-              if (typeof e !== 'string' || !e.startsWith('.')) {
-                throw new Error(
-                  `pattern-matrix: override ${absPath} patterns[${idx}].extensions[${ei}] must be a dot-prefixed string`,
-                );
-              }
-              return e;
-            })
-          : (() => {
-              throw new Error(
-                `pattern-matrix: override ${absPath} patterns[${idx}].extensions must be an array when set`,
-              );
-            })();
-    out.push({
-      id,
-      description,
-      regex,
-      ...(extArr !== undefined ? { extensions: extArr } : {}),
-    });
-  });
-  if (out.length === 0) {
-    throw new Error(`pattern-matrix: override ${absPath} produced zero patterns (must have at least one)`);
-  }
-  return out;
-}
-
-const SNIPPET_MAX_LEN = 200;
-
-function snippet(line: string): string {
-  const trimmed = line.trim();
-  if (trimmed.length <= SNIPPET_MAX_LEN) return trimmed;
-  return `${trimmed.slice(0, SNIPPET_MAX_LEN - 3)}...`;
-}
-
-function applyPattern(args: {
-  readonly pattern: PatternDef;
-  readonly scans: ReadonlyArray<SourceFileView>;
-}): PatternFinding {
-  const hits: PatternHit[] = [];
-  for (const scan of args.scans) {
-    if (
-      args.pattern.extensions !== undefined &&
-      !args.pattern.extensions.some((e) => scan.file.toLowerCase().endsWith(e))
-    ) {
-      continue;
-    }
-    for (let i = 0; i < scan.lines.length; i += 1) {
-      const line = scan.lines[i];
-      if (line === undefined) continue;
-      const re = new RegExp(args.pattern.regex.source, args.pattern.regex.flags);
-      if (re.test(line)) {
-        hits.push({
-          file: scan.file,
-          line: i + 1,
-          snippet: snippet(line),
-        });
-      }
-    }
-  }
-  return {
-    id: args.pattern.id,
-    description: args.pattern.description,
-    regex: args.pattern.regex.source,
-    hits,
-  };
+  return [...set].sort();
 }
 
 async function gatherInScopeFiles(
   input: DiscoveryAgentInput,
+  extensions: ReadonlyArray<string>,
 ): Promise<ReadonlyArray<string>> {
   const modulesInScope = await modulesInScopeForFeature(input);
   const collected: string[] = [];
@@ -252,6 +181,7 @@ async function gatherInScopeFiles(
     const files = await walkSourceFiles({
       rootAbs: modSrc,
       repoRoot: input.repoRoot,
+      extensions,
     });
     for (const f of files) collected.push(f);
   }
@@ -261,27 +191,51 @@ async function gatherInScopeFiles(
 /**
  * Public agent entrypoint. Imported by the synthesis layer + the
  * `scope-inventory` subcommand.
+ *
+ * The function signature is preserved across the Phase 11 refactor
+ * (callers continue to pass `DiscoveryAgentInput` and receive
+ * `AstGrepMatrixFindings`). Internally the per-pattern execution now
+ * routes through the polymorphic dispatcher.
  */
 export async function buildPatternMatrix(
   input: DiscoveryAgentInput,
 ): Promise<AstGrepMatrixFindings> {
   const override = await loadOverridePatterns(input.repoRoot);
-  const patterns: ReadonlyArray<PatternDef> = override ?? BUILTIN_PATTERNS;
-  const files = await gatherInScopeFiles(input);
+  const allPatterns: ReadonlyArray<PatternCatalogEntry> =
+    override ?? BUILTIN_PATTERNS;
+  // Phase 11 Task 2 — filter to actively-enforced entries before
+  // dispatching. Operators can plant `status: pending` entries in
+  // their override YAML (e.g., promoted-from-candidate proposals
+  // pending triage) without those entries firing as findings until
+  // the operator transitions them to `blessed` or `cursed`.
+  const patterns = filterActiveEntries(allPatterns);
+  // Phase 11 Task 13 — derive the file-walk extension set from the
+  // ACTIVE catalog (pending/withdrawn entries don't dictate which files
+  // get scanned). The walker honors `.ts/.tsx` by default plus every
+  // extension any active pattern entry declares.
+  const scannedExtensions = deriveScannedExtensions(patterns);
+  const files = await gatherInScopeFiles(input, scannedExtensions);
   const scans: SourceFileView[] = [];
   for (const f of files) {
     scans.push(await readSourceFile({ repoRoot: input.repoRoot, relFile: f }));
   }
   const findings: PatternFinding[] = [];
-  for (const pat of patterns) {
-    findings.push(applyPattern({ pattern: pat, scans }));
+  for (const entry of patterns) {
+    findings.push(dispatchPattern(entry, scans));
   }
+  // G5 stub — synthesis-layer unmatched-shape clustering pass. Always
+  // emitted (may be empty); the stub returns [] until the clustering
+  // algorithm lands (see synthesis-discovered-candidates.ts for the
+  // tracking issue cross-reference).
+  const discoveredCandidates = clusterUnmatchedShapes({
+    scans,
+    findings,
+  });
   return {
-    // Discriminator kept verbatim for JSON wire-format stability with
-    // the pilot — the file was renamed but the runtime tag is invariant.
     agent: 'ast-grep-matrix',
     featureSlug: input.featureSlug,
     patterns: findings,
+    discoveredCandidates,
   };
 }
 

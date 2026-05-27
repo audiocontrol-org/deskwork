@@ -169,15 +169,13 @@ The audiocontrol `feature/akai-harmonization` branch's `docs/1.0/001-IN-PROGRESS
 ### TF-002 — anti-pattern registry lacks `canonical_file` field
 
 Finding-ID: AUDIT-20260525-05
-Status:     acknowledged-#288
+Status:     fixed-d849a6f
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/anti-patterns-registry.ts`, `schema/anti-patterns.yaml.schema.json`
 
-The anti-pattern registry's `AntiPatternEntry` shape has no `canonical_file:` field; the matcher relies on `excludes_paths:` pinned at known consumer paths. When a primitive's canonical implementation moves modules (`git mv`), the entry still matches the moved file because the matcher has no concept of "exclude the primitive's own implementation no matter where it lives."
+Fix note (commit `d849a6f`, 2026-05-26): renamed the auto-exclusion field from `canonical_implementation_file` (the pre-#288 name from an earlier scaffolding round in this branch) to `canonical_file` per the issue spec; field is OPTIONAL on every entry, existing entries don't need migration. Behavior: byte-exact path matching against the candidate file's CWD-relative POSIX path (no glob, no directory expansion); silent auto-exclusion (no log line); union semantics with `excludes_paths:` (both apply when set together). Scan-start guard still fails loud with the entry id + missing path when `canonical_file:` points at a path that doesn't exist. Adversarial coverage: 6/6 scenarios in `anti-patterns.canonical-file.test.ts` pass — including a new issue-#288-derived scenario that plants `canonical_file: 'modules/foo/canonical.tsx'`, places a canonical-shape regex match inside it, and asserts a sibling holdout at `modules/bar/holdout.tsx` STILL surfaces (auto-exclusion is scoped to the named file only, not a directory). Schema description updated to document the byte-exact + union semantics for adopters' editors. Awaiting `verified-<date>` once an adopter uses the field on a real primitive-relocation refactor.
 
-Pilot reference: audiocontrol PR #462, commit `fddbad06` (TF-002 closure). The pilot's anti-patterns-registry.ts and its scenario file `anti-patterns.canonical-file-scenarios.ts` are EMPTY of `canonical_file` references in the source-of-truth checkout — the fix appears to be documented in TF-002's closure note but not visibly present in the pilot file we ported from. Filing as new work for dw-lifecycle rather than re-port.
-
-Deferred to: [#288](https://github.com/audiocontrol-org/deskwork/issues/288).
+Pilot reference: audiocontrol PR #462, commit `fddbad06` (TF-002 closure). Fixed in: [#288](https://github.com/audiocontrol-org/deskwork/issues/288).
 
 ### TF-013 — clone-detector regen silently wipes operator dispositions
 
@@ -231,11 +229,13 @@ Deferred to: [#290](https://github.com/audiocontrol-org/deskwork/issues/290).
 ### The standard scope-discovery test slice is red because clone-detector subprocess coverage now overruns Vitest's default timeout budget across multiple scenarios
 
 Finding-ID: AUDIT-20260525-10
-Status:     fixed-0aace86
+Status:     verified-2026-05-26
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/__tests__/scope-discovery/clone-detector.*.test.ts`, `detect-clones.gate-mode.test.ts`
 
 Resolution note (2026-05-25T11:30Z): the symptom described here IS the cross-file jscpd-subprocess contention flake tracked at [#297](https://github.com/audiocontrol-org/deskwork/issues/297). Commit `0aace86` (PR [#298](https://github.com/audiocontrol-org/deskwork/pull/298)) routes all `clone-detector.*.test.ts` files to a single-fork vitest pool via `poolMatchGlobs`, eliminating the cross-worker contention that drove the timeouts. Re-ran the exact verification commands cited in this finding's evidence: `npm --workspace @deskwork/plugin-dw-lifecycle run test -- scope-discovery` returns `Test Files 48 passed (48) / Tests 401 passed (401)`; full-suite `npm test` returns `Test Files 67 passed (67) / Tests 737 passed (737)`. Zero timeouts; zero failing tests. Same intermediate-state-snapshot hypothesis as AUDIT-20260525-01: the audit was filed between #297's reporting and `0aace86`'s landing. Awaiting `verified-<date>` after the fix lives in a few CI runs / parallel-load contexts without resurfacing. If the symptom returns under a different code state, file a new finding with current SHA + repro environment.
+
+Verification note (2026-05-26): independent audit rerun on this branch stayed green across the formerly failing clone-detector surface. `npm --workspace @deskwork/plugin-dw-lifecycle run test -- shortcuts` returned `183/183`; `npm --workspace @deskwork/plugin-dw-lifecycle run test -- scope-discovery` returned `Test Files 92 passed (92) / Tests 957 passed (957)`. The previously red clone-detector files (`error`, `refresh`, `baseline`, `polish`, `batch-dispose`, and `check-clones.gate-mode`) all completed within budget on the same run, so this finding is now verified on the feature branch.
 
 The branch's current load-bearing verification command fails because the clone-detector subprocess scenarios are now exceeding Vitest's default `5000ms` per-test timeout in multiple files. This is no longer isolated to one or two edge cases; the timeout budget is unstable across the main clone-detector coverage surface.
 
@@ -268,3 +268,77 @@ Fix guidance:
 
 - Treat this as a load-bearing verification defect until the timeout budget is made deterministic again.
 - Either reduce clone-detector subprocess runtime materially, or give the long-running clone-detector scenarios explicit per-test timeout budgets that match the real `jscpd` cost instead of relying on the global default.
+
+---
+
+## 2026-05-26 #287 — deprecation-scan port
+
+### `check-deprecations` ships as a subcommand shell, not a real scanner
+
+Finding-ID: AUDIT-20260526-01
+Status:     fixed-4da4660
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts`, `plugins/dw-lifecycle/src/scope-discovery/discovery-agents/regime-holdout-detector.ts`
+
+Resolution note (2026-05-26): ported the audiocontrol pilot's `tools/scope-discovery/deprecation-scan.ts` + `deprecation-report.ts` into dw-lifecycle. Closes [#287](https://github.com/audiocontrol-org/deskwork/issues/287). Three new files land:
+
+- `plugins/dw-lifecycle/src/scope-discovery/deprecation-scan.ts` — walks `.ts` / `.tsx` files for top-of-file `@deprecated` JSDoc tags + `// DEPRECATED:` line comments within the first 20 lines; resolves importers via `@/` alias (configurable `moduleRoot`, default `src`) + basename-relative path forms.
+- `plugins/dw-lifecycle/src/scope-discovery/deprecation-report.ts` — markdown / summary / JSON renderers. Default artifact path `.dw-lifecycle/scope-discovery/deprecation-queue.md` (the `--write` target; sibling to `editor-symmetry.md`).
+- `plugins/dw-lifecycle/src/scope-discovery/schema/deprecation-queue.yaml.schema.json` — informational JSON Schema for the seeded YAML placeholder (the scanner discovers markers in source — the YAML is reserved for future baseline persistence à la `clones.yaml`).
+
+The pre-port shell's CLI surface (`--root`, `--write`, `--artifact`, `--quiet`, `--json`) is preserved verbatim. New flag: `--module-root <path>` for projects where the `@/` alias root differs from `src` (the audiocontrol pilot's `modules/<editor>/src/` layout works by passing the literal root).
+
+The regime-holdout-detector now uses the real scanner: blocked importers become `source: 'deprecation'` findings; `meta.deprecation_count` populates from the real importer count instead of `0`. Safe-to-delete files do NOT surface as regime-holdout findings (they're work-ready dispositions, not drift).
+
+`install-scope-discovery` seeds `deprecation-queue.yaml` (with `schemaVersion: 1` and an empty `deprecations: []`) alongside the other three YAML seeds.
+
+Tests: 23 new vitest scenarios cover flag-parse, programmatic-main, scan scenarios (blocked / safe-to-delete / self-importer skip / inline-marker / alias-vs-relative importer / quiet / json / write / write+artifact), CLI surface (`--help`, unknown flag), and a gutted-stub self-check that gives the harness teeth (a no-op scanner returning the pre-port shell's empty-registry shape is REJECTED by the blocked-finding probe). install-scope-discovery's test gains a fourth seed-file assertion (`deprecation-queue.yaml`). Full `scope-discovery` slice: 411 passed (411).
+
+Awaiting `verified-<date>` after the commit lands on the branch + the operator re-runs `dw-lifecycle check-deprecations` against a real codebase.
+
+Evidence:
+
+- The pre-port subcommand shell at `plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts` printed `check-deprecations: registry empty; nothing to scan. (deprecation-scan port pending — see https://github.com/audiocontrol-org/deskwork/issues/287)` regardless of source-tree state.
+- The regime-holdout-detector's `collectDeprecationFindings` returned `[]` unconditionally (`// TODO(#287): replace stub with call to scanDeprecations(...)`).
+
+Expected vs actual:
+
+- Expected: `check-deprecations` walks the source tree and surfaces real `@deprecated` files + remaining importers.
+- Actual (pre-port): empty-registry placeholder regardless of input.
+
+Fix guidance:
+
+- Issue [#287](https://github.com/audiocontrol-org/deskwork/issues/287) tracks the port. The dispatch landed the port verbatim from the pilot with the path-default rewrite and the configurable `moduleRoot` addition.
+
+### The #287 port landed, but several comments and test names still describe `check-deprecations` as a stubbed Phase 4 shell
+
+Finding-ID: AUDIT-20260526-02
+Status:     fixed-16734ac
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/subcommands/check-deprecations.ts`, `plugins/dw-lifecycle/src/__tests__/scope-discovery/discovery-agents/regime-holdout-detector.test.ts`, `regime-holdout-detector.fixtures.ts`
+
+Fix note (2026-05-26): updated three surfaces to reflect the post-port `4da4660` reality:
+1. `subcommands/check-deprecations.ts:7-10` — replaced the "SUBCOMMAND SHELL" comment with a description of the shipped scanner (walks `.ts`/`.tsx` for `@deprecated` JSDoc tags + `// DEPRECATED:` line comments, resolves importers via configurable `@/` alias + basename-relative path forms).
+2. `regime-holdout-detector.test.ts:15-17` — replaced the "deprecation gate STUBBED in Phase 4" docstring with "deprecation gate live — port landed in commit 4da4660" framing.
+3. `regime-holdout-detector.test.ts:153-191` — flipped scenario 5's assertions from `deprecation_count === 0` + `deprecationFinding === undefined` to `deprecation_count >= 1` + `deprecationFinding defined`. Updated scenario 6's mixed-sources block similarly.
+4. `regime-holdout-detector.fixtures.ts:239` — updated `DEPRECATED_IMPORTER_CONTENT` to use a relative path (`./components/OldEnvelope`) instead of the `@/components/OldEnvelope` alias form. The fixture's `--module-root modules` arg means the deprecated file's `@/`-alias is `@/foo-editor/src/components/OldEnvelope`; the pre-port fixture worked only because the stub returned 0 unconditionally. The relative form exercises the basename-relative resolver and survives both layouts.
+
+9/9 regime-holdout-detector scenarios pass post-edit. The implementation is real and the audit rerun verified it, but some developer-facing prose still describes `check-deprecations` as an unported stub. That drift is now misleading because it points future readers at a problem that no longer exists.
+
+Evidence:
+
+- The dispatch shim comment still says the underlying command "is currently a SUBCOMMAND SHELL" and that the full port is pending issue #287 at [subcommands/check-deprecations.ts](/Users/orion/work/deskwork-work/scope-discovery/plugins/dw-lifecycle/src/subcommands/check-deprecations.ts:7).
+- The regime-holdout-detector tests still encode the old deferred contract:
+  - test name says `deprecation gate stubbed in Phase 4 → deprecation_count === 0` at [regime-holdout-detector.test.ts](/Users/orion/work/deskwork-work/scope-discovery/plugins/dw-lifecycle/src/__tests__/scope-discovery/discovery-agents/regime-holdout-detector.test.ts:153)
+  - assertions still expect `payload.meta.deprecation_count` to be `0` and no deprecation findings at [regime-holdout-detector.test.ts](/Users/orion/work/deskwork-work/scope-discovery/plugins/dw-lifecycle/src/__tests__/scope-discovery/discovery-agents/regime-holdout-detector.test.ts:180)
+- Meanwhile the real port is on-branch in commit `4da4660`, and the full verification run on 2026-05-26 passed `92/92` files and `957/957` tests.
+
+Expected vs actual:
+
+- Expected: developer-facing comments and tests describe the current contract, namely that `check-deprecations` is a real scanner and the regime-holdout detector consumes its findings.
+- Actual: multiple comments and at least one test block still narrate the pre-port stub behavior.
+
+Fix guidance:
+
+- Update the stale subcommand comment to describe the shipped scanner rather than the pre-port shell.
+- Replace the old stub-era regime-holdout-detector scenarios with post-port expectations that exercise real deprecation findings, so the tests document the current contract instead of the defunct one.

@@ -24,6 +24,7 @@
  *   clones.yaml                            (seeded: `clones: []`)
  *   anti-patterns.yaml                     (seeded: `anti_patterns: []`)
  *   adopter-manifests.yaml                 (seeded: `adopter_manifests: []`)
+ *   deprecation-queue.yaml                 (seeded: `deprecations: []`)
  *
  * Exit codes (returned via `main()` for the subcommand shim to forward):
  *   0   install completed (incl. idempotent no-ops).
@@ -76,7 +77,7 @@ const COPY_FILES: ReadonlyArray<{
  * NOTE on shape: `generated_at` is omitted from the seed clones.yaml
  * because it's set by the detector at write-time (operators don't hand-
  * edit it). The schema permits `generated_at` to be added later when
- * the first detect-clones run writes the baseline. The seed deliberately
+ * the first check-clones run writes the baseline. The seed deliberately
  * leaves the field out so the doctor's schema-violation rule reports a
  * missing-field for any registry that was hand-authored without a real
  * detector run.
@@ -92,7 +93,7 @@ const SEED_FILES: ReadonlyArray<{
     // strict parser requires `generated_at` to be a string; the
     // detector overwrites this on the first real run. Doctor rules
     // can treat the epoch value as a signal that the operator hasn't
-    // run `dw-lifecycle detect-clones` yet (separately surfaced).
+    // run `dw-lifecycle check-clones` yet (separately surfaced).
     content:
       'schemaVersion: 1\ngenerated_at: "1970-01-01T00:00:00Z"\nclones: []\n',
   },
@@ -103,6 +104,15 @@ const SEED_FILES: ReadonlyArray<{
   {
     name: 'adopter-manifests.yaml',
     content: 'schemaVersion: 1\nadopter_manifests: []\n',
+  },
+  {
+    name: 'deprecation-queue.yaml',
+    // The v1 scanner discovers `@deprecated` markers from source — the
+    // YAML is seeded as a placeholder for future baseline persistence
+    // (mirroring `clones.yaml`'s role for the clone detector). Empty
+    // is the steady state until that enhancement lands; the doctor's
+    // schema-stale rule keys off `schemaVersion: 1` to detect drift.
+    content: 'schemaVersion: 1\ndeprecations: []\n',
   },
 ];
 

@@ -1,0 +1,15 @@
+{
+  "kind": "entry-annotation",
+  "at": "2026-05-26T23:12:02.504Z",
+  "entryId": "4e4d6912-3edf-4aeb-b6ed-ba455f362f14",
+  "annotation": {
+    "type": "address",
+    "workflowId": "4e4d6912-3edf-4aeb-b6ed-ba455f362f14",
+    "commentId": "3694e038-9e2f-4725-b6e5-4955a945219e",
+    "version": 2,
+    "disposition": "addressed",
+    "reason": "Phase 11 Problem Statement now leads with an explicit thesis: behind-the-scenes code hygiene driven by /dw-lifecycle:implement, NOT an operator-driven workflow. Operator's role narrows to goal-setting + escalation resolution. The architectural failure mode (human-discipline-dependence) is named. Solution section opener also references the thesis to keep the framing front-and-center.",
+    "id": "c4ff4865-9482-4b5a-bea8-48236f39fe0a",
+    "createdAt": "2026-05-26T23:12:02.504Z"
+  }
+}

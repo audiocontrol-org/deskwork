@@ -15,6 +15,18 @@
  */
 
 import type { DiscoveryAgentFinding } from './discovery-agents/types.js';
+import type { CodebaseStateMetrics } from './discovery-agents/codebase-state-metrics-types.js';
+
+export type {
+  ClassificationCompletenessMetric,
+  CodebaseStateMetrics,
+  CoveragePerBlessedPattern,
+  ViolationDensityPerCursedPattern,
+  SurfaceUniformityEntry,
+  CatalogStabilityMetric,
+  DiscoveredCandidateRateMetric,
+  DispositionLatencyMetric,
+} from './discovery-agents/codebase-state-metrics-types.js';
 
 export type ManifestKind = 'ui' | 'code' | 'hybrid';
 
@@ -110,6 +122,19 @@ export interface ManifestRegimeHoldoutEntry {
     readonly registry_path: string;
     readonly registry_id: string;
   };
+  /**
+   * Phase 11 Task 11 — per-finding status/provenance from the catalog
+   * entry that produced this finding. `source_status` is the catalog
+   * `status:` literal; `provenance_source` is the catalog
+   * `provenance.source` literal. Surfaced so an operator scanning the
+   * synthesized scope-manifest.yaml can see at-a-glance which findings
+   * are actively-enforced (blessed/cursed) vs. candidates (pending)
+   * without re-reading every catalog.
+   */
+  readonly status_provenance: {
+    readonly source_status: string;
+    readonly provenance_source: string;
+  };
 }
 
 export interface ManifestRegimeHoldoutMeta {
@@ -119,6 +144,18 @@ export interface ManifestRegimeHoldoutMeta {
     readonly adopter_manifest: number;
     readonly editor_symmetry: number;
     readonly deprecation: number;
+  };
+  /**
+   * Phase 11 Task 11 — per-status rollup. `actively_enforced` are
+   * findings sourced from `blessed` or `cursed` catalog entries
+   * (these gate). `candidate` are findings from `pending` entries
+   * (operator-triage surface). Suppressed statuses (ignore /
+   * tracked-holdout / withdrawn) are filtered upstream and never
+   * surface, so they aren't counted here.
+   */
+  readonly by_status: {
+    readonly actively_enforced: number;
+    readonly candidate: number;
   };
 }
 
@@ -133,6 +170,19 @@ export interface ManifestRegimeHoldouts {
   readonly editor_symmetry: ReadonlyArray<ManifestRegimeHoldoutEntry>;
   readonly deprecations: ReadonlyArray<ManifestRegimeHoldoutEntry>;
   readonly meta: ManifestRegimeHoldoutMeta;
+}
+
+/**
+ * Phase 11 Task 3 — one operator-facing candidate cluster summary
+ * surfaced by the orchestrator-agent mediation layer in the manifest's
+ * `discovered_candidates:` section. Snake-case to mirror the YAML wire
+ * format; produced by `mediation.toManifestSection`.
+ */
+export interface ManifestDiscoveredCandidate {
+  readonly cluster_id: string;
+  readonly summary: string;
+  readonly member_count: number;
+  readonly exemplar_files: ReadonlyArray<string>;
 }
 
 /**
@@ -153,6 +203,20 @@ export interface ScopeManifest {
   readonly routes?: ReadonlyArray<ManifestRoute>;
   readonly modules?: ReadonlyArray<ManifestModule>;
   readonly regime_holdouts?: ManifestRegimeHoldouts;
+  /**
+   * Phase 11 Task 3 — discovered candidate clusters surfaced by the
+   * orchestrator-agent mediation layer. Optional (legacy manifests +
+   * clean-codebase scans both legitimately omit it).
+   */
+  readonly discovered_candidates?: ReadonlyArray<ManifestDiscoveredCandidate>;
+  /**
+   * Phase 11 Task 4 — codebase-state metrics block. Optional at the
+   * manifest level (legacy manifests omit it); when emitted, every
+   * sub-metric is present on the value. The synthesis pass populates
+   * this when at least one catalog file is present under
+   * `.dw-lifecycle/scope-discovery/`.
+   */
+  readonly codebase_state_metrics?: CodebaseStateMetrics;
   readonly notes?: string;
 }
 

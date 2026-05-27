@@ -9,7 +9,7 @@ Single-clone-group convenience wrapper around `/dw-lifecycle:batch-dispose`. The
 
 ## Steps
 
-1. Confirm the clone-group id (positional `<id>` — 12 lowercase hex chars). Get it from `/dw-lifecycle:detect-clones` output or from `/dw-lifecycle:scope-summary --verbose` (which prints matching group ids on stderr).
+1. Confirm the clone-group id (positional `<id>` — 12 lowercase hex chars). Get it from `/dw-lifecycle:check-clones` output (or its legacy alias `/dw-lifecycle:detect-clones`) or from `/dw-lifecycle:scope-summary --verbose` (which prints matching group ids on stderr).
 2. Choose the disposition. Supported via `--as`: `keep-with-reason`, `ignore-with-justification`, or `refactor` (gated — see below).
 3. Shell out to the helper:
 
@@ -46,10 +46,10 @@ The helper:
 
 - **`--as refactor` with missing precondition flags.** Helper exits 2 with the missing-flags list. Per the forcing-function design: the operator can't bypass the precondition surface — they must either type all six refactor flags (and still hit the manual-edit redirect), or pick a non-refactor disposition.
 - **`--as refactor` with ALL precondition flags present.** Helper STILL exits 2 with the manual-edit redirect message. Refactor entries don't fit `--reason` shape; edit `clones.yaml` manually and verify with `/dw-lifecycle:check-refactor-preconditions`. This is intentional — the wrapper does not silently degrade to `keep-with-reason`, and it does not stub a partial-refactor write (per the "Just for now is bullshit" rule in agent-discipline.md).
-- **Unknown id.** Forwarded to batch-dispose, which exits 2 with the typoed id + a hint pointing at `dw-lifecycle detect-clones --refresh-baseline`.
+- **Unknown id.** Forwarded to batch-dispose, which exits 2 with the typoed id + a hint pointing at `dw-lifecycle check-clones --refresh-baseline`.
 - **Verify-after-write mismatch.** Forwarded from batch-dispose: exit 1. Re-run with `--dry-run` to confirm intent.
 - **Disposition survivor risk.** Applying `--as keep-with-reason` to an id previously marked `refactor` (or vice-versa among the protected dispositions) won't trip the survivor gate (`/dw-lifecycle:check-disposition-survivor` only catches non-pending → pending). But reverting to pending DOES trip it — pass `--allow-disposition-loss` to the survivor gate if intentional. Tracked via [#289](https://github.com/audiocontrol-org/deskwork/issues/289).
 
 ## When to use
 
-Reach for dispose-clone when triaging a single clone group — typical workflow: `detect-clones` surfaces a new pending group, operator reads the involved files, decides "this is intentional duplication / not worth refactoring / a canonical-side fix we're not doing right now", and applies the appropriate disposition. For N > 1 clones with a shared `(disposition, reason)`, jump to `/dw-lifecycle:batch-dispose`. For `refactor` dispositions, do NOT use this skill to apply — use it ONCE to see the precondition surface in the error message, then edit clones.yaml manually and verify via `/dw-lifecycle:check-refactor-preconditions`. Closes [#284](https://github.com/audiocontrol-org/deskwork/issues/284) workflow; pairs with `/dw-lifecycle:check-disposition-survivor` for the inverse safety check.
+Reach for dispose-clone when triaging a single clone group — typical workflow: `check-clones` (or its legacy alias `detect-clones`) surfaces a new pending group, operator reads the involved files, decides "this is intentional duplication / not worth refactoring / a canonical-side fix we're not doing right now", and applies the appropriate disposition. For N > 1 clones with a shared `(disposition, reason)`, jump to `/dw-lifecycle:batch-dispose`. For `refactor` dispositions, do NOT use this skill to apply — use it ONCE to see the precondition surface in the error message, then edit clones.yaml manually and verify via `/dw-lifecycle:check-refactor-preconditions`. Closes [#284](https://github.com/audiocontrol-org/deskwork/issues/284) workflow; pairs with `/dw-lifecycle:check-disposition-survivor` for the inverse safety check.

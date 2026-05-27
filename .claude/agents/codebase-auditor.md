@@ -71,7 +71,7 @@ production-code modifications.
    to run:
 
    ```
-   dw-lifecycle detect-clones
+   dw-lifecycle check-clones
    ```
 
    If new clone groups appear, the disposition for each must land in

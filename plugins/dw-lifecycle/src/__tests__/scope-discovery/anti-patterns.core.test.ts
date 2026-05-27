@@ -11,8 +11,8 @@
  *   5. malformed-registry-exits-two
  *   6. (the gutted-stub self-check; teeth for scenarios 2 + 4)
  *
- * The excludes_paths and canonical_implementation_file scenarios live
- * in sibling files (`anti-patterns.excludes.test.ts`,
+ * The excludes_paths and canonical_file scenarios live in sibling
+ * files (`anti-patterns.excludes.test.ts`,
  * `anti-patterns.canonical-file.test.ts`) — split to keep each file
  * under the 300-500 line cap.
  *

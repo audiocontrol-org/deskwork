@@ -56,11 +56,69 @@ export interface PatternHit {
   readonly snippet: string;       // trimmed source line
 }
 
+/**
+ * Provenance tag on a pattern finding — names the handler that produced
+ * it so the synthesis layer + operator can distinguish "registered
+ * regex matched a known shape" from "negative-space detector saw the
+ * absence of an expected primitive" from "outlier detector flagged a
+ * statistical anomaly". Per Phase 11 G7.
+ *
+ * `registered-pattern` is the legacy provenance for handlers that match
+ * a positively-registered shape (regex, semantic). `negative-space`,
+ * `coverage-gap`, `outlier`, and `discovered-candidate` are the new
+ * vocabulary types from Phase 11 Task 1. `discovered-candidate` is the
+ * synthesis-layer clustering pass output (Phase 11 G5 stub).
+ */
+export type FindingProvenance =
+  | 'registered-pattern'
+  | 'negative-space'
+  | 'coverage-gap'
+  | 'outlier'
+  | 'discovered-candidate'
+  | 'semantic'
+  | 'prd-theme';
+
 export interface PatternFinding {
   readonly id: string;            // stable identifier: "as-type-cast", "any-annotation", ...
   readonly description: string;
   readonly regex: string;         // the regex source string (for traceability)
   readonly hits: ReadonlyArray<PatternHit>;
+  /**
+   * Provenance tag — names which handler produced this finding. Defaults
+   * to `'registered-pattern'` for legacy regex-only findings. New
+   * handlers set this explicitly so the synthesis pass can route by
+   * provenance without re-reading the catalog.
+   */
+  readonly provenance?: FindingProvenance;
+  /**
+   * Optional secondary metric a handler may attach. Coverage handlers
+   * surface adoption fractions; outlier handlers attach distance
+   * scores. The synthesis layer reads `metrics` opportunistically and
+   * tolerates absence (legacy regex findings emit none).
+   */
+  readonly metrics?: Readonly<Record<string, number>>;
+}
+
+/**
+ * A discovered-candidate cluster surfaced by the synthesis-layer
+ * unmatched-shape clustering pass (Phase 11 G5). Stub-shipped in v1.1
+ * Task 1 — the pass currently emits an empty list with a logged TODO
+ * naming the algorithmic spec at issue #315. The TYPE is here so the
+ * scope-manifest wire format is forward-compatible; the algorithm
+ * itself ships under the GH issue cross-referenced in the stub.
+ */
+export interface DiscoveredCandidateCluster {
+  /** Stable cluster id (synthesis layer assigns; not user-readable). */
+  readonly id: string;
+  /**
+   * Bag-of-words / n-gram summary of the shape that clustered. The
+   * algorithm itself is a stub at v1.1 Task 1; the field is reserved.
+   */
+  readonly shapeSummary: string;
+  /** Member files participating in the cluster. */
+  readonly members: ReadonlyArray<string>;
+  /** Member count — load-bearing for the rank-by-frequency cut. */
+  readonly memberCount: number;
 }
 
 export interface AstGrepMatrixFindings {
@@ -71,6 +129,12 @@ export interface AstGrepMatrixFindings {
   readonly agent: 'ast-grep-matrix';
   readonly featureSlug: string;
   readonly patterns: ReadonlyArray<PatternFinding>;
+  /**
+   * Optional output of the synthesis-layer unmatched-shape clustering
+   * pass (Phase 11 G5). Always emitted (may be empty); absent ONLY for
+   * pre-Phase-11 wire-format consumers reading older JSON.
+   */
+  readonly discoveredCandidates?: ReadonlyArray<DiscoveredCandidateCluster>;
 }
 
 /** A clone group surfaced from the dispositioned baseline. */
@@ -167,6 +231,38 @@ export interface RegimeHoldoutEvidence {
   readonly registryId: string;
 }
 
+/**
+ * Phase 11 Task 11 — per-finding status provenance. Names the catalog
+ * entry's `status:` at the time the finding was produced so downstream
+ * consumers (synthesis, dispositioner, operator surface) can route
+ * actively-enforced findings differently from candidate findings
+ * (status: pending) without re-reading the catalog. The field is
+ * load-bearing for the orchestrator-agent's future per-status routing
+ * (Phase 11 Task 3): `blessed`/`cursed` findings gate; `pending`
+ * findings surface as candidates; everything else is suppressed at the
+ * scanner level.
+ *
+ * `source_status` is the catalog entry's status. `provenance_source`
+ * carries the entry's `provenance.source` (operator-authored vs.
+ * orchestrator-agent vs. install-seed vs. ...) so the operator can
+ * triage agent-proposed findings differently from operator-authored
+ * findings.
+ *
+ * For `source: 'deprecation'` findings the catalog "entry" is the
+ * `@deprecated` marker in the source file itself — there is no Loop-
+ * status field on the marker, so we synthesize `blessed` + `install-
+ * seed` to keep the wire shape uniform across all four sources.
+ */
+export interface FindingStatusProvenance {
+  readonly source_status: 'pending' | 'blessed' | 'cursed' | 'ignore' | 'tracked-holdout' | 'withdrawn';
+  readonly provenance_source:
+    | 'operator-authored'
+    | 'orchestrator-agent'
+    | 'llm-judge-proposed'
+    | 'install-seed'
+    | 'promoted-from-candidate';
+}
+
 /** One regime-holdout finding. */
 export interface RegimeHoldoutFinding {
   /** Which gate caught it. */
@@ -183,6 +279,13 @@ export interface RegimeHoldoutFinding {
   readonly replacement: string;
   /** Evidence back-pointer for operator traceability. */
   readonly evidence: RegimeHoldoutEvidence;
+  /**
+   * Phase 11 Task 11 — status + provenance inherited from the catalog
+   * entry that produced this finding. Always present; the synthesizer
+   * uses this to route findings into the right manifest section
+   * (actively-enforced vs. candidate vs. suppressed-but-recorded).
+   */
+  readonly status_provenance: FindingStatusProvenance;
 }
 
 /** Per-source counts + total — surfaced verbatim by the synthesis pass. */
@@ -192,6 +295,17 @@ export interface RegimeHoldoutMeta {
   readonly editor_symmetry_holdout_count: number;
   readonly deprecation_count: number;
   readonly total: number;
+  /**
+   * Phase 11 Task 11 — per-status rollup. Sum across the four sources.
+   * `actively_enforced` = findings sourced from `blessed` + `cursed`
+   * entries; `candidate` = findings sourced from `pending` entries
+   * (surfaced for operator triage but NOT gate-blocking).
+   * Suppressed statuses (ignore / tracked-holdout / withdrawn) are
+   * never present in the findings array — they are filtered upstream
+   * at the scanner level — so they do not appear here.
+   */
+  readonly actively_enforced_count: number;
+  readonly candidate_count: number;
 }
 
 export interface RegimeHoldoutFindings {

@@ -236,6 +236,6 @@ export const payloads = {
     'export function OldEnvelope() { return null; }\n',
 
   DEPRECATED_IMPORTER_CONTENT:
-    "import { OldEnvelope } from '@/components/OldEnvelope';\n" +
+    "import { OldEnvelope } from './components/OldEnvelope';\n" +
     'export const x = OldEnvelope;\n',
 } as const;

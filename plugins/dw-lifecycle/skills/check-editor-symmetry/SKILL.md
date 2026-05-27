@@ -9,6 +9,14 @@ Cross-module symmetry gate. Reads `.dw-lifecycle/scope-discovery/adopter-manifes
 
 Stdout always emits the rendered markdown table. `--write` additionally persists the artifact to `.dw-lifecycle/scope-discovery/editor-symmetry.md` for committed-doc review.
 
+## This is the REGISTERED-PATTERN inventory check
+
+`check-editor-symmetry` is a pure **inventory** verb — it matches against the catalog the operator (or `install-seed`) authored in `adopter-manifests.yaml`. A green matrix (all rows showing `✓` across every module column) means "no parallel-module symmetry breakages against the things you registered." It says nothing about cross-module patterns the catalog doesn't yet describe (e.g. a sibling-shared pattern that lives in every module's source but doesn't yet have a registered canonical primitive).
+
+To find NOVEL cross-module asymmetries (per-module shapes that diverge from siblings without being covered by a registered canonical primitive), run `/dw-lifecycle:scope-inventory <slug>` — the discovery layer's outlier handler can surface modules whose shape distribution differs from sibling-module centroids, and the synthesis-layer clustering pass can group those into `discovered_candidates:`. Authoring an adopter-manifest entry for a freshly-discovered cross-module pattern promotes it from "discovered candidate" to "registered convention" the next check-editor-symmetry run will track.
+
+Cell-status results carried into the synthesized manifest (the regime-holdout-detector's `editor-symmetry` source bucket) inherit `status_provenance` from the underlying adopter-manifest entry — `blessed` / `cursed` source-status + `operator-authored` / `install-seed` provenance-source. Novel-candidate signals appear via the discovery handlers in `scope-inventory`, not here. See [`discovery-agents/README.md`](../../src/scope-discovery/discovery-agents/README.md) (in the plugin source) for the full agent fleet split.
+
 ## Steps
 
 1. Confirm `.dw-lifecycle/scope-discovery/adopter-manifests.yaml` exists with at least one manifest entry. Empty registry exits 0 with no work.
@@ -51,3 +59,5 @@ The helper:
 ## When to use
 
 Run check-editor-symmetry whenever a new canonical primitive is added to `adopter-manifests.yaml` (the matrix immediately shows which parallel modules are aligned and which lag), and as part of `/dw-lifecycle:scope-inventory` Phase 4 activation (the editor-symmetry-scanner agent activates on registry presence and contributes to the `regime_holdouts:` synthesis). Re-run with `--write` to refresh the committed `editor-symmetry.md` artifact after a wave of refactors brings modules into alignment. Pairs with `/dw-lifecycle:check-adopters` (per-file holdout detection, same registry) and `/dw-lifecycle:check-anti-patterns` (legacy-shape detection underneath the canonical-primitive contract).
+
+**When a green matrix is NOT enough.** If parallel modules are suspected to be diverging on a shape that isn't yet registered as a canonical primitive, check-editor-symmetry will NOT detect it — by design. Run `/dw-lifecycle:scope-inventory <slug>` to invoke the discovery layer; the outlier handler will surface per-module shape distributions, and the synthesis layer will cluster sibling-divergent patterns into `discovered_candidates:`. Promote the cluster into `adopter-manifests.yaml` (status: `blessed`) and re-run check-editor-symmetry to track it.

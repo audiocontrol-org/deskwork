@@ -5,10 +5,10 @@
  * Mirrors the detector-harness pattern (Phase 1) — each fixture is
  * self-contained under the OS tmpdir; the subprocess runs with the
  * fixture's scan-root as CWD so the scanner's CWD-relative
- * `excludes_paths:` / `canonical_implementation_file:` matching matches
- * the pilot's semantics. The CLI entry path is resolved against this
- * file's absolute location so vitest workers running from any CWD
- * still find the dispatcher.
+ * `excludes_paths:` / `canonical_file:` matching matches the pilot's
+ * semantics. The CLI entry path is resolved against this file's
+ * absolute location so vitest workers running from any CWD still find
+ * the dispatcher.
  */
 
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
@@ -69,9 +69,9 @@ export async function makeAntiPatternsFixture(label: string): Promise<AntiPatter
  * Run the scanner with the fixture's scanRoot as CWD and `--root .`.
  * This is the "literal-paths render fixture-relative" mode used by the
  * pilot's `runFromScanRoot` helper for the excludes_paths /
- * canonical_implementation_file scenarios — both fields match against
- * CWD-relative POSIX paths, so anchoring CWD at the scan root makes the
- * paths render the way the registry fixtures expect.
+ * canonical_file scenarios — both fields match against CWD-relative
+ * POSIX paths, so anchoring CWD at the scan root makes the paths
+ * render the way the registry fixtures expect.
  *
  * The harness passes `--gate-mode` by default so existing tests
  * asserting exit-1-on-findings continue to hold. Tests exercising the
