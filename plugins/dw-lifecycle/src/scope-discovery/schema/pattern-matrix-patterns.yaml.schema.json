@@ -170,6 +170,11 @@
           "exclusiveMinimum": 0,
           "description": "Sigma threshold for outlier firing. Default 2.0 (~95th percentile per direction)."
         },
+        "content_type": {
+          "type": "string",
+          "enum": ["auto", "ts", "markdown", "css", "html", "yaml", "json"],
+          "description": "Phase 11 Task 13 — content-type discriminator for the token-composition tokenizer. 'auto' (default) infers from file extension: .ts/.tsx → ts; .md/.markdown → markdown; .css/.scss → css; .html/.htm → html; .yaml/.yml → yaml; .json → json. Ignored by the className-composition metric."
+        },
         "extensions": { "$ref": "#/$defs/extensions" },
         "status": { "$ref": "#/$defs/catalogStatus" },
         "provenance": { "$ref": "#/$defs/provenance" },

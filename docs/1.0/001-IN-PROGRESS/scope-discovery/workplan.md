@@ -445,15 +445,20 @@ Cadence + intensity are NOT pre-decided. The controller observes drift / correct
 
 The existing implement skill walks the workplan. The augmentation embeds the audit/judge stack and the controller as inline machinery (operator decision 2026-05-26: implement is the entry point; no new `/dw-lifecycle:iterate` skill).
 
-- [ ] Per-turn audit/judge stack inside implement:
-  1. Read audit log (catch external auditor updates since last turn).
-  2. Internal LLM-judge pass — judges recent work (last commit, last sub-agent dispatch, last catalog edit) for missed candidates / drift / refinement opportunities.
-  3. Decide next action via skills + policies + metrics.
-  4. Take ONE action.
-  5. Fire external LLM auditor prompt (queued for next turn's audit-log read).
-- [ ] Hook-cadence is workplan-dependent + controller-tuned (NOT pre-decided per operator 2026-05-26): initial setpoint emerges from workplan metadata + risk markers; controller tunes from there.
-- [ ] Termination criteria negotiated per-cycle (NOT pre-decided per operator 2026-05-26): goal-achieved (workplan + acceptance criteria) | escalation (orchestrator queues a needs-human-decision) | budget (cost-cap per cycle) | hard-policy-violation (immediate halt). The orchestrator and operator agree on the cycle's termination contract at the start of each invocation.
-- [ ] Resumability state: durable in catalogs + audit log + new `.dw-lifecycle/orchestrator-runtime/` for true mid-flight scratch (operator decision 2026-05-26: durability-first; ephemeral scratch is the exception).
+- [x] Per-turn audit/judge stack inside implement — landed at `plugins/dw-lifecycle/src/scope-discovery/orchestrator-loop/` as the `runOrchestratorTurn` library (composition of Phase 11 Tasks 2-11). Per-turn cycle:
+  1. Read audit log via `llm/audit-log-reader.ts` (durable watermark at `.dw-lifecycle/scope-discovery/orchestrator-runtime/last-audit-read.json`).
+  2. Detect wrong-decisions via `recovery/detect-wrong-decisions.ts`; emit reversal proposals via `recovery/reverse-disposition.ts`.
+  3. Internal LLM-judge pass via `llm/judge.ts` (in-band, through `wrap()`).
+  4. Mediate findings via `mediation/mediation.ts` (cluster + architectural summaries; PHASE 2 catalog-edit proposals when dispositions supplied).
+  5. Run controller via `controller/controller.ts`; persist updated history to `controller-state.json` in-flight.
+  6. Project codebase-state metrics via `discovery-agents/codebase-state-metrics.ts`.
+  7. Fire external auditor via `llm/auditor.ts` (fire-and-forget; emits `audit-request-<id>.json` under `pending-audits/`).
+  8. Build escalation visibility surface via `escalation/escalation-visibility.ts`.
+- [x] Hook-cadence is workplan-dependent + controller-tuned — `runController` reads codebase-state metrics + auditor-correction-rate signals; emits `frequency / intensity / escalationThreshold` for the NEXT turn. Cold-start defaults to max (1.0/1.0/0.9); ratchet-down on sustained low drift; anti-thrashing damping on oscillation. Tunables in `controller-config.yaml`.
+- [x] Termination criteria negotiated per-cycle — the orchestrator-agent driving the implement skill reads `TurnReport` after each turn and decides: goal-achieved (workplan acceptance) → continue; escalation queued + count > 0 → pause for operator; budget/policy-violation → the orchestrator-agent halts and surfaces. No new code surface — termination is read off the report fields.
+- [x] Resumability state — `orchestrator-loop/loop-state.ts` persists at `.dw-lifecycle/scope-discovery/orchestrator-runtime/loop-state.json` (audit watermark + last turn id + bounded turnHistory ring). Controller history persists separately at `controller-state.json`; trust-calibration at `trust-calibration.json`; pending escalations at `pending-escalations/<id>.json`; audit requests at `pending-audits/audit-request-<id>.json`. All gitignored under `.dw-lifecycle/scope-discovery/orchestrator-runtime/`.
+- [x] Tests: 35 new vitest scenarios at `src/__tests__/scope-discovery/orchestrator-loop/` (loop-config 9 + loop-state 12 + loop-turn end-to-end 14). The end-to-end test plants synthetic catalog + audit-log state on disk, runs `runOrchestratorTurn`, and asserts the composed turn report carries the expected outputs from every wired sub-library.
+- [x] SKILL.md updated — `plugins/dw-lifecycle/skills/implement/SKILL.md` carries a "Phase 11 — Autonomous loop" section that documents the per-turn cycle, the `TurnReport` shape, the durable state files, the configuration surface, and the new error-handling cases (judge dispatch failure + wrong-decision-recovery escalation).
 
 ### Task 7: LLM-judge / external-auditor / audit-log integration
 
@@ -505,13 +510,18 @@ The pattern-type widening + Loop primitives + status/provenance fields apply uni
 
 ### Task 12: Naming alignment
 
-The operator-trust failure mode (green "discovery" report read as no-novel-anti-patterns) is a naming problem (#315 problem space). Decide and apply.
+The operator-trust failure mode (green "discovery" report read as no-novel-anti-patterns) is a naming problem (#315 problem space). Resolved 2026-05-26 via the **hybrid option** (per operator decision): keep `scope-inventory` as the operator-facing entry-point + ensure operator-visible provenance distinguishes registered-pattern matches from discovered candidates.
 
-- [ ] Option: rename "discovery agents" → "inventory agents"; add separate `scope-discover` surface for the Loop. OR
-- [ ] Option: keep names; make provenance visible enough at the operator surface that the distinction can't be missed. OR
-- [ ] Option: hybrid — keep `scope-inventory` (the orchestrator entry-point); rename internal "discovery agents" terminology to "inventory agents"; the Loop's surface becomes the architectural discovery layer.
-
-(Decision deferred to scoping pass per operator 2026-05-26.)
+- [x] Hybrid option selected: keep `scope-inventory` (the orchestrator entry-point); document the internal "inventory agents vs. discovery agents" split via a new `plugins/dw-lifecycle/src/scope-discovery/discovery-agents/README.md`; surface the registered-pattern vs. discovered-candidate vs. novel-shape-candidate distinction in every operator-facing report. No source-tree rename was performed — the cost would have exceeded the readability gain (JSON wire format's `agent: 'ast-grep-matrix'` discriminator + the existing test fixtures stay invariant; library API surface is unchanged).
+- [x] SKILL.md prose updates across `scope-inventory`, `scope-widen`, `check-anti-patterns`, `check-adopters`, `check-deprecations`, `check-editor-symmetry` — each skill now carries an explicit "Inventory vs. discovery" thesis paragraph distinguishing registered-pattern matches (the catalog said to look for it; scanner found it) from novel-shape candidates (discovered by negative-space / coverage-gap / outlier / semantic handlers + synthesis-layer clustering). The check-* skills are explicitly framed as REGISTERED-PATTERN inventory checks; each names the discovery-layer escape hatch (`/dw-lifecycle:scope-inventory <slug>`) for surfacing novel candidates.
+- [x] Manifest report surface — new module at `plugins/dw-lifecycle/src/scope-discovery/synthesis-report.ts` exports `categorizeFindings(manifest)` + `renderFindingCategoryReport(manifest)` + `renderCategorySummaryLine(manifest)`. The category-derivation honors the `discovery-agents/README.md` rules: `provenance_source ∈ {orchestrator-agent, llm-judge-proposed, promoted-from-candidate}` → novel-shape candidate (regardless of status); `source_status: pending` → novel-shape candidate; `blessed`/`cursed` + `operator-authored`/`install-seed` → registered-pattern match; `discovered_candidates:` clusters → discovered-candidate. The report-rendering integrates into:
+  - `scope-inventory`'s `synthesis.md` evidence-trail file — leads with `## Inventory vs. discovery — finding categories` before the existing `## Synthesizer notes`.
+  - `scope-inventory`'s stderr summary — adds a `categories: registered-pattern=N, discovered-candidate=N, novel-shape-candidate=N` line.
+  - `scope-widen`'s `synthesis.md` evidence-trail + stderr summary.
+  - `synthesis-cli.ts` (standalone CLI) — same shape, same evidence wiring.
+- [x] Tests: `src/__tests__/scope-discovery/synthesis-report.test.ts` — 10 vitest scenarios covering all three categorization rules + the operator-action advisory + the clean-no-findings rendering + the one-line summary contract.
+- [x] Internal "discovery-agents/" directory documented at `plugins/dw-lifecycle/src/scope-discovery/discovery-agents/README.md` — explicitly distinguishes the inventory agents (registered-pattern matchers: pattern-matrix, clone-detector-reader, adopter-manifest-checker, regime-holdout-detector, ui-route-enumerator) from the discovery agents (novel-shape surfacing: synthesis-discovered-candidates, negative-space / outlier / coverage-gap / semantic pattern handlers, mediation pass). No code renames (low-priority; would breach the wire-format invariant for limited readability gain).
+- [x] Agent-discipline rule added at `.claude/rules/agent-discipline.md` § "Inventory vs discovery — how to read scope-discovery reports" — documents the three operator-visible categories, the stderr `categories:` line format, the `synthesis.md` category-report section, the operator action when novel-shape-candidate > 0, and the failure mode the rule prevents (KeygroupSummary-shape regression shipping to release because a green inventory report was read as "no anti-patterns").
 
 ### Task 13: Multi-content-type generality
 
@@ -547,7 +557,7 @@ The existing `tooling-feedback.md` pattern from Phase 10 v1 ship is a feedback-l
 
 - Which of Tasks 1–14 ship in v1.1 vs deferred to v1.2 / future?
 - Which of G1–G7 pattern types ship at minimum (operator named negative-space as the cheapest fix; G3/G4/G5/G6 are stretch).
-- Task 12 naming alignment: which option?
+- ~~Task 12 naming alignment: which option?~~ Resolved 2026-05-26 via the hybrid option (operator-facing entry-points keep their names; provenance + report rendering surface the distinction; internal discovery-agents/ directory documents the inventory-vs-discovery split).
 - Task 13 multi-content-type: designed-in or deferred?
 - LLM-judge cost ceilings + model selection.
 - Task 9 escalation-surface UX (artifact format, edit-in-place vs chat-resume).

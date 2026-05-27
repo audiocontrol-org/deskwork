@@ -138,8 +138,35 @@ const BUILTIN_PATTERNS: ReadonlyArray<RegexEntry> = [
   },
 ];
 
+/**
+ * Phase 11 Task 13 — derive the union of file extensions the file walker
+ * must traverse from the pattern catalog. When ANY entry declares an
+ * `extensions` filter, those extensions are added to the walker's
+ * extension set so files matching the per-entry filter are actually
+ * walked (not silently skipped because the default walker ignored them).
+ *
+ * The default set `.ts/.tsx` is always included so legacy regex
+ * catalogs that omit `extensions` continue to walk TypeScript files
+ * unchanged.
+ *
+ * Per Phase 11 acceptance criterion "Multi-content-type generality":
+ * scan engine + catalog schema not TS-coupled; markdown / configs /
+ * schemas use the same glob + shape primitives.
+ */
+function deriveScannedExtensions(
+  patterns: ReadonlyArray<PatternCatalogEntry>,
+): ReadonlyArray<string> {
+  const set = new Set<string>(['.ts', '.tsx']);
+  for (const entry of patterns) {
+    if (entry.extensions === undefined) continue;
+    for (const ext of entry.extensions) set.add(ext.toLowerCase());
+  }
+  return [...set].sort();
+}
+
 async function gatherInScopeFiles(
   input: DiscoveryAgentInput,
+  extensions: ReadonlyArray<string>,
 ): Promise<ReadonlyArray<string>> {
   const modulesInScope = await modulesInScopeForFeature(input);
   const collected: string[] = [];
@@ -154,6 +181,7 @@ async function gatherInScopeFiles(
     const files = await walkSourceFiles({
       rootAbs: modSrc,
       repoRoot: input.repoRoot,
+      extensions,
     });
     for (const f of files) collected.push(f);
   }
@@ -181,7 +209,12 @@ export async function buildPatternMatrix(
   // pending triage) without those entries firing as findings until
   // the operator transitions them to `blessed` or `cursed`.
   const patterns = filterActiveEntries(allPatterns);
-  const files = await gatherInScopeFiles(input);
+  // Phase 11 Task 13 — derive the file-walk extension set from the
+  // ACTIVE catalog (pending/withdrawn entries don't dictate which files
+  // get scanned). The walker honors `.ts/.tsx` by default plus every
+  // extension any active pattern entry declares.
+  const scannedExtensions = deriveScannedExtensions(patterns);
+  const files = await gatherInScopeFiles(input, scannedExtensions);
   const scans: SourceFileView[] = [];
   for (const f of files) {
     scans.push(await readSourceFile({ repoRoot: input.repoRoot, relFile: f }));

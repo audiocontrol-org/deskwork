@@ -57,6 +57,10 @@ import {
 } from './scope-widen-delta.js';
 import { synthesize } from './synthesis.js';
 import { renderSynthesizerNotes } from './synthesis-cli.js';
+import {
+  renderCategorySummaryLine,
+  renderFindingCategoryReport,
+} from './synthesis-report.js';
 import type { ScopeManifest } from './synthesis-types.js';
 import { errorMessage } from './util/typeguards.js';
 
@@ -314,6 +318,12 @@ export async function scopeWidenMain(
 
   if (!opts.quiet) {
     process.stderr.write(formatDelta(delta) + '\n');
+    // Phase 11 Task 12 — surface the inventory-vs-discovery category
+    // summary for the re-synthesized manifest. The full category
+    // breakdown lives in the per-run synthesis.md.
+    process.stderr.write(
+      `scope-widen: next-manifest ${renderCategorySummaryLine(nextManifest)}\n`,
+    );
     process.stderr.write(
       `scope-widen: evidence at ${relative(opts.repoRoot, staged.runDir)}/\n`,
     );
@@ -369,9 +379,15 @@ async function persistEvidence(args: {
       'utf8',
     );
   }
+  // Phase 11 Task 12 — splice the inventory-vs-discovery category
+  // report BEFORE the synthesizer notes in scope-widen's per-run
+  // synthesis.md so the operator's first read of the file sees the
+  // category split BEFORE the synthesizer warnings.
+  const categoryReport = renderFindingCategoryReport(nextManifest);
+  const synthesizerNotes = renderSynthesizerNotes(synthesisWarnings);
   await writeFile(
     resolve(runDir, 'synthesis.md'),
-    renderSynthesizerNotes(synthesisWarnings),
+    `${categoryReport}\n${synthesizerNotes}`,
     'utf8',
   );
   await writeFile(

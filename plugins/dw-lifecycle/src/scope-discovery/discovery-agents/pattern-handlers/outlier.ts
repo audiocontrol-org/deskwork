@@ -37,6 +37,7 @@
 import type { PatternFinding, PatternHit } from '../types.js';
 import type { SourceFileView } from '../shared.js';
 import type {
+  OutlierContentType,
   OutlierEntry,
   PatternHandler,
   PatternHandlerInput,
@@ -45,20 +46,126 @@ import { matchesGlob } from './glob.js';
 
 type TokenBag = Map<string, number>;
 
-const TOKEN_RE = /[A-Za-z][A-Za-z0-9]{2,}/g;
+const ALPHANUM_TOKEN_RE = /[A-Za-z][A-Za-z0-9]{2,}/g;
 const CLASSNAME_RE = /className\s*=\s*["']([^"']+)["']/g;
+// CSS — property names (`color:`, `font-size:`) + ID/class selectors.
+const CSS_PROPERTY_RE = /(?:^|[\s;{}])([a-zA-Z_-][a-zA-Z0-9_-]*)\s*:/g;
+const CSS_SELECTOR_RE = /(?:^|[\s,>+~])([.#][a-zA-Z_-][a-zA-Z0-9_-]*)/g;
+// HTML — tag names + attribute names (excluding values).
+const HTML_TAG_RE = /<\s*([a-zA-Z][a-zA-Z0-9-]*)\b/g;
+const HTML_ATTR_RE = /\s([a-zA-Z_][a-zA-Z0-9_-]*)\s*=\s*["']/g;
+// YAML / JSON — top-level + nested keys. Keep the keys as-is (case-
+// preserving) because configuration semantics often differ on case.
+const YAML_KEY_RE = /(?:^|\n)\s*([A-Za-z_][A-Za-z0-9_-]*)\s*:/g;
+const JSON_KEY_RE = /"([A-Za-z_][A-Za-z0-9_-]*)"\s*:/g;
 
-function tokenize(text: string): TokenBag {
+function addToken(bag: TokenBag, tok: string): void {
+  if (tok.length === 0) return;
+  bag.set(tok, (bag.get(tok) ?? 0) + 1);
+}
+
+function tokenizeAlphanum(text: string): TokenBag {
   const bag: TokenBag = new Map();
-  const re = new RegExp(TOKEN_RE.source, 'g');
+  const re = new RegExp(ALPHANUM_TOKEN_RE.source, 'g');
   let m: RegExpExecArray | null = re.exec(text);
   while (m !== null) {
-    const tok = m[0].toLowerCase();
-    bag.set(tok, (bag.get(tok) ?? 0) + 1);
+    addToken(bag, m[0].toLowerCase());
     if (m.index === re.lastIndex) re.lastIndex += 1;
     m = re.exec(text);
   }
   return bag;
+}
+
+function tokenizeWith(text: string, patterns: ReadonlyArray<RegExp>): TokenBag {
+  const bag: TokenBag = new Map();
+  for (const pat of patterns) {
+    const re = new RegExp(pat.source, 'g');
+    let m: RegExpExecArray | null = re.exec(text);
+    while (m !== null) {
+      const tok = (m[1] ?? m[0]).toLowerCase();
+      addToken(bag, tok);
+      if (m.index === re.lastIndex) re.lastIndex += 1;
+      m = re.exec(text);
+    }
+  }
+  return bag;
+}
+
+function tokenizeCss(text: string): TokenBag {
+  return tokenizeWith(text, [CSS_PROPERTY_RE, CSS_SELECTOR_RE]);
+}
+
+function tokenizeHtml(text: string): TokenBag {
+  return tokenizeWith(text, [HTML_TAG_RE, HTML_ATTR_RE]);
+}
+
+function tokenizeYaml(text: string): TokenBag {
+  return tokenizeWith(text, [YAML_KEY_RE]);
+}
+
+function tokenizeJson(text: string): TokenBag {
+  return tokenizeWith(text, [JSON_KEY_RE]);
+}
+
+type ResolvedContentType = Exclude<OutlierContentType, 'auto'>;
+
+const EXT_TO_CONTENT: ReadonlyMap<string, ResolvedContentType> = new Map<
+  string,
+  ResolvedContentType
+>([
+  ['.ts', 'ts'],
+  ['.tsx', 'ts'],
+  ['.js', 'ts'],
+  ['.jsx', 'ts'],
+  ['.md', 'markdown'],
+  ['.markdown', 'markdown'],
+  ['.css', 'css'],
+  ['.scss', 'css'],
+  ['.html', 'html'],
+  ['.htm', 'html'],
+  ['.yaml', 'yaml'],
+  ['.yml', 'yaml'],
+  ['.json', 'json'],
+]);
+
+/**
+ * Phase 11 Task 13 — resolve `'auto'` to a concrete content type from
+ * the file extension. Unknown extensions fall back to `'ts'` (the prior
+ * alphanumeric-token tokenizer) so existing TS-scoped catalogs see no
+ * behavior change.
+ */
+function resolveContentType(
+  configured: OutlierContentType,
+  filePath: string,
+): ResolvedContentType {
+  if (configured !== 'auto') return configured;
+  const lower = filePath.toLowerCase();
+  for (const [ext, kind] of EXT_TO_CONTENT.entries()) {
+    if (lower.endsWith(ext)) return kind;
+  }
+  return 'ts';
+}
+
+function tokenizeForContentType(
+  contentType: ResolvedContentType,
+  text: string,
+): TokenBag {
+  switch (contentType) {
+    case 'ts':
+    case 'markdown':
+      // Markdown shares the alphanumeric tokenizer — words instead of
+      // identifiers, but the regex shape is identical at this layer.
+      // Per-content-type tuning has a place to land here.
+      return tokenizeAlphanum(text);
+    case 'css':
+      return tokenizeCss(text);
+    case 'html':
+      return tokenizeHtml(text);
+    case 'yaml':
+      return tokenizeYaml(text);
+    case 'json':
+      return tokenizeJson(text);
+  }
 }
 
 function classNameTokens(text: string): TokenBag {
@@ -80,7 +187,12 @@ function classNameTokens(text: string): TokenBag {
 
 function vectorize(entry: OutlierEntry, scan: SourceFileView): TokenBag {
   if (entry.distanceMetric === 'token-composition') {
-    return tokenize(scan.text);
+    // Phase 11 Task 13 — `contentType` is optional on the entry shape;
+    // pre-Task-13 fixtures (and adopters who never set it) inherit
+    // `'auto'`, which infers the tokenizer from the file extension.
+    const configured = entry.contentType ?? 'auto';
+    const resolved = resolveContentType(configured, scan.file);
+    return tokenizeForContentType(resolved, scan.text);
   }
   return classNameTokens(scan.text);
 }

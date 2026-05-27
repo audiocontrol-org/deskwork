@@ -9,6 +9,14 @@ Gate the source tree against `.dw-lifecycle/scope-discovery/adopter-manifests.ya
 
 Default mode is INFORMATIONAL (holdouts → stdout report, exit 0). `--gate-mode` flips the exit-code contract for pre-commit-hook wiring (holdouts → exit 1 → commit fails).
 
+## This is the REGISTERED-PATTERN inventory check
+
+`check-adopters` is a pure **inventory** verb — it matches against the catalog the operator (or `install-seed`) authored in `adopter-manifests.yaml`. A green run means "no files under your expected_adopters_glob fail to import the canonical primitive." It says nothing about canonical primitives the catalog doesn't yet describe, OR about adopter-shape patterns the catalog doesn't yet cover (e.g. an adopter that imports the right primitive but composes it wrong).
+
+To find NOVEL adopter-shape gaps (shapes a canonical primitive's intended adopters reach for but the catalog doesn't yet enforce), run `/dw-lifecycle:scope-inventory <slug>` — that skill invokes the discovery layer (negative-space + coverage + outlier + semantic handlers + synthesis-layer clustering) alongside the registered-pattern scanners. The negative-space handler (Phase 11 G2) is particularly relevant for adopter-shape work: it flags files that match an expected-adopter glob but lack canonical-primitive consumption — the exact failure shape the KeygroupSummary repro from [#315](https://github.com/audiocontrol-org/deskwork/issues/315) demonstrated.
+
+Provenance distinction is visible in the manifest: registered-pattern findings carry `provenance: 'registered-pattern'` and `status_provenance.provenance_source: operator-authored` / `install-seed`; discovery findings carry one of `negative-space` / `coverage-gap` / `outlier` / `semantic` / `discovered-candidate` provenance tags. See [`discovery-agents/README.md`](../../src/scope-discovery/discovery-agents/README.md) (in the plugin source) for the full agent fleet split.
+
 ## Steps
 
 1. Confirm the project has populated `.dw-lifecycle/scope-discovery/adopter-manifests.yaml`. An empty registry is a healthy no-op; the scanner reports zero holdouts and exits 0.
@@ -50,3 +58,5 @@ The helper:
 ## When to use
 
 Run check-adopters at three moments: (1) as a pre-commit gate via `--gate-mode` on staged `.ts` / `.tsx` changes so newly-added files in adopter globs are forced to use the canonical primitive on first commit; (2) as an ad-hoc audit when adding or modifying a canonical primitive's adopter set — who's still on the legacy import? (3) as an input to `/dw-lifecycle:scope-inventory` (the adopter-manifest-checker Phase 4 agent activates on registry presence and flags PRD-themed holdouts in the synthesized manifest). Pairs with `/dw-lifecycle:check-anti-patterns` (legacy-shape detection) and `/dw-lifecycle:check-editor-symmetry` (cross-module fleet matrix that reads the SAME registry).
+
+**When a green run is NOT enough.** If the project suspects a canonical primitive is being mis-composed by ostensible adopters (the import is there, the usage shape is wrong) OR an entirely new primitive needs adoption tracking, check-adopters will NOT find it — by design. Run `/dw-lifecycle:scope-inventory <slug>` to invoke the discovery layer and review the negative-space / coverage / outlier findings + `discovered_candidates:` in the resulting manifest. Promote novel adopter-manifest needs into `adopter-manifests.yaml` (status: `blessed`) and re-run check-adopters to enforce.

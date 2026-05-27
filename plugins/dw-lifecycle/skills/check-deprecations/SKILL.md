@@ -14,6 +14,14 @@ The scanner walks the source tree for two file-level deprecation markers:
 
 For each deprecated file, the scanner counts external importers (any TS/TSX file importing the deprecated path via its `@/` alias or a relative path matching its basename). Files with zero importers land in `safe-to-delete`; files with importers land in `blocked` with every importer's `file:line` named.
 
+## This is the REGISTERED-PATTERN inventory check
+
+`check-deprecations` is a pure **inventory** verb — it matches against deprecation markers the operator (or a prior refactor commit) authored DIRECTLY IN SOURCE FILES (no separate YAML catalog; the `@deprecated` tag IS the registration). A green run means "no deprecation markers in your source tree." It says nothing about files that ARE candidates for deprecation but haven't been marked yet (e.g. legacy modules that overlap with newer canonical alternatives).
+
+To find NOVEL deprecation candidates (files that should be marked `@deprecated` but aren't), run `/dw-lifecycle:scope-inventory <slug>` — the discovery layer's coverage-gap + outlier handlers can surface modules whose adoption is collapsing (low importer count + sibling-canonical-primitive presence), and the synthesis-layer clustering pass may group those into `discovered_candidates:`. Marking a file `@deprecated` after operator triage promotes it from "discovered candidate" to "registered marker" the next check-deprecations run will track.
+
+Findings from this scanner therefore always carry `status_provenance: { source_status: 'blessed', provenance_source: 'install-seed' }` in the synthesized manifest (the marker IS the catalog, and source-embedded markers default to blessed/install-seed for the purpose of the regime-holdout fan-out). Novel-candidate signals appear via the discovery handlers in `scope-inventory`, not here. See [`discovery-agents/README.md`](../../src/scope-discovery/discovery-agents/README.md) (in the plugin source) for the full agent fleet split.
+
 ## Steps
 
 1. Confirm the scan root (defaults to `.`). Override via `--root` when source lives elsewhere.
@@ -79,6 +87,8 @@ _None._
 Run `check-deprecations` as part of refactor-PR triage (the deprecation queue is the actionable list of "what can I delete next?") and as a periodic codebase-health audit (a growing `blocked:` list signals deprecation messages being ignored).
 
 Companion to `/dw-lifecycle:check-anti-patterns` (legacy-shape detection — what should be REPLACED) and `/dw-lifecycle:check-adopters` (canonical-primitive adoption — what should be USING the replacement); check-deprecations answers the third question: "what can be DELETED now?"
+
+**When a green run is NOT enough.** If a file is suspected to be effectively-deprecated (no canonical consumers, sibling-module-superseded) but lacks the `@deprecated` marker, check-deprecations will NOT find it — by design. Run `/dw-lifecycle:scope-inventory <slug>` to invoke the discovery layer; the resulting manifest's `discovered_candidates:` plus the coverage-gap / outlier findings will name the suspect files. Operator-mark them `@deprecated` to promote them into this scanner's regular reporting.
 
 ## Notes
 

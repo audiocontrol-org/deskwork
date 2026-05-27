@@ -29,6 +29,10 @@ import type {
 } from './discovery-agents/types.js';
 import { synthesize } from './synthesis.js';
 import { renderSynthesizerNotes } from './synthesis-cli.js';
+import {
+  renderCategorySummaryLine,
+  renderFindingCategoryReport,
+} from './synthesis-report.js';
 import { errorMessage } from './util/typeguards.js';
 import {
   parseCli,
@@ -379,10 +383,19 @@ export async function scopeInventoryMain(
       );
     }
 
-    // Evidence trail (optional).
+    // Evidence trail (optional). The synthesis.md fragment now leads
+    // with the inventory-vs-discovery category breakdown (Phase 11
+    // Task 12 — surfaces registered-pattern matches vs. discovered
+    // candidates vs. novel-shape candidates) so the operator's first
+    // read of the file sees the category distinction BEFORE the
+    // synthesizer notes. The categories close the operator-trust
+    // failure mode the v1 dogfood-cycle finding named (a green
+    // discovery report read as "no novel anti-patterns").
     if (opts.evidenceTrail && runDir !== null) {
       const allWarnings = [...skipNotes, ...output.metadata.warnings];
-      const notes = renderSynthesizerNotes(allWarnings);
+      const categoryReport = renderFindingCategoryReport(output.manifest);
+      const synthesizerNotes = renderSynthesizerNotes(allWarnings);
+      const notes = `${categoryReport}\n${synthesizerNotes}`;
       await writeEvidenceTrail({ runDir, agents, notes, args: opts });
       if (!opts.quiet) {
         process.stderr.write(
@@ -397,6 +410,13 @@ export async function scopeInventoryMain(
           `(kind=${output.manifest.kind}, agents=${agents.length}, ` +
           `findings=${output.metadata.findingsCount}, ` +
           `warnings=${output.metadata.warnings.length})\n`,
+      );
+      // Phase 11 Task 12 — surface the inventory-vs-discovery category
+      // summary alongside the existing "wrote ..." line so the operator
+      // sees the registered-pattern vs. candidate split at-a-glance
+      // (the manifest YAML + synthesis.md carry the full breakdown).
+      process.stderr.write(
+        `scope-inventory: ${renderCategorySummaryLine(output.manifest)}\n`,
       );
       for (const w of output.metadata.warnings) {
         process.stderr.write(`scope-inventory: note: ${w}\n`);

@@ -119,12 +119,57 @@ export type OutlierDistanceMetric =
   | 'token-composition'
   | 'className-composition';
 
+/**
+ * Phase 11 Task 13 — content-type discriminator for the
+ * `token-composition` outlier metric. Different content types call for
+ * different tokenization strategies; treating markdown words like TS
+ * identifiers loses signal (and vice-versa).
+ *
+ * - `'auto'` (default): infer from the file extension. `.ts/.tsx` →
+ *   `ts`; `.md/.markdown` → `markdown`; `.css/.scss` → `css`;
+ *   `.html/.htm` → `html`; `.yaml/.yml` → `yaml`; `.json` → `json`;
+ *   anything else → `ts` (the prior-art alphanumeric tokenizer).
+ * - `'ts'`: alphanumeric identifier tokens (prior behavior).
+ * - `'markdown'`: word tokens (a-z, A-Z, length >= 3, lowercased).
+ *   Common Markdown stopwords are kept; tokenization is identical to
+ *   `ts` for portability but the dispatcher is explicit so future
+ *   per-content-type tuning has a place to land.
+ * - `'css'`: tokens over selectors + property names (catches files
+ *   whose property mix diverges from siblings).
+ * - `'html'`: tokens over tag names + attribute names (`<div>`,
+ *   `class="..."`, `data-foo`).
+ * - `'yaml'`: tokens over top-level + nested key paths (e.g.,
+ *   `foo.bar.baz`).
+ * - `'json'`: tokens over JSON key names (same shape as yaml).
+ *
+ * The `className-composition` metric is JSX-specific (TS/TSX files);
+ * for non-TS content the operator should pick `token-composition` with
+ * an appropriate `content_type` instead.
+ */
+export type OutlierContentType =
+  | 'auto'
+  | 'ts'
+  | 'markdown'
+  | 'css'
+  | 'html'
+  | 'yaml'
+  | 'json';
+
 export interface OutlierEntry extends BaseCatalogEntry {
   readonly type: 'outlier';
   readonly matchGlob: string;
   readonly distanceMetric: OutlierDistanceMetric;
   /** Sigma threshold for an outlier finding to fire. Default 2.0. */
   readonly thresholdSigma: number;
+  /**
+   * Phase 11 Task 13 — content-type discriminator for the
+   * `token-composition` tokenizer. Defaults to `'auto'` (infer from
+   * file extension). Ignored by `className-composition`. The field is
+   * optional on the catalog-entry shape so pre-Phase-11-Task-13
+   * fixtures continue to compile; the handler treats `undefined` as
+   * `'auto'` (the default).
+   */
+  readonly contentType?: OutlierContentType;
 }
 
 /**

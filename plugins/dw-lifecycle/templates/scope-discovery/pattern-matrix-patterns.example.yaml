@@ -82,3 +82,118 @@ patterns:
       Answer with a confidence score 0.0–1.0 (1.0 = full compliance).
     confidence_threshold: 0.7
     # model: 'claude-3-5-sonnet-20241022'   # optional model override
+
+  # ─────────────────────────────────────────────────────────────────
+  # Phase 11 Task 13 — Multi-content-type examples
+  #
+  # The scan engine is content-agnostic. Every primitive above works
+  # uniformly on .ts/.tsx, .md/.markdown, .css/.scss, .html/.htm,
+  # .yaml/.yml, .json. Adopters route per-content-type behavior via
+  # the `extensions:` filter + the outlier primitive's `content_type:`
+  # discriminator (defaults to `auto` — infers from file extension).
+  # ─────────────────────────────────────────────────────────────────
+
+  # ───── 6. markdown — regex on retired Setext-style headings ─────
+  - type: regex
+    id: markdown-setext-heading-retired
+    description: |
+      Setext-style H1 headings (lines of `=`) — retired per project
+      style guide in favor of ATX `#` headings.
+    regex: '^={3,}\s*$'
+    extensions: ['.md', '.markdown']
+
+  # ───── 7. markdown — negative-space on missing frontmatter UUID ─
+  - type: negative-space
+    id: post-without-deskwork-id
+    description: |
+      Markdown posts under docs/ that lack the canonical
+      `deskwork.id` frontmatter UUID binding (per deskwork's
+      collection conventions).
+    match_glob: 'docs/**/*.md'
+    must_contain: 'deskwork:\s*\n\s*id:\s*[0-9a-fA-F-]+'
+    threshold: 1
+    extensions: ['.md', '.markdown']
+
+  # ───── 8. css — negative-space on missing canonical namespace ───
+  - type: negative-space
+    id: css-without-canonical-namespace
+    description: |
+      CSS files declaring class selectors without the canonical
+      `.ac-*` namespace prefix.
+    match_glob: 'src/**/*.css'
+    must_contain: '\.ac-[a-z][a-z0-9-]*\s*[\{,]'
+    threshold: 1
+    secondary_contains: '\.[a-z][a-z0-9-]*\s*\{'
+    extensions: ['.css']
+
+  # ───── 9. html — regex on banned inline-style attributes ────────
+  - type: regex
+    id: html-inline-style-attribute
+    description: |
+      Inline `style="..."` attributes — banned per design system
+      (every visual choice belongs in a stylesheet, not inline).
+    regex: '\sstyle\s*=\s*"'
+    extensions: ['.html', '.htm']
+
+  # ───── 10. yaml — coverage metric on schemaVersion adoption ─────
+  - type: coverage
+    id: yaml-schema-version-adoption
+    description: |
+      Fraction of YAML configs under .dw-lifecycle/ that carry the
+      canonical `schemaVersion:` field. Feeds the Phase 11 Task 4
+      controller; not a finding generator.
+    match_glob: '.dw-lifecycle/**/*.yaml'
+    must_contain: '^schemaVersion:'
+    extensions: ['.yaml', '.yml']
+
+  # ───── 11. json — negative-space on missing license field ──────
+  - type: negative-space
+    id: package-json-missing-license
+    description: |
+      package.json files lacking the `license` field. The negative-
+      space detector fires when the file matches the glob but the
+      canonical key is absent.
+    match_glob: 'packages/**/package.json'
+    must_contain: '"license"\s*:\s*"'
+    threshold: 1
+    extensions: ['.json']
+
+  # ───── 12. outlier — content_type='markdown' tokenizer ──────────
+  - type: outlier
+    id: markdown-vocabulary-outlier
+    description: |
+      Markdown posts whose word composition diverges from
+      directory siblings — surfaces topical drift / accidentally-
+      placed posts. `content_type: 'markdown'` selects the
+      word-tokenizer (alphanumeric tokens with case-folding).
+    match_glob: 'docs/posts/**/*.md'
+    distance_metric: token-composition
+    content_type: markdown
+    threshold_sigma: 1.5
+    extensions: ['.md', '.markdown']
+
+  # ───── 13. outlier — content_type='css' tokenizer ───────────────
+  - type: outlier
+    id: css-property-outlier
+    description: |
+      CSS files whose property + selector composition diverges from
+      directory siblings. `content_type: 'css'` selects the CSS
+      tokenizer (property names + class/id selectors).
+    match_glob: 'src/styles/**/*.css'
+    distance_metric: token-composition
+    content_type: css
+    threshold_sigma: 2.0
+    extensions: ['.css', '.scss']
+
+  # ───── 14. outlier — content_type='auto' (extension-inferred) ───
+  - type: outlier
+    id: config-key-outlier-auto
+    description: |
+      Configuration files whose top-level keys diverge from directory
+      siblings. `content_type: 'auto'` (default) infers the tokenizer
+      from the file extension (.yaml/.yml → yaml; .json → json).
+    match_glob: 'config/**/*'
+    distance_metric: token-composition
+    # content_type omitted → defaults to 'auto'
+    threshold_sigma: 1.8
+    extensions: ['.yaml', '.yml', '.json']

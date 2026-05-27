@@ -22,6 +22,7 @@ import { errorMessage, isEnoent, isPlainObject } from '../../util/typeguards.js'
 import type {
   CoverageEntry,
   NegativeSpaceEntry,
+  OutlierContentType,
   OutlierDistanceMetric,
   OutlierEntry,
   PatternCatalogEntry,
@@ -41,6 +42,16 @@ export const OVERRIDE_PATH =
 const ALLOWED_OUTLIER_METRICS: ReadonlyArray<OutlierDistanceMetric> = [
   'token-composition',
   'className-composition',
+];
+
+const ALLOWED_OUTLIER_CONTENT_TYPES: ReadonlyArray<OutlierContentType> = [
+  'auto',
+  'ts',
+  'markdown',
+  'css',
+  'html',
+  'yaml',
+  'json',
 ];
 
 interface ParseContext {
@@ -209,6 +220,22 @@ function parseOutlierEntry(
   }
   const sigmaRaw = optionalNumber(ctx, raw, 'threshold_sigma');
   const thresholdSigma = sigmaRaw ?? 2.0;
+  // Phase 11 Task 13 — content_type discriminator on the outlier
+  // tokenizer. Optional; defaults to 'auto' (infer from extension).
+  const contentTypeRaw = raw['content_type'];
+  let contentType: OutlierContentType = 'auto';
+  if (contentTypeRaw !== undefined) {
+    if (typeof contentTypeRaw !== 'string') {
+      throw new Error(`${ctxPrefix(ctx)}.content_type must be a string when set`);
+    }
+    const matched = ALLOWED_OUTLIER_CONTENT_TYPES.find((c) => c === contentTypeRaw);
+    if (matched === undefined) {
+      throw new Error(
+        `${ctxPrefix(ctx)}.content_type must be one of ${ALLOWED_OUTLIER_CONTENT_TYPES.join(', ')}; got ${contentTypeRaw}`,
+      );
+    }
+    contentType = matched;
+  }
   const extensions = parseExtensions(ctx, raw);
   return {
     type: 'outlier',
@@ -217,6 +244,7 @@ function parseOutlierEntry(
     matchGlob,
     distanceMetric,
     thresholdSigma,
+    contentType,
     status: meta.status,
     provenance: meta.provenance,
     auditHistory,

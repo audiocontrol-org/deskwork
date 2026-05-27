@@ -1,4 +1,4 @@
-generated_at: 2026-05-27T03:24:44.203Z
+generated_at: 2026-05-27T04:06:26.720Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -625,6 +625,13 @@ clones:
       - plugins/dw-lifecycle/src/scope-discovery/tooling-feedback-import.ts:403:416
     disposition: keep-with-reason
     reason: intentional shared scaffolding across Phase 11 Wave 5 surfaces (codebase-state metrics computation + gather pattern, LLM judge/auditor library boilerplate, tooling-feedback import + doctor rule scaffolding). Extracting would create cross-surface coupling that hurts more than the duplication costs.
+  - id: e07101e6fd30
+    lines: 11
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/controller/controller-config.ts:54:64
+      - plugins/dw-lifecycle/src/scope-discovery/orchestrator-loop/loop-config.ts:71:81
+    disposition: keep-with-reason
+    reason: "Phase 11 Task 6 scaffolding: orchestrator-loop config shares config-loader boilerplate with sibling Phase 11 libraries by design"
   - id: 457b0a7e316e
     lines: 16
     members:
@@ -632,6 +639,14 @@ clones:
       - plugins/dw-lifecycle/src/scope-discovery/controller/controller-policies.ts:213:228
     disposition: keep-with-reason
     reason: intentional shared scaffolding from Phase 11 Wave 6 (controller library + audit-log parser + cross-surface filter scaffolds share boilerplate). Extracting hurts more than the duplication costs.
+  - id: 5b458e4fbe70
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/controller/controller-state.ts:140:148
+      - plugins/dw-lifecycle/src/scope-discovery/orchestrator-loop/loop-config.ts:52:60
+      - plugins/dw-lifecycle/src/scope-discovery/orchestrator-loop/loop-state.ts:83:91
+    disposition: pending
+    reason: null
   - id: 9a9bc23a9689
     lines: 12
     members:
@@ -677,14 +692,14 @@ clones:
   - id: 3be061e8961a
     lines: 7
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-handlers/loader.ts:137:143
-      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-handlers/loader.ts:174:180
+      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-handlers/loader.ts:148:154
+      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-handlers/loader.ts:185:191
     disposition: keep-with-reason
     reason: intentional shared scaffolding across new scope-discovery surfaces from Wave 3 (migrate-from-pilot CLI shell, pattern-handler test fixtures, dispatcher boilerplate, scope-widen+migrate planning patterns). Extracting would create cross-surface coupling; the duplication is short and intentional.
   - id: 334c25cf2f41
     lines: 8
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-handlers/outlier.ts:142:149
+      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-handlers/outlier.ts:254:261
       - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-handlers/semantic.ts:162:170
     disposition: keep-with-reason
     reason: intentional shared scaffolding across Phase 11 Wave 5 surfaces (codebase-state metrics computation + gather pattern, LLM judge/auditor library boilerplate, tooling-feedback import + doctor rule scaffolding). Extracting would create cross-surface coupling that hurts more than the duplication costs.
@@ -695,20 +710,13 @@ clones:
       - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/prd-themed-pattern-hunter.ts:138:148
     disposition: keep-with-reason
     reason: intentional shared scaffolding across new scope-discovery surfaces from Wave 3 (migrate-from-pilot CLI shell, pattern-handler test fixtures, dispatcher boilerplate, scope-widen+migrate planning patterns). Extracting would create cross-surface coupling; the duplication is short and intentional.
-  - id: ce94eda7ed31
-    lines: 23
+  - id: abc1a741353a
+    lines: 9
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-matrix.ts:149:171
-      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/prd-themed-pattern-hunter.ts:181:200
-    disposition: keep-with-reason
-    reason: intentional shared scaffolding across new scope-discovery surfaces from Wave 3 (migrate-from-pilot CLI shell, pattern-handler test fixtures, dispatcher boilerplate, scope-widen+migrate planning patterns). Extracting would create cross-surface coupling; the duplication is short and intentional.
-  - id: 76e15e6eb177
-    lines: 7
-    members:
-      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-matrix.ts:183:189
-      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/prd-themed-pattern-hunter.ts:234:240
-    disposition: keep-with-reason
-    reason: Tail-end scaffolding of two unrelated discovery agents (pattern-matrix builds the matrix; prd-themed-pattern-hunter wraps the hunter). The 7-line shared shape is each agent's main() runIfMain footer plus throw-on-error guard. Extracting a wrapper would couple unrelated agents through a shared error type.
+      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-matrix.ts:176:184
+      - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/prd-themed-pattern-hunter.ts:181:189
+    disposition: pending
+    reason: null
   - id: 7a91b6f37fe8
     lines: 24
     members:
@@ -738,11 +746,11 @@ clones:
       - plugins/dw-lifecycle/src/scope-discovery/doctor-rules/clones-yaml-schema-violation.ts:44:56
     disposition: pending
     reason: null
-  - id: ca57edf2ddb1
-    lines: 12
+  - id: aa5e05315a32
+    lines: 17
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/escalation/escalation-queue.ts:134:145
-      - plugins/dw-lifecycle/src/scope-discovery/llm/auditor.ts:109:120
+      - plugins/dw-lifecycle/src/scope-discovery/escalation/escalation-queue.ts:134:150
+      - plugins/dw-lifecycle/src/scope-discovery/llm/auditor.ts:109:263
     disposition: pending
     reason: null
   - id: b55096bc507f
@@ -815,13 +823,27 @@ clones:
       - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:226:234
     disposition: pending
     reason: null
+  - id: d063bccc5fe8
+    lines: 10
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/llm/auditor.ts:111:120
+      - plugins/dw-lifecycle/src/scope-discovery/orchestrator-loop/loop-state.ts:244:253
+    disposition: pending
+    reason: null
   - id: 8f81364fec2d
     lines: 13
     members:
       - plugins/dw-lifecycle/src/scope-discovery/migrate-from-pilot.ts:208:220
-      - plugins/dw-lifecycle/src/scope-discovery/scope-widen.ts:242:254
+      - plugins/dw-lifecycle/src/scope-discovery/scope-widen.ts:246:258
     disposition: keep-with-reason
     reason: intentional shared scaffolding across new scope-discovery surfaces from Wave 3 (migrate-from-pilot CLI shell, pattern-handler test fixtures, dispatcher boilerplate, scope-widen+migrate planning patterns). Extracting would create cross-surface coupling; the duplication is short and intentional.
+  - id: 88b682b1224a
+    lines: 10
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/orchestrator-loop/loop-config.ts:54:63
+      - plugins/dw-lifecycle/src/scope-discovery/orchestrator-loop/loop-config.ts:75:84
+    disposition: pending
+    reason: null
   - id: d724eab25113
     lines: 8
     members:
@@ -853,22 +875,22 @@ clones:
   - id: babc9b39137a
     lines: 10
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/scope-inventory.ts:265:274
-      - plugins/dw-lifecycle/src/scope-discovery/scope-widen.ts:242:251
+      - plugins/dw-lifecycle/src/scope-discovery/scope-inventory.ts:269:278
+      - plugins/dw-lifecycle/src/scope-discovery/scope-widen.ts:246:255
     disposition: keep-with-reason
     reason: scope-widen mirrors scope-inventory's CLI-shell boilerplate (slug-regex validation, makeRunDir, scopeWidenMain's parseCli try/catch). Extracting shared helpers would tangle two subcommands' control flow for marginal de-duplication benefit; the symmetry is desirable for operator UX consistency.
   - id: 653e6225d350
     lines: 11
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/scope-inventory.ts:267:277
-      - plugins/dw-lifecycle/src/scope-discovery/synthesis-cli.ts:146:156
+      - plugins/dw-lifecycle/src/scope-discovery/scope-inventory.ts:271:281
+      - plugins/dw-lifecycle/src/scope-discovery/synthesis-cli.ts:150:160
     disposition: pending
     reason: null
   - id: c86cf0b21100
     lines: 11
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/scope-inventory.ts:71:81
-      - plugins/dw-lifecycle/src/scope-discovery/scope-widen.ts:74:84
+      - plugins/dw-lifecycle/src/scope-discovery/scope-inventory.ts:75:85
+      - plugins/dw-lifecycle/src/scope-discovery/scope-widen.ts:78:88
     disposition: keep-with-reason
     reason: scope-widen mirrors scope-inventory's CLI-shell boilerplate (slug-regex validation, makeRunDir, scopeWidenMain's parseCli try/catch). Extracting shared helpers would tangle two subcommands' control flow for marginal de-duplication benefit; the symmetry is desirable for operator UX consistency.
   - id: 0a9bedfbb1cf

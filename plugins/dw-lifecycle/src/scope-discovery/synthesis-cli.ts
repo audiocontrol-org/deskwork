@@ -20,6 +20,10 @@ import type {
 import { isDiscoveryAgentFinding } from './discovery-agents/types.js';
 import type { SynthesisOutput } from './synthesis-types.js';
 import { synthesize } from './synthesis.js';
+import {
+  renderCategorySummaryLine,
+  renderFindingCategoryReport,
+} from './synthesis-report.js';
 import { errorMessage } from './util/typeguards.js';
 
 /**
@@ -197,6 +201,13 @@ export async function main(argv: ReadonlyArray<string>): Promise<number> {
       `findings=${output.metadata.findingsCount}, ` +
       `dedup-savings=${output.metadata.dedupCount})\n`,
   );
+  // Phase 11 Task 12 — surface the inventory-vs-discovery category
+  // summary alongside the existing "wrote ..." line so the standalone
+  // CLI matches the orchestrating scope-inventory subcommand's stderr
+  // contract. The full breakdown lives in --notes-out.
+  process.stderr.write(
+    `synthesis: ${renderCategorySummaryLine(output.manifest)}\n`,
+  );
   for (const w of output.metadata.warnings) {
     process.stderr.write(`synthesis: note: ${w}\n`);
   }
@@ -206,7 +217,16 @@ export async function main(argv: ReadonlyArray<string>): Promise<number> {
       : resolve(opts.repoRoot, opts.notesOutPath);
     try {
       await mkdir(dirname(notesAbs), { recursive: true });
-      await writeFile(notesAbs, renderSynthesizerNotes(output.metadata.warnings), 'utf8');
+      // Phase 11 Task 12 — splice the inventory-vs-discovery category
+      // report BEFORE the synthesizer notes so the operator's first read
+      // of the notes file sees the category distinction.
+      const categoryReport = renderFindingCategoryReport(output.manifest);
+      const synthesizerNotes = renderSynthesizerNotes(output.metadata.warnings);
+      await writeFile(
+        notesAbs,
+        `${categoryReport}\n${synthesizerNotes}`,
+        'utf8',
+      );
     } catch (err) {
       process.stderr.write(`synthesis: notes write failed: ${errorMessage(err)}\n`);
       return 2;

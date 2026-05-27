@@ -9,6 +9,16 @@ Mid-implementation, the operator notices the original `scope-inventory` missed a
 
 Default behavior is DRY-RUN: the delta is printed + an evidence trail is written, but the existing `scope-manifest.yaml` is NOT touched. Pass `--apply` to merge the delta into the manifest.
 
+## Inventory vs. discovery — same split as scope-inventory
+
+scope-widen runs the SAME agent fleet as `/dw-lifecycle:scope-inventory`, so the same inventory-vs-discovery distinction applies to the delta:
+
+- **Registered-pattern matches in the delta** = the original scan saw the same registry entries, but the complaint widened the in-scope module set so additional files matched. Provenance is `registered-pattern`; `status_provenance.provenance_source` is `operator-authored` / `install-seed`.
+- **Discovered candidates in the delta** = the orchestrator-agent's mediation layer surfaced an architectural-scale candidate cluster that the original scan didn't produce (typically because the complaint shifted the PRD's thematic vocabulary). Entries land under `discovered_candidates:` in the new manifest.
+- **Novel-shape candidates in the delta** = per-handler findings (`negative-space`, `outlier`, `coverage-gap`, `semantic`) flagging shapes not in the registered catalog. Provenance tags are non-`registered-pattern`.
+
+Treat a non-empty `discovered_candidates:` delta or a non-zero `candidate_count` shift the same way you treat them on a first scope-inventory run: triage the candidates before promoting them via `--apply`. A zero delta against registered patterns is NOT a green light when novel-shape findings appeared.
+
 ## Steps
 
 1. Confirm the feature `slug` and the complaint text. The complaint must be quoted on the shell — it's a single positional argument.
@@ -31,7 +41,7 @@ The helper:
    - With `--apply`, merges the delta into the prior manifest and writes the merged YAML back. The merge is purely additive: pre-existing entries are preserved verbatim; the manifest's `generated_by` (e.g. `curated`) stays whatever the operator left it. The `regime_holdouts.meta` counts are recomputed from the merged section lengths.
 
 4. Emit the evidence trail under `docs/<v>/001-IN-PROGRESS/<slug>/scope-inventory/widen-runs/<stamp>-<runId>/` containing the complaint text, the augmented PRD, per-agent JSONs, the synthesizer notes, the new manifest, and the delta JSON.
-5. Report: the delta summary (per-section addition counts), the evidence-trail path, whether `--apply` ran, and any synthesizer warnings.
+5. Report: the delta summary (per-section addition counts, split into registered-pattern vs. novel-candidate buckets), the evidence-trail path, whether `--apply` ran, and any synthesizer warnings.
 
 ## Flags
 
@@ -62,3 +72,5 @@ Use scope-widen when the operator notices, mid-implementation, that the original
 Run with the default dry-run mode first to inspect the delta. The delta surfaces under the per-run evidence directory as `delta.json`; review it before re-running with `--apply` to merge into the manifest. If the delta is noisy (false positives from the PRD-themed tokenizer picking up complaint words that aren't really new surfaces), refine the complaint phrasing and re-run; the merge is non-destructive (the prior manifest is unchanged in dry-run).
 
 Do NOT use scope-widen to RESTART discovery from scratch — that's `/dw-lifecycle:scope-inventory`. scope-widen is purely additive; it never removes entries the operator curated. If the prior manifest needs to be rebuilt, delete it and re-run scope-inventory.
+
+When the delta contains novel-shape candidates (non-`registered-pattern` provenance, or non-empty `discovered_candidates:` delta), prefer triaging those into the catalog (via `/dw-lifecycle:implement`'s mediation flow or hand-edits) BEFORE running with `--apply` — otherwise the merged manifest will carry the candidates without an operator disposition, and subsequent runs will keep re-surfacing them.

@@ -9,6 +9,14 @@ Gate the source tree against `.dw-lifecycle/scope-discovery/anti-patterns.yaml` 
 
 Default mode is INFORMATIONAL (findings → stdout report, exit 0). `--gate-mode` flips the exit-code contract for pre-commit-hook wiring (findings → exit 1 → commit fails).
 
+## This is the REGISTERED-PATTERN inventory check
+
+`check-anti-patterns` is a pure **inventory** verb — it matches against the catalog the operator (or `install-seed`) authored. A green run means "no source-tree match against the things you registered in `anti-patterns.yaml`." It says nothing about novel anti-patterns the catalog doesn't yet describe.
+
+To find NOVEL anti-patterns (shapes that aren't in the registered catalog), run `/dw-lifecycle:scope-inventory <slug>` — that skill invokes the discovery layer (negative-space + coverage + outlier + semantic handlers + the synthesis-layer unmatched-shape clustering pass) alongside the registered-pattern scanners, and surfaces novel candidates under `discovered_candidates:` on the resulting manifest. The operator-trust failure mode this distinction closes: *"a green check-anti-patterns run read as evidence of no anti-patterns, when it's really evidence of no already-registered matches."*
+
+The runtime distinction is visible in the manifest: registered-pattern findings carry `provenance: 'registered-pattern'` and `status_provenance.provenance_source: operator-authored` / `install-seed`; discovery findings carry one of `negative-space` / `coverage-gap` / `outlier` / `semantic` / `discovered-candidate` provenance tags. See [`discovery-agents/README.md`](../../src/scope-discovery/discovery-agents/README.md) (in the plugin source) for the full agent fleet split.
+
 ## Steps
 
 1. Confirm the project has populated `.dw-lifecycle/scope-discovery/anti-patterns.yaml`. An empty registry is a healthy no-op; the scanner reports zero findings and exits 0.
@@ -50,3 +58,5 @@ The helper:
 ## When to use
 
 Run check-anti-patterns at three moments: (1) as a pre-commit gate via `--gate-mode` on staged `.ts` / `.tsx` changes so newly-introduced legacy shapes never land; (2) as an ad-hoc audit when authoring a refactor PR — does the project still contain the shape this PR is retiring? (3) as an input to `/dw-lifecycle:scope-inventory` synthesis (the pattern-matrix universal agent consumes this registry to flag PRD-themed surfaces that still carry the legacy shape). Pairs with `/dw-lifecycle:check-adopters` for the inverse question: who SHOULD use the canonical primitive but doesn't?
+
+**When a green run is NOT enough.** If the project is suspecting an undocumented anti-pattern (no catalog entry yet), check-anti-patterns will NOT find it — by design. Run `/dw-lifecycle:scope-inventory <slug>` to invoke the discovery layer and review `discovered_candidates:` in the resulting manifest. Promote novel candidates into `anti-patterns.yaml` (status: `cursed`) and re-run check-anti-patterns to enforce.
