@@ -681,7 +681,188 @@
   }
   .swim-stub:hover .ss-action { color: var(--red); }
 
-  /* Compose FAB */
+  /* ===== Compose Card — opens when the operator clicks the FAB =====
+     Anchored to bottom-right on desktop (where the FAB lives); a bottom
+     sheet on mobile. Per THESIS Consequence 2 ("the operator's
+     slash-command invocation IS the action"), the card constructs a
+     /deskwork:add invocation as the operator types and clipboard-copies
+     it on confirm. The studio never mutates state directly; the card is
+     a clipboard-copy convenience that also teaches the CLI shape. */
+  .compose-card {
+    position: absolute;
+    right: 1rem; bottom: 1rem;
+    width: 360px;
+    background: var(--paper);
+    border: 1px solid var(--paper-3);
+    border-top: 3px solid var(--red);
+    box-shadow:
+      0 24px 48px rgba(0,0,0,0.18),
+      0 4px 12px rgba(0,0,0,0.08);
+    z-index: 50;
+    display: flex; flex-direction: column;
+    font-family: var(--display);
+  }
+  .compose-card .cc-head {
+    display: flex; align-items: baseline; gap: 0.6rem;
+    padding: 0.85rem 1rem 0.6rem;
+    border-bottom: 1px dashed var(--paper-3);
+  }
+  .compose-card .cc-kicker {
+    font-family: var(--mono); font-size: 0.6rem;
+    letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--red);
+  }
+  .compose-card .cc-title {
+    font-family: var(--display); font-style: italic;
+    font-size: 1.15rem;
+    font-variation-settings: "opsz" 24, "wght" 500;
+  }
+  .compose-card .cc-close {
+    margin-left: auto;
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 28px; min-height: 28px;
+    font-family: var(--mono); font-size: 1.1rem; color: var(--ink-soft);
+    background: transparent; border: none;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: color 0.12s ease, background 0.12s ease;
+  }
+  .compose-card .cc-close:hover {
+    color: var(--red); background: rgba(184, 54, 42, 0.08);
+  }
+  .compose-card .cc-close:focus-visible {
+    outline: 2px solid var(--blue); outline-offset: 1px;
+  }
+  .compose-card .cc-body {
+    padding: 0.7rem 1rem 0.9rem;
+    display: flex; flex-direction: column; gap: 0.7rem;
+  }
+  .compose-card .cc-field {
+    display: flex; flex-direction: column; gap: 0.35rem;
+  }
+  .compose-card .cc-label {
+    font-family: var(--mono); font-size: 0.58rem;
+    letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--faded);
+  }
+  .compose-card .cc-chips {
+    display: flex; flex-wrap: wrap; gap: 0.25rem;
+  }
+  .compose-card .cc-chip {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    min-height: 26px;
+    padding: 0.3rem 0.55rem;
+    background: var(--paper-2);
+    border: 1px solid var(--paper-3);
+    border-radius: 99px;
+    font-family: var(--display); font-style: italic; font-size: 0.82rem;
+    color: var(--ink-soft);
+    cursor: pointer;
+  }
+  .compose-card .cc-chip:hover { background: var(--paper); border-color: var(--ink-soft); }
+  .compose-card .cc-chip:focus-visible {
+    outline: 2px solid var(--blue); outline-offset: 1px;
+  }
+  .compose-card .cc-chip.active {
+    background: var(--ink); color: var(--paper); border-color: var(--ink);
+  }
+  .compose-card .cc-chip .cc-chip-glyph {
+    font-family: var(--display); font-style: italic;
+  }
+  /* Slug input — feels like writing on a slug-line; mono font, single
+     underline rule rather than a box-border. */
+  .compose-card .cc-slug-wrap {
+    position: relative;
+    border-bottom: 1px solid var(--ink-soft);
+    padding: 0.25rem 0;
+  }
+  .compose-card .cc-slug {
+    width: 100%;
+    border: none; outline: none; background: transparent;
+    font-family: var(--mono); font-size: 1rem;
+    color: var(--ink); letter-spacing: 0.01em;
+    padding: 0.25rem 0;
+  }
+  .compose-card .cc-slug::placeholder {
+    color: var(--faded); font-style: italic;
+  }
+  .compose-card .cc-slug-wrap:focus-within {
+    border-bottom-color: var(--red);
+    border-bottom-width: 2px;
+    padding-bottom: calc(0.25rem - 1px);
+  }
+  .compose-card .cc-slug-hint {
+    font-family: var(--mono); font-size: 0.6rem;
+    color: var(--faded); letter-spacing: 0.1em;
+    margin-top: 0.2rem;
+  }
+  /* Command preview — terminal-card aesthetic; the slash-command
+     constructed live from the form state. */
+  .compose-card .cc-preview {
+    background: var(--ink); color: var(--paper);
+    padding: 0.6rem 0.7rem;
+    font-family: var(--mono); font-size: 0.72rem;
+    line-height: 1.55;
+    border-radius: 2px;
+    overflow-x: auto;
+    white-space: pre;
+    box-shadow: inset 0 1px 0 rgba(245,241,232,0.06);
+  }
+  .compose-card .cc-preview .cc-prompt { color: var(--faded-2); }
+  .compose-card .cc-preview .cc-cmd { color: var(--paper); }
+  .compose-card .cc-preview .cc-flag { color: #FAEABF; }
+  .compose-card .cc-preview .cc-val { color: var(--paper); }
+  .compose-card .cc-foot {
+    padding: 0.7rem 1rem 1rem;
+    display: flex; align-items: center; gap: 0.6rem;
+    border-top: 1px dashed var(--paper-3);
+  }
+  .compose-card .cc-copy {
+    flex: 1;
+    display: inline-flex; align-items: center; justify-content: center;
+    gap: 0.5rem;
+    min-height: 40px;
+    padding: 0.65rem 0.9rem;
+    background: var(--red); color: var(--paper);
+    border: none; border-radius: 2px;
+    font-family: var(--mono); font-size: 0.7rem;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    cursor: pointer;
+  }
+  .compose-card .cc-copy:hover { background: #9c2d22; }
+  .compose-card .cc-copy:focus-visible {
+    outline: 2px solid var(--blue); outline-offset: 2px;
+  }
+  .compose-card .cc-shortcut {
+    font-family: var(--mono); font-size: 0.6rem;
+    color: var(--faded); letter-spacing: 0.1em;
+  }
+  .compose-card .cc-shortcut kbd {
+    font-family: var(--mono); font-size: 0.62rem;
+    padding: 0.1rem 0.35rem;
+    border: 1px solid var(--paper-3); background: var(--paper-2);
+    border-radius: 2px;
+    color: var(--ink-soft);
+    letter-spacing: 0;
+  }
+  /* Subtle backdrop dim — focuses attention on the card. CSS-only;
+     would be a click-out-to-dismiss target in production. */
+  .compose-backdrop {
+    position: absolute; inset: 0;
+    background: rgba(20, 17, 14, 0.18);
+    z-index: 40;
+  }
+  /* Mobile: bottom sheet rather than corner popover. */
+  .phone .compose-card {
+    width: auto;
+    right: 0; bottom: 0; left: 0;
+    border: none;
+    border-top: 3px solid var(--red);
+    border-radius: 12px 12px 0 0;
+    z-index: 50;
+  }
+
+  /* ===== Compose FAB ===== */
   .compose-fab {
     position: absolute; right: 1rem; bottom: 1rem;
     min-height: 44px;
@@ -893,8 +1074,8 @@
 </head>
 <body>
   <div class="meta">Direction 3 · <a href="./index.html">↩ all directions</a></div>
-  <h1 class="demo-title">Press Bay <span style="font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.2em; color: var(--green); margin-left: 0.5rem; vertical-align: middle;">v9 · FULL ACCESSIBILITY PASS</span></h1>
-  <div class="demo-sub">Every interactive affordance (chevrons, ⋮ overflows, view toggle, focus chips, saved-view pills, lane rail rows, mobile rail trigger, compose FAB, swim stubs) now meets WCAG 2.2 AA target size, WCAG 2.1 AA non-text contrast + focus visibility, and carries keyboard semantics (role/tabindex/aria-* where applicable).</div>
+  <h1 class="demo-title">Press Bay <span style="font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.2em; color: var(--green); margin-left: 0.5rem; vertical-align: middle;">v10 · COMPOSE FLOW</span></h1>
+  <div class="demo-sub">Clicking + Compose opens a Compose Card (popover on desktop, bottom sheet on mobile) with lane + slug + stage fields and a live /deskwork:add command preview. Primary action clipboard-copies the slash-command — studio doesn't mutate state directly per THESIS Consequence 2.</div>
 
   <div class="deviation-note">
     <span class="label">Standards-compliant</span> Two granularities of collapse, each with its own chevron: <strong>lane-level</strong> (chevron in swim-head / lane-head) hides the entire lane body, leaves the swim-head + a compact per-stage count strip; <strong>stage-level</strong> (chevron in stage-head for kanban / lb-group-head for list) hides one stage's content within an expanded lane. In kanban, collapsed columns shrink to a narrow vertical strip (~42px wide) with the stage name rotated; remaining columns redistribute via flex to fill the freed space. In list, collapsed groups show just the group-head (with the entry count + tag) and hide their rows. Mockup demonstrates: Editorial swim has <strong>Published collapsed as a vertical strip</strong>; Press Releases list has <strong>Published collapsed as a head-only row</strong>; mobile Editorial list has <strong>Planned collapsed</strong>. The collapse-chev convention is universal — same `▾` glyph rotated 90° clockwise to indicate collapsed, same hover-to-red-pencil affordance, click anywhere on the head (or chevron) to toggle.<br><br>
@@ -1231,9 +1412,57 @@
             </article>
           </main>
         </div>
-        <button class="compose-fab">+ Compose</button>
+        <!-- Compose Card OPEN STATE — appears after clicking the + Compose
+             FAB. The FAB is hidden while the card is open; backdrop dims
+             the dashboard to focus attention. Per THESIS Consequence 2,
+             the card constructs a /deskwork:add invocation and the
+             primary action clipboard-copies it. -->
+        <div class="compose-backdrop" aria-hidden="true"></div>
+        <div class="compose-card" role="dialog" aria-label="Compose new entry">
+          <div class="cc-head">
+            <div>
+              <div class="cc-kicker">Compose</div>
+              <div class="cc-title">Set a new slug</div>
+            </div>
+            <button class="cc-close" type="button" aria-label="Close compose card">×</button>
+          </div>
+          <div class="cc-body">
+            <div class="cc-field">
+              <div class="cc-label">Lane</div>
+              <div class="cc-chips">
+                <button class="cc-chip active" type="button"><span class="cc-chip-glyph">§</span><span>Editorial</span></button>
+                <button class="cc-chip" type="button"><span class="cc-chip-glyph">◆</span><span>Mockups</span></button>
+                <button class="cc-chip" type="button"><span class="cc-chip-glyph">⊕</span><span>QA</span></button>
+                <button class="cc-chip" type="button"><span class="cc-chip-glyph" style="color: var(--kraft);">⌘</span><span>Press</span></button>
+              </div>
+            </div>
+            <div class="cc-field">
+              <div class="cc-label">Slug</div>
+              <div class="cc-slug-wrap">
+                <input class="cc-slug" type="text" value="multi-lane-retrospective" aria-label="Entry slug">
+              </div>
+              <div class="cc-slug-hint">kebab-case · ASCII only · unique within the lane</div>
+            </div>
+            <div class="cc-field">
+              <div class="cc-label">Initial stage <span style="text-transform: none; letter-spacing: 0; color: var(--faded);">(editorial template)</span></div>
+              <div class="cc-chips">
+                <button class="cc-chip active" type="button"><span class="cc-chip-glyph">◇</span><span>Ideas</span></button>
+                <button class="cc-chip" type="button"><span class="cc-chip-glyph">§</span><span>Planned</span></button>
+                <button class="cc-chip" type="button"><span class="cc-chip-glyph">⊹</span><span>Outlining</span></button>
+                <button class="cc-chip" type="button"><span class="cc-chip-glyph">✎</span><span>Drafting</span></button>
+              </div>
+            </div>
+            <div class="cc-preview" aria-label="Slash-command preview"><span class="cc-prompt">$ </span><span class="cc-cmd">/deskwork:add</span> <span class="cc-val">multi-lane-retrospective</span> \
+  <span class="cc-flag">--lane</span> <span class="cc-val">editorial</span> \
+  <span class="cc-flag">--stage</span> <span class="cc-val">Ideas</span></div>
+          </div>
+          <div class="cc-foot">
+            <button class="cc-copy" type="button">Copy /deskwork:add command</button>
+            <span class="cc-shortcut"><kbd>↩</kbd> to copy</span>
+          </div>
+        </div>
       </div>
-      <div class="caption">Desktop · 1280px · entire press bay visible at once; each lane's column count is template-driven</div>
+      <div class="caption">Desktop · after clicking the + Compose FAB · card anchors to bottom-right; live /deskwork:add preview updates as the operator types; "Copy" clipboard-copies the command per THESIS Consequence 2</div>
     </div>
 
     <!-- MOBILE -->
@@ -1390,10 +1619,52 @@
             </section>
           </div>
 
-          <button class="compose-fab">+ Compose</button>
+          <!-- Compose Card on mobile = bottom sheet -->
+          <div class="compose-backdrop" aria-hidden="true"></div>
+          <div class="compose-card" role="dialog" aria-label="Compose new entry">
+            <div class="cc-head">
+              <div>
+                <div class="cc-kicker">Compose</div>
+                <div class="cc-title">Set a new slug</div>
+              </div>
+              <button class="cc-close" type="button" aria-label="Close compose card">×</button>
+            </div>
+            <div class="cc-body">
+              <div class="cc-field">
+                <div class="cc-label">Lane</div>
+                <div class="cc-chips">
+                  <button class="cc-chip active" type="button"><span class="cc-chip-glyph">§</span><span>Editorial</span></button>
+                  <button class="cc-chip" type="button"><span class="cc-chip-glyph">◆</span><span>Mockups</span></button>
+                  <button class="cc-chip" type="button"><span class="cc-chip-glyph">⊕</span><span>QA</span></button>
+                  <button class="cc-chip" type="button"><span class="cc-chip-glyph" style="color: var(--kraft);">⌘</span><span>Press</span></button>
+                </div>
+              </div>
+              <div class="cc-field">
+                <div class="cc-label">Slug</div>
+                <div class="cc-slug-wrap">
+                  <input class="cc-slug" type="text" value="multi-lane-retrospective" aria-label="Entry slug">
+                </div>
+                <div class="cc-slug-hint">kebab-case · ASCII only</div>
+              </div>
+              <div class="cc-field">
+                <div class="cc-label">Initial stage</div>
+                <div class="cc-chips">
+                  <button class="cc-chip active" type="button"><span class="cc-chip-glyph">◇</span><span>Ideas</span></button>
+                  <button class="cc-chip" type="button"><span class="cc-chip-glyph">§</span><span>Planned</span></button>
+                  <button class="cc-chip" type="button"><span class="cc-chip-glyph">⊹</span><span>Outline</span></button>
+                </div>
+              </div>
+              <div class="cc-preview" aria-label="Slash-command preview"><span class="cc-prompt">$ </span><span class="cc-cmd">/deskwork:add</span> <span class="cc-val">multi-lane-retrospective</span> \
+  <span class="cc-flag">--lane</span> <span class="cc-val">editorial</span> \
+  <span class="cc-flag">--stage</span> <span class="cc-val">Ideas</span></div>
+            </div>
+            <div class="cc-foot">
+              <button class="cc-copy" type="button">Copy /deskwork:add</button>
+            </div>
+          </div>
         </div>
       </div>
-      <div class="caption">Mobile · iPhone 13 · Editorial defaults to list view (the linear mobile-natural fit); Press Releases shown in kanban tile view (single-column vertical stack per v0.19 standards) to demo the toggle. Both views preserve linear stage sequence top-to-bottom.</div>
+      <div class="caption">Mobile · after tapping + Compose · bottom sheet slides up; same fields stacked vertically; "Copy" clipboard-copies the slash-command for paste-in-chat</div>
     </div>
 
   </div>
