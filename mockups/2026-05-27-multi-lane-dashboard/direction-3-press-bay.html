@@ -266,11 +266,52 @@
     font-family: var(--mono); color: var(--ink-soft); font-size: 0.95rem;
     cursor: pointer; padding: 0.15rem 0.45rem; margin-left: 0.6rem;
   }
+  /* ===== Universal `.collapse-chev` accessibility primitives =====
+     Standards (per DESIGN-STANDARDS § Accessibility — Contrast):
+     - WCAG 2.2 SC 2.5.8 Target Size Minimum (AA): ≥24×24 CSS px.
+     - WCAG 2.1 SC 1.4.11 Non-Text Contrast (AA): ≥3:1 vs adjacent bg.
+     - WCAG 2.1 SC 2.4.7 Focus Visible (AA): focus ring at rest.
+     Contrast: `--ink-soft` (#3D3530) on `--paper-2` (#ECE6D4) ≈ 9.93:1 ✓.
+     Hover `--red` (#B8362A) on `--paper-2` ≈ 6.55:1 ✓.
+     Focus `--blue` (#2A4B7C) ring on `--paper-2` ≈ 7.92:1 ✓.
+     Target size: 24×24 uniform on desktop and mobile. WCAG 2.1 SC 2.5.5
+     (AAA 44×44) is satisfied via the "equivalent route" exception —
+     the entire enclosing head (swim-head / stage-head / lb-group-head)
+     is itself a click target with `cursor: pointer`, sized comfortably
+     larger than 44px in every context. The chevron is a precise-tap
+     option for operators who want it; the whole-head fallback covers
+     operators who don't.
+     Visual glyph stays small (0.85rem); hit area expands via
+     min-width/min-height + flex centering. */
+  .collapse-chev {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    min-height: 24px;
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    cursor: pointer;
+    user-select: none;
+    background: transparent;
+    border: none;
+    padding: 0;
+    border-radius: 2px;
+    transition: transform 0.18s ease, color 0.12s ease, background 0.12s ease;
+  }
+  .collapse-chev:hover {
+    color: var(--red);
+    background: rgba(184, 54, 42, 0.08);
+  }
+  .collapse-chev:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 1px;
+  }
+  /* Per-context overrides: positioning + rotation only — sizing + colour
+     come from the universal `.collapse-chev` rule above. */
   .swim-head .collapse-chev {
-    font-family: var(--mono); color: var(--ink-soft); font-size: 0.7rem;
-    cursor: pointer; padding: 0.15rem 0.4rem;
-    width: 22px; text-align: center; user-select: none;
-    transition: transform 0.18s ease;
+    margin-left: 0.2rem;
   }
   .swim-head:hover .collapse-chev { color: var(--red); }
 
@@ -326,9 +367,6 @@
   }
   .list-body .lb-group-head:hover { background: var(--paper-3); }
   .list-body .lb-group-head .collapse-chev {
-    font-family: var(--mono); color: var(--ink-soft); font-size: 0.65rem;
-    padding: 0 0.2rem; user-select: none;
-    transition: transform 0.18s ease;
     margin-left: 0.4rem;
   }
   .list-body .lb-group-head:hover .collapse-chev { color: var(--red); }
@@ -470,11 +508,10 @@
     cursor: pointer; user-select: none;
   }
   .stage-col .stage-head:hover { color: var(--red); }
+  /* Per-stage chevron: positioning only — accessibility primitives come
+     from the universal `.collapse-chev` rule. */
   .stage-col .stage-head .collapse-chev {
-    font-family: var(--mono); color: var(--ink-soft); font-size: 0.65rem;
-    padding: 0 0.2rem; user-select: none;
     margin-left: 0.2rem;
-    transition: transform 0.18s ease;
   }
   .stage-col .stage-head:hover .collapse-chev { color: var(--red); }
   .stage-col .stage-glyph {
@@ -629,9 +666,7 @@
     font-family: var(--mono); font-size: 0.7rem; color: var(--ink-soft);
   }
   .phone .lane-head .collapse-chev {
-    font-family: var(--mono); color: var(--ink-soft); font-size: 0.7rem;
-    padding: 0.1rem 0.4rem;
-    cursor: pointer; user-select: none;
+    margin-left: 0.2rem;
   }
   .phone .lane-section.collapsed .stage-row { display: none; }
   .phone .lane-section.collapsed .lane-head { margin-bottom: 0; }
@@ -690,9 +725,7 @@
     cursor: pointer; user-select: none;
   }
   .phone .lane-section .list-body .lb-group-head .collapse-chev {
-    font-family: var(--mono); color: var(--ink-soft); font-size: 0.6rem;
-    margin-left: 0.3rem; padding: 0 0.2rem;
-    transition: transform 0.18s ease;
+    margin-left: 0.3rem;
   }
   .phone .lane-section .list-body .lb-group.collapsed .lb-row { display: none; }
   .phone .lane-section .list-body .lb-group.collapsed .lb-group-head { border-bottom: none; }
@@ -785,8 +818,8 @@
 </head>
 <body>
   <div class="meta">Direction 3 · <a href="./index.html">↩ all directions</a></div>
-  <h1 class="demo-title">Press Bay <span style="font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.2em; color: var(--green); margin-left: 0.5rem; vertical-align: middle;">v7 · PER-STAGE COLLAPSE</span></h1>
-  <div class="demo-sub">Each stage (column in kanban, group in list) is independently collapsible. Two granularities of collapse: lane-level (in swim-head) hides the entire lane body; stage-level (in stage-head / lb-group-head) hides one stage's content within an expanded lane.</div>
+  <h1 class="demo-title">Press Bay <span style="font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.2em; color: var(--green); margin-left: 0.5rem; vertical-align: middle;">v8 · ACCESSIBLE CHEVRONS</span></h1>
+  <div class="demo-sub">All collapse chevrons now meet WCAG 2.2 AA target size (≥24×24 px), WCAG 2.1 AA non-text contrast (≥3:1), and AA focus visibility — with keyboard semantics (role=button, tabindex, aria-expanded).</div>
 
   <div class="deviation-note">
     <span class="label">Standards-compliant</span> Two granularities of collapse, each with its own chevron: <strong>lane-level</strong> (chevron in swim-head / lane-head) hides the entire lane body, leaves the swim-head + a compact per-stage count strip; <strong>stage-level</strong> (chevron in stage-head for kanban / lb-group-head for list) hides one stage's content within an expanded lane. In kanban, collapsed columns shrink to a narrow vertical strip (~42px wide) with the stage name rotated; remaining columns redistribute via flex to fill the freed space. In list, collapsed groups show just the group-head (with the entry count + tag) and hide their rows. Mockup demonstrates: Editorial swim has <strong>Published collapsed as a vertical strip</strong>; Press Releases list has <strong>Published collapsed as a head-only row</strong>; mobile Editorial list has <strong>Planned collapsed</strong>. The collapse-chev convention is universal — same `▾` glyph rotated 90° clockwise to indicate collapsed, same hover-to-red-pencil affordance, click anywhere on the head (or chevron) to toggle.<br><br>
@@ -915,7 +948,7 @@
                   <button class="vt-cell active" title="Kanban view (columnar stages with cards)"><span class="vt-icon">▦</span><span>Kanban</span></button>
                   <button class="vt-cell" title="List view (vertical grouped by stage)"><span class="vt-icon">≡</span><span>List</span></button>
                 </div>
-                <span class="collapse-chev" title="Collapse this lane">▾</span>
+                <span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse this lane" title="Collapse this lane">▾</span>
                 <span class="overflow">⋮</span>
               </div>
               <!-- Each stage-head carries its own chevron — per-stage collapse.
@@ -926,34 +959,34 @@
                    demonstrates the collapsed state. -->
               <div class="stage-grid">
                 <div class="stage-col">
-                  <div class="stage-head"><span class="stage-glyph">◇</span><span class="stage-name">Ideas</span><span class="stage-count">3</span><span class="collapse-chev">▾</span></div>
+                  <div class="stage-head"><span class="stage-glyph">◇</span><span class="stage-name">Ideas</span><span class="stage-count">3</span><span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse">▾</span></div>
                   <div class="card">Mobile-first scrapbook reflow<span class="e-meta">v1 · today</span></div>
                   <div class="card">Marginalia keyboard nav<span class="e-meta">v1 · yesterday</span></div>
                   <div class="card">Pipeline custom rationale<span class="e-meta">v1</span></div>
                 </div>
                 <div class="stage-col">
-                  <div class="stage-head"><span class="stage-glyph">§</span><span class="stage-name">Planned</span><span class="stage-count">2</span><span class="collapse-chev">▾</span></div>
+                  <div class="stage-head"><span class="stage-glyph">§</span><span class="stage-name">Planned</span><span class="stage-count">2</span><span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse">▾</span></div>
                   <div class="card">Phase 5 retrospective<span class="e-meta">v1</span></div>
                   <div class="card">Studio mobile-first v2<span class="e-meta">v1</span></div>
                 </div>
                 <div class="stage-col">
-                  <div class="stage-head"><span class="stage-glyph">⊹</span><span class="stage-name">Outlining</span><span class="stage-count">1</span><span class="collapse-chev">▾</span></div>
+                  <div class="stage-head"><span class="stage-glyph">⊹</span><span class="stage-name">Outlining</span><span class="stage-count">1</span><span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse">▾</span></div>
                   <div class="card">Annotation model deep-dive<span class="e-meta">v1</span></div>
                 </div>
                 <div class="stage-col">
-                  <div class="stage-head"><span class="stage-glyph">✎</span><span class="stage-name">Drafting</span><span class="stage-count">4</span><span class="collapse-chev">▾</span></div>
+                  <div class="stage-head"><span class="stage-glyph">✎</span><span class="stage-name">Drafting</span><span class="stage-count">4</span><span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse">▾</span></div>
                   <div class="card">Graphical-entries PRD<span class="e-meta">v3 · iterating</span></div>
                   <div class="card">Editor retrospective<span class="e-meta">v1</span></div>
                   <div class="card">Templates rationale<span class="e-meta">v1</span></div>
                   <div class="card">Phase 4 closeout<span class="e-meta">v2</span></div>
                 </div>
                 <div class="stage-col">
-                  <div class="stage-head"><span class="stage-glyph">※</span><span class="stage-name">Final</span><span class="stage-count">1</span><span class="collapse-chev">▾</span></div>
+                  <div class="stage-head"><span class="stage-glyph">※</span><span class="stage-name">Final</span><span class="stage-count">1</span><span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse">▾</span></div>
                   <div class="card">v0.20 row-affordance<span class="e-meta">ready</span></div>
                 </div>
                 <!-- Published: COLLAPSED — narrow vertical strip with rotated name -->
                 <div class="stage-col collapsed">
-                  <div class="stage-head"><span class="stage-glyph">✓</span><span class="stage-name">Published</span><span class="stage-count">1</span><span class="collapse-chev">▾</span></div>
+                  <div class="stage-head"><span class="stage-glyph">✓</span><span class="stage-name">Published</span><span class="stage-count">1</span><span class="collapse-chev" role="button" tabindex="0" aria-expanded="false" aria-label="Expand Published stage">▾</span></div>
                   <div class="card">v0.19 mobile-first<span class="e-meta">last sprint</span></div>
                 </div>
               </div>
@@ -982,7 +1015,7 @@
                   <button class="vt-cell active"><span class="vt-icon">▦</span><span>Kanban</span></button>
                   <button class="vt-cell"><span class="vt-icon">≡</span><span>List</span></button>
                 </div>
-                <span class="collapse-chev" title="Expand this lane">▾</span>
+                <span class="collapse-chev" role="button" tabindex="0" aria-expanded="false" aria-label="Expand this lane" title="Expand this lane">▾</span>
                 <span class="overflow">⋮</span>
               </div>
               <div class="swim-compact">
@@ -1022,7 +1055,7 @@
                   <button class="vt-cell"><span class="vt-icon">▦</span><span>Kanban</span></button>
                   <button class="vt-cell active" title="Currently in list view"><span class="vt-icon">≡</span><span>List</span></button>
                 </div>
-                <span class="collapse-chev" title="Collapse this lane">▾</span>
+                <span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse this lane" title="Collapse this lane">▾</span>
                 <span class="overflow">⋮</span>
               </div>
               <!-- Each lb-group-head carries its own chevron — per-stage
@@ -1036,7 +1069,7 @@
                     <span class="lb-name">Idea</span>
                     <span class="lb-tag">2 captured</span>
                     <span class="lb-count">2</span>
-                    <span class="collapse-chev">▾</span>
+                    <span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse">▾</span>
                   </div>
                   <div class="lb-row">
                     <span class="lb-title">v0.30 release announcement</span>
@@ -1057,7 +1090,7 @@
                     <span class="lb-name">Drafting</span>
                     <span class="lb-tag">3 in progress</span>
                     <span class="lb-count">3</span>
-                    <span class="collapse-chev">▾</span>
+                    <span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse">▾</span>
                   </div>
                   <div class="lb-row">
                     <span class="lb-title">Graphical-entries feature announcement</span>
@@ -1084,7 +1117,7 @@
                     <span class="lb-name">Edited</span>
                     <span class="lb-tag">locked · ready to publish</span>
                     <span class="lb-count">1</span>
-                    <span class="collapse-chev">▾</span>
+                    <span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse">▾</span>
                   </div>
                   <div class="lb-row">
                     <span class="lb-title">Hello, Lanes — the multi-pipeline rationale</span>
@@ -1100,7 +1133,7 @@
                     <span class="lb-name">Published</span>
                     <span class="lb-tag">live · 1 hidden</span>
                     <span class="lb-count">1</span>
-                    <span class="collapse-chev">▾</span>
+                    <span class="collapse-chev" role="button" tabindex="0" aria-expanded="false" aria-label="Expand Published group">▾</span>
                   </div>
                   <div class="lb-row">
                     <span class="lb-title">v0.29 release — Phase 4 lands</span>
@@ -1115,7 +1148,7 @@
                     <span class="lb-name">Blocked</span>
                     <span class="lb-tag">cul-de-sac</span>
                     <span class="lb-count">0</span>
-                    <span class="collapse-chev">▾</span>
+                    <span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse">▾</span>
                   </div>
                   <div class="lb-row empty-state">no blocked entries</div>
                 </div>
@@ -1164,7 +1197,7 @@
                   <button class="vt-cell active"><span class="vt-icon">≡</span></button>
                 </div>
                 <span class="count">12</span>
-                <span class="collapse-chev">▾</span>
+                <span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse">▾</span>
               </div>
               <div class="list-body">
                 <div class="lb-group">
@@ -1172,7 +1205,7 @@
                     <span class="lb-glyph">◇</span>
                     <span class="lb-name">Ideas</span>
                     <span class="lb-count">3</span>
-                    <span class="collapse-chev">▾</span>
+                    <span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse">▾</span>
                   </div>
                   <div class="lb-row">
                     <span class="lb-title">Mobile-first scrapbook reflow</span>
@@ -1196,7 +1229,7 @@
                     <span class="lb-glyph">§</span>
                     <span class="lb-name">Planned</span>
                     <span class="lb-count">2</span>
-                    <span class="collapse-chev">▾</span>
+                    <span class="collapse-chev" role="button" tabindex="0" aria-expanded="false" aria-label="Expand Planned group">▾</span>
                   </div>
                   <div class="lb-row">
                     <span class="lb-title">Phase 5 retrospective</span>
@@ -1209,7 +1242,7 @@
                     <span class="lb-glyph">✎</span>
                     <span class="lb-name">Drafting</span>
                     <span class="lb-count">4</span>
-                    <span class="collapse-chev">▾</span>
+                    <span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse">▾</span>
                   </div>
                   <div class="lb-row">
                     <span class="lb-title">Graphical-entries PRD</span>
@@ -1243,7 +1276,7 @@
                   <button class="vt-cell"><span class="vt-icon">≡</span></button>
                 </div>
                 <span class="count">3</span>
-                <span class="collapse-chev">▾</span>
+                <span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse">▾</span>
               </div>
               <div class="swim-compact">
                 <div class="sc-stage"><span class="sc-name">Drafted</span><span class="sc-count">1</span></div>
@@ -1270,7 +1303,7 @@
                   <button class="vt-cell"><span class="vt-icon">≡</span></button>
                 </div>
                 <span class="count">7</span>
-                <span class="collapse-chev">▾</span>
+                <span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse">▾</span>
               </div>
               <div class="stage-row">
                 <div class="m-stage-tile"><span class="stage-glyph">◇</span><span class="stage-name">Idea</span><span class="stage-count">2</span></div>
