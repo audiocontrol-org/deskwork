@@ -35,4 +35,7 @@ export {
   resolveEntryStrictTemplate,
 } from './resolve.ts';
 
-export { stageNameToFilesystemToken } from './stage-token.ts';
+// stageNameToFilesystemToken relocated to ../pipelines/ since it operates
+// on pipeline-template stage names; re-exported here for back-compat so
+// existing `@/lanes/stage-token` callers keep resolving.
+export { stageNameToFilesystemToken } from '../pipelines/stage-token.ts';

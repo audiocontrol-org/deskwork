@@ -156,57 +156,57 @@ date: 2026-05-25
 > - **I-3** — `StrictPipelineTemplate` (declared in `packages/core/src/pipelines/types.ts:158`) and `StrictLaneConfig` (`packages/core/src/lanes/types.ts:68`) are exported but currently have zero consumers. Verb refactor MUST consume these narrow types at the bound-template / bound-lane input boundary so typos like `template.lockedSatges` fail at compile time.
 > - **M-8** — `packages/core/src/entry/snapshot.ts:115` blindly lowercases the stage name for the snapshot filename. Editorial stages (`Drafting` → `drafting.md`) work; a custom-template stage like `"My Stage"` would produce `my stage.md` (filesystem-fragile). Add a stage-name → filesystem-safe-token mapping (kebab-case + non-ASCII transliteration or rejection) as part of the verb refactor.
 
-- [ ] Step 4.1.1: Identify every hardcoded stage list across the CLI (`approve`, `iterate`, `cancel`, `induct`, doctor rules) — produce a grep manifest.
-- [ ] Step 4.1.2: Plumb the entry's lane → template through each verb's stage-gate logic; replace hardcoded lists with template reads.
-- [ ] Step 4.1.3: Unit tests covering each verb against both the `editorial` preset (legacy default) and a non-editorial preset (`visual`) — confirm stage advancement, locked-stage refusal, cul-de-sac transitions.
-- [ ] Step 4.1.4: Widen `inductEntry`'s `targetStage` parameter to `string` (Phase 3 I-2); add runtime `linearStages.includes(targetStage)` check that throws with the bound template's allowed stage list on mismatch.
-- [ ] Step 4.1.5: Convert every verb signature that takes a bound template / lane to consume `StrictPipelineTemplate` / `StrictLaneConfig` (Phase 3 I-3). The narrow types exist; the verb refactor is the consumption boundary.
-- [ ] Step 4.1.6: Author `stageNameToFilesystemToken(stage: string): string` helper for snapshot path resolution (Phase 3 M-8). Tokenize: lowercase + kebab-case + reject non-ASCII (or fold via a stable mapping); throw with a clear error if the stage name can't be safely tokenized. Update `snapshot.ts:115` and any other filesystem-path producers that consume stage names.
+- [x] Step 4.1.1: Grep manifest produced in commit `844447c`'s body — every hardcoded stage literal across `packages/core/src/{entry,iterate,calendar,doctor,schema,pipelines}/` enumerated with file:line + replacement disposition. Verb-side literals all replaced via template-aware helpers; intentional editorial-narrow exceptions (legacy migration parser, editorial-default doctor switch cases, `'Published'` gate on `entry/create.ts` deferred to Phase 6 CRUD) documented in code with phase-pointer JSDoc.
+- [x] Step 4.1.2: All six verbs (`approve`, `iterate`, `cancel`, `block`, `induct`, `publish`) now route through `resolveEntryStrictTemplate(sidecar, projectRoot)` and consume `pipelines/helpers.ts` (`isLinearPipelineStageInTemplate`, `nextStageInTemplate`, `terminalLinearStage`, `preTerminalLinearStage`, etc.) instead of hardcoded stage literals.
+- [x] Step 4.1.3: `test/entry/verbs-visual.test.ts` exercises every verb against the loaded `visual` preset (Sketched → Iterating → Approved → Shipped; locked-stage refusal on Approved; off-pipeline cul-de-sacs Blocked/Cancelled/Archived); the existing editorial coverage in `test/entry/{approve,induct,...}.test.ts` is preserved.
+- [x] Step 4.1.4: `inductEntry`'s `targetStage` widened to `string` at both `packages/core/src/entry/induct.ts:23` and `packages/cli/src/commands/induct.ts:96`; runtime `linearStages.includes` check throws with the bound template's allowed stage list.
+- [x] Step 4.1.5: `StrictPipelineTemplate` + `StrictLaneConfig` consumed at every verb input boundary via `resolveEntryStrictTemplate`. The Phase 2/3 "declared-but-unused" state is closed.
+- [x] Step 4.1.6: `stageNameToFilesystemToken` lives at `packages/core/src/pipelines/stage-token.ts` (relocated from `lanes/` in the Phase 4 review fix to avoid an import cycle; lanes/ re-exports for back-compat). Snapshot.ts uses it. Plus a Zod-schema refinement catches stage-name collisions at template-load time (Phase 4 review I-3) — two stages whose tokenized forms collide are rejected with a descriptive error.
 
 **Acceptance Criteria:**
 
-- [ ] All four verbs consult the entry's lane template; no hardcoded stage list remains in verb logic.
-- [ ] Existing single-lane projects (legacy `editorial` semantics) continue to work unchanged.
-- [ ] `StrictPipelineTemplate` + `StrictLaneConfig` are consumed at every verb input boundary; the declared-but-unused state from Phase 3 is closed.
-- [ ] Snapshot filenames + any other filesystem-path-from-stage-name producers use the `stageNameToFilesystemToken` helper.
+- [x] All six verbs (approve / iterate / cancel / block / induct / publish) consult the entry's lane template; no hardcoded stage list remains in verb logic.
+- [x] Existing single-lane projects (legacy `editorial` semantics) continue to work unchanged — verified via the editorial coverage in `test/entry/*.test.ts` + smoke run against this repo's actual sidecars.
+- [x] `StrictPipelineTemplate` + `StrictLaneConfig` are consumed at every verb input boundary; the declared-but-unused state from Phase 3 is closed.
+- [x] Snapshot filenames + any other filesystem-path-from-stage-name producers use the `stageNameToFilesystemToken` helper.
 
 ### Task 4.2: Calendar regen — fix #247 (writer-side)
 
-- [ ] Step 4.2.1: Trace the calendar-regen module's current stage-iteration list; confirm it still emits pre-redesign stage names (`Review` / `Paused`).
-- [ ] Step 4.2.2: Refactor calendar regen to iterate the lane's template stages (linearStages ∪ offPipelineStages); for multi-lane projects, emit a per-lane section with the lane's template stage list.
-- [ ] Step 4.2.3: Regression test: regen against a fixture project with entries in `Final` and `Cancelled` — confirm every entry persists in the rendered calendar; no `Review` / `Paused` ghost sections.
-- [ ] Step 4.2.4: Smoke test against the current deskwork repo's actual `.deskwork/calendar.md` — confirm the 12 currently-orphaned entries (PRDs + design docs in Final/Cancelled) all render correctly post-regen.
+- [x] Step 4.2.1: Pre-redesign `STAGE_ORDER` constant in `calendar/render.ts` traced and removed; the only remaining literal `linearStages` array is the `EDITORIAL_FALLBACK` constant used when no project root is supplied (test fixtures), with a JSDoc note pointing at Phase 8's enforcement step that lets the fallback be deleted.
+- [x] Step 4.2.2: `calendar/render.ts:154` now accepts `projectRoot?: string` and iterates `templateStageOrder(template) = [...linearStages, ...offPipelineStages]` per lane. Multi-lane projects emit `# Lane: <name>` sections; single-lane projects keep the legacy shape unchanged.
+- [x] Step 4.2.3: `test/calendar/regenerate-multilane.test.ts` covers a fixture project with entries across `Final` and `Cancelled` — no `Review` / `Paused` ghost sections; every entry renders.
+- [x] Step 4.2.4: Smoke run `node scripts/smoke-phase4-issues.mjs` against this repo's `.deskwork/calendar.md` — `PASS: all 22 sidecars present in regenerated calendar` (every Final/Cancelled entry persists).
 
 **Acceptance Criteria:**
 
-- [ ] `deskwork ingest --apply` and `deskwork approve` no longer drop Final / Cancelled entries from the calendar.
-- [ ] Calendar sections match the canonical eight stages (or the lane's template stages in multi-lane projects); no `Review` / `Paused` legacy sections.
-- [ ] Issue #247 closes via the smoke-test evidence comment.
+- [x] `deskwork ingest --apply` and `deskwork approve` no longer drop Final / Cancelled entries from the calendar (verified via smoke + the regression test).
+- [x] Calendar sections match the canonical eight stages (or the lane's template stages in multi-lane projects); no `Review` / `Paused` legacy sections.
+- [x] Issue #247 closes via the smoke-test evidence (auto-close via commit body `closes #247`).
 
 ### Task 4.3: Doctor parser — fix #300 (reader-side counterpart)
 
-- [ ] Step 4.3.1: Locate the `orphan-frontmatter-id` rule's calendar-parsing logic.
-- [ ] Step 4.3.2: Replace section-based parsing with a UUID-set-based lookup (per #300's recommended fix B): scan every row across every table in the calendar; collect UUIDs into a flat set; check frontmatter IDs against the set.
-- [ ] Step 4.3.3: Regression test: assemble a fixture calendar with entries in `Ideas`, `Drafting`, `Final`, `Cancelled` sections; assert zero false-positive orphan flags.
-- [ ] Step 4.3.4: Smoke test against current deskwork repo state — confirm the 12 currently-false-positive entries no longer surface as orphans.
+- [x] Step 4.3.1: Located at `packages/core/src/doctor/rules/orphan-frontmatter-id.ts`. Section-based parser depended on stage-header recognition (the bug #300 names).
+- [x] Step 4.3.2: New `UUID_IN_ROW_RE` regex scans every table row in `<calendar>.md` regardless of section heading; `readCalendarUuidSet` collects UUIDs into a flat set; the audit checks every frontmatter `deskwork.id` against the union of (parsed-entries-set ∪ regex-derived-set) so the over-counting is biased toward false negatives.
+- [x] Step 4.3.3: `test/doctor/orphan-frontmatter-id.test.ts` carries fixture coverage of entries in `Ideas`, `Drafting`, `Final`, `Cancelled`, plus a custom-lane section — zero false-positive orphan flags.
+- [x] Step 4.3.4: Smoke `node scripts/smoke-phase4-issues.mjs` against this repo — only 2 legitimate orphans remain (markdown files whose UUIDs genuinely don't appear in any calendar row); the false-positives on Final/Cancelled the bug named are gone.
 
 **Acceptance Criteria:**
 
-- [ ] `deskwork doctor` reports zero false positives for entries in `Final` and `Cancelled` sections.
-- [ ] Issue #300 closes via the smoke-test evidence comment.
+- [x] `deskwork doctor` reports zero false positives for entries in `Final` and `Cancelled` sections.
+- [x] Issue #300 closes via the smoke-test evidence (auto-close via commit body `closes #300`).
 
 ### Task 4.4: Doctor migration scaffolding
 
-- [ ] Step 4.4.1: Implement the `default` lane auto-creation on first invocation under the new model (per PRD § Migration step 1).
-- [ ] Step 4.4.2: Back-fill `lane: "default"` and derived `artifactKind` on every existing sidecar.
-- [ ] Step 4.4.3: Emit `migration` journal events for each change.
-- [ ] Step 4.4.4: Integration test: pre-feature single-pipeline project → run doctor → confirm `default` lane created, every entry has `lane: default` + correct `artifactKind`.
+- [x] Step 4.4.1: `migrateLaneMembership` (in `packages/core/src/doctor/lane-migration.ts`) calls `bootstrapDefaultLaneIfMissing` (Phase 3 helper) as its first step. Auto-creation is gated on the legacy `sites.<defaultSite>.contentDir` being present in the config; pre-feature projects bootstrap cleanly.
+- [x] Step 4.4.2: Back-fill walks every sidecar; sets `lane: "default"` where absent; derives `artifactKind` from `artifactPath` via `deriveArtifactKindFromPath` (extension-based — `.md` → `markdown`, etc.).
+- [x] Step 4.4.3: Each back-fill emits a `lane-migration` journal event (`migration: 'backfill-lane-and-artifact-kind'`, details listing the entry uuid + which fields were added). Phase 4 review I-2 reversed the order so sidecar writes happen FIRST, then the journal event lands as a post-condition record (matching `bootstrapDefaultLaneIfMissing`'s convention).
+- [x] Step 4.4.4: `test/doctor/lane-migration.test.ts` carries the integration test — pre-feature project → run migration → confirm default lane created, every entry has `lane: default` + correct `artifactKind`. Smoke `node scripts/smoke-phase4-migration.mjs` verified against this repo: 22 examined / 22 lane back-fills / 22 artifactKind back-fills / second run idempotent.
 
 **Acceptance Criteria:**
 
-- [ ] Migration runs in `--dry-run` first; atomic sidecar writes (tmp + rename) per existing ingest pattern.
-- [ ] Every legacy entry post-migration has `lane: "default"` and a correct `artifactKind`.
-- [ ] No data loss — all existing frontmatter, scrapbook content, marginalia, journal events preserved.
+- [x] Migration runs in `--dry-run` first; atomic sidecar writes via the existing `writeSidecar` helper (tmp + rename).
+- [x] Every legacy entry post-migration has `lane: "default"` and a correct `artifactKind`.
+- [x] No data loss — all existing frontmatter, scrapbook content, marginalia, journal events preserved (the migration only ADDS fields; never deletes existing ones).
 
 ## Phase 5: Studio render — per-lane tabs + template stage columns + combined overview + lane-visibility panel + multi-lane composed views  ·  [#306](https://github.com/audiocontrol-org/deskwork/issues/306)
 
@@ -375,6 +375,14 @@ date: 2026-05-25
 ## Phase 8: Annotation model extension — threads + screenshot attachments + spatial anchors + disposition-trace affordance  ·  [#309](https://github.com/audiocontrol-org/deskwork/issues/309)
 
 **Deliverable:** Threaded replies (`replyTo`), screenshot attachments (`attachments[]`), spatial anchors (`spatialAnchor`), and per-comment disposition-trace affordance (inline diff expansion on "addressed" badge + required free-text disposition reason at iterate time). Cross-cutting; markdown review benefits too. Sidecar storage at `<entryDir>/scrapbook/screenshots/`. Closes #299.
+
+### Task 8.0: Enforce `lane` presence at the doctor layer (Phase 4 follow-up)
+
+> **Phase 4 follow-up (from code-quality review 2026-05-27, M-5):** `packages/core/src/lanes/resolve.ts:60-64` carries a migration-window default that resolves `entry.lane === undefined` to the editorial template. Once doctor's `lane-migration` step (Phase 4 Task 4.4) has run across the canary repos (this project + audiocontrol + writingcontrol) AND reports zero un-migrated entries, the resolver should tighten to throw on missing-lane. `packages/core/src/calendar/render.ts:130-141` similarly carries an `EDITORIAL_FALLBACK` constant that becomes unreachable once doctor enforces lane presence; remove it in the same change.
+
+- [ ] Step 8.0.1: Add a doctor rule `entry-lane-missing` that surfaces every sidecar without a `lane` field as a finding. Repair flow: run `migrateLaneMembership` to back-fill `default`, OR have the operator explicitly assign a lane via `/deskwork:lane move <slug> --to <lane-id>` once Phase 6's lane CRUD ships.
+- [ ] Step 8.0.2: Once the canary projects report zero `entry-lane-missing` findings, tighten `resolveEntryTemplate` in `packages/core/src/lanes/resolve.ts:60-64` to throw on missing-lane. Delete the `EDITORIAL_FALLBACK` constant in `packages/core/src/calendar/render.ts` and pipe the renderer through `loadPipelineTemplate` always.
+- [ ] Step 8.0.3: Update the `@deprecated` tags in `packages/core/src/schema/entry.ts` to remove the "kept for back-compat" caveat; the legacy editorial helpers can be deleted in a future cleanup once their last callers (legacy calendar migration parser) are themselves removed.
 
 ### Task 8.1: Annotation schema extension
 

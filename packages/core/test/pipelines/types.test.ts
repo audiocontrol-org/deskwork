@@ -112,6 +112,36 @@ describe('PipelineTemplateSchema', () => {
         expect(messages.some((m) => m.includes('reserved'))).toBe(true);
       }
     });
+
+    it('rejects linearStages whose tokenized forms collide via stageNameToFilesystemToken', () => {
+      // "Drafting" and "drafting" are distinct strings (so the
+      // uniqueStringArray invariant passes) but both tokenize to
+      // `drafting`, which would cause snapshot-file collisions at
+      // verb-write time. The schema must catch this at template-load.
+      const tpl = makeTemplate({
+        linearStages: ['Ideas', 'Drafting', 'drafting', 'Published'],
+        offPipelineStages: ['Blocked', 'Cancelled'],
+      });
+      const result = PipelineTemplateSchema.safeParse(tpl);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        const messages = result.error.issues.map((issue) => issue.message);
+        expect(messages.some((m) => m.includes('tokenize') || m.includes('collide'))).toBe(true);
+      }
+    });
+
+    it('rejects offPipelineStages whose tokenized forms collide', () => {
+      const tpl = makeTemplate({
+        linearStages: ['Ideas', 'Drafting', 'Published'],
+        offPipelineStages: ['My-Stage', 'my stage', 'Cancelled'],
+      });
+      const result = PipelineTemplateSchema.safeParse(tpl);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        const messages = result.error.issues.map((issue) => issue.message);
+        expect(messages.some((m) => m.includes('tokenize') || m.includes('collide'))).toBe(true);
+      }
+    });
   });
 
   describe('lockedStages invariants', () => {

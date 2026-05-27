@@ -168,12 +168,28 @@ export async function migrateLaneMembership(
 
     if (dryRun) continue;
 
-    // 3. Emit journal event BEFORE the sidecar write so a crash between
-    //    the two leaves a journal record of the intent (and the next
-    //    migration run skips the sidecar because the field is already
-    //    present, or finds the field missing and re-emits — idempotent
-    //    either way).
+    // 3. Write sidecar FIRST, then emit journal event. The journal's
+    //    claims should describe post-conditions (what happened), not
+    //    intent (what's about to happen). This matches
+    //    `bootstrapDefaultLaneIfMissing`'s ordering in
+    //    `packages/core/src/lanes/bootstrap.ts` and the broader
+    //    append-only-journal convention. Crash semantics: if the
+    //    sidecar write succeeds but the journal append fails, the
+    //    state is correct but the audit trail is missing — the next
+    //    migration run sees the field already present and skips both
+    //    actions, so the journal never claims something untrue. The
+    //    inverse ordering would let the journal claim a migration
+    //    that didn't happen.
     const at = new Date().toISOString();
+    const updated: Entry = {
+      ...parsed,
+      ...(needsLane ? { lane: 'default' } : {}),
+      ...(needsArtifactKind && derivedKind !== undefined
+        ? { artifactKind: derivedKind }
+        : {}),
+      updatedAt: at,
+    };
+    await writeSidecar(projectRoot, updated);
     await appendJournalEvent(projectRoot, {
       kind: 'lane-migration',
       at,
@@ -188,16 +204,6 @@ export async function migrateLaneMembership(
           : {}),
       },
     });
-
-    const updated: Entry = {
-      ...parsed,
-      ...(needsLane ? { lane: 'default' } : {}),
-      ...(needsArtifactKind && derivedKind !== undefined
-        ? { artifactKind: derivedKind }
-        : {}),
-      updatedAt: at,
-    };
-    await writeSidecar(projectRoot, updated);
   }
 
   return {

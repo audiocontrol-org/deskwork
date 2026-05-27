@@ -49,6 +49,7 @@
  */
 
 import { z } from 'zod';
+import { stageNameToFilesystemToken } from './stage-token.ts';
 
 /**
  * Cross-field invariant helper: every entry in `subset` exists in
@@ -121,7 +122,53 @@ export const PipelineTemplateSchema = z.object({
         '"Cancelled" is a reserved off-pipeline stage name and must not appear in linearStages',
       path: ['linearStages'],
     },
+  )
+  // Stage names must produce unique filesystem tokens via
+  // `stageNameToFilesystemToken`. Two stages whose tokenized forms
+  // collide would race against each other when verbs write snapshot
+  // files (`drafting.md` vs `Drafting` both produce `drafting.md`).
+  // Catching at template-load time surfaces the failure where the
+  // operator can fix it (in the template JSON) rather than later when
+  // a verb's snapshot write conflicts at runtime.
+  .refine(
+    (template) => uniqueTokens(template.linearStages),
+    {
+      message:
+        'linearStages contains entries whose stageNameToFilesystemToken forms collide; '
+        + 'rename one stage to ensure every linearStage tokenizes to a distinct filesystem path',
+      path: ['linearStages'],
+    },
+  )
+  .refine(
+    (template) => uniqueTokens(template.offPipelineStages),
+    {
+      message:
+        'offPipelineStages contains entries whose stageNameToFilesystemToken forms collide; '
+        + 'rename one stage to ensure every offPipelineStage tokenizes to a distinct filesystem path',
+      path: ['offPipelineStages'],
+    },
   );
+
+function uniqueTokens(stages: readonly string[]): boolean {
+  const tokens = new Set<string>();
+  for (const stage of stages) {
+    let token: string;
+    try {
+      token = stageNameToFilesystemToken(stage);
+    } catch {
+      // If a stage name is not tokenizable at all, the
+      // stageNameToFilesystemToken contract has its own error path the
+      // caller will see at first-write time. Schema-level we treat the
+      // un-tokenizable stage as "passing the collision check" (it can't
+      // collide with itself) — the per-stage tokenization-rejection
+      // surfaces separately.
+      continue;
+    }
+    if (tokens.has(token)) return false;
+    tokens.add(token);
+  }
+  return true;
+}
 
 /**
  * The type inferred from the Zod schema. Equivalent to the PRD's

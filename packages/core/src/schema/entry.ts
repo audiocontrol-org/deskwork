@@ -59,23 +59,23 @@ const OFF_PIPELINE: readonly Stage[] = ['Blocked', 'Cancelled'] as const;
  * "is this stage one of the editorial lane's linear / off-pipeline
  * stages?" — a non-editorial stage name returns false.
  *
- * @deprecated Phase 4 replaces these with template-driven equivalents
- *   in `../pipelines/helpers.ts`
- *   (`isLinearPipelineStageInTemplate`,
- *   `isOffPipelineStageInTemplate`). New code should resolve the
- *   entry's lane template via `resolveEntryTemplate` and call the
- *   template-aware helper. These editorial-narrow forms are kept for
- *   back-compat with non-verb callers and for the legacy migration
- *   parser that knows about the editorial vocabulary only.
+ * @deprecated Use `isLinearPipelineStageInTemplate(template, stage)` from
+ *   `@deskwork/core/pipelines`. Resolve `template` via
+ *   `resolveEntryStrictTemplate(entry, projectRoot)` from
+ *   `@deskwork/core/lanes`. The editorial-narrow form here is kept for
+ *   non-verb callers that operate on the editorial vocabulary
+ *   specifically (e.g. the legacy calendar migration parser); new code
+ *   should use the template-aware helper.
  */
 export function isLinearPipelineStage(s: string): boolean {
   return (LINEAR_PIPELINE as readonly string[]).includes(s);
 }
 
 /**
- * @deprecated Phase 4 — see `isLinearPipelineStage` deprecation note.
- *   Use `isOffPipelineStageInTemplate` against the entry's resolved
- *   lane template instead.
+ * @deprecated Use `isOffPipelineStageInTemplate(template, stage)` from
+ *   `@deskwork/core/pipelines`. Resolve `template` via
+ *   `resolveEntryStrictTemplate(entry, projectRoot)` from
+ *   `@deskwork/core/lanes`.
  */
 export function isOffPipelineStage(s: string): boolean {
   return (OFF_PIPELINE as readonly string[]).includes(s);
@@ -99,13 +99,12 @@ const SUCCESSOR: Record<Stage, Stage | null> = {
  * rather than throwing — callers handle the "no successor" case
  * already.
  *
- * @deprecated Phase 4 replaces this with `nextStageInTemplate` in
- *   `../pipelines/helpers.ts`. New code should resolve the entry's
- *   lane template via `resolveEntryTemplate` and call the template-
- *   aware successor instead. This editorial-narrow form is kept for
- *   back-compat with non-verb callers that operate on the editorial
- *   vocabulary specifically (e.g. the legacy calendar migration
- *   parser).
+ * @deprecated Use `nextStageInTemplate(template, stage)` from
+ *   `@deskwork/core/pipelines`. Resolve `template` via
+ *   `resolveEntryStrictTemplate(entry, projectRoot)` from
+ *   `@deskwork/core/lanes`. The editorial-narrow form here is kept for
+ *   non-verb callers that operate on the editorial vocabulary
+ *   specifically (e.g. the legacy calendar migration parser).
  */
 export function nextStage(s: string): Stage | null {
   if (

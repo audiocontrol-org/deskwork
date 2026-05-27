@@ -126,6 +126,14 @@ function loadLaneContexts(projectRoot: string | undefined): LaneContext[] {
  * require the editorial preset to be discoverable via `loadPipelineTemplate`
  * — necessary for the test fixtures that exercise `renderCalendar`
  * without a project root.
+ *
+ * IMPORTANT: this constant duplicates `packages/core/src/pipelines/
+ * editorial.json` and the two MUST stay in sync. If the editorial
+ * preset's stage list ever changes, update this fallback in lockstep.
+ * Phase 8 enforces lane presence at the doctor layer; once doctor
+ * refuses to load entries without a `lane` field, the renderer's
+ * no-project-root path is no longer reachable and this constant can
+ * be deleted in favor of always loading via `loadPipelineTemplate`.
  */
 const EDITORIAL_FALLBACK: StrictPipelineTemplate = {
   id: 'editorial',

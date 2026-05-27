@@ -37,7 +37,7 @@ import {
 } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import type { Entry } from '../schema/entry.ts';
-import { stageNameToFilesystemToken } from '../lanes/stage-token.ts';
+import { stageNameToFilesystemToken } from '../pipelines/stage-token.ts';
 
 export interface SnapshotResult {
   /** True when a snapshot file was written (or already matched on disk). */

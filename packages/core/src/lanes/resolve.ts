@@ -39,8 +39,13 @@ import type { StrictPipelineTemplate } from '../pipelines/types.ts';
  * Resolve the pipeline template that governs an entry's lifecycle.
  *
  * Migration-window behavior: when `entry.lane` is undefined, defaults
- * to the `editorial` template. Phase 8+ tightens this to a throw once
- * doctor enforces `lane` presence on every sidecar.
+ * to the `editorial` template. Phase 8 enforces `lane` presence on
+ * every sidecar at the doctor layer (workplan: Phase 8 § "Doctor —
+ * enforce lane presence post-migration"); once that lands, this
+ * function tightens to throw on missing-lane. The migration-window
+ * default is the only thing that keeps pre-migration entries (and the
+ * sidecar-free test fixtures used by `calendar/render`) resolving
+ * cleanly today.
  *
  * @param entry - The entry sidecar.
  * @param projectRoot - Absolute path to the project root.
@@ -58,7 +63,9 @@ export function resolveEntryTemplate(
   projectRoot: string,
 ): PipelineTemplate {
   if (entry.lane === undefined) {
-    // Migration-window default. Phase 8+ removes this branch.
+    // Migration-window default — Phase 8 doctor-enforcement removes
+    // this branch. See `docs/1.0/001-IN-PROGRESS/graphical-entries/
+    // workplan.md` Phase 8 for the enforcement step.
     return loadPipelineTemplate('editorial', projectRoot);
   }
   const lane = loadLaneConfig(entry.lane, projectRoot);

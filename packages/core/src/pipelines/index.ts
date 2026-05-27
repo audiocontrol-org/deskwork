@@ -27,3 +27,5 @@ export {
   terminalLinearStage,
   preTerminalLinearStage,
 } from './helpers.ts';
+
+export { stageNameToFilesystemToken } from './stage-token.ts';

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { stageNameToFilesystemToken } from '@/lanes/stage-token';
+import { stageNameToFilesystemToken } from '@/pipelines/stage-token';
 
 describe('stageNameToFilesystemToken', () => {
   it('lowercases editorial stages cleanly', () => {
