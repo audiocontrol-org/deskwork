@@ -32,7 +32,7 @@ The helper:
 The Step 0 fragment instructs the sub-agent to:
 
 1. Detect changes to `.dw-lifecycle/scope-discovery/clones.yaml` and run `dw-lifecycle check-refactor-preconditions`. Each finding becomes a review comment.
-2. Detect diffs that look like refactors but have no `clones.yaml` update; ask the author to run `dw-lifecycle detect-clones`.
+2. Detect diffs that look like refactors but have no `clones.yaml` update; ask the author to run `dw-lifecycle check-clones`.
 3. Detect anti-pattern findings under the diff via `dw-lifecycle check-anti-patterns --gate-mode`.
 
 The fragment defers Step 0 ONLY for pure-docs / pure-comment / version-bump / revert commits. The full text is at `plugins/dw-lifecycle/templates/scope-discovery/agent-step-0-fragment.md`.

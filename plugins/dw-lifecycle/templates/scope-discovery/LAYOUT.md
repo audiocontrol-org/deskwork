@@ -46,7 +46,7 @@ override path. The complete list:
 
 | Scanner | Flag | Default |
 |---|---|---|
-| `detect-clones` | jscpd's `pattern:` (in `.jscpd.json`) | `**/*.ts` |
+| `check-clones` | jscpd's `pattern:` (in `.jscpd.json`) | `**/*.ts` |
 | `check-anti-patterns` | `--root <path>` | `src/` |
 | `check-adopters` | `--root <path>` | `src/` |
 | `check-refactor-preconditions` | (operates on `clones.yaml` directly) | n/a |
@@ -83,7 +83,7 @@ The directory name `.dw-lifecycle/scope-discovery/` is deliberate:
 - The project does not have to have a single source tree. Operators
   with multi-tree layouts run the scanners with explicit `--root`
   per tree and aggregate findings via standard shell composition.
-- The project does not have to use jscpd. `detect-clones` uses jscpd
+- The project does not have to use jscpd. `check-clones` uses jscpd
   internally, but the registries (`anti-patterns.yaml`,
   `adopter-manifests.yaml`) are independent of any duplicate-detection
   engine.

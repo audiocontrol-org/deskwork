@@ -7,6 +7,7 @@ Machine-readable specs of the YAML wire formats produced and consumed by the sco
 | `clones.yaml.schema.json` | `.dw-lifecycle/scope-discovery/clones.yaml` | `../clones-yaml.parse.ts` + `../clones-yaml.refactor.ts` (`validateRefactorPreconditions`) |
 | `anti-patterns.yaml.schema.json` | `.dw-lifecycle/scope-discovery/anti-patterns.yaml` | `../anti-patterns-registry.ts` (`parseEntry`) |
 | `adopter-manifests.yaml.schema.json` | `.dw-lifecycle/scope-discovery/adopter-manifests.yaml` | `../adopter-manifests-registry.ts` (`parseEntry`) |
+| `deprecation-queue.yaml.schema.json` | `.dw-lifecycle/scope-discovery/deprecation-queue.yaml` | (none in v1 — the scanner discovers markers in source, not in YAML; schema is informational + reserved for a future baseline-persistence pass) |
 
 Phase 3 adds `annotated-trace.json.schema.json`.
 

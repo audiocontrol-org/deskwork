@@ -15,13 +15,12 @@
  *      manifest registry, surfacing per-(manifest x editor) cells
  *      flagged 'partial' or 'missing' (the operator's regime-drift
  *      attention queue).
- *   3. Deprecation-queue collection: STUBBED in Phase 4 — the pilot's
- *      `deprecation-scan.ts` has not yet been ported. The stub
- *      returns an empty array so `meta.deprecation_count` is always
- *      0. Tracked at:
- *        https://github.com/audiocontrol-org/deskwork/issues/287
- *      When that issue lands, replace `collectDeprecationFindings`
- *      with the real scan path.
+ *   3. Deprecation-queue collection: walks the scan root for files
+ *      with a top-of-file `@deprecated` JSDoc tag or a `// DEPRECATED:`
+ *      line comment within the first 20 lines, then counts external
+ *      importers per deprecated file. Files with importers > 0 become
+ *      regime-holdout findings (the importer itself is the holdout —
+ *      it's the file blocking deletion). Closes #287.
  *   4. Emit structured findings with per-finding evidence
  *      back-pointers to the registry / scan output that caught each
  *      entry.
@@ -64,6 +63,7 @@ import { resolve } from 'node:path';
 import { scan as scanAntiPatterns } from '../check-anti-patterns.js';
 import { scan as scanAdopters } from '../check-adopters.js';
 import { computeMatrix } from '../editor-symmetry-matrix.js';
+import { scan as scanDeprecations } from '../deprecation-scan.js';
 import type {
   DiscoveryAgentInput,
   RegimeHoldoutFinding,
@@ -231,23 +231,53 @@ async function collectEditorSymmetryFindings(
 }
 
 /**
- * Deprecation-queue collection. STUBBED in Phase 4 — the pilot's
- * `deprecation-scan.ts` (and its `check-deprecations` CLI surface)
- * has not yet been ported. Always returns an empty array.
+ * Deprecation-queue collection. Walks the scan root for files marked
+ * `@deprecated` (top-of-file JSDoc) or `// DEPRECATED:` (within the
+ * first 20 lines) and surfaces every external importer as a regime-
+ * holdout finding. The importer is the holdout — it's the file
+ * preventing deletion of the deprecated source. Files with zero
+ * importers are safe to delete and DO NOT surface here as findings
+ * (they appear in the standalone `check-deprecations` artifact's
+ * "safe to delete" section, but they are not regime drift — they are
+ * work-ready dispositions).
  *
- * Tracked at issue #287:
- *   https://github.com/audiocontrol-org/deskwork/issues/287
- *
- * When that issue lands, replace this stub with a call to the real
- * scan path (mirroring the other `collect*Findings` helpers above).
- * The `meta.deprecation_count` will follow automatically.
+ * Closes #287 (port of the audiocontrol pilot's deprecation-scan).
  */
 async function collectDeprecationFindings(
-  _input: DiscoveryAgentInput,
+  input: DiscoveryAgentInput,
 ): Promise<readonly RegimeHoldoutFinding[]> {
-  // TODO(#287): replace stub with call to scanDeprecations(...) once
-  // deprecation-scan.ts is ported from the audiocontrol pilot.
-  return [];
+  const result = await scanDeprecations({
+    scanRoot: input.repoRoot,
+    moduleRoot: input.moduleRoot,
+  });
+  const out: RegimeHoldoutFinding[] = [];
+  for (const deprecated of result.blocked) {
+    for (const importer of deprecated.importers) {
+      const markerLabel =
+        deprecated.markerKind === 'jsdoc' ? '`@deprecated`' : '`// DEPRECATED:`';
+      const tail = deprecated.message.length > 0 ? ` ${deprecated.message}` : '';
+      out.push({
+        source: 'deprecation',
+        // `id` is the deprecated file's path — it's the unit of work
+        // (operators drain the queue one deprecated file at a time).
+        id: deprecated.path,
+        file: importer.path,
+        line: importer.line,
+        shape: `imports deprecated file '${deprecated.path}'${
+          deprecated.message.length > 0 ? ` (${deprecated.message})` : ''
+        }`,
+        replacement: `migrate off '${deprecated.path}' — the marker is ${markerLabel}${tail}`,
+        evidence: {
+          // The deprecation "registry" is the source file itself — the
+          // marker IS the entry. Point operators at the deprecated file
+          // so they can read its message in context.
+          registryPath: deprecated.path,
+          registryId: deprecated.markerKind,
+        },
+      });
+    }
+  }
+  return out;
 }
 
 /**

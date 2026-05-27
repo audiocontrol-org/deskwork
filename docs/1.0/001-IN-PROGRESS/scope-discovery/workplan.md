@@ -109,7 +109,7 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
 
 ### Task 1: regime-holdout-detector
 
-- [x] Port from pilot; synthesizes the four scan types into `regime_holdouts:` section on the scope manifest — landed at `plugins/dw-lifecycle/src/scope-discovery/discovery-agents/regime-holdout-detector.ts` (commit `362ce6d`). Deprecation gate stubbed; tracked at [#287](https://github.com/audiocontrol-org/deskwork/issues/287).
+- [x] Port from pilot; synthesizes the four scan types into `regime_holdouts:` section on the scope manifest — landed at `plugins/dw-lifecycle/src/scope-discovery/discovery-agents/regime-holdout-detector.ts` (commit `362ce6d`). Deprecation gate stub later replaced with full scanner port (closes [#287](https://github.com/audiocontrol-org/deskwork/issues/287)).
 - [x] Activates only if `anti-patterns.yaml` OR `adopter-manifests.yaml` has entries — orchestrator's `decideActivations` in `scope-inventory.ts` checks file presence; agent prints `scope-inventory: skipped regime-holdout-detector (...)` when none of the three gate files are present.
 
 ### Task 2: editor-symmetry-scanner
@@ -125,7 +125,7 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
 **Acceptance Criteria:**
 - [x] Three agents activate ONLY when project config has the relevant entries — verified via `/tmp/phase4-acceptance-c1-noop.sh` (empty tmpdir, all three skip notes print, no per-agent JSON or `editor-symmetry.md` artifact in evidence trail).
 - [x] Agents not activated cost zero (no scan time) — no-op run timed at 0.526s vs activated run at 0.603s (delta 77ms ≈ scan + matrix + JSON write cost); the skip notes print BEFORE the synthesis pass, confirming the gating is upstream of cost.
-- [x] `regime_holdouts:` section on scope-manifest populated when active — verified via `/tmp/phase4-acceptance-c2-activated.sh`; the section contains `anti_patterns` (2 entries), `adopter_manifests` (2), `editor_symmetry` (1), `deprecations: []` (stubbed per [#287](https://github.com/audiocontrol-org/deskwork/issues/287)), and `meta.total: 5`.
+- [x] `regime_holdouts:` section on scope-manifest populated when active — verified via `/tmp/phase4-acceptance-c2-activated.sh`; the section contains `anti_patterns` (2 entries), `adopter_manifests` (2), `editor_symmetry` (1), and `deprecations` (originally stubbed pending [#287](https://github.com/audiocontrol-org/deskwork/issues/287); now populated from the real scanner since the port landed), and `meta.total` rolls up across all four sources.
 
 ## Phase 5: Dispatch wrapper + skill-prose convention template
 
@@ -179,9 +179,9 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
 
 ### Task 2: Check-* gate commands
 
-- [x] `check-clones [--gate-mode]` — subcommand registered as `detect-clones` in Phase 1; `--gate-mode` flag landed as a no-op-for-symmetry (`detect-clones` already exits 1 on NEW groups by default — the hook contract). Rename `detect-clones` → `check-clones` is a separate Phase 6 follow-up.
+- [x] `check-clones [--gate-mode]` — subcommand originally registered as `detect-clones` in Phase 1; renamed to `check-clones` in the Phase 6 verb-naming pass with `detect-clones` preserved as a forever-back-compat alias (both names dispatch to the same handler, so adopter pre-commit hooks installed by pre-rename versions of `install-scope-discovery-hooks` continue to work without modification). Library API renamed `detectClones` → `checkClones`; new hook chains emit `check-clones --gate-mode`; deprecation-hint surfaced in CLI `--help` listing. `--gate-mode` flag landed as a no-op-for-symmetry (check-clones already exits 1 on NEW groups by default — the hook contract). New skill at `plugins/dw-lifecycle/skills/check-clones/SKILL.md` is the canonical procedure; `plugins/dw-lifecycle/skills/detect-clones/SKILL.md` is a thin redirector pointing at the canonical skill. 3 new vitest scenarios — 2 gate-mode-flag-no-op + 1 alias-symmetry (both names produce identical exit codes on the same fixture).
 - [x] `check-anti-patterns [--gate-mode]` — subcommand registered in Phase 2; `--gate-mode` flag landed. Default is informational (findings → exit 0, full report on stdout); `--gate-mode` flips to hook-friendly exit 1 on findings. **Schema follow-up:** add optional `negative_match_classes:` array per pilot TF-015 (AUDIT-20260525-08); validator auto-generates negative-test scenarios. Pairs with #285 pattern-type dispatcher work.
-- [x] `check-deprecations [--write]` — subcommand SHELL landed; deprecation-scan port still tracked at [#287](https://github.com/audiocontrol-org/deskwork/issues/287). Empty-registry happy path (stdout one-line status + #287 link), `--quiet` suppresses, `--json` emits documented shape (`{ blocked: [], safeToDelete: [], deprecation_count: 0 }`), `--write` + `--artifact` are accepted no-ops until #287 lands. Forward-compatible: when #287 lands the scan logic back-fills without changing the CLI contract. 15 vitest scenarios.
+- [x] `check-deprecations [--write]` — subcommand SHELL → full scanner port landed. Walks the scan root for file-level `@deprecated` JSDoc tags + `// DEPRECATED:` line comments within the first 20 lines; resolves importers via `@/` alias + basename-relative path forms; classifies as blocked (importers > 0) or safe-to-delete (importers === 0). `--write` emits markdown to `.dw-lifecycle/scope-discovery/deprecation-queue.md`. `--json` emits structured output (`{ total, deprecation_count, filesVisited, blocked: [...], safeToDelete: [...] }`). `--module-root` accepts the `@/` alias root (default `src`; pilot's audiocontrol layout uses `modules/<editor>/src`). Closes [#287](https://github.com/audiocontrol-org/deskwork/issues/287). 23 vitest scenarios including gutted-stub teeth. Regime-holdout-detector now uses the real scanner; `meta.deprecation_count` populates from real importers.
 - [x] `check-adopters [--gate-mode]` — subcommand registered in Phase 2; `--gate-mode` flag landed (default informational; flag flips to hook-friendly exit 1 on holdouts).
 - [x] `check-editor-symmetry [--write]` — landed in Phase 4 with `--write` flag honored; default writes to `docs/<v>/001-IN-PROGRESS/<slug>/scope-inventory/editor-symmetry.md`.
 - [x] `check-refactor-preconditions [--gate-mode]` — subcommand registered in Phase 2; `--gate-mode` flag landed (default informational; flag flips to hook-friendly exit 1 on precondition failures).
@@ -209,7 +209,7 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
 **Acceptance Criteria:**
 - [ ] All ~20 CLI verbs invokable via `dw-lifecycle <verb>` + via skill prose
 - [x] `--gate-mode` flag on check-* commands exits non-zero on violations — landed across `check-anti-patterns`, `check-adopters`, `check-refactor-preconditions` (default informational; flag flips to hook-friendly exit 1) and `detect-clones` (already gate-by-default; flag is a no-op for symmetry). 10 new vitest scenarios cover the flag delta.
-- [x] `--json` flag on summary/export commands emits structured output — `scope-summary --json` emits `{ surface, clones, total, pending-touching, pending-intra, dispositioned-touching }`; `scope-export --json` emits the parsed manifest re-serialized via `JSON.stringify`; `check-deprecations --json` emits `{ blocked, safeToDelete, deprecation_count, note }`.
+- [x] `--json` flag on summary/export commands emits structured output — `scope-summary --json` emits `{ surface, clones, total, pending-touching, pending-intra, dispositioned-touching }`; `scope-export --json` emits the parsed manifest re-serialized via `JSON.stringify`; `check-deprecations --json` emits `{ total, deprecation_count, filesVisited, blocked: [...], safeToDelete: [...] }` (the post-port shape; the pre-port shell's `{ blocked, safeToDelete, deprecation_count, note }` is a superset).
 
 ## Phase 7: Slash command skill prose
 
@@ -225,13 +225,13 @@ Design spec: `docs/superpowers/specs/2026-05-24-scope-discovery-design.md`. Audi
   - [x] `check-adopters` — SKILL.md + commands/check-adopters.md.
   - [x] `check-refactor-preconditions` — SKILL.md + commands/check-refactor-preconditions.md.
   - [x] `check-editor-symmetry` — SKILL.md + commands/check-editor-symmetry.md.
-  - [x] `check-deprecations` — SKILL.md + commands/check-deprecations.md (documents pre-#287 shell behavior + the deferral).
+  - [x] `check-deprecations` — SKILL.md + commands/check-deprecations.md (updated to document the now-real scanner behavior after the #287 port landed).
   - [x] `batch-dispose` — SKILL.md + commands/batch-dispose.md. (Not in the original Phase 7 enumeration; authored because the Phase 6 Task 3 verb landed and it pairs with dispose-clone + check-disposition-survivor.)
   - [x] `dispose-clone` — SKILL.md + commands/dispose-clone.md.
   - [x] `check-disposition-survivor` — SKILL.md + commands/check-disposition-survivor.md. (Not in the original Phase 7 enumeration; authored because the Phase 6 Task 3 verb landed and the pre-commit gate behavior is operator-facing.)
   - [x] `refresh-clones-baseline` — SKILL.md + commands/refresh-clones-baseline.md.
   - [x] `validate-scope-discovery` — SKILL.md + commands/validate-scope-discovery.md.
-  - [ ] `check-clones` — DEFERRED. The Phase 6 rename of `detect-clones` → `check-clones` is itself deferred (Task 2 line cites it as a separate Phase 6 follow-up); authoring prose for a verb whose name is not yet final would create rot. Author when the rename lands.
+  - [x] `check-clones` — SKILL.md + commands/check-clones.md authored in the Phase 6 Task 2 rename pass; sibling `detect-clones` SKILL.md + commands/detect-clones.md are thin redirectors documenting the back-compat alias.
   - [ ] `scope-widen` — DEFERRED, tracked at [#292](https://github.com/audiocontrol-org/deskwork/issues/292). Subcommand semantics need design via `/frontend-design`; prose blocked on that.
   - [x] `install-scope-discovery` — SKILL.md + commands/install-scope-discovery.md landed Phase 8 commit 6 (this run).
   - [x] `install-scope-discovery-hooks` — SKILL.md + commands/install-scope-discovery-hooks.md landed Phase 8 commit 6.

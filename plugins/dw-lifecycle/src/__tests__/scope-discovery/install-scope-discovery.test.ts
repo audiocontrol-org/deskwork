@@ -33,6 +33,7 @@ const SEED_FILE_NAMES = [
   'clones.yaml',
   'anti-patterns.yaml',
   'adopter-manifests.yaml',
+  'deprecation-queue.yaml',
 ];
 
 describe('install-scope-discovery — parseCli', () => {
@@ -73,7 +74,7 @@ describe('install-scope-discovery — install() against tmpdir', () => {
     rmSync(tmp, { recursive: true, force: true });
   });
 
-  it('greenfield: creates 7 files', () => {
+  it('greenfield: creates 8 files', () => {
     const result = install({ target: tmp, force: false, dryRun: false });
     expect(result.code).toBe(0);
     expect(result.actions.length).toBe(
@@ -142,6 +143,9 @@ describe('install-scope-discovery — install() against tmpdir', () => {
     expect(
       readFileSync(join(configDir, 'adopter-manifests.yaml'), 'utf8'),
     ).toBe('schemaVersion: 1\nadopter_manifests: []\n');
+    expect(
+      readFileSync(join(configDir, 'deprecation-queue.yaml'), 'utf8'),
+    ).toBe('schemaVersion: 1\ndeprecations: []\n');
   });
 
   it('copied templates have non-empty content', () => {

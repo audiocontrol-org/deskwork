@@ -23,11 +23,11 @@
  *       real detector from a no-op.
  *
  * Verifying this test actually catches a gutted implementation:
- *   1. Temporarily replace detectClones in clone-detector.ts with
+ *   1. Temporarily replace checkClones in clone-detector.ts with
  *      `process.stdout.write('0 groups; 0 NEW; 0 DROPPED\\n'); process.exit(0);`
  *   2. Re-run this test file alone.
  *   3. The test MUST fail.
- *   4. Restore the original detectClones; the test passes again.
+ *   4. Restore the original checkClones; the test passes again.
  */
 
 import { describe, it, expect } from 'vitest';

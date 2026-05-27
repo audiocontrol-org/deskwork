@@ -7,7 +7,7 @@ import { journalAppend } from './subcommands/journal-append.js';
 import { transition } from './subcommands/transition.js';
 import { issues } from './subcommands/issues.js';
 import { customize } from './subcommands/customize.js';
-import { detectClones } from './subcommands/detect-clones.js';
+import { checkClones } from './subcommands/check-clones.js';
 import { checkAntiPatterns } from './subcommands/check-anti-patterns.js';
 import { checkAdopters } from './subcommands/check-adopters.js';
 import { checkEditorSymmetry } from './subcommands/check-editor-symmetry.js';
@@ -39,7 +39,14 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'journal-append': journalAppend,
   doctor,
   customize,
-  'detect-clones': detectClones,
+  // `check-clones` is the canonical name (workplan Phase 6 Task 2). The
+  // legacy `detect-clones` is preserved as a back-compat alias so
+  // adopter projects whose `install-scope-discovery-hooks` ran against
+  // earlier versions of the plugin keep working without re-installing
+  // their pre-commit hook. New code, new docs, new hook chains emit
+  // `check-clones`. The alias has no scheduled removal.
+  'check-clones': checkClones,
+  'detect-clones': checkClones,
   'check-anti-patterns': checkAntiPatterns,
   'check-adopters': checkAdopters,
   'check-editor-symmetry': checkEditorSymmetry,
@@ -59,9 +66,20 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'uninstall-scope-discovery-hooks': uninstallScopeDiscoveryHooks,
 };
 
+// Deprecation hints printed alongside the subcommand list in `--help`.
+// Each entry maps the alias subcommand name to a one-line note telling
+// the operator which canonical verb to migrate to. The alias still works
+// (registered in SUBCOMMANDS above); the hint is informational only.
+const DEPRECATED_ALIASES: Record<string, string> = {
+  'detect-clones': 'alias for `check-clones` (preferred name; alias kept for back-compat)',
+};
+
 function printUsage(stream: NodeJS.WriteStream): void {
   stream.write('Usage: dw-lifecycle <subcommand> [args...]\n');
   stream.write(`Subcommands: ${Object.keys(SUBCOMMANDS).join(', ')}\n`);
+  for (const [alias, hint] of Object.entries(DEPRECATED_ALIASES)) {
+    stream.write(`  (${alias}: ${hint})\n`);
+  }
 }
 
 async function main() {

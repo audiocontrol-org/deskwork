@@ -247,7 +247,7 @@ async function runAgents(
         // Audit-2026-05-25 Finding 02).
         throw new Error(
           `clone-detector-reader failed: ${errorMessage(err)}\n` +
-            'Generate the baseline first: dw-lifecycle detect-clones --refresh-baseline',
+            'Generate the baseline first: dw-lifecycle check-clones --refresh-baseline',
         );
       })
       .then((f) => ({ name: 'clone-detector-reader', finding: f })),

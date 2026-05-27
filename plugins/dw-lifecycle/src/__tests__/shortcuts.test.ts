@@ -72,10 +72,14 @@ const META_COMMANDS = [
   'batch-dispose',
   'check-adopters',
   'check-anti-patterns',
+  // `check-clones` is the canonical Phase 6 rename; `detect-clones` is the
+  // forever-back-compat alias that ships a thin redirector command file.
+  'check-clones',
   'check-deprecations',
   'check-disposition-survivor',
   'check-editor-symmetry',
   'check-refactor-preconditions',
+  'detect-clones',
   'dispose-clone',
   'install-agent-prompts',
   'install-scope-discovery',

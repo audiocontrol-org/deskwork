@@ -14,8 +14,12 @@
  *      `git config core.hooksPath .githooks` so the new hook is active.
  *
  * Hook content runs these gates in sequence (non-short-circuiting per
- * Phase 4 / TF-004): detect-clones, check-anti-patterns,
+ * Phase 4 / TF-004): check-clones, check-anti-patterns,
  * check-adopters, check-disposition-survivor, check-editor-symmetry.
+ * (Pre-existing installations may have `detect-clones` in the chain;
+ * that alias still works — see cli.ts SUBCOMMANDS map. Re-run
+ * `dw-lifecycle install-scope-discovery-hooks --replace` to migrate
+ * the hook to the canonical `check-clones` name.)
  * Each gate's exit code is captured; the hook exits 1 if any gate
  * reports a violation but never short-circuits, so the operator sees
  * the full picture on every commit attempt.
@@ -55,7 +59,7 @@ const HOOK_BODY_LINES: ReadonlyArray<string> = [
   'set +e',
   'dw_lifecycle_gate_failures=0',
   '',
-  'dw-lifecycle detect-clones --gate-mode || dw_lifecycle_gate_failures=$((dw_lifecycle_gate_failures + 1))',
+  'dw-lifecycle check-clones --gate-mode || dw_lifecycle_gate_failures=$((dw_lifecycle_gate_failures + 1))',
   'dw-lifecycle check-anti-patterns --gate-mode || dw_lifecycle_gate_failures=$((dw_lifecycle_gate_failures + 1))',
   'dw-lifecycle check-adopters --gate-mode || dw_lifecycle_gate_failures=$((dw_lifecycle_gate_failures + 1))',
   'dw-lifecycle check-disposition-survivor || dw_lifecycle_gate_failures=$((dw_lifecycle_gate_failures + 1))',

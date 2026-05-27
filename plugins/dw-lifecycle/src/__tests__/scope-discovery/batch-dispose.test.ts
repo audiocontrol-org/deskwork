@@ -156,7 +156,7 @@ describe('batch-dispose — core scenarios', () => {
       // TF-014 (AUDIT-20260525-07): unknown-id error MUST cite the
       // refresh-baseline prereq so the operator's recovery path is
       // discoverable.
-      expect(stderr).toContain('dw-lifecycle detect-clones --refresh-baseline');
+      expect(stderr).toContain('dw-lifecycle check-clones --refresh-baseline');
       expect(stderr).toContain('pending');
       // File must not be modified despite the unknown id.
       const afterText = await readFile(fixture.path, 'utf8');

@@ -1,19 +1,20 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/refresh-clones-baseline.ts
  *
- * Thin wrapper carving the `--refresh-baseline` mode of `detect-clones`
- * into its own subcommand for operator ergonomics. The underlying
- * implementation lives in `clone-detector.ts`; this file injects
- * `--refresh-baseline` into the arg list and dispatches.
+ * Thin wrapper carving the `--refresh-baseline` mode of `check-clones`
+ * (formerly `detect-clones`) into its own subcommand for operator
+ * ergonomics. The underlying implementation lives in `clone-detector.ts`;
+ * this file injects `--refresh-baseline` into the arg list and
+ * dispatches.
  *
  * Rationale (workplan Phase 6 Task 3 + audit-log AUDIT-20260525-07
  * "Heavy"): operators land on the `dw-lifecycle refresh-clones-baseline`
  * verb naturally — the clone-detector's `batch-dispose` hint cites it as
  * the recovery path when an unknown id is encountered, and skill prose
  * + hook docs reference it without the operator needing to remember the
- * `detect-clones --refresh-baseline` incantation.
+ * `check-clones --refresh-baseline` incantation.
  *
- * Flags accepted (forwarded to detectClones verbatim):
+ * Flags accepted (forwarded to checkClones verbatim):
  *   --baseline <path>  Override the clones.yaml path.
  *   --quiet            Suppress per-clone output; print summary only.
  *
@@ -21,12 +22,12 @@
  *   --gate-mode        Refresh is mutating by definition; gating semantics
  *                       don't apply.
  *
- * Exit codes mirror detectClones for --refresh-baseline mode:
+ * Exit codes mirror checkClones for --refresh-baseline mode:
  *   0  baseline written.
  *   2  I/O, parse, or jscpd-crash error.
  */
 
-import { detectClones } from './clone-detector.js';
+import { checkClones } from './clone-detector.js';
 
 function printHelp(): void {
   process.stdout.write(
@@ -49,7 +50,7 @@ function printHelp(): void {
 }
 
 /**
- * Pure helper: compute the forwarded arg list for detectClones. Injects
+ * Pure helper: compute the forwarded arg list for checkClones. Injects
  * `--refresh-baseline` iff not already present. Pulled out so tests can
  * exercise the arg-translation contract without spawning jscpd.
  */
@@ -71,7 +72,7 @@ export function wantsHelp(args: readonly string[]): boolean {
  * Programmatic entrypoint. Mirrors the other subcommand library APIs:
  * receive the dispatcher's argv, do any flag-level pre-processing, then
  * hand off to the underlying implementation. The handoff calls
- * `process.exit` from inside `detectClones`, matching the dispatcher's
+ * `process.exit` from inside `checkClones`, matching the dispatcher's
  * contract (subcommand handlers exit the process).
  */
 export async function main(args: readonly string[]): Promise<void> {
@@ -79,5 +80,5 @@ export async function main(args: readonly string[]): Promise<void> {
     printHelp();
     process.exit(0);
   }
-  await detectClones(forwardedArgs(args));
+  await checkClones(forwardedArgs(args));
 }

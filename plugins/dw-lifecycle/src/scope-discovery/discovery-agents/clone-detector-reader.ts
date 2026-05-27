@@ -139,7 +139,7 @@ export async function readCloneDetectorOutput(
     if (isEnoent(err)) {
       throw new Error(
         `clone-detector baseline missing at ${baselineAbs}; ` +
-          `run \`dw-lifecycle detect-clones --refresh-baseline\` to generate it`,
+          `run \`dw-lifecycle check-clones --refresh-baseline\` to generate it`,
       );
     }
     throw err;

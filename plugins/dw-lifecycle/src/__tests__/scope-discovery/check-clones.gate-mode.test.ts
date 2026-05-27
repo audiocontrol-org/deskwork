@@ -1,16 +1,20 @@
 /**
- * plugins/dw-lifecycle/src/__tests__/scope-discovery/detect-clones.gate-mode.test.ts
+ * plugins/dw-lifecycle/src/__tests__/scope-discovery/check-clones.gate-mode.test.ts
  *
  * Phase 6 acceptance criterion: `--gate-mode` flag on check-* commands
  * exits non-zero on violations.
  *
- * For `detect-clones`, gate-mode behavior is the EXISTING default (the
- * pre-commit-hook contract — exit 1 on NEW groups, 0 otherwise, 2 on
- * I/O). The `--gate-mode` flag is accepted for symmetry with the other
- * check-* subcommands; it is a no-op in effect.
+ * For `check-clones` (formerly `detect-clones`), gate-mode behavior is
+ * the EXISTING default (the pre-commit-hook contract — exit 1 on NEW
+ * groups, 0 otherwise, 2 on I/O). The `--gate-mode` flag is accepted
+ * for symmetry with the other check-* subcommands; it is a no-op in
+ * effect.
  *
  * This file pins that no-op contract: with the flag and without, the
  * exit code is the same.
+ *
+ * The legacy `detect-clones` subcommand alias is exercised by the
+ * sibling `check-clones.alias.test.ts`.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -34,7 +38,7 @@ const CLONE_BODY_B = `export function gateModeBeta(a: number, b: number): number
 }
 `;
 
-describe('detect-clones — --gate-mode flag (symmetry no-op)', () => {
+describe('check-clones — --gate-mode flag (symmetry no-op)', () => {
   it('NEW group present: exit 1 with --gate-mode (matches existing default)', async () => {
     const fixture = await makeFixture('gate-mode-with-flag');
     try {

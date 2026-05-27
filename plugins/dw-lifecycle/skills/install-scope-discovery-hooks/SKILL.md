@@ -31,7 +31,7 @@ The helper:
 
 | Gate | Behavior |
 |---|---|
-| `dw-lifecycle detect-clones --gate-mode` | Exit 1 if a NEW clone group surfaces (not yet dispositioned in `clones.yaml`). |
+| `dw-lifecycle check-clones --gate-mode` | Exit 1 if a NEW clone group surfaces (not yet dispositioned in `clones.yaml`). Pre-Phase-6 installations have `dw-lifecycle detect-clones --gate-mode` in the chain; the legacy alias still works. Re-run `/dw-lifecycle:install-scope-discovery-hooks --replace` to migrate the hook to the canonical `check-clones` name. |
 | `dw-lifecycle check-anti-patterns --gate-mode` | Exit 1 on any anti-pattern match. |
 | `dw-lifecycle check-adopters --gate-mode` | Exit 1 on adopter-manifest holdouts (files that should use a canonical primitive but don't). |
 | `dw-lifecycle check-disposition-survivor` | Exit 1 if a previously-dispositioned clone has reverted to `pending`. |
