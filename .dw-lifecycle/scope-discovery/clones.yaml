@@ -1,4 +1,4 @@
-generated_at: 2026-05-28T06:35:47.333Z
+generated_at: 2026-05-28T18:18:52.230Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -526,6 +526,41 @@ clones:
       - plugins/dw-lifecycle/src/__tests__/scope-discovery/util/detector-harness.ts:22:36
     disposition: pending
     reason: null
+  - id: 94802334249e
+    lines: 11
+    members:
+      - plugins/dw-lifecycle/src/debt-report/gh-issues.ts:104:114
+      - plugins/dw-lifecycle/src/triage-issues/propose.ts:92:102
+    disposition: keep-with-reason
+    reason: "Hygiene Phase 2 intentional parallelism: workplan instructs 'Don't re-import from debt-report; declare your own in triage-issues/types.ts'. Each clone is a small utility shape (RunGh type, parsePositiveInt, isRawIssue type-guard, latestCommentDate, detectRepoFromGit) intentionally mirrored across the two hygiene-skill libraries to keep them independently evolvable; promotion to a shared module would couple them prematurely before Phase 3-5 reveal the durable abstraction shape."
+  - id: 67a3d7148839
+    lines: 8
+    members:
+      - plugins/dw-lifecycle/src/debt-report/gh-issues.ts:34:41
+      - plugins/dw-lifecycle/src/triage-issues/propose.ts:41:48
+    disposition: keep-with-reason
+    reason: "Hygiene Phase 2 intentional parallelism: workplan instructs 'Don't re-import from debt-report; declare your own in triage-issues/types.ts'. Each clone is a small utility shape (RunGh type, parsePositiveInt, isRawIssue type-guard, latestCommentDate, detectRepoFromGit) intentionally mirrored across the two hygiene-skill libraries to keep them independently evolvable; promotion to a shared module would couple them prematurely before Phase 3-5 reveal the durable abstraction shape."
+  - id: c028a8035019
+    lines: 16
+    members:
+      - plugins/dw-lifecycle/src/debt-report/gh-issues.ts:60:75
+      - plugins/dw-lifecycle/src/triage-issues/propose.ts:61:76
+    disposition: keep-with-reason
+    reason: "Hygiene Phase 2 intentional parallelism: workplan instructs 'Don't re-import from debt-report; declare your own in triage-issues/types.ts'. Each clone is a small utility shape (RunGh type, parsePositiveInt, isRawIssue type-guard, latestCommentDate, detectRepoFromGit) intentionally mirrored across the two hygiene-skill libraries to keep them independently evolvable; promotion to a shared module would couple them prematurely before Phase 3-5 reveal the durable abstraction shape."
+  - id: 9a0dbd3d1c3e
+    lines: 13
+    members:
+      - plugins/dw-lifecycle/src/debt-report/gh-issues.ts:75:87
+      - plugins/dw-lifecycle/src/triage-issues/propose.ts:76:88
+    disposition: keep-with-reason
+    reason: "Hygiene Phase 2 intentional parallelism: workplan instructs 'Don't re-import from debt-report; declare your own in triage-issues/types.ts'. Each clone is a small utility shape (RunGh type, parsePositiveInt, isRawIssue type-guard, latestCommentDate, detectRepoFromGit) intentionally mirrored across the two hygiene-skill libraries to keep them independently evolvable; promotion to a shared module would couple them prematurely before Phase 3-5 reveal the durable abstraction shape."
+  - id: 229bcde0591f
+    lines: 15
+    members:
+      - plugins/dw-lifecycle/src/debt-report/index.ts:14:28
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:147:161
+    disposition: keep-with-reason
+    reason: "Hygiene Phase 2 intentional parallelism: workplan instructs 'Don't re-import from debt-report; declare your own in triage-issues/types.ts'. Each clone is a small utility shape (RunGh type, parsePositiveInt, isRawIssue type-guard, latestCommentDate, detectRepoFromGit) intentionally mirrored across the two hygiene-skill libraries to keep them independently evolvable; promotion to a shared module would couple them prematurely before Phase 3-5 reveal the durable abstraction shape."
   - id: 1801f1b7dd0b
     lines: 8
     members:
@@ -906,6 +941,13 @@ clones:
       - plugins/dw-lifecycle/src/scope-discovery/scope-widen.ts:78:88
     disposition: keep-with-reason
     reason: scope-widen mirrors scope-inventory's CLI-shell boilerplate (slug-regex validation, makeRunDir, scopeWidenMain's parseCli try/catch). Extracting shared helpers would tangle two subcommands' control flow for marginal de-duplication benefit; the symmetry is desirable for operator UX consistency.
+  - id: 9cfccf0a8979
+    lines: 11
+    members:
+      - plugins/dw-lifecycle/src/subcommands/debt-report.ts:39:49
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:34:44
+    disposition: keep-with-reason
+    reason: "Hygiene Phase 2 intentional parallelism: workplan instructs 'Don't re-import from debt-report; declare your own in triage-issues/types.ts'. Each clone is a small utility shape (RunGh type, parsePositiveInt, isRawIssue type-guard, latestCommentDate, detectRepoFromGit) intentionally mirrored across the two hygiene-skill libraries to keep them independently evolvable; promotion to a shared module would couple them prematurely before Phase 3-5 reveal the durable abstraction shape."
   - id: 0a9bedfbb1cf
     lines: 7
     members:
@@ -920,3 +962,10 @@ clones:
       - plugins/dw-lifecycle/src/subcommands/uninstall-shortcuts.ts:276:285
     disposition: pending
     reason: null
+  - id: ff90da1cc3cf
+    lines: 7
+    members:
+      - plugins/dw-lifecycle/src/subcommands/issues.ts:40:46
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:143:149
+    disposition: keep-with-reason
+    reason: "Hygiene Phase 2 intentional parallelism: workplan instructs 'Don't re-import from debt-report; declare your own in triage-issues/types.ts'. Each clone is a small utility shape (RunGh type, parsePositiveInt, isRawIssue type-guard, latestCommentDate, detectRepoFromGit) intentionally mirrored across the two hygiene-skill libraries to keep them independently evolvable; promotion to a shared module would couple them prematurely before Phase 3-5 reveal the durable abstraction shape."
