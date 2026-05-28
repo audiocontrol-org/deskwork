@@ -11,9 +11,14 @@
 // CURRENT content; the edit functions do NOT re-read the file.
 //
 // Each edit performs a drift check: the live line at the recorded
-// `lineNumber` must contain the recorded `expectedText` excerpt as a
-// substring. When the check fails, the edit throws WorkplanDriftError and
-// the apply layer records the failure per-item without mutating the file.
+// `lineNumber`, after trimming, must EQUAL the recorded `expectedText`
+// (also trimmed). Equality — not prefix or substring — is the dispatch
+// spec's wording: "the recorded line text still matches the file's
+// current content." A line that's been appended to out-of-band would
+// slip through a prefix check; equality refuses it. When the check
+// fails, the edit throws WorkplanDriftError with the spec-wording
+// message and the apply layer records the failure per-item without
+// mutating the file.
 //
 // Multi-marker-per-line: when a single line carries multiple TBD markers
 // (e.g. "TBD: defer to next quarter"), the apply layer treats the LINE
@@ -73,15 +78,20 @@ function splitAndLocate(ctx: EditContext): SplitContent {
       `recorded line ${ctx.sample.lineNumber} was unexpectedly empty in the current workplan.`,
     );
   }
-  // Drift check. The sample stores a trimmed excerpt (capped at 200 chars).
-  // We require the live line, when trimmed, to START WITH the recorded
-  // excerpt (a startsWith check rather than includes catches a workplan that
-  // appended text to the line — the marker is still there but the operator
-  // has already annotated it, e.g. with a [debt: #N] tag).
+  // Drift check. The sample stores a trimmed excerpt (capped at 200 chars
+  // by the scanner). We require the live line, when trimmed, to EQUAL the
+  // recorded excerpt (also trimmed — tolerant of trailing whitespace, but
+  // otherwise exact). Equality matches the dispatch spec wording: "the
+  // recorded line text still matches the file's current content." A
+  // substring-or-prefix check would silently accept lines that have been
+  // appended to out-of-band; equality refuses them. The double-back-link
+  // and wontfix-already-applied guards below catch a more-specific shape
+  // of drift (already-applied lines) with a distinct error message.
   const trimmedLive = line.trim();
-  if (!trimmedLive.startsWith(ctx.sample.expectedText)) {
+  const trimmedExpected = ctx.sample.expectedText.trim();
+  if (trimmedLive !== trimmedExpected) {
     throw new WorkplanDriftError(
-      `recorded line ${ctx.sample.lineNumber} text drifted: expected to start with '${ctx.sample.expectedText.slice(0, 60)}' but live line is '${trimmedLive.slice(0, 60)}'. Re-run propose to refresh.`,
+      `workplan file changed since proposal; re-propose (line ${ctx.sample.lineNumber}: expected '${trimmedExpected.slice(0, 60)}' but live line is '${trimmedLive.slice(0, 60)}').`,
     );
   }
   return { lines, originalLine: line };

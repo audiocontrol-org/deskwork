@@ -67,6 +67,25 @@ const BANNED_PHRASES: readonly BannedPhraseRule[] = [
     display: 'follow up / follow-up',
     match: { kind: 'regex', pattern: /\bfollow[- ]up\b/i },
   },
+  // Phrases pulled directly from the canonical self-audit grep list in
+  // .claude/rules/agent-discipline.md (Just-for-now rule). The validator
+  // is the mechanical enforcement of that rule; the banned set must
+  // mirror the rule's self-audit list. Word-boundary regexes throughout
+  // so substring matches inside longer words don't false-positive
+  // (e.g. `stubbornly` does not match `stub`; `pendingMetaCount` is a
+  // CamelCase compound that won't carry a word-boundary `pending`).
+  { display: 'HACK', match: { kind: 'regex', pattern: /\bHACK\b/i } },
+  { display: 'XXX', match: { kind: 'regex', pattern: /\bXXX\b/i } },
+  { display: 'temporary', match: { kind: 'regex', pattern: /\btemporary\b/i } },
+  { display: 'stub', match: { kind: 'regex', pattern: /\bstub\b/i } },
+  { display: 'placeholder', match: { kind: 'regex', pattern: /\bplaceholder\b/i } },
+  { display: 'pending', match: { kind: 'regex', pattern: /\bpending\b/i } },
+  // "until F<digit>" / "until v<digit>" — phase-rollover and version-rollover
+  // markers ("until F5", "until F12", "until v0.20", "until v1.0"). Both
+  // signal the deferral is conditioned on a future release that may or may
+  // not happen on the implied schedule.
+  { display: 'until F<phase>', match: { kind: 'regex', pattern: /until F\d+/i } },
+  { display: 'until v<version>', match: { kind: 'regex', pattern: /until v\d+/i } },
 ];
 
 function matchesRule(text: string, rule: BannedPhraseRule): boolean {

@@ -16,7 +16,7 @@ The substantive-reason validator refuses the gaming phrases the rule names — `
 3. **Propose**:
 
 ```
-dw-lifecycle promote-deferrals propose --workplan <path> [--repo owner/repo] [--output <path>]
+dw-lifecycle promote-deferrals propose --workplan <path> [--repo owner/repo] [--output <path>] [--force]
 ```
 
 The subcommand emits:
@@ -56,8 +56,9 @@ The subcommand:
 ### `inline-wontfix` rules
 
 - `reason` is required, ≥40 characters after trim.
-- `reason` MUST NOT contain any of the banned hedge phrases: `for now`, `just for now`, `next pass`, `TBD`, `will fix later`, `will fix`, `will address`, `address in`, `fix later`, `eventually`, `tomorrow`, `next sprint`, `next cycle`, `next milestone`, `deferred`, `todo`, `fixme`, the bare word `later`, and the verb phrase `follow up` / `follow-up`.
-- The validator is case-insensitive. Word-boundary patterns apply to `later`, `todo`, `fixme`, `TBD`, and `follow up` / `follow-up` so they don't over-match (e.g. `later-version` is fine; bare `later` is rejected).
+- `reason` MUST NOT contain any of the banned hedge phrases: `for now`, `just for now`, `next pass`, `TBD`, `will fix later`, `will fix`, `will address`, `address in`, `fix later`, `eventually`, `tomorrow`, `next sprint`, `next cycle`, `next milestone`, `deferred`, `todo`, `fixme`, the bare word `later`, the verb phrase `follow up` / `follow-up`, `HACK`, `XXX`, `temporary`, `stub`, `placeholder`, `pending`, and the rollover anchors `until F<digit>` (e.g. `until F5`) and `until v<digit>` (e.g. `until v0.20`).
+- The validator is case-insensitive. Word-boundary patterns apply to `later`, `todo`, `fixme`, `TBD`, `follow up` / `follow-up`, `HACK`, `XXX`, `temporary`, `stub`, `placeholder`, and `pending` so they don't over-match (e.g. `later-version`, `contemporary`, `stubbornly`, `pendingMetaCount` are fine; the bare tokens are rejected).
+- The validator operates on operator-authored reasons, not on code commentary. Descriptive uses of banned tokens inside backticks (e.g. `` `pending` `` as an issue-tracker label) are still rejected — the validator does not parse backticks. The rule is: if the wontfix reason mentions one of these tokens, write the explanation without them.
 
 ## Proposal file shape
 
@@ -142,6 +143,7 @@ The workplan file is rewritten ONCE at the end of the run so a per-row drift err
 - **Banned hedge phrase in a wontfix reason.** Pre-validation gate aborts the batch with the per-phrase rejection message naming WHICH phrase matched. Fix the reason and re-run.
 - **Workplan drift between propose and apply.** Per-row drift error; the row's `apply_error` records the discrepancy. The run continues for other rows. Operator re-runs propose to refresh.
 - **Output path already exists for propose.** Propose refuses to overwrite an existing file. Pass `--force`, pass a different `--output` path, or move the existing file aside.
+- **Mid-run write failure.** If `apply` fails mid-run, the workplan is either fully updated or unchanged — never partially mutated. The proposal file is written FIRST (the idempotency record with all `applied` / `apply_error` markers populated); the workplan is written SECOND. Both writes are atomic (write-to-tmp + `renameSync`). If the proposal-file write throws, no workplan mutation has happened yet and the operator can re-run from the original state.
 
 ## Why two verbs
 

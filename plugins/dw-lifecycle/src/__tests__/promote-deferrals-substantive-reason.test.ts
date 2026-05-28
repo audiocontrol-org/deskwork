@@ -72,6 +72,17 @@ describe('validateSubstantiveReason — banned hedge phrases', () => {
     'we can investigate this later if the failure rate climbs past 0.5 percent',
     'follow up after the next architecture review with the storage team owner',
     'will follow-up after the next sync once the storage team has weighed in',
+    // Phrases pulled from the canonical self-audit grep list in
+    // .claude/rules/agent-discipline.md — added so the validator mirrors
+    // the rule's enumerated set.
+    'this is a HACK until the renderer team rewrites the diff-application path next',
+    'XXX we need to revisit this once the cluster has migrated off the legacy quorum',
+    'a temporary workaround while the storage team works out the migration path',
+    'a stub implementation that wires up the right shape but does not validate inputs',
+    'a placeholder UI while the design team finalizes the affordance shape and tokens',
+    'pending re-architecture per the 2026-05 architecture review board decision draft',
+    'this should land until F5 brings in the cap-relief rewrite across all surfaces',
+    'this should land until v0.20 brings in the cap-relief rewrite across all surfaces',
   ])('rejects reason containing banned phrase: %s', (reason) => {
     const r = validateSubstantiveReason(reason);
     expect(r.valid).toBe(false);
@@ -110,6 +121,32 @@ describe('validateSubstantiveReason — banned hedge phrases', () => {
     expect(r.valid).toBe(true);
   });
 
+  it('does NOT match `stub` as a substring inside `stubbornly`', () => {
+    const reason =
+      'stubbornly the parser refuses to handle unicode normalization across module boundaries';
+    const r = validateSubstantiveReason(reason);
+    expect(r.valid).toBe(true);
+  });
+
+  it('does NOT match `pending` as a substring inside a CamelCase compound', () => {
+    // CamelCase compounds (pendingMetaCount, etc.) are common in code
+    // references; the word-boundary regex correctly does NOT match
+    // because the lower-to-upper-case boundary is not a `\b` boundary.
+    const reason =
+      'the pendingMetaCount field is referenced by the synthesis report and several scope hooks';
+    const r = validateSubstantiveReason(reason);
+    expect(r.valid).toBe(true);
+  });
+
+  it('does NOT match `temporary` as a substring inside `contemporary`', () => {
+    const reason =
+      'this surface is contemporary with the v0.16 redesign and shares its architectural shape';
+    const r = validateSubstantiveReason(reason);
+    // `contemporary` contains `temporary` as a substring but
+    // word-boundary regex correctly skips it.
+    expect(r.valid).toBe(true);
+  });
+
   it('surfaces multiple banned hits in the rejection reason', () => {
     const r = validateSubstantiveReason(
       'this is a TODO that we will fix later when the time comes around the bend',
@@ -144,6 +181,18 @@ describe('validateSubstantiveReason — banned-phrase catalog', () => {
     expect(names).toContain('fixme');
     expect(names).toContain('later (standalone word)');
     expect(names).toContain('follow up / follow-up');
+    // Phrases added to mirror the .claude/rules/agent-discipline.md
+    // self-audit list. Each is a word-boundary regex (HACK / XXX /
+    // temporary / stub / placeholder / pending) or a regex with a
+    // numeric anchor (until F<digit> / until v<digit>).
+    expect(names).toContain('HACK');
+    expect(names).toContain('XXX');
+    expect(names).toContain('temporary');
+    expect(names).toContain('stub');
+    expect(names).toContain('placeholder');
+    expect(names).toContain('pending');
+    expect(names).toContain('until F<phase>');
+    expect(names).toContain('until v<version>');
   });
 
   it('exports the minimum length constant', () => {

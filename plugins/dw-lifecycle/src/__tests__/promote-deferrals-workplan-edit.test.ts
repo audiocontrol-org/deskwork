@@ -79,6 +79,47 @@ describe('appendBacklink', () => {
     ).toThrow(WorkplanDriftError);
   });
 
+  it('tolerates trailing whitespace on the live line (trim-vs-trim equality)', () => {
+    // Operator added two trailing spaces by hand. Trim-tolerant equality
+    // keeps the edit working without re-propose.
+    const withTrailingWs = SAMPLE.replace(
+      '- [ ] TBD: figure out database schema for nested groups',
+      '- [ ] TBD: figure out database schema for nested groups  ',
+    );
+    const next = appendBacklink({
+      content: withTrailingWs,
+      sample: {
+        lineNumber: 7,
+        expectedText: '- [ ] TBD: figure out database schema for nested groups',
+      },
+      issueNumber: 189,
+    });
+    expect(lineOf(next, 7)).toBe(
+      '- [ ] TBD: figure out database schema for nested groups [debt: #189]',
+    );
+  });
+
+  it('throws WorkplanDriftError when the operator appended non-whitespace content out-of-band', () => {
+    // The dispatch spec requires equality (after trim), not prefix. A
+    // line that's been appended to with extra non-whitespace content
+    // must trip drift — otherwise edits silently stack on top of an
+    // already-annotated line.
+    const appended = SAMPLE.replace(
+      '- [ ] TBD: figure out database schema for nested groups',
+      '- [ ] TBD: figure out database schema for nested groups — note from operator',
+    );
+    expect(() =>
+      appendBacklink({
+        content: appended,
+        sample: {
+          lineNumber: 7,
+          expectedText: '- [ ] TBD: figure out database schema for nested groups',
+        },
+        issueNumber: 189,
+      }),
+    ).toThrow(/workplan file changed since proposal; re-propose/);
+  });
+
   it('throws WorkplanDriftError when line number is out of range', () => {
     expect(() =>
       appendBacklink({

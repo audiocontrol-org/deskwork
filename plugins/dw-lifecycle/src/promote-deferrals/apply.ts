@@ -11,7 +11,12 @@
 // accumulated in memory and written once at the end so a per-row
 // workplan-edit error (drift detected) doesn't corrupt the file.
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import {
+  readFileSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import {
   buildDispatch,
   parseIssueNumberFromGhOutput,
@@ -28,7 +33,6 @@ import type { ApprovalToken } from './gate.js';
 import {
   appendBacklink,
   replaceWithWontfix,
-  WorkplanDriftError,
 } from './workplan-edit.js';
 import type {
   InlineWontfixFields,
@@ -180,9 +184,11 @@ function runInlineWontfix(
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    if (err instanceof WorkplanDriftError) {
-      return failedOutcome(args, `workplan drift: ${firstLine(message)}`);
-    }
+    // WorkplanDriftError carries the spec-wording message verbatim
+    // ("workplan file changed since proposal; re-propose ..."); pass it
+    // through unchanged so `apply_error` receives the spec wording. The
+    // already-applied guards (double back-link / wontfix-on-back-linked
+    // line) surface their own distinct messages through this same path.
     return failedOutcome(args, firstLine(message));
   }
   return {
@@ -242,8 +248,29 @@ function defaultReadWorkplan(path: string): string {
   return readFileSync(path, 'utf8');
 }
 
+// Atomic write: write to <path>.tmp-<pid>-<random>, then renameSync. On
+// POSIX same-mount renames are atomic, so a reader of <path> sees either
+// the old or the new content but never a half-written file. If the
+// rename throws, clean up the tmp file before re-throwing.
+function atomicWrite(path: string, content: string): void {
+  const suffix = `${process.pid}-${Math.random().toString(36).slice(2, 10)}`;
+  const tmpPath = `${path}.tmp-${suffix}`;
+  writeFileSync(tmpPath, content, 'utf8');
+  try {
+    renameSync(tmpPath, path);
+  } catch (err) {
+    try {
+      unlinkSync(tmpPath);
+    } catch {
+      // Ignore secondary cleanup failures; the rename error is the one
+      // we want to surface.
+    }
+    throw err;
+  }
+}
+
 function defaultWriteWorkplan(path: string, content: string): void {
-  writeFileSync(path, content, 'utf8');
+  atomicWrite(path, content);
 }
 
 export function apply(args: ApplyArgs): ApplyResult {
@@ -304,9 +331,15 @@ export function apply(args: ApplyArgs): ApplyResult {
   }
 
   outcomes.sort((a, b) => a.itemIndex - b.itemIndex);
-  writeWorkplan(file.workplan_path, workplanContent);
+  // Write ordering: proposal file FIRST (the idempotency record with
+  // all `applied` / `apply_error` markers populated), workplan SECOND.
+  // If the proposal-file write fails, NO workplan mutation has happened
+  // yet — operator can re-run from the original state. Both writes are
+  // atomic (write-to-tmp + renameSync) so a reader of either path sees
+  // old or new content but never a partial file.
   const next: ProposalFile = { ...file, items: updatedItems };
-  writeFileSync(args.proposalPath, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
+  atomicWrite(args.proposalPath, `${JSON.stringify(next, null, 2)}\n`);
+  writeWorkplan(file.workplan_path, workplanContent);
 
   const summary: ApplySummary = {
     applied: outcomes.filter((o) => o.applied).length,

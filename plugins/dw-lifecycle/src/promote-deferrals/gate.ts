@@ -70,33 +70,70 @@ export function parseApproval(
   return { kind: 'subset', indexes };
 }
 
-function isProposalItemShape(value: unknown): value is ProposalItem {
+// Validate every declared field on ProposalItem rather than the 5-field
+// subset the previous guard checked. A malformed item with missing
+// `disposition_fields` / `applied` / `apply_error` / `result` / `sample`
+// keys would otherwise pass the guard and then trip a TypeError deeper
+// in the apply pipeline. Returns the per-field failure name so the
+// caller can surface it via InvalidProposalFileError.
+type ItemValidationResult =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly missing: string };
+
+function isNullOrType(value: unknown, kind: 'string' | 'number' | 'boolean' | 'object'): boolean {
+  if (value === null) return true;
+  if (kind === 'object') return typeof value === 'object' && !Array.isArray(value);
+  return typeof value === kind;
+}
+
+function validateProposalItemShape(value: unknown): ItemValidationResult {
+  if (typeof value !== 'object' || value === null) {
+    return { ok: false, missing: '(item is not an object)' };
+  }
+  const v = value as Record<string, unknown>;
+  // Required scalar fields.
+  if (typeof v.lineNumber !== 'number') return { ok: false, missing: 'lineNumber' };
+  if (typeof v.markerKey !== 'string') return { ok: false, missing: 'markerKey' };
+  if (typeof v.text !== 'string') return { ok: false, missing: 'text' };
+  // Nullable-string fields. Each must EXIST as a key with the right shape.
+  if (!isNullOrType(v.containingTask, 'string')) return { ok: false, missing: 'containingTask' };
+  if (!isNullOrType(v.parentPhase, 'string')) return { ok: false, missing: 'parentPhase' };
+  if (!('containingTaskLine' in v) || !isNullOrType(v.containingTaskLine, 'number')) {
+    return { ok: false, missing: 'containingTaskLine' };
+  }
+  if (!('parentPhaseLine' in v) || !isNullOrType(v.parentPhaseLine, 'number')) {
+    return { ok: false, missing: 'parentPhaseLine' };
+  }
+  // Disposition fields. Both halves are nullable but must exist as keys.
+  if (!('disposition' in v) || !isNullOrType(v.disposition, 'string')) {
+    return { ok: false, missing: 'disposition' };
+  }
+  if (!('disposition_fields' in v) || !isNullOrType(v.disposition_fields, 'object')) {
+    return { ok: false, missing: 'disposition_fields' };
+  }
+  // Outcome fields populated by apply. Each must exist as a key.
+  if (!('applied' in v) || !isNullOrType(v.applied, 'boolean')) {
+    return { ok: false, missing: 'applied' };
+  }
+  if (!('apply_error' in v) || !isNullOrType(v.apply_error, 'string')) {
+    return { ok: false, missing: 'apply_error' };
+  }
+  if (!('result' in v) || !isNullOrType(v.result, 'string')) {
+    return { ok: false, missing: 'result' };
+  }
+  return { ok: true };
+}
+
+
+function isProposalFileTopLevel(value: unknown): value is { items: unknown[] } & Record<string, unknown> {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
   return (
-    typeof v.lineNumber === 'number' &&
-    typeof v.markerKey === 'string' &&
-    typeof v.text === 'string' &&
-    (v.containingTask === null || typeof v.containingTask === 'string') &&
-    (v.parentPhase === null || typeof v.parentPhase === 'string')
+    typeof v.generated_at === 'string' &&
+    typeof v.workplan_path === 'string' &&
+    typeof v.repo === 'string' &&
+    Array.isArray(v.items)
   );
-}
-
-function isProposalFile(value: unknown): value is ProposalFile {
-  if (typeof value !== 'object' || value === null) return false;
-  const v = value as Record<string, unknown>;
-  if (
-    typeof v.generated_at !== 'string' ||
-    typeof v.workplan_path !== 'string' ||
-    typeof v.repo !== 'string' ||
-    !Array.isArray(v.items)
-  ) {
-    return false;
-  }
-  for (const item of v.items) {
-    if (!isProposalItemShape(item)) return false;
-  }
-  return true;
 }
 
 export function readProposalFile(path: string): ProposalFile {
@@ -110,12 +147,27 @@ export function readProposalFile(path: string): ProposalFile {
       `Could not parse ${path} as JSON: ${message}`,
     );
   }
-  if (!isProposalFile(parsed)) {
+  if (!isProposalFileTopLevel(parsed)) {
     throw new InvalidProposalFileError(
       `${path} is not a valid proposal file (missing or malformed required fields).`,
     );
   }
-  return parsed;
+  // Walk each item; surface the per-field failure name so the operator
+  // can locate the malformed row. A row missing any declared field
+  // (disposition / disposition_fields / applied / apply_error / result /
+  // containingTaskLine / parentPhaseLine) aborts the gate with the
+  // field name in the message — pre-Fix-4 the missing field would have
+  // tripped a TypeError deeper in the apply pipeline.
+  for (let i = 0; i < parsed.items.length; i++) {
+    const item = parsed.items[i];
+    const check = validateProposalItemShape(item);
+    if (!check.ok) {
+      throw new InvalidProposalFileError(
+        `malformed item at index ${i}: missing field '${check.missing}'`,
+      );
+    }
+  }
+  return parsed as unknown as ProposalFile;
 }
 
 export function selectedIndexes(

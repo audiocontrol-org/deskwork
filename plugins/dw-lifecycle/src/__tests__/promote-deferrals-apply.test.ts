@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -137,6 +143,47 @@ describe('apply — gate behavior', () => {
     expect(() => apply({ proposalPath, runGh: () => '' })).toThrow(
       InvalidProposalFileError,
     );
+  });
+
+  it('throws InvalidProposalFileError when an item is missing the disposition_fields key', () => {
+    // The guard validates EVERY declared field on ProposalItem. A row
+    // that omits `disposition_fields` (one of the 11 declared fields)
+    // must be caught at gate time — pre-Fix-4, the row would have
+    // passed the 5-field guard and tripped a TypeError later.
+    const wpPath = fixtureWorkplan(projectRoot);
+    const proposalPath = join(projectRoot, 'p.json');
+    const before = readFileSync(wpPath, 'utf8');
+    writeFileSync(
+      proposalPath,
+      JSON.stringify({
+        generated_at: '2026-05-28T00:00:00.000Z',
+        workplan_path: wpPath,
+        repo: 'owner/repo',
+        approval: 'y',
+        items: [
+          {
+            lineNumber: 3,
+            markerKey: 'tbd',
+            text: '- [ ] TBD: figure out schema',
+            containingTask: null,
+            parentPhase: null,
+            containingTaskLine: null,
+            parentPhaseLine: null,
+            disposition: null,
+            // disposition_fields intentionally omitted
+            applied: null,
+            apply_error: null,
+            result: null,
+          },
+        ],
+      }),
+      'utf8',
+    );
+    expect(() => apply({ proposalPath, runGh: () => '' })).toThrow(
+      /malformed item at index 0: missing field 'disposition_fields'/,
+    );
+    // No workplan mutation happened.
+    expect(readFileSync(wpPath, 'utf8')).toBe(before);
   });
 
   it('throws InvalidProposalFileError on half-filled item', () => {
@@ -330,7 +377,7 @@ describe('apply — happy path', () => {
     expect(result.summary.applied).toBe(1);
     expect(result.summary.failed).toBe(1);
     const failed = result.outcomes.find((o) => !o.applied && !o.skipped);
-    expect(failed?.error).toMatch(/drift/i);
+    expect(failed?.error).toMatch(/workplan file changed since proposal; re-propose/);
   });
 
   it('records gh failure as per-item failure (partial success)', () => {
@@ -357,6 +404,50 @@ describe('apply — happy path', () => {
     expect(result.summary.applied).toBe(0);
     expect(result.summary.failed).toBe(1);
     expect(result.outcomes[0]?.error).toMatch(/not authenticated/);
+  });
+
+  it('leaves the workplan unchanged when the proposal-file write fails', () => {
+    // Write ordering: proposal file FIRST, workplan SECOND. If the
+    // proposal-file write throws, the workplan must be untouched so the
+    // operator can re-run from the original state. We simulate the
+    // proposal-write failure by making the proposal-path directory
+    // read-only after the workplan fixture is written.
+    const wpPath = fixtureWorkplan(projectRoot);
+    const originalWorkplan = readFileSync(wpPath, 'utf8');
+    // Place the proposal file in a subdir we can chmod-readonly. We
+    // first write the proposal, then chmod the parent directory so the
+    // subsequent atomic-write (tmp file create) inside the same dir
+    // fails — but the workplan write (which is in a DIFFERENT parent
+    // directory) would still succeed if write-ordering were wrong.
+    const proposalDir = join(projectRoot, 'subdir');
+    mkdirSync(proposalDir);
+    const proposalPath = join(proposalDir, 'p.json');
+    writeProposal(proposalPath, {
+      generated_at: '2026-05-28T00:00:00.000Z',
+      workplan_path: wpPath,
+      repo: 'owner/repo',
+      approval: 'y',
+      items: [
+        makeItem({
+          lineNumber: 3,
+          text: '- [ ] TBD: figure out schema',
+          disposition: 'inline-wontfix',
+          disposition_fields: { reason: GOOD_REASON },
+        }),
+      ],
+    });
+    chmodSync(proposalDir, 0o500);
+    try {
+      expect(() =>
+        apply({ proposalPath, runGh: () => '' }),
+      ).toThrow();
+    } finally {
+      // Restore so test cleanup can proceed.
+      chmodSync(proposalDir, 0o700);
+    }
+    // Workplan content must be the pre-apply original — proposal-file
+    // write failed before any workplan mutation hit disk.
+    expect(readFileSync(wpPath, 'utf8')).toBe(originalWorkplan);
   });
 
   it('overwrites proposal file with per-row outcomes', () => {
