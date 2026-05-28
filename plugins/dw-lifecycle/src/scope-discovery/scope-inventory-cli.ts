@@ -2,7 +2,7 @@
  * plugins/dw-lifecycle/src/scope-discovery/scope-inventory-cli.ts
  *
  * CLI parser + USAGE string extracted from `scope-inventory.ts` so the
- * library entry stays under the 300–500 line cap after the Phase 11
+ * library entry stays under the 300–500 line cap after the the orchestrator loop
  * Task 7 LLM-ensemble integration. The split is mechanical (no
  * semantic change) — `parseCli` + `USAGE` + the `CliOptions` interface
  * + the slug regex / default module-root constants live here; the
@@ -24,7 +24,7 @@ export interface CliOptions {
   readonly quiet: boolean;
   readonly editorSymmetryOut: string | null;
   /**
-   * Phase 11 Task 7 — LLM ensemble opt-out flags. Default behavior is
+   * LLM ensemble opt-out flags. Default behavior is
    * "engage the audit-log read at the start of the run + fire the
    * external auditor at the end of the run." Operators set these
    * flags to silence the integration without removing scope-discovery
@@ -32,6 +32,15 @@ export interface CliOptions {
    */
   readonly noAuditRead: boolean;
   readonly noAuditFire: boolean;
+  /**
+   * TF-016 (dogfood) — when true, the orchestrator does NOT emit the
+   * "zero modules detected" advisory on stderr. The modules array can
+   * still be empty (the schema relaxation in TF-016a permits this);
+   * the flag only silences the per-run note for adopters who already
+   * understand their repo doesn't use a `<module-root>/<feature-slug>/`
+   * layout. Default false preserves the advisory for new adopters.
+   */
+  readonly noRequireModules: boolean;
 }
 
 export const USAGE =
@@ -44,6 +53,7 @@ export const USAGE =
   '    [--evidence-trail on|off] \\\n' +
   '    [--editor-symmetry-out <path>] \\\n' +
   '    [--no-audit-read] [--no-audit-fire] \\\n' +
+  '    [--no-require-modules] \\\n' +
   '    [--quiet]\n';
 
 export function parseCli(argv: ReadonlyArray<string>): CliOptions {
@@ -60,6 +70,7 @@ export function parseCli(argv: ReadonlyArray<string>): CliOptions {
   let quiet = false;
   let noAuditRead = false;
   let noAuditFire = false;
+  let noRequireModules = false;
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === '--help' || a === '-h') throw new Error('HELP');
@@ -73,6 +84,10 @@ export function parseCli(argv: ReadonlyArray<string>): CliOptions {
     }
     if (a === '--no-audit-fire') {
       noAuditFire = true;
+      continue;
+    }
+    if (a === '--no-require-modules') {
+      noRequireModules = true;
       continue;
     }
     if (a !== undefined && SCALAR_FLAGS.has(a)) {
@@ -121,5 +136,6 @@ export function parseCli(argv: ReadonlyArray<string>): CliOptions {
     editorSymmetryOut,
     noAuditRead,
     noAuditFire,
+    noRequireModules,
   };
 }

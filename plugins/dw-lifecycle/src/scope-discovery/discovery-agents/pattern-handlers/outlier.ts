@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-handlers/outlier.ts
  *
- * Statistical-outlier pattern handler — Phase 11 G4.
+ * Statistical-outlier pattern handler — the discovered_candidates stub.
  *
  * For each glob-matched file, computes a feature vector (token
  * composition or className composition) and a distance from the
@@ -129,7 +129,7 @@ const EXT_TO_CONTENT: ReadonlyMap<string, ResolvedContentType> = new Map<
 ]);
 
 /**
- * Phase 11 Task 13 — resolve `'auto'` to a concrete content type from
+ * resolve `'auto'` to a concrete content type from
  * the file extension. Unknown extensions fall back to `'ts'` (the prior
  * alphanumeric-token tokenizer) so existing TS-scoped catalogs see no
  * behavior change.
@@ -187,7 +187,7 @@ function classNameTokens(text: string): TokenBag {
 
 function vectorize(entry: OutlierEntry, scan: SourceFileView): TokenBag {
   if (entry.distanceMetric === 'token-composition') {
-    // Phase 11 Task 13 — `contentType` is optional on the entry shape;
+    // `contentType` is optional on the entry shape;
     // pre-Task-13 fixtures (and adopters who never set it) inherit
     // `'auto'`, which infers the tokenizer from the file extension.
     const configured = entry.contentType ?? 'auto';

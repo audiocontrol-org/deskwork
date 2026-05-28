@@ -257,7 +257,7 @@ export async function synthesize(input: SynthesizeOptions): Promise<SynthesisOut
     );
   }
 
-  // Phase 11 Task 4 — gather + compute codebase-state metrics when
+  // gather + compute codebase-state metrics when
   // the project ships any catalog files. Informational: failures
   // surface as warnings, not throws, so a broken git history doesn't
   // take down an otherwise-healthy synthesis run.
@@ -269,7 +269,7 @@ export async function synthesize(input: SynthesizeOptions): Promise<SynthesisOut
     warnings,
   });
 
-  // Phase 11 Task 3 — orchestrator-agent mediation: cluster raw
+  // orchestrator-agent mediation: cluster raw
   // findings into architectural-scale candidate classes. PHASE 1
   // invocation (no dispositions) — surfaces clusters + summaries
   // for the operator to triage. The dispositions + line-level edits

@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-handlers/negative-space.ts
  *
- * Negative-space pattern handler — Phase 11 G2.
+ * Negative-space pattern handler — the discovered_candidates stub.
  *
  * Fires when a file matching `matchGlob` does NOT contain at least one
  * match for `mustContain`. This is the "expected adopter that didn't

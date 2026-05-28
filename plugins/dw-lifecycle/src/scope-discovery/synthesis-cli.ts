@@ -201,7 +201,7 @@ export async function main(argv: ReadonlyArray<string>): Promise<number> {
       `findings=${output.metadata.findingsCount}, ` +
       `dedup-savings=${output.metadata.dedupCount})\n`,
   );
-  // Phase 11 Task 12 — surface the inventory-vs-discovery category
+  // surface the inventory-vs-discovery category
   // summary alongside the existing "wrote ..." line so the standalone
   // CLI matches the orchestrating scope-inventory subcommand's stderr
   // contract. The full breakdown lives in --notes-out.
@@ -217,7 +217,7 @@ export async function main(argv: ReadonlyArray<string>): Promise<number> {
       : resolve(opts.repoRoot, opts.notesOutPath);
     try {
       await mkdir(dirname(notesAbs), { recursive: true });
-      // Phase 11 Task 12 — splice the inventory-vs-discovery category
+      // splice the inventory-vs-discovery category
       // report BEFORE the synthesizer notes so the operator's first read
       // of the notes file sees the category distinction.
       const categoryReport = renderFindingCategoryReport(output.manifest);

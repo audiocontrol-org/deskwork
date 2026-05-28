@@ -1,41 +1,11 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/controller/controller-state.ts
  *
- * Phase 11 Task 5 — Durable state persistence for the controller.
- *
- * The controller itself is pure (see `controller.ts`). This module
- * handles the read/write side: loading prior history + decision from
- * disk before invoking `runController`, then persisting the updated
- * history afterward.
- *
- * Default path:
- *   `.dw-lifecycle/scope-discovery/orchestrator-runtime/controller-state.json`
- *
- * The orchestrator-runtime dir is gitignored (per Phase 11 Task 6's
- * resumability decision); the controller-state.json file is
- * orchestrator-private — operators inspect it for telemetry but it
- * is NOT operator-edited.
- *
- * # File format
- *
- *   {
- *     "version": 1,
- *     "history": [
- *       {
- *         "decision": { ... ControllerDecision JSON ... },
- *         "metrics_snapshot": { ... MetricsSnapshot JSON ... }
- *       },
- *       ...
- *     ]
- *   }
- *
- * History is stored newest-first (history[0] is the most recent). The
- * controller's history-window operations are O(history.length) so we
- * cap retention at `DEFAULT_HISTORY_RETENTION` entries (24 turns —
- * deep enough for the longest anti-thrashing / ratchet-down window
- * any reasonable config would use, plus a few turns of margin).
+ * Durable state persistence for the controller. Per-feature isolation
+ * at `<runtimeDir>/<featureSlug>/controller-state.json`. See TF-012.
  */
 
+import { existsSync } from 'node:fs';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { loadLlmConfig } from '../llm/config.js';
@@ -47,18 +17,6 @@ import type {
 } from './controller-types.js';
 
 export const CONTROLLER_STATE_FILENAME = 'controller-state.json';
-
-/**
- * Maximum history entries retained. Bounded so the state file does
- * not grow unbounded over long-running projects. Old entries beyond
- * this cap are dropped from the tail on each `persistControllerState`.
- *
- * 24 was picked as the smallest value that comfortably exceeds the
- * largest reasonable ratchet_down_window + anti_thrashing_window
- * combined (default 5 + 3 = 8; ceiling around 12; 24 leaves 2x
- * headroom). Adopters with extreme configs override at the
- * orchestrator-side.
- */
 export const DEFAULT_HISTORY_RETENTION = 24;
 
 interface ControllerStateFile {
@@ -66,70 +24,68 @@ interface ControllerStateFile {
   readonly history: ReadonlyArray<ControllerHistoryEntry>;
 }
 
-function statePath(repoRoot: string, runtimeDir: string): string {
+function statePath(repoRoot: string, runtimeDir: string, featureSlug: string): string {
+  return resolve(repoRoot, runtimeDir, featureSlug, CONTROLLER_STATE_FILENAME);
+}
+
+function legacyStatePath(repoRoot: string, runtimeDir: string): string {
   return resolve(repoRoot, runtimeDir, CONTROLLER_STATE_FILENAME);
 }
 
-/**
- * Type-guard parse for the JSON file. Returns `null` for missing
- * file (caller treats as cold-start); throws on malformed file (per
- * project rule against silent fallbacks).
- */
-function parseStateFile(
-  text: string,
-  ctx: string,
-): ControllerStateFile {
+const warnedLegacyControllerPaths = new Set<string>();
+
+function warnLegacyControllerState(legacyPath: string): void {
+  if (warnedLegacyControllerPaths.has(legacyPath)) return;
+  warnedLegacyControllerPaths.add(legacyPath);
+  process.stderr.write(
+    `controller-state: legacy per-repo controller-state at ${legacyPath} ` +
+      'ignored — using empty per-feature state. Delete the legacy file when ' +
+      'you have confirmed no other features depend on it.\n',
+  );
+}
+
+function requireFeatureSlug(featureSlug: string, fn: string): void {
+  if (featureSlug.length === 0) {
+    throw new Error(`controller-state: ${fn} requires a non-empty featureSlug`);
+  }
+}
+
+function parseStateFile(text: string, ctx: string): ControllerStateFile {
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
   } catch (err) {
-    throw new Error(
-      `controller-state: cannot parse ${ctx}: ${errorMessage(err)}`,
-    );
+    throw new Error(`controller-state: cannot parse ${ctx}: ${errorMessage(err)}`);
   }
   if (!isPlainObject(parsed)) {
-    throw new Error(
-      `controller-state: ${ctx} did not parse to an object`,
-    );
+    throw new Error(`controller-state: ${ctx} did not parse to an object`);
   }
   const version = parsed['version'];
   if (version !== 1) {
-    throw new Error(
-      `controller-state: ${ctx} has unsupported version ${String(version)}; expected 1`,
-    );
+    throw new Error(`controller-state: ${ctx} has unsupported version ${String(version)}; expected 1`);
   }
   const historyRaw = parsed['history'];
   if (!Array.isArray(historyRaw)) {
-    throw new Error(
-      `controller-state: ${ctx} \`history\` must be an array`,
-    );
+    throw new Error(`controller-state: ${ctx} \`history\` must be an array`);
   }
   const history: ControllerHistoryEntry[] = [];
   for (let i = 0; i < historyRaw.length; i += 1) {
-    const item = historyRaw[i];
-    history.push(parseHistoryEntry(item, `${ctx}#/history/${i}`));
+    history.push(parseHistoryEntry(historyRaw[i], `${ctx}#/history/${i}`));
   }
   return { version: 1, history };
 }
 
-function parseHistoryEntry(
-  raw: unknown,
-  ctx: string,
-): ControllerHistoryEntry {
+function parseHistoryEntry(raw: unknown, ctx: string): ControllerHistoryEntry {
   if (!isPlainObject(raw)) {
     throw new Error(`controller-state: ${ctx} must be an object`);
   }
   const decisionRaw = raw['decision'];
   const metricsRaw = raw['metrics_snapshot'];
   if (!isPlainObject(decisionRaw)) {
-    throw new Error(
-      `controller-state: ${ctx} \`decision\` must be an object`,
-    );
+    throw new Error(`controller-state: ${ctx} \`decision\` must be an object`);
   }
   if (!isPlainObject(metricsRaw)) {
-    throw new Error(
-      `controller-state: ${ctx} \`metrics_snapshot\` must be an object`,
-    );
+    throw new Error(`controller-state: ${ctx} \`metrics_snapshot\` must be an object`);
   }
   return {
     decision: parseDecision(decisionRaw, `${ctx}/decision`),
@@ -137,38 +93,23 @@ function parseHistoryEntry(
   };
 }
 
-function requireNumber(
-  raw: Record<string, unknown>,
-  field: string,
-  ctx: string,
-): number {
+function requireNumber(raw: Record<string, unknown>, field: string, ctx: string): number {
   const v = raw[field];
   if (typeof v !== 'number' || !Number.isFinite(v)) {
-    throw new Error(
-      `controller-state: ${ctx} \`${field}\` must be a finite number`,
-    );
+    throw new Error(`controller-state: ${ctx} \`${field}\` must be a finite number`);
   }
   return v;
 }
 
-function requireString(
-  raw: Record<string, unknown>,
-  field: string,
-  ctx: string,
-): string {
+function requireString(raw: Record<string, unknown>, field: string, ctx: string): string {
   const v = raw[field];
   if (typeof v !== 'string' || v.length === 0) {
-    throw new Error(
-      `controller-state: ${ctx} \`${field}\` must be a non-empty string`,
-    );
+    throw new Error(`controller-state: ${ctx} \`${field}\` must be a non-empty string`);
   }
   return v;
 }
 
-function parseDecision(
-  raw: Record<string, unknown>,
-  ctx: string,
-): ControllerDecision {
+function parseDecision(raw: Record<string, unknown>, ctx: string): ControllerDecision {
   const frequency = requireNumber(raw, 'frequency', ctx);
   const intensity = requireNumber(raw, 'intensity', ctx);
   const escalationThreshold = requireNumber(raw, 'escalationThreshold', ctx);
@@ -180,106 +121,64 @@ function parseDecision(
   const signals = {
     drift: requireNumber(signalsRaw, 'drift', `${ctx}/signals`),
     correction: requireNumber(signalsRaw, 'correction', `${ctx}/signals`),
-    auditorCorrectionRate: requireNumber(
-      signalsRaw,
-      'auditorCorrectionRate',
-      `${ctx}/signals`,
-    ),
+    auditorCorrectionRate: requireNumber(signalsRaw, 'auditorCorrectionRate', `${ctx}/signals`),
   };
   const trailRaw = raw['audit_trail'];
   if (!Array.isArray(trailRaw)) {
-    throw new Error(
-      `controller-state: ${ctx} \`audit_trail\` must be an array`,
-    );
+    throw new Error(`controller-state: ${ctx} \`audit_trail\` must be an array`);
   }
   const audit_trail: ControllerDecision['audit_trail'] = trailRaw.map(
     (entry, idx) => {
       if (!isPlainObject(entry)) {
-        throw new Error(
-          `controller-state: ${ctx}/audit_trail[${idx}] must be an object`,
-        );
+        throw new Error(`controller-state: ${ctx}/audit_trail[${idx}] must be an object`);
       }
       const field = parseField(entry['field'], `${ctx}/audit_trail[${idx}]/field`);
-      const signal_used = parseSignal(
-        entry['signal_used'],
-        `${ctx}/audit_trail[${idx}]/signal_used`,
-      );
+      const signal_used = parseSignal(entry['signal_used'], `${ctx}/audit_trail[${idx}]/signal_used`);
       return {
         field,
         signal_used,
         prior_value: requireNumber(entry, 'prior_value', `${ctx}/audit_trail[${idx}]`),
         new_value: requireNumber(entry, 'new_value', `${ctx}/audit_trail[${idx}]`),
         reason: requireString(entry, 'reason', `${ctx}/audit_trail[${idx}]`),
-        adjusted_at: requireString(
-          entry,
-          'adjusted_at',
-          `${ctx}/audit_trail[${idx}]`,
-        ),
+        adjusted_at: requireString(entry, 'adjusted_at', `${ctx}/audit_trail[${idx}]`),
       };
     },
   );
-  return {
-    frequency,
-    intensity,
-    escalationThreshold,
-    signals,
-    audit_trail,
-    decided_at: decidedAt,
-  };
+  return { frequency, intensity, escalationThreshold, signals, audit_trail, decided_at: decidedAt };
 }
 
 const ALLOWED_FIELDS: ReadonlyArray<'frequency' | 'intensity' | 'escalationThreshold'> = [
-  'frequency',
-  'intensity',
-  'escalationThreshold',
+  'frequency', 'intensity', 'escalationThreshold',
 ];
 
-function parseField(
-  raw: unknown,
-  ctx: string,
-): 'frequency' | 'intensity' | 'escalationThreshold' {
+function parseField(raw: unknown, ctx: string): 'frequency' | 'intensity' | 'escalationThreshold' {
   if (typeof raw !== 'string') {
     throw new Error(`controller-state: ${ctx} must be a string`);
   }
   const matched = ALLOWED_FIELDS.find((f) => f === raw);
   if (matched === undefined) {
-    throw new Error(
-      `controller-state: ${ctx} must be one of ${ALLOWED_FIELDS.join(', ')}; got "${raw}"`,
-    );
+    throw new Error(`controller-state: ${ctx} must be one of ${ALLOWED_FIELDS.join(', ')}; got "${raw}"`);
   }
   return matched;
 }
 
 const ALLOWED_SIGNALS: ReadonlyArray<ControllerDecision['audit_trail'][number]['signal_used']> = [
-  'cold-start',
-  'drift',
-  'correction',
-  'auditor-correction-rate',
-  'anti-thrashing-damping',
-  'ratchet-down',
-  'steady-state',
+  'cold-start', 'drift', 'correction', 'auditor-correction-rate',
+  'anti-thrashing-damping', 'ratchet-down', 'steady-state',
 ];
 
-function parseSignal(
-  raw: unknown,
-  ctx: string,
-): ControllerDecision['audit_trail'][number]['signal_used'] {
+function parseSignal(raw: unknown, ctx: string): ControllerDecision['audit_trail'][number]['signal_used'] {
   if (typeof raw !== 'string') {
     throw new Error(`controller-state: ${ctx} must be a string`);
   }
   const matched = ALLOWED_SIGNALS.find((s) => s === raw);
   if (matched === undefined) {
-    throw new Error(
-      `controller-state: ${ctx} must be one of ${ALLOWED_SIGNALS.join(', ')}; got "${raw}"`,
-    );
+    throw new Error(`controller-state: ${ctx} must be one of ${ALLOWED_SIGNALS.join(', ')}; got "${raw}"`);
   }
   return matched;
 }
 
-function parseMetricsSnapshot(
-  raw: Record<string, unknown>,
-  ctx: string,
-): MetricsSnapshot {
+function parseMetricsSnapshot(raw: Record<string, unknown>, ctx: string): MetricsSnapshot {
   const latency = raw['median_disposition_latency_ms'];
   let parsedLatency: number | null;
   if (latency === null) {
@@ -287,92 +186,71 @@ function parseMetricsSnapshot(
   } else if (typeof latency === 'number' && Number.isFinite(latency)) {
     parsedLatency = latency;
   } else {
-    throw new Error(
-      `controller-state: ${ctx} \`median_disposition_latency_ms\` must be a finite number or null`,
-    );
+    throw new Error(`controller-state: ${ctx} \`median_disposition_latency_ms\` must be a finite number or null`);
   }
   return {
-    classification_completeness: requireNumber(
-      raw,
-      'classification_completeness',
-      ctx,
-    ),
+    classification_completeness: requireNumber(raw, 'classification_completeness', ctx),
     average_coverage: requireNumber(raw, 'average_coverage', ctx),
     violation_density: requireNumber(raw, 'violation_density', ctx),
-    average_surface_variance: requireNumber(
-      raw,
-      'average_surface_variance',
-      ctx,
-    ),
+    average_surface_variance: requireNumber(raw, 'average_surface_variance', ctx),
     catalog_edit_rate: requireNumber(raw, 'catalog_edit_rate', ctx),
     pending_count: requireNumber(raw, 'pending_count', ctx),
     median_disposition_latency_ms: parsedLatency,
   };
 }
 
-/**
- * Load the durable controller state from disk. Returns an empty
- * history (cold-start) when the file is absent. Throws on malformed
- * file.
- */
+async function resolveRuntimeDir(repoRoot: string, override: string | undefined): Promise<string> {
+  if (override !== undefined) return override;
+  const llmConfig = await loadLlmConfig(repoRoot);
+  return llmConfig.orchestratorRuntimeDir;
+}
+
 export async function loadControllerState(
   repoRoot: string,
+  featureSlug: string,
   runtimeDirOverride?: string,
 ): Promise<ReadonlyArray<ControllerHistoryEntry>> {
-  let runtimeDir = runtimeDirOverride;
-  if (runtimeDir === undefined) {
-    const llmConfig = await loadLlmConfig(repoRoot);
-    runtimeDir = llmConfig.orchestratorRuntimeDir;
-  }
-  const path = statePath(repoRoot, runtimeDir);
+  requireFeatureSlug(featureSlug, 'loadControllerState');
+  const runtimeDir = await resolveRuntimeDir(repoRoot, runtimeDirOverride);
+  const path = statePath(repoRoot, runtimeDir, featureSlug);
   try {
     const text = await readFile(path, 'utf8');
     const file = parseStateFile(text, path);
     return file.history;
   } catch (err) {
-    if (isEnoent(err)) return [];
+    if (isEnoent(err)) {
+      const legacy = legacyStatePath(repoRoot, runtimeDir);
+      if (existsSync(legacy)) warnLegacyControllerState(legacy);
+      return [];
+    }
     throw err;
   }
 }
 
-/**
- * Persist a new history (with the just-produced decision prepended)
- * to the durable runtime dir. Caller is responsible for prepending
- * the new entry; this function just writes whatever it's given (after
- * truncating to `DEFAULT_HISTORY_RETENTION`).
- */
 export async function persistControllerState(
   repoRoot: string,
+  featureSlug: string,
   history: ReadonlyArray<ControllerHistoryEntry>,
   runtimeDirOverride?: string,
 ): Promise<void> {
-  let runtimeDir = runtimeDirOverride;
-  if (runtimeDir === undefined) {
-    const llmConfig = await loadLlmConfig(repoRoot);
-    runtimeDir = llmConfig.orchestratorRuntimeDir;
-  }
-  const path = statePath(repoRoot, runtimeDir);
+  requireFeatureSlug(featureSlug, 'persistControllerState');
+  const runtimeDir = await resolveRuntimeDir(repoRoot, runtimeDirOverride);
+  const path = statePath(repoRoot, runtimeDir, featureSlug);
   await mkdir(dirname(path), { recursive: true });
   const truncated = history.slice(0, DEFAULT_HISTORY_RETENTION);
-  const data: ControllerStateFile = {
-    version: 1,
-    history: truncated,
-  };
+  const data: ControllerStateFile = { version: 1, history: truncated };
   await writeFile(path, `${JSON.stringify(data, null, 2)}\n`, 'utf8');
 }
 
-/**
- * Convenience: prepend a new entry to the existing history and persist.
- * The new entry takes index 0; older entries shift down; the tail
- * beyond `DEFAULT_HISTORY_RETENTION` is dropped.
- */
 export async function appendControllerEntry(
   repoRoot: string,
+  featureSlug: string,
   entry: ControllerHistoryEntry,
   runtimeDirOverride?: string,
 ): Promise<ReadonlyArray<ControllerHistoryEntry>> {
-  const current = await loadControllerState(repoRoot, runtimeDirOverride);
+  requireFeatureSlug(featureSlug, 'appendControllerEntry');
+  const current = await loadControllerState(repoRoot, featureSlug, runtimeDirOverride);
   const next: ControllerHistoryEntry[] = [entry, ...current];
-  await persistControllerState(repoRoot, next, runtimeDirOverride);
+  await persistControllerState(repoRoot, featureSlug, next, runtimeDirOverride);
   return next.slice(0, DEFAULT_HISTORY_RETENTION);
 }

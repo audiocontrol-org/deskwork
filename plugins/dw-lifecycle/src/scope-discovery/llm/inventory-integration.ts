@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/llm/inventory-integration.ts
  *
- * Phase 11 Task 7 — scope-inventory ↔ LLM ensemble integration.
+ * scope-inventory ↔ LLM ensemble integration.
  *
  * The scope-inventory orchestrator runs:
  *
@@ -75,6 +75,7 @@ export interface InventoryAuditReadResult {
  */
 export async function readPendingAuditUpdatesForInventory(args: {
   readonly repoRoot: string;
+  readonly featureSlug: string;
   readonly options: InventoryAuditReadOptions;
 }): Promise<InventoryAuditReadResult> {
   if (args.options.skip) {
@@ -97,6 +98,7 @@ export async function readPendingAuditUpdatesForInventory(args: {
     const config = await loadLlmConfig(args.repoRoot);
     const result = await readAuditLogUpdates({
       repoRoot: args.repoRoot,
+      featureSlug: args.featureSlug,
       auditLogPath: args.options.auditLogPath,
       configOverride: config,
     });
@@ -133,13 +135,19 @@ export async function readPendingAuditUpdatesForInventory(args: {
  */
 export async function persistInventoryWatermark(args: {
   readonly repoRoot: string;
+  readonly featureSlug: string;
   readonly newWatermark: string | null;
 }): Promise<void> {
   if (args.newWatermark === null) return;
   if (!isScopeDiscoveryInstalled(args.repoRoot)) return;
   try {
     const config = await loadLlmConfig(args.repoRoot);
-    await persistAuditWatermark(args.repoRoot, args.newWatermark, config);
+    await persistAuditWatermark(
+      args.repoRoot,
+      args.featureSlug,
+      args.newWatermark,
+      config,
+    );
   } catch (err) {
     // Persisting the watermark is best-effort — a failure here means
     // the next run reprocesses the same entries. Surface the message

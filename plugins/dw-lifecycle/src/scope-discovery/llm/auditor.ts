@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/llm/auditor.ts
  *
- * External LLM auditor library (Phase 11 Task 7).
+ * External LLM auditor library (the LLM judge + external auditor).
  *
  * Fire-and-forget per turn: the orchestrator emits an audit-request
  * artifact under `<repoRoot>/<pendingAuditsDir>/audit-request-<id>.json`.
@@ -10,7 +10,7 @@
  * `<date>`-`<NN>` entries back to the feature's audit-log.
  *
  * The library does NOT perform the audit network call itself (per
- * Phase 11 Task 7 pre-made decision #2: "the external auditor process
+ * the LLM judge + external auditor pre-made decision #2: "the external auditor process
  * ... is OPERATOR-PROVIDED. The plugin documents the contract; the
  * operator wires their auditor of choice"). The library's job is:
  *
@@ -69,7 +69,7 @@ export interface FireExternalAuditOptions {
  * artifact (the orchestrator surfaces this in its per-turn report so
  * the operator can inspect what was requested).
  *
- * Fire-and-forget per Phase 11 Task 7 — the function does NOT wait
+ * Fire-and-forget per the function does NOT wait
  * for the external auditor to produce findings. Findings arrive
  * asynchronously in the audit-log; the next turn's `readAuditLogUpdates`
  * surfaces them.

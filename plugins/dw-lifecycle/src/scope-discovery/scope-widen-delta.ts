@@ -247,7 +247,7 @@ export function mergeDelta(
       ...(mergedRegime?.deprecations ?? []),
       ...delta.regimeHoldouts.deprecations,
     ];
-    // Phase 11 Task 11 — re-derive `by_status` rollup over the merged
+    // re-derive `by_status` rollup over the merged
     // entries. The synthesis-derive-regime helper computes this from
     // first principles; we mirror that derivation here so the merge
     // produces a manifest with the same shape (operators reading the

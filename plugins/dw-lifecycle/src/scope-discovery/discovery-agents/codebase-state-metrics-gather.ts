@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/discovery-agents/codebase-state-metrics-gather.ts
  *
- * Phase 11 Task 4 — Input-gatherer for the pure metrics computation.
+ * Input-gatherer for the pure metrics computation.
  *
  * Separates I/O (file reads, git log, scan-run directory walks) from
  * pure math (codebase-state-metrics.ts). The synthesis pass calls
@@ -192,7 +192,7 @@ export async function gatherMetricsInput(
   // -- Scan runs + disposition transitions ----------------------------------
   // These are derived from the provenance.context tags on the entries
   // themselves. Synthesis pass doesn't have a separate scan-run log
-  // store yet (Phase 11 Task 5's controller will manage one); for now
+  // store yet (the self-correcting controller's controller will manage one); for now
   // we approximate from what we have.
   const scanRuns: ScanRunObservation[] = [];
   const transitions: DispositionTransitionObservation[] = [];

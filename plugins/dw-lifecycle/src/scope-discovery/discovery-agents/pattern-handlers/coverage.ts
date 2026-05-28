@@ -1,12 +1,12 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-handlers/coverage.ts
  *
- * Coverage-metric pattern handler — Phase 11 G3.
+ * Coverage-metric pattern handler — the discovered_candidates stub.
  *
  * Emits a synthesis-layer metric describing what fraction of files in
  * `matchGlob` contain at least one match for `mustContain`. Unlike
  * regex / negative-space, coverage entries are NOT primarily violation
- * generators — they're CODEBASE-STATE METRICS feeding the Phase 11
+ * generators — they're CODEBASE-STATE METRICS feeding the the orchestrator loop
  * Task 4 controller. The handler still produces a PatternFinding (for
  * uniform routing through the dispatcher), but its `hits` list is
  * empty by default; the load-bearing payload is in `metrics`.
@@ -19,7 +19,7 @@
  * glob → adoption is meaningless; the operator sees the zero and knows
  * the glob is wrong / the codebase has no matching shape).
  *
- * Synthesis-layer consumers (Phase 11 Task 4) read `metrics.ratio`
+ * Synthesis-layer consumers (codebase-state metrics) read `metrics.ratio`
  * directly. The pattern-matrix agent's output retains compatibility
  * with the legacy AstGrepMatrixFindings shape — coverage entries
  * appear in `patterns[]` alongside regex entries.

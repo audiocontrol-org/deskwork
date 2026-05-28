@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/tooling-feedback-import.ts
  *
- * Phase 11 Task 14 — closes the dogfood-feedback loop.
+ * closes the dogfood-feedback loop.
  *
  * Walks `docs/<v>/001-IN-PROGRESS/<slug>/tooling-feedback.md` for each
  * in-progress feature (or a single slug when `--slug` is given), parses

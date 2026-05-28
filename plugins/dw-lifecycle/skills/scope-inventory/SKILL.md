@@ -12,7 +12,7 @@ Inventory the surfaces a feature will touch BEFORE implementation begins. Fans t
 The skill name says **inventory** because the action is "inventory the surfaces a feature touches." Internally, the agent fleet does TWO different things in one pass:
 
 1. **Inventory of registered patterns.** Matches the source tree against vocabularies the project has authored — `anti-patterns.yaml`, `adopter-manifests.yaml`, `clones.yaml`, the pattern-matrix catalog, `@deprecated` markers. A finding here means "the registry said to look for this shape, and it's still in the tree." Provenance on these findings is `registered-pattern` (or one of the scanner-specific tags); `status_provenance.provenance_source` is `operator-authored` / `install-seed`.
-2. **Discovery of novel candidates.** Surfaces shapes the catalog doesn't yet know about — negative-space (Phase 11 G2), coverage-gap (G3), outlier (G4), semantic (G6), and the synthesis-layer unmatched-shape clustering pass (G5). Provenance is one of `negative-space` / `coverage-gap` / `outlier` / `semantic` / `discovered-candidate`. The mediation layer additionally surfaces architectural-scale cluster summaries under `discovered_candidates:` on the manifest.
+2. **Discovery of novel candidates.** Surfaces shapes the catalog doesn't yet know about — negative-space (the discovered_candidates stub), coverage-gap (G3), outlier (G4), semantic (G6), and the synthesis-layer unmatched-shape clustering pass (G5). Provenance is one of `negative-space` / `coverage-gap` / `outlier` / `semantic` / `discovered-candidate`. The mediation layer additionally surfaces architectural-scale cluster summaries under `discovered_candidates:` on the manifest.
 
 A green inventory run reports zero holdouts against registered patterns. It does NOT mean "no novel anti-patterns exist" — that's a separate signal carried by `discovered_candidates:` plus the per-finding provenance. The operator-trust failure mode this distinction closes: *"a green discovery report read as evidence of no novel shapes, when it's really evidence of no already-registered matches."* See [`discovery-agents/README.md`](../../src/scope-discovery/discovery-agents/README.md) (in the plugin source) for the agent-by-agent split.
 
@@ -31,7 +31,7 @@ The helper:
    - Fans the four universal agents in parallel.
    - Checks Phase 4 gate files (`.dw-lifecycle/scope-discovery/{anti-patterns,adopter-manifests,editor-symmetry.md}`) and activates the relevant config-driven agents only when their activator file is present — agents not activated pay zero scan cost.
    - Runs the synthesis pass in-process, dedupes `(file, id)` cross-cuts, and renders the strawman manifest.
-   - Runs the orchestrator-agent mediation layer (Phase 11 Task 3) to cluster raw findings into architectural-scale candidate summaries; non-empty clusters land under `discovered_candidates:` on the manifest.
+   - Runs the orchestrator-agent mediation layer (orchestrator-agent mediation) to cluster raw findings into architectural-scale candidate summaries; non-empty clusters land under `discovered_candidates:` on the manifest.
    - Validates the manifest against `scope-manifest.yaml.schema.json` before writing.
    - Writes the manifest to `--out` (default: `docs/<v>/001-IN-PROGRESS/<slug>/scope-manifest.yaml`) and emits per-agent JSON + a `synthesis.md` digest under `scope-inventory/runs/<stamp>-<runId>/` when `--evidence-trail` is set.
 

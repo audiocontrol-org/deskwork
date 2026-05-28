@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-handlers/types.ts
  *
- * Shared types for the pattern-handler dispatcher (Phase 11 Task 1).
+ * Shared types for the pattern-handler dispatcher (polymorphic pattern handlers).
  *
  * The pattern-matrix discovery agent grew from a regex-only scanner
  * into a polymorphic dispatcher that routes catalog entries to
@@ -10,7 +10,7 @@
  * `'outlier'` | `'semantic'`). For backward compatibility, entries
  * without `type` default to `'regex'`.
  *
- * Per Phase 11 PRD section, the v1 vocabulary is six types — five
+ * Per the orchestrator loop PRD section, the v1 vocabulary is six types — five
  * implemented as per-file pattern handlers + one synthesis-layer
  * clustering pass (which lives outside this dispatcher).
  *
@@ -39,7 +39,7 @@ import type { CatalogStatus, Provenance } from '../../util/catalog-status.js';
 /**
  * Common metadata every catalog entry carries, regardless of type.
  *
- * Phase 11 Task 2 — every catalog entry now also carries Loop
+ * every catalog entry now also carries Loop
  * metadata (status + provenance). The dispatcher filters out non-
  * actively-enforced entries at the entry-point boundary
  * (`pattern-matrix.ts` → `buildPatternMatrix`) BEFORE handlers run,
@@ -49,12 +49,12 @@ interface BaseCatalogEntry {
   readonly id: string;
   readonly description: string;
   readonly extensions?: ReadonlyArray<string>;
-  /** Phase 11 Task 2 — Loop status. Default `blessed` for pre-Loop entries. */
+  /** Loop status. Default `blessed` for pre-Loop entries. */
   readonly status: CatalogStatus;
-  /** Phase 11 Task 2 — provenance block; synthesized when absent. */
+  /** provenance block; synthesized when absent. */
   readonly provenance: Provenance;
   /**
-   * Phase 11 Task 10 — REVERSE provenance link to the audit-log.
+   * REVERSE provenance link to the audit-log.
    * Empty when no audit finding has referenced this entry.
    */
   readonly auditHistory: ReadonlyArray<string>;
@@ -97,7 +97,7 @@ export interface NegativeSpaceEntry extends BaseCatalogEntry {
  * Coverage-metric catalog entry. NOT a finding generator per se — emits
  * a synthesis-layer metric `<glob>: <N>/<M> = <fraction>%` describing
  * what fraction of matched files contain `must_contain`. Feeds the
- * Phase 11 Task 4 codebase-state-metrics.
+ * codebase-state metrics codebase-state-metrics.
  */
 export interface CoverageEntry extends BaseCatalogEntry {
   readonly type: 'coverage';
@@ -120,7 +120,7 @@ export type OutlierDistanceMetric =
   | 'className-composition';
 
 /**
- * Phase 11 Task 13 — content-type discriminator for the
+ * content-type discriminator for the
  * `token-composition` outlier metric. Different content types call for
  * different tokenization strategies; treating markdown words like TS
  * identifiers loses signal (and vice-versa).
@@ -162,7 +162,7 @@ export interface OutlierEntry extends BaseCatalogEntry {
   /** Sigma threshold for an outlier finding to fire. Default 2.0. */
   readonly thresholdSigma: number;
   /**
-   * Phase 11 Task 13 — content-type discriminator for the
+   * content-type discriminator for the
    * `token-composition` tokenizer. Defaults to `'auto'` (infer from
    * file extension). Ignored by `className-composition`. The field is
    * optional on the catalog-entry shape so pre-Phase-11-Task-13
@@ -176,7 +176,7 @@ export interface OutlierEntry extends BaseCatalogEntry {
  * Semantic (LLM-augmented) catalog entry. STUB in v1.1 Task 1 — the
  * type is reserved + dispatched but the handler returns zero findings
  * with a runtime log line naming the deferral. The LLM wiring lands
- * under Phase 11 Task 7's judge work; see the cross-reference issue.
+ * under the LLM judge + external auditor's judge work; see the cross-reference issue.
  */
 export interface SemanticEntry extends BaseCatalogEntry {
   readonly type: 'semantic';

@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/recovery/detect-wrong-decisions.ts
  *
- * Phase 11 Task 8 — Detection of wrong auto-dispositions.
+ * Detection of wrong auto-dispositions.
  *
  * # What "wrong" means here
  *

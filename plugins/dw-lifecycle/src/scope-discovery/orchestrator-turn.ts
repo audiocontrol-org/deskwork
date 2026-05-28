@@ -44,7 +44,7 @@
  */
 
 import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { computeCodebaseStateMetrics } from './discovery-agents/codebase-state-metrics.js';
 import { gatherMetricsInput } from './discovery-agents/codebase-state-metrics-gather.js';
@@ -93,6 +93,12 @@ export interface OrchestratorTurnCliArgs {
   readonly auditorInputPath?: string;
   readonly runtimeDirOverride?: string;
   readonly now?: string;
+  /**
+   * When true, skip the "feature directory must exist" pre-flight check
+   * (TF-005). Intended for test fixtures and adopter projects that
+   * don't use the standard `docs/<v>/001-IN-PROGRESS/<slug>/` layout.
+   */
+  readonly allowMissingFeature?: boolean;
 }
 
 /**
@@ -327,6 +333,115 @@ async function collectFindings(
 }
 
 /**
+ * Walk `docs/<v>/001-IN-PROGRESS/` directories and return the matched
+ * path when a directory for `featureSlug` exists; null otherwise.
+ * Implements the TF-005 feature-existence pre-flight.
+ */
+async function listFeatureDirsByVersion(
+  repoRoot: string,
+): Promise<ReadonlyArray<{ version: string; slugs: ReadonlyArray<string> }>> {
+  const docsDir = resolve(repoRoot, 'docs');
+  if (!existsSync(docsDir)) return [];
+  const versions: Array<{ version: string; slugs: ReadonlyArray<string> }> = [];
+  let topEntries: ReadonlyArray<string>;
+  try {
+    topEntries = await readdir(docsDir);
+  } catch {
+    return [];
+  }
+  for (const version of topEntries) {
+    const inProgress = resolve(docsDir, version, '001-IN-PROGRESS');
+    if (!existsSync(inProgress)) continue;
+    let slugs: ReadonlyArray<string>;
+    try {
+      slugs = await readdir(inProgress);
+    } catch {
+      continue;
+    }
+    versions.push({ version, slugs });
+  }
+  return versions;
+}
+
+async function findFeatureDirectory(
+  repoRoot: string,
+  featureSlug: string,
+): Promise<string | null> {
+  const versions = await listFeatureDirsByVersion(repoRoot);
+  for (const v of versions) {
+    if (v.slugs.includes(featureSlug)) {
+      return `docs/${v.version}/001-IN-PROGRESS/${featureSlug}`;
+    }
+  }
+  return null;
+}
+
+async function listAvailableFeatureSlugs(
+  repoRoot: string,
+): Promise<ReadonlyArray<string>> {
+  const versions = await listFeatureDirsByVersion(repoRoot);
+  const set = new Set<string>();
+  for (const v of versions) {
+    for (const s of v.slugs) set.add(s);
+  }
+  return Array.from(set).sort();
+}
+
+/**
+ * TF-006 — catalog files scope-discovery scans / synthesizes. The
+ * presence count distinguishes "happy steady-state" (all files present
+ * + zero findings) from "scanned NOTHING because catalog absent."
+ */
+const CATALOG_FILENAMES: ReadonlyArray<string> = [
+  'anti-patterns.yaml',
+  'adopter-manifests.yaml',
+  'editor-symmetry-matrix.yaml',
+  'deprecations.yaml',
+  'pattern-matrix-patterns.yaml',
+  'clones.yaml',
+];
+
+interface CatalogPresence {
+  readonly presentCount: number;
+  readonly presentNames: ReadonlyArray<string>;
+  readonly totalCount: number;
+}
+
+function inspectCatalogPresence(repoRoot: string): CatalogPresence {
+  const present: string[] = [];
+  for (const name of CATALOG_FILENAMES) {
+    const abs = resolve(repoRoot, SCOPE_DISCOVERY_DIR, name);
+    if (existsSync(abs)) present.push(name);
+  }
+  return {
+    presentCount: present.length,
+    presentNames: present,
+    totalCount: CATALOG_FILENAMES.length,
+  };
+}
+
+function decorateSummaryWithCatalogPresence(
+  summary: string,
+  presence: CatalogPresence,
+): string {
+  if (presence.presentCount === 0) {
+    return (
+      'WARNING: no scope-discovery catalog files in ' +
+      '.dw-lifecycle/scope-discovery/ — run \`dw-lifecycle install-scope-discovery\` ' +
+      `first. ${summary}`
+    );
+  }
+  if (presence.presentCount < presence.totalCount) {
+    const names = presence.presentNames.join(', ');
+    return (
+      `NOTE: only ${presence.presentCount}/${presence.totalCount} catalog ` +
+      `files present (${names}). ${summary}`
+    );
+  }
+  return summary;
+}
+
+/**
  * Build a `TurnInput` from disk + run the orchestrator turn.
  *
  * Exit codes:
@@ -340,6 +455,25 @@ export async function runOrchestratorTurnCli(
 ): Promise<OrchestratorTurnCliResult> {
   const repoRoot = resolve(args.repoRoot);
   const now = args.now ?? new Date().toISOString();
+
+  // TF-005 — pre-flight feature existence check. A typo'd
+  // `--feature does-not-exist` previously exited 0 with all-zeros;
+  // that "success" was indistinguishable from a real green run.
+  if (args.allowMissingFeature !== true) {
+    const matched = await findFeatureDirectory(repoRoot, args.featureSlug);
+    if (matched === null) {
+      const available = await listAvailableFeatureSlugs(repoRoot);
+      const list = available.length > 0 ? available.join(', ') : '<none found>';
+      return {
+        exitCode: 2,
+        errorText:
+          `orchestrator-turn: feature '${args.featureSlug}' not found — ` +
+          `expected directory under \`docs/<v>/001-IN-PROGRESS/${args.featureSlug}/\`. ` +
+          `Available features: ${list}.`,
+      };
+    }
+  }
+
   const auditLogPath = resolveAuditLogPath({
     repoRoot,
     featureSlug: args.featureSlug,
@@ -449,9 +583,9 @@ export async function runOrchestratorTurnCli(
     now,
   };
 
-  let report: TurnReport;
+  let rawReport: TurnReport;
   try {
-    report = await runOrchestratorTurn(turnInput, {
+    rawReport = await runOrchestratorTurn(turnInput, {
       ...(args.runtimeDirOverride !== undefined
         ? { runtimeDirOverride: args.runtimeDirOverride }
         : {}),
@@ -464,12 +598,22 @@ export async function runOrchestratorTurnCli(
     };
   }
 
+  // TF-006 — decorate the summary with catalog-presence so adopters
+  // can distinguish "no findings + no catalog" from "happy steady-
+  // state with full catalog." All-zeros was previously indistinguishable.
+  const catalogPresence = inspectCatalogPresence(repoRoot);
+  const decoratedSummary = decorateSummaryWithCatalogPresence(
+    rawReport.summary,
+    catalogPresence,
+  );
+  const report: TurnReport = { ...rawReport, summary: decoratedSummary };
+
   // Persist the new loop state. The library returns the state without
   // writing; the caller (this assembler) owns the write so a future
   // dry-run mode could discard nextLoopState without persisting.
   try {
     const cfg = await loadLoopConfig(repoRoot);
-    await persistLoopState(repoRoot, report.nextLoopState, {
+    await persistLoopState(repoRoot, args.featureSlug, report.nextLoopState, {
       ...(args.runtimeDirOverride !== undefined
         ? { runtimeDirOverride: args.runtimeDirOverride }
         : {}),

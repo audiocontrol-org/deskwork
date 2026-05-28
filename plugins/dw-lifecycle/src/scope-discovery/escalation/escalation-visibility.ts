@@ -1,10 +1,10 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/escalation/escalation-visibility.ts
  *
- * Phase 11 Task 9 — Visibility surface for the orchestrator's per-turn
+ * Visibility surface for the orchestrator's per-turn
  * report.
  *
- * The orchestrator's per-turn report (built by Phase 11 Task 6 wiring)
+ * The orchestrator's per-turn report (built by the orchestrator loop wiring)
  * includes:
  *
  *   (a) actions taken silently (count + brief summary),

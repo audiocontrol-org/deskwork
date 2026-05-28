@@ -42,6 +42,8 @@ function makeEntry(turn: number): ControllerHistoryEntry {
   };
 }
 
+const FEATURE_SLUG = 'controller-state-test';
+
 describe('controller-state — persistence round-trip', () => {
   let root: string;
 
@@ -56,7 +58,7 @@ describe('controller-state — persistence round-trip', () => {
   });
 
   it('returns empty history when no state file exists', async () => {
-    const history = await loadControllerState(root);
+    const history = await loadControllerState(root, FEATURE_SLUG);
     expect(history).toEqual([]);
   });
 
@@ -85,29 +87,30 @@ describe('controller-state — persistence round-trip', () => {
       },
       metrics_snapshot: baseMetrics(),
     };
-    await persistControllerState(root, [entry]);
+    await persistControllerState(root, FEATURE_SLUG, [entry]);
     const stateFile = join(
       root,
       '.dw-lifecycle',
       'scope-discovery',
       'orchestrator-runtime',
+      FEATURE_SLUG,
       CONTROLLER_STATE_FILENAME,
     );
     const text = await readFile(stateFile, 'utf8');
     expect(text).toContain('"version": 1');
-    const loaded = await loadControllerState(root);
+    const loaded = await loadControllerState(root, FEATURE_SLUG);
     expect(loaded.length).toBe(1);
     expect(loaded[0]?.decision.frequency).toBe(0.8);
     expect(loaded[0]?.decision.signals.drift).toBe(0.1);
   });
 
   it('appendControllerEntry prepends and trims retention', async () => {
-    await persistControllerState(root, []);
+    await persistControllerState(root, FEATURE_SLUG, []);
     for (let i = 0; i < DEFAULT_HISTORY_RETENTION + 5; i += 1) {
       // eslint-disable-next-line no-await-in-loop
-      await appendControllerEntry(root, makeEntry(i));
+      await appendControllerEntry(root, FEATURE_SLUG, makeEntry(i));
     }
-    const final = await loadControllerState(root);
+    const final = await loadControllerState(root, FEATURE_SLUG);
     expect(final.length).toBe(DEFAULT_HISTORY_RETENTION);
     // Newest-first: index 0 has the most recent decided_at; with our
     // sequence, the LAST iteration of the loop (turn = retention + 4)
@@ -130,6 +133,7 @@ describe('controller-state — persistence round-trip', () => {
       '.dw-lifecycle',
       'scope-discovery',
       'orchestrator-runtime',
+      FEATURE_SLUG,
     );
     await mkdir(stateDir, { recursive: true });
     await writeFile(
@@ -137,7 +141,7 @@ describe('controller-state — persistence round-trip', () => {
       JSON.stringify({ version: 99, history: [] }),
       'utf8',
     );
-    await expect(loadControllerState(root)).rejects.toThrow(
+    await expect(loadControllerState(root, FEATURE_SLUG)).rejects.toThrow(
       /unsupported version 99/,
     );
   });
@@ -148,6 +152,7 @@ describe('controller-state — persistence round-trip', () => {
       '.dw-lifecycle',
       'scope-discovery',
       'orchestrator-runtime',
+      FEATURE_SLUG,
     );
     await mkdir(stateDir, { recursive: true });
     await writeFile(
@@ -155,7 +160,7 @@ describe('controller-state — persistence round-trip', () => {
       'this is not json',
       'utf8',
     );
-    await expect(loadControllerState(root)).rejects.toThrow(/cannot parse/);
+    await expect(loadControllerState(root, FEATURE_SLUG)).rejects.toThrow(/cannot parse/);
   });
 
   it('rejects state file with non-array history', async () => {
@@ -164,6 +169,7 @@ describe('controller-state — persistence round-trip', () => {
       '.dw-lifecycle',
       'scope-discovery',
       'orchestrator-runtime',
+      FEATURE_SLUG,
     );
     await mkdir(stateDir, { recursive: true });
     await writeFile(
@@ -171,7 +177,7 @@ describe('controller-state — persistence round-trip', () => {
       JSON.stringify({ version: 1, history: { wrong: 'shape' } }),
       'utf8',
     );
-    await expect(loadControllerState(root)).rejects.toThrow(
+    await expect(loadControllerState(root, FEATURE_SLUG)).rejects.toThrow(
       /\`history\` must be an array/,
     );
   });
@@ -181,8 +187,27 @@ describe('controller-state — persistence round-trip', () => {
     for (let i = 0; i < DEFAULT_HISTORY_RETENTION + 10; i += 1) {
       overlong.push(makeEntry(i));
     }
-    await persistControllerState(root, overlong);
-    const reloaded = await loadControllerState(root);
+    await persistControllerState(root, FEATURE_SLUG, overlong);
+    const reloaded = await loadControllerState(root, FEATURE_SLUG);
     expect(reloaded.length).toBe(DEFAULT_HISTORY_RETENTION);
+  });
+
+  it('rejects empty featureSlug', async () => {
+    await expect(loadControllerState(root, '')).rejects.toThrow(/non-empty featureSlug/);
+    await expect(persistControllerState(root, '', [])).rejects.toThrow(/non-empty featureSlug/);
+  });
+
+  it('per-feature isolation: different slugs do NOT share state', async () => {
+    const isolatedRoot = await mkdtemp(join(tmpdir(), 'controller-state-iso-'));
+    try {
+      await persistControllerState(isolatedRoot, 'feature-a', [makeEntry(1)]);
+      await persistControllerState(isolatedRoot, 'feature-b', [makeEntry(2), makeEntry(3)]);
+      const a = await loadControllerState(isolatedRoot, 'feature-a');
+      const b = await loadControllerState(isolatedRoot, 'feature-b');
+      expect(a.length).toBe(1);
+      expect(b.length).toBe(2);
+    } finally {
+      await rm(isolatedRoot, { recursive: true, force: true });
+    }
   });
 });

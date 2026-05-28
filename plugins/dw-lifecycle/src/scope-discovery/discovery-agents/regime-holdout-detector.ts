@@ -99,7 +99,7 @@ function moduleRootAbs(input: DiscoveryAgentInput): string {
 }
 
 /**
- * Phase 11 Task 11 — extract the FindingStatusProvenance wire shape
+ * extract the FindingStatusProvenance wire shape
  * from a catalog entry's `status` + `provenance` pair. Uniform across
  * every scanner so the synthesizer + the operator surface see one
  * consistent field regardless of which catalog the finding originated
@@ -116,7 +116,7 @@ function statusProvenance(
 }
 
 /**
- * Phase 11 Task 11 — implicit Loop metadata for sources that have NO
+ * implicit Loop metadata for sources that have NO
  * underlying catalog entry. The deprecation scanner reads markers
  * embedded in source files; the markers themselves are the registry,
  * and they carry no Loop fields. We synthesize `blessed` + `install-
@@ -156,7 +156,7 @@ async function collectAntiPatternFindings(
   });
   const out: RegimeHoldoutFinding[] = [];
   for (const f of result.findings) {
-    // Phase 11 Task 11 — the scanner has already filtered to
+    // the scanner has already filtered to
     // actively-enforced entries; this assertion documents the
     // invariant (and protects against a future scanner refactor that
     // forgets the filter). If a non-active entry leaked through, the
@@ -269,7 +269,7 @@ async function collectEditorSymmetryFindings(
   const out: RegimeHoldoutFinding[] = [];
   for (const row of matrix.rows) {
     const primary = row.entry.from[0] ?? '';
-    // Phase 11 Task 11 — matrix rows are already filtered to actively-
+    // matrix rows are already filtered to actively-
     // enforced entries by `computeMatrix`; assert the invariant.
     if (!isActivelyEnforced(row.status)) {
       throw new Error(
@@ -349,7 +349,7 @@ async function collectDeprecationFindings(
           registryPath: deprecated.path,
           registryId: deprecated.markerKind,
         },
-        // Phase 11 Task 11 — deprecation markers have no Loop fields
+        // deprecation markers have no Loop fields
         // (they're embedded in source code, not a catalog YAML); we
         // surface implicit `blessed` so the wire shape is uniform.
         status_provenance: IMPLICIT_BLESSED,
@@ -403,7 +403,7 @@ function deriveMeta(findings: readonly RegimeHoldoutFinding[]): RegimeHoldoutMet
         deprecation += 1;
         break;
     }
-    // Phase 11 Task 11 — per-status rollup.
+    // per-status rollup.
     if (
       f.status_provenance.source_status === 'blessed' ||
       f.status_provenance.source_status === 'cursed'

@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/discovery-agents/codebase-state-metrics.ts
  *
- * Phase 11 Task 4 — Codebase-state metrics computation library.
+ * Codebase-state metrics computation library.
  *
  * Pure computation: takes parsed catalogs + pattern findings + git
  * history + scan-run history, returns the seven metrics. No I/O — the
@@ -9,7 +9,7 @@
  * directory walks) and passes them in.
  *
  * Why a pure computation: tests can plant synthetic inputs without
- * walking the filesystem; the controller (Phase 11 Task 5) can re-run
+ * walking the filesystem; the controller (the self-correcting controller) can re-run
  * metrics on a delta without re-touching disk; the LLM judge (Task 7)
  * gets a deterministic snapshot of what the regime knows about itself.
  *

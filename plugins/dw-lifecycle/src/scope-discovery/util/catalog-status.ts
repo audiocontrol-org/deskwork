@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/util/catalog-status.ts
  *
- * Phase 11 Task 2 — The Loop foundation. Shared `status:` + `provenance:`
+ * The Loop foundation. Shared `status:` + `provenance:`
  * shape applied uniformly to EVERY catalog entry type in the registry-
  * driven scanners (anti-patterns, adopter-manifests, pattern-matrix,
  * clones, deprecations, editor-symmetry).
@@ -10,7 +10,7 @@
  *
  * The Loop is a cross-cutting concern: every catalog entry needs the
  * same status + provenance shape so the scanners can filter on it
- * uniformly and so the orchestrator-agent (Phase 11 Task 3) can edit
+ * uniformly and so the orchestrator-agent (orchestrator-agent mediation) can edit
  * dispositions without learning each registry's bespoke wire shape.
  * Co-locating the type + parser + filter predicate here keeps every
  * scanner's per-entry parse path branchless: `parseCatalogStatus(raw)`
@@ -96,9 +96,9 @@ export type CatalogStatus =
  *
  *   operator-authored        — hand-edited by an operator.
  *   orchestrator-agent       — proposed by the dw-lifecycle orchestrator
- *                              agent (Phase 11 Task 3).
+ *                              agent (orchestrator-agent mediation).
  *   llm-judge-proposed       — proposed by the in-band LLM judge
- *                              (Phase 11 Task 7).
+ *                              (the LLM judge + external auditor).
  *   install-seed             — placeholder for pre-Loop entries that
  *                              omit `provenance:`; synthesized at parse
  *                              time so the doctor rule can warn.
@@ -241,13 +241,13 @@ export function parseCatalogEntryMetadata(
   // Reversibility-primitive invariant: a `withdrawn` status MUST carry
   // `provenance.context: 'audit-finding-<id>'` so the linkage is
   // discoverable on read. The doctor rule `provenance-orphaned-entries`
-  // (Phase 11 Task 10) cross-checks against the audit-log.
+  // (the audit-log provenance link) cross-checks against the audit-log.
   if (status === 'withdrawn') {
     if (provenance.context === undefined || !provenance.context.startsWith('audit-finding-')) {
       throw new Error(
         `${namespace}: ${ctx} \`status: withdrawn\` requires ` +
           `\`provenance.context\` starting with \`audit-finding-\` ` +
-          `(the reversibility primitive's contract — see Phase 11 Task 2 + Task 10).`,
+          `(the reversibility primitive's contract — see catalog status + provenance + Task 10).`,
       );
     }
   }
@@ -354,7 +354,7 @@ export function isActivelyEnforced(status: CatalogStatus): boolean {
 }
 
 /**
- * Phase 11 Task 10 — Parse the OPTIONAL `audit_history:` field from a
+ * Parse the OPTIONAL `audit_history:` field from a
  * raw catalog entry. The field is the REVERSE provenance link: it
  * names every audit-log Finding-ID that referenced this entry over
  * time. Forward provenance (`provenance.context: audit-finding-<id>`)

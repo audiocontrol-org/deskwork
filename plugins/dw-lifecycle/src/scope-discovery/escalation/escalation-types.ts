@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/escalation/escalation-types.ts
  *
- * Phase 11 Task 9 — Operator escalation surface.
+ * Operator escalation surface.
  *
  * Escalation should be rare, high-information, asynchronous-friendly
  * (operator decision 2026-05-26). The orchestrator-agent emits an

@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/recovery/recovery-types.ts
  *
- * Phase 11 Task 8 — Type contracts for the wrong-decision recovery
+ * Type contracts for the wrong-decision recovery
  * primitives.
  *
  * # Why these types live here
@@ -97,7 +97,7 @@ export interface WrongDecisionEvent {
 /**
  * A proposed catalog edit. Recovery operations are SOFT — they emit
  * one of these per wrong-decision event; the orchestrator-agent
- * (Phase 11 Task 3) applies them.
+ * (orchestrator-agent mediation) applies them.
  *
  * The shape is intentionally minimal: the three fields needed to drive
  * an edit (registry-path + entry-id + the target metadata block), plus
@@ -114,7 +114,7 @@ export interface CatalogEditProposal {
   readonly targetProvenance: Provenance;
   /**
    * Per pre-made decision #1: recovery operations are SOFT — the
-   * consumer commits the edit (per Phase 11 Task 3). This tag names
+   * consumer commits the edit (per orchestrator-agent mediation). This tag names
    * the proposal's origin so consumers can attribute it.
    */
   readonly proposalSource: 'recovery';

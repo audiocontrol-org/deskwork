@@ -279,7 +279,7 @@ describe('orchestrator-loop/loop-turn', () => {
       now: '2026-05-26T12:00:00.000Z',
     };
     await runOrchestratorTurn(input);
-    const statePath = join(tmp, RUNTIME_DIR, 'controller-state.json');
+    const statePath = join(tmp, RUNTIME_DIR, 'test', 'controller-state.json');
     const text = await readFile(statePath, 'utf8');
     const parsed = JSON.parse(text);
     expect(parsed.version).toBe(1);
@@ -308,7 +308,7 @@ describe('orchestrator-loop/loop-turn', () => {
       now: '2026-05-26T12:00:00.000Z',
     };
     await runOrchestratorTurn(input);
-    const watermarkPath = join(tmp, RUNTIME_DIR, 'last-audit-read.json');
+    const watermarkPath = join(tmp, RUNTIME_DIR, 'test', 'last-audit-read.json');
     const parsed = JSON.parse(await readFile(watermarkPath, 'utf8'));
     expect(parsed.watermark).toBe('AUDIT-20260526-99');
   });

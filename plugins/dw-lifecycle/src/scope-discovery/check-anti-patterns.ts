@@ -274,7 +274,7 @@ function positionToLine(content: string, position: number): number {
 
 export async function scan(opts: CliOptions): Promise<ScanResult> {
   const registry = await loadRegistry(opts.registryPath);
-  // Phase 11 Task 2 — filter to actively-enforced entries only.
+  // filter to actively-enforced entries only.
   // `blessed` and `cursed` entries fire; `pending`, `ignore`,
   // `tracked-holdout`, and `withdrawn` entries are skipped (they are
   // either awaiting triage, acknowledged-as-noise, deferred to a

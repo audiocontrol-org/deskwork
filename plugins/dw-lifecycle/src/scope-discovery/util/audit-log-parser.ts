@@ -1,12 +1,12 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/util/audit-log-parser.ts
  *
- * Phase 11 Task 10 — Audit-log markdown parser for bidirectional
+ * Audit-log markdown parser for bidirectional
  * navigation between catalog entries and audit-log findings.
  *
  * # Why this exists alongside `llm/audit-log-reader.ts`
  *
- * The reader (Phase 11 Task 7) tails the audit-log for NEW entries
+ * The reader (the LLM judge + external auditor) tails the audit-log for NEW entries
  * since a durable watermark; it surfaces per-turn entries to the
  * orchestrator-agent. Its `Affects:` parsing handles the single-line
  * comma-separated form used by the LLM-auditor's structured output.

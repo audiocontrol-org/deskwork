@@ -1,14 +1,14 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/mediation/propose-catalog-edits.ts
  *
- * Phase 11 Task 3 — given an architectural disposition on a candidate
+ * given an architectural disposition on a candidate
  * cluster, propose the line-level catalog edits the orchestrator-
  * agent will commit.
  *
  * # Novelty vs. refinement
  *
- * The agent decides — per Phase 11 PRD: "the operator never picks the
- * verb." Decision per Phase 11 Task 3 pre-made decision #3:
+ * The agent decides — per the orchestrator loop PRD: "the operator never picks the
+ * verb." Decision per orchestrator-agent mediation pre-made decision #3:
  *
  *   - If the cluster's representative shape MATCHES an existing entry's
  *     match_regex (dry-run regex test), propose `edit` to that entry.
@@ -71,7 +71,7 @@ export function deriveLiteralRegex(excerpt: string): string {
 }
 
 /**
- * Default disposition-to-catalog mapping per the Phase 11 design.
+ * Default disposition-to-catalog mapping per the the orchestrator loop design.
  * Callers can override post-hoc; the mapping ships as the default.
  */
 function defaultCatalogForDisposition(
@@ -134,7 +134,7 @@ function buildProvenance(
  *
  * Skips entries with `status: withdrawn` — they are read-only; the
  * agent cannot un-withdraw without an audit-finding-link (a separate
- * recovery path in Phase 11 Task 8).
+ * recovery path in wrong-decision recovery).
  */
 function findMatchingExistingEntry(
   cluster: Candidate,

@@ -13,7 +13,7 @@
  * (the on-disk PRD is never modified) so the PRD-themed pattern hunter
  * tokenizes the complaint alongside the PRD body — operator words
  * become themed keywords without bespoke parsing. Smarter complaint
- * parsing is deferred to Phase 11's orchestrator-agent work; v1 is
+ * parsing is deferred to the orchestrator loop's orchestrator-agent work; v1 is
  * plumbing. Evidence trail lands under `widen-runs/<stamp>-<runId>/`
  * (sibling to scope-inventory's `runs/`) and contains the complaint,
  * the augmented PRD, per-agent JSONs, the synthesizer notes, the
@@ -318,7 +318,7 @@ export async function scopeWidenMain(
 
   if (!opts.quiet) {
     process.stderr.write(formatDelta(delta) + '\n');
-    // Phase 11 Task 12 — surface the inventory-vs-discovery category
+    // surface the inventory-vs-discovery category
     // summary for the re-synthesized manifest. The full category
     // breakdown lives in the per-run synthesis.md.
     process.stderr.write(
@@ -379,7 +379,7 @@ async function persistEvidence(args: {
       'utf8',
     );
   }
-  // Phase 11 Task 12 — splice the inventory-vs-discovery category
+  // splice the inventory-vs-discovery category
   // report BEFORE the synthesizer notes in scope-widen's per-run
   // synthesis.md so the operator's first read of the file sees the
   // category split BEFORE the synthesizer warnings.

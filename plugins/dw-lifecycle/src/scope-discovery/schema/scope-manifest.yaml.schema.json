@@ -63,9 +63,9 @@
       "items": { "$ref": "#/$defs/route" }
     },
     "modules": {
-      "description": "Source-code module entries to audit. Required when kind is code or hybrid; forbidden when kind is ui.",
+      "description": "Source-code module entries to audit. Required when kind is code or hybrid (the array MUST be present), but the array MAY be empty for repos that don't use a `<module-root>/<feature-slug>/` layout — discovery agents populate this array per feature-instance directory under `<module-root>/<feature-slug>/`, and repos with monorepo-style layouts (e.g. `packages/<pkg>/`, `plugins/<plugin>/`) won't match. Downstream consumers tolerate `modules: []`; the manifest's other sections (regime_holdouts, discovered_candidates, etc.) populate based on scanner output regardless. Forbidden when kind is ui.",
       "type": "array",
-      "minItems": 1,
+      "minItems": 0,
       "items": { "$ref": "#/$defs/module" }
     },
     "regime_holdouts": {
@@ -95,7 +95,7 @@
           "items": { "$ref": "#/$defs/regime_holdout_entry" }
         },
         "meta": {
-          "description": "Per-source counts + total. Useful for at-a-glance burndown without iterating the per-bucket arrays. Phase 11 Task 11 adds `by_status` rollup so operators can see actively-enforced vs. candidate counts at-a-glance.",
+          "description": "Per-source counts + total. Useful for at-a-glance burndown without iterating the per-bucket arrays. cross-surface status + provenance adds `by_status` rollup so operators can see actively-enforced vs. candidate counts at-a-glance.",
           "type": "object",
           "additionalProperties": false,
           "required": ["total", "by_source"],
@@ -116,7 +116,7 @@
               }
             },
             "by_status": {
-              "description": "Phase 11 Task 11 — per-status rollup. `actively_enforced` are findings sourced from `blessed`/`cursed` catalog entries (gate-blocking). `candidate` are findings from `pending` entries (operator-triage surface; non-gate-blocking). Suppressed statuses (ignore / tracked-holdout / withdrawn) never surface — they are filtered upstream at the scanner level.",
+              "description": "per-status rollup. `actively_enforced` are findings sourced from `blessed`/`cursed` catalog entries (gate-blocking). `candidate` are findings from `pending` entries (operator-triage surface; non-gate-blocking). Suppressed statuses (ignore / tracked-holdout / withdrawn) never surface — they are filtered upstream at the scanner level.",
               "type": "object",
               "additionalProperties": false,
               "required": ["actively_enforced", "candidate"],
@@ -130,12 +130,12 @@
       }
     },
     "discovered_candidates": {
-      "description": "Phase 11 Task 3 — orchestrator-agent-mediated candidate clusters. Each entry is one cluster of shape-similar findings that the operator triages at architecture-scale (BLESSED / CURSED / IGNORE). The orchestrator-agent translates each disposition into line-level catalog edits via the mediation library; the operator never edits regex. Optional (older manifests + clean-codebase scans both legitimately omit the section).",
+      "description": "orchestrator-agent-mediated candidate clusters. Each entry is one cluster of shape-similar findings that the operator triages at architecture-scale (BLESSED / CURSED / IGNORE). The orchestrator-agent translates each disposition into line-level catalog edits via the mediation library; the operator never edits regex. Optional (older manifests + clean-codebase scans both legitimately omit the section).",
       "type": "array",
       "items": { "$ref": "#/$defs/discovered_candidate_entry" }
     },
     "codebase_state_metrics": {
-      "description": "Phase 11 Task 4 — codebase-state metrics computed during the synthesis pass. Informational: feeds the Phase 11 Task 5 self-correcting controller and operator-visible dashboards. Optional at the manifest level (legacy manifests omit it).",
+      "description": "codebase-state metrics computed during the synthesis pass. Informational: feeds the self-correcting controller and operator-visible dashboards. Optional at the manifest level (legacy manifests omit it).",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -535,7 +535,7 @@
       }
     },
     "discovered_candidate_entry": {
-      "description": "One operator-facing candidate cluster summary surfaced by the Phase 11 Task 3 orchestrator-agent mediation layer. Each cluster is a group of shape-similar findings clustered via Jaccard n-gram similarity. The operator triages clusters at architecture-scale; the agent translates the disposition into line-level catalog edits.",
+      "description": "One operator-facing candidate cluster summary surfaced by the orchestrator-agent mediation layer. Each cluster is a group of shape-similar findings clustered via Jaccard n-gram similarity. The operator triages clusters at architecture-scale; the agent translates the disposition into line-level catalog edits.",
       "type": "object",
       "additionalProperties": false,
       "required": ["cluster_id", "summary", "member_count", "exemplar_files"],
@@ -569,7 +569,7 @@
       }
     },
     "regime_holdout_entry": {
-      "description": "One regime-holdout finding. Emitted by the T6.5 regime-holdout-detector and grouped by source bucket in the manifest's regime_holdouts section. Phase 11 Task 11 adds `status_provenance` so each finding traces back to the catalog entry's status + provenance.",
+      "description": "One regime-holdout finding. Emitted by the T6.5 regime-holdout-detector and grouped by source bucket in the manifest's regime_holdouts section. cross-surface status + provenance adds `status_provenance` so each finding traces back to the catalog entry's status + provenance.",
       "type": "object",
       "additionalProperties": false,
       "required": ["id", "file", "shape", "replacement", "evidence", "status_provenance"],
@@ -621,7 +621,7 @@
           }
         },
         "status_provenance": {
-          "description": "Phase 11 Task 11 — inherited status + provenance from the catalog entry that produced the finding. `source_status` is the catalog `status:` literal (pending / blessed / cursed / ignore / tracked-holdout / withdrawn). `provenance_source` is the catalog `provenance.source` literal. Deprecation findings synthesize `blessed` + `install-seed` (the marker IS the registry; there is no Loop field).",
+          "description": "inherited status + provenance from the catalog entry that produced the finding. `source_status` is the catalog `status:` literal (pending / blessed / cursed / ignore / tracked-holdout / withdrawn). `provenance_source` is the catalog `provenance.source` literal. Deprecation findings synthesize `blessed` + `install-seed` (the marker IS the registry; there is no Loop field).",
           "type": "object",
           "additionalProperties": false,
           "required": ["source_status", "provenance_source"],

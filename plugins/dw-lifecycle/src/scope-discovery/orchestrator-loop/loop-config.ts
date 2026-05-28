@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/orchestrator-loop/loop-config.ts
  *
- * Phase 11 Task 6 — Loader + defaults for the orchestrator loop.
+ * Loader + defaults for the orchestrator loop.
  *
  * Config YAML lives at `.dw-lifecycle/scope-discovery/loop-config.yaml`
  * when adopters want to override. Schema is intentionally narrow — the
@@ -32,7 +32,7 @@ export const LOOP_CONFIG_PATH =
  * Defaults exported for tests + adopters who want to reference what
  * the runtime falls through to when no override is in play.
  *
- * Defaults match the Phase 11 Task 6 pre-made decisions:
+ * Defaults match the the orchestrator loop pre-made decisions:
  *
  *   - `turn_history_retention = 24` mirrors `controller-state.ts`'s
  *     `DEFAULT_HISTORY_RETENTION` — the same value powers both the
