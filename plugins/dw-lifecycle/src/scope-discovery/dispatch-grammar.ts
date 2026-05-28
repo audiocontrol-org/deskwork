@@ -202,6 +202,22 @@ function findLastBlockStart(text: string, label: string): number {
   return off === undefined ? -1 : off;
 }
 
+/**
+ * Recognized head nouns for the Searched-count phrase. Closes TF-008
+ * (canary 2026-05-28): the parser previously required the literal
+ * "matches"; agents naturally wrote "call sites", "occurrences",
+ * "hits" etc. Accept a whitelist of head nouns, with up to 3
+ * intervening modifier tokens (hyphenated/kebab-case identifiers
+ * like "source-emitter call sites") between the digit and the head.
+ *
+ * The whitelist is deterministic — extending it is a code change,
+ * not a regex-permissiveness slide. To add a noun, append to this
+ * regex AND to the GRAMMAR_INSTRUCTION prelude's noun-whitelist
+ * documentation in dispatch-wrapper.ts.
+ */
+const SEARCHED_COUNT_NOUN_REGEX =
+  /^(\d+)\s+(?:[\w-]+\s+){0,3}(?:match(?:es)?|hits?|occurrences?|instances?|call\s+sites?|sites?|files?|results?|references?)\b/i;
+
 function parseSearchedLine(line: string, rawText: string): SearchedBlock {
   const body = line.replace(/^\s*Searched:\s*/, '');
   const parts = body.split(SEPARATOR_REGEX);
@@ -215,10 +231,13 @@ function parseSearchedLine(line: string, rawText: string): SearchedBlock {
   const first = parts[0];
   const pattern = first === undefined ? '' : first.trim();
   const countPart = parts.slice(1).join(' - ').trim();
-  const countMatch = /^(\d+)\s+match(?:es)?\b/i.exec(countPart);
+  const countMatch = SEARCHED_COUNT_NOUN_REGEX.exec(countPart);
   if (countMatch === null) {
     throw new DispatchRejected(
-      `Malformed Searched: count — expected "<N> matches" but got: ${countPart}`,
+      `Malformed Searched: count — expected "<N> <noun>" where <noun> is one of ` +
+        `matches/match/hits/hit/occurrences/instances/sites/call sites/files/results/references ` +
+        `(optionally preceded by up to 3 modifier tokens, e.g. "2 source-emitter call sites"); ` +
+        `but got: ${countPart}`,
       [],
       rawText,
     );

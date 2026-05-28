@@ -319,6 +319,43 @@ ${regexesPrompt}.
 If you want to write "for now" or "TODO": STOP. Either include the
 file:line in your fix, or write a permanent-exclusion reason (different
 primitive, deprecated path being deleted, scoped differently, etc.).
+
+### Gotchas — agent-natural writing vs. parser strictness
+
+The parser has three known points where natural agent writing collides
+with strict-format requirements. Read these before writing the block:
+
+1. **Searched-count noun whitelist.** The count after the em-dash
+   must end in one of: \`matches\`, \`match\`, \`hits\`, \`hit\`,
+   \`occurrences\`, \`instances\`, \`sites\`, \`call sites\`,
+   \`files\`, \`results\`, \`references\`. Up to 3 modifier tokens
+   are permitted before the head noun (e.g. \`2 source-emitter call
+   sites\`, \`3 unique occurrences\`). Anything outside this set is
+   rejected — \`5 issues found\`, \`7 places\`, \`4 spots\` all fail.
+
+2. **Excluded entries require \`path:LINE\`.** Every Excluded
+   citation must carry a line number. For whole-file exclusions
+   (the exclusion is structural, not anchored to a specific line),
+   use \`:1\` as the conventional sentinel and explain the whole-
+   file nature in the reason:
+       Excluded: test/dashboard.test.ts:1 — test-file references
+       are assertions, not production code under review.
+   Don't omit \`:LINE\`; the parser rejects.
+
+3. **Forbidden-deferral phrase list collides with project
+   vocabulary.** If a project's canonical class name or function
+   contains a deferral-class word (e.g. \`.swim-stub\` /
+   \`renderSwimStub\` / \`.placeholder-tile\`), describe the
+   affordance's PURPOSE rather than its CANONICAL NAME in the
+   Excluded reason. Example:
+       OK:    Excluded: src/swimlane-card.ts:330 — focus-off
+              compact button for filtered-out lanes (not a stage-
+              bearing body)
+       FAIL:  Excluded: src/swimlane-card.ts:330 — renderSwimStub
+              is the focus-off stub button   ← contains "stub"
+   The parser's substring match doesn't distinguish proper-noun
+   usage from deferral usage; the workaround is to talk about what
+   the code DOES, not what it's CALLED.
 `;
 }
 
