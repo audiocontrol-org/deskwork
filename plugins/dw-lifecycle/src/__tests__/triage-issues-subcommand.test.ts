@@ -282,6 +282,139 @@ describe('runTriageIssues — apply', () => {
     expect(code).toBe(1);
   });
 
+  it('exits 2 on malformed JSON in the proposal file (Fix 3)', () => {
+    const path = join(projectRoot, 'p.json');
+    writeFileSync(path, '{ this is not json');
+    const stderrChunks: string[] = [];
+    const origStderrWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = ((chunk: unknown): boolean => {
+      stderrChunks.push(typeof chunk === 'string' ? chunk : String(chunk));
+      return true;
+    }) as typeof process.stderr.write;
+    let calls = 0;
+    try {
+      const { stream } = captureStdout();
+      const code = runTriageIssues({
+        opts: { verb: 'apply', fromFile: path },
+        projectRoot,
+        now: new Date(),
+        runGh: () => {
+          calls += 1;
+          return '';
+        },
+        stdout: stream,
+        detectRepo: () => 'foo/bar',
+      });
+      expect(code).toBe(2);
+      expect(calls).toBe(0);
+      expect(stderrChunks.join('')).toMatch(/Could not parse/);
+    } finally {
+      process.stderr.write = origStderrWrite;
+    }
+  });
+
+  it('exits 2 when the proposal file is missing required top-level fields (Fix 3)', () => {
+    const path = join(projectRoot, 'p.json');
+    writeFileSync(path, JSON.stringify({ bucket: 'unlabeled' }));
+    const stderrChunks: string[] = [];
+    const origStderrWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = ((chunk: unknown): boolean => {
+      stderrChunks.push(typeof chunk === 'string' ? chunk : String(chunk));
+      return true;
+    }) as typeof process.stderr.write;
+    let calls = 0;
+    try {
+      const { stream } = captureStdout();
+      const code = runTriageIssues({
+        opts: { verb: 'apply', fromFile: path },
+        projectRoot,
+        now: new Date(),
+        runGh: () => {
+          calls += 1;
+          return '';
+        },
+        stdout: stream,
+        detectRepo: () => 'foo/bar',
+      });
+      expect(code).toBe(2);
+      expect(calls).toBe(0);
+      expect(stderrChunks.join('')).toMatch(/not a valid proposal file/);
+    } finally {
+      process.stderr.write = origStderrWrite;
+    }
+  });
+
+  it('exits 2 when an approved item has invalid disposition_fields, with NO gh calls (Fix 3 + Fix 1)', () => {
+    const path = join(projectRoot, 'p.json');
+    const file: ProposalFile = {
+      generated_at: '2026-05-28T00:00:00.000Z',
+      bucket: 'unlabeled',
+      query: 'state:open no:label',
+      repo: 'foo/bar',
+      approval: 'y',
+      items: [
+        {
+          number: 1,
+          title: 't',
+          url: 'u',
+          age_days: 1,
+          comment_age_days: null,
+          labels: [],
+          body_excerpt: '',
+          disposition: 'leave-with-comment',
+          disposition_fields: { comment: 'ok' },
+          applied: null,
+          apply_error: null,
+          result: null,
+        },
+        {
+          number: 2,
+          title: 't',
+          url: 'u',
+          age_days: 1,
+          comment_age_days: null,
+          labels: [],
+          body_excerpt: '',
+          disposition: 'close-wontfix',
+          disposition_fields: { reason: '' },
+          applied: null,
+          apply_error: null,
+          result: null,
+        },
+      ],
+    };
+    writeFileSync(path, JSON.stringify(file, null, 2));
+    const stderrChunks: string[] = [];
+    const origStderrWrite = process.stderr.write.bind(process.stderr);
+    process.stderr.write = ((chunk: unknown): boolean => {
+      stderrChunks.push(typeof chunk === 'string' ? chunk : String(chunk));
+      return true;
+    }) as typeof process.stderr.write;
+    let calls = 0;
+    try {
+      const { stream } = captureStdout();
+      const code = runTriageIssues({
+        opts: { verb: 'apply', fromFile: path },
+        projectRoot,
+        now: new Date(),
+        runGh: () => {
+          calls += 1;
+          return '';
+        },
+        stdout: stream,
+        detectRepo: () => 'foo/bar',
+      });
+      expect(code).toBe(2);
+      // The no-mutation oracle: item 1 had a valid leave-with-comment
+      // disposition, but item 2's malformed close-wontfix aborts the
+      // whole batch before either is dispatched.
+      expect(calls).toBe(0);
+      expect(stderrChunks.join('')).toMatch(/Item 2/);
+    } finally {
+      process.stderr.write = origStderrWrite;
+    }
+  });
+
   it('rewrites the file with applied + result fields after a successful run', () => {
     const path = join(projectRoot, 'p.json');
     const file: ProposalFile = {

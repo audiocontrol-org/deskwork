@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { repoRoot } from '../repo.js';
-import { apply } from '../triage-issues/apply.js';
+import { apply, InvalidProposalFileError } from '../triage-issues/apply.js';
 import { propose } from '../triage-issues/propose.js';
 import type { RunGh } from '../triage-issues/types.js';
 
@@ -193,11 +193,20 @@ export function runTriageIssues(args: RunTriageIssuesArgs): number {
     stdout.write('\n');
     return 0;
   }
-  const result = apply({
-    proposalPath: opts.fromFile,
-    runGh,
-    ...(opts.repo !== undefined ? { repo: opts.repo } : {}),
-  });
+  let result;
+  try {
+    result = apply({
+      proposalPath: opts.fromFile,
+      runGh,
+      ...(opts.repo !== undefined ? { repo: opts.repo } : {}),
+    });
+  } catch (err) {
+    if (err instanceof InvalidProposalFileError) {
+      process.stderr.write(`${err.message}\n`);
+      return 2;
+    }
+    throw err;
+  }
   if (result.aborted) {
     stdout.write('Aborted by operator approval ("n").\n');
     return 0;

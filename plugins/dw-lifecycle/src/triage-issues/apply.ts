@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync } from 'node:fs';
-import { buildDispatch } from './dispositions.js';
+import { buildDispatch, validateDisposition } from './dispositions.js';
 import type {
   DispositionFields,
   DispositionKind,
@@ -13,6 +13,15 @@ import type {
 // outcome is recorded inline; no rollback. The file is overwritten with
 // the post-apply state so the operator can re-read it (or re-run apply
 // against the unchanged rows after fixing the failures).
+//
+// Structural failures (malformed JSON, missing required top-level fields,
+// approved items whose disposition_fields are invalid) throw
+// InvalidProposalFileError BEFORE any gh mutation runs. The subcommand
+// layer maps that error class to exit code 2.
+
+export class InvalidProposalFileError extends Error {
+  override name = 'InvalidProposalFileError';
+}
 
 export interface ApplyArgs {
   readonly proposalPath: string;
@@ -136,10 +145,12 @@ export function readProposalFile(path: string): ProposalFile {
     parsed = JSON.parse(raw);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    throw new Error(`Could not parse ${path} as JSON: ${message}`);
+    throw new InvalidProposalFileError(
+      `Could not parse ${path} as JSON: ${message}`,
+    );
   }
   if (!isProposalFile(parsed)) {
-    throw new Error(
+    throw new InvalidProposalFileError(
       `${path} is not a valid proposal file (missing or malformed required fields).`,
     );
   }
@@ -236,6 +247,29 @@ export function apply(args: ApplyArgs): ApplyResult {
   }
 
   const chosen = new Set(selectedIndexes(token, file.items.length));
+
+  // All-or-nothing pre-validation gate. Walk EVERY approved item and
+  // validate disposition_fields BEFORE issuing any gh call. If a single
+  // approved item is malformed, the whole apply aborts with zero
+  // mutations. This is the contract that distinguishes "I made a typo in
+  // one row" (recoverable: fix and re-run) from "two rows landed, one
+  // exploded mid-flight" (partial-state mess).
+  for (let i = 0; i < file.items.length; i++) {
+    const oneBased = i + 1;
+    if (!chosen.has(oneBased)) continue;
+    const item = file.items[i];
+    if (item === undefined) continue;
+    if (item.disposition === null || item.disposition_fields === null) continue;
+    try {
+      validateDisposition(item.disposition, item.disposition_fields);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new InvalidProposalFileError(
+        `Item ${oneBased} (issue #${item.number}, disposition '${item.disposition}') has invalid disposition_fields: ${message}`,
+      );
+    }
+  }
+
   const outcomes: ApplyOutcome[] = [];
   const updatedItems: ProposalItem[] = file.items.map((item, i) => {
     const oneBased = i + 1;

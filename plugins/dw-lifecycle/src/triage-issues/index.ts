@@ -1,6 +1,11 @@
 export { propose } from './propose.js';
 export type { ProposeArgs, ProposeResult } from './propose.js';
-export { apply, parseApproval, readProposalFile } from './apply.js';
+export {
+  apply,
+  InvalidProposalFileError,
+  parseApproval,
+  readProposalFile,
+} from './apply.js';
 export type {
   ApplyArgs,
   ApplyOutcome,

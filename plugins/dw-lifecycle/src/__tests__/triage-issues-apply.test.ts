@@ -2,7 +2,12 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { mkdtempSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { apply, parseApproval, readProposalFile } from '../triage-issues/apply.js';
+import {
+  apply,
+  InvalidProposalFileError,
+  parseApproval,
+  readProposalFile,
+} from '../triage-issues/apply.js';
 import type { ProposalFile, ProposalItem } from '../triage-issues/types.js';
 
 describe('parseApproval', () => {
@@ -283,6 +288,91 @@ describe('apply', () => {
     expect(result.summary.applied).toBe(0);
     expect(result.summary.failed).toBe(1);
     expect(result.outcomes[0]?.error).toMatch(/no disposition/);
+  });
+
+  it('aborts the whole apply with NO gh calls when one approved item has invalid disposition_fields (Fix 1 — pre-validation gate)', () => {
+    const path = join(projectRoot, 'p.json');
+    const file: ProposalFile = {
+      generated_at: '2026-05-28T00:00:00.000Z',
+      bucket: 'unlabeled',
+      query: 'state:open no:label',
+      repo: 'foo/bar',
+      approval: 'y',
+      items: [
+        makeItem({
+          number: 1,
+          disposition: 'close-wontfix',
+          disposition_fields: { reason: 'real reason' },
+        }),
+        makeItem({
+          number: 2,
+          disposition: 'leave-with-comment',
+          disposition_fields: { comment: 'ok' },
+        }),
+        // Item 3 is malformed: close-wontfix requires a non-empty reason.
+        makeItem({
+          number: 3,
+          disposition: 'close-wontfix',
+          disposition_fields: { reason: '' },
+        }),
+      ],
+    };
+    writeProposal(path, file);
+    expect(() => apply({ proposalPath: path, runGh })).toThrow(
+      InvalidProposalFileError,
+    );
+    // The all-or-nothing gate: items 1 and 2 had valid dispositions but
+    // the apply MUST abort before any gh mutation runs.
+    expect(calls).toHaveLength(0);
+  });
+
+  it('names the offending item index + disposition + invalid field in the gate error', () => {
+    const path = join(projectRoot, 'p.json');
+    const file: ProposalFile = {
+      generated_at: '2026-05-28T00:00:00.000Z',
+      bucket: 'unlabeled',
+      query: 'state:open no:label',
+      repo: 'foo/bar',
+      approval: 'y',
+      items: [
+        makeItem({
+          number: 99,
+          disposition: 'close-wontfix',
+          disposition_fields: { reason: '' },
+        }),
+      ],
+    };
+    writeProposal(path, file);
+    expect(() => apply({ proposalPath: path, runGh })).toThrow(
+      /Item 1 \(issue #99, disposition 'close-wontfix'\) has invalid disposition_fields/,
+    );
+  });
+
+  it('skips items missing a disposition (records inline error, NOT a gate failure)', () => {
+    const path = join(projectRoot, 'p.json');
+    const file: ProposalFile = {
+      generated_at: '2026-05-28T00:00:00.000Z',
+      bucket: 'unlabeled',
+      query: 'state:open no:label',
+      repo: 'foo/bar',
+      approval: 'y',
+      items: [
+        makeItem({
+          number: 1,
+          disposition: 'leave-with-comment',
+          disposition_fields: { comment: 'c' },
+        }),
+        // Item 2 has no disposition — different from invalid disposition.
+        // The gate must let it through; runOne records "no disposition".
+        makeItem({ number: 2 }),
+      ],
+    };
+    writeProposal(path, file);
+    const result = apply({ proposalPath: path, runGh });
+    expect(result.summary.applied).toBe(1);
+    expect(result.summary.failed).toBe(1);
+    expect(result.outcomes[1]?.error).toMatch(/no disposition/);
+    expect(calls).toHaveLength(1);
   });
 
   it('uses the explicit --repo override when supplied', () => {
