@@ -27,9 +27,23 @@
  * tokens declared here; everything routes through the existing
  * palette per DESIGN-STANDARDS.md.
  *
+ * Phase 5 Task 5.1B adds per-lane kanban ↔ list view toggle:
+ *   - `.view-toggle` segmented `▦ Kanban` / `≡ List` cell pair in
+ *     each swim-head (between `.quick-meta` and the lane-collapse
+ *     chevron). Real `<button>` cells with `role="radio"` + `aria-
+ *     checked` per WAI-ARIA Authoring Practices.
+ *   - `.swim.view-kanban` shows `.stage-grid`; `.swim.view-list`
+ *     shows `.list-body`. Both bodies are server-rendered every
+ *     time; CSS picks the visible one.
+ *   - Collapse precedence: `.swim.collapsed .view-toggle` greys
+ *     out + disables pointer events.
+ *   - `.list-body` carries `.lb-group` per stage with the same
+ *     stage-name + count + collapse-chev pattern as kanban's
+ *     `.stage-col`, plus per-entry `.lb-row`s (title + slug +
+ *     state-slot + overflow).
+ *
  * Affordances scoped to other Phase 5 tasks (the swim-head's HTML
  * comment slots reserve space; their CSS lands with the affordance):
- *   - Kanban ↔ list view toggle (Task 5.1B).
  *   - `+ new` compose chip (Task 5.1C).
  *   - Drag-to-reorder visual feedback (Task 5.4).
  *
@@ -823,6 +837,294 @@
  *  flexes down gracefully on phone via the @media rule below.
  * ============================================================ */
 
+/* ============================================================
+ *  Task 5.1B — Per-lane kanban ↔ list view toggle.
+ *
+ *  Server renders BOTH `.stage-grid` (kanban) AND `.list-body`
+ *  (list) inside every `<article class="swim">`. CSS picks one
+ *  based on the swim's mode class (`.view-kanban` / `.view-list`).
+ *  Server-default is `.view-kanban`; the client controller
+ *  applies viewport-default (mobile→list at ≤720px, matching the
+ *  existing mobile breakpoint above) + per-lane localStorage
+ *  override.
+ *
+ *  Mockup reference: direction-3-press-bay.html
+ *  - View-toggle: lines 354-389 (desktop) + 830-841 (phone).
+ *  - List-body: lines 393-491 (desktop) + 842-908 (phone).
+ *  - Collapse precedence: `.swim.collapsed .view-toggle` line 389.
+ * ============================================================ */
+
+.view-toggle {
+  display: inline-flex;
+  border: 1px solid var(--er-paper-3);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-left: 0.4rem;
+  background: var(--er-paper);
+}
+
+.view-toggle .vt-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.25rem 0.55rem;
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--er-paper-3);
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  color: var(--er-ink-soft);
+  cursor: pointer;
+  min-height: 24px;
+}
+
+.view-toggle .vt-cell:last-child {
+  border-right: none;
+}
+
+.view-toggle .vt-cell:hover {
+  background: var(--er-paper-2);
+}
+
+.view-toggle .vt-cell:focus-visible {
+  outline: 2px solid var(--er-proof-blue);
+  outline-offset: -2px;
+}
+
+.view-toggle .vt-cell .vt-icon {
+  font-size: 0.85rem;
+}
+
+.view-toggle .vt-cell.active {
+  background: var(--er-ink);
+  color: var(--er-paper);
+}
+
+.view-toggle .vt-cell.active .vt-icon {
+  color: var(--er-paper);
+}
+
+/* Collapse precedence — when the lane is collapsed there is no
+ * body to render either view of; greying the toggle + disabling
+ * pointer events communicates the contract visually, while the
+ * client controller sets `aria-disabled="true"` for assistive tech
+ * (mockup line 389). */
+.swim.collapsed .view-toggle {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* ----- Body switching: show exactly one based on view-mode. ----- */
+
+/* Server default (.view-kanban) renders the kanban grid; hide the
+ * list-body. The .view-list class flips both. */
+.swim.view-kanban .list-body { display: none; }
+.swim.view-list .stage-grid { display: none; }
+
+/* When a lane is collapsed both bodies hide — the existing
+ * `.swim.collapsed .stage-grid { display: none }` covers kanban;
+ * mirror it for list-body so a collapsed list-view lane stays
+ * collapsed (mockup line 502-505 + 745 reasoning). */
+.swim.collapsed .list-body {
+  display: none;
+}
+
+/* ============================================================
+ *  Task 5.1B — List body shape.
+ *
+ *  Per mockup lines 393-491: `.list-body` is a vertical stack of
+ *  `.lb-group` (one per template stage). Each group has a
+ *  `.lb-group-head` (glyph + name + count + chevron) and a series
+ *  of `.lb-row` rows (title + slug + state slot + ⋮ overflow).
+ *  Locked stages tint the glyph proof-blue (line 420 — same colour
+ *  treatment kanban's `.stage-col.locked .stage-glyph` rule uses).
+ * ============================================================ */
+
+.list-body {
+  background: var(--er-paper);
+  padding: 0;
+}
+
+.list-body .lb-group {
+  border-bottom: 1px dashed var(--er-paper-3);
+}
+
+.list-body .lb-group:last-child {
+  border-bottom: none;
+}
+
+.list-body .lb-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.45rem 0.7rem;
+  background: var(--er-paper-2);
+  border-bottom: 1px dashed var(--er-paper-3);
+  cursor: pointer;
+  user-select: none;
+}
+
+.list-body .lb-group-head:hover {
+  background: var(--er-paper-3);
+}
+
+.list-body .lb-group-head:hover .collapse-chev {
+  color: var(--er-red-pencil);
+}
+
+.list-body .lb-group-head .lb-glyph {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-size: 0.95rem;
+  color: var(--er-red-pencil);
+}
+
+.list-body .lb-group.empty .lb-glyph {
+  color: var(--er-faded);
+}
+
+/* Locked stages render the head glyph in proof-blue — same
+ * treatment as kanban's `.stage-col.locked .stage-glyph` rule
+ * (mockup line 420). */
+.list-body .lb-group.locked .lb-glyph {
+  color: var(--er-proof-blue);
+}
+
+.list-body .lb-group-head .lb-name {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-size: 0.85rem;
+}
+
+.list-body .lb-group.empty .lb-name {
+  color: var(--er-ink-soft);
+}
+
+.list-body .lb-group-head .lb-count {
+  font-family: var(--er-font-mono);
+  font-size: 0.62rem;
+  color: var(--er-faded);
+  letter-spacing: 0.14em;
+  margin-left: auto;
+}
+
+.list-body .lb-group-head .collapse-chev {
+  margin-left: 0.2rem;
+}
+
+/* Per-stage collapse in list view — the lb-group toggles
+ * `.collapsed` the same way `.stage-col` does. When collapsed the
+ * rows hide; the head stays. */
+.list-body .lb-group.collapsed .lb-row {
+  display: none;
+}
+
+.list-body .lb-group.collapsed .lb-group-head {
+  border-bottom: none;
+}
+
+/* Off-pipeline list groups (Blocked / Cancelled) — subdued head
+ * to keep the operator's eye on the linear pipeline first
+ * (parallels `.stage-col.off-pipeline .stage-head { opacity: 0.8 }`). */
+.list-body .lb-group.off-pipeline .lb-group-head {
+  opacity: 0.8;
+}
+
+/* ----- Rows ----- */
+
+.list-body .lb-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
+  padding: 0.35rem 0.8rem;
+  border-bottom: 1px dashed var(--er-paper-3);
+  text-decoration: none;
+  color: inherit;
+}
+
+.list-body .lb-row:last-child {
+  border-bottom: none;
+}
+
+.list-body .lb-row:hover {
+  background: var(--er-paper-2);
+}
+
+.list-body .lb-row:focus-visible {
+  outline: 2px solid var(--er-proof-blue);
+  outline-offset: -2px;
+}
+
+.list-body .lb-row .lb-title {
+  flex: 1 1 auto;
+  font-family: var(--er-font-display);
+  font-size: 0.92rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list-body .lb-row .lb-version {
+  font-family: var(--er-font-mono);
+  font-size: 0.65rem;
+  color: var(--er-faded);
+  letter-spacing: 0.06em;
+  flex: 0 0 auto;
+}
+
+.list-body .lb-row .lb-state {
+  font-family: var(--er-font-mono);
+  font-size: 0.65rem;
+  color: var(--er-ink-soft);
+  flex: 0 0 auto;
+}
+
+.list-body .lb-row .lb-overflow {
+  /* The overflow is a `<span role="button" tabindex="0">` — NOT a
+   * nested `<button>`, since `<a class="lb-row">` is the row
+   * wrapper and nested interactives are invalid HTML. Style
+   * properties that would default differently on a span vs a
+   * button (background / border / cursor) are pinned explicitly. */
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
+  background: transparent;
+  border: none;
+  color: var(--er-ink-soft);
+  cursor: pointer;
+  font-size: 1rem;
+  border-radius: 2px;
+  user-select: none;
+}
+
+.list-body .lb-row .lb-overflow:hover {
+  background: var(--er-paper-3);
+  color: var(--er-red-pencil);
+}
+
+.list-body .lb-row .lb-overflow:focus-visible {
+  outline: 2px solid var(--er-proof-blue);
+  outline-offset: 1px;
+}
+
+/* Empty-state row — single-row hint when a stage has no entries
+ * in the list view (parallels kanban's `.empty-state` body). */
+.list-body .lb-row.empty-state {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-size: 0.85rem;
+  color: var(--er-ink-soft);
+  cursor: default;
+}
+
+.list-body .lb-row.empty-state:hover {
+  background: var(--er-paper);
+}
+
 @media (max-width: 720px) {
   .bay-shell {
     grid-template-columns: 1fr;
@@ -861,5 +1163,44 @@
 
   .stage-col:last-child {
     border-bottom: none;
+  }
+
+  /* ----- Task 5.1B mobile pass ----- */
+
+  /* View-toggle narrows on phone — labels shrink so both cells fit
+   * comfortably in the wrapped swim-head row (mockup line 830-841). */
+  .view-toggle .vt-cell {
+    padding: 0.2rem 0.4rem;
+    font-size: 0.62rem;
+    gap: 0.2rem;
+  }
+
+  .view-toggle .vt-cell .vt-icon {
+    font-size: 0.78rem;
+  }
+
+  /* Mobile kanban tile view = the v0.19 collapsible-stage-tile
+   * pattern (single-column vertical stack — NOT a 2-column wrap,
+   * which would obscure the linear stage sequence). The existing
+   * `.stage-grid { flex-direction: column }` rule above already
+   * places columns in a single stack; the `.stage-col` becomes a
+   * one-line tile by default — operators tap the per-stage chevron
+   * to expand. This matches `DESIGN-STANDARDS.md § Collapsible
+   * stage tiles mobile-only navigation`. No 2-column rule needed
+   * here — the absence of one is the rule. */
+
+  /* List-body on phone — narrower padding so titles fit; rows still
+   * dense (title + slug + state + overflow). */
+  .list-body .lb-group-head {
+    padding: 0.35rem 0.55rem;
+  }
+
+  .list-body .lb-row {
+    padding: 0.35rem 0.55rem;
+    gap: 0.5rem;
+  }
+
+  .list-body .lb-row .lb-title {
+    font-size: 0.88rem;
   }
 }

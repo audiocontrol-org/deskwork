@@ -1,6 +1,7 @@
 /**
  * Per-lane swimlane card renderer for the multi-lane dashboard
- * (Phase 5 Task 5.1 + Task 5.1A — per-lane collapse).
+ * (Phase 5 Task 5.1 + Task 5.1A — per-lane collapse + Task 5.1B —
+ * per-lane kanban ↔ list view toggle).
  *
  * Renders:
  *   - `renderSwimlane`: the full `<article class="swim">` for a
@@ -14,6 +15,15 @@
  *     is server-rendered as expanded (`aria-expanded="true"`); the
  *     client controller restores the operator's persisted state
  *     from localStorage post-DOMContentLoaded.
+ *     Task 5.1B adds a `.view-toggle` segmented control between
+ *     `.quick-meta` and the lane-collapse chevron — two `<button
+ *     class="vt-cell">` cells (`▦ Kanban` / `≡ List`) with `role=
+ *     "radio"` + `aria-checked` per WAI-ARIA Authoring Practices.
+ *     Both `.stage-grid` AND `.list-body` are server-rendered for
+ *     every swim; CSS shows exactly one via `.swim.view-kanban` /
+ *     `.swim.view-list`. The server default is kanban; the client
+ *     controller post-DOMContentLoaded applies viewport-default
+ *     (mobile→list) + per-lane localStorage override.
  *   - `renderSwimStub`: the compact `<button class="swim-stub">`
  *     emitted alongside the swim for visibility-on lanes. CSS picks
  *     which one shows via `.is-focus-hidden`.
@@ -28,6 +38,9 @@
  *   - `renderSwimCompact`: the compact per-stage strip rendered
  *     inside every swim; CSS reveals it when the lane is
  *     `.collapsed` (state added by Task 5.1A's chevron controller).
+ *   - `renderViewToggle`: segmented `▦ Kanban` / `≡ List` control
+ *     in the swim-head. Per `affordance-placement.md`, the toggle
+ *     lives ON the lane it controls.
  */
 
 import { html, unsafe, type RawHtml } from '../html.ts';
@@ -35,6 +48,7 @@ import { renderRow } from './section.ts';
 import { stageGlyph, GLYPH_OFF } from './swimlane-stage-glyph.ts';
 import { laneGlyph } from './lane-glyph.ts';
 import { renderEntryCard } from './swimlane-entry-card.ts';
+import { renderListBody } from './swimlane-list-body.ts';
 import { isLegacyEditorialStage } from './legacy-stage.ts';
 import type { LaneBucket } from './lane-data.ts';
 import type { LaneRailRow } from './swimlane-rail.ts';
@@ -167,6 +181,46 @@ function renderStageCol(
     </section>`);
 }
 
+/**
+ * Per-lane view-toggle (Task 5.1B). Renders the segmented `▦ Kanban`
+ * / `≡ List` control in the swim-head. Two real `<button>` cells
+ * grouped under `role="radiogroup"` per WAI-ARIA Authoring Practices
+ * for radio buttons; each cell carries `role="radio"` + `aria-
+ * checked`. The server-default selection is kanban — the client
+ * controller post-DOMContentLoaded applies the viewport-aware
+ * default (mobile→list) and any per-lane localStorage override.
+ *
+ * The toggle lives ON the lane it controls (per `affordance-place
+ * ment.md` — component-attached affordances over toolbar-attached
+ * affordances). When the lane is `.collapsed`, the CSS rule `.swim
+ * .collapsed .view-toggle { opacity: 0.4; pointer-events: none; }`
+ * + the server-rendered `aria-disabled="false"` (flipped to true
+ * by the client controller when the swim's `.collapsed` class is
+ * applied) communicate the collapse-precedence contract to both
+ * sighted and assistive-tech operators.
+ */
+export function renderViewToggle(laneId: string, laneName: string): RawHtml {
+  return unsafe(html`
+    <div class="view-toggle" role="radiogroup"
+      aria-label="View mode for ${laneName}"
+      data-view-toggle data-lane-id="${laneId}">
+      <button class="vt-cell vt-cell--kanban active" type="button"
+        role="radio" aria-checked="true" aria-disabled="false"
+        aria-label="Kanban view"
+        data-view-mode="kanban" data-lane-id="${laneId}">
+        <span class="vt-icon" aria-hidden="true">▦</span>
+        <span class="vt-label">Kanban</span>
+      </button>
+      <button class="vt-cell vt-cell--list" type="button"
+        role="radio" aria-checked="false" aria-disabled="false"
+        aria-label="List view"
+        data-view-mode="list" data-lane-id="${laneId}">
+        <span class="vt-icon" aria-hidden="true">≡</span>
+        <span class="vt-label">List</span>
+      </button>
+    </div>`);
+}
+
 function renderSwimCompact(bucket: LaneBucket): RawHtml {
   const stages: string[] = [
     ...bucket.template.linearStages,
@@ -240,15 +294,25 @@ export function renderSwimlane(
   // controller mirrors the toggle on chip clicks (already wired in
   // `swimlane.ts:153`).
   const focusClass = focusHidden ? ' is-focus-hidden' : '';
+  // Per Task 5.1B: the server-default view-mode class is `view-
+  // kanban` — the client controller post-DOMContentLoaded mirrors
+  // the operator's per-lane localStorage override OR the viewport-
+  // aware default (mobile→list). CSS toggles which body renders
+  // via `.swim.view-kanban .list-body { display: none }` and
+  // `.swim.view-list .stage-grid { display: none }`. Both bodies
+  // are emitted at server time so the controller flips one class
+  // instead of mutating DOM (mirrors the dual swim+stub pattern
+  // AUDIT-02 landed for focus toggle).
   return unsafe(html`
-    <article class="swim swim--${template.id}${unsafe(focusClass)}" data-lane-id="${lane.id}"
+    <article class="swim swim--${template.id} view-kanban${unsafe(focusClass)}"
+      data-lane-id="${lane.id}"
       data-template-id="${template.id}">
       <div class="swim-head">
         <span class="glyph" aria-hidden="true">${laneGlyph(template.id)}</span>
         <span class="name">${lane.name}</span>
         <span class="tag">${tag}</span>
         <span class="quick-meta">${meta}</span>
-        <!-- 5.1B slot: view-toggle (kanban ↔ list) lands here. -->
+        ${renderViewToggle(lane.id, lane.name)}
         <!-- 5.1C slot: + new compose chip lands here. -->
         <button class="collapse-chev" type="button"
           aria-expanded="true"
@@ -259,6 +323,7 @@ export function renderSwimlane(
       </div>
       ${renderSwimCompact(bucket)}
       <div class="stage-grid" data-stage-grid>${unsafe(stagesRaw)}</div>
+      ${renderListBody(bucket, defaultSite)}
     </article>`);
 }
 

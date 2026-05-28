@@ -267,8 +267,11 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
     const stubMatches = r.html.match(/<button class="swim-stub(?:\s[^"]*)?"/g) ?? [];
     expect(stubMatches.length).toBe(3);
     // Focused lanes' swims do NOT carry is-focus-hidden; their stubs DO.
-    expect(r.html).toMatch(/<article class="swim swim--editorial"[^>]*data-lane-id="default"/);
-    expect(r.html).toMatch(/<article class="swim swim--visual"[^>]*data-lane-id="mockups"/);
+    // Task 5.1B adds a `view-kanban` token between `swim--<id>` and
+    // any focus-hidden modifier; the regex tolerates additional class
+    // tokens via `[^"]*`.
+    expect(r.html).toMatch(/<article class="swim swim--editorial[^"]*"[^>]*data-lane-id="default"/);
+    expect(r.html).toMatch(/<article class="swim swim--visual[^"]*"[^>]*data-lane-id="mockups"/);
     expect(r.html).toMatch(
       /<button class="swim-stub is-focus-hidden"[^>]*data-swim-stub="default"/,
     );
@@ -277,7 +280,7 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
     );
     // Non-focused lane (qa): swim carries is-focus-hidden; stub does NOT.
     expect(r.html).toMatch(
-      /<article class="swim swim--qa-plan is-focus-hidden"[^>]*data-lane-id="qa"/,
+      /<article class="swim swim--qa-plan[^"]*\bis-focus-hidden\b[^"]*"[^>]*data-lane-id="qa"/,
     );
     expect(r.html).toMatch(
       /<button class="swim-stub"[^>]*data-swim-stub="qa"/,
@@ -310,7 +313,7 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
     );
   });
 
-  it('leaves later-task affordance slots in place (5.1B/C placeholders, no stubs)', async () => {
+  it('leaves later-task affordance slots in place (5.1C placeholders, no stubs)', async () => {
     // Slots are HTML comments — they survive into the rendered page
     // because we render via string templates rather than JSX. The
     // assertion verifies the placeholder commentary lands so the
@@ -319,16 +322,15 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
     // Task 5.1A landed the lane-level + per-stage collapse chevrons,
     // so the 5.1A slots have been replaced by real `<button
     // class="collapse-chev">` markup — see the dedicated 5.1A tests
-    // below. The 5.1B (view-toggle) and 5.1C (compose chip) slots
-    // remain HTML-comment placeholders.
+    // below. Task 5.1B landed the view-toggle, so the 5.1B slot has
+    // been replaced by a real `<div class="view-toggle">` (see the
+    // dedicated 5.1B tests below). Only the 5.1C (compose chip)
+    // slot remains an HTML-comment placeholder.
     const r = await getHtml(app, '/dev/editorial-studio');
     expect(r.status).toBe(200);
-    expect(r.html).toContain('5.1B slot');
     expect(r.html).toContain('5.1C slot');
-    // No 5.1B/C ACTUAL affordances render yet — assert by absence
-    // of their class names.
+    // 5.1C affordance not yet rendered — assert by absence.
     expect(r.html).not.toContain('class="swim-compose"');
-    expect(r.html).not.toContain('class="view-toggle"');
   });
 
   it('per-lane glyphs from the mockup mapping (editorial=§, visual=◆, qa-plan=⊕)', async () => {
@@ -413,17 +415,18 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
   it('swimlane <article> carries template-id modifier class (swim--<template-id>)', async () => {
     const r = await getHtml(app, '/dev/editorial-studio');
     expect(r.status).toBe(200);
-    // Editorial lane → swim--editorial.
+    // Editorial lane → swim--editorial (followed by Task 5.1B's
+    // `view-kanban` server-default token).
     expect(r.html).toMatch(
-      /<article class="swim swim--editorial"[^>]*data-lane-id="default"/,
+      /<article class="swim swim--editorial[^"]*"[^>]*data-lane-id="default"/,
     );
     // Mockups (visual template) → swim--visual.
     expect(r.html).toMatch(
-      /<article class="swim swim--visual"[^>]*data-lane-id="mockups"/,
+      /<article class="swim swim--visual[^"]*"[^>]*data-lane-id="mockups"/,
     );
     // QA → swim--qa-plan.
     expect(r.html).toMatch(
-      /<article class="swim swim--qa-plan"[^>]*data-lane-id="qa"/,
+      /<article class="swim swim--qa-plan[^"]*"[^>]*data-lane-id="qa"/,
     );
   });
 
@@ -479,10 +482,12 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
     expect(swims.length).toBe(3);
     expect(stubs.length).toBe(3);
     // With nothing in `?focus=`, all 3 swims show and all 3 stubs hide.
+    // Task 5.1B added the `view-kanban` server-default class token; the
+    // regex tolerates additional class tokens after `swim--<id>`.
     for (const id of ['default', 'mockups', 'qa']) {
       // swim is NOT focus-hidden
       const swimRe = new RegExp(
-        `<article class="swim swim--[a-z0-9-]+"[^>]*data-lane-id="${id}"`,
+        `<article class="swim swim--[a-z0-9-]+[^"]*"[^>]*data-lane-id="${id}"`,
       );
       expect(r.html).toMatch(swimRe);
       // stub IS focus-hidden
@@ -500,7 +505,7 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
     // Focused lanes — swim visible, stub hidden.
     for (const id of ['default', 'mockups']) {
       const swimRe = new RegExp(
-        `<article class="swim swim--[a-z0-9-]+"[^>]*data-lane-id="${id}"`,
+        `<article class="swim swim--[a-z0-9-]+[^"]*"[^>]*data-lane-id="${id}"`,
       );
       expect(r.html).toMatch(swimRe);
       const stubRe = new RegExp(
@@ -510,7 +515,7 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
     }
     // Non-focused — swim hidden, stub visible.
     expect(r.html).toMatch(
-      /<article class="swim swim--qa-plan is-focus-hidden"[^>]*data-lane-id="qa"/,
+      /<article class="swim swim--qa-plan[^"]*\bis-focus-hidden\b[^"]*"[^>]*data-lane-id="qa"/,
     );
     expect(r.html).toMatch(
       /<button class="swim-stub"[^>]*data-swim-stub="qa"/,
@@ -633,17 +638,34 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
   it('Task 5.1A: every stage-head emits a per-stage `<button class="collapse-chev">` with aria-expanded="true"', async () => {
     const r = await getHtml(app, '/dev/editorial-studio');
     expect(r.status).toBe(200);
-    // One per-stage chevron per `(lane, stage)` pair. Editorial=8,
-    // Visual=7, QA=7 — total 22 across all three lanes.
+    // One per-stage chevron per `(lane, stage)` pair in the kanban
+    // body. Editorial=8, Visual=7, QA=7 — 22 in total. Task 5.1B
+    // adds a sibling chevron per `lb-group` in the list-body — same
+    // count, mirroring the kanban shape — so the total over both
+    // bodies is 44. The kanban-only count is asserted by scoping to
+    // the stage-grid section.
     const stageChevs = r.html.match(
       /<button class="collapse-chev"[^>]*data-collapse-target="stage"/g,
     ) ?? [];
-    expect(stageChevs.length).toBe(22);
+    expect(stageChevs.length).toBe(44);
+    // Kanban-scoped count (the original Task 5.1A invariant): walk
+    // each lane's stage-grid section and count.
+    let kanbanStageChevCount = 0;
+    for (const laneId of ['default', 'mockups', 'qa']) {
+      const grid = extractStageGridSection(extractLaneSection(r.html, laneId));
+      kanbanStageChevCount += (
+        grid.match(/<button class="collapse-chev"[^>]*data-collapse-target="stage"/g)
+        ?? []
+      ).length;
+    }
+    expect(kanbanStageChevCount).toBe(22);
     // The Drafting column in the editorial lane has the canonical
     // shape: lane-scoped data-lane-id + data-stage-name carrying the
-    // human-readable stage name.
-    const editorialBlock = extractLaneSection(r.html, 'default');
-    expect(editorialBlock).toMatch(
+    // human-readable stage name. Scope to the stage-grid so the
+    // assertion targets the kanban chevron — the list-body's
+    // `lb-group` chevron uses the same data attributes.
+    const editorialGrid = extractStageGridSection(extractLaneSection(r.html, 'default'));
+    expect(editorialGrid).toMatch(
       /<button class="collapse-chev"[^>]*aria-expanded="true"[^>]*aria-label="Collapse Drafting stage"[^>]*data-collapse-target="stage"[^>]*data-lane-id="default"[^>]*data-stage-name="Drafting"/,
     );
   });
@@ -656,7 +678,10 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
     expect(r.html).toMatch(
       /<button class="collapse-chev"[^>]*data-collapse-target="lane"[^>]*data-lane-id="default"[^>]*>▾<\/button>/,
     );
-    // Same glyph at stage-level.
+    // Same glyph at stage-level. The pattern matches against any
+    // chevron with the canonical data attributes — kanban OR list-
+    // body — since both bodies use the same chevron primitive
+    // (Task 5.1B reuses the universal `.collapse-chev` from 5.1A).
     expect(r.html).toMatch(
       /<button class="collapse-chev"[^>]*data-collapse-target="stage"[^>]*data-stage-name="Drafting"[^>]*>▾<\/button>/,
     );
@@ -693,6 +718,218 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
       /\.stage-col\.collapsed\s+\.stage-head\s+\.stage-name\s*\{[\s\S]*?writing-mode:\s*vertical-rl/,
     );
   });
+
+  // ============================================================
+  //  Task 5.1B — per-lane kanban ↔ list view toggle.
+  // ============================================================
+
+  it('Task 5.1B: every swim-head emits a `.view-toggle` segmented control', async () => {
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    // One toggle per lane.
+    const toggles = r.html.match(
+      /<div class="view-toggle"[^>]*data-view-toggle/g,
+    ) ?? [];
+    expect(toggles.length).toBe(3);
+    // Each toggle is a role="radiogroup" with the lane's name in
+    // its aria-label.
+    for (const [id, displayName] of [
+      ['default', 'Editorial'],
+      ['mockups', 'Mockups'],
+      ['qa', 'QA'],
+    ] as const) {
+      const re = new RegExp(
+        `<div class="view-toggle"[^>]*role="radiogroup"[^>]*aria-label="View mode for ${displayName}"[^>]*data-lane-id="${id}"`,
+      );
+      expect(r.html).toMatch(re);
+    }
+  });
+
+  it('Task 5.1B: each `.view-toggle` carries two real <button class="vt-cell"> cells with role="radio"', async () => {
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    // Three lanes × 2 cells = 6 cell buttons.
+    const kanbanCells = r.html.match(
+      /<button class="vt-cell vt-cell--kanban[^"]*"[^>]*type="button"[^>]*role="radio"/g,
+    ) ?? [];
+    expect(kanbanCells.length).toBe(3);
+    const listCells = r.html.match(
+      /<button class="vt-cell vt-cell--list"[^>]*type="button"[^>]*role="radio"/g,
+    ) ?? [];
+    expect(listCells.length).toBe(3);
+    // Server-default selection: kanban cell is aria-checked="true"
+    // + carries `.active`; list cell is aria-checked="false".
+    const editorialBlock = extractLaneSection(r.html, 'default');
+    expect(editorialBlock).toMatch(
+      /<button class="vt-cell vt-cell--kanban active"[^>]*aria-checked="true"[^>]*data-view-mode="kanban"[^>]*data-lane-id="default"/,
+    );
+    expect(editorialBlock).toMatch(
+      /<button class="vt-cell vt-cell--list"[^>]*aria-checked="false"[^>]*data-view-mode="list"[^>]*data-lane-id="default"/,
+    );
+  });
+
+  it('Task 5.1B: every swim is server-rendered with `view-kanban` class (server default)', async () => {
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    // The class string is `swim swim--<template-id> view-kanban ...`.
+    for (const id of ['default', 'mockups', 'qa']) {
+      const re = new RegExp(
+        `<article class="swim swim--[a-z0-9-]+ view-kanban[^"]*"[^>]*data-lane-id="${id}"`,
+      );
+      expect(r.html).toMatch(re);
+    }
+  });
+
+  it('Task 5.1B: every swim emits BOTH `.stage-grid` AND `.list-body` (dual-body server render)', async () => {
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    const grids = r.html.match(/<div class="stage-grid"/g) ?? [];
+    const lists = r.html.match(/<div class="list-body"/g) ?? [];
+    expect(grids.length).toBe(3);
+    expect(lists.length).toBe(3);
+    // Each lane has both bodies inside its swim.
+    for (const id of ['default', 'mockups', 'qa']) {
+      const block = extractLaneSection(r.html, id);
+      expect(block).toMatch(/<div class="stage-grid"/);
+      expect(block).toMatch(/<div class="list-body" data-list-body/);
+    }
+  });
+
+  it('Task 5.1B: list-body emits one `.lb-group[data-lb-group="<stage>"]` per template stage', async () => {
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    // Editorial: 6 linear + 2 off-pipeline = 8 stages.
+    const editorialBlock = extractLaneSection(r.html, 'default');
+    const editorialListBody = extractListBodySection(editorialBlock);
+    const editorialGroups = editorialListBody.match(/data-lb-group="[^"]+"/g) ?? [];
+    expect(editorialGroups.length).toBe(8);
+    // Visual: 4 linear + 3 off-pipeline = 7 stages.
+    const visualListBody = extractListBodySection(extractLaneSection(r.html, 'mockups'));
+    expect((visualListBody.match(/data-lb-group="[^"]+"/g) ?? []).length).toBe(7);
+    // QA: 4 linear + 3 off-pipeline = 7 stages.
+    const qaListBody = extractListBodySection(extractLaneSection(r.html, 'qa'));
+    expect((qaListBody.match(/data-lb-group="[^"]+"/g) ?? []).length).toBe(7);
+  });
+
+  it('Task 5.1B: each `.lb-group` carries glyph + name + count + per-stage `collapse-chev` (role="button")', async () => {
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    const editorialListBody = extractListBodySection(extractLaneSection(r.html, 'default'));
+    // Drafting group has the canonical shape. The html`` template
+    // renders attributes across newlines + indentation, so the
+    // regex tolerates whitespace between attributes.
+    expect(editorialListBody).toMatch(
+      /<div class="lb-group[^"]*"\s+data-lb-group="Drafting">[\s\S]*?<span class="lb-glyph"[^>]*>[\s\S]*?<\/span>[\s\S]*?<span class="lb-name">Drafting<\/span>[\s\S]*?<span class="lb-count">/,
+    );
+    // Per-stage chevron lives inside `.lb-group-head` with data-
+    // collapse-target="stage" + data-stage-name + data-lane-id.
+    expect(editorialListBody).toMatch(
+      /<div class="lb-group-head">[\s\S]*?<button class="collapse-chev"[^>]*aria-expanded="true"[^>]*aria-label="Collapse Drafting group"[^>]*data-collapse-target="stage"[^>]*data-lane-id="default"[^>]*data-stage-name="Drafting"/,
+    );
+  });
+
+  it('Task 5.1B: list-body entries render as <a class="lb-row"> rows with title + slug + state-slot + overflow', async () => {
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    // The editorial Drafting entry has slug=a-draft, title=A Draft.
+    const editorialListBody = extractListBodySection(extractLaneSection(r.html, 'default'));
+    // The row carries data attributes + the three spans + a role=
+    // "button" overflow span (nested `<button>` would be invalid
+    // inside a wrapping `<a>` — interactive inside interactive).
+    const rowRe = new RegExp(
+      `<a class="lb-row"[^>]*data-stage="Drafting"[^>]*data-uuid="${UUID_EDITORIAL_DRAFTING}"[^>]*data-slug="a-draft"[^>]*>[\\s\\S]*?` +
+        `<span class="lb-title">A Draft</span>[\\s\\S]*?` +
+        `<span class="lb-version">a-draft</span>[\\s\\S]*?` +
+        `<span class="lb-state"></span>[\\s\\S]*?` +
+        `<span class="lb-overflow"[^>]*role="button"[^>]*aria-label="Actions for A Draft"`,
+    );
+    expect(editorialListBody).toMatch(rowRe);
+  });
+
+  it('Task 5.1B: locked stages in list-body get `.lb-group.locked`', async () => {
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    // Editorial template: lockedStages = ["Final"]. The html``
+    // template renders attributes across newlines, so the regex
+    // tolerates whitespace between `class="..."` and the next
+    // attribute.
+    const editorialListBody = extractListBodySection(extractLaneSection(r.html, 'default'));
+    expect(editorialListBody).toMatch(
+      /<div class="lb-group[^"]*\blocked\b[^"]*"\s+data-lb-group="Final"/,
+    );
+    // QA template: lockedStages = ["Reviewed"].
+    const qaListBody = extractListBodySection(extractLaneSection(r.html, 'qa'));
+    expect(qaListBody).toMatch(
+      /<div class="lb-group[^"]*\blocked\b[^"]*"\s+data-lb-group="Reviewed"/,
+    );
+  });
+
+  it('Task 5.1B: empty stages in list-body render `<div class="lb-row empty-state">`', async () => {
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    // Editorial has 1 Drafting entry; every other stage in the
+    // editorial lane is empty.
+    const editorialListBody = extractListBodySection(extractLaneSection(r.html, 'default'));
+    expect(editorialListBody).toMatch(
+      /<div class="lb-row empty-state"[^>]*data-empty-stage="Ideas"[^>]*>Nothing in ideas\./,
+    );
+    // The non-empty Drafting group does NOT have an empty-state row
+    // — locate the Drafting group's content (between its head and
+    // the next `<div class="lb-group"`) and assert empty-state is
+    // absent.
+    const draftingGroupRe = /<div class="lb-group[^"]*"\s+data-lb-group="Drafting">[\s\S]*?(?=<div class="lb-group|<\/div>\s*<\/article>|$)/;
+    const draftingMatch = draftingGroupRe.exec(editorialListBody);
+    expect(draftingMatch).not.toBeNull();
+    if (draftingMatch !== null) {
+      expect(draftingMatch[0]).not.toContain('empty-state');
+    }
+  });
+
+  it('Task 5.1B: off-pipeline stages in list-body get `.lb-group.off-pipeline`', async () => {
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    // Editorial off-pipeline stages: Blocked + Cancelled.
+    const editorialListBody = extractListBodySection(extractLaneSection(r.html, 'default'));
+    expect(editorialListBody).toMatch(
+      /<div class="lb-group[^"]*\boff-pipeline\b[^"]*"\s+data-lb-group="Blocked"/,
+    );
+    expect(editorialListBody).toMatch(
+      /<div class="lb-group[^"]*\boff-pipeline\b[^"]*"\s+data-lb-group="Cancelled"/,
+    );
+  });
+
+  it('Task 5.1B: CSS ships `.view-toggle`, body-switching, list-body, and collapse-precedence rules', async () => {
+    const cssRes = await app.fetch(
+      new Request('http://x/static/css/dashboard-swimlane.css'),
+    );
+    expect(cssRes.status).toBe(200);
+    const css = await cssRes.text();
+    // View-toggle primitive.
+    expect(css).toMatch(/\.view-toggle\s*\{[\s\S]*?display:\s*inline-flex/);
+    expect(css).toMatch(/\.view-toggle\s+\.vt-cell\s*\{[\s\S]*?min-height:\s*24px/);
+    // Focus-visible ring on cells (WCAG 2.1 SC 2.4.7 AA).
+    expect(css).toMatch(
+      /\.view-toggle\s+\.vt-cell:focus-visible\s*\{[\s\S]*?outline:\s*2px\s+solid\s+var\(--er-proof-blue\)/,
+    );
+    // Body switching rules.
+    expect(css).toMatch(/\.swim\.view-kanban\s+\.list-body\s*\{[\s\S]*?display:\s*none/);
+    expect(css).toMatch(/\.swim\.view-list\s+\.stage-grid\s*\{[\s\S]*?display:\s*none/);
+    // Collapse precedence (Task 5.1B.3).
+    expect(css).toMatch(
+      /\.swim\.collapsed\s+\.view-toggle\s*\{[\s\S]*?opacity:\s*0\.4[\s\S]*?pointer-events:\s*none/,
+    );
+    // Locked-stage proof-blue in list-body (mockup line 420 mirror).
+    expect(css).toMatch(
+      /\.list-body\s+\.lb-group\.locked\s+\.lb-glyph\s*\{[\s\S]*?color:\s*var\(--er-proof-blue\)/,
+    );
+    // List-body group head + row presence.
+    expect(css).toMatch(/\.list-body\s+\.lb-group-head\s*\{/);
+    expect(css).toMatch(/\.list-body\s+\.lb-row\s*\{/);
+    // Mobile gate at 720px: view-toggle narrows.
+    expect(css).toMatch(
+      /@media\s*\(max-width:\s*720px\)\s*\{[\s\S]*?\.view-toggle\s+\.vt-cell\s*\{[\s\S]*?font-size:\s*0\.62rem/,
+    );
+  });
 });
 
 /**
@@ -718,4 +955,34 @@ function extractLaneSection(html: string, laneId: string): string {
 
 function extractStageCols(htmlSection: string): readonly string[] {
   return htmlSection.match(/data-stage-col="[^"]+"/g) ?? [];
+}
+
+/**
+ * Extract the substring of HTML between a swim's `<div class="stage-
+ * grid">` opening and its closing tag. Task 5.1B added a sibling
+ * `<div class="list-body">` — when callers want to assert kanban-
+ * specific markup without leaking into list-body matches, slice the
+ * stage-grid section first.
+ */
+function extractStageGridSection(htmlSection: string): string {
+  const openIdx = htmlSection.indexOf('<div class="stage-grid"');
+  if (openIdx === -1) return '';
+  const sentinel = '<div class="list-body"';
+  const closeIdx = htmlSection.indexOf(sentinel, openIdx);
+  if (closeIdx === -1) return htmlSection.slice(openIdx);
+  return htmlSection.slice(openIdx, closeIdx);
+}
+
+/**
+ * Extract the substring of HTML between a swim's `<div class="list-
+ * body">` opening and its closing tag (the swim's closing
+ * `</article>` is the boundary). Used to scope assertions inside the
+ * list-body without bleeding into the kanban stage-grid above.
+ */
+function extractListBodySection(htmlSection: string): string {
+  const openIdx = htmlSection.indexOf('<div class="list-body"');
+  if (openIdx === -1) return '';
+  const closeIdx = htmlSection.indexOf('</article>', openIdx);
+  if (closeIdx === -1) return htmlSection.slice(openIdx);
+  return htmlSection.slice(openIdx, closeIdx);
 }

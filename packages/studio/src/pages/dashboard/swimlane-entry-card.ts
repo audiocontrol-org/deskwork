@@ -22,6 +22,7 @@
  */
 
 import { html, unsafe, type RawHtml } from '../html.ts';
+import { entryRowLinkMeta } from './entry-link-meta.ts';
 import type { Entry } from '@deskwork/core/schema/entry';
 
 /**
@@ -33,10 +34,7 @@ import type { Entry } from '@deskwork/core/schema/entry';
  */
 export function renderEntryCard(entry: Entry, defaultSite: string): RawHtml {
   void defaultSite;
-  const reviewLink = `/dev/editorial-review/entry/${entry.uuid}`;
-  const search = [entry.slug, entry.title, entry.keywords.join(' ')]
-    .join(' ')
-    .toLowerCase();
+  const { reviewLink, search } = entryRowLinkMeta(entry);
   return unsafe(html`
     <a class="card" href="${reviewLink}"
       data-row-shell data-search="${search}"

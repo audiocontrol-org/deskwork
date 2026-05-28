@@ -1,5 +1,6 @@
 /**
- * Lane-level + per-stage collapse controller (Phase 5 Task 5.1A).
+ * Lane-level + per-stage collapse controller (Phase 5 Task 5.1A,
+ * extended in Task 5.1B to cover the list-body's `.lb-group` parent).
  *
  * Wires the universal `.collapse-chev` button at two scopes:
  *
@@ -7,11 +8,12 @@
  *     `<article class="swim">` between expanded (default) and
  *     `.collapsed`. CSS hides `.stage-grid` and reveals the
  *     `.swim-compact` per-stage count strip when collapsed.
- *   - per-stage: the chevron in `.stage-head` toggles the parent
- *     `<div class="stage-col">` between expanded and `.collapsed`.
- *     CSS shrinks the column to a 42px vertical strip with the stage
- *     name rotated bottom-to-top; remaining columns redistribute via
- *     flex.
+ *   - per-stage: the chevron in `.stage-head` (kanban) OR `.lb-
+ *     group-head` (list-body) toggles the parent `.stage-col` /
+ *     `.lb-group` between expanded and `.collapsed`. CSS shrinks
+ *     the kanban column to a 42px vertical strip with the stage
+ *     name rotated bottom-to-top; the list-body group hides its
+ *     rows + keeps the group-head visible.
  *
  * State is stored per-operator-per-project in localStorage:
  *
@@ -19,11 +21,16 @@
  *     JSON array of lane ids the operator has collapsed.
  *   - `deskwork:dashboard:<projectKey>:stage-collapse`
  *     JSON object mapping lane id → array of collapsed stage names.
+ *     Per-stage collapse state is SHARED across kanban + list-body
+ *     — a stage collapsed in kanban shows collapsed in list-body
+ *     too (and vice-versa), since the operator's mental model of
+ *     "this stage is folded away" is view-independent.
  *
- * Click anywhere on the `.swim-head` (or `.stage-head`) toggles the
- * affordance — not just the chevron — but the chevron is the focusable
- * element. Enter + Space activate the chevron's toggle (free with the
- * real `<button>` primitive). `aria-expanded` mirrors current state.
+ * Click anywhere on the `.swim-head` (or `.stage-head` / `.lb-
+ * group-head`) toggles the affordance — not just the chevron — but
+ * the chevron is the focusable element. Enter + Space activate the
+ * chevron's toggle (free with the real `<button>` primitive).
+ * `aria-expanded` mirrors current state.
  *
  * Accessibility primitives (per WAI-ARIA Authoring Practices for
  * disclosure widgets):
@@ -33,6 +40,8 @@
  *   - `aria-expanded="true|false"` reflects current state, updated
  *     in lockstep with the `.collapsed` class on the target.
  */
+
+import { readStoredObjectMap } from './swimlane-storage.ts';
 
 const STORAGE_KEY_PREFIX = 'deskwork:dashboard:';
 const LANE_COLLAPSE_KEY_SUFFIX = ':lane-collapse';
@@ -69,27 +78,22 @@ function readStoredLanes(key: string): Set<string> {
   }
 }
 
+function isStringArray(value: unknown): value is readonly string[] {
+  return Array.isArray(value) && value.every((v) => typeof v === 'string');
+}
+
 function readStoredStages(key: string): Map<string, Set<string>> {
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (raw === null) return new Map();
-    const parsed: unknown = JSON.parse(raw);
-    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      return new Map();
-    }
-    const out = new Map<string, Set<string>>();
-    for (const [laneId, value] of Object.entries(parsed)) {
-      if (!Array.isArray(value)) continue;
-      const stages = new Set<string>();
-      for (const item of value) {
-        if (typeof item === 'string') stages.add(item);
-      }
-      if (stages.size > 0) out.set(laneId, stages);
-    }
-    return out;
-  } catch {
-    return new Map();
+  // The on-disk shape is `Record<laneId, string[]>` — sets are
+  // serialised as arrays. Use the shared object-map reader to get
+  // a `Map<laneId, string[]>`, then post-process into the in-memory
+  // `Map<laneId, Set<string>>`, dropping empty sets.
+  const arrays = readStoredObjectMap<readonly string[]>(key, isStringArray);
+  const out = new Map<string, Set<string>>();
+  for (const [laneId, items] of arrays) {
+    const stages = new Set<string>(items);
+    if (stages.size > 0) out.set(laneId, stages);
   }
+  return out;
 }
 
 function writeStoredLanes(key: string, value: ReadonlySet<string>): void {
@@ -140,24 +144,52 @@ function applyCollapseState(state: CollapseState): void {
     }
   }
 
-  // Per-stage collapse: `.stage-col[data-stage-col]` inside each swim.
-  for (const col of document.querySelectorAll<HTMLElement>('.stage-col[data-stage-col]')) {
-    const stageName = col.dataset.stageCol;
+  // Per-stage collapse — kanban scope (`.stage-col[data-stage-col]`)
+  // + list-body scope (`.lb-group[data-lb-group]`). Both views share
+  // the same lane:stage state — a stage collapsed in one view shows
+  // collapsed in the other (the operator's mental model of "this
+  // stage is folded" is view-independent).
+  applyStageScope(state, {
+    parentSelector: '.stage-col[data-stage-col]',
+    stageAttrKey: 'stageCol',
+    chevSelector: '.stage-head > .collapse-chev[data-collapse-target="stage"]',
+    labelNoun: 'stage',
+  });
+  applyStageScope(state, {
+    parentSelector: '.lb-group[data-lb-group]',
+    stageAttrKey: 'lbGroup',
+    chevSelector: '.lb-group-head > .collapse-chev[data-collapse-target="stage"]',
+    labelNoun: 'group',
+  });
+}
+
+interface StageScopeConfig {
+  /** CSS selector for the per-stage parent element. */
+  readonly parentSelector: string;
+  /** Dataset key on the parent that carries the stage name. */
+  readonly stageAttrKey: string;
+  /** CSS selector for the chevron button inside the parent. */
+  readonly chevSelector: string;
+  /** Noun appended to the aria-label (e.g. "stage" or "group"). */
+  readonly labelNoun: string;
+}
+
+function applyStageScope(state: CollapseState, cfg: StageScopeConfig): void {
+  for (const parent of document.querySelectorAll<HTMLElement>(cfg.parentSelector)) {
+    const stageName = parent.dataset[cfg.stageAttrKey];
     if (stageName === undefined) continue;
-    const swim = col.closest<HTMLElement>('.swim[data-lane-id]');
+    const swim = parent.closest<HTMLElement>('.swim[data-lane-id]');
     const laneId = swim?.dataset.laneId;
     if (laneId === undefined) continue;
     const stages = state.stages.get(laneId);
     const collapsed = stages !== undefined && stages.has(stageName);
-    col.classList.toggle('collapsed', collapsed);
-    const chev = col.querySelector<HTMLButtonElement>(
-      '.stage-head > .collapse-chev[data-collapse-target="stage"]',
-    );
+    parent.classList.toggle('collapsed', collapsed);
+    const chev = parent.querySelector<HTMLButtonElement>(cfg.chevSelector);
     if (chev !== null) {
       chev.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
       chev.setAttribute(
         'aria-label',
-        `${collapsed ? 'Expand' : 'Collapse'} ${stageName} stage`,
+        `${collapsed ? 'Expand' : 'Collapse'} ${stageName} ${cfg.labelNoun}`,
       );
     }
   }
@@ -236,6 +268,20 @@ function dispatchToggle(
     return true;
   }
 
+  // List-body group head — same per-stage contract, different
+  // parent element. Per Task 5.1B the lane:stage state is shared
+  // with kanban so the toggle applies across both views.
+  const groupHead = target.closest<HTMLElement>('.lb-group-head');
+  if (groupHead !== null) {
+    const group = groupHead.closest<HTMLElement>('.lb-group[data-lb-group]');
+    const stageName = group?.dataset.lbGroup;
+    const swim = group?.closest<HTMLElement>('.swim[data-lane-id]');
+    const laneId = swim?.dataset.laneId;
+    if (laneId === undefined || stageName === undefined) return false;
+    toggleStage(state, laneId, stageName);
+    return true;
+  }
+
   const swimHead = target.closest<HTMLElement>('.swim-head');
   if (swimHead !== null) {
     const swim = swimHead.closest<HTMLElement>('.swim[data-lane-id]');
@@ -273,6 +319,30 @@ function dispatchToggleStage(
   return true;
 }
 
+/**
+ * List-body group dispatch: mirror of `dispatchToggleStage` but
+ * scoped to `.lb-group` containers. The list-body lb-row carries
+ * its own `<a>` semantics (open the entry-review surface), so the
+ * group toggle fires only when the click lands on the group head
+ * — clicking a row navigates instead of collapsing the group.
+ */
+function dispatchToggleListGroup(
+  state: CollapseState,
+  target: HTMLElement,
+  group: HTMLElement,
+): boolean {
+  const stageName = group.dataset.lbGroup;
+  const swim = group.closest<HTMLElement>('.swim[data-lane-id]');
+  const laneId = swim?.dataset.laneId;
+  if (laneId === undefined || stageName === undefined) return false;
+
+  const inHead = target.closest<HTMLElement>('.lb-group-head') !== null;
+  if (!inHead) return false;
+
+  toggleStage(state, laneId, stageName);
+  return true;
+}
+
 function bindHandlers(state: CollapseState, projectKey: string): void {
   // Lane-level: click on swim-head (anywhere) toggles. The chevron is
   // a child of the swim-head so its click bubbles through this handler.
@@ -304,6 +374,22 @@ function bindHandlers(state: CollapseState, projectKey: string): void {
       const target = ev.target;
       if (!(target instanceof HTMLElement)) return;
       if (!dispatchToggleStage(state, target, col)) return;
+      applyCollapseState(state);
+      persist(state, projectKey);
+    });
+  }
+
+  // Per-stage (list-body scope): click on the `.lb-group-head`
+  // toggles. The list-body has `.lb-row` anchor links inside the
+  // group; clicking a row navigates via its own `<a>` semantics —
+  // `dispatchToggleListGroup` only fires when the target is inside
+  // the head so a row click doesn't accidentally collapse its
+  // group on the way to the entry-review surface.
+  for (const group of document.querySelectorAll<HTMLElement>('.lb-group[data-lb-group]')) {
+    group.addEventListener('click', (ev) => {
+      const target = ev.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (!dispatchToggleListGroup(state, target, group)) return;
       applyCollapseState(state);
       persist(state, projectKey);
     });
