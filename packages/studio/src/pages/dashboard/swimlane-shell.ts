@@ -178,6 +178,21 @@ export function renderSwimlanesShell(input: SwimlaneShellInput): RawHtml {
   const railRaw = renderRail(laneRows, laneIds.length).__raw;
   const focusStripRaw = renderFocusStrip(laneRows, allActive).__raw;
 
+  // Task 5.3.3 mobile sheet container: wraps the rail so CSS can
+  // reposition the whole assembly as a slide-up sheet at narrow
+  // widths. The container also houses a backdrop sibling the client
+  // controller binds for tap-to-dismiss. Desktop CSS leaves the rail
+  // in its original left-column position; mobile CSS hides the rail
+  // until the `.lane-sheet-trigger` toggles `.is-open` on the
+  // container.
+  const sheetContainerOpen
+    = '<div class="lane-sheet-container" id="lane-sheet" data-lane-sheet>';
+  const sheetBackdrop
+    = '<div class="lane-sheet-backdrop" data-lane-sheet-backdrop aria-hidden="true"></div>';
+  const sheetContainerClose = '</div>';
+  const wrappedRailRaw
+    = sheetContainerOpen + sheetBackdrop + railRaw + sheetContainerClose;
+
   // Per AUDIT-20260528-02: render BOTH the swimlane and the stub for
   // every visibility-on lane so the client's focus toggle has both
   // DOM nodes to swap between. The CSS rule
@@ -212,16 +227,29 @@ export function renderSwimlanesShell(input: SwimlaneShellInput): RawHtml {
       : `${input.lanes.unroutedEntries.length} unrouted · `;
   const metaRaw = `${filteredBadge}${focused.size} of ${laneIds.length} lanes shown · ${unroutedPart}${countTotal(lanes)} entries`;
 
+  // Task 5.3.3: the mobile "Lanes ▾" trigger lives in the bay-head's
+  // top row (per `.claude/rules/affordance-placement.md` — the rail
+  // is a bay-level concern, so its discoverability affordance lives
+  // on the bay-head, not on the page-level masthead). Renders
+  // unconditionally; desktop CSS hides it via `display: none` inside
+  // the > 720px scope.
+  const sheetTriggerRaw
+    = '<button class="lane-sheet-trigger" type="button"'
+    + ' data-lane-sheet-trigger aria-expanded="false"'
+    + ' aria-controls="lane-sheet"'
+    + ' aria-label="Show lane visibility sheet">Lanes &#x25BE;</button>';
+
   return unsafe(html`
     <section class="bay-shell" data-bay-shell
       data-project-key="${projectKey}"
       data-focus-url-driven="${urlDriven ? 'true' : 'false'}">
-      ${unsafe(railRaw)}
+      ${unsafe(wrappedRailRaw)}
       <main class="bay" data-bay>
         <div class="bay-head">
           <div class="bh-row-1">
             <span>The Press Bay</span>
             <span class="bh-meta">${unsafe(metaRaw)}</span>
+            ${unsafe(sheetTriggerRaw)}
           </div>
           ${unsafe(focusStripRaw)}
         </div>

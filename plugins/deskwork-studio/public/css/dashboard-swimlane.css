@@ -1379,3 +1379,207 @@
   opacity: 0.4;
   pointer-events: none;
 }
+
+/* ============================================================
+ *  Task 5.3 — Many-lane overflow + mobile lane-sheet.
+ *
+ *  Step 5.3.1: focus-chip strip overflows horizontally when N lanes
+ *  exceed viewport width. The desktop `.focus-strip` rule above used
+ *  `flex-wrap: wrap`; here we override to `nowrap` + horizontal
+ *  scroll. A right-edge fade gradient (`::after`) signals the
+ *  overflow visually; scrollbar visuals stay thin so the bay-head's
+ *  vertical rhythm isn't disrupted. Per WCAG 2.1 SC 1.4.10 (Reflow),
+ *  horizontal scroll is permitted for content with natural left-to-
+ *  right linear order (the focus-chip strip is exactly that).
+ *
+ *  Step 5.3.3: at phone widths, the lane-rail relocates into a
+ *  slide-up bottom sheet triggered by the bay-head's "Lanes ▾"
+ *  button. Mirrors the `dashboard-mobile.css .er-compose-sheet`
+ *  precedent (scrim + panel + slide-up transform) — the new sheet
+ *  goes through the shared `createSlideUpSheet` controller, so the
+ *  drag/escape/scrim gestures match every other sheet on the
+ *  surface.
+ * ============================================================ */
+
+/* Step 5.3.1 — override the wrap rule from `.focus-strip` above so
+ * many-lane configurations scroll horizontally instead of pushing
+ * chips onto a second row. `position: relative` anchors the right-
+ * edge fade overlay. */
+.focus-strip {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  position: relative;
+  scroll-behavior: smooth;
+  /* Thin scrollbar so the bay-head's vertical rhythm holds. Firefox:
+   * `scrollbar-width: thin`. WebKit/Blink: the dedicated ::webkit-
+   * scrollbar rule below. The bay's vertical scrollbar gets the same
+   * treatment from the existing `overflow: auto` on `.bay`. */
+  scrollbar-width: thin;
+}
+
+.focus-strip::-webkit-scrollbar {
+  height: 4px;
+}
+
+.focus-strip::-webkit-scrollbar-thumb {
+  background: var(--er-paper-3);
+  border-radius: 99px;
+}
+
+/* Right-edge fade gradient — only paints when there's overflow.
+ * Position: sticky on a right-anchored pseudo would be cleaner but
+ * isn't reliable across the strip's flex-item layout; the fixed-
+ * width gradient at the strip's right edge is the project's existing
+ * idiom (mirrors how `.editorial-review.css` handles overflow fades
+ * on its content surfaces). Pointer-events: none so the gradient
+ * doesn't intercept chip clicks under it. */
+.focus-strip::after {
+  content: '';
+  position: sticky;
+  right: 0;
+  top: 0;
+  width: 28px;
+  height: 100%;
+  background: linear-gradient(to right, transparent, var(--er-paper) 100%);
+  pointer-events: none;
+  flex: 0 0 auto;
+  margin-left: -28px;
+}
+
+/* Step 5.3.2 — hidden lanes in the rail get a paler treatment so the
+ * operator can see at a glance which lanes are off. Mirrors the
+ * existing `.rail-lane[data-lane-visible="false"]` color rule
+ * (line 145 above) but uses opacity for symmetry with the
+ * `.swim.collapsed` chrome on other surfaces. */
+.rail-lane[data-lane-visible="false"] {
+  opacity: 0.6;
+}
+
+/* ============================================================
+ *  Step 5.3.3 — Mobile lane sheet trigger + container.
+ *
+ *  The bay-head trigger `.lane-sheet-trigger` lives in `.bh-row-1`
+ *  after `.bh-meta`. Per `.claude/rules/affordance-placement.md`,
+ *  the trigger sits ON the bay-head (the local chrome of the
+ *  component the rail belongs to), NOT on the page-level masthead.
+ *
+ *  Desktop (> 720px): trigger hidden; `.lane-sheet-container` is
+ *  the regular left-column wrapper around the rail (the bay-shell
+ *  grid puts it in column 1). The container is structurally
+ *  transparent at desktop — it has no styles other than
+ *  `display: contents` so the rail's grid placement is unchanged.
+ *
+ *  Mobile (<= 720px): trigger visible; container becomes a fixed-
+ *  position slide-up sheet covering the bottom of the viewport.
+ * ============================================================ */
+
+.lane-sheet-trigger {
+  display: none;
+}
+
+/* Default container behavior on desktop — `display: contents`
+ * collapses the wrapper element so the underlying `<aside class=
+ * "lane-rail">` lands in the bay-shell grid's left column exactly
+ * as it did before the wrapper was introduced. */
+.lane-sheet-container {
+  display: contents;
+}
+
+/* The backdrop element is unconditionally present in the DOM but
+ * only visible when the sheet is open at mobile widths. */
+.lane-sheet-backdrop {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  /* Mobile trigger styling — small chip in the bay-head's row 1.
+   * Sized to match the existing `.swim-compose` aesthetic so it
+   * reads as a bay-head affordance rather than a generic toolbar
+   * button. Min hit target 30×30 per WCAG 2.2 SC 2.5.8 AA. */
+  .lane-sheet-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-height: 30px;
+    min-width: 30px;
+    padding: 0.25rem 0.55rem;
+    margin-left: 0.5rem;
+    background: var(--er-paper);
+    border: 1px solid var(--er-paper-3);
+    border-radius: 99px;
+    font-family: var(--er-font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--er-ink);
+    cursor: pointer;
+  }
+
+  .lane-sheet-trigger:hover {
+    background: var(--er-paper-2);
+    border-color: var(--er-ink-soft);
+  }
+
+  .lane-sheet-trigger:focus-visible {
+    outline: 2px solid var(--er-proof-blue);
+    outline-offset: 2px;
+  }
+
+  /* Container morphs from `display: contents` (transparent) into a
+   * proper block element so the slide-up panel can position itself
+   * inside it. The container itself stays at z-index 0 / no
+   * background; the rail and backdrop are the visible surfaces. */
+  .lane-sheet-container {
+    display: block;
+  }
+
+  /* Backdrop — full-bleed dim layer, tappable to dismiss. Only
+   * visible when the sheet is open (body attr set by the shared
+   * controller). */
+  .lane-sheet-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0);
+    z-index: 999;
+    pointer-events: none;
+    transition: background 0.18s ease;
+  }
+
+  body[data-lane-sheet-open] .lane-sheet-backdrop {
+    background: rgba(26, 22, 20, 0.32);
+    pointer-events: auto;
+  }
+
+  /* Rail repositions into the slide-up panel. The desktop rail rule
+   * inside the existing `@media (max-width: 720px)` block sets
+   * `display: none` on `.lane-rail`. We override that within the
+   * sheet container so the rail is always present in the DOM at
+   * mobile widths (the slide-up reveal animates via transform on
+   * the open class — keeping `display: block` always lets the
+   * close-direction transition fire). */
+  .lane-sheet-container .lane-rail {
+    display: block;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 70vh;
+    overflow-y: auto;
+    background: var(--er-paper);
+    border-top: 2px solid var(--er-ink);
+    border-radius: 8px 8px 0 0;
+    padding: 1rem;
+    transform: translateY(100%);
+    transition: transform 0.18s ease;
+    z-index: 1000;
+  }
+
+  /* Open-state — slide the panel in. The `.is-open` class is added
+   * to the container by the client controller; the transition
+   * above animates both directions. */
+  .lane-sheet-container.is-open .lane-rail {
+    transform: translateY(0);
+  }
+}

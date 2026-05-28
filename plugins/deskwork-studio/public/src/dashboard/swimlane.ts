@@ -46,7 +46,7 @@ import {
 const FOCUS_KEY_SUFFIX = ':focus';
 const VISIBILITY_KEY_SUFFIX = ':visibility';
 
-interface SwimlaneState {
+export interface SwimlaneState {
   /** Set of lane ids currently focused. */
   readonly focused: Set<string>;
   /**
@@ -205,10 +205,12 @@ function persist(state: SwimlaneState, projectKey: string): void {
 }
 
 /**
- * Single shared focus toggle. Used by both the per-lane focus chips
- * and the rail row clicks — same semantics, two affordances.
+ * Single shared focus toggle. Used by the per-lane focus chips —
+ * those callers never want to surface a hidden lane (the chip's CSS
+ * `is-visibility-hidden` rule hides it from the strip entirely).
  * Returns true when the toggle actually fired (visible lanes); false
- * when ignored (hidden lanes don't participate in focus).
+ * when ignored (hidden lanes don't participate in focus from the
+ * chip path).
  */
 function toggleFocus(
   state: SwimlaneState,
@@ -224,6 +226,43 @@ function toggleFocus(
   applyState(state);
   persist(state, projectKey);
   return true;
+}
+
+/**
+ * Task 5.3.2 — rail-row activation contract: the rail acts as the
+ * master list of every lane (visible AND hidden). Clicking (or
+ * keyboard-activating) a rail row has a dual semantics:
+ *
+ *   - On a HIDDEN lane: flip visibility ON AND add the lane to focus
+ *     in a single gesture. This is the "bring it back" semantic the
+ *     rail exists to serve.
+ *   - On a VISIBLE lane: toggle focus on/off (the existing 5.1
+ *     behavior).
+ *
+ * The dedicated `.r-eye-btn` (handled separately) still exclusively
+ * toggles persistent visibility — its click path stays unchanged so
+ * the operator retains the "hide without focusing" gesture.
+ *
+ * Returns the activation kind so callers (e.g. the mobile-sheet
+ * controller) can chain additional behavior — closing the sheet on
+ * focus activation, for instance.
+ */
+export type RailRowActivation = 'unhid-and-focused' | 'focus-toggled';
+
+export function handleRailRowActivation(
+  state: SwimlaneState,
+  projectKey: string,
+  id: string,
+): RailRowActivation {
+  if (state.hidden.has(id)) {
+    state.hidden.delete(id);
+    state.focused.add(id);
+    applyState(state);
+    persist(state, projectKey);
+    return 'unhid-and-focused';
+  }
+  toggleFocus(state, projectKey, id);
+  return 'focus-toggled';
 }
 
 function bindFocusChips(state: SwimlaneState, projectKey: string): void {
@@ -292,16 +331,19 @@ function bindRailEyeToggles(
     }
 
     row.addEventListener('click', () => {
-      toggleFocus(state, projectKey, id);
+      handleRailRowActivation(state, projectKey, id);
     });
 
     // F5 a11y fix: keyboard activation for the row's role="button".
     // Enter and Space both activate; preventDefault on Space stops
-    // the default page-scroll.
+    // the default page-scroll. Per Task 5.3.2 the keyboard path
+    // mirrors the click path — both gestures dispatch through
+    // `handleRailRowActivation` so hidden-lane Enter unhides + focuses
+    // identically to click.
     row.addEventListener('keydown', (ev) => {
       if (ev.key !== 'Enter' && ev.key !== ' ') return;
       ev.preventDefault();
-      toggleFocus(state, projectKey, id);
+      handleRailRowActivation(state, projectKey, id);
     });
   }
 }

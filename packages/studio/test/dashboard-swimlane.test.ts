@@ -1142,6 +1142,99 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
     }
   });
 
+  // ============================================================
+  //  Task 5.3 — Many-lane overflow + mobile lane sheet.
+  // ============================================================
+
+  it('Task 5.3.3: bay-head row 1 emits the `<button class="lane-sheet-trigger">` after `.bh-meta`', async () => {
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    // The trigger appears AFTER `.bh-meta` in the same `.bh-row-1`.
+    // Tolerate whitespace between the meta close and the trigger
+    // open. The trigger carries data-lane-sheet-trigger, aria-
+    // expanded="false", aria-controls="lane-sheet", and a non-empty
+    // aria-label.
+    expect(r.html).toMatch(
+      /<span class="bh-meta">[\s\S]*?<\/span>\s*<button class="lane-sheet-trigger"[^>]*type="button"[^>]*data-lane-sheet-trigger[^>]*aria-expanded="false"[^>]*aria-controls="lane-sheet"[^>]*aria-label="[^"]+">/,
+    );
+  });
+
+  it('Task 5.3.3: `.lane-rail` is wrapped inside `[data-lane-sheet]` container with backdrop sibling', async () => {
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    // The container opens with class + id + data attr; the backdrop
+    // sibling is the FIRST child of the container; the rail follows.
+    expect(r.html).toMatch(
+      /<div class="lane-sheet-container" id="lane-sheet" data-lane-sheet>\s*<div class="lane-sheet-backdrop" data-lane-sheet-backdrop aria-hidden="true"><\/div>\s*<aside class="lane-rail"/,
+    );
+  });
+
+  it('Task 5.3.1: dashboard-swimlane.css uses `flex-wrap: nowrap` + `overflow-x: auto` on `.focus-strip`', async () => {
+    const cssRes = await app.fetch(
+      new Request('http://x/static/css/dashboard-swimlane.css'),
+    );
+    expect(cssRes.status).toBe(200);
+    const css = await cssRes.text();
+    // The Task 5.3 override block re-declares `.focus-strip` with
+    // `flex-wrap: nowrap` + `overflow-x: auto` (the original 5.1
+    // block at line 254 still ships `flex-wrap: wrap` — the
+    // override later in the cascade wins). Assert the override
+    // rule exists.
+    expect(css).toMatch(
+      /\.focus-strip\s*\{[\s\S]*?flex-wrap:\s*nowrap[\s\S]*?overflow-x:\s*auto/,
+    );
+    // Right-edge fade gradient via ::after.
+    expect(css).toMatch(
+      /\.focus-strip::after\s*\{[\s\S]*?background:\s*linear-gradient\(to right,\s*transparent,\s*var\(--er-paper\) 100%\)/,
+    );
+    // Smooth scroll behavior.
+    expect(css).toMatch(/\.focus-strip\s*\{[\s\S]*?scroll-behavior:\s*smooth/);
+  });
+
+  it('Task 5.3.3: dashboard-swimlane.css ships the mobile lane-sheet rules (trigger, panel, backdrop)', async () => {
+    const cssRes = await app.fetch(
+      new Request('http://x/static/css/dashboard-swimlane.css'),
+    );
+    expect(cssRes.status).toBe(200);
+    const css = await cssRes.text();
+    // Desktop default: trigger hidden.
+    expect(css).toMatch(/\.lane-sheet-trigger\s*\{[\s\S]*?display:\s*none/);
+    // Mobile breakpoint: trigger visible.
+    expect(css).toMatch(
+      /@media\s*\(max-width:\s*720px\)\s*\{[\s\S]*?\.lane-sheet-trigger\s*\{[\s\S]*?display:\s*inline-flex/,
+    );
+    // Sheet panel — slide-up + fixed-bottom.
+    expect(css).toMatch(
+      /\.lane-sheet-container\s+\.lane-rail\s*\{[\s\S]*?position:\s*fixed[\s\S]*?bottom:\s*0[\s\S]*?transform:\s*translateY\(100%\)/,
+    );
+    // Open state translates to 0.
+    expect(css).toMatch(
+      /\.lane-sheet-container\.is-open\s+\.lane-rail\s*\{[\s\S]*?transform:\s*translateY\(0\)/,
+    );
+    // Backdrop reveal via body[data-lane-sheet-open] (shared
+    // controller's attribute name).
+    expect(css).toMatch(
+      /body\[data-lane-sheet-open\]\s+\.lane-sheet-backdrop\s*\{[\s\S]*?background:\s*rgba\(/,
+    );
+    // Focus-visible ring on the trigger (WCAG 2.1 SC 2.4.7 AA).
+    expect(css).toMatch(
+      /\.lane-sheet-trigger:focus-visible\s*\{[\s\S]*?outline:\s*2px\s+solid\s+var\(--er-proof-blue\)/,
+    );
+  });
+
+  it('Task 5.3.2: hidden lanes in the rail receive a paler treatment via opacity', async () => {
+    const cssRes = await app.fetch(
+      new Request('http://x/static/css/dashboard-swimlane.css'),
+    );
+    expect(cssRes.status).toBe(200);
+    const css = await cssRes.text();
+    // The Task 5.3 block adds an opacity rule for hidden lanes so
+    // the operator sees at a glance which lanes are off.
+    expect(css).toMatch(
+      /\.rail-lane\[data-lane-visible="false"\]\s*\{[\s\S]*?opacity:\s*0\.6/,
+    );
+  });
+
   it('Task 5.2: CSS ships `.swim-empty-cta` rules (block, button, hint, collapse precedence)', async () => {
     const cssRes = await app.fetch(
       new Request('http://x/static/css/dashboard-swimlane.css'),

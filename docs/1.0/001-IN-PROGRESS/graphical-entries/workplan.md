@@ -254,9 +254,9 @@ The picked design **pivots away from the PRD's original "per-lane tab strip" fra
 
 ### Task 5.3: Many-lane overflow — horizontal scroll of focus-chip strip + visibility-rail jump
 
-- [ ] Step 5.3.1: When N visibility-on lanes exceeds the viewport-fitting threshold, the focus-chip strip overflows into a horizontally-scrollable row (per the D3 mockup's mobile focus-strip behavior).
-- [ ] Step 5.3.2: The lane-visibility rail acts as the master list of every lane (including persistently-hidden ones); clicking a hidden lane in the rail flips its visibility on AND adds it to focus. No separate "lanes ▾" dropdown is needed — the rail already serves that role.
-- [ ] Step 5.3.3: Mobile / phone: focus-chip strip becomes a horizontally-scrollable row inside the masthead; lane-visibility rail becomes a slide-up sheet triggered by the masthead's "Lanes ▾" button.
+- [x] Step 5.3.1: When N visibility-on lanes exceeds the viewport-fitting threshold, the focus-chip strip overflows into a horizontally-scrollable row (per the D3 mockup's mobile focus-strip behavior).
+- [x] Step 5.3.2: The lane-visibility rail acts as the master list of every lane (including persistently-hidden ones); clicking a hidden lane in the rail flips its visibility on AND adds it to focus. No separate "lanes ▾" dropdown is needed — the rail already serves that role.
+- [x] Step 5.3.3: Mobile / phone: focus-chip strip becomes a horizontally-scrollable row inside the masthead; lane-visibility rail becomes a slide-up sheet triggered by the masthead's "Lanes ▾" button. **Trigger lives on the bay-head per `.claude/rules/affordance-placement.md`** (the rail is a bay concern, not a page-level masthead concern).
 
 ### Task 5.4: Lane-visibility panel + drag-to-reorder
 

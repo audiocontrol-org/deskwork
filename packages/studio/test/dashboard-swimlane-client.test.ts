@@ -227,6 +227,85 @@ describe('swimlane client controller — AUDIT-02 / AUDIT-04 acceptance', () => 
     expect(qaRow?.getAttribute('aria-pressed')).toBe(before ?? null);
   });
 
+  // ============================================================
+  //  Task 5.3.2 — hidden-lane row activation.
+  // ============================================================
+
+  it('Task 5.3.2: clicking a HIDDEN lane row flips visibility ON and adds the lane to focus', () => {
+    buildShell(['default', 'mockups', 'qa']);
+    initSwimlane();
+    const qaRow = document.querySelector<HTMLElement>(
+      '[data-rail-lane="qa"]',
+    );
+    const qaEye = qaRow?.querySelector<HTMLElement>('.r-eye-btn') ?? null;
+    const qaChip = document.querySelector<HTMLButtonElement>(
+      '[data-focus-chip="qa"]',
+    );
+    expect(qaRow).not.toBeNull();
+    expect(qaEye).not.toBeNull();
+    expect(qaChip).not.toBeNull();
+    // Step 1: hide the qa lane via the eye-button. After this the
+    // chip is `.is-visibility-hidden`, the row is `data-lane-visible
+    // ="false"`, and focus is dropped.
+    qaEye?.click();
+    expect(qaRow?.dataset.laneVisible).toBe('false');
+    expect(qaChip?.classList.contains('is-visibility-hidden')).toBe(true);
+    expect(qaRow?.getAttribute('aria-pressed')).toBe('false');
+    // Step 2: clicking the ROW (not the eye) on the hidden lane
+    // restores visibility AND adds the lane to focus. After this
+    // both lane-visible and aria-pressed reflect the focused state,
+    // and the chip is no longer visibility-hidden.
+    qaRow?.click();
+    expect(qaRow?.dataset.laneVisible).toBe('true');
+    expect(qaRow?.getAttribute('aria-pressed')).toBe('true');
+    expect(qaChip?.classList.contains('is-visibility-hidden')).toBe(false);
+    expect(qaChip?.classList.contains('active')).toBe(true);
+  });
+
+  it('Task 5.3.2: pressing Enter on a HIDDEN rail row flips visibility ON and focuses (mirrors click)', () => {
+    buildShell(['default', 'mockups', 'qa']);
+    initSwimlane();
+    const mockupsRow = document.querySelector<HTMLElement>(
+      '[data-rail-lane="mockups"]',
+    );
+    const mockupsEye
+      = mockupsRow?.querySelector<HTMLElement>('.r-eye-btn') ?? null;
+    const mockupsChip = document.querySelector<HTMLButtonElement>(
+      '[data-focus-chip="mockups"]',
+    );
+    // Hide the mockups lane.
+    mockupsEye?.click();
+    expect(mockupsRow?.dataset.laneVisible).toBe('false');
+    expect(mockupsChip?.classList.contains('is-visibility-hidden')).toBe(true);
+    // Press Enter on the row — same dual-action contract as the
+    // click path (Task 5.3.2 spec).
+    mockupsRow?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+    );
+    expect(mockupsRow?.dataset.laneVisible).toBe('true');
+    expect(mockupsRow?.getAttribute('aria-pressed')).toBe('true');
+    expect(mockupsChip?.classList.contains('is-visibility-hidden')).toBe(false);
+  });
+
+  it('Task 5.3.2: clicking a VISIBLE row preserves the 5.1 toggle behavior (no unhide path fires)', () => {
+    buildShell(['default', 'mockups', 'qa']);
+    initSwimlane();
+    const defaultRow = document.querySelector<HTMLElement>(
+      '[data-rail-lane="default"]',
+    );
+    // Initially focused (visible). One click toggles focus off.
+    expect(defaultRow?.getAttribute('aria-pressed')).toBe('true');
+    expect(defaultRow?.dataset.laneVisible).toBe('true');
+    defaultRow?.click();
+    // Visibility unchanged; focus flipped off.
+    expect(defaultRow?.dataset.laneVisible).toBe('true');
+    expect(defaultRow?.getAttribute('aria-pressed')).toBe('false');
+    // Click again to flip focus back on.
+    defaultRow?.click();
+    expect(defaultRow?.getAttribute('aria-pressed')).toBe('true');
+    expect(defaultRow?.dataset.laneVisible).toBe('true');
+  });
+
   it('F6: the eye-toggle button carries aria-label + dual decorative glyphs', () => {
     buildShell(['default', 'mockups', 'qa']);
     initSwimlane();
