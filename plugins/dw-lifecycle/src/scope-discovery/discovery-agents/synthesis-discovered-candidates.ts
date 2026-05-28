@@ -166,10 +166,10 @@ function buildShape(view: SourceFileView): FileShape | null {
  * Strip comments + string literals; tokenize on non-alphanumeric.
  *
  * The stripping is heuristic, not language-aware (we accept .ts,
- * .tsx, .md, .css, .yaml, .json, .html — see Phase 11 multi-content-
- * type support). For language-aware tokenization (e.g. JSX-aware
- * unwrapping of attribute values), an AST tokenizer would replace
- * this; not in scope for #318.
+ * .tsx, .md, .css, .yaml, .json, .html — the same content types the
+ * scan engine handles uniformly via the polymorphic dispatcher). For
+ * language-aware tokenization (e.g. JSX-aware unwrapping of attribute
+ * values), an AST tokenizer would replace this; not in scope for #318.
  */
 function tokenize(text: string): string[] {
   const stripped = text
