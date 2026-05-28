@@ -116,6 +116,13 @@ function classifyStage(
     );
   }
   if (linearIdx === template.linearStages.length - 1) {
+    // Terminal-first dispatch: a stage that is BOTH the last linear
+    // stage AND a member of lockedStages is dispatched as terminal
+    // (view + scrapbook only). There's no `linearIdx + 1` for the
+    // "Approve → next" label to point at — the artifact has nowhere
+    // to advance to. Adopter templates that want a "terminal but
+    // also locked" semantics should express it via the off-pipeline
+    // set instead.
     return { kind: 'terminal' };
   }
   const locked = template.lockedStages ?? [];

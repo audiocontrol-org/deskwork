@@ -28,6 +28,9 @@ import { join } from 'node:path';
 import {
   verbsForStage,
   classifyStage,
+  renderRowActions,
+  renderRowDrawer,
+  renderRowMenu,
 } from '../src/pages/dashboard/affordances.ts';
 import { loadPipelineTemplate } from '@deskwork/core/pipelines';
 import type { StrictPipelineTemplate } from '@deskwork/core/pipelines';
@@ -191,6 +194,53 @@ describe('verbsForStage — Task 5.2 active linear (iterate + approve + scrapboo
     const v = verbsForStage('Drafted', qaPlan, makeEntry('Drafted'), DEFAULT_SITE);
     expect(v.inline.map((x) => x.kind)).toEqual(['iterate', 'approve', 'scrapbook']);
   });
+
+  it('feature-doc Drafting emits iterate + approve + scrapbook inline', () => {
+    const v = verbsForStage('Drafting', featureDoc, makeEntry('Drafting'), DEFAULT_SITE);
+    expect(v.inline.map((x) => x.kind)).toEqual(['iterate', 'approve', 'scrapbook']);
+    expect(v.inline[1]?.label).toBe('Approve');
+  });
+
+  it('blog-post Drafting emits iterate + approve + scrapbook inline', () => {
+    const v = verbsForStage('Drafting', blogPost, makeEntry('Drafting'), DEFAULT_SITE);
+    expect(v.inline.map((x) => x.kind)).toEqual(['iterate', 'approve', 'scrapbook']);
+    expect(v.inline[1]?.label).toBe('Approve');
+  });
+});
+
+describe('verbsForStage — Task 5.2 drawer-view invariants', () => {
+  // The mobile-swipe drawer set per category. Active linear surfaces
+  // iterate+approve+scrapbook (the top-N power-user verbs); locked
+  // surfaces approve+cancel+scrapbook (no iterate; explicit cancel
+  // escape); off-pipeline mirrors the inline set; terminal mirrors the
+  // inline view+scrapbook pair.
+
+  it('active linear drawer = iterate + approve + cancel + scrapbook', () => {
+    const v = verbsForStage('Drafting', editorial, makeEntry('Drafting'), DEFAULT_SITE);
+    expect(v.drawer.map((x) => x.kind)).toEqual([
+      'iterate',
+      'approve',
+      'cancel',
+      'scrapbook',
+    ]);
+  });
+
+  it('locked drawer = approve + cancel + scrapbook (no iterate)', () => {
+    const v = verbsForStage('Final', editorial, makeEntry('Final'), DEFAULT_SITE);
+    expect(v.drawer.map((x) => x.kind)).toEqual(['approve', 'cancel', 'scrapbook']);
+  });
+
+  it('off-pipeline drawer mirrors inline (induct + scrapbook)', () => {
+    const v = verbsForStage('Blocked', editorial, makeEntry('Blocked'), DEFAULT_SITE);
+    expect(v.drawer.map((x) => x.kind)).toEqual(v.inline.map((x) => x.kind));
+    expect(v.drawer.map((x) => x.kind)).toEqual(['induct', 'scrapbook']);
+  });
+
+  it('terminal drawer mirrors inline (view + scrapbook)', () => {
+    const v = verbsForStage('Published', editorial, makeEntry('Published'), DEFAULT_SITE);
+    expect(v.drawer.map((x) => x.kind)).toEqual(v.inline.map((x) => x.kind));
+    expect(v.drawer.map((x) => x.kind)).toEqual(['view', 'scrapbook']);
+  });
 });
 
 describe('verbsForStage — Task 5.2 locked stages (Approve → next)', () => {
@@ -289,6 +339,92 @@ describe('verbsForStage — Task 5.2 off-pipeline (Blocked / Cancelled / Archive
   it('qa-plan Archived — induct + scrapbook only', () => {
     const v = verbsForStage('Archived', qaPlan, makeEntry('Archived'), DEFAULT_SITE);
     expect(v.inline.map((x) => x.kind)).toEqual(['induct', 'scrapbook']);
+  });
+});
+
+describe('Commandment III — no review-state labels in template-aware row chrome', () => {
+  // Pinning Commandment III for the new template-aware verb-chip
+  // render path: an absence assertion on every rendered chrome
+  // ensures the next time someone tries to add a state badge (e.g.
+  // `er-stamp-iterating`, `IN REVIEW`, `ITERATING`) the test catches
+  // the regression before review.
+  const REVIEW_STATE_TOKENS = [
+    'er-stamp',
+    'IN REVIEW',
+    'ITERATING',
+    'reviewState',
+    'in-review',
+  ];
+
+  function assertNoReviewState(html: string, label: string): void {
+    for (const token of REVIEW_STATE_TOKENS) {
+      expect(html, `${label} must not contain review-state token "${token}"`)
+        .not.toContain(token);
+    }
+  }
+
+  it('editorial active-linear row chrome carries no review-state tokens', () => {
+    const e = makeEntry('Drafting');
+    assertNoReviewState(
+      renderRowActions(e, editorial, DEFAULT_SITE).__raw,
+      'editorial Drafting actions',
+    );
+    assertNoReviewState(
+      renderRowDrawer(e, editorial, DEFAULT_SITE).__raw,
+      'editorial Drafting drawer',
+    );
+    assertNoReviewState(
+      renderRowMenu(e, editorial, DEFAULT_SITE).__raw,
+      'editorial Drafting menu',
+    );
+  });
+
+  it('editorial locked + terminal row chrome carries no review-state tokens', () => {
+    for (const stage of ['Final', 'Published']) {
+      const e = makeEntry(stage);
+      assertNoReviewState(
+        renderRowActions(e, editorial, DEFAULT_SITE).__raw,
+        `editorial ${stage} actions`,
+      );
+      assertNoReviewState(
+        renderRowDrawer(e, editorial, DEFAULT_SITE).__raw,
+        `editorial ${stage} drawer`,
+      );
+      assertNoReviewState(
+        renderRowMenu(e, editorial, DEFAULT_SITE).__raw,
+        `editorial ${stage} menu`,
+      );
+    }
+  });
+
+  it('visual + qa-plan + feature-doc + blog-post row chrome carries no review-state tokens', () => {
+    const cases: Array<[StrictPipelineTemplate, string]> = [
+      [visual, 'Sketched'],
+      [visual, 'Approved'],
+      [visual, 'Shipped'],
+      [qaPlan, 'Reviewed'],
+      [qaPlan, 'Approved'],
+      [featureDoc, 'Approved'],
+      [featureDoc, 'Implemented'],
+      [featureDoc, 'Complete'],
+      [blogPost, 'Edited'],
+      [blogPost, 'Published'],
+    ];
+    for (const [template, stage] of cases) {
+      const e = makeEntry(stage);
+      assertNoReviewState(
+        renderRowActions(e, template, DEFAULT_SITE).__raw,
+        `${template.id} ${stage} actions`,
+      );
+      assertNoReviewState(
+        renderRowDrawer(e, template, DEFAULT_SITE).__raw,
+        `${template.id} ${stage} drawer`,
+      );
+      assertNoReviewState(
+        renderRowMenu(e, template, DEFAULT_SITE).__raw,
+        `${template.id} ${stage} menu`,
+      );
+    }
   });
 });
 

@@ -20,9 +20,12 @@
  * removed in v0.19.
  *
  * The renderer's data flow:
- *   1. loadDashboardData reads every sidecar and groups by stage.
- *   2. Each stage renders via `renderStageSection`.
- *   3. The Distribution placeholder renders below the stage sections.
+ *   1. loadDashboardData reads every sidecar and groups by lane and by
+ *      stage.
+ *   2. The multi-lane swimlane shell (Phase 5 Task 5.1+) renders one
+ *      swimlane per focused lane; per-stage columns and rows come from
+ *      the lane's resolved pipeline template.
+ *   3. The Distribution placeholder renders below the swimlane shell.
  *   4. The mobile-only Compose chrome (FAB + slide-up sheet) renders
  *      at the page tail; CSS hides it on desktop.
  *

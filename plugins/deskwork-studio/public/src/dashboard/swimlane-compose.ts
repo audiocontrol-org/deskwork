@@ -249,6 +249,11 @@ function bindAffordance(button: HTMLButtonElement, spec: AffordanceSpec): void {
   });
   button.addEventListener('keydown', (ev) => {
     if (ev.key !== ' ') return;
+    // Suppress held-Space auto-repeat so a long press doesn't fire N
+    // clipboard writes (each keydown auto-repeat would otherwise re-
+    // invoke `activateAffordance`). The single-activation contract
+    // matches the click handler's one-shot semantics.
+    if (ev.repeat) return;
     // Space activates the affordance. Per WCAG 2.1 SC 2.1.1,
     // preventDefault to suppress page scroll. Enter is free with
     // the native `<button>` keyboard contract — no extra handler

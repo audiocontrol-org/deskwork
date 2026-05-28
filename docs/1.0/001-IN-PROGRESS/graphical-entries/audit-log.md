@@ -532,3 +532,135 @@ e.g. `dashboard-swimlane-chips.css`, `dashboard-swimlane-list.css` (CSS)
 and `dashboard-swimlane-{shell,collapse,view-toggle,compose}.test.ts`
 (tests). The split keeps each file under the 500-line cap going
 forward.
+
+## 2026-05-28 audit: Phase 5 Task 5.2 (template-aware stage rendering + empty-lane CTA)
+
+Audit scope: commits `1d6383a` + in-task followup (this commit).
+Predecessor: `877e778`. Tests 672 → 732 (+60). Build exit 0 across core + studio.
+
+Two-stage review (spec-compliance + code-quality) routed through the
+dw-lifecycle trussing. Spec ✅ SPEC-COMPLIANT; quality ⚠️ APPROVED WITH
+FOLLOWUPS — zero blocking, four non-blocking findings + four observations.
+The followups land in this same in-task commit (no deferral).
+
+### AUDIT-20260528-15
+
+Finding-ID: AUDIT-20260528-15
+Status:     fixed-followup-commit
+Severity:   medium
+Surface:    packages/studio/src/pages/dashboard/{swimlane-entry-card.ts, section.ts}
+
+Two orphaned exports surfaced after Task 5.2 lifted the swimlane-card
+dispatch to a universal `renderRow`: `renderEntryCard` in
+`swimlane-entry-card.ts` (implementer-flagged) AND `renderStageSection`
+in `section.ts` (caught by the code-quality reviewer, NOT flagged by
+the implementer). The reviewer's note: per `Just for now is bullshit`,
+orphaned code is a defer.
+
+Resolution: deleted `swimlane-entry-card.ts` entirely (no live callers);
+removed `renderStageSection`, `renderStageTile`, `STAGE_ORNAMENTS`, and
+`STAGE_EMPTY_MESSAGES` from `section.ts` (all dead code post-5.2). The
+remaining `section.ts` exports are `renderRow` (consumed by
+`swimlane-card.ts`) and `renderDistributionPlaceholder` (consumed by
+`dashboard.ts`).
+
+Stale doc-comments updated in lockstep: `dashboard.ts:24` (the data flow
+no longer mentions `renderStageSection`); `legacy-stage.ts:1-30` (the
+"until Task 5.2 lands" framing replaced with "after Task 5.2; the guard
+remains for `data.ts:bucketize` only").
+
+### AUDIT-20260528-16
+
+Finding-ID: AUDIT-20260528-16
+Status:     fixed-followup-commit
+Severity:   medium
+Surface:    packages/studio/test/dashboard-affordances-template.test.ts
+
+Commandment III was not test-pinned for the new template-aware row
+chrome path. The reviewer's recommendation: add an `er-stamp-*` /
+`reviewState` / `IN REVIEW` / `ITERATING` / `in-review` absence
+assertion across every template's rendered chrome so a future regression
+that re-introduces a review-state badge fails fast.
+
+Resolution: added `describe('Commandment III — no review-state labels
+in template-aware row chrome')` to `dashboard-affordances-template.test.ts`.
+Three test bodies cover the editorial active-linear + locked + terminal
+chrome plus a matrix run across visual + qa-plan + feature-doc +
+blog-post (10 stage-template pairs).
+
+### AUDIT-20260528-17
+
+Finding-ID: AUDIT-20260528-17
+Status:     fixed-followup-commit
+Severity:   low
+Surface:    packages/studio/test/dashboard-affordances-template.test.ts
+
+`verbsForStage` activeLinear matrix had small gaps — `feature-doc` and
+`blog-post` templates were covered for locked + terminal but not for
+their active-linear stages. Drawer-view invariants (the mobile-swipe
+top-N set) were not asserted at all.
+
+Resolution: added `feature-doc Drafting` + `blog-post Drafting`
+activeLinear cases; added a 4-test `drawer-view invariants` describe
+block covering active linear + locked + off-pipeline + terminal drawer
+sets.
+
+### AUDIT-20260528-18
+
+Finding-ID: AUDIT-20260528-18
+Status:     fixed-followup-commit
+Severity:   low
+Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-compose.ts
+
+Held-Space auto-repeat on the affordance button would fire N clipboard
+writes (each `keydown` repeat re-invokes `activateAffordance`). The
+visible state stays stable (`scheduleRevert` resets the timer) but the
+no-single-activation contract is violated and the clipboard sees N
+identical writes.
+
+Resolution: added `if (ev.repeat) return;` to the Space-key handler.
+Click and Enter (native button keyboard contract) are single-activation
+already; only Space needed the explicit guard.
+
+### AUDIT-20260528-19
+
+Finding-ID: AUDIT-20260528-19
+Status:     open
+Severity:   low
+Surface:    packages/studio/src/pages/dashboard/affordances.ts
+
+`classifyStage` dispatches a stage that is BOTH terminal (last linear
+stage) AND a member of `lockedStages` as `terminal` (view + scrapbook
+only) rather than as `locked` (Approve → next). Adopter templates that
+want "this is the terminal stage AND it must be approved before
+freezing" semantics will silently get the frozen-artifact UX. This is
+defensible — there's no `linearIdx + 1` to label "Approve → next" — but
+was previously undocumented.
+
+Resolution: added an inline doc-comment at the terminal-first branch
+(`affordances.ts:118-126`) naming the precedence rule and pointing
+adopters at off-pipeline-stages as the alternative express form.
+
+Tracked as `open` rather than `fixed` because the doc-comment is the
+disposition; no behavior change. A schema-level invariant forbidding
+terminal-AND-locked stages could be added in a future task (would
+require migrating any adopter that relies on the current dispatch) —
+worth re-evaluating when a real adopter hits the case.
+
+### AUDIT-20260528-20
+
+Finding-ID: AUDIT-20260528-20
+Status:     open
+Severity:   informational
+Surface:    packages/studio/src/pages/dashboard/swimlane-card.ts
+
+`swimlane-card.ts` post-5.2 is 482 lines — within the 300–500 cap but
+near the limit. The file has accumulated four sibling task contracts
+(5.1 swim-shell, 5.1A collapse, 5.1B view-toggle, 5.1C compose chip,
+5.2 empty-CTA + template-aware dispatch). The next addition (Task 5.6
+integration test or a new affordance) will likely push it over.
+
+Fix guidance: if a Task 5.6 / 5.3 addition would push past 500, split
+into `swimlane-card-{shell,renderers,empty-cta}.ts` (or similar). Track
+alongside AUDIT-20260528-14 (CSS + test file split) as a Phase 5
+cleanup task.

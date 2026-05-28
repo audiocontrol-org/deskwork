@@ -248,9 +248,9 @@ The picked design **pivots away from the PRD's original "per-lane tab strip" fra
 
 ### Task 5.2: Template-aware stage columns (no hardcoded stages in render)
 
-- [ ] Step 5.2.1: Grep the studio's render code for hardcoded stage names (`Drafting`, `Final`, `Published`, etc.); refactor every site to read from the lane's template instead.
-- [ ] Step 5.2.2: Empty-lane state: shows the lane's pipeline shape as empty stage columns + a "Create your first entry" CTA that clipboard-copies `/deskwork:add --lane <id>`.
-- [ ] Step 5.2.3: Per Commandment III, no surface renders "review state" labels — only stage labels appear.
+- [x] Step 5.2.1: Grep the studio's render code for hardcoded stage names (`Drafting`, `Final`, `Published`, etc.); refactor every site to read from the lane's template instead.
+- [x] Step 5.2.2: Empty-lane state: shows the lane's pipeline shape as empty stage columns + a "Create your first entry" CTA that clipboard-copies `/deskwork:add --lane <id>`.
+- [x] Step 5.2.3: Per Commandment III, no surface renders "review state" labels — only stage labels appear.
 
 ### Task 5.3: Many-lane overflow — horizontal scroll of focus-chip strip + visibility-rail jump
 

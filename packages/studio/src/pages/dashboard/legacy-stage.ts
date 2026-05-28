@@ -1,32 +1,18 @@
 /**
- * Legacy editorial-stage type guard for the dashboard render path.
+ * Legacy editorial-stage type guard.
  *
  * Phase 3 widened `Entry.currentStage` from the eight-stage `Stage`
  * union to an arbitrary non-empty string (lane-template-driven —
- * `packages/core/src/schema/entry.ts:164`). The dashboard's verb-chip
- * rendering helpers (`affordances.ts:verbsForStage` /
- * `affordances.ts:renderMenu`) still operate on the legacy `Stage`
- * union because the verb vocabulary they emit is the editorial
- * vocabulary specifically — iterate / approve / block / induct /
- * cancel / view / scrapbook. Non-editorial templates' verb
- * vocabularies become available through the template-aware verb
- * resolver landing in Phase 5 Task 5.2 (per
- * `docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md`).
+ * `packages/core/src/schema/entry.ts:164`). Phase 5 Task 5.2 lifted
+ * the dashboard's verb-chip render paths to be template-aware, so
+ * the swimlane renderer no longer consults this guard.
  *
- * Until that task lands, the safe behaviour at the verb-chip call
- * sites is: emit chips for entries whose `currentStage` is one of
- * the eight legacy editorial stages, and emit no chips for entries
- * outside that vocabulary (so non-editorial entries surface as
- * compact cards via `swimlane-entry-card.ts:renderEntryCard` —
- * already the existing dispatch in `swimlane-shell.ts:247`). The
- * guard below is the boundary check that narrows
- * `entry.currentStage: string` to the `Stage` union the dashboard's
- * editorial-vocabulary helpers expect.
- *
- * Per project rule "No fallbacks or mock data": this is not a
- * fallback — non-editorial-vocabulary entries already have a
- * separate, correct render path (the compact card). The guard
- * routes correctly; it doesn't substitute a degraded experience.
+ * The guard remains used by `dashboard/data.ts:bucketize` to populate
+ * the legacy `byStage` map (the eight-stage union read view kept for
+ * back-compat with v7 ordering tests + the eight-stage section
+ * renderer for Shortform / Adjacent siblings). Non-editorial entries
+ * are skipped in that map; their per-lane bucketing in
+ * `loadLaneBuckets` is the authoritative routing.
  */
 
 import type { Stage } from '@deskwork/core/schema/entry';
