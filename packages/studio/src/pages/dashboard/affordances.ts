@@ -13,11 +13,28 @@
  *   `⋮` button + menu hold the secondary verbs (block / cancel / scrapbook).
  *
  * Stage-aware verb vocabulary per DESKWORK-STATE-MACHINE.md (Commandment II
- * — verbs are stage-gated). The block + induct verbs are surfaced uniformly
- * on every linear-pipeline stage (block pauses an in-pipeline entry; induct
- * teleports to an operator-chosen stage in either direction). Both clipboard-
- * copy their `/deskwork:<verb> <slug>` slash command; the receiving agent
- * runs the atomic CLI helper (`deskwork block / cancel / induct`).
+ * — verbs are universal and stage-gated). The block + induct verbs are
+ * surfaced uniformly on every linear-pipeline stage (block pauses an
+ * in-pipeline entry; induct teleports to an operator-chosen stage in either
+ * direction). Both clipboard-copy their `/deskwork:<verb> <slug>` slash
+ * command; the receiving agent runs the atomic CLI helper
+ * (`deskwork block / cancel / induct`).
+ *
+ * Phase 5 Task 5.2 — `verbsForStage` is now template-aware. The dispatch
+ * categorizes a stage as:
+ *   - off-pipeline (in `template.offPipelineStages`) → inductForward + scrap
+ *   - frozen terminal (last entry in `template.linearStages`) → view + scrap
+ *   - locked (in `template.lockedStages`) → approve (→ next linear stage)
+ *     + scrap, with the menu/drawer surfacing block + induct + cancel
+ *   - active linear (any other `linearStages` member) → iterate + approve
+ *     + scrap, plus block + induct + cancel in the menu
+ * The "Approve → {next}" label dynamically picks the linear stage
+ * immediately after a locked stage, so editorial Final → "Approve →
+ * Published", visual Approved → "Approve → Shipped", feature-doc Approved
+ * → "Approve → Implemented" AND Implemented → "Approve → Complete",
+ * qa-plan Reviewed → "Approve → Tested", blog-post Edited → "Approve →
+ * Published". Any stage outside both `linearStages` and
+ * `offPipelineStages` is a programming error and throws.
  *
  * The row's outer wrapper is `.er-row-shell` (was `.er-calendar-row-wrap`).
  * Inside: a `.er-row-drawer` for the swipe-action chips (positioned right of
@@ -30,8 +47,8 @@
 
 import { html, unsafe, type RawHtml } from '../html.ts';
 import { scrapbookViewerUrl } from '../../components/scrapbook-item.ts';
-import { isLegacyEditorialStage } from './legacy-stage.ts';
-import type { Entry, Stage } from '@deskwork/core/schema/entry';
+import type { Entry } from '@deskwork/core/schema/entry';
+import type { StrictPipelineTemplate } from '@deskwork/core/pipelines';
 
 /** A single verb the operator can invoke from a row. */
 interface Verb {
@@ -61,15 +78,82 @@ interface Verb {
 }
 
 /**
+ * Categorize a stage against its pipeline template. The four
+ * categories drive the verb-set dispatch in `verbsForStage`.
+ * `offPipeline` covers Blocked / Cancelled / Archived (cul-de-sacs).
+ * `terminal` covers the LAST linear stage (published / shipped / etc.
+ * — read-only artifact). `locked` covers any lockedStages member
+ * (review-frozen, awaiting the next approve). `activeLinear` is the
+ * default linear-pipeline stage (iterate + approve both available).
+ */
+type StageCategory =
+  | { readonly kind: 'offPipeline' }
+  | { readonly kind: 'terminal' }
+  | { readonly kind: 'locked'; readonly nextLinearStage: string }
+  | { readonly kind: 'activeLinear' };
+
+/**
+ * Classify a stage against the template's linear + off-pipeline +
+ * locked vocabularies. Throws when the stage doesn't belong to
+ * either linearStages or offPipelineStages — that condition is a
+ * programming error upstream (entries should never carry a stage
+ * name absent from their lane's template), surfaced loudly per the
+ * no-fallback rule.
+ */
+function classifyStage(
+  stage: string,
+  template: StrictPipelineTemplate,
+): StageCategory {
+  if (template.offPipelineStages.includes(stage)) {
+    return { kind: 'offPipeline' };
+  }
+  const linearIdx = template.linearStages.indexOf(stage);
+  if (linearIdx === -1) {
+    throw new Error(
+      `verbsForStage: stage "${stage}" is not in template "${template.id}" `
+        + `(linearStages=[${template.linearStages.join(', ')}], `
+        + `offPipelineStages=[${template.offPipelineStages.join(', ')}])`,
+    );
+  }
+  if (linearIdx === template.linearStages.length - 1) {
+    return { kind: 'terminal' };
+  }
+  const locked = template.lockedStages ?? [];
+  if (locked.includes(stage)) {
+    // The lockedStages-subset-of-linearStages invariant + the
+    // linear-terminal guard above means linearIdx + 1 is always a
+    // valid index. Read it directly; per the no-fallback rule, an
+    // index-out-of-range read here would surface as `undefined` and
+    // we throw rather than fabricate a label.
+    const nextLinearStage = template.linearStages[linearIdx + 1];
+    if (nextLinearStage === undefined) {
+      throw new Error(
+        `verbsForStage: locked stage "${stage}" in template "${template.id}" `
+          + 'has no successor in linearStages — schema invariant violation',
+      );
+    }
+    return { kind: 'locked', nextLinearStage };
+  }
+  return { kind: 'activeLinear' };
+}
+
+/**
  * Build the stage-aware verb set for an entry. Returns three views — the
  * inline-chip set (desktop high-frequency verbs), the drawer set (mobile
  * swipe top-N), and the menu set (full stage-aware vocabulary).
+ *
+ * Per DESKWORK-STATE-MACHINE.md Commandment II — verbs are universal and
+ * stage-gated only. Phase 5 Task 5.2: the dispatch now reads the lane's
+ * pipeline template (linearStages / lockedStages / offPipelineStages) to
+ * decide which verbs are available + how the approve label is worded;
+ * no template-specific stage names are hardcoded here.
  *
  * Visibility-by-surface is intentional and documented in
  * `docs/studio-design/ACCEPTED/2026-05-11-row-affordance-overflow-plus-swipe/brief.md`.
  */
 function verbsForStage(
-  stage: Stage,
+  stage: string,
+  template: StrictPipelineTemplate,
   entry: Entry,
   defaultSite: string,
 ): {
@@ -87,6 +171,8 @@ function verbsForStage(
     entryId: entry.uuid,
   });
 
+  const category = classifyStage(stage, template);
+
   const iterate: Verb = {
     kind: 'iterate',
     label: 'Iterate',
@@ -94,20 +180,22 @@ function verbsForStage(
     copy: `/deskwork:iterate ${slug}`,
     title: 'append a new revision to this entry',
   };
+  const approveLabel = category.kind === 'locked'
+    ? `Approve → ${category.nextLinearStage}`
+    : 'Approve';
+  const approveTitle = category.kind === 'locked'
+    ? `advance this entry to ${category.nextLinearStage}`
+    : 'advance this entry to the next stage';
   const approve: Verb = {
     kind: 'approve',
-    label: stage === 'Final' ? 'Approve → Published' : 'Approve',
+    label: approveLabel,
     glyph: '✓',
     // Per DESKWORK-STATE-MACHINE.md Commandment II, approve is universal
-    // across every linear-pipeline transition including Final → Published.
-    // The `/deskwork:approve` skill handles all stage transitions; the
-    // separate `/deskwork:publish` skill is an alias for the Final →
-    // Published case, not a separate verb. Use approve uniformly.
+    // across every linear-pipeline transition including the locked →
+    // terminal hop. The `/deskwork:approve` skill handles all stage
+    // transitions; use approve uniformly.
     copy: `/deskwork:approve ${slug}`,
-    title:
-      stage === 'Final'
-        ? 'advance this entry to Published (assigns a public version)'
-        : 'advance this entry to the next stage',
+    title: approveTitle,
   };
   const block: Verb = {
     kind: 'block',
@@ -145,7 +233,7 @@ function verbsForStage(
     title: "open the entry's scrapbook (research notes, drafts, etc.)",
     drawerLabel: 'Scrpbk',
   };
-  // Used only on Blocked/Cancelled rows where induct's primary use is
+  // Used only on off-pipeline rows where induct's primary use is
   // bringing the entry back into the pipeline.
   const inductForward: Verb = {
     ...induct,
@@ -153,7 +241,7 @@ function verbsForStage(
     title: 'bring this entry back into the pipeline',
   };
 
-  if (stage === 'Ideas' || stage === 'Planned' || stage === 'Outlining' || stage === 'Drafting') {
+  if (category.kind === 'activeLinear') {
     return {
       // Scrapbook stays inline on every stage — it's the entry's research
       // surface, used at the same cadence as the active-stage verb.
@@ -162,33 +250,30 @@ function verbsForStage(
       menu: [iterate, approve, block, induct, cancel, scrapbook],
     };
   }
-  if (stage === 'Final') {
+  if (category.kind === 'locked') {
+    // Locked stages: iterate is refused; approve advances to the
+    // declared next linear stage. Block / induct / cancel still
+    // surface in the menu so the operator can pause / reroute /
+    // abandon a locked artifact.
     return {
       inline: [approve, scrapbook],
       drawer: [approve, cancel, scrapbook],
       menu: [approve, block, induct, cancel, scrapbook],
     };
   }
-  if (stage === 'Blocked' || stage === 'Cancelled') {
+  if (category.kind === 'offPipeline') {
     return {
       inline: [inductForward, scrapbook],
       drawer: [inductForward, scrapbook],
       menu: [inductForward, scrapbook],
     };
   }
-  if (stage === 'Published') {
-    // Frozen artifact; view + scrapbook only.
-    return {
-      inline: [view, scrapbook],
-      drawer: [view, scrapbook],
-      menu: [view, scrapbook],
-    };
-  }
-  // Exhaustiveness check — if the Stage union gains a new variant, the
-  // assertion will fail at typecheck time and at runtime so we don't
-  // silently fall through to an empty verb set.
-  const _exhaustive: never = stage;
-  throw new Error(`verbsForStage: unhandled stage "${String(_exhaustive)}"`);
+  // terminal — frozen artifact; view + scrapbook only.
+  return {
+    inline: [view, scrapbook],
+    drawer: [view, scrapbook],
+    menu: [view, scrapbook],
+  };
 }
 
 function renderDrawerChip(verb: Verb): string {
@@ -272,14 +357,20 @@ function renderMenuItem(verb: Verb): string {
  * Group menu items per the mockup's visual rhythm:
  *   primary verbs · divider · secondary (block / induct) · divider · off-pipeline
  *
- * For Blocked/Cancelled/Published the menu is short enough to skip dividers.
+ * Short menus (off-pipeline OR terminal-frozen) skip dividers — the menu
+ * holds at most two items there.
  */
-function renderMenu(stage: Stage, menu: readonly Verb[]): string {
-  const isShort = stage === 'Blocked' || stage === 'Cancelled' || stage === 'Published';
+function renderMenu(
+  stage: string,
+  template: StrictPipelineTemplate,
+  menu: readonly Verb[],
+): string {
+  const category = classifyStage(stage, template);
+  const isShort = category.kind === 'offPipeline' || category.kind === 'terminal';
   if (isShort) {
     return menu.map(renderMenuItem).join('');
   }
-  // Active + Final use grouped layout.
+  // Active linear + locked use grouped layout.
   const primary: Verb[] = [];
   const secondary: Verb[] = [];
   const tail: Verb[] = [];
@@ -318,17 +409,16 @@ function renderMenu(stage: Stage, menu: readonly Verb[]): string {
  * correct outer layout (drawer is sibling of `.er-row-fg`; menu is sibling
  * of `.er-row-fg`).
  */
-export function renderRowActions(entry: Entry, defaultSite: string): RawHtml {
-  // Per AUDIT-20260528-01: gate the editorial-vocabulary verb chips
-  // on the legacy `Stage` union. Non-editorial entries render no
-  // verb chips here; the swimlane shell's dispatch (swimlane-shell.
-  // ts:247) routes them to `renderEntryCard` so they still appear
-  // on the page. Phase 5 Task 5.2 generalises this via a template-
-  // aware verb resolver — at which point this guard retires.
-  if (!isLegacyEditorialStage(entry.currentStage)) {
-    return unsafe('');
-  }
-  const { inline } = verbsForStage(entry.currentStage, entry, defaultSite);
+export function renderRowActions(
+  entry: Entry,
+  template: StrictPipelineTemplate,
+  defaultSite: string,
+): RawHtml {
+  // Per Phase 5 Task 5.2: the template-aware verb dispatch covers
+  // every pipeline template's stage vocabulary. Every entry's row
+  // now receives the verb-chip chrome — Commandment II ensures verbs
+  // are universal across templates, gated only on stage position.
+  const { inline } = verbsForStage(entry.currentStage, template, entry, defaultSite);
   const chips = inline.map(renderInlineChip).join('');
   const overflow = html`<button type="button"
     class="er-row-overflow"
@@ -350,12 +440,12 @@ export function renderRowActions(entry: Entry, defaultSite: string): RawHtml {
  * row's trailing edge; hidden behind the foreground at-rest. Revealed by
  * the foreground translating left on swipe.
  */
-export function renderRowDrawer(entry: Entry, defaultSite: string): RawHtml {
-  // See `renderRowActions` for the AUDIT-20260528-01 rationale.
-  if (!isLegacyEditorialStage(entry.currentStage)) {
-    return unsafe('');
-  }
-  const { drawer } = verbsForStage(entry.currentStage, entry, defaultSite);
+export function renderRowDrawer(
+  entry: Entry,
+  template: StrictPipelineTemplate,
+  defaultSite: string,
+): RawHtml {
+  const { drawer } = verbsForStage(entry.currentStage, template, entry, defaultSite);
   return unsafe(html`<div class="er-row-drawer" aria-hidden="true">${unsafe(drawer.map(renderDrawerChip).join(''))}</div>`);
 }
 
@@ -363,11 +453,16 @@ export function renderRowDrawer(entry: Entry, defaultSite: string): RawHtml {
  * Menu popover rendered as a sibling of `.er-row-fg`. Hidden by default
  * (the controller flips `hidden` + `aria-expanded` on the overflow button).
  */
-export function renderRowMenu(entry: Entry, defaultSite: string): RawHtml {
-  // See `renderRowActions` for the AUDIT-20260528-01 rationale.
-  if (!isLegacyEditorialStage(entry.currentStage)) {
-    return unsafe('');
-  }
-  const { menu } = verbsForStage(entry.currentStage, entry, defaultSite);
-  return unsafe(html`<div class="er-row-menu" role="menu" hidden>${unsafe(renderMenu(entry.currentStage, menu))}</div>`);
+export function renderRowMenu(
+  entry: Entry,
+  template: StrictPipelineTemplate,
+  defaultSite: string,
+): RawHtml {
+  const { menu } = verbsForStage(entry.currentStage, template, entry, defaultSite);
+  return unsafe(html`<div class="er-row-menu" role="menu" hidden>${unsafe(renderMenu(entry.currentStage, template, menu))}</div>`);
 }
+
+// Exported for tests + downstream renderers that need to compose verb
+// vocabularies directly (Phase 5 Task 5.2 test suite covers each
+// template's locked / terminal / off-pipeline / active-linear shape).
+export { verbsForStage, classifyStage };

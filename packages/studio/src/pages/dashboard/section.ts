@@ -16,6 +16,7 @@
 
 import { html, unsafe, type RawHtml } from '../html.ts';
 import type { Entry, Stage } from '@deskwork/core/schema/entry';
+import type { StrictPipelineTemplate } from '@deskwork/core/pipelines';
 import { renderRowActions, renderRowDrawer, renderRowMenu } from './affordances.ts';
 
 const STAGE_ORNAMENTS: Record<Stage, string> = {
@@ -53,7 +54,12 @@ const STAGE_EMPTY_MESSAGES: Record<Stage, string> = {
  * revisions only via the View History surface and revert flows.
  * reviewState badges are likewise retired (Commandment III).
  */
-export function renderRow(entry: Entry, index: number, defaultSite: string): RawHtml {
+export function renderRow(
+  entry: Entry,
+  index: number,
+  template: StrictPipelineTemplate,
+  defaultSite: string,
+): RawHtml {
   const reviewLink = `/dev/editorial-review/entry/${entry.uuid}`;
   const search = [entry.slug, entry.title, entry.keywords.join(' ')].join(' ').toLowerCase();
   // Hierarchical entries (slugs containing `/`) get a visual indent
@@ -86,7 +92,7 @@ export function renderRow(entry: Entry, index: number, defaultSite: string): Raw
     <div class="er-row-shell" data-row-shell data-search="${search}"${depthAttrs}
       data-stage="${entry.currentStage}"
       data-uuid="${entry.uuid}" data-slug="${entry.slug}">
-      ${renderRowDrawer(entry, defaultSite)}
+      ${renderRowDrawer(entry, template, defaultSite)}
       <div class="er-row-fg er-calendar-row">
         <span class="er-row-num">№ ${String(index + 1).padStart(2, '0')}</span>
         <div class="er-calendar-body">
@@ -97,9 +103,9 @@ export function renderRow(entry: Entry, index: number, defaultSite: string): Raw
             datetime="${entry.updatedAt}" title="${entry.updatedAt}">${formatDate(entry.updatedAt)}</time>
         </div>
         <span class="er-calendar-status" aria-hidden="true"></span>
-        ${renderRowActions(entry, defaultSite)}
+        ${renderRowActions(entry, template, defaultSite)}
       </div>
-      ${renderRowMenu(entry, defaultSite)}
+      ${renderRowMenu(entry, template, defaultSite)}
     </div>`);
 }
 
@@ -163,6 +169,7 @@ function renderStageTile(stage: Stage, count: number): RawHtml {
 export function renderStageSection(
   stage: Stage,
   entries: readonly Entry[],
+  template: StrictPipelineTemplate,
   defaultSite: string,
 ): RawHtml {
   const tile = renderStageTile(stage, entries.length);
@@ -184,7 +191,7 @@ export function renderStageSection(
       </div>`);
   }
 
-  const body = unsafe(entries.map((e, i) => renderRow(e, i, defaultSite).__raw).join(''));
+  const body = unsafe(entries.map((e, i) => renderRow(e, i, template, defaultSite).__raw).join(''));
 
   return unsafe(html`
     <div class="er-stage-block" data-stage-block="${stage}">

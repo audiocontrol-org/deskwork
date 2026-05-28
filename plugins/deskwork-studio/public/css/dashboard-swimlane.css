@@ -1283,3 +1283,99 @@
     font-size: 0.88rem;
   }
 }
+
+/* ============================================================
+ *  Task 5.2 — Empty-lane CTA (.swim-empty-cta).
+ *
+ *  Surfaced only on lanes whose `bucket.entryCount === 0` — the
+ *  prominent "create your first entry" affordance an operator sees
+ *  the first time they open a freshly-configured lane. Sibling to
+ *  the per-lane Compose chip (Task 5.1C) but larger and with a
+ *  different clipboard payload (no <SLUG>, no --stage).
+ *
+ *  Per `affordance-placement.md`, the CTA lives ON the empty lane's
+ *  swim body (not in any toolbar). Mirrors the .er-outline-tab
+ *  precedent of attaching affordances ON the component they affect.
+ * ============================================================ */
+
+.swim-empty-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 2rem 1rem;
+  border-top: 1px dashed var(--er-paper-3);
+  border-bottom: 1px dashed var(--er-paper-3);
+  font-family: var(--er-font-mono);
+  background: var(--er-paper);
+  text-align: center;
+}
+
+.swim-empty-cta .sec-msg {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--er-ink-soft);
+  letter-spacing: 0.02em;
+}
+
+.swim-empty-cta .sec-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 36px;
+  padding: 0.5rem 1rem;
+  background: var(--er-paper);
+  border: 1px solid var(--er-paper-3);
+  border-radius: 2px;
+  font-family: var(--er-font-mono);
+  font-size: 0.8rem;
+  color: var(--er-ink);
+  cursor: pointer;
+}
+
+.swim-empty-cta .sec-cta:hover {
+  background: var(--er-paper-2);
+}
+
+.swim-empty-cta .sec-cta:focus-visible {
+  outline: 2px solid var(--er-proof-blue);
+  outline-offset: -2px;
+}
+
+.swim-empty-cta .sec-cta .sec-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+/* Flash state — fired on successful clipboard write; reverts after
+ * ~2000ms via the controller. Uses the project's approved-green
+ * token (mirroring `.swim-compose.copied` at line 982). */
+.swim-empty-cta .sec-cta.copied {
+  background: var(--er-stamp-green);
+  color: var(--er-paper);
+  border-color: var(--er-stamp-green);
+}
+
+.swim-empty-cta .sec-hint {
+  margin: 0;
+  font-size: 0.7rem;
+  color: var(--er-ink-soft);
+  letter-spacing: 0.01em;
+}
+
+.swim-empty-cta .sec-hint code {
+  background: var(--er-paper-2);
+  padding: 0.1rem 0.3rem;
+  border-radius: 2px;
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  color: var(--er-ink);
+}
+
+/* Collapse precedence — when the parent lane is collapsed, the
+ * empty-lane CTA greys out + becomes non-interactive (mirrors
+ * `.swim.collapsed .swim-compose` at line 991). */
+.swim.collapsed .swim-empty-cta .sec-cta {
+  opacity: 0.4;
+  pointer-events: none;
+}

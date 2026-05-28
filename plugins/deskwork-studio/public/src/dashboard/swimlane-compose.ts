@@ -1,33 +1,38 @@
 /**
- * Per-lane Compose chip controller (Phase 5 Task 5.1C).
+ * Per-lane Compose chip + empty-lane CTA controller (Phase 5
+ * Task 5.1C + Task 5.2).
  *
- * Wires the `.swim-compose` chip in every `<article class="swim">`:
+ * Wires TWO clipboard-only affordances inside every swim:
  *
- *   - Click composes the partial slash command `/deskwork:add
- *     <SLUG> --lane <laneId> --stage <firstLinearStage>` (the four-
- *     character `<SLUG>` placeholder is literal — the operator
- *     replaces it in the chat editor after paste).
- *   - `navigator.clipboard.writeText` is the entire side effect.
- *     On success the chip flashes `.copied` (✓ + "Copied — paste in
- *     chat") for ~2000ms, then reverts.
+ *   - `.swim-compose` chip in the swim-head (Task 5.1C). Composes
+ *     `/deskwork:add <SLUG> --lane <laneId> --stage <firstStage>`
+ *     — the literal four-character `<SLUG>` placeholder is part of
+ *     the copied text, the operator replaces it in the chat editor
+ *     after paste.
+ *   - `.swim-empty-cta .sec-cta` button in the empty-lane body
+ *     (Task 5.2). Composes `/deskwork:add --lane <laneId>` — NO
+ *     slug placeholder, NO `--stage` flag (the operator's first
+ *     invocation in a lane runs the add skill's full prompt flow).
+ *
+ * Both affordances:
+ *
+ *   - Use `navigator.clipboard.writeText` as the entire side effect.
+ *     On success they flash `.copied` (visual + aria-label swap)
+ *     for ~2000ms, then revert.
+ *   - Stop click propagation so the parent `.swim-head` / swim body
+ *     handlers don't also fire (the lane-collapse toggler would
+ *     otherwise pick the click up).
+ *   - Honor collapse precedence: when the parent swim is `.collapsed`,
+ *     click is a no-op.
+ *   - Activate on Space (with `preventDefault` to suppress page
+ *     scroll) per WCAG 2.1 SC 2.1.1. Enter is free via the native
+ *     `<button>` keyboard contract.
  *
  * Per THESIS Consequence 2 + DESKWORK-STATE-MACHINE.md Commandment
- * II: the studio does NOT mutate sidecar state from this affordance.
- * No verb is dispatched, no network request is made, no entry is
- * created. The operator's pasted slash command IS the action — this
- * controller's contract is clipboard + flash, period.
- *
- * Collapse precedence (mirrors Task 5.1B's `.view-toggle`): when the
- * parent swim is `.collapsed`, the chip is non-interactive — the CSS
- * rule `.swim.collapsed .swim-compose { opacity: 0.4; pointer-
- * events: none }` handles the visual + pointer-event side; this
- * controller also early-returns on click so the gesture is a no-op
- * even if the CSS hasn't loaded yet.
- *
- * Keyboard activation: Enter activates via the native `<button>`
- * primitive; Space is wired explicitly with `preventDefault` to
- * suppress page scroll (per WCAG 2.1 SC 2.1.1). Mirrors the pattern
- * in `swimlane-view-toggle.ts`.
+ * II: the studio does NOT mutate sidecar state from either
+ * affordance. No verb is dispatched, no network request is made, no
+ * entry is created. The operator's pasted slash command IS the
+ * action — this controller's contract is clipboard + flash, period.
  *
  * Per the no-fallback rule: when `navigator.clipboard` is missing
  * or `writeText` rejects, the controller surfaces a runtime error
@@ -35,83 +40,140 @@
  * The error is the correct signal that the surface is broken.
  */
 
-/** Duration the chip stays in the `.copied` flash state (ms). */
+/** Duration the affordance stays in the `.copied` flash state (ms). */
 const COPIED_FLASH_MS = 2000;
+
+/** Literal slug placeholder — operator replaces it in the chat editor. */
+const SLUG_PLACEHOLDER = '<SLUG>';
+
+/** Accessible name for an affordance during the `.copied` flash. */
+const COPIED_ARIA_LABEL = 'Copied — paste in chat';
 
 /** WeakMap of button → pending revert-timer handle. */
 const pendingTimers = new WeakMap<HTMLButtonElement, number>();
 
 /**
- * Snapshot of the chip's render-time `aria-label` so the `.copied`
- * flash can swap it to the success message and restore it on revert.
- * Captured at `bindChip` time so subsequent renders / DOM rewrites
- * don't drift the snapshot.
+ * Snapshot of an affordance's render-time `aria-label` so the
+ * `.copied` flash can swap it to the success message and restore it
+ * on revert. Captured at bind time so subsequent renders / DOM
+ * rewrites don't drift the snapshot.
  *
- * Mobile motivation: on phone the `.sc-label` is `display: none`, so
- * the visible label swap (`new` → `Copied — paste in chat`) is invisible
- * to screen-reader users — `aria-label` is the only accessible name.
+ * Mobile motivation: on phone the compose chip's `.sc-label` is
+ * `display: none`, so the visible label swap is invisible to
+ * screen-reader users — `aria-label` is the only accessible name.
  * Without this swap the AT user gets zero feedback that the copy
- * succeeded.
+ * succeeded. The empty-CTA's `.sec-label` is visible at every
+ * breakpoint, but mirroring the swap keeps the contract uniform.
  */
 const originalAriaLabel = new WeakMap<HTMLButtonElement, string>();
 
-/** Literal slug placeholder — operator replaces it in the chat editor. */
-const SLUG_PLACEHOLDER = '<SLUG>';
+/**
+ * Per-affordance behavior contract. Each affordance kind (compose
+ * chip vs empty CTA) provides its own slash-command builder + flash
+ * visual swap (the chip is "+ new" → "✓ Copied — paste in chat";
+ * the CTA is "Create your first entry" → "Copied — paste in chat").
+ */
+interface AffordanceSpec {
+  /** CSS selector the controller targets to bind this affordance. */
+  readonly selector: string;
+  /**
+   * Compose the slash command to copy. Receives the affordance's
+   * dataset; returns the literal text written to the clipboard.
+   */
+  readonly compose: (dataset: DOMStringMap) => string;
+  /** Apply the `.copied` visual swap (icon + label). */
+  readonly enterCopied: (button: HTMLButtonElement) => void;
+  /** Restore the at-rest visual state (icon + label). */
+  readonly leaveCopied: (button: HTMLButtonElement) => void;
+}
 
-/** Accessible name for the chip during the `.copied` flash state. */
-const COPIED_ARIA_LABEL = 'Copied — paste in chat';
-
-function composeSlashCommand(laneId: string, firstStage: string): string {
+function composeChipSlash(dataset: DOMStringMap): string {
+  const { laneId, firstStage } = dataset;
+  if (laneId === undefined || firstStage === undefined) {
+    throw new Error(
+      '.swim-compose chip missing data-lane-id or data-first-stage',
+    );
+  }
   return `/deskwork:add ${SLUG_PLACEHOLDER} --lane ${laneId} --stage ${firstStage}`;
 }
 
-function enterCopiedState(button: HTMLButtonElement): void {
-  button.classList.add('copied');
-  button.setAttribute('aria-label', COPIED_ARIA_LABEL);
+function composeEmptyCtaSlash(dataset: DOMStringMap): string {
+  const { laneId } = dataset;
+  if (laneId === undefined) {
+    throw new Error('.swim-empty-cta .sec-cta missing data-lane-id');
+  }
+  return `/deskwork:add --lane ${laneId}`;
+}
+
+function chipEnterCopied(button: HTMLButtonElement): void {
   const icon = button.querySelector<HTMLElement>('.sc-icon');
   const label = button.querySelector<HTMLElement>('.sc-label');
   if (icon !== null) icon.textContent = '✓';
   if (label !== null) label.textContent = 'Copied — paste in chat';
 }
 
-function leaveCopiedState(button: HTMLButtonElement): void {
-  button.classList.remove('copied');
-  const original = originalAriaLabel.get(button);
-  if (original !== undefined) button.setAttribute('aria-label', original);
+function chipLeaveCopied(button: HTMLButtonElement): void {
   const icon = button.querySelector<HTMLElement>('.sc-icon');
   const label = button.querySelector<HTMLElement>('.sc-label');
   if (icon !== null) icon.textContent = '+';
   if (label !== null) label.textContent = 'new';
 }
 
+function ctaEnterCopied(button: HTMLButtonElement): void {
+  const icon = button.querySelector<HTMLElement>('.sec-icon');
+  const label = button.querySelector<HTMLElement>('.sec-label');
+  if (icon !== null) icon.textContent = '✓';
+  if (label !== null) label.textContent = 'Copied — paste in chat';
+}
+
+function ctaLeaveCopied(button: HTMLButtonElement): void {
+  const icon = button.querySelector<HTMLElement>('.sec-icon');
+  const label = button.querySelector<HTMLElement>('.sec-label');
+  if (icon !== null) icon.textContent = '+';
+  if (label !== null) label.textContent = 'Create your first entry';
+}
+
+const COMPOSE_CHIP_SPEC: AffordanceSpec = {
+  selector: '.swim-compose[data-swim-compose]',
+  compose: composeChipSlash,
+  enterCopied: chipEnterCopied,
+  leaveCopied: chipLeaveCopied,
+};
+
+const EMPTY_CTA_SPEC: AffordanceSpec = {
+  selector: '.swim-empty-cta .sec-cta[data-swim-empty-copy]',
+  compose: composeEmptyCtaSlash,
+  enterCopied: ctaEnterCopied,
+  leaveCopied: ctaLeaveCopied,
+};
+
+function enterCopiedState(button: HTMLButtonElement, spec: AffordanceSpec): void {
+  button.classList.add('copied');
+  button.setAttribute('aria-label', COPIED_ARIA_LABEL);
+  spec.enterCopied(button);
+}
+
+function leaveCopiedState(button: HTMLButtonElement, spec: AffordanceSpec): void {
+  button.classList.remove('copied');
+  const original = originalAriaLabel.get(button);
+  if (original !== undefined) button.setAttribute('aria-label', original);
+  spec.leaveCopied(button);
+}
+
 /**
  * Schedule the revert. Any prior revert-timer on this button is
  * cleared first so rapid double-clicks restart the flash window —
- * the chip stays in `.copied` for ~2000ms after the LAST click, not
- * after the first.
+ * the affordance stays in `.copied` for ~2000ms after the LAST
+ * click, not after the first.
  */
-function scheduleRevert(button: HTMLButtonElement): void {
+function scheduleRevert(button: HTMLButtonElement, spec: AffordanceSpec): void {
   const prior = pendingTimers.get(button);
   if (prior !== undefined) window.clearTimeout(prior);
   const handle = window.setTimeout(() => {
     pendingTimers.delete(button);
-    leaveCopiedState(button);
+    leaveCopiedState(button, spec);
   }, COPIED_FLASH_MS);
   pendingTimers.set(button, handle);
-}
-
-/**
- * Read the (laneId, firstStage) tuple off the chip's data attrs and
- * compose the slash command. Returns null when either attribute is
- * missing — caller treats that as an invalid gesture.
- */
-function readChipData(
-  button: HTMLButtonElement,
-): { laneId: string; firstStage: string } | null {
-  const laneId = button.dataset.laneId;
-  const firstStage = button.dataset.firstStage;
-  if (laneId === undefined || firstStage === undefined) return null;
-  return { laneId, firstStage };
 }
 
 /**
@@ -123,13 +185,10 @@ function readChipData(
  * degraded path — the operator seeing the surface as broken is the
  * correct signal.
  */
-async function copyAndFlash(button: HTMLButtonElement): Promise<void> {
-  const data = readChipData(button);
-  if (data === null) {
-    throw new Error(
-      '.swim-compose chip missing data-lane-id or data-first-stage',
-    );
-  }
+async function copyAndFlash(
+  button: HTMLButtonElement,
+  spec: AffordanceSpec,
+): Promise<void> {
   // `navigator.clipboard` is missing on http (non-secure) contexts
   // and in jsdom without an explicit shim. Surface the missing API
   // as a runtime error per the no-fallback rule.
@@ -139,22 +198,25 @@ async function copyAndFlash(button: HTMLButtonElement): Promise<void> {
       + 'compose chip requires a secure (https) context',
     );
   }
-  const text = composeSlashCommand(data.laneId, data.firstStage);
+  const text = spec.compose(button.dataset);
   await navigator.clipboard.writeText(text);
-  enterCopiedState(button);
-  scheduleRevert(button);
+  enterCopiedState(button, spec);
+  scheduleRevert(button, spec);
 }
 
 /**
- * Resolve a chip-activation gesture (click OR Space keydown).
+ * Resolve an affordance-activation gesture (click OR Space keydown).
  * Returns false when collapse precedence blocks the gesture; throws
  * the underlying clipboard error otherwise so the caller (and any
  * test that spies on rejection) sees the failure.
  */
-async function activateChip(button: HTMLButtonElement): Promise<boolean> {
+async function activateAffordance(
+  button: HTMLButtonElement,
+  spec: AffordanceSpec,
+): Promise<boolean> {
   const swim = button.closest<HTMLElement>('.swim[data-lane-id]');
   if (swim !== null && swim.classList.contains('collapsed')) return false;
-  await copyAndFlash(button);
+  await copyAndFlash(button, spec);
   return true;
 }
 
@@ -173,39 +235,44 @@ function surfaceActivationError(err: unknown): void {
   });
 }
 
-function bindChip(button: HTMLButtonElement): void {
+function bindAffordance(button: HTMLButtonElement, spec: AffordanceSpec): void {
   const renderedAriaLabel = button.getAttribute('aria-label');
   if (renderedAriaLabel !== null) {
     originalAriaLabel.set(button, renderedAriaLabel);
   }
   button.addEventListener('click', (ev) => {
-    // Stop the click from bubbling into `swimlane-collapse.ts`'s
-    // swim-head handler (which would otherwise also toggle the lane
-    // collapse on every chip click). Mirrors the pattern in
-    // `swimlane-view-toggle.ts:202–204`.
+    // Stop the click from bubbling into the swim-head /
+    // swim-body's collapse handler (which would otherwise also
+    // toggle the lane collapse on every affordance click).
     ev.stopPropagation();
-    activateChip(button).catch(surfaceActivationError);
+    activateAffordance(button, spec).catch(surfaceActivationError);
   });
   button.addEventListener('keydown', (ev) => {
     if (ev.key !== ' ') return;
-    // Space activates the chip. Per WCAG 2.1 SC 2.1.1, preventDefault
-    // to suppress page scroll. Enter is free with the native
-    // `<button>` keyboard contract — no extra handler needed.
+    // Space activates the affordance. Per WCAG 2.1 SC 2.1.1,
+    // preventDefault to suppress page scroll. Enter is free with
+    // the native `<button>` keyboard contract — no extra handler
+    // needed.
     ev.preventDefault();
-    activateChip(button).catch(surfaceActivationError);
+    activateAffordance(button, spec).catch(surfaceActivationError);
   });
 }
 
 /**
- * Entry point — wire compose-chip handlers for every swim on the
- * page. No-op when the bay-shell is absent.
+ * Entry point — wire compose-chip + empty-lane CTA handlers for
+ * every swim on the page. No-op when the bay-shell is absent.
  */
 export function initSwimlaneCompose(): void {
   const shell = document.querySelector<HTMLElement>('[data-bay-shell]');
   if (shell === null) return;
   for (const button of document.querySelectorAll<HTMLButtonElement>(
-    '.swim-compose[data-swim-compose]',
+    COMPOSE_CHIP_SPEC.selector,
   )) {
-    bindChip(button);
+    bindAffordance(button, COMPOSE_CHIP_SPEC);
+  }
+  for (const button of document.querySelectorAll<HTMLButtonElement>(
+    EMPTY_CTA_SPEC.selector,
+  )) {
+    bindAffordance(button, EMPTY_CTA_SPEC);
   }
 }

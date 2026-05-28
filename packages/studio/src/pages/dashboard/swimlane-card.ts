@@ -1,7 +1,8 @@
 /**
  * Per-lane swimlane card renderer for the multi-lane dashboard
  * (Phase 5 Task 5.1 + Task 5.1A — per-lane collapse + Task 5.1B —
- * per-lane kanban ↔ list view toggle).
+ * per-lane kanban ↔ list view toggle + Task 5.2 — template-aware
+ * stage rendering + empty-lane CTA).
  *
  * Renders:
  *   - `renderSwimlane`: the full `<article class="swim">` for a
@@ -24,16 +25,25 @@
  *     `.swim.view-list`. The server default is kanban; the client
  *     controller post-DOMContentLoaded applies viewport-default
  *     (mobile→list) + per-lane localStorage override.
+ *     Task 5.2 adds an empty-lane CTA — `.swim-empty-cta` renders
+ *     in the swim body when `bucket.entryCount === 0`, between the
+ *     swim-head and the compact strip. The CTA clipboard-copies
+ *     `/deskwork:add --lane <laneId>` (no slug placeholder, no
+ *     stage flag) — a wider invocation than the per-lane Compose
+ *     chip's `+ new` shortcut, intended as the first-entry on-ramp
+ *     for an empty lane.
  *   - `renderSwimStub`: the compact `<button class="swim-stub">`
  *     emitted alongside the swim for visibility-on lanes. CSS picks
  *     which one shows via `.is-focus-hidden`.
  *   - `renderStageCol`: per-stage kanban column with lane-scoped
  *     DOM ID, back-compat anchors for the default editorial lane,
- *     locked-stage / off-pipeline modifiers, and the dispatch
- *     between the editorial verb-chip row and the lighter
- *     `renderEntryCard` for non-editorial stages. The stage-head now
- *     carries a per-stage `<button class="collapse-chev">` mirroring
- *     the lane-level chevron's contract (same a11y primitives,
+ *     locked-stage / off-pipeline modifiers. Task 5.2 lifts the
+ *     prior `isLegacyEditorialStage` dispatch — every entry now
+ *     renders via the template-aware `renderRow` (Commandment II:
+ *     verbs are universal across templates, gated only on stage
+ *     position within the lane's pipeline). The stage-head carries
+ *     a per-stage `<button class="collapse-chev">` mirroring the
+ *     lane-level chevron's contract (same a11y primitives,
  *     `data-collapse-target="stage"` for the client dispatcher).
  *   - `renderSwimCompact`: the compact per-stage strip rendered
  *     inside every swim; CSS reveals it when the lane is
@@ -48,25 +58,36 @@
  *     trip. Per THESIS Consequence 2 / DESKWORK-STATE-MACHINE.md
  *     Commandment II — the chip is a clipboard convenience, not a
  *     verb; it never mutates sidecar state.
+ *   - `renderEmptyLaneCta`: per-lane "Create your first entry" CTA
+ *     (Task 5.2). Sibling affordance to the Compose chip — wider
+ *     copy + larger hit target, surfaced only on empty lanes. Per
+ *     `affordance-placement.md` — lives ON the empty lane's swim
+ *     body, not in any toolbar. Per THESIS Consequence 2 — clipboard
+ *     only; no sidecar mutation.
  */
 
 import { html, unsafe, type RawHtml } from '../html.ts';
 import { renderRow } from './section.ts';
 import { stageGlyph, GLYPH_OFF } from './swimlane-stage-glyph.ts';
 import { laneGlyph } from './lane-glyph.ts';
-import { renderEntryCard } from './swimlane-entry-card.ts';
 import { renderListBody } from './swimlane-list-body.ts';
-import { isLegacyEditorialStage } from './legacy-stage.ts';
 import type { LaneBucket } from './lane-data.ts';
 import type { LaneRailRow } from './swimlane-rail.ts';
 import type { Entry } from '@deskwork/core/schema/entry';
+import type { StrictPipelineTemplate } from '@deskwork/core/pipelines';
 
 /**
- * Empty-state placeholder copy. The editorial stages get the
- * pre-Task-5.1 strings verbatim (the dashboard.test.ts assertions
- * pin specific phrasings); other stages get a neutral message.
+ * Editorial-template empty-state strings. The pre-Task-5.1 dashboard
+ * tests pin these verbatim phrasings ("Run /deskwork:add to capture
+ * one.", "/deskwork:approve <slug> to graduate an idea.", etc.) and
+ * the strings name the editorial verb vocabulary explicitly.
+ *
+ * Per Task 5.2: this map is scoped to the editorial template only.
+ * Non-editorial lanes fall through to the neutral `Nothing in
+ * ${stage.toLowerCase()}.` so the editorial verb vocabulary does
+ * not leak into other templates' empty-state copy.
  */
-const STAGE_EMPTY_HINTS: Record<string, string> = {
+const EDITORIAL_STAGE_EMPTY_HINTS: Record<string, string> = {
   Ideas: 'No open ideas. Run /deskwork:add to capture one.',
   Planned: 'Nothing planned. /deskwork:approve <slug> to graduate an idea.',
   Outlining: 'Nothing in outlining.',
@@ -77,8 +98,18 @@ const STAGE_EMPTY_HINTS: Record<string, string> = {
   Cancelled: 'No cancelled entries.',
 };
 
-function stageEmptyHint(stage: string): string {
-  return STAGE_EMPTY_HINTS[stage] ?? `Nothing in ${stage.toLowerCase()}.`;
+/**
+ * Editorial-specific copy for the editorial template; generic
+ * "Nothing in ${stage}." for any other template. The dispatch is
+ * template-id-gated so each pipeline's empty-state vocabulary
+ * tracks its own pipeline copy.
+ */
+function stageEmptyHint(stage: string, templateId: string): string {
+  if (templateId === 'editorial') {
+    const editorial = EDITORIAL_STAGE_EMPTY_HINTS[stage];
+    if (editorial !== undefined) return editorial;
+  }
+  return `Nothing in ${stage.toLowerCase()}.`;
 }
 
 /**
@@ -111,6 +142,7 @@ function stageEmptyHint(stage: string): string {
  */
 function renderStageCol(
   laneId: string,
+  template: StrictPipelineTemplate,
   stage: string,
   entries: readonly Entry[],
   defaultSite: string,
@@ -142,28 +174,23 @@ function renderStageCol(
   const legacyAnchor = laneId === 'default'
     ? unsafe(`<span id="stage-${stageIdSlug}" aria-hidden="true"></span>`)
     : '';
-  const emptyHint = stageEmptyHint(stage);
+  const emptyHint = stageEmptyHint(stage, template.id);
   const emptyAttrs = entries.length === 0
     ? unsafe(html` data-empty-stage="${stage}"`)
     : '';
 
-  // Stage-vocabulary-driven dispatch: editorial-pipeline stages get
-  // the full dashboard row chrome (renderRow → verbsForStage chain).
-  // Non-editorial stages render as compact cards so the operator
-  // still sees the entry on the page. Task 5.2 generalises
-  // verbsForStage by template and removes this dispatch. The guard
-  // here uses the single project-wide editorial-stage guard
-  // `isLegacyEditorialStage` (`./legacy-stage.ts`) — no local copy.
+  // Per Phase 5 Task 5.2: the prior `isLegacyEditorialStage`
+  // dispatch is lifted. The template-aware `verbsForStage` (via
+  // `renderRow → renderRowActions / renderRowDrawer / renderRow
+  // Menu`) handles every pipeline template's stage vocabulary
+  // uniformly — Commandment II's "verbs are universal" contract.
+  // Every entry now gets the verb-chip row regardless of its lane's
+  // template.
   const body = entries.length === 0
     ? unsafe(html`<div class="empty-state" data-empty-stage-msg>${emptyHint}</div>`)
     : unsafe(
       entries
-        .map((e, i) => {
-          if (isLegacyEditorialStage(e.currentStage)) {
-            return renderRow(e, i, defaultSite).__raw;
-          }
-          return renderEntryCard(e, defaultSite).__raw;
-        })
+        .map((e, i) => renderRow(e, i, template, defaultSite).__raw)
         .join(''),
     );
 
@@ -270,6 +297,50 @@ export function renderComposeChip(
     </button>`);
 }
 
+/**
+ * Per-lane empty-lane CTA (Task 5.2 Step 5.2.2). Rendered only
+ * when `bucket.entryCount === 0` — the prominent "create your
+ * first entry" affordance an operator sees the first time they
+ * open a freshly-configured lane.
+ *
+ * Sibling to the per-lane `.swim-compose` chip (Task 5.1C) but
+ * with a DIFFERENT clipboard payload:
+ *
+ *   - `.swim-compose` chip → `/deskwork:add <SLUG> --lane <id>
+ *     --stage <first-stage>` (the operator already knows what
+ *     they're composing; the chip carries an explicit destination
+ *     stage to skip).
+ *   - `.swim-empty-cta` button → `/deskwork:add --lane <id>` (no
+ *     `<SLUG>` placeholder, no `--stage` flag — the operator's
+ *     first invocation in this lane; the add skill prompts for
+ *     slug + content as part of its normal flow).
+ *
+ * Per THESIS Consequence 2 and DESKWORK-STATE-MACHINE.md Commandment
+ * II — clipboard only; no sidecar mutation, no network round trip.
+ *
+ * Per `affordance-placement.md` — the CTA lives ON the empty lane's
+ * swim body (between `.swim-head` and `.swim-compact`), not in any
+ * toolbar. Mirrors the `.er-outline-tab` precedent of attaching
+ * affordances ON the component they affect.
+ */
+export function renderEmptyLaneCta(
+  laneId: string,
+  laneName: string,
+): RawHtml {
+  return unsafe(html`
+    <div class="swim-empty-cta" data-swim-empty-cta>
+      <p class="sec-msg">Create your first entry in this lane.</p>
+      <button class="sec-cta" type="button"
+        aria-label="Compose first entry in ${laneName}"
+        data-swim-empty-copy
+        data-lane-id="${laneId}">
+        <span class="sec-icon" aria-hidden="true">+</span>
+        <span class="sec-label">Create your first entry</span>
+      </button>
+      <p class="sec-hint">copies <code>/deskwork:add --lane ${laneId}</code> to your clipboard</p>
+    </div>`);
+}
+
 function renderSwimCompact(bucket: LaneBucket): RawHtml {
   const stages: string[] = [
     ...bucket.template.linearStages,
@@ -307,6 +378,7 @@ export function renderSwimlane(
     ...template.linearStages.map((stage) =>
       renderStageCol(
         lane.id,
+        template,
         stage,
         bucket.byStage.get(stage) ?? [],
         defaultSite,
@@ -318,6 +390,7 @@ export function renderSwimlane(
     ...template.offPipelineStages.map((stage) =>
       renderStageCol(
         lane.id,
+        template,
         stage,
         bucket.byStage.get(stage) ?? [],
         defaultSite,
@@ -384,6 +457,7 @@ export function renderSwimlane(
           data-lane-id="${lane.id}"
           data-lane-name="${lane.name}">▾</button>
       </div>
+      ${bucket.entryCount === 0 ? renderEmptyLaneCta(lane.id, lane.name) : unsafe('')}
       ${renderSwimCompact(bucket)}
       <div class="stage-grid" data-stage-grid>${unsafe(stagesRaw)}</div>
       ${renderListBody(bucket, defaultSite)}
