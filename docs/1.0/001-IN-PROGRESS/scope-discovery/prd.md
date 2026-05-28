@@ -40,10 +40,6 @@ Move the audiocontrol-piloted Scope Discovery Protocol's CODE (scanners, validat
 
 Phase 11 captures exhaustively per the capture-mode rule. Scoping — which sub-tasks ship in which release — is operator-driven.
 
-**Phase 12 extension (2026-05-28).** Triggered by the accumulated-debt audit following the v0.24.0–v0.24.2 release cycle: the deskwork repo carries ~100 open GH issues across its history, of which 17 are stale phase parent metadata, 3 are confirmed shipped-but-open (#284, #289, #292), and a long tail are multi-release deferrals. The canary's TF doc grew from 3 to 10 entries across one week with close-rate trailing open-rate. The structural asymmetry: **shipping is rewarded; closure isn't.** Each cycle ships substantive work + carefully tracked follow-ups; the next cycle has its own work to ship; previous follow-ups rot. The audit-log already carries `fixed-<sha>` / `verified-<date>` markers; `tooling-feedback-import` already promotes closure-marked TF entries; the project rule *"Issue closure requires verification in a formally-installed release"* names the contract. **What's missing is the inverse promotion path:** audit-log `fixed-<sha>` reachable in tagged release + corresponding GH issue still open → surface for operator-confirmed closure. Phase 12 ships the inverse promotion as `/dw-lifecycle:close-shipped` + integrates it at the natural lifecycle gates (`/release` post-push, `/dw-lifecycle:session-end`, `/dw-lifecycle:doctor`, `/dw-lifecycle:complete` for phase-parent closure). The infrastructure is composition over existing primitives — no new state model — and closes the structural-asymmetry failure mode the accumulated-debt audit named.
-
-Phase 12 captures exhaustively per the capture-mode rule; workplan § Phase 12 enumerates 8 tasks with task-level acceptance criteria + 5 open scoping questions for operator decision. Scoping is operator-driven; the agent does not pre-cut.
-
 ## Acceptance Criteria
 
 - [ ] All ~18 new `/dw-lifecycle:*` slash commands exist and are discoverable via the Claude Code slash-command picker
@@ -80,18 +76,6 @@ Phase 12 captures exhaustively per the capture-mode rule; workplan § Phase 12 e
 - [ ] Tooling-feedback closure import workflow: TF-closure entries auto-promote to scope-discovery audit-log AUDIT-`<date>`-`<NN>` entries with cross-reference; doctor rule surfaces stale TF entries (configurable threshold); `/dw-lifecycle:tooling-feedback-import` skill walks closure-marked TF entries + transitions them.
 - [ ] **KeygroupSummary-shape repro fixture (anonymized) commits to test suite + passes** — synthetic component with ZERO `.ac-*` consumers + ≥5 utility-class hits → the negative-space pattern fires. The audiocontrol incident's canonical repro becomes the regression-defense fixture.
 - [ ] **First dogfood cycle (graphical-entries team) reports the inventory-vs-discovery gap is closed** via the v1.X tooling-feedback log. The auditor-correction-rate on that team's commits decreases over time as the catalog matures.
-
-**Phase 12 acceptance criteria (added 2026-05-28; extension proposed in design conversation following accumulated-debt audit):**
-
-- [ ] NEW `/dw-lifecycle:close-shipped` skill exists + is discoverable. Walks four closure-evidence sources (audit-log `Status: fixed-<sha>` reachable in tagged release; per-feature TF entries `Status: Closed | <commit>`; commit subjects `(closes|fixes|resolves) #\d+` in release; workplan `[x]` items with embedded `· [#NNN](url)`). Cross-references the sources per-issue; surfaces provenance trail; operator confirms per-issue; `gh issue close --comment "<provenance>"` fires on accepted candidates. Library + CLI verb + tests + SKILL.md ship together.
-- [ ] `/release` end-of-flow (Pause 5) prompts to invoke `close-shipped --release-tag v<version>` after `atomic-push` succeeds. Auto-generated release-notes body from the closeable list injects via `gh release edit --notes`.
-- [ ] `/dw-lifecycle:session-end` walks the just-touched feature(s) and invokes `close-shipped --feature <slug>` before journal-commit. Multi-worktree session-end iterates per touched feature.
-- [ ] NEW doctor rule `shipped-issue-still-open`: audit-log `fixed-<sha>` entries where `<sha>` is in a tagged release AND corresponding GH issue is open surface as findings; `--fix` mode invokes close-shipped against affected features.
-- [ ] NEW doctor rule `audit-log-issue-bidirectional`: orphan-audit (audit-entry references missing GH issue) + orphan-issue (GH issue with no audit-entry / commit reference) surface as findings with the missing-half hint.
-- [ ] `/dw-lifecycle:complete` walks the feature's GH issues; closes the phase parent issue when all child phase issues close OR the feature reaches feature-complete per this skill's invocation.
-- [ ] Acceptance dogfood: `close-shipped` against scope-discovery surfaces at minimum [#284](https://github.com/audiocontrol-org/deskwork/issues/284), [#289](https://github.com/audiocontrol-org/deskwork/issues/289), [#292](https://github.com/audiocontrol-org/deskwork/issues/292) as confirmed-shippable + closes them on operator confirm. One-time catch-up sweep across every in-progress feature surfaces the broader accumulated backlog.
-- [ ] Agent-discipline rule documents the closure-as-structural-gate pattern: cite `/dw-lifecycle:close-shipped` + the post-release + session-end + doctor-rule gates; cite the existing verification rule's "agent posts evidence; operator decides" clause stays load-bearing; cite the asymmetry the phase closes (shipping > closing).
-- [ ] `plugins/dw-lifecycle/README.md` documents the closure-of-shipped workflow + the four evidence sources + the surfaces that auto-invoke it.
 
 ## Out of Scope
 
