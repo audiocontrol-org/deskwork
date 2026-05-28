@@ -1,0 +1,63 @@
+{
+  "agent": "regime-holdout-detector",
+  "featureSlug": "graphical-entries",
+  "findings": [
+    {
+      "source": "deprecation",
+      "id": "plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts",
+      "file": "plugins/dw-lifecycle/src/__tests__/scope-discovery/check-deprecations.test.ts",
+      "line": 24,
+      "shape": "imports deprecated file 'plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts' (; here are the importers)",
+      "replacement": "migrate off 'plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts' — the marker is `@deprecated` ; here are the importers",
+      "evidence": {
+        "registryPath": "plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts",
+        "registryId": "jsdoc"
+      },
+      "status_provenance": {
+        "source_status": "blessed",
+        "provenance_source": "install-seed"
+      }
+    },
+    {
+      "source": "deprecation",
+      "id": "plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts",
+      "file": "plugins/dw-lifecycle/src/cli.ts",
+      "line": 19,
+      "shape": "imports deprecated file 'plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts' (; here are the importers)",
+      "replacement": "migrate off 'plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts' — the marker is `@deprecated` ; here are the importers",
+      "evidence": {
+        "registryPath": "plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts",
+        "registryId": "jsdoc"
+      },
+      "status_provenance": {
+        "source_status": "blessed",
+        "provenance_source": "install-seed"
+      }
+    },
+    {
+      "source": "deprecation",
+      "id": "plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts",
+      "file": "plugins/dw-lifecycle/src/subcommands/check-deprecations.ts",
+      "line": 12,
+      "shape": "imports deprecated file 'plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts' (; here are the importers)",
+      "replacement": "migrate off 'plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts' — the marker is `@deprecated` ; here are the importers",
+      "evidence": {
+        "registryPath": "plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts",
+        "registryId": "jsdoc"
+      },
+      "status_provenance": {
+        "source_status": "blessed",
+        "provenance_source": "install-seed"
+      }
+    }
+  ],
+  "meta": {
+    "anti_pattern_count": 0,
+    "adopter_manifest_count": 0,
+    "editor_symmetry_holdout_count": 0,
+    "deprecation_count": 3,
+    "total": 3,
+    "actively_enforced_count": 3,
+    "candidate_count": 0
+  }
+}

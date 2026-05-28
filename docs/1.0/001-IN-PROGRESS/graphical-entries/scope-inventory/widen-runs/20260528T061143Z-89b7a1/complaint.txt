@@ -1,0 +1,1 @@
+Phase 5 introduces multi-lane swimlane dashboard render — new surfaces (focus-chip strip, lane-visibility rail, per-lane swim-head with collapse + view-toggle + compose chip) not enumerated in current scope-manifest

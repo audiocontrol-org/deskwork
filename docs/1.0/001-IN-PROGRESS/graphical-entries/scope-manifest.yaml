@@ -1,0 +1,119 @@
+kind: code
+feature_slug: graphical-entries
+generated_by: strawman
+generated_at: 2026-05-28T06:10:38.112Z
+scenarios:
+  - id: default
+    label: Default state
+    description: Strawman scenario; operator curates the real scenario matrix.
+reference_docs:
+  - path: docs/1.0/001-IN-PROGRESS/graphical-entries/prd.md
+    role: prd
+    summary: Feature PRD — synthesis anchor.
+  - path: .dw-lifecycle/scope-discovery/LAYOUT.md
+    role: other
+    summary: On-disk layout contract for scope-discovery artifacts.
+discovery_themes:
+  - deskwork (0 occurrences)
+  - entries (0 occurrences)
+  - entry (0 occurrences)
+  - graphical (0 occurrences)
+  - iterate (0 occurrences)
+  - lane (0 occurrences)
+  - lanes (0 occurrences)
+  - pipeline (0 occurrences)
+  - stage (0 occurrences)
+  - studio (0 occurrences)
+modules: []
+regime_holdouts:
+  anti_patterns: []
+  adopter_manifests: []
+  editor_symmetry: []
+  deprecations:
+    - id: plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts
+      file: plugins/dw-lifecycle/src/__tests__/scope-discovery/check-deprecations.test.ts
+      line: 24
+      shape: imports deprecated file
+        'plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts' (; here
+        are the importers)
+      replacement: migrate off
+        'plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts' — the
+        marker is `@deprecated` ; here are the importers
+      evidence:
+        registry_path: plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts
+        registry_id: jsdoc
+      status_provenance:
+        source_status: blessed
+        provenance_source: install-seed
+    - id: plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts
+      file: plugins/dw-lifecycle/src/cli.ts
+      line: 19
+      shape: imports deprecated file
+        'plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts' (; here
+        are the importers)
+      replacement: migrate off
+        'plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts' — the
+        marker is `@deprecated` ; here are the importers
+      evidence:
+        registry_path: plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts
+        registry_id: jsdoc
+      status_provenance:
+        source_status: blessed
+        provenance_source: install-seed
+    - id: plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts
+      file: plugins/dw-lifecycle/src/subcommands/check-deprecations.ts
+      line: 12
+      shape: imports deprecated file
+        'plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts' (; here
+        are the importers)
+      replacement: migrate off
+        'plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts' — the
+        marker is `@deprecated` ; here are the importers
+      evidence:
+        registry_path: plugins/dw-lifecycle/src/scope-discovery/check-deprecations.ts
+        registry_id: jsdoc
+      status_provenance:
+        source_status: blessed
+        provenance_source: install-seed
+  meta:
+    total: 3
+    by_source:
+      anti_pattern: 0
+      adopter_manifest: 0
+      editor_symmetry: 0
+      deprecation: 3
+    by_status:
+      actively_enforced: 3
+      candidate: 0
+codebase_state_metrics:
+  generated_at: 2026-05-28T06:10:38.112Z
+  classification_completeness:
+    catalogued_distinct_shapes: 8
+    pending_distinct_shapes: 105
+    uncatalogued_candidates: 0
+    total_distinct_shapes: 113
+    ratio: 0.07079646017699115
+  coverage_per_blessed_pattern: []
+  violation_density_per_cursed_pattern: []
+  surface_uniformity: []
+  catalog_stability:
+    git_available: true
+    lookback_commits: 20
+    commits_with_edits: 3
+    total_catalog_edits: 5
+    edits_per_commit_avg: 0.25
+    trend: stable
+  discovered_candidate_rate:
+    pending_entries_total: 105
+    unattributed_pending: 105
+    by_scan_run: []
+    trend: null
+  disposition_latency:
+    transitioned_count: 0
+    median_latency_ms: null
+    p90_latency_ms: null
+    slowest_five: []
+notes: Strawman synthesized from 6 discovery agent(s) (adopter-manifest-checker,
+  ast-grep-matrix, clone-detector-reader, prd-themed-pattern-hunter,
+  regime-holdout-detector, ui-route-enumerator). Operator curates
+  devices/scenarios/primitives.

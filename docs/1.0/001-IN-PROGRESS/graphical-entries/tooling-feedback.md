@@ -34,8 +34,8 @@ Running log of friction, pathologies, and improvement opportunities in the scope
 | TF-003 | Open | — |
 | TF-004 | Open | — |
 | TF-005 | Open | — |
-| TF-006 | Open | — |
-| TF-007 | Open | — |
+| TF-006 | Closed | dw-lifecycle v0.24.1 — `modules` minItems relaxed; bootstrap manifest now valid |
+| TF-007 | Closed | dw-lifecycle v0.24.1 — `dw-lifecycle orchestrator-turn --feature <slug>` CLI subcommand shipped |
 
 ## How to add an entry
 
@@ -125,6 +125,9 @@ Recommended: **Medium**. The frontmatter back-fill already happens; the operator
 
 ## TF-004 · MISC · high · `dw-lifecycle` bin shim fails on first invocation — declared deps not installed; `repair-install.sh` reports healthy
 
+**Status (2026-05-28, dw-lifecycle v0.24.1):** **OPEN — code unchanged.** The bin shim at `~/.claude/plugins/marketplaces/deskwork/plugins/dw-lifecycle/bin/dw-lifecycle` is byte-identical between v0.24.0 and v0.24.1 — it still probes only for `tsx` on its `find_tsx` walk, not for the rest of the declared `package.json` dependencies. `repair-install.sh` is similarly unchanged (still scoped to plugin-cache eviction recovery, not dep-set probing). Current install state happens to be healthy (ajv etc. are present in `node_modules/`) because of either the marketplace bump's incidental `npm install` or this worktree's earlier manual `npm install --omit=dev --workspaces=false`. The next adopter with a freshly-evicted cache will hit the same failure shape unless a clean install path that probes all declared deps lands. Re-test gate: empirically reproduce on a node_modules-wiped install of the plugin.
+
+
 **Repro:**
 
 1. Fresh-ish marketplace install of deskwork (this session, dw-lifecycle v0.24.0). `~/.claude/plugins/marketplaces/deskwork/plugins/dw-lifecycle/node_modules/` contains tsx, yaml, zod (the shell-script-resolver deps the bin shim greps for) plus some transitive packages.
@@ -153,6 +156,9 @@ Cross-reference: pairs with the project's "Marketplace-scripts contract" rule in
 
 ## TF-005 · DSC · high · `dispatch-wrapper` is library-only; orchestrator (Claude session) has no operator-facing way to engage it
 
+**Status (2026-05-28, dw-lifecycle v0.24.1):** **OPEN — code unchanged.** No new CLI subcommand (`wrap-prompt` / `validate-return` or similar) shipped to bridge the orchestrator to the dispatch-wrapper engine. SKILL.md § "Dispatch-wrapper engagement" still describes `wrap(agentType, taskPrompt, { dispatchFn })` as the entry point and says *"The controller (this skill's orchestrating agent) supplies the `dispatchFn` callback that drives the Agent tool"* — which the Claude Code session can't actually do (the Agent tool is a runtime-owned tool-use primitive, not a TypeScript callable). The orchestrator continues to hand-inline GRAMMAR_INSTRUCTION + parse + validate the return manually. The orchestrator-turn CLI (which TF-007 introduced) DOES engage `wrap()` internally for the judge step — but the implementer/reviewer/code-explorer dispatches that this skill prescribes still need a parallel operator-facing entry point.
+
+
 **Repro:**
 
 1. Read `/dw-lifecycle:implement` SKILL.md (v0.24.0) § "Dispatch-wrapper engagement": *"Every sub-agent dispatch fired by this skill — implementer, reviewer, code-explorer, code-architect, parallel fan-out workers — MUST be routed through `wrap()` from `plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper.ts`."*
@@ -177,6 +183,29 @@ Recommended: **Light + Medium together**. Light closes the documentation contrad
 Cross-reference: the orchestrator's manual-enforcement workaround means this pilot's dispatches WILL have the grammar instruction + forbidden-deferral rejection in place; the friction is on the implementation cost (every dispatch prompt grows by the instruction body — ~50 lines per dispatch — and the orchestrator owns the parse logic in-prompt rather than via library).
 
 ## TF-006 · DSC · high · `scope-inventory` baseline pass fails on schema validation (empty `/modules`); blocks `scope-widen` auto-invocation between tasks
+
+**Status (2026-05-28, dw-lifecycle v0.24.1):** **CLOSED — fix verified.** The `modules` minItems constraint was relaxed (Light fix). Re-tested empirically:
+
+```bash
+$ dw-lifecycle scope-inventory --slug graphical-entries --quiet
+pattern-matrix: unmatched-shape clustering pass is a STUB (stub; tracking #318). The polymorphic dispatcher is shipped; the clustering algorithm lands under issue #318. discovered_candidates returns [] until then.
+$ echo $?
+0
+$ ls docs/1.0/001-IN-PROGRESS/graphical-entries/scope-manifest.yaml
+docs/1.0/001-IN-PROGRESS/graphical-entries/scope-manifest.yaml
+```
+
+The bootstrap manifest now writes with `modules: []` (valid greenfield state); `discovery_themes` carries occurrence counts; `reference_docs` enumerates PRD + LAYOUT.md as synthesis anchors. Downstream `scope-widen` invocation also runs cleanly against the baseline:
+
+```bash
+$ dw-lifecycle scope-widen "Phase 5 introduces multi-lane swimlane dashboard ..." --slug graphical-entries
+... scope-widen delta — 0 addition(s):
+$ echo $?
+0
+```
+
+Both the bootstrap state and the next-task between-task auto-invocation now work end-to-end.
+
 
 **Repro:**
 
@@ -218,6 +247,19 @@ Recommended: **Light**. The minItems:1 constraint forbids a legitimate state. Re
 Cross-reference: the STUB warning about unmatched-shape clustering (Phase 11 G5; #318) is informational — `discovered_candidates: []` is acceptable for now. The schema-validation hard-fail is the actual blocker.
 
 ## TF-007 · DSC · medium · Phase 11 orchestrator loop (`runOrchestratorTurn`) is library-only, same surface as TF-005 — un-engageable from the orchestrating Claude session
+
+**Status (2026-05-28, dw-lifecycle v0.24.1):** **CLOSED — Medium fix shipped.** A `dw-lifecycle orchestrator-turn` CLI subcommand now exists; SKILL.md § "Orchestrator loop (per-turn audit/judge stack)" is rewritten to invoke it as `dw-lifecycle orchestrator-turn --feature <slug> [--skip-judge] [--skip-auditor]`. Re-tested empirically:
+
+```bash
+$ dw-lifecycle orchestrator-turn --feature graphical-entries --skip-judge --skip-auditor
+{ ...TurnReport JSON to stdout... }
+orchestrator-turn: NOTE: only 3/6 catalog files present (anti-patterns.yaml, adopter-manifests.yaml, clones.yaml). 0 new audit entries; 0 wrong-decisions; 0 mediation clusters; judge skipped; auditor skipped; 0 escalations queued
+$ echo $?
+0
+```
+
+The CLI verb emits `TurnReport` JSON (conforming to `loop-types.ts`) to stdout, a one-line human summary to stderr, and persists `nextLoopState` to `.dw-lifecycle/scope-discovery/orchestrator-runtime/loop-state.json` automatically — exactly the shape this entry recommended. The flags (`--skip-judge`, `--skip-auditor`, `--judge-input <path>`, `--auditor-input <path>`) let the operator stage the in-band LLM calls explicitly. The orchestrator can now run one turn before each task and one after, surfacing `summary` in the per-task report. Phase 11 trussing is engageable end-to-end.
+
 
 **Repro:**
 
