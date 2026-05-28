@@ -1,11 +1,19 @@
 /**
  * Per-lane swimlane card renderer for the multi-lane dashboard
- * (Phase 5 Task 5.1).
+ * (Phase 5 Task 5.1 + Task 5.1A — per-lane collapse).
  *
  * Renders:
  *   - `renderSwimlane`: the full `<article class="swim">` for a
  *     focused lane (swim-head + swim-compact strip + kanban-style
- *     stage grid with one column per template stage).
+ *     stage grid with one column per template stage). The swim-head
+ *     now carries a `<button class="collapse-chev">` at the tail —
+ *     Task 5.1A's lane-level collapse affordance (aria-expanded +
+ *     aria-label per WAI-ARIA Authoring Practices for disclosure
+ *     widgets; ≥24×24 hit target per WCAG 2.2 SC 2.5.8 AA;
+ *     focus-visible ring per WCAG 2.1 SC 2.4.7 AA). Initial state
+ *     is server-rendered as expanded (`aria-expanded="true"`); the
+ *     client controller restores the operator's persisted state
+ *     from localStorage post-DOMContentLoaded.
  *   - `renderSwimStub`: the compact `<button class="swim-stub">`
  *     emitted alongside the swim for visibility-on lanes. CSS picks
  *     which one shows via `.is-focus-hidden`.
@@ -13,7 +21,10 @@
  *     DOM ID, back-compat anchors for the default editorial lane,
  *     locked-stage / off-pipeline modifiers, and the dispatch
  *     between the editorial verb-chip row and the lighter
- *     `renderEntryCard` for non-editorial stages.
+ *     `renderEntryCard` for non-editorial stages. The stage-head now
+ *     carries a per-stage `<button class="collapse-chev">` mirroring
+ *     the lane-level chevron's contract (same a11y primitives,
+ *     `data-collapse-target="stage"` for the client dispatcher).
  *   - `renderSwimCompact`: the compact per-stage strip rendered
  *     inside every swim; CSS reveals it when the lane is
  *     `.collapsed` (state added by Task 5.1A's chevron controller).
@@ -145,7 +156,12 @@ function renderStageCol(
         <span class="stage-glyph" aria-hidden="true">${glyph}</span>
         <span class="stage-name">${stage}</span>
         <span class="stage-count">${entries.length}</span>
-        <!-- 5.1A slot: per-stage collapse chevron lands here. -->
+        <button class="collapse-chev" type="button"
+          aria-expanded="true"
+          aria-label="Collapse ${stage} stage"
+          data-collapse-target="stage"
+          data-lane-id="${laneId}"
+          data-stage-name="${stage}">▾</button>
       </div>
       ${body}
     </section>`);
@@ -234,7 +250,12 @@ export function renderSwimlane(
         <span class="quick-meta">${meta}</span>
         <!-- 5.1B slot: view-toggle (kanban ↔ list) lands here. -->
         <!-- 5.1C slot: + new compose chip lands here. -->
-        <!-- 5.1A slot: lane-level collapse chevron lands here. -->
+        <button class="collapse-chev" type="button"
+          aria-expanded="true"
+          aria-label="Collapse ${lane.name} lane"
+          data-collapse-target="lane"
+          data-lane-id="${lane.id}"
+          data-lane-name="${lane.name}">▾</button>
       </div>
       ${renderSwimCompact(bucket)}
       <div class="stage-grid" data-stage-grid>${unsafe(stagesRaw)}</div>

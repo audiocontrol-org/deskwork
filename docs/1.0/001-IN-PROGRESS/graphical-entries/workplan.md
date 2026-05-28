@@ -228,9 +228,9 @@ The picked design **pivots away from the PRD's original "per-lane tab strip" fra
 
 ### Task 5.1A: Per-lane collapse — lane-level + per-stage
 
-- [ ] Step 5.1A.1: Lane-level collapse: chevron in each `swim-head` / `lane-head` toggles between expanded (full pipeline body) and collapsed (swim-head + compact per-stage count strip). State stored per-lane-per-operator.
-- [ ] Step 5.1A.2: Per-stage collapse: chevron in each `stage-head` (kanban) / `lb-group-head` (list) toggles one stage's content within an expanded lane. In kanban, collapsed columns shrink to a ~42px vertical strip with the stage name rotated 90°; remaining columns redistribute via flex. State stored per-lane-per-stage-per-operator.
-- [ ] Step 5.1A.3: Universal chevron convention: `▾` glyph, rotates 90° clockwise to indicate collapsed, click anywhere on the head (or chevron) to toggle, focus-visible ring, ≥24×24 hit target per WCAG 2.2 SC 2.5.8 AA.
+- [x] Step 5.1A.1: Lane-level collapse: chevron in each `swim-head` toggles between expanded (full pipeline body) and collapsed (swim-head + compact per-stage count strip). State stored per-lane-per-operator at `deskwork:dashboard:<projectKey>:lane-collapse` (JSON array of lane ids). The `lane-head` (mobile lane-stack) variant ships with Task 5.1B's mobile pass — only the desktop `swim-head` carries the chevron in 5.1A scope.
+- [x] Step 5.1A.2: Per-stage collapse: chevron in each `stage-head` (kanban) toggles one stage's content within an expanded lane. Collapsed columns shrink to a 42px vertical strip with the stage name rotated bottom-to-top via `writing-mode: vertical-rl` + `transform: rotate(180deg)`; remaining columns redistribute via the base `flex: 1 1 0` rule. State stored per-lane-per-stage-per-operator at `deskwork:dashboard:<projectKey>:stage-collapse` (JSON `Record<laneId, stageName[]>`). The list-view `lb-group-head` variant ships with Task 5.1B.
+- [x] Step 5.1A.3: Universal chevron convention: `▾` (U+25BE) glyph, `transform: rotate(-90deg)` when `aria-expanded="false"`, click anywhere on the head (or chevron) to toggle, focus-visible ring via `outline: 2px solid var(--er-proof-blue)`, ≥24×24 hit target per WCAG 2.2 SC 2.5.8 AA. Chevron is a real focusable `<button>` carrying `aria-expanded` per WAI-ARIA Authoring Practices for disclosure widgets; Enter activates via the native `<button>` keyboard contract; Space is wired explicitly with `preventDefault` to suppress page scroll.
 
 ### Task 5.1B: Per-lane kanban ↔ list view toggle
 

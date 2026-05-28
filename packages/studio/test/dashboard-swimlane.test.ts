@@ -310,23 +310,25 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
     );
   });
 
-  it('leaves later-task affordance slots in place (5.1A/B/C placeholders, no stubs)', async () => {
+  it('leaves later-task affordance slots in place (5.1B/C placeholders, no stubs)', async () => {
     // Slots are HTML comments — they survive into the rendered page
     // because we render via string templates rather than JSX. The
     // assertion verifies the placeholder commentary lands so the
     // next dispatch can do additive diffs.
+    //
+    // Task 5.1A landed the lane-level + per-stage collapse chevrons,
+    // so the 5.1A slots have been replaced by real `<button
+    // class="collapse-chev">` markup — see the dedicated 5.1A tests
+    // below. The 5.1B (view-toggle) and 5.1C (compose chip) slots
+    // remain HTML-comment placeholders.
     const r = await getHtml(app, '/dev/editorial-studio');
     expect(r.status).toBe(200);
-    expect(r.html).toContain('5.1A slot');
     expect(r.html).toContain('5.1B slot');
     expect(r.html).toContain('5.1C slot');
-    // No 5.1A/B/C ACTUAL affordances render yet — assert by absence
+    // No 5.1B/C ACTUAL affordances render yet — assert by absence
     // of their class names.
     expect(r.html).not.toContain('class="swim-compose"');
     expect(r.html).not.toContain('class="view-toggle"');
-    // The chevron primitive itself is a known later affordance; the
-    // shell does NOT emit a `.collapse-chev` anywhere in 5.1.
-    expect(r.html).not.toMatch(/class="collapse-chev"/);
   });
 
   it('per-lane glyphs from the mockup mapping (editorial=§, visual=◆, qa-plan=⊕)', async () => {
@@ -581,8 +583,10 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
     expect(r.html).toContain('id="lane-default-stage-drafting"');
     // No duplicate `id="..."` attributes anywhere in the rendered
     // dashboard output — gather every id value and assert uniqueness.
-    const idMatches = r.html.match(/\bid="([^"]+)"/g) ?? [];
-    const idValues = idMatches.map((m) => m.slice(4, -1));
+    // Match `id="..."` preceded by whitespace (not by `-`, which
+    // would also match `data-lane-id` / `data-stage-id` etc.).
+    const idMatches = r.html.match(/\sid="([^"]+)"/g) ?? [];
+    const idValues = idMatches.map((m) => m.replace(/^\sid="(.+)"$/, '$1'));
     const dedup = new Set(idValues);
     expect(dedup.size).toBe(idValues.length);
   });
@@ -600,6 +604,94 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
     expect(r.html).not.toContain('id="stage-sketched"');
     expect(r.html).not.toContain('id="stage-drafted"');
     expect(r.html).not.toContain('id="stage-tested"');
+  });
+
+  // Task 5.1A acceptance — lane-level + per-stage collapse chevrons.
+  it('Task 5.1A: every swim-head emits a lane-level `<button class="collapse-chev">` with aria-expanded="true"', async () => {
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    // One lane-level chevron per lane.
+    const laneChevs = r.html.match(
+      /<button class="collapse-chev"[^>]*data-collapse-target="lane"/g,
+    ) ?? [];
+    expect(laneChevs.length).toBe(3);
+    // Each lane-level chevron carries the correct data-lane-id +
+    // data-lane-name (used by the client to restore aria-label when
+    // toggling) + aria-expanded="true" + descriptive aria-label.
+    for (const [id, displayName] of [
+      ['default', 'Editorial'],
+      ['mockups', 'Mockups'],
+      ['qa', 'QA'],
+    ] as const) {
+      const re = new RegExp(
+        `<button class="collapse-chev"[^>]*aria-expanded="true"[^>]*aria-label="Collapse ${displayName} lane"[^>]*data-collapse-target="lane"[^>]*data-lane-id="${id}"[^>]*data-lane-name="${displayName}"`,
+      );
+      expect(r.html).toMatch(re);
+    }
+  });
+
+  it('Task 5.1A: every stage-head emits a per-stage `<button class="collapse-chev">` with aria-expanded="true"', async () => {
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    // One per-stage chevron per `(lane, stage)` pair. Editorial=8,
+    // Visual=7, QA=7 — total 22 across all three lanes.
+    const stageChevs = r.html.match(
+      /<button class="collapse-chev"[^>]*data-collapse-target="stage"/g,
+    ) ?? [];
+    expect(stageChevs.length).toBe(22);
+    // The Drafting column in the editorial lane has the canonical
+    // shape: lane-scoped data-lane-id + data-stage-name carrying the
+    // human-readable stage name.
+    const editorialBlock = extractLaneSection(r.html, 'default');
+    expect(editorialBlock).toMatch(
+      /<button class="collapse-chev"[^>]*aria-expanded="true"[^>]*aria-label="Collapse Drafting stage"[^>]*data-collapse-target="stage"[^>]*data-lane-id="default"[^>]*data-stage-name="Drafting"/,
+    );
+  });
+
+  it('Task 5.1A: chevron glyph is the canonical `▾` (U+25BE) — same at lane-level and per-stage', async () => {
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    // Pick a specific lane-level chevron + verify it carries ▾ as
+    // its glyph text.
+    expect(r.html).toMatch(
+      /<button class="collapse-chev"[^>]*data-collapse-target="lane"[^>]*data-lane-id="default"[^>]*>▾<\/button>/,
+    );
+    // Same glyph at stage-level.
+    expect(r.html).toMatch(
+      /<button class="collapse-chev"[^>]*data-collapse-target="stage"[^>]*data-stage-name="Drafting"[^>]*>▾<\/button>/,
+    );
+  });
+
+  it('Task 5.1A: dashboard-swimlane.css ships the universal `.collapse-chev` primitive + collapsed-state rules', async () => {
+    const cssRes = await app.fetch(
+      new Request('http://x/static/css/dashboard-swimlane.css'),
+    );
+    expect(cssRes.status).toBe(200);
+    const css = await cssRes.text();
+    // Universal primitive: min-width: 24px + min-height: 24px (WCAG
+    // 2.2 SC 2.5.8 AA target size).
+    expect(css).toMatch(/\.collapse-chev\s*\{[\s\S]*?min-width:\s*24px/);
+    expect(css).toMatch(/\.collapse-chev\s*\{[\s\S]*?min-height:\s*24px/);
+    // Focus-visible ring (WCAG 2.1 SC 2.4.7 AA).
+    expect(css).toMatch(
+      /\.collapse-chev:focus-visible\s*\{[\s\S]*?outline:\s*2px\s+solid\s+var\(--er-proof-blue\)/,
+    );
+    // Collapsed-state rotation.
+    expect(css).toMatch(
+      /\.collapse-chev\[aria-expanded="false"\]\s*\{[\s\S]*?transform:\s*rotate\(-90deg\)/,
+    );
+    // Lane-level: `.swim.collapsed` hides the stage-grid (already
+    // shipped in 5.1; the reciprocal CSS makes the chevron the only
+    // toggle).
+    expect(css).toMatch(/\.swim\.collapsed\s+\.stage-grid\s*\{[\s\S]*?display:\s*none/);
+    // Per-stage: `.stage-col.collapsed` becomes a 42px strip.
+    expect(css).toMatch(
+      /\.stage-col\.collapsed\s*\{[\s\S]*?flex:\s*0\s+0\s+42px/,
+    );
+    // Vertical writing-mode for the rotated stage name.
+    expect(css).toMatch(
+      /\.stage-col\.collapsed\s+\.stage-head\s+\.stage-name\s*\{[\s\S]*?writing-mode:\s*vertical-rl/,
+    );
   });
 });
 

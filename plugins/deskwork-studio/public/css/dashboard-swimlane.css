@@ -1,7 +1,7 @@
 /**
  * Multi-lane swimlane dashboard — Direction 3 "Press Bay" v11.
  *
- * Phase 5 Task 5.1 ships the SHELL only:
+ * Phase 5 Task 5.1 ships the SHELL:
  *   - `.bay-shell` two-column grid (left lane-rail + bay).
  *   - `.lane-rail` per-lane visibility rows with eye-toggle + drag stub.
  *   - `.focus-strip` chip strip at the top of the bay.
@@ -12,6 +12,16 @@
  *   - `.stage-col` per-stage column with head + rows.
  *   - `.swim-stub` filtered-out-lane button.
  *
+ * Phase 5 Task 5.1A adds per-lane collapse (lane-level + per-stage):
+ *   - `.collapse-chev` universal disclosure-widget primitive (24×24
+ *     hit target per WCAG 2.2 SC 2.5.8 AA, focus-visible ring per
+ *     WCAG 2.1 SC 2.4.7 AA, `▾` glyph rotated -90deg when collapsed).
+ *   - `.swim.collapsed` hides the stage-grid; the swim-compact strip
+ *     reveals (existing rule reciprocated by a non-collapsed hide).
+ *   - `.stage-col.collapsed` shrinks to a 42px vertical strip with
+ *     the stage name rendered bottom-to-top via writing-mode; cards
+ *     and empty-state hide; remaining columns redistribute via flex.
+ *
  * Tokens map mockup-style `--paper` / `--red` / `--blue` / etc. onto
  * the production `--er-*` set defined in editorial-review.css. No new
  * tokens declared here; everything routes through the existing
@@ -19,8 +29,6 @@
  *
  * Affordances scoped to other Phase 5 tasks (the swim-head's HTML
  * comment slots reserve space; their CSS lands with the affordance):
- *   - Lane-level collapse chevron (Task 5.1A).
- *   - Per-stage collapse chevron (Task 5.1A).
  *   - Kanban ↔ list view toggle (Task 5.1B).
  *   - `+ new` compose chip (Task 5.1C).
  *   - Drag-to-reorder visual feedback (Task 5.4).
@@ -655,6 +663,156 @@
 
 .rail-lane[data-lane-visible="false"] .r-eye-btn .r-eye-hidden {
   display: inline;
+}
+
+/* ============================================================
+ *  Task 5.1A — Universal collapse-chevron primitive.
+ *
+ *  Same primitive used at lane-level (swim-head) and per-stage
+ *  (stage-head). Per WAI-ARIA Authoring Practices for disclosure
+ *  widgets, the chevron is a real `<button>` with `aria-expanded`
+ *  reflecting state. A11y standards:
+ *    - WCAG 2.2 SC 2.5.8 Target Size Minimum (AA): ≥24×24 CSS px.
+ *      Visual glyph stays small (0.85rem); hit area expands via
+ *      min-width / min-height + flex centering.
+ *    - WCAG 2.1 SC 2.4.7 Focus Visible (AA): proof-blue ring at
+ *      rest on the focused state.
+ *    - WCAG 2.1 SC 1.4.11 Non-Text Contrast (AA): ink-soft on
+ *      paper-2 ≈ 9.93:1 (mockup line 308); hover red-pencil on
+ *      paper-2 ≈ 6.55:1 (mockup line 309); proof-blue ring on
+ *      paper-2 ≈ 7.92:1 (mockup line 310). All ≥ 3:1.
+ *
+ *  Mockup reference: direction-3-press-bay.html lines 320-344
+ *  (universal `.collapse-chev` rule) + 506-510 (rotation under
+ *  `.swim.collapsed`) + 642-645 (per-stage rotation).
+ * ============================================================ */
+
+.collapse-chev {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
+  font-family: var(--er-font-mono);
+  font-size: 0.85rem;
+  color: var(--er-ink-soft);
+  cursor: pointer;
+  user-select: none;
+  background: transparent;
+  border: none;
+  padding: 0;
+  border-radius: 2px;
+  transition: transform 0.18s ease, color 0.12s ease, background 0.12s ease;
+}
+
+.collapse-chev:hover {
+  color: var(--er-red-pencil);
+  background: rgba(184, 54, 42, 0.08);
+}
+
+.collapse-chev:focus-visible {
+  outline: 2px solid var(--er-proof-blue);
+  outline-offset: 1px;
+}
+
+/* `▾` already points down. Rotating -90deg makes it point right —
+   the collapsed indicator (per mockup line 507 + 643). */
+.collapse-chev[aria-expanded="false"] {
+  transform: rotate(-90deg);
+}
+
+/* Per-context positioning only (sizing + colour come from the
+   universal rule above). */
+.swim-head .collapse-chev {
+  margin-left: 0.2rem;
+}
+
+.swim-head:hover .collapse-chev {
+  color: var(--er-red-pencil);
+}
+
+.stage-col .stage-head .collapse-chev {
+  margin-left: 0.2rem;
+}
+
+.stage-col .stage-head:hover .collapse-chev {
+  color: var(--er-red-pencil);
+}
+
+/* When the lane is collapsed, the swim-head loses its bottom dashed
+   border so the compact strip reads as continuous with the head
+   (mockup line 502-505). */
+.swim.collapsed .swim-head {
+  border-bottom: none;
+  background: var(--er-paper);
+}
+
+.swim.collapsed .swim-head .collapse-chev {
+  color: var(--er-faded);
+}
+
+.swim.collapsed .swim-head:hover .collapse-chev {
+  color: var(--er-red-pencil);
+}
+
+/* ============================================================
+ *  Task 5.1A — Collapsed stage column: narrow vertical strip.
+ *
+ *  Per mockup lines 609-648: collapsed columns shrink to ~42px
+ *  wide. Stage name renders bottom-to-top via writing-mode +
+ *  rotate(180deg) so it reads naturally when the operator's head
+ *  tilts left. Cards + empty-state hide; remaining columns
+ *  redistribute via flex (the base `.stage-col` rule's `flex: 1
+ *  1 0` shares space among the still-expanded siblings).
+ * ============================================================ */
+
+.stage-col.collapsed {
+  flex: 0 0 42px;
+  min-width: 42px;
+  padding: 0.5rem 0;
+  background: var(--er-paper-2);
+  cursor: pointer;
+}
+
+.stage-col.collapsed .stage-head {
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  border-bottom: none;
+  padding: 0;
+  margin: 0;
+}
+
+.stage-col.collapsed .stage-head .stage-glyph {
+  margin: 0;
+}
+
+.stage-col.collapsed .stage-head .stage-name {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 0.85rem;
+  color: var(--er-ink-soft);
+  margin: 0.3rem 0;
+  white-space: nowrap;
+}
+
+.stage-col.collapsed .stage-head .stage-count {
+  font-size: 0.78rem;
+  color: var(--er-ink-soft);
+  margin-left: 0;
+}
+
+.stage-col.collapsed .stage-head .collapse-chev {
+  margin: 0;
+}
+
+/* Collapsed columns hide everything except the stage-head + the
+   legacy back-compat anchor span (which is `aria-hidden` and has
+   no rendered size). The legacy anchor's selector is `:not(.
+   stage-head)` excluded so all body children — entry cards, empty-
+   state, row markup — go away. */
+.stage-col.collapsed > *:not(.stage-head):not([aria-hidden="true"]) {
+  display: none;
 }
 
 /* ============================================================

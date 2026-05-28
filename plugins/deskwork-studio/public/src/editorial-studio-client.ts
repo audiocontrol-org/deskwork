@@ -10,6 +10,7 @@ import { initComposeChip } from './dashboard/compose-chip.ts';
 import { initRowActions } from './dashboard/row-actions.ts';
 import { initStageTiles } from './dashboard/stage-tiles.ts';
 import { initSwimlane } from './dashboard/swimlane.ts';
+import { initSwimlaneCollapse } from './dashboard/swimlane-collapse.ts';
 import { initMastheadPopover } from './mobile-shell/masthead-popover.ts';
 
 function siteFromButton(btn: HTMLButtonElement): string {
@@ -515,6 +516,7 @@ function init(): void {
   initComposeChip();
   initStageTiles();
   initSwimlane();
+  initSwimlaneCollapse();
   initRowActions();
   initMastheadPopover();
 }
