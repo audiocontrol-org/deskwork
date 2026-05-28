@@ -114,18 +114,28 @@ date: 2026-05-28
 
 ### Task 1: Implement archive-branch
 
-- [ ] Step 1: Helper script `plugins/dw-lifecycle/src/subcommands/archive-branch.ts`. Takes a branch name.
-- [ ] Step 2: Pre-flight checks — refuse if a worktree is checked out for the branch; refuse if `archived/<branch>-<YYYY-MM-DD>` tag already exists.
-- [ ] Step 3: Create annotated tag — message references the branch + the operator-supplied or default rationale.
-- [ ] Step 4: Push the tag to origin.
-- [ ] Step 5: Delete local branch (`git branch -D`); delete remote branch (`git push origin --delete`).
-- [ ] Step 6: `plugins/dw-lifecycle/skills/archive-branch/SKILL.md`.
-- [ ] Step 7: Vitest unit + integration tests against a fixture remote.
+- [x] Step 1: Helper script `plugins/dw-lifecycle/src/subcommands/archive-branch.ts`. Takes a branch name.
+- [x] Step 2: Pre-flight checks — refuse if a worktree is checked out for the branch; refuse if `archived/<branch>-<YYYY-MM-DD>` tag already exists.
+- [x] Step 3: Create annotated tag — message references the branch + the operator-supplied or default rationale.
+- [x] Step 4: Push the tag to origin.
+- [x] Step 5: Delete local branch (`git branch -D`); delete remote branch (`git push origin --delete`).
+- [x] Step 6: `plugins/dw-lifecycle/skills/archive-branch/SKILL.md`.
+- [x] Step 7: Vitest unit + integration tests against a fixture remote.
 
 **Acceptance Criteria:**
-- [ ] `/dw-lifecycle:archive-branch` ships.
-- [ ] Creates `archived/<branch>-<date>` annotated tag; pushes; deletes the branch (local + remote).
-- [ ] Refuses on dirty/checked-out worktree or pre-existing tag.
+- [x] `/dw-lifecycle:archive-branch` ships.
+- [x] Creates `archived/<branch>-<date>` annotated tag; pushes; deletes the branch (local + remote).
+- [x] Refuses on dirty/checked-out worktree or pre-existing tag.
+
+**Implementation notes (operator decisions captured during dispatch):**
+
+- Single-action verb (no propose/apply protocol) — pre-flight gates are deterministic; one-branch-per-invocation keeps the flag surface minimal (`--rationale`, `--no-push` / `--local-only`, `--dry-run`, `--force`).
+- Tag naming: `archived/<branch-with-slashes-replaced-by-dashes>-<YYYY-MM-DD>` (UTC). Slash-to-dash keeps the `archived/` namespace flat.
+- Pre-flight gates (all-or-nothing): branch-exists → branch-not-checked-out → tag-doesn't-exist → has-novel-commits (skippable via `--force`). Each gate throws a typed `ArchiveBranchPreflightError` with operator-actionable recovery advice.
+- Apply sequence: tag-create → tag-push → local-delete → remote-delete. Mid-flight failures do NOT roll back; the tag preserves work even if push/delete steps fail. Remote branch absent surfaces as a non-fatal `remote-delete skipped` summary line.
+- Exit codes: 0 (success / dry-run pre-flight passed), 1 (apply-stage runtime failure), 2 (pre-flight gate failed).
+- `RunGit` imported from `src/debt-report/types.ts`; `RunPush` declared inline in `src/archive-branch/types.ts` so push operations can be stubbed independently of in-process git invocations. Broader shared-`gh-runtime/` extraction tracked at [#335](https://github.com/audiocontrol-org/deskwork/issues/335).
+- 34 vitest cases (10 preflight + 8 apply against a real fixture bare-remote + clone + 16 subcommand) — happy path, every refusal mode, every flag variant.
 
 ## Phase 5: Release-time issue closure — `/dw-lifecycle:close-shipped`  ·  [#329](https://github.com/audiocontrol-org/deskwork/issues/329)
 
