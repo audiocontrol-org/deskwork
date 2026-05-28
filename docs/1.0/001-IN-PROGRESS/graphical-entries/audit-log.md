@@ -1258,3 +1258,175 @@ Tooling-feedback during the cycle:
 Phase 5 audit log: AUDIT-01 through AUDIT-39, 39 findings total. All
 blocking findings closed; non-blocking observations either applied
 inline or tracked as `open` with explicit fix guidance.
+
+## Phase 6 Task 6.1 — `/deskwork:lane` skill family — review cycle (2026-05-28)
+
+Task 6.1 shipped at `5941c00` (feat) + `c2be222` (review followups). The
+SDD discipline ran one spec-compliance review pass + one code-quality
+review pass; the orchestrator triaged 11 findings into 6 applied, 2
+declined-with-reasoning, 3 audit-trail observations.
+
+### AUDIT-20260528-40 — Lane id charset + path-traversal validation
+
+Finding-ID: AUDIT-20260528-40
+Status:     fixed-c2be222
+Severity:   blocking (security)
+Surface:    `packages/core/src/lanes/types.ts:57`, `packages/core/src/lanes/loader.ts:101-115`
+
+`LaneConfigSchema.id` was `z.string().min(1)` only, with no charset
+restriction and no filesystem-boundary check. `lane create
+"../../etc/foo" --template editorial --content-dir docs` would have
+resolved to a file outside `.deskwork/lanes/`. Same exposure on every
+verb taking `<id>`; same exposure on `--content-dir` (operator passing
+`../../tmp/foo` writes outside the project tree).
+
+Fix: tightened schema to `.regex(/^[a-z0-9][a-z0-9-]*$/)` matching the
+documented kebab-case convention; added `assertSafeLaneId` (regex +
+path-containment) and `assertSafeContentDir` (project-root-containment)
+helpers at `loader.ts:54, 86`; wired both into `loadLaneConfig`,
+`createLane`, and `updateLane` (update covered as in-scope hardening —
+the operator-controlled `--content-dir` flag exposes the same surface).
+Tests cover invalid id chars, traversal-resolving id, and
+traversal-resolving contentDir at `packages/core/test/lanes/loader.test.ts:127`
+and `packages/cli/test/lane/list-show-create.test.ts:222`.
+
+### AUDIT-20260528-41 — Atomic write in lane-config commit helper
+
+Finding-ID: AUDIT-20260528-41
+Status:     fixed-c2be222
+Severity:   non-blocking (data safety)
+Surface:    `packages/core/src/lanes/operations/commit.ts:38`
+
+`writeFileSync(path, ...)` was a direct write; a crash mid-write would
+have left a truncated `.deskwork/lanes/<id>.json` that `loadLaneConfig`
+then rejects on every subsequent read until hand-repair.
+
+Fix: switched to tmp + rename pattern mirroring `packages/core/src/sidecar/write.ts`;
+wrapped in try/catch with tmp-file cleanup on failure; documented the
+helper's purpose in the file header so the name's git-connotation
+doesn't mislead future readers.
+
+### AUDIT-20260528-42 — Move rollback when writeSidecar fails
+
+Finding-ID: AUDIT-20260528-42
+Status:     fixed-c2be222
+Severity:   non-blocking (data safety)
+Surface:    `packages/core/src/lanes/operations/move.ts:228-260`
+
+Lines 228 (artifact move), 248 (scrapbook move), 260 (sidecar write)
+were not atomic. A `writeSidecar` failure after the fs moves succeed
+would have left the entry half-moved — artifact + scrapbook in target
+lane's contentDir but sidecar still recording old lane. Subsequent
+`lane move` re-runs would fail with "source artifact does not exist."
+
+Fix: wrapped 228–260 in try block; tracks `artifactMoved` /
+`scrapbookMoved` booleans; on catch, reverses successful fs moves in
+LIFO order before re-throwing with context (slug + "rolled back" +
+cause). Same pattern as the pre-existing collision rollback at line 240,
+extended to the success-then-write-fails path. Regression test marks
+the entries dir read-only post-move and confirms rollback restores
+artifact + scrapbook to source.
+
+### AUDIT-20260528-43 — handleMove pattern consistency
+
+Finding-ID: AUDIT-20260528-43
+Status:     fixed-c2be222
+Severity:   non-blocking (readability)
+Surface:    `packages/cli/src/commands/lane.ts:298-343`
+
+`handleMove` used an early try/catch around `resolveEntryUuid` plus a
+second try/catch around the rest; every other handler uses one trailing
+try/catch.
+
+Fix: merged the two try blocks; resolveEntryUuid lives inside the main
+try; one outer catch routes through `fail(err.message)` — matches the
+shape of all 7 other handlers.
+
+### AUDIT-20260528-44 — Magic constant 5 in purge sample limit
+
+Finding-ID: AUDIT-20260528-44
+Status:     fixed-c2be222
+Severity:   non-blocking (maintainability)
+Surface:    `packages/core/src/lanes/operations/purge.ts:43`
+
+`5` appeared in the slice, the file comment, and the SKILL.md — three
+sites that would drift if the limit changed.
+
+Fix: extracted `PURGE_DEPENDENTS_SAMPLE_LIMIT = 5` at module top;
+referenced from the slice and the file comment. SKILL.md left numeric
+per orchestrator instruction (reader-facing doc).
+
+### AUDIT-20260528-45 — Defensive binary-presence check in test helpers
+
+Finding-ID: AUDIT-20260528-45
+Status:     fixed-c2be222
+Severity:   non-blocking (DX)
+Surface:    `packages/cli/test/lane/helpers.ts:25`
+
+Tests `spawnSync(deskworkBin, ...)` would have reported `code: -1` with
+empty stdout/stderr if the test runner ran without an `npm install`
+pre-step — confusing failure mode for new contributors.
+
+Fix: added `assertDeskworkBinPresent` helper at `helpers.ts:34`; each
+test file invokes it once in `beforeAll`. Surfaces an actionable error
+naming the missing path and the remediation step.
+
+### AUDIT-20260528-46 — Per-handler arg-parsing dance duplicated 8 times
+
+Finding-ID: AUDIT-20260528-46
+Status:     declined-not-net-debt
+Severity:   non-blocking (DRY)
+Surface:    `packages/cli/src/commands/lane.ts:150-343`
+
+The 8 verb handlers share roughly 3 lines of boilerplate each for
+required-positional + required-flag checks.
+
+Declined: extracting a `requireArg`/`requireFlag` helper would replace
+3 readable lines per handler with one indirection step plus a helper
+file. Current shape is the natural CLI shape and matches `cancel.ts` /
+`induct.ts` precedent; the cost of helper indirection exceeds the
+DRY-saving. Not net-new debt; recorded as a deliberate orchestrator
+choice for the audit trail.
+
+### AUDIT-20260528-47 — commit.ts filename overloaded with git connotations
+
+Finding-ID: AUDIT-20260528-47
+Status:     declined-no-confusion-observed
+Severity:   observation
+Surface:    `packages/core/src/lanes/operations/commit.ts:1-40`
+
+The filename `commit.ts` shares vocabulary with `git commit`. The file
+actually does atomic-write-lane-config-to-disk (per AUDIT-41 fix).
+
+Declined: file header comment names the purpose ("Atomic write helper
+for lane config JSON files. Mirrors packages/core/src/sidecar/write.ts.")
+explicitly. No actual reader confusion has surfaced. Rename costs
+the import-graph an update without surfacing user value. Recorded as
+deliberate orchestrator choice for the audit trail.
+
+### AUDIT-20260528-48 — LaneMigrationEvent shape variation from new Lane*Event variants
+
+Finding-ID: AUDIT-20260528-48
+Status:     open (pre-existing; out of scope for Task 6.1)
+Severity:   observation
+Surface:    `packages/core/src/schema/journal-events.ts:104-117` (pre-existing) vs `journal-events.ts:148-203` (new)
+
+The pre-existing `LaneMigrationEvent` uses `migration / source / target`
+keys; the 6 new Lane*Event variants use `laneId`. `LaneMoveEvent` is the
+only new variant that uses `entryId` instead (well-justified by the
+schema docstring at lines 143-146).
+
+Pre-existing schema-shape inconsistency. Not introduced by Task 6.1.
+Worth a harmonization pass that either renames `LaneMigrationEvent`
+fields or documents the split; that pass should be a separate refactor
+with its own clones.yaml disposition. Filed as open for future
+consideration.
+
+### Task 6.1 closing summary
+
+- Spec-compliance review: SPEC-COMPLIANT WITH NON-BLOCKING OBSERVATIONS (3 audit-trail items recorded above).
+- Code-quality review: QUALITY-APPROVED WITH NON-BLOCKING OBSERVATIONS (11 findings; 6 applied at c2be222, 2 declined-with-reasoning, 3 audit-trail observations).
+- Test deltas: core 706 → 708 (+2); CLI lane suite 39 → 45 (+6).
+- Builds: `@deskwork/core` exit 0; `@deskwork/cli` exit 0.
+- Pre-existing CLI test failures verified unrelated to 5941c00/c2be222 by checkout-parent-and-rerun: `test/publish-entry-centric.test.ts:139`, `test/approve-entry-centric.test.ts:129`.
+- AUDIT-40 (security) was the highest-value finding — closed a real attack surface the operator-facing CLI exposed unintentionally.

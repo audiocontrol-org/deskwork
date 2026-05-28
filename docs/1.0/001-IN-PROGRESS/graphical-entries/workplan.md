@@ -295,11 +295,11 @@ The picked design **pivots away from the PRD's original "per-lane tab strip" fra
 
 ### Task 6.1: `/deskwork:lane` skill family
 
-- [ ] Step 6.1.1: Author SKILL.md at `plugins/deskwork/skills/lane/SKILL.md` documenting subcommands: `list`, `show <id>`, `create <id> --template <preset-or-custom> --content-dir <path>`, `update <id> [--template <id>] [--name <label>] [--content-dir <path>]`, `archive <id>`, `restore <id>`, `purge <id>` (gated; refused if any entries exist), `move <slug> --to <lane-id>` (cross-lane entry move with stage remap prompt).
-- [ ] Step 6.1.2: CLI implementation at `packages/cli/src/commands/lane.ts` covering each subcommand; reads / writes `.deskwork/lanes/<id>.json` via Phase 3's loader.
-- [ ] Step 6.1.3: Stage remap on cross-lane move: prompt operator for target stage; default to target lane's first linearStage; preserve `iterationByStage` counters per PRD's open-question default.
-- [ ] Step 6.1.4: Content-tree relocation on lane move: move the artifact file (and scrapbook) to the new lane's `contentDir`.
-- [ ] Step 6.1.5: Unit tests covering each subcommand against a tmp-fixture.
+- [x] Step 6.1.1: Author SKILL.md at `plugins/deskwork/skills/lane/SKILL.md` documenting subcommands: `list`, `show <id>`, `create <id> --template <preset-or-custom> --content-dir <path>`, `update <id> [--template <id>] [--name <label>] [--content-dir <path>]`, `archive <id>`, `restore <id>`, `purge <id>` (gated; refused if any entries exist), `move <slug> --to <lane-id>` (cross-lane entry move with stage remap prompt).
+- [x] Step 6.1.2: CLI implementation at `packages/cli/src/commands/lane.ts` covering each subcommand; reads / writes `.deskwork/lanes/<id>.json` via Phase 3's loader.
+- [x] Step 6.1.3: Stage remap on cross-lane move: prompt operator for target stage; default to target lane's first linearStage; preserve `iterationByStage` counters per PRD's open-question default. (Implemented non-interactively as `--target-stage <name>` with default = first linearStage; documented in SKILL.md.)
+- [x] Step 6.1.4: Content-tree relocation on lane move: move the artifact file (and scrapbook) to the new lane's `contentDir`. (Includes EXDEV fallback + transactional rollback if `writeSidecar` fails after fs moves succeed.)
+- [x] Step 6.1.5: Unit tests covering each subcommand against a tmp-fixture. (45 lane tests; subprocess-driven via `node_modules/.bin/deskwork`; covers happy path + refusal paths + path-traversal validation.)
 
 ### Task 6.2: `/deskwork:pipeline` skill family
 
