@@ -1,4 +1,4 @@
-export { propose } from './propose.js';
+export { propose, ProposalOutputExistsError } from './propose.js';
 export type { ProposeArgs, ProposeResult } from './propose.js';
 export {
   apply,

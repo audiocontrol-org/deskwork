@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { resolveBucket } from './buckets.js';
 import type {
@@ -7,6 +7,14 @@ import type {
   RawIssueForProposal,
   RunGh,
 } from './types.js';
+
+// Thrown when the proposal output path already exists and `force` is not
+// set. The subcommand layer maps this to a non-zero exit and surfaces the
+// path so the operator can either move the existing file aside, pass an
+// alternate --output, or pass --force to opt in to overwriting.
+export class ProposalOutputExistsError extends Error {
+  override name = 'ProposalOutputExistsError';
+}
 
 export interface ProposeArgs {
   readonly bucket: string;
@@ -18,6 +26,10 @@ export interface ProposeArgs {
   // Override for the proposal file path; otherwise computed under
   // `<projectRoot>/.dw-lifecycle/triage-issues/proposals-<iso>.json`.
   readonly outputPath?: string;
+  // When true, an existing file at outputPath is silently overwritten.
+  // When false (default), an existing file causes ProposalOutputExistsError
+  // so operator hand-edits on a prior proposal don't get clobbered.
+  readonly force?: boolean;
 }
 
 export interface ProposeResult {
@@ -197,6 +209,11 @@ export function propose(args: ProposeArgs): ProposeResult {
 
   const outputPath =
     args.outputPath ?? defaultOutputPath(args.projectRoot, args.now);
+  if (!(args.force ?? false) && existsSync(outputPath)) {
+    throw new ProposalOutputExistsError(
+      `output file already exists at ${outputPath}; pass --force to overwrite (or move the existing file aside / pass a different --output path).`,
+    );
+  }
   mkdirSync(dirname(outputPath), { recursive: true });
   writeFileSync(outputPath, `${JSON.stringify(proposalFile, null, 2)}\n`, 'utf8');
 

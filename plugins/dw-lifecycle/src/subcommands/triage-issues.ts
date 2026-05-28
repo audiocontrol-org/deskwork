@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { repoRoot } from '../repo.js';
 import { apply, InvalidProposalFileError } from '../triage-issues/apply.js';
-import { propose } from '../triage-issues/propose.js';
+import { propose, ProposalOutputExistsError } from '../triage-issues/propose.js';
 import type { RunGh } from '../triage-issues/types.js';
 
 // Subcommand layer for /dw-lifecycle:triage-issues. The verb selects which
@@ -17,6 +17,7 @@ export interface ProposeCliOptions {
   readonly limit: number;
   readonly repo?: string;
   readonly outputPath?: string;
+  readonly force?: boolean;
 }
 
 export interface ApplyCliOptions {
@@ -46,6 +47,7 @@ function parseProposeArgs(args: readonly string[]): ProposeCliOptions {
   let limit = DEFAULT_LIMIT;
   let repo: string | undefined;
   let outputPath: string | undefined;
+  let force = false;
   for (let i = 0; i < args.length; i++) {
     const flag = args[i];
     switch (flag) {
@@ -70,6 +72,9 @@ function parseProposeArgs(args: readonly string[]): ProposeCliOptions {
         outputPath = next;
         break;
       }
+      case '--force':
+        force = true;
+        break;
       default:
         throw new Error(`Unknown flag for propose: ${flag}`);
     }
@@ -84,6 +89,7 @@ function parseProposeArgs(args: readonly string[]): ProposeCliOptions {
     ...base,
     ...(repo !== undefined ? { repo } : {}),
     ...(outputPath !== undefined ? { outputPath } : {}),
+    ...(force ? { force: true } : {}),
   };
 }
 
@@ -175,15 +181,25 @@ export function runTriageIssues(args: RunTriageIssuesArgs): number {
   const { opts, projectRoot, now, runGh, stdout, detectRepo } = args;
   if (opts.verb === 'propose') {
     const repo = opts.repo ?? detectRepo();
-    const result = propose({
-      bucket: opts.bucket,
-      limit: opts.limit,
-      repo,
-      projectRoot,
-      now,
-      runGh,
-      ...(opts.outputPath !== undefined ? { outputPath: opts.outputPath } : {}),
-    });
+    let result;
+    try {
+      result = propose({
+        bucket: opts.bucket,
+        limit: opts.limit,
+        repo,
+        projectRoot,
+        now,
+        runGh,
+        ...(opts.outputPath !== undefined ? { outputPath: opts.outputPath } : {}),
+        ...(opts.force === true ? { force: true } : {}),
+      });
+    } catch (err) {
+      if (err instanceof ProposalOutputExistsError) {
+        process.stderr.write(`${err.message}\n`);
+        return 2;
+      }
+      throw err;
+    }
     stdout.write(`Wrote proposal: ${result.outputPath}\n`);
     stdout.write(`Bucket: ${result.proposalFile.bucket}\n`);
     stdout.write(`Query: ${result.proposalFile.query}\n`);

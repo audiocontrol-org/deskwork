@@ -38,13 +38,17 @@ The subcommand dispatches one `gh` mutation per approved row, surfaces per-item 
 
 ## Buckets
 
-| Name | Query |
-|---|---|
-| `stale-30d` | `state:open updated:<$DATE_30d_AGO` |
-| `unlabeled` | `state:open no:label` |
-| `bug-no-comment-7d` | `state:open label:bug comments:0 created:<$DATE_7d_AGO` |
+| Name | Query | What it matches |
+|---|---|---|
+| `stale-30d` | `state:open updated:<$DATE_30d_AGO` | open issues that haven't been touched in 30+ days |
+| `unlabeled` | `state:open no:label` | open issues with no labels |
+| `bug-no-comment-7d` | `state:open label:bug comments:0 created:<$DATE_7d_AGO` | open `bug`-labeled issues opened more than 7 days ago that have received zero comments (creation-time staleness, not comment-activity staleness) |
 
-The `$DATE_NNd_AGO` placeholder is substituted at propose-time against the caller's `now`. Adopters may add or override buckets via `.dw-lifecycle/triage-buckets.yaml`:
+### `$DATE_NNd_AGO` placeholder
+
+Built-in and adopter-supplied bucket queries support a `$DATE_NNd_AGO` placeholder, where `NN` is any positive integer. At propose-time the placeholder is substituted with the ISO date `NN` days before `now` (the caller's clock). For example, when `propose` runs on `2026-05-28`, `$DATE_30d_AGO` becomes `2026-04-28`. This lets adopters author custom buckets that adapt to invocation time without hand-editing the query each run.
+
+Adopters may add or override buckets via `.dw-lifecycle/triage-buckets.yaml`:
 
 ```yaml
 stale-90d: "state:open updated:<$DATE_90d_AGO"
@@ -108,6 +112,7 @@ Re-running `apply` against the same file is safe — already-applied rows can be
 | `--limit <N>` | propose | 10 | Max issues per batch. |
 | `--repo <owner/repo>` | both | autodetect from `origin` | Target repository. |
 | `--output <path>` | propose | `.dw-lifecycle/triage-issues/proposals-<ts>.json` | Override proposal-file path. |
+| `--force` | propose | off | Overwrite the output path if a file already exists (without `--force`, propose refuses to clobber an existing proposal so operator hand-edits aren't silently lost). |
 | `--from-file <path>` | apply | required | Proposal file to apply. |
 
 ## Exit codes
@@ -115,16 +120,19 @@ Re-running `apply` against the same file is safe — already-applied rows can be
 | Code | Verb | Meaning |
 |---|---|---|
 | 0 | propose | Proposal written. |
+| 2 | propose | Output path already exists and `--force` was not supplied. |
 | 0 | apply | Proposal applied (at least one row succeeded, or `approval: "n"`, or no rows attempted). |
 | 1 | apply | Every approved row failed; nothing landed. |
-| 2 | apply | Proposal file was structurally invalid (could not parse). |
+| 2 | apply | Proposal file was structurally invalid (could not parse, missing required fields, or an approved item was half-filled / had invalid disposition_fields). |
 
 ## Error handling
 
 - **Unknown bucket.** Throws with the built-in bucket list + the override file path so the operator can either fix the name or define a custom bucket.
 - **`gh` not authenticated.** The first `gh` call's error message surfaces verbatim; subsequent rows continue independently (each will fail with the same auth error and be recorded individually).
 - **Approval not set.** `apply` throws if `approval` is null; the operator (or their agent) must write the token before applying.
-- **Disposition missing for an approved row.** The row's `apply_error` records "no disposition" and the summary surfaces it as a failure.
+- **Disposition missing for an approved row.** The row's `apply_error` records "no disposition" and the summary surfaces it as a failure. Both halves (`disposition` and `disposition_fields`) must be null together; a row with only one half filled aborts the whole batch via the pre-validation gate.
+- **Approved row with half-filled disposition.** Apply's pre-validation gate aborts the whole batch with zero `gh` mutations and names which side is missing (disposition vs disposition_fields). Fix the row and re-run.
+- **Output path already exists for propose.** Propose refuses to overwrite an existing file (so operator hand-edits aren't silently clobbered). Pass `--force` to opt in, pass a different `--output` path, or move the existing file aside.
 
 ## Why two verbs
 

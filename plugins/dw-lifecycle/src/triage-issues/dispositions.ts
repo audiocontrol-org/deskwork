@@ -74,7 +74,14 @@ export function validateDisposition(
   switch (kind) {
     case 'close-wontfix':
       if (!isCloseWontfixFields(fields)) {
+        // ensureNonEmpty surfaces the specific field name in its thrown
+        // message. The backstop below guarantees the function never
+        // returns silently from a guard-failed branch even if a future
+        // change to isCloseWontfixFields drifts from ensureNonEmpty.
         ensureNonEmpty('reason', (fields as { reason?: unknown }).reason);
+        throw new Error(
+          `disposition 'close-wontfix' has malformed fields (expected non-empty 'reason' string).`,
+        );
       }
       return;
     case 'label':
@@ -93,11 +100,17 @@ export function validateDisposition(
           );
         }
         ensureNonEmpty('reason', v.reason);
+        throw new Error(
+          `disposition 'duplicate' has malformed fields (expected positive integer 'dup_of' and non-empty 'reason' string).`,
+        );
       }
       return;
     case 'leave-with-comment':
       if (!isLeaveWithCommentFields(fields)) {
         ensureNonEmpty('comment', (fields as { comment?: unknown }).comment);
+        throw new Error(
+          `disposition 'leave-with-comment' has malformed fields (expected non-empty 'comment' string).`,
+        );
       }
       return;
     default: {

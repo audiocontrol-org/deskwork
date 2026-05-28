@@ -165,12 +165,50 @@ function selectedIndexes(token: ApprovalToken, itemCount: number): readonly numb
   return token.indexes;
 }
 
-function gatherDisposition(item: ProposalItem): {
-  readonly kind: DispositionKind;
-  readonly fields: DispositionFields;
-} | null {
-  if (item.disposition === null || item.disposition_fields === null) return null;
-  return { kind: item.disposition, fields: item.disposition_fields };
+// Returns the disposition+fields when both halves are set, the literal
+// 'absent' marker when neither is set, or a precise error string naming the
+// missing side when exactly one is set. runOne reports the error string
+// verbatim so the operator sees which side they forgot to fill in instead
+// of the misleading "no disposition" message that collapses both cases.
+type GatheredDisposition =
+  | {
+      readonly kind: 'present';
+      readonly disposition: DispositionKind;
+      readonly fields: DispositionFields;
+    }
+  | { readonly kind: 'absent' }
+  | { readonly kind: 'half-filled'; readonly error: string };
+
+function gatherDisposition(item: ProposalItem): GatheredDisposition {
+  const dispositionSet = item.disposition !== null;
+  const fieldsSet = item.disposition_fields !== null;
+  if (!dispositionSet && !fieldsSet) return { kind: 'absent' };
+  if (dispositionSet && !fieldsSet) {
+    return {
+      kind: 'half-filled',
+      error: `item #${item.number} has disposition '${item.disposition}' but disposition_fields is null — fill in disposition_fields before applying.`,
+    };
+  }
+  if (!dispositionSet && fieldsSet) {
+    return {
+      kind: 'half-filled',
+      error: `item #${item.number} has disposition_fields set but disposition is null — fill in disposition before applying.`,
+    };
+  }
+  // Both non-null. The null-narrowing is justified by the two checks above
+  // (TypeScript can't narrow across the booleans, so we re-assert by reading
+  // the already-validated fields directly).
+  if (item.disposition === null || item.disposition_fields === null) {
+    // Unreachable: the dispositionSet/fieldsSet booleans above ruled this out.
+    throw new Error(
+      `internal invariant: item #${item.number} disposition gather reached an impossible branch.`,
+    );
+  }
+  return {
+    kind: 'present',
+    disposition: item.disposition,
+    fields: item.disposition_fields,
+  };
 }
 
 interface RunOneArgs {
@@ -181,8 +219,8 @@ interface RunOneArgs {
 }
 
 function runOne(args: RunOneArgs): ApplyOutcome {
-  const dispatchInputs = gatherDisposition(args.item);
-  if (dispatchInputs === null) {
+  const gathered = gatherDisposition(args.item);
+  if (gathered.kind === 'absent') {
     return {
       itemIndex: args.itemIndex,
       issueNumber: args.item.number,
@@ -192,11 +230,27 @@ function runOne(args: RunOneArgs): ApplyOutcome {
       skipped: false,
     };
   }
+  if (gathered.kind === 'half-filled') {
+    // Unreachable when reached via apply(): the pre-validation gate
+    // converts half-filled items into InvalidProposalFileError before
+    // runOne sees them. Kept as a defensive surface so direct callers
+    // (or future code paths that bypass the gate) get a precise error
+    // identifying WHICH side is missing instead of the collapsed
+    // "no disposition" message.
+    return {
+      itemIndex: args.itemIndex,
+      issueNumber: args.item.number,
+      applied: false,
+      result: null,
+      error: gathered.error,
+      skipped: false,
+    };
+  }
   try {
     const dispatch = buildDispatch({
       issueNumber: args.item.number,
-      kind: dispatchInputs.kind,
-      fields: dispatchInputs.fields,
+      kind: gathered.disposition,
+      fields: gathered.fields,
       repo: args.repo,
     });
     args.runGh(dispatch.args);
@@ -250,22 +304,36 @@ export function apply(args: ApplyArgs): ApplyResult {
 
   // All-or-nothing pre-validation gate. Walk EVERY approved item and
   // validate disposition_fields BEFORE issuing any gh call. If a single
-  // approved item is malformed, the whole apply aborts with zero
-  // mutations. This is the contract that distinguishes "I made a typo in
-  // one row" (recoverable: fix and re-run) from "two rows landed, one
-  // exploded mid-flight" (partial-state mess).
+  // approved item is malformed OR half-filled, the whole apply aborts
+  // with zero mutations. This is the contract that distinguishes "I made
+  // a typo in one row" (recoverable: fix and re-run) from "two rows
+  // landed, one exploded mid-flight" (partial-state mess).
+  //
+  // Two distinct failure shapes are surfaced as InvalidProposalFileError:
+  //   - Half-filled (disposition set without disposition_fields, or
+  //     vice versa). The gather function names which side is missing.
+  //   - Both sides set but the fields fail validateDisposition.
+  // Items with neither side set ("absent") are NOT a gate failure — they
+  // fall through to runOne, which records the inline "no disposition"
+  // error for that row only.
   for (let i = 0; i < file.items.length; i++) {
     const oneBased = i + 1;
     if (!chosen.has(oneBased)) continue;
     const item = file.items[i];
     if (item === undefined) continue;
-    if (item.disposition === null || item.disposition_fields === null) continue;
+    const gathered = gatherDisposition(item);
+    if (gathered.kind === 'absent') continue;
+    if (gathered.kind === 'half-filled') {
+      throw new InvalidProposalFileError(
+        `Item ${oneBased} (issue #${item.number}) is half-filled: ${gathered.error}`,
+      );
+    }
     try {
-      validateDisposition(item.disposition, item.disposition_fields);
+      validateDisposition(gathered.disposition, gathered.fields);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       throw new InvalidProposalFileError(
-        `Item ${oneBased} (issue #${item.number}, disposition '${item.disposition}') has invalid disposition_fields: ${message}`,
+        `Item ${oneBased} (issue #${item.number}, disposition '${gathered.disposition}') has invalid disposition_fields: ${message}`,
       );
     }
   }
