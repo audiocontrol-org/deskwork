@@ -32,8 +32,8 @@ Running log of friction, pathologies, and improvement opportunities in the scope
 | TF-001 | Open | — |
 | TF-002 | Open | — |
 | TF-003 | Open | — |
-| TF-004 | Open | — |
-| TF-005 | Open | — |
+| TF-004 | Closed | dw-lifecycle v0.24.2 — bin shim now probes the full declared-deps set (tsx + yaml + zod + ajv + ajv-formats + jscpd); `repair-install.sh` gained `plugin_declared_deps()` probe logic |
+| TF-005 | Closed | dw-lifecycle v0.24.2 — `wrap-prompt` + `validate-return` CLI subcommands shipped; round-trip verified |
 | TF-006 | Closed | dw-lifecycle v0.24.1 — `modules` minItems relaxed; bootstrap manifest now valid |
 | TF-007 | Closed | dw-lifecycle v0.24.1 — `dw-lifecycle orchestrator-turn --feature <slug>` CLI subcommand shipped |
 
@@ -125,7 +125,7 @@ Recommended: **Medium**. The frontmatter back-fill already happens; the operator
 
 ## TF-004 · MISC · high · `dw-lifecycle` bin shim fails on first invocation — declared deps not installed; `repair-install.sh` reports healthy
 
-**Status (2026-05-28, dw-lifecycle v0.24.1):** **OPEN — code unchanged.** The bin shim at `~/.claude/plugins/marketplaces/deskwork/plugins/dw-lifecycle/bin/dw-lifecycle` is byte-identical between v0.24.0 and v0.24.1 — it still probes only for `tsx` on its `find_tsx` walk, not for the rest of the declared `package.json` dependencies. `repair-install.sh` is similarly unchanged (still scoped to plugin-cache eviction recovery, not dep-set probing). Current install state happens to be healthy (ajv etc. are present in `node_modules/`) because of either the marketplace bump's incidental `npm install` or this worktree's earlier manual `npm install --omit=dev --workspaces=false`. The next adopter with a freshly-evicted cache will hit the same failure shape unless a clean install path that probes all declared deps lands. Re-test gate: empirically reproduce on a node_modules-wiped install of the plugin.
+**Status (2026-05-28, dw-lifecycle v0.24.2):** **CLOSED — Light + Medium fixes shipped together.** Bin shim grew 62 → 193 lines; comment at line 21 names the full runtime-deps set (`tsx + yaml + zod + ajv + ajv-formats + jscpd`); line 87 carries the dep-probe loop (`for dep in tsx yaml zod ajv ajv-formats jscpd`). `repair-install.sh` gained `plugin_declared_deps()` (line 181), `plugin_missing_deps()` (line 196), and an inline comment at line 230 explicitly naming this entry's failure mode (*"clone's node_modules missing ajv etc., but --check says healthy"*) — exactly the false-positive surface called out. Empirically re-verified: post-bump install reports `all plugins healthy` via `repair-install.sh --check`, and `dw-lifecycle --help` returns the full subcommand listing without `ERR_MODULE_NOT_FOUND`. Both code-level Light (bin shim) and Medium (repair-install probe) fixes are present.
 
 
 **Repro:**
@@ -156,7 +156,31 @@ Cross-reference: pairs with the project's "Marketplace-scripts contract" rule in
 
 ## TF-005 · DSC · high · `dispatch-wrapper` is library-only; orchestrator (Claude session) has no operator-facing way to engage it
 
-**Status (2026-05-28, dw-lifecycle v0.24.1):** **OPEN — code unchanged.** No new CLI subcommand (`wrap-prompt` / `validate-return` or similar) shipped to bridge the orchestrator to the dispatch-wrapper engine. SKILL.md § "Dispatch-wrapper engagement" still describes `wrap(agentType, taskPrompt, { dispatchFn })` as the entry point and says *"The controller (this skill's orchestrating agent) supplies the `dispatchFn` callback that drives the Agent tool"* — which the Claude Code session can't actually do (the Agent tool is a runtime-owned tool-use primitive, not a TypeScript callable). The orchestrator continues to hand-inline GRAMMAR_INSTRUCTION + parse + validate the return manually. The orchestrator-turn CLI (which TF-007 introduced) DOES engage `wrap()` internally for the judge step — but the implementer/reviewer/code-explorer dispatches that this skill prescribes still need a parallel operator-facing entry point.
+**Status (2026-05-28, dw-lifecycle v0.24.2):** **CLOSED — Medium fix shipped.** Two new CLI subcommands wire the orchestrator into the wrap() engine:
+
+```bash
+$ dw-lifecycle wrap-prompt --agent-type typescript-pro --prompt-file <path>
+# → augmented prompt to stdout (GRAMMAR_INSTRUCTION + refactor prelude if applicable)
+
+$ dw-lifecycle validate-return --response-file <path> --agent-type typescript-pro
+# → ValidationResult JSON to stdout; exit 0 valid, exit 1 reject (re-dispatch with correction)
+```
+
+Re-tested empirically:
+
+```bash
+$ RTN=$(mktemp); printf 'Searched: pattern — 3 matches\nIncluded: foo.ts:1\nExcluded: bar.ts:5 — different primitive (CodeMirror)' > "$RTN"
+$ dw-lifecycle validate-return --response-file "$RTN" --agent-type typescript-pro
+{ ... "missingBlocks": [], "parseError": null, "forbiddenPhrases": [],
+  "refactorPreconditionViolations": [], "skippedAudit": null,
+  "summary": "validate-return: response valid for agent-type=typescript-pro" }
+validate-return: response valid for agent-type=typescript-pro
+$ echo $?
+0
+```
+
+Both subcommands match the recommended Medium-fix shape exactly: `wrap-prompt` augments the prompt-file with `GRAMMAR_INSTRUCTION` + refactor prelude (when refactor-marker detected) for the orchestrator to feed into Agent dispatch; `validate-return` parses + validates the response with the same rules the library applies; exit codes drive re-dispatch decisions. The hand-inlining workaround retires forward; subsequent implementer / reviewer / code-explorer dispatches in this pilot will engage via CLI piping.
+
 
 
 **Repro:**
