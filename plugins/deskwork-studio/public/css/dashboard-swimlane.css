@@ -1,0 +1,619 @@
+/**
+ * Multi-lane swimlane dashboard — Direction 3 "Press Bay" v11.
+ *
+ * Phase 5 Task 5.1 ships the SHELL only:
+ *   - `.bay-shell` two-column grid (left lane-rail + bay).
+ *   - `.lane-rail` per-lane visibility rows with eye-toggle + drag stub.
+ *   - `.focus-strip` chip strip at the top of the bay.
+ *   - `.swim` per-lane swimlane article.
+ *   - `.swim-head` swimlane chrome (glyph + name + meta + slots).
+ *   - `.swim-compact` collapsed-state per-stage count strip.
+ *   - `.stage-grid` flex container of `.stage-col` columns.
+ *   - `.stage-col` per-stage column with head + rows.
+ *   - `.swim-stub` filtered-out-lane button.
+ *
+ * Tokens map mockup-style `--paper` / `--red` / `--blue` / etc. onto
+ * the production `--er-*` set defined in editorial-review.css. No new
+ * tokens declared here; everything routes through the existing
+ * palette per DESIGN-STANDARDS.md.
+ *
+ * Affordances scoped to other Phase 5 tasks (the swim-head's HTML
+ * comment slots reserve space; their CSS lands with the affordance):
+ *   - Lane-level collapse chevron (Task 5.1A).
+ *   - Per-stage collapse chevron (Task 5.1A).
+ *   - Kanban ↔ list view toggle (Task 5.1B).
+ *   - `+ new` compose chip (Task 5.1C).
+ *   - Drag-to-reorder visual feedback (Task 5.4).
+ *
+ * Mockup reference: mockups/2026-05-27-multi-lane-dashboard/direction-3-press-bay.html
+ */
+
+/* ============================================================
+ *  Bay shell — two-column grid on desktop, stacked on phone.
+ * ============================================================ */
+
+.bay-shell {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  min-height: 700px;
+  background: var(--er-paper);
+  border: 1px solid var(--er-paper-3);
+  margin-bottom: 1.5rem;
+}
+
+.bay-shell--empty {
+  display: block;
+  padding: 2rem 1.5rem;
+  min-height: 0;
+}
+
+.bay-shell--empty .bay-empty-message {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  color: var(--er-ink-soft);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.bay-shell--empty code {
+  font-family: var(--er-font-mono);
+  font-size: 0.85em;
+  color: var(--er-ink);
+  background: var(--er-paper-2);
+  padding: 0.05rem 0.3rem;
+  border: 1px solid var(--er-paper-3);
+}
+
+/* ============================================================
+ *  Lane rail — left sidebar with one row per lane.
+ * ============================================================ */
+
+.lane-rail {
+  background: var(--er-paper-2);
+  border-right: 1px solid var(--er-paper-3);
+  padding: 1rem 0.7rem 1.5rem;
+}
+
+.lane-rail .rail-head {
+  font-family: var(--er-font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  padding: 0.4rem 0.3rem 0.5rem;
+  border-bottom: 1px dashed var(--er-paper-3);
+  margin-bottom: 0.5rem;
+}
+
+.lane-rail .rail-head-count {
+  font-family: var(--er-font-mono);
+  font-size: 0.55rem;
+  color: var(--er-faded);
+  margin-left: 0.3rem;
+  letter-spacing: 0.1em;
+  text-transform: none;
+}
+
+.rail-lane {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-height: 32px;
+  padding: 0.55rem 0.4rem;
+  border-bottom: 1px dashed var(--er-paper-3);
+  cursor: pointer;
+  position: relative;
+}
+
+.rail-lane:hover {
+  background: var(--er-paper);
+}
+
+.rail-lane:focus-visible {
+  outline: 2px solid var(--er-proof-blue);
+  outline-offset: -2px;
+}
+
+.rail-lane.focused {
+  background: var(--er-paper);
+  border-left: 3px solid var(--er-red-pencil);
+  padding-left: 0.55rem;
+}
+
+.rail-lane[data-lane-visible="false"] {
+  color: var(--er-faded);
+}
+
+.rail-lane[data-lane-visible="false"] .r-name {
+  text-decoration: line-through;
+}
+
+.rail-lane .r-eye {
+  font-family: var(--er-font-mono);
+  width: 14px;
+  text-align: center;
+  color: var(--er-ink-soft);
+  font-size: 0.85rem;
+}
+
+.rail-lane[data-lane-visible="false"] .r-eye {
+  color: var(--er-faded);
+}
+
+.rail-lane .r-glyph {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  color: var(--er-red-pencil);
+  font-size: 1.05rem;
+}
+
+.rail-lane[data-lane-visible="false"] .r-glyph {
+  color: var(--er-faded);
+}
+
+.rail-lane .r-name {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-size: 0.95rem;
+}
+
+.rail-lane .r-count {
+  margin-left: auto;
+  font-family: var(--er-font-mono);
+  font-size: 0.65rem;
+  color: var(--er-faded);
+}
+
+.rail-lane .rail-drag {
+  font-family: var(--er-font-mono);
+  font-size: 0.75rem;
+  color: var(--er-faded-2);
+  margin-left: 0.3rem;
+  cursor: grab;
+  user-select: none;
+}
+
+/* ============================================================
+ *  Bay main column — focus-chip strip + swimlanes.
+ * ============================================================ */
+
+.bay {
+  overflow: auto;
+  padding: 0.6rem 1rem 1.6rem;
+  background: var(--er-paper);
+}
+
+.bay-head {
+  padding: 0.3rem 0.2rem 0.6rem;
+  border-bottom: 1px solid var(--er-paper-3);
+  margin-bottom: 0.8rem;
+}
+
+.bay-head .bh-row-1 {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-family: var(--er-font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  margin-bottom: 0.5rem;
+}
+
+.bay-head .bh-meta {
+  margin-left: auto;
+  color: var(--er-ink-soft);
+}
+
+/* ============================================================
+ *  Focus chip strip — transient lane filter.
+ * ============================================================ */
+
+.focus-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0;
+}
+
+.focus-strip .strip-label {
+  font-family: var(--er-font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  margin-right: 0.35rem;
+}
+
+.focus-strip .strip-divider {
+  width: 1px;
+  height: 1.4rem;
+  align-self: center;
+  background: var(--er-paper-3);
+  margin: 0 0.25rem;
+}
+
+.focus-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 28px;
+  padding: 0.36rem 0.7rem;
+  background: var(--er-paper-2);
+  border: 1px solid var(--er-paper-3);
+  border-radius: 99px;
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-size: 0.88rem;
+  color: var(--er-ink-soft);
+  cursor: pointer;
+  transition: background 0.1s ease, border-color 0.1s ease;
+}
+
+.focus-chip:hover {
+  background: var(--er-paper);
+  border-color: var(--er-ink-soft);
+}
+
+.focus-chip:focus-visible {
+  outline: 2px solid var(--er-proof-blue);
+  outline-offset: 2px;
+}
+
+.focus-chip .fc-glyph {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  color: var(--er-ink-soft);
+  font-size: 0.95rem;
+}
+
+.focus-chip .fc-count {
+  font-family: var(--er-font-mono);
+  font-size: 0.6rem;
+  color: var(--er-faded);
+  letter-spacing: 0.1em;
+  padding: 0.05rem 0.3rem;
+  background: var(--er-paper);
+  border-radius: 99px;
+}
+
+.focus-chip.active {
+  background: var(--er-ink);
+  color: var(--er-paper);
+  border-color: var(--er-ink);
+}
+
+.focus-chip.active .fc-glyph {
+  color: var(--er-paper);
+}
+
+.focus-chip.active .fc-count {
+  background: rgba(245, 241, 232, 0.18);
+  color: var(--er-paper);
+}
+
+.focus-chip.all {
+  background: var(--er-paper);
+}
+
+.focus-chip.all.active {
+  background: var(--er-ink);
+  color: var(--er-paper);
+}
+
+/* ============================================================
+ *  Swimlane — one article per focused lane.
+ * ============================================================ */
+
+.swim {
+  margin-bottom: 1.2rem;
+  background: var(--er-paper);
+  border: 1px solid var(--er-paper-3);
+  border-left: 4px solid var(--er-red-pencil);
+}
+
+.swim:nth-of-type(2) { border-left-color: var(--er-proof-blue); }
+.swim:nth-of-type(3) { border-left-color: var(--er-stamp-green); }
+.swim:nth-of-type(4) { border-left-color: var(--er-kraft); }
+
+.swim-head {
+  padding: 0.6rem 0.85rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  background: var(--er-paper-2);
+  border-bottom: 1px dashed var(--er-paper-3);
+}
+
+.swim-head .glyph {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-size: 1.25rem;
+  color: var(--er-red-pencil);
+}
+
+.swim-head .name {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-size: 1.15rem;
+}
+
+.swim-head .tag {
+  font-family: var(--er-font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+  padding: 0.1rem 0.4rem;
+  border: 1px solid var(--er-paper-3);
+  border-radius: 2px;
+}
+
+.swim-head .quick-meta {
+  margin-left: auto;
+  font-family: var(--er-font-mono);
+  font-size: 0.65rem;
+  color: var(--er-ink-soft);
+  letter-spacing: 0.1em;
+}
+
+/* ============================================================
+ *  Compact per-stage strip — emitted always, revealed when
+ *  the lane is `.collapsed` (Task 5.1A adds the class).
+ * ============================================================ */
+
+.swim-compact {
+  display: none;
+  align-items: stretch;
+  border-top: 1px dashed var(--er-paper-3);
+  background: var(--er-paper-2);
+}
+
+.swim.collapsed .swim-compact {
+  display: flex;
+}
+
+.swim-compact .sc-stage {
+  flex: 1;
+  padding: 0.4rem 0.55rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  border-right: 1px dashed var(--er-paper-3);
+}
+
+.swim-compact .sc-stage:last-child {
+  border-right: none;
+}
+
+.swim-compact .sc-name {
+  font-family: var(--er-font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--er-faded);
+}
+
+.swim-compact .sc-count {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-size: 1.05rem;
+  color: var(--er-ink-soft);
+}
+
+.swim-compact .sc-stage.empty .sc-count {
+  color: var(--er-faded);
+}
+
+/* ============================================================
+ *  Stage grid — flex container so 5.1A's collapsed columns
+ *  redistribute remaining space via `flex: 0 0 42px`.
+ * ============================================================ */
+
+.stage-grid {
+  display: flex;
+  gap: 1px;
+  background: var(--er-paper-3);
+}
+
+.swim.collapsed .stage-grid {
+  display: none;
+}
+
+.stage-col {
+  flex: 1 1 0;
+  min-width: 0;
+  background: var(--er-paper);
+  padding: 0.5rem 0.55rem;
+  min-height: 100px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.stage-col.empty {
+  /* Empty columns stay full-width by default (the operator can still
+     see the column shape); 5.1A's collapse turns them into the
+     narrow strip when explicitly toggled. */
+}
+
+.stage-col.off-pipeline .stage-head {
+  /* Off-pipeline columns (Blocked / Cancelled) carry a subdued head
+     to keep the operator's eye drawn to the linear pipeline first. */
+  opacity: 0.8;
+}
+
+.stage-col .stage-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  border-bottom: 1px dashed var(--er-paper-3);
+  padding-bottom: 0.3rem;
+  margin-bottom: 0.2rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.stage-col .stage-head:hover {
+  color: var(--er-red-pencil);
+}
+
+.stage-col .stage-glyph {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-size: 0.95rem;
+  color: var(--er-red-pencil);
+}
+
+.stage-col.empty .stage-glyph {
+  color: var(--er-faded);
+}
+
+.stage-col .stage-name {
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-size: 0.85rem;
+}
+
+.stage-col.empty .stage-name {
+  color: var(--er-ink-soft);
+}
+
+.stage-col .stage-count {
+  margin-left: auto;
+  font-family: var(--er-font-mono);
+  font-size: 0.7rem;
+  color: var(--er-ink-soft);
+}
+
+.stage-col .empty-state {
+  font-family: var(--er-font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  color: var(--er-faded);
+  text-transform: uppercase;
+}
+
+/* ============================================================
+ *  Swim-stub — visibility-on-but-focus-off lane button.
+ * ============================================================ */
+
+.swim-stub {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  margin-bottom: 1.2rem;
+  min-height: 36px;
+  padding: 0.65rem 0.85rem;
+  background: var(--er-paper-2);
+  border: 1px dashed var(--er-paper-3);
+  border-left: 4px solid var(--er-paper-3);
+  color: var(--er-ink-soft);
+  font-family: var(--er-font-display);
+  font-style: italic;
+  font-size: 0.92rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.swim-stub:hover {
+  background: var(--er-paper);
+  border-left-color: var(--er-red-pencil);
+}
+
+.swim-stub:focus-visible {
+  outline: 2px solid var(--er-proof-blue);
+  outline-offset: 2px;
+}
+
+.swim-stub .ss-glyph {
+  font-size: 1.1rem;
+  color: var(--er-ink-soft);
+}
+
+.swim-stub .ss-meta {
+  margin-left: auto;
+  font-family: var(--er-font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.swim-stub .ss-action {
+  font-family: var(--er-font-mono);
+  font-size: 1.1rem;
+  color: var(--er-faded);
+  margin-left: 0.3rem;
+  width: 22px;
+  text-align: center;
+}
+
+.swim-stub:hover .ss-action {
+  color: var(--er-red-pencil);
+}
+
+/* Lanes the operator has flipped persistently OFF via the eye-toggle
+   are hidden from the bay (and from the focus-chip strip — see the
+   client controller). The class is applied client-side. */
+.swim.is-visibility-hidden,
+.swim-stub.is-visibility-hidden {
+  display: none;
+}
+
+/* Lane is visibility-on but focus-off — client controller toggles
+   this class on chip-click. The server renders this distinction on
+   initial paint (focus-driven from `?focus=`); the client mirrors
+   the state through localStorage post-load. */
+.swim.is-focus-hidden {
+  display: none;
+}
+
+/* ============================================================
+ *  Mobile — stack the rail below the bay (Task 5.1 ships the
+ *  shell only; the dedicated mobile lane-stack with accordion
+ *  sections lands as part of Task 5.1A/B's mobile pass). For
+ *  now the desktop layout collapses gracefully on phone.
+ * ============================================================ */
+
+@media (max-width: 720px) {
+  .bay-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .lane-rail {
+    display: none;
+    /* The mobile lane-rail is reached via the masthead "Lanes ▾"
+       trigger (Task 5.1A's mobile sheet). Until that sheet ships,
+       the rail is hidden on phone — the focus-chip strip is the
+       operator's only lane affordance at narrow widths. */
+  }
+
+  .bay {
+    padding: 0.5rem 0.6rem 1.2rem;
+  }
+
+  .swim-head {
+    flex-wrap: wrap;
+    gap: 0.4rem 0.6rem;
+  }
+
+  .stage-grid {
+    /* On phone, stage columns stack vertically so the operator's
+       scroll preserves the linear stage sequence. Task 5.1B's
+       view-toggle introduces an alternative list view; both are
+       single-column on phone. */
+    flex-direction: column;
+  }
+
+  .stage-col {
+    min-height: auto;
+    border-bottom: 1px solid var(--er-paper-3);
+  }
+
+  .stage-col:last-child {
+    border-bottom: none;
+  }
+}

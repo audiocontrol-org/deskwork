@@ -362,6 +362,13 @@ clones:
       - packages/studio/src/pages/shortform.ts:55:69
     disposition: pending
     reason: null
+  - id: feecb3d2c71e
+    lines: 8
+    members:
+      - packages/studio/src/pages/dashboard/swimlane-shell.ts:67:74
+      - plugins/deskwork-studio/public/src/dashboard/swimlane.ts:106:113
+    disposition: keep-with-reason
+    reason: "wire-format symmetry: server parseFocusCsv + client parseCsvNonEmpty parse the same focus CSV on opposite ends of the request boundary; consolidating would require a shared vendored module since server and client bundles are independent"
   - id: 6a86f85c95cd
     lines: 14
     members:
@@ -458,36 +465,36 @@ clones:
   - id: d6093f110268
     lines: 10
     members:
-      - packages/studio/src/server.ts:384:393
-      - packages/studio/src/server.ts:393:402
+      - packages/studio/src/server.ts:386:395
+      - packages/studio/src/server.ts:395:404
     disposition: pending
     reason: null
   - id: 14579dae3bdf
     lines: 20
     members:
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:106:118
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:138:157
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:107:119
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:139:158
     disposition: pending
     reason: null
   - id: 8a46fe453209
     lines: 17
     members:
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:107:118
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:471:487
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:108:119
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:472:488
     disposition: pending
     reason: null
   - id: 82d6dc44c67e
     lines: 11
     members:
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:108:118
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:192:202
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:109:119
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:193:203
     disposition: pending
     reason: null
   - id: f0e04e87d0e2
     lines: 7
     members:
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:159:165
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:80:86
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:160:166
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:81:87
     disposition: pending
     reason: null
   - id: 7c1800068cfe

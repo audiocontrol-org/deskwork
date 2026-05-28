@@ -247,7 +247,9 @@ export function createApp(ctx: StudioContext): Hono {
       getIndex,
     ]);
     if (overridden !== null) return c.html(overridden);
-    return c.html(await renderDashboard(ctx, getIndex));
+    // Phase 5 Task 5.1: thread the request URL so the dashboard can
+    // honour `?focus=<csv>` server-side.
+    return c.html(await renderDashboard(ctx, getIndex, c.req.url));
   });
   app.get('/dev/editorial-help', async (c) => {
     const overridden = await runTemplateOverride(ctx, 'help', [ctx]);

@@ -220,11 +220,11 @@ The picked design **pivots away from the PRD's original "per-lane tab strip" fra
 
 ### Task 5.1: Multi-lane swimlane dashboard + focus-chip strip + lane-visibility rail
 
-- [ ] Step 5.1.1: Refactor the studio's dashboard server-render to read `listLaneConfigs(projectRoot)` and emit one **swimlane** (`<article class="swim ...">`) per visible-and-focused lane, in operator-configured order.
-- [ ] Step 5.1.2: Each swimlane's body renders the lane's dashboard: columns drawn from the lane's template `linearStages` (in order) + an "Off-pipeline" section listing entries in `offPipelineStages`. No tab navigation; every focused lane is on-screen at once.
-- [ ] Step 5.1.3: **Focus-chip strip** (transient filter) emits one chip per visibility-on lane plus an "All" chip; clicking a chip toggles whether that lane is rendered in the current view. State stored per-operator (localStorage); URL-deep-linkable via `?focus=<csv>`.
-- [ ] Step 5.1.4: **Lane-visibility rail** (left rail on desktop, sheet on mobile) lists every lane with an eye-toggle (`●` visible / `○` persistently hidden) + drag handle. Visibility-off lanes don't appear in the focus-chip strip at all.
-- [ ] Step 5.1.5: Filtered-out lane stubs: when a lane is visibility-on but focus-off, render a compact **swim-stub** button between the focused swimlanes so the operator can see what's hidden by the current focus filter; clicking the stub re-adds the lane to focus.
+- [x] Step 5.1.1: Refactor the studio's dashboard server-render to read `listLaneConfigs(projectRoot)` and emit one **swimlane** (`<article class="swim ...">`) per visible-and-focused lane, in operator-configured order.
+- [x] Step 5.1.2: Each swimlane's body renders the lane's dashboard: columns drawn from the lane's template `linearStages` (in order) + an "Off-pipeline" section listing entries in `offPipelineStages`. No tab navigation; every focused lane is on-screen at once.
+- [x] Step 5.1.3: **Focus-chip strip** (transient filter) emits one chip per visibility-on lane plus an "All" chip; clicking a chip toggles whether that lane is rendered in the current view. State stored per-operator (localStorage); URL-deep-linkable via `?focus=<csv>`.
+- [x] Step 5.1.4: **Lane-visibility rail** (left rail on desktop, sheet on mobile) lists every lane with an eye-toggle (`●` visible / `○` persistently hidden) + drag handle. Visibility-off lanes don't appear in the focus-chip strip at all. (Mobile sheet is Task 5.1A's territory; desktop rail ships here. Drag handle renders as a non-interactive stub — drag wiring is Task 5.4.)
+- [x] Step 5.1.5: Filtered-out lane stubs: when a lane is visibility-on but focus-off, render a compact **swim-stub** button between the focused swimlanes so the operator can see what's hidden by the current focus filter; clicking the stub re-adds the lane to focus.
 
 ### Task 5.1A: Per-lane collapse — lane-level + per-stage
 

@@ -20,6 +20,7 @@ import { listOpen } from '@deskwork/core/review/pipeline';
 import type { DraftWorkflowItem } from '@deskwork/core/review/types';
 import type { Platform } from '@deskwork/core/types';
 import type { DeskworkConfig } from '@deskwork/core/config';
+import { loadLaneBuckets, type LaneBucketsResult } from './lane-data.ts';
 
 /**
  * The eight canonical stages, in display order. Linear pipeline
@@ -56,6 +57,16 @@ export interface DashboardData {
   readonly byStage: ReadonlyMap<Stage, readonly Entry[]>;
   readonly shortformWorkflows: readonly DraftWorkflowItem[];
   readonly shortformByPlatform: ReadonlyMap<Platform, readonly DraftWorkflowItem[]>;
+  /**
+   * Per-lane buckets for the multi-lane swimlane shell (Phase 5
+   * Task 5.1). `byLane` iteration order = lane order from
+   * `listLaneConfigs`. Entries are bucketed against the lane's
+   * resolved pipeline template, not the legacy eight-stage union.
+   * `byStage` above is kept as a back-compat read view for code that
+   * still iterates the legacy union (the v7 ordering test + the
+   * eight-stage section renderer for Shortform/Adjacent siblings).
+   */
+  readonly lanes: LaneBucketsResult;
 }
 
 function bucketize(entries: readonly Entry[]): Map<Stage, Entry[]> {
@@ -131,5 +142,10 @@ export async function loadDashboardData(
   const byStage = bucketize(entries);
   const shortformWorkflows = loadOpenShortform(projectRoot, config);
   const shortformByPlatform = bucketizeShortform(shortformWorkflows);
-  return { entries, byStage, shortformWorkflows, shortformByPlatform };
+  // Phase 5 Task 5.1 Step 5.1.1: also bucket entries per lane.
+  // bootstrapDefaultLaneIfMissing fires inside loadLaneBuckets so
+  // legacy projects without `.deskwork/lanes/` participate in the
+  // new model without explicit operator setup.
+  const lanes = await loadLaneBuckets(projectRoot, config, entries);
+  return { entries, byStage, shortformWorkflows, shortformByPlatform, lanes };
 }
