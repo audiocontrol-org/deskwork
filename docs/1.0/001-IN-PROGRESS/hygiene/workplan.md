@@ -30,15 +30,24 @@ date: 2026-05-28
 
 ### Task 1: Implement debt-report
 
-- [ ] Step 1: Helper script `plugins/dw-lifecycle/src/subcommands/debt-report.ts` — queries `gh issue list` with bucketing by label/age/stale-since-last-comment.
-- [ ] Step 2: Workplan-TBD scan across `docs/<v>/001-IN-PROGRESS/*/workplan.md` — counts per-feature `TBD:` / `defer` / `follow-up:` / `out of scope` markers.
-- [ ] Step 3: Parked-branch scan via `git for-each-ref` — list local + remote branches with ahead/behind status relative to `origin/main`.
-- [ ] Step 4: Output formatters — markdown table (operator-readable) + JSON (downstream-consumable). Default = markdown; `--json` flag emits JSON.
-- [ ] Step 5: `plugins/dw-lifecycle/skills/debt-report/SKILL.md` — adopter-facing prose.
-- [ ] Step 6: Vitest unit + integration tests against fixture project trees + mocked `gh` stub.
+- [x] Step 1: Helper script `plugins/dw-lifecycle/src/subcommands/debt-report.ts` — queries `gh issue list` with bucketing by label/age/stale-since-last-comment.
+- [x] Step 2: Workplan-TBD scan across `docs/<v>/001-IN-PROGRESS/*/workplan.md` — counts per-feature `TBD:` / `defer` / `follow-up:` / `out of scope` markers.
+- [x] Step 3: Parked-branch scan via `git for-each-ref` — list local + remote branches with ahead/behind status relative to `origin/main`.
+- [x] Step 4: Output formatters — markdown table (operator-readable) + JSON (downstream-consumable). Default = markdown; `--json` flag emits JSON.
+- [x] Step 5: `plugins/dw-lifecycle/skills/debt-report/SKILL.md` — adopter-facing prose.
+- [x] Step 6: Vitest unit + integration tests against fixture project trees + mocked `gh` stub.
 
 **Acceptance Criteria:**
-- [ ] `/dw-lifecycle:debt-report` ships; emits markdown + JSON across the three categories.
+- [x] `/dw-lifecycle:debt-report` ships; emits markdown + JSON across the three categories. (Landed in 734008d + spec/quality-review fix commits d0c2a37 + 965501c; 42 new vitest tests passing; SKILL.md ships at `plugins/dw-lifecycle/skills/debt-report/SKILL.md`.)
+
+**Implementation notes (operator decisions captured during dispatch):**
+
+- Sample size `N=5` for issue/branch samples; configurable via `--sample-size <N>`.
+- Added `--parked-days <N>` flag (default 30) — parametric instead of hardcoded so the parked-vs-other threshold matches the staleness siblings.
+- JSON bucket shape uses `stale` + `threshold_days: <N>` (not the spec's literal `stale_30d` / `stale_since_last_comment_7d` keys). The thresholds are configurable via `--stale-days` / `--comment-stale-days`; hardcoding `_30d` into the JSON key when the threshold is overridable would mislead downstream consumers. Spec text intent is preserved; only the literal key shape is parametric.
+- Workplan scanner emits per-marker line-number samples (capped at 20 per feature, 200-char text excerpt). Samples surface only in JSON output, not markdown. Phase 3 (`:promote-deferrals`) consumes these to drive workplan edits without a second scan.
+- `--no-gh` / `--no-workplan` / `--no-branches` are opt-out toggles (sections included by default). Section headers stay in the markdown with a `(skipped via --no-X)` marker so the operator sees what was suppressed; JSON uses `null` for skipped sections so consumers see a stable schema.
+- Relative imports used throughout (the `@/` mapping is not wired for this plugin; introducing it was scoped out per the dispatch brief).
 
 ## Phase 2: GitHub-issue triage — `/dw-lifecycle:triage-issues`  ·  [#326](https://github.com/audiocontrol-org/deskwork/issues/326)
 
