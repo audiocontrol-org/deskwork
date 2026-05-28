@@ -281,13 +281,13 @@ The picked design **pivots away from the PRD's original "per-lane tab strip" fra
 
 **Acceptance Criteria:**
 
-- [ ] Studio dashboard renders one swimlane per focused lane; columns are template-driven (no hardcoded stage names in render code).
-- [ ] Lane visibility + focus + reorder all work; visibility persists project-wide-or-per-operator; focus + view-mode + collapse persist per-operator.
-- [ ] Per-lane collapse (lane + per-stage) and kanban↔list toggle work with universal chevron convention and viewport-aware defaults.
-- [ ] Per-lane `+ new` Compose chip clipboard-copies the partial `/deskwork:add` command with lane + initial stage pre-filled; no form, no popover, no bottom sheet.
-- [ ] Saveable focus presets work; deep-link URL pattern opens saved preset.
-- [ ] Phone + desktop viewports both render correctly (dual-viewport verification protocol passes for all changed surfaces).
-- [ ] WCAG 2.2 SC 2.5.8 AA: every interactive affordance has a ≥24×24 hit target; WCAG 2.1 SC 2.4.7 AA: every interactive affordance has a visible focus ring; WCAG 2.1 SC 1.4.11 AA: contrast ratios verified for chevrons, chips, and stub-text.
+- [x] Studio dashboard renders one swimlane per focused lane; columns are template-driven (no hardcoded stage names in render code). (Tasks 5.1.1–5.1.2, 5.2.1)
+- [x] Lane visibility + focus + reorder all work; visibility persists project-wide-or-per-operator; focus + view-mode + collapse persist per-operator. (Tasks 5.1.3, 5.1.4, 5.4, 5.5.2)
+- [x] Per-lane collapse (lane + per-stage) and kanban↔list toggle work with universal chevron convention and viewport-aware defaults. (Tasks 5.1A.1–3, 5.1B.1–4)
+- [x] Per-lane `+ new` Compose chip clipboard-copies the partial `/deskwork:add` command with lane + initial stage pre-filled; no form, no popover, no bottom sheet. (Task 5.1C.1–4)
+- [x] Saveable focus presets work; deep-link URL pattern opens saved preset. (Task 5.5.1–3)
+- [x] Phone + desktop viewports both render correctly (dual-viewport verification protocol passes for all changed surfaces). (Task 5.6.6 + per-task verification across 5.1A/5.1B/5.3)
+- [x] WCAG 2.2 SC 2.5.8 AA: every interactive affordance has a ≥24×24 hit target; WCAG 2.1 SC 2.4.7 AA: every interactive affordance has a visible focus ring; WCAG 2.1 SC 1.4.11 AA: contrast ratios verified for chevrons, chips, and stub-text. (Tasks 5.1A.3, 5.1C.1; per-task a11y followups across AUDIT log)
 
 ## Phase 6: Lane + pipeline CRUD skills + studio management surfaces  ·  [#307](https://github.com/audiocontrol-org/deskwork/issues/307)
 
