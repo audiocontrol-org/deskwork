@@ -9,7 +9,7 @@ export interface IssueSample {
   readonly number: number;
   readonly title: string;
   readonly url: string;
-  readonly updatedAt: string;
+  readonly updated_at: string;
 }
 
 export interface GhIssuesReport {

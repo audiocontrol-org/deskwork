@@ -58,12 +58,16 @@ function parseGhOutput(raw: string): RawIssue[] {
   return issues;
 }
 
+// Translates gh's camelCase `updatedAt` to our snake_case `updated_at` at the
+// parse boundary — mirrors how parked-branches.ts translates git's
+// `committerdate` to `last_commit_date`. Keeping the rename here means the
+// rest of the pipeline + JSON output stays snake_case end-to-end.
 function toSample(issue: RawIssue): IssueSample {
   return {
     number: issue.number,
     title: issue.title,
     url: issue.url,
-    updatedAt: issue.updatedAt,
+    updated_at: issue.updatedAt,
   };
 }
 

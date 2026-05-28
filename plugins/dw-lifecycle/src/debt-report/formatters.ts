@@ -61,7 +61,7 @@ function renderIssueSampleTable(
   lines.push('|---|---|---|');
   for (const item of sample) {
     const safeTitle = item.title.replace(/\|/g, '\\|');
-    lines.push(`| [#${item.number}](${item.url}) | ${safeTitle} | ${item.updatedAt} |`);
+    lines.push(`| [#${item.number}](${item.url}) | ${safeTitle} | ${item.updated_at} |`);
   }
 }
 

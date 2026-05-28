@@ -27,7 +27,7 @@ dw-lifecycle debt-report [--json] [--repo owner/repo] [--stale-days N] [--commen
 
 - Total open issue count.
 - Counts bucketed by label (sorted by count, descending).
-- Unlabeled count + sample (N oldest by `updatedAt`).
+- Unlabeled count + sample (N oldest by `updated_at`).
 - Stale count (open and not updated in > 30 days; threshold configurable via `--stale-days`).
 - Stale-since-last-comment count (open > 7 days; latest comment older than 7 days OR no comments and issue itself older than 7 days; threshold via `--comment-stale-days`).
 
@@ -65,9 +65,9 @@ Excluded: `main`, `origin/main`, `master`, `origin/master`, `HEAD`, and the curr
 | `--parked-days <N>` | 30 | Override the parked-branch age threshold. |
 | `--limit <N>` | 1000 | `gh issue list` page limit. |
 | `--sample-size <N>` | 5 | Number of items shown per sample table. |
-| `--no-gh` | on | Skip the GitHub issues section (useful when `gh` is not authenticated). |
-| `--no-workplan` | on | Skip the workplan TBDs section. |
-| `--no-branches` | on | Skip the parked-branches section. |
+| `--no-gh` | off | Skip the GitHub issues section (useful when `gh` is not authenticated). |
+| `--no-workplan` | off | Skip the workplan TBDs section. |
+| `--no-branches` | off | Skip the parked-branches section. |
 
 ## Error handling
 

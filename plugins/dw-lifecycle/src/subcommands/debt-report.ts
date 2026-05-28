@@ -87,12 +87,12 @@ export function parseDebtReportArgs(args: readonly string[]): DebtReportCliOptio
 }
 
 function defaultRunGh(args: readonly string[]): string {
-  return execFileSync('gh', args as string[], { encoding: 'utf8' });
+  return execFileSync('gh', [...args], { encoding: 'utf8' });
 }
 
 function defaultRunGit(cwd: string) {
   return (args: readonly string[]): string =>
-    execFileSync('git', args as string[], { cwd, encoding: 'utf8' });
+    execFileSync('git', [...args], { cwd, encoding: 'utf8' });
 }
 
 export async function debtReport(rawArgs: string[]): Promise<void> {
