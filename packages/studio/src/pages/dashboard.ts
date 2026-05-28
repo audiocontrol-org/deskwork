@@ -96,6 +96,7 @@ export async function renderDashboard(
   const swimlanes = renderSwimlanesShell({
     lanes: data.lanes,
     defaultSite,
+    projectRoot: ctx.projectRoot,
     focusFromUrl,
   });
 

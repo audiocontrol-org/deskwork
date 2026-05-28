@@ -33,12 +33,23 @@
 import { html, unsafe, type RawHtml } from '../html.ts';
 import { renderRow } from './section.ts';
 import { stageGlyph, GLYPH_OFF } from './swimlane-stage-glyph.ts';
+import { laneGlyph } from './lane-glyph.ts';
+import { projectKeyHash } from './project-key.ts';
+import { isEditorialStage, renderEntryCard } from './swimlane-entry-card.ts';
 import type { LaneBucket, LaneBucketsResult } from './lane-data.ts';
 import type { Entry } from '@deskwork/core/schema/entry';
 
 export interface SwimlaneShellInput {
   readonly lanes: LaneBucketsResult;
   readonly defaultSite: string;
+  /**
+   * Absolute project root path. The shell hashes it into a stable
+   * 12-char token and emits it as `data-project-key` on the bay
+   * shell so the client controller can namespace its localStorage
+   * state per project (preventing cross-project key collisions when
+   * two projects share a studio route).
+   */
+  readonly projectRoot: string;
   /**
    * URL `?focus=<csv>` value parsed from the request. When present,
    * takes precedence over localStorage (handled server-side: lanes
@@ -56,6 +67,12 @@ interface LaneRailRow {
   readonly entryCount: number;
   readonly inFocus: boolean;
   readonly visible: true;
+  /**
+   * Template id resolved from the lane's pipeline template. Used to
+   * pick the per-lane press-check glyph (`§` / `◆` / `⊹` / `⊕` /
+   * `⌘`) in the rail row, focus chip, swim-head, and swim-stub.
+   */
+  readonly templateId: string;
 }
 
 /**
@@ -115,7 +132,7 @@ function renderRailRow(row: LaneRailRow): RawHtml {
       aria-pressed="${row.inFocus ? 'true' : 'false'}"
       data-lane-visible="true">
       <span class="r-eye" aria-hidden="true">●</span>
-      <span class="r-glyph" aria-hidden="true">§</span>
+      <span class="r-glyph" aria-hidden="true">${laneGlyph(row.templateId)}</span>
       <span class="r-name">${row.name}</span>
       <span class="r-count">${row.entryCount}</span>
       <!-- Task 5.4 slot: drag handle for lane reorder. Renders as a
@@ -145,7 +162,7 @@ function renderFocusChip(row: LaneRailRow): RawHtml {
   return unsafe(html`
     <button class="${classes}" type="button" data-focus-chip="${row.id}"
       aria-pressed="${row.inFocus ? 'true' : 'false'}">
-      <span class="fc-glyph" aria-hidden="true">§</span>
+      <span class="fc-glyph" aria-hidden="true">${laneGlyph(row.templateId)}</span>
       <span class="fc-label">${row.name}</span>
       <span class="fc-count">${row.entryCount}</span>
     </button>`);
@@ -168,60 +185,6 @@ function renderFocusStrip(
       <div class="strip-divider" aria-hidden="true"></div>
       ${unsafe(chipsRaw)}
     </nav>`);
-}
-
-/**
- * Vocabulary set the legacy `renderRowActions` / `verbsForStage`
- * helpers handle. Entries whose `currentStage` is in this set render
- * as full dashboard rows (with stage-gated inline chips + drawer +
- * menu). Entries outside this set render as the lighter `.card`
- * markup the mockup uses. This is a deliberate dispatch on stage
- * vocabulary, NOT a fallback in the bug-factory sense: the editorial
- * verb-chip helpers were written before the multi-template work and
- * accept only the eight editorial stage names. A Sketched / Iterating
- * / Drafted entry in a visual or qa-plan lane has no inline-chip
- * semantics under the current verb-chip helpers. Task 5.2 generalises
- * verbsForStage by template; this dispatch retires alongside it. The
- * card form preserves slug + uuid + stage data attributes so 5.2 can
- * add verb chrome additively to the card markup.
- */
-const EDITORIAL_STAGE_VOCAB: ReadonlySet<string> = new Set([
-  'Ideas',
-  'Planned',
-  'Outlining',
-  'Drafting',
-  'Final',
-  'Published',
-  'Blocked',
-  'Cancelled',
-]);
-
-function isEditorialStage(stage: string): boolean {
-  return EDITORIAL_STAGE_VOCAB.has(stage);
-}
-
-/**
- * Render a lighter card for an entry whose stage vocabulary isn't
- * the editorial set. Preserves the data-* attributes existing tests
- * + future affordance work depend on. The card lives inside its
- * stage column; clicking it opens the entry's review surface (the
- * same target as the dashboard row's slug link).
- */
-function renderEntryCard(entry: Entry, defaultSite: string): RawHtml {
-  void defaultSite;
-  const reviewLink = `/dev/editorial-review/entry/${entry.uuid}`;
-  const search = [entry.slug, entry.title, entry.keywords.join(' ')]
-    .join(' ')
-    .toLowerCase();
-  return unsafe(html`
-    <a class="card" href="${reviewLink}"
-      data-row-shell data-search="${search}"
-      data-stage="${entry.currentStage}"
-      data-uuid="${entry.uuid}" data-slug="${entry.slug}"
-      title="open the review surface">
-      <span class="card-title">${entry.title}</span>
-      <span class="e-meta">${entry.slug}</span>
-    </a>`);
 }
 
 /**
@@ -250,6 +213,7 @@ function renderStageCol(
   defaultSite: string,
   glyph: string,
   isOffPipeline: boolean,
+  isLocked: boolean,
 ): RawHtml {
   // Empty columns also pick up `er-section--empty` for back-compat
   // with the legacy compact-empty assertion (#112). The class lives
@@ -257,6 +221,13 @@ function renderStageCol(
   // forward.
   const emptyClass = entries.length === 0 ? ' empty er-section--empty' : '';
   const offClass = isOffPipeline ? ' off-pipeline' : '';
+  // Per the mockup at line 420 (.lb-group.locked .lb-glyph) and
+  // lines 540 / 826 (.swim-compact .sc-stage.locked .sc-count), a
+  // template's lockedStages render with proof-blue accent so the
+  // operator's eye picks them up. The kanban analogue is the
+  // `.stage-col.locked` modifier emitted here; dashboard-swimlane.
+  // css applies the colour to the stage-glyph + stage-name.
+  const lockedClass = isLocked ? ' locked' : '';
   const stageIdSlug = stage.toLowerCase().replace(/[^a-z0-9-]+/g, '-');
   const emptyHint = stageEmptyHint(stage);
   const emptyAttrs = entries.length === 0
@@ -282,7 +253,7 @@ function renderStageCol(
     );
 
   return unsafe(html`
-    <section class="stage-col${unsafe(emptyClass)}${unsafe(offClass)}"
+    <section class="stage-col${unsafe(emptyClass)}${unsafe(offClass)}${unsafe(lockedClass)}"
       id="stage-${stageIdSlug}"
       data-stage-col="${stage}"
       data-stage-section="${stage}"${emptyAttrs}>
@@ -321,12 +292,18 @@ function renderSwimCompact(bucket: LaneBucket): RawHtml {
     ...bucket.template.linearStages,
     ...bucket.template.offPipelineStages,
   ];
+  // `lockedStages` is optional on a pipeline template (schema:
+  // `uniqueStringArray('lockedStages', 0).optional()`). Treat
+  // missing as "no stages locked" — an empty lookup set, never
+  // an "every stage locked" sentinel.
+  const lockedSet = new Set<string>(bucket.template.lockedStages ?? []);
   const cellsRaw = stages
     .map((stage) => {
       const count = (bucket.byStage.get(stage) ?? []).length;
       const empty = count === 0 ? ' empty' : '';
+      const locked = lockedSet.has(stage) ? ' locked' : '';
       return html`
-        <div class="sc-stage${unsafe(empty)}" data-sc-stage="${stage}">
+        <div class="sc-stage${unsafe(empty)}${unsafe(locked)}" data-sc-stage="${stage}">
           <span class="sc-name">${stage}</span>
           <span class="sc-count">${count}</span>
         </div>`;
@@ -341,6 +318,7 @@ function renderSwimlane(
   defaultSite: string,
 ): RawHtml {
   const { lane, template } = bucket;
+  const lockedSet = new Set<string>(template.lockedStages ?? []);
   const stagesRaw = [
     ...template.linearStages.map((stage) =>
       renderStageCol(
@@ -349,6 +327,7 @@ function renderSwimlane(
         defaultSite,
         stageGlyph(stage),
         false,
+        lockedSet.has(stage),
       ).__raw,
     ),
     ...template.offPipelineStages.map((stage) =>
@@ -358,6 +337,11 @@ function renderSwimlane(
         defaultSite,
         stageGlyph(stage, GLYPH_OFF),
         true,
+        // Off-pipeline stages are not part of lockedStages (the
+        // template schema enforces lockedStages ⊆ linearStages),
+        // so this is always false. Pass it explicitly to keep the
+        // signature parallel.
+        false,
       ).__raw,
     ),
   ].join('');
@@ -367,10 +351,10 @@ function renderSwimlane(
   const meta = `${bucket.entryCount} entries`;
 
   return unsafe(html`
-    <article class="swim" data-lane-id="${lane.id}"
+    <article class="swim swim--${template.id}" data-lane-id="${lane.id}"
       data-template-id="${template.id}">
       <div class="swim-head">
-        <span class="glyph" aria-hidden="true">§</span>
+        <span class="glyph" aria-hidden="true">${laneGlyph(template.id)}</span>
         <span class="name">${lane.name}</span>
         <span class="tag">${tag}</span>
         <span class="quick-meta">${meta}</span>
@@ -387,7 +371,7 @@ function renderSwimStub(row: LaneRailRow): RawHtml {
   return unsafe(html`
     <button class="swim-stub" type="button" data-swim-stub="${row.id}"
       aria-label="Restore ${row.name} to focus">
-      <span class="ss-glyph" aria-hidden="true">§</span>
+      <span class="ss-glyph" aria-hidden="true">${laneGlyph(row.templateId)}</span>
       <span class="ss-name">${row.name}</span>
       <span class="ss-meta">hidden by focus · ${row.entryCount} entries · click to restore</span>
       <span class="ss-action" aria-hidden="true">+</span>
@@ -414,6 +398,7 @@ function buildLaneRows(
       entryCount: bucket.entryCount,
       inFocus: focused.has(id),
       visible: true,
+      templateId: bucket.template.id,
     });
   }
   return out;
@@ -432,7 +417,8 @@ function buildLaneRows(
  * the dashboard renders a sane empty state instead of crashing.
  */
 export function renderSwimlanesShell(input: SwimlaneShellInput): RawHtml {
-  const { lanes, defaultSite, focusFromUrl } = input;
+  const { lanes, defaultSite, focusFromUrl, projectRoot } = input;
+  const projectKey = projectKeyHash(projectRoot);
   const laneIds = Array.from(lanes.byLane.keys());
   if (laneIds.length === 0) {
     return unsafe(html`
@@ -463,15 +449,32 @@ export function renderSwimlanesShell(input: SwimlaneShellInput): RawHtml {
     })
     .join('');
 
+  // Per the mockup at line 1031, when the focus filter narrows the
+  // visible set below the total, the bay-head meta prefixes a
+  // `<span class="filter-active">Filtered · </span>` badge. The
+  // badge is the operator-perceivable signal that some lanes are
+  // suppressed; without it, "2 of 3 lanes shown" reads as a static
+  // count rather than as a transient filter state.
+  const isFiltered = focused.size < laneIds.length;
+  const filteredBadge = isFiltered
+    ? '<span class="filter-active">Filtered · </span>'
+    : '';
+  const unroutedPart =
+    input.lanes.unroutedEntries.length === 0
+      ? ''
+      : `${input.lanes.unroutedEntries.length} unrouted · `;
+  const metaRaw = `${filteredBadge}${focused.size} of ${laneIds.length} lanes shown · ${unroutedPart}${countTotal(lanes)} entries`;
+
   return unsafe(html`
     <section class="bay-shell" data-bay-shell
+      data-project-key="${projectKey}"
       data-focus-url-driven="${urlDriven ? 'true' : 'false'}">
       ${unsafe(railRaw)}
       <main class="bay" data-bay>
         <div class="bay-head">
           <div class="bh-row-1">
             <span>The Press Bay</span>
-            <span class="bh-meta">${focused.size} of ${laneIds.length} lanes shown · ${input.lanes.unroutedEntries.length === 0 ? '' : `${input.lanes.unroutedEntries.length} unrouted · `}${countTotal(lanes)} entries</span>
+            <span class="bh-meta">${unsafe(metaRaw)}</span>
           </div>
           ${unsafe(focusStripRaw)}
         </div>

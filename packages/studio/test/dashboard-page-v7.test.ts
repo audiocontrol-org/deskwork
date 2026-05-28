@@ -155,7 +155,11 @@ describe('dashboard v7 page wiring (Step 2.2.9)', () => {
     // ordering test above still holds.
     const r = await getHtml(app, '/dev/editorial-studio');
     expect(r.status).toBe(200);
-    const swimMatches = r.html.match(/<article class="swim"[^>]*data-lane-id="default"/g) ?? [];
+    // Phase 5 Task 5.1 spec-fidelity fix (Finding 3) added a
+    // `swim--<template-id>` modifier class on the `<article>`; the
+    // regex tolerates the additional class token while still
+    // pinning the same semantic assertion.
+    const swimMatches = r.html.match(/<article class="swim(?:\s[^"]*)?"[^>]*data-lane-id="default"/g) ?? [];
     expect(swimMatches.length).toBe(1);
   });
 

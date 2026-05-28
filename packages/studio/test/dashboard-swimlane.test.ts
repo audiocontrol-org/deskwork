@@ -148,19 +148,21 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
-  it('renders one <article class="swim"> per lane configured on disk', async () => {
+  it('renders one <article class="swim ..."> per lane configured on disk', async () => {
     const r = await getHtml(app, '/dev/editorial-studio');
     expect(r.status).toBe(200);
-    const swimMatches = r.html.match(/<article class="swim"/g) ?? [];
+    // Per Finding 3, the `<article>` carries `class="swim swim--<id>"`.
+    // Tolerate the modifier in the count regex.
+    const swimMatches = r.html.match(/<article class="swim(?:\s[^"]*)?"/g) ?? [];
     expect(swimMatches.length).toBe(3);
   });
 
   it('every swimlane carries data-lane-id matching its config', async () => {
     const r = await getHtml(app, '/dev/editorial-studio');
     expect(r.status).toBe(200);
-    expect(r.html).toMatch(/<article class="swim"[^>]*data-lane-id="default"/);
-    expect(r.html).toMatch(/<article class="swim"[^>]*data-lane-id="mockups"/);
-    expect(r.html).toMatch(/<article class="swim"[^>]*data-lane-id="qa"/);
+    expect(r.html).toMatch(/<article class="swim(?:\s[^"]*)?"[^>]*data-lane-id="default"/);
+    expect(r.html).toMatch(/<article class="swim(?:\s[^"]*)?"[^>]*data-lane-id="mockups"/);
+    expect(r.html).toMatch(/<article class="swim(?:\s[^"]*)?"[^>]*data-lane-id="qa"/);
   });
 
   it('focus-chip strip contains one chip per lane + the All chip', async () => {
@@ -255,11 +257,12 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
       '/dev/editorial-studio?focus=default,mockups',
     );
     expect(r.status).toBe(200);
-    // Two swimlanes render fully.
-    const swimMatches = r.html.match(/<article class="swim"/g) ?? [];
+    // Two swimlanes render fully (regex tolerates the swim--<id>
+    // modifier class added in Finding 3).
+    const swimMatches = r.html.match(/<article class="swim(?:\s[^"]*)?"/g) ?? [];
     expect(swimMatches.length).toBe(2);
-    expect(r.html).toMatch(/<article class="swim"[^>]*data-lane-id="default"/);
-    expect(r.html).toMatch(/<article class="swim"[^>]*data-lane-id="mockups"/);
+    expect(r.html).toMatch(/<article class="swim(?:\s[^"]*)?"[^>]*data-lane-id="default"/);
+    expect(r.html).toMatch(/<article class="swim(?:\s[^"]*)?"[^>]*data-lane-id="mockups"/);
     // QA lane renders as a swim-stub (visibility-on, focus-off).
     expect(r.html).toMatch(
       /<button class="swim-stub"[^>]*data-swim-stub="qa"/,
@@ -311,6 +314,122 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
     expect(r.html).not.toMatch(/class="collapse-chev"/);
   });
 
+  it('per-lane glyphs from the mockup mapping (editorial=§, visual=◆, qa-plan=⊕)', async () => {
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    // Editorial lane: § glyph appears in the rail row + focus chip + swim-head.
+    const editorialBlock = extractLaneSection(r.html, 'default');
+    expect(editorialBlock).toMatch(/<span class="glyph" aria-hidden="true">§<\/span>/);
+    // Visual (mockups) lane: ◆ glyph in the swim-head.
+    const visualBlock = extractLaneSection(r.html, 'mockups');
+    expect(visualBlock).toMatch(/<span class="glyph" aria-hidden="true">◆<\/span>/);
+    // QA lane: ⊕ glyph in the swim-head.
+    const qaBlock = extractLaneSection(r.html, 'qa');
+    expect(qaBlock).toMatch(/<span class="glyph" aria-hidden="true">⊕<\/span>/);
+    // Focus-chip strip: each chip carries the template-mapped glyph.
+    expect(r.html).toMatch(
+      /data-focus-chip="default"[^>]*>\s*<span class="fc-glyph" aria-hidden="true">§<\/span>/,
+    );
+    expect(r.html).toMatch(
+      /data-focus-chip="mockups"[^>]*>\s*<span class="fc-glyph" aria-hidden="true">◆<\/span>/,
+    );
+    expect(r.html).toMatch(
+      /data-focus-chip="qa"[^>]*>\s*<span class="fc-glyph" aria-hidden="true">⊕<\/span>/,
+    );
+    // Rail rows: each row's r-glyph follows the same mapping.
+    expect(r.html).toMatch(
+      /data-rail-lane="default"[\s\S]*?<span class="r-glyph" aria-hidden="true">§<\/span>/,
+    );
+    expect(r.html).toMatch(
+      /data-rail-lane="mockups"[\s\S]*?<span class="r-glyph" aria-hidden="true">◆<\/span>/,
+    );
+    expect(r.html).toMatch(
+      /data-rail-lane="qa"[\s\S]*?<span class="r-glyph" aria-hidden="true">⊕<\/span>/,
+    );
+  });
+
+  it('swim-stub for a focus-off lane carries the lane\'s template glyph', async () => {
+    // Focus only editorial + mockups; qa is visibility-on, focus-off.
+    const r = await getHtml(app, '/dev/editorial-studio?focus=default,mockups');
+    expect(r.status).toBe(200);
+    // QA stub renders with ⊕ (the qa-plan template glyph), NOT §.
+    expect(r.html).toMatch(
+      /data-swim-stub="qa"[\s\S]*?<span class="ss-glyph" aria-hidden="true">⊕<\/span>/,
+    );
+  });
+
+  it('locked stages render with `class="stage-col ... locked"` (editorial Final, qa Reviewed)', async () => {
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    // Editorial template: lockedStages = ["Final"].
+    const editorialBlock = extractLaneSection(r.html, 'default');
+    expect(editorialBlock).toMatch(
+      /class="stage-col[^"]*\blocked\b[^"]*"[^>]*data-stage-col="Final"/,
+    );
+    // QA-plan template: lockedStages = ["Reviewed"].
+    const qaBlock = extractLaneSection(r.html, 'qa');
+    expect(qaBlock).toMatch(
+      /class="stage-col[^"]*\blocked\b[^"]*"[^>]*data-stage-col="Reviewed"/,
+    );
+    // Non-locked stages do NOT pick up the modifier (editorial Drafting
+    // is not in lockedStages).
+    expect(editorialBlock).not.toMatch(
+      /class="stage-col[^"]*\blocked\b[^"]*"[^>]*data-stage-col="Drafting"/,
+    );
+  });
+
+  it('swim-compact strip mirrors the locked-stage modifier (.sc-stage.locked)', async () => {
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    // Editorial Final → sc-stage.locked.
+    const editorialBlock = extractLaneSection(r.html, 'default');
+    expect(editorialBlock).toMatch(
+      /class="sc-stage[^"]*\blocked\b[^"]*"[^>]*data-sc-stage="Final"/,
+    );
+    // QA Reviewed → sc-stage.locked.
+    const qaBlock = extractLaneSection(r.html, 'qa');
+    expect(qaBlock).toMatch(
+      /class="sc-stage[^"]*\blocked\b[^"]*"[^>]*data-sc-stage="Reviewed"/,
+    );
+  });
+
+  it('swimlane <article> carries template-id modifier class (swim--<template-id>)', async () => {
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    // Editorial lane → swim--editorial.
+    expect(r.html).toMatch(
+      /<article class="swim swim--editorial"[^>]*data-lane-id="default"/,
+    );
+    // Mockups (visual template) → swim--visual.
+    expect(r.html).toMatch(
+      /<article class="swim swim--visual"[^>]*data-lane-id="mockups"/,
+    );
+    // QA → swim--qa-plan.
+    expect(r.html).toMatch(
+      /<article class="swim swim--qa-plan"[^>]*data-lane-id="qa"/,
+    );
+  });
+
+  it('bay-shell carries data-project-key with a 12-char lowercase hex hash', async () => {
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    const match = r.html.match(/data-project-key="([^"]+)"/);
+    expect(match).not.toBeNull();
+    // Hash shape: exactly 12 lowercase hex characters.
+    expect(match?.[1]).toMatch(/^[0-9a-f]{12}$/);
+  });
+
+  it('"Filtered ·" badge appears in .bh-meta when ?focus= narrows the visible set', async () => {
+    // 2 of 3 lanes focused → filter is active.
+    const r1 = await getHtml(app, '/dev/editorial-studio?focus=default,mockups');
+    expect(r1.status).toBe(200);
+    expect(r1.html).toContain('<span class="filter-active">Filtered · </span>');
+    // No filter: all lanes focused → badge absent.
+    const r2 = await getHtml(app, '/dev/editorial-studio');
+    expect(r2.status).toBe(200);
+    expect(r2.html).not.toContain('class="filter-active"');
+  });
+
   it('per ambiguity 4: entries with undefined lane route to default and surface a warn (does not crash)', async () => {
     // Add a legacy sidecar with no lane field.
     await writeSidecar(
@@ -339,8 +458,11 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
  * leak into mockups-lane assertions.
  */
 function extractLaneSection(html: string, laneId: string): string {
+  // Matches `<article class="swim"` or `<article class="swim swim--<id>"`
+  // — Finding 3 added the template-id modifier so the regex tolerates
+  // additional class tokens before the `data-lane-id` attribute.
   const openPattern = new RegExp(
-    `<article class="swim"[^>]*data-lane-id="${laneId}"`,
+    `<article class="swim(?:\\s[^"]*)?"[^>]*data-lane-id="${laneId}"`,
   );
   const openMatch = openPattern.exec(html);
   if (openMatch === null) return '';

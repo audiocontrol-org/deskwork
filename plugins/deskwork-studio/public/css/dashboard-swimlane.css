@@ -206,6 +206,16 @@
   color: var(--er-ink-soft);
 }
 
+/* Filter-active badge — prepended to .bh-meta when focused lanes
+ * are a strict subset of visible lanes (mockup line 162-164 +
+ * usage at line 1031). Proof-red accent + medium weight so the
+ * operator's eye picks up that "2 of 3 lanes shown" is a transient
+ * filter state, not a static count. */
+.bay-head .bh-meta .filter-active {
+  color: var(--er-red-pencil);
+  font-weight: 600;
+}
+
 /* ============================================================
  *  Focus chip strip — transient lane filter.
  * ============================================================ */
@@ -314,9 +324,31 @@
   border-left: 4px solid var(--er-red-pencil);
 }
 
-.swim:nth-of-type(2) { border-left-color: var(--er-proof-blue); }
-.swim:nth-of-type(3) { border-left-color: var(--er-stamp-green); }
-.swim:nth-of-type(4) { border-left-color: var(--er-kraft); }
+/*
+ * Per-lane border-left accent — bound to the lane's pipeline
+ * template id (NOT to its position via nth-of-type). Template-id
+ * binding keeps the operator's lane-to-colour muscle memory stable
+ * even when other lanes are focus-hidden; nth-of-type would shift
+ * colours as the visible set changes.
+ *
+ * Mockup mapping (mockups/2026-05-27-multi-lane-dashboard/
+ *   direction-3-press-bay.html lines 257-260 + the per-lane
+ *   `class="swim editorial"` etc. usages):
+ *   editorial    → red-pencil (the .swim base rule above)
+ *   visual       → proof-blue
+ *   feature-doc  → stamp-green (matches the qa-plan/feature-doc
+ *                  family in the mockup's colour palette)
+ *   qa-plan      → stamp-green
+ *   blog-post    → kraft
+ *
+ * Unknown template ids fall through to the .swim base rule's
+ * red-pencil border-left.
+ */
+.swim.swim--editorial   { border-left-color: var(--er-red-pencil); }
+.swim.swim--visual      { border-left-color: var(--er-proof-blue); }
+.swim.swim--feature-doc { border-left-color: var(--er-stamp-green); }
+.swim.swim--qa-plan     { border-left-color: var(--er-stamp-green); }
+.swim.swim--blog-post   { border-left-color: var(--er-kraft); }
 
 .swim-head {
   padding: 0.6rem 0.85rem;
@@ -407,6 +439,14 @@
   color: var(--er-faded);
 }
 
+/* Locked-stage proof-blue in the collapsed-lane compact strip
+ * (mockup line 540). The locked-stage signal must survive
+ * collapse so the operator's review-lock awareness persists
+ * across view modes. */
+.swim-compact .sc-stage.locked .sc-count {
+  color: var(--er-proof-blue);
+}
+
 /* ============================================================
  *  Stage grid — flex container so 5.1A's collapsed columns
  *  redistribute remaining space via `flex: 0 0 42px`.
@@ -479,6 +519,17 @@
 
 .stage-col.empty .stage-name {
   color: var(--er-ink-soft);
+}
+
+/* Locked stages (templates declare `lockedStages`, e.g. editorial's
+ * Final, qa-plan's Reviewed, blog-post's Edited) render their head
+ * glyph + name in proof-blue. Per the mockup at lines 420 + 540 +
+ * 826 + 869 — the list-view and swim-compact analogues — locked
+ * stages are colour-coded so the operator's eye picks up "review
+ * lock" without reading the stage name. */
+.stage-col.locked .stage-glyph,
+.stage-col.locked .stage-name {
+  color: var(--er-proof-blue);
 }
 
 .stage-col .stage-count {
