@@ -19,12 +19,11 @@
  *   - Drag-to-reorder rail handler (Task 5.4).
  *   - Saveable focus presets + deep-link URL (Task 5.5).
  *
- * Tasks 5.1A + 5.1B landed: the lane-level + per-stage collapse
- * chevrons (5.1A) and the segmented kanban↔list view-toggle (5.1B)
- * are real markup in `swimlane-card.ts`. Only the `<!-- 5.1C slot
- * -->` HTML comment remains in the swim-head; the next dispatch's
- * diff stays additive (drop in the affordance; no markup needs
- * removing).
+ * Tasks 5.1A + 5.1B + 5.1C landed: the lane-level + per-stage
+ * collapse chevrons (5.1A), the segmented kanban↔list view-toggle
+ * (5.1B), and the per-lane `+ new` Compose chip (5.1C) are all real
+ * markup in `swimlane-card.ts`. The swim-head shape is now complete
+ * for Phase 5 Task 5.1's slot allocation.
  *
  * F4 split (Phase 5 Task 5.1 code-quality pass): the rail, focus-
  * strip, and per-lane swim/stub renderers live in sibling modules

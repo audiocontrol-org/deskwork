@@ -41,6 +41,13 @@
  *   - `renderViewToggle`: segmented `▦ Kanban` / `≡ List` control
  *     in the swim-head. Per `affordance-placement.md`, the toggle
  *     lives ON the lane it controls.
+ *   - `renderComposeChip`: per-lane `+ new` clipboard-copy affordance
+ *     (Task 5.1C). Lives ON the lane it composes for; carries the
+ *     lane id + first linear stage as data attributes so the client
+ *     controller can compose the slash-command WITHOUT a server round
+ *     trip. Per THESIS Consequence 2 / DESKWORK-STATE-MACHINE.md
+ *     Commandment II — the chip is a clipboard convenience, not a
+ *     verb; it never mutates sidecar state.
  */
 
 import { html, unsafe, type RawHtml } from '../html.ts';
@@ -221,6 +228,48 @@ export function renderViewToggle(laneId: string, laneName: string): RawHtml {
     </div>`);
 }
 
+/**
+ * Per-lane Compose chip (Task 5.1C). Renders the `+ new` affordance
+ * in the swim-head, between the view-toggle and the lane-collapse
+ * chevron. Clicking the chip clipboard-copies the partial slash
+ * command `/deskwork:add <SLUG> --lane <laneId> --stage <firstStage>`
+ * — the literal four-character `<SLUG>` placeholder is part of the
+ * copied text, the operator replaces it in the chat editor after
+ * paste.
+ *
+ * Per THESIS Consequence 2 and DESKWORK-STATE-MACHINE.md Commandment
+ * II — the chip is a clipboard convenience, never a verb. No sidecar
+ * mutation, no network round trip, no state change. The operator's
+ * pasted slash command IS the action.
+ *
+ * Per `affordance-placement.md` — the chip lives ON the lane it
+ * composes for, not in any toolbar.
+ *
+ * `firstLinearStage` is the entry's destination stage on `/deskwork
+ * :add`. The pipeline-template schema enforces `linearStages.length
+ * ≥ 1` (`packages/core/src/pipelines/types.ts:99` —
+ * `uniqueStringArray('linearStages', 1)`), so every lane has at
+ * least one. The render throws if that invariant is ever violated
+ * at runtime — per the no-fallback rule, surfacing the empty case
+ * as an error rather than silently emitting an empty `data-first-
+ * stage` attribute.
+ */
+export function renderComposeChip(
+  laneId: string,
+  laneName: string,
+  firstLinearStage: string,
+): RawHtml {
+  return unsafe(html`
+    <button class="swim-compose" type="button"
+      aria-label="Compose new entry in ${laneName}"
+      data-swim-compose
+      data-lane-id="${laneId}"
+      data-first-stage="${firstLinearStage}">
+      <span class="sc-icon" aria-hidden="true">+</span>
+      <span class="sc-label">new</span>
+    </button>`);
+}
+
 function renderSwimCompact(bucket: LaneBucket): RawHtml {
   const stages: string[] = [
     ...bucket.template.linearStages,
@@ -286,6 +335,20 @@ export function renderSwimlane(
   const stageCount = template.linearStages.length + template.offPipelineStages.length;
   const tag = `${template.id} · ${stageCount} stages`;
   const meta = `${bucket.entryCount} entries`;
+  // Pipeline-template schema invariant: linearStages.length ≥ 1
+  // (`packages/core/src/pipelines/types.ts:99` — `uniqueStringArray
+  // ('linearStages', 1)`). If a malformed template ever reaches the
+  // renderer at runtime, surface the violation as an error rather
+  // than silently emitting an empty `data-first-stage` attribute
+  // (per the project's no-fallback rule).
+  const firstLinearStage = template.linearStages[0];
+  if (firstLinearStage === undefined) {
+    throw new Error(
+      `pipeline template "${template.id}" has empty linearStages — `
+      + 'the schema enforces a minimum of 1; this is a programming '
+      + 'error reaching the swimlane renderer',
+    );
+  }
 
   // Per AUDIT-20260528-02: the swimlane is server-rendered alongside
   // its stub for every visibility-on lane. CSS hides exactly one
@@ -313,7 +376,7 @@ export function renderSwimlane(
         <span class="tag">${tag}</span>
         <span class="quick-meta">${meta}</span>
         ${renderViewToggle(lane.id, lane.name)}
-        <!-- 5.1C slot: + new compose chip lands here. -->
+        ${renderComposeChip(lane.id, lane.name, firstLinearStage)}
         <button class="collapse-chev" type="button"
           aria-expanded="true"
           aria-label="Collapse ${lane.name} lane"

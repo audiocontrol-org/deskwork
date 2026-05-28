@@ -313,24 +313,44 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
     );
   });
 
-  it('leaves later-task affordance slots in place (5.1C placeholders, no stubs)', async () => {
-    // Slots are HTML comments — they survive into the rendered page
-    // because we render via string templates rather than JSX. The
-    // assertion verifies the placeholder commentary lands so the
-    // next dispatch can do additive diffs.
+  it('emits a real .swim-compose chip per lane', async () => {
+    // Task 5.1C — per-lane compose chip in each swim-head. The chip
+    // carries data-lane-id + data-first-stage so the client
+    // controller can compose the slash command without a server
+    // round trip; the aria-label carries the full action.
     //
-    // Task 5.1A landed the lane-level + per-stage collapse chevrons,
-    // so the 5.1A slots have been replaced by real `<button
-    // class="collapse-chev">` markup — see the dedicated 5.1A tests
-    // below. Task 5.1B landed the view-toggle, so the 5.1B slot has
-    // been replaced by a real `<div class="view-toggle">` (see the
-    // dedicated 5.1B tests below). Only the 5.1C (compose chip)
-    // slot remains an HTML-comment placeholder.
+    // First linear stages per preset (verified against the JSON):
+    //   - editorial → Ideas  (editorial.json:linearStages[0])
+    //   - visual    → Sketched (visual.json:linearStages[0])
+    //   - qa-plan   → Drafted (qa-plan.json:linearStages[0])
     const r = await getHtml(app, '/dev/editorial-studio');
     expect(r.status).toBe(200);
-    expect(r.html).toContain('5.1C slot');
-    // 5.1C affordance not yet rendered — assert by absence.
-    expect(r.html).not.toContain('class="swim-compose"');
+    const lanes: Array<{ id: string; name: string; firstStage: string }> = [
+      { id: 'default', name: 'Editorial', firstStage: 'Ideas' },
+      { id: 'mockups', name: 'Mockups', firstStage: 'Sketched' },
+      { id: 'qa', name: 'QA', firstStage: 'Drafted' },
+    ];
+    for (const lane of lanes) {
+      const block = extractLaneSection(r.html, lane.id);
+      // The chip carries class="swim-compose" AND the lane-scoped
+      // data attributes. Attribute order is not guaranteed by the
+      // template, so we assert each fragment independently.
+      expect(block).toContain('class="swim-compose"');
+      expect(block).toContain(`data-lane-id="${lane.id}"`);
+      expect(block).toContain(`data-first-stage="${lane.firstStage}"`);
+      expect(block).toContain(
+        `aria-label="Compose new entry in ${lane.name}"`,
+      );
+    }
+  });
+
+  it('5.1C slot comment is removed from the rendered output', async () => {
+    // Task 5.1C replaces the HTML-comment slot with real markup. Any
+    // remaining `5.1C slot` literal would indicate the renderer
+    // regressed to the placeholder shape.
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    expect(r.html).not.toContain('5.1C slot');
   });
 
   it('per-lane glyphs from the mockup mapping (editorial=§, visual=◆, qa-plan=⊕)', async () => {

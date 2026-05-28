@@ -12,6 +12,7 @@ import { initStageTiles } from './dashboard/stage-tiles.ts';
 import { initSwimlane } from './dashboard/swimlane.ts';
 import { initSwimlaneCollapse } from './dashboard/swimlane-collapse.ts';
 import { initSwimlaneViewToggle } from './dashboard/swimlane-view-toggle.ts';
+import { initSwimlaneCompose } from './dashboard/swimlane-compose.ts';
 import { initMastheadPopover } from './mobile-shell/masthead-popover.ts';
 
 function siteFromButton(btn: HTMLButtonElement): string {
@@ -519,6 +520,7 @@ function init(): void {
   initSwimlane();
   initSwimlaneCollapse();
   initSwimlaneViewToggle();
+  initSwimlaneCompose();
   initRowActions();
   initMastheadPopover();
 }

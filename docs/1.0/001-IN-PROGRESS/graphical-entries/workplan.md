@@ -241,10 +241,10 @@ The picked design **pivots away from the PRD's original "per-lane tab strip" fra
 
 ### Task 5.1C: Per-lane Compose chip (`+ new`)
 
-- [ ] Step 5.1C.1: Each swim-head / lane-head carries a `.swim-compose` chip rendering `+ new` on desktop, icon-only `+` on mobile (aria-label carries the full action). Min hit target: 26px desktop / 30×30 mobile, ≥24×24 per WCAG 2.2 SC 2.5.8 AA.
-- [ ] Step 5.1C.2: Click handler clipboard-copies the partial slash-command: `/deskwork:add <SLUG> --lane <lane-id> --stage <first-linear-stage>`. The placeholder text `<SLUG>` is LITERAL — the operator replaces it in the chat editor after pasting.
-- [ ] Step 5.1C.3: Post-click state: chip flashes green with `✓ Copied — paste in chat` for ~2s, then reverts to default. Implementation may use `.copied` class + `setTimeout`; no form fields, no popover, no bottom sheet.
-- [ ] Step 5.1C.4: Per THESIS Consequence 2, the studio does not mutate sidecar state from the click — the chip only copies; the operator's pasted slash-command IS the action.
+- [x] Step 5.1C.1: Each swim-head / lane-head carries a `.swim-compose` chip rendering `+ new` on desktop, icon-only `+` on mobile (aria-label carries the full action). Min hit target: 26px desktop / 30×30 mobile, ≥24×24 per WCAG 2.2 SC 2.5.8 AA.
+- [x] Step 5.1C.2: Click handler clipboard-copies the partial slash-command: `/deskwork:add <SLUG> --lane <lane-id> --stage <first-linear-stage>`. The placeholder text `<SLUG>` is LITERAL — the operator replaces it in the chat editor after pasting.
+- [x] Step 5.1C.3: Post-click state: chip flashes green with `✓ Copied — paste in chat` for ~2s, then reverts to default. Implementation may use `.copied` class + `setTimeout`; no form fields, no popover, no bottom sheet.
+- [x] Step 5.1C.4: Per THESIS Consequence 2, the studio does not mutate sidecar state from the click — the chip only copies; the operator's pasted slash-command IS the action.
 
 ### Task 5.2: Template-aware stage columns (no hardcoded stages in render)
 
