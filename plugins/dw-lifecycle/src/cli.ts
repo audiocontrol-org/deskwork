@@ -30,6 +30,7 @@ import { uninstallScopeDiscoveryHooks } from './subcommands/uninstall-scope-disc
 import { orchestratorTurn } from './subcommands/orchestrator-turn.js';
 import { wrapPrompt } from './subcommands/wrap-prompt.js';
 import { validateReturn } from './subcommands/validate-return.js';
+import { debtReport } from './subcommands/debt-report.js';
 
 const subcommand = process.argv[2];
 const args = process.argv.slice(3);
@@ -74,6 +75,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'orchestrator-turn': orchestratorTurn,
   'wrap-prompt': wrapPrompt,
   'validate-return': validateReturn,
+  'debt-report': debtReport,
 };
 
 // Deprecation hints printed alongside the subcommand list in `--help`.
