@@ -907,3 +907,160 @@ Phase 5 expansions (e.g., touch-drag via Pointer Events, or
 animation polish) would push past the cap.
 
 Trajectory note alongside AUDIT-14 / -20 / -26.
+
+## 2026-05-28 audit: Phase 5 Task 5.5 (saveable focus presets + deep-link URL)
+
+Audit scope: commit `643f2e9` + in-task review followup.
+Predecessor: `990d304`. Tests 771 → 781 (with one regression after the
+window.prompt removal addressed below); after followup tests stabilize.
+Build exit 0 across core + studio.
+
+Combined spec + code-quality review via the dw-lifecycle trussing.
+Spec ✅ SPEC-COMPLIANT; quality ⚠️ APPROVED WITH FOLLOWUPS — 0
+blocking architecture findings, 3 actionable non-blocking (F1 URL
+strip, F3 id collision, F8 whitespace name) + 1 BLOCKING discovered
+during in-task verification (window.prompt / window.confirm violate
+the project's `no-native-prompts.test.ts` enforcement rule). All
+applied inline.
+
+### AUDIT-20260528-33
+
+Finding-ID: AUDIT-20260528-33
+Status:     fixed-followup-commit
+Severity:   medium
+Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-presets.ts
+
+Deep-link URL persisted `?preset=<id>` in the URL bar after applying
+the preset. Subsequent operator-driven mutations (focus chip clicks,
+view-toggle flips) drifted the live state away from what the URL
+advertised; the shareable deep-link became a half-truth.
+
+Resolution: added `stripPresetFromUrl()` helper invoked at the end of
+`applyDeepLinkPreset`. Uses `history.replaceState` to remove the
+`preset` query param while preserving the rest of the URL (other
+params, hash). Degrades to no-op when `history.replaceState` is
+unavailable.
+
+### AUDIT-20260528-34
+
+Finding-ID: AUDIT-20260528-34
+Status:     fixed-followup-commit
+Severity:   medium
+Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts
+
+`p${Date.now().toString(36)}` preset ids collided on same-millisecond
+saves, silently overwriting the prior preset with no error.
+
+Resolution: appended a short base-36 random suffix (`-${random5}`) so
+two saves in the same millisecond produce distinct ids. Added a
+16-attempt collision-guard that throws if the random suffix also
+collides (cosmic-ray-rare; the throw surfaces the case loudly per the
+no-fallback rule).
+
+### AUDIT-20260528-35
+
+Finding-ID: AUDIT-20260528-35
+Status:     fixed-followup-commit
+Severity:   low
+Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-presets.ts
+
+Save handler silently dropped whitespace-only names with no operator
+feedback. The flash confirm wouldn't fire, leaving the operator
+unsure whether the save took.
+
+Resolution: the new `inlinePrompt` helper (see AUDIT-36) trims and
+returns null on whitespace-only input, which the save handler treats
+as cancel. The belt-and-braces guard in `handleSaveClick` covers any
+custom hook violating the contract.
+
+### AUDIT-20260528-36
+
+Finding-ID: AUDIT-20260528-36
+Status:     fixed-followup-commit
+Severity:   high
+Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-presets.ts + plugins/deskwork-studio/public/src/entry-review/inline-prompt.ts
+
+The initial Task 5.5 implementation used `window.prompt` and
+`window.confirm` (per the dispatch contract's "use window.prompt for
+simplicity"). This violated the project-wide ban enforced by
+`packages/studio/test/no-native-prompts.test.ts:78` (per #166 / Phase
+34b — full audit). The test failed immediately on the followup-
+verification suite run.
+
+Resolution: extended `plugins/deskwork-studio/public/src/entry-review/
+inline-prompt.ts` with a new `inlinePrompt(opts)` function for text
+input (sibling of the existing `inlineConfirm`). Updated
+`PresetControllerHooks` so `promptForName` returns `Promise<string |
+null>` and `confirmDelete` returns `Promise<boolean>`; the default
+hooks consume the inline helpers. Handlers became async; the bind
+wrapper uses `void` to suppress the floating-promise warning. Tests
+updated to await the async hook chain via `Promise.resolve` yields.
+
+Dispatch-contract conflict learned: the implementer prompt instructed
+`window.prompt` per the workplan literal text, but the project rule
+forbids it. The dispatch prompt should have caught this. Adding a
+note to the dispatch playbook: pre-check the dispatch's
+implementation primitives against the no-native-prompts test.
+
+### AUDIT-20260528-37
+
+Finding-ID: AUDIT-20260528-37
+Status:     open
+Severity:   low
+Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-presets.ts
+
+Reviewer findings F2 (no copy-deep-link affordance), F4 (`?focus=` vs
+`?preset=` interaction docs), F5 (singleton reset for tests), F6
+(type narrowing on stage collapse), F7 (window.prompt replacement now
+covered by AUDIT-36) — surfaced as observations.
+
+F2 (copy-deep-link affordance): the dispatch prompt called it
+"optional but valued." Adding a small `🔗` button next to Delete
+clipboard-copies `<origin>/dev/editorial-studio?preset=<id>` and is
+a worthwhile Phase 5 polish addition. Not blocking 5.5 close.
+
+F4: the preset apply overrides any concurrent `?focus=` URL param
+silently. Worth a doc-comment in `applyDeepLinkPreset` and a test
+pinning the precedence.
+
+F5: module-level singleton state means cross-describe-block tests
+could see stale state. Currently no such test exists; document the
+contract via a code comment at each `activeState` declaration.
+
+F6: `stageCollapseState: Record<string, Record<string, boolean>>`
+silently drops `false` flags through the snapshot/apply round-trip.
+Type would be cleaner as `Record<string, readonly string[]>`
+(collapsed stage names).
+
+Tracked as `open` observations; revisit during Phase 5 polish or
+Phase 6 lane CRUD work.
+
+## 2026-05-28 tooling-feedback verification against dw-lifecycle v0.25.0
+
+Operator notification: the upstream dw-lifecycle plugins shipped
+v0.25.0 with purported tooling-feedback fixes. Verified by probing
+each TF entry against `/Users/orion/.claude/plugins/marketplaces/
+deskwork/plugins/dw-lifecycle/bin/dw-lifecycle` (the v0.25.0
+binary):
+
+- **TF-008** (Searched-line strictness — "matches" noun required):
+  ✅ PROBE PASSES under v0.25.0. The validator now accepts other
+  enumeration nouns ("call sites" probed; passes). Update TF-008
+  status: `closed-v0.25.0`.
+- **TF-009** (forbidden-deferral false-positives on project-vocab
+  nouns like "stub" / "placeholder"): ✅ PROBE PASSES under v0.25.0.
+  Body text containing "stub" and "placeholder" no longer trips the
+  forbidden-phrase check (only Excluded-line reasons are scanned).
+  Update TF-009 status: `closed-v0.25.0`.
+- **TF-011** (`Excluded: (none ...)` parser rejection): ❌ STILL
+  REJECTED under v0.25.0. The parser still requires a `path:LINE`
+  shape. Workaround documented in TF-011 remains the operator's
+  path. Status: still open.
+- **TF-012** (`refactored` word triggers refactor-precondition gate
+  on additive-feature responses): ❌ STILL REJECTED under v0.25.0.
+  The matcher still fires on bare-word "refactored" in any context.
+  Workaround documented in TF-012 remains. Status: still open.
+
+Net: 2 of 4 wrapper-format frictions closed by v0.25.0. TF-008 and
+TF-009 to be marked `closed-v0.25.0` in `tooling-feedback.md`.
+TF-011 and TF-012 remain open with the v0.25.0 verification noted.

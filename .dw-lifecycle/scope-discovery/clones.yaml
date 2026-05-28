@@ -365,8 +365,8 @@ clones:
   - id: feecb3d2c71e
     lines: 8
     members:
-      - packages/studio/src/pages/dashboard/swimlane-shell.ts:67:74
-      - plugins/deskwork-studio/public/src/dashboard/swimlane.ts:106:113
+      - packages/studio/src/pages/dashboard/swimlane-shell.ts:76:83
+      - plugins/deskwork-studio/public/src/dashboard/swimlane.ts:109:116
     disposition: keep-with-reason
     reason: "wire-format symmetry: server parseFocusCsv + client parseCsvNonEmpty parse the same focus CSV on opposite ends of the request boundary; consolidating would require a shared vendored module since server and client bundles are independent"
   - id: 6a86f85c95cd
@@ -472,29 +472,29 @@ clones:
   - id: 14579dae3bdf
     lines: 20
     members:
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:107:119
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:139:158
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:113:125
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:145:164
     disposition: pending
     reason: null
   - id: 8a46fe453209
     lines: 17
     members:
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:108:119
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:472:488
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:114:125
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:478:494
     disposition: pending
     reason: null
   - id: 82d6dc44c67e
     lines: 11
     members:
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:109:119
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:193:203
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:115:125
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:199:209
     disposition: pending
     reason: null
   - id: f0e04e87d0e2
     lines: 7
     members:
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:160:166
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:81:87
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:166:172
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:87:93
     disposition: pending
     reason: null
   - id: 7c1800068cfe
@@ -512,6 +512,20 @@ clones:
       - plugins/deskwork-studio/public/src/entry-review/comment-edit-delete.ts:92:97
     disposition: pending
     reason: null
+  - id: 406b9691cf88
+    lines: 8
+    members:
+      - plugins/deskwork-studio/public/src/entry-review/inline-prompt.ts:118:125
+      - plugins/deskwork-studio/public/src/entry-review/inline-prompt.ts:37:44
+    disposition: keep-with-reason
+    reason: inlineConfirm + inlinePrompt are sibling primitives sharing mounting boilerplate (wrap + label + actions + keydown lifecycle); the inline-dialog-shell consolidation is a focused refactor task to be tracked separately, not a same-commit fix
+  - id: 2e8ffa1809f2
+    lines: 12
+    members:
+      - plugins/deskwork-studio/public/src/entry-review/inline-prompt.ts:135:146
+      - plugins/deskwork-studio/public/src/entry-review/inline-prompt.ts:50:61
+    disposition: keep-with-reason
+    reason: inlineConfirm + inlinePrompt are sibling primitives sharing mounting boilerplate (wrap + label + actions + keydown lifecycle); the inline-dialog-shell consolidation is a focused refactor task to be tracked separately, not a same-commit fix
   - id: 02612a02fc99
     lines: 7
     members:

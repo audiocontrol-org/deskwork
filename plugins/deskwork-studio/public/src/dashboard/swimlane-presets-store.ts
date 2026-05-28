@@ -298,7 +298,24 @@ export function savePresetFromCurrent(
   name: string,
 ): FocusPreset {
   const now = new Date();
-  const id = `p${now.getTime().toString(36)}`;
+  const presets = readPresets(projectKey);
+  // Per AUDIT-20260528-34 — `p${Date.now().toString(36)}` is
+  // millisecond-resolution and silently overwrites on collision
+  // (a same-ms second save erases the first). Append a short
+  // base-36 random suffix so two saves in the same millisecond
+  // produce distinct ids; on the rare collision-of-the-suffix
+  // path, bump until a free id is found.
+  let id = `p${now.getTime().toString(36)}-${Math.random().toString(36).slice(2, 5)}`;
+  let collisionGuard = 0;
+  while (presets.has(id)) {
+    collisionGuard += 1;
+    if (collisionGuard > 16) {
+      throw new Error(
+        'savePresetFromCurrent: failed to mint a unique preset id after 16 attempts',
+      );
+    }
+    id = `p${now.getTime().toString(36)}-${Math.random().toString(36).slice(2, 5)}`;
+  }
   const snapshot = snapshotCurrentState(projectKey);
   const preset: FocusPreset = {
     id,
@@ -310,7 +327,6 @@ export function savePresetFromCurrent(
     laneCollapseState: snapshot.laneCollapseState,
     stageCollapseState: snapshot.stageCollapseState,
   };
-  const presets = readPresets(projectKey);
   presets.set(id, preset);
   writePresets(projectKey, presets);
   return preset;

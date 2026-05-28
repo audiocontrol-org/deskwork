@@ -315,6 +315,10 @@ Cross-reference: paired tightly with TF-005; both describe the same root cause (
 
 ## TF-008 · DSC · low · `validate-return` parser strictly requires the literal noun "matches" — semantically equivalent phrasings are rejected
 
+**Status:** closed-v0.25.0. Verified 2026-05-28 by probing the v0.25.0 binary at `/Users/orion/.claude/plugins/marketplaces/deskwork/plugins/dw-lifecycle/bin/dw-lifecycle` with a `Searched:` line using `3 call sites` instead of `3 matches`; the response validated cleanly. The parser now accepts other enumeration nouns. The original analysis below is preserved as the historical record of the failure mode.
+
+---
+
 **Repro:**
 
 1. Run a sub-agent dispatch via `wrap-prompt` and instruct the agent to conclude with the REQUIRED RETURN GRAMMAR block.
@@ -375,6 +379,10 @@ Combined recommendation for TF-008: ship a **Light** update to the GRAMMAR_INSTR
 This is documentation-only; the parser's existing strict contract stays as-is.
 
 ## TF-009 · DSC · low · `validate-return` forbidden-phrase list false-positives on project-vocabulary nouns ("stub", "placeholder")
+
+**Status:** closed-v0.25.0. Verified 2026-05-28 by probing v0.25.0 with a body containing the words "stub" and "placeholder" used as project canonical nouns; the response validated cleanly. The forbidden-phrase check now scopes to Excluded-line reasons only (not the whole response body) — the original false-positive pattern is no longer triggered. The original analysis below is preserved as the historical record.
+
+---
 
 **Repro:**
 
@@ -476,6 +484,10 @@ Cross-reference: TF-006 (closed) is incidentally the entry that first surfaced t
 
 ## TF-011 · DSC · low · `validate-return` rejects the canonical "no exclusions" shape `Excluded: (none — ...)` with parseError
 
+**Status:** still open (verified against v0.25.0 on 2026-05-28 — the parser still rejects `(none` with the same `Malformed file:line entry` error). Workaround documented below remains operative.
+
+---
+
 **Repro:**
 
 The wrapper's REQUIRED RETURN GRAMMAR prose says the `Excluded:` line carries `file:line pairs you intentionally did NOT cover`. When the dispatched task's grep enumerates a single class of fix and every match is covered (the dispatch's whole scope), there are no out-of-scope citations. A natural way to express that is:
@@ -511,6 +523,10 @@ Option (1) is closer to the operator's natural-language intent; option (2) is th
 Cross-reference: TF-008 + TF-009 are the same shape (wrapper format strictness producing rejection where substantive work is intact). The pattern across the three: the validate-return parser is exact-string-matching where the operator's natural phrasing is semantically equivalent.
 
 ## TF-012 · DSC · low · `validate-return` refactor-precondition gate false-positives on additive-feature responses that use the word "refactored"
+
+**Status:** still open (verified against v0.25.0 on 2026-05-28 — the bare word "refactored" still trips the refactor-precondition gate even when the response has no clones.yaml citation). Workaround documented below remains operative.
+
+---
 
 **Repro:**
 

@@ -39,6 +39,10 @@ import {
   readPresets,
   savePresetFromCurrent,
 } from './swimlane-presets-store.ts';
+import {
+  inlineConfirm,
+  inlinePrompt,
+} from '../entry-review/inline-prompt.ts';
 
 export type { FocusPreset };
 export {
@@ -108,25 +112,43 @@ function flashSaveConfirm(button: HTMLElement): void {
 }
 
 export interface PresetControllerHooks {
-  readonly promptForName: (defaultName: string) => string | null;
-  readonly confirmDelete: (presetName: string) => boolean;
+  readonly promptForName: (defaultName: string, anchor: HTMLElement) => Promise<string | null>;
+  readonly confirmDelete: (presetName: string, anchor: HTMLElement) => Promise<boolean>;
 }
 
 const defaultHooks: PresetControllerHooks = {
-  promptForName: (defaultName) => window.prompt('Preset name:', defaultName),
-  confirmDelete: (presetName) =>
-    window.confirm(`Delete preset "${presetName}"?`),
+  promptForName: (defaultName, anchor) =>
+    inlinePrompt({
+      label: 'Preset name',
+      defaultValue: defaultName,
+      placeholder: 'e.g. "Drafting focus"',
+      confirm: 'Save',
+      cancel: 'Cancel',
+      anchor,
+    }),
+  confirmDelete: (presetName, anchor) =>
+    inlineConfirm({
+      label: 'Delete preset',
+      message: `Delete preset "${presetName}"?`,
+      confirm: 'Delete',
+      cancel: 'Cancel',
+      anchor,
+    }),
 };
 
-function handleSaveClick(
+async function handleSaveClick(
   saveBtn: HTMLButtonElement,
   projectKey: string,
   listContainer: HTMLElement,
   hooks: PresetControllerHooks,
-): void {
+): Promise<void> {
   const defaultName = `Preset ${listPresets(projectKey).length + 1}`;
-  const name = hooks.promptForName(defaultName);
+  const name = await hooks.promptForName(defaultName, saveBtn);
   if (name === null) return;
+  // The inlinePrompt helper trims and returns null on whitespace-only
+  // input, so by contract we receive a non-empty trimmed string here.
+  // Add a belt-and-braces guard in case a custom hook violates that
+  // contract.
   const trimmed = name.trim();
   if (trimmed.length === 0) return;
   savePresetFromCurrent(projectKey, trimmed);
@@ -134,12 +156,12 @@ function handleSaveClick(
   flashSaveConfirm(saveBtn);
 }
 
-function handleListClick(
+async function handleListClick(
   ev: MouseEvent,
   projectKey: string,
   listContainer: HTMLElement,
   hooks: PresetControllerHooks,
-): void {
+): Promise<void> {
   const target = ev.target;
   if (!(target instanceof HTMLElement)) return;
 
@@ -161,7 +183,8 @@ function handleListClick(
     const presets = readPresets(projectKey);
     const preset = presets.get(id);
     if (preset === undefined) return;
-    if (!hooks.confirmDelete(preset.name)) return;
+    const confirmed = await hooks.confirmDelete(preset.name, deleteBtn);
+    if (!confirmed) return;
     deletePreset(projectKey, id);
     renderPresetList(listContainer, projectKey);
     return;
@@ -177,12 +200,12 @@ function bindHandlers(
   const saveBtn = rail.querySelector<HTMLButtonElement>('[data-preset-save]');
   if (saveBtn !== null) {
     saveBtn.addEventListener('click', () => {
-      handleSaveClick(saveBtn, projectKey, listContainer, hooks);
+      void handleSaveClick(saveBtn, projectKey, listContainer, hooks);
     });
   }
 
   listContainer.addEventListener('click', (ev) => {
-    handleListClick(ev, projectKey, listContainer, hooks);
+    void handleListClick(ev, projectKey, listContainer, hooks);
   });
 }
 
@@ -200,6 +223,30 @@ function applyDeepLinkPreset(projectKey: string): void {
   const preset = presets.get(id);
   if (preset === undefined) return;
   applyPreset(projectKey, preset);
+  // Per AUDIT-20260528-33 — strip `?preset=<id>` from the URL after
+  // applying the preset. Once applied the preset's contribution to
+  // the page state is complete; subsequent operator-driven mutations
+  // (focus chip clicks, view-toggle flips, etc.) should not silently
+  // drift the live state away from what the URL bar advertises. A
+  // shareable deep-link should always be honest about what it opens.
+  stripPresetFromUrl();
+}
+
+/**
+ * Remove the `preset` query parameter from the current URL via
+ * `history.replaceState`. No-op when `history.replaceState` is
+ * unavailable (older browsers, certain sandboxes); the URL stays
+ * intact and the operator still sees the applied state — only the
+ * URL hygiene step degrades.
+ */
+function stripPresetFromUrl(): void {
+  if (typeof window.history?.replaceState !== 'function') return;
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has('preset')) return;
+  url.searchParams.delete('preset');
+  const search = url.searchParams.toString();
+  const newUrl = url.pathname + (search.length > 0 ? `?${search}` : '') + url.hash;
+  window.history.replaceState({}, '', newUrl);
 }
 
 /**

@@ -175,8 +175,8 @@ function bootControllers(): void {
 
 function makeHooks(name: string, confirm: boolean = true): PresetControllerHooks {
   return {
-    promptForName: () => name,
-    confirmDelete: () => confirm,
+    promptForName: () => Promise.resolve(name),
+    confirmDelete: () => Promise.resolve(confirm),
   };
 }
 
@@ -368,7 +368,7 @@ describe('Task 5.5 — saveable focus presets client controller', () => {
     expect(after).toBe(before);
   });
 
-  it('Save button + name prompt + Load + Delete affordances are bound', () => {
+  it('Save button + name prompt + Load + Delete affordances are bound', async () => {
     buildShell(['default', 'mockups', 'qa']);
     bootControllers();
 
@@ -385,6 +385,9 @@ describe('Task 5.5 — saveable focus presets client controller', () => {
     );
     expect(saveBtn).not.toBeNull();
     saveBtn?.click();
+    // Yield for the async hook chain (promptForName + flash).
+    await Promise.resolve();
+    await Promise.resolve();
 
     // Save flash applied.
     expect(saveBtn?.classList.contains('is-flashing')).toBe(true);
@@ -401,35 +404,39 @@ describe('Task 5.5 — saveable focus presets client controller', () => {
     );
     expect(deleteBtn).not.toBeNull();
     deleteBtn?.click();
+    await Promise.resolve();
+    await Promise.resolve();
 
     // List goes back to empty.
     expect(document.querySelector('.preset-empty')).not.toBeNull();
     expect(listPresets(PROJECT_KEY).length).toBe(0);
   });
 
-  it('Save prompt returning null short-circuits the save', () => {
+  it('Save prompt returning null short-circuits the save', async () => {
     buildShell(['default', 'mockups', 'qa']);
     bootControllers();
 
     const hooks: PresetControllerHooks = {
-      promptForName: () => null,
-      confirmDelete: () => true,
+      promptForName: () => Promise.resolve(null),
+      confirmDelete: () => Promise.resolve(true),
     };
     initSwimlanePresets(hooks);
     const saveBtn = document.querySelector<HTMLButtonElement>(
       '[data-preset-save]',
     );
     saveBtn?.click();
+    // Yield for the async hook to resolve.
+    await Promise.resolve();
     expect(listPresets(PROJECT_KEY).length).toBe(0);
   });
 
-  it('Delete confirm returning false short-circuits the delete', () => {
+  it('Delete confirm returning false short-circuits the delete', async () => {
     buildShell(['default', 'mockups', 'qa']);
     bootControllers();
 
     const hooks: PresetControllerHooks = {
-      promptForName: () => 'Saved',
-      confirmDelete: () => false,
+      promptForName: () => Promise.resolve('Saved'),
+      confirmDelete: () => Promise.resolve(false),
     };
     initSwimlanePresets(hooks);
 
@@ -437,12 +444,14 @@ describe('Task 5.5 — saveable focus presets client controller', () => {
       '[data-preset-save]',
     );
     saveBtn?.click();
+    await Promise.resolve();
     expect(listPresets(PROJECT_KEY).length).toBe(1);
 
     const deleteBtn = document.querySelector<HTMLButtonElement>(
       '[data-preset-delete]',
     );
     deleteBtn?.click();
+    await Promise.resolve();
     expect(listPresets(PROJECT_KEY).length).toBe(1);
   });
 });
