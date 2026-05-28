@@ -22,6 +22,13 @@ import type {
   RunPush,
 } from './types.js';
 
+/**
+ * The mid-flight stage at which apply failed. `'remote-delete'` is
+ * intentionally absent — those failures are surfaced as
+ * {@link ArchiveResult.remoteDeleteSkipped} (non-fatal by design): the
+ * branch may have been local-only, and the work-preservation contract
+ * holds without the remote ref being deleted.
+ */
 export class ArchiveBranchApplyError extends Error {
   readonly stage: 'tag-create' | 'tag-push' | 'branch-delete-local';
   readonly cause: Error;
@@ -68,6 +75,7 @@ function prepareArchive(opts: ArchiveBranchOptions, runGit: RunGit): PreparedArc
     branch: opts.branch,
     tagName,
     force: opts.force,
+    compareRef: opts.compareRef,
     runGit,
   });
   const tagMessage = buildTagMessage(opts, meta);
@@ -92,8 +100,12 @@ export function planArchive(args: PlanArgs): DryRunPlan {
   const prep = prepareArchive(opts, runGit);
   const { tagName, tagMessage } = prep;
   const commands: string[] = [];
+  // The tag-message is rendered on its own section in the dry-run output
+  // (see DryRunPlan.tagMessageLines). The command itself references the
+  // message indirectly so a copy-paste from the dry-run output doesn't
+  // collapse embedded newlines via JS string escaping.
   commands.push(
-    `git tag -a ${tagName} ${opts.branch} -m ${JSON.stringify(tagMessage)}`,
+    `git tag -a ${tagName} ${opts.branch} -m <see "Tag message" below>`,
   );
   if (!opts.noPush) {
     commands.push(
@@ -104,7 +116,13 @@ export function planArchive(args: PlanArgs): DryRunPlan {
   if (!opts.noPush) {
     commands.push(`git push origin --delete ${opts.branch}`);
   }
-  return { branch: opts.branch, tagName, commands };
+  return {
+    branch: opts.branch,
+    tagName,
+    commands,
+    tagMessageLines: tagMessage.split('\n'),
+    forceUsed: opts.force,
+  };
 }
 
 /**

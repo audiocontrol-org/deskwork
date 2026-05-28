@@ -34,8 +34,16 @@ export const ConfigSchema = z.object({
   branches: z
     .object({
       prefix: z.string().default('feature/'),
+      archive: z
+        .object({
+          compareRef: z.string().default('origin/main'),
+        })
+        .default({ compareRef: 'origin/main' }),
     })
-    .default({ prefix: 'feature/' }),
+    .default({
+      prefix: 'feature/',
+      archive: { compareRef: 'origin/main' },
+    }),
   worktrees: z
     .object({
       naming: z.string().default('<repo>-<slug>'),

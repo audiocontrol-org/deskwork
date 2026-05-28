@@ -53,8 +53,6 @@ describe('buildTagName', () => {
 });
 
 describe('runPreflight', () => {
-  const now = new Date('2026-05-28T12:00:00.000Z');
-
   it('throws unknown-branch when rev-parse refs/heads/<branch> fails', () => {
     const { runGit } = makeStub([
       {
@@ -69,6 +67,7 @@ describe('runPreflight', () => {
         branch: 'nope',
         tagName: 'archived/nope-2026-05-28',
         force: false,
+        compareRef: 'origin/main',
         runGit,
       }),
     ).toThrow(ArchiveBranchPreflightError);
@@ -77,6 +76,7 @@ describe('runPreflight', () => {
         branch: 'nope',
         tagName: 'archived/nope-2026-05-28',
         force: false,
+        compareRef: 'origin/main',
         runGit,
       });
     } catch (err) {
@@ -114,6 +114,7 @@ describe('runPreflight', () => {
         branch: 'feature/parked',
         tagName: 'archived/feature-parked-2026-05-28',
         force: false,
+        compareRef: 'origin/main',
         runGit,
       });
       throw new Error('expected throw');
@@ -148,6 +149,7 @@ describe('runPreflight', () => {
         branch: 'feature/parked',
         tagName: 'archived/feature-parked-2026-05-28',
         force: false,
+        compareRef: 'origin/main',
         runGit,
       });
       throw new Error('expected throw');
@@ -195,6 +197,7 @@ describe('runPreflight', () => {
         branch: 'feature/empty',
         tagName: 'archived/feature-empty-2026-05-28',
         force: false,
+        compareRef: 'origin/main',
         runGit,
       });
       throw new Error('expected throw');
@@ -237,6 +240,7 @@ describe('runPreflight', () => {
       branch: 'feature/x',
       tagName: 'archived/feature-x-2026-05-28',
       force: true,
+      compareRef: 'origin/main',
       runGit,
     });
     expect(meta.lastCommitSha).toBe('shashasha');
@@ -282,11 +286,192 @@ describe('runPreflight', () => {
       branch: 'feature/parked',
       tagName: 'archived/feature-parked-2026-05-28',
       force: false,
+      compareRef: 'origin/main',
       runGit,
     });
     expect(meta.lastCommitSha).toBe('deadbeef');
     expect(meta.lastCommitSubject).toBe('last commit subject line');
   });
-  // Reference `now` so the linter doesn't flag the import.
-  void now;
+
+  it('honors a non-default compareRef (e.g. upstream/master)', () => {
+    // Asserts that the rev-list invocation uses the operator-supplied
+    // compare-ref rather than hardcoded origin/main. The stub records
+    // which args were called so we can verify the actual ref used.
+    const { runGit, calls } = makeStub([
+      {
+        match: (a) =>
+          a[0] === 'rev-parse' && a[1] === '--verify' && a[2]?.startsWith('refs/heads/') === true,
+        respond: () => 'abc\n',
+      },
+      {
+        match: (a) => a[0] === 'worktree',
+        respond: () => '',
+      },
+      {
+        match: (a) =>
+          a[0] === 'rev-parse' && a[1] === '--verify' && a[2]?.startsWith('refs/tags/') === true,
+        respond: () => {
+          throw new Error('fatal: ref not found');
+        },
+      },
+      {
+        match: (a) => a[0] === 'rev-parse' && a.length === 2,
+        respond: () => 'deadbeef\n',
+      },
+      {
+        match: (a) => a[0] === 'log',
+        respond: () => 'subject\n',
+      },
+      {
+        match: (a) => a[0] === 'rev-list' && a[1] === '--count',
+        respond: () => '4\n',
+      },
+    ]);
+    runPreflight({
+      branch: 'feature/parked',
+      tagName: 'archived/feature-parked-2026-05-28',
+      force: false,
+      compareRef: 'upstream/master',
+      runGit,
+    });
+    const revList = calls.find(
+      (a) => a[0] === 'rev-list' && a[1] === '--count',
+    );
+    expect(revList).toBeDefined();
+    if (revList) {
+      expect(revList[2]).toBe('feature/parked');
+      expect(revList[3]).toBe('^upstream/master');
+    }
+  });
+
+  it('surfaces the configured compareRef in the no-novel-commits error message', () => {
+    const { runGit } = makeStub([
+      {
+        match: (a) =>
+          a[0] === 'rev-parse' && a[1] === '--verify' && a[2]?.startsWith('refs/heads/') === true,
+        respond: () => 'abc\n',
+      },
+      {
+        match: (a) => a[0] === 'worktree',
+        respond: () => '',
+      },
+      {
+        match: (a) =>
+          a[0] === 'rev-parse' && a[1] === '--verify' && a[2]?.startsWith('refs/tags/') === true,
+        respond: () => {
+          throw new Error('fatal: ref not found');
+        },
+      },
+      {
+        match: (a) => a[0] === 'rev-parse' && a.length === 2,
+        respond: () => 'aaa\n',
+      },
+      {
+        match: (a) => a[0] === 'log',
+        respond: () => 'subj\n',
+      },
+      {
+        match: (a) => a[0] === 'rev-list' && a[1] === '--count',
+        respond: () => '0\n',
+      },
+    ]);
+    try {
+      runPreflight({
+        branch: 'feature/merged',
+        tagName: 'archived/feature-merged-2026-05-28',
+        force: false,
+        compareRef: 'upstream/trunk',
+        runGit,
+      });
+      throw new Error('expected throw');
+    } catch (err) {
+      expect(err).toBeInstanceOf(ArchiveBranchPreflightError);
+      if (err instanceof ArchiveBranchPreflightError) {
+        expect(err.kind).toBe('no-novel-commits');
+        expect(err.message).toContain('upstream/trunk');
+      }
+    }
+  });
+
+  it('parses worktree output with no trailing blank (single-block, older git)', () => {
+    // Older git versions may emit porcelain output without a trailing
+    // blank line after the last block. The parser must still find the
+    // branch reference inside that single block.
+    const worktreeOutput = [
+      'worktree /Users/op/feat',
+      'HEAD def',
+      'branch refs/heads/feature/parked',
+    ].join('\n');
+    const { runGit } = makeStub([
+      {
+        match: (a) =>
+          a[0] === 'rev-parse' && a[1] === '--verify' && a[2]?.startsWith('refs/heads/') === true,
+        respond: () => 'def\n',
+      },
+      {
+        match: (a) => a[0] === 'worktree',
+        respond: () => worktreeOutput,
+      },
+    ]);
+    try {
+      runPreflight({
+        branch: 'feature/parked',
+        tagName: 'archived/feature-parked-2026-05-28',
+        force: false,
+        compareRef: 'origin/main',
+        runGit,
+      });
+      throw new Error('expected throw');
+    } catch (err) {
+      expect(err).toBeInstanceOf(ArchiveBranchPreflightError);
+      if (err instanceof ArchiveBranchPreflightError) {
+        expect(err.kind).toBe('branch-checked-out');
+        expect(err.message).toContain('/Users/op/feat');
+      }
+    }
+  });
+
+  it('parses two consecutive worktree blocks separated by only one newline', () => {
+    // Defensive: the split-on-^worktree anchor must still pick out the
+    // second block's branch line independently of the first, even when
+    // the blocks aren't separated by a blank line.
+    const worktreeOutput = [
+      'worktree /Users/op/main',
+      'HEAD abc',
+      'branch refs/heads/main',
+      'worktree /Users/op/feat',
+      'HEAD def',
+      'branch refs/heads/feature/parked',
+    ].join('\n');
+    const { runGit } = makeStub([
+      {
+        match: (a) =>
+          a[0] === 'rev-parse' && a[1] === '--verify' && a[2]?.startsWith('refs/heads/') === true,
+        respond: () => 'def\n',
+      },
+      {
+        match: (a) => a[0] === 'worktree',
+        respond: () => worktreeOutput,
+      },
+    ]);
+    try {
+      runPreflight({
+        branch: 'feature/parked',
+        tagName: 'archived/feature-parked-2026-05-28',
+        force: false,
+        compareRef: 'origin/main',
+        runGit,
+      });
+      throw new Error('expected throw');
+    } catch (err) {
+      expect(err).toBeInstanceOf(ArchiveBranchPreflightError);
+      if (err instanceof ArchiveBranchPreflightError) {
+        expect(err.kind).toBe('branch-checked-out');
+        // The second block's worktree path is the one that should trip
+        // the gate — not the first block's mainline path.
+        expect(err.message).toContain('/Users/op/feat');
+        expect(err.message).not.toContain('/Users/op/main');
+      }
+    }
+  });
 });

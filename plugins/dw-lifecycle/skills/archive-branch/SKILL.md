@@ -26,7 +26,7 @@ The archive pattern is the right disposition when the branch's work is potential
 3. Shell out:
 
 ```
-dw-lifecycle archive-branch <branch> [--rationale "<text>"] [--no-push|--local-only] [--dry-run] [--force]
+dw-lifecycle archive-branch <branch> [--rationale "<text>"] [--compare-ref <ref>] [--no-push|--local-only] [--dry-run] [--force]
 ```
 
 4. Read the summary printed to stdout; the `To restore:` line names the exact `git checkout -b <branch> <tag-name>` invocation to revive the branch later.
@@ -46,7 +46,7 @@ ALL gates must pass before any mutation. Any failure throws with an actionable m
 1. **Branch exists.** `git rev-parse --verify refs/heads/<branch>` must succeed. Fail message names the branch and points at `git branch --list`.
 2. **Branch is not currently checked out.** Parsed from `git worktree list --porcelain`. If a worktree is checked out for the branch, the failure message includes the worktree path + the `git worktree remove` command to clear it first.
 3. **Tag does not already exist.** `git rev-parse --verify refs/tags/<tag-name>` must FAIL (non-zero exit = ref doesn't exist, which is the desired state). If the tag exists, the failure message offers two options: delete the existing tag, or wait until tomorrow so the date suffix differs.
-4. **Branch has at least one commit not on `origin/main`.** `git rev-list --count <branch> ^origin/main` must return >0. If 0, the branch is fully merged or empty; the failure message advises `--force` to archive anyway. (Helpful when `origin/main` is unreachable — pass `--force` to skip the novelty check.)
+4. **Branch has at least one commit not on the compare-ref.** `git rev-list --count <branch> ^<compare-ref>` must return >0. The compare-ref defaults to `origin/main` and is configurable per project via `.dw-lifecycle/config.json` (`branches.archive.compareRef`) or per invocation via `--compare-ref <ref>`. The CLI flag takes precedence over the config; the config takes precedence over the default. If 0, the branch is fully merged or empty; the failure message advises `--force` to archive anyway. (Helpful when the compare-ref is unreachable — pass `--force` to skip the novelty check, or point `--compare-ref` at a different ref like `upstream/master` or `origin/develop`.)
 
 ### Apply sequence
 
@@ -67,10 +67,11 @@ If any apply step fails mid-flight (network error on push, etc.), the skill does
 |---|---|---|
 | `<branch>` | required | The branch to archive (positional). |
 | `--rationale "<text>"` | `Archived <YYYY-MM-DD>; preserved as tag.` | Rationale embedded in the annotated tag's message body. |
-| `--no-push` | off | Skip pushing the tag AND the remote-branch delete. Local-only operation. |
+| `--compare-ref <ref>` | `origin/main` (or `branches.archive.compareRef` from `.dw-lifecycle/config.json` when set) | Ref to compare the branch against for the novel-commits gate. Use this for repos whose mainline is `master`, `trunk`, `develop`, or that live on a non-`origin` remote (e.g. `upstream/master`). |
+| `--no-push` | off | Skip the tag push AND the remote branch delete (both push operations are skipped). Local-only operation. |
 | `--local-only` | off | Alias for `--no-push`. |
 | `--dry-run` | off | Print every git command the skill would run, without running any of them. Pre-flight gates still run; their refusal messages still surface. Exits 0 if pre-flight passes. |
-| `--force` | off | Skip the "has novel commits" pre-flight check. Useful when `origin/main` is unreachable, or when archiving a branch fully merged to main that should still be preserved as a named tag. |
+| `--force` | off | Skip the "has novel commits" pre-flight check. Useful when the compare-ref is unreachable, or when archiving a branch fully merged to mainline that should still be preserved as a named tag. |
 
 ## Exit codes
 

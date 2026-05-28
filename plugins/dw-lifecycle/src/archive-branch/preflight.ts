@@ -27,6 +27,7 @@ interface CheckArgs {
   readonly branch: string;
   readonly tagName: string;
   readonly force: boolean;
+  readonly compareRef: string;
   readonly runGit: RunGit;
 }
 
@@ -59,13 +60,13 @@ export function runPreflight(args: CheckArgs): {
   readonly lastCommitSha: string;
   readonly lastCommitSubject: string;
 } {
-  const { branch, tagName, force, runGit } = args;
+  const { branch, tagName, force, compareRef, runGit } = args;
   assertBranchExists(branch, runGit);
   assertBranchNotCheckedOut(branch, runGit);
   assertTagDoesNotExist(tagName, runGit);
   const meta = readBranchTip(branch, runGit);
   if (!force) {
-    assertHasNovelCommits(branch, runGit);
+    assertHasNovelCommits(branch, compareRef, runGit);
   }
   return meta;
 }
@@ -83,12 +84,18 @@ function assertBranchExists(branch: string, runGit: RunGit): void {
 
 function assertBranchNotCheckedOut(branch: string, runGit: RunGit): void {
   const out = runGit(['worktree', 'list', '--porcelain']);
-  const blocks = out.split(/\n\n+/);
+  // Split on lines beginning with "worktree " so each block deterministically
+  // starts with the worktree-path line. This works regardless of whether the
+  // porcelain output uses blank-line separators (newer git) or only newlines
+  // (older versions), and resists mis-matching the first worktree's branch
+  // line against a target branch declared in a later block.
+  const blocks = out.split(/^worktree /m);
   for (const block of blocks) {
-    const wtMatch = /^worktree (.+)$/m.exec(block);
+    if (!block) continue;
+    const firstLineEnd = block.indexOf('\n');
+    const path = (firstLineEnd === -1 ? block : block.slice(0, firstLineEnd)).trim();
     const brMatch = /^branch refs\/heads\/(.+)$/m.exec(block);
-    if (wtMatch && brMatch && brMatch[1] === branch && wtMatch[1]) {
-      const path = wtMatch[1].trim();
+    if (path && brMatch && brMatch[1] === branch) {
       throw new ArchiveBranchPreflightError(
         'branch-checked-out',
         `Branch ${branch} is checked out at ${path}. Remove the worktree first: git worktree remove ${path}.`,
@@ -114,28 +121,32 @@ function assertTagDoesNotExist(tagName: string, runGit: RunGit): void {
   }
 }
 
-function assertHasNovelCommits(branch: string, runGit: RunGit): void {
+function assertHasNovelCommits(
+  branch: string,
+  compareRef: string,
+  runGit: RunGit,
+): void {
   let countStr: string;
   try {
     countStr = runGit([
       'rev-list',
       '--count',
       branch,
-      '^origin/main',
+      `^${compareRef}`,
     ]).trim();
   } catch {
-    // `origin/main` may not exist in fixture repos or fresh clones; treat
+    // The compare-ref may not exist in fixture repos or fresh clones; treat
     // as "cannot verify novelty" — let the operator decide via --force.
     throw new ArchiveBranchPreflightError(
       'no-novel-commits',
-      `Could not compare ${branch} against origin/main. If the remote is unavailable, pass --force to archive anyway.`,
+      `Could not compare ${branch} against ${compareRef}. If the remote is unavailable, pass --force to archive anyway.`,
     );
   }
   const count = Number.parseInt(countStr, 10);
   if (!Number.isFinite(count) || count <= 0) {
     throw new ArchiveBranchPreflightError(
       'no-novel-commits',
-      `Branch ${branch} has no commits not on origin/main. Archiving anyway? Pass --force to confirm.`,
+      `Branch ${branch} has no commits not on ${compareRef}. Archiving anyway? Pass --force to confirm.`,
     );
   }
 }

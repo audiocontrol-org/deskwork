@@ -11,13 +11,19 @@
 // operations. The same shape as debt-report/types.ts RunGit (which this
 // module imports from to avoid duplicating the signature).
 
+import type { RunGit } from '../debt-report/types.js';
+
 export type { RunGit } from '../debt-report/types.js';
 
-// `runPush` is a separate callback because push operations target a remote
-// and tests need to simulate network failures independently of the
-// in-process git invocations covered by RunGit. Returns push command
-// stdout; throws on non-zero exit (matching execFileSync semantics).
-export type RunPush = (args: readonly string[]) => string;
+/**
+ * Alias for {@link RunGit}. The runtime shape is identical to RunGit; the
+ * separate type exists solely so tests can inject a distinct stub for push
+ * operations (e.g. to simulate network failures on tag-push or remote-delete
+ * while leaving the in-process git invocations unaffected). The production
+ * factories collapse both onto the same implementation so env settings like
+ * `LC_ALL=C` can't drift between local and push commands.
+ */
+export type RunPush = RunGit;
 
 export interface ArchiveBranchOptions {
   readonly branch: string;
@@ -25,6 +31,7 @@ export interface ArchiveBranchOptions {
   readonly noPush: boolean;
   readonly dryRun: boolean;
   readonly force: boolean;
+  readonly compareRef: string;
   readonly now: Date;
 }
 
@@ -52,4 +59,11 @@ export interface DryRunPlan {
   readonly branch: string;
   readonly tagName: string;
   readonly commands: readonly string[];
+  /** Tag-message lines (rendered separately from the command list so
+   * embedded newlines don't get JS-escaped into shell-incompatible
+   * `\n` sequences inside the `git tag -a ... -m <message>` command). */
+  readonly tagMessageLines: readonly string[];
+  /** True when --force was passed (novelty gate skipped). Surfaced in the
+   * dry-run output so operators see the gate-bypass explicitly. */
+  readonly forceUsed: boolean;
 }

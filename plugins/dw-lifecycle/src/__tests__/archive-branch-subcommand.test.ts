@@ -15,6 +15,22 @@ describe('parseArchiveBranchArgs', () => {
     expect(opts.noPush).toBe(false);
     expect(opts.dryRun).toBe(false);
     expect(opts.force).toBe(false);
+    expect(opts.compareRef).toBeNull();
+  });
+
+  it('parses --compare-ref with a value', () => {
+    const opts = parseArchiveBranchArgs([
+      'feature/parked',
+      '--compare-ref',
+      'upstream/master',
+    ]);
+    expect(opts.compareRef).toBe('upstream/master');
+  });
+
+  it('throws when --compare-ref has no value', () => {
+    expect(() =>
+      parseArchiveBranchArgs(['feature/x', '--compare-ref']),
+    ).toThrow(/--compare-ref requires/);
   });
 
   it('parses --rationale with a value', () => {
@@ -168,6 +184,7 @@ describe('runArchiveBranch — dry-run', () => {
         noPush: false,
         dryRun: true,
         force: false,
+        compareRef: null,
       },
       projectRoot: '/repo',
       now: new Date('2026-05-28T12:00:00.000Z'),
@@ -180,11 +197,194 @@ describe('runArchiveBranch — dry-run', () => {
     const out = cap.stdoutText();
     expect(out).toContain('Dry-run plan');
     expect(out).toContain('archived/feature-parked-2026-05-28');
-    expect(out).toContain('git tag -a');
+    // Tag-message is rendered as its own section, separate from the
+    // command list; the tag command references it indirectly so a
+    // copy-paste from the dry-run output doesn't collapse newlines via
+    // JS string escaping.
+    expect(out).toContain('git tag -a archived/feature-parked-2026-05-28 feature/parked -m <see "Tag message" below>');
     expect(out).toContain('git push origin refs/tags/');
     expect(out).toContain('git branch -D feature/parked');
     expect(out).toContain('git push origin --delete feature/parked');
+    expect(out).toContain('Tag message:');
+    expect(out).toContain('Source branch: feature/parked');
+    expect(out).toContain('Archive date: 2026-05-28');
     expect(out).toContain('No mutations performed');
+    // Force-mode line is absent when --force was NOT passed.
+    expect(out).not.toContain('Force mode:');
+  });
+
+  it('surfaces --force in dry-run output when the gate is bypassed', () => {
+    const runGit = makeStubGit([
+      {
+        match: (a) => a[0] === 'rev-parse' && a[1] === '--verify' && a[2]?.startsWith('refs/heads/') === true,
+        respond: () => 'abc\n',
+      },
+      {
+        match: (a) => a[0] === 'worktree',
+        respond: () => '',
+      },
+      {
+        match: (a) => a[0] === 'rev-parse' && a[1] === '--verify' && a[2]?.startsWith('refs/tags/') === true,
+        respond: () => {
+          throw new Error('fatal: ref not found');
+        },
+      },
+      {
+        match: (a) => a[0] === 'rev-parse' && a.length === 2,
+        respond: () => 'deadbeef\n',
+      },
+      {
+        match: (a) => a[0] === 'log',
+        respond: () => 'subject\n',
+      },
+    ]);
+    const runPush: RunPush = () => {
+      throw new Error('runPush MUST NOT be called in dry-run');
+    };
+    const cap = captureStreams();
+    const code = runArchiveBranch({
+      opts: {
+        branch: 'feature/parked',
+        rationale: 'r',
+        noPush: false,
+        dryRun: true,
+        force: true,
+        compareRef: null,
+      },
+      projectRoot: '/repo',
+      now: new Date('2026-05-28T12:00:00.000Z'),
+      runGit,
+      runPush,
+      stdout: cap.stdout,
+      stderr: cap.stderr,
+    });
+    expect(code).toBe(0);
+    const out = cap.stdoutText();
+    expect(out).toContain('Force mode: novel-commits gate skipped.');
+  });
+
+  it('honors --compare-ref over the configCompareRef default', () => {
+    let revListArgs: readonly string[] | null = null;
+    const runGit = makeStubGit([
+      {
+        match: (a) => a[0] === 'rev-parse' && a[1] === '--verify' && a[2]?.startsWith('refs/heads/') === true,
+        respond: () => 'abc\n',
+      },
+      {
+        match: (a) => a[0] === 'worktree',
+        respond: () => '',
+      },
+      {
+        match: (a) => a[0] === 'rev-parse' && a[1] === '--verify' && a[2]?.startsWith('refs/tags/') === true,
+        respond: () => {
+          throw new Error('fatal: ref not found');
+        },
+      },
+      {
+        match: (a) => a[0] === 'rev-parse' && a.length === 2,
+        respond: () => 'deadbeef\n',
+      },
+      {
+        match: (a) => a[0] === 'log',
+        respond: () => 'subject\n',
+      },
+      {
+        match: (a) => a[0] === 'rev-list' && a[1] === '--count',
+        respond: (a) => {
+          revListArgs = a;
+          return '3\n';
+        },
+      },
+    ]);
+    const runPush: RunPush = () => {
+      throw new Error('runPush MUST NOT be called in dry-run');
+    };
+    const cap = captureStreams();
+    const code = runArchiveBranch({
+      opts: {
+        branch: 'feature/parked',
+        rationale: 'r',
+        noPush: false,
+        dryRun: true,
+        force: false,
+        compareRef: 'upstream/master',
+      },
+      projectRoot: '/repo',
+      now: new Date('2026-05-28T12:00:00.000Z'),
+      runGit,
+      runPush,
+      stdout: cap.stdout,
+      stderr: cap.stderr,
+      // Config says origin/develop; CLI flag --compare-ref=upstream/master wins.
+      configCompareRef: 'origin/develop',
+    });
+    expect(code).toBe(0);
+    expect(revListArgs).not.toBeNull();
+    if (revListArgs) {
+      const a: readonly string[] = revListArgs;
+      expect(a[3]).toBe('^upstream/master');
+    }
+  });
+
+  it('honors configCompareRef when no --compare-ref flag is passed', () => {
+    let revListArgs: readonly string[] | null = null;
+    const runGit = makeStubGit([
+      {
+        match: (a) => a[0] === 'rev-parse' && a[1] === '--verify' && a[2]?.startsWith('refs/heads/') === true,
+        respond: () => 'abc\n',
+      },
+      {
+        match: (a) => a[0] === 'worktree',
+        respond: () => '',
+      },
+      {
+        match: (a) => a[0] === 'rev-parse' && a[1] === '--verify' && a[2]?.startsWith('refs/tags/') === true,
+        respond: () => {
+          throw new Error('fatal: ref not found');
+        },
+      },
+      {
+        match: (a) => a[0] === 'rev-parse' && a.length === 2,
+        respond: () => 'deadbeef\n',
+      },
+      {
+        match: (a) => a[0] === 'log',
+        respond: () => 'subject\n',
+      },
+      {
+        match: (a) => a[0] === 'rev-list' && a[1] === '--count',
+        respond: (a) => {
+          revListArgs = a;
+          return '3\n';
+        },
+      },
+    ]);
+    const runPush: RunPush = () => {
+      throw new Error('runPush MUST NOT be called in dry-run');
+    };
+    const cap = captureStreams();
+    runArchiveBranch({
+      opts: {
+        branch: 'feature/parked',
+        rationale: 'r',
+        noPush: false,
+        dryRun: true,
+        force: false,
+        compareRef: null,
+      },
+      projectRoot: '/repo',
+      now: new Date('2026-05-28T12:00:00.000Z'),
+      runGit,
+      runPush,
+      stdout: cap.stdout,
+      stderr: cap.stderr,
+      configCompareRef: 'origin/develop',
+    });
+    expect(revListArgs).not.toBeNull();
+    if (revListArgs) {
+      const a: readonly string[] = revListArgs;
+      expect(a[3]).toBe('^origin/develop');
+    }
   });
 
   it('returns exit code 2 on pre-flight failure', () => {
@@ -205,6 +405,7 @@ describe('runArchiveBranch — dry-run', () => {
         noPush: false,
         dryRun: true,
         force: false,
+        compareRef: null,
       },
       projectRoot: '/repo',
       now: new Date('2026-05-28T12:00:00.000Z'),
@@ -273,6 +474,7 @@ describe('runArchiveBranch — apply', () => {
         noPush: false,
         dryRun: false,
         force: false,
+        compareRef: null,
       },
       projectRoot: '/repo',
       now: new Date('2026-05-28T12:00:00.000Z'),
@@ -336,6 +538,7 @@ describe('runArchiveBranch — apply', () => {
         noPush: false,
         dryRun: false,
         force: false,
+        compareRef: null,
       },
       projectRoot: '/repo',
       now: new Date('2026-05-28T12:00:00.000Z'),
@@ -367,6 +570,7 @@ describe('runArchiveBranch — apply', () => {
         noPush: false,
         dryRun: false,
         force: false,
+        compareRef: null,
       },
       projectRoot: '/repo',
       now: new Date('2026-05-28T12:00:00.000Z'),

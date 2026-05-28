@@ -66,6 +66,7 @@ describe('planArchive (dry-run)', () => {
       noPush: false,
       dryRun: true,
       force: false,
+      compareRef: 'origin/main',
       now: new Date('2026-05-28T12:00:00.000Z'),
     };
     const plan = planArchive({ opts, runGit: gitInFixture(clone) });
@@ -73,9 +74,18 @@ describe('planArchive (dry-run)', () => {
     expect(plan.tagName).toBe('archived/feature-parked-2026-05-28');
     expect(plan.commands.length).toBe(4);
     expect(plan.commands[0]).toContain('git tag -a archived/feature-parked-2026-05-28 feature/parked');
+    // The tag command references the tag-message section indirectly so
+    // a copy-paste from the dry-run output preserves the embedded
+    // newlines (which JS-stringifying inline would otherwise escape).
+    expect(plan.commands[0]).toContain('<see "Tag message" below>');
+    expect(plan.commands[0]).not.toContain('\\n');
     expect(plan.commands[1]).toContain('git push origin refs/tags/archived/feature-parked-2026-05-28');
     expect(plan.commands[2]).toBe('git branch -D feature/parked');
     expect(plan.commands[3]).toBe('git push origin --delete feature/parked');
+    expect(plan.tagMessageLines.length).toBeGreaterThan(0);
+    expect(plan.tagMessageLines).toContain('no longer needed');
+    expect(plan.tagMessageLines).toContain('Source branch: feature/parked');
+    expect(plan.forceUsed).toBe(false);
 
     // No-push variant strips the push commands.
     const planLocal = planArchive({
@@ -94,6 +104,7 @@ describe('planArchive (dry-run)', () => {
       noPush: false,
       dryRun: true,
       force: false,
+      compareRef: 'origin/main',
       now: new Date('2026-05-28T12:00:00.000Z'),
     };
     expect(() =>
@@ -115,6 +126,7 @@ describe('applyArchive — integration against fixture remote', () => {
       noPush: false,
       dryRun: false,
       force: false,
+      compareRef: 'origin/main',
       now: new Date('2026-05-28T12:00:00.000Z'),
     };
     const runGit = gitInFixture(clone);
@@ -176,6 +188,7 @@ describe('applyArchive — integration against fixture remote', () => {
       noPush: true,
       dryRun: false,
       force: false,
+      compareRef: 'origin/main',
       now: new Date('2026-05-28T12:00:00.000Z'),
     };
     const runGit = gitInFixture(clone);
@@ -218,6 +231,7 @@ describe('applyArchive — integration against fixture remote', () => {
       noPush: true,
       dryRun: false,
       force: false,
+      compareRef: 'origin/main',
       now: new Date('2026-05-28T12:00:00.000Z'),
     };
     const runPush: RunPush = () => '';
@@ -244,6 +258,7 @@ describe('applyArchive — integration against fixture remote', () => {
       noPush: true,
       dryRun: false,
       force: false,
+      compareRef: 'origin/main',
       now: new Date('2026-05-28T12:00:00.000Z'),
     };
     const runGit = gitInFixture(clone);
@@ -304,6 +319,7 @@ describe('applyArchive — integration against fixture remote', () => {
       noPush: false,
       dryRun: false,
       force: false,
+      compareRef: 'origin/main',
       now: new Date('2026-05-28T12:00:00.000Z'),
     };
     const runPush: RunPush = (args) =>
@@ -323,6 +339,7 @@ describe('applyArchive — integration against fixture remote', () => {
       noPush: false,
       dryRun: false,
       force: false,
+      compareRef: 'origin/main',
       now: new Date('2026-05-28T12:00:00.000Z'),
     };
     const runGit = gitInFixture(clone);
