@@ -171,6 +171,31 @@ describe('swimlane compose-chip client — Task 5.1C', () => {
     ).toBe('Copied — paste in chat');
   });
 
+  // The visible `.sc-label` is hidden on mobile (`display: none` in
+  // dashboard-swimlane.css). The chip's `aria-label` is therefore the
+  // ONLY accessible name available to a screen-reader user. Without
+  // swapping the aria-label during `.copied`, an AT user on mobile gets
+  // zero feedback that the clipboard copy succeeded.
+  it('swaps aria-label to the success message during .copied (mobile a11y)', async () => {
+    installClipboard(() => Promise.resolve());
+    buildShell([
+      { laneId: 'default', laneName: 'Editorial', firstStage: 'Ideas' },
+    ]);
+    initSwimlaneCompose();
+    const chip = document.querySelector<HTMLButtonElement>('.swim-compose');
+    expect(chip?.getAttribute('aria-label')).toBe(
+      'Compose new entry in Editorial',
+    );
+    chip?.click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(chip?.getAttribute('aria-label')).toBe('Copied — paste in chat');
+    // After the flash window the original label is restored.
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(chip?.getAttribute('aria-label')).toBe(
+      'Compose new entry in Editorial',
+    );
+  });
+
   it('after ~2000ms the .copied flash reverts', async () => {
     installClipboard(() => Promise.resolve());
     buildShell([
@@ -348,8 +373,8 @@ describe('swimlane compose-chip client — Task 5.1C', () => {
     chip?.click();
     await vi.advanceTimersByTimeAsync(0);
     expect(chip?.tagName.toLowerCase()).toBe('button');
-    expect(chip?.getAttribute('aria-label')).toBe(
-      'Compose new entry in Editorial',
-    );
+    // Mid-flash the aria-label carries the success message (the dedicated
+    // a11y test above asserts the original label restoration after revert).
+    expect(chip?.getAttribute('aria-label')).toBe('Copied — paste in chat');
   });
 });

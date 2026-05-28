@@ -474,3 +474,79 @@ If the clustering pass produces the expected swimlane-vocabulary candidates from
 
 Cross-reference: TF-006 (closed) is incidentally the entry that first surfaced the STUB warning — TF-006 was scoped to the schema-validation hard-fail (`modules: minItems: 1` rejecting greenfield manifests) and treated the STUB as informational context. TF-010 promotes the STUB to its own entry per the project's `capture friction over scope` rule: upstream tracking doesn't substitute for the per-feature dogfood log when the operator-visible behavior is real friction (three no-op invocations across one session).
 
+## TF-011 · DSC · low · `validate-return` rejects the canonical "no exclusions" shape `Excluded: (none — ...)` with parseError
+
+**Repro:**
+
+The wrapper's REQUIRED RETURN GRAMMAR prose says the `Excluded:` line carries `file:line pairs you intentionally did NOT cover`. When the dispatched task's grep enumerates a single class of fix and every match is covered (the dispatch's whole scope), there are no out-of-scope citations. A natural way to express that is:
+
+```
+Excluded: (none — every match is covered by this dispatch)
+```
+
+`validate-return` rejects with:
+
+```json
+{"valid": false, "parseError": "Malformed file:line entry — expected \"path/to/file.ts:LINE\" but got: (none"}
+```
+
+The parser requires every `Excluded:` value to be `path:LINE`-shaped. Sentinels like `dispatch-scope:1` satisfy the parser but read as confusing pseudo-paths.
+
+Surfaced during Phase 5 Task 5.1C's implementer return validation. The implementer's substantive work was intact — the rejection was purely on the meta-deliverable format. Same shape as TF-008 (`Searched: N matches` strictness) and TF-009 (forbidden-phrase false positives).
+
+**Workaround used:**
+
+Re-wrote the line to `Excluded: dispatch-scope:1 — all N grep matches are <task> citations introduced by this dispatch`. The `:1` sentinel was already documented in the wrap-prompt prose (`use :1 as sentinel if you don't have a specific line`); extending the documentation to cover the "no exclusions at all" case would surface the right shape.
+
+**Suggested fix:**
+
+Two options:
+
+1. **Permit `Excluded: (none)` as a canonical empty-set value.** The parser short-circuits when the value matches `(none)` (with optional trailing reason in parens) AND the operator's task is a single-class dispatch where Included covers all matches. Reuses the existing "skippedAudit" check inversely — if Searched=Included, an empty Excluded is legitimate.
+
+2. **Document the `dispatch-scope:1` sentinel** for the no-out-of-scope case explicitly in the wrap-prompt prose. The augmented prompt already explains `:1` for whole-file exclusions; add one sentence on the no-exclusions case.
+
+Option (1) is closer to the operator's natural-language intent; option (2) is the minimal-change path. Both close the friction.
+
+Cross-reference: TF-008 + TF-009 are the same shape (wrapper format strictness producing rejection where substantive work is intact). The pattern across the three: the validate-return parser is exact-string-matching where the operator's natural phrasing is semantically equivalent.
+
+## TF-012 · DSC · low · `validate-return` refactor-precondition gate false-positives on additive-feature responses that use the word "refactored"
+
+**Repro:**
+
+A `typescript-pro` implementer dispatched on additive feature work (Phase 5 Task 5.1C — a brand-new file + new function) wrote a free-form note describing an in-task implementation decision:
+
+```
+Rejection-surface mechanism: I refactored the click handler to attach
+`.catch(surfaceActivationError)` ...
+```
+
+`validate-return` rejected with:
+
+```json
+{
+  "refactorPreconditionViolations": [
+    "response describes a refactor but does not cite `canonical_side` ...",
+    "response describes a refactor but does not cite `tests_proof.sha` ..."
+  ]
+}
+```
+
+The gate fires on the literal word "refactor"/"refactored" anywhere in the response. There is no clones.yaml entry, no canonical_side disposition — this is additive feature work, not consolidation. The implementer was describing a within-task implementation choice (replace one error-handling approach with another within the same dispatch), not a multi-file consolidation.
+
+**Workaround used:**
+
+Re-wrote the note to use "implemented" instead of "refactored". The substantive content was unchanged; only the verb noun shifted to avoid the gate.
+
+**Suggested fix:**
+
+Either:
+
+1. **Scope the gate to responses where the wrap-prompt was augmented with the REFACTOR-CONTEXT prelude.** That prelude only attaches when the operator's prompt cites a `clones.yaml` entry; firing the response-side gate on responses that didn't get the prelude is asymmetric. The parser can detect the prelude's absence and skip the response-side check.
+
+2. **Tighten the matcher.** Match "refactor" only when adjacent to refactor-context vocabulary (`canonical_side`, `Closes clones.yaml`, `regime-erasure`, etc.). The current matcher fires on bare-word "refactored" in any context.
+
+Option (1) is the architecturally-clean fix (preserve the response-side check, but gate it on whether the wrap-prompt-side gate triggered). Option (2) is the local fix.
+
+Cross-reference: TF-008 + TF-009 + TF-011 are all wrapper-format strictness frictions; TF-012 is the wrapper-semantic-classification false-positive variant — the wrapper misclassified additive work as consolidation based on a single keyword.
+

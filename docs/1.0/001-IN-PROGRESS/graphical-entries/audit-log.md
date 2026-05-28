@@ -430,3 +430,105 @@ workplan text marks the lane-head mobile variant as shipped.
 Fix guidance: implement the mobile lane-stack / lane-head path for
 5.1B, or move that acceptance criterion out of checked-off scope and
 track it explicitly in later mobile work.
+
+## 2026-05-28 audit: Phase 5 Task 5.1C (per-lane Compose chip)
+
+Audit scope: commit `487e9bb` (+ in-task a11y follow-up below).
+Predecessor: `755a50d`. Tests 661 → 672 (+11). Build exit 0.
+
+Two-stage review (spec-compliance + code-quality) routed through the
+dw-lifecycle trussing (wrap-prompt → dispatch → validate-return).
+
+- Spec-compliance: SPEC-COMPLIANT. All four steps (5.1C.1–5.1C.4)
+  match the workplan + brief; no scope creep, no missing affordance.
+  Per-lane `data-first-stage` verified against editorial.json (Ideas),
+  visual.json (Sketched), qa-plan.json (Drafted).
+- Code-quality: APPROVED WITH FOLLOWUPS. Zero blocking, two
+  non-blocking findings (F11 + F15) plus several observations.
+
+### AUDIT-20260528-11
+
+Finding-ID: AUDIT-20260528-11
+Status:     fixed-8a2e0a5
+Severity:   medium
+Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-compose.ts
+
+The chip's `aria-label` did not update during the `.copied` flash. On
+phone (`.sc-label { display: none }` per
+`plugins/deskwork-studio/public/css/dashboard-swimlane.css:1257`), the
+visible label swap was invisible to screen-reader users — `aria-label`
+is the only accessible name available on mobile. AT users got zero
+feedback that the clipboard copy succeeded.
+
+Resolution: snapshot the render-time `aria-label` at `bindChip` time
+(WeakMap); swap to `Copied — paste in chat` on enter; restore on
+revert. Added a dedicated mobile-a11y test
+(`packages/studio/test/dashboard-swimlane-compose-client.test.ts`
+"swaps aria-label to the success message during .copied"); updated the
+pre-existing "chip remains a real focusable <button>" test to assert
+the mid-flash aria-label rather than the original.
+
+Rejected alternative: `aria-live="polite"` region elsewhere on the
+page. Heavier change for an equivalent outcome; the `aria-label` swap
+is local to the affordance and keeps the AT contract on the chip
+itself. Rejected the static-aria-label option (the existing
+`.er-copy-btn` pattern is not analogous — that primitive's accessible
+name comes from `textContent`, not from a separate `aria-label`; it
+has no aria-label/visible-label split for the icon-only case to land
+on).
+
+### AUDIT-20260528-12
+
+Finding-ID: AUDIT-20260528-12
+Status:     open
+Severity:   low
+Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-compose.ts
+
+The `typeof navigator.clipboard?.writeText !== 'function'` guard at
+`plugins/deskwork-studio/public/src/dashboard/swimlane-compose.ts:116`
+catches missing / non-function but not a polyfill that exposes
+`writeText` as a synchronous `undefined`-returning shim. In that
+hypothetical case, the chip would flash `.copied` even though nothing
+was copied.
+
+No known production polyfill exhibits that shape (`clipboard-polyfill`
+and the Permissions API shim return real Promises). Tracked as an
+observation; no fix needed unless a polyfill case surfaces.
+
+### AUDIT-20260528-13
+
+Finding-ID: AUDIT-20260528-13
+Status:     open
+Severity:   low
+Surface:    packages/studio/test/dashboard-swimlane-compose-client.test.ts
+
+The clipboard-rejection test uses `process.removeAllListeners(
+'uncaughtException')` + reinstalls prior listeners in `finally`, and
+performs a heuristic microtask flush via a 10-iteration `await
+Promise.resolve()` loop.
+
+Two latent fragilities: (1) a parallel-installed listener mid-test
+would be wiped without restoration (unlikely under vitest's
+serial-tests-within-a-file model); (2) a future Node microtask
+scheduler change could break the flush heuristic silently.
+
+No action unless the test flakes in CI. If it does, switch to a
+`vi.spyOn(window, 'onerror')` assertion shape.
+
+### AUDIT-20260528-14
+
+Finding-ID: AUDIT-20260528-14
+Status:     open
+Severity:   medium
+Surface:    plugins/deskwork-studio/public/css/dashboard-swimlane.css + packages/studio/test/dashboard-swimlane.test.ts
+
+File-size cap trajectory: `dashboard-swimlane.css` is now 1285 lines
+and `dashboard-swimlane.test.ts` is 1008 lines. Both pre-existed >500
+before Task 5.1C. The 5.1{,A,B,C} sequence has piled additive sections
+onto a single file each.
+
+Fix guidance: before Task 5.2 lands, split into per-section files —
+e.g. `dashboard-swimlane-chips.css`, `dashboard-swimlane-list.css` (CSS)
+and `dashboard-swimlane-{shell,collapse,view-toggle,compose}.test.ts`
+(tests). The split keeps each file under the 500-line cap going
+forward.

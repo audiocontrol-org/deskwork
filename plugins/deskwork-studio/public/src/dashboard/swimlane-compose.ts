@@ -41,8 +41,25 @@ const COPIED_FLASH_MS = 2000;
 /** WeakMap of button → pending revert-timer handle. */
 const pendingTimers = new WeakMap<HTMLButtonElement, number>();
 
+/**
+ * Snapshot of the chip's render-time `aria-label` so the `.copied`
+ * flash can swap it to the success message and restore it on revert.
+ * Captured at `bindChip` time so subsequent renders / DOM rewrites
+ * don't drift the snapshot.
+ *
+ * Mobile motivation: on phone the `.sc-label` is `display: none`, so
+ * the visible label swap (`new` → `Copied — paste in chat`) is invisible
+ * to screen-reader users — `aria-label` is the only accessible name.
+ * Without this swap the AT user gets zero feedback that the copy
+ * succeeded.
+ */
+const originalAriaLabel = new WeakMap<HTMLButtonElement, string>();
+
 /** Literal slug placeholder — operator replaces it in the chat editor. */
 const SLUG_PLACEHOLDER = '<SLUG>';
+
+/** Accessible name for the chip during the `.copied` flash state. */
+const COPIED_ARIA_LABEL = 'Copied — paste in chat';
 
 function composeSlashCommand(laneId: string, firstStage: string): string {
   return `/deskwork:add ${SLUG_PLACEHOLDER} --lane ${laneId} --stage ${firstStage}`;
@@ -50,6 +67,7 @@ function composeSlashCommand(laneId: string, firstStage: string): string {
 
 function enterCopiedState(button: HTMLButtonElement): void {
   button.classList.add('copied');
+  button.setAttribute('aria-label', COPIED_ARIA_LABEL);
   const icon = button.querySelector<HTMLElement>('.sc-icon');
   const label = button.querySelector<HTMLElement>('.sc-label');
   if (icon !== null) icon.textContent = '✓';
@@ -58,6 +76,8 @@ function enterCopiedState(button: HTMLButtonElement): void {
 
 function leaveCopiedState(button: HTMLButtonElement): void {
   button.classList.remove('copied');
+  const original = originalAriaLabel.get(button);
+  if (original !== undefined) button.setAttribute('aria-label', original);
   const icon = button.querySelector<HTMLElement>('.sc-icon');
   const label = button.querySelector<HTMLElement>('.sc-label');
   if (icon !== null) icon.textContent = '+';
@@ -154,6 +174,10 @@ function surfaceActivationError(err: unknown): void {
 }
 
 function bindChip(button: HTMLButtonElement): void {
+  const renderedAriaLabel = button.getAttribute('aria-label');
+  if (renderedAriaLabel !== null) {
+    originalAriaLabel.set(button, renderedAriaLabel);
+  }
   button.addEventListener('click', (ev) => {
     // Stop the click from bubbling into `swimlane-collapse.ts`'s
     // swim-head handler (which would otherwise also toggle the lane
