@@ -1222,16 +1222,31 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
     );
   });
 
-  it('Task 5.3.2: hidden lanes in the rail receive a paler treatment via opacity', async () => {
+  it('Task 5.3.2 followup (AUDIT-22): hidden lanes use an AA-passing readable color (no opacity wash)', async () => {
     const cssRes = await app.fetch(
       new Request('http://x/static/css/dashboard-swimlane.css'),
     );
     expect(cssRes.status).toBe(200);
     const css = await cssRes.text();
-    // The Task 5.3 block adds an opacity rule for hidden lanes so
-    // the operator sees at a glance which lanes are off.
+    // The Task 5.3 initial pass added `opacity: 0.6` which compounded
+    // an already-failing contrast on `--er-faded`. The review followup
+    // upgrades the color to `--er-ink-soft` (AAA) and drops the
+    // redundant opacity wash. Line-through on `.r-name` still
+    // differentiates hidden lanes visually.
     expect(css).toMatch(
-      /\.rail-lane\[data-lane-visible="false"\]\s*\{[\s\S]*?opacity:\s*0\.6/,
+      /\.rail-lane\[data-lane-visible="false"\]\s*\{[\s\S]*?color:\s*var\(--er-ink-soft\)/,
+    );
+    // The opacity wash is removed — verify no `.rail-lane[data-lane-
+    // visible="false"]` rule sets opacity: 0.6.
+    const hiddenRowRules = css.match(
+      /\.rail-lane\[data-lane-visible="false"\][^{]*\{[^}]*\}/g,
+    ) ?? [];
+    for (const rule of hiddenRowRules) {
+      expect(rule).not.toMatch(/opacity:\s*0\.6/);
+    }
+    // The line-through differentiation stays in place.
+    expect(css).toMatch(
+      /\.rail-lane\[data-lane-visible="false"\]\s+\.r-name\s*\{[\s\S]*?text-decoration:\s*line-through/,
     );
   });
 

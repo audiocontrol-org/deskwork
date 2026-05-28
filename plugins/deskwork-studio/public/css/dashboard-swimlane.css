@@ -142,8 +142,17 @@
   padding-left: 0.55rem;
 }
 
+/* Hidden-lane rail row treatment (Phase 5 Task 5.3 review-followup):
+ * The pre-existing rule used `--er-faded` which renders at ~3.48:1
+ * contrast on `--er-paper` — below WCAG 2.1 SC 1.4.3 AA (4.5:1).
+ * Upgraded to `--er-ink-soft` (~8.92:1 on paper, AAA) so the row
+ * stays readable while still differentiating from the active lanes
+ * via `text-decoration: line-through` on the name. Per AUDIT-
+ * 20260528-22 — the redundant opacity wash that was added at the
+ * tail of this file (Task 5.3 initial commit) is replaced with this
+ * single color rule. */
 .rail-lane[data-lane-visible="false"] {
-  color: var(--er-faded);
+  color: var(--er-ink-soft);
 }
 
 .rail-lane[data-lane-visible="false"] .r-name {
@@ -291,6 +300,22 @@
   color: var(--er-ink-soft);
   cursor: pointer;
   transition: background 0.1s ease, border-color 0.1s ease;
+  /* Phase 5 Task 5.3 — the focus-strip is `flex-wrap: nowrap;
+   * overflow-x: auto` (line 1408 below). Chips must NOT shrink under
+   * pressure (long lane names) — the strip should scroll horizontally
+   * once the chip widths exceed the viewport. Without flex-shrink: 0
+   * chips compress at their min-content size before the overflow
+   * scroll kicks in. Per AUDIT-20260528-23. */
+  flex-shrink: 0;
+}
+
+.focus-chip .fc-label {
+  /* Lane names can contain spaces (e.g. "Mockups & Specs"); without
+   * `white-space: nowrap` the label can break inside the chip when
+   * the strip pressure is high. The chip's `flex-shrink: 0` above
+   * already prevents the chip itself from compressing; this rule
+   * extends the contract to the label text. */
+  white-space: nowrap;
 }
 
 .focus-chip:hover {
@@ -1448,13 +1473,12 @@
 }
 
 /* Step 5.3.2 — hidden lanes in the rail get a paler treatment so the
- * operator can see at a glance which lanes are off. Mirrors the
- * existing `.rail-lane[data-lane-visible="false"]` color rule
- * (line 145 above) but uses opacity for symmetry with the
- * `.swim.collapsed` chrome on other surfaces. */
-.rail-lane[data-lane-visible="false"] {
-  opacity: 0.6;
-}
+ * operator can see at a glance which lanes are off. The color +
+ * line-through styling lives at line 145–158 above and was upgraded
+ * from `--er-faded` to `--er-ink-soft` in the Task 5.3 review-
+ * followup per AUDIT-20260528-22 (the original opacity layer compounded
+ * an already-failing contrast — the single readable color rule is the
+ * disposition). */
 
 /* ============================================================
  *  Step 5.3.3 — Mobile lane sheet trigger + container.

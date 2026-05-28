@@ -664,3 +664,129 @@ Fix guidance: if a Task 5.6 / 5.3 addition would push past 500, split
 into `swimlane-card-{shell,renderers,empty-cta}.ts` (or similar). Track
 alongside AUDIT-20260528-14 (CSS + test file split) as a Phase 5
 cleanup task.
+
+## 2026-05-28 audit: Phase 5 Task 5.3 (overflow + mobile sheet + hidden-row activation)
+
+Audit scope: commit `cfe4812` + in-task review followup.
+Predecessor: `5bc36c5`. Tests 732 → 751 (+19, including +2 review-
+followup regression tests). Build exit 0 across core + studio.
+
+Two-stage review via the dw-lifecycle trussing. Spec ✅ SPEC-COMPLIANT;
+quality ⚠️ APPROVED WITH FOLLOWUPS — 1 blocking + 2 non-blocking
+findings. All three applied in-thread (no deferral).
+
+### AUDIT-20260528-21
+
+Finding-ID: AUDIT-20260528-21
+Status:     fixed-followup-commit
+Severity:   high
+Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane.ts
+
+Keyboard a11y bug: the row's `keydown` listener (lines 343-347 pre-fix)
+called `preventDefault()` on every Enter/Space inside the row,
+including when the eye-button (`.r-eye-btn`) had focus. The
+preventDefault cancelled the native button click synthesis, so the
+eye-button's visibility-only contract was silently swallowed — the
+row's dual-action (visibility + focus) fired instead.
+
+Consequence: a VISIBLE lane + eye-button focus + Enter = "hide this
+lane" gesture flipped focus off without hiding. Mouse path was
+correct (eye-click runs stopPropagation); only the keyboard path
+was broken.
+
+Resolution: added `if (ev.target instanceof Element && ev.target
+.closest('.r-eye-btn') !== null) return;` to the row keydown handler
+before the `preventDefault`. Pulled the same predicate the mobile-
+sheet's `shouldCloseOnTarget` already uses (DRY across two
+controllers).
+
+Regression tests added at `dashboard-swimlane-client.test.ts` for
+both Enter and Space gestures on the eye-button; both assert
+`defaultPrevented === false` AND that the row's focus state is
+unchanged.
+
+### AUDIT-20260528-22
+
+Finding-ID: AUDIT-20260528-22
+Status:     fixed-followup-commit
+Severity:   medium
+Surface:    plugins/deskwork-studio/public/css/dashboard-swimlane.css
+
+The Task 5.3 initial commit added `opacity: 0.6` to
+`.rail-lane[data-lane-visible="false"]` (line 1455 of the post-5.3
+CSS). Compound effect: the pre-existing rule at line 145 already set
+`color: var(--er-faded)`, which renders at ~3.48:1 contrast on
+`--er-paper` (below WCAG 2.1 SC 1.4.3 AA's 4.5:1 floor). The opacity
+layer reduced effective contrast further.
+
+Resolution: upgraded the pre-existing color from `--er-faded` to
+`--er-ink-soft` (~8.92:1 — AAA on paper) and dropped the redundant
+opacity wash. The `text-decoration: line-through` on `.r-name` keeps
+the visual differentiation; the row is now readable AND
+distinguishable.
+
+Test pin: `dashboard-swimlane.test.ts` test renamed and updated to
+assert the new `--er-ink-soft` color rule AND verify no
+`opacity: 0.6` rule survives on the hidden-row selector.
+
+### AUDIT-20260528-23
+
+Finding-ID: AUDIT-20260528-23
+Status:     fixed-followup-commit
+Severity:   medium
+Surface:    plugins/deskwork-studio/public/css/dashboard-swimlane.css
+
+`.focus-chip` lacked `flex-shrink: 0`. With the Task 5.3.1 overflow-
+scroll (`.focus-strip { flex-wrap: nowrap; overflow-x: auto }`),
+default flex-shrink-1 chips would compress under pressure (long lane
+names, narrow viewport) before the scroll kicked in.
+
+Resolution: added `flex-shrink: 0` to `.focus-chip` and
+`white-space: nowrap` to `.fc-label` so chips preserve their natural
+width and the strip scrolls instead of crushing the labels.
+
+### AUDIT-20260528-24
+
+Finding-ID: AUDIT-20260528-24
+Status:     open
+Severity:   low
+Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-mobile-sheet.ts
+
+Focus-return behavior on row-activation close: the row click/keydown
+closes the sheet via `onClose` → `trigger.focus()`. The trigger sits
+in the bay-head; the operator just activated a row, so focus
+yanking is mildly jarring. Disclosure-widget convention prefers
+return-to-trigger, so the current behavior is defensible. Surface as
+an observation; revisit if operator feedback shows confusion.
+
+### AUDIT-20260528-25
+
+Finding-ID: AUDIT-20260528-25
+Status:     open
+Severity:   low
+Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane.ts
+
+`SwimlaneState` and `RailRowActivation` are `export`-marked but no
+other module imports them. Forward-looking public API per the
+implementer's note; YAGNI flag per the project's `Just for now is
+bullshit` rule. Either drop the `export` modifiers now (one-line
+revert) or wait for a concrete consumer.
+
+Observation only; no immediate action.
+
+### AUDIT-20260528-26
+
+Finding-ID: AUDIT-20260528-26
+Status:     open
+Severity:   informational
+Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane.ts
+
+`swimlane.ts` is at 415 lines post-5.3 — within the 500-line cap but
+approaching. Phase 5 future tasks (5.4 drag-reorder, 5.5 presets,
+5.6 integration test) will likely push it over. The Task 5.3
+mobile-sheet split into a sibling controller was the right call;
+further splits along the same boundaries (focus-chips, rail-eye,
+row-activation) become candidates if the file grows.
+
+Trajectory note alongside AUDIT-14 (CSS) and AUDIT-20
+(swimlane-card.ts).

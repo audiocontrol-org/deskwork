@@ -340,8 +340,24 @@ function bindRailEyeToggles(
     // mirrors the click path — both gestures dispatch through
     // `handleRailRowActivation` so hidden-lane Enter unhides + focuses
     // identically to click.
+    //
+    // Eye-button keyboard symmetry (AUDIT-20260528-21): when the
+    // eye-button has keyboard focus, Enter/Space must trigger its
+    // OWN click handler (visibility-only toggle), not the row's
+    // dual-action handler. Without this guard the row's
+    // `preventDefault` cancels the native button activation and the
+    // eye-button's contract is silently swallowed. The eye-button's
+    // click handler runs `stopPropagation` so the mouse path is
+    // already correct; this guard provides the symmetric keyboard
+    // path.
     row.addEventListener('keydown', (ev) => {
       if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      if (
+        ev.target instanceof Element
+        && ev.target.closest('.r-eye-btn') !== null
+      ) {
+        return;
+      }
       ev.preventDefault();
       handleRailRowActivation(state, projectKey, id);
     });

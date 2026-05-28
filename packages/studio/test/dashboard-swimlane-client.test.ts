@@ -287,6 +287,68 @@ describe('swimlane client controller — AUDIT-02 / AUDIT-04 acceptance', () => 
     expect(mockupsChip?.classList.contains('is-visibility-hidden')).toBe(false);
   });
 
+  it('Task 5.3.2 followup (AUDIT-21): Enter on the eye-button triggers the eye contract, NOT the row dual-action', () => {
+    // Regression test for the keyboard a11y finding — when the eye-
+    // button has focus and the operator presses Enter/Space, the
+    // row's keydown handler must NOT preventDefault the native button
+    // activation. Otherwise the eye-button's visibility-only contract
+    // is silently swallowed and the row's focus-toggle fires instead.
+    buildShell(['default', 'mockups', 'qa']);
+    initSwimlane();
+    const defaultRow = document.querySelector<HTMLElement>(
+      '[data-rail-lane="default"]',
+    );
+    const defaultEye
+      = defaultRow?.querySelector<HTMLButtonElement>('.r-eye-btn') ?? null;
+    expect(defaultEye).not.toBeNull();
+    // Default lane starts visible AND focused.
+    expect(defaultRow?.dataset.laneVisible).toBe('true');
+    expect(defaultRow?.getAttribute('aria-pressed')).toBe('true');
+    // Synthesise a keydown originating ON the eye-button that
+    // bubbles to the row (matches what jsdom + the browser produce
+    // when the eye-button has focus and the operator presses Enter).
+    const ev = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      bubbles: true,
+      cancelable: true,
+    });
+    defaultEye?.dispatchEvent(ev);
+    // The row's keydown listener must NOT have called preventDefault —
+    // otherwise the native button click synthesis was cancelled.
+    expect(ev.defaultPrevented).toBe(false);
+    // The row's focus state must be unchanged — only the eye-button's
+    // contract should fire. (jsdom does not synthesize the native
+    // click on Enter without a real event-loop turn; the assertion
+    // above is the contract guarantee. We additionally verify the row
+    // state hasn't been mutated by the dual-action handler.)
+    expect(defaultRow?.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('Task 5.3.2 followup (AUDIT-21): Space on the eye-button does NOT trigger the row dual-action', () => {
+    buildShell(['default', 'mockups', 'qa']);
+    initSwimlane();
+    const qaRow = document.querySelector<HTMLElement>(
+      '[data-rail-lane="qa"]',
+    );
+    const qaEye = qaRow?.querySelector<HTMLButtonElement>('.r-eye-btn') ?? null;
+    // Hide the qa lane first via the eye click (so we have a hidden
+    // lane to verify the row's dual-action DOESN'T re-show on Space).
+    qaEye?.click();
+    expect(qaRow?.dataset.laneVisible).toBe('false');
+    // Press Space on the eye-button. The row's keydown listener must
+    // ignore the gesture so the eye's contract owns it.
+    const ev = new KeyboardEvent('keydown', {
+      key: ' ',
+      bubbles: true,
+      cancelable: true,
+    });
+    qaEye?.dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(false);
+    // The lane is still hidden — the row's unhide-and-focus path did
+    // not fire on the eye-button-targeted Space gesture.
+    expect(qaRow?.dataset.laneVisible).toBe('false');
+  });
+
   it('Task 5.3.2: clicking a VISIBLE row preserves the 5.1 toggle behavior (no unhide path fires)', () => {
     buildShell(['default', 'mockups', 'qa']);
     initSwimlane();
