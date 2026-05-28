@@ -84,18 +84,29 @@ date: 2026-05-28
 
 ### Task 1: Implement promote-deferrals
 
-- [ ] Step 1: Helper script `plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts`. Takes a target workplan path.
-- [ ] Step 2: TBD-pattern parser — finds `TBD:` / `defer` / `follow-up:` / `out of scope` markers + their surrounding context (containing task name, parent phase heading).
-- [ ] Step 3: Reuse Phase 2's batched-proposal protocol. Per item, propose (a) promote-to-issue with surrounding context as the issue body OR (b) inline-wontfix with substantive-reason.
-- [ ] Step 4: Substantive-reason validator — ≥40 chars, no gaming phrases (`for now`, `next pass`, `TBD`, `will fix later`, etc.). Mirrors the in-flight `visual-verification-gate` feature's validator; share code if it's already in tree.
-- [ ] Step 5: Apply-step — `gh issue create` for (a)-items; workplan-edit replaces bare TBD with `[debt: #NNN]` back-link. For (b)-items, workplan-edit replaces bare TBD with the substantive-reason text inline.
-- [ ] Step 6: `plugins/dw-lifecycle/skills/promote-deferrals/SKILL.md`.
-- [ ] Step 7: Vitest unit + integration tests.
+- [x] Step 1: Helper script `plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts`. Takes a target workplan path.
+- [x] Step 2: TBD-pattern parser — finds `TBD:` / `defer` / `follow-up:` / `out of scope` markers + their surrounding context (containing task name, parent phase heading).
+- [x] Step 3: Reuse Phase 2's batched-proposal protocol. Per item, propose (a) promote-to-issue with surrounding context as the issue body OR (b) inline-wontfix with substantive-reason.
+- [x] Step 4: Substantive-reason validator — ≥40 chars, no gaming phrases. Widened to match `.claude/rules/agent-discipline.md` § "Just for now is bullshit" grep list (adds `HACK`, `XXX`, `temporary`, `stub`, `placeholder`, `pending`, `until F<digit>`, `until v<digit>` beyond the spec-listed phrases).
+- [x] Step 5: Apply-step — `gh issue create` for (a)-items; workplan-edit replaces bare TBD with `[debt: #NNN]` back-link. For (b)-items, workplan-edit replaces bare TBD with the substantive-reason text inline.
+- [x] Step 6: `plugins/dw-lifecycle/skills/promote-deferrals/SKILL.md`.
+- [x] Step 7: Vitest unit + integration tests.
 
 **Acceptance Criteria:**
-- [ ] `/dw-lifecycle:promote-deferrals` ships; finds `TBD:` / `defer` / `follow-up:` / `out of scope` patterns in a target workplan.
-- [ ] Supports promote-to-issue and inline-wontfix dispositions.
-- [ ] Substantive-reason validator enforced for wontfix; rejects gaming phrases.
+- [x] `/dw-lifecycle:promote-deferrals` ships; finds `TBD:` / `defer` / `follow-up:` / `out of scope` patterns in a target workplan. (Landed in 62d3965 + 53eec56; 83 new vitest tests passing; SKILL.md at `plugins/dw-lifecycle/skills/promote-deferrals/SKILL.md`.)
+- [x] Supports promote-to-issue and inline-wontfix dispositions.
+- [x] Substantive-reason validator enforced for wontfix; rejects gaming phrases.
+
+**Implementation notes (operator decisions captured during dispatch):**
+
+- Two CLI verbs (`propose` + `apply`) mirroring Phase 2's pattern. Intermediate JSON file under `.dw-lifecycle/promote-deferrals/`. `--force` flag on propose; pre-validation gate on apply; exit codes 0/1/2.
+- `scanSingleWorkplanFile` exported directly from `src/debt-report/workplan-tbd.ts` (keeps parser logic DRY between debt-report's full-tree walk and promote-deferrals' single-file scan).
+- Two disposition shapes: `promote-to-issue` (title ≤100 chars, body ≥40 chars containing surrounding context) and `inline-wontfix` (reason ≥40 chars, no gaming phrases).
+- Workplan-edit drift check: strict trimmed equality against the recorded sample text. Error wording matches the spec: `"workplan file changed since proposal; re-propose"`.
+- Atomic writes: proposal file written FIRST (idempotency record), workplan SECOND. Both via tmp+rename pattern. If proposal write fails, NO workplan mutation. If the workplan rename fails, the tmp file is cleaned up.
+- Banned-phrase set widened beyond the dispatch spec to match the full `.claude/rules/agent-discipline.md` grep list — `HACK`, `XXX`, `temporary`, `stub`, `placeholder`, `pending`, `until F<digit>`, `until v<digit>` added to the original set (`for now`, `just for now`, `next pass`, `TBD`, `will fix later`, `will fix`, `will address`, `address in`, `fix later`, `later` standalone with hyphen-tolerant boundary, `follow up` / `follow-up` verb-phrase, `eventually`, `tomorrow`, `next sprint`, `next cycle`, `next milestone`, `deferred`, `todo`, `fixme`).
+- RunGh imported from `src/triage-issues/types.ts` — no third copy. The broader shared-`gh-runtime/` extraction is tracked at [#335](https://github.com/audiocontrol-org/deskwork/issues/335) for operator triage before Phase 5.
+- 16 new clone groups dispositioned `keep-with-reason` in clones.yaml per the precedent set in Phase 2.
 
 ## Phase 4: Branch archive — `/dw-lifecycle:archive-branch`  ·  [#328](https://github.com/audiocontrol-org/deskwork/issues/328)
 
