@@ -3,7 +3,7 @@ slug: hygiene
 title: Hygiene
 targetVersion: "1.0"
 date: 2026-05-28
-parentIssue:
+parentIssue: "#323"
 deskwork:
   id: aee9b719-7451-401e-be45-7dba8a8cd41a
 ---

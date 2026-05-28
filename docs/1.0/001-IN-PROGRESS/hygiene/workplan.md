@@ -10,7 +10,7 @@ date: 2026-05-28
 
 **Reference design spec:** [`docs/superpowers/specs/2026-05-28-hygiene-design.md`](../../../superpowers/specs/2026-05-28-hygiene-design.md) on main.
 
-## Phase 0: Infrastructure teardown
+## Phase 0: Infrastructure teardown  ·  [#324](https://github.com/audiocontrol-org/deskwork/issues/324)
 
 **Deliverable:** Stalled placeholder branch removed; clean slate for the hygiene infrastructure.
 
@@ -24,7 +24,7 @@ date: 2026-05-28
 **Acceptance Criteria:**
 - [x] Stalled `feature/deskwork-open-issue-tranche-cleanup` branch + worktree are torn down. (DONE during this feature's setup, 2026-05-28.)
 
-## Phase 1: Read-only baseline — `/dw-lifecycle:debt-report`
+## Phase 1: Read-only baseline — `/dw-lifecycle:debt-report`  ·  [#325](https://github.com/audiocontrol-org/deskwork/issues/325)
 
 **Deliverable:** Cross-source debt snapshot available as a skill. Read-only — no mutations.
 
@@ -40,7 +40,7 @@ date: 2026-05-28
 **Acceptance Criteria:**
 - [ ] `/dw-lifecycle:debt-report` ships; emits markdown + JSON across the three categories.
 
-## Phase 2: GitHub-issue triage — `/dw-lifecycle:triage-issues`
+## Phase 2: GitHub-issue triage — `/dw-lifecycle:triage-issues`  ·  [#326](https://github.com/audiocontrol-org/deskwork/issues/326)
 
 **Deliverable:** Operator-triggered batched-proposal cycle for stale GitHub issues. Implements the batched-proposal infrastructure subsequent skills reuse.
 
@@ -59,7 +59,7 @@ date: 2026-05-28
 - [ ] Partial-approval works (operator picks subset of proposals).
 - [ ] Partial-success surfaces failures with reasons; no rollback.
 
-## Phase 3: Workplan-deferral promotion — `/dw-lifecycle:promote-deferrals`
+## Phase 3: Workplan-deferral promotion — `/dw-lifecycle:promote-deferrals`  ·  [#327](https://github.com/audiocontrol-org/deskwork/issues/327)
 
 **Deliverable:** Workplan-TBD scanner with promote-to-issue and inline-wontfix dispositions. Mechanically enforces the project's `Just for now is bullshit` rule.
 
@@ -78,7 +78,7 @@ date: 2026-05-28
 - [ ] Supports promote-to-issue and inline-wontfix dispositions.
 - [ ] Substantive-reason validator enforced for wontfix; rejects gaming phrases.
 
-## Phase 4: Branch archive — `/dw-lifecycle:archive-branch`
+## Phase 4: Branch archive — `/dw-lifecycle:archive-branch`  ·  [#328](https://github.com/audiocontrol-org/deskwork/issues/328)
 
 **Deliverable:** Preserve-work-then-delete pattern for parked branches.
 
@@ -97,7 +97,7 @@ date: 2026-05-28
 - [ ] Creates `archived/<branch>-<date>` annotated tag; pushes; deletes the branch (local + remote).
 - [ ] Refuses on dirty/checked-out worktree or pre-existing tag.
 
-## Phase 5: Release-time issue closure — `/dw-lifecycle:close-shipped`
+## Phase 5: Release-time issue closure — `/dw-lifecycle:close-shipped`  ·  [#329](https://github.com/audiocontrol-org/deskwork/issues/329)
 
 **Deliverable:** Release-time pending-verification labeling for shipped-in-this-version issues. Closure waits for verification per project rule.
 
@@ -116,7 +116,7 @@ date: 2026-05-28
 - [ ] Transitions matching issues to a `pending-verification` label (does NOT close).
 - [ ] `/release` invokes `:close-shipped` post-publish (optional integration; landed if operator wants the auto-invoke).
 
-## Phase 6: Lifecycle integration
+## Phase 6: Lifecycle integration  ·  [#330](https://github.com/audiocontrol-org/deskwork/issues/330)
 
 **Deliverable:** Hygiene auto-fires at natural waypoints — session-end captures the just-completed work's debts, session-start displays the prior session's recommendation, complete enforces the no-bare-TBDs gate before merge.
 
@@ -142,7 +142,7 @@ date: 2026-05-28
 - [ ] `/dw-lifecycle:session-start` displays the prior session's recommendation without re-scanning.
 - [ ] `/dw-lifecycle:complete` carries the pre-merge TBD gate; supports `--skip-tbd-gate --reason "<substantive>"` override with logged reason.
 
-## Phase 7: Documentation
+## Phase 7: Documentation  ·  [#331](https://github.com/audiocontrol-org/deskwork/issues/331)
 
 **Deliverable:** Adopter-facing prose explaining the skill family + the operational pattern.
 
@@ -155,7 +155,7 @@ date: 2026-05-28
 **Acceptance Criteria:**
 - [ ] Adopter-facing docs (README + per-skill SKILL.md) explain the skills + the operational pattern.
 
-## Phase 8: Tests + smoke
+## Phase 8: Tests + smoke  ·  [#332](https://github.com/audiocontrol-org/deskwork/issues/332)
 
 **Deliverable:** Vitest unit + integration coverage for every v1 skill + a local smoke script.
 
@@ -168,7 +168,7 @@ date: 2026-05-28
 - [ ] All v1 skills carry vitest unit + integration tests against fixture projects.
 - [ ] Local smoke script exercises end-to-end wiring.
 
-## Phase 9: Dogfood round
+## Phase 9: Dogfood round  ·  [#333](https://github.com/audiocontrol-org/deskwork/issues/333)
 
 **Deliverable:** First batched-proposal cycle run against the existing backlog. Validates the workflow against real items.
 
