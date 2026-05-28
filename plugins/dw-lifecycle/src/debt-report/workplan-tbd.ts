@@ -137,6 +137,38 @@ function scanMarkers(content: string): MarkerScanResult {
   };
 }
 
+// Single-file scanner used by Phase 3 (/dw-lifecycle:promote-deferrals).
+// Runs the SAME marker parser logic as the full-tree walk, but against a
+// caller-supplied file path. Returns the per-marker counts + sample list
+// (with line numbers) so the promote-deferrals propose step can drive
+// workplan edits without re-tokenizing the file.
+//
+// The sample cap (MAX_SAMPLES_PER_FEATURE = 20) applies identically here.
+// When a workplan exceeds the cap, propose surfaces the first 20 markers;
+// the operator runs propose again after applying the first batch to pick
+// up the remainder.
+//
+// Throws when the path does not exist or is not a file. Callers handle the
+// error and surface it as a usage error to the operator.
+export interface ScanSingleWorkplanFileResult {
+  readonly workplanPath: string;
+  readonly counts: WorkplanFeatureCounts['counts'];
+  readonly samples: readonly WorkplanMarkerSample[];
+}
+
+export function scanSingleWorkplanFile(
+  workplanPath: string,
+): ScanSingleWorkplanFileResult {
+  if (!existsSync(workplanPath)) {
+    throw new Error(
+      `Workplan not found at ${workplanPath}. Pass --workplan <path> pointing at an existing file.`,
+    );
+  }
+  const content = readFileSync(workplanPath, 'utf8');
+  const { counts, samples } = scanMarkers(content);
+  return { workplanPath, counts, samples };
+}
+
 export function scanWorkplanTbds(args: ScanWorkplanTbdsArgs): WorkplanTbdsReport {
   const { projectRoot, config } = args;
   const docsRoot = join(projectRoot, config.docs.root);

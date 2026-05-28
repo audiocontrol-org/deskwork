@@ -32,6 +32,7 @@ import { wrapPrompt } from './subcommands/wrap-prompt.js';
 import { validateReturn } from './subcommands/validate-return.js';
 import { debtReport } from './subcommands/debt-report.js';
 import { triageIssues } from './subcommands/triage-issues.js';
+import { promoteDeferrals } from './subcommands/promote-deferrals.js';
 
 const subcommand = process.argv[2];
 const args = process.argv.slice(3);
@@ -78,6 +79,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'validate-return': validateReturn,
   'debt-report': debtReport,
   'triage-issues': triageIssues,
+  'promote-deferrals': promoteDeferrals,
 };
 
 // Deprecation hints printed alongside the subcommand list in `--help`.
