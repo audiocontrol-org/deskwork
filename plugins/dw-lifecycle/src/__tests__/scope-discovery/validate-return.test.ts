@@ -339,3 +339,130 @@ describe('validate-return flag parser', () => {
     expect(parsed.help).toBe(true);
   });
 });
+
+/**
+ * TF-008 (canary 2026-05-28) — Searched-count noun whitelist.
+ *
+ * Real implementer dispatches naturally use descriptive nouns
+ * ("source-emitter call sites", "occurrences", "hits") instead of
+ * the literal "matches". Pre-fix parser required exactly "matches"
+ * and rejected everything else. Fix: accept a whitelist of head
+ * nouns + up to 3 modifier tokens preceding the head.
+ */
+describe('validate-return — TF-008 Searched-count noun whitelist', () => {
+  function responseWithCount(searchedCountPhrase: string): string {
+    return [
+      'Did the work.',
+      '',
+      `Searched: foo-pattern — ${searchedCountPhrase}`,
+      'Included: src/a.tsx:42',
+      'Excluded: src/legacy.tsx:88 — different primitive (CodeMirror)',
+      '',
+    ].join('\n');
+  }
+
+  async function validate(response: string) {
+    return validateReturnForCli({
+      response,
+      agentType: 'implementer',
+      repoRoot: '/nonexistent',
+    });
+  }
+
+  it('accepts the original literal "matches"', async () => {
+    const r = await validate(responseWithCount('2 matches'));
+    expect(r.valid).toBe(true);
+  });
+
+  it('accepts the canary failing case: "2 source-emitter call sites (...)"', async () => {
+    const r = await validate(
+      responseWithCount('2 source-emitter call sites (`swimlane-card.ts`)'),
+    );
+    expect(r.valid).toBe(true);
+  });
+
+  it('accepts synonym nouns: hits, occurrences, instances, sites, files, results, references', async () => {
+    for (const phrase of [
+      '3 hits',
+      '5 occurrences',
+      '7 instances',
+      '4 sites',
+      '2 files',
+      '6 results',
+      '1 reference',
+    ]) {
+      const r = await validate(responseWithCount(phrase));
+      expect(r.valid, `expected accept for: ${phrase}; parseError=${r.parseError}`).toBe(true);
+    }
+  });
+
+  it('accepts up to 3 modifier tokens before head noun', async () => {
+    for (const phrase of [
+      '3 unique occurrences',
+      '2 cross-cutting call sites',
+      '5 distinct source-emitter call sites',
+    ]) {
+      const r = await validate(responseWithCount(phrase));
+      expect(r.valid, `expected accept for: ${phrase}; parseError=${r.parseError}`).toBe(true);
+    }
+  });
+
+  it('rejects nouns outside the whitelist (issues, places, spots, things)', async () => {
+    for (const phrase of [
+      '5 issues found',
+      '7 places',
+      '4 spots',
+      '3 things',
+    ]) {
+      const r = await validate(responseWithCount(phrase));
+      expect(r.valid, `expected reject for: ${phrase}`).toBe(false);
+      expect(r.parseError).toContain('Malformed Searched: count');
+    }
+  });
+
+  it('rejection message names the whitelist so the agent can self-correct', async () => {
+    const r = await validate(responseWithCount('5 widgets'));
+    expect(r.valid).toBe(false);
+    expect(r.parseError).toContain('matches/match/hits');
+    expect(r.parseError).toContain('call sites');
+  });
+});
+
+/**
+ * TF-008 + TF-009 (canary 2026-05-28) — GRAMMAR_INSTRUCTION prelude
+ * documents the three known agent-natural-writing gotchas: noun
+ * whitelist, :LINE-with-:1-sentinel, project-vocabulary collisions.
+ *
+ * Documentation-only assertions; the actual workaround is for the
+ * agent to read these before writing the grammar block.
+ */
+describe('GRAMMAR_INSTRUCTION prelude — TF-008 + TF-009 documentation', () => {
+  it('documents the Searched-count noun whitelist (TF-008)', async () => {
+    const { GRAMMAR_INSTRUCTION } = await import(
+      '../../scope-discovery/dispatch-wrapper.js'
+    );
+    expect(GRAMMAR_INSTRUCTION).toContain('Searched-count noun whitelist');
+    expect(GRAMMAR_INSTRUCTION).toContain('`matches`');
+    expect(GRAMMAR_INSTRUCTION).toContain('`call sites`');
+    expect(GRAMMAR_INSTRUCTION).toContain('modifier tokens');
+  });
+
+  it('documents the :LINE :1 sentinel for whole-file Excluded entries (TF-008 addendum)', async () => {
+    const { GRAMMAR_INSTRUCTION } = await import(
+      '../../scope-discovery/dispatch-wrapper.js'
+    );
+    expect(GRAMMAR_INSTRUCTION).toContain('Excluded entries require');
+    expect(GRAMMAR_INSTRUCTION).toContain(':1');
+    expect(GRAMMAR_INSTRUCTION).toContain('whole-file');
+  });
+
+  it('documents the project-vocabulary collision workaround (TF-009)', async () => {
+    const { GRAMMAR_INSTRUCTION } = await import(
+      '../../scope-discovery/dispatch-wrapper.js'
+    );
+    expect(GRAMMAR_INSTRUCTION).toContain('Forbidden-deferral phrase list');
+    expect(GRAMMAR_INSTRUCTION).toContain('project');
+    expect(GRAMMAR_INSTRUCTION.toLowerCase()).toContain('swim-stub');
+    expect(GRAMMAR_INSTRUCTION).toContain('PURPOSE');
+  });
+});
