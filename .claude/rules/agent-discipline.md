@@ -432,3 +432,43 @@ Once a script at `~/.claude/plugins/marketplaces/deskwork/scripts/<name>.sh` is 
 - The same discipline applies to the `deskwork` / `deskwork-studio` / `dw-lifecycle` CLI subcommands more broadly, but the marketplace-clone scripts have a special exposure because they get wired directly into session-start hooks rather than invoked via the bin shim. Friction in the bin shim is recoverable; friction in the script is invisible until the operator notices their session-start hook stopped working.
 
 The repair-install.sh script (post-#131) prints a one-line version banner when not `--quiet`. Operators triaging "did the fix land?" can see the version without reading the file. That banner format is now also part of the contract — keep it stable enough that adopters can grep for it if they ever build automation around it.
+
+## Closure is a structural step, not aspirational
+
+A feature's lifecycle has two halves: shipping the work and closing it. Across cycles, the shipping half wins structurally — there are gates that refuse to let work ship without tests / review / verification, and natural rewards (PR merged, version bumped, tag pushed) at every shipping waypoint. The closure half has historically had no equivalent. Issues stayed open across releases because nothing structurally walked them. Workplan TBD markers shipped to merge because nothing structurally refused them. Parked branches accumulated in the branch-list noise because nothing structurally surfaced them.
+
+The hygiene-skill family closes that asymmetry. Each skill is structural — invokable on demand by the operator, and tied into the natural shipping waypoints so closure-work fires at the same cadence as ship-work:
+
+| Closure step | Structural waypoint it fires from |
+|---|---|
+| `/dw-lifecycle:close-shipped` | Post-release (operator runs immediately after `gh release create`) — labels every issue whose fix lands between the two tags with `pending-verification`, comments with the evidence trail, leaves closure to the operator's install-and-walk verification. Does NOT close. |
+| `/dw-lifecycle:complete` no-bare-TBDs gate | Pre-merge — refuses to graduate the feature from `001-IN-PROGRESS/` to `003-COMPLETE/` if the workplan still carries bare TBD / defer / follow-up / out-of-scope markers that lack either a `[debt: #NNN]` back-link OR an inline `(wontfix: <substantive reason>)` annotation. Operator override is `--skip-tbd-gate --reason "<≥40-char substantive reason>"`; the reason logs to the journal. |
+| `/dw-lifecycle:session-end` hygiene capture | End-of-session — writes a structured hygiene-observations + next-session-recommendation block into `DEVELOPMENT-NOTES.md`. The block always emits (even on the "no signals" branch) so session-start always sees a written record from the prior session. |
+| `/dw-lifecycle:session-start` recommendation display | Start-of-session — displays the prior session's recommendation verbatim. No fresh scan; display-only. Re-entry stays cheap. |
+| `/dw-lifecycle:debt-report` | On-demand operator invocation — cross-source snapshot of all three debt streams. The read-only baseline the mutating verbs operate on. |
+| `/dw-lifecycle:triage-issues`, `:promote-deferrals`, `:archive-branch` | On-demand operator-triggered mutations against the snapshot. Batched-proposal contract (`propose` writes a JSON file; operator fills in dispositions; `apply` validates all-or-nothing then dispatches) keeps the closure work auditable. |
+
+### The load-bearing contract: agent posts evidence, operator decides
+
+The hygiene family rests on the same contract as the existing `Issue closure requires verification in a formally-installed release` rule (above). The agent's role at every closure step is to **post evidence** — the four-source evidence trail in `close-shipped`'s per-issue comment, the markdown table of proposed dispositions in `triage-issues propose`, the bare-TBD location list in `complete-gate`'s refusal output. The operator's role is to **decide** — clicking close on the labeled issue after walking the install, picking the subset of triage proposals to apply, supplying a substantive reason on the `--skip-tbd-gate --reason "<text>"` override.
+
+This asymmetry is intentional. The agent that shipped the fix is structurally the wrong party to judge whether the fix matches the operator's lived experience of the bug. The agent that wrote the TBD marker is structurally the wrong party to judge whether the deferral represents a real disposition or an IOU dressed up as discipline. Every hygiene verb is built to surface the evidence with maximum legibility (provenance trails per issue, sample line numbers per TBD marker, ahead/behind counts per parked branch) precisely so the operator can decide quickly without re-deriving the underlying state.
+
+### The structural asymmetry the family closes
+
+Pre-hygiene, the closure half of the lifecycle relied on operator vigilance. After every release: did anyone walk the merged PRs to find issues whose fixes landed? After every feature-complete: did anyone grep the workplan for residual TBDs? After every "this branch is parked" reckoning: did anyone preserve the work before deleting? The answer was usually no, because there was no structural reason to do so. Shipping work has its own momentum; closing work doesn't unless something demands it.
+
+The hygiene verbs invert that. `close-shipped` becomes the post-publish reflex that turns a release into a labeled queue of pending-verification candidates. `complete-gate` becomes the pre-merge refusal that turns "I'll deal with the TBDs later" into "I deal with the TBDs now or I supply a substantive reason." `archive-branch` becomes the structural alternative to the false choice between "leave the parked branch sitting forever" and "delete and lose the work." None of these verbs introduce new policy — they mechanize policy that already lived in this rules file. The mechanization is what makes closure unavoidable.
+
+### How to apply
+
+- After tagging and pushing a release: run `/dw-lifecycle:close-shipped --from-tag <prior> --to-tag <current>`. Don't close the labeled issues; let the operator walk the install.
+- Before invoking `/dw-lifecycle:complete` on a closing feature: confirm the workplan is clean (every TBD either has a `[debt: #NNN]` back-link or an inline `(wontfix: <reason>)` annotation). If `complete-gate` refuses, run `/dw-lifecycle:promote-deferrals propose --workplan <path>` to triage the residual markers; don't reach for `--skip-tbd-gate` unless the operator explicitly authorizes the override AND supplies the substantive reason.
+- After every session: run `/dw-lifecycle:session-end` (it writes the hygiene-observations + next-session-recommendation block automatically). On re-entry, `/dw-lifecycle:session-start` surfaces the block verbatim — the closure thread carries forward across session boundaries without requiring re-derivation.
+- When a parked branch surfaces in `/dw-lifecycle:debt-report`'s parked-branch section: pick one of the three dispositions (revive, discard, archive). Use `/dw-lifecycle:archive-branch` for the preserve-then-delete path; the annotated tag keeps the work reachable + named even after the branch is gone.
+
+### Cross-references
+
+- Design spec the family was built from: [`docs/superpowers/specs/2026-05-28-hygiene-design.md`](../../docs/superpowers/specs/2026-05-28-hygiene-design.md).
+- The rule the family mechanizes for the implementation half: § "Just for now is bullshit" above.
+- The rule the family honors for the post-release half: § "Issue closure requires verification in a formally-installed release" above.

@@ -21,8 +21,8 @@ Ships a family of UNIX-style `/dw-lifecycle:*` skills that surface and burn down
 | 4 | Branch archive — `/dw-lifecycle:archive-branch` | [#328](https://github.com/audiocontrol-org/deskwork/issues/328) | Shipped on branch (34 tests pass; preserve-then-delete with all-or-nothing pre-flight gates) |
 | 5 | Release-time issue closure — `/dw-lifecycle:close-shipped` | [#329](https://github.com/audiocontrol-org/deskwork/issues/329) | Shipped on branch (8b3a8de + extension; 4-source evidence walker (commit-log + audit-log + tooling-feedback + workplan-checkbox) + cross-source merge + release-notes-body flag; 110 tests pass) |
 | 6 | Lifecycle integration | [#330](https://github.com/audiocontrol-org/deskwork/issues/330) | Shipped on branch (Tasks 1–3 of 4: session-end + session-start + complete TBD gate; 24 new vitest tests; Task 4 phase-parent closure gate remains open) |
-| 7 | Documentation | [#331](https://github.com/audiocontrol-org/deskwork/issues/331) | Not started |
-| 8 | Tests + smoke | [#332](https://github.com/audiocontrol-org/deskwork/issues/332) | Not started |
+| 7 | Documentation | [#331](https://github.com/audiocontrol-org/deskwork/issues/331) | Shipped on branch (README section + per-skill SKILL.md audit complete) |
+| 8 | Tests + smoke | [#332](https://github.com/audiocontrol-org/deskwork/issues/332) | Shipped on branch (1804 tests pass + scripts/smoke-hygiene.sh) |
 | 9 | Dogfood round | [#333](https://github.com/audiocontrol-org/deskwork/issues/333) | Not started |
 
 ## Key Links

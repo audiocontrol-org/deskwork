@@ -216,14 +216,14 @@ Closes a separate concern from the no-bare-TBDs gate: the 17 stale phase parent 
 
 ### Task 1: Author docs
 
-- [ ] Step 1: README section under `plugins/dw-lifecycle/README.md` introducing the hygiene skills + the operational-pattern narrative (operator-triggered + lifecycle-triggered).
-- [ ] Step 2: Per-skill `SKILL.md` prose for each new skill (already covered in Phase 1–6 task lists; this phase verifies completeness + cross-references).
-- [ ] Step 3: Cross-reference the design spec on main + the related `Just for now is bullshit` rule.
-- [ ] Step 4: Add a section to `.claude/rules/agent-discipline.md` titled "Closure is a structural step, not aspirational." Names the hygiene skill family + the post-release + session-end + complete gates that make closure unavoidable. Cites the existing verification rule's "agent posts evidence; operator decides" clause as load-bearing. Documents the structural asymmetry the hygiene feature closes (shipping > closing; previously the closure half of the lifecycle structurally lost across cycles).
+- [x] Step 1: README section under `plugins/dw-lifecycle/README.md` introducing the hygiene skills + the operational-pattern narrative (operator-triggered + lifecycle-triggered).
+- [x] Step 2: Per-skill `SKILL.md` prose for each new skill (already covered in Phase 1–6 task lists; this phase verifies completeness + cross-references).
+- [x] Step 3: Cross-reference the design spec on main + the related `Just for now is bullshit` rule.
+- [x] Step 4: Add a section to `.claude/rules/agent-discipline.md` titled "Closure is a structural step, not aspirational." Names the hygiene skill family + the post-release + session-end + complete gates that make closure unavoidable. Cites the existing verification rule's "agent posts evidence; operator decides" clause as load-bearing. Documents the structural asymmetry the hygiene feature closes (shipping > closing; previously the closure half of the lifecycle structurally lost across cycles).
 
 **Acceptance Criteria:**
-- [ ] Adopter-facing docs (README + per-skill SKILL.md) explain the skills + the operational pattern.
-- [ ] Agent-discipline rule documents the closure-as-structural-step pattern.
+- [x] Adopter-facing docs (README + per-skill SKILL.md) explain the skills + the operational pattern.
+- [x] Agent-discipline rule documents the closure-as-structural-step pattern.
 
 ## Phase 8: Tests + smoke  ·  [#332](https://github.com/audiocontrol-org/deskwork/issues/332)
 
@@ -231,12 +231,12 @@ Closes a separate concern from the no-bare-TBDs gate: the 17 stale phase parent 
 
 ### Task 1: Test coverage audit
 
-- [ ] Step 1: Verify each Phase 1–5 task has vitest unit + integration tests landed; backfill any gaps.
-- [ ] Step 2: Local smoke script `scripts/smoke-hygiene.sh` exercises end-to-end wiring (each skill invoked against a throwaway `gh` fixture repo + fixture workplan tree). NOT added to CI.
+- [x] Step 1: Verify each Phase 1–5 task has vitest unit + integration tests landed; backfill any gaps. (1804 vitest tests pass across 149 files — `npx vitest run` from `plugins/dw-lifecycle/`. The Phase 1–6 task lists already ship the corresponding test suites; this phase confirms.)
+- [x] Step 2: Local smoke script `scripts/smoke-hygiene.sh` exercises end-to-end wiring (each skill invoked against a throwaway `gh` fixture repo + fixture workplan tree). NOT added to CI.
 
 **Acceptance Criteria:**
-- [ ] All v1 skills carry vitest unit + integration tests against fixture projects.
-- [ ] Local smoke script exercises end-to-end wiring.
+- [x] All v1 skills carry vitest unit + integration tests against fixture projects.
+- [x] Local smoke script exercises end-to-end wiring.
 
 ## Phase 9: Dogfood round  ·  [#333](https://github.com/audiocontrol-org/deskwork/issues/333)
 

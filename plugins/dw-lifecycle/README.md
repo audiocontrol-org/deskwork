@@ -152,6 +152,59 @@ Install-side, the helper refuses to clobber existing files by default:
 - **Foreign shim collision** — a file exists at a target shim path that's not part of a prior dw-lifecycle install. Refused with exit 2; operator passes `--force` to overwrite, or `--rename <prefix>` to avoid the collision entirely (e.g. `--rename mt` produces `mti` / `mt-implement` etc.).
 - **Prior dw-lifecycle install** — a manifest already exists. Refused with exit 2; operator passes `--replace` to uninstall the prior install before installing the new scheme. `--replace` and `--force` are orthogonal — both can be set if migrating from a prior install AND clobbering an unrelated foreign file in the new scheme's path.
 
+## Hygiene — permanent debt burndown
+
+The `/dw-lifecycle:hygiene*` skill family ships UNIX-style verbs that surface and burn down three classes of permanent debt across a project: stale GitHub issues, workplan TBD/defer markers, and parked branches. The family is operator-triggered (no continuous polling) and integrates with the natural feature-lifecycle waypoints (session-end captures observations, complete enforces a no-bare-TBDs gate, release closes shipped-in-this-version issues).
+
+### The six core verbs
+
+| Skill | Purpose | Mutation? |
+|---|---|---|
+| `/dw-lifecycle:debt-report` | Cross-source snapshot (GitHub issues bucketed by label/age/stale-since-last-comment; workplan TBD totals per in-progress feature; parked-branch list with ahead/behind). Markdown + JSON output. | Read-only |
+| `/dw-lifecycle:triage-issues` | Operator-triggered batched-proposal cycle for stale GitHub issues. Two verbs (`propose` + `apply`); intermediate JSON file as the contract. Four disposition shapes. | gh write |
+| `/dw-lifecycle:promote-deferrals` | Scan a target workplan for TBD/defer/follow-up/out-of-scope markers; per-item propose promote-to-issue OR inline-wontfix; the wontfix path enforces a substantive-reason validator (≥40 chars, no gaming phrases). | gh write + workplan edit |
+| `/dw-lifecycle:archive-branch` | Preserve a parked branch as `archived/<branch>-<date>` annotated tag, push, delete local + remote. All-or-nothing pre-flight gate. | git write + push |
+| `/dw-lifecycle:close-shipped` | Walk four evidence sources (commit-log + audit-log + tooling-feedback + workplan-checkbox) between two release tags; comment + label matching issues with `pending-verification`. Does NOT close — closure waits for operator verification. | gh write |
+| Lifecycle wiring | `session-end` captures hygiene observations + writes a next-session recommendation block; `session-start` displays the prior recommendation (no fresh scan); `complete` refuses on bare TBDs before merge (with `--skip-tbd-gate --reason "<text>"` override). | Mixed |
+
+### Operational pattern
+
+The skills share NO persistent state. Every skill reads live state (GitHub via `gh`, workplans via grep, branches via git) and mutates the same source-of-truth. The batched-proposal pattern (introduced by `triage-issues`, reused by `promote-deferrals`) writes a hand-editable intermediate JSON file at `.dw-lifecycle/<skill>/proposals-<timestamp>.json` between the propose and apply verbs — the operator's chat agent fills in dispositions, the apply step validates all-or-nothing then dispatches.
+
+This mechanizes the project's "Just for now is bullshit" rule (see `.claude/rules/agent-discipline.md`): code-side workplan TBD markers AND workplan deferral lines are surfaced; the only valid dispositions are "promote to tracked GitHub issue" (with a back-link in the workplan) or "inline-wontfix with substantive reason ≥40 chars, no gaming phrases."
+
+### Quick reference
+
+```
+# Read-only snapshot of all three debt sources:
+dw-lifecycle debt-report
+
+# JSON output for downstream consumers:
+dw-lifecycle debt-report --json
+
+# Walk the four-source evidence trail for a release tag range:
+dw-lifecycle close-shipped --from-tag v0.24.0 --to-tag v0.25.0
+
+# Triage stale issues (batched proposal cycle):
+dw-lifecycle triage-issues propose --bucket stale-30d --limit 10
+# operator fills in the proposal JSON
+dw-lifecycle triage-issues apply --from-file .dw-lifecycle/triage-issues/proposals-*.json
+
+# Promote workplan TBDs to tracked issues OR inline-wontfix:
+dw-lifecycle promote-deferrals propose --workplan docs/1.0/001-IN-PROGRESS/<slug>/workplan.md
+# operator fills in dispositions + substantive reasons
+dw-lifecycle promote-deferrals apply --from-file .dw-lifecycle/promote-deferrals/proposals-*.json
+
+# Archive a parked branch (annotated tag preserved; branch deleted local + remote):
+dw-lifecycle archive-branch feature/studio-bridge --rationale "Security gap on auth bridge; tag preserves work."
+```
+
+### Cross-references
+
+- Design spec: [`docs/superpowers/specs/2026-05-28-hygiene-design.md`](../../docs/superpowers/specs/2026-05-28-hygiene-design.md).
+- Canonical rule the family mechanizes: [`.claude/rules/agent-discipline.md`](../../.claude/rules/agent-discipline.md) § "Just for now is bullshit."
+- Issue-closure rule the `close-shipped` verb honors: [`.claude/rules/agent-discipline.md`](../../.claude/rules/agent-discipline.md) § "Issue closure requires verification in a formally-installed release."
+
 ## Boundary contract
 
 The architectural promise that distinguishes `dw-lifecycle` from a homegrown lifecycle stack: it never reimplements anything the canonical layer ships. Three rules from [`design.md` §2](../../docs/1.0/001-IN-PROGRESS/dw-lifecycle/design.md):
