@@ -244,11 +244,20 @@ Closes a separate concern from the no-bare-TBDs gate: the 17 stale phase parent 
 
 ### Task 1: Dogfood the new skills
 
-- [ ] Step 1: Run `/dw-lifecycle:debt-report` to baseline the current state.
-- [ ] Step 2: Run `/dw-lifecycle:triage-issues --bucket stale-30d --limit 10` end-to-end (propose → approve → apply). At least one full cycle.
-- [ ] Step 3: Run `/dw-lifecycle:promote-deferrals` against one in-progress feature's workplan end-to-end. At least one full cycle.
-- [ ] Step 4: Capture friction in `DEVELOPMENT-NOTES.md` as a session-end entry; file follow-up issues for any sharp edges.
+- [x] Step 1: Run `/dw-lifecycle:debt-report` to baseline the current state.
+- [x] Step 2: Run `/dw-lifecycle:triage-issues --bucket stale-30d --limit 10` end-to-end (propose → approve → apply). At least one full cycle.
+- [x] Step 3: Run `/dw-lifecycle:promote-deferrals` against one in-progress feature's workplan end-to-end. At least one full cycle.
+- [x] Step 4: Capture friction in `DEVELOPMENT-NOTES.md` as a session-end entry; file follow-up issues for any sharp edges.
 
 **Acceptance Criteria:**
-- [ ] Dogfood round against the existing backlog runs at least one full batched-proposal cycle for each of `:triage-issues` and `:promote-deferrals`.
-- [ ] Friction captured in `DEVELOPMENT-NOTES.md`; follow-up issues filed for sharp edges.
+- [x] Dogfood round against the existing backlog runs at least one full batched-proposal cycle for each of `:triage-issues` and `:promote-deferrals`.
+- [x] Friction captured in `DEVELOPMENT-NOTES.md`; follow-up issues filed for sharp edges.
+
+**Implementation notes (dogfood findings — 2026-05-28, run from v0.26.0):**
+
+- `:debt-report` baseline: 190 open issues (92 enhancement, 53 bug, 46 unlabeled, 3 stale > 30d, 139 stale-since-last-comment > 7d); 62 workplan TBDs across 8 in-progress features; 1 parked branch (`origin/feature/deskwork-triage`, 1 ahead / 746 behind, last commit 2026-04-26) + 29 other-branches.
+- `:triage-issues --bucket stale-30d --limit 10` cycle: 3 issues in the bucket. All three dispositioned + applied. [#33](https://github.com/audiocontrol-org/deskwork/issues/33) closed as wontfix (superseded — verified every Phase 19 deliverable shipped: content-index.ts, 7 doctor rules, paths.ts + content-tree.ts wired via content-index, workflow-paths.ts keyed by entryId). [#30](https://github.com/audiocontrol-org/deskwork/issues/30) closed as wontfix (hyperventilation — premature optimization with no perf signal). [#18](https://github.com/audiocontrol-org/deskwork/issues/18) closed as duplicate of [#301](https://github.com/audiocontrol-org/deskwork/issues/301) (graphical-entries).
+- `:promote-deferrals propose --workplan docs/1.0/001-IN-PROGRESS/hygiene/workplan.md` cycle: produced 20 proposals, 100% false positives. ALL on `- [x]`-checked acceptance criteria + descriptive prose referring to the marker keywords themselves (TBD inside `workplan-tbd.ts`, `--skip-tbd-gate`, banned-phrase lists). Aborted (`approval: n`). Friction filed at [#339](https://github.com/audiocontrol-org/deskwork/issues/339).
+- Fix landed in `9086894` on main: Fix A (skip `- [x]` lines), Fix B-1 (tighten TBD regex to require `TBD:` colon-suffix per spec), Fix B-2 (strip backtick code-spans before pattern dispatch). Re-ran propose against hygiene workplan post-fix: 0 false positives. 1829 / 1829 tests pass. The fix is reachable in any v0.26.x build past `9086894`.
+- Lesson saved: the worktree's pinned branch is the fix target — never direct-push to main, never create a sibling fix branch (per `feedback_worktree_pinned_branch_for_fixes.md`).
+- TF-001 (dispatch-wrapper false-positive on cue substring matches in cited file paths) at `docs/1.0/001-IN-PROGRESS/hygiene/tooling-feedback.md` stays open; not surfaced again in Phase 9 but still tracked.
