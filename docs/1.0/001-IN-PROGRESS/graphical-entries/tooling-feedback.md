@@ -36,6 +36,7 @@ Running log of friction, pathologies, and improvement opportunities in the scope
 | TF-005 | Closed | dw-lifecycle v0.24.2 — `wrap-prompt` + `validate-return` CLI subcommands shipped; round-trip verified |
 | TF-006 | Closed | dw-lifecycle v0.24.1 — `modules` minItems relaxed; bootstrap manifest now valid |
 | TF-007 | Closed | dw-lifecycle v0.24.1 — `dw-lifecycle orchestrator-turn --feature <slug>` CLI subcommand shipped |
+| TF-008 | Open | — |
 
 ## How to add an entry
 
@@ -309,4 +310,48 @@ Same shape as TF-005:
 Recommended: **Medium**. Light is documentation triage; the SKILL.md describes the loop accurately for embedded callers but those don't exist outside test code. Medium is the principled fix: the orchestrator-side loop IS the load-bearing engine that the dispatch-wrapper hooks into for judge/mediation/controller, and exposing it as a CLI is the same shape as `scope-widen`'s existing CLI exposure. Heavy is the right end-state once enough pieces are in place that the orchestrator-as-TypeScript-harness pays for itself.
 
 Cross-reference: paired tightly with TF-005; both describe the same root cause (orchestrator owns Agent tool primitives, can't engage TypeScript libraries directly). A combined "operator-facing CLI shims for scope-discovery's enforcement engines" fix closes both.
+
+## TF-008 · DSC · low · `validate-return` parser strictly requires the literal noun "matches" — semantically equivalent phrasings are rejected
+
+**Repro:**
+
+1. Run a sub-agent dispatch via `wrap-prompt` and instruct the agent to conclude with the REQUIRED RETURN GRAMMAR block.
+2. Agent writes a substantively-correct grammar block where the `Searched:` line phrases the count using a descriptive noun:
+
+   ```
+   Searched: `class="collapse-chev"` in production markup paths — 2 source-emitter call sites (`swimlane-card.ts`).
+   Included: ...
+   Excluded: ...
+   ```
+
+3. Run `dw-lifecycle validate-return --response-file <path> --agent-type typescript-pro`:
+
+   ```json
+   {
+     ...
+     "parseError": "Malformed Searched: count — expected \"<N> matches\" but got: 2 source-emitter call sites (`swimlane-card.ts`).",
+     ...
+     "summary": "validate-return: REJECTED (Malformed Searched: count — expected \"<N> matches\" but got: 2 source-emitter call sites (...).)"
+   }
+   ```
+
+4. Exit code 1; the wrapper rejects what is semantically the same as `2 matches`.
+
+The wrapper's parser at `plugins/dw-lifecycle/src/scope-discovery/dispatch-grammar.ts` requires the literal noun "matches" after the digit count in the `Searched:` line. Descriptive nouns ("source-emitter call sites", "call sites", "occurrences", "instances", "hits", "files") all reject.
+
+This is a real signal-vs-noise tradeoff: enforcing a literal noun is what makes the parser deterministic; loosening to any `<digit>\s+<noun>` shape would risk false positives on partial sentences. But agents naturally write descriptively — "2 source-emitter call sites" is more informative than "2 matches" — and the wrapper's strictness forces a meaning-loss-on-format-strictness tradeoff.
+
+**Workaround used:**
+
+Documented in the orchestrator's session narrative; the implementer's commits landed cleanly and the substantive work was sound (635 passing tests, build exit 0). The wrapper rejection is a return-grammar format-fail, not a work-quality fail. Moving forward to the next dispatch with the same risk surface.
+
+**Suggested fix:**
+
+- **Light:** the GRAMMAR_INSTRUCTION prelude (the text `wrap-prompt` appends to every dispatch) explicitly underlines that "matches" is the REQUIRED noun and shows several rejected phrasings as anti-examples. Cheapest: documentation-only.
+- **Medium:** the parser accepts any of a small whitelist of nouns: `matches`, `match`, `hits`, `hit`, `occurrences`, `instances`, `call sites`, `sites`, `files`. Any other noun rejects. Preserves the deterministic shape while letting the agent write naturally.
+- **Heavy:** the parser switches to a count-first regex that ignores the noun entirely: `^Searched:\s+<pattern>\s+—\s+(\d+)(?:\s+\S+)*$`. Always takes the first digit as the count. Most permissive; relies entirely on the digit's position. Probably too loose — `Searched: pattern matching ... — 7 issues found` would match `7` even if the digit is mid-sentence.
+
+Recommended: **Light + Medium together**. Light closes the documentation loop (agents see the constraint explicitly); Medium adds a small noun whitelist so the most common natural phrasings pass without weakening the parser's structure. Heavy is too permissive.
+
+Cross-reference: surfaced during Task 5.1A implementer dispatch on 2026-05-28; agent wrote "2 source-emitter call sites" rather than "2 matches". The Light + Medium fix would have accepted the original phrasing.
 
