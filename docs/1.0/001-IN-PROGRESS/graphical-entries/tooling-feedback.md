@@ -37,6 +37,7 @@ Running log of friction, pathologies, and improvement opportunities in the scope
 | TF-006 | Closed | dw-lifecycle v0.24.1 — `modules` minItems relaxed; bootstrap manifest now valid |
 | TF-007 | Closed | dw-lifecycle v0.24.1 — `dw-lifecycle orchestrator-turn --feature <slug>` CLI subcommand shipped |
 | TF-008 | Open | — |
+| TF-009 | Open | — |
 
 ## How to add an entry
 
@@ -371,4 +372,42 @@ Combined recommendation for TF-008: ship a **Light** update to the GRAMMAR_INSTR
 2. Every Excluded entry requires `path:LINE`, even when the exclusion is whole-file (use `:1` as the sentinel).
 
 This is documentation-only; the parser's existing strict contract stays as-is.
+
+## TF-009 · DSC · low · `validate-return` forbidden-phrase list false-positives on project-vocabulary nouns ("stub", "placeholder")
+
+**Repro:**
+
+1. The project uses `swim-stub` as the canonical class name for the focus-off compact button in the multi-lane swimlane dashboard. The corresponding render function is `renderSwimStub`. The mockup uses `.swim-stub` throughout; the Task 5.1 acceptance criteria name it explicitly ("Step 5.1.5: Filtered-out lane stubs — when a lane is visibility-on but focus-off, render a compact swim-stub button between the focused swimlanes").
+2. During Task 5.1B implementer dispatch return, the agent wrote the following Excluded line in the grammar block:
+
+   ```
+   Excluded: packages/studio/src/pages/dashboard/swimlane-card.ts:330 — renderSwimStub is the focus-off stub button (not a stage-bearing body; no kanban/list bodies to switch between)
+   ```
+
+3. Run `validate-return --response-file <path> --agent-type typescript-pro` — REJECTED:
+
+   ```
+   parseError: Excluded reason for packages/studio/src/pages/dashboard/swimlane-card.ts:330 contains forbidden deferral phrase "stub" — rewrite the reason to explain why the exclusion is permanent, or move the file:line into Included and fix it.
+   forbidden-phrase: "stub" at packages/studio/src/pages/dashboard/swimlane-card.ts:330
+   ```
+
+The parser caught "stub" as a forbidden deferral phrase from `FORBIDDEN_DEFERRAL_PHRASES` (which includes both `"stub"` and `"placeholder"`). The substring match correctly fires — `"stub button"` does contain `"stub"`. But the context here is the project's OWN canonical vocabulary for a specific UI primitive, not a deferral or placeholder-pending-future-work.
+
+The agent's correct fix is to rewrite the reason without the word "stub" — e.g., "the focus-off compact button" or "the alternate visibility-off render for a lane." But agents naturally describe affordances using their canonical names, and the wrapper's strict substring-match doesn't distinguish proper-noun-like usage from deferral noun usage.
+
+**Workaround used:**
+
+Documented as TF-009. The Task 5.1B substantive work landed cleanly (661 tests passing, build exit 0, 2 commits); the wrapper rejection is purely on the meta-deliverable layer. Continuing with spec-review + code-quality dispatches with a friction-aware reminder that "stub" and "placeholder" in reasons must be rephrased even when describing legitimate project vocabulary.
+
+**Suggested fix:**
+
+The fundamental tension: the forbidden-phrase list is a load-bearing contract (no `"stub"` / `"placeholder"` in code as deferral); the project's UI vocabulary collides with the list's noun set.
+
+- **Light:** add an example in `GRAMMAR_INSTRUCTION` showing the workaround — *"if you need to reference an affordance whose canonical class name is `.swim-stub` or `.placeholder-tile`, write the EXCLUDED reason without the word; describe the affordance's purpose ('focus-off compact button', 'reserved tile') rather than its class name."* Cheapest; documentation-only.
+- **Medium:** project override at `.dw-lifecycle/scope-discovery/forbidden-deferral-phrases.yaml` that drops `stub` and `placeholder` from this project's list (since the project uses them as primitive vocabulary). The risk: deferral usage in *other* contexts ("stub method", "fix later as a placeholder") now passes through. Probably not worth the trade unless the operator confirms the vocabulary collision is more common than deferral misuse.
+- **Heavy:** parser-side word-boundary refinement: only flag when the forbidden phrase appears WITHOUT a preceding noun-class context (e.g., a hyphenated class name like `.swim-stub`, a CamelCase function name like `renderSwimStub`). Significantly more complex; risks false-negatives on real deferrals.
+
+Recommended: **Light**. The GRAMMAR_INSTRUCTION prelude is the natural place to surface the contract's gotchas; agents read it on every dispatch. A 2-sentence callout about project-vocabulary collisions makes the rephrasing visible up front instead of after a rejection.
+
+Cross-reference: same parent shape as TF-008 (parser format strictness with semantic equivalent that passes meaning but fails contract). The fix-class is also similar: document the gotcha in the prelude. Both TF-008 and TF-009 would close together with a single GRAMMAR_INSTRUCTION rewrite covering all three gotchas (noun strictness on Searched, `:LINE` requirement on Excluded, project-vocabulary phrase collisions).
 
