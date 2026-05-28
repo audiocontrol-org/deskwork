@@ -61,7 +61,7 @@ describe('scanForBareTbds', () => {
       fx.workplanPath,
       [
         '# Workplan',
-        '- [ ] Step 1: TBD wire up the API call',
+        '- [ ] Step 1: TBD: wire up the API call',
         '- [ ] Step 2: defer the migration script',
         '- [ ] Step 3: clean line',
         '',
@@ -87,7 +87,7 @@ describe('runCompleteGate — refusal path', () => {
   it('throws CompleteGateRefusedError when bare TBDs are present', () => {
     writeFileSync(
       fx.workplanPath,
-      '- [ ] Step 1: TBD wire up\n',
+      '- [ ] Step 1: TBD: wire up\n',
       'utf8',
     );
     expect(() =>
@@ -102,7 +102,7 @@ describe('runCompleteGate — refusal path', () => {
   it('refusal message mentions promote-deferrals as the remediation', () => {
     writeFileSync(
       fx.workplanPath,
-      '- [ ] Step 1: TBD wire up\n',
+      '- [ ] Step 1: TBD: wire up\n',
       'utf8',
     );
     try {
@@ -147,7 +147,7 @@ describe('runCompleteGate — override path', () => {
   afterEach(() => rmSync(fx.root, { recursive: true, force: true }));
 
   it('refuses --skip-tbd-gate without --reason', () => {
-    writeFileSync(fx.workplanPath, '- [ ] Step 1: TBD wire up\n', 'utf8');
+    writeFileSync(fx.workplanPath, '- [ ] Step 1: TBD: wire up\n', 'utf8');
     expect(() =>
       runCompleteGate({
         workplanPath: fx.workplanPath,
@@ -158,7 +158,7 @@ describe('runCompleteGate — override path', () => {
   });
 
   it('refuses --reason "<short>" via substantive-reason validator', () => {
-    writeFileSync(fx.workplanPath, '- [ ] Step 1: TBD wire up\n', 'utf8');
+    writeFileSync(fx.workplanPath, '- [ ] Step 1: TBD: wire up\n', 'utf8');
     expect(() =>
       runCompleteGate({
         workplanPath: fx.workplanPath,
@@ -169,7 +169,7 @@ describe('runCompleteGate — override path', () => {
   });
 
   it('refuses --reason "<gaming phrase>" via substantive-reason validator', () => {
-    writeFileSync(fx.workplanPath, '- [ ] Step 1: TBD wire up\n', 'utf8');
+    writeFileSync(fx.workplanPath, '- [ ] Step 1: TBD: wire up\n', 'utf8');
     expect(() =>
       runCompleteGate({
         workplanPath: fx.workplanPath,
@@ -180,7 +180,7 @@ describe('runCompleteGate — override path', () => {
   });
 
   it('accepts a substantive override reason and surfaces bareTbds for journaling', () => {
-    writeFileSync(fx.workplanPath, '- [ ] Step 1: TBD wire up\n', 'utf8');
+    writeFileSync(fx.workplanPath, '- [ ] Step 1: TBD: wire up\n', 'utf8');
     const result = runCompleteGate({
       workplanPath: fx.workplanPath,
       skipTbdGate: true,
@@ -199,7 +199,7 @@ describe('formatOverrideJournalEntry', () => {
       workplanPath: '/repo/docs/1.0/001-IN-PROGRESS/hygiene/workplan.md',
       reason: SUBSTANTIVE,
       bareTbds: [
-        { path: '/repo/docs/1.0/001-IN-PROGRESS/hygiene/workplan.md', lineNumber: 12, text: '- [ ] Step 1: TBD wire up' },
+        { path: '/repo/docs/1.0/001-IN-PROGRESS/hygiene/workplan.md', lineNumber: 12, text: '- [ ] Step 1: TBD: wire up' },
       ],
     });
     expect(entry).toContain('### Hygiene override');

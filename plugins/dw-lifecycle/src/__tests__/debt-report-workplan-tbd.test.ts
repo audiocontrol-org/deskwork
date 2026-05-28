@@ -153,6 +153,128 @@ describe('scanWorkplanTbds', () => {
     expect(feat.counts.out_of_scope).toBe(1);
   });
 
+  it('skips `- [x]` checkbox-checked acceptance criteria (closes #339)', () => {
+    // Regression: the scanner used to fire on every checked acceptance
+    // line that described the marker vocabulary itself — the hygiene
+    // workplan produced 20 false positives because every checked
+    // criterion that named "TBD / defer / follow-up / out of scope"
+    // matched. A `[x]`-checked bullet is by grammar already closed.
+    const root = createProjectRoot();
+    const cfg = defaultConfig();
+    cfg.docs.knownVersions = ['1.0'];
+    writeWorkplan(
+      root,
+      '1.0',
+      'feature-checked',
+      [
+        '## Phase 1: Example',
+        '',
+        '- [ ] Step 1: Real TBD: implement the thing.',
+        '- [x] Step 2: Already-done; ignore TBD/defer/follow-up/out of scope.',
+        '- [ ] Step 3: defer to follow-up: cycle.',
+        '- [x] Step 4: shipped TBD-aware scanner.',
+        '',
+        '**Acceptance:**',
+        '',
+        '- [x] `/dw-lifecycle:foo` ships; finds TBD: / defer / follow-up: / out of scope.',
+        '- [ ] TBD: another real one.',
+      ].join('\n'),
+    );
+    const report = scanWorkplanTbds({ projectRoot: root, config: cfg });
+    const feat = report.features[0];
+    if (!feat) throw new Error('expected feature');
+    // Step 1: tbd (1). Step 3: defer (1) + follow_up (1). Bottom item: tbd (1).
+    expect(feat.counts.tbd).toBe(2);
+    expect(feat.counts.defer).toBe(1);
+    expect(feat.counts.follow_up).toBe(1);
+    expect(feat.counts.out_of_scope).toBe(0);
+    expect(feat.counts.total).toBe(4);
+    // Every sample's line must be an open `- [ ]` bullet.
+    for (const sample of feat.samples) {
+      expect(sample.text.startsWith('- [x]')).toBe(false);
+    }
+  });
+
+  it('skips `- [x]` with whitespace + casing variance', () => {
+    const root = createProjectRoot();
+    const cfg = defaultConfig();
+    cfg.docs.knownVersions = ['1.0'];
+    writeWorkplan(
+      root,
+      '1.0',
+      'feature-variance',
+      [
+        '  - [x] indented checked TBD',
+        '- [ x ] padded-bracket checked defer',
+        '- [X] uppercase-X checked follow-up:',
+        '- [x] plain checked out of scope',
+        '- [ ] open: TBD: counts',
+      ].join('\n'),
+    );
+    const report = scanWorkplanTbds({ projectRoot: root, config: cfg });
+    const feat = report.features[0];
+    if (!feat) throw new Error('expected feature');
+    expect(feat.counts.total).toBe(1);
+    expect(feat.counts.tbd).toBe(1);
+  });
+
+  it('requires the colon suffix on TBD — substring inside identifiers does not match (closes #339 Fix B)', () => {
+    // The looser `\bTBD\b` form fired on `tbd` inside hyphenated
+    // identifiers because `-` and `.` are JS word boundaries. The spec
+    // form is `TBD:` (colon-suffixed); the dogfood that produced #339
+    // showed the looser shape generated noise on any workplan whose
+    // prose names the scanner itself.
+    const root = createProjectRoot();
+    const cfg = defaultConfig();
+    cfg.docs.knownVersions = ['1.0'];
+    writeWorkplan(
+      root,
+      '1.0',
+      'feature-tbd-colon',
+      [
+        '- TBD: this is a real marker — counts',
+        '- scanSingleWorkplanFile from src/debt-report/workplan-tbd.ts — does NOT count',
+        '- --skip-tbd-gate flag — does NOT count',
+        '- A bare TBD without colon — does NOT count',
+        '- workplan-TBD-aware scanner — does NOT count',
+      ].join('\n'),
+    );
+    const report = scanWorkplanTbds({ projectRoot: root, config: cfg });
+    const feat = report.features[0];
+    if (!feat) throw new Error('expected feature');
+    expect(feat.counts.tbd).toBe(1);
+    expect(feat.counts.total).toBe(1);
+  });
+
+  it('strips inline-code spans before applying marker regexes (closes #339 Fix B)', () => {
+    // Markers inside backtick-delimited code spans are syntactic
+    // references (identifiers, filenames, flag names) and are not
+    // actionable TBDs. Strip them before pattern dispatch.
+    const root = createProjectRoot();
+    const cfg = defaultConfig();
+    cfg.docs.knownVersions = ['1.0'];
+    writeWorkplan(
+      root,
+      '1.0',
+      'feature-code-spans',
+      [
+        '- TBD: a real one outside code',
+        '- The `TBD:` token inside a code span — does NOT count',
+        '- The `--skip-tbd-gate` flag — does NOT count',
+        '- The `defer` identifier inside backticks — does NOT count',
+        '- bare defer outside — counts',
+        '- `out of scope` inside backticks — does NOT count',
+      ].join('\n'),
+    );
+    const report = scanWorkplanTbds({ projectRoot: root, config: cfg });
+    const feat = report.features[0];
+    if (!feat) throw new Error('expected feature');
+    expect(feat.counts.tbd).toBe(1);
+    expect(feat.counts.defer).toBe(1);
+    expect(feat.counts.out_of_scope).toBe(0);
+    expect(feat.counts.total).toBe(2);
+  });
+
   it('skips lines already annotated with [debt: #NNN]', () => {
     const root = createProjectRoot();
     const cfg = defaultConfig();

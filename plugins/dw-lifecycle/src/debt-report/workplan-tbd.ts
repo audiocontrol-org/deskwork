@@ -30,8 +30,14 @@ interface MarkerRule {
 // Regexes are case-insensitive. They match the marker form anywhere on the
 // line; the [debt: #NNN] back-reference suppression happens before pattern
 // dispatch so a single annotated line doesn't contribute to any bucket.
+//
+// The `tbd` rule REQUIRES the colon suffix. Without it the regex fires on
+// `tbd` inside hyphenated identifiers (`workplan-tbd.ts`, `--skip-tbd-gate`)
+// because `-` and `.` are JS word boundaries. The spec form is `TBD:`; the
+// dogfood that surfaced #339 confirmed the looser shape produces noise on
+// any workplan whose prose discusses the scanner itself.
 const MARKER_RULES: readonly MarkerRule[] = [
-  { key: 'tbd', pattern: /\bTBD\b/i },
+  { key: 'tbd', pattern: /\bTBD:/i },
   { key: 'defer', pattern: /\bdefer\b/i },
   { key: 'follow_up', pattern: /\bfollow-up:/i },
   { key: 'out_of_scope', pattern: /\bout of scope\b/i },
@@ -41,6 +47,14 @@ const MARKER_RULES: readonly MarkerRule[] = [
 // back-link. The check is intentionally simple — operators write the
 // link by hand so any [debt: #<digits>] form matches.
 const PROMOTED_RE = /\[debt:\s*#\d+\]/i;
+
+// A `- [x]` checkbox-checked bullet is a closed acceptance criterion: by
+// the workplan grammar it cannot contain an open marker. Without this
+// pre-filter, every checked criterion that describes the marker
+// vocabulary itself (e.g. an acceptance line citing "TBD / defer /
+// follow-up / out of scope") would re-fire on each release. The pattern
+// tolerates indent + spacing variance inside the brackets.
+const CHECKED_BULLET_RE = /^\s*-\s*\[\s*x\s*\]/i;
 
 function listInProgressVersions(projectRoot: string, cfg: Config): string[] {
   const docsRoot = join(projectRoot, cfg.docs.root);
@@ -87,6 +101,15 @@ function excerpt(line: string): string {
     : trimmed;
 }
 
+// Markers inside inline-code spans (`like-this`) refer to identifiers,
+// filenames, or syntax — they are not actionable TBDs. Strip the span
+// contents (preserving line length so sample text positions stay sensible)
+// before applying marker regexes. The pattern is non-greedy to handle
+// multiple spans on one line; unclosed backticks pass through unchanged.
+function stripCodeSpans(line: string): string {
+  return line.replace(/`[^`]*`/g, (match) => ' '.repeat(match.length));
+}
+
 function scanMarkers(content: string): MarkerScanResult {
   let tbd = 0;
   let defer = 0;
@@ -98,9 +121,11 @@ function scanMarkers(content: string): MarkerScanResult {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (line === undefined) continue;
+    if (CHECKED_BULLET_RE.test(line)) continue;
     if (PROMOTED_RE.test(line)) continue;
+    const stripped = stripCodeSpans(line);
     for (const rule of MARKER_RULES) {
-      if (rule.pattern.test(line)) {
+      if (rule.pattern.test(stripped)) {
         switch (rule.key) {
           case 'tbd':
             tbd += 1;
