@@ -39,6 +39,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { errorMessage, isPlainObject } from './util/typeguards.js';
 import {
+  filterRecordsUnderTarget,
   HookFileRecord,
   HooksManifest,
   mergeFileRecords,
@@ -186,12 +187,18 @@ function appendFragment(existing: string, fragment: string): string {
 function writeManifest(
   manifestPath: string,
   records: ReadonlyArray<HookFileRecord>,
+  target: string,
   dryRun: boolean,
 ): void {
   if (dryRun) return;
   const existing = readExistingManifest(manifestPath);
   mkdirSync(dirname(manifestPath), { recursive: true });
-  const merged = mergeFileRecords(existing?.files ?? [], records);
+  // TF-002: drop stale cross-worktree entries before merging. Mirrors
+  // the filter in install-scope-discovery-hooks; both writers must
+  // apply it so either entry point cleans up the same way. The filter
+  // realpath-resolves both sides internally.
+  const liveExisting = filterRecordsUnderTarget(existing?.files ?? [], target);
+  const merged = mergeFileRecords(liveExisting, records);
   const manifest: HooksManifest = {
     installed_at: existing?.installed_at ?? new Date().toISOString(),
     installed_by:
@@ -286,7 +293,7 @@ export function install(opts: AgentPromptsOptions): AgentPromptsResult {
   }
 
   if (appendedRecords.length > 0 && !opts.dryRun) {
-    writeManifest(manifestPath, appendedRecords, opts.dryRun);
+    writeManifest(manifestPath, appendedRecords, target, opts.dryRun);
   }
 
   const anyMissing = actions.some((a) => a.action === 'missing');

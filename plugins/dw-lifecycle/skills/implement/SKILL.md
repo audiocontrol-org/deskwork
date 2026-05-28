@@ -65,38 +65,56 @@ Cross-reference: `plugins/dw-lifecycle/templates/scope-discovery/dispatch-wrappe
 
 If `.dw-lifecycle/scope-discovery/` is not present in the project, the dispatch-wrapper still runs — the wrapper itself is plugin code, not project config — but it falls back to the built-in `FORBIDDEN_DEFERRAL_PHRASES` / `REFACTOR_CONTEXT_MARKERS` defaults. Project overrides are the only thing the project-side install gates.
 
-## Phase 11 — Autonomous loop (per-turn audit/judge stack)
+## Orchestrator loop (per-turn audit/judge stack)
 
-When `.dw-lifecycle/scope-discovery/` is present in the project, this skill runs an autonomous per-turn audit/judge stack via the `runOrchestratorTurn` library at `plugins/dw-lifecycle/src/scope-discovery/orchestrator-loop/loop-turn.ts`. The function composes the Phase 11 Tasks 2-11 libraries into a deterministic cycle:
+When `.dw-lifecycle/scope-discovery/` is present in the project, this skill runs an orchestrator-loop per-turn audit/judge stack. Invoke the loop via Bash:
+
+```bash
+dw-lifecycle orchestrator-turn --feature <slug> [--skip-judge] [--skip-auditor]
+```
+
+The CLI verb assembles `TurnInput` from on-disk state (catalog entries, audit-log, fresh codebase-state metrics, discovery-agent findings) and calls the orchestrator-loop library. It emits a machine-readable `TurnReport` (JSON) to stdout and a one-line human summary to stderr. Pass `--json` to suppress the stderr summary.
+
+Per-turn the loop composes the following libraries into a deterministic cycle:
 
 1. **Audit-log read** — `llm/audit-log-reader.ts` surfaces new audit-log entries since the durable watermark at `.dw-lifecycle/scope-discovery/orchestrator-runtime/last-audit-read.json`.
 2. **Wrong-decision detection** — `recovery/detect-wrong-decisions.ts` matches audit-log findings whose body contains a disagreement token against agent-driven catalog entries; auto-reverses via `recovery/reverse-disposition.ts` when confidence supports, queues escalation otherwise.
-3. **Internal LLM-judge pass** — `llm/judge.ts` runs in-band through `wrap()` (dispatch-grammar + forbidden-deferral phrases enforced); emits ranked disposition proposals with confidence scores.
+3. **Internal LLM-judge pass** — `llm/judge.ts` runs in-band through `wrap()` (dispatch-grammar + forbidden-deferral phrases enforced); emits ranked disposition proposals with confidence scores. The judge runs only when `--judge-input <path>` is supplied (operator opt-in for the in-band LLM call); otherwise skipped.
 4. **Mediation** — `mediation/mediation.ts` clusters recent findings into architectural summaries + (when dispositions supplied) proposes catalog edits.
 5. **Controller** — `controller/controller.ts` reads the codebase-state metrics + auditor-correction-rate; adjusts cadence/intensity/escalation-threshold for the next turn; persists history to `.dw-lifecycle/scope-discovery/orchestrator-runtime/controller-state.json`.
-6. **Codebase-state metrics** — `discovery-agents/codebase-state-metrics.ts` produces the seven Phase 11 Task 4 metrics; the loop projects them to the controller's `MetricsSnapshot` shape.
-7. **External auditor fire** — `llm/auditor.ts` emits an audit-request artifact under `.dw-lifecycle/scope-discovery/pending-audits/` (fire-and-forget; results materialize next turn via the audit-log reader).
+6. **Codebase-state metrics** — `discovery-agents/codebase-state-metrics.ts` produces the seven metrics; the loop projects them to the controller's `MetricsSnapshot` shape.
+7. **External auditor fire** — `llm/auditor.ts` emits an audit-request artifact under `.dw-lifecycle/scope-discovery/pending-audits/` (fire-and-forget; results materialize next turn via the audit-log reader). Fires only when `--auditor-input <path>` is supplied; suppressed with `--skip-auditor`.
 8. **Escalation visibility** — `escalation/escalation-visibility.ts` surfaces queued escalations + their quick-links.
 
-The function returns a structured `TurnReport`:
+The CLI verb persists `nextLoopState` to disk after the turn completes; the agent does not need to call `persistLoopState` separately.
 
-- `auditRead` (new entry count + prior/new watermarks)
-- `wrongDecisions` + `reversalProposals`
-- `judgeResult` (proposals + narrative) when judgeInput supplied
-- `mediationClusters` + `mediationSummaries`
-- `controllerDecision` (frequency/intensity/escalationThreshold + audit_trail)
-- `auditorArtifactPath` when auditorInput supplied
-- `escalationVisibility` (count + rows)
-- `nextLoopState` (caller persists via `persistLoopState` after committing the in-process actions)
-- `summary` — single-sentence digest the orchestrator includes in the per-task report
+### Reading the TurnReport
 
-Run one orchestrator turn **before each task** (assess what changed since the prior turn) and **after each task** (assess what the just-completed task introduced). Surface the `summary` field in the per-task report; surface `escalationVisibility` whenever its count is non-zero.
+Stdout JSON conforms to `TurnReport` in `plugins/dw-lifecycle/src/scope-discovery/orchestrator-loop/loop-types.ts`. The agent reads the parsed JSON and acts on each field:
 
-When `.dw-lifecycle/scope-discovery/` is absent, the Phase 11 loop is silently skipped (the project hasn't opted into scope-discovery).
+- `auditRead.newEntryCount` — new audit-log entries since last turn.
+- `wrongDecisions` + `reversalProposals` — operator-or-agent reversal candidates. Apply auto when `controllerDecision.intensity` and `recovery/trust-calibration.ts` both support; otherwise enqueue an escalation.
+- `judgeResult` (proposals + narrative) — present only when `--judge-input` was supplied.
+- `mediationClusters` + `mediationSummaries` — architectural-scale clusters the synthesis discovery pass would surface as `discovered_candidates`.
+- `controllerDecision` — frequency/intensity/escalationThreshold for the NEXT turn.
+- `auditorArtifactPath` — pending audit-request artifact path; present only when `--auditor-input` was supplied and `--skip-auditor` was not passed.
+- `escalationVisibility` — count + rows. Surface whenever count > 0.
+- `nextLoopState` — already persisted by the CLI verb.
+- `summary` — single-sentence digest. Echo this in the per-task report.
 
-Resumability: `loopState` persists across `/dw-lifecycle:implement` invocations. The orchestrator-agent reads via `loadLoopState`, runs the turn, and persists `report.nextLoopState` via `persistLoopState`. The audit-log watermark + controller history advance with each turn; pending-escalations + audit-requests survive in their own durable artifacts.
+### When to run
 
-Configuration: defaults at `DEFAULT_LOOP_CONFIG` in `orchestrator-loop/loop-config.ts`. Operator overrides at `.dw-lifecycle/scope-discovery/loop-config.yaml` (turn_history_retention + auto_apply_confidence_floor). The judge model, auditor model, and orchestrator-runtime dir come from `llm-judge.yaml`; the controller's cadence/intensity tunables come from `controller-config.yaml`.
+Run one orchestrator turn **before each task** (assess what changed since the prior turn) and **after each task** (assess what the just-completed task introduced). Surface `summary` in the per-task report; surface `escalationVisibility` rows whenever its count is non-zero.
+
+When `.dw-lifecycle/scope-discovery/` is absent, skip the orchestrator-turn invocation entirely (the project hasn't opted into scope-discovery).
+
+### Resumability
+
+`loop-state.json` (`.dw-lifecycle/scope-discovery/orchestrator-runtime/loop-state.json`) persists across `/dw-lifecycle:implement` invocations. The audit-log watermark + controller history advance with each turn; pending-escalations + audit-requests survive in their own durable artifacts.
+
+### Configuration
+
+Defaults at `DEFAULT_LOOP_CONFIG` in `orchestrator-loop/loop-config.ts`. Operator overrides at `.dw-lifecycle/scope-discovery/loop-config.yaml` (turn_history_retention + auto_apply_confidence_floor). The judge model, auditor model, and orchestrator-runtime dir come from `llm-judge.yaml`; the controller's cadence/intensity tunables come from `controller-config.yaml`.
 
 ## Error handling
 
@@ -106,5 +124,5 @@ Configuration: defaults at `DEFAULT_LOOP_CONFIG` in `orchestrator-loop/loop-conf
 - **Auto-invocation behavior (scope-widen).** When `.dw-lifecycle/scope-discovery/` is absent, the Step 5 auto-invocation is silently skipped. When present, `scope-widen` runs with default flags (dry-run is its default; `--apply` is passed when this skill invokes it because the merged manifest must be readable by the next task's implementer brief). The widen run's resulting `scope-manifest.yaml` path AND the additive-delta summary are passed into the next task's dispatched-agent context so the implementer sees the augmented scope before starting.
 - **`scope-widen` fails.** Surface the error in the next task's brief; the task still proceeds. The operator can re-run scope-widen manually (`/dw-lifecycle:scope-widen <slug> "<complaint>"`) after addressing the cause.
 - **`DispatchRejected` from `wrap()`.** Re-prompt the sub-agent with the violation reason (missing block / forbidden phrase / skipped-audit signal). After two consecutive rejections on the same dispatch, surface the parsed-return excerpt to the operator and pause the task.
-- **Phase 11 loop — judge dispatch fails.** `runOrchestratorTurn` propagates `DispatchRejected` from the judge's `wrap()` call. Surface the violation to the operator; the next turn re-runs the judge with the same input (recovery is operator-decided per the wrong-decision-recovery primitives at `recovery/`).
-- **Phase 11 loop — wrong-decision detected but reversal proposal needs operator review.** The reversal proposal lands in `TurnReport.reversalProposals`. Auto-apply when `controllerDecision.intensity` AND the recovery library's trust-calibration both support it; otherwise enqueue an escalation via `escalation/escalation-queue.ts#enqueueEscalation`. Escalations surface in the next turn's `escalationVisibility`.
+- **Orchestrator loop — judge dispatch fails.** `dw-lifecycle orchestrator-turn` exits non-zero when the judge's `wrap()` call rejects. Surface the violation to the operator; the next turn re-runs the judge with the same input (recovery is operator-decided per the wrong-decision-recovery primitives at `recovery/`).
+- **Orchestrator loop — wrong-decision detected but reversal proposal needs operator review.** The reversal proposal lands in `TurnReport.reversalProposals`. Auto-apply when `controllerDecision.intensity` AND the recovery library's trust-calibration both support it; otherwise enqueue an escalation via `escalation/escalation-queue.ts#enqueueEscalation`. Escalations surface in the next turn's `escalationVisibility`.

@@ -39,12 +39,19 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  realpathSync,
   writeFileSync,
 } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import { errorMessage, isPlainObject } from './util/typeguards.js';
+import {
+  bootstrapHuskyDispatcherIfMissing,
+  defaultBootstrapHuskyRunner,
+  detectMissingHuskyDispatcher,
+  type HuskyBootstrapRunner,
+} from './husky-bootstrap.js';
 
 export const HOOK_BEGIN_MARKER =
   '# >>> dw-lifecycle scope-discovery hook >>>';
@@ -97,6 +104,13 @@ export interface HooksInstallOptions {
   readonly replace: boolean;
   readonly force: boolean;
   readonly dryRun: boolean;
+  /**
+   * Test seam — when set, the installer uses this function instead of
+   * shelling out to `npx --yes husky install` for the husky-dispatcher
+   * bootstrap step. Real installs leave this undefined; vitest scenarios
+   * inject a stub that simulates success/failure without running npx.
+   */
+  readonly bootstrapHuskyRunner?: HuskyBootstrapRunner;
 }
 
 export interface HookFileRecord {
@@ -367,6 +381,19 @@ export function install(opts: HooksInstallOptions): HooksInstallResult {
     actions.push('git config core.hooksPath .githooks');
   }
 
+  // Husky-9 silent-skip mitigation (TF-001): when the project is a
+  // husky shop but `npm install` hasn't bootstrapped `.husky/_`, git
+  // silently skips all hooks at commit time. Detect + bootstrap here
+  // so a green-light install report matches the real on-disk state.
+  if (mode === 'husky') {
+    const runner = opts.bootstrapHuskyRunner ?? defaultBootstrapHuskyRunner;
+    const missingBefore = detectMissingHuskyDispatcher(target);
+    bootstrapHuskyDispatcherIfMissing(target, runner, opts.dryRun);
+    if (missingBefore !== null && !opts.dryRun) {
+      actions.push(`bootstrapped husky dispatcher: ${missingBefore}`);
+    }
+  }
+
   const files: HookFileRecord[] = [
     {
       path: hookPath,
@@ -376,7 +403,16 @@ export function install(opts: HooksInstallOptions): HooksInstallResult {
   ];
 
   const existingManifest = readExistingManifest(manifestPath);
-  const mergedFiles = mergeFileRecords(existingManifest?.files ?? [], files);
+  // TF-002: drop pre-existing records that don't resolve under this
+  // target before merging in the new ones. Closes the cross-worktree
+  // accumulation surface that bit the canary's first install. The
+  // filter realpath-resolves both sides internally so callers don't
+  // have to.
+  const liveExisting = filterRecordsUnderTarget(
+    existingManifest?.files ?? [],
+    target,
+  );
+  const mergedFiles = mergeFileRecords(liveExisting, files);
 
   const manifest: HooksManifest = {
     installed_at: new Date().toISOString(),
@@ -445,6 +481,67 @@ export function mergeFileRecords(
     byPath.set(record.path, record);
   }
   return [...byPath.values()];
+}
+
+/**
+ * Resolve `target` through any intervening symlinks. Returns the input
+ * unchanged when realpath fails (target doesn't exist yet, permission
+ * denied, etc.) — the manifest filter is a defensive measure; a missing
+ * realpath shouldn't crash the install.
+ */
+function resolveTargetRealpath(target: string): string {
+  try {
+    return realpathSync(target);
+  } catch {
+    return target;
+  }
+}
+
+/**
+ * Drop records whose `path` doesn't resolve under `target`. The
+ * manifest is a transactional record of where THIS install put managed
+ * files (TF-002): stale entries pointing at sibling worktrees would
+ * otherwise accumulate forever once the file is shared across worktrees
+ * (gitignore closes the leak; this filter prevents pre-leak manifests
+ * from carrying forward when adopters re-install in a fresh tree).
+ *
+ * Realpath-resolves BOTH the target and each record's path so that
+ * symlinked worktrees (or platforms like macOS where /tmp -> /private/tmp)
+ * still match. Records whose path doesn't exist on disk are treated as
+ * stale and dropped — if a managed file was removed out-of-band, the
+ * record is meaningless. When realpath fails for an existing file
+ * (transient errors, permission denied) the record is kept rather than
+ * silently dropped.
+ */
+export function filterRecordsUnderTarget(
+  records: ReadonlyArray<HookFileRecord>,
+  target: string,
+): HookFileRecord[] {
+  const targetRealpath = resolveTargetRealpath(target);
+  const prefix = targetRealpath.endsWith(sep)
+    ? targetRealpath
+    : targetRealpath + sep;
+  const kept: HookFileRecord[] = [];
+  for (const record of records) {
+    if (!existsSync(record.path)) {
+      // File no longer exists — record is stale by construction.
+      continue;
+    }
+    let resolved: string;
+    try {
+      resolved = realpathSync(record.path);
+    } catch {
+      // Realpath failure on an existing file is unusual but not fatal;
+      // keep the record so we don't silently drop it on a transient
+      // FS error.
+      kept.push(record);
+      continue;
+    }
+    if (resolved === targetRealpath || resolved.startsWith(prefix)) {
+      kept.push(record);
+    }
+  }
+  return kept;
 }
 
 function reportActions(result: HooksInstallResult, dryRun: boolean): void {
