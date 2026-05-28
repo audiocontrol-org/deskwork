@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/controller/controller-types.ts
  *
- * Phase 11 Task 5 — Type contracts for the self-correcting controller.
+ * Type contracts for the self-correcting controller.
  *
  * The controller is a PURE computation (per task pre-made decision #1):
  * it takes codebase-state metrics, history of prior decisions, and recent
@@ -23,7 +23,7 @@
  *     bounding. The complement of drift on a per-metric basis but not
  *     globally (a metric can be stable, contributing to neither).
  *
- *   - auditorCorrectionRate — TRUTH SIGNAL per Phase 11 Task 5 PRD:
+ *   - auditorCorrectionRate — TRUTH SIGNAL per the self-correcting controller PRD:
  *     count of catalog edits driven by auditor findings since the
  *     last controller run, normalised to a rate. The metric ratchets
  *     UP when the model is consistently undercounting drift in its
@@ -154,7 +154,7 @@ export interface ControllerHistoryEntry {
 /**
  * Compact projection of the seven codebase-state metrics into the
  * scalar signals the controller cares about. The synthesis pass
- * (Phase 11 Task 4) emits the full metrics block; the controller
+ * (codebase-state metrics) emits the full metrics block; the controller
  * projects to this shape so it can compare history entries without
  * carrying the full metrics blob (which can be megabytes for large
  * codebases). Each field is the value the controller derives drift /
@@ -212,7 +212,7 @@ export interface RecentAuditEntry {
  * Input contract for the pure computation. The orchestrator assembles
  * each field per-turn:
  *
- *   - currentMetrics — fresh metrics from Phase 11 Task 4.
+ *   - currentMetrics — fresh metrics from codebase-state metrics.
  *   - history — last-N controller decisions + their metrics snapshots,
  *     newest-first (history[0] is the most-recent prior decision).
  *   - auditEntries — entries since the controller's prior turn (caller

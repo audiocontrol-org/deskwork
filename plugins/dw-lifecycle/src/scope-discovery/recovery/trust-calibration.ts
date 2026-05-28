@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/recovery/trust-calibration.ts
  *
- * Phase 11 Task 8 — Trust calibration state + adjustment logic.
+ * Trust calibration state + adjustment logic.
  *
  * # Responsibilities
  *

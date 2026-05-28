@@ -92,7 +92,7 @@ export type Disposition =
   | 'refactor';
 
 /**
- * Phase 11 Task 2 — Map clones.yaml `disposition` to the unified
+ * Map clones.yaml `disposition` to the unified
  * Loop `status`. The mapping is fixed per the operator's design:
  *
  *   disposition: pending                       → status: pending
@@ -125,7 +125,7 @@ interface CloneGroupBase {
   readonly members: string[]; // "<path>:<startLine>:<endLine>", sorted
   readonly reason: string | null;
   /**
-   * Phase 11 Task 2 — Loop status. Per the operator's mapping:
+   * Loop status. Per the operator's mapping:
    *   disposition: pending                       → status: pending
    *   disposition: keep-with-reason              → status: blessed
    *   disposition: refactor                      → status: blessed
@@ -138,10 +138,10 @@ interface CloneGroupBase {
    * YAML omits `status:` so pre-Loop baselines continue to work.
    */
   readonly status: CatalogStatus;
-  /** Phase 11 Task 2 — provenance block; synthesized when absent. */
+  /** provenance block; synthesized when absent. */
   readonly provenance: Provenance;
   /**
-   * Phase 11 Task 10 — REVERSE provenance link to the audit-log.
+   * REVERSE provenance link to the audit-log.
    * Empty when no audit finding has touched this group.
    */
   readonly auditHistory: readonly string[];
@@ -215,13 +215,13 @@ export function makeCloneGroup(args: {
     members: sorted,
     disposition: args.disposition,
     reason: args.reason,
-    // Phase 11 Task 2 — derive status from disposition; synthesize
+    // derive status from disposition; synthesize
     // an install-seed provenance block. Detector-written entries are
     // always `disposition: pending` → `status: pending`, so the
     // scanners will skip them until an operator dispositions them.
     status: dispositionToStatus(args.disposition),
     provenance: { source: 'install-seed', authored_at: '1970-01-01T00:00:00Z' },
-    // Phase 11 Task 10 — detector-written entries start with an empty
+    // detector-written entries start with an empty
     // audit history; auditor findings populate this list over time.
     auditHistory: [],
   };
@@ -264,7 +264,7 @@ export function makeRefactorCloneGroup(args: {
     canonical_reason: args.canonical_reason,
     tests: [...args.tests],
     tests_proof: { ...args.tests_proof },
-    // Phase 11 Task 2 — `disposition: refactor` → `status: blessed`
+    // `disposition: refactor` → `status: blessed`
     // per the operator's mapping. The refactor entries are
     // operator-curated and actively-enforced; the canonical_reason
     // field carries the refactor-precondition rationale that the
@@ -273,7 +273,7 @@ export function makeRefactorCloneGroup(args: {
     // to explicit provenance later if they choose.
     status: 'blessed',
     provenance: { source: 'install-seed', authored_at: '1970-01-01T00:00:00Z' },
-    // Phase 11 Task 10 — empty audit history at construction; auditor
+    // empty audit history at construction; auditor
     // findings populate over time via operator-curated edits.
     auditHistory: [],
   };
@@ -328,7 +328,7 @@ export function serializeClonesYaml(doc: ClonesYaml): string {
     {
       generated_at: doc.generated_at,
       clones: sorted.map((g) => {
-        // Phase 11 Task 2 — serialize the Loop fields ONLY when they
+        // serialize the Loop fields ONLY when they
         // were operator-authored (i.e., NOT the synthesized defaults).
         // The synthesis is recognizable: provenance.source ===
         // 'install-seed' AND authored_at === epoch. Suppressing
@@ -342,7 +342,7 @@ export function serializeClonesYaml(doc: ClonesYaml): string {
         const loopFields = isSynthesized
           ? {}
           : { status: g.status, provenance: g.provenance };
-        // Phase 11 Task 10 — only emit `audit_history:` when non-empty
+        // only emit `audit_history:` when non-empty
         // (back-compat: pre-Task-10 baselines omit the field; we don't
         // surprise the operator with an empty list on roundtrip).
         const auditHistoryField =
@@ -452,12 +452,12 @@ export function mergeDispositions(
         canonical_reason: existing.canonical_reason,
         tests: existing.tests,
         tests_proof: existing.tests_proof,
-        // Phase 11 Task 2 — carry forward operator-authored status +
+        // carry forward operator-authored status +
         // provenance from the baseline. Refresh never invents new
         // provenance; the operator's authored value is the SSOT.
         status: existing.status,
         provenance: existing.provenance,
-        // Phase 11 Task 10 — carry forward audit history from the
+        // carry forward audit history from the
         // baseline; refresh never invents new audit references.
         auditHistory: existing.auditHistory,
         ...(existing.new_shape_summary !== undefined
@@ -472,10 +472,10 @@ export function mergeDispositions(
       members: g.members,
       disposition: existing.disposition,
       reason: existing.reason,
-      // Phase 11 Task 2 — carry forward operator-authored Loop fields.
+      // carry forward operator-authored Loop fields.
       status: existing.status,
       provenance: existing.provenance,
-      // Phase 11 Task 10 — carry forward audit history.
+      // carry forward audit history.
       auditHistory: existing.auditHistory,
     };
   });

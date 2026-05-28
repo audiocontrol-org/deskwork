@@ -207,7 +207,7 @@ describe('install-agent-prompts — install() against tmpdir', () => {
     }
   });
 
-  it('co-exists with hooks manifest (does not clobber existing entries)', () => {
+  it('co-exists with hooks manifest (does not clobber existing in-target entries)', () => {
     seedAgents(tmp, TARGET_AGENTS);
     const manifestPath = join(
       tmp,
@@ -215,10 +215,15 @@ describe('install-agent-prompts — install() against tmpdir', () => {
       'scope-discovery',
       'hooks-installed.json',
     );
-    // Pre-seed a hooks manifest with a different file entry
+    // Pre-seed a hooks manifest with a different file entry. TF-002:
+    // the entry's path must physically exist under the target for the
+    // filter to keep it — write the seed hook to disk too.
     mkdirSync(join(tmp, '.dw-lifecycle', 'scope-discovery'), {
       recursive: true,
     });
+    mkdirSync(join(tmp, '.githooks'), { recursive: true });
+    const hookPath = join(tmp, '.githooks', 'pre-commit');
+    writeFileSync(hookPath, '#!/bin/sh\n', 'utf8');
     writeFileSync(
       manifestPath,
       JSON.stringify({
@@ -227,7 +232,7 @@ describe('install-agent-prompts — install() against tmpdir', () => {
         husky_detected: false,
         files: [
           {
-            path: join(tmp, '.githooks', 'pre-commit'),
+            path: hookPath,
             sha256: 'a'.repeat(64),
             managed: true,
           },
@@ -247,7 +252,7 @@ describe('install-agent-prompts — install() against tmpdir', () => {
     // 1 pre-existing + 2 agents = 3
     expect(merged.files.length).toBe(3);
     const paths = merged.files.map((f) => f.path);
-    expect(paths).toContain(join(tmp, '.githooks', 'pre-commit'));
+    expect(paths).toContain(hookPath);
   });
 
   it('--merge / --force on already-installed file is a safe no-op (no duplicate block)', () => {

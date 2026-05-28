@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/controller/controller-signals.ts
  *
- * Phase 11 Task 5 — Signal computation helpers.
+ * Signal computation helpers.
  *
  * Pure functions that derive the three controller signals (drift,
  * correction, auditor-correction-rate) from a current metrics snapshot
@@ -138,7 +138,7 @@ export function computeDriftAndCorrection(
 /**
  * Auditor-driven catalog edit count, normalised to a [0, 1] rate.
  *
- * Per Phase 11 Task 5 PRD: an auditor-driven edit is an audit-log
+ * Per the self-correcting controller PRD: an auditor-driven edit is an audit-log
  * entry whose `provenance.source` is `'llm-judge-proposed'` OR which
  * is operator-authored with `context: audit-finding-*`. The
  * controller treats this as the TRUTH SIGNAL — the metric ratchets up

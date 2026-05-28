@@ -1,28 +1,16 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/orchestrator-loop/loop-state.ts
  *
- * Phase 11 Task 6 — Durable orchestrator-loop state.
+ * Durable orchestrator-loop state.
  *
- * Persists the audit-log watermark + last turn id + accumulated
- * turn-history at `<runtimeDir>/loop-state.json` (default
- * `.dw-lifecycle/scope-discovery/orchestrator-runtime/loop-state.json`).
- *
- * The controller's own history persists separately in
- * `controller-state.json` (per Phase 11 Task 5). The loop state is
- * intentionally NARROW — it carries the cross-turn coordinates the
- * loop itself needs (watermark, last turn id, history-ring) and
- * NOTHING else. Anything richer belongs to the dependent libraries'
- * own state files.
- *
- * # No silent fallback
- *
- * Missing file → return empty state (first-ever run). Malformed file
- * → throw with the absolute path + parse error (operator can see what
- * to fix). The "absent → empty" case is the cold-start path the loop
- * relies on.
+ * Per-feature isolation: state lives under
+ * `<runtimeDir>/<featureSlug>/loop-state.json` so running turns against
+ * different features does not contaminate each other's
+ * `lastAuditWatermark` or `turnHistory`. See TF-012.
  */
 
 import { randomBytes } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { loadLlmConfig } from '../llm/config.js';
@@ -31,17 +19,6 @@ import type { LoopState, TurnHistoryEntry } from './loop-types.js';
 
 export const LOOP_STATE_FILENAME = 'loop-state.json';
 
-/**
- * Empty loop state used on first-ever-run. The `lastAuditWatermark`
- * is the empty string (string-compare against any real Finding-ID
- * is strictly less, so every audit-log entry surfaces as new). The
- * `lastTurnId` is empty as well; `turnHistory` is empty.
- *
- * Per the empty-revisions-beat-missed-changes rule: we DO NOT
- * pretend a missing state file is suspicious; first-run is the
- * common path on fresh installs. Operator gets a clean cold-start
- * loop without any warning chatter.
- */
 export const EMPTY_LOOP_STATE: LoopState = {
   version: 1,
   lastAuditWatermark: '',
@@ -50,15 +27,31 @@ export const EMPTY_LOOP_STATE: LoopState = {
   persistedAt: '1970-01-01T00:00:00.000Z',
 };
 
-function statePath(repoRoot: string, runtimeDir: string): string {
+function statePath(
+  repoRoot: string,
+  runtimeDir: string,
+  featureSlug: string,
+): string {
+  return resolve(repoRoot, runtimeDir, featureSlug, LOOP_STATE_FILENAME);
+}
+
+function legacyStatePath(repoRoot: string, runtimeDir: string): string {
   return resolve(repoRoot, runtimeDir, LOOP_STATE_FILENAME);
 }
 
-function requireString(
-  raw: Record<string, unknown>,
-  field: string,
-  ctx: string,
-): string {
+const warnedLegacyPaths = new Set<string>();
+
+function warnLegacyLoopState(legacyPath: string): void {
+  if (warnedLegacyPaths.has(legacyPath)) return;
+  warnedLegacyPaths.add(legacyPath);
+  process.stderr.write(
+    `loop-state: legacy per-repo loop-state at ${legacyPath} ignored — ` +
+      'using empty per-feature state. Delete the legacy file when you have ' +
+      'confirmed no other features depend on it.\n',
+  );
+}
+
+function requireString(raw: Record<string, unknown>, field: string, ctx: string): string {
   const v = raw[field];
   if (typeof v !== 'string') {
     throw new Error(`loop-state: ${ctx} \`${field}\` must be a string`);
@@ -66,30 +59,18 @@ function requireString(
   return v;
 }
 
-function requireNonEmptyString(
-  raw: Record<string, unknown>,
-  field: string,
-  ctx: string,
-): string {
+function requireNonEmptyString(raw: Record<string, unknown>, field: string, ctx: string): string {
   const v = requireString(raw, field, ctx);
   if (v.length === 0) {
-    throw new Error(
-      `loop-state: ${ctx} \`${field}\` must be a non-empty string`,
-    );
+    throw new Error(`loop-state: ${ctx} \`${field}\` must be a non-empty string`);
   }
   return v;
 }
 
-function requireNonNegativeInt(
-  raw: Record<string, unknown>,
-  field: string,
-  ctx: string,
-): number {
+function requireNonNegativeInt(raw: Record<string, unknown>, field: string, ctx: string): number {
   const v = raw[field];
   if (typeof v !== 'number' || !Number.isFinite(v)) {
-    throw new Error(
-      `loop-state: ${ctx} \`${field}\` must be a finite number`,
-    );
+    throw new Error(`loop-state: ${ctx} \`${field}\` must be a finite number`);
   }
   if (!Number.isInteger(v) || v < 0) {
     throw new Error(
@@ -99,11 +80,7 @@ function requireNonNegativeInt(
   return v;
 }
 
-function requireBoolean(
-  raw: Record<string, unknown>,
-  field: string,
-  ctx: string,
-): boolean {
+function requireBoolean(raw: Record<string, unknown>, field: string, ctx: string): boolean {
   const v = raw[field];
   if (typeof v !== 'boolean') {
     throw new Error(`loop-state: ${ctx} \`${field}\` must be a boolean`);
@@ -119,16 +96,8 @@ function parseHistoryEntry(raw: unknown, ctx: string): TurnHistoryEntry {
     turnId: requireNonEmptyString(raw, 'turnId', ctx),
     turnAt: requireNonEmptyString(raw, 'turnAt', ctx),
     newAuditEntries: requireNonNegativeInt(raw, 'newAuditEntries', ctx),
-    wrongDecisionEvents: requireNonNegativeInt(
-      raw,
-      'wrongDecisionEvents',
-      ctx,
-    ),
-    catalogEditProposals: requireNonNegativeInt(
-      raw,
-      'catalogEditProposals',
-      ctx,
-    ),
+    wrongDecisionEvents: requireNonNegativeInt(raw, 'wrongDecisionEvents', ctx),
+    catalogEditProposals: requireNonNegativeInt(raw, 'catalogEditProposals', ctx),
     escalationsQueued: requireNonNegativeInt(raw, 'escalationsQueued', ctx),
     judgeRan: requireBoolean(raw, 'judgeRan', ctx),
     auditorFired: requireBoolean(raw, 'auditorFired', ctx),
@@ -156,9 +125,7 @@ function parseStateFile(text: string, ctx: string): LoopState {
   const persistedAt = requireNonEmptyString(parsed, 'persistedAt', ctx);
   const historyRaw = parsed['turnHistory'];
   if (!Array.isArray(historyRaw)) {
-    throw new Error(
-      `loop-state: ${ctx} \`turnHistory\` must be an array`,
-    );
+    throw new Error(`loop-state: ${ctx} \`turnHistory\` must be an array`);
   }
   const turnHistory: TurnHistoryEntry[] = historyRaw.map((item, idx) =>
     parseHistoryEntry(item, `${ctx}#/turnHistory/${idx}`),
@@ -181,48 +148,45 @@ async function resolveRuntimeDir(
   return llmConfig.orchestratorRuntimeDir;
 }
 
-/**
- * Load the durable loop state from disk. Returns `EMPTY_LOOP_STATE`
- * (deep-readable; safe for the caller to use as the cold-start
- * baseline) when the file is absent. Throws on malformed file.
- *
- * The orchestrator's per-turn flow loads at start-of-turn, mutates
- * via the pure `advanceLoopState` helper, and persists via
- * `persistLoopState` at end-of-turn.
- */
 export async function loadLoopState(
   repoRoot: string,
+  featureSlug: string,
   runtimeDirOverride?: string,
 ): Promise<LoopState> {
+  if (featureSlug.length === 0) {
+    throw new Error('loop-state: loadLoopState requires a non-empty featureSlug');
+  }
   const runtimeDir = await resolveRuntimeDir(repoRoot, runtimeDirOverride);
-  const path = statePath(repoRoot, runtimeDir);
+  const path = statePath(repoRoot, runtimeDir, featureSlug);
   try {
     const text = await readFile(path, 'utf8');
     return parseStateFile(text, path);
   } catch (err) {
-    if (isEnoent(err)) return EMPTY_LOOP_STATE;
+    if (isEnoent(err)) {
+      const legacy = legacyStatePath(repoRoot, runtimeDir);
+      if (existsSync(legacy)) warnLegacyLoopState(legacy);
+      return EMPTY_LOOP_STATE;
+    }
     throw err;
   }
 }
 
-/**
- * Persist the loop state to disk. Creates the parent directory if
- * needed. Truncates `turnHistory` to `retention` entries (newest-
- * first) so the state file does not grow without bound.
- */
 export async function persistLoopState(
   repoRoot: string,
+  featureSlug: string,
   state: LoopState,
   options: {
     readonly runtimeDirOverride?: string;
     readonly retention: number;
   },
 ): Promise<void> {
-  const runtimeDir = await resolveRuntimeDir(
-    repoRoot,
-    options.runtimeDirOverride,
-  );
-  const path = statePath(repoRoot, runtimeDir);
+  if (featureSlug.length === 0) {
+    throw new Error(
+      'loop-state: persistLoopState requires a non-empty featureSlug',
+    );
+  }
+  const runtimeDir = await resolveRuntimeDir(repoRoot, options.runtimeDirOverride);
+  const path = statePath(repoRoot, runtimeDir, featureSlug);
   await mkdir(dirname(path), { recursive: true });
   const truncated: LoopState = {
     version: 1,
@@ -234,12 +198,6 @@ export async function persistLoopState(
   await writeFile(path, `${JSON.stringify(truncated, null, 2)}\n`, 'utf8');
 }
 
-/**
- * Generate a stable turn id. Format mirrors the auditor's request-id
- * + escalation id formats: `YYYYMMDDHHMMSS-<6hex>`. Sorting by id
- * produces chronological order; the random suffix prevents collisions
- * for multi-turn-per-second runs.
- */
 export function generateTurnId(now: Date = new Date()): string {
   const stamp =
     `${now.getUTCFullYear().toString().padStart(4, '0')}` +
@@ -252,15 +210,6 @@ export function generateTurnId(now: Date = new Date()): string {
   return `${stamp}-${suffix}`;
 }
 
-/**
- * Pure: prepend a new history entry, update watermark + last-turn-id +
- * persistedAt, and return the new state. The caller persists with
- * `persistLoopState`.
- *
- * Retention is applied at persist-time (not here) so callers can
- * carry the unbounded list across multiple in-process turns if they
- * want; the disk-side state stays bounded.
- */
 export function advanceLoopState(
   prior: LoopState,
   next: {

@@ -123,7 +123,7 @@ export interface ManifestRegimeHoldoutEntry {
     readonly registry_id: string;
   };
   /**
-   * Phase 11 Task 11 — per-finding status/provenance from the catalog
+   * per-finding status/provenance from the catalog
    * entry that produced this finding. `source_status` is the catalog
    * `status:` literal; `provenance_source` is the catalog
    * `provenance.source` literal. Surfaced so an operator scanning the
@@ -146,7 +146,7 @@ export interface ManifestRegimeHoldoutMeta {
     readonly deprecation: number;
   };
   /**
-   * Phase 11 Task 11 — per-status rollup. `actively_enforced` are
+   * per-status rollup. `actively_enforced` are
    * findings sourced from `blessed` or `cursed` catalog entries
    * (these gate). `candidate` are findings from `pending` entries
    * (operator-triage surface). Suppressed statuses (ignore /
@@ -173,7 +173,7 @@ export interface ManifestRegimeHoldouts {
 }
 
 /**
- * Phase 11 Task 3 — one operator-facing candidate cluster summary
+ * one operator-facing candidate cluster summary
  * surfaced by the orchestrator-agent mediation layer in the manifest's
  * `discovered_candidates:` section. Snake-case to mirror the YAML wire
  * format; produced by `mediation.toManifestSection`.
@@ -204,13 +204,13 @@ export interface ScopeManifest {
   readonly modules?: ReadonlyArray<ManifestModule>;
   readonly regime_holdouts?: ManifestRegimeHoldouts;
   /**
-   * Phase 11 Task 3 — discovered candidate clusters surfaced by the
+   * discovered candidate clusters surfaced by the
    * orchestrator-agent mediation layer. Optional (legacy manifests +
    * clean-codebase scans both legitimately omit it).
    */
   readonly discovered_candidates?: ReadonlyArray<ManifestDiscoveredCandidate>;
   /**
-   * Phase 11 Task 4 — codebase-state metrics block. Optional at the
+   * codebase-state metrics block. Optional at the
    * manifest level (legacy manifests omit it); when emitted, every
    * sub-metric is present on the value. The synthesis pass populates
    * this when at least one catalog file is present under

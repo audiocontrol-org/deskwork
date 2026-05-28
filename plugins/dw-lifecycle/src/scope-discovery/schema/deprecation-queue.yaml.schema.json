@@ -50,27 +50,27 @@
           "items": { "$ref": "#/definitions/Importer" }
         },
         "status": {
-          "description": "Phase 11 Task 2 — Loop status. See plugins/dw-lifecycle/src/scope-discovery/util/catalog-status.ts. Reserved for future use (v1 deprecation scanner discovers entries from source markers; the YAML is a placeholder for future persistence).",
+          "description": "Loop status. See plugins/dw-lifecycle/src/scope-discovery/util/catalog-status.ts. Reserved for future use (v1 deprecation scanner discovers entries from source markers; the YAML is a placeholder for future persistence).",
           "$ref": "#/definitions/CatalogStatus"
         },
         "provenance": {
-          "description": "Phase 11 Task 2 — provenance block. Reserved for future use.",
+          "description": "provenance block. Reserved for future use.",
           "$ref": "#/definitions/Provenance"
         },
         "audit_history": {
-          "description": "Phase 11 Task 10 — REVERSE provenance link to the audit-log. Reserved for future use.",
+          "description": "REVERSE provenance link to the audit-log. Reserved for future use.",
           "type": "array",
           "items": { "type": "string", "minLength": 1 }
         }
       }
     },
     "CatalogStatus": {
-      "description": "Shared Loop-status discriminator (Phase 11 Task 2).",
+      "description": "Shared Loop-status discriminator (catalog status + provenance).",
       "type": "string",
       "enum": ["pending", "blessed", "cursed", "ignore", "tracked-holdout", "withdrawn"]
     },
     "Provenance": {
-      "description": "Shared Loop-provenance shape (Phase 11 Task 2).",
+      "description": "Shared Loop-provenance shape (catalog status + provenance).",
       "type": "object",
       "additionalProperties": false,
       "required": ["source", "authored_at"],

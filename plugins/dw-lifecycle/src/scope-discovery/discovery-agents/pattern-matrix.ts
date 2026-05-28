@@ -7,7 +7,7 @@
  * agent does NOT shell out to the `ast-grep` binary — it uses pure-JS
  * line-grep + glob-based scanners for the polymorphic pattern catalog.
  *
- * # Phase 11 Task 1 — polymorphic dispatcher
+ * # polymorphic dispatcher
  *
  * The agent now routes catalog entries by `type` discriminator to
  * type-specific handlers under `./pattern-handlers/`. The supported
@@ -20,7 +20,7 @@
  *   - `coverage` (NEW; emits a synthesis-layer adoption metric)
  *   - `outlier` (NEW; statistical outlier detection)
  *   - `semantic` (NEW; LLM-augmented — STUB in this dispatch; the
- *     wiring lands under Phase 11 Task 7)
+ *     wiring lands under the LLM judge + external auditor)
  *
  * The dispatcher in `pattern-handlers/index.ts` is the registry of
  * record. Adding a new type requires a new handler file there + a
@@ -93,7 +93,7 @@ import {
  * All built-ins are `type: 'regex'`. Project overrides can mix any of
  * the dispatcher's supported types.
  */
-// Phase 11 Task 2 — built-ins are `status: 'blessed'` (actively
+// built-ins are `status: 'blessed'` (actively
 // enforced) with synthesized install-seed provenance. Operators who
 // override the catalog can mark entries with any status they choose;
 // the dispatcher filters on status before running handlers.
@@ -139,7 +139,7 @@ const BUILTIN_PATTERNS: ReadonlyArray<RegexEntry> = [
 ];
 
 /**
- * Phase 11 Task 13 — derive the union of file extensions the file walker
+ * derive the union of file extensions the file walker
  * must traverse from the pattern catalog. When ANY entry declares an
  * `extensions` filter, those extensions are added to the walker's
  * extension set so files matching the per-entry filter are actually
@@ -149,7 +149,7 @@ const BUILTIN_PATTERNS: ReadonlyArray<RegexEntry> = [
  * catalogs that omit `extensions` continue to walk TypeScript files
  * unchanged.
  *
- * Per Phase 11 acceptance criterion "Multi-content-type generality":
+ * Per the scope-discovery acceptance criterion criterion "Multi-content-type generality":
  * scan engine + catalog schema not TS-coupled; markdown / configs /
  * schemas use the same glob + shape primitives.
  */
@@ -192,7 +192,7 @@ async function gatherInScopeFiles(
  * Public agent entrypoint. Imported by the synthesis layer + the
  * `scope-inventory` subcommand.
  *
- * The function signature is preserved across the Phase 11 refactor
+ * The function signature is preserved across the the orchestrator loop refactor
  * (callers continue to pass `DiscoveryAgentInput` and receive
  * `AstGrepMatrixFindings`). Internally the per-pattern execution now
  * routes through the polymorphic dispatcher.
@@ -203,13 +203,13 @@ export async function buildPatternMatrix(
   const override = await loadOverridePatterns(input.repoRoot);
   const allPatterns: ReadonlyArray<PatternCatalogEntry> =
     override ?? BUILTIN_PATTERNS;
-  // Phase 11 Task 2 — filter to actively-enforced entries before
+  // filter to actively-enforced entries before
   // dispatching. Operators can plant `status: pending` entries in
   // their override YAML (e.g., promoted-from-candidate proposals
   // pending triage) without those entries firing as findings until
   // the operator transitions them to `blessed` or `cursed`.
   const patterns = filterActiveEntries(allPatterns);
-  // Phase 11 Task 13 — derive the file-walk extension set from the
+  // derive the file-walk extension set from the
   // ACTIVE catalog (pending/withdrawn entries don't dictate which files
   // get scanned). The walker honors `.ts/.tsx` by default plus every
   // extension any active pattern entry declares.

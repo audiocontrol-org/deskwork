@@ -131,7 +131,7 @@ export interface AntiPatternEntry {
   readonly canonicalFile: string | null;
   readonly message: string;
   /**
-   * Phase 11 Task 2 — The Loop foundation. Status discriminator (one
+   * The Loop foundation. Status discriminator (one
    * of pending / blessed / cursed / ignore / tracked-holdout /
    * withdrawn) determining whether the scanner actively enforces this
    * entry. Entries with `status: blessed` (the default for hand-
@@ -143,7 +143,7 @@ export interface AntiPatternEntry {
    */
   readonly status: CatalogStatus;
   /**
-   * Phase 11 Task 2 — provenance block tracking where the entry came
+   * provenance block tracking where the entry came
    * from. Synthesized to `{ source: 'install-seed', authored_at: <epoch> }`
    * when the entry omits the field (back-compat with pre-Loop registries;
    * the `catalog-entry-missing-status` doctor rule surfaces these as
@@ -151,7 +151,7 @@ export interface AntiPatternEntry {
    */
   readonly provenance: Provenance;
   /**
-   * Phase 11 Task 10 — REVERSE provenance link. Lists every audit-log
+   * REVERSE provenance link. Lists every audit-log
    * Finding-ID that referenced this entry over time. Empty when the
    * entry has never been touched by an auditor. The doctor rule
    * `provenance-orphaned-entries` cross-checks each id against the

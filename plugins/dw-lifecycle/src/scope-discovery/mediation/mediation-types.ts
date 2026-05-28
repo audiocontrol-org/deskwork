@@ -1,12 +1,12 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/mediation/mediation-types.ts
  *
- * Phase 11 Task 3 — orchestrator-agent mediation surface.
+ * orchestrator-agent mediation surface.
  *
  * The mediation layer translates between LINE-LEVEL scan results (raw
  * pattern findings, regex hits, file paths) and ARCHITECTURE-SCALE
  * operator dispositions (one disposition per cluster of similar
- * shapes). The thesis (PRD Phase 11): the operator never edits regex,
+ * shapes). The thesis (PRD the orchestrator loop): the operator never edits regex,
  * the agent never picks the architectural disposition.
  *
  * # Layered shape
@@ -104,7 +104,7 @@ export interface Candidate {
  *     zero `.ac-*` consumers; n-gram fingerprint includes `flex`,
  *     `grid`, `absolute`").
  *   - `ArchitecturalSummary.text` is the OPERATOR-FACING summary,
- *     potentially rewritten by an LLM-judge step (Phase 11 Task 7)
+ *     potentially rewritten by an LLM-judge step (the LLM judge + external auditor)
  *     into a 1-2 sentence architectural framing.
  *
  * The agent owns both. The operator dispositions against the cluster
@@ -174,7 +174,7 @@ export type CatalogFile =
  *   mark-withdrawn  — an existing entry overturned by an auditor
  *                     finding flips to `status: withdrawn` (the
  *                     reversibility primitive). Reserved here for the
- *                     wrong-decision recovery path (Phase 11 Task 8);
+ *                     wrong-decision recovery path (wrong-decision recovery);
  *                     mediation surfaces it for completeness.
  */
 export type CatalogEditOperation = 'append' | 'edit' | 'mark-withdrawn';
@@ -245,12 +245,12 @@ export interface ExistingCatalogEntry {
 
 /**
  * Tuning knobs for `clusterCandidates`. Defaults are sensible per
- * Phase 11 PRD; callers may override per scan invocation.
+ * the orchestrator loop PRD; callers may override per scan invocation.
  */
 export interface ClusteringConfig {
   /**
    * Jaccard similarity threshold for two findings to join the same
-   * cluster. Range (0, 1]. Default 0.7 per Phase 11 PRD.
+   * cluster. Range (0, 1]. Default 0.7 per the orchestrator loop PRD.
    */
   readonly jaccardThreshold: number;
   /**
@@ -268,7 +268,7 @@ export interface ClusteringConfig {
   readonly minClusterSize: number;
 }
 
-/** Defaults per Phase 11 Task 3 spec. */
+/** Defaults per orchestrator-agent mediation spec. */
 export const DEFAULT_CLUSTERING_CONFIG: ClusteringConfig = {
   jaccardThreshold: 0.7,
   ngramSize: 3,

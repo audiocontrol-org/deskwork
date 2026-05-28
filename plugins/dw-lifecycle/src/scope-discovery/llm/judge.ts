@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/llm/judge.ts
  *
- * Internal LLM-judge library (Phase 11 Task 7).
+ * Internal LLM-judge library (the LLM judge + external auditor).
  *
  * Runs in-band as part of `/dw-lifecycle:implement`'s per-turn loop.
  * Reads recent work + catalog state + open candidates; emits ranked
@@ -10,7 +10,7 @@
  * # Architecture
  *
  * The actual LLM network call is OUT OF SCOPE for this library (per
- * the Phase 11 Task 7 pre-made-decision #1 — the library defines the
+ * the the LLM judge + external auditor pre-made-decision #1 — the library defines the
  * SHAPE of the call, not the network mechanic). The orchestrator
  * supplies a `dispatchFn` callback that performs the dispatch; the
  * judge wraps it with the Phase-5 `wrap()` function so:

@@ -204,7 +204,7 @@ function escapeRegex(s: string): string {
 
 export async function scan(opts: CliOptions): Promise<ScanResult> {
   const registry = await loadRegistry(opts.registryPath);
-  // Phase 11 Task 2 — filter to actively-enforced entries only.
+  // filter to actively-enforced entries only.
   // Entries with `status: pending | ignore | tracked-holdout | withdrawn`
   // are skipped at the registry level so the scanner does not produce
   // findings for them. Pre-Loop registries without explicit status

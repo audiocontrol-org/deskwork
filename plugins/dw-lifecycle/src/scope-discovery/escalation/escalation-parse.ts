@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/escalation/escalation-parse.ts
  *
- * Phase 11 Task 9 — Parser for on-disk EscalationRequest JSON.
+ * Parser for on-disk EscalationRequest JSON.
  *
  * Extracted from `escalation-queue.ts` to keep that file under the 500-
  * line guideline. The parser is shared by the queue (for read +

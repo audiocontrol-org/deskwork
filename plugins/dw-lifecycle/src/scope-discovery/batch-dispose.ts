@@ -405,7 +405,7 @@ function applyDispositions(
           `internal error: tried to apply non-refactor disposition to refactor group ${g.id}`,
         );
       }
-      // Phase 11 Task 2 — re-derive `status` from the new
+      // re-derive `status` from the new
       // disposition per the fixed mapping in `dispositionToStatus()`
       // (the operator is explicitly transitioning the disposition;
       // status should track unless the operator has authored an
@@ -422,7 +422,7 @@ function applyDispositions(
         reason: args.reason,
         status: dispositionToStatus(args.disposition),
         provenance: g.provenance,
-        // Phase 11 Task 10 — preserve the existing audit history when
+        // preserve the existing audit history when
         // transitioning the disposition. The auditor's record of past
         // findings against this group is provenance, not operational
         // state.

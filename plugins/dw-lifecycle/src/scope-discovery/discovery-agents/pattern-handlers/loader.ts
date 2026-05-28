@@ -220,7 +220,7 @@ function parseOutlierEntry(
   }
   const sigmaRaw = optionalNumber(ctx, raw, 'threshold_sigma');
   const thresholdSigma = sigmaRaw ?? 2.0;
-  // Phase 11 Task 13 — content_type discriminator on the outlier
+  // content_type discriminator on the outlier
   // tokenizer. Optional; defaults to 'auto' (infer from extension).
   const contentTypeRaw = raw['content_type'];
   let contentType: OutlierContentType = 'auto';
@@ -328,7 +328,7 @@ function parseEntry(
     }
     type = matched;
   }
-  // Phase 11 Task 2 — parse the shared Loop metadata once per entry,
+  // parse the shared Loop metadata once per entry,
   // before dispatching to the variant parser. The shared parser
   // synthesizes defaults when status/provenance are absent and
   // enforces the `withdrawn` invariant.
@@ -337,7 +337,7 @@ function parseEntry(
     `override ${path} patterns[${index}]`,
     'pattern-matrix',
   );
-  // Phase 11 Task 10 — reverse provenance link (audit-log).
+  // reverse provenance link (audit-log).
   const auditHistory = parseAuditHistory(
     raw['audit_history'],
     `override ${path} patterns[${index}]`,

@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-handlers/glob.ts
  *
- * Tiny in-process glob-to-regex compiler used by the new Phase 11
+ * Tiny in-process glob-to-regex compiler used by the new the orchestrator loop
  * handlers (negative-space, coverage, outlier, semantic). The pattern
  * catalog YAML carries glob strings (e.g.,
  * `modules/*-editor/src/**\/*Summary.tsx`); each handler needs a fast

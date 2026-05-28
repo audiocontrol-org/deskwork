@@ -117,7 +117,7 @@ function renderRow(row: MatrixRow): string[] {
   // narrow. The detail block below renders the full list for entries
   // that have multiple paths.
   const primary = row.entry.from[0] ?? '';
-  // Phase 11 Task 11 — append a status badge when the row was promoted
+  // append a status badge when the row was promoted
   // via a non-`blessed` actively-enforced status (currently only
   // `cursed`). `blessed` is the default; surfacing the badge for every
   // row would add visual noise without signal. The matrix never

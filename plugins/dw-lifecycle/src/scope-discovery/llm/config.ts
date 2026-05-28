@@ -2,7 +2,7 @@
  * plugins/dw-lifecycle/src/scope-discovery/llm/config.ts
  *
  * Loader for `.dw-lifecycle/scope-discovery/llm-judge.yaml`. When the
- * file is absent we return documented defaults (per Phase 11 Task 7
+ * file is absent we return documented defaults (per the LLM judge + external auditor
  * pre-made decision #1: "the actual LLM API integration is OUT OF
  * SCOPE"; the agent type + model are NAMES the orchestrator's
  * dispatch function interprets, not network endpoints).

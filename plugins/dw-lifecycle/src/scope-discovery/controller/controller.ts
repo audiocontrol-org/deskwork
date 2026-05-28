@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/controller/controller.ts
  *
- * Phase 11 Task 5 — Self-correcting controller entry point (pure
+ * Self-correcting controller entry point (pure
  * computation). The bulk of the work is split across sibling modules
  * to keep each file under the project 300-500 line cap:
  *
@@ -13,7 +13,7 @@
  *
  * This file owns the cold-start branch and the decision assembly.
  *
- * Algorithm overview (full rationale at PRD § Phase 11 Task 5):
+ * Algorithm overview (full rationale at PRD § the self-correcting controller):
  *
  *   1. SIGNALS — compute drift / correction / auditor-correction-rate.
  *   2. COLD-START — no history → emit cold-start defaults.

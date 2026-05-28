@@ -150,11 +150,13 @@ describe('readAuditLogFile', () => {
   });
 });
 
+const TEST_FEATURE_SLUG = 'wm-test-feature';
+
 describe('loadAuditWatermark + persistAuditWatermark', () => {
   it('returns empty string when no watermark file exists', async () => {
     const isolatedRoot = await mkdtemp(join(tmpdir(), 'wm-empty-'));
     try {
-      const wm = await loadAuditWatermark(isolatedRoot, DEFAULT_LLM_CONFIG);
+      const wm = await loadAuditWatermark(isolatedRoot, TEST_FEATURE_SLUG, DEFAULT_LLM_CONFIG);
       expect(wm).toBe('');
     } finally {
       await rm(isolatedRoot, { recursive: true, force: true });
@@ -166,11 +168,26 @@ describe('loadAuditWatermark + persistAuditWatermark', () => {
     try {
       await persistAuditWatermark(
         isolatedRoot,
+        TEST_FEATURE_SLUG,
         'AUDIT-20260526-05',
         DEFAULT_LLM_CONFIG,
       );
-      const wm = await loadAuditWatermark(isolatedRoot, DEFAULT_LLM_CONFIG);
+      const wm = await loadAuditWatermark(isolatedRoot, TEST_FEATURE_SLUG, DEFAULT_LLM_CONFIG);
       expect(wm).toBe('AUDIT-20260526-05');
+    } finally {
+      await rm(isolatedRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('per-feature isolation: different slugs do NOT share watermark', async () => {
+    const isolatedRoot = await mkdtemp(join(tmpdir(), 'wm-iso-'));
+    try {
+      await persistAuditWatermark(isolatedRoot, 'feature-a', 'AUDIT-A-99', DEFAULT_LLM_CONFIG);
+      await persistAuditWatermark(isolatedRoot, 'feature-b', 'AUDIT-B-42', DEFAULT_LLM_CONFIG);
+      const wmA = await loadAuditWatermark(isolatedRoot, 'feature-a', DEFAULT_LLM_CONFIG);
+      const wmB = await loadAuditWatermark(isolatedRoot, 'feature-b', DEFAULT_LLM_CONFIG);
+      expect(wmA).toBe('AUDIT-A-99');
+      expect(wmB).toBe('AUDIT-B-42');
     } finally {
       await rm(isolatedRoot, { recursive: true, force: true });
     }
@@ -183,9 +200,9 @@ describe('loadAuditWatermark + persistAuditWatermark', () => {
         ...DEFAULT_LLM_CONFIG,
         orchestratorRuntimeDir: '.custom/runtime',
       };
-      await persistAuditWatermark(isolatedRoot, 'AUDIT-X', customConfig);
+      await persistAuditWatermark(isolatedRoot, TEST_FEATURE_SLUG, 'AUDIT-X', customConfig);
       const text = await readFile(
-        join(isolatedRoot, '.custom/runtime/last-audit-read.json'),
+        join(isolatedRoot, '.custom/runtime', TEST_FEATURE_SLUG, 'last-audit-read.json'),
         'utf8',
       );
       const parsed = readJsonObj(text);
@@ -203,6 +220,7 @@ describe('readAuditLogUpdates — high-level entry point', () => {
       // Persist a watermark + write a log file with one new entry past it.
       await persistAuditWatermark(
         isolatedRoot,
+        TEST_FEATURE_SLUG,
         'AUDIT-20260526-01',
         DEFAULT_LLM_CONFIG,
       );
@@ -211,6 +229,7 @@ describe('readAuditLogUpdates — high-level entry point', () => {
       await writeFile(logPath, SAMPLE_AUDIT_LOG, 'utf8');
       const result = await readAuditLogUpdates({
         repoRoot: isolatedRoot,
+        featureSlug: TEST_FEATURE_SLUG,
         auditLogPath: logPath,
         configOverride: DEFAULT_LLM_CONFIG,
       });
@@ -230,6 +249,7 @@ describe('readAuditLogUpdates — high-level entry point', () => {
     try {
       const result = await readAuditLogUpdates({
         repoRoot: isolatedRoot,
+        featureSlug: TEST_FEATURE_SLUG,
         auditLogPath: join(isolatedRoot, 'missing.md'),
         configOverride: DEFAULT_LLM_CONFIG,
       });

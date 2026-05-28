@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-handlers/index.ts
  *
- * Pattern-handler registry + dispatcher (Phase 11 Task 1, G1 — the
+ * Pattern-handler registry + dispatcher (polymorphic pattern handlers, G1 — the
  * polymorphic dispatcher itself).
  *
  * The pattern-matrix discovery agent calls `dispatch(entry, input)` for

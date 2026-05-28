@@ -164,7 +164,7 @@ type EntryResult =
   | { kind: 'refactor-error'; errors: readonly string[] };
 
 /**
- * Phase 11 Task 2 — parse status + provenance from a clone-group
+ * parse status + provenance from a clone-group
  * entry. Returns the metadata pair plus a `synthesizedFromDisposition`
  * flag so the caller knows whether to synthesize from disposition
  * (legacy path) or honor the operator-authored value.

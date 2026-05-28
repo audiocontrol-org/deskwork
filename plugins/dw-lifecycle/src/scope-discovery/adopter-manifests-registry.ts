@@ -134,16 +134,16 @@ export interface AdopterManifestEntry {
   /** Multi-line replacement message rendered when a holdout is found. */
   readonly message: string;
   /**
-   * Phase 11 Task 2 — The Loop foundation. See
+   * The Loop foundation. See
    * `util/catalog-status.ts` for the full lifecycle spec. `blessed`
    * is the default for pre-Loop entries; the scanner enforces only
    * actively-enforced entries (`blessed` + `cursed`).
    */
   readonly status: CatalogStatus;
-  /** Phase 11 Task 2 — provenance block. */
+  /** provenance block. */
   readonly provenance: Provenance;
   /**
-   * Phase 11 Task 10 — REVERSE provenance link to the audit-log.
+   * REVERSE provenance link to the audit-log.
    * Empty when no audit finding has touched this entry.
    */
   readonly auditHistory: readonly string[];

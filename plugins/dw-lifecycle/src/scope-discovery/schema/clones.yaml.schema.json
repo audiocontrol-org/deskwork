@@ -105,27 +105,27 @@
           "type": "number"
         },
         "status": {
-          "description": "Phase 11 Task 2 — Loop status. clones.yaml entries carry BOTH `disposition:` (the clone-specific operator decision) and `status:` (the Loop-wide enforcement discriminator). The mapping is fixed: pending → pending; keep-with-reason / refactor → blessed; ignore-with-justification → ignore. New code reads `status:` for Loop-wide filtering; the disposition-survivor gate continues to operate on `disposition:` (its semantic is clones-specific). Synthesized from `disposition:` when absent.",
+          "description": "Loop status. clones.yaml entries carry BOTH `disposition:` (the clone-specific operator decision) and `status:` (the Loop-wide enforcement discriminator). The mapping is fixed: pending → pending; keep-with-reason / refactor → blessed; ignore-with-justification → ignore. New code reads `status:` for Loop-wide filtering; the disposition-survivor gate continues to operate on `disposition:` (its semantic is clones-specific). Synthesized from `disposition:` when absent.",
           "$ref": "#/definitions/CatalogStatus"
         },
         "provenance": {
-          "description": "Phase 11 Task 2 — provenance block. Synthesized to install-seed when absent.",
+          "description": "provenance block. Synthesized to install-seed when absent.",
           "$ref": "#/definitions/Provenance"
         },
         "audit_history": {
-          "description": "Phase 11 Task 10 — REVERSE provenance link to the audit-log. List of audit-log Finding-IDs that referenced this group over time. Optional.",
+          "description": "REVERSE provenance link to the audit-log. List of audit-log Finding-IDs that referenced this group over time. Optional.",
           "type": "array",
           "items": { "type": "string", "minLength": 1 }
         }
       }
     },
     "CatalogStatus": {
-      "description": "Shared Loop-status discriminator (Phase 11 Task 2).",
+      "description": "Shared Loop-status discriminator (catalog status + provenance).",
       "type": "string",
       "enum": ["pending", "blessed", "cursed", "ignore", "tracked-holdout", "withdrawn"]
     },
     "Provenance": {
-      "description": "Shared Loop-provenance shape (Phase 11 Task 2).",
+      "description": "Shared Loop-provenance shape (catalog status + provenance).",
       "type": "object",
       "required": ["source", "authored_at"],
       "properties": {

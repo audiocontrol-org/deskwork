@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/mediation/mediation.ts
  *
- * Phase 11 Task 3 — orchestrator entry point. Composes the pure
+ * orchestrator entry point. Composes the pure
  * computation pipeline:
  *
  *   raw findings → clusterCandidates() → Candidate[]
@@ -20,7 +20,7 @@
  *     yet. Returns the clusters + architectural summaries for the
  *     operator-facing `discovered_candidates:` manifest section. The
  *     orchestrator surfaces the summaries to the operator (in chat
- *     or as a pending-decision artifact per Phase 11 Task 9).
+ *     or as a pending-decision artifact per the operator escalation surface).
  *
  *   PHASE 2 (propose edits) — operator returns dispositions; the
  *     call site invokes `proposeCatalogEdits()` directly with the
@@ -97,7 +97,7 @@ export interface MediationOutput {
 /**
  * Synthesize the architectural-summary view for a cluster. The text
  * is the cluster's own summary by default; the orchestrator-agent
- * may replace this with an LLM-judge-rewritten version (Phase 11
+ * may replace this with an LLM-judge-rewritten version (the orchestrator loop
  * Task 7).
  *
  * `exemplarFiles` surfaces the first three (deterministic, sorted)

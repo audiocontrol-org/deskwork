@@ -1,19 +1,19 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/recovery/reverse-disposition.ts
  *
- * Phase 11 Task 8 — Reversal-proposal builder.
+ * Reversal-proposal builder.
  *
  * Given a `WrongDecisionEvent`, produce a `CatalogEditProposal` that
  * transitions the affected catalog entry to `status: withdrawn` and
  * stamps `provenance.context: audit-finding-<findingId>` (the
  * reversibility primitive's contract per `util/catalog-status.ts` +
- * Phase 11 Task 2).
+ * catalog status + provenance).
  *
  * # Soft proposals
  *
  * Per task pre-made decision #4: "Recovery operations are SOFT — they
  * propose the reversal as a `CatalogEditProposal`; the operator/
- * orchestrator commits the edit per Phase 11 Task 3." This module is
+ * orchestrator commits the edit per orchestrator-agent mediation." This module is
  * pure — no disk I/O. The proposal carries the target metadata block
  * verbatim; the consumer's edit applier sets the entry's
  * `status:` + `provenance:` fields to match the proposal.

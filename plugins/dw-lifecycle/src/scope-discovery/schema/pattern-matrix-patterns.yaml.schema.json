@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://deskwork/dw-lifecycle/schema/pattern-matrix-patterns.yaml.schema.json",
   "title": "Pattern-Matrix Patterns Registry",
-  "description": "Project-supplied override of the built-in pattern catalog for the pattern-matrix discovery agent. When .dw-lifecycle/scope-discovery/pattern-matrix-patterns.yaml exists, its `patterns:` list REPLACES the agent's built-in defaults (does not merge). Each entry declares a kebab-case id, a description, and a `type` discriminator selecting the handler: regex (default; legacy), negative-space, coverage, outlier, or semantic. Phase 11 Task 1 extended the schema to a discriminated union. Entries WITHOUT a `type` field default to `regex` for backward compatibility with pre-Phase-11 registries.",
+  "description": "Project-supplied override of the built-in pattern catalog for the pattern-matrix discovery agent. When .dw-lifecycle/scope-discovery/pattern-matrix-patterns.yaml exists, its `patterns:` list REPLACES the agent's built-in defaults (does not merge). Each entry declares a kebab-case id, a description, and a `type` discriminator selecting the handler: regex (default; legacy), negative-space, coverage, outlier, or semantic. polymorphic pattern handlers extended the schema to a discriminated union. Entries WITHOUT a `type` field default to `regex` for backward compatibility with pre-Phase-11 registries.",
   "type": "object",
   "additionalProperties": false,
   "required": ["patterns"],
@@ -48,12 +48,12 @@
       "description": "Optional file-extension filter."
     },
     "catalogStatus": {
-      "description": "Phase 11 Task 2 — Loop status. See plugins/dw-lifecycle/src/scope-discovery/util/catalog-status.ts. Default `blessed` when omitted.",
+      "description": "Loop status. See plugins/dw-lifecycle/src/scope-discovery/util/catalog-status.ts. Default `blessed` when omitted.",
       "type": "string",
       "enum": ["pending", "blessed", "cursed", "ignore", "tracked-holdout", "withdrawn"]
     },
     "provenance": {
-      "description": "Phase 11 Task 2 — provenance block. Synthesized to install-seed when absent.",
+      "description": "provenance block. Synthesized to install-seed when absent.",
       "type": "object",
       "additionalProperties": false,
       "required": ["source", "authored_at"],
@@ -75,7 +75,7 @@
       }
     },
     "auditHistory": {
-      "description": "Phase 11 Task 10 — REVERSE provenance link to the audit-log. List of audit-log Finding-IDs that referenced this entry over time. Optional.",
+      "description": "REVERSE provenance link to the audit-log. List of audit-log Finding-IDs that referenced this entry over time. Optional.",
       "type": "array",
       "items": { "type": "string", "minLength": 1 }
     },
@@ -173,7 +173,7 @@
         "content_type": {
           "type": "string",
           "enum": ["auto", "ts", "markdown", "css", "html", "yaml", "json"],
-          "description": "Phase 11 Task 13 — content-type discriminator for the token-composition tokenizer. 'auto' (default) infers from file extension: .ts/.tsx → ts; .md/.markdown → markdown; .css/.scss → css; .html/.htm → html; .yaml/.yml → yaml; .json → json. Ignored by the className-composition metric."
+          "description": "content-type discriminator for the token-composition tokenizer. 'auto' (default) infers from file extension: .ts/.tsx → ts; .md/.markdown → markdown; .css/.scss → css; .html/.htm → html; .yaml/.yml → yaml; .json → json. Ignored by the className-composition metric."
         },
         "extensions": { "$ref": "#/$defs/extensions" },
         "status": { "$ref": "#/$defs/catalogStatus" },
@@ -193,7 +193,7 @@
         "prompt_template": {
           "type": "string",
           "minLength": 4,
-          "description": "Template injected into the LLM prompt. The handler renders this with the file content + catalog metadata before dispatch. STUB in v1.1 Task 1 — the LLM wiring lands under Phase 11 Task 7."
+          "description": "Template injected into the LLM prompt. The handler renders this with the file content + catalog metadata before dispatch. STUB in v1.1 Task 1 — the LLM wiring lands under the LLM judge + external auditor."
         },
         "model": {
           "type": "string",

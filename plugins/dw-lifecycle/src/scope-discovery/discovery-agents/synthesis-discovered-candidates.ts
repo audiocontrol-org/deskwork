@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/discovery-agents/synthesis-discovered-candidates.ts
  *
- * Synthesis-layer unmatched-shape clustering pass — Phase 11 G5 STUB.
+ * Synthesis-layer unmatched-shape clustering pass — the discovered_candidates stub STUB.
  *
  * STATUS: stub-shipped in v1.1 Task 1. The TYPE + invocation site are
  * complete; the clustering algorithm itself returns an empty list
@@ -34,7 +34,7 @@
  *
  * # Why the stub here
  *
- * The Phase 11 Task 1 dispatch ships the polymorphic dispatcher;
+ * The the polymorphic dispatcher ships;
  * the clustering algorithm is its own non-trivial piece of work
  * (token-vocabulary modeling + clustering + ranking + threshold
  * tuning). Shipping a stub keeps the wire-format forward-compatible
@@ -56,7 +56,7 @@ function warnOnce(): void {
   // pattern-handler findings unaffected.
   process.stderr.write(
     'pattern-matrix: unmatched-shape clustering pass is a STUB ' +
-      '(Phase 11 G5; tracking #318). The polymorphic dispatcher is ' +
+      '(stub; tracking #318). The polymorphic dispatcher is ' +
       'shipped; the clustering algorithm lands under issue #318. ' +
       'discovered_candidates returns [] until then.\n',
   );
@@ -80,7 +80,7 @@ export function clusterUnmatchedShapes(
   // TODO(#318): implement n-gram / MinHash-based clustering over the
   // files not covered by any registered pattern. The algorithmic
   // specs are at audiocontrol issue #315; the deskwork tracking issue
-  // is #318 (filed alongside Phase 11 Task 1).
+  // is #318 (filed alongside polymorphic pattern handlers).
   //
   // Real implementation outline:
   //   1. Build a set of "covered" files = union of files in

@@ -35,6 +35,11 @@ import {
 } from './synthesis-report.js';
 import { errorMessage } from './util/typeguards.js';
 import {
+  extractAjvErrorsFromSynthesisMessage,
+  isSchemaValidationError,
+  wrapSchemaErrors,
+} from './synthesis-error-hints.js';
+import {
   parseCli,
   USAGE,
   type CliOptions,
@@ -262,9 +267,20 @@ async function writeEvidenceTrail(args: {
  * (subcommand shim) translate to `process.exit`.
  *
  * Exit codes:
- *   0 — success (manifest written + validated)
- *   1 — manifest fails schema (existing manifest validation failure)
- *   2 — infra error (CLI parse, write, agent invocation, missing PRD)
+ *   0 — success (manifest written + validated, OR no findings)
+ *   1 — findings to act on (currently unused at this layer; reserved for
+ *       a future surface that splits "manifest emitted with findings"
+ *       from "manifest emitted clean")
+ *   2 — infra error (CLI parse, write, agent invocation, missing PRD,
+ *       AND schema-validation failure — the verb couldn't produce a
+ *       manifest, so this is "didn't do the work" not "findings to
+ *       triage"; see TF-014)
+ *
+ * TF-014 (dogfood) — prior to this change, schema-validation failures
+ * exited 1, which adopter CI gates interpreted as "findings to triage"
+ * (a still-actionable but not-blocking state). Schema-validation
+ * failure is fundamentally different — the verb couldn't produce a
+ * manifest at all — so exit 2 is the correct signal.
  */
 export async function scopeInventoryMain(
   argv: ReadonlyArray<string>,
@@ -298,7 +314,7 @@ export async function scopeInventoryMain(
     }
   };
 
-  // Phase 11 Task 7 — read audit-log updates BEFORE the agent fan-out
+  // read audit-log updates BEFORE the agent fan-out
   // so any auditor findings since the last run surface in the run's
   // notes. Silent-skip when scope-discovery isn't installed or when
   // the operator passed --no-audit-read.
@@ -312,6 +328,7 @@ export async function scopeInventoryMain(
   );
   const auditRead = await readPendingAuditUpdatesForInventory({
     repoRoot: opts.repoRoot,
+    featureSlug: opts.featureSlug,
     options: {
       auditLogPath,
       skip: opts.noAuditRead,
@@ -347,6 +364,27 @@ export async function scopeInventoryMain(
     const yamlText = stringifyYaml(output.manifest);
     await mkdir(dirname(opts.outPath), { recursive: true });
     await writeFile(opts.outPath, yamlText, 'utf8');
+
+    // TF-016 (dogfood) — surface a one-line advisory when the manifest
+    // emitted an empty `modules:` array. Schema permits it (the TF-016a
+    // relaxation set `minItems: 0`); the advisory just flags that the
+    // discovery agents found AST/clone signal but couldn't attribute
+    // any of it to a `<module-root>/<feature-slug>/`-shaped slug.
+    // Suppress with `--no-require-modules` once the operator has
+    // confirmed their repo's layout doesn't match.
+    const manifestModules = output.manifest.modules;
+    const modulesEmpty =
+      manifestModules !== undefined && manifestModules.length === 0;
+    if (modulesEmpty && !opts.noRequireModules && !opts.quiet) {
+      process.stderr.write(
+        'scope-inventory: zero modules detected — manifest emits ' +
+          'empty modules: array. If your repo uses a ' +
+          '`<module-root>/<feature-slug>/` layout, pass `--module-root` ' +
+          'or check that the feature\'s siblings exist under it. Pass ' +
+          '`--no-require-modules` to silence this advisory once ' +
+          "confirmed (the manifest is valid either way).\n",
+      );
+    }
 
     // Editor-symmetry artifact (Phase 4 Family B): activate when
     // adopter-manifests.yaml exists. Default output lives under the
@@ -384,7 +422,7 @@ export async function scopeInventoryMain(
     }
 
     // Evidence trail (optional). The synthesis.md fragment now leads
-    // with the inventory-vs-discovery category breakdown (Phase 11
+    // with the inventory-vs-discovery category breakdown (the orchestrator loop
     // Task 12 — surfaces registered-pattern matches vs. discovered
     // candidates vs. novel-shape candidates) so the operator's first
     // read of the file sees the category distinction BEFORE the
@@ -411,7 +449,7 @@ export async function scopeInventoryMain(
           `findings=${output.metadata.findingsCount}, ` +
           `warnings=${output.metadata.warnings.length})\n`,
       );
-      // Phase 11 Task 12 — surface the inventory-vs-discovery category
+      // surface the inventory-vs-discovery category
       // summary alongside the existing "wrote ..." line so the operator
       // sees the registered-pattern vs. candidate split at-a-glance
       // (the manifest YAML + synthesis.md carry the full breakdown).
@@ -423,7 +461,7 @@ export async function scopeInventoryMain(
       }
     }
 
-    // Phase 11 Task 7 — fire the external audit AFTER synthesis. The
+    // fire the external audit AFTER synthesis. The
     // auditor process picks up the audit-request artifact + writes
     // findings back to the audit-log for the NEXT scope-inventory run.
     await fireAuditForInventory({
@@ -438,17 +476,24 @@ export async function scopeInventoryMain(
     // Persist the watermark advanced by the pre-run audit read.
     await persistInventoryWatermark({
       repoRoot: opts.repoRoot,
+      featureSlug: opts.featureSlug,
       newWatermark: auditRead.newWatermark,
     });
     return 0;
   } catch (err) {
     const msg = errorMessage(err);
-    // Schema validation failures are signaled by the synthesis layer
-    // throwing with a "fails the manifest schema" prefix; map to exit 1
-    // (vs. infra failure exit 2) so the caller can distinguish them.
-    if (msg.includes('fails the manifest schema')) {
-      process.stderr.write(`scope-inventory: ${msg}\n`);
-      return 1;
+    // Schema validation failures: re-format the raw ajv bullets through
+    // the hint table (TF-015) so the operator sees an actionable
+    // message rather than the bare `/modules: must NOT have fewer than
+    // 1 items` text. Schema-validation failure means the verb COULDN'T
+    // produce a manifest at all, so exit code 2 (TF-014) — adopter CI
+    // gates would otherwise see exit 1 and treat it as "findings to
+    // triage," which is the wrong signal.
+    if (isSchemaValidationError(msg)) {
+      const ajvBullets = extractAjvErrorsFromSynthesisMessage(msg);
+      const wrapped = wrapSchemaErrors(ajvBullets);
+      process.stderr.write(`${wrapped}\n`);
+      return 2;
     }
     process.stderr.write(`scope-inventory: ${msg}\n`);
     return 2;

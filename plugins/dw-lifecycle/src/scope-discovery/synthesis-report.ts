@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/synthesis-report.ts
  *
- * Inventory-vs-discovery report rendering (Phase 11 Task 12). Splits the
+ * Inventory-vs-discovery report rendering (inventory vs. discovery surfacing). Splits the
  * synthesized manifest's findings into three operator-visible categories
  * (registered-pattern match, discovered candidate, novel-shape candidate)
  * + renders a markdown fragment the scope-inventory + synthesis-cli
@@ -10,7 +10,7 @@
  * synthesis-cli stays focused on argv/IO.
  *
  * The categories close the operator-trust failure mode named in the
- * Phase 11 acceptance criteria: a green discovery report read as
+ * the scope-discovery acceptance criterion criteria: a green discovery report read as
  * evidence-of-no-novel-anti-patterns when it is really evidence of
  * no-already-registered matches. The report MUST distinguish the two
  * so the operator can read it correctly.
@@ -35,7 +35,7 @@ import type {
  *     to look for.
  *   - `discoveredCandidate` — entries under `discovered_candidates:` on
  *     the manifest. Surfaced by the orchestrator-agent mediation layer
- *     (Phase 11 Task 3); architectural-scale candidate clusters that
+ *     (orchestrator-agent mediation); architectural-scale candidate clusters that
  *     the catalog doesn't currently cover.
  *   - `novelShapeCandidate` — findings whose `status_provenance.provenance_
  *     source` is `orchestrator-agent` / `llm-judge-proposed` /

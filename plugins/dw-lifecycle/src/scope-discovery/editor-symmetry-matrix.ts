@@ -111,7 +111,7 @@ export interface MatrixRow {
   /** One cell per editor, in `editors` order. */
   readonly cells: readonly MatrixCell[];
   /**
-   * Phase 11 Task 11 — Loop status inherited verbatim from the
+   * Loop status inherited verbatim from the
    * adopter-manifest entry that drives this row. The matrix renderer
    * surfaces this on the row label so operators see whether a row is
    * actively enforced (`blessed` / `cursed`), pending triage, or
@@ -150,7 +150,7 @@ export async function computeMatrix(opts: ComputeOptions): Promise<SymmetryMatri
   const moduleRoot = opts.moduleRoot ?? DEFAULT_MODULE_ROOT;
   const editors = await discoverEditors(rootAbs, moduleRoot);
   const registry = await loadRegistry(opts.registryPath);
-  // Phase 11 Task 11 — filter to actively-enforced entries before
+  // filter to actively-enforced entries before
   // building the matrix. Adopter-manifest entries with `status:
   // pending | ignore | tracked-holdout | withdrawn` are skipped so the
   // matrix doesn't surface withdrawn / pending rows alongside

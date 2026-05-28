@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/discovery-agents/pattern-handlers/semantic.ts
  *
- * Semantic (LLM-augmented) pattern handler — Phase 11 G6.
+ * Semantic (LLM-augmented) pattern handler — the discovered_candidates stub.
  *
  * # Two code paths
  *
@@ -20,12 +20,12 @@
  * Splitting sync (stub) from async (wired) keeps the sync dispatch
  * contract intact + enables the LLM path without forcing every
  * scope-inventory caller to thread a dispatcher through. Per the
- * Phase 11 Task 7 pre-made decision: the library defines the SHAPE of
+ * the LLM judge + external auditor pre-made decision: the library defines the SHAPE of
  * the call; the orchestrator-agent performs the actual dispatch.
  *
  * # Issue #319 closure
  *
- * Phase 11 Task 1 shipped the polymorphic dispatcher + the sync stub
+ * the polymorphic dispatcher shipped + the sync stub
  * with a tracking link at https://github.com/audiocontrol-org/deskwork/issues/319.
  * This dispatch closes the wiring gap: the sync path stays for
  * backward compatibility; the async `enrichSemanticFinding` path is
@@ -66,7 +66,7 @@ function warnOnce(): void {
   process.stderr.write(
     'pattern-handlers/semantic: STUB path — no judge dispatcher in scope. ' +
       'Wire `enrichSemanticFinding()` with a judge `DispatchFn` to engage ' +
-      'the LLM-judge path (Phase 11 Task 7).\n',
+      'the LLM-judge path (the LLM judge + external auditor).\n',
   );
 }
 
@@ -106,7 +106,7 @@ export const semanticHandler: PatternHandler<SemanticEntry> = {
  *     REASONING: <one-line explanation>
  *
  * Returns the confidence or throws when the block is missing /
- * malformed. We do NOT clamp out-of-range values — the Phase 11
+ * malformed. We do NOT clamp out-of-range values — the the orchestrator loop
  * controller wants the raw signal (see judge.ts for the same rule).
  */
 function parseAdherenceConfidence(narrative: string, filePath: string): number {

@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/controller/controller-policies.ts
  *
- * Phase 11 Task 5 — Per-field adjustment policies + anti-thrashing.
+ * Per-field adjustment policies + anti-thrashing.
  *
  * Each function in this module proposes an adjustment to one field
  * (frequency / intensity / escalation threshold) based on the current
@@ -55,7 +55,7 @@ export function clamp(value: number, min: number, max: number): number {
  *   - The dominant direction (sign of net delta sum) of those prior K
  *     is opposite to the proposed delta's sign.
  *
- * Anti-thrashing logic per the Phase 11 Task 5 pre-made decision:
+ * Anti-thrashing logic per the the self-correcting controller pre-made decision:
  * "any adjustment that reverses the prior K=3 adjustments is damped
  * 50%." We interpret "reverses" as "opposite-signed against the net
  * direction of the prior K"; a tied / zero net direction does not

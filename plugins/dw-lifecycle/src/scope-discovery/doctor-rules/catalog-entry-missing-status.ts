@@ -1,12 +1,12 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/doctor-rules/catalog-entry-missing-status.ts
  *
- * Phase 11 Task 2 — Doctor rule: detect operator-curated catalog
+ * Doctor rule: detect operator-curated catalog
  * entries that were authored without an explicit `status:` field.
  *
  * # Why this rule exists
  *
- * The Loop foundation (Phase 11 Task 2) adds `status:` + `provenance:`
+ * The Loop foundation (catalog status + provenance) adds `status:` + `provenance:`
  * to every registered catalog entry. Backward-compatible: registries
  * that omit the fields continue to parse — the parser synthesizes
  * `status: blessed` + an install-seed provenance for pre-Loop entries.

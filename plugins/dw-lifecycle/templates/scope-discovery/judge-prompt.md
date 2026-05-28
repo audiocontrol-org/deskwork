@@ -44,4 +44,4 @@ The orchestrator parses these proposals + ranks by confidence; the controller ch
 
 ## Auditor-correction-rate is the truth signal
 
-The Phase 11 controller measures how often the external auditor overturns your proposals. If your confidence is well-calibrated, that rate stays low and the controller loosens the auto-disposition threshold. If you systematically over-confide, the controller routes a CLASS of decisions to escalation by default until evidence improves. Calibrate honestly; you cannot game this measurement by faking lower confidence — the controller measures the JOINT distribution of confidence + correctness.
+The the orchestrator loop controller measures how often the external auditor overturns your proposals. If your confidence is well-calibrated, that rate stays low and the controller loosens the auto-disposition threshold. If you systematically over-confide, the controller routes a CLASS of decisions to escalation by default until evidence improves. Calibrate honestly; you cannot game this measurement by faking lower confidence — the controller measures the JOINT distribution of confidence + correctness.

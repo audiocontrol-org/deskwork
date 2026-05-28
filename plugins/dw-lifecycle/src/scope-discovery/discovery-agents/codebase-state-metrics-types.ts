@@ -1,10 +1,10 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/discovery-agents/codebase-state-metrics-types.ts
  *
- * Phase 11 Task 4 — Codebase-state metrics type definitions.
+ * Codebase-state metrics type definitions.
  *
  * Seven metrics that observe properties of the codebase + the catalog
- * regime over time. Their derivatives feed Phase 11 Task 5's self-
+ * regime over time. Their derivatives feed the self-correcting controller's self-
  * correcting controller — but at THIS layer the metrics are purely
  * INFORMATIONAL. They land in the scope-manifest's `codebase_state_metrics:`
  * section so:
@@ -21,7 +21,7 @@
  *      codebase that are catalogued (status: blessed/cursed/ignore/
  *      tracked-holdout). Denominator includes discovered candidates
  *      (status: pending) + uncatalogued candidates from the clustering
- *      pass (Phase 11 G5; currently a stub).
+ *      pass (stub; currently a stub).
  *
  *   2. coverage_per_blessed_pattern — for each blessed entry with a
  *      `match_glob` (negative-space / coverage handlers), the adoption
@@ -50,7 +50,7 @@
  * # Reading these on the manifest
  *
  * All seven sub-sections are OPTIONAL at the manifest level: a manifest
- * generated before Phase 11 Task 4 lands continues to parse. The
+ * generated before codebase-state metrics lands continues to parse. The
  * synthesis pass emits the section ONLY when at least one metric was
  * computed (catalogs present + scan run executed); otherwise the
  * section is omitted entirely.
@@ -223,7 +223,7 @@ export interface ScanRunPendingCount {
  *
  *   - `transitioned_count` — total entries observed in the catalog
  *     transitions log (used as the population for median / p90).
- *     Phase 11 Task 4 currently reads the log from a single source: a
+ *     codebase-state metrics currently reads the log from a single source: a
  *     `transitioned_at` field synthesizable from registered scan-run
  *     evidence trails. When the log isn't available, the metric
  *     reports 0 transitions + null statistics.
@@ -258,7 +258,7 @@ export interface DispositionLatencyEntry {
  * `generated_at` is an ISO-8601 timestamp set by the computation; it's
  * separate from the manifest's own `generated_at` so a downstream
  * consumer can tell when these metrics specifically were computed (the
- * Phase 11 Task 5 controller will dispatch them on a different cadence
+ * the self-correcting controller controller will dispatch them on a different cadence
  * from manifest emission once the controller lands).
  */
 export interface CodebaseStateMetrics {

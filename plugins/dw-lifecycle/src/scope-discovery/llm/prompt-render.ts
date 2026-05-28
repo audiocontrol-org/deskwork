@@ -4,7 +4,7 @@
  * Render the judge / auditor prompt templates with the per-turn inputs.
  *
  * The templates live under `plugins/dw-lifecycle/templates/scope-
- * discovery/{judge-prompt.md, audit-prompt.md}` (NEW in Phase 11
+ * discovery/{judge-prompt.md, audit-prompt.md}` (NEW in the orchestrator loop
  * Task 7). They use `{{placeholder}}` syntax for the four well-known
  * slots; the renderer substitutes one section at a time with a
  * deterministic markdown serialization of the input.

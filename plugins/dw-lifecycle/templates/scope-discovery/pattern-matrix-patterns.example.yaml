@@ -9,7 +9,7 @@
 # Schema reference:
 #   plugins/dw-lifecycle/src/scope-discovery/schema/pattern-matrix-patterns.yaml.schema.json
 #
-# Phase 11 Task 1 extended the catalog to a polymorphic discriminated
+# the polymorphic dispatcher extends the catalog to a discriminated
 # union. Each entry declares a `type` discriminator selecting the
 # handler. Entries WITHOUT a `type` field default to `regex` for
 # backward compatibility with pre-Phase-11 registries.
@@ -51,7 +51,7 @@ patterns:
     id: editor-canonical-adoption
     description: |
       Fraction of editor-summary files consuming the canonical
-      primitive. Feeds the Phase 11 Task 4 codebase-state metrics
+      primitive. Feeds the codebase-state metrics
       (not a finding generator).
     match_glob: 'modules/*-editor/src/**/*Summary.tsx'
     must_contain: '\bac-[a-z]+'
@@ -73,7 +73,7 @@ patterns:
     description: |
       LLM-augmented check for design-discipline compliance in editor
       components. STUB in v1.1 Task 1 — emits zero findings + a
-      `stub: 1` metric until the LLM wiring lands (Phase 11 Task 7).
+      `stub: 1` metric until the LLM wiring lands (the LLM judge + external auditor).
     match_glob: 'modules/*-editor/src/**/*Summary.tsx'
     prompt_template: |
       You are auditing an editor-summary component for design-system
@@ -84,7 +84,7 @@ patterns:
     # model: 'claude-3-5-sonnet-20241022'   # optional model override
 
   # ─────────────────────────────────────────────────────────────────
-  # Phase 11 Task 13 — Multi-content-type examples
+  # Multi-content-type examples
   #
   # The scan engine is content-agnostic. Every primitive above works
   # uniformly on .ts/.tsx, .md/.markdown, .css/.scss, .html/.htm,
@@ -140,7 +140,7 @@ patterns:
     id: yaml-schema-version-adoption
     description: |
       Fraction of YAML configs under .dw-lifecycle/ that carry the
-      canonical `schemaVersion:` field. Feeds the Phase 11 Task 4
+      canonical `schemaVersion:` field. Feeds the codebase-state metrics
       controller; not a finding generator.
     match_glob: '.dw-lifecycle/**/*.yaml'
     must_contain: '^schemaVersion:'

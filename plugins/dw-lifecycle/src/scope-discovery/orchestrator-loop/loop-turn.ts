@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/orchestrator-loop/loop-turn.ts
  *
- * Phase 11 Task 6 — The autonomous per-turn audit/judge stack.
+ * The autonomous per-turn audit/judge stack.
  *
  * `runOrchestratorTurn` is the entry point the implement-skill's
  * orchestrator-agent invokes once per task boundary. It composes the
@@ -90,7 +90,7 @@ import {
 } from './loop-state.js';
 
 /**
- * Project a Phase 11 Task 4 `CodebaseStateMetrics` block into the
+ * Project a codebase-state metrics `CodebaseStateMetrics` block into the
  * scalar `MetricsSnapshot` the controller consumes. The controller's
  * shape is intentionally narrower than the full metrics block (per
  * `controller-types.ts` JSDoc — the controller projects to compact
@@ -170,7 +170,7 @@ function projectAuditEntryForController(
 /**
  * Convert the reader's `AuditLogEntry[]` to the recovery library's
  * `ParsedAuditLog` shape. The two surfaces converged on different
- * type names during Phase 11's development; this projection keeps
+ * type names during the orchestrator loop's development; this projection keeps
  * the loop wiring honest without forcing a refactor of either
  * library.
  */
@@ -218,7 +218,10 @@ async function readAuditUpdate(
   // owned by the reader. We prefer the loop-state version because
   // the loop is the source of truth for "what was the last turn's
   // observation point".
-  const readerWatermark = await loadAuditWatermark(input.repoRoot);
+  const readerWatermark = await loadAuditWatermark(
+    input.repoRoot,
+    input.featureSlug,
+  );
   const priorWatermark =
     loopState.lastAuditWatermark.length > 0
       ? loopState.lastAuditWatermark
@@ -290,7 +293,7 @@ function buildSummary(report: {
 }
 
 /**
- * Run one orchestrator turn end-to-end. Composes the Phase 11
+ * Run one orchestrator turn end-to-end. Composes the the orchestrator loop
  * libraries; produces a structured `TurnReport` + the updated
  * `LoopState`.
  *
@@ -323,7 +326,11 @@ export async function runOrchestratorTurn(
   const effectiveLoopState: LoopState =
     options.loopStateOverride !== undefined
       ? options.loopStateOverride
-      : await loadLoopState(input.repoRoot, options.runtimeDirOverride);
+      : await loadLoopState(
+          input.repoRoot,
+          input.featureSlug,
+          options.runtimeDirOverride,
+        );
 
   // STEP 1 — Read audit-log updates since the prior watermark.
   const audit = await readAuditUpdate(input, effectiveLoopState, options);
@@ -359,6 +366,7 @@ export async function runOrchestratorTurn(
   const controllerConfig = await loadControllerConfig(input.repoRoot);
   const controllerHistory = await loadControllerState(
     input.repoRoot,
+    input.featureSlug,
     options.runtimeDirOverride,
   );
   const metricsSnapshot = projectMetricsSnapshot(input.currentMetrics);
@@ -378,6 +386,7 @@ export async function runOrchestratorTurn(
   };
   await persistControllerState(
     input.repoRoot,
+    input.featureSlug,
     [newControllerEntry, ...controllerHistory],
     options.runtimeDirOverride,
   );
@@ -400,7 +409,11 @@ export async function runOrchestratorTurn(
   });
 
   // STEP 8 — Advance loop state + persist watermark.
-  await persistAuditWatermark(input.repoRoot, audit.newWatermark);
+  await persistAuditWatermark(
+    input.repoRoot,
+    input.featureSlug,
+    audit.newWatermark,
+  );
   const turnId = generateTurnId(new Date(input.now));
   const historyEntry: TurnHistoryEntry = {
     turnId,

@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://deskwork.dev/schemas/dw-lifecycle/scope-discovery/controller-config.yaml",
-  "title": "scope-discovery Phase 11 Task 5 controller configuration",
-  "description": "Configuration for the self-correcting controller (Phase 11 Task 5). Every field is OPTIONAL and falls through to the documented default (see DEFAULT_CONTROLLER_CONFIG in controller-config.ts). Cross-field invariants are enforced at parse time: cold_start_* must lie within the corresponding [min, max] band; low_drift_threshold <= high_drift_threshold. The controller is a pure computation (state lives in `.dw-lifecycle/scope-discovery/orchestrator-runtime/controller-state.json`).",
+  "title": "scope-discovery the self-correcting controller controller configuration",
+  "description": "Configuration for the self-correcting controller (the self-correcting controller). Every field is OPTIONAL and falls through to the documented default (see DEFAULT_CONTROLLER_CONFIG in controller-config.ts). Cross-field invariants are enforced at parse time: cold_start_* must lie within the corresponding [min, max] band; low_drift_threshold <= high_drift_threshold. The controller is a pure computation (state lives in `.dw-lifecycle/scope-discovery/orchestrator-runtime/controller-state.json`).",
   "type": "object",
   "additionalProperties": false,
   "properties": {

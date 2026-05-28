@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://deskwork.dev/schemas/dw-lifecycle/scope-discovery/llm-judge.yaml",
   "title": "scope-discovery LLM judge + auditor configuration",
-  "description": "Configuration for the multi-source LLM ensemble (Phase 11 Task 7). Defines the internal LLM-judge (in-band, every turn) + external LLM auditor (out-of-band, fired by orchestrator every turn, results materialize in audit log for next turn). Both sections are required; orchestrator_runtime_dir is optional with documented default. The model + agent_type values are tokens the orchestrator's DispatchFn interprets (per Phase 11 Task 7 pre-made decision: actual LLM API integration is OUT OF SCOPE for the library; the library defines the SHAPE of the call, the orchestrator-agent performs the dispatch).",
+  "description": "Configuration for the multi-source LLM ensemble (the LLM judge + external auditor). Defines the internal LLM-judge (in-band, every turn) + external LLM auditor (out-of-band, fired by orchestrator every turn, results materialize in audit log for next turn). Both sections are required; orchestrator_runtime_dir is optional with documented default. The model + agent_type values are tokens the orchestrator's DispatchFn interprets (per the LLM judge + external auditor pre-made decision: actual LLM API integration is OUT OF SCOPE for the library; the library defines the SHAPE of the call, the orchestrator-agent performs the dispatch).",
   "type": "object",
   "additionalProperties": false,
   "required": ["judge", "auditor"],
@@ -26,7 +26,7 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1,
-          "description": "Minimum proposal confidence for auto-disposition. Proposals BELOW this floor are still surfaced; the Phase 11 Task 5 controller treats them as escalation candidates."
+          "description": "Minimum proposal confidence for auto-disposition. Proposals BELOW this floor are still surfaced; the the self-correcting controller controller treats them as escalation candidates."
         }
       }
     },
@@ -38,7 +38,7 @@
         "model": {
           "type": "string",
           "minLength": 1,
-          "description": "Model identifier the external auditor process runs. MUST be a different model class from judge.model — the auditor cannot self-grade the judge's work (Phase 11 Task 7 independence rule)."
+          "description": "Model identifier the external auditor process runs. MUST be a different model class from judge.model — the auditor cannot self-grade the judge's work (the LLM judge + external auditor independence rule)."
         },
         "pending_audits_dir": {
           "type": "string",

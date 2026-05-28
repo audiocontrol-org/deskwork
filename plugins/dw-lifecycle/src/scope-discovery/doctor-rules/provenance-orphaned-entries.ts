@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/doctor-rules/provenance-orphaned-entries.ts
  *
- * Phase 11 Task 10 — Doctor rule: surface broken cross-references
+ * Doctor rule: surface broken cross-references
  * between catalog entries and audit-log findings.
  *
  * # The two failure modes this rule catches

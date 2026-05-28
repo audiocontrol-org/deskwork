@@ -72,7 +72,7 @@ export function deriveRegimeHoldouts(
       const key = `${entry.file}::${entry.manifestId}`;
       if (adopterKey.has(key)) continue;
       adopterKey.add(key);
-      // Phase 11 Task 11 — the adopter-manifest-checker emits findings
+      // the adopter-manifest-checker emits findings
       // without preserving the catalog entry's status/provenance on
       // the finding shape. The scanner has already filtered to
       // actively-enforced entries (per Task 2's plumbing), so every
@@ -111,7 +111,7 @@ export function deriveRegimeHoldouts(
     buckets['adopter-manifest'].length +
     buckets['editor-symmetry'].length +
     buckets.deprecation.length;
-  // Phase 11 Task 11 — per-status rollup across the entire
+  // per-status rollup across the entire
   // post-merge manifest section. We re-derive this from the materi-
   // alized entries rather than summing the per-detector meta blocks
   // because adopter-manifest-checker findings (which lack a per-meta

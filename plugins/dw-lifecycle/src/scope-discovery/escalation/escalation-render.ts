@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/escalation/escalation-render.ts
  *
- * Phase 11 Task 9 — Markdown renderer for `EscalationRequest`.
+ * Markdown renderer for `EscalationRequest`.
  *
  * The operator opens the pending JSON artifact AND a co-located
  * `.md` view of the same data in their editor. The markdown is

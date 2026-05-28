@@ -79,7 +79,7 @@ The directory name `.dw-lifecycle/scope-discovery/` is deliberate:
 ## Pattern-matrix overrides — polymorphic catalog
 
 The pattern-matrix discovery agent supports a polymorphic catalog of
-pattern types beyond plain regex (Phase 11 Task 1). When the file
+pattern types beyond plain regex (polymorphic pattern handlers). When the file
 `.dw-lifecycle/scope-discovery/pattern-matrix-patterns.yaml` is present,
 its `patterns:` list REPLACES the built-in catalog. Each entry carries
 a `type` discriminator selecting the handler:
@@ -99,18 +99,18 @@ and an example showing all five types is at
 
 ## Content type support
 
-Phase 11 Task 13 generalized the scan engine beyond TypeScript. The
+multi-content-type support generalized the scan engine beyond TypeScript. The
 pattern catalog + glob + shape model is content-type-agnostic; the same
 primitives operate uniformly on every content type listed below.
 
 | Extension | Walker support | Outlier `content_type:` token unit |
 |---|---|---|
 | `.ts` / `.tsx` | yes (default) | `ts` — alphanumeric identifiers |
-| `.md` / `.markdown` | yes (NEW Phase 11 Task 13) | `markdown` — alphanumeric words |
-| `.css` / `.scss` | yes (NEW Phase 11 Task 13) | `css` — property names + class/id selectors |
-| `.html` / `.htm` | yes (NEW Phase 11 Task 13) | `html` — tag names + attribute names |
-| `.yaml` / `.yml` | yes (NEW Phase 11 Task 13) | `yaml` — top-level + nested key names |
-| `.json` | yes (NEW Phase 11 Task 13) | `json` — JSON key names |
+| `.md` / `.markdown` | yes (NEW multi-content-type support) | `markdown` — alphanumeric words |
+| `.css` / `.scss` | yes (NEW multi-content-type support) | `css` — property names + class/id selectors |
+| `.html` / `.htm` | yes (NEW multi-content-type support) | `html` — tag names + attribute names |
+| `.yaml` / `.yml` | yes (NEW multi-content-type support) | `yaml` — top-level + nested key names |
+| `.json` | yes (NEW multi-content-type support) | `json` — JSON key names |
 
 ### How extension support actually works
 

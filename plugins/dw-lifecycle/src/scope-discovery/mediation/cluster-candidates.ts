@@ -1,13 +1,13 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/mediation/cluster-candidates.ts
  *
- * Phase 11 Task 3 — cluster raw per-agent findings into architectural-
+ * cluster raw per-agent findings into architectural-
  * scale candidate classes.
  *
  * # Algorithm
  *
  * Shape-similarity clustering via Jaccard similarity over character
- * n-grams of the matched excerpt. Default threshold 0.7 (per Phase 11
+ * n-grams of the matched excerpt. Default threshold 0.7 (per the orchestrator loop
  * Task 3 pre-made decision #1).
  *
  * Steps:
@@ -229,7 +229,7 @@ function greedyCluster(
 
 /**
  * Synthesize a 1-2 sentence operator-readable summary for one cluster.
- * The orchestrator-agent (Phase 11 Task 7 LLM-judge wiring) may
+ * The orchestrator-agent (the LLM judge + external auditor LLM-judge wiring) may
  * replace this with a richer description; this is the deterministic
  * fallback that ships with the pure-compute layer.
  */
@@ -294,7 +294,7 @@ function finalizeCluster(cluster: InternalCluster): Candidate {
  *                   reader emits its own cluster-like groups; this
  *                   clusterer ignores them to preserve the
  *                   single-responsibility shape).
- * @param config   — optional tuning. Defaults per Phase 11 Task 3.
+ * @param config   — optional tuning. Defaults per orchestrator-agent mediation.
  * @returns Candidate[] — clusters with >= minClusterSize members,
  *                        sorted by cluster id (== creation order).
  */

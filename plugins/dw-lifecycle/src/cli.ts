@@ -27,6 +27,7 @@ import { installScopeDiscoveryHooks } from './subcommands/install-scope-discover
 import { installAgentPrompts } from './subcommands/install-agent-prompts.js';
 import { migrateFromPilot } from './subcommands/migrate-from-pilot.js';
 import { uninstallScopeDiscoveryHooks } from './subcommands/uninstall-scope-discovery-hooks.js';
+import { orchestratorTurn } from './subcommands/orchestrator-turn.js';
 
 const subcommand = process.argv[2];
 const args = process.argv.slice(3);
@@ -68,6 +69,7 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'install-agent-prompts': installAgentPrompts,
   'migrate-from-pilot': migrateFromPilot,
   'uninstall-scope-discovery-hooks': uninstallScopeDiscoveryHooks,
+  'orchestrator-turn': orchestratorTurn,
 };
 
 // Deprecation hints printed alongside the subcommand list in `--help`.

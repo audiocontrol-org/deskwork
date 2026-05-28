@@ -23,6 +23,29 @@ plugins/deskwork-studio/.runtime-cache/
 ## should never be committed.
 plugins/*/package-lock.json
 
+## scope-discovery install manifest. Per-worktree transactional state
+## recording which files `install-scope-discovery-hooks` (and the paired
+## `install-agent-prompts`) wrote into THIS worktree. Contains absolute
+## paths that are meaningless in any other worktree; committing it
+## pollutes new worktrees with stale cross-worktree entries on every
+## re-install. The journal preserves any audit need; the manifest itself
+## is reachable runtime state, not source-of-truth.
+.dw-lifecycle/scope-discovery/hooks-installed.json
+
+## scope-discovery orchestrator-loop durable runtime state. The
+## orchestrator-turn CLI verb persists loop-state, controller-state,
+## audit watermarks, and audit-request artifacts under these paths.
+## Per-worktree state; never committed.
+.dw-lifecycle/scope-discovery/orchestrator-runtime/
+.dw-lifecycle/scope-discovery/pending-audits/
+.dw-lifecycle/scope-discovery/resolved-escalations/
+
+## scope-discovery synthesizer output. `scope-inventory` writes the
+## manifest + run-history under the feature's docs dir. Regenerated on
+## each invocation; never committed.
+docs/*/001-IN-PROGRESS/*/scope-manifest.yaml
+docs/*/001-IN-PROGRESS/*/scope-inventory/
+
 ## Runtime / local state
 .env
 .env.*

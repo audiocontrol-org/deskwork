@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/llm/types.ts
  *
- * Shared types for the multi-source LLM ensemble (Phase 11 Task 7).
+ * Shared types for the multi-source LLM ensemble (the LLM judge + external auditor).
  *
  * Three independent surfaces:
  *
@@ -23,7 +23,7 @@
  *      so the orchestrator can react to auditor findings without the
  *      operator having to deliver them by hand.
  *
- * The three pieces are independent (per Phase 11 Task 7 PRD: "Judge-
+ * The three pieces are independent (per the LLM judge + external auditor PRD: "Judge-
  * vs-auditor independence — different model/prompt scaffolds; auditor
  * cannot self-grade the judge's work") so each can be tested + iterated
  * separately.
@@ -175,11 +175,11 @@ export interface AuditorInput {
  * audit-log convention (AUDIT-<date>-<NN> entries with `Finding-ID`,
  * `Status`, `Severity`, `Surface`).
  *
- * Phase 11 Task 7 extension: an `Affects:` field links the entry to
+ * the LLM judge + external auditor extension: an `Affects:` field links the entry to
  * specific catalog entries (Task 10 carries the bidirectional shape
  * proper; this type carries the field so the reader surfaces it).
  *
- * `Provenance:` is also a Phase 11 Task 7 addition — names the LLM
+ * `Provenance:` is also a the LLM judge + external auditor addition — names the LLM
  * auditor (or operator) that produced the entry so the orchestrator
  * can distinguish auditor-driven findings from operator-authored ones.
  */

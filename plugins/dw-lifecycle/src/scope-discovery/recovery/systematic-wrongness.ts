@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/recovery/systematic-wrongness.ts
  *
- * Phase 11 Task 8 — Systematic-wrongness classifier.
+ * Systematic-wrongness classifier.
  *
  * Per task pre-made decision #3: "When a CLASS of decisions has been
  * wrong N times in a row, route that class to escalation by default.

@@ -61,13 +61,13 @@ export interface PatternHit {
  * it so the synthesis layer + operator can distinguish "registered
  * regex matched a known shape" from "negative-space detector saw the
  * absence of an expected primitive" from "outlier detector flagged a
- * statistical anomaly". Per Phase 11 G7.
+ * statistical anomaly". Per the discovered_candidates stub.
  *
  * `registered-pattern` is the legacy provenance for handlers that match
  * a positively-registered shape (regex, semantic). `negative-space`,
  * `coverage-gap`, `outlier`, and `discovered-candidate` are the new
- * vocabulary types from Phase 11 Task 1. `discovered-candidate` is the
- * synthesis-layer clustering pass output (Phase 11 G5 stub).
+ * vocabulary types from polymorphic pattern handlers. `discovered-candidate` is the
+ * synthesis-layer clustering pass output (the discovered_candidates stub stub).
  */
 export type FindingProvenance =
   | 'registered-pattern'
@@ -101,7 +101,7 @@ export interface PatternFinding {
 
 /**
  * A discovered-candidate cluster surfaced by the synthesis-layer
- * unmatched-shape clustering pass (Phase 11 G5). Stub-shipped in v1.1
+ * unmatched-shape clustering pass (the discovered_candidates stub). Stub-shipped in v1.1
  * Task 1 — the pass currently emits an empty list with a logged TODO
  * naming the algorithmic spec at issue #315. The TYPE is here so the
  * scope-manifest wire format is forward-compatible; the algorithm
@@ -131,7 +131,7 @@ export interface AstGrepMatrixFindings {
   readonly patterns: ReadonlyArray<PatternFinding>;
   /**
    * Optional output of the synthesis-layer unmatched-shape clustering
-   * pass (Phase 11 G5). Always emitted (may be empty); absent ONLY for
+   * pass (the discovered_candidates stub). Always emitted (may be empty); absent ONLY for
    * pre-Phase-11 wire-format consumers reading older JSON.
    */
   readonly discoveredCandidates?: ReadonlyArray<DiscoveredCandidateCluster>;
@@ -232,13 +232,13 @@ export interface RegimeHoldoutEvidence {
 }
 
 /**
- * Phase 11 Task 11 — per-finding status provenance. Names the catalog
+ * per-finding status provenance. Names the catalog
  * entry's `status:` at the time the finding was produced so downstream
  * consumers (synthesis, dispositioner, operator surface) can route
  * actively-enforced findings differently from candidate findings
  * (status: pending) without re-reading the catalog. The field is
  * load-bearing for the orchestrator-agent's future per-status routing
- * (Phase 11 Task 3): `blessed`/`cursed` findings gate; `pending`
+ * (orchestrator-agent mediation): `blessed`/`cursed` findings gate; `pending`
  * findings surface as candidates; everything else is suppressed at the
  * scanner level.
  *
@@ -280,7 +280,7 @@ export interface RegimeHoldoutFinding {
   /** Evidence back-pointer for operator traceability. */
   readonly evidence: RegimeHoldoutEvidence;
   /**
-   * Phase 11 Task 11 — status + provenance inherited from the catalog
+   * status + provenance inherited from the catalog
    * entry that produced this finding. Always present; the synthesizer
    * uses this to route findings into the right manifest section
    * (actively-enforced vs. candidate vs. suppressed-but-recorded).
@@ -296,7 +296,7 @@ export interface RegimeHoldoutMeta {
   readonly deprecation_count: number;
   readonly total: number;
   /**
-   * Phase 11 Task 11 — per-status rollup. Sum across the four sources.
+   * per-status rollup. Sum across the four sources.
    * `actively_enforced` = findings sourced from `blessed` + `cursed`
    * entries; `candidate` = findings sourced from `pending` entries
    * (surfaced for operator triage but NOT gate-blocking).

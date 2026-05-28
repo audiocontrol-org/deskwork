@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/escalation/escalation-queue.ts
  *
- * Phase 11 Task 9 — Persistent escalation queue.
+ * Persistent escalation queue.
  *
  * Three operations:
  *

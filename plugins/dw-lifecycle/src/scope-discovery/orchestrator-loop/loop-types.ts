@@ -1,11 +1,11 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/orchestrator-loop/loop-types.ts
  *
- * Phase 11 Task 6 — Type contracts for the autonomous per-turn audit/
+ * Type contracts for the autonomous per-turn audit/
  * judge stack inside `/dw-lifecycle:implement`.
  *
  * The orchestrator loop is PURE COMPOSITION of the libraries shipped
- * in Phase 11 Tasks 2–11:
+ * in the orchestrator loop Tasks 2–11:
  *
  *   - Task 7: `llm/audit-log-reader.ts` (audit-log read since watermark)
  *   - Task 8: `recovery/*.ts` (detect + reverse + calibrate + classify)
@@ -51,7 +51,7 @@ import type {
 /**
  * Per-turn input the orchestrator-agent assembles before invoking
  * `runOrchestratorTurn`. Every field corresponds to one of the
- * Phase 11 library inputs; the function does NOT touch disk to
+ * the orchestrator loop library inputs; the function does NOT touch disk to
  * gather them (except for the durable loop-state + audit-log read,
  * which are by-design I/O concerns of the loop itself).
  *
@@ -63,7 +63,7 @@ import type {
  *     entries; the turn still proceeds.
  *   - `dispatchFn` — orchestrator's dispatch callback; routed through
  *     `wrap()` by the judge.
- *   - `currentMetrics` — fresh `CodebaseStateMetrics` from Phase 11
+ *   - `currentMetrics` — fresh `CodebaseStateMetrics` from the orchestrator loop
  *     Task 4. The function projects to `MetricsSnapshot` for the
  *     controller.
  *   - `findings` — recent `DiscoveryAgentFinding`s (typically since
@@ -109,7 +109,7 @@ export interface TurnInput {
  *   - `persistedAt` — ISO-8601 timestamp the state was last written.
  *
  * The controller's own history persists separately in
- * `controller-state.json` (per Phase 11 Task 5); the loop does NOT
+ * `controller-state.json` (per the self-correcting controller); the loop does NOT
  * duplicate it. `turnHistory` records turn-level metadata only.
  */
 export interface LoopState {

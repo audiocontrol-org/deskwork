@@ -1,7 +1,7 @@
 /**
  * plugins/dw-lifecycle/src/scope-discovery/controller/controller-config.ts
  *
- * Loader + defaults for the Phase 11 Task 5 controller. The config
+ * Loader + defaults for the the self-correcting controller controller. The config
  * YAML lives at `.dw-lifecycle/scope-discovery/controller-config.yaml`
  * (operator-owned, repo-scoped). Defaults match the pre-made decisions:
  *
@@ -30,7 +30,7 @@ export const CONTROLLER_CONFIG_PATH =
 /**
  * Default controller config. Every field documented in
  * `controller-types.ts`'s `ControllerConfig` interface; defaults
- * match the Phase 11 Task 5 pre-made decisions.
+ * match the the self-correcting controller pre-made decisions.
  */
 export const DEFAULT_CONTROLLER_CONFIG: ControllerConfig = {
   cold_start_frequency: 1.0,
