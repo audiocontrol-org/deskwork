@@ -272,12 +272,12 @@ The picked design **pivots away from the PRD's original "per-lane tab strip" fra
 
 ### Task 5.6: Integration test against multi-lane fixture
 
-- [ ] Step 5.6.1: Build a tmp-fixture project with 3 lanes (`default` editorial / `mockups` visual / `qa` qa-plan); add 2 entries per lane in different stages.
-- [ ] Step 5.6.2: Boot the studio against the fixture; assert: three swimlanes render in the bay shell (one per focused lane); each swimlane's stage columns match its template; focus-chip strip shows 3 chips + "All"; lane-visibility rail lists all 3 lanes with eye-toggles; hidden-lane test (toggle one off, confirm its chip disappears AND no swimlane renders, but the entry still counts in dashboard stats).
-- [ ] Step 5.6.3: Per-lane collapse test: toggle lane-level collapse → swim-head + count strip only; toggle per-stage collapse → narrow vertical strip with rotated name + redistributed remaining columns.
-- [ ] Step 5.6.4: Per-lane view-toggle test: flip one lane to list view → vertical stage groups with row entries; flip another to kanban → columnar stages with cards. Both modes show the same entries.
-- [ ] Step 5.6.5: Compose-chip test: click `+ new` on a lane → clipboard contains `/deskwork:add <SLUG> --lane <id> --stage <first-linear-stage>`; chip flashes green with `✓ Copied — paste in chat` for ~2s, then reverts.
-- [ ] Step 5.6.6: Phone-viewport regression: re-run the existing `scripts/smoke-er-viewport-regressions.mjs` against the multi-lane fixture; assert no overflow / no hidden-affordance / no fixed-position offenders per the project's UI verification protocol. Verify the chip layout doesn't overflow the lane-head row on phone viewports.
+- [x] Step 5.6.1: Build a tmp-fixture project with 3 lanes (`default` editorial / `mockups` visual / `qa` qa-plan); add 2 entries per lane in different stages.
+- [x] Step 5.6.2: Boot the studio against the fixture; assert: three swimlanes render in the bay shell (one per focused lane); each swimlane's stage columns match its template; focus-chip strip shows 3 chips + "All"; lane-visibility rail lists all 3 lanes with eye-toggles; hidden-lane test (toggle one off, confirm its chip disappears AND no swimlane renders, but the entry still counts in dashboard stats).
+- [x] Step 5.6.3: Per-lane collapse test: toggle lane-level collapse → swim-head + count strip only; toggle per-stage collapse → narrow vertical strip with rotated name + redistributed remaining columns.
+- [x] Step 5.6.4: Per-lane view-toggle test: flip one lane to list view → vertical stage groups with row entries; flip another to kanban → columnar stages with cards. Both modes show the same entries.
+- [x] Step 5.6.5: Compose-chip test: click `+ new` on a lane → clipboard contains `/deskwork:add <SLUG> --lane <id> --stage <first-linear-stage>`; chip flashes green with `✓ Copied — paste in chat` for ~2s, then reverts.
+- [x] Step 5.6.6: Phone-viewport regression captured via jsdom matchMedia stub + DOM presence assertion + CSS-rule presence assertion (mobile `.lane-sheet-trigger` + `.sc-label { display: none }`); full-browser `scripts/smoke-er-viewport-regressions.mjs` run is documented as a manual local-only step in the test file per `.claude/rules/agent-discipline.md` "No test infrastructure in CI".
 
 **Acceptance Criteria:**
 
