@@ -21,6 +21,7 @@ import type { DraftWorkflowItem } from '@deskwork/core/review/types';
 import type { Platform } from '@deskwork/core/types';
 import type { DeskworkConfig } from '@deskwork/core/config';
 import { loadLaneBuckets, type LaneBucketsResult } from './lane-data.ts';
+import { isLegacyEditorialStage } from './legacy-stage.ts';
 
 /**
  * The eight canonical stages, in display order. Linear pipeline
@@ -73,6 +74,14 @@ function bucketize(entries: readonly Entry[]): Map<Stage, Entry[]> {
   const out = new Map<Stage, Entry[]>();
   for (const stage of DASHBOARD_STAGE_ORDER) out.set(stage, []);
   for (const e of entries) {
+    // Per AUDIT-20260528-01: `byStage` is the back-compat read view
+    // keyed by the legacy editorial `Stage` union. Entries whose
+    // `currentStage` is not a legacy editorial stage belong to a
+    // non-editorial lane template and are surfaced through the
+    // `lanes` (LaneBucketsResult) read path below. Skip them here so
+    // the legacy view stays type-clean; their per-lane bucketing in
+    // `loadLaneBuckets` is the authoritative routing.
+    if (!isLegacyEditorialStage(e.currentStage)) continue;
     const bucket = out.get(e.currentStage);
     if (bucket !== undefined) bucket.push(e);
   }

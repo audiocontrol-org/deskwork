@@ -126,12 +126,19 @@ function computeFocus(
 
 function renderRailRow(row: LaneRailRow): RawHtml {
   const classes = row.inFocus ? 'rail-lane focused' : 'rail-lane';
+  // Per AUDIT-20260528-04 sub-issue B: render BOTH eye glyphs as
+  // siblings inside `.r-eye`; CSS picks which one shows based on the
+  // parent `.rail-lane[data-lane-visible]` attribute. The client
+  // controller updates the data attribute on visibility toggles; CSS
+  // swaps which glyph is visible. Mirrors the `.sc-glyph-default` /
+  // `.sc-glyph-copied` pattern used elsewhere.
   return unsafe(html`
     <div class="${classes}" role="button" tabindex="0"
       data-rail-lane="${row.id}"
       aria-pressed="${row.inFocus ? 'true' : 'false'}"
       data-lane-visible="true">
-      <span class="r-eye" aria-hidden="true">●</span>
+      <span class="r-eye" aria-hidden="true"
+        ><span class="r-eye-visible">●</span><span class="r-eye-hidden">○</span></span>
       <span class="r-glyph" aria-hidden="true">${laneGlyph(row.templateId)}</span>
       <span class="r-name">${row.name}</span>
       <span class="r-count">${row.entryCount}</span>
@@ -197,9 +204,17 @@ function renderFocusStrip(
  *     legacy filter strip + stage-tile + ordering tests still target
  *     it; preserving the attribute here means none of those tests
  *     need to change as the bay-shell ships.
- *   - `id="stage-<lower>"` — anchor target for the existing
- *     shortform-empty-state link (#106) and any operator's
- *     bookmarked deep link into a specific stage section.
+ *   - `id="lane-<laneId>-stage-<stageSlug>"` — DOM-unique ID per
+ *     lane. Per AUDIT-20260528-05: lanes share stage names (e.g.
+ *     `Approved` appears in both `visual` and `qa-plan` templates),
+ *     so the previous `id="stage-<slug>"` collided across multiple
+ *     lanes on a multi-lane page. The default editorial lane ALSO
+ *     emits the bare `id="stage-<slug>"` anchor (back-compat for the
+ *     shortform-empty-state deep-link href
+ *     `/dev/editorial-studio#stage-drafting` — see `pages/
+ *     shortform.ts:113` and `pages/index.ts:114`). Other lanes do
+ *     not emit the bare anchor; their stage columns are reachable
+ *     only via the lane-scoped ID.
  *   - `data-empty-stage="<stage>"` on empty columns — back-compat
  *     hook for the legacy empty-state assertion shape.
  *
@@ -208,6 +223,7 @@ function renderFocusStrip(
  * lands identically.
  */
 function renderStageCol(
+  laneId: string,
   stage: string,
   entries: readonly Entry[],
   defaultSite: string,
@@ -229,6 +245,16 @@ function renderStageCol(
   // css applies the colour to the stage-glyph + stage-name.
   const lockedClass = isLocked ? ' locked' : '';
   const stageIdSlug = stage.toLowerCase().replace(/[^a-z0-9-]+/g, '-');
+  const laneIdSlug = laneId.toLowerCase().replace(/[^a-z0-9-]+/g, '-');
+  // Lane-scoped DOM ID is the canonical anchor — unique per multi-
+  // lane page (AUDIT-20260528-05). The default editorial lane also
+  // mounts a legacy `<span id="stage-<slug>">` inside the column so
+  // existing deep links (`/dev/editorial-studio#stage-drafting` from
+  // `pages/shortform.ts` + `pages/index.ts`) continue to resolve.
+  const stageId = `lane-${laneIdSlug}-stage-${stageIdSlug}`;
+  const legacyAnchor = laneId === 'default'
+    ? unsafe(`<span id="stage-${stageIdSlug}" aria-hidden="true"></span>`)
+    : '';
   const emptyHint = stageEmptyHint(stage);
   const emptyAttrs = entries.length === 0
     ? unsafe(html` data-empty-stage="${stage}"`)
@@ -254,9 +280,10 @@ function renderStageCol(
 
   return unsafe(html`
     <section class="stage-col${unsafe(emptyClass)}${unsafe(offClass)}${unsafe(lockedClass)}"
-      id="stage-${stageIdSlug}"
+      id="${stageId}"
       data-stage-col="${stage}"
       data-stage-section="${stage}"${emptyAttrs}>
+      ${legacyAnchor}
       <div class="stage-head">
         <span class="stage-glyph" aria-hidden="true">${glyph}</span>
         <span class="stage-name">${stage}</span>
@@ -316,12 +343,14 @@ function renderSwimCompact(bucket: LaneBucket): RawHtml {
 function renderSwimlane(
   bucket: LaneBucket,
   defaultSite: string,
+  focusHidden: boolean,
 ): RawHtml {
   const { lane, template } = bucket;
   const lockedSet = new Set<string>(template.lockedStages ?? []);
   const stagesRaw = [
     ...template.linearStages.map((stage) =>
       renderStageCol(
+        lane.id,
         stage,
         bucket.byStage.get(stage) ?? [],
         defaultSite,
@@ -332,6 +361,7 @@ function renderSwimlane(
     ),
     ...template.offPipelineStages.map((stage) =>
       renderStageCol(
+        lane.id,
         stage,
         bucket.byStage.get(stage) ?? [],
         defaultSite,
@@ -350,8 +380,15 @@ function renderSwimlane(
   const tag = `${template.id} · ${stageCount} stages`;
   const meta = `${bucket.entryCount} entries`;
 
+  // Per AUDIT-20260528-02: the swimlane is server-rendered alongside
+  // its stub for every visibility-on lane. CSS hides exactly one
+  // based on `.is-focus-hidden`. The class is applied at the server
+  // when the lane is not in the initial focus set, and the client
+  // controller mirrors the toggle on chip clicks (already wired in
+  // `swimlane.ts:153`).
+  const focusClass = focusHidden ? ' is-focus-hidden' : '';
   return unsafe(html`
-    <article class="swim swim--${template.id}" data-lane-id="${lane.id}"
+    <article class="swim swim--${template.id}${unsafe(focusClass)}" data-lane-id="${lane.id}"
       data-template-id="${template.id}">
       <div class="swim-head">
         <span class="glyph" aria-hidden="true">${laneGlyph(template.id)}</span>
@@ -367,9 +404,15 @@ function renderSwimlane(
     </article>`);
 }
 
-function renderSwimStub(row: LaneRailRow): RawHtml {
+function renderSwimStub(row: LaneRailRow, focusHidden: boolean): RawHtml {
+  // Per AUDIT-20260528-02: stub is rendered alongside its swimlane
+  // for every visibility-on lane; CSS hides one or the other based
+  // on `.is-focus-hidden`. The stub is hidden when the lane IS
+  // focused (full swimlane shown) and visible when the lane is
+  // focus-off.
+  const focusClass = focusHidden ? ' is-focus-hidden' : '';
   return unsafe(html`
-    <button class="swim-stub" type="button" data-swim-stub="${row.id}"
+    <button class="swim-stub${unsafe(focusClass)}" type="button" data-swim-stub="${row.id}"
       aria-label="Restore ${row.name} to focus">
       <span class="ss-glyph" aria-hidden="true">${laneGlyph(row.templateId)}</span>
       <span class="ss-name">${row.name}</span>
@@ -439,13 +482,21 @@ export function renderSwimlanesShell(input: SwimlaneShellInput): RawHtml {
   const railRaw = renderRail(laneRows, laneIds.length).__raw;
   const focusStripRaw = renderFocusStrip(laneRows, allActive).__raw;
 
+  // Per AUDIT-20260528-02: render BOTH the swimlane and the stub for
+  // every visibility-on lane so the client's focus toggle has both
+  // DOM nodes to swap between. The CSS rule
+  // `.swim.is-focus-hidden { display: none }` (and its newly-added
+  // `.swim-stub.is-focus-hidden` sibling) decides which one shows.
   const bodyRaw = laneRows
     .map((row) => {
       const bucket = lanes.byLane.get(row.id);
       if (bucket === undefined) return '';
-      return row.inFocus
-        ? renderSwimlane(bucket, defaultSite).__raw
-        : renderSwimStub(row).__raw;
+      const swimHidden = !row.inFocus;
+      const stubHidden = row.inFocus;
+      return (
+        renderSwimlane(bucket, defaultSite, swimHidden).__raw
+        + renderSwimStub(row, stubHidden).__raw
+      );
     })
     .join('');
 

@@ -30,6 +30,7 @@
 
 import { html, unsafe, type RawHtml } from '../html.ts';
 import { scrapbookViewerUrl } from '../../components/scrapbook-item.ts';
+import { isLegacyEditorialStage } from './legacy-stage.ts';
 import type { Entry, Stage } from '@deskwork/core/schema/entry';
 
 /** A single verb the operator can invoke from a row. */
@@ -318,6 +319,15 @@ function renderMenu(stage: Stage, menu: readonly Verb[]): string {
  * of `.er-row-fg`).
  */
 export function renderRowActions(entry: Entry, defaultSite: string): RawHtml {
+  // Per AUDIT-20260528-01: gate the editorial-vocabulary verb chips
+  // on the legacy `Stage` union. Non-editorial entries render no
+  // verb chips here; the swimlane shell's dispatch (swimlane-shell.
+  // ts:247) routes them to `renderEntryCard` so they still appear
+  // on the page. Phase 5 Task 5.2 generalises this via a template-
+  // aware verb resolver — at which point this guard retires.
+  if (!isLegacyEditorialStage(entry.currentStage)) {
+    return unsafe('');
+  }
   const { inline } = verbsForStage(entry.currentStage, entry, defaultSite);
   const chips = inline.map(renderInlineChip).join('');
   const overflow = html`<button type="button"
@@ -341,6 +351,10 @@ export function renderRowActions(entry: Entry, defaultSite: string): RawHtml {
  * the foreground translating left on swipe.
  */
 export function renderRowDrawer(entry: Entry, defaultSite: string): RawHtml {
+  // See `renderRowActions` for the AUDIT-20260528-01 rationale.
+  if (!isLegacyEditorialStage(entry.currentStage)) {
+    return unsafe('');
+  }
   const { drawer } = verbsForStage(entry.currentStage, entry, defaultSite);
   return unsafe(html`<div class="er-row-drawer" aria-hidden="true">${unsafe(drawer.map(renderDrawerChip).join(''))}</div>`);
 }
@@ -350,6 +364,10 @@ export function renderRowDrawer(entry: Entry, defaultSite: string): RawHtml {
  * (the controller flips `hidden` + `aria-expanded` on the overflow button).
  */
 export function renderRowMenu(entry: Entry, defaultSite: string): RawHtml {
+  // See `renderRowActions` for the AUDIT-20260528-01 rationale.
+  if (!isLegacyEditorialStage(entry.currentStage)) {
+    return unsafe('');
+  }
   const { menu } = verbsForStage(entry.currentStage, entry, defaultSite);
   return unsafe(html`<div class="er-row-menu" role="menu" hidden>${unsafe(renderMenu(entry.currentStage, menu))}</div>`);
 }

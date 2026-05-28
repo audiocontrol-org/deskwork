@@ -109,3 +109,17 @@ yarn-error.log*
 
 ## Stray pnpm lockfile — this project uses npm workspaces, not pnpm.
 /pnpm-lock.yaml
+
+## Scope-discovery orchestrator-loop runtime state — `dw-lifecycle
+## orchestrator-turn` persists controller history, last-audit watermark,
+## and pending audit-request artifacts here. Per-operator transactional
+## state, not versioned content.
+/.dw-lifecycle/scope-discovery/orchestrator-runtime/
+/.dw-lifecycle/scope-discovery/pending-audits/
+
+## TF-005 workaround scratchpad — GRAMMAR_INSTRUCTION cache populated by
+## .dw-lifecycle/scope-discovery/grammar-instruction.mjs. Retired now
+## that v0.24.2 ships `wrap-prompt` + `validate-return` CLI subcommands;
+## kept ignored so the cache file doesn't reappear if someone re-runs
+## the helper script.
+/.dw-lifecycle/scope-discovery/grammar-instruction.txt

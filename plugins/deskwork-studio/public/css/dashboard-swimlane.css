@@ -608,18 +608,44 @@
 
 /* Lanes the operator has flipped persistently OFF via the eye-toggle
    are hidden from the bay (and from the focus-chip strip — see the
-   client controller). The class is applied client-side. */
+   client controller). The class is applied client-side.
+   `.focus-chip.is-visibility-hidden` covers AUDIT-20260528-04 sub-A:
+   focus chips for visibility-off lanes must disappear. */
 .swim.is-visibility-hidden,
-.swim-stub.is-visibility-hidden {
+.swim-stub.is-visibility-hidden,
+.focus-chip.is-visibility-hidden {
   display: none;
 }
 
 /* Lane is visibility-on but focus-off — client controller toggles
    this class on chip-click. The server renders this distinction on
    initial paint (focus-driven from `?focus=`); the client mirrors
-   the state through localStorage post-load. */
-.swim.is-focus-hidden {
+   the state through localStorage post-load. Per AUDIT-20260528-02
+   the server renders BOTH the swimlane AND the stub for every
+   visibility-on lane and stamps `.is-focus-hidden` on exactly one;
+   the client toggles which one carries the class on chip clicks. */
+.swim.is-focus-hidden,
+.swim-stub.is-focus-hidden {
   display: none;
+}
+
+/* AUDIT-20260528-04 sub-B: the rail eye glyph swaps between two
+   server-rendered siblings inside `.r-eye` based on the parent
+   `[data-lane-visible]` attribute. The client controller updates
+   the attribute on visibility toggles; CSS picks which sibling
+   shows. Both siblings exist in the DOM at server render so no
+   client-side text mutation is required. */
+.r-eye .r-eye-visible,
+.r-eye .r-eye-hidden {
+  display: none;
+}
+
+.rail-lane[data-lane-visible="true"] .r-eye .r-eye-visible {
+  display: inline;
+}
+
+.rail-lane[data-lane-visible="false"] .r-eye .r-eye-hidden {
+  display: inline;
 }
 
 /* ============================================================

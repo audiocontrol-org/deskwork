@@ -250,20 +250,35 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
     expect(r.html).toContain('/static/css/dashboard-swimlane.css');
   });
 
-  it('honours ?focus=<csv> URL param: focused lanes render as <article class="swim">', async () => {
+  it('honours ?focus=<csv> URL param: focused lanes render with .swim (no .is-focus-hidden); non-focused with .is-focus-hidden', async () => {
     // Server-side focus filter — only editorial + mockups in focus.
     const r = await getHtml(
       app,
       '/dev/editorial-studio?focus=default,mockups',
     );
     expect(r.status).toBe(200);
-    // Two swimlanes render fully (regex tolerates the swim--<id>
-    // modifier class added in Finding 3).
+    // Per AUDIT-20260528-02 the server now renders BOTH the swimlane
+    // AND the stub for every visibility-on lane. `.is-focus-hidden`
+    // is server-stamped on whichever node the initial focus state
+    // wants invisible. So all 3 lanes emit a `<article class="swim">`
+    // and all 3 emit a `<button class="swim-stub">`.
     const swimMatches = r.html.match(/<article class="swim(?:\s[^"]*)?"/g) ?? [];
-    expect(swimMatches.length).toBe(2);
-    expect(r.html).toMatch(/<article class="swim(?:\s[^"]*)?"[^>]*data-lane-id="default"/);
-    expect(r.html).toMatch(/<article class="swim(?:\s[^"]*)?"[^>]*data-lane-id="mockups"/);
-    // QA lane renders as a swim-stub (visibility-on, focus-off).
+    expect(swimMatches.length).toBe(3);
+    const stubMatches = r.html.match(/<button class="swim-stub(?:\s[^"]*)?"/g) ?? [];
+    expect(stubMatches.length).toBe(3);
+    // Focused lanes' swims do NOT carry is-focus-hidden; their stubs DO.
+    expect(r.html).toMatch(/<article class="swim swim--editorial"[^>]*data-lane-id="default"/);
+    expect(r.html).toMatch(/<article class="swim swim--visual"[^>]*data-lane-id="mockups"/);
+    expect(r.html).toMatch(
+      /<button class="swim-stub is-focus-hidden"[^>]*data-swim-stub="default"/,
+    );
+    expect(r.html).toMatch(
+      /<button class="swim-stub is-focus-hidden"[^>]*data-swim-stub="mockups"/,
+    );
+    // Non-focused lane (qa): swim carries is-focus-hidden; stub does NOT.
+    expect(r.html).toMatch(
+      /<article class="swim swim--qa-plan is-focus-hidden"[^>]*data-lane-id="qa"/,
+    );
     expect(r.html).toMatch(
       /<button class="swim-stub"[^>]*data-swim-stub="qa"/,
     );
@@ -448,6 +463,127 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
     // The legacy entry lands in the default lane's Ideas column.
     const editorialBlock = extractLaneSection(r.html, 'default');
     expect(editorialBlock).toContain('data-slug="legacy-no-lane"');
+  });
+
+  // AUDIT-20260528-02 acceptance: server renders BOTH the swim and
+  // stub for every visibility-on lane, with exactly one carrying
+  // is-focus-hidden based on initial focus state.
+  it('AUDIT-02: every visibility-on lane emits BOTH <article class="swim"> AND <button class="swim-stub">', async () => {
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    // Default render — all lanes focused.
+    const swims = r.html.match(/<article class="swim(?:\s[^"]*)?"/g) ?? [];
+    const stubs = r.html.match(/<button class="swim-stub(?:\s[^"]*)?"/g) ?? [];
+    expect(swims.length).toBe(3);
+    expect(stubs.length).toBe(3);
+    // With nothing in `?focus=`, all 3 swims show and all 3 stubs hide.
+    for (const id of ['default', 'mockups', 'qa']) {
+      // swim is NOT focus-hidden
+      const swimRe = new RegExp(
+        `<article class="swim swim--[a-z0-9-]+"[^>]*data-lane-id="${id}"`,
+      );
+      expect(r.html).toMatch(swimRe);
+      // stub IS focus-hidden
+      const stubRe = new RegExp(
+        `<button class="swim-stub is-focus-hidden"[^>]*data-swim-stub="${id}"`,
+      );
+      expect(r.html).toMatch(stubRe);
+    }
+  });
+
+  it('AUDIT-02: with ?focus= narrowing, exactly one of {swim, stub} per lane carries is-focus-hidden', async () => {
+    // Focus only default + mockups; qa is focus-off.
+    const r = await getHtml(app, '/dev/editorial-studio?focus=default,mockups');
+    expect(r.status).toBe(200);
+    // Focused lanes — swim visible, stub hidden.
+    for (const id of ['default', 'mockups']) {
+      const swimRe = new RegExp(
+        `<article class="swim swim--[a-z0-9-]+"[^>]*data-lane-id="${id}"`,
+      );
+      expect(r.html).toMatch(swimRe);
+      const stubRe = new RegExp(
+        `<button class="swim-stub is-focus-hidden"[^>]*data-swim-stub="${id}"`,
+      );
+      expect(r.html).toMatch(stubRe);
+    }
+    // Non-focused — swim hidden, stub visible.
+    expect(r.html).toMatch(
+      /<article class="swim swim--qa-plan is-focus-hidden"[^>]*data-lane-id="qa"/,
+    );
+    expect(r.html).toMatch(
+      /<button class="swim-stub"[^>]*data-swim-stub="qa"/,
+    );
+  });
+
+  // AUDIT-20260528-04 acceptance: rail eye renders BOTH glyphs as
+  // siblings; CSS picks one based on data-lane-visible. Focus-chip
+  // CSS class `.focus-chip.is-visibility-hidden` is the surface the
+  // client toggles on visibility-off lanes.
+  it('AUDIT-04: rail row emits both `.r-eye-visible` (●) and `.r-eye-hidden` (○) glyphs', async () => {
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    // Every rail row has both spans.
+    for (const id of ['default', 'mockups', 'qa']) {
+      const re = new RegExp(
+        `data-rail-lane="${id}"[\\s\\S]*?<span class="r-eye-visible">●</span>` +
+          `<span class="r-eye-hidden">○</span>`,
+      );
+      expect(r.html).toMatch(re);
+    }
+  });
+
+  it('AUDIT-04: dashboard-swimlane.css contains `.focus-chip.is-visibility-hidden` hide rule', async () => {
+    const cssRes = await app.fetch(
+      new Request('http://x/static/css/dashboard-swimlane.css'),
+    );
+    expect(cssRes.status).toBe(200);
+    const css = await cssRes.text();
+    // Rule body has display: none; matched via the selector list
+    // including .focus-chip.is-visibility-hidden.
+    expect(css).toMatch(
+      /\.focus-chip\.is-visibility-hidden[\s\S]*?display:\s*none/,
+    );
+    // Eye-glyph swap rules — selector + display:inline.
+    expect(css).toMatch(
+      /\.rail-lane\[data-lane-visible="true"\] \.r-eye \.r-eye-visible/,
+    );
+    expect(css).toMatch(
+      /\.rail-lane\[data-lane-visible="false"\] \.r-eye \.r-eye-hidden/,
+    );
+  });
+
+  // AUDIT-20260528-05 acceptance: stage IDs are lane-scoped + unique;
+  // legacy `id="stage-<slug>"` survives ONLY for the default lane.
+  it('AUDIT-05: multi-lane stage columns carry unique `id="lane-<laneId>-stage-<slug>"` IDs', async () => {
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    // Both visual and qa-plan templates contain an "Approved" stage.
+    // Each lane's Approved column must carry a unique lane-scoped ID.
+    expect(r.html).toContain('id="lane-mockups-stage-approved"');
+    expect(r.html).toContain('id="lane-qa-stage-approved"');
+    // Default lane's Drafting column carries the lane-scoped ID too.
+    expect(r.html).toContain('id="lane-default-stage-drafting"');
+    // No duplicate `id="..."` attributes anywhere in the rendered
+    // dashboard output — gather every id value and assert uniqueness.
+    const idMatches = r.html.match(/\bid="([^"]+)"/g) ?? [];
+    const idValues = idMatches.map((m) => m.slice(4, -1));
+    const dedup = new Set(idValues);
+    expect(dedup.size).toBe(idValues.length);
+  });
+
+  it('AUDIT-05: legacy `id="stage-<slug>"` anchor is preserved ONLY for the default editorial lane', async () => {
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    // Default lane Drafting column carries the back-compat anchor
+    // (used by `/dev/editorial-studio#stage-drafting` deep links).
+    expect(r.html).toContain('id="stage-drafting"');
+    expect(r.html).toContain('id="stage-ideas"');
+    // Non-default lanes do NOT emit the bare-anchor form for stages
+    // that exist only in their template. `Sketched` is unique to the
+    // visual template, so no `id="stage-sketched"` should appear.
+    expect(r.html).not.toContain('id="stage-sketched"');
+    expect(r.html).not.toContain('id="stage-drafted"');
+    expect(r.html).not.toContain('id="stage-tested"');
   });
 });
 
