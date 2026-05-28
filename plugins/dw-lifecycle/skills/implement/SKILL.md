@@ -43,7 +43,7 @@ Default = run scope-widen between tasks. Skipping is the exception, not the rule
 
 ## Dispatch-wrapper engagement
 
-Every sub-agent dispatch fired by this skill — implementer, reviewer, code-explorer, code-architect, parallel fan-out workers — MUST be routed through `wrap()` from `plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper.ts` (the Phase 5 library API). The wrapper enforces three contracts on the sub-agent's return:
+Every sub-agent dispatch fired by this skill — implementer, reviewer, code-explorer, code-architect, parallel fan-out workers — MUST be routed through the dispatch wrapper. The wrapper enforces three contracts on the sub-agent's return:
 
 - **Return grammar.** Every dispatched response MUST conclude with three labelled blocks:
 
@@ -53,17 +53,39 @@ Every sub-agent dispatch fired by this skill — implementer, reviewer, code-exp
   Excluded: <file:line> — <one-line non-deferral reason>
   ```
 
-  `parseReturn()` extracts the blocks; `validateParsed()` rejects on missing blocks AND on the "skipped same-class audit" shape (Searched count > 1, Included covers exactly 1 match, Excluded empty).
+  The parser extracts the blocks; the validator rejects on missing blocks AND on the "skipped same-class audit" shape (Searched count > 1, Included covers exactly 1 match, Excluded empty).
 
 - **Forbidden-deferral phrases.** Any `Excluded` reason containing a deferral substring or matching a deferral regex (per `FORBIDDEN_DEFERRAL_PHRASES` / `FORBIDDEN_DEFERRAL_REGEXES`) is rejected. Project overrides at `.dw-lifecycle/scope-discovery/forbidden-deferral-phrases.yaml` are honored.
 
-- **Refactor-marker auto-prelude.** When the task prompt contains a refactor marker (`refactor`, `extraction`, `clones.yaml`, `canonical_side`, `tests_proof`, or any project-supplied marker from `.dw-lifecycle/scope-discovery/refactor-markers.yaml`), `wrap()` automatically appends the REFACTOR-CONTEXT PRECONDITIONS prelude to the dispatched prompt. Refactor dispatches without the Step 0 obligation are the failure mode the prelude exists to prevent; the marker set is intentionally narrow so false positives stay cheap.
+- **Refactor-marker auto-prelude.** When the task prompt contains a refactor marker (`refactor`, `extraction`, `clones.yaml`, `canonical_side`, `tests_proof`, or any project-supplied marker from `.dw-lifecycle/scope-discovery/refactor-markers.yaml`), the wrapper automatically appends the REFACTOR-CONTEXT PRECONDITIONS prelude to the dispatched prompt. Refactor dispatches without the Step 0 obligation are the failure mode the prelude exists to prevent; the marker set is intentionally narrow so false positives stay cheap.
 
-The wrapper is library-only — `wrap(agentType, taskPrompt, { dispatchFn })`. The controller (this skill's orchestrating agent) supplies the `dispatchFn` callback that drives the Agent tool. On `DispatchRejected`, the controller re-prompts the sub-agent with the violation reason in the next iteration; persistent rejection escalates to the operator with the parsed-return excerpt.
+### How the orchestrator engages the wrapper
 
-Cross-reference: `plugins/dw-lifecycle/templates/scope-discovery/dispatch-wrapper-prelude.md` documents the convention and the override files in full.
+The wrapper is engaged via two Bash invocations bracketing every Agent-tool dispatch. The orchestrator (this skill's Claude session) cannot supply a TypeScript `dispatchFn` callback to the wrapper because the Agent tool is a runtime tool-use primitive, not a callable. The CLI verbs below factor the wrapper's prompt-augmentation half and response-validation half out into separate steps the orchestrator drives.
 
-If `.dw-lifecycle/scope-discovery/` is not present in the project, the dispatch-wrapper still runs — the wrapper itself is plugin code, not project config — but it falls back to the built-in `FORBIDDEN_DEFERRAL_PHRASES` / `REFACTOR_CONTEXT_MARKERS` defaults. Project overrides are the only thing the project-side install gates.
+1. **Before dispatch — augment the operator-authored prompt.** Write the prompt to a temp file via `mktemp`, then invoke:
+
+   ```bash
+   dw-lifecycle wrap-prompt --agent-type <type> --prompt-file <path>
+   ```
+
+   Stdout is the augmented prompt (original prompt + grammar instruction + optional refactor-context prelude). Stderr is a one-line summary (suppress with `--quiet`). Paste stdout into the Agent tool's `prompt` parameter. The verb resolves project overrides under `.dw-lifecycle/scope-discovery/*.yaml` against `--repo-root` (defaults to cwd).
+
+2. **After dispatch — validate the sub-agent's response.** Write the response to a temp file, then invoke:
+
+   ```bash
+   dw-lifecycle validate-return --agent-type <type> --response-file <path>
+   ```
+
+   Stdout is a structured `ValidationResult` JSON: `{ valid, foundBlocks: {searched, included, excluded}, missingBlocks, parseError, forbiddenPhrases: [{phrase, file, line, reason}], refactorPreconditionViolations, skippedAudit, summary }`. Exit code: 0 if valid; 1 on validation failure. Pass `--json` to suppress the stderr summary in pipelines.
+
+   On exit 1, the orchestrator rejects the response and re-dispatches with the same augmented prompt + a correction note quoting the violation surfaced in the JSON. After two consecutive rejections on the same dispatch, surface the parsed-return excerpt to the operator and pause the task.
+
+Agent types recognized by both verbs: `implementer`, `reviewer`, `code-explorer`, `code-architect`, `ui-engineer`, `typescript-pro`, `documentation-engineer`, `project-orchestrator`, `feature-orchestrator`, `codebase-auditor`, `architect-reviewer`, `code-reviewer`. The augmentation profile is currently uniform across types; the flag is required so future per-type profiles ship without a CLI breaking change. The refactor-precondition cue check in `validate-return` fires only when the response itself claims a refactor (mentions `refactor` / `extraction` / `clones.yaml` / `canonical_side`) AND the agent type is refactor-eligible (`implementer`, `code-architect`, `typescript-pro`).
+
+Cross-reference: `plugins/dw-lifecycle/templates/scope-discovery/dispatch-wrapper-prelude.md` documents the convention and the override files in full. In-band TypeScript callers (e.g. the orchestrator-turn's judge step) still engage the dispatch wrapper via `wrap()` from `plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper.ts`; the CLI verbs share the same library functions for marker detection, override loading, grammar instruction, and parser/validator.
+
+If `.dw-lifecycle/scope-discovery/` is not present in the project, the verbs still run — the dispatch grammar is plugin code, not project config — and fall back to the built-in `FORBIDDEN_DEFERRAL_PHRASES` / `REFACTOR_CONTEXT_MARKERS` defaults. Project overrides are the only thing the project-side install gates.
 
 ## Orchestrator loop (per-turn audit/judge stack)
 
@@ -123,6 +145,6 @@ Defaults at `DEFAULT_LOOP_CONFIG` in `orchestrator-loop/loop-config.ts`. Operato
 - **Test failures during TDD.** Per the TDD discipline: failing test is expected before implementation. Failing tests AFTER implementation means the impl is wrong; iterate, don't bypass the test.
 - **Auto-invocation behavior (scope-widen).** When `.dw-lifecycle/scope-discovery/` is absent, the Step 5 auto-invocation is silently skipped. When present, `scope-widen` runs with default flags (dry-run is its default; `--apply` is passed when this skill invokes it because the merged manifest must be readable by the next task's implementer brief). The widen run's resulting `scope-manifest.yaml` path AND the additive-delta summary are passed into the next task's dispatched-agent context so the implementer sees the augmented scope before starting.
 - **`scope-widen` fails.** Surface the error in the next task's brief; the task still proceeds. The operator can re-run scope-widen manually (`/dw-lifecycle:scope-widen <slug> "<complaint>"`) after addressing the cause.
-- **`DispatchRejected` from `wrap()`.** Re-prompt the sub-agent with the violation reason (missing block / forbidden phrase / skipped-audit signal). After two consecutive rejections on the same dispatch, surface the parsed-return excerpt to the operator and pause the task.
-- **Orchestrator loop — judge dispatch fails.** `dw-lifecycle orchestrator-turn` exits non-zero when the judge's `wrap()` call rejects. Surface the violation to the operator; the next turn re-runs the judge with the same input (recovery is operator-decided per the wrong-decision-recovery primitives at `recovery/`).
+- **`dw-lifecycle validate-return` exit 1.** The sub-agent's response was rejected by the dispatch grammar (missing block / forbidden phrase / skipped-audit signal / refactor-precondition violation). Re-dispatch with the same augmented prompt + a correction note that quotes the violation surfaced in the JSON. After two consecutive rejections on the same dispatch, surface the parsed-return excerpt to the operator and pause the task.
+- **Orchestrator loop — judge dispatch fails.** `dw-lifecycle orchestrator-turn` exits non-zero when the in-band judge's wrapper call rejects. Surface the violation to the operator; the next turn re-runs the judge with the same input (recovery is operator-decided per the wrong-decision-recovery primitives at `recovery/`).
 - **Orchestrator loop — wrong-decision detected but reversal proposal needs operator review.** The reversal proposal lands in `TurnReport.reversalProposals`. Auto-apply when `controllerDecision.intensity` AND the recovery library's trust-calibration both support it; otherwise enqueue an escalation via `escalation/escalation-queue.ts#enqueueEscalation`. Escalations surface in the next turn's `escalationVisibility`.

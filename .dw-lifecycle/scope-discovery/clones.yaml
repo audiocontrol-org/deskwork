@@ -1,4 +1,4 @@
-generated_at: 2026-05-27T04:21:30.812Z
+generated_at: 2026-05-28T06:35:47.333Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -639,35 +639,6 @@ clones:
       - plugins/dw-lifecycle/src/scope-discovery/controller/controller-policies.ts:213:228
     disposition: keep-with-reason
     reason: intentional shared scaffolding from Phase 11 Wave 6 (controller library + audit-log parser + cross-surface filter scaffolds share boilerplate). Extracting hurts more than the duplication costs.
-  - id: 5b458e4fbe70
-    lines: 9
-    members:
-      - plugins/dw-lifecycle/src/scope-discovery/controller/controller-state.ts:140:148
-      - plugins/dw-lifecycle/src/scope-discovery/orchestrator-loop/loop-config.ts:52:60
-      - plugins/dw-lifecycle/src/scope-discovery/orchestrator-loop/loop-state.ts:83:91
-    disposition: pending
-    reason: null
-  - id: 9a9bc23a9689
-    lines: 12
-    members:
-      - plugins/dw-lifecycle/src/scope-discovery/controller/controller-state.ts:151:162
-      - plugins/dw-lifecycle/src/scope-discovery/escalation/escalation-parse.ts:63:74
-    disposition: pending
-    reason: null
-  - id: 3adf9dc3205a
-    lines: 10
-    members:
-      - plugins/dw-lifecycle/src/scope-discovery/controller/controller-state.ts:321:330
-      - plugins/dw-lifecycle/src/scope-discovery/recovery/trust-calibration.ts:337:346
-    disposition: pending
-    reason: null
-  - id: 901289cce185
-    lines: 11
-    members:
-      - plugins/dw-lifecycle/src/scope-discovery/controller/controller-state.ts:346:356
-      - plugins/dw-lifecycle/src/scope-discovery/recovery/trust-calibration.ts:359:369
-    disposition: pending
-    reason: null
   - id: afeee722255a
     lines: 16
     members:
@@ -717,6 +688,48 @@ clones:
       - plugins/dw-lifecycle/src/scope-discovery/discovery-agents/prd-themed-pattern-hunter.ts:181:189
     disposition: pending
     reason: null
+  - id: 9ff84b42341b
+    lines: 18
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper-overrides.ts:104:121
+      - plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper.ts:196:213
+    disposition: pending
+    reason: null
+  - id: 329cba21b4ca
+    lines: 24
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper-overrides.ts:114:137
+      - plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper-overrides.ts:39:62
+    disposition: keep-with-reason
+    reason: "TF-005 fix: wrap-prompt + validate-return CLI verbs share parsing + override-resolution boilerplate with dispatch-wrapper.ts by design"
+  - id: 48215ae524d5
+    lines: 8
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper-overrides.ts:140:147
+      - plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper.ts:232:239
+    disposition: keep-with-reason
+    reason: "TF-005 fix: wrap-prompt + validate-return CLI verbs share parsing + override-resolution boilerplate with dispatch-wrapper.ts by design"
+  - id: a5ba00eab10c
+    lines: 21
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper-overrides.ts:26:46
+      - plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper.ts:118:138
+    disposition: pending
+    reason: null
+  - id: 641aa1adda0d
+    lines: 10
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper-overrides.ts:59:68
+      - plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper.ts:151:160
+    disposition: pending
+    reason: null
+  - id: 08acb5a7f406
+    lines: 11
+    members:
+      - plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper-overrides.ts:74:84
+      - plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper.ts:166:176
+    disposition: pending
+    reason: null
   - id: 7a91b6f37fe8
     lines: 24
     members:
@@ -750,55 +763,55 @@ clones:
     lines: 17
     members:
       - plugins/dw-lifecycle/src/scope-discovery/escalation/escalation-queue.ts:134:150
-      - plugins/dw-lifecycle/src/scope-discovery/llm/auditor.ts:109:263
+      - plugins/dw-lifecycle/src/scope-discovery/llm/auditor.ts:109:213
     disposition: pending
     reason: null
   - id: b55096bc507f
     lines: 17
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/install-agent-prompts.ts:118:134
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:154:170
+      - plugins/dw-lifecycle/src/scope-discovery/install-agent-prompts.ts:119:135
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:168:184
     disposition: pending
     reason: null
   - id: ced608f5be46
     lines: 18
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/install-agent-prompts.ts:132:149
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:171:188
+      - plugins/dw-lifecycle/src/scope-discovery/install-agent-prompts.ts:133:150
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:185:202
     disposition: pending
     reason: null
   - id: bc97e6ec2135
     lines: 7
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/install-agent-prompts.ts:304:310
+      - plugins/dw-lifecycle/src/scope-discovery/install-agent-prompts.ts:311:317
       - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:245:251
     disposition: pending
     reason: null
   - id: 3c6b6627d081
     lines: 14
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:154:167
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:168:181
       - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:157:112
     disposition: pending
     reason: null
   - id: 92d75db1cad2
     lines: 16
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:173:188
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:187:202
       - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:170:127
     disposition: pending
     reason: null
   - id: 7698568d0d6c
     lines: 9
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:327:335
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:347:355
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:341:349
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:361:369
     disposition: pending
     reason: null
   - id: cd6cea43f755
     lines: 9
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:465:473
+      - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery-hooks.ts:562:570
       - plugins/dw-lifecycle/src/scope-discovery/install-scope-discovery.ts:267:275
     disposition: pending
     reason: null
@@ -827,7 +840,7 @@ clones:
     lines: 10
     members:
       - plugins/dw-lifecycle/src/scope-discovery/llm/auditor.ts:111:120
-      - plugins/dw-lifecycle/src/scope-discovery/orchestrator-loop/loop-state.ts:244:253
+      - plugins/dw-lifecycle/src/scope-discovery/orchestrator-loop/loop-state.ts:202:211
     disposition: pending
     reason: null
   - id: 8f81364fec2d
@@ -868,28 +881,28 @@ clones:
   - id: 3696fa4e795e
     lines: 13
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/scope-inventory-cli.ts:84:96
+      - plugins/dw-lifecycle/src/scope-discovery/scope-inventory-cli.ts:99:111
       - plugins/dw-lifecycle/src/scope-discovery/scope-widen-cli.ts:104:116
     disposition: keep-with-reason
     reason: intentional shared scaffolding across Phase 11 Wave 5 surfaces (codebase-state metrics computation + gather pattern, LLM judge/auditor library boilerplate, tooling-feedback import + doctor rule scaffolding). Extracting would create cross-surface coupling that hurts more than the duplication costs.
   - id: babc9b39137a
     lines: 10
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/scope-inventory.ts:269:278
+      - plugins/dw-lifecycle/src/scope-discovery/scope-inventory.ts:285:294
       - plugins/dw-lifecycle/src/scope-discovery/scope-widen.ts:246:255
     disposition: keep-with-reason
     reason: scope-widen mirrors scope-inventory's CLI-shell boilerplate (slug-regex validation, makeRunDir, scopeWidenMain's parseCli try/catch). Extracting shared helpers would tangle two subcommands' control flow for marginal de-duplication benefit; the symmetry is desirable for operator UX consistency.
   - id: 653e6225d350
     lines: 11
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/scope-inventory.ts:271:281
+      - plugins/dw-lifecycle/src/scope-discovery/scope-inventory.ts:287:297
       - plugins/dw-lifecycle/src/scope-discovery/synthesis-cli.ts:150:160
     disposition: pending
     reason: null
   - id: c86cf0b21100
     lines: 11
     members:
-      - plugins/dw-lifecycle/src/scope-discovery/scope-inventory.ts:75:85
+      - plugins/dw-lifecycle/src/scope-discovery/scope-inventory.ts:80:90
       - plugins/dw-lifecycle/src/scope-discovery/scope-widen.ts:78:88
     disposition: keep-with-reason
     reason: scope-widen mirrors scope-inventory's CLI-shell boilerplate (slug-regex validation, makeRunDir, scopeWidenMain's parseCli try/catch). Extracting shared helpers would tangle two subcommands' control flow for marginal de-duplication benefit; the symmetry is desirable for operator UX consistency.
