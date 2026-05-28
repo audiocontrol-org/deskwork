@@ -12,15 +12,23 @@
  * relevant and has no historical entries. The preferred disposition
  * for a lane with history is `lane archive`.
  *
- * The refusal lists the first five dependent entry slugs (with a
- * `+N more` suffix when there are additional dependents) so the
- * operator can find them quickly.
+ * The refusal lists the first `PURGE_DEPENDENTS_SAMPLE_LIMIT`
+ * dependent entry slugs (with a `+N more` suffix when there are
+ * additional dependents) so the operator can find them quickly.
  */
 
 import { unlinkSync } from 'node:fs';
 import { appendJournalEvent } from '../../journal/append.ts';
 import { readAllSidecars } from '../../sidecar/read-all.ts';
 import { laneConfigPath, loadLaneConfig } from '../loader.ts';
+
+/**
+ * Cap on the number of dependent slugs included verbatim in the
+ * refusal error before falling back to `+N more`. Five keeps the
+ * error message scannable while still giving the operator concrete
+ * names to grep for.
+ */
+const PURGE_DEPENDENTS_SAMPLE_LIMIT = 5;
 
 export interface PurgeLaneResult {
   readonly purgedPath: string;
@@ -40,7 +48,7 @@ export async function purgeLane(
     .map((entry) => entry.slug);
 
   if (dependents.length > 0) {
-    const sample = dependents.slice(0, 5);
+    const sample = dependents.slice(0, PURGE_DEPENDENTS_SAMPLE_LIMIT);
     const remainder = dependents.length - sample.length;
     const suffix = remainder > 0 ? `, +${remainder} more` : '';
     throw new Error(

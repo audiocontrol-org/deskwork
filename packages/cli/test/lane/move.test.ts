@@ -8,10 +8,11 @@
  * rule, and the refusal shapes.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import {
+  assertDeskworkBinPresent,
   destroyProject,
   lane,
   makeProject,
@@ -20,6 +21,8 @@ import {
   writeSidecar,
   writeVisualPipeline,
 } from './helpers.ts';
+
+beforeAll(() => { assertDeskworkBinPresent(); });
 
 let project: string;
 beforeEach(() => {
@@ -237,5 +240,57 @@ describe('deskwork lane move', () => {
     const res = lane(project, 'move', 'to-archived', '--to', 'mockups');
     expect(res.code).not.toBe(0);
     expect(res.stderr).toMatch(/archived lane "mockups"/);
+  });
+});
+
+describe('deskwork lane move — sidecar-write failure rollback', () => {
+  it('rolls back artifact + scrapbook when writeSidecar fails', async () => {
+    // Skip on platforms / users where chmod 0o555 doesn't prevent
+    // writes (e.g. running as root — happens in some CI sandboxes).
+    // The test pre-flights a write into the read-only dir before
+    // asserting; if the pre-flight succeeds, the test framework
+    // can't simulate the failure mode and skips.
+    const { chmodSync } = await import('node:fs');
+
+    const uuid = '550e8400-e29b-41d4-a716-446655440100';
+    seedEntryWithArtifact({
+      uuid,
+      slug: 'rollback-me',
+      artifactPath: 'rollback-me.md',
+      artifactBody: '# pre-move\n',
+      scrapbookContents: { 'note.md': 'pre-move scrapbook\n' },
+    });
+
+    const entriesDir = join(project, '.deskwork', 'entries');
+    chmodSync(entriesDir, 0o555);
+    try {
+      // Pre-flight: try writing into the locked dir. If it succeeds,
+      // we can't simulate the failure (running as root); bail.
+      try {
+        writeFileSync(join(entriesDir, '.preflight'), 'x', 'utf-8');
+        chmodSync(entriesDir, 0o755);
+        return; // skip
+      } catch { /* good — writes are blocked */ }
+
+      const res = lane(project, 'move', 'rollback-me', '--to', 'mockups');
+      expect(res.code).not.toBe(0);
+      expect(res.stderr).toMatch(/sidecar write failed/);
+
+      // Artifact restored at source path; target empty.
+      expect(existsSync(join(project, 'docs', 'rollback-me.md'))).toBe(true);
+      expect(existsSync(join(project, 'src', 'mockups', 'rollback-me.md'))).toBe(false);
+
+      // Scrapbook restored at source path; target empty.
+      expect(
+        existsSync(join(project, 'docs', 'rollback-me', 'scrapbook', 'note.md')),
+      ).toBe(true);
+      expect(
+        existsSync(
+          join(project, 'src', 'mockups', 'rollback-me', 'scrapbook', 'note.md'),
+        ),
+      ).toBe(false);
+    } finally {
+      chmodSync(entriesDir, 0o755);
+    }
   });
 });

@@ -22,7 +22,7 @@
 
 import { appendJournalEvent } from '../../journal/append.ts';
 import { loadPipelineTemplate } from '../../pipelines/loader.ts';
-import { loadLaneConfig } from '../loader.ts';
+import { assertSafeContentDir, loadLaneConfig } from '../loader.ts';
 import { type LaneConfig } from '../types.ts';
 import { commitLaneConfig } from './commit.ts';
 
@@ -50,7 +50,10 @@ export async function updateLane(
   if (opts.pipelineTemplate !== undefined) {
     patches['pipelineTemplate'] = opts.pipelineTemplate;
   }
-  if (opts.contentDir !== undefined) patches['contentDir'] = opts.contentDir;
+  if (opts.contentDir !== undefined) {
+    assertSafeContentDir(projectRoot, opts.contentDir);
+    patches['contentDir'] = opts.contentDir;
+  }
 
   const changedFields = Object.keys(patches);
   if (changedFields.length === 0) {

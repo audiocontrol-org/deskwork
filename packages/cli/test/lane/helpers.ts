@@ -10,6 +10,7 @@
 
 import { spawnSync } from 'node:child_process';
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -23,6 +24,27 @@ import { fileURLToPath } from 'node:url';
 const testDir = dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = resolve(testDir, '../../../..');
 export const deskworkBin = join(workspaceRoot, 'node_modules/.bin/deskwork');
+
+/**
+ * Defensive precondition for the lane test suite: if the workspace
+ * has never been `npm install`-ed (or `node_modules/.bin/deskwork`
+ * was wiped), `spawnSync` invokes a non-existent binary and the test
+ * reports `code: -1` with empty stdout/stderr — a deeply confusing
+ * failure mode. Surfacing the missing binary up front gives the
+ * operator the actionable error directly.
+ *
+ * Call once per test file (the import barrel re-evaluates per file
+ * because vitest isolates module graphs); the check is a single
+ * `existsSync` and is effectively free.
+ */
+export function assertDeskworkBinPresent(): void {
+  if (!existsSync(deskworkBin)) {
+    throw new Error(
+      `deskwork binary not found at ${deskworkBin} — run npm install at the `
+      + `workspace root before running lane tests.`,
+    );
+  }
+}
 
 export interface RunResult {
   readonly code: number;

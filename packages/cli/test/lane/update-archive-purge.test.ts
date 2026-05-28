@@ -6,10 +6,11 @@
  * in `move.test.ts`.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  assertDeskworkBinPresent,
   destroyProject,
   lane,
   makeProject,
@@ -17,6 +18,8 @@ import {
   writeLaneJson,
   writeSidecar,
 } from './helpers.ts';
+
+beforeAll(() => { assertDeskworkBinPresent(); });
 
 let project: string;
 beforeEach(() => { project = makeProject(); });
@@ -67,6 +70,18 @@ describe('deskwork lane update', () => {
     expect(res.code).toBe(0);
     const parsed = JSON.parse(res.stdout) as { changedFields: string[] };
     expect(parsed.changedFields.sort()).toEqual(['contentDir', 'name']);
+  });
+
+  it('refuses --content-dir that resolves outside the project root', () => {
+    const res = lane(
+      project,
+      'update', 'default',
+      '--content-dir', '../../tmp/foo',
+    );
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toMatch(/Invalid contentDir/);
+    // Lane config unchanged
+    expect(readLaneJson(project, 'default')['contentDir']).toBe('docs');
   });
 });
 

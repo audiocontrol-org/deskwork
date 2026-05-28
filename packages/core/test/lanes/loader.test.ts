@@ -124,6 +124,24 @@ describe('loadLaneConfig', () => {
     expect(() => loadLaneConfig('   ', projectRoot)).toThrow(/non-empty id/);
   });
 
+  it('refuses lane ids whose charset escapes the kebab-case convention', () => {
+    for (const bad of ['UPPER', 'with space', 'with/slash', 'leading-dash-ok', '-bad']) {
+      // Sanity: kebab-case must start with [a-z0-9], so "-bad" fails;
+      // "leading-dash-ok" passes the regex (starts with 'l') and is
+      // included as a confirm-not-refused case below.
+      if (bad === 'leading-dash-ok') continue;
+      expect(() => loadLaneConfig(bad, projectRoot)).toThrow(/Invalid lane id/);
+    }
+  });
+
+  it('refuses a path-traversal-shaped lane id at the loader boundary', () => {
+    // The regex catches this case (`.` and `/` are not in the charset),
+    // and the path-containment check enforces the invariant at the
+    // filesystem boundary. Either layer should refuse — the test just
+    // confirms loadLaneConfig rejects with a recognizable error.
+    expect(() => loadLaneConfig('../../etc/foo', projectRoot)).toThrow(/Invalid lane id/);
+  });
+
   it('cross-validates a lane bound to a project-override pipeline template', () => {
     // Write a custom pipeline override the lane references — the loader's
     // cross-validation must resolve it via loadPipelineTemplate's

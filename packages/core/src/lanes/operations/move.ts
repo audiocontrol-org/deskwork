@@ -225,19 +225,30 @@ export async function moveEntryToLane(
         + `running lane move.`,
       );
     }
+  }
+
+  const sourceScrapbookDir = join(sourceContentDir, sidecar.slug, 'scrapbook');
+  const targetScrapbookDir = join(targetContentDir, sidecar.slug, 'scrapbook');
+
+  // Track which filesystem operations succeeded so the catch below
+  // can reverse them on a later failure (e.g. writeSidecar throwing
+  // after the artifact + scrapbook are already in the target lane).
+  let artifactMoved = false;
+  let scrapbookMoved = false;
+
+  if (fromArtifactAbs !== undefined && toArtifactAbs !== undefined) {
     moveFile(fromArtifactAbs, toArtifactAbs);
+    artifactMoved = true;
   }
 
   // Relocate the per-entry scrapbook directory when present. Lives at
   // `<contentDir>/<slug>/scrapbook/` per the slug-template convention
   // — see packages/core/src/scrapbook/paths.ts (_scrapbookDirSlug).
-  const sourceScrapbookDir = join(sourceContentDir, sidecar.slug, 'scrapbook');
-  const targetScrapbookDir = join(targetContentDir, sidecar.slug, 'scrapbook');
   if (existsSync(sourceScrapbookDir)) {
     if (existsSync(targetScrapbookDir)) {
       // Rollback the artifact relocation so the operator's state is
       // consistent before re-running.
-      if (fromArtifactAbs !== undefined && toArtifactAbs !== undefined) {
+      if (artifactMoved && fromArtifactAbs !== undefined && toArtifactAbs !== undefined) {
         moveFile(toArtifactAbs, fromArtifactAbs);
       }
       throw new Error(
@@ -246,6 +257,7 @@ export async function moveEntryToLane(
       );
     }
     moveDir(sourceScrapbookDir, targetScrapbookDir);
+    scrapbookMoved = true;
   }
 
   const at = new Date().toISOString();
@@ -257,7 +269,42 @@ export async function moveEntryToLane(
     updatedAt: at,
   };
 
-  await writeSidecar(projectRoot, updated);
+  // Wrap the sidecar write in a rollback. If the sidecar write throws
+  // AFTER the artifact + scrapbook have been moved, the entry is
+  // half-moved: filesystem says "target lane" but sidecar still says
+  // "source lane". Reverse the successful filesystem moves before
+  // re-throwing so the operator's state is consistent.
+  try {
+    await writeSidecar(projectRoot, updated);
+  } catch (err) {
+    try {
+      if (scrapbookMoved) {
+        moveDir(targetScrapbookDir, sourceScrapbookDir);
+      }
+      if (
+        artifactMoved
+        && fromArtifactAbs !== undefined
+        && toArtifactAbs !== undefined
+      ) {
+        moveFile(toArtifactAbs, fromArtifactAbs);
+      }
+    } catch (rollbackErr) {
+      const rollbackDetail = rollbackErr instanceof Error
+        ? rollbackErr.message
+        : String(rollbackErr);
+      const writeDetail = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        `Failed to move entry ${sidecar.slug}: sidecar write failed `
+        + `(${writeDetail}) AND rollback of filesystem moves failed `
+        + `(${rollbackDetail}). Operator intervention required.`,
+      );
+    }
+    const detail = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `Failed to move entry ${sidecar.slug}: sidecar write failed `
+      + `(${detail}); filesystem moves rolled back.`,
+    );
+  }
 
   const moveDetails: {
     fromLane: string;

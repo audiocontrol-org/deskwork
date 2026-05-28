@@ -7,14 +7,17 @@
  * `move.test.ts`.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import {
+  assertDeskworkBinPresent,
   destroyProject,
   lane,
   makeProject,
   readLaneJson,
   writeLaneJson,
 } from './helpers.ts';
+
+beforeAll(() => { assertDeskworkBinPresent(); });
 
 let project: string;
 beforeEach(() => { project = makeProject(); });
@@ -215,6 +218,50 @@ describe('deskwork lane create', () => {
     const res = lane(project, 'create', 'mockups', '--template', 'editorial');
     expect(res.code).toBe(2);
     expect(res.stderr).toMatch(/Missing required flag --content-dir/);
+  });
+
+  it('refuses lane ids that fail the kebab-case charset', () => {
+    const res = lane(
+      project,
+      'create', 'UPPER',
+      '--template', 'editorial',
+      '--content-dir', 'docs',
+    );
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toMatch(/Invalid lane id/);
+  });
+
+  it('refuses lane ids with whitespace', () => {
+    const res = lane(
+      project,
+      'create', 'with space',
+      '--template', 'editorial',
+      '--content-dir', 'docs',
+    );
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toMatch(/Invalid lane id/);
+  });
+
+  it('refuses lane ids that look like path-traversal', () => {
+    const res = lane(
+      project,
+      'create', '../../etc/foo',
+      '--template', 'editorial',
+      '--content-dir', 'docs',
+    );
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toMatch(/Invalid lane id/);
+  });
+
+  it('refuses --content-dir that resolves outside the project root', () => {
+    const res = lane(
+      project,
+      'create', 'mockups',
+      '--template', 'editorial',
+      '--content-dir', '../../tmp/foo',
+    );
+    expect(res.code).not.toBe(0);
+    expect(res.stderr).toMatch(/Invalid contentDir/);
   });
 });
 

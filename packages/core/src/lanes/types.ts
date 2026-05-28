@@ -53,8 +53,27 @@ import { z } from 'zod';
  * preferred disposition over destructive deletion — `purge` is gated
  * and refuses when any entry still references the lane.
  */
+/**
+ * Canonical lane id charset: kebab-case starting with [a-z0-9], allowing
+ * `[a-z0-9-]` thereafter. The convention was documented above in the
+ * docblock; encoding it in the schema makes invalid ids fail at parse
+ * time AND closes the path-traversal exposure (an id like `../../etc/foo`
+ * resolves outside `.deskwork/lanes/` if the schema only enforces
+ * non-empty).
+ *
+ * Operations that resolve `<id>` to a filesystem path (loader, create)
+ * additionally enforce the lanes-dir containment invariant via a
+ * defensive path check — belt-and-suspenders; the regex prevents the
+ * case and the path check enforces the invariant at the filesystem
+ * boundary.
+ */
+export const LANE_ID_REGEX = /^[a-z0-9][a-z0-9-]*$/;
+
 export const LaneConfigSchema = z.object({
-  id: z.string().min(1, 'id must be a non-empty string'),
+  id: z.string().regex(
+    LANE_ID_REGEX,
+    'lane id must be kebab-case [a-z0-9-], starting with [a-z0-9]',
+  ),
   name: z.string().min(1, 'name must be a non-empty string'),
   pipelineTemplate: z.string().min(1, 'pipelineTemplate must be a non-empty string'),
   contentDir: z.string().min(1, 'contentDir must be a non-empty string'),

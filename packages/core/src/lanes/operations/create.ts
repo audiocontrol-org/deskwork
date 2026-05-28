@@ -16,7 +16,11 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { appendJournalEvent } from '../../journal/append.ts';
 import { loadPipelineTemplate } from '../../pipelines/loader.ts';
-import { laneConfigPath } from '../loader.ts';
+import {
+  assertSafeContentDir,
+  assertSafeLaneId,
+  laneConfigPath,
+} from '../loader.ts';
 import { type LaneConfig } from '../types.ts';
 import { commitLaneConfig } from './commit.ts';
 
@@ -46,6 +50,8 @@ export async function createLane(
   projectRoot: string,
   opts: CreateLaneOptions,
 ): Promise<CreateLaneResult> {
+  assertSafeLaneId(projectRoot, opts.id);
+  assertSafeContentDir(projectRoot, opts.contentDir);
   const target = laneConfigPath(projectRoot, opts.id);
   if (existsSync(target)) {
     throw new Error(

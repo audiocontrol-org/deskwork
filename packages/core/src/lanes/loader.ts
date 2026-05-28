@@ -30,8 +30,8 @@
  */
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join, basename } from 'node:path';
-import { LaneConfigSchema, type LaneConfig } from './types.ts';
+import { join, basename, relative, resolve, isAbsolute } from 'node:path';
+import { LANE_ID_REGEX, LaneConfigSchema, type LaneConfig } from './types.ts';
 import { loadPipelineTemplate } from '../pipelines/loader.ts';
 
 /**
@@ -46,6 +46,67 @@ export function lanesDir(projectRoot: string): string {
  */
 export function laneConfigPath(projectRoot: string, id: string): string {
   return join(lanesDir(projectRoot), `${id}.json`);
+}
+
+/**
+ * Defensive containment check: refuse any operator-supplied lane id
+ * whose resolved JSON path is not under `<projectRoot>/.deskwork/lanes/`.
+ *
+ * The Zod schema's `LANE_ID_REGEX` already prevents the path-traversal
+ * shape from passing validation in practice, but this check enforces
+ * the invariant at the filesystem boundary so the same exposure can't
+ * sneak in via a future code path that constructs a `LaneConfig`
+ * without going through the schema. Belt-and-suspenders by design.
+ *
+ * Refuses on:
+ *   - id whose resolved path escapes the lanes directory (e.g.
+ *     `../../etc/foo` or any string the regex would also reject).
+ *   - id that fails the `LANE_ID_REGEX` charset check.
+ */
+export function assertSafeLaneId(projectRoot: string, id: string): void {
+  if (!LANE_ID_REGEX.test(id)) {
+    throw new Error(
+      `Invalid lane id ${JSON.stringify(id)}: must be kebab-case [a-z0-9-], `
+      + `starting with [a-z0-9]. Lane ids are filenames under .deskwork/lanes/.`,
+    );
+  }
+  const lanesDirAbs = resolve(lanesDir(projectRoot));
+  const configAbs = resolve(laneConfigPath(projectRoot, id));
+  const rel = relative(lanesDirAbs, configAbs);
+  if (rel.startsWith('..') || isAbsolute(rel)) {
+    throw new Error(
+      `Invalid lane id ${JSON.stringify(id)}: resolved path ${configAbs} `
+      + `escapes the lanes directory ${lanesDirAbs}.`,
+    );
+  }
+}
+
+/**
+ * Refuse a `contentDir` whose resolved path escapes the project root.
+ * Lane configs constrain `contentDir` to the project tree; an
+ * operator passing `--content-dir ../../tmp/foo` (or any other shape
+ * that resolves higher in the filesystem) is a path-traversal
+ * exposure and is refused at the create / update boundaries. Mirrors
+ * `assertSafeLaneId` — same belt-and-suspenders shape.
+ *
+ * Absolute paths equal to or inside the project root are accepted
+ * verbatim; relative paths resolve against the project root.
+ */
+export function assertSafeContentDir(
+  projectRoot: string,
+  contentDir: string,
+): void {
+  const projectAbs = resolve(projectRoot);
+  const targetAbs = isAbsolute(contentDir)
+    ? resolve(contentDir)
+    : resolve(projectAbs, contentDir);
+  const rel = relative(projectAbs, targetAbs);
+  if (rel.startsWith('..') || isAbsolute(rel)) {
+    throw new Error(
+      `Invalid contentDir ${JSON.stringify(contentDir)}: resolved path `
+      + `${targetAbs} must resolve inside the project root ${projectAbs}.`,
+    );
+  }
 }
 
 /**
@@ -104,6 +165,7 @@ export function loadLaneConfig(id: string, projectRoot: string): LaneConfig {
       `loadLaneConfig requires a non-empty id; received ${JSON.stringify(id)}`,
     );
   }
+  assertSafeLaneId(projectRoot, id);
   const path = laneConfigPath(projectRoot, id);
   if (!existsSync(path)) {
     throw new Error(

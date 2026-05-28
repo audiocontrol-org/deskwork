@@ -307,14 +307,8 @@ async function handleMove(
   }
   const toLane = flags['to'];
 
-  let uuid: string;
   try {
-    uuid = await resolveEntryUuid(projectRoot, slug);
-  } catch (err) {
-    fail(err instanceof Error ? err.message : String(err));
-  }
-
-  try {
+    const uuid = await resolveEntryUuid(projectRoot, slug);
     const result = await moveEntryToLane(projectRoot, {
       uuid,
       toLane,
