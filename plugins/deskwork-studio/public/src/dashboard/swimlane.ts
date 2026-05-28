@@ -375,22 +375,22 @@ function bindSwimStubs(state: SwimlaneState, projectKey: string): void {
 }
 
 /**
- * Entry point — wire the swimlane shell to localStorage + click
- * handlers. No-op when the bay shell is absent (e.g. on a project
- * without lanes, or a page that doesn't render the dashboard).
+ * Build a fresh `SwimlaneState` from current localStorage + URL +
+ * live lane set. Factored out of `initSwimlane` so the preset
+ * controller (Task 5.5) can rebuild state from storage without
+ * re-binding click handlers — the preset apply pipeline writes
+ * through the constituent storage keys and then calls
+ * `reapplyFromStorage` to push DOM into the new state. The bound
+ * handlers' closure-captured state object is mutated in-place so
+ * subsequent click/keyboard gestures see the same focused + hidden
+ * sets the DOM reflects.
  */
-export function initSwimlane(): void {
-  const shell = document.querySelector<HTMLElement>('[data-bay-shell]');
-  if (shell === null) return;
-
-  const allLanes = collectAllLanes();
-  if (allLanes.length === 0) return;
-
-  const projectKey = resolveProjectKey(shell);
-
-  // Establish the initial focus set. URL takes precedence; it also
-  // writes through to localStorage so subsequent loads pick it up.
-  const urlFocus = parseFocusFromUrl();
+function buildStateFromStorage(
+  allLanes: readonly string[],
+  projectKey: string,
+  honorUrlFocus: boolean,
+): SwimlaneState {
+  const urlFocus = honorUrlFocus ? parseFocusFromUrl() : null;
   const storedFocus = readStoredSet(focusKey(projectKey));
   const storedHidden = readStoredSet(visibilityKey(projectKey)) ?? new Set<string>();
 
@@ -409,11 +409,65 @@ export function initSwimlane(): void {
     focused = new Set<string>(allLanes.filter((id) => !storedHidden.has(id)));
   }
 
-  const state: SwimlaneState = {
+  return {
     focused,
     hidden: storedHidden,
     allLanes,
   };
+}
+
+/**
+ * Module-level singleton state — written by `initSwimlane` and
+ * mutated by `reapplyFromStorage` so all bound handlers operate on
+ * the same object. Without the singleton, calling `reapplyFromStorage`
+ * would create a fresh state object that the already-bound click
+ * handlers wouldn't see — they'd keep mutating the original closure-
+ * captured object. The shared object pattern is the legitimate
+ * generalization the dispatch contract authorizes for Task 5.5's
+ * preset-application sequencing.
+ */
+let activeState: SwimlaneState | null = null;
+
+/**
+ * Re-read storage and re-apply the resulting state to the DOM. Used
+ * by the Task 5.5 preset controller after writing through the
+ * visibility + focus storage keys. URL `?focus=` is NOT honored on
+ * re-apply — preset application is the authoritative source on this
+ * call (the URL was honored once at initial paint).
+ */
+export function reapplyFromStorage(): void {
+  if (activeState === null) return;
+  const shell = document.querySelector<HTMLElement>('[data-bay-shell]');
+  if (shell === null) return;
+  const projectKey = resolveProjectKey(shell);
+  const next = buildStateFromStorage(activeState.allLanes, projectKey, false);
+  // Mutate the singleton in-place so already-bound click handlers
+  // observe the new sets through their closure-captured reference.
+  activeState.focused.clear();
+  for (const id of next.focused) activeState.focused.add(id);
+  activeState.hidden.clear();
+  for (const id of next.hidden) activeState.hidden.add(id);
+  applyState(activeState);
+}
+
+/**
+ * Entry point — wire the swimlane shell to localStorage + click
+ * handlers. No-op when the bay shell is absent (e.g. on a project
+ * without lanes, or a page that doesn't render the dashboard).
+ */
+export function initSwimlane(): void {
+  const shell = document.querySelector<HTMLElement>('[data-bay-shell]');
+  if (shell === null) return;
+
+  const allLanes = collectAllLanes();
+  if (allLanes.length === 0) return;
+
+  const projectKey = resolveProjectKey(shell);
+
+  // Establish the initial focus set. URL takes precedence; it also
+  // writes through to localStorage so subsequent loads pick it up.
+  const state = buildStateFromStorage(allLanes, projectKey, true);
+  activeState = state;
 
   applyState(state);
   // Persist after applyState so URL-driven values land in storage

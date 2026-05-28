@@ -266,9 +266,9 @@ The picked design **pivots away from the PRD's original "per-lane tab strip" fra
 
 ### Task 5.5: Saveable focus presets + deep-link URL pattern
 
-- [ ] Step 5.5.1: The dashboard's base view is already multi-lane (D3 Press Bay) — every focused lane renders simultaneously. The "composed view" concept becomes a **saved focus preset**: a named subset of `{ visible-lanes, focused-lanes, per-lane-view-mode, per-lane-collapse-state }` that the operator can re-open later.
-- [ ] Step 5.5.2: Saved presets stored at `.deskwork/personal/<operator-id>/focus-presets.json` (per-operator) or `.deskwork/focus-presets/<preset-id>.json` (project-wide).
-- [ ] Step 5.5.3: Deep-link URL pattern: `/dev/editorial-studio?preset=<preset-id>` opens the saved preset. The lane-visibility rail surfaces "Save current as preset…" and "Load preset…" affordances.
+- [x] Step 5.5.1: The dashboard's base view is already multi-lane (D3 Press Bay) — every focused lane renders simultaneously. The "composed view" concept becomes a **saved focus preset**: a named subset of `{ visible-lanes, focused-lanes, per-lane-view-mode, per-lane-collapse-state }` that the operator can re-open later.
+- [x] Step 5.5.2: Saved presets stored at `${STORAGE_KEY_PREFIX}${projectKey}:focus-presets` localStorage (per-operator). `.deskwork/personal/<operator-id>/focus-presets.json` server-side path deferred to Phase 6 enhancements per dispatch scope.
+- [x] Step 5.5.3: Deep-link URL pattern: `/dev/editorial-studio?preset=<preset-id>` opens the saved preset. The rail head surfaces "Save current as preset…" + a per-row "Load <name>" affordance + "Delete" sibling. Per `.claude/rules/affordance-placement.md`, affordances live on the rail head (component-attached), not in a separate page-level toolbar.
 
 ### Task 5.6: Integration test against multi-lane fixture
 

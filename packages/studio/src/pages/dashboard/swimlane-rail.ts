@@ -73,16 +73,47 @@ function renderRailRow(row: LaneRailRow): RawHtml {
     </div>`);
 }
 
+/**
+ * Render the rail head's preset-save / preset-list surface (Phase 5
+ * Task 5.5). Per `.claude/rules/affordance-placement.md`, the Save +
+ * Load affordances live on the component they control — the rail —
+ * not in the page-level masthead. The Save button captures the
+ * current four-axis state (visible / focused / view-mode / collapse)
+ * as a named preset; the per-row Load buttons re-apply a saved
+ * preset; the per-row Delete buttons remove a preset.
+ *
+ * The list container is server-rendered empty + populated by the
+ * client controller (`swimlane-presets.ts`) on init. The empty
+ * state is `<span class="preset-empty">No saved presets</span>`,
+ * matching what the client renders before any preset exists. This
+ * means the SSR output is operator-perceivable on first paint
+ * (before client JS runs) and re-rendered identically by the client
+ * once it boots — no flash-of-empty-content.
+ */
+function renderPresetSurface(): RawHtml {
+  return unsafe(html`
+    <div class="rail-presets" data-rail-presets>
+      <button class="preset-save" type="button"
+        data-preset-save
+        aria-label="Save current view as preset">+ Save as preset</button>
+      <div class="preset-list" data-preset-list>
+        <span class="preset-empty">No saved presets</span>
+      </div>
+    </div>`);
+}
+
 export function renderRail(
   laneRows: readonly LaneRailRow[],
   laneCount: number,
 ): RawHtml {
   const rowsRaw = laneRows.map((r) => renderRailRow(r).__raw).join('');
+  const presetSurfaceRaw = renderPresetSurface().__raw;
   return unsafe(html`
     <aside class="lane-rail" data-lane-rail>
       <div class="rail-head">
         Lanes
         <span class="rail-head-count" aria-hidden="true">${laneCount} visible</span>
+        ${unsafe(presetSurfaceRaw)}
       </div>
       ${unsafe(rowsRaw)}
     </aside>`);

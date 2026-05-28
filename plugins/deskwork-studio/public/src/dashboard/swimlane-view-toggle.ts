@@ -253,6 +253,32 @@ function watchViewport(state: ViewToggleState): void {
 }
 
 /**
+ * Module-level singleton — written by `initSwimlaneViewToggle`,
+ * mutated in-place by `reapplyViewToggleFromStorage` so the bound
+ * `.vt-cell` click handlers (which closure-capture the state object)
+ * keep operating on the same overrides Map after a preset apply.
+ */
+let activeState: ViewToggleState | null = null;
+
+/**
+ * Re-read storage + re-apply to every swim. Used by the Task 5.5
+ * preset controller after writing through the view-mode storage
+ * key. No-op when `initSwimlaneViewToggle` hasn't fired yet.
+ */
+export function reapplyViewToggleFromStorage(): void {
+  if (activeState === null) return;
+  const shell = document.querySelector<HTMLElement>('[data-bay-shell]');
+  if (shell === null) return;
+  const projectKey = resolveProjectKey(shell);
+  const next = readStoredOverrides(viewModeKey(projectKey));
+  // Mutate the singleton's overrides Map in-place so bound handlers
+  // observe the new entries through their closure-captured reference.
+  activeState.overrides.clear();
+  for (const [k, v] of next) activeState.overrides.set(k, v);
+  applyAll(activeState.overrides, activeState.isMobile);
+}
+
+/**
  * Entry point — wire view-toggle handlers + restore the operator's
  * resolved view-mode for every swim on the page. No-op when the
  * bay-shell is absent.
@@ -271,6 +297,7 @@ export function initSwimlaneViewToggle(): void {
     overrides,
     isMobile,
   };
+  activeState = state;
 
   applyAll(state.overrides, state.isMobile);
   bindCellClicks(state, projectKey);

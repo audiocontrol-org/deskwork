@@ -15,6 +15,7 @@ import { initSwimlaneViewToggle } from './dashboard/swimlane-view-toggle.ts';
 import { initSwimlaneCompose } from './dashboard/swimlane-compose.ts';
 import { initSwimlaneMobileSheet } from './dashboard/swimlane-mobile-sheet.ts';
 import { initSwimlaneDrag } from './dashboard/swimlane-drag.ts';
+import { initSwimlanePresets } from './dashboard/swimlane-presets.ts';
 import { initMastheadPopover } from './mobile-shell/masthead-popover.ts';
 
 function siteFromButton(btn: HTMLButtonElement): string {
@@ -525,6 +526,12 @@ function init(): void {
   initSwimlaneCompose();
   initSwimlaneMobileSheet();
   initSwimlaneDrag();
+  // Task 5.5: must run AFTER initSwimlane / initSwimlaneCollapse /
+  // initSwimlaneViewToggle — the preset controller's deep-link
+  // apply path calls their `reapply*FromStorage` exports, which
+  // require each init function to have populated the controller's
+  // module-level singleton state.
+  initSwimlanePresets();
   initRowActions();
   initMastheadPopover();
 }

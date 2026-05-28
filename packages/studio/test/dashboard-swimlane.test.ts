@@ -190,6 +190,34 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
   });
 
   // ============================================================
+  //  Task 5.5 — saveable focus presets surface.
+  // ============================================================
+
+  it('Task 5.5: rail head renders the "Save current as preset…" + preset-list surface', async () => {
+    // Per `.claude/rules/affordance-placement.md`, the Save / Load
+    // preset affordances live ON the rail head (component-attached),
+    // not in a separate page-level toolbar. Server-rendered markup
+    // ships the Save button + an empty preset-list container the
+    // client controller populates from localStorage.
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    // The rail head exists.
+    expect(r.html).toMatch(/<div class="rail-head">/);
+    // The preset-save button is inside the rail (a real focusable
+    // <button> with an accessible name + data hook).
+    expect(r.html).toMatch(
+      /<button class="preset-save" type="button"\s+data-preset-save\s+aria-label="Save current view as preset">\+ Save as preset<\/button>/,
+    );
+    // The preset-list container is server-rendered with the empty-
+    // state child so first paint matches what the client renders
+    // for an operator with no saved presets.
+    expect(r.html).toMatch(/<div class="preset-list" data-preset-list>/);
+    expect(r.html).toMatch(
+      /<span class="preset-empty">No saved presets<\/span>/,
+    );
+  });
+
+  // ============================================================
   //  Task 5.4 — drag-to-reorder server contract.
   // ============================================================
 

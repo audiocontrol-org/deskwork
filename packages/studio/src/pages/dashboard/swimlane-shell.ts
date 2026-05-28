@@ -17,7 +17,12 @@
  * Slots still empty (later-task affordances not yet rendered):
  *   - Per-lane `+ new` Compose chip (Task 5.1C).
  *   - Drag-to-reorder rail handler (Task 5.4).
- *   - Saveable focus presets + deep-link URL (Task 5.5).
+ *
+ * Task 5.5 (saveable focus presets + deep-link URL) landed: the rail
+ * head renders the Save + per-row Load + Delete affordances; the
+ * preset-list is server-rendered empty + populated by the client
+ * controller (`plugins/deskwork-studio/public/src/dashboard/swimlane-
+ * presets.ts` + `swimlane-presets-store.ts`).
  *
  * Tasks 5.1A + 5.1B + 5.1C landed: the lane-level + per-stage
  * collapse chevrons (5.1A), the segmented kanban↔list view-toggle

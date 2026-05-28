@@ -415,6 +415,42 @@ function bindHandlers(state: CollapseState, projectKey: string): void {
 }
 
 /**
+ * Module-level singleton — written by `initSwimlaneCollapse`,
+ * mutated in-place by `reapplyCollapseFromStorage` so the bound
+ * `swim-head` / `stage-col` click handlers (which closure-capture
+ * the state object) keep operating on the same Sets / Maps after a
+ * preset apply. See `swimlane.ts:activeState` for the same pattern
+ * + rationale.
+ */
+let activeState: CollapseState | null = null;
+
+/**
+ * Re-read storage + re-apply to the DOM. Used by the Task 5.5
+ * preset controller after writing through the lane-collapse + stage-
+ * collapse storage keys. No-op when `initSwimlaneCollapse` hasn't
+ * fired yet (controllers run in order at DOMContentLoaded).
+ */
+export function reapplyCollapseFromStorage(): void {
+  if (activeState === null) return;
+  const shell = document.querySelector<HTMLElement>('[data-bay-shell]');
+  if (shell === null) return;
+  const projectKey = resolveProjectKey(shell);
+
+  const nextLanes = readStoredLanes(laneCollapseKey(projectKey));
+  const nextStages = readStoredStages(stageCollapseKey(projectKey));
+
+  // Mutate the singleton in-place so already-bound handlers see the
+  // new lane + stage state through their closure-captured references.
+  activeState.lanes.clear();
+  for (const id of nextLanes) activeState.lanes.add(id);
+  activeState.stages.clear();
+  for (const [laneId, stages] of nextStages) {
+    activeState.stages.set(laneId, stages);
+  }
+  applyCollapseState(activeState);
+}
+
+/**
  * Entry point — wire collapse-chev handlers + restore persisted
  * state. No-op when there's no bay-shell on the page.
  */
@@ -427,6 +463,7 @@ export function initSwimlaneCollapse(): void {
     lanes: readStoredLanes(laneCollapseKey(projectKey)),
     stages: readStoredStages(stageCollapseKey(projectKey)),
   };
+  activeState = state;
 
   applyCollapseState(state);
   bindHandlers(state, projectKey);
