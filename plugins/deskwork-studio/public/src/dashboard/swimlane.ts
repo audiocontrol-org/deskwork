@@ -19,8 +19,12 @@
  *
  *   - Focus chip: toggles whether the lane is in the focus set.
  *     "All" chip resets focus to every visible lane.
- *   - Rail eye-toggle (clicking the `.r-eye` span): flips persistent
- *     visibility.
+ *   - Rail eye-toggle (clicking the `.r-eye-btn` button — F6 a11y
+ *     fix promoted the previous `.r-eye` span to a real focusable
+ *     `<button>`): flips persistent visibility.
+ *   - Rail row keyboard activation (F5 a11y fix): Enter / Space on
+ *     a `.rail-lane[role="button"]` toggles focus state (mirrors the
+ *     click handler bound on the same element).
  *   - Swim-stub: re-adds the lane to focus (the stub removes itself
  *     once the swimlane renders).
  *
@@ -263,14 +267,20 @@ function bindRailEyeToggles(
   projectKey: string,
 ): void {
   // Clicking the rail row's eye glyph toggles persistent visibility;
-  // clicking elsewhere on the row toggles focus (default rail behavior).
+  // clicking elsewhere on the row toggles focus (default rail
+  // behavior). F5 a11y fix: the row carries `role="button"` so it
+  // must also honor Enter / Space activation via keyboard.
   for (const row of document.querySelectorAll<HTMLElement>(
     '[data-rail-lane]',
   )) {
     const id = row.dataset.railLane;
     if (id === undefined) continue;
 
-    const eye = row.querySelector<HTMLElement>('.r-eye');
+    // F6 a11y fix: the visibility toggle is a real `<button
+    // class="r-eye-btn">` (previously a span). Stops click
+    // propagation so the row's focus-toggle handler doesn't also
+    // fire on the same gesture.
+    const eye = row.querySelector<HTMLElement>('.r-eye-btn');
     if (eye !== null) {
       eye.addEventListener('click', (ev) => {
         ev.stopPropagation();
@@ -286,6 +296,15 @@ function bindRailEyeToggles(
     }
 
     row.addEventListener('click', () => {
+      toggleFocus(state, projectKey, id);
+    });
+
+    // F5 a11y fix: keyboard activation for the row's role="button".
+    // Enter and Space both activate; preventDefault on Space stops
+    // the default page-scroll.
+    row.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      ev.preventDefault();
       toggleFocus(state, projectKey, id);
     });
   }

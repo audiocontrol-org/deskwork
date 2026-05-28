@@ -97,6 +97,28 @@ export interface LaneBucketsResult {
   readonly unroutedEntries: readonly Entry[];
 }
 
+/**
+ * Internal mutable working type used while assembling lane buckets.
+ * Public consumers see the readonly `LaneBucket` shape; this type
+ * is module-private and exists so the bucketing pass can push into
+ * `Entry[]` arrays without subverting the public read-only contract
+ * via `as Type` casts (F3 code-quality fix).
+ *
+ * `LaneBucketBuilder` is converted to `LaneBucket` by `freezeBucket`
+ * at the end of `loadLaneBuckets`. `Map<string, Entry[]>` is
+ * structurally assignable to `ReadonlyMap<string, readonly Entry[]>`
+ * because `Map` extends `ReadonlyMap` and `Entry[]` widens to
+ * `readonly Entry[]`, so the freeze is a plain shape narrowing — no
+ * cast required.
+ */
+interface LaneBucketBuilder {
+  readonly lane: StrictLaneConfig;
+  readonly template: StrictPipelineTemplate;
+  readonly byStage: Map<string, Entry[]>;
+  unbucketed: Entry[];
+  entryCount: number;
+}
+
 function buildEmptyStageMap(
   template: StrictPipelineTemplate,
 ): Map<string, Entry[]> {
@@ -138,31 +160,35 @@ function strictifyLane(lane: LaneConfig): StrictLaneConfig {
 async function resolveAllLanes(
   projectRoot: string,
   config: DeskworkConfig,
-): Promise<Map<string, LaneBucket>> {
+): Promise<Map<string, LaneBucketBuilder>> {
   await bootstrapDefaultLaneIfMissing(projectRoot);
   const laneIds = listLaneConfigs(projectRoot);
 
-  const byLane = new Map<string, LaneBucket>();
+  const byLane = new Map<string, LaneBucketBuilder>();
   for (const id of laneIds) {
     const lane = loadLaneConfig(id, projectRoot);
     const template = loadPipelineTemplate(lane.pipelineTemplate, projectRoot);
-    const stageMap = buildEmptyStageMap(template);
     byLane.set(id, {
       lane: strictifyLane(lane),
       template,
-      byStage: stageMap,
+      byStage: buildEmptyStageMap(template),
       unbucketed: [],
       entryCount: 0,
     });
   }
 
   if (byLane.size === 0) {
-    // In-memory default-lane fallback for adopters whose
-    // `.deskwork/config.json` lives only in the runtime call
-    // arguments. Synthesizes the same `default` lane the
-    // on-disk bootstrap would have produced; mirrors the loud
-    // refusal contract — we only synthesize when the resolved
-    // config has a usable `defaultSite` site block.
+    // Soft empty-state path: when the runtime-config argument has
+    // no usable `defaultSite` site block, we can't synthesize a
+    // default lane on the fly. Returning an empty builder map lets
+    // the downstream renderer in `swimlane-shell.ts` surface a
+    // friendly empty state ("No lanes configured. Run /deskwork:
+    // lane create ...") rather than crashing the dashboard. The
+    // schema-loaded path is the loud refusal — `bootstrap
+    // DefaultLaneIfMissing` throws on malformed config; this path
+    // is the runtime-config fallback used by the test harness
+    // `createApp({ projectRoot, config })` shape, where surfacing
+    // the empty state is the desired UX.
     const defaultSiteId = config.defaultSite;
     const site = config.sites[defaultSiteId];
     if (site !== undefined) {
@@ -188,8 +214,8 @@ async function resolveAllLanes(
 
 /**
  * Bucket every entry into its lane → stage bucket. Mutates the
- * `byStage` Maps in place (we built them mutable for this); returns a
- * tuple of `{ unbucketed-by-lane, unrouted }` for later aggregation.
+ * `byStage` Maps in place on the internal builders; returns a tuple
+ * of `{ unbucketed-by-lane, unrouted }` for later aggregation.
  *
  * `entry.lane === undefined` routes to the `default` lane (per
  * AMBIGUITY 4). Emits a `console.warn` naming the entry slug so the
@@ -197,7 +223,7 @@ async function resolveAllLanes(
  */
 function bucketIntoLanes(
   entries: readonly Entry[],
-  byLane: Map<string, LaneBucket>,
+  byLane: Map<string, LaneBucketBuilder>,
 ): {
   unbucketedByLane: Map<string, Entry[]>;
   unrouted: Entry[];
@@ -226,11 +252,6 @@ function bucketIntoLanes(
       unrouted.push(entry);
       continue;
     }
-    // The Map values are typed readonly in the public LaneBucket
-    // shape, but we built them as plain `Entry[]` arrays via
-    // `buildEmptyStageMap`. Cast-free narrowing: look up the
-    // mutable array, append, and the outward-facing readonly type
-    // is preserved by the eventual freeze in `loadLaneBuckets`.
     const stageBucket = bucket.byStage.get(entry.currentStage);
     if (stageBucket === undefined) {
       // Entry's currentStage isn't in the lane's template. Capture
@@ -240,11 +261,12 @@ function bucketIntoLanes(
       unbucketedByLane.set(laneId, arr);
       continue;
     }
-    // stageBucket is the same Map value we put in via
-    // `buildEmptyStageMap` — a mutable `Entry[]`. The readonly in
-    // the public shape is a view-side narrowing, not a runtime
-    // immutability claim.
-    (stageBucket as Entry[]).push(entry);
+    // `stageBucket` is the mutable `Entry[]` we built in
+    // `buildEmptyStageMap`. No cast required — the builder's
+    // `byStage` is typed as `Map<string, Entry[]>` precisely so the
+    // public readonly contract is delivered by a separate freeze
+    // step at the end of `loadLaneBuckets` (F3 code-quality fix).
+    stageBucket.push(entry);
   }
 
   return { unbucketedByLane, unrouted };
@@ -253,14 +275,37 @@ function bucketIntoLanes(
 /**
  * Sort every stage's bucket by slug — hierarchical entries cluster
  * under their ancestor (display-only ordering; storage stays flat).
- * Mirrors the sort behavior of `bucketize` in `./data.ts`.
+ * Mirrors the sort behavior of `bucketize` in `./data.ts`. Operates
+ * on the mutable builder bucket, so no cast is required.
  */
-function sortStageBuckets(byLane: Map<string, LaneBucket>): void {
+function sortStageBuckets(byLane: Map<string, LaneBucketBuilder>): void {
   for (const bucket of byLane.values()) {
     for (const stageBucket of bucket.byStage.values()) {
-      (stageBucket as Entry[]).sort((a, b) => a.slug.localeCompare(b.slug));
+      stageBucket.sort((a, b) => a.slug.localeCompare(b.slug));
     }
   }
+}
+
+/**
+ * Convert an internal `LaneBucketBuilder` to the public read-only
+ * `LaneBucket` shape. `Map<string, Entry[]>` is structurally
+ * assignable to `ReadonlyMap<string, readonly Entry[]>` (Map's
+ * interface extends ReadonlyMap; `Entry[]` widens to `readonly
+ * Entry[]`), so the conversion is a plain rebind — no `as Type`
+ * cast required.
+ */
+function freezeBucket(
+  builder: LaneBucketBuilder,
+  unbucketed: readonly Entry[],
+  entryCount: number,
+): LaneBucket {
+  return {
+    lane: builder.lane,
+    template: builder.template,
+    byStage: builder.byStage,
+    unbucketed,
+    entryCount,
+  };
 }
 
 /**
@@ -279,25 +324,19 @@ export async function loadLaneBuckets(
   config: DeskworkConfig,
   entries: readonly Entry[],
 ): Promise<LaneBucketsResult> {
-  const byLane = await resolveAllLanes(projectRoot, config);
-  const { unbucketedByLane, unrouted } = bucketIntoLanes(entries, byLane);
-  sortStageBuckets(byLane);
+  const builders = await resolveAllLanes(projectRoot, config);
+  const { unbucketedByLane, unrouted } = bucketIntoLanes(entries, builders);
+  sortStageBuckets(builders);
 
-  // Compose final buckets with unbucketed + entryCount filled in.
-  // The Map mutation pattern keeps lane-order intact (insertion-order
-  // preserved across the rebuild).
+  // Freeze each builder into the public LaneBucket shape. Map
+  // iteration preserves insertion order, so lane order set in
+  // `resolveAllLanes` is preserved across this rebuild.
   const finalByLane = new Map<string, LaneBucket>();
-  for (const [id, bucket] of byLane) {
+  for (const [id, builder] of builders) {
     const unbucketed = unbucketedByLane.get(id) ?? [];
     let total = unbucketed.length;
-    for (const stageBucket of bucket.byStage.values()) total += stageBucket.length;
-    finalByLane.set(id, {
-      lane: bucket.lane,
-      template: bucket.template,
-      byStage: bucket.byStage,
-      unbucketed,
-      entryCount: total,
-    });
+    for (const stageBucket of builder.byStage.values()) total += stageBucket.length;
+    finalByLane.set(id, freezeBucket(builder, unbucketed, total));
   }
 
   return {

@@ -128,15 +128,24 @@
   text-decoration: line-through;
 }
 
-.rail-lane .r-eye {
+.rail-lane .r-eye-btn {
   font-family: var(--er-font-mono);
   width: 14px;
   text-align: center;
   color: var(--er-ink-soft);
   font-size: 0.85rem;
+  /* F6 a11y: real <button> primitive instead of <span>. Strip the
+     UA chrome so the visual presentation matches the previous
+     span-based glyph cell. */
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  line-height: inherit;
 }
 
-.rail-lane[data-lane-visible="false"] .r-eye {
+.rail-lane[data-lane-visible="false"] .r-eye-btn {
   color: var(--er-faded);
 }
 
@@ -629,30 +638,31 @@
   display: none;
 }
 
-/* AUDIT-20260528-04 sub-B: the rail eye glyph swaps between two
-   server-rendered siblings inside `.r-eye` based on the parent
-   `[data-lane-visible]` attribute. The client controller updates
-   the attribute on visibility toggles; CSS picks which sibling
-   shows. Both siblings exist in the DOM at server render so no
-   client-side text mutation is required. */
-.r-eye .r-eye-visible,
-.r-eye .r-eye-hidden {
+/* AUDIT-20260528-04 sub-B (with F6 a11y fix): the rail eye glyph
+   swaps between two server-rendered siblings inside `.r-eye-btn`
+   based on the parent `[data-lane-visible]` attribute. The client
+   controller updates the attribute on visibility toggles; CSS picks
+   which sibling shows. Both siblings exist in the DOM at server
+   render so no client-side text mutation is required. */
+.r-eye-btn .r-eye-visible,
+.r-eye-btn .r-eye-hidden {
   display: none;
 }
 
-.rail-lane[data-lane-visible="true"] .r-eye .r-eye-visible {
+.rail-lane[data-lane-visible="true"] .r-eye-btn .r-eye-visible {
   display: inline;
 }
 
-.rail-lane[data-lane-visible="false"] .r-eye .r-eye-hidden {
+.rail-lane[data-lane-visible="false"] .r-eye-btn .r-eye-hidden {
   display: inline;
 }
 
 /* ============================================================
- *  Mobile — stack the rail below the bay (Task 5.1 ships the
- *  shell only; the dedicated mobile lane-stack with accordion
- *  sections lands as part of Task 5.1A/B's mobile pass). For
- *  now the desktop layout collapses gracefully on phone.
+ *  Mobile — stack the rail below the bay. The mobile lane-stack
+ *  with accordion sections is the v0.19 collapsible-stage-tile
+ *  pattern; its full integration lands as part of Task 5.1A/B's
+ *  mobile pass. Within this Task 5.1 scope the desktop layout
+ *  flexes down gracefully on phone via the @media rule below.
  * ============================================================ */
 
 @media (max-width: 720px) {
@@ -663,9 +673,10 @@
   .lane-rail {
     display: none;
     /* The mobile lane-rail is reached via the masthead "Lanes ▾"
-       trigger (Task 5.1A's mobile sheet). Until that sheet ships,
-       the rail is hidden on phone — the focus-chip strip is the
-       operator's only lane affordance at narrow widths. */
+       trigger introduced in Task 5.1A's mobile sheet. Outside that
+       sheet's scope the rail is hidden on phone; the focus-chip
+       strip is the operator's only lane affordance at narrow
+       widths. */
   }
 
   .bay {

@@ -1,6 +1,6 @@
 /**
- * Stage-vocabulary dispatch + lighter entry-card markup for the
- * multi-lane swimlane dashboard's per-stage columns.
+ * Lighter entry-card markup for the multi-lane swimlane dashboard's
+ * per-stage columns.
  *
  * The editorial verb-chip helpers (`renderRow`, `verbsForStage`)
  * predate the multi-template work and only handle the eight
@@ -11,34 +11,18 @@
  * as a lighter `.card` form that preserves the data attributes
  * existing tests + future affordance work depend on.
  *
- * Task 5.2 generalises verbsForStage by template and retires this
- * dispatch; the card form is additive markup so Task 5.2 can add
- * verb chrome to it without rewriting the column renderer.
+ * Task 5.2 generalises verbsForStage by template; the card form is
+ * additive markup so 5.2 can add verb chrome to it without rewriting
+ * the column renderer.
+ *
+ * Stage-vocabulary dispatch (editorial vs other) is delegated to the
+ * single project-wide type guard `isLegacyEditorialStage` in
+ * `./legacy-stage.ts`. This module intentionally does NOT export its
+ * own duplicate vocabulary list.
  */
 
 import { html, unsafe, type RawHtml } from '../html.ts';
 import type { Entry } from '@deskwork/core/schema/entry';
-
-/**
- * The eight editorial stage names that `renderRow` /
- * `verbsForStage` know how to handle. Entries whose `currentStage`
- * is in this set render via the full row chrome; others render via
- * `renderEntryCard` below.
- */
-const EDITORIAL_STAGE_VOCAB: ReadonlySet<string> = new Set([
-  'Ideas',
-  'Planned',
-  'Outlining',
-  'Drafting',
-  'Final',
-  'Published',
-  'Blocked',
-  'Cancelled',
-]);
-
-export function isEditorialStage(stage: string): boolean {
-  return EDITORIAL_STAGE_VOCAB.has(stage);
-}
 
 /**
  * Render a lighter card for an entry whose stage vocabulary isn't

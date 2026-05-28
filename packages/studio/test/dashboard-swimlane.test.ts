@@ -518,15 +518,30 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
   // AUDIT-20260528-04 acceptance: rail eye renders BOTH glyphs as
   // siblings; CSS picks one based on data-lane-visible. Focus-chip
   // CSS class `.focus-chip.is-visibility-hidden` is the surface the
-  // client toggles on visibility-off lanes.
-  it('AUDIT-04: rail row emits both `.r-eye-visible` (●) and `.r-eye-hidden` (○) glyphs', async () => {
+  // client toggles on visibility-off lanes. F6 a11y fix promoted
+  // the eye container from `<span class="r-eye">` to `<button
+  // class="r-eye-btn">` so the regex matches the new shape.
+  it('AUDIT-04: rail row emits both `.r-eye-visible` (●) and `.r-eye-hidden` (○) glyphs inside the eye-button', async () => {
     const r = await getHtml(app, '/dev/editorial-studio');
     expect(r.status).toBe(200);
-    // Every rail row has both spans.
     for (const id of ['default', 'mockups', 'qa']) {
       const re = new RegExp(
-        `data-rail-lane="${id}"[\\s\\S]*?<span class="r-eye-visible">●</span>` +
-          `<span class="r-eye-hidden">○</span>`,
+        `data-rail-lane="${id}"[\\s\\S]*?<button class="r-eye-btn"[\\s\\S]*?` +
+          `<span class="r-eye-visible" aria-hidden="true">●</span>` +
+          `<span class="r-eye-hidden" aria-hidden="true">○</span>` +
+          `[\\s\\S]*?</button>`,
+      );
+      expect(r.html).toMatch(re);
+    }
+  });
+
+  it('F6 a11y: the eye-toggle is a focusable <button class="r-eye-btn"> with a non-empty aria-label', async () => {
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    for (const id of ['default', 'mockups', 'qa']) {
+      const re = new RegExp(
+        `data-rail-lane="${id}"[\\s\\S]*?<button class="r-eye-btn"[^>]*` +
+          `data-rail-eye="${id}"[^>]*aria-label="[^"]+"`,
       );
       expect(r.html).toMatch(re);
     }
@@ -543,12 +558,13 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
     expect(css).toMatch(
       /\.focus-chip\.is-visibility-hidden[\s\S]*?display:\s*none/,
     );
-    // Eye-glyph swap rules — selector + display:inline.
+    // Eye-glyph swap rules — selector + display:inline (F6 fix
+    // selectors target `.r-eye-btn`).
     expect(css).toMatch(
-      /\.rail-lane\[data-lane-visible="true"\] \.r-eye \.r-eye-visible/,
+      /\.rail-lane\[data-lane-visible="true"\] \.r-eye-btn \.r-eye-visible/,
     );
     expect(css).toMatch(
-      /\.rail-lane\[data-lane-visible="false"\] \.r-eye \.r-eye-hidden/,
+      /\.rail-lane\[data-lane-visible="false"\] \.r-eye-btn \.r-eye-hidden/,
     );
   });
 
