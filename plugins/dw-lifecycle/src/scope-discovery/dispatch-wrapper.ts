@@ -270,7 +270,7 @@ function regexToPromptShape(re: RegExp): string {
 }
 
 /** Build the grammar instruction text given the active phrase/regex lists. */
-function buildGrammarInstruction(
+export function buildGrammarInstruction(
   phrases: ReadonlyArray<string>,
   regexes: ReadonlyArray<RegExp>,
 ): string {
