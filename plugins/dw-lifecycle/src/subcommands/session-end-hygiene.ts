@@ -65,7 +65,11 @@ export function parseSessionEndHygieneArgs(
 }
 
 function defaultRunGit(args: readonly string[]): string {
-  return execFileSync('git', [...args], { encoding: 'utf8' });
+  // LC_ALL=C pins git's locale to English so committer-date timestamps
+  // (`git show -s --format=%cI <sha>`) and merge-base output stay stable
+  // regardless of the operator's user locale.
+  const env = { ...process.env, LC_ALL: 'C' };
+  return execFileSync('git', [...args], { encoding: 'utf8', env });
 }
 
 function defaultRunGh(args: readonly string[]): string {

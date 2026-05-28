@@ -197,10 +197,10 @@ Closes a separate concern from the no-bare-TBDs gate: the 17 stale phase parent 
 
 Closes three semantic + rendering bugs in `session-end-hygiene` surfaced during the Phase 9 dogfood. Land alongside the v0.26.1 ship that carries the #339 scanner fix.
 
-- [ ] Step 1: Switch the "issues filed this session" filter from `created:<today>` to a session-scope filter. When `--session-start-sha` is supplied, translate the SHA to an ISO timestamp via `git show -s --format=%cI <sha>` and pass `created:>=<iso>` to `gh issue list`. Document the no-SHA fallback (e.g. "since the last git fetch"); the fallback MUST NOT be "today."
-- [ ] Step 2: Filter CLOSED issues from the `### Next session recommendation` block's `Triage:` line. The observations block can still cite closed issues (they're relevant signal for the just-completed session); the recommendation line is forward-looking and must list OPEN issues only.
-- [ ] Step 3: Coalesce per-line workplan-TBD observations. Group samples by `lineNumber` so a multi-marker line emits ONE entry naming all matched markers, not one entry per marker keyword.
-- [ ] Step 4: Vitest coverage — session-scope-filter test (given `--session-start-sha <sha>`, gh query string contains `created:>=<iso>`, not `created:<today>`); closed-filter test (gh response with 1 open + 1 closed issue → recommendation lists only the open one); per-line-coalescing test (fixture with one line matching 4 markers → exactly one observation entry naming all 4).
+- [x] Step 1: Switch the "issues filed this session" filter from `created:<today>` to a session-scope filter. When `--session-start-sha` is supplied, translate the SHA to an ISO timestamp via `git show -s --format=%cI <sha>` and pass `created:>=<iso>` to `gh issue list`. Document the no-SHA fallback (e.g. "since the last git fetch"); the fallback MUST NOT be "today."
+- [x] Step 2: Filter CLOSED issues from the `### Next session recommendation` block's `Triage:` line. The observations block can still cite closed issues (they're relevant signal for the just-completed session); the recommendation line is forward-looking and must list OPEN issues only.
+- [x] Step 3: Coalesce per-line workplan-TBD observations. Group samples by `lineNumber` so a multi-marker line emits ONE entry naming all matched markers, not one entry per marker keyword.
+- [x] Step 4: Vitest coverage — session-scope-filter test (given `--session-start-sha <sha>`, gh query string contains `created:>=<iso>`, not `created:<today>`); closed-filter test (gh response with 1 open + 1 closed issue → recommendation lists only the open one); per-line-coalescing test (fixture with one line matching 4 markers → exactly one observation entry naming all 4).
 - [ ] Step 5: Post-v0.26.1 install, re-run `/dw-lifecycle:session-end` against this same hygiene workplan and confirm the observations block is signal-only.
 
 **Acceptance Criteria:**
@@ -208,7 +208,7 @@ Closes three semantic + rendering bugs in `session-end-hygiene` surfaced during 
 - [x] `/dw-lifecycle:session-start` displays the prior session's recommendation without re-scanning. (Landed via the `session-start-recommendation` subcommand + updated SKILL.md — display-only, zero git/gh/workplan calls.)
 - [x] `/dw-lifecycle:complete` carries the pre-merge TBD gate; supports `--skip-tbd-gate --reason "<substantive>"` override with logged reason. (Landed via the `complete-gate` subcommand + updated SKILL.md.)
 - [ ] `/dw-lifecycle:complete` walks the closing feature's phase-parent issue tree; closes parents whose children are all closed (operator-gated batched proposal). · #336
-- [ ] `session-end-hygiene` filters by session boundary (not calendar date) AND filters closed issues from the recommendation list AND coalesces multi-marker workplan lines into one observation entry. · #340
+- [x] `session-end-hygiene` filters by session boundary (not calendar date) AND filters closed issues from the recommendation list AND coalesces multi-marker workplan lines into one observation entry. · #340
 
 **Implementation notes (operator decisions captured during dispatch):**
 

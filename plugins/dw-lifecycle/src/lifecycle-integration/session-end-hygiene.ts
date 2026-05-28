@@ -6,10 +6,16 @@
 //   1. git log subjects in the range <sessionStartSha>..HEAD (or the last
 //      ~10 commits when no session-start SHA was tracked) — extracting any
 //      commit subject mentioning a hygiene-relevant token.
-//   2. workplan diffs across the same range — any new/modified line that
-//      introduces a TBD-style marker.
-//   3. open issues filed by the current user this session — surfaced via
-//      `gh issue list --search "author:@me created:<today>"`.
+//   2. workplan markers in the feature workplan — any line that carries a
+//      TBD-style marker (coalesced per line so a multi-marker line emits
+//      one observation listing every matched marker).
+//   3. issues filed by the current user inside the session boundary —
+//      surfaced via `gh issue list --json number,title,state` with a
+//      `created:>=<iso>` search where `<iso>` is the committer date of
+//      `--session-start-sha`. When the SHA is absent, fall back to the
+//      committer date of the merge-base of HEAD with origin/main, and if
+//      that is also unavailable, to the committer date of HEAD~10. The
+//      fallback boundary is documented inline so it is never "today."
 //
 // The captured observations feed a small markdown block that gets appended
 // to the journal entry under `### Hygiene observations` followed by the
@@ -19,6 +25,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { scanSingleWorkplanFile } from '../debt-report/workplan-tbd.js';
+import type { WorkplanMarkerKey } from '../debt-report/types.js';
 import type {
   HygieneObservation,
   NextSessionRecommendation,
@@ -119,58 +126,129 @@ function workplanPathFor(
   );
 }
 
+// Display form for each marker key. Mirrors the operator-visible marker
+// vocabulary documented in `Just for now is bullshit`.
+const MARKER_DISPLAY: Readonly<Record<WorkplanMarkerKey, string>> = {
+  tbd: 'tbd',
+  defer: 'defer',
+  follow_up: 'follow-up',
+  out_of_scope: 'out-of-scope',
+};
+
+// Coalesce the raw per-marker samples into one observation per workplan
+// line. A line firing on N marker keywords collapses to a single entry
+// whose `markerText` lists every matched marker; the line's text excerpt
+// is shared by all samples (by construction in the scanner) so the first
+// sample's `text` is authoritative.
 function scanWorkplanTbds(
   args: SessionEndHygieneArgs,
 ): readonly HygieneObservation[] {
   const path = workplanPathFor(args);
   if (!existsSync(path)) return [];
   const result = scanSingleWorkplanFile(path);
-  return result.samples.map<HygieneObservation>((sample) => ({
-    category: 'workplan-tbd-introduced',
-    path,
-    lineNumber: sample.lineNumber,
-    markerText: sample.text,
-  }));
+  const groups = new Map<number, { markers: Set<WorkplanMarkerKey>; text: string }>();
+  for (const sample of result.samples) {
+    const existing = groups.get(sample.lineNumber);
+    if (existing === undefined) {
+      groups.set(sample.lineNumber, {
+        markers: new Set([sample.markerKey]),
+        text: sample.text,
+      });
+    } else {
+      existing.markers.add(sample.markerKey);
+    }
+  }
+  // Preserve scan-order (insertion order of the map matches the first-hit
+  // order of each line in the file).
+  const observations: HygieneObservation[] = [];
+  for (const [lineNumber, group] of groups) {
+    const markerList = Array.from(group.markers)
+      .map((key) => MARKER_DISPLAY[key])
+      .join(', ');
+    observations.push({
+      category: 'workplan-tbd-introduced',
+      path,
+      lineNumber,
+      markerText: `markers: ${markerList} — ${group.text}`,
+    });
+  }
+  return observations;
 }
 
 interface RawIssue {
   readonly number: number;
   readonly title: string;
+  readonly state?: string;
 }
 
 function isRawIssue(value: unknown): value is RawIssue {
   if (value === null || typeof value !== 'object') return false;
-  const candidate = value as { number?: unknown; title?: unknown };
+  const candidate = value as { number?: unknown; title?: unknown; state?: unknown };
   return (
     typeof candidate.number === 'number' &&
-    typeof candidate.title === 'string'
+    typeof candidate.title === 'string' &&
+    (candidate.state === undefined || typeof candidate.state === 'string')
   );
 }
 
-function isoDate(now: Date): string {
-  const year = now.getUTCFullYear();
-  const month = String(now.getUTCMonth() + 1).padStart(2, '0');
-  const day = String(now.getUTCDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+// Run a git command that may fail (missing SHA, missing remote ref, etc.)
+// and return null instead of throwing. Used for the session-boundary
+// timestamp resolution, where each fallback step is allowed to fail.
+function tryGit(runGit: RunGit, args: readonly string[]): string | null {
+  try {
+    return runGit(args).trim();
+  } catch {
+    return null;
+  }
+}
+
+// Resolve the session-boundary ISO-8601 committer-date timestamp.
+//
+// Priority order (each step that yields a non-empty string wins):
+//   1. The committer date of `--session-start-sha`.
+//   2. The committer date of the merge-base of HEAD with origin/main.
+//   3. The committer date of HEAD~10 (last-10-commits fallback, mirrored
+//      from the commit-scanner's FALLBACK_RECENT_COMMITS).
+//
+// Returns null when every step fails. The caller treats null as "no usable
+// boundary; skip the gh query" — better than emitting a calendar-date
+// query that re-introduces the bug this method exists to close.
+function resolveSessionBoundaryIso(
+  runGit: RunGit,
+  sessionStartSha: string | null,
+): string | null {
+  if (sessionStartSha !== null) {
+    const fromSha = tryGit(runGit, ['show', '-s', '--format=%cI', sessionStartSha]);
+    if (fromSha !== null && fromSha.length > 0) return fromSha;
+  }
+  const mergeBase = tryGit(runGit, ['merge-base', 'HEAD', 'origin/main']);
+  if (mergeBase !== null && mergeBase.length > 0) {
+    const fromMergeBase = tryGit(runGit, ['show', '-s', '--format=%cI', mergeBase]);
+    if (fromMergeBase !== null && fromMergeBase.length > 0) return fromMergeBase;
+  }
+  const fromHead = tryGit(runGit, ['show', '-s', '--format=%cI', `HEAD~${FALLBACK_RECENT_COMMITS}`]);
+  if (fromHead !== null && fromHead.length > 0) return fromHead;
+  return null;
 }
 
 function scanIssuesThisSession(
   args: SessionEndHygieneArgs,
 ): readonly HygieneObservation[] {
-  const today = isoDate(args.now);
+  const sinceIso = resolveSessionBoundaryIso(args.runGit, args.sessionStartSha);
+  if (sinceIso === null) return [];
   let raw: string;
   try {
     raw = args.runGh([
       'issue',
       'list',
-      '--state',
-      'open',
       '--author',
       '@me',
+      '--state',
+      'all',
       '--search',
-      `created:${today}`,
+      `created:>=${sinceIso}`,
       '--json',
-      'number,title',
+      'number,title,state',
     ]);
   } catch {
     return [];
@@ -186,10 +264,14 @@ function scanIssuesThisSession(
   const observations: HygieneObservation[] = [];
   for (const entry of parsed) {
     if (!isRawIssue(entry)) continue;
+    const upper = entry.state?.toUpperCase();
+    const issueState: 'OPEN' | 'CLOSED' | undefined =
+      upper === 'OPEN' ? 'OPEN' : upper === 'CLOSED' ? 'CLOSED' : undefined;
     observations.push({
       category: 'issue-filed-this-session',
       issueNumber: entry.number,
       issueTitle: entry.title,
+      issueState,
     });
   }
   return observations;
@@ -205,7 +287,14 @@ function recommend(
 
   for (const obs of observations) {
     if (obs.category === 'issue-filed-this-session') {
-      if (obs.issueNumber !== undefined && obs.issueTitle !== undefined) {
+      // Forward-looking Triage line only carries OPEN issues. CLOSED-this-
+      // session issues stay in the observations block as historical signal
+      // but they are NOT triageable next session — they are already done.
+      if (
+        obs.issueNumber !== undefined &&
+        obs.issueTitle !== undefined &&
+        obs.issueState !== 'CLOSED'
+      ) {
         triageItems.push(`#${obs.issueNumber} (${obs.issueTitle})`);
       }
     } else if (obs.category === 'workplan-tbd-introduced') {
@@ -249,7 +338,8 @@ function renderMarkdownBlock(
       } else if (obs.category === 'workplan-tbd-introduced') {
         lines.push(`- workplan ${obs.path ?? ''}:${obs.lineNumber ?? ''} — ${obs.markerText ?? ''}`);
       } else if (obs.category === 'issue-filed-this-session') {
-        lines.push(`- issue #${obs.issueNumber ?? ''} filed this session: ${obs.issueTitle ?? ''}`);
+        const badge = obs.issueState === 'CLOSED' ? ' [CLOSED]' : obs.issueState === 'OPEN' ? ' [OPEN]' : '';
+        lines.push(`- issue #${obs.issueNumber ?? ''}${badge} filed this session: ${obs.issueTitle ?? ''}`);
       }
     }
   }

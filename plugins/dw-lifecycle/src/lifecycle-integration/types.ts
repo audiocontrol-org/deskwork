@@ -24,6 +24,11 @@ export interface HygieneObservation {
   readonly markerText?: string;
   readonly issueNumber?: number;
   readonly issueTitle?: string;
+  // Set on `issue-filed-this-session` observations: 'OPEN' | 'CLOSED' verbatim
+  // from `gh issue list --json state` so the recommendation half can filter
+  // OPEN issues for the forward-looking Triage line while observations stay
+  // inclusive (closed-this-session issues are still historical signal).
+  readonly issueState?: 'OPEN' | 'CLOSED';
   readonly path?: string;
   readonly lineNumber?: number;
 }
