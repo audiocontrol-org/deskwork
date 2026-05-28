@@ -1,0 +1,1 @@
+Task 5.1A: per-lane collapse — lane-level + per-stage chevron buttons + .swim-compact reveal + .stage-col.collapsed vertical-strip pattern + per-operator localStorage state
