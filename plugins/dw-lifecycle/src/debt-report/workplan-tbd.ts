@@ -3,6 +3,8 @@ import { join } from 'node:path';
 import type { Config } from '../config.types.js';
 import type {
   WorkplanFeatureCounts,
+  WorkplanMarkerKey,
+  WorkplanMarkerSample,
   WorkplanTbdsReport,
 } from './types.js';
 
@@ -11,8 +13,17 @@ export interface ScanWorkplanTbdsArgs {
   readonly config: Config;
 }
 
+// Sample cap: prevents a runaway workplan from bloating the JSON report.
+// The count fields remain authoritative — only the per-line sample list
+// is truncated.
+const MAX_SAMPLES_PER_FEATURE = 20;
+
+// Text excerpt cap: keeps each sample's `text` field short enough that the
+// JSON payload stays scan-friendly even at 20 samples per feature.
+const SAMPLE_TEXT_MAX_LENGTH = 200;
+
 interface MarkerRule {
-  readonly key: 'tbd' | 'defer' | 'follow_up' | 'out_of_scope';
+  readonly key: WorkplanMarkerKey;
   readonly pattern: RegExp;
 }
 
@@ -64,13 +75,29 @@ function listFeatureSlugs(stageDir: string): string[] {
     .sort();
 }
 
-function countMarkers(content: string): WorkplanFeatureCounts['counts'] {
+interface MarkerScanResult {
+  readonly counts: WorkplanFeatureCounts['counts'];
+  readonly samples: readonly WorkplanMarkerSample[];
+}
+
+function excerpt(line: string): string {
+  const trimmed = line.trim();
+  return trimmed.length > SAMPLE_TEXT_MAX_LENGTH
+    ? trimmed.slice(0, SAMPLE_TEXT_MAX_LENGTH)
+    : trimmed;
+}
+
+function scanMarkers(content: string): MarkerScanResult {
   let tbd = 0;
   let defer = 0;
   let follow_up = 0;
   let out_of_scope = 0;
+  const samples: WorkplanMarkerSample[] = [];
 
-  for (const line of content.split('\n')) {
+  const lines = content.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line === undefined) continue;
     if (PROMOTED_RE.test(line)) continue;
     for (const rule of MARKER_RULES) {
       if (rule.pattern.test(line)) {
@@ -88,15 +115,25 @@ function countMarkers(content: string): WorkplanFeatureCounts['counts'] {
             out_of_scope += 1;
             break;
         }
+        if (samples.length < MAX_SAMPLES_PER_FEATURE) {
+          samples.push({
+            lineNumber: i + 1,
+            markerKey: rule.key,
+            text: excerpt(line),
+          });
+        }
       }
     }
   }
   return {
-    tbd,
-    defer,
-    follow_up,
-    out_of_scope,
-    total: tbd + defer + follow_up + out_of_scope,
+    counts: {
+      tbd,
+      defer,
+      follow_up,
+      out_of_scope,
+      total: tbd + defer + follow_up + out_of_scope,
+    },
+    samples,
   };
 }
 
@@ -115,12 +152,13 @@ export function scanWorkplanTbds(args: ScanWorkplanTbdsArgs): WorkplanTbdsReport
       const workplanPath = join(stageDir, slug, 'workplan.md');
       if (!existsSync(workplanPath)) continue;
       const content = readFileSync(workplanPath, 'utf8');
-      const counts = countMarkers(content);
+      const { counts, samples } = scanMarkers(content);
       features.push({
         slug,
         target_version: version || config.docs.defaultTargetVersion,
         path: workplanPath,
         counts,
+        samples,
       });
       total += counts.total;
     }

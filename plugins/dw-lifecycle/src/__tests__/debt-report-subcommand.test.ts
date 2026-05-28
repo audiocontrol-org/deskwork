@@ -68,4 +68,13 @@ describe('parseDebtReportArgs', () => {
       /--stale-days must be a positive integer/,
     );
   });
+
+  it('rejects mixed-digit input like "30abc" rather than silently truncating', () => {
+    // Number.parseInt('30abc', 10) would return 30; the strict guard
+    // requires the whole token to be digits so the operator sees the
+    // typo instead of getting a different value than they typed.
+    expect(() => parseDebtReportArgs(['--stale-days', '30abc'])).toThrow(
+      /--stale-days must be a positive integer/,
+    );
+  });
 });

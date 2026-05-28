@@ -76,7 +76,7 @@ export function scanParkedBranches(
 
     const base = ref.upstream && ref.upstream.length > 0 ? ref.upstream : 'origin/main';
     const range = `${ref.refname}...${base}`;
-    const ahead_behind = parseAheadBehind(
+    const aheadBehind = parseAheadBehind(
       runGit(['rev-list', '--left-right', '--count', range]),
     );
 
@@ -85,8 +85,8 @@ export function scanParkedBranches(
 
     const sample: BranchSample = {
       refname: ref.refname,
-      ahead: ahead_behind.ahead,
-      behind: ahead_behind.behind,
+      ahead: aheadBehind.ahead,
+      behind: aheadBehind.behind,
       last_commit_date: ref.committerdate,
     };
 

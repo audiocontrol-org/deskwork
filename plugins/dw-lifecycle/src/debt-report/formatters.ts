@@ -1,4 +1,5 @@
 import type {
+  BranchSample,
   DebtReport,
   GhIssuesReport,
   IssueSample,
@@ -87,6 +88,24 @@ function renderWorkplanSection(wp: WorkplanTbdsReport): string {
   return lines.join('\n');
 }
 
+function renderBranchTable(
+  lines: string[],
+  emptyLabel: string,
+  branches: readonly BranchSample[],
+): void {
+  if (branches.length === 0) {
+    lines.push(emptyLabel);
+    return;
+  }
+  lines.push('| Ref | Ahead | Behind | Last commit |');
+  lines.push('|---|---|---|---|');
+  for (const b of branches) {
+    lines.push(
+      `| ${b.refname} | ${b.ahead} | ${b.behind} | ${b.last_commit_date} |`,
+    );
+  }
+}
+
 function renderBranchesSection(pb: ParkedBranchesReport): string {
   const lines: string[] = [];
   lines.push('## Parked branches');
@@ -95,31 +114,11 @@ function renderBranchesSection(pb: ParkedBranchesReport): string {
     `Parked (threshold: ${pb.parked_threshold_days} days): **${pb.parked.length}**`,
   );
   lines.push('');
-  if (pb.parked.length === 0) {
-    lines.push('_no parked branches_');
-  } else {
-    lines.push('| Ref | Ahead | Behind | Last commit |');
-    lines.push('|---|---|---|---|');
-    for (const b of pb.parked) {
-      lines.push(
-        `| ${b.refname} | ${b.ahead} | ${b.behind} | ${b.last_commit_date} |`,
-      );
-    }
-  }
+  renderBranchTable(lines, '_no parked branches_', pb.parked);
   lines.push('');
   lines.push(`Other branches: **${pb.other_branches.length}**`);
   lines.push('');
-  if (pb.other_branches.length === 0) {
-    lines.push('_no other branches_');
-  } else {
-    lines.push('| Ref | Ahead | Behind | Last commit |');
-    lines.push('|---|---|---|---|');
-    for (const b of pb.other_branches) {
-      lines.push(
-        `| ${b.refname} | ${b.ahead} | ${b.behind} | ${b.last_commit_date} |`,
-      );
-    }
-  }
+  renderBranchTable(lines, '_no other branches_', pb.other_branches);
   lines.push('');
   return lines.join('\n');
 }

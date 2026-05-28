@@ -31,6 +31,14 @@ export interface GhIssuesReport {
   };
 }
 
+export type WorkplanMarkerKey = 'tbd' | 'defer' | 'follow_up' | 'out_of_scope';
+
+export interface WorkplanMarkerSample {
+  readonly lineNumber: number;
+  readonly markerKey: WorkplanMarkerKey;
+  readonly text: string;
+}
+
 export interface WorkplanFeatureCounts {
   readonly slug: string;
   readonly target_version: string;
@@ -42,6 +50,11 @@ export interface WorkplanFeatureCounts {
     readonly out_of_scope: number;
     readonly total: number;
   };
+  // Per-marker call-sites in line order, capped at MAX_SAMPLES_PER_FEATURE.
+  // Surfaced via JSON output only; the markdown formatter keeps the table
+  // count-per-feature. Phase 3 (promote-deferrals) consumes these line
+  // numbers to rewrite bare TBDs into [debt: #NNN] back-links in place.
+  readonly samples: readonly WorkplanMarkerSample[];
 }
 
 export interface WorkplanTbdsReport {

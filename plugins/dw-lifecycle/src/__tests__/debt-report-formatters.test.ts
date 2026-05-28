@@ -51,6 +51,11 @@ function fixtureReport(overrides?: Partial<DebtReport>): DebtReport {
             out_of_scope: 1,
             total: 3,
           },
+          samples: [
+            { lineNumber: 5, markerKey: 'tbd', text: '- TBD: investigate' },
+            { lineNumber: 6, markerKey: 'defer', text: '- defer rebuild' },
+            { lineNumber: 7, markerKey: 'out_of_scope', text: '- out of scope' },
+          ],
         },
       ],
     },
@@ -162,6 +167,19 @@ describe('formatJson', () => {
     expect(parsed.github_issues.stale.threshold_days).toBe(30);
     expect(parsed.workplan_tbds.features[0].counts.out_of_scope).toBe(1);
     expect(parsed.parked_branches.parked[0].refname).toBe('feature/old-stuff');
+    // Per-feature samples flow through to JSON so Phase 3 can read line
+    // numbers without re-scanning the workplan.
+    expect(parsed.workplan_tbds.features[0].samples).toHaveLength(3);
+    expect(parsed.workplan_tbds.features[0].samples[0].lineNumber).toBe(5);
+    expect(parsed.workplan_tbds.features[0].samples[0].markerKey).toBe('tbd');
+  });
+
+  it('omits the samples list from the markdown output', () => {
+    // The markdown table is count-per-feature; per-line samples would
+    // clutter it. Only JSON consumers (Phase 3) read the samples.
+    const md = formatMarkdown(fixtureReport());
+    expect(md).not.toMatch(/lineNumber/i);
+    expect(md).not.toContain('- TBD: investigate');
   });
 
   it('preserves null entries for skipped sections', () => {

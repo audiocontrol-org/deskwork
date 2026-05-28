@@ -19,17 +19,42 @@ interface RawIssue {
   readonly comments: ReadonlyArray<{ readonly createdAt: string }>;
 }
 
+function isLabelShape(value: unknown): value is { name: string } {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return typeof v.name === 'string';
+}
+
+function isCommentShape(value: unknown): value is { createdAt: string } {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return typeof v.createdAt === 'string';
+}
+
 function isRawIssue(value: unknown): value is RawIssue {
   if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
-  return (
-    typeof v.number === 'number' &&
-    typeof v.title === 'string' &&
-    typeof v.url === 'string' &&
-    typeof v.updatedAt === 'string' &&
-    Array.isArray(v.labels) &&
-    Array.isArray(v.comments)
-  );
+  if (
+    typeof v.number !== 'number' ||
+    typeof v.title !== 'string' ||
+    typeof v.url !== 'string' ||
+    typeof v.updatedAt !== 'string' ||
+    !Array.isArray(v.labels) ||
+    !Array.isArray(v.comments)
+  ) {
+    return false;
+  }
+  // Walk inner shapes — a missing label.name or comment.createdAt would
+  // otherwise yield `undefined` at access time (label.name) or
+  // `Invalid Date` (new Date(comment.createdAt)) and silently corrupt
+  // the by_label / stale_since_last_comment buckets.
+  for (const label of v.labels) {
+    if (!isLabelShape(label)) return false;
+  }
+  for (const comment of v.comments) {
+    if (!isCommentShape(comment)) return false;
+  }
+  return true;
 }
 
 function parseGhOutput(raw: string): RawIssue[] {
@@ -37,8 +62,9 @@ function parseGhOutput(raw: string): RawIssue[] {
   try {
     parsed = JSON.parse(raw);
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
     throw new Error(
-      `Could not parse gh issue list output as JSON: ${(err as Error).message}`,
+      `Could not parse gh issue list output as JSON: ${message}`,
     );
   }
   if (!Array.isArray(parsed)) {
