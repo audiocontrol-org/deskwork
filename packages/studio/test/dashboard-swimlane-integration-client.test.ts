@@ -208,6 +208,15 @@ describe('Phase 5 Task 5.6 — multi-lane integration (client)', () => {
     expect(qaSwim?.classList.contains('is-visibility-hidden')).toBe(true);
     expect(qaChip?.classList.contains('is-visibility-hidden')).toBe(true);
     expect(qaRow?.dataset.laneVisible).toBe('false');
+    // Per AUDIT-20260528-38 — the stub also receives the
+    // is-visibility-hidden class from the swimlane controller (line
+    // 151 of swimlane.ts). Without this assertion the contract is
+    // half-covered: a regression that left stubs visible while
+    // hiding the full swim would not surface here.
+    const qaStub = document.querySelector<HTMLElement>(
+      '[data-swim-stub="qa"]',
+    );
+    expect(qaStub?.classList.contains('is-visibility-hidden')).toBe(true);
     // Other lanes stay visible.
     const defaultSwim = document.querySelector<HTMLElement>(
       '.swim[data-lane-id="default"]',

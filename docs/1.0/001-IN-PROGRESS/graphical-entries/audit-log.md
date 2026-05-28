@@ -1064,3 +1064,197 @@ binary):
 Net: 2 of 4 wrapper-format frictions closed by v0.25.0. TF-008 and
 TF-009 to be marked `closed-v0.25.0` in `tooling-feedback.md`.
 TF-011 and TF-012 remain open with the v0.25.0 verification noted.
+
+## 2026-05-28 audit rerun: Phase 5.5 end state
+
+Audit scope: `main...HEAD` from merge-base
+`23e0b0edcc831db04d9c0dd50ac7308b2810581a`, current HEAD `e792d03`.
+
+Risk classification: high. The rerun covers the accumulated Phase 5.2
+through 5.5 dashboard behavior, including saveable presets and the
+followup fixes through `e792d03`.
+
+Track 1 verification:
+
+- `npm --workspace @deskwork/core test` passed: 64 files, 697 tests.
+- `npm --workspace @deskwork/studio test` passed: 68 files, 781 tests;
+  2 files and 11 tests skipped.
+- `npm run build --workspaces --if-present` passed for core, CLI, and
+  Studio.
+- `tsx scripts/smoke-phase4-issues.mjs` passed.
+- `tsx scripts/smoke-phase4-migration.mjs` passed.
+- Browser / viewport smoke was attempted but not completed: Studio dev
+  server with escalation reported `http://localhost:47326/`, but
+  `curl` and `scripts/smoke-er-viewport-regressions.mjs` could not
+  connect from the command context. The server processes were stopped.
+
+Track 2 spec-compliance review: read-only reviewer pass against Phase 5
+Tasks 5.2 through 5.5 and the accepted D3 Press Bay brief.
+
+Track 3 code-quality review: read-only reviewer pass against current
+dashboard controllers, presets, storage, accessibility, and command
+integration.
+
+### AUDIT-20260528-38
+
+Finding-ID: AUDIT-20260528-38
+Status:     open
+Severity:   medium
+Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts
+
+Saved presets do not capture viewport-derived view mode. Task 5.5.1
+defines saved focus presets as including per-lane view mode, but the
+snapshot reads only explicit storage overrides, not the effective mode
+currently rendered on the page.
+
+Evidence:
+
+- `docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:269`
+  defines saved presets as including `per-lane-view-mode`.
+- `plugins/deskwork-studio/public/src/dashboard/swimlane-view-toggle.ts`
+  applies the mobile `list` / desktop `kanban` default from
+  `matchMedia`, but only writes storage when the operator clicks a
+  toggle.
+- `plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:189`
+  snapshots `viewModePerLane` from the stored override map only.
+- `plugins/deskwork-studio/public/src/dashboard/swimlane-presets-store.ts:256`
+  applies that stored map back as the authoritative view-mode state.
+
+Expected: `Save current as preset` captures the actual current per-lane
+view mode, including viewport-derived mobile `list` mode when no
+explicit override exists.
+
+Actual: a preset saved from mobile default list view can store `{}` for
+`viewModePerLane`; loading it later on desktop resolves back to desktop
+default `kanban`, so the reopened preset does not match the saved view.
+
+Fix guidance: snapshot effective view mode from the live
+`.swim.view-kanban` / `.swim.view-list` DOM state for every lane, or
+expose a view-toggle helper that returns resolved per-lane modes after
+viewport defaults and overrides are applied. Add a regression test that
+saves under mobile default list mode, applies under desktop, and verifies
+the lane remains list.
+
+### AUDIT-20260528-39
+
+Finding-ID: AUDIT-20260528-39
+Status:     open
+Severity:   high
+Surface:    dashboard compose chip / deskwork add command integration
+
+Studio copies `/deskwork:add` commands that the current add surface
+cannot execute. The per-lane compose chip now generates lane/template
+aware commands, but the deskwork add skill, CLI parser, and core create
+path are still legacy-editorial only.
+
+Evidence:
+
+- `plugins/deskwork-studio/public/src/dashboard/swimlane-compose.ts:97`
+  copies `/deskwork:add <SLUG> --lane ${laneId} --stage ${firstStage}`.
+- `plugins/deskwork/skills/add/SKILL.md:13` documents only
+  `/deskwork:add <slug> "<title>"`; no `--lane`, `--stage`, or
+  lane-aware behavior.
+- `packages/cli/src/commands/add.ts:22` accepts only `site`, `type`,
+  `content-url`, `source`, and `slug`; unknown flags are rejected by
+  `parseArgs`.
+- `packages/core/src/entry/create.ts:20` still types
+  `currentStage` as the legacy `Stage` union while
+  `packages/core/src/schema/entry.ts:164` permits arbitrary template
+  stage strings.
+
+Expected: clicking `+ new` in a non-editorial lane produces a pasteable
+command that creates an entry in that lane's first template stage.
+
+Actual: the copied command is ahead of the command implementation. It
+will be rejected or mishandled by the current add path, and non-editorial
+stages such as `Sketched` / `Drafted` cannot flow through the typed
+creation helper.
+
+Fix guidance: update `/deskwork:add` skill + CLI + core create path
+together: accept `--lane`, `--stage`, and `--kind`; validate stage
+against the target lane template; widen `CreateEntryParams.currentStage`
+to the schema's string contract; write `lane` / `artifactKind`; and add
+an integration test from copied compose command to sidecar output. Also
+quote or otherwise encode stage values, since valid stage names may
+contain spaces.
+
+## 2026-05-28 audit: Phase 5 Task 5.6 (multi-lane integration test)
+
+Audit scope: commit `6ad45d9` + in-task review followup.
+Predecessor: `e792d03`. Tests 781 → 801 (+20 integration tests). Build
+exit 0 across core + studio. Phase 5 closes with this task.
+
+Combined spec + code-quality review via the dw-lifecycle trussing.
+Spec ✅ SPEC-COMPLIANT across all six steps; quality ⚠️ APPROVED WITH
+FOLLOWUPS — 0 blocking, 2 info-level findings.
+
+### AUDIT-20260528-38
+
+Finding-ID: AUDIT-20260528-38
+Status:     fixed-followup-commit
+Severity:   low
+Surface:    packages/studio/test/dashboard-swimlane-integration-client.test.ts
+
+The Step 5.6.2 hidden-lane test asserted `.is-visibility-hidden`
+on the qa swim + qa chip + `data-lane-visible="false"` on the qa
+rail row, but did NOT assert the corresponding state on the qa
+**stub** ([data-swim-stub="qa"]). The stub class state is part of
+the controller's contract (swimlane.ts:151) and was untested by
+this integration suite — a regression that left stubs visible while
+hiding the full swim would not have surfaced.
+
+Resolution: added a one-line assertion for the stub's
+`.is-visibility-hidden` class. The contract is now end-to-end
+covered: swim + stub + chip + rail row all signal hidden state
+when localStorage carries the hidden lane.
+
+### AUDIT-20260528-39
+
+Finding-ID: AUDIT-20260528-39
+Status:     open
+Severity:   informational
+Surface:    packages/studio/test/dashboard-swimlane-integration-client.test.ts:83-84 + ~3 other test files
+
+Two `as { CSS?: unknown }` / `as { CSS: CSSShim }` casts to read/install
+the `CSS.escape` shim under jsdom. This pattern is carried over verbatim
+from the existing precedent in `dashboard-swimlane-client.test.ts:105-106`
+and 2-3 other client-test files. The cast pattern violates the project's
+"no `as Type` casts" rule literally, but the test file inherits — it is
+not net-new debt.
+
+The cleaner shape across all jsdom test files would be a single shared
+helper using `Object.defineProperty(globalThis, 'CSS', {...})` paired with
+`if ('CSS' in globalThis === false)`. Worth a focused project-wide
+cleanup pass; not blocking Phase 5.
+
+## 2026-05-28: Phase 5 — closing summary
+
+All six Phase 5 tasks (5.1 / 5.1A / 5.1B / 5.1C / 5.2 / 5.3 / 5.4 / 5.5 /
+5.6) landed cleanly via the dw-lifecycle trussing. Test count grew from
+the pre-Phase-5 baseline (586) to 801 (+215) with zero regressions.
+Build exits 0 across core + studio. The multi-lane bay-shell ships:
+
+- Swimlane shell with template-driven stage columns per lane.
+- Per-lane chrome: collapse (lane + per-stage), kanban ↔ list toggle,
+  compose chip, empty-lane CTA.
+- Lane-visibility rail with eye-toggle + drag-to-reorder + per-operator
+  order persistence (localStorage).
+- Focus-chip strip with overflow scroll, hidden-lane rail activation,
+  mobile slide-up sheet via bay-head trigger.
+- Saveable focus presets capturing the four state axes; deep-link URL
+  pattern `?preset=<id>` applies on init AND strips after apply.
+- Template-aware verb dispatch via `classifyStage(stage, template)`:
+  off-pipeline, terminal, locked (with `Approve → <next>` label), or
+  active-linear.
+- Commandment III verified end-to-end: no surface renders review-state
+  labels; pinned by regression tests across every template's row chrome.
+
+Tooling-feedback during the cycle:
+- TF-008 and TF-009 closed in dw-lifecycle v0.25.0.
+- TF-010 (scope-widen no-op clustering) tracks upstream #318.
+- TF-011 (`Excluded: (none ...)` parser) and TF-012 (refactored-word
+  gate) remain open under v0.25.0.
+
+Phase 5 audit log: AUDIT-01 through AUDIT-39, 39 findings total. All
+blocking findings closed; non-blocking observations either applied
+inline or tracked as `open` with explicit fix guidance.
