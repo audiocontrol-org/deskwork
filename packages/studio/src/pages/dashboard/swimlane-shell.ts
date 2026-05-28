@@ -16,18 +16,17 @@
  *
  * What's deliberately NOT here (later-task slots only — empty, not
  * stubbed):
- *   - Lane-level collapse / per-stage collapse chevron handlers
- *     (Task 5.1A — markup carries an `<empty-slot>`-style comment
- *     where the chevron will land so 5.1A diff is additive).
  *   - Per-lane kanban ↔ list view toggle (Task 5.1B).
  *   - Per-lane `+ new` Compose chip (Task 5.1C).
  *   - Drag-to-reorder rail handler (Task 5.4).
  *   - Saveable focus presets + deep-link URL (Task 5.5).
  *
- * The markup leaves explicit `<!-- 5.1A slot -->` / `<!-- 5.1B
- * slot -->` / `<!-- 5.1C slot -->` HTML comments so the next
- * dispatch's diff is additive (drop in the affordance; no markup
- * needs removing).
+ * The swim-head markup leaves explicit `<!-- 5.1B slot -->` /
+ * `<!-- 5.1C slot -->` HTML comments so the next dispatch's diff is
+ * additive (drop in the affordance; no markup needs removing). The
+ * 5.1A lane-level collapse chevron landed in `swimlane-card.ts` —
+ * the slot comment was replaced by a real `<button class="collapse-
+ * chev">` carrying `aria-expanded` + lane-scoped data attributes.
  *
  * F4 split (Phase 5 Task 5.1 code-quality pass): the rail, focus-
  * strip, and per-lane swim/stub renderers live in sibling modules
