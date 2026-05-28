@@ -123,3 +123,10 @@ yarn-error.log*
 ## kept ignored so the cache file doesn't reappear if someone re-runs
 ## the helper script.
 /.dw-lifecycle/scope-discovery/grammar-instruction.txt
+
+## Orchestrator prompt scratch — `wrap-prompt`-augmented dispatch briefs +
+## return-validation captures used during the scope-discovery dogfood
+## pilot. Per-session transactional state; the orchestrator regenerates
+## these as it dispatches sub-agents. Audit evidence lives in the
+## audit-log + commit history, not in the scratch files themselves.
+/.dw-lifecycle/scope-discovery/scratch/
