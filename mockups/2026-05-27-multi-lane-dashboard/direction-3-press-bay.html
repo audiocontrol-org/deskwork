@@ -957,13 +957,13 @@
 <body>
   <div class="meta">Direction 3 · <a href="./index.html">↩ all directions</a></div>
   <h1 class="demo-title">Press Bay <span style="font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.2em; color: var(--green); margin-left: 0.5rem; vertical-align: middle;">v11 · PER-LANE COMPOSE</span></h1>
-  <div class="demo-sub">No form. Each lane carries its own <code>+ slug</code> chip. Click clipboard-copies <code>/deskwork:add &lt;SLUG&gt; --lane &lt;id&gt; --stage &lt;first&gt;</code> with lane + initial stage pre-filled; the operator pastes in chat, replaces <code>&lt;SLUG&gt;</code> with their actual slug, hits return. The "form" is the chat editor — where the operator already is.</div>
+  <div class="demo-sub">No form. Each lane carries its own <code>+ new</code> chip. Click clipboard-copies <code>/deskwork:add &lt;SLUG&gt; --lane &lt;id&gt; --stage &lt;first&gt;</code> with lane + initial stage pre-filled; the operator pastes in chat, replaces <code>&lt;SLUG&gt;</code> with the actual slug, hits return. The "form" is the chat editor — where the operator already is.</div>
 
   <div class="deviation-note">
     <span class="label">Standards-compliant</span> Two granularities of collapse, each with its own chevron: <strong>lane-level</strong> (chevron in swim-head / lane-head) hides the entire lane body, leaves the swim-head + a compact per-stage count strip; <strong>stage-level</strong> (chevron in stage-head for kanban / lb-group-head for list) hides one stage's content within an expanded lane. In kanban, collapsed columns shrink to a narrow vertical strip (~42px wide) with the stage name rotated; remaining columns redistribute via flex to fill the freed space. In list, collapsed groups show just the group-head (with the entry count + tag) and hide their rows. Mockup demonstrates: Editorial swim has <strong>Published collapsed as a vertical strip</strong>; Press Releases list has <strong>Published collapsed as a head-only row</strong>; mobile Editorial list has <strong>Planned collapsed</strong>. The collapse-chev convention is universal — same `▾` glyph rotated 90° clockwise to indicate collapsed, same hover-to-red-pencil affordance, click anywhere on the head (or chevron) to toggle.<br><br>
     Per-lane segmented toggle (<code>▦ Kanban</code> / <code>≡ List</code>) flips the body between the two views. Both views show the same entries — only the spatial arrangement differs. <strong>Defaults are viewport-aware:</strong> desktop defaults to kanban (wide viewport → multi-column real estate); mobile defaults to list (narrow viewport → vertical sequence is the natural fit, AND list view preserves the linear stage relationship more honestly than the tile-stack does). The operator can flip either default per-lane via the toggle. When collapsed, the toggle greys out (collapse precedence). The kanban tile view on mobile is the established v0.19 collapsible-stage-tile pattern — single-column vertical stack of one-line tile strips (per <code>DESIGN-STANDARDS.md § Collapsible stage tiles</code>), NOT a 2-column wrap (which would break the stage sequence visually). Mockup demonstrates four lane states at once: <strong>Editorial</strong> (kanban on desktop / list on mobile), <strong>Mockups</strong> (filtered out), <strong>QA</strong> (collapsed — view-toggle greyed), <strong>Press Releases</strong> (list on desktop / kanban-tile on mobile). The list-view stage groups carry the same stage-name + count + tag pattern as the kanban stage-grid heads; rows are dense (one-liner: title + version-pill + state + ⋮ overflow); locked stages render the group-head glyph in proof-blue.<br><br>
 
-    <strong>Compose is per-lane, no form (v11).</strong> Every swim-head (desktop) and lane-head (mobile) carries a red-pencil <code>+ slug</code> chip. Click does ONE thing: clipboard-copies <code>/deskwork:add &lt;SLUG&gt; --lane &lt;id&gt; --stage &lt;first-linear-stage&gt;</code> with the lane and initial stage pre-filled — the operator pastes in chat, replaces <code>&lt;SLUG&gt;</code>, hits return. No form fields. No popover. No bottom sheet. The chat editor is already the slug input; the chip just primes the rest of the command. This honors THESIS Consequence 2 (studio doesn't mutate state — the operator's slash-command IS the action) while eliminating the form-fill friction. Post-click, the chip flashes green with <strong>"✓ Copied — paste in chat"</strong> for ~2s, then reverts (Editorial's chip is shown in this state in both frames). Mobile chip is icon-only (<code>+</code>) to fit the narrower lane-head; aria-label carries the full action. The compose chip's position mirrors the lane's identity — same chip on every lane means muscle memory works regardless of which lane the operator targets, and lane-level filtering can't hide compose (it travels with the lane). The Mockups lane is filtered out via a compact stub; clicking the stub restores Mockups to focus, at which point its compose chip becomes available again. This pattern retires the v9 floating <strong>+ Compose</strong> FAB and the v10 multi-field <strong>Compose Card</strong> dialog — both required selecting the lane after opening compose; the v11 chip makes lane selection implicit (you click the chip on the lane you want).
+    <strong>Compose is per-lane, no form (v11).</strong> Every swim-head (desktop) and lane-head (mobile) carries a red-pencil <code>+ new</code> chip ("new" rather than "slug" so the chip reads as the action, not the field — the operator types the slug in chat after pasting). Click does ONE thing: clipboard-copies <code>/deskwork:add &lt;SLUG&gt; --lane &lt;id&gt; --stage &lt;first-linear-stage&gt;</code> with the lane and initial stage pre-filled — the operator pastes in chat, replaces <code>&lt;SLUG&gt;</code>, hits return. No form fields. No popover. No bottom sheet. The chat editor is already the slug input; the chip just primes the rest of the command. This honors THESIS Consequence 2 (studio doesn't mutate state — the operator's slash-command IS the action) while eliminating the form-fill friction. Post-click, the chip flashes green with <strong>"✓ Copied — paste in chat"</strong> for ~2s, then reverts (Editorial's chip is shown in this state in both frames). Mobile chip is icon-only (<code>+</code>) to fit the narrower lane-head; aria-label carries the full action. The compose chip's position mirrors the lane's identity — same chip on every lane means muscle memory works regardless of which lane the operator targets, and lane-level filtering can't hide compose (it travels with the lane). The Mockups lane is filtered out via a compact stub; clicking the stub restores Mockups to focus, at which point its compose chip becomes available again. This pattern retires the v9 floating <strong>+ Compose</strong> FAB and the v10 multi-field <strong>Compose Card</strong> dialog — both required selecting the lane after opening compose; the v11 chip makes lane selection implicit (you click the chip on the lane you want).
   </div>
 
   <div class="frames" style="margin-top:1.4rem;">
@@ -1095,7 +1095,7 @@
                 <button class="swim-compose copied" type="button" aria-label="Composed — paste in chat">
                   <span class="sc-glyph sc-glyph-default" aria-hidden="true">+</span>
                   <span class="sc-glyph sc-glyph-copied" aria-hidden="true">✓</span>
-                  <span class="sc-label-default">slug</span>
+                  <span class="sc-label-default">new</span>
                   <span class="sc-label-copied" aria-hidden="true">Copied — paste in chat</span>
                 </button>
                 <span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse this lane" title="Collapse this lane">▾</span>
@@ -1168,7 +1168,7 @@
                 <button class="swim-compose" type="button" aria-label="Compose new entry in QA lane">
                   <span class="sc-glyph sc-glyph-default" aria-hidden="true">+</span>
                   <span class="sc-glyph sc-glyph-copied" aria-hidden="true">✓</span>
-                  <span class="sc-label-default">slug</span>
+                  <span class="sc-label-default">new</span>
                   <span class="sc-label-copied" aria-hidden="true">Copied — paste in chat</span>
                 </button>
                 <span class="collapse-chev" role="button" tabindex="0" aria-expanded="false" aria-label="Expand this lane" title="Expand this lane">▾</span>
@@ -1214,7 +1214,7 @@
                 <button class="swim-compose" type="button" aria-label="Compose new entry in Press Releases lane">
                   <span class="sc-glyph sc-glyph-default" aria-hidden="true">+</span>
                   <span class="sc-glyph sc-glyph-copied" aria-hidden="true">✓</span>
-                  <span class="sc-label-default">slug</span>
+                  <span class="sc-label-default">new</span>
                   <span class="sc-label-copied" aria-hidden="true">Copied — paste in chat</span>
                 </button>
                 <span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse this lane" title="Collapse this lane">▾</span>
@@ -1319,7 +1319,7 @@
           </main>
         </div>
       </div>
-      <div class="caption">Desktop · per-lane <code>+ slug</code> chip in each swim-head. Click copies the partial slash-command (lane + stage pre-filled) so the operator can paste in chat and fill in the slug. Editorial's chip is shown post-click in the "Copied" state.</div>
+      <div class="caption">Desktop · per-lane <code>+ new</code> chip in each swim-head. Click copies the partial slash-command (lane + stage pre-filled) so the operator can paste in chat and fill in the slug. Editorial's chip is shown post-click in the "Copied" state.</div>
     </div>
 
     <!-- MOBILE -->
@@ -1361,7 +1361,7 @@
                 <button class="swim-compose copied" type="button" aria-label="Composed — paste in chat">
                   <span class="sc-glyph sc-glyph-default" aria-hidden="true">+</span>
                   <span class="sc-glyph sc-glyph-copied" aria-hidden="true">✓</span>
-                  <span class="sc-label-default">slug</span>
+                  <span class="sc-label-default">new</span>
                   <span class="sc-label-copied" aria-hidden="true">Copied — paste in chat</span>
                 </button>
                 <span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse">▾</span>
@@ -1446,7 +1446,7 @@
                 <button class="swim-compose" type="button" aria-label="Compose new entry in QA lane">
                   <span class="sc-glyph sc-glyph-default" aria-hidden="true">+</span>
                   <span class="sc-glyph sc-glyph-copied" aria-hidden="true">✓</span>
-                  <span class="sc-label-default">slug</span>
+                  <span class="sc-label-default">new</span>
                   <span class="sc-label-copied" aria-hidden="true">Copied — paste in chat</span>
                 </button>
                 <span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse">▾</span>
@@ -1479,7 +1479,7 @@
                 <button class="swim-compose" type="button" aria-label="Compose new entry in Press Releases lane">
                   <span class="sc-glyph sc-glyph-default" aria-hidden="true">+</span>
                   <span class="sc-glyph sc-glyph-copied" aria-hidden="true">✓</span>
-                  <span class="sc-label-default">slug</span>
+                  <span class="sc-label-default">new</span>
                   <span class="sc-label-copied" aria-hidden="true">Copied — paste in chat</span>
                 </button>
                 <span class="collapse-chev" role="button" tabindex="0" aria-expanded="true" aria-label="Collapse">▾</span>
