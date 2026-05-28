@@ -126,10 +126,13 @@ function workplanPathFor(
   );
 }
 
-// Display form for each marker key. Mirrors the operator-visible marker
-// vocabulary documented in `Just for now is bullshit`.
+// Display form for each marker key. Casing mirrors the spec brief's
+// `TBD / defer / follow-up / out-of-scope` phrasing — `TBD` is uppercase as
+// a proper noun; the remaining tokens are English words rendered lowercase
+// with hyphen joins. This keeps the marker render consistent with the
+// commit-subject token display (also uppercase `TBD`).
 const MARKER_DISPLAY: Readonly<Record<WorkplanMarkerKey, string>> = {
-  tbd: 'tbd',
+  tbd: 'TBD',
   defer: 'defer',
   follow_up: 'follow-up',
   out_of_scope: 'out-of-scope',
@@ -191,16 +194,40 @@ function isRawIssue(value: unknown): value is RawIssue {
   );
 }
 
+// Result of a git invocation that the caller is willing to fail. Carries
+// the reason on the failure branch so a downstream diagnostic can name
+// WHICH step failed and with what message instead of collapsing every
+// failure mode onto an indistinguishable `null`.
+type GitAttempt =
+  | { readonly ok: true; readonly value: string }
+  | { readonly ok: false; readonly reason: string };
+
 // Run a git command that may fail (missing SHA, missing remote ref, etc.)
-// and return null instead of throwing. Used for the session-boundary
-// timestamp resolution, where each fallback step is allowed to fail.
-function tryGit(runGit: RunGit, args: readonly string[]): string | null {
+// and return a discriminated outcome instead of throwing. The reason
+// string preserves the upstream error message so the session-boundary
+// resolver can surface WHICH fallback failed and why when every step
+// exhausts.
+function tryGit(runGit: RunGit, args: readonly string[]): GitAttempt {
   try {
-    return runGit(args).trim();
-  } catch {
-    return null;
+    return { ok: true, value: runGit(args).trim() };
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    return { ok: false, reason };
   }
 }
+
+// Result of the session-boundary resolution. On success, carries the ISO
+// timestamp; on failure, carries per-fallback reason strings so the caller
+// can surface a one-line diagnostic to stderr naming WHICH steps were
+// tried and why each failed.
+type BoundaryResolution =
+  | { readonly ok: true; readonly iso: string }
+  | {
+      readonly ok: false;
+      readonly shaReason: string | null;
+      readonly mergeBaseReason: string;
+      readonly headReason: string;
+    };
 
 // Resolve the session-boundary ISO-8601 committer-date timestamp.
 //
@@ -210,32 +237,64 @@ function tryGit(runGit: RunGit, args: readonly string[]): string | null {
 //   3. The committer date of HEAD~10 (last-10-commits fallback, mirrored
 //      from the commit-scanner's FALLBACK_RECENT_COMMITS).
 //
-// Returns null when every step fails. The caller treats null as "no usable
-// boundary; skip the gh query" — better than emitting a calendar-date
-// query that re-introduces the bug this method exists to close.
+// Returns a failure object when every step fails. The caller treats that
+// as "no usable boundary; skip the gh query" — better than emitting a
+// calendar-date query that re-introduces the bug this method exists to
+// close — AND surfaces a one-line stderr diagnostic so the operator can
+// tell the failure mode apart from "no issues filed this session."
 function resolveSessionBoundaryIso(
   runGit: RunGit,
   sessionStartSha: string | null,
-): string | null {
+): BoundaryResolution {
+  let shaReason: string | null = null;
   if (sessionStartSha !== null) {
     const fromSha = tryGit(runGit, ['show', '-s', '--format=%cI', sessionStartSha]);
-    if (fromSha !== null && fromSha.length > 0) return fromSha;
+    if (fromSha.ok && fromSha.value.length > 0) {
+      return { ok: true, iso: fromSha.value };
+    }
+    shaReason = fromSha.ok ? 'empty-output' : fromSha.reason;
   }
   const mergeBase = tryGit(runGit, ['merge-base', 'HEAD', 'origin/main']);
-  if (mergeBase !== null && mergeBase.length > 0) {
-    const fromMergeBase = tryGit(runGit, ['show', '-s', '--format=%cI', mergeBase]);
-    if (fromMergeBase !== null && fromMergeBase.length > 0) return fromMergeBase;
+  let mergeBaseReason: string;
+  if (mergeBase.ok && mergeBase.value.length > 0) {
+    const fromMergeBase = tryGit(runGit, ['show', '-s', '--format=%cI', mergeBase.value]);
+    if (fromMergeBase.ok && fromMergeBase.value.length > 0) {
+      return { ok: true, iso: fromMergeBase.value };
+    }
+    mergeBaseReason = fromMergeBase.ok
+      ? 'merge-base resolved but committer-date empty'
+      : `merge-base resolved but committer-date lookup failed: ${fromMergeBase.reason}`;
+  } else {
+    mergeBaseReason = mergeBase.ok ? 'empty-output' : mergeBase.reason;
   }
   const fromHead = tryGit(runGit, ['show', '-s', '--format=%cI', `HEAD~${FALLBACK_RECENT_COMMITS}`]);
-  if (fromHead !== null && fromHead.length > 0) return fromHead;
-  return null;
+  if (fromHead.ok && fromHead.value.length > 0) {
+    return { ok: true, iso: fromHead.value };
+  }
+  const headReason = fromHead.ok ? 'empty-output' : fromHead.reason;
+  return { ok: false, shaReason, mergeBaseReason, headReason };
 }
 
 function scanIssuesThisSession(
   args: SessionEndHygieneArgs,
 ): readonly HygieneObservation[] {
-  const sinceIso = resolveSessionBoundaryIso(args.runGit, args.sessionStartSha);
-  if (sinceIso === null) return [];
+  const resolution = resolveSessionBoundaryIso(args.runGit, args.sessionStartSha);
+  if (!resolution.ok) {
+    // Every fallback step exhausted. Empty issue list is still a valid
+    // outcome (the caller renders "no issues need disposition" downstream)
+    // but the operator needs to be able to tell THIS case apart from a
+    // session that genuinely filed zero issues — emit a one-line stderr
+    // diagnostic naming WHICH fallbacks were tried and the last error.
+    const shaPart =
+      resolution.shaReason !== null
+        ? `sha=${resolution.shaReason}`
+        : 'sha=not-supplied';
+    console.error(
+      `session-end-hygiene: no session boundary resolvable (tried ${shaPart}, merge-base=${resolution.mergeBaseReason}, HEAD~${FALLBACK_RECENT_COMMITS}=${resolution.headReason}); skipping issue scan`,
+    );
+    return [];
+  }
+  const sinceIso = resolution.iso;
   let raw: string;
   try {
     raw = args.runGh([
@@ -287,13 +346,17 @@ function recommend(
 
   for (const obs of observations) {
     if (obs.category === 'issue-filed-this-session') {
-      // Forward-looking Triage line only carries OPEN issues. CLOSED-this-
+      // Forward-looking Triage line carries OPEN issues only. CLOSED-this-
       // session issues stay in the observations block as historical signal
-      // but they are NOT triageable next session — they are already done.
+      // but are NOT triageable next session — they are already done.
+      // Undefined-state issues (malformed gh JSON, schema drift) are also
+      // excluded from the Triage line — they still appear in observations
+      // with their absent state cited, but the operator-facing forward-
+      // looking line gates strictly on OPEN per the #340 spec.
       if (
         obs.issueNumber !== undefined &&
         obs.issueTitle !== undefined &&
-        obs.issueState !== 'CLOSED'
+        obs.issueState === 'OPEN'
       ) {
         triageItems.push(`#${obs.issueNumber} (${obs.issueTitle})`);
       }
