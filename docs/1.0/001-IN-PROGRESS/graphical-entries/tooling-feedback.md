@@ -38,6 +38,7 @@ Running log of friction, pathologies, and improvement opportunities in the scope
 | TF-007 | Closed | dw-lifecycle v0.24.1 — `dw-lifecycle orchestrator-turn --feature <slug>` CLI subcommand shipped |
 | TF-008 | Open | — |
 | TF-009 | Open | — |
+| TF-010 | Open | — |
 
 ## How to add an entry
 
@@ -410,4 +411,66 @@ The fundamental tension: the forbidden-phrase list is a load-bearing contract (n
 Recommended: **Light**. The GRAMMAR_INSTRUCTION prelude is the natural place to surface the contract's gotchas; agents read it on every dispatch. A 2-sentence callout about project-vocabulary collisions makes the rephrasing visible up front instead of after a rejection.
 
 Cross-reference: same parent shape as TF-008 (parser format strictness with semantic equivalent that passes meaning but fails contract). The fix-class is also similar: document the gotcha in the prelude. Both TF-008 and TF-009 would close together with a single GRAMMAR_INSTRUCTION rewrite covering all three gotchas (noun strictness on Searched, `:LINE` requirement on Excluded, project-vocabulary phrase collisions).
+
+## TF-010 · DSC · low · `scope-widen` always emits 0 additions because the unmatched-shape clustering pass is STUB (upstream #318)
+
+**Repro:**
+
+1. From a feature worktree, run an `orchestrator-turn` to confirm the scope-discovery state is clean, then invoke `scope-widen` with a complaint describing concrete new surfaces the current task introduced:
+
+   ```bash
+   dw-lifecycle scope-widen "Task 5.1: multi-lane swimlane shell + focus-chip strip + lane-visibility rail + swim-stub introduced new surfaces (bay-shell, swim-head with 5.1A/B/C slots, focus chips, rail-lane, eye-toggle, locked-stage variant, per-lane modifier classes)" --slug graphical-entries --apply
+   ```
+
+2. The CLI runs through the discovery agents (parallel dispatch — `ui-route-enumerator`, `pattern-matrix`, `clone-detector-reader`, `prd-themed-pattern-hunter`) and writes their evidence JSON files into `docs/<v>/001-IN-PROGRESS/<slug>/scope-inventory/widen-runs/<timestamp>/`.
+
+3. The synthesis stage prints:
+
+   ```
+   pattern-matrix: unmatched-shape clustering pass is a STUB (stub; tracking #318). The polymorphic dispatcher is shipped; the clustering algorithm lands under issue #318. discovered_candidates returns [] until then.
+   scope-widen delta — 0 addition(s):
+     routes:           +0
+     modules:          +0
+     themes:           +0
+     regime-holdouts:  +0 anti-pattern, +0 adopter-manifest, +0 editor-symmetry, +0 deprecation
+   scope-widen: next-manifest categories: registered-pattern=0, discovered-candidate=0, novel-shape-candidate=0
+   scope-widen: --apply requested but delta is empty; manifest unchanged.
+   ```
+
+4. Exit code 0; manifest unchanged.
+
+Observed across three between-task widen invocations this session (one after each of Tasks 5.1, 5.1A, 5.1B). The discovery agents do real work (the evidence JSON files contain real route enumeration + theme keyword mining), but the synthesis stage can't cluster their output into manifest-shaped candidates without the clustering algorithm, so `discovered_candidates` is always `[]`.
+
+The `/dw-lifecycle:implement` SKILL.md describes the between-task auto-invocation:
+
+> When the completed task introduced NEW shapes / surfaces / primitives not enumerated in the project's existing `scope-manifest.yaml`, invoke `dw-lifecycle scope-widen <slug> "<task brief as complaint>"` to expand the manifest. ... The widened scope-manifest is read by the next task's implementer brief so its dispatch sees the augmented scope context.
+
+In practice for greenfield features (`modules: []` baseline from `scope-inventory`), the manifest never grows — the next implementer brief sees the same empty manifest the previous one did. For projects with already-populated manifests (e.g. audiocontrol), existing entries DO drive enforcement; the STUB just means new shapes won't be added.
+
+This is the *learning* layer of the trussing (teaching the manifest about new patterns). The *enforcement* layer (dispatch-wrapper grammar; audit-log read + wrong-decision detection; mediation + controller; escalation visibility) is entirely independent of the clustering pass — those continued to work end-to-end this session and earned the trussing's keep.
+
+**Workaround used:**
+
+None directly applied — the STUB is upstream-tracked and the dogfood verdict is "informational, acceptable in the meantime." The retroactive workaround that COULD be used once #318 ships: replay `synthesis` against the archived `widen-runs/*` directories from this session to back-fill the manifest with everything Phase 5 introduced (bay-shell, swim-head, focus-chip-strip, view-toggle, list-body, collapse-chev, swim-stub, etc.). The evidence files (`ui-route-enumerator.json`, `prd-themed-pattern-hunter.json`, etc.) are durable input the clustering pass would consume.
+
+The narrow manual escape hatch if learning-layer matters mid-session: hand-author entries into `scope-manifest.yaml` (same shape as `adopter-manifests.yaml`). Bypasses synthesis entirely; not worth doing for Phase 5 where the manifest isn't gating downstream work, but documented here as the operator's option.
+
+**Suggested fix:**
+
+#318 is the upstream tracker; this TF entry isn't a separate fix proposal. It's the dogfood signal that:
+
+1. The STUB's operator-facing behavior is the "no-op widen" pattern — every invocation runs cleanly, prints `0 addition(s)`, leaves the manifest unchanged.
+2. The widen-run evidence dirs accumulate even when synthesis can't consume them; they're durable input for #318's algorithm.
+3. For greenfield features, the "next implementer sees augmented manifest" promise can't be fulfilled until #318 ships. SKILL.md prose mentioning that promise should either annotate it as gated-on-#318 OR ship a `--no-scope-widen` default for greenfield features (where the no-op runs add session-overhead without signal).
+
+**Suggested closure path:** when #318 ships, retroactively run synthesis against the three archived widen-run dirs from this session:
+
+- `docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T061143Z-89b7a1/` (Task 5.1)
+- `docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T082055Z-220e45/` (Task 5.1A)
+- `docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T090129Z-4f2251/` (Task 5.1A re-run)
+- `docs/1.0/001-IN-PROGRESS/graphical-entries/scope-inventory/widen-runs/20260528T094458Z-a64941/` (Task 5.1B)
+
+If the clustering pass produces the expected swimlane-vocabulary candidates from those evidence sets, that's confirmation that the gap was exactly the algorithm and not the dispatch shape. Close TF-010 with `verified-<date>` against the back-fill commit.
+
+Cross-reference: TF-006 (closed) is incidentally the entry that first surfaced the STUB warning — TF-006 was scoped to the schema-validation hard-fail (`modules: minItems: 1` rejecting greenfield manifests) and treated the STUB as informational context. TF-010 promotes the STUB to its own entry per the project's `capture friction over scope` rule: upstream tracking doesn't substitute for the per-feature dogfood log when the operator-visible behavior is real friction (three no-op invocations across one session).
 
