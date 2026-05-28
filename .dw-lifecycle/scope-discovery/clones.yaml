@@ -1,4 +1,4 @@
-generated_at: 2026-05-28T19:59:56.914Z
+generated_at: 2026-05-28T20:31:30.832Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -993,7 +993,7 @@ clones:
   - id: 17db7d8fff6f
     lines: 10
     members:
-      - plugins/dw-lifecycle/src/subcommands/close-shipped.ts:105:114
+      - plugins/dw-lifecycle/src/subcommands/close-shipped.ts:118:127
       - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:146:155
     disposition: keep-with-reason
     reason: "Hygiene Phase 5 intentional parallelism: detectRepoFromGit + RunGh boundary callback shapes intentionally mirrored across the hygiene-skill libraries (debt-report, triage-issues, promote-deferrals, close-shipped) to keep them independently evolvable; promotion to a shared module would couple them prematurely before Phase 6 lifecycle integration reveals the durable abstraction shape."
@@ -1081,3 +1081,10 @@ clones:
       - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:107:130
     disposition: keep-with-reason
     reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape (propose/apply verbs, argv parsing, approval-token grammar, structural JSON guards, per-row outcome shape) on purpose. Per-skill subcommand boilerplate (parsePositiveInt, flag-loop parseProposeArgs/parseApplyArgs, defaultRunGh, detectRepoFromGit) is mirrored rather than imported so each hygiene skill remains independently evolvable; consolidation into a shared module is tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
+  - id: ec203342fa99
+    lines: 12
+    members:
+      - plugins/dw-lifecycle/src/subcommands/session-end-hygiene.ts:30:41
+      - plugins/dw-lifecycle/src/subcommands/session-start-recommendation.ts:21:32
+    disposition: keep-with-reason
+    reason: "argv parsing for --slug flag — identical helper-script CLI boilerplate per the Phase 2/3 precedent. Extracting a shared argv parser is broader infrastructure work outside this dispatch's scope (tracked at #335)."

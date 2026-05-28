@@ -170,20 +170,20 @@ date: 2026-05-28
 
 ### Task 1: Modify session-end
 
-- [ ] Step 1: Edit `plugins/dw-lifecycle/skills/session-end/SKILL.md` + the helper to capture hygiene observations from the session (commit messages mentioning TBD/defer, files touched matching workplan-TBD patterns, etc.).
-- [ ] Step 2: Generate a next-session recommendation block. Operator-editable before commit.
-- [ ] Step 3: Land the recommendation block in `DEVELOPMENT-NOTES.md` as part of the journal entry.
+- [x] Step 1: Edit `plugins/dw-lifecycle/skills/session-end/SKILL.md` + the helper to capture hygiene observations from the session (commit messages mentioning TBD/defer, files touched matching workplan-TBD patterns, etc.).
+- [x] Step 2: Generate a next-session recommendation block. Operator-editable before commit.
+- [x] Step 3: Land the recommendation block in `DEVELOPMENT-NOTES.md` as part of the journal entry.
 
 ### Task 2: Modify session-start
 
-- [ ] Step 1: Edit `plugins/dw-lifecycle/skills/session-start/SKILL.md` + helper to read the prior session's recommendation from `DEVELOPMENT-NOTES.md` and display it.
-- [ ] Step 2: NO fresh scan — display-only. Re-entry stays cheap.
+- [x] Step 1: Edit `plugins/dw-lifecycle/skills/session-start/SKILL.md` + helper to read the prior session's recommendation from `DEVELOPMENT-NOTES.md` and display it.
+- [x] Step 2: NO fresh scan — display-only. Re-entry stays cheap.
 
 ### Task 3: Modify complete
 
-- [ ] Step 1: Edit `plugins/dw-lifecycle/skills/complete/SKILL.md` + helper to scan the closing feature's workplan for uncalled-out TBDs.
-- [ ] Step 2: Refuse on any bare TBD (no `[debt: #NNN]` back-link, no inline "wontfix because ...").
-- [ ] Step 3: Support `--skip-tbd-gate --reason "<substantive>"` override with substantive-reason validator; reason logged in the session journal.
+- [x] Step 1: Edit `plugins/dw-lifecycle/skills/complete/SKILL.md` + helper to scan the closing feature's workplan for uncalled-out TBDs.
+- [x] Step 2: Refuse on any bare TBD (no `[debt: #NNN]` back-link, no inline "wontfix because ...").
+- [x] Step 3: Support `--skip-tbd-gate --reason "<substantive>"` override with substantive-reason validator; reason logged in the session journal.
 
 ### Task 4: Phase-parent closure gate in `/dw-lifecycle:complete`
 
@@ -194,10 +194,21 @@ Closes a separate concern from the no-bare-TBDs gate: the 17 stale phase parent 
 - [ ] Step 3: Operator gate (mirror the batched-proposal pattern from Phase 2). Apply via `gh issue close --comment` on confirmed candidates.
 
 **Acceptance Criteria:**
-- [ ] `/dw-lifecycle:session-end` carries the hygiene-observations + next-session-recommendation block; lands in `DEVELOPMENT-NOTES.md`.
-- [ ] `/dw-lifecycle:session-start` displays the prior session's recommendation without re-scanning.
-- [ ] `/dw-lifecycle:complete` carries the pre-merge TBD gate; supports `--skip-tbd-gate --reason "<substantive>"` override with logged reason.
+- [x] `/dw-lifecycle:session-end` carries the hygiene-observations + next-session-recommendation block; lands in `DEVELOPMENT-NOTES.md`. (Landed via the `session-end-hygiene` subcommand + updated SKILL.md.)
+- [x] `/dw-lifecycle:session-start` displays the prior session's recommendation without re-scanning. (Landed via the `session-start-recommendation` subcommand + updated SKILL.md — display-only, zero git/gh/workplan calls.)
+- [x] `/dw-lifecycle:complete` carries the pre-merge TBD gate; supports `--skip-tbd-gate --reason "<substantive>"` override with logged reason. (Landed via the `complete-gate` subcommand + updated SKILL.md.)
 - [ ] `/dw-lifecycle:complete` walks the closing feature's phase-parent issue tree; closes parents whose children are all closed (operator-gated batched proposal).
+
+**Implementation notes (operator decisions captured during dispatch):**
+
+- Three new subcommands registered in `src/cli.ts`: `session-end-hygiene`, `session-start-recommendation`, `complete-gate`. The corresponding SKILL.md files call these helpers as discrete steps so the procedural skill body stays auditable.
+- Shared module tree under `src/lifecycle-integration/` (types, session-end-hygiene, session-start-recommendation, complete-tbd-gate). Each file stays well under the 300-line cap.
+- `complete-gate` reuses `scanSingleWorkplanFile` from `src/debt-report/workplan-tbd.ts` (already exported for Phase 3 use) and `validateSubstantiveReason` from `src/promote-deferrals/substantive-reason.ts` — zero parser/validator duplication.
+- session-end's hygiene capture walks three sources and degrades gracefully when any source is unavailable (no `gh`, no commits in range, no workplan markers). The block always emits — including the explicit "no signals" branch — so session-start always sees a written record from the prior session.
+- session-start's reader does ZERO git / gh / workplan calls. It opens `DEVELOPMENT-NOTES.md` once, locates the latest entry for the slug, extracts the `### Hygiene observations` + `### Next session recommendation (hygiene)` block, and prints it verbatim. When no prior block exists, it surfaces `No prior hygiene recommendation (first session or session-end skipped).`
+- complete-gate's bare-TBD test classifies each scanner hit: any line carrying `[debt: #NNN]` OR an inline `(wontfix: <reason>)` clause is CLEAN; everything else is BARE. The override path requires both `--skip-tbd-gate` AND `--reason "<text>"`; the reason flows through `validateSubstantiveReason` (≥40 chars, banned-phrase scan). When the override fires AND `--journal-override-file <path>` is set, a markdown `### Hygiene override` entry is written to the supplied path for the SKILL.md to append via `journal-append`.
+- 24 new vitest tests across three files: `lifecycle-session-end-hygiene.test.ts` (7), `lifecycle-session-start-recommendation.test.ts` (5), `lifecycle-complete-tbd-gate.test.ts` (12). All 1804 plugin tests pass.
+- Task 4 (phase-parent closure gate) is NOT addressed in this commit; it remains unchecked under Phase 6 for a separate cycle.
 
 ## Phase 7: Documentation  ·  [#331](https://github.com/audiocontrol-org/deskwork/issues/331)
 

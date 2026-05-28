@@ -5,7 +5,7 @@ description: "Bootstrap session: read workplan + journal + open issues; report c
 
 # /dw-lifecycle:session-start
 
-Bootstrap a session. Reads the active feature's workplan, last journal entry, and open issues; reports context.
+Bootstrap a session. Reads the active feature's workplan, last journal entry, prior hygiene recommendation, and open issues; reports context.
 
 ## Steps
 
@@ -16,9 +16,18 @@ Bootstrap a session. Reads the active feature's workplan, last journal entry, an
    - use `.dw-lifecycle/templates/journal-entry.md` if the project customized it
    - otherwise use the bundled default copied by `/dw-lifecycle:customize templates journal-entry`
 5. Read the latest entry from `DEVELOPMENT-NOTES.md` referencing this slug. Summarize it according to the sections that actually exist in the project's journal template; do not assume deskwork's detailed taxonomy if the project uses a different shape.
-6. Run `gh issue list --state open --search <slug>` to surface relevant issues.
-7. Report context to the operator. Do NOT start work until they confirm the session goal.
+6. Display the prior session's hygiene recommendation verbatim — NO fresh scan, display only. Re-entry stays cheap.
+
+```
+dw-lifecycle session-start-recommendation --slug <feature-slug>
+```
+
+   When no prior recommendation exists (first session, or session-end was skipped), the helper surfaces: `No prior hygiene recommendation (first session or session-end skipped).`
+
+7. Run `gh issue list --state open --search <slug>` to surface relevant issues.
+8. Report context to the operator. Do NOT start work until they confirm the session goal.
 
 ## Error handling
 
 - **Not on a feature branch.** Skill prompts: "Current branch is `main` (or other non-feature branch). Switch to a feature worktree before continuing."
+- **`DEVELOPMENT-NOTES.md` missing.** Treated identically to "no prior recommendation"; surface the friendly message and proceed.
