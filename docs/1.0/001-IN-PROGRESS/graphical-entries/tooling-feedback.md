@@ -355,3 +355,20 @@ Recommended: **Light + Medium together**. Light closes the documentation loop (a
 
 Cross-reference: surfaced during Task 5.1A implementer dispatch on 2026-05-28; agent wrote "2 source-emitter call sites" rather than "2 matches". The Light + Medium fix would have accepted the original phrasing.
 
+**Addendum (2026-05-28, second wrapper rejection):** the same format-strictness applies to `Excluded:` entries. The parser rejects an Excluded citation that omits the `:LINE` suffix:
+
+```
+parseError: Malformed file:line entry — expected "path/to/file.ts:LINE" but got: packages/studio/test/dashboard-swimlane.test.ts
+```
+
+Surfaced when the Task 5.1A code-quality reviewer wrote `Excluded: packages/studio/test/dashboard-swimlane.test.ts — test-file references to .collapse-chev are assertions, not production code under review` (no `:LINE` suffix because the exclusion was "whole file out of scope, no specific line"). The parser strictly enforces the `path:LINE` format on every Excluded entry, even when the exclusion is whole-file. The agent would have needed to write `packages/studio/test/dashboard-swimlane.test.ts:1` (a sentinel line number) to pass.
+
+**Same fix-class as the noun-strictness:** the parser's contract is structural-format-first; semantic-meaning-second. Both rejections preserved the substantive work intact (the agent's review was sound; the grammar block was technically malformed). The Light fix (clearer documentation in the GRAMMAR_INSTRUCTION prelude) closes both. The Medium variant for this addendum: accept `path` without `:LINE` when the exclusion reason names "whole file" / "module" / "directory" / etc. — but the simpler convention is to require a sentinel line (line `:1`) for whole-file exclusions and document that in the prelude.
+
+Combined recommendation for TF-008: ship a **Light** update to the GRAMMAR_INSTRUCTION prelude (1 paragraph) naming both gotchas explicitly:
+
+1. The literal noun `matches` is required after the digit count in the `Searched:` line.
+2. Every Excluded entry requires `path:LINE`, even when the exclusion is whole-file (use `:1` as the sentinel).
+
+This is documentation-only; the parser's existing strict contract stays as-is.
+
