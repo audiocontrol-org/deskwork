@@ -56,9 +56,11 @@ code changed in `packages/core`, `packages/cli`, `packages/studio`, and
 ### AUDIT-20260528-01
 
 Finding-ID: AUDIT-20260528-01
-Status:     open
+Status:     fixed-68e5fbd
 Severity:   blocking
 Surface:    packages/studio build
+
+**Fix:** commit `68e5fbd fix(graphical-entries): Phase 5 Task 5.1 — audit-log findings AUDIT-01/02/04/05` introduced `packages/studio/src/pages/dashboard/legacy-stage.ts` exporting `isLegacyEditorialStage(s: string): s is Stage` — a proper type-narrowing predicate, not an `as` cast. The five call sites flagged in Evidence now guard on the predicate: the three `renderRowActions` / `renderRowDrawer` / `renderRowMenu` exports return empty `RawHtml` for non-editorial entries (the existing `swimlane-shell.ts:247` dispatch routes them to `renderEntryCard` so they still surface), and `data.ts:bucketize` skips non-editorial entries from the legacy back-compat `byStage` map (their per-lane bucketing in `loadLaneBuckets` is the authoritative routing). Per DESKWORK-STATE-MACHINE.md Commandment II, the editorial verb vocabulary stays editorial-scoped until Phase 5 Task 5.2 lands the template-driven verb resolver. Build now exits 0 (verified post-fix); test count went 606 → 614.
 
 Studio does not build after `Entry.currentStage` was widened from the
 legacy eight-stage `Stage` union to an arbitrary non-empty string.
@@ -90,9 +92,11 @@ helpers deliberately after removing exhaustive `Stage` assumptions.
 ### AUDIT-20260528-02
 
 Finding-ID: AUDIT-20260528-02
-Status:     open
+Status:     fixed-68e5fbd
 Severity:   high
 Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane.ts
+
+**Fix:** commit `68e5fbd` made the server render BOTH `<article class="swim">` AND `<button class="swim-stub">` for every visibility-on lane (`packages/studio/src/pages/dashboard/swimlane-shell.ts`). The server stamps `.is-focus-hidden` on exactly one of the pair based on the initial focus state — the existing client controller at `plugins/deskwork-studio/public/src/dashboard/swimlane.ts:153` already toggles the class on chip clicks, so once both nodes exist in the DOM the toggle is end-to-end. Added the missing `.swim-stub.is-focus-hidden { display: none; }` CSS rule mirroring `.swim.is-focus-hidden`. New acceptance tests in `packages/studio/test/dashboard-swimlane.test.ts` assert both elements render per lane with exactly one carrying `.is-focus-hidden`. New jsdom client test in `packages/studio/test/dashboard-swimlane-client.test.ts` exercises the chip-and-stub toggle end-to-end.
 
 Focus-off swim stubs do not work after client-side focus changes. Phase
 5 Task 5.1.5 requires visibility-on but focus-off lanes to render compact
@@ -162,9 +166,11 @@ different project keys produce separate localStorage keys.
 ### AUDIT-20260528-04
 
 Finding-ID: AUDIT-20260528-04
-Status:     open
+Status:     fixed-68e5fbd
 Severity:   high
 Surface:    dashboard lane visibility UI
+
+**Fix:** commit `68e5fbd` addressed both sub-issues. Sub-A: added `.focus-chip.is-visibility-hidden` to the existing hide rule list in `plugins/deskwork-studio/public/css/dashboard-swimlane.css`. Sub-B: the rail row now server-renders BOTH eye glyphs as siblings inside `.r-eye` — `<span class="r-eye-visible">●</span><span class="r-eye-hidden">○</span>` — and CSS picks which one shows based on the parent `.rail-lane[data-lane-visible]` attribute (the client controller already updates the attribute on visibility toggles at `swimlane.ts:197`). New acceptance tests in `packages/studio/test/dashboard-swimlane.test.ts` assert both glyph spans render per rail row and assert the new CSS rules (`.focus-chip.is-visibility-hidden { display: none }` and the `[data-lane-visible]` glyph swap). The jsdom client test in `dashboard-swimlane-client.test.ts` exercises the eye-glyph click end-to-end — confirming `data-lane-visible` flips between `"true"` and `"false"` and the focus chip picks up `.is-visibility-hidden` so CSS hides it.
 
 Visibility-off lanes still appear in the focus strip and the rail eye
 does not change to the hidden state. Phase 5 Task 5.1.4 requires
@@ -196,9 +202,11 @@ visibility toggle.
 ### AUDIT-20260528-05
 
 Finding-ID: AUDIT-20260528-05
-Status:     open
+Status:     fixed-68e5fbd
 Severity:   medium
 Surface:    packages/studio/src/pages/dashboard/swimlane-shell.ts
+
+**Fix:** commit `68e5fbd` switched the stage-column DOM ID from `id="stage-<slug>"` to lane-scoped `id="lane-<laneId>-stage-<slug>"` so multi-lane pages can no longer collide on shared stage names (e.g. `Approved`, which appears in both `visual` and `qa-plan` templates). Picked option (a) from the audit's fix guidance — the default editorial lane ALSO emits an empty `<span id="stage-<slug>" aria-hidden="true">` inside the column so the existing deep-link href `/dev/editorial-studio#stage-drafting` (used by `pages/shortform.ts:113` and `pages/index.ts:114`) continues to resolve. Option (a) won over (b) because the legacy deep-link is referenced from two production pages AND pinned by `packages/studio/test/shortform-empty-state.test.ts` assertions on `id="stage-drafting"`, `id="stage-ideas"`, `id="stage-planned"`, `id="stage-published"`. New acceptance tests in `packages/studio/test/dashboard-swimlane.test.ts` assert: (a) each `Approved` column across `mockups` and `qa` lanes carries a unique `id="lane-<laneId>-stage-approved"`; (b) the rendered page has zero duplicate `id="..."` attributes anywhere; (c) the legacy `id="stage-drafting"` etc. anchors persist for the default lane only, and non-default lane-unique stage names (e.g. `Sketched`, `Drafted`, `Tested`) do NOT emit a bare-anchor form.
 
 Multi-lane stage columns can render duplicate DOM IDs when lanes share a
 stage name. Phase 5 introduces multiple lanes on the same page, and
