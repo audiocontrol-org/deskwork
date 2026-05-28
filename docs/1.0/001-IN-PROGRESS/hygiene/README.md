@@ -16,7 +16,7 @@ Ships a family of UNIX-style `/dw-lifecycle:*` skills that surface and burn down
 |---|---|---|---|
 | 0 | Infrastructure teardown | [#324](https://github.com/audiocontrol-org/deskwork/issues/324) | Done in setup (2026-05-28) |
 | 1 | Read-only baseline — `/dw-lifecycle:debt-report` | [#325](https://github.com/audiocontrol-org/deskwork/issues/325) | Shipped on branch (734008d + d0c2a37 + 965501c; spec + quality review complete) |
-| 2 | GitHub-issue triage — `/dw-lifecycle:triage-issues` | [#326](https://github.com/audiocontrol-org/deskwork/issues/326) | Not started |
+| 2 | GitHub-issue triage — `/dw-lifecycle:triage-issues` | [#326](https://github.com/audiocontrol-org/deskwork/issues/326) | Shipped on branch (b2e5178 + 025a1dc + ed1ac26; spec + quality review complete) |
 | 3 | Workplan-deferral promotion — `/dw-lifecycle:promote-deferrals` | [#327](https://github.com/audiocontrol-org/deskwork/issues/327) | Not started |
 | 4 | Branch archive — `/dw-lifecycle:archive-branch` | [#328](https://github.com/audiocontrol-org/deskwork/issues/328) | Not started |
 | 5 | Release-time issue closure — `/dw-lifecycle:close-shipped` | [#329](https://github.com/audiocontrol-org/deskwork/issues/329) | Not started |

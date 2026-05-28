@@ -55,18 +55,28 @@ date: 2026-05-28
 
 ### Task 1: Implement triage-issues
 
-- [ ] Step 1: Helper script `plugins/dw-lifecycle/src/subcommands/triage-issues.ts`. Args: `--bucket <name>` (`stale-30d` / `unlabeled` / `bug-no-comment-7d`), `--limit N` (default ~10).
-- [ ] Step 2: Bucket-query-builder — translates each bucket name to a `gh issue list --search` query string.
-- [ ] Step 3: Batched-proposal protocol — uniform markdown-table output of N issues, one row per proposed disposition (close-wontfix + reason / label / mark duplicate / leave + comment). Designed for the calling-conversation agent to populate the proposal rationale.
-- [ ] Step 4: Operator-approval parser — accept `y` (all) / `n` (none) / `1,3,5` (subset).
-- [ ] Step 5: Apply-step — one `gh` mutation per approved disposition; partial-success surfaces with per-item reasons; no rollback.
-- [ ] Step 6: `plugins/dw-lifecycle/skills/triage-issues/SKILL.md` — adopter-facing prose.
-- [ ] Step 7: Vitest unit + integration tests; mocked `gh` stub.
+- [x] Step 1: Helper script `plugins/dw-lifecycle/src/subcommands/triage-issues.ts`. Args: `--bucket <name>` (`stale-30d` / `unlabeled` / `bug-no-comment-7d`), `--limit N` (default ~10).
+- [x] Step 2: Bucket-query-builder — translates each bucket name to a `gh issue list --search` query string.
+- [x] Step 3: Batched-proposal protocol — uniform markdown-table output of N issues, one row per proposed disposition (close-wontfix + reason / label / mark duplicate / leave + comment). Designed for the calling-conversation agent to populate the proposal rationale.
+- [x] Step 4: Operator-approval parser — accept `y` (all) / `n` (none) / `1,3,5` (subset).
+- [x] Step 5: Apply-step — one `gh` mutation per approved disposition; partial-success surfaces with per-item reasons; no rollback.
+- [x] Step 6: `plugins/dw-lifecycle/skills/triage-issues/SKILL.md` — adopter-facing prose.
+- [x] Step 7: Vitest unit + integration tests; mocked `gh` stub.
 
 **Acceptance Criteria:**
-- [ ] `/dw-lifecycle:triage-issues` ships; supports `stale-30d`, `unlabeled`, `bug-no-comment-7d` buckets.
-- [ ] Partial-approval works (operator picks subset of proposals).
-- [ ] Partial-success surfaces failures with reasons; no rollback.
+- [x] `/dw-lifecycle:triage-issues` ships; supports `stale-30d`, `unlabeled`, `bug-no-comment-7d` buckets. (Landed in b2e5178 + 025a1dc + ed1ac26; 74 new vitest tests passing; SKILL.md at `plugins/dw-lifecycle/skills/triage-issues/SKILL.md`.)
+- [x] Partial-approval works (operator picks subset of proposals). (Approval token grammar `y` / `n` / `1,3,5`; tests at `triage-issues-apply.test.ts`.)
+- [x] Partial-success surfaces failures with reasons; no rollback. (Per-item `apply_error` field; final tally to stdout; exit 1 only if every approved item failed.)
+
+**Implementation notes (operator decisions captured during dispatch):**
+
+- Two CLI verbs (`propose` + `apply`). The intermediate JSON file at `.dw-lifecycle/triage-issues/proposals-<timestamp>.json` is the contract between the operator's orchestrator agent (which fills in disposition + rationale) and the apply step. Hand-editable, replayable.
+- Pre-validation gate: `apply` validates ALL approved items before issuing any `gh` mutation. If ANY item is malformed, abort the whole batch with zero mutations + exit code 2. Discriminator class `InvalidProposalFileError` separates structural failures from per-item gh failures.
+- Exit codes: 0 (>=1 succeeded OR no items attempted), 1 (every approved item failed), 2 (structurally invalid file).
+- Four disposition shapes: `close-wontfix` (reason field), `label` (labels list), `duplicate` (dup_of + reason), `leave-with-comment` (comment field). `close-wontfix` requires non-empty reason; ≥40-char substantive-reason validator is Phase 3 infrastructure.
+- Bucket-query loader: built-in defaults at `triage-issues/buckets.ts`; override at `.dw-lifecycle/triage-buckets.yaml`. `$DATE_NNd_AGO` placeholder substitutes ISO date NN days before invocation time (documented in SKILL.md).
+- `propose --force` flag (added during review cycle): prevents silent overwrite of existing proposal files.
+- Parallel utility shapes (RunGh type, isRawIssue type-guard, daysBetween, parsePositiveInt, defaultRunGh, detectRepoFromGit) duplicated between `debt-report/` and `triage-issues/` per the original brief's domain-isolation intent. 7 clone-group entries dispositioned `keep-with-reason` in pre-commit gate. Extraction-to-shared-`gh-runtime/` proposal filed as [#335](https://github.com/audiocontrol-org/deskwork/issues/335) for operator triage before Phase 5.
 
 ## Phase 3: Workplan-deferral promotion — `/dw-lifecycle:promote-deferrals`  ·  [#327](https://github.com/audiocontrol-org/deskwork/issues/327)
 
