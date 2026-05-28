@@ -34,6 +34,18 @@ import {
   computeReorder,
 } from '../../../plugins/deskwork-studio/public/src/dashboard/swimlane-drag';
 
+// jsdom lacks `CSS.escape`. Per AUDIT-20260528-28 the drag controller
+// escapes lane ids in querySelector calls; the test installs an
+// identity shim mirroring the pattern in
+// `dashboard-swimlane-client.test.ts:98-107`. Real browsers ship
+// `CSS.escape`; this is a jsdom-only gap.
+interface CSSShim {
+  escape: (id: string) => string;
+}
+if (typeof (globalThis as { CSS?: unknown }).CSS === 'undefined') {
+  (globalThis as { CSS: CSSShim }).CSS = { escape: (s: string) => s };
+}
+
 const PROJECT_KEY = 'task-5-4-drag-test-key';
 const ORDER_STORAGE_KEY = `deskwork:dashboard:${PROJECT_KEY}:lane-order`;
 
@@ -383,7 +395,7 @@ describe('swimlane drag client controller — Task 5.4', () => {
     expect(getLaneOrder()).toEqual(['mockups', 'default', 'qa']);
   });
 
-  it('drag with source === target is a no-op (no localStorage write, no reorder)', () => {
+  it('drag with source === target is a no-op (no localStorage write, no reorder) — AUDIT-29', () => {
     buildShell(['default', 'mockups', 'qa']);
     initSwimlaneDrag();
     const row = getRow('mockups');
@@ -392,12 +404,82 @@ describe('swimlane drag client controller — Task 5.4', () => {
     dispatchDragEvent('dragover', { target: row, clientY: 48, dataTransfer: dt });
     dispatchDragEvent('drop', { target: row, clientY: 48, dataTransfer: dt });
     expect(getLaneOrder()).toEqual(['default', 'mockups', 'qa']);
-    // computeReorder short-circuits on same-id, so the drop handler
-    // still persists the unchanged order (write is harmless). We
-    // assert the order is preserved end-to-end.
-    const stored = window.localStorage.getItem(ORDER_STORAGE_KEY);
-    if (stored !== null) {
-      expect(JSON.parse(stored)).toEqual(['default', 'mockups', 'qa']);
-    }
+    // Per AUDIT-20260528-29 — the no-op drop branch skips the
+    // localStorage write entirely so the controller's contract is
+    // "writes happen only on real reorders." Confirm no stored entry
+    // was emitted by the no-op drop.
+    expect(window.localStorage.getItem(ORDER_STORAGE_KEY)).toBeNull();
+  });
+
+  it('AUDIT-27: dragleave that exits the rail clears all drop-target classes', () => {
+    buildShell(['default', 'mockups', 'qa']);
+    initSwimlaneDrag();
+    const source = getRow('default');
+    const target = getRow('qa');
+    const dt = makeFakeDataTransfer();
+    dispatchDragEvent('dragstart', { target: source, clientY: 8, dataTransfer: dt });
+    // Stage a drop-target class on `qa`.
+    dispatchDragEvent('dragover', { target, clientY: 95, dataTransfer: dt });
+    expect(
+      target.classList.contains('drop-target-above')
+        || target.classList.contains('drop-target-below'),
+    ).toBe(true);
+    // dragleave that exits the rail (relatedTarget outside the rail)
+    // should clear the drop-target classes. Synthesize relatedTarget
+    // as a node OUTSIDE the rail container.
+    const outside = document.createElement('div');
+    document.body.appendChild(outside);
+    const leaveEv = new Event('dragleave', { bubbles: true, cancelable: true });
+    Object.defineProperty(leaveEv, 'relatedTarget', {
+      configurable: true,
+      get: () => outside,
+    });
+    target.dispatchEvent(leaveEv);
+    expect(target.classList.contains('drop-target-above')).toBe(false);
+    expect(target.classList.contains('drop-target-below')).toBe(false);
+  });
+
+  it('AUDIT-27: dragging a visibility-hidden lane preserves the is-visibility-hidden class post-reorder', () => {
+    buildShell(['default', 'mockups', 'qa']);
+    initSwimlaneDrag();
+    // Pretend the qa lane was previously hidden via the eye-toggle —
+    // stamp the class directly on the rail row + focus chip.
+    const qaRow = getRow('qa');
+    const qaChip = document.querySelector<HTMLElement>(
+      '[data-focus-chip="qa"]',
+    );
+    qaRow.dataset.laneVisible = 'false';
+    qaChip?.classList.add('is-visibility-hidden');
+    // Drag qa above default.
+    const source = qaRow;
+    const target = getRow('default');
+    const dt = makeFakeDataTransfer();
+    dispatchDragEvent('dragstart', { target: source, clientY: 96, dataTransfer: dt });
+    dispatchDragEvent('dragover', { target, clientY: 4, dataTransfer: dt });
+    dispatchDragEvent('drop', { target, clientY: 4, dataTransfer: dt });
+    // Order has changed: qa moved to the top.
+    expect(getLaneOrder()).toEqual(['qa', 'default', 'mockups']);
+    // Class state on the moved row + chip survives the appendChild
+    // moves (per AUDIT-20260528-29 — class state is preserved on a
+    // per-id basis by appendChild; no applyState reapply needed).
+    expect(qaRow.dataset.laneVisible).toBe('false');
+    expect(qaChip?.classList.contains('is-visibility-hidden')).toBe(true);
+  });
+
+  it('AUDIT-30: dragstart sweeps stale .is-dragging classes from a prior aborted drag', () => {
+    buildShell(['default', 'mockups', 'qa']);
+    initSwimlaneDrag();
+    // Simulate a previous drag's dragend that failed to fire — a
+    // stale .is-dragging class is sitting on default.
+    const stale = getRow('default');
+    stale.classList.add('is-dragging');
+    expect(stale.classList.contains('is-dragging')).toBe(true);
+    // Now start a new drag on a different row. The dragstart sweep
+    // should clear the stale class.
+    const newSource = getRow('mockups');
+    const dt = makeFakeDataTransfer();
+    dispatchDragEvent('dragstart', { target: newSource, clientY: 48, dataTransfer: dt });
+    expect(stale.classList.contains('is-dragging')).toBe(false);
+    expect(newSource.classList.contains('is-dragging')).toBe(true);
   });
 });

@@ -260,9 +260,9 @@ The picked design **pivots away from the PRD's original "per-lane tab strip" fra
 
 ### Task 5.4: Lane-visibility panel + drag-to-reorder
 
-- [ ] Step 5.4.1: Studio surface (gear menu or sidebar) listing every lane with: visible toggle, drag handle for reorder.
-- [ ] Step 5.4.2: Hidden lanes don't render tabs but their entries still exist and count in dashboard stats.
-- [ ] Step 5.4.3: Order stored at `.deskwork/lane-order.json` (project-wide) or per-operator via localStorage per PRD § Implied scope captured.
+- [x] Step 5.4.1: Studio surface (gear menu or sidebar) listing every lane with: visible toggle, drag handle for reorder.
+- [x] Step 5.4.2: Hidden lanes don't render tabs but their entries still exist and count in dashboard stats.
+- [x] Step 5.4.3: Order stored at `.deskwork/lane-order.json` (project-wide) or per-operator via localStorage per PRD § Implied scope captured.
 
 ### Task 5.5: Saveable focus presets + deep-link URL pattern
 

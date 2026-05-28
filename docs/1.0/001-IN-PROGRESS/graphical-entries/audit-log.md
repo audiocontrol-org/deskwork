@@ -790,3 +790,120 @@ row-activation) become candidates if the file grows.
 
 Trajectory note alongside AUDIT-14 (CSS) and AUDIT-20
 (swimlane-card.ts).
+
+## 2026-05-28 audit: Phase 5 Task 5.4 (drag-to-reorder + lane order persistence)
+
+Audit scope: commit `5c5864a` + in-task review followup.
+Predecessor: `a3480c2`. Tests 751 → 771 (+20, including +3 review-
+followup regression tests). Build exit 0 across core + studio.
+
+Two-stage review via the dw-lifecycle trussing. Spec ✅ SPEC-COMPLIANT;
+quality ⚠️ APPROVED WITH FOLLOWUPS — 0 blocking, 4 actionable non-
+blocking findings + a11y observation. The actionables landed in this
+in-task followup commit.
+
+### AUDIT-20260528-27
+
+Finding-ID: AUDIT-20260528-27
+Status:     fixed-followup-commit
+Severity:   low
+Surface:    packages/studio/test/dashboard-swimlane-drag-client.test.ts
+
+Test coverage gaps: dragleave-that-exits-rail clearing drop-target
+classes; visibility-hidden-lane reorder preserving `is-visibility-
+hidden`; dragstart sweep of stale `.is-dragging` (AUDIT-30).
+
+Resolution: 3 new regression tests added.
+
+### AUDIT-20260528-28
+
+Finding-ID: AUDIT-20260528-28
+Status:     fixed-followup-commit
+Severity:   medium
+Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-drag.ts
+
+The dragend handler's `querySelector` interpolated `state.draggingId`
+into an attribute selector without `CSS.escape`. Lane ids are
+operator-authored (`.deskwork/lanes/<id>.json`) and not constrained
+to alphanumeric — an id containing `"`, `]`, or `\` would break the
+selector. The companion `swimlane.ts:138,141` consistently uses
+`CSS.escape` for the same data dictionary; the inconsistency was
+the maintainability concern.
+
+Resolution: wrapped `state.draggingId` with `CSS.escape`. Added a
+`CSS.escape` shim at the top of the drag-client test (jsdom 29.x
+does not ship `CSS.escape` natively) mirroring the existing pattern
+in `dashboard-swimlane-client.test.ts:98-107`.
+
+### AUDIT-20260528-29
+
+Finding-ID: AUDIT-20260528-29
+Status:     fixed-followup-commit
+Severity:   low
+Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-drag.ts
+
+The `drop` handler called `writeStoredOrder` even when
+`computeReorder` short-circuited (same source-target id, or stale
+target). The localStorage write was a harmless no-op but violated
+the controller's "writes happen on real reorders" contract.
+
+Resolution: added an `orderEquals(prev, next)` helper; the drop
+handler guards the DOM-reorder + localStorage write on a real
+change. Inline comment cites the invariant that class state
+survives `appendChild` moves on a per-id basis, so no
+`applyState` reapply is needed post-reorder. Test updated to
+assert the no-op drop produces ZERO localStorage entries.
+
+### AUDIT-20260528-30
+
+Finding-ID: AUDIT-20260528-30
+Status:     fixed-followup-commit
+Severity:   low
+Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-drag.ts
+
+If a previous `dragend` failed to fire (browser quirks — disconnect,
+page navigation, dev-tools cancellation), a stale `.is-dragging`
+class would survive on the old row. The next `dragstart` would
+stamp the new source without sweeping the stale class.
+
+Resolution: added a one-time stale-class sweep at the top of the
+`dragstart` handler. Cheap insurance against a hard-to-reproduce
+browser quirk. Regression test added.
+
+### AUDIT-20260528-31
+
+Finding-ID: AUDIT-20260528-31
+Status:     open
+Severity:   medium
+Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-drag.ts
+
+HTML5 native DnD has no keyboard equivalent. Keyboard-only operators
+cannot reorder lanes. The workplan accepted the native-DnD-only
+constraint for Phase 5; this finding tracks the gap for future
+disposition.
+
+Options:
+1. ARIA grabbed/listbox semantics with custom keyboard handler
+   (deprecated grabbed but functional).
+2. A separate "move up / move down" affordance on each row reachable
+   via keyboard.
+3. Replace HTML5 native DnD with a keyboard-sensor-equipped library
+   (dnd-kit ships one).
+
+Operator-decision required. No immediate action; tracking for Phase 6
+disposition.
+
+### AUDIT-20260528-32
+
+Finding-ID: AUDIT-20260528-32
+Status:     open
+Severity:   informational
+Surface:    plugins/deskwork-studio/public/src/dashboard/swimlane-drag.ts
+
+`swimlane-drag.ts` post-followup is 396 lines (was 365 pre-followup).
+Approaching the 500-line cap. The recent additions (orderEquals,
+stale-class sweep, CSS.escape, comments) consumed ~30 lines. Future
+Phase 5 expansions (e.g., touch-drag via Pointer Events, or
+animation polish) would push past the cap.
+
+Trajectory note alongside AUDIT-14 / -20 / -26.

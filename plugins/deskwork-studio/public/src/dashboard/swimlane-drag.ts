@@ -218,6 +218,20 @@ function clearDropTargets(rail: HTMLElement): void {
   }
 }
 
+/**
+ * Strict positional equality on two lane-order arrays. Used by the
+ * drop handler to detect no-op drops (same source-target or
+ * `computeReorder` short-circuit) so we don't bother writing the
+ * unchanged array back to localStorage.
+ */
+function orderEquals(a: readonly string[], b: readonly string[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
 function findRowFromTarget(target: EventTarget | null): HTMLElement | null {
   if (!(target instanceof Element)) return null;
   const closest = target.closest<HTMLElement>('[data-rail-lane]');
@@ -259,6 +273,14 @@ function bindDragHandlers(
     if (row === null) return;
     const id = row.dataset.railLane;
     if (id === undefined) return;
+    // Per AUDIT-20260528-30 — if a previous drag's `dragend` failed
+    // to fire (browser quirks: disconnect mid-drag, page navigation,
+    // dev-tools-cancellation), a stale `.is-dragging` class may
+    // survive on an old row. Sweep before stamping the new source so
+    // the visual state matches the actual drag.
+    for (const stale of rail.querySelectorAll('.is-dragging')) {
+      stale.classList.remove('is-dragging');
+    }
     state.draggingId = id;
     row.classList.add('is-dragging');
     if (ev.dataTransfer !== null) {
@@ -306,18 +328,34 @@ function bindDragHandlers(
       resolved.id,
       position,
     );
-    state.order = [...next];
-    reorderRail(rail, state.order);
-    reorderFocusStrip(state.order);
-    reorderBay(state.order);
-    writeStoredOrder(orderKey(projectKey), state.order);
+    // Per AUDIT-20260528-29 — skip the DOM reorder + localStorage
+    // write when the drop didn't move anything (same source as
+    // target, or computeReorder short-circuited). `is-visibility-
+    // hidden` / `is-focus-hidden` / `aria-pressed` classes survive
+    // `appendChild` moves on a per-id basis, so no `applyState` call
+    // is needed after the reorder; the appended class state IS the
+    // state.
+    const changed = !orderEquals(state.order, next);
+    if (changed) {
+      state.order = [...next];
+      reorderRail(rail, state.order);
+      reorderFocusStrip(state.order);
+      reorderBay(state.order);
+      writeStoredOrder(orderKey(projectKey), state.order);
+    }
     clearDropTargets(rail);
   });
 
   rail.addEventListener('dragend', () => {
     if (state.draggingId !== null) {
+      // Per AUDIT-20260528-28 — escape the id via CSS.escape; lane
+      // ids are operator-authored (`.deskwork/lanes/<id>.json`) and
+      // are not constrained to alphanumeric. An id containing `"`,
+      // `]`, or `\` would break the attribute selector. Mirrors the
+      // CSS.escape usage in `swimlane.ts:138,141` for the same
+      // data dictionary.
       const sourceRow = rail.querySelector<HTMLElement>(
-        `[data-rail-lane="${state.draggingId}"]`,
+        `[data-rail-lane="${CSS.escape(state.draggingId)}"]`,
       );
       if (sourceRow !== null) sourceRow.classList.remove('is-dragging');
     }
