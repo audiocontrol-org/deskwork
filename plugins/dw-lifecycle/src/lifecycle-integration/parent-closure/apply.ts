@@ -300,16 +300,16 @@ function runOne(args: RunOneArgs): ApplyOutcome {
       };
     }
   }
-  // Exhaustiveness check.
+  // Exhaustiveness check. This branch is type-level unreachable: every
+  // DispositionKind member is handled above. Throwing (rather than
+  // returning a soft per-row error) enforces the contract at runtime --
+  // if a new DispositionKind member is added without updating runOne,
+  // the apply layer crashes structurally instead of silently degrading
+  // every approved row to a per-row failure.
   const exhaustive: never = item.disposition;
-  return {
-    itemIndex,
-    issueNumber: item.number,
-    applied: false,
-    result: null,
-    error: `unknown disposition: ${String(exhaustive)}`,
-    skipped: false,
-  };
+  throw new Error(
+    `unreachable: runOne disposition switch was not exhaustive -- DispositionKind member added without updating runOne (got: ${String(exhaustive)})`,
+  );
 }
 
 function updateItem(item: ProposalItem, outcome: ApplyOutcome): ProposalItem {

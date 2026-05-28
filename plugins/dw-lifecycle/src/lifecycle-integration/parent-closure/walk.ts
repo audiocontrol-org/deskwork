@@ -313,10 +313,26 @@ export interface WalkedCandidate {
   readonly classification: ClassificationKind;
 }
 
+// Convert a RawIssueForSearch payload (carried by title-search or timeline
+// sources) into the FetchedIssueState shape the walker consumes. The title-
+// search response already provides every field the walker needs to classify
+// the candidate; round-tripping via `gh issue view` would only re-fetch
+// what we already have.
+function rawToFetched(raw: RawIssueForSearch): FetchedIssueState {
+  return {
+    number: raw.number,
+    title: raw.title,
+    state: normalizeState(raw.state),
+    url: raw.url,
+  };
+}
+
 // Walks the three sources, builds a candidate-parent set, then for each
-// candidate fetches its current state and child-issue states. Returns the
-// full classified set; the propose layer filters out `skip-*` rows before
-// emitting the proposal file.
+// candidate uses the title/state already carried by the originating source
+// when available; only falls back to `gh issue view` for candidates whose
+// source provided number-only data (the workplan-anchored source). Returns
+// the full classified set; the propose layer filters out `skip-*` rows
+// before emitting the proposal file.
 export function walk(args: WalkArgs): readonly WalkedCandidate[] {
   // (a) title-search.
   const searchHits = titleSearch({
@@ -339,39 +355,92 @@ export function walk(args: WalkArgs): readonly WalkedCandidate[] {
   // title-search hit. Timeline hits are recorded as POTENTIAL CHILDREN,
   // not as additional parent candidates -- a cross-reference from issue
   // #X to the parent does not make #X a parent.
+  //
+  // Each candidate's value holds the title-search payload (when the source
+  // carried it). The explicit parentIssue is seeded as null because the
+  // operator-supplied frontmatter only gives us a number.
   const parentCandidates = new Map<number, RawIssueForSearch | null>();
   parentCandidates.set(args.parentIssue, null);
   for (const hit of searchHits) {
-    if (!parentCandidates.has(hit.number)) {
+    // Prefer the populated title-search payload over a null seed. When the
+    // explicit parentIssue ALSO appears in title-search (the common case
+    // for the feature's own parent), this upgrades the null seed to the
+    // populated payload so the walker can skip the `gh issue view` round
+    // trip for the parent too.
+    const existing = parentCandidates.get(hit.number);
+    if (existing === undefined || existing === null) {
       parentCandidates.set(hit.number, hit);
     }
   }
 
   // The expected child set per parent candidate is the union of:
   //   - workplan-anchored phase issue numbers
-  //   - timeline cross-references (number-only; state fetched below)
-  //   - title-search hits OTHER than the parent itself
-  // We collapse all three into one set per pass; per-candidate filtering
-  // happens in classify().
-  const expectedChildren = new Set<number>();
-  for (const n of workplanChildNumbers) expectedChildren.add(n);
-  for (const hit of timelineHits) expectedChildren.add(hit.number);
-  for (const hit of searchHits) expectedChildren.add(hit.number);
-
-  const results: WalkedCandidate[] = [];
-  for (const [parentNumber] of parentCandidates) {
-    // Don't enumerate the parent as its own child.
-    const childNumbers = new Set<number>();
-    for (const n of expectedChildren) {
-      if (n !== parentNumber) childNumbers.add(n);
+  //   - timeline cross-references (carry title/state in the payload)
+  //   - title-search hits OTHER than the parent itself (carry title/state)
+  // We collapse all three into one map per pass; map values hold the
+  // already-known title/state payload when the originating source provided
+  // it, so child enumeration can skip the `gh issue view` round trip for
+  // those rows.
+  const expectedChildren = new Map<number, RawIssueForSearch | null>();
+  for (const n of workplanChildNumbers) {
+    if (!expectedChildren.has(n)) expectedChildren.set(n, null);
+  }
+  for (const hit of timelineHits) {
+    // Prefer a populated payload over the workplan-anchored null seed.
+    const existing = expectedChildren.get(hit.number);
+    if (existing === undefined || existing === null) {
+      expectedChildren.set(hit.number, hit);
     }
+  }
+  for (const hit of searchHits) {
+    // Title-search hits also carry title/state -- prefer over workplan null.
+    const existing = expectedChildren.get(hit.number);
+    if (existing === undefined || existing === null) {
+      expectedChildren.set(hit.number, hit);
+    }
+  }
 
-    // Fetch the parent's current state.
-    const parentState = fetchIssueState({
-      issueNumber: parentNumber,
+  // Memoize per-child-number view fetches across parent candidates. The
+  // same workplan-anchored child appears in every parent's child set; without
+  // memoization N parent candidates × M shared children = N×M view calls,
+  // which dwarfs the savings from reusing title-search payloads. Memoization
+  // collapses repeated fetches of the same number to a single call.
+  const fetchedChildCache = new Map<number, FetchedIssueState>();
+  const resolveChild = (
+    n: number,
+    payload: RawIssueForSearch | null,
+  ): FetchedIssueState => {
+    if (payload !== null) return rawToFetched(payload);
+    const cached = fetchedChildCache.get(n);
+    if (cached !== undefined) return cached;
+    const fresh = fetchIssueState({
+      issueNumber: n,
       repo: args.repo,
       runGh: args.runGh,
     });
+    fetchedChildCache.set(n, fresh);
+    return fresh;
+  };
+
+  const results: WalkedCandidate[] = [];
+  for (const [parentNumber, parentRaw] of parentCandidates) {
+    // Don't enumerate the parent as its own child.
+    const childEntries: [number, RawIssueForSearch | null][] = [];
+    for (const [n, payload] of expectedChildren) {
+      if (n !== parentNumber) childEntries.push([n, payload]);
+    }
+
+    // Resolve the parent's current state. Reuse the title-search payload
+    // when present; only round-trip via `gh issue view` when the candidate
+    // was seeded number-only (the explicit parentIssue case).
+    const parentState =
+      parentRaw !== null
+        ? rawToFetched(parentRaw)
+        : fetchIssueState({
+            issueNumber: parentNumber,
+            repo: args.repo,
+            runGh: args.runGh,
+          });
 
     // Decide whether this candidate belongs to the feature. Two signals:
     //   - It IS the explicit parentIssue (always matches).
@@ -388,14 +457,13 @@ export function walk(args: WalkArgs): readonly WalkedCandidate[] {
       matchesFeature = title.toLowerCase().includes(args.slug.toLowerCase());
     }
 
-    // Fetch each child's state.
+    // Resolve each child's state. Reuse the carried payload when present;
+    // fall back to `gh issue view` only for workplan-only children whose
+    // source provided just a number, and memoize that fallback across
+    // parent candidates so the same child isn't re-fetched per parent.
     const childRefs: ChildIssueRef[] = [];
-    for (const childNumber of childNumbers) {
-      const childState = fetchIssueState({
-        issueNumber: childNumber,
-        repo: args.repo,
-        runGh: args.runGh,
-      });
+    for (const [childNumber, childRaw] of childEntries) {
+      const childState = resolveChild(childNumber, childRaw);
       // Filter out children whose title doesn't reference the feature
       // unless they came from the workplan-anchored source (which is
       // authoritative). This keeps unrelated cross-references from

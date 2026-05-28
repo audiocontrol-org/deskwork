@@ -119,7 +119,11 @@ describe('propose', () => {
         return JSON.stringify([
           {
             number: 700,
-            title: 'unrelated mention of hygiene-blah',
+            // Title without `hygiene` substring -> skip-not-this-feature.
+            // The title-search response IS the canonical title source for
+            // walker classification; the walker no longer round-trips via
+            // `gh issue view` for title-search hits.
+            title: 'unrelated work',
             state: 'OPEN',
             url: 'u',
           },
@@ -136,7 +140,6 @@ describe('propose', () => {
             url: 'u',
           });
         if (n === 700)
-          // Title without `hygiene` substring -> skip-not-this-feature.
           return JSON.stringify({
             number: 700,
             title: 'unrelated work',

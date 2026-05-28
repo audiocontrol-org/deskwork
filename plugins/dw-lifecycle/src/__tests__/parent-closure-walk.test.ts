@@ -343,17 +343,20 @@ describe('walk (combiner)', () => {
   });
 
   it('emits skip-not-this-feature for a title-search hit whose title omits the slug', () => {
+    // The title-search response carries title+state directly; the walker
+    // uses that title (no `gh issue view` round trip for title-search hits).
+    // For matchesFeature=false, the hit's own title must not contain the
+    // slug substring.
     const runGh = routedRunGh({
       titleSearch: () =>
         JSON.stringify([
-          { number: 999, title: 'unrelated mention of hygiene-test', state: 'OPEN', url: 'u' },
+          { number: 999, title: 'unrelated mention only', state: 'OPEN', url: 'u' },
         ]),
       timeline: () => '[]',
       issueView: (n) =>
         JSON.stringify({
           number: n,
-          // Title for #999 has no `hygiene` substring -> matchesFeature false.
-          title: n === 999 ? 'unrelated work' : 'feat(hygiene): parent',
+          title: 'feat(hygiene): parent',
           state: 'OPEN',
           url: 'u',
         }),
@@ -367,6 +370,64 @@ describe('walk (combiner)', () => {
     });
     const unrelated = result.find((r) => r.number === 999);
     expect(unrelated?.classification).toBe('skip-not-this-feature');
+  });
+
+  it('reuses title-search payload instead of round-tripping `gh issue view` per hit', () => {
+    // Fixture: 5 title-search hits (each carrying title+state) + 1 workplan-
+    // anchored child issue with NO accompanying title-search hit. The walker
+    // should only `gh issue view` the workplan-only child (1 view call).
+    // Title-search hits supply title+state directly; no view call for them.
+    writeFileSync(
+      fx.workplanPath,
+      [
+        '## Phase 0: setup  ·  [#400](https://github.com/o/r/issues/400)',
+      ].join('\n'),
+      'utf8',
+    );
+    const viewCalls: number[] = [];
+    const runGh = (args: readonly string[]): string => {
+      if (args[0] === 'issue' && args[1] === 'list') {
+        return JSON.stringify([
+          { number: 323, title: 'feat(hygiene): parent', state: 'OPEN', url: 'u323' },
+          { number: 324, title: 'feat(hygiene): phase A', state: 'CLOSED', url: 'u324' },
+          { number: 325, title: 'feat(hygiene): phase B', state: 'CLOSED', url: 'u325' },
+          { number: 326, title: 'feat(hygiene): phase C', state: 'CLOSED', url: 'u326' },
+          { number: 327, title: 'feat(hygiene): phase D', state: 'CLOSED', url: 'u327' },
+        ]);
+      }
+      if (args[0] === 'api') return '[]';
+      if (args[0] === 'issue' && args[1] === 'view') {
+        const n = Number.parseInt(args[2] ?? '0', 10);
+        viewCalls.push(n);
+        return JSON.stringify({
+          number: n,
+          title: `feat(hygiene): workplan-only #${n}`,
+          state: 'CLOSED',
+          url: `u${n}`,
+        });
+      }
+      return '';
+    };
+    const result = walk({
+      slug: 'hygiene',
+      parentIssue: 323,
+      workplanPath: fx.workplanPath,
+      repo: 'o/r',
+      runGh,
+    });
+    // Only the workplan-anchored child #400 is fetched via `gh issue view`.
+    // The parent #323 + its 4 sibling title-search hits supply their payload
+    // directly via the title-search response.
+    expect(viewCalls).toEqual([400]);
+    // Sanity: the walker produced 5 parent-candidate rows.
+    expect(result.map((r) => r.number).sort((a, b) => a - b)).toEqual([
+      323, 324, 325, 326, 327,
+    ]);
+    // Parent should classify as close-all-children-closed: every enumerated
+    // child (the 4 title-search siblings + the 1 workplan-anchored phase)
+    // is CLOSED.
+    const parent = result.find((r) => r.number === 323);
+    expect(parent?.classification).toBe('close-all-children-closed');
   });
 
   it('dedupes parent candidates across sources (same number from search + parentIssue)', () => {
