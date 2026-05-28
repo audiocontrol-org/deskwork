@@ -1,18 +1,42 @@
 /**
  * Shared localStorage helpers for the dashboard swimlane controllers.
  *
- * The `swimlane-collapse.ts` and `swimlane-view-toggle.ts`
- * controllers both store per-lane state at
- * `deskwork:dashboard:<projectKey>:<suffix>` and both read it back
- * as `Map<laneId, T>` where the on-disk shape is a JSON object.
- * This module centralises the read+parse boilerplate so the
- * controllers can call a typed function with a per-value validator.
+ * The `swimlane.ts`, `swimlane-collapse.ts`, and `swimlane-view-
+ * toggle.ts` controllers all namespace localStorage entries under
+ * `deskwork:dashboard:<projectKey>:<suffix>` and all resolve the
+ * `<projectKey>` from the bay-shell's `data-project-key` attribute
+ * (falling back to the page pathname when the shell lacks one). The
+ * map-shaped controllers (collapse + view-toggle) additionally read
+ * a `Map<laneId, T>` whose on-disk shape is a JSON object. This
+ * module centralises all three pieces — the key prefix, the project-
+ * key resolver, and the read+parse boilerplate — so the controllers
+ * import a single contract instead of redeclaring it.
  *
  * Failures (no entry / malformed JSON / wrong root type / unknown
  * value shape) all collapse to "empty map" — the controllers treat
  * localStorage as best-effort persistence; in-page state still
  * works without it.
  */
+
+/**
+ * Common prefix for every dashboard localStorage key. Controllers
+ * append `:<projectKey>:<suffix>` to namespace per-operator state
+ * per-project (so two operators sharing a machine but working on
+ * different projects don't see each other's lane state).
+ */
+export const STORAGE_KEY_PREFIX = 'deskwork:dashboard:';
+
+/**
+ * Resolve the project key the swimlane controllers use to namespace
+ * localStorage entries. The bay-shell carries it as `data-project-
+ * key`; in jsdom + tests with no shell, fall back to the page
+ * pathname for stable isolation.
+ */
+export function resolveProjectKey(shell: HTMLElement): string {
+  const explicit = shell.dataset.projectKey;
+  if (explicit !== undefined && explicit.length > 0) return explicit;
+  return window.location.pathname;
+}
 
 /**
  * Read a JSON object from localStorage and project it into a

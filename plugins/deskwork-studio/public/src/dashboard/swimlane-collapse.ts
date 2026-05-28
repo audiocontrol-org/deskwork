@@ -41,9 +41,12 @@
  *     in lockstep with the `.collapsed` class on the target.
  */
 
-import { readStoredObjectMap } from './swimlane-storage.ts';
+import {
+  readStoredObjectMap,
+  resolveProjectKey,
+  STORAGE_KEY_PREFIX,
+} from './swimlane-storage.ts';
 
-const STORAGE_KEY_PREFIX = 'deskwork:dashboard:';
 const LANE_COLLAPSE_KEY_SUFFIX = ':lane-collapse';
 const STAGE_COLLAPSE_KEY_SUFFIX = ':stage-collapse';
 
@@ -409,18 +412,6 @@ function bindHandlers(state: CollapseState, projectKey: string): void {
       persist(state, projectKey);
     });
   }
-}
-
-/**
- * Resolve the project key the swimlane controller uses to namespace
- * localStorage entries. The bay-shell carries it as `data-project-
- * key`; in jsdom + tests with no shell, we fall back to the page
- * pathname for stable isolation.
- */
-function resolveProjectKey(shell: HTMLElement): string {
-  const explicit = shell.dataset.projectKey;
-  if (explicit !== undefined && explicit.length > 0) return explicit;
-  return window.location.pathname;
 }
 
 /**

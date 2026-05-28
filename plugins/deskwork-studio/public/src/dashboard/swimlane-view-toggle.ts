@@ -40,9 +40,12 @@
  * — exactly one cell is `aria-checked="true"` per group.
  */
 
-import { readStoredObjectMap } from './swimlane-storage.ts';
+import {
+  readStoredObjectMap,
+  resolveProjectKey,
+  STORAGE_KEY_PREFIX,
+} from './swimlane-storage.ts';
 
-const STORAGE_KEY_PREFIX = 'deskwork:dashboard:';
 const VIEW_MODE_KEY_SUFFIX = ':view-mode';
 
 /**
@@ -247,12 +250,6 @@ function watchViewport(state: ViewToggleState): void {
       applyAll(state.overrides, state.isMobile);
     });
   }
-}
-
-function resolveProjectKey(shell: HTMLElement): string {
-  const explicit = shell.dataset.projectKey;
-  if (explicit !== undefined && explicit.length > 0) return explicit;
-  return window.location.pathname;
 }
 
 /**

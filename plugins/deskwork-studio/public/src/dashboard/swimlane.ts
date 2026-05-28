@@ -38,7 +38,11 @@
  * drag reorder (5.4), preset save (5.5).
  */
 
-const STORAGE_KEY_PREFIX = 'deskwork:dashboard:';
+import {
+  resolveProjectKey,
+  STORAGE_KEY_PREFIX,
+} from './swimlane-storage.ts';
+
 const FOCUS_KEY_SUFFIX = ':focus';
 const VISIBILITY_KEY_SUFFIX = ':visibility';
 
@@ -124,14 +128,6 @@ function collectAllLanes(): string[] {
     if (id !== undefined) ids.push(id);
   }
   return ids;
-}
-
-function getProjectKey(shell: HTMLElement): string {
-  const explicit = shell.dataset.projectKey;
-  if (explicit !== undefined && explicit.length > 0) return explicit;
-  // Fall back to a stable per-pathname key so a fresh project root
-  // without a server-rendered key still gets isolated state.
-  return window.location.pathname;
 }
 
 /**
@@ -337,7 +333,7 @@ export function initSwimlane(): void {
   const allLanes = collectAllLanes();
   if (allLanes.length === 0) return;
 
-  const projectKey = getProjectKey(shell);
+  const projectKey = resolveProjectKey(shell);
 
   // Establish the initial focus set. URL takes precedence; it also
   // writes through to localStorage so subsequent loads pick it up.
