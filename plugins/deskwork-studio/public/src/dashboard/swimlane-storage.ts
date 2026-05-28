@@ -39,6 +39,34 @@ export function resolveProjectKey(shell: HTMLElement): string {
 }
 
 /**
+ * Read a JSON array of strings from localStorage. Returns null on
+ * any read failure (missing entry, parse error, wrong root shape).
+ * Non-string array elements are dropped. Callers pick their own
+ * container type — `swimlane.ts:readStoredSet` projects into a
+ * `Set<string>`; `swimlane-drag.ts:readStoredOrder` keeps the
+ * positional array (lane order is positional, not set-like).
+ *
+ * Centralising the read+parse boilerplate avoids drift between the
+ * two surfaces while letting each caller pick the in-memory shape
+ * that matches its access pattern.
+ */
+export function readStoredStringArray(key: string): readonly string[] | null {
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (raw === null) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    const out: string[] = [];
+    for (const item of parsed) {
+      if (typeof item === 'string') out.push(item);
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Read a JSON object from localStorage and project it into a
  * `Map<string, T>` via a per-value type guard. Returns an empty
  * Map on every read failure (missing entry, parse error, wrong

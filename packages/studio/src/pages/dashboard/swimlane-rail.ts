@@ -10,7 +10,12 @@
  *     a real focusable `<button>` with `aria-label`; the visible /
  *     hidden glyphs render as `aria-hidden` siblings whose display
  *     is driven by the parent `.rail-lane[data-lane-visible]` CSS)
- *   - a non-interactive drag-handle stub (Task 5.4 wires the handler)
+ *   - a drag handle (`.rail-drag`). Task 5.4 wires the rail-level
+ *     HTML5 native drag-and-drop handler — the whole row carries
+ *     `draggable="true"` per the HTML5 DnD contract (the browser only
+ *     starts a drag when the source root opts in). The handle glyph
+ *     is the operator's visual cue ("grab here"); the CSS surfaces
+ *     `cursor: grab` on `.rail-drag` to reinforce that mental model.
  *
  * The rail row itself remains a `role="button"` div (the whole row
  * is the focus toggle). Keyboard activation (Enter / Space) is wired
@@ -43,9 +48,18 @@ function renderRailRow(row: LaneRailRow): RawHtml {
   // which one shows based on the parent `.rail-lane
   // [data-lane-visible]` attribute the client controller updates on
   // click.
+  //
+  // Task 5.4 drag handle: HTML5 native DnD requires the source root
+  // to carry `draggable="true"`; the visible `.rail-drag` glyph is
+  // the operator's "grab here" cue (cursor: grab in CSS). Whole-row
+  // drag is the pragmatic call — the browser fires dragstart from
+  // any descendant; the visual handle anchors the mental model. The
+  // reorder controller lives in
+  // `plugins/deskwork-studio/public/src/dashboard/swimlane-drag.ts`.
   const eyeLabel = `Toggle visibility for ${row.name} lane`;
   return unsafe(html`
     <div class="${classes}" role="button" tabindex="0"
+      draggable="true"
       data-rail-lane="${row.id}"
       aria-pressed="${row.inFocus ? 'true' : 'false'}"
       data-lane-visible="true">
@@ -55,9 +69,6 @@ function renderRailRow(row: LaneRailRow): RawHtml {
       <span class="r-glyph" aria-hidden="true">${laneGlyph(row.templateId)}</span>
       <span class="r-name">${row.name}</span>
       <span class="r-count">${row.entryCount}</span>
-      <!-- Task 5.4 slot: drag handle for lane reorder. Renders as a
-           non-interactive stub for 5.1 so muscle-memory is in place;
-           5.4 wires the handler. -->
       <span class="rail-drag" aria-hidden="true">⋮⋮</span>
     </div>`);
 }

@@ -176,7 +176,7 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
     expect(r.html).toContain('data-focus-chip-all');
   });
 
-  it('lane-visibility rail contains one row per lane with drag stub', async () => {
+  it('lane-visibility rail contains one row per lane with drag handle', async () => {
     const r = await getHtml(app, '/dev/editorial-studio');
     expect(r.status).toBe(200);
     const railMatches = r.html.match(/data-rail-lane="[^"]+"/g) ?? [];
@@ -184,8 +184,66 @@ describe('dashboard swimlane shell — Phase 5 Task 5.1', () => {
     expect(r.html).toContain('data-rail-lane="default"');
     expect(r.html).toContain('data-rail-lane="mockups"');
     expect(r.html).toContain('data-rail-lane="qa"');
-    // Drag handle stub renders (Task 5.4 wires the handler).
+    // Drag handle glyph renders on every row (Task 5.4 controller in
+    // `swimlane-drag.ts` reads this).
     expect(r.html).toMatch(/<span class="rail-drag" aria-hidden="true">⋮⋮<\/span>/);
+  });
+
+  // ============================================================
+  //  Task 5.4 — drag-to-reorder server contract.
+  // ============================================================
+
+  it('Task 5.4: every rail row carries draggable="true" so HTML5 DnD can start', async () => {
+    // HTML5 native drag-and-drop requires the source root to opt
+    // into draggable. The whole `.rail-lane` row carries the attribute
+    // (per the affordance-placement contract — drag handle on the
+    // row, not in a separate toolbar). The visible `.rail-drag` glyph
+    // is the operator's grab-here cue (cursor: grab in CSS).
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    for (const id of ['default', 'mockups', 'qa']) {
+      const re = new RegExp(
+        `<div class="rail-lane(?:\\s[^"]*)?"[^>]*draggable="true"[^>]*data-rail-lane="${id}"`,
+      );
+      expect(r.html).toMatch(re);
+    }
+  });
+
+  it('Task 5.4: dashboard-swimlane.css ships cursor: grab on the drag handle + drop-target feedback rules', async () => {
+    const cssRes = await app.fetch(
+      new Request('http://x/static/css/dashboard-swimlane.css'),
+    );
+    expect(cssRes.status).toBe(200);
+    const css = await cssRes.text();
+    // `.rail-drag` carries the canonical grab cursor.
+    expect(css).toMatch(/\.rail-lane\s+\.rail-drag\s*\{[\s\S]*?cursor:\s*grab/);
+    // While a row is being dragged the source carries `is-dragging`
+    // and the cursor flips to grabbing on both the row and the handle.
+    expect(css).toMatch(/\.rail-lane\.is-dragging\s*\{[\s\S]*?cursor:\s*grabbing/);
+    // Drop-target feedback — insertion hairline above / below the
+    // target row via inset box-shadow on the red-pencil token.
+    expect(css).toMatch(
+      /\.rail-lane\.drop-target-above\s*\{[\s\S]*?box-shadow:\s*inset\s+0\s+2px\s+0\s+0\s+var\(--er-red-pencil\)/,
+    );
+    expect(css).toMatch(
+      /\.rail-lane\.drop-target-below\s*\{[\s\S]*?box-shadow:\s*inset\s+0\s+-2px\s+0\s+0\s+var\(--er-red-pencil\)/,
+    );
+  });
+
+  it('Task 5.4.2: bay-head meta total INCLUDES hidden lanes\' entry counts', async () => {
+    // Step 5.4.2 verification: hidden lanes don't render swimlanes
+    // but their entries DO count in dashboard stats. The server
+    // emits the total via `countTotal(lanes)` which iterates every
+    // lane bucket regardless of visibility (visibility is a client-
+    // side concern; server has no knowledge of it). This invariant
+    // ships at the server boundary.
+    //
+    // Fixture: 3 lanes (default=1 entry, mockups=2 entries, qa=1
+    // entry) = 4 total. Even if the operator hides any subset
+    // client-side, the server-rendered total is still 4.
+    const r = await getHtml(app, '/dev/editorial-studio');
+    expect(r.status).toBe(200);
+    expect(r.html).toContain('4 entries');
   });
 
   it('each swimlane emits a .stage-grid with one column per template stage', async () => {

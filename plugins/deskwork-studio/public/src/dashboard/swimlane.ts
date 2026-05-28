@@ -39,6 +39,7 @@
  */
 
 import {
+  readStoredStringArray,
   resolveProjectKey,
   STORAGE_KEY_PREFIX,
 } from './swimlane-storage.ts';
@@ -69,20 +70,14 @@ function visibilityKey(projectKey: string): string {
 }
 
 function readStoredSet(key: string): Set<string> | null {
-  try {
-    const raw = window.localStorage.getItem(key);
-    if (raw === null) return null;
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return null;
-    const out = new Set<string>();
-    for (const item of parsed) {
-      if (typeof item === 'string') out.add(item);
-    }
-    return out;
-  } catch {
-    // localStorage unavailable or corrupted — proceed without stored state.
-    return null;
-  }
+  // Delegates to the shared string-array reader in swimlane-storage.ts
+  // (the read+parse boilerplate); this surface returns a Set because
+  // the focus + hidden state is set-shaped (membership matters,
+  // order does not). The order surface in swimlane-drag.ts uses the
+  // same reader but keeps the positional array.
+  const items = readStoredStringArray(key);
+  if (items === null) return null;
+  return new Set(items);
 }
 
 function writeStoredSet(key: string, value: ReadonlySet<string>): void {

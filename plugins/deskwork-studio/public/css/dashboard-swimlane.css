@@ -213,6 +213,29 @@
   user-select: none;
 }
 
+/* Task 5.4 drag-and-drop feedback. While a row is being dragged the
+ * source dims; the row whose midpoint the cursor is above gets a
+ * red-pencil insertion hairline on the appropriate edge ("above" or
+ * "below" the target row's center Y). The grabbing cursor persists
+ * during the drag so the operator's pointer state matches the
+ * dragstart's intent. */
+.rail-lane.is-dragging {
+  opacity: 0.45;
+  cursor: grabbing;
+}
+
+.rail-lane.is-dragging .rail-drag {
+  cursor: grabbing;
+}
+
+.rail-lane.drop-target-above {
+  box-shadow: inset 0 2px 0 0 var(--er-red-pencil);
+}
+
+.rail-lane.drop-target-below {
+  box-shadow: inset 0 -2px 0 0 var(--er-red-pencil);
+}
+
 /* ============================================================
  *  Bay main column — focus-chip strip + swimlanes.
  * ============================================================ */

@@ -14,6 +14,7 @@ import { initSwimlaneCollapse } from './dashboard/swimlane-collapse.ts';
 import { initSwimlaneViewToggle } from './dashboard/swimlane-view-toggle.ts';
 import { initSwimlaneCompose } from './dashboard/swimlane-compose.ts';
 import { initSwimlaneMobileSheet } from './dashboard/swimlane-mobile-sheet.ts';
+import { initSwimlaneDrag } from './dashboard/swimlane-drag.ts';
 import { initMastheadPopover } from './mobile-shell/masthead-popover.ts';
 
 function siteFromButton(btn: HTMLButtonElement): string {
@@ -523,6 +524,7 @@ function init(): void {
   initSwimlaneViewToggle();
   initSwimlaneCompose();
   initSwimlaneMobileSheet();
+  initSwimlaneDrag();
   initRowActions();
   initMastheadPopover();
 }
