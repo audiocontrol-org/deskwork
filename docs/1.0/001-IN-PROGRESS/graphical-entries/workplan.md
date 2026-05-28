@@ -208,16 +208,43 @@ date: 2026-05-25
 - [x] Every legacy entry post-migration has `lane: "default"` and a correct `artifactKind`.
 - [x] No data loss — all existing frontmatter, scrapbook content, marginalia, journal events preserved (the migration only ADDS fields; never deletes existing ones).
 
-## Phase 5: Studio render — per-lane tabs + template stage columns + combined overview + lane-visibility panel + multi-lane composed views  ·  [#306](https://github.com/audiocontrol-org/deskwork/issues/306)
+## Phase 5: Studio render — multi-lane swimlane dashboard + template stage columns + per-lane collapse + kanban↔list toggle + per-lane compose  ·  [#306](https://github.com/audiocontrol-org/deskwork/issues/306)
 
-**Deliverable:** Markdown-only studio render that's lane-aware. Tab strip + Combined overview + lane visibility panel + multi-lane composed views. Integration test against multi-lane fixture.
+**Deliverable:** Markdown-only studio render that's lane-aware. Multi-lane swimlane dashboard (D3 Press Bay v11) + per-stage and per-lane collapse + per-lane kanban↔list toggle + per-lane compose chip + focus-chip + lane-visibility rail. Integration test against multi-lane fixture.
 
-### Task 5.1: Per-lane dashboard tab strip + Combined overview
+### Phase 5 · Design pick (accepted)
 
-- [ ] Step 5.1.1: Refactor the studio's dashboard server-render to read `listLaneConfigs(projectRoot)` and emit one tab per lane plus a "Combined" tab.
-- [ ] Step 5.1.2: Each tab's body renders the lane's dashboard: columns drawn from the lane's template `linearStages` (in order) + an "Off-pipeline" section listing entries in `offPipelineStages`.
-- [ ] Step 5.1.3: Combined tab aggregates rows from all lanes with a lane-badge per row indicating membership.
-- [ ] Step 5.1.4: Default tab on first load = Combined; remembers last-active tab per-operator via localStorage.
+Direction 3 "Press Bay" (v11) is the accepted design as of 2026-05-27. Decision brief: [`docs/studio-design/ACCEPTED/2026-05-27-multi-lane-dashboard-d3-press-bay/brief.md`](../../../studio-design/ACCEPTED/2026-05-27-multi-lane-dashboard-d3-press-bay/brief.md). Canonical mockup: [`mockups/2026-05-27-multi-lane-dashboard/direction-3-press-bay.html`](../../../../mockups/2026-05-27-multi-lane-dashboard/direction-3-press-bay.html) (committed at SHA `2102f4e`). Rejected alternatives: [`D1 Lane Stack`](../../../studio-design/REJECTED/2026-05-27-multi-lane-dashboard-d1-lane-stack/brief.md), [`D2 Lane Bar`](../../../studio-design/REJECTED/2026-05-27-multi-lane-dashboard-d2-lane-bar/brief.md).
+
+The picked design **pivots away from the PRD's original "per-lane tab strip" framing** (which corresponds to D2 Lane Bar — now REJECTED) toward stacked horizontal swimlanes on desktop + a vertical lane-stack on mobile. The PRD body in `prd.md` still describes the tab-strip approach; that wording is to be iterated through `/deskwork:iterate` so the PRD reflects the picked design. Implementation continues against the swimlane spec captured in the brief + mockup, not against the stale PRD prose.
+
+### Task 5.1: Multi-lane swimlane dashboard + focus-chip strip + lane-visibility rail
+
+- [ ] Step 5.1.1: Refactor the studio's dashboard server-render to read `listLaneConfigs(projectRoot)` and emit one **swimlane** (`<article class="swim ...">`) per visible-and-focused lane, in operator-configured order.
+- [ ] Step 5.1.2: Each swimlane's body renders the lane's dashboard: columns drawn from the lane's template `linearStages` (in order) + an "Off-pipeline" section listing entries in `offPipelineStages`. No tab navigation; every focused lane is on-screen at once.
+- [ ] Step 5.1.3: **Focus-chip strip** (transient filter) emits one chip per visibility-on lane plus an "All" chip; clicking a chip toggles whether that lane is rendered in the current view. State stored per-operator (localStorage); URL-deep-linkable via `?focus=<csv>`.
+- [ ] Step 5.1.4: **Lane-visibility rail** (left rail on desktop, sheet on mobile) lists every lane with an eye-toggle (`●` visible / `○` persistently hidden) + drag handle. Visibility-off lanes don't appear in the focus-chip strip at all.
+- [ ] Step 5.1.5: Filtered-out lane stubs: when a lane is visibility-on but focus-off, render a compact **swim-stub** button between the focused swimlanes so the operator can see what's hidden by the current focus filter; clicking the stub re-adds the lane to focus.
+
+### Task 5.1A: Per-lane collapse — lane-level + per-stage
+
+- [ ] Step 5.1A.1: Lane-level collapse: chevron in each `swim-head` / `lane-head` toggles between expanded (full pipeline body) and collapsed (swim-head + compact per-stage count strip). State stored per-lane-per-operator.
+- [ ] Step 5.1A.2: Per-stage collapse: chevron in each `stage-head` (kanban) / `lb-group-head` (list) toggles one stage's content within an expanded lane. In kanban, collapsed columns shrink to a ~42px vertical strip with the stage name rotated 90°; remaining columns redistribute via flex. State stored per-lane-per-stage-per-operator.
+- [ ] Step 5.1A.3: Universal chevron convention: `▾` glyph, rotates 90° clockwise to indicate collapsed, click anywhere on the head (or chevron) to toggle, focus-visible ring, ≥24×24 hit target per WCAG 2.2 SC 2.5.8 AA.
+
+### Task 5.1B: Per-lane kanban ↔ list view toggle
+
+- [ ] Step 5.1B.1: Segmented `▦ Kanban` / `≡ List` toggle in each swim-head / lane-head flips the body between the two views. Both views show the same entries — only spatial arrangement differs.
+- [ ] Step 5.1B.2: Viewport-aware defaults: desktop kanban, mobile list. Operator's per-lane choice persists once set (per-operator localStorage).
+- [ ] Step 5.1B.3: When a lane is lane-level-collapsed, the toggle greys out (collapse precedence — there's no body to render either view of).
+- [ ] Step 5.1B.4: Mobile kanban tile view is the **v0.19 single-column collapsible-stage-tile pattern** (per `DESIGN-STANDARDS.md § Collapsible stage tiles`), NOT a 2-column wrap (which would obscure the linear stage sequence). List view stage groups carry the same stage-name + count + tag pattern as the kanban stage-grid heads; rows are dense (title + version-pill + state + ⋮ overflow).
+
+### Task 5.1C: Per-lane Compose chip (`+ new`)
+
+- [ ] Step 5.1C.1: Each swim-head / lane-head carries a `.swim-compose` chip rendering `+ new` on desktop, icon-only `+` on mobile (aria-label carries the full action). Min hit target: 26px desktop / 30×30 mobile, ≥24×24 per WCAG 2.2 SC 2.5.8 AA.
+- [ ] Step 5.1C.2: Click handler clipboard-copies the partial slash-command: `/deskwork:add <SLUG> --lane <lane-id> --stage <first-linear-stage>`. The placeholder text `<SLUG>` is LITERAL — the operator replaces it in the chat editor after pasting.
+- [ ] Step 5.1C.3: Post-click state: chip flashes green with `✓ Copied — paste in chat` for ~2s, then reverts to default. Implementation may use `.copied` class + `setTimeout`; no form fields, no popover, no bottom sheet.
+- [ ] Step 5.1C.4: Per THESIS Consequence 2, the studio does not mutate sidecar state from the click — the chip only copies; the operator's pasted slash-command IS the action.
 
 ### Task 5.2: Template-aware stage columns (no hardcoded stages in render)
 
@@ -225,11 +252,11 @@ date: 2026-05-25
 - [ ] Step 5.2.2: Empty-lane state: shows the lane's pipeline shape as empty stage columns + a "Create your first entry" CTA that clipboard-copies `/deskwork:add --lane <id>`.
 - [ ] Step 5.2.3: Per Commandment III, no surface renders "review state" labels — only stage labels appear.
 
-### Task 5.3: Many-lane overflow + dropdown
+### Task 5.3: Many-lane overflow — horizontal scroll of focus-chip strip + visibility-rail jump
 
-- [ ] Step 5.3.1: When N lanes > viewport-fitting threshold, the tab strip overflows into a horizontally-scrollable strip.
-- [ ] Step 5.3.2: A "lanes ▾" dropdown lets the operator jump directly to any lane (including hidden lanes); selecting from the dropdown also makes the lane visible if hidden.
-- [ ] Step 5.3.3: Mobile / phone: tab strip becomes a swipeable carousel; stage columns collapse to a vertical accordion per the existing mobile-first work.
+- [ ] Step 5.3.1: When N visibility-on lanes exceeds the viewport-fitting threshold, the focus-chip strip overflows into a horizontally-scrollable row (per the D3 mockup's mobile focus-strip behavior).
+- [ ] Step 5.3.2: The lane-visibility rail acts as the master list of every lane (including persistently-hidden ones); clicking a hidden lane in the rail flips its visibility on AND adds it to focus. No separate "lanes ▾" dropdown is needed — the rail already serves that role.
+- [ ] Step 5.3.3: Mobile / phone: focus-chip strip becomes a horizontally-scrollable row inside the masthead; lane-visibility rail becomes a slide-up sheet triggered by the masthead's "Lanes ▾" button.
 
 ### Task 5.4: Lane-visibility panel + drag-to-reorder
 
@@ -237,24 +264,30 @@ date: 2026-05-25
 - [ ] Step 5.4.2: Hidden lanes don't render tabs but their entries still exist and count in dashboard stats.
 - [ ] Step 5.4.3: Order stored at `.deskwork/lane-order.json` (project-wide) or per-operator via localStorage per PRD § Implied scope captured.
 
-### Task 5.5: Multi-lane composed views (saveable + reopenable)
+### Task 5.5: Saveable focus presets + deep-link URL pattern
 
-- [ ] Step 5.5.1: Operator can pick a subset of lanes (e.g. `mockups` + `feature-doc`) and pin a multi-lane view that tiles their dashboards horizontally with shared scroll for stage rows.
-- [ ] Step 5.5.2: Saved views stored at `.deskwork/personal/<operator-id>.json` (per-operator) or `.deskwork/views/<view-id>.json` (project-wide).
-- [ ] Step 5.5.3: Deep-link URL pattern: `/dev/view/<view-id>` opens the saved composition.
+- [ ] Step 5.5.1: The dashboard's base view is already multi-lane (D3 Press Bay) — every focused lane renders simultaneously. The "composed view" concept becomes a **saved focus preset**: a named subset of `{ visible-lanes, focused-lanes, per-lane-view-mode, per-lane-collapse-state }` that the operator can re-open later.
+- [ ] Step 5.5.2: Saved presets stored at `.deskwork/personal/<operator-id>/focus-presets.json` (per-operator) or `.deskwork/focus-presets/<preset-id>.json` (project-wide).
+- [ ] Step 5.5.3: Deep-link URL pattern: `/dev/editorial-studio?preset=<preset-id>` opens the saved preset. The lane-visibility rail surfaces "Save current as preset…" and "Load preset…" affordances.
 
 ### Task 5.6: Integration test against multi-lane fixture
 
 - [ ] Step 5.6.1: Build a tmp-fixture project with 3 lanes (`default` editorial / `mockups` visual / `qa` qa-plan); add 2 entries per lane in different stages.
-- [ ] Step 5.6.2: Boot the studio against the fixture; assert: tab strip has 4 tabs (3 lanes + Combined); each lane tab's columns match its template; Combined shows all 6 entries with lane badges; hidden-lane test (toggle one off, confirm tab disappears but entry still counts in stats).
-- [ ] Step 5.6.3: Phone-viewport regression: re-run the existing `scripts/smoke-er-viewport-regressions.mjs` against the multi-lane fixture; assert no overflow / no hidden-affordance / no fixed-position offenders per the project's UI verification protocol.
+- [ ] Step 5.6.2: Boot the studio against the fixture; assert: three swimlanes render in the bay shell (one per focused lane); each swimlane's stage columns match its template; focus-chip strip shows 3 chips + "All"; lane-visibility rail lists all 3 lanes with eye-toggles; hidden-lane test (toggle one off, confirm its chip disappears AND no swimlane renders, but the entry still counts in dashboard stats).
+- [ ] Step 5.6.3: Per-lane collapse test: toggle lane-level collapse → swim-head + count strip only; toggle per-stage collapse → narrow vertical strip with rotated name + redistributed remaining columns.
+- [ ] Step 5.6.4: Per-lane view-toggle test: flip one lane to list view → vertical stage groups with row entries; flip another to kanban → columnar stages with cards. Both modes show the same entries.
+- [ ] Step 5.6.5: Compose-chip test: click `+ new` on a lane → clipboard contains `/deskwork:add <SLUG> --lane <id> --stage <first-linear-stage>`; chip flashes green with `✓ Copied — paste in chat` for ~2s, then reverts.
+- [ ] Step 5.6.6: Phone-viewport regression: re-run the existing `scripts/smoke-er-viewport-regressions.mjs` against the multi-lane fixture; assert no overflow / no hidden-affordance / no fixed-position offenders per the project's UI verification protocol. Verify the chip layout doesn't overflow the lane-head row on phone viewports.
 
 **Acceptance Criteria:**
 
-- [ ] Studio dashboard renders one tab per lane + Combined; columns are template-driven (no hardcoded stage names in render code).
-- [ ] Lane visibility + reorder works; ordering persists.
-- [ ] Multi-lane composed views are saveable and reopenable via deep link.
+- [ ] Studio dashboard renders one swimlane per focused lane; columns are template-driven (no hardcoded stage names in render code).
+- [ ] Lane visibility + focus + reorder all work; visibility persists project-wide-or-per-operator; focus + view-mode + collapse persist per-operator.
+- [ ] Per-lane collapse (lane + per-stage) and kanban↔list toggle work with universal chevron convention and viewport-aware defaults.
+- [ ] Per-lane `+ new` Compose chip clipboard-copies the partial `/deskwork:add` command with lane + initial stage pre-filled; no form, no popover, no bottom sheet.
+- [ ] Saveable focus presets work; deep-link URL pattern opens saved preset.
 - [ ] Phone + desktop viewports both render correctly (dual-viewport verification protocol passes for all changed surfaces).
+- [ ] WCAG 2.2 SC 2.5.8 AA: every interactive affordance has a ≥24×24 hit target; WCAG 2.1 SC 2.4.7 AA: every interactive affordance has a visible focus ring; WCAG 2.1 SC 1.4.11 AA: contrast ratios verified for chevrons, chips, and stub-text.
 
 ## Phase 6: Lane + pipeline CRUD skills + studio management surfaces  ·  [#307](https://github.com/audiocontrol-org/deskwork/issues/307)
 
