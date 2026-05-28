@@ -1,4 +1,4 @@
-generated_at: 2026-05-28T06:35:47.333Z
+generated_at: 2026-05-28T20:31:30.832Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -526,6 +526,90 @@ clones:
       - plugins/dw-lifecycle/src/__tests__/scope-discovery/util/detector-harness.ts:22:36
     disposition: pending
     reason: null
+  - id: 94802334249e
+    lines: 11
+    members:
+      - plugins/dw-lifecycle/src/debt-report/gh-issues.ts:104:114
+      - plugins/dw-lifecycle/src/triage-issues/propose.ts:104:114
+    disposition: keep-with-reason
+    reason: "Hygiene Phase 2 intentional parallelism: workplan instructs 'Don't re-import from debt-report; declare your own in triage-issues/types.ts'. Each clone is a small utility shape (RunGh type, parsePositiveInt, isRawIssue type-guard, latestCommentDate, detectRepoFromGit) intentionally mirrored across the two hygiene-skill libraries to keep them independently evolvable; promotion to a shared module would couple them prematurely before Phase 3-5 reveal the durable abstraction shape."
+  - id: 67a3d7148839
+    lines: 8
+    members:
+      - plugins/dw-lifecycle/src/debt-report/gh-issues.ts:34:41
+      - plugins/dw-lifecycle/src/triage-issues/propose.ts:53:60
+    disposition: keep-with-reason
+    reason: "Hygiene Phase 2 intentional parallelism: workplan instructs 'Don't re-import from debt-report; declare your own in triage-issues/types.ts'. Each clone is a small utility shape (RunGh type, parsePositiveInt, isRawIssue type-guard, latestCommentDate, detectRepoFromGit) intentionally mirrored across the two hygiene-skill libraries to keep them independently evolvable; promotion to a shared module would couple them prematurely before Phase 3-5 reveal the durable abstraction shape."
+  - id: c028a8035019
+    lines: 16
+    members:
+      - plugins/dw-lifecycle/src/debt-report/gh-issues.ts:60:75
+      - plugins/dw-lifecycle/src/triage-issues/propose.ts:73:88
+    disposition: keep-with-reason
+    reason: "Hygiene Phase 2 intentional parallelism: workplan instructs 'Don't re-import from debt-report; declare your own in triage-issues/types.ts'. Each clone is a small utility shape (RunGh type, parsePositiveInt, isRawIssue type-guard, latestCommentDate, detectRepoFromGit) intentionally mirrored across the two hygiene-skill libraries to keep them independently evolvable; promotion to a shared module would couple them prematurely before Phase 3-5 reveal the durable abstraction shape."
+  - id: 9a0dbd3d1c3e
+    lines: 13
+    members:
+      - plugins/dw-lifecycle/src/debt-report/gh-issues.ts:75:87
+      - plugins/dw-lifecycle/src/triage-issues/propose.ts:88:100
+    disposition: keep-with-reason
+    reason: "Hygiene Phase 2 intentional parallelism: workplan instructs 'Don't re-import from debt-report; declare your own in triage-issues/types.ts'. Each clone is a small utility shape (RunGh type, parsePositiveInt, isRawIssue type-guard, latestCommentDate, detectRepoFromGit) intentionally mirrored across the two hygiene-skill libraries to keep them independently evolvable; promotion to a shared module would couple them prematurely before Phase 3-5 reveal the durable abstraction shape."
+  - id: 229bcde0591f
+    lines: 15
+    members:
+      - plugins/dw-lifecycle/src/debt-report/index.ts:14:28
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:153:167
+    disposition: keep-with-reason
+    reason: "Hygiene Phase 2 intentional parallelism: workplan instructs 'Don't re-import from debt-report; declare your own in triage-issues/types.ts'. Each clone is a small utility shape (RunGh type, parsePositiveInt, isRawIssue type-guard, latestCommentDate, detectRepoFromGit) intentionally mirrored across the two hygiene-skill libraries to keep them independently evolvable; promotion to a shared module would couple them prematurely before Phase 3-5 reveal the durable abstraction shape."
+  - id: b5c1ce0a0d88
+    lines: 16
+    members:
+      - plugins/dw-lifecycle/src/promote-deferrals/apply.ts:273:288
+      - plugins/dw-lifecycle/src/triage-issues/apply.ts:287:305
+    disposition: keep-with-reason
+    reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape on purpose. The apply-step entry sequence (readProposalFile → repo resolution → parseApproval → none-token shortcut → selectedIndexes → validateAllApproved gate) is canonical batched-proposal protocol surface; identical behavior is the contract. Shared-extraction tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
+  - id: 8659d4bad581
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/promote-deferrals/apply.ts:342:350
+      - plugins/dw-lifecycle/src/triage-issues/apply.ts:366:375
+    disposition: keep-with-reason
+    reason: "Cross-skill duplication between promote-deferrals and triage-issues batched-proposal infra; operator-known similarity tracked at #335 alongside other cross-skill primitives"
+  - id: cc6040c50c9b
+    lines: 15
+    members:
+      - plugins/dw-lifecycle/src/promote-deferrals/gate.ts:136:150
+      - plugins/dw-lifecycle/src/triage-issues/apply.ts:138:152
+    disposition: keep-with-reason
+    reason: "Cross-skill duplication between promote-deferrals and triage-issues batched-proposal infra; operator-known similarity tracked at #335 alongside other cross-skill primitives"
+  - id: 637fe5f9da59
+    lines: 8
+    members:
+      - plugins/dw-lifecycle/src/promote-deferrals/gate.ts:196:203
+      - plugins/dw-lifecycle/src/triage-issues/apply.ts:182:189
+    disposition: keep-with-reason
+    reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape on purpose. gatherDisposition's per-item half-filled-vs-absent-vs-present classifier is canonical batched-proposal protocol surface; the classification is what gives the apply layer the precise per-row error narrative. Shared-extraction tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
+  - id: 50970ea6178b
+    lines: 9
+    members:
+      - plugins/dw-lifecycle/src/promote-deferrals/gate.ts:242:250
+      - plugins/dw-lifecycle/src/triage-issues/apply.ts:328:336
+    disposition: keep-with-reason
+    reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape on purpose. validateAllApproved's per-item walk (half-filled detection + validateDisposition wrap with InvalidProposalFileError translation) is canonical batched-proposal protocol surface — same all-or-nothing gate semantics shared across both skills. Shared-extraction tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
+  - id: a8bdc6a76077
+    lines: 41
+    members:
+      - plugins/dw-lifecycle/src/promote-deferrals/gate.ts:33:73
+      - plugins/dw-lifecycle/src/triage-issues/apply.ts:65:105
+    disposition: keep-with-reason
+    reason: "Cross-skill duplication between promote-deferrals and triage-issues batched-proposal infra; operator-known similarity tracked at #335 alongside other cross-skill primitives"
+  - id: e2e1fde75061
+    lines: 21
+    members:
+      - plugins/dw-lifecycle/src/promote-deferrals/propose.ts:164:184
+      - plugins/dw-lifecycle/src/triage-issues/propose.ts:204:224
+    disposition: keep-with-reason
+    reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape on purpose. The propose-step finale (proposal-file shape construction, defaultOutputPath ISO-stamp computation, output-path collision check, JSON write) is canonical batched-proposal protocol surface shared across both hygiene skills; promotion to a shared module is tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
   - id: 1801f1b7dd0b
     lines: 8
     members:
@@ -906,6 +990,20 @@ clones:
       - plugins/dw-lifecycle/src/scope-discovery/scope-widen.ts:78:88
     disposition: keep-with-reason
     reason: scope-widen mirrors scope-inventory's CLI-shell boilerplate (slug-regex validation, makeRunDir, scopeWidenMain's parseCli try/catch). Extracting shared helpers would tangle two subcommands' control flow for marginal de-duplication benefit; the symmetry is desirable for operator UX consistency.
+  - id: 17db7d8fff6f
+    lines: 10
+    members:
+      - plugins/dw-lifecycle/src/subcommands/close-shipped.ts:118:127
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:146:155
+    disposition: keep-with-reason
+    reason: "Hygiene Phase 5 intentional parallelism: detectRepoFromGit + RunGh boundary callback shapes intentionally mirrored across the hygiene-skill libraries (debt-report, triage-issues, promote-deferrals, close-shipped) to keep them independently evolvable; promotion to a shared module would couple them prematurely before Phase 6 lifecycle integration reveals the durable abstraction shape."
+  - id: 9cfccf0a8979
+    lines: 11
+    members:
+      - plugins/dw-lifecycle/src/subcommands/debt-report.ts:39:49
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:35:45
+    disposition: keep-with-reason
+    reason: "Hygiene Phase 2 intentional parallelism: workplan instructs 'Don't re-import from debt-report; declare your own in triage-issues/types.ts'. Each clone is a small utility shape (RunGh type, parsePositiveInt, isRawIssue type-guard, latestCommentDate, detectRepoFromGit) intentionally mirrored across the two hygiene-skill libraries to keep them independently evolvable; promotion to a shared module would couple them prematurely before Phase 3-5 reveal the durable abstraction shape."
   - id: 0a9bedfbb1cf
     lines: 7
     members:
@@ -920,3 +1018,73 @@ clones:
       - plugins/dw-lifecycle/src/subcommands/uninstall-shortcuts.ts:276:285
     disposition: pending
     reason: null
+  - id: ff90da1cc3cf
+    lines: 7
+    members:
+      - plugins/dw-lifecycle/src/subcommands/issues.ts:40:46
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:149:155
+    disposition: keep-with-reason
+    reason: "Hygiene Phase 2 intentional parallelism: workplan instructs 'Don't re-import from debt-report; declare your own in triage-issues/types.ts'. Each clone is a small utility shape (RunGh type, parsePositiveInt, isRawIssue type-guard, latestCommentDate, detectRepoFromGit) intentionally mirrored across the two hygiene-skill libraries to keep them independently evolvable; promotion to a shared module would couple them prematurely before Phase 3-5 reveal the durable abstraction shape."
+  - id: 52b437adb7e8
+    lines: 34
+    members:
+      - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:120:153
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:134:167
+    disposition: keep-with-reason
+    reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape (propose/apply verbs, argv parsing, approval-token grammar, structural JSON guards, per-row outcome shape) on purpose. Per-skill subcommand boilerplate (parsePositiveInt, flag-loop parseProposeArgs/parseApplyArgs, defaultRunGh, detectRepoFromGit) is mirrored rather than imported so each hygiene skill remains independently evolvable; consolidation into a shared module is tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
+  - id: 8e5f16a18cc8
+    lines: 13
+    members:
+      - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:175:187
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:192:204
+    disposition: keep-with-reason
+    reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape (propose/apply verbs, argv parsing, approval-token grammar, structural JSON guards, per-row outcome shape) on purpose. Per-skill subcommand boilerplate (parsePositiveInt, flag-loop parseProposeArgs/parseApplyArgs, defaultRunGh, detectRepoFromGit) is mirrored rather than imported so each hygiene skill remains independently evolvable; consolidation into a shared module is tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
+  - id: 2a9a858b5922
+    lines: 28
+    members:
+      - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:189:216
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:206:233
+    disposition: keep-with-reason
+    reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape (propose/apply verbs, argv parsing, approval-token grammar, structural JSON guards, per-row outcome shape) on purpose. Per-skill subcommand boilerplate (parsePositiveInt, flag-loop parseProposeArgs/parseApplyArgs, defaultRunGh, detectRepoFromGit) is mirrored rather than imported so each hygiene skill remains independently evolvable; consolidation into a shared module is tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
+  - id: 3e0f9e6532b9
+    lines: 10
+    members:
+      - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:232:241
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:248:257
+    disposition: keep-with-reason
+    reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape (propose/apply verbs, argv parsing, approval-token grammar, structural JSON guards, per-row outcome shape) on purpose. Per-skill subcommand boilerplate (parsePositiveInt, flag-loop parseProposeArgs/parseApplyArgs, defaultRunGh, detectRepoFromGit) is mirrored rather than imported so each hygiene skill remains independently evolvable; consolidation into a shared module is tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
+  - id: 48c9db6582fb
+    lines: 8
+    members:
+      - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:38:45
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:47:54
+    disposition: keep-with-reason
+    reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape (propose/apply verbs, argv parsing, approval-token grammar, structural JSON guards, per-row outcome shape) on purpose. Per-skill subcommand boilerplate (parsePositiveInt, flag-loop parseProposeArgs/parseApplyArgs, defaultRunGh, detectRepoFromGit) is mirrored rather than imported so each hygiene skill remains independently evolvable; consolidation into a shared module is tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
+  - id: abc1afffaf43
+    lines: 20
+    members:
+      - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:51:70
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:63:82
+    disposition: keep-with-reason
+    reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape (propose/apply verbs, argv parsing, approval-token grammar, structural JSON guards, per-row outcome shape) on purpose. Per-skill subcommand boilerplate (parsePositiveInt, flag-loop parseProposeArgs/parseApplyArgs, defaultRunGh, detectRepoFromGit) is mirrored rather than imported so each hygiene skill remains independently evolvable; consolidation into a shared module is tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
+  - id: d290e3525f10
+    lines: 18
+    members:
+      - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:73:90
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:87:104
+    disposition: keep-with-reason
+    reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape (propose/apply verbs, argv parsing, approval-token grammar, structural JSON guards, per-row outcome shape) on purpose. Per-skill subcommand boilerplate (parsePositiveInt, flag-loop parseProposeArgs/parseApplyArgs, defaultRunGh, detectRepoFromGit) is mirrored rather than imported so each hygiene skill remains independently evolvable; consolidation into a shared module is tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
+  - id: 777751b1eafd
+    lines: 24
+    members:
+      - plugins/dw-lifecycle/src/subcommands/promote-deferrals.ts:91:114
+      - plugins/dw-lifecycle/src/subcommands/triage-issues.ts:107:130
+    disposition: keep-with-reason
+    reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape (propose/apply verbs, argv parsing, approval-token grammar, structural JSON guards, per-row outcome shape) on purpose. Per-skill subcommand boilerplate (parsePositiveInt, flag-loop parseProposeArgs/parseApplyArgs, defaultRunGh, detectRepoFromGit) is mirrored rather than imported so each hygiene skill remains independently evolvable; consolidation into a shared module is tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
+  - id: ec203342fa99
+    lines: 12
+    members:
+      - plugins/dw-lifecycle/src/subcommands/session-end-hygiene.ts:30:41
+      - plugins/dw-lifecycle/src/subcommands/session-start-recommendation.ts:21:32
+    disposition: keep-with-reason
+    reason: "argv parsing for --slug flag — identical helper-script CLI boilerplate per the Phase 2/3 precedent. Extracting a shared argv parser is broader infrastructure work outside this dispatch's scope (tracked at #335)."

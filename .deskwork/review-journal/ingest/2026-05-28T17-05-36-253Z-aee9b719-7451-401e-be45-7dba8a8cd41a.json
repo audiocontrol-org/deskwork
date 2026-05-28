@@ -1,0 +1,25 @@
+{
+  "id": "aee9b719-7451-401e-be45-7dba8a8cd41a",
+  "timestamp": "2026-05-28T17:05:36.253Z",
+  "event": "ingest",
+  "slug": "hygiene/prd",
+  "entryId": "aee9b719-7451-401e-be45-7dba8a8cd41a",
+  "site": "deskwork-internal",
+  "stage": "Drafting",
+  "sourceFile": "docs/1.0/001-IN-PROGRESS/hygiene/prd.md",
+  "frontmatterSnapshot": {
+    "slug": "hygiene",
+    "title": "Hygiene",
+    "targetVersion": "1.0",
+    "date": "2026-05-28",
+    "parentIssue": null,
+    "deskwork": {
+      "id": "aee9b719-7451-401e-be45-7dba8a8cd41a"
+    }
+  },
+  "derivation": {
+    "slug": "path",
+    "state": "default",
+    "date": "frontmatter"
+  }
+}

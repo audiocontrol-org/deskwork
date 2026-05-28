@@ -5,7 +5,7 @@ description: "Append journal entry; update feature docs; commit documentation ch
 
 # /dw-lifecycle:session-end
 
-Wrap up a session. Append a structured journal entry, update feature docs, commit documentation changes.
+Wrap up a session. Append a structured journal entry (with hygiene observations + a next-session recommendation), update feature docs, commit documentation changes.
 
 ## Steps
 
@@ -15,35 +15,37 @@ Wrap up a session. Append a structured journal entry, update feature docs, commi
 4. Determine the journal-entry template path:
    - use `.dw-lifecycle/templates/journal-entry.md` if the project customized it
    - otherwise use the bundled default copied by `/dw-lifecycle:customize templates journal-entry`
-5. Compose the journal entry from that template. The bundled default is intentionally generic:
+5. Compose the journal entry body from that template.
+6. Capture hygiene observations + the next-session recommendation:
 
-```markdown
-## YYYY-MM-DD: [Session Title]
-### Feature: [slug]
-### Worktree: [name]
-
-**Goal:** ...
-**Accomplished:** ...
-
-[Add, remove, or rename sections to match this project's journaling style.]
+```
+dw-lifecycle session-end-hygiene --slug <feature-slug> [--target-version <vN.N>] [--session-start-sha <sha>]
 ```
 
-6. Append the entry via the helper:
+   Captures (a) commit subjects in the session range mentioning TBD / defer / follow-up / wontfix / keep-with-reason / `[debt: #NNN]`, (b) bare TBD markers introduced into the feature workplan during the session, (c) issues filed this session by the current GitHub user. Prints a two-section markdown block:
+
+   - `### Hygiene observations` — what surfaced this session.
+   - `### Next session recommendation (hygiene)` — Resume / Triage / Address TBD lines, operator-editable before commit.
+
+   Append the captured block to the end of the journal entry body (after the operator reviews and optionally edits it).
+
+7. Append the entry via the helper:
 
 ```
 dw-lifecycle journal-append --file <entry.md>
 ```
 
-7. Read `config.session.end.preamble` and display any project-specific wrap-up text.
-8. Commit all documentation changes:
+8. Read `config.session.end.preamble` and display any project-specific wrap-up text.
+9. Commit all documentation changes:
 
 ```
 git add <feature-dir> DEVELOPMENT-NOTES.md
 git commit -m "docs: session-end <YYYY-MM-DD> [<slug>]"
 ```
 
-9. Report: commit hash, files changed, journal-entry summary.
+10. Report: commit hash, files changed, journal-entry summary.
 
 ## Error handling
 
 - **Uncommitted code changes outside docs.** Skill warns: "There are non-doc changes uncommitted. Commit those separately first to keep the session-end commit doc-only."
+- **No commits in session range / no workplan markers / no issues filed.** The hygiene block still emits; each section reports an empty result with a parenthetical note. The block is still appended so the next session-start sees an explicit "no prior recommendation" signal.

@@ -30,6 +30,14 @@ import { uninstallScopeDiscoveryHooks } from './subcommands/uninstall-scope-disc
 import { orchestratorTurn } from './subcommands/orchestrator-turn.js';
 import { wrapPrompt } from './subcommands/wrap-prompt.js';
 import { validateReturn } from './subcommands/validate-return.js';
+import { debtReport } from './subcommands/debt-report.js';
+import { triageIssues } from './subcommands/triage-issues.js';
+import { promoteDeferrals } from './subcommands/promote-deferrals.js';
+import { archiveBranch } from './subcommands/archive-branch.js';
+import { closeShipped } from './subcommands/close-shipped.js';
+import { sessionEndHygiene } from './subcommands/session-end-hygiene.js';
+import { sessionStartRecommendation } from './subcommands/session-start-recommendation.js';
+import { completeGate } from './subcommands/complete-gate.js';
 
 const subcommand = process.argv[2];
 const args = process.argv.slice(3);
@@ -74,6 +82,14 @@ const SUBCOMMANDS: Record<string, (args: string[]) => Promise<void>> = {
   'orchestrator-turn': orchestratorTurn,
   'wrap-prompt': wrapPrompt,
   'validate-return': validateReturn,
+  'debt-report': debtReport,
+  'triage-issues': triageIssues,
+  'promote-deferrals': promoteDeferrals,
+  'archive-branch': archiveBranch,
+  'close-shipped': closeShipped,
+  'session-end-hygiene': sessionEndHygiene,
+  'session-start-recommendation': sessionStartRecommendation,
+  'complete-gate': completeGate,
 };
 
 // Deprecation hints printed alongside the subcommand list in `--help`.
