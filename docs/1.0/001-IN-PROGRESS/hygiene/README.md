@@ -19,7 +19,7 @@ Ships a family of UNIX-style `/dw-lifecycle:*` skills that surface and burn down
 | 2 | GitHub-issue triage — `/dw-lifecycle:triage-issues` | [#326](https://github.com/audiocontrol-org/deskwork/issues/326) | Shipped on branch (b2e5178 + 025a1dc + ed1ac26; spec + quality review complete) |
 | 3 | Workplan-deferral promotion — `/dw-lifecycle:promote-deferrals` | [#327](https://github.com/audiocontrol-org/deskwork/issues/327) | Shipped on branch (62d3965 + 53eec56; combined review complete) |
 | 4 | Branch archive — `/dw-lifecycle:archive-branch` | [#328](https://github.com/audiocontrol-org/deskwork/issues/328) | Shipped on branch (34 tests pass; preserve-then-delete with all-or-nothing pre-flight gates) |
-| 5 | Release-time issue closure — `/dw-lifecycle:close-shipped` | [#329](https://github.com/audiocontrol-org/deskwork/issues/329) | Not started |
+| 5 | Release-time issue closure — `/dw-lifecycle:close-shipped` | [#329](https://github.com/audiocontrol-org/deskwork/issues/329) | Shipped on branch (8b3a8de + extension; 4-source evidence walker (commit-log + audit-log + tooling-feedback + workplan-checkbox) + cross-source merge + release-notes-body flag; 110 tests pass) |
 | 6 | Lifecycle integration | [#330](https://github.com/audiocontrol-org/deskwork/issues/330) | Not started |
 | 7 | Documentation | [#331](https://github.com/audiocontrol-org/deskwork/issues/331) | Not started |
 | 8 | Tests + smoke | [#332](https://github.com/audiocontrol-org/deskwork/issues/332) | Not started |

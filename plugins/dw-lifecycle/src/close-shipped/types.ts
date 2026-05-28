@@ -56,6 +56,45 @@ export interface IssueReferenceGroup {
   readonly primarySubject: string;
 }
 
+// Source identifiers for the four evidence walkers. The commit-log
+// scanner produces 'commit-log' findings; the audit-log walker produces
+// 'audit-log' findings (one per `Status: fixed-<sha>` entry whose SHA is
+// reachable in the release range); the tooling-feedback walker produces
+// 'tooling-feedback' findings; the workplan-checkbox walker produces
+// 'workplan-checkbox' findings (one per checked task carrying a
+// `· [#NNN](url)` back-fill).
+export type EvidenceSource =
+  | 'commit-log'
+  | 'audit-log'
+  | 'tooling-feedback'
+  | 'workplan-checkbox';
+
+// Per-source provenance entry. Sources (a)/(b)/(c) carry a SHA that
+// roots the finding in a specific commit. Source (d) is the checkbox
+// itself — no SHA association. All sources carry a path that points
+// the operator at the on-disk evidence.
+export interface ProvenanceEntry {
+  readonly source: EvidenceSource;
+  readonly sha: string | null;
+  readonly path: string | null;
+  readonly detail: string | null;
+}
+
+// Per-issue merged evidence: which sources flagged it, the dedup'd
+// commit set across sources, the verb history from the commit-log
+// scanner (when present), the per-source provenance trail, and the
+// orphan-source flag when two sources cite mutually-exclusive SHAs.
+export interface MergedIssueEvidence {
+  readonly issue: number;
+  readonly sources: readonly EvidenceSource[];
+  readonly commits: readonly ScannedCommit[];
+  readonly verbs: readonly ReferenceVerb[];
+  readonly primarySubject: string;
+  readonly provenance: readonly ProvenanceEntry[];
+  readonly orphanSource: boolean;
+  readonly orphanReason: string | null;
+}
+
 // Per-issue outcome from the apply step.
 export type ApplyOutcomeKind =
   | 'labeled-and-commented'
@@ -87,6 +126,7 @@ export interface CloseShippedResult {
   readonly fromTag: string;
   readonly toTag: string;
   readonly groups: readonly IssueReferenceGroup[];
+  readonly merged: readonly MergedIssueEvidence[];
   readonly outcomes: readonly CloseShippedOutcome[];
   readonly summary: CloseShippedSummary;
 }

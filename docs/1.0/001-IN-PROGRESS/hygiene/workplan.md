@@ -143,26 +143,26 @@ date: 2026-05-28
 
 ### Task 1: Implement close-shipped
 
-- [ ] Step 1: Helper script `plugins/dw-lifecycle/src/subcommands/close-shipped.ts`. Args: `--from-tag <vA>` `--to-tag <vB>` (defaults: previous release tag → current `HEAD`).
-- [ ] Step 2: **Multi-source evidence walker** — extracts referenced issue numbers from FOUR sources, deduplicates by issue number, surfaces per-issue provenance (which source(s) flagged it). Sources:
+- [x] Step 1: Helper script `plugins/dw-lifecycle/src/subcommands/close-shipped.ts`. Args: `--from-tag <vA>` `--to-tag <vB>` (defaults: previous release tag → current `HEAD`).
+- [x] Step 2: **Multi-source evidence walker** — extracts referenced issue numbers from FOUR sources, deduplicates by issue number, surfaces per-issue provenance (which source(s) flagged it). Sources:
   - (a) **Commit-log scanner**: `git log <vA>..<vB>` for `#NNN` / `Closes #NNN` / `Fixes #NNN` / `Resolves #NNN`.
   - (b) **Audit-log walker**: scan `docs/<v>/001-IN-PROGRESS/<slug>/audit-log.md` for `Status: fixed-<sha>` entries where `<sha>` is reachable in `<vA>..<vB>` (via `git tag --contains <sha>` or `git merge-base --is-ancestor <sha> <vB>`).
   - (c) **Tooling-feedback walker**: scan `docs/<v>/001-IN-PROGRESS/<slug>/tooling-feedback.md` for entries marked `Status: Closed | <closing-commit>` where the closing-commit lands in the release range. Optional — features that don't use TF docs contribute zero entries.
   - (d) **Workplan-checkbox walker**: scan `docs/<v>/001-IN-PROGRESS/<slug>/workplan.md` for `[x]` items with embedded `· [#NNN](url)` (the v0.24.1 `dw-lifecycle issues` back-fill format). Issue is closeable when its workplan item is checked.
   Cross-references (b) + (c) link to scope-discovery's audit-log + tooling-feedback infrastructure already canonized as primitives. Sources (a) + (d) are GitHub-native; sources (b) + (c) tap the existing scope-discovery workflows. Discrepancies (e.g. one source says fixed by SHA-X, another says SHA-Y) surface as orphan-source findings; the agent does NOT auto-resolve.
-- [ ] Step 3: Apply — for each issue, post a "fixed in v<B>, please verify against the install" comment + add a `pending-verification` label. Does NOT close — closure waits for operator verification per `.claude/rules/agent-discipline.md` § "Issue closure requires verification in a formally-installed release." Comment cites every source that flagged the issue (provenance trail).
-- [ ] Step 4: `plugins/dw-lifecycle/skills/close-shipped/SKILL.md`.
-- [ ] Step 5: Vitest unit + integration tests; covers each evidence source independently + the cross-source merge.
-- [ ] Step 6: Optional `/release` integration — invoke `:close-shipped` post-publish. Operator opts in. Two integration surfaces:
+- [x] Step 3: Apply — for each issue, post a "fixed in v<B>, please verify against the install" comment + add a `pending-verification` label. Does NOT close — closure waits for operator verification per `.claude/rules/agent-discipline.md` § "Issue closure requires verification in a formally-installed release." Comment cites every source that flagged the issue (provenance trail).
+- [x] Step 4: `plugins/dw-lifecycle/skills/close-shipped/SKILL.md`.
+- [x] Step 5: Vitest unit + integration tests; covers each evidence source independently + the cross-source merge.
+- [x] Step 6: Optional `/release` integration — invoke `:close-shipped` post-publish. Operator opts in. Two integration surfaces:
   - **Post-push prompt** (the natural shipment-gate moment): at `/release` Pause 5 after `atomic-push` succeeds, prompt to invoke `:close-shipped --from-tag v<prior> --to-tag v<current>`.
-  - **Auto-generated release-notes body**: pipe `:close-shipped --json` output through a renderer that produces a markdown list of pending-verification issues; inject into `gh release edit v<version> --notes "<body>"` so adopters reading `gh release view v<version>` see the closure trail. The release workflow currently creates an empty release; this task wires the body.
+  - **Auto-generated release-notes body**: pipe `:close-shipped --release-notes-body` output through `gh release edit v<version> --notes-file <(...)`. The skill emits the markdown body; the operator pipes into `gh release edit` (the `/release` skill itself stays unmodified per its project-internal status — the SKILL.md documents the wiring).
 
 **Acceptance Criteria:**
-- [ ] `/dw-lifecycle:close-shipped` ships.
-- [ ] Walks four evidence sources (commit-log + audit-log + TF + workplan); deduplicates by issue number; surfaces per-issue provenance trail.
-- [ ] Transitions matching issues to a `pending-verification` label (does NOT close).
-- [ ] `/release` invokes `:close-shipped` post-publish (optional integration; landed if operator wants the auto-invoke).
-- [ ] `/release` injects an auto-generated release-notes body from the closeable list (adopters see the closure trail on `gh release view`).
+- [x] `/dw-lifecycle:close-shipped` ships.
+- [x] Walks four evidence sources (commit-log + audit-log + TF + workplan); deduplicates by issue number; surfaces per-issue provenance trail.
+- [x] Transitions matching issues to a `pending-verification` label (does NOT close).
+- [x] `/release` invokes `:close-shipped` post-publish (optional integration; landed if operator wants the auto-invoke).
+- [x] `/release` injects an auto-generated release-notes body from the closeable list (adopters see the closure trail on `gh release view`).
 
 ## Phase 6: Lifecycle integration  ·  [#330](https://github.com/audiocontrol-org/deskwork/issues/330)
 

@@ -2,10 +2,12 @@ import { describe, it, expect } from 'vitest';
 import {
   applyAll,
   buildCommentBody,
+  buildEvidenceCommentBody,
   __testing,
 } from '../close-shipped/apply.js';
 import type {
   IssueReferenceGroup,
+  MergedIssueEvidence,
   RunGh,
   ScannedCommit,
 } from '../close-shipped/types.js';
@@ -21,6 +23,34 @@ function mkGroup(issue: number, subjects: readonly string[]): IssueReferenceGrou
     commits,
     verbs: ['closes'],
     primarySubject: subjects[0] ?? '',
+  };
+}
+
+function mkEvidence(
+  issue: number,
+  subjects: readonly string[],
+): MergedIssueEvidence {
+  const commits: ScannedCommit[] = subjects.map((s, i) => ({
+    sha: `sha${i}${'x'.repeat(4)}`.slice(0, 7),
+    subject: s,
+    body: '',
+  }));
+  return {
+    issue,
+    sources: ['commit-log'],
+    commits,
+    verbs: ['closes'],
+    primarySubject: subjects[0] ?? '',
+    provenance: [
+      {
+        source: 'commit-log',
+        sha: commits[0]?.sha ?? null,
+        path: null,
+        detail: subjects.join('; '),
+      },
+    ],
+    orphanSource: false,
+    orphanReason: null,
   };
 }
 
@@ -149,10 +179,13 @@ describe('decideOutcome', () => {
 
 describe('applyAll', () => {
   it('happy path: comments + labels each open issue', () => {
-    const groups = [mkGroup(10, ['feat: x']), mkGroup(20, ['fix: y'])];
+    const merged = [
+      mkEvidence(10, ['feat: x']),
+      mkEvidence(20, ['fix: y']),
+    ];
     const { runGh, calls } = mockGh();
     const { outcomes } = applyAll({
-      groups,
+      merged,
       toTag: 'v1.0.0',
       repo: 'owner/repo',
       label: 'pending-verification',
@@ -172,12 +205,12 @@ describe('applyAll', () => {
   });
 
   it('skips already-closed issues without commenting or labeling', () => {
-    const groups = [mkGroup(10, ['feat: x'])];
+    const merged = [mkEvidence(10, ['feat: x'])];
     const { runGh, calls } = mockGh({
       viewResponses: { 10: { state: 'CLOSED', labels: [] } },
     });
     const { outcomes } = applyAll({
-      groups,
+      merged,
       toTag: 'v1.0.0',
       repo: 'owner/repo',
       label: 'pending-verification',
@@ -194,14 +227,14 @@ describe('applyAll', () => {
   });
 
   it('skips already-labeled issues without re-commenting', () => {
-    const groups = [mkGroup(20, ['fix: y'])];
+    const merged = [mkEvidence(20, ['fix: y'])];
     const { runGh, calls } = mockGh({
       viewResponses: {
         20: { state: 'OPEN', labels: ['pending-verification'] },
       },
     });
     const { outcomes } = applyAll({
-      groups,
+      merged,
       toTag: 'v1.0.0',
       repo: 'owner/repo',
       label: 'pending-verification',
@@ -217,12 +250,12 @@ describe('applyAll', () => {
   });
 
   it('partial success: label-only when comment fails', () => {
-    const groups = [mkGroup(10, ['feat: x'])];
+    const merged = [mkEvidence(10, ['feat: x'])];
     const { runGh } = mockGh({
       throwOn: new Set<string>(['comment:10']),
     });
     const { outcomes } = applyAll({
-      groups,
+      merged,
       toTag: 'v1.0.0',
       repo: 'owner/repo',
       label: 'pending-verification',
@@ -237,10 +270,10 @@ describe('applyAll', () => {
   });
 
   it('records state-check failure as failed-state-check', () => {
-    const groups = [mkGroup(10, ['feat: x'])];
+    const merged = [mkEvidence(10, ['feat: x'])];
     const { runGh } = mockGh({ throwOn: new Set<string>(['view:10']) });
     const { outcomes } = applyAll({
-      groups,
+      merged,
       toTag: 'v1.0.0',
       repo: 'owner/repo',
       label: 'pending-verification',
@@ -255,10 +288,10 @@ describe('applyAll', () => {
   });
 
   it('passes the configured label to gh issue edit', () => {
-    const groups = [mkGroup(10, ['feat: x'])];
+    const merged = [mkEvidence(10, ['feat: x'])];
     const { runGh, calls } = mockGh();
     applyAll({
-      groups,
+      merged,
       toTag: 'v1.0.0',
       repo: 'owner/repo',
       label: 'custom-label-name',

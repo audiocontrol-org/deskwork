@@ -1,23 +1,31 @@
 import { execFileSync } from 'node:child_process';
+import { loadConfig } from '../config.js';
 import { repoRoot } from '../repo.js';
 import {
   applyAll,
-  buildCommentBody,
+  buildEvidenceCommentBody,
 } from '../close-shipped/apply.js';
+import { walkAuditLogs } from '../close-shipped/audit-log-walker.js';
 import {
   CommitScanError,
   scanAndGroup,
 } from '../close-shipped/commit-scanner.js';
+import { mergeAll } from '../close-shipped/merger.js';
+import { buildReleaseNotesBody } from '../close-shipped/release-notes.js';
 import {
   TagResolutionError,
   assertTagsExist,
   resolveDefaults,
 } from '../close-shipped/tag-resolver.js';
+import { walkToolingFeedback } from '../close-shipped/tooling-feedback-walker.js';
+import { walkWorkplans } from '../close-shipped/workplan-walker.js';
+import type { Config } from '../config.types.js';
 import type {
   CloseShippedOutcome,
   CloseShippedResult,
   CloseShippedSummary,
   IssueReferenceGroup,
+  MergedIssueEvidence,
   RunGh,
   RunGit,
 } from '../close-shipped/types.js';
@@ -33,6 +41,7 @@ export interface CloseShippedCliOptions {
   readonly repo: string | null;
   readonly label: string;
   readonly dryRun: boolean;
+  readonly releaseNotesBody: boolean;
 }
 
 export function parseCloseShippedArgs(
@@ -43,6 +52,7 @@ export function parseCloseShippedArgs(
   let repo: string | null = null;
   let label = DEFAULT_LABEL;
   let dryRun = false;
+  let releaseNotesBody = false;
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === undefined) continue;
@@ -85,6 +95,9 @@ export function parseCloseShippedArgs(
       case '--dry-run':
         dryRun = true;
         break;
+      case '--release-notes-body':
+        releaseNotesBody = true;
+        break;
       default:
         if (arg.startsWith('-')) {
           throw new Error(`Unknown flag: ${arg}`);
@@ -92,7 +105,7 @@ export function parseCloseShippedArgs(
         throw new Error(`Unexpected positional argument: ${arg}`);
     }
   }
-  return { fromTag, toTag, repo, label, dryRun };
+  return { fromTag, toTag, repo, label, dryRun, releaseNotesBody };
 }
 
 function defaultRunGh(args: readonly string[]): string {
@@ -123,12 +136,13 @@ function summarize(
   fromTag: string,
   toTag: string,
   groups: readonly IssueReferenceGroup[],
+  merged: readonly MergedIssueEvidence[],
   outcomes: readonly CloseShippedOutcome[],
   commitsScanned: number,
 ): CloseShippedResult {
   const summary: CloseShippedSummary = {
     commitsScanned,
-    issuesReferenced: groups.length,
+    issuesReferenced: merged.length,
     applied: outcomes.filter(
       (o) =>
         o.applied &&
@@ -147,7 +161,7 @@ function summarize(
         o.action !== 'skipped-already-labeled',
     ).length,
   };
-  return { fromTag, toTag, groups, outcomes, summary };
+  return { fromTag, toTag, groups, merged, outcomes, summary };
 }
 
 function formatDryRun(result: CloseShippedResult, label: string): string {
@@ -156,19 +170,39 @@ function formatDryRun(result: CloseShippedResult, label: string): string {
   lines.push(`Commits scanned: ${result.summary.commitsScanned}`);
   lines.push(`Issues referenced: ${result.summary.issuesReferenced}`);
   lines.push('');
-  if (result.groups.length === 0) {
+  if (result.merged.length === 0) {
     lines.push('No issue references found in the range.');
     lines.push('');
     return lines.join('\n');
   }
   lines.push(`For each open issue, would post a verification-request comment and add label '${label}':`);
   lines.push('');
-  for (const group of result.groups) {
-    lines.push(`Issue #${group.issue} (verb: ${group.verbs.join(', ')})`);
-    for (const commit of group.commits) {
+  for (const evidence of result.merged) {
+    const verbSuffix =
+      evidence.verbs.length > 0 ? ` (verbs: ${evidence.verbs.join(', ')})` : '';
+    lines.push(
+      `Issue #${evidence.issue} sources: ${evidence.sources.join(', ')}${verbSuffix}`,
+    );
+    for (const commit of evidence.commits) {
       lines.push(`  ${commit.sha}: ${commit.subject}`);
     }
-    const sampleBody = buildCommentBody({ toTag: result.toTag, group });
+    for (const entry of evidence.provenance) {
+      const path = entry.path ?? '';
+      const detail = entry.detail ?? '';
+      const sha = entry.sha ?? '';
+      const parts: string[] = [];
+      if (path !== '') parts.push(path);
+      if (sha !== '') parts.push(`sha ${sha}`);
+      if (detail !== '') parts.push(detail);
+      lines.push(`  [${entry.source}] ${parts.join(' — ')}`);
+    }
+    if (evidence.orphanSource && evidence.orphanReason !== null) {
+      lines.push(`  orphan-source: ${evidence.orphanReason}`);
+    }
+    const sampleBody = buildEvidenceCommentBody({
+      toTag: result.toTag,
+      evidence,
+    });
     const sampleFirstLine = sampleBody.split('\n')[0] ?? '';
     lines.push(`  Comment first line: ${sampleFirstLine}`);
     lines.push('');
@@ -216,6 +250,7 @@ function formatResult(result: CloseShippedResult, label: string): string {
 export interface RunCloseShippedArgs {
   readonly opts: CloseShippedCliOptions;
   readonly projectRoot: string;
+  readonly config: Config;
   readonly runGh: RunGh;
   readonly runGit: RunGit;
   readonly stdout: NodeJS.WriteStream;
@@ -224,7 +259,8 @@ export interface RunCloseShippedArgs {
 }
 
 export function runCloseShipped(args: RunCloseShippedArgs): number {
-  const { opts, runGh, runGit, stdout, stderr, detectRepo } = args;
+  const { opts, projectRoot, config, runGh, runGit, stdout, stderr, detectRepo } =
+    args;
 
   let resolved;
   try {
@@ -300,11 +336,50 @@ export function runCloseShipped(args: RunCloseShippedArgs): number {
     throw err;
   }
 
+  // Source (b): audit-log walker.
+  const auditFindings = walkAuditLogs({
+    projectRoot,
+    config,
+    fromTag: resolved.fromTag,
+    toTag: resolved.toTag,
+    runGit,
+  });
+
+  // Source (c): tooling-feedback walker.
+  const tfFindings = walkToolingFeedback({
+    projectRoot,
+    config,
+    fromTag: resolved.fromTag,
+    toTag: resolved.toTag,
+    runGit,
+  });
+
+  // Source (d): workplan-checkbox walker.
+  const workplanFindings = walkWorkplans({ projectRoot, config });
+
+  const merged = mergeAll({
+    commits: scan.commits,
+    groups: scan.groups,
+    auditFindings,
+    tfFindings,
+    workplanFindings,
+  });
+
+  // --release-notes-body emits ONLY the markdown body (no other
+  // output) so the operator can pipe it into `gh release edit --notes`.
+  if (opts.releaseNotesBody) {
+    stdout.write(
+      buildReleaseNotesBody({ toTag: resolved.toTag, merged }),
+    );
+    return 0;
+  }
+
   if (opts.dryRun) {
     const result = summarize(
       resolved.fromTag,
       resolved.toTag,
       scan.groups,
+      merged,
       [],
       scan.commits.length,
     );
@@ -313,7 +388,7 @@ export function runCloseShipped(args: RunCloseShippedArgs): number {
   }
 
   const { outcomes } = applyAll({
-    groups: scan.groups,
+    merged,
     toTag: resolved.toTag,
     repo,
     label: opts.label,
@@ -324,6 +399,7 @@ export function runCloseShipped(args: RunCloseShippedArgs): number {
     resolved.fromTag,
     resolved.toTag,
     scan.groups,
+    merged,
     outcomes,
     scan.commits.length,
   );
@@ -334,7 +410,7 @@ export function runCloseShipped(args: RunCloseShippedArgs): number {
   //     handled above before we get here.
   //   - every applicable issue failed -> exit 1.
   //   - everything else (success, no-op, partial-success, all-skipped) -> 0.
-  if (scan.groups.length === 0) return 0;
+  if (merged.length === 0) return 0;
   const attempted = outcomes.filter(
     (o) =>
       o.action !== 'skipped-already-closed' &&
@@ -354,9 +430,11 @@ function parseRevCount(out: string): number {
 export async function closeShipped(rawArgs: string[]): Promise<void> {
   const opts = parseCloseShippedArgs(rawArgs);
   const root = repoRoot();
+  const config = loadConfig(root);
   const exitCode = runCloseShipped({
     opts,
     projectRoot: root,
+    config,
     runGh: defaultRunGh,
     runGit: defaultRunGit(root),
     stdout: process.stdout,

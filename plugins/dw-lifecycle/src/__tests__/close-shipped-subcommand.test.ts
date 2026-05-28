@@ -4,7 +4,11 @@ import {
   parseCloseShippedArgs,
   runCloseShipped,
 } from '../subcommands/close-shipped.js';
+import { defaultConfig } from '../config.js';
+import type { Config } from '../config.types.js';
 import type { RunGh, RunGit } from '../close-shipped/types.js';
+
+const TEST_CONFIG: Config = defaultConfig();
 
 const RECORD_SEPARATOR = '\x1e';
 const FIELD_SEPARATOR = '\x1f';
@@ -115,6 +119,16 @@ describe('parseCloseShippedArgs', () => {
     expect(opts.dryRun).toBe(true);
   });
 
+  it('parses --release-notes-body', () => {
+    const opts = parseCloseShippedArgs(['--release-notes-body']);
+    expect(opts.releaseNotesBody).toBe(true);
+  });
+
+  it('defaults --release-notes-body to false', () => {
+    const opts = parseCloseShippedArgs([]);
+    expect(opts.releaseNotesBody).toBe(false);
+  });
+
   it('throws when --from-tag has no value', () => {
     expect(() => parseCloseShippedArgs(['--from-tag'])).toThrow(
       /--from-tag requires/,
@@ -158,8 +172,10 @@ describe('runCloseShipped', () => {
         repo: 'owner/repo',
         label: 'pending-verification',
         dryRun: true,
+        releaseNotesBody: false,
       },
       projectRoot: '/tmp/test',
+      config: TEST_CONFIG,
       runGh,
       runGit,
       stdout: stdout as unknown as NodeJS.WriteStream,
@@ -197,8 +213,10 @@ describe('runCloseShipped', () => {
         repo: 'owner/repo',
         label: 'pending-verification',
         dryRun: false,
+        releaseNotesBody: false,
       },
       projectRoot: '/tmp/test',
+      config: TEST_CONFIG,
       runGh,
       runGit,
       stdout: stdout as unknown as NodeJS.WriteStream,
@@ -233,8 +251,10 @@ describe('runCloseShipped', () => {
         repo: 'owner/repo',
         label: 'pending-verification',
         dryRun: false,
+        releaseNotesBody: false,
       },
       projectRoot: '/tmp/test',
+      config: TEST_CONFIG,
       runGh,
       runGit,
       stdout: stdout as unknown as NodeJS.WriteStream,
@@ -266,8 +286,10 @@ describe('runCloseShipped', () => {
         repo: 'owner/repo',
         label: 'pending-verification',
         dryRun: false,
+        releaseNotesBody: false,
       },
       projectRoot: '/tmp/test',
+      config: TEST_CONFIG,
       runGh,
       runGit,
       stdout: stdout as unknown as NodeJS.WriteStream,
@@ -301,8 +323,10 @@ describe('runCloseShipped', () => {
         repo: 'owner/repo',
         label: 'pending-verification',
         dryRun: false,
+        releaseNotesBody: false,
       },
       projectRoot: '/tmp/test',
+      config: TEST_CONFIG,
       runGh,
       runGit,
       stdout: stdout as unknown as NodeJS.WriteStream,
@@ -316,6 +340,45 @@ describe('runCloseShipped', () => {
     expect(out).toContain('skipped-already-closed');
     // Only the state-check call. No comment or label.
     expect(calls.length).toBe(1);
+  });
+
+  it('emits release-notes body when --release-notes-body is set', async () => {
+    const stdout = new PassThrough();
+    const stderr = new PassThrough();
+    const stdoutPromise = streamToString(stdout);
+    const repoState: RepoState = {
+      tags: ['v1.0.0', 'v1.1.0'],
+      commits: [{ sha: 'aaa1234', subject: 'fix: thing (#10)', body: '' }],
+      revCounts: { 'v1.0.0..v1.1.0': 1, 'v1.1.0..v1.0.0': 0 },
+    };
+    const runGit = mockGit(repoState);
+    const { runGh, calls } = mockGh();
+    const code = runCloseShipped({
+      opts: {
+        fromTag: null,
+        toTag: null,
+        repo: 'owner/repo',
+        label: 'pending-verification',
+        dryRun: false,
+        releaseNotesBody: true,
+      },
+      projectRoot: '/tmp/test',
+      config: TEST_CONFIG,
+      runGh,
+      runGit,
+      stdout: stdout as unknown as NodeJS.WriteStream,
+      stderr: stderr as unknown as NodeJS.WriteStream,
+      detectRepo: () => 'owner/repo',
+    });
+    stdout.end();
+    stderr.end();
+    expect(code).toBe(0);
+    const out = await stdoutPromise;
+    expect(out).toContain('## Pending verification');
+    expect(out).toContain('- #10');
+    expect(out).toContain('To verify: install v1.1.0');
+    // gh should never be called when emitting the body.
+    expect(calls.length).toBe(0);
   });
 
   it('exits 0 when no issue references found', async () => {
@@ -339,8 +402,10 @@ describe('runCloseShipped', () => {
         repo: 'owner/repo',
         label: 'pending-verification',
         dryRun: false,
+        releaseNotesBody: false,
       },
       projectRoot: '/tmp/test',
+      config: TEST_CONFIG,
       runGh,
       runGit,
       stdout: stdout as unknown as NodeJS.WriteStream,

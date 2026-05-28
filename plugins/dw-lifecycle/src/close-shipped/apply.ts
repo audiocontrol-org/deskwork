@@ -17,12 +17,15 @@
 import type {
   ApplyOutcomeKind,
   CloseShippedOutcome,
+  EvidenceSource,
   IssueReferenceGroup,
+  MergedIssueEvidence,
+  ProvenanceEntry,
   RunGh,
 } from './types.js';
 
 export interface ApplyArgs {
-  readonly groups: readonly IssueReferenceGroup[];
+  readonly merged: readonly MergedIssueEvidence[];
   readonly toTag: string;
   readonly repo: string;
   readonly label: string;
@@ -70,33 +73,100 @@ function parseIssueView(raw: string): IssueState {
   return { state, labels };
 }
 
+// Shared header + install-instructions footer used by both comment-body
+// renderers. Centralizes the verification-rule prose so the two body
+// shapes don't drift.
+function headerLines(toTag: string): readonly string[] {
+  return [
+    `Shipped in ${toTag}. Please verify against an installed release before closing this issue.`,
+    '',
+  ];
+}
+
+function installFooterLines(toTag: string): readonly string[] {
+  return [
+    'Install / repro instructions (per the project rule "Issue closure requires verification in a formally-installed release"):',
+    `1. Install / upgrade to ${toTag}.`,
+    '2. Reproduce the original issue.',
+    '3. If the fix holds, close with a brief note.',
+    '4. If not, comment with the surviving symptom.',
+  ];
+}
+
 export function buildCommentBody(args: {
   readonly toTag: string;
   readonly group: IssueReferenceGroup;
 }): string {
   const { toTag, group } = args;
   const lines: string[] = [];
-  lines.push(
-    `Shipped in ${toTag}. Please verify against an installed release before closing this issue.`,
-  );
-  lines.push('');
+  for (const line of headerLines(toTag)) lines.push(line);
   lines.push('Source commits in this release:');
   for (const commit of group.commits) {
     lines.push(`- ${commit.sha}: ${commit.subject}`);
   }
   lines.push('');
-  lines.push(
-    'Install / repro instructions (per the project rule "Issue closure requires verification in a formally-installed release"):',
-  );
-  lines.push(`1. Install / upgrade to ${toTag}.`);
-  lines.push('2. Reproduce the original issue.');
-  lines.push('3. If the fix holds, close with a brief note.');
-  lines.push('4. If not, comment with the surviving symptom.');
+  for (const line of installFooterLines(toTag)) lines.push(line);
   return lines.join('\n');
 }
 
+// Build the multi-source evidence-trail comment body. Cites every
+// source that flagged the issue, with the per-source provenance entries
+// rendered as bullets under a `By source` heading. Adds an orphan-source
+// warning when the merger detected mutually-exclusive SHAs across
+// sources.
+export function buildEvidenceCommentBody(args: {
+  readonly toTag: string;
+  readonly evidence: MergedIssueEvidence;
+}): string {
+  const { toTag, evidence } = args;
+  const lines: string[] = [];
+  for (const line of headerLines(toTag)) lines.push(line);
+  lines.push('Evidence trail:');
+  const bySource = groupProvenanceBySource(evidence.provenance);
+  for (const source of evidence.sources) {
+    const entries = bySource.get(source) ?? [];
+    if (entries.length === 0) continue;
+    const summary = entries
+      .map((entry) => renderProvenanceLine(entry))
+      .join('; ');
+    lines.push(`- ${source}: ${summary}`);
+  }
+  if (evidence.orphanSource && evidence.orphanReason !== null) {
+    lines.push('');
+    lines.push(
+      `Note: orphan-source warning — ${evidence.orphanReason} The agent did not auto-resolve; verify which fix actually landed.`,
+    );
+  }
+  lines.push('');
+  for (const line of installFooterLines(toTag)) lines.push(line);
+  return lines.join('\n');
+}
+
+function groupProvenanceBySource(
+  provenance: readonly ProvenanceEntry[],
+): ReadonlyMap<EvidenceSource, readonly ProvenanceEntry[]> {
+  const out = new Map<EvidenceSource, ProvenanceEntry[]>();
+  for (const entry of provenance) {
+    let bucket = out.get(entry.source);
+    if (bucket === undefined) {
+      bucket = [];
+      out.set(entry.source, bucket);
+    }
+    bucket.push(entry);
+  }
+  return out;
+}
+
+function renderProvenanceLine(entry: ProvenanceEntry): string {
+  const parts: string[] = [];
+  if (entry.path !== null && entry.path !== '') parts.push(entry.path);
+  if (entry.detail !== null && entry.detail !== '') parts.push(entry.detail);
+  if (parts.length === 0 && entry.sha !== null) parts.push(entry.sha);
+  return parts.join(' — ');
+}
+
 interface ApplyOneArgs {
-  readonly group: IssueReferenceGroup;
+  readonly evidence: MergedIssueEvidence;
   readonly toTag: string;
   readonly repo: string;
   readonly label: string;
@@ -112,7 +182,7 @@ function viewIssue(args: ApplyOneArgs): IssueState | string {
     const raw = args.runGh([
       'issue',
       'view',
-      String(args.group.issue),
+      String(args.evidence.issue),
       '--repo',
       args.repo,
       '--json',
@@ -130,7 +200,7 @@ function postComment(args: ApplyOneArgs, body: string): string | null {
     args.runGh([
       'issue',
       'comment',
-      String(args.group.issue),
+      String(args.evidence.issue),
       '--repo',
       args.repo,
       '--body',
@@ -148,7 +218,7 @@ function addLabel(args: ApplyOneArgs): string | null {
     args.runGh([
       'issue',
       'edit',
-      String(args.group.issue),
+      String(args.evidence.issue),
       '--repo',
       args.repo,
       '--add-label',
@@ -165,7 +235,7 @@ function applyOne(args: ApplyOneArgs): CloseShippedOutcome {
   const stateOrError = viewIssue(args);
   if (typeof stateOrError === 'string') {
     return {
-      issue: args.group.issue,
+      issue: args.evidence.issue,
       applied: false,
       action: 'failed-state-check',
       error: stateOrError,
@@ -173,7 +243,7 @@ function applyOne(args: ApplyOneArgs): CloseShippedOutcome {
   }
   if (stateOrError.state === 'CLOSED') {
     return {
-      issue: args.group.issue,
+      issue: args.evidence.issue,
       applied: false,
       action: 'skipped-already-closed',
       error: null,
@@ -181,16 +251,19 @@ function applyOne(args: ApplyOneArgs): CloseShippedOutcome {
   }
   if (stateOrError.labels.includes(args.label)) {
     return {
-      issue: args.group.issue,
+      issue: args.evidence.issue,
       applied: false,
       action: 'skipped-already-labeled',
       error: null,
     };
   }
-  const body = buildCommentBody({ toTag: args.toTag, group: args.group });
+  const body = buildEvidenceCommentBody({
+    toTag: args.toTag,
+    evidence: args.evidence,
+  });
   const commentError = postComment(args, body);
   const labelError = addLabel(args);
-  return decideOutcome(args.group.issue, commentError, labelError);
+  return decideOutcome(args.evidence.issue, commentError, labelError);
 }
 
 function decideOutcome(
@@ -236,9 +309,9 @@ export interface ApplyResult {
 
 export function applyAll(args: ApplyArgs): ApplyResult {
   const outcomes: CloseShippedOutcome[] = [];
-  for (const group of args.groups) {
+  for (const evidence of args.merged) {
     const outcome = applyOne({
-      group,
+      evidence,
       toTag: args.toTag,
       repo: args.repo,
       label: args.label,
