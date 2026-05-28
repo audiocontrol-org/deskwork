@@ -116,6 +116,92 @@ const LaneMigrationEvent = z.object({
   details: z.record(z.string(), z.unknown()).optional(),
 });
 
+/**
+ * Phase 6 Task 6.1 (graphical-entries): lane-lifecycle events emitted
+ * by the `/deskwork:lane` verb family. Each event is project-scoped
+ * (no `entryId`); `laneId` identifies the lane the operation acted on
+ * and `details` carries kind-specific context (the source / target
+ * fields on `lane-update` / `lane-move`, the stage chosen on
+ * `lane-move`, etc.).
+ *
+ * The six kinds mirror the six mutating verbs:
+ *
+ *   - `lane-create`  — a new lane config was written.
+ *   - `lane-update`  — an existing lane's `name`, `pipelineTemplate`,
+ *                      or `contentDir` was updated.
+ *   - `lane-archive` — a lane was soft-archived (its `archivedAt`
+ *                      field was set; the JSON stays on disk).
+ *   - `lane-restore` — a lane's `archivedAt` field was cleared.
+ *   - `lane-purge`   — a lane's JSON was deleted from disk. Refused
+ *                      when any entry still references the lane.
+ *   - `lane-move`    — an entry was moved from one lane to another;
+ *                      the entry's `lane` and `currentStage` were
+ *                      updated and the artifact file (plus
+ *                      scrapbook) was relocated under the new lane's
+ *                      `contentDir`.
+ *
+ * `lane-move` additionally carries `entryId` (UUID) because the move
+ * is also an entry-state mutation; the dashboard / studio surfaces
+ * may key on it. The other five kinds are project-level and do not
+ * carry an entry id.
+ */
+const LaneCreateEvent = z.object({
+  kind: z.literal('lane-create'),
+  at: z.string().datetime(),
+  laneId: z.string().min(1),
+  details: z.object({
+    name: z.string().min(1),
+    pipelineTemplate: z.string().min(1),
+    contentDir: z.string().min(1),
+  }),
+});
+
+const LaneUpdateEvent = z.object({
+  kind: z.literal('lane-update'),
+  at: z.string().datetime(),
+  laneId: z.string().min(1),
+  details: z.object({
+    changedFields: z.array(z.string().min(1)).min(1),
+    before: z.record(z.string(), z.unknown()),
+    after: z.record(z.string(), z.unknown()),
+  }),
+});
+
+const LaneArchiveEvent = z.object({
+  kind: z.literal('lane-archive'),
+  at: z.string().datetime(),
+  laneId: z.string().min(1),
+});
+
+const LaneRestoreEvent = z.object({
+  kind: z.literal('lane-restore'),
+  at: z.string().datetime(),
+  laneId: z.string().min(1),
+});
+
+const LanePurgeEvent = z.object({
+  kind: z.literal('lane-purge'),
+  at: z.string().datetime(),
+  laneId: z.string().min(1),
+  details: z.object({
+    purgedPath: z.string().min(1),
+  }),
+});
+
+const LaneMoveEvent = z.object({
+  kind: z.literal('lane-move'),
+  at: z.string().datetime(),
+  entryId: z.string().uuid(),
+  details: z.object({
+    fromLane: z.string().min(1),
+    toLane: z.string().min(1),
+    fromStage: StageStringSchema,
+    toStage: StageStringSchema,
+    fromArtifactPath: z.string().optional(),
+    toArtifactPath: z.string().optional(),
+  }),
+});
+
 export const JournalEventSchema = z.discriminatedUnion('kind', [
   EntryCreatedEvent,
   EntryIngestedEvent,
@@ -125,6 +211,12 @@ export const JournalEventSchema = z.discriminatedUnion('kind', [
   StageTransitionEvent,
   EntryAnnotationEvent,
   LaneMigrationEvent,
+  LaneCreateEvent,
+  LaneUpdateEvent,
+  LaneArchiveEvent,
+  LaneRestoreEvent,
+  LanePurgeEvent,
+  LaneMoveEvent,
 ]);
 
 export type JournalEvent = z.infer<typeof JournalEventSchema>;

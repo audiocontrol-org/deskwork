@@ -40,11 +40,25 @@
 
 import { z } from 'zod';
 
+/**
+ * Soft-archive marker (Phase 6 Task 6.1). When present, the lane is
+ * considered "archived" — listings hide it by default, dashboard /
+ * studio renderers skip it, but the JSON file stays on disk along with
+ * every entry that referenced the lane. Restoring strips the field.
+ *
+ * The value is an ISO datetime carrying the moment the archive verb
+ * ran. The truthiness of the field is the boolean signal; the
+ * datetime is the audit trail. Per the project's "content-management
+ * databases preserve, they don't delete" rule, archive is the
+ * preferred disposition over destructive deletion — `purge` is gated
+ * and refuses when any entry still references the lane.
+ */
 export const LaneConfigSchema = z.object({
   id: z.string().min(1, 'id must be a non-empty string'),
   name: z.string().min(1, 'name must be a non-empty string'),
   pipelineTemplate: z.string().min(1, 'pipelineTemplate must be a non-empty string'),
   contentDir: z.string().min(1, 'contentDir must be a non-empty string'),
+  archivedAt: z.string().datetime().optional(),
 }).passthrough();
 
 /**
@@ -67,7 +81,7 @@ export type LaneConfig = z.infer<typeof LaneConfigSchema>;
  */
 export type StrictLaneConfig = Pick<
   LaneConfig,
-  'id' | 'name' | 'pipelineTemplate' | 'contentDir'
+  'id' | 'name' | 'pipelineTemplate' | 'contentDir' | 'archivedAt'
 >;
 
 /**

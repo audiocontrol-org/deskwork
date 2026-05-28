@@ -225,6 +225,59 @@ describe('listLaneConfigs', () => {
     const ids = listLaneConfigs(projectRoot);
     expect(ids).toEqual(['default']);
   });
+
+  it('filters archived lanes out by default (Phase 6 Task 6.1)', () => {
+    writeLane(projectRoot, 'default', {
+      id: 'default',
+      name: 'Default',
+      pipelineTemplate: 'editorial',
+      contentDir: 'docs',
+    });
+    writeLane(projectRoot, 'stale', {
+      id: 'stale',
+      name: 'Stale',
+      pipelineTemplate: 'editorial',
+      contentDir: 'docs',
+      archivedAt: '2026-05-28T10:00:00.000Z',
+    });
+    expect(listLaneConfigs(projectRoot)).toEqual(['default']);
+  });
+
+  it('returns archived lanes when includeArchived=true (Phase 6 Task 6.1)', () => {
+    writeLane(projectRoot, 'default', {
+      id: 'default',
+      name: 'Default',
+      pipelineTemplate: 'editorial',
+      contentDir: 'docs',
+    });
+    writeLane(projectRoot, 'stale', {
+      id: 'stale',
+      name: 'Stale',
+      pipelineTemplate: 'editorial',
+      contentDir: 'docs',
+      archivedAt: '2026-05-28T10:00:00.000Z',
+    });
+    expect(listLaneConfigs(projectRoot, { includeArchived: true })).toEqual([
+      'default',
+      'stale',
+    ]);
+  });
+
+  it('degrades gracefully on malformed JSON when filtering archived lanes', () => {
+    // Malformed JSON should not break the archived-filter pass; the
+    // lane appears in the (non-archived) list and surfaces its
+    // malformation at loadLaneConfig time.
+    const dir = lanesDir(projectRoot);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'broken.json'), '{ not json', 'utf8');
+    writeLane(projectRoot, 'default', {
+      id: 'default',
+      name: 'Default',
+      pipelineTemplate: 'editorial',
+      contentDir: 'docs',
+    });
+    expect(listLaneConfigs(projectRoot)).toEqual(['broken', 'default']);
+  });
 });
 
 describe('path helpers', () => {

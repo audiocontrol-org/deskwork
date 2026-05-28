@@ -1,0 +1,295 @@
+/**
+ * lane move — relocate an entry from one lane to another.
+ *
+ * Phase 6 Task 6.1 (graphical-entries). The move:
+ *
+ *   1. Resolves the entry's current lane via the sidecar's `lane`
+ *      field. Migration-window default: an entry without a `lane`
+ *      field is treated as belonging to the `default` lane (matches
+ *      the doctor's lane-back-fill default). The move is refused
+ *      when the source lane and target lane are the same.
+ *
+ *   2. Resolves the target lane's pipeline template. The target
+ *      stage MUST be in the union of `linearStages ∪
+ *      offPipelineStages` of the target template. When the caller
+ *      omits `targetStage`, the move defaults to the target
+ *      template's FIRST `linearStages` entry.
+ *
+ *   3. Relocates the artifact file at
+ *      `<sourceContentDir>/<artifactPath>` to
+ *      `<targetContentDir>/<artifactPath>` (same relative path under
+ *      the lane's contentDir). When the source file does not exist,
+ *      the move is refused — the operator must repair the binding
+ *      before relocating.
+ *
+ *   4. Relocates the per-entry scrapbook directory at
+ *      `<sourceContentDir>/<slug>/scrapbook/` (when present) to the
+ *      target lane's parallel location. A missing scrapbook
+ *      directory is normal; the move proceeds.
+ *
+ *   5. Rewrites the sidecar with `lane = target`, `currentStage =
+ *      targetStage`. Per the PRD's open-question default,
+ *      `iterationByStage` is preserved verbatim — no stage-name
+ *      remapping. Old keys from the prior lane template become dead
+ *      entries that cause no harm (iterate uses `?? 0`).
+ *
+ *   6. Emits a `lane-move` journal event identifying source / target
+ *      lanes, source / target stages, and the artifact paths.
+ *
+ * The function uses `renameSync` for the artifact relocation
+ * (atomic on the same filesystem); when `renameSync` fails with
+ * `EXDEV` (cross-device) the fallback is a copy + delete loop so the
+ * move survives a contentDir that points at a separate mount.
+ */
+
+import {
+  copyFileSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  renameSync,
+  rmSync,
+  unlinkSync,
+} from 'node:fs';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { appendJournalEvent } from '../../journal/append.ts';
+import { writeSidecar } from '../../sidecar/write.ts';
+import { readSidecar } from '../../sidecar/read.ts';
+import { loadPipelineTemplate } from '../../pipelines/loader.ts';
+import { loadLaneConfig } from '../loader.ts';
+
+const DEFAULT_LANE_ID = 'default';
+
+export interface MoveEntryOptions {
+  readonly uuid: string;
+  readonly toLane: string;
+  /**
+   * Stage in the TARGET lane's template to assign to the entry. When
+   * omitted, defaults to the target template's first `linearStages`
+   * entry. Must be in the union of the target template's
+   * `linearStages ∪ offPipelineStages`.
+   */
+  readonly targetStage?: string;
+}
+
+export interface MoveEntryResult {
+  readonly entryId: string;
+  readonly fromLane: string;
+  readonly toLane: string;
+  readonly fromStage: string;
+  readonly toStage: string;
+  readonly fromArtifactPath?: string;
+  readonly toArtifactPath?: string;
+}
+
+/**
+ * Resolve `<contentDir>` to an absolute path. Lane configs may
+ * declare `contentDir` as either absolute (taken verbatim) or
+ * relative (resolved against the project root).
+ */
+function resolveContentDirAbs(projectRoot: string, contentDir: string): string {
+  return isAbsolute(contentDir) ? contentDir : resolve(projectRoot, contentDir);
+}
+
+/**
+ * Type guard for the subset of Node ErrnoException we care about
+ * (just the `code` string). Keeps the cross-device fallback path
+ * type-safe without an unchecked `as NodeJS.ErrnoException`.
+ */
+function isErrnoCode(err: unknown, expected: string): boolean {
+  if (err === null || typeof err !== 'object') return false;
+  const maybe = (err as { code?: unknown }).code;
+  return typeof maybe === 'string' && maybe === expected;
+}
+
+/**
+ * Move a path with renameSync, falling back to a caller-supplied
+ * cross-device strategy on EXDEV. The fallback is responsible for
+ * both creating the destination and removing the source — the
+ * helper does not split copy/delete across calls.
+ *
+ * The parent directory of `dst` is mkdir'd on every call so callers
+ * don't have to thread that detail.
+ */
+function tryRenameWithFallback(
+  src: string,
+  dst: string,
+  exdevFallback: (src: string, dst: string) => void,
+): void {
+  mkdirSync(dirname(dst), { recursive: true });
+  try {
+    renameSync(src, dst);
+  } catch (err) {
+    if (!isErrnoCode(err, 'EXDEV')) throw err;
+    exdevFallback(src, dst);
+  }
+}
+
+function moveFile(src: string, dst: string): void {
+  tryRenameWithFallback(src, dst, (s, d) => {
+    copyFileSync(s, d);
+    unlinkSync(s);
+  });
+}
+
+function moveDir(src: string, dst: string): void {
+  tryRenameWithFallback(src, dst, (s, d) => {
+    cpSync(s, d, { recursive: true });
+    rmSync(s, { recursive: true, force: true });
+  });
+}
+
+export async function moveEntryToLane(
+  projectRoot: string,
+  opts: MoveEntryOptions,
+): Promise<MoveEntryResult> {
+  const sidecar = await readSidecar(projectRoot, opts.uuid);
+
+  const sourceLaneId = sidecar.lane ?? DEFAULT_LANE_ID;
+  if (sourceLaneId === opts.toLane) {
+    throw new Error(
+      `Cannot move entry ${sidecar.slug}: already in lane "${opts.toLane}".`,
+    );
+  }
+
+  const sourceLane = loadLaneConfig(sourceLaneId, projectRoot);
+  const targetLane = loadLaneConfig(opts.toLane, projectRoot);
+  if (
+    typeof targetLane.archivedAt === 'string'
+    && targetLane.archivedAt.length > 0
+  ) {
+    throw new Error(
+      `Cannot move entry ${sidecar.slug} into archived lane "${opts.toLane}". `
+      + `Restore the lane first via "deskwork lane restore ${opts.toLane}".`,
+    );
+  }
+
+  const targetTemplate = loadPipelineTemplate(
+    targetLane.pipelineTemplate,
+    projectRoot,
+  );
+
+  // Resolve targetStage — explicit operator value takes precedence;
+  // default falls back to the target template's first linearStage.
+  const targetStage = opts.targetStage ?? targetTemplate.linearStages[0];
+  if (targetStage === undefined) {
+    throw new Error(
+      `Cannot move entry ${sidecar.slug}: target lane "${opts.toLane}" `
+      + `template "${targetTemplate.id}" has no linearStages defined. `
+      + `Repair the template before moving.`,
+    );
+  }
+
+  const allowed = new Set<string>([
+    ...targetTemplate.linearStages,
+    ...targetTemplate.offPipelineStages,
+  ]);
+  if (!allowed.has(targetStage)) {
+    throw new Error(
+      `Cannot move entry ${sidecar.slug} to stage "${targetStage}": `
+      + `not in target lane "${opts.toLane}" template "${targetTemplate.id}". `
+      + `Allowed stages: ${[...allowed].join(', ')}.`,
+    );
+  }
+
+  const sourceContentDir = resolveContentDirAbs(
+    projectRoot,
+    sourceLane.contentDir,
+  );
+  const targetContentDir = resolveContentDirAbs(
+    projectRoot,
+    targetLane.contentDir,
+  );
+
+  // Relocate the artifact file. When `artifactPath` is set on the
+  // sidecar, the source file is at `<sourceContentDir>/<artifactPath>`;
+  // we move it to `<targetContentDir>/<artifactPath>` (same relative
+  // shape under the new contentDir).
+  let fromArtifactAbs: string | undefined;
+  let toArtifactAbs: string | undefined;
+  if (sidecar.artifactPath !== undefined) {
+    fromArtifactAbs = join(sourceContentDir, sidecar.artifactPath);
+    toArtifactAbs = join(targetContentDir, sidecar.artifactPath);
+    if (!existsSync(fromArtifactAbs)) {
+      throw new Error(
+        `Cannot move entry ${sidecar.slug}: source artifact does not exist at `
+        + `${fromArtifactAbs}. Repair the binding (e.g. via "deskwork doctor") `
+        + `before moving.`,
+      );
+    }
+    if (existsSync(toArtifactAbs)) {
+      throw new Error(
+        `Cannot move entry ${sidecar.slug}: target artifact already exists at `
+        + `${toArtifactAbs}. The target lane already holds a file at the same `
+        + `relative path; resolve the collision (rename / move / remove) before `
+        + `running lane move.`,
+      );
+    }
+    moveFile(fromArtifactAbs, toArtifactAbs);
+  }
+
+  // Relocate the per-entry scrapbook directory when present. Lives at
+  // `<contentDir>/<slug>/scrapbook/` per the slug-template convention
+  // — see packages/core/src/scrapbook/paths.ts (_scrapbookDirSlug).
+  const sourceScrapbookDir = join(sourceContentDir, sidecar.slug, 'scrapbook');
+  const targetScrapbookDir = join(targetContentDir, sidecar.slug, 'scrapbook');
+  if (existsSync(sourceScrapbookDir)) {
+    if (existsSync(targetScrapbookDir)) {
+      // Rollback the artifact relocation so the operator's state is
+      // consistent before re-running.
+      if (fromArtifactAbs !== undefined && toArtifactAbs !== undefined) {
+        moveFile(toArtifactAbs, fromArtifactAbs);
+      }
+      throw new Error(
+        `Cannot move entry ${sidecar.slug}: target scrapbook directory already `
+        + `exists at ${targetScrapbookDir}. Resolve the collision before moving.`,
+      );
+    }
+    moveDir(sourceScrapbookDir, targetScrapbookDir);
+  }
+
+  const at = new Date().toISOString();
+  const fromStage = sidecar.currentStage;
+  const updated = {
+    ...sidecar,
+    lane: opts.toLane,
+    currentStage: targetStage,
+    updatedAt: at,
+  };
+
+  await writeSidecar(projectRoot, updated);
+
+  const moveDetails: {
+    fromLane: string;
+    toLane: string;
+    fromStage: string;
+    toStage: string;
+    fromArtifactPath?: string;
+    toArtifactPath?: string;
+  } = {
+    fromLane: sourceLaneId,
+    toLane: opts.toLane,
+    fromStage,
+    toStage: targetStage,
+  };
+  if (fromArtifactAbs !== undefined) moveDetails.fromArtifactPath = fromArtifactAbs;
+  if (toArtifactAbs !== undefined) moveDetails.toArtifactPath = toArtifactAbs;
+
+  await appendJournalEvent(projectRoot, {
+    kind: 'lane-move',
+    at,
+    entryId: sidecar.uuid,
+    details: moveDetails,
+  });
+
+  const result: MoveEntryResult = {
+    entryId: sidecar.uuid,
+    fromLane: sourceLaneId,
+    toLane: opts.toLane,
+    fromStage,
+    toStage: targetStage,
+    ...(fromArtifactAbs !== undefined && { fromArtifactPath: fromArtifactAbs }),
+    ...(toArtifactAbs !== undefined && { toArtifactPath: toArtifactAbs }),
+  };
+  return result;
+}

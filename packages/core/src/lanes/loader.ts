@@ -133,6 +133,23 @@ export function loadLaneConfig(id: string, projectRoot: string): LaneConfig {
 }
 
 /**
+ * Options accepted by `listLaneConfigs`.
+ *
+ * - `includeArchived` — when `false` (the default), lanes carrying a
+ *   non-empty `archivedAt` field are filtered OUT of the returned
+ *   list. When `true`, archived lanes appear alongside active ones.
+ *
+ * The default of `false` is intentional: prior to Phase 6 Task 6.1
+ * archived lanes did not exist, so every existing call site (dashboard
+ * renderer, calendar renderer) wants only active lanes. Callers that
+ * genuinely want the full set (the `lane list --include-archived`
+ * verb; doctor enumeration) opt in explicitly.
+ */
+export interface ListLaneConfigsOptions {
+  readonly includeArchived?: boolean;
+}
+
+/**
  * Enumerate every lane config id under `<projectRoot>/.deskwork/lanes/`.
  * Missing directory is treated as empty — a project with no lanes
  * configured returns an empty array (the bootstrap helper handles the
@@ -142,15 +159,57 @@ export function loadLaneConfig(id: string, projectRoot: string): LaneConfig {
  * what's on disk. A malformed lane JSON still appears in the list; the
  * operator finds out about the malformation at load time.
  *
+ * Archived lanes (those whose JSON carries a non-empty `archivedAt`
+ * field) are filtered out by default. Pass `{ includeArchived: true }`
+ * to include them. The filter reads JSON and inspects the `archivedAt`
+ * field directly — it does NOT validate the full lane config (a
+ * malformed lane still appears in the list as before; the
+ * archived-filter degrades gracefully to "not archived" for any lane
+ * whose JSON fails to parse, mirroring the loader's read-only-on-
+ * enumeration contract).
+ *
  * @param projectRoot - Absolute path to the project root.
+ * @param options - Optional behavior toggles; defaults documented on
+ *   {@link ListLaneConfigsOptions}.
  */
-export function listLaneConfigs(projectRoot: string): string[] {
+export function listLaneConfigs(
+  projectRoot: string,
+  options: ListLaneConfigsOptions = {},
+): string[] {
+  const includeArchived = options.includeArchived ?? false;
   const dir = lanesDir(projectRoot);
   if (!existsSync(dir)) {
     return [];
   }
-  return readdirSync(dir)
+  const basenames = readdirSync(dir)
     .filter((entry) => entry.endsWith('.json'))
     .map((entry) => basename(entry, '.json'))
     .sort();
+  if (includeArchived) {
+    return basenames;
+  }
+  return basenames.filter((id) => !isArchivedOnDisk(projectRoot, id));
+}
+
+/**
+ * Inspect a lane's JSON file directly for the presence of a non-empty
+ * `archivedAt` field. Used by `listLaneConfigs` to filter archived
+ * lanes. Read-only: refuses to throw on malformed JSON (returns
+ * `false` so the lane still appears in non-archived lists; the
+ * malformation surfaces at `loadLaneConfig` time).
+ */
+function isArchivedOnDisk(projectRoot: string, id: string): boolean {
+  const path = laneConfigPath(projectRoot, id);
+  if (!existsSync(path)) {
+    return false;
+  }
+  try {
+    const raw = readFileSync(path, 'utf8');
+    const parsed: unknown = JSON.parse(raw);
+    if (parsed === null || typeof parsed !== 'object') return false;
+    const archivedAt = Reflect.get(parsed, 'archivedAt');
+    return typeof archivedAt === 'string' && archivedAt.length > 0;
+  } catch {
+    return false;
+  }
 }
