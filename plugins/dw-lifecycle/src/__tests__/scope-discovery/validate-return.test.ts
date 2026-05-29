@@ -461,13 +461,23 @@ describe('GRAMMAR_INSTRUCTION prelude — TF-008 + TF-009 documentation', () => 
     expect(GRAMMAR_INSTRUCTION).toContain('whole-file');
   });
 
-  it('documents the project-vocabulary collision workaround (TF-009)', async () => {
+  it('documents the context-aware forbidden-phrase behavior (TF-009 + Phase 14 Task 2)', async () => {
+    // Phase 14 Task 2 (AUDIT-20260529-13) replaced the prior
+    // "project-vocabulary collision workaround" (which told agents to
+    // describe purpose not canonical name when stub/placeholder
+    // appeared in identifiers) with context-aware matching. The
+    // prelude now documents the new behavior: ambiguous nouns require
+    // a deferral collocation to trip; bare identifiers pass.
     const { GRAMMAR_INSTRUCTION } = await import(
       '../../scope-discovery/dispatch-wrapper.js'
     );
     expect(GRAMMAR_INSTRUCTION).toContain('Forbidden-deferral phrase list');
-    expect(GRAMMAR_INSTRUCTION).toContain('project');
-    expect(GRAMMAR_INSTRUCTION.toLowerCase()).toContain('swim-stub');
-    expect(GRAMMAR_INSTRUCTION).toContain('PURPOSE');
+    expect(GRAMMAR_INSTRUCTION).toContain('context-aware');
+    expect(GRAMMAR_INSTRUCTION).toContain('Ambiguous nouns');
+    expect(GRAMMAR_INSTRUCTION).toContain('deferral collocation');
+    // The post-relaxation prelude shows a renderSwimStub example as
+    // PASSING (the bare identifier no longer trips).
+    expect(GRAMMAR_INSTRUCTION).toContain('renderSwimStub');
+    expect(GRAMMAR_INSTRUCTION).toContain('defer to the spec');
   });
 });

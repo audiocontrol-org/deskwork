@@ -572,6 +572,8 @@ Surface:    `plugins/dw-lifecycle/src/scope-discovery/dispatch-grammar.ts`, `plu
 
 Imported from deskwork-plugin TF-003 (`docs/1.0/001-IN-PROGRESS/deskwork-plugin/tooling-feedback.md` on `feature/deskwork-plugin`). Co-tracked with AUDIT-20260529-14 via [#362](https://github.com/audiocontrol-org/deskwork/issues/362).
 
+**Follow-up landed in commit `<NEXT>` (Phase 14 Task 2 review integration):** the Track 2 review surfaced that the GRAMMAR_INSTRUCTION prelude's Gotchas item 3 still showed `renderSwimStub` as a FAIL example after Phase 14 Task 2 relaxed the bare-noun match — agents reading the prelude would falsely believe descriptive `stub` trips. The prelude was rewritten to document context-aware behavior (ambiguous nouns require deferral collocation; bare identifiers pass; comment-marker form `TODO`/`FIXME`/`XXX` still trips). See AUDIT-20260529-16.
+
 Fix note (commit `8365973`, 2026-05-29; Phase 14 Task 2 — #362 Medium): widened `SEARCHED_COUNT_NOUN_REGEX` to accept `issues?`/`bugs?`/`findings?`/`errors?`/`warnings?`. Restructured forbidden-phrase matching: ambiguous bare nouns (`stub`, `placeholder`, `pending`, `temporary`, `hack`, `defer`, `deferred`, `todo`, `fixme`, `xxx`) removed from `FORBIDDEN_DEFERRAL_PHRASES`; 6 new context-aware regexes added to `FORBIDDEN_DEFERRAL_REGEXES` for (a) ALL-CAPS comment markers (`TODO`/`FIXME`/`XXX` — case-sensitive), (b) ambiguous noun + deferral collocation (`placeholder for now` / `stub until F3`), (c) deferral verb + ambiguous noun, (d) bare `defer to v2` verb action. Unambiguous deferral phrases (`for now`, `will fix`) stay in PHRASES. Grammar-instruction prelude updated to document the expanded whitelist; rejection examples refreshed. 24 new tests at `dispatch-wrapper-grammar.test.ts`; existing TF-008 noun-whitelist test updated; fixtures' `REGEX_SAMPLE_REASONS` extended to keep parallel with the regex list. Awaiting `verified-<date>` after a few live reviewer dispatches exercise the relaxed grammar end-to-end. Pairs with the Light fix in AUDIT-20260529-14 (already landed at `95927f5`).
 
 Every `/dw-lifecycle:review` reviewer dispatch requires a hand-managed round-trip: `mktemp` a prompt file → Write the prompt body into it → `dw-lifecycle wrap-prompt --prompt-file <path>` → paste the (120+ line) wrapped stdout into the Agent tool. The wrapped suffix's return grammar has three sharp edges that recur per session: the Searched-count noun whitelist (`5 issues found` rejected; must end in `matches`/`hits`/...), mandatory `path:LINE` on every Excluded entry (`:1` sentinel for whole-file), and a forbidden-substring list that collides with ordinary descriptive prose (`stub` / `placeholder` / `pending` in a reason trips the deferral detector even in non-deferral usage).
@@ -618,3 +620,90 @@ Fix landed on `feature/deskwork-plugin` at commit `37683c8` ("fix(38·1): clone 
 The fix SHA is on `origin/feature/deskwork-plugin` only; `feature/scope-discovery` inherits it on merge to main. No re-implementation needed.
 
 Scoped into workplan: Phase 14 Task 4 (verify-on-merge) — confirms the SHA reaches this branch and the regression test passes here too. Awaiting `verified-<date>` after the merge + post-merge re-audit.
+
+## 2026-05-29 — Three-track review integration (post-Phase-14 commits)
+
+Track 1: `tsc --noEmit` clean; plugin vitest 2150/2150; `dw-lifecycle check-open-findings --feature scope-discovery` exit 0; `dw-lifecycle check-clones --gate-mode` exit 0 (no NEW groups).
+
+Track 2 (spec-compliance, `feature-dev:code-reviewer` dispatch): 1 finding.
+Track 3 (code-quality, `feature-dev:code-reviewer` dispatch in parallel): 5 findings (4 actionable + 1 informational).
+
+All 5 dispatched through the post-Phase-14 dispatch wrapper. Track 2's first response was REJECTED by the validator (`4 commits reviewed, 1 finding` — comma in the count phrase breaks the modifier regex); response was hand-corrected to a parseable Searched line (`17 files`) and re-validated cleanly. Both responses then validated through the AUDIT-14 stdin pipe (`cat <file> | dw-lifecycle validate-return --response-file - --agent-type reviewer --json`) — dogfooded the AUDIT-13 + AUDIT-14 fixes end-to-end.
+
+Per the agent-discipline rule, the 4 actionable findings landed inline in a follow-up commit; the informational one is recorded as `informational` with no required fix.
+
+### AUDIT-20260529-16 — GRAMMAR_INSTRUCTION prelude Gotchas item 3 stale after Phase 14 Task 2
+
+Finding-ID: AUDIT-20260529-16
+Status:     fixed-<NEXT>
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper.ts:347-360`
+
+Track 2 review-finding (confidence 82). After Phase 14 Task 2's grammar relaxation, the prelude's Gotchas item 3 still showed `renderSwimStub is the focus-off stub button` as a FAIL example and claimed "the parser's substring match doesn't distinguish proper-noun usage from deferral usage." Post-relaxation, that example PASSES (bare `stub` no longer trips without a deferral collocation). Future agents reading the prelude would over-avoid descriptive `stub` / `placeholder` in Excluded reasons or be surprised when the FAIL example actually passes.
+
+Fix: rewrote item 3 to document context-aware behavior — ambiguous nouns require deferral collocation (`for now`, `until v#`, `until we`, `until the next <unit>`, etc.); descriptive prose passes (`placeholder text shown until the user types`, `renderSwimStub is the focus-off button`, `defer to the spec`). The case-sensitive `TODO`/`FIXME`/`XXX` comment markers are called out explicitly. Updated TF-009 test in `validate-return.test.ts` (the prior assertions about `swim-stub` workaround + `PURPOSE` are stale; new assertions check `context-aware`, `Ambiguous nouns`, `deferral collocation`, `renderSwimStub` example, `defer to the spec` example).
+
+### AUDIT-20260529-17 — open-findings-gate version-candidate list is narrower than the rest of the tool
+
+Finding-ID: AUDIT-20260529-17
+Status:     fixed-<NEXT>
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/open-findings-gate.ts:66-69`
+
+Track 3 review-finding. The gate hardcoded two candidate paths (`docs/1.0/001-IN-PROGRESS/<slug>` + `docs/0.x/001-IN-PROGRESS/<slug>`) while `orchestrator-turn.ts:findFeatureDirectory` walks every top-level `docs/*/001-IN-PROGRESS/` dir dynamically. Real features at `docs/0.19.0/001-IN-PROGRESS/studio-mobile-first/` and `docs/0.16.0/001-IN-PROGRESS/open-issue-tranche-cleanup/` would throw `FeatureRootNotFoundError` instead of returning a gate verdict — disorienting for the operator.
+
+Fix: replaced the hardcoded candidate list with a `findFeatureRoot` walk that `readdir`s every top-level directory under `docs/`, looks for `001-IN-PROGRESS/<slug>`, and returns the first match. Updated `FeatureRootNotFoundError` to report the actual versions walked (not the hardcoded fallback). 4 new test scenarios at `open-findings-gate.test.ts`: docs/0.19.0/, docs/0.16.0/, arbitrary version (`2.0`), mixed-docs case with README.md + 003-COMPLETE/ subdirs to skip. Live smoke confirmed: gate now returns exit 0 for `studio-mobile-first` and `open-issue-tranche-cleanup`.
+
+### AUDIT-20260529-18 — grammar false-negative: ambiguous-noun + intervening modifier slips deferral detection
+
+Finding-ID: AUDIT-20260529-18
+Status:     fixed-<NEXT>
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/dispatch-grammar.ts:144`
+
+Track 3 review-finding. Phase 14 Task 2's ambiguous-noun regex required adjacency between the noun and the deferral collocation: `\b(?:stub|placeholder|...)\s+(?:for\s+now|until|...)\b/i`. The reviewer flagged that an intervening modifier word slips the matcher — `placeholder approach until we figure out the right shape` doesn't trip because `approach` separates `placeholder` from `until`. Same gap for `stub implementation until v2`, `placeholder code path until the next sprint`, etc.
+
+Fix: widened the regex to allow `{0,2}` modifier tokens between the noun and the collocation, AND extended the `until` deferral context to include `until we` + `until the next <sprint|milestone|phase|release|version|cycle|iteration>` (the specific shapes the reviewer flagged as gaps). Kept the descriptive cases passing: `placeholder text shown until the user types` does NOT trip because `the user` is not in the `until` deferral suffix; `stub function tested elsewhere` does NOT trip because there's no deferral collocation. 5 new positive tests + 2 new negative tests at `dispatch-wrapper-grammar.test.ts`.
+
+### AUDIT-20260529-19 — grammar false-positive: `defer to <noun phrase>` trips legitimate idioms
+
+Finding-ID: AUDIT-20260529-19
+Status:     fixed-<NEXT>
+Severity:   high
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/dispatch-grammar.ts:148`
+
+Track 3 review-finding. Phase 14 Task 2's defer-verb regex included bare `to` in the alternation: `\bdefer(?:red|ring)?\s+(?:to|until|...)\b/i`. This caught the canonical `defer to v2` deferral but also caught legitimate idioms: `defer to the operator` (let the operator decide), `defer to the spec` (rely on the canonical spec), `defer to the existing abstraction` (use the existing code). The pattern is a common natural-English construction agents would use in Excluded reasons.
+
+Fix: narrowed to require a version (`v\d`), phase (`F\d` / `phase \d`), or `the next <unit>` target after `to`: `to\s+(?:v\d|F\d|phase\s+\d|the\s+next\s+(?:milestone|sprint|phase|release|version|cycle|iteration))`. `until` retained as an unambiguous deferral preposition. New tests: 3 positive (`defer to v2`, `defer to F3`, `defer to phase 5`) + 3 negative (`defer to the operator`, `defer to the spec`, `defer to the existing abstraction`) + 1 past-tense regression (`deferred to v2`).
+
+### AUDIT-20260529-20 — whitespace-only stdin surfaces as confusing DispatchRejected instead of EmptyStdinError
+
+Finding-ID: AUDIT-20260529-20
+Status:     fixed-<NEXT>
+Severity:   medium
+Surface:    `plugins/dw-lifecycle/src/subcommands/validate-return.ts:62`
+
+Track 3 review-finding. Phase 14 Task 3's empty-stdin guard used `body.length === 0`, which only catches truly-empty stdin. A whitespace-only pipe (e.g. `echo "" | dw-lifecycle validate-return --response-file - --agent-type reviewer` — the common operator-typo case) produces a non-empty body of just `\n`, which then fails downstream inside `parseReturn` with a `DispatchRejected` on missing blocks. The operator sees a generic "missing required block(s)" message instead of the actionable `EmptyStdinError` hint to pipe the response body in.
+
+Fix: changed `body.length === 0` to `body.trim().length === 0` — whitespace-only stdin now throws `EmptyStdinError` cleanly. 4 new test scenarios at `validate-return-stdin.test.ts`: newline-only, CRLF-only, multi-newline-with-tab, and a positive case (`'  x  '` with surrounding whitespace passes through with leading/trailing whitespace preserved).
+
+### AUDIT-20260529-21 — assembler does a redundant second `loadLoopState` to read `priorPresentCount`
+
+Finding-ID: AUDIT-20260529-21
+Status:     informational
+Severity:   low
+Surface:    `plugins/dw-lifecycle/src/scope-discovery/orchestrator-turn.ts:638-651`
+
+Track 3 review-finding (informational). The orchestrator-turn assembler loads `LoopState` independently at the top to read the prior catalog count, and the library `runOrchestratorTurn` ALSO loads `LoopState` internally inside `loop-turn.ts:329`. Two reads of the same file in normal sequential execution. The reviewer flagged it as informational: "not a functional bug in single-process sequential execution" but creates "unnecessary I/O coupling."
+
+Disposition: recorded as informational, no immediate fix. The cleaner refactor (pass `loopStateOverride` from the assembler into the library so the library uses the assembler's pre-loaded state) widens the library's surface for a UI-side concern (NOTE-noise gating) — not appropriate to land alongside the review integration. If/when the assembler grows additional loop-state-dependent decoration that justifies the cost, the refactor follows then. No workplan task; no GH issue.
+
+### Closure note
+
+All 4 actionable findings (AUDIT-20260529-16/17/18/19/20) land in the same review-integration commit. AUDIT-20260529-21 is informational and requires no fix. Plugin suite at 2170/2170 (2150 baseline + 20 new tests). `tsc --noEmit` clean. Smoke-verified end-to-end:
+
+- `dw-lifecycle check-open-findings --feature scope-discovery` → exit 0
+- `dw-lifecycle check-open-findings --feature studio-mobile-first` → exit 0 (NEW: previously would have errored with FeatureRootNotFoundError)
+- `dw-lifecycle check-open-findings --feature open-issue-tranche-cleanup` → exit 0 (NEW)
+
+Awaiting `verified-<date>` on each of -16 through -20 after the next batch of dispatch-wrapper-using or gate-using work confirms no regression.

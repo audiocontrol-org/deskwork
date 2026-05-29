@@ -59,7 +59,13 @@ export async function readResponseSource(
       chunks.push(typeof chunk === 'string' ? Buffer.from(chunk, 'utf8') : chunk);
     }
     const body = Buffer.concat(chunks).toString('utf8');
-    if (body.length === 0) throw new EmptyStdinError();
+    // AUDIT-20260529-20 (review-finding T3-4): `body.length === 0` only
+    // catches truly-empty stdin. A pipe of whitespace-only content (the
+    // common `echo "" | ...` case) passed through as non-empty and the
+    // operator got a confusing DispatchRejected on missing blocks
+    // instead of the actionable `EmptyStdinError` shape. Trim before
+    // the empty check so whitespace-only stdin is treated as empty.
+    if (body.trim().length === 0) throw new EmptyStdinError();
     return body;
   }
   return readFile(responseFile, 'utf8');

@@ -215,4 +215,109 @@ describe('checkOpenFindings — library gate', () => {
     if (result.allowed) throw new Error('unreachable');
     expect(result.openFindings).toHaveLength(1);
   });
+
+  // Review-finding T3-1 (AUDIT-20260529-17): the gate's prior hardcoded
+  // candidate list missed real version dirs like `docs/0.19.0/` /
+  // `docs/0.16.0/`. The fix is a directory walk that mirrors the
+  // orchestrator-turn assembler's `findFeatureDirectory`. These tests
+  // exercise the walk against several version-dir shapes.
+  it('finds feature root under docs/0.19.0/ (concrete non-1.0 version)', async () => {
+    const repoRoot = makeRepo('repo-0-19-0');
+    const featureDir = join(repoRoot, 'docs', '0.19.0', '001-IN-PROGRESS', 'demo');
+    mkdirSync(featureDir, { recursive: true });
+    writeAuditLog(
+      featureDir,
+      [
+        '# Audit Log',
+        '',
+        '### AUDIT-20260529-99 — concrete version dir',
+        '',
+        'Finding-ID: AUDIT-20260529-99',
+        'Status:     open',
+        '',
+        'Body.',
+      ].join('\n'),
+    );
+    const result = await checkOpenFindings({ featureSlug: 'demo', repoRoot });
+    expect(result.allowed).toBe(false);
+    if (result.allowed) throw new Error('unreachable');
+    expect(result.openFindings).toHaveLength(1);
+  });
+
+  it('finds feature root under docs/0.16.0/ (another concrete version)', async () => {
+    const repoRoot = makeRepo('repo-0-16-0');
+    const featureDir = join(repoRoot, 'docs', '0.16.0', '001-IN-PROGRESS', 'demo');
+    mkdirSync(featureDir, { recursive: true });
+    writeAuditLog(
+      featureDir,
+      [
+        '# Audit Log',
+        '',
+        '### AUDIT-20260529-99 — another concrete version dir',
+        '',
+        'Finding-ID: AUDIT-20260529-99',
+        'Status:     open',
+        '',
+        'Body.',
+      ].join('\n'),
+    );
+    const result = await checkOpenFindings({ featureSlug: 'demo', repoRoot });
+    expect(result.allowed).toBe(false);
+    if (result.allowed) throw new Error('unreachable');
+    expect(result.openFindings).toHaveLength(1);
+  });
+
+  it('finds feature root under an arbitrary version dir (forward-compat)', async () => {
+    const repoRoot = makeRepo('repo-future-version');
+    const featureDir = join(repoRoot, 'docs', '2.0', '001-IN-PROGRESS', 'demo');
+    mkdirSync(featureDir, { recursive: true });
+    writeAuditLog(
+      featureDir,
+      [
+        '# Audit Log',
+        '',
+        '### AUDIT-20260529-99 — arbitrary version',
+        '',
+        'Finding-ID: AUDIT-20260529-99',
+        'Status:     open',
+        '',
+        'Body.',
+      ].join('\n'),
+    );
+    const result = await checkOpenFindings({ featureSlug: 'demo', repoRoot });
+    expect(result.allowed).toBe(false);
+    if (result.allowed) throw new Error('unreachable');
+    expect(result.openFindings).toHaveLength(1);
+  });
+
+  it('skips non-001-IN-PROGRESS subdirs and does not throw on docs/ with mixed content', async () => {
+    const repoRoot = makeRepo('repo-mixed-docs');
+    // README.md at docs/ root (file, not dir)
+    mkdirSync(join(repoRoot, 'docs'), { recursive: true });
+    writeFileSync(join(repoRoot, 'docs', 'README.md'), 'overview', 'utf8');
+    // Other version dirs with 003-COMPLETE/ (not 001-IN-PROGRESS).
+    mkdirSync(join(repoRoot, 'docs', '0.5.0', '003-COMPLETE', 'legacy'), {
+      recursive: true,
+    });
+    // The actual target.
+    const featureDir = join(repoRoot, 'docs', '1.1', '001-IN-PROGRESS', 'demo');
+    mkdirSync(featureDir, { recursive: true });
+    writeAuditLog(
+      featureDir,
+      [
+        '# Audit Log',
+        '',
+        '### AUDIT-20260529-99 — mixed-docs case',
+        '',
+        'Finding-ID: AUDIT-20260529-99',
+        'Status:     open',
+        '',
+        'Body.',
+      ].join('\n'),
+    );
+    const result = await checkOpenFindings({ featureSlug: 'demo', repoRoot });
+    expect(result.allowed).toBe(false);
+    if (result.allowed) throw new Error('unreachable');
+    expect(result.openFindings).toHaveLength(1);
+  });
 });

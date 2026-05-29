@@ -211,3 +211,79 @@ describe('Phase 14 Task 2 — deferral collocations still trip', () => {
     expect(r.valid).toBe(false);
   });
 });
+
+// Review-finding integration — Track 3 #2 + #3 (AUDIT-20260529-18 + -19).
+describe('Phase 14 Task 2 follow-up — review findings T3-2 + T3-3', () => {
+  // T3-2: ambiguous noun + intervening modifier + deferral collocation.
+  // Phase 14 Task 2's regex required adjacency; an intervening modifier
+  // slipped the matcher. Widen to `{0,2}` modifier tokens AND extend
+  // `until` deferral context to include `until we` / `until the next`.
+
+  it("'placeholder approach until we figure out the right shape' trips (modifier + until-we)", () => {
+    const r = checkExcluded('left a placeholder approach until we figure out the right shape');
+    expect(r.valid).toBe(false);
+  });
+
+  it("'stub implementation until v3' trips (modifier + until-version)", () => {
+    const r = checkExcluded('using a stub implementation until v3 lands');
+    expect(r.valid).toBe(false);
+  });
+
+  it("'placeholder code path until the next sprint' trips (2 modifiers + until-next)", () => {
+    const r = checkExcluded('left a placeholder code path until the next sprint addresses it');
+    expect(r.valid).toBe(false);
+  });
+
+  // Negative cases — descriptive prose with the same ambiguous nouns
+  // that should NOT trip even with the widened regex.
+
+  it("'placeholder text shown until the user types' passes (descriptive UI behavior)", () => {
+    const r = checkExcluded('placeholder text shown until the user types in the input field');
+    expect(r.valid).toBe(true);
+  });
+
+  it("'stub function tested elsewhere' passes (descriptive prose)", () => {
+    const r = checkExcluded('the stub function tested elsewhere by the legacy harness');
+    expect(r.valid).toBe(true);
+  });
+
+  // T3-3: defer-verb false positive on bare `to`. "defer to v#/F#/phase"
+  // is a real deferral; "defer to the operator/spec/abstraction" is a
+  // legitimate idiom meaning "let X decide". Narrow the regex to require
+  // a version/phase marker after `to`.
+
+  it("'defer to v2' still trips (version target — regression guard)", () => {
+    const r = checkExcluded('defer to v2 since the contract is not yet finalized');
+    expect(r.valid).toBe(false);
+  });
+
+  it("'defer to F3' still trips (phase target — regression guard)", () => {
+    const r = checkExcluded('defer to F3 once the upstream API stabilizes');
+    expect(r.valid).toBe(false);
+  });
+
+  it("'defer to phase 5' still trips (phase number target)", () => {
+    const r = checkExcluded('defer to phase 5 alongside the schema migration');
+    expect(r.valid).toBe(false);
+  });
+
+  it("'defer to the operator' passes (legitimate idiom — let-X-decide)", () => {
+    const r = checkExcluded('architectural concern; defer to the operator for scoping');
+    expect(r.valid).toBe(true);
+  });
+
+  it("'defer to the spec' passes (legitimate documentation reference)", () => {
+    const r = checkExcluded('semantics defer to the spec at THESIS.md');
+    expect(r.valid).toBe(true);
+  });
+
+  it("'defer to the existing abstraction' passes (legitimate technical prose)", () => {
+    const r = checkExcluded('the new code defers to the existing abstraction in util/parser.ts');
+    expect(r.valid).toBe(true);
+  });
+
+  it("'deferred to v2' still trips (past-tense + version)", () => {
+    const r = checkExcluded('originally deferred to v2 release alongside the schema migration');
+    expect(r.valid).toBe(false);
+  });
+});

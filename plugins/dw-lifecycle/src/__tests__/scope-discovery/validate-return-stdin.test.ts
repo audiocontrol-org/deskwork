@@ -123,4 +123,33 @@ describe('readResponseSource — stdin branch + file fallback', () => {
     );
     expect(result).toBe(onDisk);
   });
+
+  // Review-finding integration — Track 3 #4 (AUDIT-20260529-20).
+  // `body.length === 0` only catches zero-byte stdin; whitespace-only
+  // (e.g. `echo "" | ...`) passes through as a non-empty body and the
+  // operator gets a confusing DispatchRejected instead of EmptyStdinError.
+  // Fix: trim before the empty check.
+
+  it("throws EmptyStdinError on newline-only stdin (whitespace-only sentinel)", async () => {
+    await expect(
+      readResponseSource('-', stdinFrom('\n')),
+    ).rejects.toThrow(EmptyStdinError);
+  });
+
+  it("throws EmptyStdinError on CRLF-only stdin", async () => {
+    await expect(
+      readResponseSource('-', stdinFrom('\r\n')),
+    ).rejects.toThrow(EmptyStdinError);
+  });
+
+  it("throws EmptyStdinError on multi-newline + whitespace-only stdin (echo-empty case)", async () => {
+    await expect(
+      readResponseSource('-', stdinFrom('   \n\n   \t\n')),
+    ).rejects.toThrow(EmptyStdinError);
+  });
+
+  it("does NOT throw on stdin with one valid byte surrounded by whitespace", async () => {
+    const result = await readResponseSource('-', stdinFrom('  x  '));
+    expect(result).toBe('  x  ');
+  });
 });

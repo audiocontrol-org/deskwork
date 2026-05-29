@@ -141,11 +141,29 @@ export const FORBIDDEN_DEFERRAL_REGEXES: ReadonlyArray<RegExp> = [
   // word alone is a descriptive noun in many domains (UI components,
   // technical scratch space, etc.); only when paired with a deferral
   // collocation does it signal an IOU.
-  /\b(?:stub|placeholder|pending|temporary|hack|hacky|deferred?)\s+(?:for\s+now|until|in\s+(?:v\d|phase|F\d|future)|pending|deferred?|later)\b/i,
+  //
+  // AUDIT-20260529-18 (review-finding T3-2): widened with `{0,2}`
+  // modifier tokens between noun and collocation, plus the targeted
+  // `until we` / `until the next <unit>` deferral suffix. Catches
+  // `placeholder approach until we figure out` (1 modifier);
+  // `placeholder code path until the next sprint` (2 modifiers).
+  // Stays narrow enough that descriptive uses like `placeholder text
+  // shown until the user types` do NOT trip (the `until` context is
+  // `the user`, not `we` / `the next <sprint>` / version).
+  /\b(?:stub|placeholder|pending|temporary|hack|hacky|deferred?)(?:\s+[\w-]+){0,2}\s+(?:for\s+now|until\s+(?:v\d|F\d|phase|we\b|the\s+next\s+(?:milestone|sprint|phase|release|version|cycle|iteration))|in\s+(?:v\d|phase|F\d|future)|pending|deferred?|later)\b/i,
   // "leave/use a <stub|placeholder|...>" followed by deferral verb.
   /\b(?:leave|leaving|left|use|using|put|added?|adding|insert(?:ed|ing)?)\s+(?:a|an|the)?\s*(?:stub|placeholder|temporary|deferred?)\b\s*(?:in|until|for|pending|to\s+(?:address|fix|handle|come\s+back|revisit)|until\s+we|so\s+we\s+can\s+(?:fix|address|come\s+back))/i,
-  // Bare "defer/deferred" as a verb action ("defer to v2", "defer this fix").
-  /\bdefer(?:red|ring)?\s+(?:to|until|until\s+v\d|until\s+F\d|until\s+phase|in|for)\b/i,
+  // Bare "defer/deferred" as a verb action — version/phase target.
+  //
+  // AUDIT-20260529-19 (review-finding T3-3): narrowed to require a
+  // version (`v\d`), phase (`F\d` / `phase \d`), or `next <unit>`
+  // marker after `to`. The prior bare `to` blocked legitimate idioms
+  // like `defer to the operator` / `defer to the spec` / `defer to
+  // the existing abstraction`. With this narrowing, `defer to v2` /
+  // `defer to F3` / `defer to phase 5` still trip; `defer to <noun
+  // phrase>` passes. `until` retained as an unambiguous deferral
+  // preposition.
+  /\bdefer(?:red|ring)?\s+(?:to\s+(?:v\d|F\d|phase\s+\d|the\s+next\s+(?:milestone|sprint|phase|release|version|cycle|iteration))|until)\b/i,
 ];
 
 interface ForbiddenMatch {

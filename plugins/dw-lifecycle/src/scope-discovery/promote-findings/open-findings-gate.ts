@@ -11,25 +11,30 @@
  * operator decision: err on rigidity.
  *
  * The library is fs-touching but I/O-thin: it resolves the audit-log path
- * from `repoRoot` + `featureSlug` (mirroring promote-findings.ts's
- * `resolveFeatureRoot` shape) and delegates to `walkOpenFindings` for the
- * actual parse + status filter. The result is a discriminated union the
- * CLI (or any in-band caller) renders into a refusal message.
+ * from `repoRoot` + `featureSlug` and delegates to `walkOpenFindings` for
+ * the actual parse + status filter. The result is a discriminated union
+ * the CLI (or any in-band caller) renders into a refusal message.
  *
  * NOTE on path resolution: docs/<v>/001-IN-PROGRESS/<slug>/audit-log.md
- * is the canonical layout. We try `1.0` first then `0.x` (matching the
- * candidate list in promote-findings.ts so this gate behaves identically
- * to the upstream promotion verb). If neither exists,
- * FeatureRootNotFoundError signals a config-level failure the CLI maps
- * to exit 2.
+ * is the canonical layout. AUDIT-20260529-17 (review-finding T3-1)
+ * replaced the prior hardcoded `1.0` + `0.x` candidate list with a
+ * directory walk that mirrors `findFeatureDirectory` in
+ * `../../orchestrator-turn.ts`. The prior narrow list missed real
+ * features under `docs/0.19.0/` / `docs/0.16.0/`. The walk inspects
+ * every top-level directory under `docs/`, looks for a
+ * `001-IN-PROGRESS/<slug>` subdir, and returns the first match.
  *
- * If the audit-log file itself is missing (feature root present but
- * the log hasn't been created yet), we treat it as "zero open findings"
- * — a brand-new feature with no findings is, by definition, allowed.
+ * If the feature root is not found under any version, FeatureRootNotFoundError
+ * signals a config-level failure the CLI maps to exit 2.
+ *
+ * If the audit-log file itself is missing (feature root present but the
+ * log hasn't been created yet), we treat it as "zero open findings" — a
+ * brand-new feature with no findings is, by definition, allowed.
  * walkOpenFindings already returns `[]` for that case.
  */
 
 import { existsSync } from 'node:fs';
+import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { walkOpenFindings } from './audit-log-walker.js';
 import type { OpenFinding } from './types.js';
@@ -51,7 +56,7 @@ export class FeatureRootNotFoundError extends Error {
   readonly searched: readonly string[];
   constructor(featureSlug: string, searched: readonly string[]) {
     super(
-      `open-findings-gate: feature '${featureSlug}' not found under any of: ${searched.join(', ')}`,
+      `open-findings-gate: feature '${featureSlug}' not found under docs/<v>/001-IN-PROGRESS/. Checked versions: ${searched.join(', ')}`,
     );
     this.name = 'FeatureRootNotFoundError';
     this.featureSlug = featureSlug;
@@ -59,17 +64,43 @@ export class FeatureRootNotFoundError extends Error {
   }
 }
 
+async function findFeatureRoot(
+  docsRoot: string,
+  featureSlug: string,
+): Promise<{ root: string | undefined; versionsChecked: readonly string[] }> {
+  if (!existsSync(docsRoot)) {
+    return { root: undefined, versionsChecked: [] };
+  }
+  let topEntries: ReadonlyArray<string>;
+  try {
+    topEntries = await readdir(docsRoot);
+  } catch {
+    return { root: undefined, versionsChecked: [] };
+  }
+  const versionsChecked: string[] = [];
+  for (const version of topEntries) {
+    const inProgress = join(docsRoot, version, '001-IN-PROGRESS');
+    if (!existsSync(inProgress)) continue;
+    versionsChecked.push(version);
+    const featureDir = join(inProgress, featureSlug);
+    if (existsSync(featureDir)) return { root: featureDir, versionsChecked };
+  }
+  return { root: undefined, versionsChecked };
+}
+
 export async function checkOpenFindings(
   args: CheckOpenFindingsArgs,
 ): Promise<OpenFindingsGateResult> {
   const docsRoot = join(args.repoRoot, 'docs');
-  const candidates = [
-    join(docsRoot, '1.0', '001-IN-PROGRESS', args.featureSlug),
-    join(docsRoot, '0.x', '001-IN-PROGRESS', args.featureSlug),
-  ];
-  const featureRoot = candidates.find((c) => existsSync(c));
+  const { root: featureRoot, versionsChecked } = await findFeatureRoot(
+    docsRoot,
+    args.featureSlug,
+  );
   if (featureRoot === undefined) {
-    throw new FeatureRootNotFoundError(args.featureSlug, candidates);
+    throw new FeatureRootNotFoundError(
+      args.featureSlug,
+      versionsChecked.length > 0 ? versionsChecked : ['<no version dirs found>'],
+    );
   }
   const auditLogPath = join(featureRoot, 'audit-log.md');
   const findings = await walkOpenFindings({
