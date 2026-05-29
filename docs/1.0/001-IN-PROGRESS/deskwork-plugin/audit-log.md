@@ -247,3 +247,50 @@ Surface:    n/a (38c triage)
 - **Already landed:** #226 (afc81e9), #58 (411d762, prose). #215 issues 1/3/4
   landed previously; issue 2 was #232 (now done) — likely closeable-pending-
   verification.
+
+## 2026-05-29 — Phase 38 sub-phase 38c (#219 doctor-model decision implemented + reviewed)
+
+Decisions taken this session (operator, via AskUserQuestion): doctor-model →
+retire `missing-frontmatter-id` (#219 opt 3); #65 moot; calendar-surface
+(#223/#234/#357) + #218 deferred to graphical-entries #301; #62 → refuse on
+no-`state` + write namespaced `deskwork:{id}` on `--apply`. Recorded two-track
+(workplan + per-issue comments).
+
+Finding-ID: AUDIT-20260529-09
+Status:     informational
+Severity:   informational
+Surface:    packages/core/src/doctor (commit 4b24a9e)
+
+Track-2 (spec-compliance) review of the #219 retirement (4b24a9e): PASS on all
+six checks — rule deleted + removed from RULES (not disabled); regression
+(`missing-frontmatter-id-retired.test.ts`) encodes the decision against a real
+tmp fixture (Ideas + youtube + tool, zero findings); runner-plumbing coverage
+(#44 skipReason / JSON / grouped output / exit-code matrix) re-anchored to
+surviving rules with equivalent assertions; scope clean (no surviving-rule
+logic changed; `--fix=calendar-uuid-missing` #357 test untouched); reworded
+references accurate (confirmed `ingest --apply` actually binds `deskwork.id`,
+so content-tree.ts remedy text is true); no over-delivery. No remediation.
+
+Finding-ID: AUDIT-20260529-10
+Status:     fixed-7a916ae
+Severity:   medium
+Surface:    packages/core/src/doctor/runner.ts:300 (reportOnlySkipReason)
+
+Track-3 (code-quality) review of 4b24a9e: the `reportOnlySkipReason` return-type
+union still listed `'prerequisite-missing'` and `'no-action-needed'`, both
+unreachable after the retirement (the deletion removed the only case returning
+`prerequisite-missing`; `no-action-needed` was never returned by this helper).
+A type-lie that would mislead a future maintainer about which dispositions
+bundled report-only rules can produce. Verified correct by reading the function
+(only `editorial-decision`/`schema-rejected` reachable). Fixed in 7a916ae by
+narrowing the return type to the two values actually returned; the full
+SkipReason union stays in types.ts for plan-supplied reasons. Verified: core
+538/538, cli 210 (+29 pre-existing skips), core+cli tsc clean. Stays in
+`fixed-` until release-verification.
+
+Track-1 (controller independent gate): re-ran `npm --workspace @deskwork/core
+test` (538/538), `npm --workspace @deskwork/cli test` (210 + 29 pre-existing
+skips), and `tsc --noEmit` on both (clean) in the controller's own environment
+— not the implementer's reported output. Clone-check skipped (detector ran this
+session via pre-commit gate + refresh-clones-baseline; net -4 groups, all
+pending, no curated dispositions lost).
