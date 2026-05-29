@@ -48,6 +48,18 @@ export interface FlipAuditLogStatusArgs {
   readonly auditLogPath: string;
   readonly flips: readonly StatusFlip[];
   readonly read: ReadAuditLog;
+  /**
+   * Optional predicate gating which CURRENT Status values are allowed
+   * to be flipped. Default: `s => s === 'open'` — the original
+   * promote-findings + apply-audit-flips contract. Phase 13 Task 4
+   * Step 1 (`close-shipped-audit-findings`) passes a predicate that
+   * accepts `fixed-<sha>` so it can flip to `verified-<date>`.
+   *
+   * Any flip whose finding's current status doesn't pass the predicate
+   * throws AuditLogEditError. The all-or-nothing atomic contract is
+   * unchanged: a single failure discards the whole batch.
+   */
+  readonly currentStatusPredicate?: (current: string) => boolean;
 }
 
 export interface FlipAuditLogStatusResult {
@@ -132,9 +144,11 @@ export async function flipAuditLogStatus(
       );
     }
     const currentValue = statusMatch[2] ?? '';
-    if (currentValue !== 'open') {
+    const predicate =
+      args.currentStatusPredicate ?? ((s: string) => s === 'open');
+    if (!predicate(currentValue)) {
       throw new AuditLogEditError(
-        `Finding-ID '${flip.findingId}' has Status '${currentValue}' (not 'open'); refusing to flip an already-dispositioned finding.`,
+        `Finding-ID '${flip.findingId}' has Status '${currentValue}'; the currentStatusPredicate did not accept it (refusing to flip).`,
       );
     }
     const prefix = statusMatch[1] ?? 'Status: ';
