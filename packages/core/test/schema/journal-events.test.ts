@@ -138,4 +138,48 @@ describe('JournalEventSchema', () => {
     };
     expect(JournalEventSchema.safeParse(event).success).toBe(true);
   });
+
+  it('parses a pipeline-create event (Phase 6 Task 6.2)', () => {
+    const event: JournalEvent = {
+      kind: 'pipeline-create',
+      at: '2026-05-28T10:00:00.000Z',
+      pipelineId: 'my-blog',
+      details: {
+        name: 'My Blog',
+        linearStages: ['Idea', 'Drafting', 'Review', 'Live'],
+        lockedStages: [],
+        offPipelineStages: [],
+      },
+    };
+    expect(JournalEventSchema.safeParse(event).success).toBe(true);
+  });
+
+  it('parses a pipeline-update rename-stage event (Phase 6 Task 6.2)', () => {
+    const event: JournalEvent = {
+      kind: 'pipeline-update',
+      at: '2026-05-28T10:00:00.000Z',
+      pipelineId: 'my-blog',
+      details: {
+        operation: 'rename-stage',
+        from: 'Drafting',
+        to: 'Writing',
+      },
+    };
+    expect(JournalEventSchema.safeParse(event).success).toBe(true);
+  });
+
+  it('parses a pipeline-delete event with reassigned lanes (Phase 6 Task 6.2)', () => {
+    const event: JournalEvent = {
+      kind: 'pipeline-delete',
+      at: '2026-05-28T10:00:00.000Z',
+      pipelineId: 'old-blog',
+      details: {
+        purgedPath: '/proj/.deskwork/pipelines/old-blog.json',
+        reassignedLanes: [
+          { laneId: 'default', from: 'old-blog', to: 'editorial' },
+        ],
+      },
+    };
+    expect(JournalEventSchema.safeParse(event).success).toBe(true);
+  });
 });

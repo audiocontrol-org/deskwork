@@ -1,4 +1,4 @@
-generated_at: 2026-05-28T23:33:10.111Z
+generated_at: 2026-05-29T00:02:23.242Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -121,6 +121,77 @@ clones:
       - packages/cli/src/commands/publish.ts:53:65
     disposition: pending
     reason: null
+  - id: 1d7745b2f157
+    lines: 13
+    members:
+      - packages/cli/src/commands/lane.ts:142:154
+      - packages/cli/src/commands/pipeline.ts:148:160
+    disposition: keep-with-reason
+    reason: "Phase 6 Task 6.2: intentional pipeline-vs-lane CLI handler symmetry (usage banners, error catch shape, JSON emit shape). The verb families share a dispatch contract by design; collapsing would mean a generic 'CRUD dispatcher' that obscures per-verb argument validation."
+  - id: 35dd3acfbdb6
+    lines: 11
+    members:
+      - packages/cli/src/commands/lane.ts:185:195
+      - packages/cli/src/commands/pipeline.ts:186:196
+    disposition: keep-with-reason
+    reason: "Phase 6 Task 6.2: intentional pipeline-vs-lane CLI handler symmetry (usage banners, error catch shape, JSON emit shape). The verb families share a dispatch contract by design; collapsing would mean a generic 'CRUD dispatcher' that obscures per-verb argument validation."
+  - id: 51bf553937e3
+    lines: 11
+    members:
+      - packages/cli/src/commands/lane.ts:220:230
+      - packages/cli/src/commands/pipeline.ts:296:305
+    disposition: keep-with-reason
+    reason: "Phase 6 Task 6.2: intentional pipeline-vs-lane CLI handler symmetry (usage banners, error catch shape, JSON emit shape). The verb families share a dispatch contract by design; collapsing would mean a generic 'CRUD dispatcher' that obscures per-verb argument validation."
+  - id: 99d2afe73b96
+    lines: 28
+    members:
+      - packages/cli/src/commands/lane.ts:68:95
+      - packages/cli/src/commands/pipeline.ts:84:111
+    disposition: keep-with-reason
+    reason: "Phase 6 Task 6.2: intentional pipeline-vs-lane CLI handler symmetry (usage banners, error catch shape, JSON emit shape). The verb families share a dispatch contract by design; collapsing would mean a generic 'CRUD dispatcher' that obscures per-verb argument validation."
+  - id: f8fd4881f0dc
+    lines: 12
+    members:
+      - packages/cli/src/commands/pipeline.ts:213:228
+      - packages/cli/src/commands/pipeline.ts:312:323
+    disposition: keep-with-reason
+    reason: "Phase 6 Task 6.2: in-file similarity between handleCreate (parse --shape, emit created result) and handleDelete (parse --reassign-lanes-to, emit deleted result). Both follow the verb-handler shape (parse → invoke core → emit) but operate on different argument structures and different result envelopes; collapsing into a generic verb handler would obscure per-verb argument validation."
+  - id: d93c17540f3a
+    lines: 29
+    members:
+      - packages/cli/test/lane/helpers.ts:11:39
+      - packages/cli/test/pipeline/helpers.ts:11:33
+    disposition: keep-with-reason
+    reason: "Phase 6 Task 6.2: intentional pipeline-vs-lane symmetry. Pipeline CRUD mirrors Task 6.1 lane CRUD by design (atomic commit helpers, tmp-fixture test helpers, sidecar writers); premature DRY would couple two evolving lifecycles."
+  - id: 2e09e327a82a
+    lines: 19
+    members:
+      - packages/cli/test/lane/helpers.ts:141:159
+      - packages/cli/test/pipeline/helpers.ts:178:196
+    disposition: keep-with-reason
+    reason: "Phase 6 Task 6.2: intentional pipeline-vs-lane symmetry. Pipeline CRUD mirrors Task 6.1 lane CRUD by design (atomic commit helpers, tmp-fixture test helpers, sidecar writers); premature DRY would couple two evolving lifecycles."
+  - id: 6f13bea8f16e
+    lines: 26
+    members:
+      - packages/cli/test/lane/helpers.ts:56:81
+      - packages/cli/test/pipeline/helpers.ts:50:75
+    disposition: keep-with-reason
+    reason: "Phase 6 Task 6.2: intentional pipeline-vs-lane symmetry. Pipeline CRUD mirrors Task 6.1 lane CRUD by design (atomic commit helpers, tmp-fixture test helpers, sidecar writers); premature DRY would couple two evolving lifecycles."
+  - id: b99074143b08
+    lines: 11
+    members:
+      - packages/cli/test/lane/helpers.ts:84:94
+      - packages/cli/test/pipeline/helpers.ts:78:88
+      - packages/cli/test/pipeline/helpers.ts:91:101
+    disposition: keep-with-reason
+    reason: "Phase 6 Task 6.2: intentional pipeline-vs-lane symmetry. Pipeline CRUD mirrors Task 6.1 lane CRUD by design (atomic commit helpers, tmp-fixture test helpers, sidecar writers); premature DRY would couple two evolving lifecycles."
+  - id: b182ab3fd6d1
+    lines: 27
+    members:
+      - packages/cli/test/lane/helpers.ts:91:117
+      - packages/cli/test/pipeline/helpers.ts:150:176
+    disposition: keep-with-reason
+    reason: "Phase 6 Task 6.2: intentional pipeline-vs-lane symmetry. Pipeline CRUD mirrors Task 6.1 lane CRUD by design (atomic commit helpers, tmp-fixture test helpers, sidecar writers); premature DRY would couple two evolving lifecycles."
   - id: 44c103564dce
     lines: 9
     members:
@@ -253,17 +324,31 @@ clones:
   - id: c20b4e4f0469
     lines: 9
     members:
-      - packages/core/src/lanes/loader.ts:59:67
-      - packages/core/src/pipelines/loader.ts:72:80
+      - packages/core/src/lanes/loader.ts:120:128
+      - packages/core/src/pipelines/loader.ts:163:171
     disposition: keep-with-reason
     reason: "lanes/loader mirrors pipelines/loader by workplan design: JSON-read+Zod-validate+id-match-filename idiom across two parallel module-shaped readers; extracting a shared helper would couple lane evolution to pipeline evolution"
   - id: b223f2def90d
     lines: 7
     members:
-      - packages/core/src/lanes/loader.ts:69:75
-      - packages/core/src/pipelines/loader.ts:82:88
+      - packages/core/src/lanes/loader.ts:130:136
+      - packages/core/src/pipelines/loader.ts:173:179
     disposition: keep-with-reason
     reason: second half of the lanes/loader vs pipelines/loader mirroring (Zod-validate + id-mismatch refusal); same rationale as c20b4e4f0469
+  - id: 93e1ae2c9a27
+    lines: 15
+    members:
+      - packages/core/src/lanes/operations/commit.ts:45:59
+      - packages/core/src/pipelines/operations/commit.ts:45:59
+    disposition: keep-with-reason
+    reason: "Phase 6 Task 6.2: intentional pipeline-vs-lane symmetry. Pipeline CRUD mirrors Task 6.1 lane CRUD by design (atomic commit helpers, tmp-fixture test helpers, sidecar writers); premature DRY would couple two evolving lifecycles."
+  - id: b1fd648407e9
+    lines: 10
+    members:
+      - packages/core/src/pipelines/operations/update.ts:284:293
+      - packages/core/src/pipelines/operations/update.ts:307:316
+    disposition: keep-with-reason
+    reason: "Phase 6 Task 6.2: in-file similarity between applySetLocked and applySetOffPipeline — both validate each comma-separated stage against linearStages with mirror invariants. Collapsing into a shared helper would obscure the asymmetry (set-locked enforces subset, set-off-pipeline enforces disjoint) that matters at the error-message level."
   - id: 68e3966349bd
     lines: 11
     members:

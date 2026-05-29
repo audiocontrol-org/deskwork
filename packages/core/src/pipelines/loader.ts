@@ -40,9 +40,23 @@
  */
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { dirname, join, basename } from 'node:path';
+import { dirname, join, basename, isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PipelineTemplateSchema, type PipelineTemplate } from './types.ts';
+
+/**
+ * Canonical pipeline id charset: kebab-case starting with [a-z0-9],
+ * allowing `[a-z0-9-]` thereafter. Mirrors `LANE_ID_REGEX` over in
+ * `lanes/types.ts` — pipeline ids end up as JSON filenames under
+ * `.deskwork/pipelines/` and `dist/pipelines/`, so the same character
+ * restrictions and path-traversal exposure apply.
+ *
+ * Operations that resolve `<id>` to a filesystem path (loader,
+ * create, update, delete) enforce the override-dir containment
+ * invariant via `assertSafePipelineId` — belt-and-suspenders by design
+ * mirrors Task 6.1's approach to lane ids.
+ */
+export const PIPELINE_ID_REGEX = /^[a-z0-9][a-z0-9-]*$/;
 
 /**
  * Directory shipping the plugin's built-in preset templates. The path
@@ -54,8 +68,85 @@ const PLUGIN_DEFAULTS_DIR = dirname(fileURLToPath(import.meta.url));
 /**
  * Directory inside a project where operator overrides live.
  */
-function projectOverridesDir(projectRoot: string): string {
+export function pipelineOverridesDir(projectRoot: string): string {
   return join(projectRoot, '.deskwork', 'pipelines');
+}
+
+/**
+ * Path to a specific pipeline-override JSON file under the project.
+ * Returns the path even if the file does not exist on disk (the
+ * caller resolves the override-takes-precedence semantics).
+ */
+export function pipelineOverridePath(projectRoot: string, id: string): string {
+  return join(pipelineOverridesDir(projectRoot), `${id}.json`);
+}
+
+/**
+ * Path to a built-in plugin-default pipeline JSON, regardless of
+ * whether it exists. Resolves relative to this module's location so it
+ * works in both source-mode (tsx) and built-mode (node dist/).
+ */
+export function pipelinePluginDefaultPath(id: string): string {
+  return join(PLUGIN_DEFAULTS_DIR, `${id}.json`);
+}
+
+/**
+ * Defensive containment check: refuse any operator-supplied pipeline
+ * id whose resolved JSON path is not under
+ * `<projectRoot>/.deskwork/pipelines/`.
+ *
+ * The `PIPELINE_ID_REGEX` charset check above already rejects the
+ * path-traversal shape, but this function enforces the invariant at
+ * the filesystem boundary so the same exposure cannot sneak in via a
+ * future code path that constructs a path without going through the
+ * regex. Belt-and-suspenders, mirrors `assertSafeLaneId`.
+ *
+ * Refuses on:
+ *   - id that fails the `PIPELINE_ID_REGEX` charset check.
+ *   - id whose resolved path escapes the pipelines directory.
+ */
+export function assertSafePipelineId(projectRoot: string, id: string): void {
+  if (!PIPELINE_ID_REGEX.test(id)) {
+    throw new Error(
+      `Invalid pipeline id ${JSON.stringify(id)}: must be kebab-case `
+      + `[a-z0-9-], starting with [a-z0-9]. Pipeline ids are filenames `
+      + `under .deskwork/pipelines/.`,
+    );
+  }
+  const overrideDirAbs = resolve(pipelineOverridesDir(projectRoot));
+  const overrideAbs = resolve(pipelineOverridePath(projectRoot, id));
+  const rel = relative(overrideDirAbs, overrideAbs);
+  if (rel.startsWith('..') || isAbsolute(rel)) {
+    throw new Error(
+      `Invalid pipeline id ${JSON.stringify(id)}: resolved path `
+      + `${overrideAbs} escapes the pipelines directory ${overrideDirAbs}.`,
+    );
+  }
+}
+
+/**
+ * Inspect whether a pipeline template id is resolvable as a built-in
+ * plugin preset. `loadPipelineTemplate` returns the override first if
+ * present; this helper exists for operations that need to distinguish
+ * "plugin-shipped read-only template" from "project-override the
+ * operator wrote" (e.g. `pipeline delete` refuses on plugin presets).
+ *
+ * Returns `true` when the plugin-default JSON exists for `id`,
+ * regardless of whether a project override also exists. Does NOT
+ * validate the JSON.
+ */
+export function isPluginPresetPipeline(id: string): boolean {
+  return existsSync(pipelinePluginDefaultPath(id));
+}
+
+/**
+ * Inspect whether the project carries an override for the given
+ * pipeline id. Used by mutating operations (update, delete) to refuse
+ * with a clear "create a project override first via customize" error
+ * when only the plugin preset exists.
+ */
+export function hasPipelineOverride(projectRoot: string, id: string): boolean {
+  return existsSync(pipelineOverridePath(projectRoot, id));
 }
 
 /**
@@ -115,12 +206,13 @@ export function loadPipelineTemplate(id: string, projectRoot: string): PipelineT
       `loadPipelineTemplate requires a non-empty id; received ${JSON.stringify(id)}`,
     );
   }
+  assertSafePipelineId(projectRoot, id);
   // Override-takes-precedence: project path wins when present.
-  const overridePath = join(projectOverridesDir(projectRoot), `${id}.json`);
+  const overridePath = pipelineOverridePath(projectRoot, id);
   if (existsSync(overridePath)) {
     return readAndValidate(overridePath, id);
   }
-  const defaultPath = join(PLUGIN_DEFAULTS_DIR, `${id}.json`);
+  const defaultPath = pipelinePluginDefaultPath(id);
   if (existsSync(defaultPath)) {
     return readAndValidate(defaultPath, id);
   }
@@ -159,7 +251,7 @@ function listJsonBasenames(dir: string): string[] {
  * @param projectRoot - Absolute path to the project root.
  */
 export function listAvailablePipelineTemplates(projectRoot: string): string[] {
-  const overrideIds = listJsonBasenames(projectOverridesDir(projectRoot));
+  const overrideIds = listJsonBasenames(pipelineOverridesDir(projectRoot));
   const defaultIds = listJsonBasenames(PLUGIN_DEFAULTS_DIR);
   // De-duplicate by id; overrides win, but for enumeration both sources
   // contribute the same id to the same slot in the de-dup set, so

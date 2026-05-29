@@ -202,6 +202,99 @@ const LaneMoveEvent = z.object({
   }),
 });
 
+/**
+ * Phase 6 Task 6.2 (graphical-entries): pipeline-template-lifecycle
+ * events emitted by the `/deskwork:pipeline` verb family. Each event is
+ * project-scoped (no `entryId`); `pipelineId` identifies the template
+ * the operation acted on and `details` carries kind-specific context.
+ *
+ * Three kinds mirror the three mutating verbs:
+ *
+ *   - `pipeline-create` — a new pipeline template was written to
+ *                         `<projectRoot>/.deskwork/pipelines/<id>.json`.
+ *   - `pipeline-update` — an existing project-override pipeline was
+ *                         mutated (stage added / renamed / removed,
+ *                         lockedStages or offPipelineStages replaced).
+ *                         The `operation` discriminator names which of
+ *                         the five mutation flavors ran, with shape-
+ *                         specific `before` / `after` fields.
+ *   - `pipeline-delete` — a project-override pipeline JSON was deleted
+ *                         from disk. `reassignedLanes` carries the
+ *                         list of lane ids that were re-bound (empty
+ *                         when no lanes referenced the template).
+ *
+ * Plugin presets are read-only — none of these events fire against
+ * the packaged defaults; the mutating verbs refuse with a "create a
+ * project override first" error before reaching the journal append.
+ */
+const PipelineCreateEvent = z.object({
+  kind: z.literal('pipeline-create'),
+  at: z.string().datetime(),
+  pipelineId: z.string().min(1),
+  details: z.object({
+    name: z.string().min(1),
+    linearStages: z.array(z.string().min(1)).min(1),
+    lockedStages: z.array(z.string().min(1)),
+    offPipelineStages: z.array(z.string().min(1)),
+  }),
+});
+
+const PipelineUpdateAddStage = z.object({
+  operation: z.literal('add-stage'),
+  stage: z.string().min(1),
+  position: z.number().int().nonnegative(),
+});
+
+const PipelineUpdateRenameStage = z.object({
+  operation: z.literal('rename-stage'),
+  from: z.string().min(1),
+  to: z.string().min(1),
+});
+
+const PipelineUpdateRemoveStage = z.object({
+  operation: z.literal('remove-stage'),
+  stage: z.string().min(1),
+});
+
+const PipelineUpdateSetLocked = z.object({
+  operation: z.literal('set-locked'),
+  before: z.array(z.string().min(1)),
+  after: z.array(z.string().min(1)),
+});
+
+const PipelineUpdateSetOffPipeline = z.object({
+  operation: z.literal('set-off-pipeline'),
+  before: z.array(z.string().min(1)),
+  after: z.array(z.string().min(1)),
+});
+
+const PipelineUpdateEvent = z.object({
+  kind: z.literal('pipeline-update'),
+  at: z.string().datetime(),
+  pipelineId: z.string().min(1),
+  details: z.discriminatedUnion('operation', [
+    PipelineUpdateAddStage,
+    PipelineUpdateRenameStage,
+    PipelineUpdateRemoveStage,
+    PipelineUpdateSetLocked,
+    PipelineUpdateSetOffPipeline,
+  ]),
+});
+
+const PipelineDeleteEvent = z.object({
+  kind: z.literal('pipeline-delete'),
+  at: z.string().datetime(),
+  pipelineId: z.string().min(1),
+  details: z.object({
+    purgedPath: z.string().min(1),
+    reassignedLanes: z.array(z.object({
+      laneId: z.string().min(1),
+      from: z.string().min(1),
+      to: z.string().min(1),
+    })),
+  }),
+});
+
 export const JournalEventSchema = z.discriminatedUnion('kind', [
   EntryCreatedEvent,
   EntryIngestedEvent,
@@ -217,6 +310,9 @@ export const JournalEventSchema = z.discriminatedUnion('kind', [
   LaneRestoreEvent,
   LanePurgeEvent,
   LaneMoveEvent,
+  PipelineCreateEvent,
+  PipelineUpdateEvent,
+  PipelineDeleteEvent,
 ]);
 
 export type JournalEvent = z.infer<typeof JournalEventSchema>;

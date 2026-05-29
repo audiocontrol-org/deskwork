@@ -1,10 +1,13 @@
 /**
  * deskwork customize — copy a plugin-default file into the project's
- * `.deskwork/<category>/<name>.ts` so the operator can edit it.
+ * `.deskwork/<category>/<name>.<ext>` so the operator can edit it.
  *
  * Categories:
  *   - templates  → copies `<@deskwork/studio>/dist/pages/<name>.ts`
  *   - doctor     → copies `<@deskwork/core>/dist/doctor/rules/<name>.ts`
+ *   - pipeline   → copies `<@deskwork/core>/dist/pipelines/<name>.json`
+ *                  (Phase 6 Task 6.2 — start-from-preset for
+ *                  `deskwork pipeline` mutations)
  *   - prompts    → reserved (no default-source mapping yet)
  *
  * Usage (after the dispatcher injects projectRoot):
@@ -15,7 +18,7 @@
  *      against the published package paths so it works in both
  *      workspace dev and npm-installed plugins.
  *   2. Copies the source verbatim into
- *      `<projectRoot>/.deskwork/<category>/<name>.ts`, creating the
+ *      `<projectRoot>/.deskwork/<category>/<name>.<ext>`, creating the
  *      directory tree as needed.
  *   3. Refuses if the destination file already exists — clobbering an
  *      operator's edits would be a bug-factory.
@@ -39,12 +42,26 @@ import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fail } from '@deskwork/core/cli-args';
 
-const VALID_CATEGORIES = ['templates', 'prompts', 'doctor'] as const;
+const VALID_CATEGORIES = ['templates', 'prompts', 'doctor', 'pipeline'] as const;
 type Category = (typeof VALID_CATEGORIES)[number];
 
 function isCategory(value: string): value is Category {
   return (VALID_CATEGORIES as readonly string[]).includes(value);
 }
+
+/**
+ * Per-category file-extension mapping. All TypeScript-extension
+ * categories (templates, doctor) ship `.ts` source verbatim under
+ * `dist/<category>/`; the `pipeline` category copies JSON.
+ */
+const CATEGORY_EXT: Readonly<Record<Category, string>> = {
+  templates: '.ts',
+  doctor: '.ts',
+  pipeline: '.json',
+  // `prompts` is reserved; resolveDefaultSource throws before any
+  // extension lookup runs.
+  prompts: '.ts',
+};
 
 /**
  * Resolve a node module path via `import.meta.resolve`. Returns the
@@ -111,6 +128,23 @@ function resolveDefaultSource(category: Category, name: string): string {
       throw new Error(
         `no built-in template named "${name}". Available templates: ${listAvailable(
           dirname(candidate),
+          '.ts',
+        )}`,
+      );
+    }
+    return candidate;
+  }
+  if (category === 'pipeline') {
+    // Pipeline presets ship as JSON under `dist/pipelines/`. The build
+    // script copies them from `src/pipelines/*.json` so the customize
+    // anchor lives inside the `files: ["dist", ...]` whitelist.
+    const coreRoot = resolvePackageRoot('@deskwork/core');
+    const candidate = resolve(coreRoot, 'dist', 'pipelines', `${name}.json`);
+    if (!existsSync(candidate)) {
+      throw new Error(
+        `no built-in pipeline preset named "${name}". Available presets: ${listAvailable(
+          dirname(candidate),
+          '.json',
         )}`,
       );
     }
@@ -123,6 +157,7 @@ function resolveDefaultSource(category: Category, name: string): string {
     throw new Error(
       `no built-in doctor rule named "${name}". Available rules: ${listAvailable(
         dirname(candidate),
+        '.ts',
       )}`,
     );
   }
@@ -132,17 +167,17 @@ function resolveDefaultSource(category: Category, name: string): string {
 /**
  * Best-effort listing of the available basenames in a directory. Used
  * to enrich error messages when the operator passes a name that
- * doesn't match a built-in default.
+ * doesn't match a built-in default. `ext` is the extension to filter
+ * by, including the leading dot (e.g. `.ts`, `.json`).
+ *
+ * For `.ts`, declaration files (`.d.ts`) are excluded so they don't
+ * pollute the picker. JSON has no equivalent suffix.
  */
-function listAvailable(dir: string): string {
+function listAvailable(dir: string, ext: string): string {
   if (!existsSync(dir)) return '(none — broken install)';
-  // Filter to .ts files, excluding TypeScript declaration files (.d.ts)
-  // and source maps. The customize anchor is the verbatim source-copy
-  // shipped under dist/<category>/<name>.ts; declaration files alongside
-  // it would surface as bogus "available templates" entries.
   const entries = readdirSync(dir)
-    .filter((n) => n.endsWith('.ts') && !n.endsWith('.d.ts'))
-    .map((n) => n.slice(0, -'.ts'.length))
+    .filter((n) => n.endsWith(ext) && !(ext === '.ts' && n.endsWith('.d.ts')))
+    .map((n) => n.slice(0, -ext.length))
     .sort();
   return entries.join(', ');
 }
@@ -186,8 +221,14 @@ export async function run(argv: string[]): Promise<void> {
     fail(err instanceof Error ? err.message : String(err), 1);
   }
 
-  const destDir = join(projectRoot, '.deskwork', categoryArg);
-  const destFile = join(destDir, `${name}.ts`);
+  const ext = CATEGORY_EXT[categoryArg];
+  // The on-disk destination directory mirrors the category name. The
+  // pipeline category lands under `.deskwork/pipelines/` (plural) to
+  // match the pipeline loader's `pipelineOverridesDir`; every other
+  // category uses the singular form historically established.
+  const destSubdir = categoryArg === 'pipeline' ? 'pipelines' : categoryArg;
+  const destDir = join(projectRoot, '.deskwork', destSubdir);
+  const destFile = join(destDir, `${name}${ext}`);
   if (existsSync(destFile)) {
     fail(
       `destination already exists: ${destFile}\n` +
@@ -203,10 +244,25 @@ export async function run(argv: string[]): Promise<void> {
   process.stdout.write(`Customized ${categoryArg}/${name}\n`);
   process.stdout.write(`  source: ${source}\n`);
   process.stdout.write(`  dest:   ${destFile}\n`);
-  process.stdout.write(
-    '  Edit the destination file to customize behavior. The studio\n',
-  );
-  process.stdout.write(
-    '  loads the override automatically on the next request.\n',
-  );
+  if (categoryArg === 'pipeline') {
+    process.stdout.write(
+      '  Edit the JSON directly, or mutate via "deskwork pipeline update\n',
+    );
+    process.stdout.write(
+      `  ${name} --add-stage <name>" / "--rename-stage <from> --to-stage <to>" /\n`,
+    );
+    process.stdout.write(
+      '  "--remove-stage <name>" / "--set-locked <s,...>" / "--set-off-pipeline <s,...>".\n',
+    );
+    process.stdout.write(
+      '  Lanes bound to this id resolve the project override automatically.\n',
+    );
+  } else {
+    process.stdout.write(
+      '  Edit the destination file to customize behavior. The studio\n',
+    );
+    process.stdout.write(
+      '  loads the override automatically on the next request.\n',
+    );
+  }
 }
