@@ -1847,7 +1847,7 @@ Track 3 code-quality review: one medium finding, one low finding.
 ### AUDIT-20260529-01 — Pipeline-page client test slice is red
 
 Finding-ID: AUDIT-20260529-01
-Status:     open
+Status:     fixed-af1e91a (verified 2026-05-29; 9/9 in pipelines-page-client.test.ts pass; 4 originally-named failures all green)
 Severity:   blocking (verification)
 Surface:    `packages/studio/test/pipelines/pipelines-page-client.test.ts`,
             `packages/studio/test/pipelines/test-helpers.ts`
@@ -1875,7 +1875,7 @@ new disabled-until-preview-rebuilt contract explicitly.
 ### AUDIT-20260529-02 — Referencing lanes hidden in delete tooltip
 
 Finding-ID: AUDIT-20260529-02
-Status:     open
+Status:     fixed-b2bcdc0
 Severity:   medium
 Surface:    `packages/studio/src/pages/pipelines/table.ts:124-134`
 
@@ -1892,7 +1892,7 @@ hover tooltip.
 ### AUDIT-20260529-03 — Preset edit actions copy known-refused update commands
 
 Finding-ID: AUDIT-20260529-03
-Status:     open
+Status:     fixed-b2bcdc0
 Severity:   medium
 Surface:    `packages/studio/src/pages/pipelines/edit-form.ts:34-43`,
             `plugins/deskwork-studio/public/src/pipelines/pipelines-page.ts:377-384`
@@ -1909,7 +1909,7 @@ Actual: the page can emit commands it already knows will fail.
 ### AUDIT-20260529-04 — Copy-builder validation allows CLI-invalid values
 
 Finding-ID: AUDIT-20260529-04
-Status:     open
+Status:     fixed-b2bcdc0
 Severity:   medium
 Surface:    `packages/studio/src/pages/pipelines/new-form.ts:42`,
             `packages/studio/src/pages/pipelines/edit-form.ts:78-81`,
@@ -1931,7 +1931,7 @@ the same inline notice pattern used for missing fields.
 ### AUDIT-20260529-05 — Clear-locks disabled-state guidance is inaccurate
 
 Finding-ID: AUDIT-20260529-05
-Status:     open
+Status:     fixed-b2bcdc0
 Severity:   low
 Surface:    `plugins/deskwork-studio/public/src/pipelines/pipelines-page.ts:191-195`
 
@@ -1948,7 +1948,7 @@ future explicit CLI clear-locks capability.
 ### AUDIT-20260529-06 — CLI approve/publish tests assert stale message copy
 
 Finding-ID: AUDIT-20260529-06
-Status:     open
+Status:     fixed-b2bcdc0
 Severity:   medium (verification)
 Surface:    `packages/cli/test/approve-entry-centric.test.ts:129`,
             `packages/cli/test/publish-entry-centric.test.ts:139`
