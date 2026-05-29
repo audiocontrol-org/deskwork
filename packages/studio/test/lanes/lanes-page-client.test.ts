@@ -1,0 +1,359 @@
+/**
+ * @vitest-environment jsdom
+ *
+ * Client-controller tests for the `/dev/lanes` page (Phase 6 Task
+ * 6.3).
+ *
+ * Coverage:
+ *   - New form: editing fields rebuilds the slash-command preview
+ *     live.
+ *   - New form: copy button calls navigator.clipboard.writeText with
+ *     the assembled `/deskwork:lane create ...` command.
+ *   - Edit form: only changed fields appear in the
+ *     `/deskwork:lane update ...` command.
+ *   - Edit form: untouched form copies a bare `/deskwork:lane update
+ *     <id>` (no flags) — the CLI rejects this; the studio's job is
+ *     to surface the no-op shape so the operator sees the gate.
+ *   - Edit toggle: clicking Edit reveals the hidden form row +
+ *     flips aria-expanded; clicking Close hides it again.
+ *   - Row Archive button: clicking copies the `/deskwork:lane archive
+ *     <id>` command from the button's data-copy attribute.
+ *   - Missing container: initLanesPage is a no-op (no throws) when
+ *     `[data-lanes-container]` is absent.
+ */
+
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { initLanesPage } from '../../../../plugins/deskwork-studio/public/src/lanes/lanes-page';
+
+function buildContainer(): HTMLElement {
+  document.body.innerHTML = '';
+  const container = document.createElement('main');
+  container.dataset.lanesContainer = '';
+  document.body.appendChild(container);
+  return container;
+}
+
+function buildNewForm(container: HTMLElement, templates: readonly string[]): HTMLElement {
+  const form = document.createElement('section');
+  form.dataset.lanesNewForm = '';
+
+  // id
+  const idInput = document.createElement('input');
+  idInput.dataset.lanesField = 'id';
+  form.appendChild(idInput);
+  // name
+  const nameInput = document.createElement('input');
+  nameInput.dataset.lanesField = 'name';
+  form.appendChild(nameInput);
+  // template
+  const select = document.createElement('select');
+  select.dataset.lanesField = 'template';
+  const blank = document.createElement('option');
+  blank.value = '';
+  select.appendChild(blank);
+  for (const t of templates) {
+    const opt = document.createElement('option');
+    opt.value = t;
+    opt.textContent = t;
+    select.appendChild(opt);
+  }
+  form.appendChild(select);
+  // contentDir
+  const contentDir = document.createElement('input');
+  contentDir.dataset.lanesField = 'contentDir';
+  form.appendChild(contentDir);
+  // preview + copy
+  const preview = document.createElement('code');
+  preview.dataset.lanesPreview = '';
+  form.appendChild(preview);
+  const copy = document.createElement('button');
+  copy.type = 'button';
+  copy.dataset.lanesCopyButton = 'new';
+  copy.textContent = 'Copy command';
+  form.appendChild(copy);
+
+  container.appendChild(form);
+  return form;
+}
+
+function buildEditFormRow(
+  container: HTMLElement,
+  laneId: string,
+  current: { name: string; template: string; contentDir: string },
+  templates: readonly string[],
+): { toggleRow: HTMLElement; editRow: HTMLElement; toggle: HTMLButtonElement; form: HTMLElement } {
+  // Toggle row
+  const toggleRow = document.createElement('tr');
+  toggleRow.dataset.laneRow = '';
+  toggleRow.dataset.laneId = laneId;
+  const actionsCell = document.createElement('td');
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.dataset.laneEditToggle = '';
+  toggle.dataset.laneId = laneId;
+  toggle.setAttribute('aria-expanded', 'false');
+  actionsCell.appendChild(toggle);
+
+  // Archive button (carries data-lane-copy)
+  const archiveBtn = document.createElement('button');
+  archiveBtn.type = 'button';
+  archiveBtn.dataset.laneCopy = '';
+  archiveBtn.dataset.copy = `/deskwork:lane archive ${laneId}`;
+  archiveBtn.textContent = 'Archive';
+  actionsCell.appendChild(archiveBtn);
+  toggleRow.appendChild(actionsCell);
+  container.appendChild(toggleRow);
+
+  // Edit form row (hidden)
+  const editRow = document.createElement('tr');
+  editRow.dataset.laneEditRow = '';
+  editRow.dataset.laneId = laneId;
+  editRow.hidden = true;
+  const cell = document.createElement('td');
+  const form = document.createElement('section');
+  form.dataset.lanesEditForm = '';
+  form.dataset.laneId = laneId;
+
+  const nameInput = document.createElement('input');
+  nameInput.dataset.lanesField = 'name';
+  nameInput.dataset.current = current.name;
+  nameInput.value = current.name;
+  form.appendChild(nameInput);
+
+  const select = document.createElement('select');
+  select.dataset.lanesField = 'template';
+  select.dataset.current = current.template;
+  for (const t of templates) {
+    const opt = document.createElement('option');
+    opt.value = t;
+    opt.textContent = t;
+    if (t === current.template) opt.selected = true;
+    select.appendChild(opt);
+  }
+  form.appendChild(select);
+
+  const contentDirInput = document.createElement('input');
+  contentDirInput.dataset.lanesField = 'contentDir';
+  contentDirInput.dataset.current = current.contentDir;
+  contentDirInput.value = current.contentDir;
+  form.appendChild(contentDirInput);
+
+  const preview = document.createElement('code');
+  preview.dataset.lanesPreview = '';
+  preview.dataset.laneId = laneId;
+  form.appendChild(preview);
+
+  const copy = document.createElement('button');
+  copy.type = 'button';
+  copy.dataset.lanesCopyButton = 'edit';
+  copy.dataset.laneId = laneId;
+  copy.textContent = 'Copy command';
+  form.appendChild(copy);
+
+  const cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.dataset.laneEditCancel = '';
+  cancel.dataset.laneId = laneId;
+  cancel.textContent = 'Close';
+  form.appendChild(cancel);
+
+  cell.appendChild(form);
+  editRow.appendChild(cell);
+  container.appendChild(editRow);
+
+  return { toggleRow, editRow, toggle, form };
+}
+
+function installClipboardStub(): { calls: string[] } {
+  const calls: string[] = [];
+  const clipboardStub = {
+    writeText: async (text: string) => {
+      calls.push(text);
+    },
+  };
+  Object.defineProperty(navigator, 'clipboard', {
+    value: clipboardStub,
+    configurable: true,
+    writable: false,
+  });
+  Object.defineProperty(window, 'isSecureContext', {
+    value: true,
+    configurable: true,
+    writable: false,
+  });
+  return { calls };
+}
+
+function inputEvent(): Event {
+  const ev = new Event('input', { bubbles: true });
+  return ev;
+}
+
+function changeEvent(): Event {
+  const ev = new Event('change', { bubbles: true });
+  return ev;
+}
+
+describe('lanes-page client controller', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('is a no-op when [data-lanes-container] is absent', () => {
+    document.body.innerHTML = '<div>no container</div>';
+    expect(() => initLanesPage()).not.toThrow();
+  });
+
+  it('New form: live-updates the slash-command preview on input', () => {
+    const container = buildContainer();
+    buildNewForm(container, ['editorial', 'visual']);
+    initLanesPage();
+    const preview = container.querySelector<HTMLElement>('[data-lanes-preview]')!;
+
+    // Initial preview is the placeholder shape (no values yet)
+    expect(preview.textContent).toMatch(/^\/deskwork:lane create <id>/);
+
+    const idInput = container.querySelector<HTMLInputElement>('[data-lanes-field="id"]')!;
+    idInput.value = 'mockups';
+    idInput.dispatchEvent(inputEvent());
+    expect(preview.textContent).toContain('/deskwork:lane create mockups');
+
+    const select = container.querySelector<HTMLSelectElement>('[data-lanes-field="template"]')!;
+    select.value = 'visual';
+    select.dispatchEvent(changeEvent());
+    expect(preview.textContent).toContain('--template visual');
+
+    const contentDir = container.querySelector<HTMLInputElement>('[data-lanes-field="contentDir"]')!;
+    contentDir.value = 'mockups';
+    contentDir.dispatchEvent(inputEvent());
+    expect(preview.textContent).toContain('--content-dir mockups');
+
+    // Optional name appears only when filled
+    expect(preview.textContent).not.toContain('--name');
+    const name = container.querySelector<HTMLInputElement>('[data-lanes-field="name"]')!;
+    name.value = 'Mockup Lane';
+    name.dispatchEvent(inputEvent());
+    expect(preview.textContent).toContain('--name "Mockup Lane"');
+  });
+
+  it('New form: copy button writes the assembled slash command to the clipboard', async () => {
+    const container = buildContainer();
+    const form = buildNewForm(container, ['editorial', 'visual']);
+    const { calls } = installClipboardStub();
+    initLanesPage();
+
+    (container.querySelector<HTMLInputElement>('[data-lanes-field="id"]')!).value = 'mockups';
+    (container.querySelector<HTMLSelectElement>('[data-lanes-field="template"]')!).value = 'visual';
+    (container.querySelector<HTMLInputElement>('[data-lanes-field="contentDir"]')!).value = 'mockups';
+
+    const copy = form.querySelector<HTMLButtonElement>('[data-lanes-copy-button="new"]')!;
+    copy.click();
+    // Allow the async copyAndFlash to flush.
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(calls.length).toBe(1);
+    expect(calls[0]).toContain('/deskwork:lane create mockups --template visual --content-dir mockups');
+  });
+
+  it('Edit form: only changed fields appear in the update command', () => {
+    const container = buildContainer();
+    buildEditFormRow(
+      container,
+      'editorial-lane',
+      { name: 'Editorial', template: 'editorial', contentDir: 'docs' },
+      ['editorial', 'visual'],
+    );
+    initLanesPage();
+
+    const preview = container.querySelector<HTMLElement>(
+      '[data-lanes-preview][data-lane-id="editorial-lane"]',
+    )!;
+    // No changes yet → bare update shape
+    expect(preview.textContent).toBe('/deskwork:lane update editorial-lane');
+
+    // Change contentDir only
+    const contentDir = container.querySelector<HTMLInputElement>(
+      '[data-lanes-edit-form][data-lane-id="editorial-lane"] [data-lanes-field="contentDir"]',
+    )!;
+    contentDir.value = 'docs-new';
+    contentDir.dispatchEvent(inputEvent());
+    expect(preview.textContent).toBe(
+      '/deskwork:lane update editorial-lane --content-dir docs-new',
+    );
+
+    // Also change name
+    const name = container.querySelector<HTMLInputElement>(
+      '[data-lanes-edit-form][data-lane-id="editorial-lane"] [data-lanes-field="name"]',
+    )!;
+    name.value = 'Edit Lane';
+    name.dispatchEvent(inputEvent());
+    expect(preview.textContent).toContain('--name "Edit Lane"');
+    expect(preview.textContent).toContain('--content-dir docs-new');
+  });
+
+  it('Edit toggle reveals + hides the hidden edit row + flips aria-expanded', () => {
+    const container = buildContainer();
+    const { toggle, editRow } = buildEditFormRow(
+      container,
+      'editorial-lane',
+      { name: 'Editorial', template: 'editorial', contentDir: 'docs' },
+      ['editorial'],
+    );
+    initLanesPage();
+
+    expect(editRow.hidden).toBe(true);
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+
+    toggle.click();
+    expect(editRow.hidden).toBe(false);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+
+    toggle.click();
+    expect(editRow.hidden).toBe(true);
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('Cancel button hides the edit form + resets the toggle aria state', () => {
+    const container = buildContainer();
+    const { toggle, editRow, form } = buildEditFormRow(
+      container,
+      'editorial-lane',
+      { name: 'Editorial', template: 'editorial', contentDir: 'docs' },
+      ['editorial'],
+    );
+    initLanesPage();
+
+    toggle.click();
+    expect(editRow.hidden).toBe(false);
+
+    const cancel = form.querySelector<HTMLButtonElement>('[data-lane-edit-cancel]')!;
+    cancel.click();
+    expect(editRow.hidden).toBe(true);
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('row Archive button clipboards the slash command from data-copy', async () => {
+    const container = buildContainer();
+    buildEditFormRow(
+      container,
+      'editorial-lane',
+      { name: 'Editorial', template: 'editorial', contentDir: 'docs' },
+      ['editorial'],
+    );
+    const { calls } = installClipboardStub();
+    initLanesPage();
+
+    const archiveBtn = container.querySelector<HTMLButtonElement>('[data-lane-copy]')!;
+    archiveBtn.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(calls.length).toBe(1);
+    expect(calls[0]).toBe('/deskwork:lane archive editorial-lane');
+  });
+});

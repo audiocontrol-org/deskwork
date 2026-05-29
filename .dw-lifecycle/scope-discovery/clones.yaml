@@ -1,4 +1,4 @@
-generated_at: 2026-05-29T00:02:23.242Z
+generated_at: 2026-05-29T01:03:57.568Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -325,14 +325,14 @@ clones:
     lines: 9
     members:
       - packages/core/src/lanes/loader.ts:120:128
-      - packages/core/src/pipelines/loader.ts:163:171
+      - packages/core/src/pipelines/loader.ts:183:191
     disposition: keep-with-reason
     reason: "lanes/loader mirrors pipelines/loader by workplan design: JSON-read+Zod-validate+id-match-filename idiom across two parallel module-shaped readers; extracting a shared helper would couple lane evolution to pipeline evolution"
   - id: b223f2def90d
     lines: 7
     members:
       - packages/core/src/lanes/loader.ts:130:136
-      - packages/core/src/pipelines/loader.ts:173:179
+      - packages/core/src/pipelines/loader.ts:193:199
     disposition: keep-with-reason
     reason: second half of the lanes/loader vs pipelines/loader mirroring (Zod-validate + id-mismatch refusal); same rationale as c20b4e4f0469
   - id: 93e1ae2c9a27
@@ -345,8 +345,8 @@ clones:
   - id: b1fd648407e9
     lines: 10
     members:
-      - packages/core/src/pipelines/operations/update.ts:284:293
-      - packages/core/src/pipelines/operations/update.ts:307:316
+      - packages/core/src/pipelines/operations/update.ts:301:310
+      - packages/core/src/pipelines/operations/update.ts:324:333
     disposition: keep-with-reason
     reason: "Phase 6 Task 6.2: in-file similarity between applySetLocked and applySetOffPipeline — both validate each comma-separated stage against linearStages with mirror invariants. Collapsing into a shared helper would obscure the asymmetry (set-locked enforces subset, set-off-pipeline enforces disjoint) that matters at the error-message level."
   - id: 68e3966349bd
@@ -440,6 +440,13 @@ clones:
       - packages/studio/src/pages/content.ts:347:352
     disposition: pending
     reason: null
+  - id: ae309588f08f
+    lines: 7
+    members:
+      - packages/studio/src/pages/dashboard.ts:37:43
+      - packages/studio/src/pages/lanes.ts:36:42
+    disposition: keep-with-reason
+    reason: Canonical studio page-shell imports — every page using the masthead+folio scaffold needs this exact set; extracting would be a useless re-export
   - id: a1cac4b2512f
     lines: 15
     members:
@@ -550,36 +557,36 @@ clones:
   - id: d6093f110268
     lines: 10
     members:
-      - packages/studio/src/server.ts:386:395
-      - packages/studio/src/server.ts:395:404
+      - packages/studio/src/server.ts:394:403
+      - packages/studio/src/server.ts:403:412
     disposition: pending
     reason: null
   - id: 14579dae3bdf
     lines: 20
     members:
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:113:125
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:145:164
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:114:126
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:146:165
     disposition: pending
     reason: null
   - id: 8a46fe453209
     lines: 17
     members:
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:114:125
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:478:494
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:115:126
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:479:495
     disposition: pending
     reason: null
   - id: 82d6dc44c67e
     lines: 11
     members:
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:115:125
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:199:209
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:116:126
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:200:210
     disposition: pending
     reason: null
   - id: f0e04e87d0e2
     lines: 7
     members:
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:166:172
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:87:93
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:167:173
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:88:94
     disposition: pending
     reason: null
   - id: 7c1800068cfe

@@ -17,6 +17,7 @@ import { initSwimlaneMobileSheet } from './dashboard/swimlane-mobile-sheet.ts';
 import { initSwimlaneDrag } from './dashboard/swimlane-drag.ts';
 import { initSwimlanePresets } from './dashboard/swimlane-presets.ts';
 import { initMastheadPopover } from './mobile-shell/masthead-popover.ts';
+import { initLanesPage } from './lanes/lanes-page.ts';
 
 function siteFromButton(btn: HTMLButtonElement): string {
   const site = btn.dataset.site;
@@ -534,6 +535,9 @@ function init(): void {
   initSwimlanePresets();
   initRowActions();
   initMastheadPopover();
+  // Phase 6 Task 6.3: lanes-page controller (idempotent — no-op
+  // when [data-lanes-container] is absent on the dashboard).
+  initLanesPage();
 }
 
 init();

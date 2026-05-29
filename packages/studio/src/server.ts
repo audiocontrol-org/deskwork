@@ -44,6 +44,7 @@ import { renderShortformReviewPage } from './pages/shortform-review.ts';
 import { renderEntryReviewPage } from './pages/entry-review.ts';
 import { renderShortformPage } from './pages/shortform.ts';
 import { renderHelpPage } from './pages/help.ts';
+import { renderLanesPage } from './pages/lanes.ts';
 import { renderScrapbookPage, ScrapbookPageError } from './pages/scrapbook.ts';
 import {
   renderContentTopLevel,
@@ -256,6 +257,13 @@ export function createApp(ctx: StudioContext): Hono {
     if (overridden !== null) return c.html(overridden);
     return c.html(renderHelpPage(ctx));
   });
+  // Phase 6 Task 6.3: studio lane-management page. Server-renders
+  // the lane registry + a copy-builder New Lane form + per-row
+  // Edit / Archive / Restore / Purge clipboard buttons. The page
+  // never mutates sidecar state — every button copies an equivalent
+  // /deskwork:lane <verb> slash command per THESIS Consequence 2.
+  app.get('/dev/lanes', async (c) => c.html(await renderLanesPage(ctx)));
+  app.get('/dev/lanes/', async (c) => c.html(await renderLanesPage(ctx)));
   app.get('/dev/editorial-review-shortform', (c) =>
     c.html(renderShortformPage(ctx)),
   );
