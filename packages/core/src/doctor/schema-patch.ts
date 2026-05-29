@@ -46,9 +46,9 @@ export const collections = { blog };
 \`\`\`
 
 The \`deskwork\` block is optional so legacy files without it keep
-validating; deskwork sets it on every new scaffold and via
-\`deskwork doctor --fix=missing-frontmatter-id\` /
-\`--fix=legacy-top-level-id-migration\`. The inner \`.passthrough()\`
+validating; deskwork sets it on every new scaffold, at
+\`deskwork ingest --apply\` time, and via
+\`deskwork doctor --fix=legacy-top-level-id-migration\`. The inner \`.passthrough()\`
 leaves room for additional deskwork-scoped fields without forcing a
 schema change every release.
 

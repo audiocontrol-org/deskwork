@@ -323,7 +323,7 @@ To migrate:
 
 ```
 /deskwork:customize templates dashboard      # re-skin the dashboard
-/deskwork:customize doctor missing-frontmatter-id   # alter a doctor rule
+/deskwork:customize doctor orphan-frontmatter-id   # alter a doctor rule
 ```
 
 The skill copies the plugin default into `<projectRoot>/.deskwork/<category>/<name>.ts`. Edit that copy. The runtime resolver picks it up automatically — no plugin fork, no rebuild. Overrides survive plugin upgrades because they live in your project, not the plugin cache.

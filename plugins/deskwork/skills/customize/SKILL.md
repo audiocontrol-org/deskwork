@@ -32,7 +32,7 @@ Ask the operator which category they want to customize.
 The `name` is the file basename WITHOUT the `.ts` extension. Common picks:
 
 - Templates: `dashboard`, `content`, `content-project`, `scrapbook`, `review`, `help`.
-- Doctor rules: `missing-frontmatter-id`, `orphan-frontmatter-id`, `duplicate-id`, `slug-collision`, `schema-rejected`, `workflow-stale`, `calendar-uuid-missing`, `legacy-top-level-id-migration`.
+- Doctor rules: `orphan-frontmatter-id`, `duplicate-id`, `slug-collision`, `schema-rejected`, `workflow-stale`, `calendar-uuid-missing`, `legacy-top-level-id-migration`, `legacy-stage-artifact-path`.
 
 If the operator names something that doesn't exist as a built-in, the helper exits with an actionable error listing the available basenames. Re-prompt with one of the listed names.
 

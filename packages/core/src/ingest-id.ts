@@ -9,11 +9,10 @@
  * silently rewrote the source file's frontmatter — breaking the
  * setup → ingest handoff documented in `.claude/CLAUDE.md`.
  *
- * This helper centralizes the read-and-validate step. Two regression
- * shapes live elsewhere (`content-index.ts` for index population,
- * `doctor/rules/missing-frontmatter-id.ts` for candidate filtering);
- * keep this one focused on the "is the UUID present + valid" question
- * the ingest layer needs.
+ * This helper centralizes the read-and-validate step. A sibling
+ * regression shape lives in `content-index.ts` (UUID reads during index
+ * population); keep this one focused on the "is the UUID present +
+ * valid" question the ingest layer needs.
  *
  * Sibling-relative imports per the project convention — `@/` doesn't
  * resolve under tsx at runtime in this package's `src/`, only in tests.

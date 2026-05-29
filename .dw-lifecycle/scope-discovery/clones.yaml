@@ -1,4 +1,4 @@
-generated_at: 2026-05-28T23:33:10.111Z
+generated_at: 2026-05-29T18:10:21.320Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -136,34 +136,27 @@ clones:
       - packages/core/src/calendar.ts:92:101
     disposition: pending
     reason: null
-  - id: "800396267262"
+  - id: db7dfc711fad
     lines: 28
     members:
       - packages/core/src/content-index.ts:120:147
-      - packages/core/src/doctor/rules/missing-frontmatter-id.ts:62:94
+      - packages/core/src/doctor/rules/legacy-top-level-id-migration.ts:67:94
     disposition: pending
     reason: null
   - id: aba391647f70
     lines: 19
     members:
-      - packages/core/src/doctor/repair.ts:22:40
-      - packages/core/src/doctor/validate.ts:170:198
+      - packages/core/src/doctor/repair.ts:24:42
+      - packages/core/src/doctor/validate.ts:179:207
     disposition: pending
     reason: null
-  - id: 2b7d648d9381
+  - id: ab480e7452f8
     lines: 14
     members:
       - packages/core/src/doctor/rules/calendar-uuid-missing.ts:155:168
-      - packages/core/src/doctor/rules/missing-frontmatter-id.ts:282:295
+      - packages/core/src/doctor/rules/duplicate-id.ts:115:128
       - packages/core/src/doctor/rules/orphan-frontmatter-id.ts:95:108
       - packages/core/src/doctor/rules/workflow-stale.ts:103:116
-    disposition: pending
-    reason: null
-  - id: 6ce82987b6bb
-    lines: 15
-    members:
-      - packages/core/src/doctor/rules/duplicate-id.ts:114:128
-      - packages/core/src/doctor/rules/missing-frontmatter-id.ts:281:116
     disposition: pending
     reason: null
   - id: 2d803bd758f4
@@ -173,10 +166,11 @@ clones:
       - packages/core/src/doctor/rules/orphan-frontmatter-id.ts:39:54
     disposition: pending
     reason: null
-  - id: 2ccdcd76762f
+  - id: 481cc645cc12
     lines: 15
     members:
       - packages/core/src/doctor/rules/legacy-stage-artifact-path.ts:208:222
+      - packages/core/src/doctor/rules/legacy-top-level-id-migration.ts:218:232
       - packages/core/src/doctor/rules/workflow-stale.ts:103:116
     disposition: pending
     reason: null
@@ -187,38 +181,17 @@ clones:
       - packages/core/src/entry/snapshot.ts:62:79
     disposition: pending
     reason: null
-  - id: 18718b4e0ad7
-    lines: 16
-    members:
-      - packages/core/src/doctor/rules/legacy-top-level-id-migration.ts:218:233
-      - packages/core/src/doctor/rules/workflow-stale.ts:103:296
-    disposition: pending
-    reason: null
-  - id: 98a17ac7f3a7
-    lines: 26
-    members:
-      - packages/core/src/doctor/rules/legacy-top-level-id-migration.ts:64:89
-      - packages/core/src/doctor/rules/missing-frontmatter-id.ts:59:84
-    disposition: pending
-    reason: null
-  - id: 8b1f12469501
-    lines: 13
-    members:
-      - packages/core/src/doctor/rules/legacy-top-level-id-migration.ts:89:101
-      - packages/core/src/doctor/rules/missing-frontmatter-id.ts:84:96
-    disposition: pending
-    reason: null
   - id: 189be54baaa8
     lines: 9
     members:
-      - packages/core/src/doctor/runner.ts:180:188
-      - packages/core/src/doctor/runner.ts:207:215
+      - packages/core/src/doctor/runner.ts:177:185
+      - packages/core/src/doctor/runner.ts:204:212
     disposition: pending
     reason: null
   - id: 41b3f9fce647
     lines: 8
     members:
-      - packages/core/src/doctor/validate.ts:148:155
+      - packages/core/src/doctor/validate.ts:157:164
       - packages/core/src/doctor/validate.ts:44:51
     disposition: pending
     reason: null
@@ -523,7 +496,7 @@ clones:
     lines: 11
     members:
       - plugins/dw-lifecycle/src/__tests__/scope-discovery/util/check-deprecations-harness.ts:10:20
-      - plugins/dw-lifecycle/src/__tests__/scope-discovery/util/detector-harness.ts:22:36
+      - plugins/dw-lifecycle/src/__tests__/scope-discovery/util/detector-harness.ts:22:40
     disposition: pending
     reason: null
   - id: 94802334249e

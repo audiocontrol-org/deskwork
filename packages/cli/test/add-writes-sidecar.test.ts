@@ -145,11 +145,13 @@ describe('deskwork add writes entry-centric sidecar (Issue #184)', () => {
   });
 
   it('after add, doctor --check reports zero calendar-sidecar drift', () => {
-    // `add` legitimately leaves doctor with `missing-frontmatter-id` +
-    // `file-presence` findings (the entry isn't bound to a file until
-    // the operator runs the next lifecycle step). Those are out of
-    // scope for #184 — assert only that calendar-sidecar drift is not
-    // present (the specific bug we fixed).
+    // `add` legitimately leaves doctor with `file-presence` findings
+    // (the entry has no scaffolded artifact until the operator runs the
+    // next lifecycle step). The unbound-entry case is no longer flagged
+    // — Phase 30 made sidecars the source-of-truth and retired the
+    // missing-frontmatter-id rule (Issue #219). Those are out of scope
+    // for #184 — assert only that calendar-sidecar drift is not present
+    // (the specific bug we fixed).
     const r1 = run('add', [project, 'First idea']);
     expect(r1.code).toBe(0);
     const r2 = run('add', [project, 'Second idea', 'with description']);

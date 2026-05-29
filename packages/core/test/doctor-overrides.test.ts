@@ -6,6 +6,10 @@
  * automatically; basename collisions with built-in rules let the
  * project rule REPLACE the built-in.
  *
+ * The override example targets `orphan-frontmatter-id` (a surviving
+ * bundled rule). The mechanism under test is override resolution by
+ * basename, not the specific rule.
+ *
  * These tests work at the unit level — they exercise `loadProjectRules`
  * and `mergeRules` directly, plus an end-to-end `runAudit` invocation
  * against a fixture project that ships a project rule. Avoiding the
@@ -81,12 +85,12 @@ export default rule;
 
 const OVERRIDE_RULE_SRC = `
 const rule = {
-  id: 'missing-frontmatter-id',
-  label: 'Override of missing-frontmatter-id',
+  id: 'orphan-frontmatter-id',
+  label: 'Override of orphan-frontmatter-id',
   async audit(ctx) {
     return [
       {
-        ruleId: 'missing-frontmatter-id',
+        ruleId: 'orphan-frontmatter-id',
         site: ctx.site,
         severity: 'warning',
         message: 'OVERRIDE_FIRED',
@@ -167,7 +171,7 @@ describe('doctor — project rules', () => {
       },
     };
     const overrideRule: DoctorRule = {
-      id: 'missing-frontmatter-id',
+      id: 'orphan-frontmatter-id',
       label: 'overridden',
       async audit(): Promise<Finding[]> {
         return [];
@@ -186,14 +190,14 @@ describe('doctor — project rules', () => {
         rule: projectOnly,
       },
       {
-        basename: 'missing-frontmatter-id',
+        basename: 'orphan-frontmatter-id',
         path: '/dev/null',
         rule: overrideRule,
       },
     ]);
     // Override replaces the built-in at the SAME index — no append.
     const builtInIdx = RULES.findIndex(
-      (r) => r.id === 'missing-frontmatter-id',
+      (r) => r.id === 'orphan-frontmatter-id',
     );
     expect(merged[builtInIdx].label).toBe('overridden');
     // New rule appended.
@@ -226,7 +230,7 @@ describe('doctor — project rules', () => {
     const ruleDir = join(root, '.deskwork', 'doctor');
     mkdirSync(ruleDir, { recursive: true });
     writeFileSync(
-      join(ruleDir, 'missing-frontmatter-id.ts'),
+      join(ruleDir, 'orphan-frontmatter-id.ts'),
       OVERRIDE_RULE_SRC,
       'utf-8',
     );
@@ -238,7 +242,7 @@ describe('doctor — project rules', () => {
 
     // The override fires for the seeded site, producing OVERRIDE_FIRED.
     const overrideFindings = report.findings.filter(
-      (f) => f.ruleId === 'missing-frontmatter-id',
+      (f) => f.ruleId === 'orphan-frontmatter-id',
     );
     expect(overrideFindings.length).toBe(1);
     expect(overrideFindings[0].message).toBe('OVERRIDE_FIRED');

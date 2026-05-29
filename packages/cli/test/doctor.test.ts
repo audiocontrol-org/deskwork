@@ -6,7 +6,7 @@
  *   - --fix=<rule> --yes (or interactive equivalent) repairs where
  *     the rule has a real auto-repair, or skips with a clear message
  *     when the rule defers to the operator (slug-collision,
- *     ambiguous missing-frontmatter-id, etc.)
+ *     orphan-frontmatter-id, etc.)
  *   - re-audit on the post-repair state expects no findings; exit 0
  *
  * Tests use the real `deskwork` CLI binary against tmp project trees
@@ -116,11 +116,11 @@ function slugify(title: string): string {
  * `docs/<slug>/scrapbook/idea.md` (satisfies `file-presence`) and an
  * `artifactPath` written into the sidecar (satisfies `missing-artifact-path`).
  *
- * Tests in this file exercise legacy validators (missing-frontmatter-id,
- * legacy-top-level-id-migration, the exit-code matrix); both Phase 30
- * entry-centric validators are orthogonal to those concerns and these
- * stubs keep them quiet. Tests that DO want to exercise the entry-centric
- * validators call `run('add', ...)` directly.
+ * Tests in this file exercise legacy validators (legacy-top-level-id-
+ * migration, the exit-code matrix); both Phase 30 entry-centric
+ * validators are orthogonal to those concerns and these stubs keep them
+ * quiet. Tests that DO want to exercise the entry-centric validators
+ * call `run('add', ...)` directly.
  */
 function addWithIdeaStub(args: string[]): RunResult {
   const result = run('add', args);
@@ -201,89 +201,6 @@ describe('deskwork doctor — healthy fixture', () => {
     expect(out.mode).toBe('audit');
     expect(out.findings).toEqual([]);
     expect(out.sites).toEqual(['main']);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// missing-frontmatter-id
-// ---------------------------------------------------------------------------
-
-describe('deskwork doctor — missing-frontmatter-id', () => {
-  it('reports findings when calendar has an entry but no file carries the id', () => {
-    // Add a calendar entry, then create a file at the slug-template path
-    // WITHOUT an `id:` so it's a candidate but not yet bound.
-    addWithIdeaStub([project, 'My Post']);
-    writeContent(
-      'my-post/index.md',
-      '---\ntitle: My Post\n---\n\n# My Post\n',
-    );
-
-    const audit = run('doctor', [project]);
-    expect(audit.code).toBe(1);
-    expect(audit.stdout).toMatch(/missing-frontmatter-id/);
-  });
-
-  it('--fix=missing-frontmatter-id --yes binds the id when there is exactly one candidate', () => {
-    addWithIdeaStub([project, 'Single Candidate']);
-    writeContent(
-      'single-candidate/index.md',
-      '---\ntitle: Single Candidate\n---\n\n# Single\n',
-    );
-
-    const fix = run('doctor', [project, '--fix=missing-frontmatter-id', '--yes']);
-    expect(fix.code).toBe(0);
-    expect(fix.stdout).toMatch(/applied/);
-
-    // File now carries the calendar's id under `deskwork.id` (Issue #38).
-    const cal = readCalendarFile();
-    const entry = cal.entries.find((e) => e.slug === 'single-candidate');
-    expect(entry).toBeDefined();
-    if (!entry) return;
-    expect(deskworkIdOf('single-candidate/index.md')).toBe(entry.id);
-    // Top-level `id:` MUST NOT have been written — that keyspace is
-    // the operator's, not deskwork's.
-    expect(frontmatterOf('single-candidate/index.md').id).toBeUndefined();
-
-    // Re-audit: no findings.
-    const reaudit = run('doctor', [project]);
-    expect(reaudit.code).toBe(0);
-  });
-
-  it('--fix=... --yes skips when multiple candidates exist (ambiguous)', () => {
-    addWithIdeaStub([project, 'Ambiguous']);
-    // Two candidate files: one at the slug-template path, one with a
-    // matching title elsewhere.
-    writeContent(
-      'ambiguous/index.md',
-      '---\ntitle: Ambiguous\n---\n\n# A\n',
-    );
-    writeContent(
-      'other/duplicate-title.md',
-      '---\ntitle: Ambiguous\n---\n\n# B\n',
-    );
-
-    const fix = run('doctor', [project, '--fix=missing-frontmatter-id', '--yes']);
-    // exit code is 1 because the finding wasn't repaired (skipped).
-    expect(fix.code).toBe(1);
-    expect(fix.stdout).toMatch(/skipped/i);
-
-    // Neither file got a deskwork.id written.
-    expect(deskworkIdOf('ambiguous/index.md')).toBeUndefined();
-    expect(deskworkIdOf('other/duplicate-title.md')).toBeUndefined();
-  });
-
-  it('reports zero candidates explicitly when no matching file exists, exits 0 (Issue #44 — prerequisite-missing is not a real follow-up)', () => {
-    addWithIdeaStub([project, 'Detached Entry']);
-    // No file at all under contentDir. (The stub idea.md lives outside
-    // contentDir so missing-frontmatter-id still finds zero candidates.)
-
-    const fix = run('doctor', [project, '--fix=missing-frontmatter-id', '--yes']);
-    // Issue #44: prerequisite-missing skips do not warrant exit 1 in
-    // --fix mode — there's nothing for doctor to do until the operator
-    // runs /deskwork:outline. The skip is informational, not blocking.
-    expect(fix.code).toBe(0);
-    expect(fix.stdout).toMatch(/no candidate file/);
-    expect(fix.stdout).toMatch(/prerequisite-missing/);
   });
 });
 
@@ -617,9 +534,9 @@ describe('deskwork doctor — calendar-uuid-missing', () => {
     expect(entry?.id?.length).toBeGreaterThan(0);
 
     // Re-audit just this rule — the now-bound calendar still has no
-    // frontmatter file for the row, which is a separate rule's
-    // concern (missing-frontmatter-id), so a global re-audit would
-    // still report. Scope to this rule for the clean assertion.
+    // scaffolded artifact for the row, which is a separate validator's
+    // concern (file-presence), so a global re-audit would still report.
+    // Scope to this rule for the clean assertion.
     const reaudit = run('doctor', [project, '--json']);
     const reauditJson = reaudit.json as { findings: Array<{ ruleId: string }> };
     const uuidFindings = reauditJson.findings.filter(
@@ -799,10 +716,11 @@ describe('deskwork doctor — flag handling', () => {
 
 describe('deskwork doctor — exit-code matrix (Issue #44)', () => {
   it('audit on findings: exit 1 (unchanged)', () => {
-    addWithIdeaStub([project, 'Audit Findings']);
+    // An orphan file (deskwork.id with no calendar match) is a
+    // finding → audit exits 1.
     writeContent(
       'audit-findings/index.md',
-      '---\ntitle: Audit Findings\n---\n\n# A\n',
+      `---\ndeskwork:\n  id: ${ID_C}\ntitle: Audit Findings\n---\n\n# A\n`,
     );
     const res = run('doctor', [project]);
     expect(res.code).toBe(1);
@@ -814,66 +732,38 @@ describe('deskwork doctor — exit-code matrix (Issue #44)', () => {
   });
 
   it('--fix with all-applied: exit 0', () => {
+    // legacy-top-level-id-migration produces an `apply` plan: a file
+    // with a legacy top-level `id:` matching a calendar UUID migrates
+    // to deskwork.id. All-applied → exit 0.
     addWithIdeaStub([project, 'All Applied']);
+    const cal = readCalendarFile();
+    const entry = cal.entries.find((e) => e.slug === 'all-applied');
+    expect(entry).toBeDefined();
+    if (!entry) return;
     writeContent(
       'all-applied/index.md',
-      '---\ntitle: All Applied\n---\n\n# AA\n',
+      `---\nid: ${entry.id}\ntitle: All Applied\n---\n\n# AA\n`,
     );
     const res = run('doctor', [
       project,
-      '--fix=missing-frontmatter-id',
+      '--fix=legacy-top-level-id-migration',
       '--yes',
     ]);
     expect(res.code).toBe(0);
     expect(res.stdout).toMatch(/applied/);
-  });
-
-  it('--fix with all-skipped-prerequisite: exit 0 (NEW behavior)', () => {
-    // Calendar entry with no body file → prerequisite-missing → exit 0.
-    addWithIdeaStub([project, 'Skip Pre One']);
-    addWithIdeaStub([project, 'Skip Pre Two']);
-    const res = run('doctor', [
-      project,
-      '--fix=missing-frontmatter-id',
-      '--yes',
-    ]);
-    expect(res.code).toBe(0);
-    expect(res.stdout).toMatch(/prerequisite-missing/);
-  });
-
-  it('--fix with mixed applied + prerequisite-skipped: exit 0 (NEW behavior)', () => {
-    // One entry has a body file (will be applied); one doesn't (will
-    // be skipped as prerequisite-missing). Mixed run still exits 0.
-    addWithIdeaStub([project, 'Has Body']);
-    writeContent(
-      'has-body/index.md',
-      '---\ntitle: Has Body\n---\n\n# B\n',
-    );
-    addWithIdeaStub([project, 'No Body']);
-    const res = run('doctor', [
-      project,
-      '--fix=missing-frontmatter-id',
-      '--yes',
-    ]);
-    expect(res.code).toBe(0);
-    expect(res.stdout).toMatch(/applied/);
-    expect(res.stdout).toMatch(/prerequisite-missing/);
   });
 
   it('--fix with ambiguous case: exit 1 (operator must resolve)', () => {
-    // Two candidate files for the same entry → ambiguous → exit 1.
-    addWithIdeaStub([project, 'Ambiguous Case']);
+    // orphan-frontmatter-id emits a `prompt` plan (leave-as-is vs
+    // clear-id). `--yes` can't choose without a UI, so it skips with
+    // skipReason 'ambiguous' → a real follow-up → exit 1.
     writeContent(
-      'ambiguous-case/index.md',
-      '---\ntitle: Ambiguous Case\n---\n\n# A\n',
-    );
-    writeContent(
-      'other/dup.md',
-      '---\ntitle: Ambiguous Case\n---\n\n# B\n',
+      'orphan/index.md',
+      `---\ndeskwork:\n  id: ${ID_A}\ntitle: Orphan\n---\n\n# O\n`,
     );
     const res = run('doctor', [
       project,
-      '--fix=missing-frontmatter-id',
+      '--fix=orphan-frontmatter-id',
       '--yes',
     ]);
     expect(res.code).toBe(1);
@@ -922,41 +812,74 @@ describe('deskwork doctor — exit-code matrix (Issue #44)', () => {
   });
 
   it('JSON output includes skipReason field (Issue #44)', () => {
-    addWithIdeaStub([project, 'For Json']);
+    // slug-collision skips with skipReason 'editorial-decision' — the
+    // JSON repair record carries the skipReason field through.
+    const calendarPath = join(project, 'docs/calendar.md');
+    const calendar = parseCalendar(readFileSync(calendarPath, 'utf-8'));
+    calendar.entries.push(
+      {
+        id: '88888888-8888-4888-8888-888888888881',
+        slug: 'json-collide',
+        title: 'A',
+        description: '',
+        stage: 'Ideas',
+        targetKeywords: [],
+        source: 'manual',
+      },
+      {
+        id: '88888888-8888-4888-8888-888888888882',
+        slug: 'json-collide',
+        title: 'B',
+        description: '',
+        stage: 'Ideas',
+        targetKeywords: [],
+        source: 'manual',
+      },
+    );
+    writeCalendar(calendarPath, calendar);
     const res = run('doctor', [
       project,
-      '--fix=missing-frontmatter-id',
+      '--fix=slug-collision',
       '--yes',
       '--json',
     ]);
-    expect(res.code).toBe(0);
+    expect(res.code).toBe(1);
     const out = res.json as {
       repairs: Array<{ skipReason?: string; ruleId: string }>;
     };
     expect(out.repairs.length).toBeGreaterThan(0);
-    const r = out.repairs.find((x) => x.ruleId === 'missing-frontmatter-id');
+    const r = out.repairs.find((x) => x.ruleId === 'slug-collision');
     expect(r).toBeDefined();
-    expect(r?.skipReason).toBe('prerequisite-missing');
+    expect(r?.skipReason).toBe('editorial-decision');
   });
 
   it('grouped output prints applied/skipped subgroups (Issue #44)', () => {
+    // Two rules in one `--fix=all` run produce both an applied subgroup
+    // (legacy-top-level-id-migration migrates a legacy top-level id) and
+    // a skipped subgroup (orphan-frontmatter-id can't auto-resolve under
+    // --yes → ambiguous). The grouped output prints a per-rule header
+    // line followed by indented `applied:` / `skipped (...):` lists.
     addWithIdeaStub([project, 'Grouped Applied']);
+    const cal = readCalendarFile();
+    const migrateEntry = cal.entries.find((e) => e.slug === 'grouped-applied');
+    expect(migrateEntry).toBeDefined();
+    if (!migrateEntry) return;
     writeContent(
       'grouped-applied/index.md',
-      '---\ntitle: Grouped Applied\n---\n\n# G\n',
+      `---\nid: ${migrateEntry.id}\ntitle: Grouped Applied\n---\n\n# G\n`,
     );
-    addWithIdeaStub([project, 'Grouped Skipped']);
-    const res = run('doctor', [
-      project,
-      '--fix=missing-frontmatter-id',
-      '--yes',
-    ]);
-    expect(res.code).toBe(0);
-    // The grouped output format puts the rule name on its own
-    // header line followed by indented `applied:` / `skipped (...):`
-    // bullet lists.
-    expect(res.stdout).toMatch(/missing-frontmatter-id: \d+ applied, \d+ skipped/);
+    writeContent(
+      'grouped-orphan/index.md',
+      `---\ndeskwork:\n  id: ${ID_B}\ntitle: Grouped Orphan\n---\n\n# O\n`,
+    );
+    const res = run('doctor', [project, '--fix=all', '--yes']);
+    // Mixed run: an applied migration + a skipped (ambiguous) orphan →
+    // a real follow-up exists → exit 1.
+    expect(res.code).toBe(1);
+    expect(res.stdout).toMatch(
+      /legacy-top-level-id-migration: \d+ applied, \d+ skipped/,
+    );
     expect(res.stdout).toMatch(/applied:/);
-    expect(res.stdout).toMatch(/skipped \(prerequisite-missing\):/);
+    expect(res.stdout).toMatch(/skipped \(ambiguous\):/);
   });
 });
