@@ -1,0 +1,67 @@
+name: Publish to npm
+
+# Auto-publishes @deskwork/{core,cli,studio} to npm when a v* tag lands on
+# origin. Uses npm's Trusted Publisher (OIDC) flow — no NPM_TOKEN secret.
+# Each @deskwork/* package on npmjs.com has a Trusted Publisher entry
+# pointing at this workflow file's path; that entry plus the
+# `id-token: write` permission below is what authorizes the publish.
+#
+# The /release skill's atomic-push step is the operator's approval moment
+# (the tag IS the trigger). `make publish` stays as a documented manual
+# fallback for outages or one-off out-of-band publishes; see RELEASING.md
+# § "Recovery — CI is broken".
+#
+# Per the project rule (.claude/rules/agent-discipline.md § "No test
+# infrastructure in CI"), this workflow ONLY runs the release-blocking
+# gates (publish → assert-published → marketplace smoke). It is NOT a
+# stand-in for the per-package vitest suite, which the operator runs
+# locally as part of /release.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install workspaces
+        run: npm ci
+
+      # No standalone build step here on purpose. `npm publish` invokes
+      # each package's `prepack` script automatically (per-package: tsc
+      # build + auxiliary file copies + chmod on bin entries), and the
+      # `prepack` script in every packages/<pkg>/package.json is the
+      # authoritative build for that package. A separate `npm run build`
+      # step would duplicate that work AND create a drift surface — if
+      # build and prepack diverge, the published artifact is ambiguous.
+      # The root build also runs scripts/link-workspace-bins.sh, which is
+      # for local test spawn of node_modules/.bin/deskwork; npm publish
+      # does not read those symlinks (it consumes each package's own
+      # `bin` field), so the symlink side effect is not needed pre-publish.
+      - name: Publish all @deskwork packages (OIDC, dep-ordered)
+        run: make publish-ci
+        env:
+          NPM_CONFIG_PROVENANCE: 'true'
+
+      - name: Extract version from tag
+        id: ver
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Assert all three packages published
+        run: npx tsx .claude/skills/release/lib/release-helpers.ts assert-published "${{ steps.ver.outputs.version }}"
+
+      - name: Marketplace smoke
+        run: bash scripts/smoke-marketplace.sh

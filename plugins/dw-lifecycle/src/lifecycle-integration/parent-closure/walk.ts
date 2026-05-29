@@ -133,10 +133,16 @@ export function parentTimeline(
   args: ParentTimelineArgs,
 ): readonly RawIssueForSearch[] {
   // Use `gh api --paginate` so we walk every page; the timeline can carry
-  // hundreds of events on long-running features.
+  // hundreds of events on long-running features. The repo is interpolated
+  // directly into the URL path -- `gh api` doesn't accept a `--repo` flag
+  // (that flag is for `gh issue` / `gh pr`), and `gh api` won't substitute
+  // `{owner}/{repo}` placeholders the way some other gh subcommands do.
+  // Both bugs surfaced in #342: literal placeholders in the URL +
+  // `--repo` flag together produced a `gh api: unknown flag` failure that
+  // aborted the walker before the recovery contract could engage.
   const ghArgs: readonly string[] = [
     'api',
-    `/repos/{owner}/{repo}/issues/${args.parentIssue}/timeline`,
+    `/repos/${args.repo}/issues/${args.parentIssue}/timeline`,
     '--paginate',
     '-H',
     'Accept: application/vnd.github+json',
@@ -145,29 +151,43 @@ export function parentTimeline(
   // wrapping them into a single array. Each page is a self-contained JSON
   // array on its own line(s). Split on the boundary `][` (a closing bracket
   // followed by an opening bracket) and re-wrap to parse as one stream.
+  //
+  // The recovery contract: ANY failure from `runGh` (404 on archived repos,
+  // CLI usage error from a flag mismatch, network failure, malformed JSON
+  // pagination, etc.) collapses to "this source contributed zero
+  // candidates." The walker depends on the union of the three sources, not
+  // on every source succeeding. A one-line stderr breadcrumb names the
+  // failure mode so the operator can tell silent backfill apart from a
+  // genuinely-empty timeline; the diagnostic pattern mirrors
+  // session-end-hygiene.ts's resolveSessionBoundaryIso error handling.
   let raw: string;
   try {
-    raw = args.runGh([...ghArgs, '--repo', args.repo]);
+    raw = args.runGh(ghArgs);
   } catch (err) {
-    // The timeline endpoint can fail (404 on archived repos, etc.). Treat
-    // failures as "this source contributed zero candidates" -- the walker
-    // depends on the union of the three sources, not on every source
-    // succeeding.
     const message = err instanceof Error ? err.message : String(err);
-    if (/HTTP 404/i.test(message) || /not found/i.test(message)) {
-      return [];
-    }
-    throw err;
+    console.error(
+      `complete-parent-closure: timeline source failed (${message.split('\n')[0]}); continuing with other sources`,
+    );
+    return [];
   }
   if (raw.trim() === '') return [];
   const concatenated = raw.replace(/\]\s*\[/g, ',');
   let parsed: unknown;
   try {
     parsed = JSON.parse(concatenated);
-  } catch {
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(
+      `complete-parent-closure: timeline source failed (json-parse: ${message.split('\n')[0]}); continuing with other sources`,
+    );
     return [];
   }
-  if (!Array.isArray(parsed)) return [];
+  if (!Array.isArray(parsed)) {
+    console.error(
+      'complete-parent-closure: timeline source failed (response was not a JSON array); continuing with other sources',
+    );
+    return [];
+  }
   const refs: RawIssueForSearch[] = [];
   for (const event of parsed) {
     if (!isPlainObject(event)) continue;

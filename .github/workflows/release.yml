@@ -5,12 +5,19 @@ name: release
 # page on GitHub is the consumer-facing record of what changed between
 # versions.
 #
-# No tests, no smoke, no marketplace verification. Per the project's
-# `.claude/rules/agent-discipline.md`: "No test infrastructure in CI."
-# The local smoke (`scripts/smoke-marketplace.sh`) is the release-blocking
-# gate; it runs in the operator's `/release` flow before the tag is
-# pushed. CI does not publish to npm — the operator publishes manually
-# via `make publish` from their terminal.
+# Scope: GitHub-release-notes only. This workflow does NOT publish to
+# npm — that authority lives in the sibling workflow
+# `.github/workflows/publish-npm.yml`, which fires on the SAME `v*`
+# tag-push trigger and runs in parallel. publish-npm.yml owns the npm
+# publish (via Trusted Publisher / OIDC), the post-publish
+# `assert-published` registry check, AND the release-blocking marketplace
+# smoke (`scripts/smoke-marketplace.sh`). See `RELEASING.md` §
+# "npm-publish architecture" + § "Trusted Publisher setup".
+#
+# Per the project's `.claude/rules/agent-discipline.md` rule
+# "No test infrastructure in CI", this workflow runs no tests or smoke
+# of its own — the workspace vitest suites are operator-run locally
+# before tagging.
 
 on:
   push:
