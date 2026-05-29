@@ -3277,3 +3277,59 @@ The `dw-lifecycle session-end-hygiene` helper output is noisy due to the #339 sc
 - **#62** needs a UX call (ingest default for no-frontmatter legacy active docs).
 - **Resume (no decision needed):** `/dwi` at **#267** — CLI to enumerate pending annotations; clean self-contained medium.
 - **Note:** #357/#358 are the live review residuals; triage when the calendar/sidecar clusters are picked up.
+
+## 2026-05-29 (cont. 2): Phase 38c — take up the decision cluster, then implement (#219 retired, #267 shipped, #62/#218 resolved)
+
+### Feature: deskwork-plugin
+### Worktree: deskwork-plugin
+
+**Goal:** Resume Phase 38c. Operator chose to "take up the decisions" (the decision-gated 38c clusters) before coding, then `/dwi` to implement the unblocked work.
+
+**Accomplished:**
+
+- **Took all 5 38c decisions** via `AskUserQuestion`, recorded two-track (workplan + per-issue comments): doctor-model → **retire** `missing-frontmatter-id` (#219 opt 3; #65 moot); calendar-surface (#223/#234/#357) + the #218 migration-rule → **defer to graphical-entries #301** (lanes generalize the per-site-vs-entry-centric surface question); #62 + #218 → reconciled (see below).
+- **#219 — retired `missing-frontmatter-id`** (`4b24a9e`). The Phase-30 reversal (sidecars SSOT, markdown downstream) made the rule's "every UUID has matching frontmatter" invariant false (Ideas/Planned unscaffolded + youtube/tool never have artifacts). Deleted rule + de-registered; re-anchored the runner-plumbing tests (issue-#44 skipReason / JSON / grouped-output / exit-code matrix) to surviving rules; dropped 2 `prerequisite-missing` scenarios (no surviving rule produces that disposition); refreshed the clones baseline (a pre-existing 3-way `collectMarkdownFiles` clone → 2-way). Regression `missing-frontmatter-id-retired.test.ts`. Implemented via `typescript-pro` dispatch (wrapper-validated) + TDD.
+- **#267 — new `deskwork annotations` verb** (`90e5d82`). `deskwork annotations <project-root> <slug-or-uuid> [--all] [--json]` — surfaces pending annotations (the gap: `iterate` reported `addressedComments: []` with no way to see them). Thin verb over the existing `listEntryAnnotations` reader; pending = a comment with no `address` disposition (latest-`createdAt`-wins fold, mirroring the studio). Operator-approved verb shape before implementing. TDD + `typescript-pro` dispatch.
+- **`/dw-lifecycle:review` on every production commit** (parallel Track-2 spec + Track-3 code-quality, dispatch-wrapper-validated): #219 → Track-2 PASS, Track-3 1 medium (`reportOnlySkipReason` return-type lie) fixed `7a916ae`; #267 → Track-2 PASS, Track-3 2 test-coverage gaps (latest-wins fold + unknown-flag exit-2) fixed `e515fa4`. Track-1 (controller independent gate) re-run by me each time, not the implementer's reported output. Audit-log `AUDIT-20260529-09/10/11/12`.
+- **#62 + #218 — resolved-in-substance, NO code** (`c6dd2e2`, `646a02a`). Both decisions rested on stale premises that the pre-implementation does-it-already-exist check caught:
+  - #62 ("default-to-Ideas is wrong"): #206 already changed the no-`state` default to **Drafting** (closed + tested); #63 already binds `deskwork.id` on `--apply`. The literal "refuse / require --state" pick would have reverted #206 and broken 4 tests. Operator reconciled → keep #206.
+  - #218 ("legacy→sidecars migration not shipped"): `migrateCalendar` + `detectLegacySchema` exist, are wired into `doctor` via `maybeMigrate` (check + `--fix=all`), and are tested. The "not available" caveat I was about to write would have been **false**. Operator reconciled → resolved-pending-verification, no caveat, per-site gap stays with #301.
+
+**Didn't Work:**
+
+- **Two decision framings I authored were built on stale premises (#62, #218).** Both issues were filed in earlier phases and silently fixed on-branch since. Had I implemented the literal decisions, #62 would have reverted a shipped+tested decision (#206) and #218 would have shipped a false adopter-facing caveat. The pre-task "verify current behavior before acting" check is what caught both.
+
+**Course Corrections:**
+
+- [PROCESS] Self-caught (not operator-driven): framed the #62 AskUserQuestion on a stale "defaults to Ideas" premise. Verified current behavior before implementing → found #206 superseded it → surfaced the conflict and let the operator reconcile rather than silently reverse a prior decision.
+- [PROCESS] Self-caught: the #218 "migration missing" premise was stale (migration exists + wired + tested). Surfaced before writing a false caveat.
+- [PROCESS] The implementer correctly used the project's `<project-root>`-first positional convention for the new verb (matching doctor/approve), which my brief had abbreviated — accepted as correct.
+
+**Quantitative:**
+
+- Operator turns: ~7 (session-start, "take up decisions", "is everything scoped", "approve—do it", two `/dwi`, session-end).
+- Commits this session: 11 (`0dc4d8a`..`e2172b1`; range `29dbdb6..HEAD` shows 12 — one, `87535bf`, predates this session's start within the range).
+- Sub-agent dispatches: 6 — 2 implementers (`typescript-pro`: #219, #267) + 4 reviewers (`feature-dev:code-reviewer`: 2 per task), all dispatch-wrapper-validated.
+- Issues commented (decisions/dispositions): 8 (#357, #234, #223, #219, #65, #218, #62, #267). Issues FILED: 0.
+- Operator corrections: 0 (operator made decisions + approved; both course-corrections were agent-self-caught).
+- Code tasks completed: 2 (#219 retire, #267 verb). No-code dispositions: 2 (#62, #218).
+- Tests: core 538/538, cli 220 passed + 29 pre-existing skips, core+cli `tsc --noEmit` clean.
+
+**Insights:**
+
+- **"Open ≠ code-not-landed" is a confirmed recurring pattern** (3 issues last session: #221/#198/#226; 2 this session: #62/#218). The pre-task does-it-already-exist check is now clearly load-bearing — issues filed in earlier phases get fixed on-branch but keep stale framing in triage notes. Triage-before-implement should be standard for any "old" issue.
+- **The design→decide→implement→review→verify loop earned its cost every time this session.** AskUserQuestion surfaced the decisions; the verify-before-acting check caught two stale premises; the adversarial review caught a type-lie (#219) and two untested invariants (#267). None of those would have surfaced from "just implement the issue."
+- **Surfacing a stale-premise conflict beats silently overriding a prior decision.** Both #62 and #218 had prior shipped decisions (#206, the migrate-gate wiring) that the new decision would have contradicted. Stopping to reconcile with the operator — rather than barreling ahead on the literal instruction — preserved #206's friction-removal and avoided a false caveat.
+
+### Hygiene observations
+
+- **No NEW bare TBD/defer markers introduced this session.** The `session-end-hygiene` helper flagged ~17 markers (workplan lines 488–1920) — ALL pre-existing Phases 12–26 historical prose, unrelated to this session's 38c work (lines ~1895–1925). This is the recurring #361/#340-shaped whole-file-scan scoping bug; the session diff introduced none.
+- **Issues FILED this session: ZERO.** I commented on 8 existing issues (#357/#234/#223/#219/#65/#218/#62/#267) recording decisions/dispositions. The helper's "filed this session" list (#366/#364/#363/#362) is merge-range / same-GitHub-user noise from OTHER branches — the same #361 scoping bug, NOT this session's work.
+- The two decision commits (`0dc4d8a`/`5bb6cd5`) legitimately carry "defer" in their subjects — they record the operator's #301 deferral two-track (workplan + issue comments), not IOUs.
+- All 38c decision residuals tracked two-track (workplan checkboxes + per-issue comments + audit-log AUDIT-09/10/11/12). No code-comment IOUs.
+
+### Next session recommendation (hygiene)
+
+- **Resume:** `/dwi` at **#215** (verify-only — parts landed, issue 2 was #232 which is done; likely closeable-pending-release-verification, cheap), then **#59** (new "remove mistakenly-added entry" subcommand; the verb name/shape is a public CLI contract — propose before implementing, as with #267). After that, 38d (studio quick fixes: #68/#98/#71/#233/#229/#177) opens the studio lane.
+- **Disregard helper noise:** the auto-generated "Resume: install deskwork in audiocontrol.org" and the #366/#364/#363/#362 triage list are #361-scoping-bug artifacts, not this session's actual next steps.
+- **Release-verification queue:** #219, #267, #62, #218 (+ prior #354/#256/#232/#64/#58/#221/#198/#226) are all fixed-pending-release-verification — a `/release` + marketplace walk would let the operator close the accumulated batch.
