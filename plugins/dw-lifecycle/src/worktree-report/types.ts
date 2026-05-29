@@ -93,4 +93,11 @@ export interface WorktreeReportOptions {
   readonly readDir: (path: string) => readonly string[];
   /** filesystem probe — true if path is a directory that exists. */
   readonly statDir: (path: string) => boolean;
+  /**
+   * Optional filesystem probe — true if path exists as anything
+   * (file, dir, symlink, …). Defaults to `statDir`-only; pass a
+   * broader probe to detect `.git` files (worktree .git pointers are
+   * files, not directories).
+   */
+  readonly pathExists?: (path: string) => boolean;
 }

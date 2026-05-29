@@ -3,8 +3,6 @@
 // Wraps runWorktreeReport with flag parsing and process-boundary glue
 // (real git, gh, fs). Pure read; no mutations.
 
-import { execFileSync } from 'node:child_process';
-import { readdirSync, statSync } from 'node:fs';
 import { runWorktreeReport } from '../worktree-report/index.js';
 import {
   formatJson,
@@ -12,6 +10,7 @@ import {
 } from '../worktree-report/index.js';
 import { repoRoot } from '../repo.js';
 import { parsePositiveInt } from './lib/parse-flag-value.js';
+import { buildWorktreeReportOptions } from './lib/build-worktree-opts.js';
 
 export interface WorktreeReportCliOptions {
   json: boolean;
@@ -78,43 +77,6 @@ all non-bare entries in 'git worktree list --porcelain'. Pass
 `);
 }
 
-function runGit(args: readonly string[]): string {
-  try {
-    return execFileSync('git', args as string[], {
-      encoding: 'utf-8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    });
-  } catch {
-    return '';
-  }
-}
-
-function runGh(args: readonly string[]): string {
-  try {
-    return execFileSync('gh', args as string[], {
-      encoding: 'utf-8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    });
-  } catch {
-    return '[]';
-  }
-}
-
-function readDir(path: string): readonly string[] {
-  try {
-    return readdirSync(path);
-  } catch {
-    return [];
-  }
-}
-
-function statDir(path: string): boolean {
-  try {
-    return statSync(path).isDirectory();
-  } catch {
-    return false;
-  }
-}
 
 export async function worktreeReport(args: string[]): Promise<void> {
   let opts: WorktreeReportCliOptions;
@@ -128,18 +90,13 @@ export async function worktreeReport(args: string[]): Promise<void> {
   }
 
   const projectRoot = repoRoot();
-  const report = runWorktreeReport({
+  const report = runWorktreeReport(buildWorktreeReportOptions({
     projectRoot,
     daysThreshold: opts.daysThreshold,
     thresholdCount: opts.thresholdCount,
     ...(opts.worktreeBase !== undefined ? { worktreeBase: opts.worktreeBase } : {}),
     allowExternal: opts.allowExternal,
-    now: new Date(),
-    runGit,
-    runGh,
-    readDir,
-    statDir,
-  });
+  }));
 
   const out = opts.json ? formatJson(report) : formatMarkdown(report);
   process.stdout.write(out);

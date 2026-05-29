@@ -42,6 +42,21 @@ export function findOrphanDirs(
   registeredPaths: ReadonlySet<string>,
   readDir: (path: string) => readonly string[],
   statDir: (path: string) => boolean,
+  /**
+   * Predicate: does the path's `.git` look like an orphaned-worktree
+   * pointer? A linked worktree's `.git` is a FILE (gitdir: pointer
+   * into `.git/worktrees/<name>` of the main repo). A standalone git
+   * repo's `.git` is a DIRECTORY. We want to flag the former when
+   * its pointed-to admin dir is gone (manually-deleted worktree
+   * admin, leaving the path stranded on disk).
+   *
+   * A simpler heuristic the scan layer hands in (when available):
+   * `.git` exists as a file at the path AND `.git/HEAD` does NOT
+   * exist (HEAD lives in the admin dir, so if it's missing the
+   * worktree admin is gone). Sibling project-repos (where `.git` is
+   * a directory) fail the first part of the heuristic.
+   */
+  isOrphanedWorktreePath: (path: string) => boolean = () => false,
 ): string[] {
   if (worktreeBase.length === 0 || !statDir(worktreeBase)) return [];
   let children: readonly string[];
@@ -56,6 +71,7 @@ export function findOrphanDirs(
     if (!statDir(full)) continue;
     if (registeredPaths.has(full)) continue;
     if (child.startsWith('.')) continue;
+    if (!isOrphanedWorktreePath(full)) continue;
     orphans.push(full);
   }
   return orphans;

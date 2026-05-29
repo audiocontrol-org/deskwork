@@ -346,13 +346,13 @@ Operator decisions (locked in during definition):
 
 ### Task 2: Dismantle verb — batched proposal + apply
 
-- [ ] Step 1: Implement `plugins/dw-lifecycle/src/dismantle-worktrees/propose.ts`. Reads the scan output (or re-scans); for each `stale` / `orphan` entry, emits a proposal JSON file at `.dw-lifecycle/dismantle-worktrees-proposal-<ts>.json` with one entry per worktree carrying the recommended disposition + a blank operator-decision field.
-- [ ] Step 2: Implement `plugins/dw-lifecycle/src/dismantle-worktrees/apply.ts`. Reads the proposal file; validates every entry has a `decision` field set; all-or-nothing on validation; per-worktree dismantle is best-effort (records per-entry success/failure; continues with the rest).
-- [ ] Step 3: Implement the dismantle primitive `dismantleWorktree(path, opts)`. Pre-condition checks (current-worktree / main-worktree / dirty / local-only-commits / force-push / external-path / multi-worktree-same-branch). On all-clear, runs `git worktree remove <path>` + (optionally) `git branch -d <branch>`. With `--archive-first`, composes with `:archive-branch` to tag + push first.
-- [ ] Step 4: Wire CLI subcommands `dw-lifecycle dismantle-worktrees propose|apply`.
-- [ ] Step 5: Author `plugins/dw-lifecycle/skills/dismantle-worktrees/SKILL.md`. Mirrors `:triage-issues` SKILL.md structure (propose / fill-in / apply).
-- [ ] Step 6: Substantive-reason validator hookup. Reuse `plugins/dw-lifecycle/src/lib/substantive-reason.ts` for `--allow-dirty --reason` and `--force-discard --reason` overrides.
-- [ ] Step 7: Vitest unit + integration tests. Cover every safety-rail refusal path. Integration tests use isolated tmp git repos with realistic worktree state.
+- [x] Step 1: Implement `plugins/dw-lifecycle/src/dismantle-worktrees/propose.ts`. Reads the scan; filters to `stale` + `orphan` verdicts; emits proposal JSON with one entry per filtered worktree (recommended_disposition pre-filled, `decision` blank).
+- [x] Step 2: Implement `plugins/dw-lifecycle/src/dismantle-worktrees/apply.ts`. Reads the proposal; all-or-nothing validation that every entry has a valid decision; per-worktree best-effort dispatch; partial-failure reporting in `applied`/`skipped`/`failed` buckets.
+- [x] Step 3: Implement `plugins/dw-lifecycle/src/dismantle-worktrees/dismantle.ts` — pre-flight gates + `git worktree remove` + `--archive-first` composition with `:archive-branch`. Order: remove worktree first (frees the branch), then archive (which refuses on checked-out branches). Removed-branch tracking honors the archive path's branch deletion.
+- [x] Step 4: Wire CLI subcommands `dw-lifecycle dismantle-worktrees propose|apply` with all flags (`--days`, `--threshold-count`, `--worktree-base`, `--allow-external`, `--output`, `--force`, `--proposal`, `--allow-dirty`, `--force-discard`, `--accept-divergence`, `--reason`).
+- [x] Step 5: Author `plugins/dw-lifecycle/skills/dismantle-worktrees/SKILL.md` mirroring `:triage-issues` propose / fill-in / apply structure.
+- [x] Step 6: Substantive-reason validator hookup. Reuses `plugins/dw-lifecycle/src/promote-deferrals/substantive-reason.ts`'s `validateSubstantiveReason` for `--allow-dirty` + `--force-discard` overrides.
+- [x] Step 7: Vitest coverage — 14 preflight tests (every refusal path: current/main/external/dirty/local-only/divergence/banned-hedge/short-reason; happy path) + 6 apply tests (validation failures + dispatch routing for skip/prune/dismantle). Live smoke against the operator's worktree-base correctly filters to 5 actual stale candidates (0 false-positive orphans after the `.git`-file-shape signal landed).
 
 ### Task 3: Lifecycle integration
 

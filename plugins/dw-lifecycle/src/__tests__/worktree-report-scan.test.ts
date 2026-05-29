@@ -263,9 +263,16 @@ describe('runWorktreeReport — end-to-end with stubs', () => {
         return [];
       },
       statDir: (path: string) => {
+        // The worktree-base + the orphan dir exist as directories;
+        // the orphan's `.git` is NOT a directory (it's a file pointer).
         if (path === '/Users/x/work') return true;
         if (path === '/Users/x/work/feat-a') return true;
         if (path === '/Users/x/work/orphan-x') return true;
+        return false;
+      },
+      pathExists: (path: string) => {
+        // The orphan dir's `.git` pointer file exists; nothing else.
+        if (path === '/Users/x/work/orphan-x/.git') return true;
         return false;
       },
     });

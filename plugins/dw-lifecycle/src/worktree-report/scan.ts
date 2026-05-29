@@ -258,7 +258,23 @@ export function runWorktreeReport(opts: WorktreeReportOptions): WorktreeReport {
   }
 
   const registeredPaths = new Set(porcelain.map((e) => e.path));
-  for (const orphanPath of findOrphanDirs(worktreeBase, registeredPaths, opts.readDir, opts.statDir)) {
+  // Orphan-worktree detection: a worktree path's `.git` is a FILE
+  // (gitdir: pointer); a standalone git repo's `.git` is a DIRECTORY.
+  // A truly orphaned worktree (admin dir deleted manually) leaves the
+  // `.git` file on disk but no `.git/HEAD` to back it.
+  const isOrphanedWorktreePath = opts.pathExists !== undefined
+    ? (p: string) => {
+        const dotGit = `${p}/.git`;
+        // A worktree's `.git` is always a FILE (gitdir: pointer to
+        // <main>/.git/worktrees/<name>). A standalone git repo's
+        // `.git` is a DIRECTORY. We're already excluding registered
+        // worktrees by the time we get here, so a remaining FILE-shape
+        // `.git` is the orphan signal.
+        if (!opts.pathExists!(dotGit)) return false;
+        return !opts.statDir(dotGit);
+      }
+    : undefined;
+  for (const orphanPath of findOrphanDirs(worktreeBase, registeredPaths, opts.readDir, opts.statDir, isOrphanedWorktreePath)) {
     entries.push(buildOrphanEntry(orphanPath, opts.thresholdCount));
   }
 
