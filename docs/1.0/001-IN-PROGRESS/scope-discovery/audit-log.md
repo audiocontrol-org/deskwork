@@ -572,7 +572,7 @@ Surface:    `plugins/dw-lifecycle/src/scope-discovery/dispatch-grammar.ts`, `plu
 
 Imported from deskwork-plugin TF-003 (`docs/1.0/001-IN-PROGRESS/deskwork-plugin/tooling-feedback.md` on `feature/deskwork-plugin`). Co-tracked with AUDIT-20260529-14 via [#362](https://github.com/audiocontrol-org/deskwork/issues/362).
 
-**Follow-up landed in commit `<NEXT>` (Phase 14 Task 2 review integration):** the Track 2 review surfaced that the GRAMMAR_INSTRUCTION prelude's Gotchas item 3 still showed `renderSwimStub` as a FAIL example after Phase 14 Task 2 relaxed the bare-noun match — agents reading the prelude would falsely believe descriptive `stub` trips. The prelude was rewritten to document context-aware behavior (ambiguous nouns require deferral collocation; bare identifiers pass; comment-marker form `TODO`/`FIXME`/`XXX` still trips). See AUDIT-20260529-16.
+**Follow-up landed in commit `b5c362e` (Phase 14 Task 2 review integration):** the Track 2 review surfaced that the GRAMMAR_INSTRUCTION prelude's Gotchas item 3 still showed `renderSwimStub` as a FAIL example after Phase 14 Task 2 relaxed the bare-noun match — agents reading the prelude would falsely believe descriptive `stub` trips. The prelude was rewritten to document context-aware behavior (ambiguous nouns require deferral collocation; bare identifiers pass; comment-marker form `TODO`/`FIXME`/`XXX` still trips). See AUDIT-20260529-16.
 
 Fix note (commit `8365973`, 2026-05-29; Phase 14 Task 2 — #362 Medium): widened `SEARCHED_COUNT_NOUN_REGEX` to accept `issues?`/`bugs?`/`findings?`/`errors?`/`warnings?`. Restructured forbidden-phrase matching: ambiguous bare nouns (`stub`, `placeholder`, `pending`, `temporary`, `hack`, `defer`, `deferred`, `todo`, `fixme`, `xxx`) removed from `FORBIDDEN_DEFERRAL_PHRASES`; 6 new context-aware regexes added to `FORBIDDEN_DEFERRAL_REGEXES` for (a) ALL-CAPS comment markers (`TODO`/`FIXME`/`XXX` — case-sensitive), (b) ambiguous noun + deferral collocation (`placeholder for now` / `stub until F3`), (c) deferral verb + ambiguous noun, (d) bare `defer to v2` verb action. Unambiguous deferral phrases (`for now`, `will fix`) stay in PHRASES. Grammar-instruction prelude updated to document the expanded whitelist; rejection examples refreshed. 24 new tests at `dispatch-wrapper-grammar.test.ts`; existing TF-008 noun-whitelist test updated; fixtures' `REGEX_SAMPLE_REASONS` extended to keep parallel with the regex list. Awaiting `verified-<date>` after a few live reviewer dispatches exercise the relaxed grammar end-to-end. Pairs with the Light fix in AUDIT-20260529-14 (already landed at `95927f5`).
 
@@ -635,7 +635,7 @@ Per the agent-discipline rule, the 4 actionable findings landed inline in a foll
 ### AUDIT-20260529-16 — GRAMMAR_INSTRUCTION prelude Gotchas item 3 stale after Phase 14 Task 2
 
 Finding-ID: AUDIT-20260529-16
-Status:     fixed-<NEXT>
+Status:     fixed-b5c362e
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper.ts:347-360`
 
@@ -646,7 +646,7 @@ Fix: rewrote item 3 to document context-aware behavior — ambiguous nouns requi
 ### AUDIT-20260529-17 — open-findings-gate version-candidate list is narrower than the rest of the tool
 
 Finding-ID: AUDIT-20260529-17
-Status:     fixed-<NEXT>
+Status:     fixed-b5c362e
 Severity:   high
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/promote-findings/open-findings-gate.ts:66-69`
 
@@ -657,7 +657,7 @@ Fix: replaced the hardcoded candidate list with a `findFeatureRoot` walk that `r
 ### AUDIT-20260529-18 — grammar false-negative: ambiguous-noun + intervening modifier slips deferral detection
 
 Finding-ID: AUDIT-20260529-18
-Status:     fixed-<NEXT>
+Status:     fixed-b5c362e
 Severity:   high
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/dispatch-grammar.ts:144`
 
@@ -668,7 +668,7 @@ Fix: widened the regex to allow `{0,2}` modifier tokens between the noun and the
 ### AUDIT-20260529-19 — grammar false-positive: `defer to <noun phrase>` trips legitimate idioms
 
 Finding-ID: AUDIT-20260529-19
-Status:     fixed-<NEXT>
+Status:     fixed-b5c362e
 Severity:   high
 Surface:    `plugins/dw-lifecycle/src/scope-discovery/dispatch-grammar.ts:148`
 
@@ -679,7 +679,7 @@ Fix: narrowed to require a version (`v\d`), phase (`F\d` / `phase \d`), or `the 
 ### AUDIT-20260529-20 — whitespace-only stdin surfaces as confusing DispatchRejected instead of EmptyStdinError
 
 Finding-ID: AUDIT-20260529-20
-Status:     fixed-<NEXT>
+Status:     fixed-b5c362e
 Severity:   medium
 Surface:    `plugins/dw-lifecycle/src/subcommands/validate-return.ts:62`
 
