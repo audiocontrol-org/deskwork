@@ -132,6 +132,21 @@ Clone gate (`check-clones --gate-mode`): 0 NEW, 1 DROPPED (the deleted `resolveS
 
 ---
 
+## AUDIT-20260529-06 — Phase 11 Task 5 (commit 7b42ed8) — smoke-hygiene worktree-verbs round-trip
+
+Finding-ID: AUDIT-20260529-06
+Status:     verified-2026-05-29
+Severity:   informational
+Surface:    scripts/smoke-hygiene.sh (worktree-section, lines 333–411)
+
+Combined reviewer (feature-dev:code-reviewer, single-pass per the SKILL's small-routine carve-out) verified the smoke extension is technically correct, the assertions are falsifiable, cleanup is leak-free under both default-mktemp and `SMOKE_HYGIENE_TMPDIR` paths, and the new section is stylistically consistent with the pre-existing smoke structure.
+
+The reviewer noted one out-of-scope observation: `feature/smoke-parked` (line 325, in the pre-existing archive-branch section) is left uncleaned. This pre-dates the Phase 11 commit and was correctly excluded from this commit's review scope; if the operator wants the cleanup, file a separate issue against the pre-existing archive-branch section.
+
+Verification: Track 1 was running the smoke script end-to-end (exits `OK`, all ten verb checks pass) + `npm test --workspaces` (1953 / 1953 pass).
+
+---
+
 ## Clone-detector summary
 
 | Run | Detected | NEW | DROPPED | Notes |
