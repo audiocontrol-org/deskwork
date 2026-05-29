@@ -25,7 +25,7 @@ Ships a family of UNIX-style `/dw-lifecycle:*` skills that surface and burn down
 | 8 | Tests + smoke | [#332](https://github.com/audiocontrol-org/deskwork/issues/332) | Shipped on branch (1804 tests pass + scripts/smoke-hygiene.sh) |
 | 9 | Dogfood round | [#333](https://github.com/audiocontrol-org/deskwork/issues/333) | Shipped (v0.26.0 dogfood; 3 stale issues triaged + closed; promote-deferrals false-positive surfaced as [#339](https://github.com/audiocontrol-org/deskwork/issues/339) and fixed in 9086894) |
 | 10 | npm Trusted Publisher CI workflow | [#343](https://github.com/audiocontrol-org/deskwork/issues/343) | Shipped on branch (Tasks 1-4: workflow + publishConfig + /release skill update + RELEASING.md; Task 5 verification awaits first real release using the new workflow) |
-| 11 | Stale worktree discovery + dismantle | [#356](https://github.com/audiocontrol-org/deskwork/issues/356) | PRD published 2026-05-29 (Option A locked, 30d/3-of-9, archive-first opt-in, auto-detected worktree-base). Ready for implementation in a new session. |
+| 11 | Stale worktree discovery + dismantle | [#356](https://github.com/audiocontrol-org/deskwork/issues/356) | Tasks 1–4 shipped on branch (worktree-report + dismantle-worktrees verbs + session-end-hygiene integration + agent-discipline rule extension + plugin README update). 70 worktree-related tests pass. Tasks 5 (smoke extension) + 6 (dogfood) + Task 3 Step 3 (complete-gate suggestion) remain. Live smoke against `/Users/orion/work/` surfaces 4 actual stale worktree candidates; 0 false-positive orphans after the `.git`-file-shape signal landed. |
 
 ## Key Links
 

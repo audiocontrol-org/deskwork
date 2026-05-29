@@ -22,10 +22,11 @@
 // `### Next session recommendation (hygiene)` heading. The recommendation
 // is intentionally lightweight: the operator can edit it before commit.
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { scanSingleWorkplanFile } from '../debt-report/workplan-tbd.js';
 import type { WorkplanMarkerKey } from '../debt-report/types.js';
+import { runWorktreeReport } from '../worktree-report/scan.js';
 import type {
   HygieneObservation,
   NextSessionRecommendation,
@@ -342,9 +343,20 @@ function recommend(
 ): NextSessionRecommendation {
   const triageItems: string[] = [];
   const addressTbdItems: string[] = [];
+  const dismantleCandidates: string[] = [];
   let resumeTask: string | null = null;
 
   for (const obs of observations) {
+    if (obs.category === 'worktree-stale' && obs.worktreePath !== undefined) {
+      const branchLabel = obs.worktreeBranch !== undefined && obs.worktreeBranch !== null
+        ? ` (\`${obs.worktreeBranch}\`)`
+        : '';
+      const signalLabel = obs.staleSignalCount !== undefined
+        ? ` — ${obs.staleSignalCount} of 9 signals`
+        : '';
+      dismantleCandidates.push(`${obs.worktreePath}${branchLabel}${signalLabel}`);
+      continue;
+    }
     if (obs.category === 'issue-filed-this-session') {
       // Forward-looking Triage line carries OPEN issues only. CLOSED-this-
       // session issues stay in the observations block as historical signal
@@ -382,7 +394,7 @@ function recommend(
     }
   }
 
-  return { resumeTask, triageItems, addressTbdItems };
+  return { resumeTask, triageItems, addressTbdItems, dismantleCandidates };
 }
 
 function renderMarkdownBlock(
@@ -403,6 +415,14 @@ function renderMarkdownBlock(
       } else if (obs.category === 'issue-filed-this-session') {
         const badge = obs.issueState === 'CLOSED' ? ' [CLOSED]' : obs.issueState === 'OPEN' ? ' [OPEN]' : '';
         lines.push(`- issue #${obs.issueNumber ?? ''}${badge} filed this session: ${obs.issueTitle ?? ''}`);
+      } else if (obs.category === 'worktree-stale') {
+        const branchLabel = obs.worktreeBranch !== undefined && obs.worktreeBranch !== null
+          ? ` \`${obs.worktreeBranch}\``
+          : '';
+        const signalLabel = obs.staleSignalCount !== undefined
+          ? ` — ${obs.staleSignalCount} of 9 staleness signals`
+          : '';
+        lines.push(`- worktree \`${obs.worktreePath ?? ''}\`${branchLabel}${signalLabel}`);
       }
     }
   }
@@ -424,8 +444,55 @@ function renderMarkdownBlock(
   } else {
     lines.push('- Address TBD markers: (no bare TBD markers introduced this session)');
   }
+  if (recommendation.dismantleCandidates.length > 0) {
+    lines.push(`- Dismantle stale worktrees: ${recommendation.dismantleCandidates.join('; ')}`);
+  } else {
+    lines.push('- Dismantle stale worktrees: (no stale worktrees flagged)');
+  }
   lines.push('');
   return lines.join('\n');
+}
+
+function readDirSafe(path: string): readonly string[] {
+  try { return readdirSync(path); } catch { return []; }
+}
+function statDirSafe(path: string): boolean {
+  try { return statSync(path).isDirectory(); } catch { return false; }
+}
+function pathExistsSafe(path: string): boolean {
+  try { statSync(path); return true; } catch { return false; }
+}
+
+function scanWorktreeStaleness(args: SessionEndHygieneArgs): readonly HygieneObservation[] {
+  let report;
+  try {
+    report = runWorktreeReport({
+      projectRoot: args.projectRoot,
+      daysThreshold: 30,
+      thresholdCount: 3,
+      allowExternal: false,
+      now: args.now,
+      runGit: args.runGit,
+      runGh: args.runGh,
+      readDir: readDirSafe,
+      statDir: statDirSafe,
+      pathExists: pathExistsSafe,
+    });
+  } catch {
+    return [];
+  }
+  const observations: HygieneObservation[] = [];
+  for (const entry of report.entries) {
+    if (entry.verdict !== 'stale' && entry.verdict !== 'orphan') continue;
+    const heldCount = entry.signals.filter((s) => s.held).length;
+    observations.push({
+      category: 'worktree-stale',
+      worktreePath: entry.path,
+      worktreeBranch: entry.branch,
+      staleSignalCount: heldCount,
+    });
+  }
+  return observations;
 }
 
 export function captureSessionEndHygiene(
@@ -435,10 +502,12 @@ export function captureSessionEndHygiene(
   const commitObservations = scanCommitMarkers(rows);
   const workplanObservations = scanWorkplanTbds(args);
   const issueObservations = scanIssuesThisSession(args);
+  const worktreeObservations = scanWorktreeStaleness(args);
   const observations: readonly HygieneObservation[] = [
     ...commitObservations,
     ...workplanObservations,
     ...issueObservations,
+    ...worktreeObservations,
   ];
   const recommendation = recommend(observations, args);
   const markdownBlock = renderMarkdownBlock(observations, recommendation);

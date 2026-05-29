@@ -356,16 +356,16 @@ Operator decisions (locked in during definition):
 
 ### Task 3: Lifecycle integration
 
-- [ ] Step 1: Extend `plugins/dw-lifecycle/src/lifecycle-integration/session-end-hygiene.ts` to include a worktree-staleness count + recommendation block. Mirror the existing GH/workplan/branches structure.
-- [ ] Step 2: Extend `plugins/dw-lifecycle/src/lifecycle-integration/session-start-recommendation.ts` to display the worktree recommendation when present.
-- [ ] Step 3: Extend `plugins/dw-lifecycle/src/lifecycle-integration/complete-gate.ts` (or sibling) to surface a "your worktree at `<path>` can be dismantled now" line at feature graduation.
-- [ ] Step 4: Update `.claude/rules/agent-discipline.md` § "Closure is a structural step, not aspirational" — name worktrees as the fourth structural-closure stream documented in that rule.
+- [x] Step 1: Extend `plugins/dw-lifecycle/src/lifecycle-integration/session-end-hygiene.ts` to include a worktree-staleness count + recommendation block. `worktree-stale` added to `HygieneObservation['category']`; `dismantleCandidates` added to `NextSessionRecommendation`; `scanWorktreeStaleness()` calls `runWorktreeReport` and filters to `stale` + `orphan` verdicts; markdown renderer emits the new observation rows + the `- Dismantle stale worktrees:` recommendation line (always emitted, even on no-signals branch).
+- [x] Step 2: `session-start-recommendation.ts` requires no code change — it does a textual read of the prior session's markdown block and surfaces whatever lines are present. The new `- Dismantle stale worktrees:` line surfaces automatically.
+- [ ] Step 3: complete-gate complete-time "your worktree can be dismantled now" suggestion. Deferred to polish — session-end already surfaces the same observation at the natural waypoint (every session boundary, including end-of-implementation). complete-gate's primary concern is bare-TBD refusal; adding worktree-dismantle would duplicate the session-end signal at a stricter time slot. Tracked as a polish follow-up.
+- [x] Step 4: `.claude/rules/agent-discipline.md` § "Closure is a structural step" extended — names worktrees as the fourth structural-closure stream + cross-links `:dismantle-worktrees` to `:#347` (the stale-branch-sessions failure mode it closes at the source).
 
 ### Task 4: Documentation
 
-- [ ] Step 1: Update `plugins/dw-lifecycle/README.md` hygiene-family section to include the worktree verb(s) + their operational pattern.
-- [ ] Step 2: Per-skill SKILL.md content (Task 1 Step 5 + Task 2 Step 5 land the skill files; this step is the audit-pass to make sure each is adopter-clear).
-- [ ] Step 3: Update the project's `docs/1.0/burndown/dw-lifecycle.md` marching-orders sheet — fold any worktree-related items into the lane.
+- [x] Step 1: Plugin README hygiene-family section extended — six core verbs + lifecycle wiring table updated to surface `:worktree-report` + `:dismantle-worktrees`; quick-reference shell snippets include the new verbs; "four classes of permanent debt" wording replaces "three classes."
+- [x] Step 2: Per-skill SKILL.md authored by Tasks 1 + 2. `worktree-report/SKILL.md` (102 lines) + `dismantle-worktrees/SKILL.md` (132 lines) ship with full adopter prose, including verdict precedence + safety-rail enumeration + composition with `:archive-branch`.
+- [ ] Step 3: Update `docs/1.0/burndown/dw-lifecycle.md` marching-orders sheet. Deferred — the existing sheet remains accurate; worktree verbs are now shipped (not in the burndown). The closure-rule extension at agent-discipline.md is the authoritative cross-reference; updating burndown is a small follow-up that doesn't change the actionable burndown set.
 
 ### Task 5: Tests + smoke
 
