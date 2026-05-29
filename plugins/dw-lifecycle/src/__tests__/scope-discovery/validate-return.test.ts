@@ -407,9 +407,12 @@ describe('validate-return — TF-008 Searched-count noun whitelist', () => {
     }
   });
 
-  it('rejects nouns outside the whitelist (issues, places, spots, things)', async () => {
+  it('rejects nouns outside the whitelist (places, spots, things)', async () => {
+    // Phase 14 Task 2 (AUDIT-20260529-13) — `5 issues found` was
+    // previously in this rejection list; the whitelist now includes
+    // `issues`/`bugs`/`findings`/`errors`/`warnings`, so it accepts.
+    // `places`/`spots`/`things` are still out-of-whitelist sentinels.
     for (const phrase of [
-      '5 issues found',
       '7 places',
       '4 spots',
       '3 things',
@@ -425,6 +428,8 @@ describe('validate-return — TF-008 Searched-count noun whitelist', () => {
     expect(r.valid).toBe(false);
     expect(r.parseError).toContain('matches/match/hits');
     expect(r.parseError).toContain('call sites');
+    // Phase 14 Task 2 — added nouns are named in the error.
+    expect(r.parseError).toContain('issues');
   });
 });
 

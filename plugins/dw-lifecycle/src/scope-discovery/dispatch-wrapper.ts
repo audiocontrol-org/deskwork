@@ -328,10 +328,12 @@ with strict-format requirements. Read these before writing the block:
 1. **Searched-count noun whitelist.** The count after the em-dash
    must end in one of: \`matches\`, \`match\`, \`hits\`, \`hit\`,
    \`occurrences\`, \`instances\`, \`sites\`, \`call sites\`,
-   \`files\`, \`results\`, \`references\`. Up to 3 modifier tokens
+   \`files\`, \`results\`, \`references\`, \`issues\`, \`bugs\`,
+   \`findings\`, \`errors\`, \`warnings\`. Up to 3 modifier tokens
    are permitted before the head noun (e.g. \`2 source-emitter call
-   sites\`, \`3 unique occurrences\`). Anything outside this set is
-   rejected — \`5 issues found\`, \`7 places\`, \`4 spots\` all fail.
+   sites\`, \`3 unique occurrences\`, \`5 issues found\`). Anything
+   outside this set is rejected — \`7 places\`, \`4 spots\`,
+   \`3 widgets\` all fail.
 
 2. **Excluded entries require \`path:LINE\`.** Every Excluded
    citation must carry a line number. For whole-file exclusions

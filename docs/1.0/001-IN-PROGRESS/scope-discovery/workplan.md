@@ -924,16 +924,20 @@ The orchestrator-turn summary printer emits the `NOTE: only 3/6 catalog files pr
 
 `validate-return`'s wrapped-return grammar has three sharp edges that recur per reviewer dispatch: Searched-count noun whitelist too narrow; mandatory `path:LINE` on every Excluded entry; forbidden-substring list collides with descriptive prose. Medium fix per [#362](https://github.com/audiocontrol-org/deskwork/issues/362): word-boundary + context-aware match on forbidden substrings; widen Searched-count noun whitelist.
 
-- [ ] Step 1: Write failing tests at `plugins/dw-lifecycle/src/__tests__/scope-discovery/dispatch-wrapper-grammar.test.ts` — asserts (a) `5 issues found` is now accepted in the Searched count (was rejected), (b) descriptive prose containing `the placeholder tile` in an Excluded reason passes (was tripping the deferral detector), (c) deliberate deferral language (`for now`, `TODO: address later`) still trips the detector, (d) Searched-count nouns `issues`/`files`/`instances` are accepted alongside the existing whitelist. Run; confirm red.
-- [ ] Step 2: Widen the Searched-count noun whitelist in `plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper.ts` (or wherever the grammar lives). Add `issues`, `files`, `instances`, and any other operator-vetted nouns; document the rationale in a comment.
-- [ ] Step 3: Replace the bare substring scan for forbidden phrases (`stub`, `placeholder`, `pending`) with a word-boundary + context-aware matcher. Heuristic: trip only when the word appears as a verb / disposition phrase (`stub for now`, `placeholder until`, `pending fix`), not as a descriptive noun (`the placeholder tile`, `stub function`).
-- [ ] Step 4: Re-run all dispatch-wrapper tests; confirm green. Verify the existing forbidden-phrase coverage (real deferrals) still trips.
-- [ ] Step 5: Update `validate-return` skill prose / `--help` to document the relaxed grammar.
+- [x] Step 1: Wrote failing tests at `plugins/dw-lifecycle/src/__tests__/scope-discovery/dispatch-wrapper-grammar.test.ts` — 24 scenarios covering Searched-count noun whitelist widening (`issues`, `bugs`, `findings`, `errors`, `warnings`; singular + plural; with/without trailing modifier; pre-existing nouns regression-guard; unknown noun still rejected) AND forbidden-deferral relaxation (descriptive `placeholder tile`, `stub function`, `pending review`, `temporary buffer`, `hack the planet` all pass; deferral collocations `for now`, `placeholder for now`, `stub for now`, `placeholder until phase 5`, `defer to v2`, `TODO`, `FIXME`, `XXX`, `address in v3`, `fix it later` all trip). Red confirmed (22 failed of 24 before impl).
+- [x] Step 2: Widened `SEARCHED_COUNT_NOUN_REGEX` in `plugins/dw-lifecycle/src/scope-discovery/dispatch-grammar.ts` to include `issues?`, `bugs?`, `findings?`, `errors?`, `warnings?`. Error message + `GRAMMAR_INSTRUCTION` prelude both updated to name the new nouns.
+- [x] Step 3: Restructured `FORBIDDEN_DEFERRAL_PHRASES` — removed ambiguous bare nouns (`stub`, `placeholder`, `pending`, `temporary`, `hack`, `defer`, `deferred`, `todo`, `fixme`, `xxx`). Added new context-aware regexes to `FORBIDDEN_DEFERRAL_REGEXES`: `\b(?:TODO|FIXME|XXX)\b` (case-sensitive comment markers), `\b(?:stub|placeholder|pending|temporary|hack|hacky|deferred?)\s+(?:for\s+now|until|in\s+(?:v\d|phase|F\d|future)|...)/i` (ambiguous-noun + deferral collocation), `\b(?:leave|use|put|...)\s+(?:a|the)?\s*(?:stub|placeholder|temporary|...)\b\s*(?:in|until|for|pending|to\s+(?:address|fix|...))/i` (deferral verb + ambiguous noun), `\bdefer(?:red|ring)?\s+(?:to|until|...)` (defer verb action).
+- [x] Step 4: Re-ran all dispatch-wrapper tests; 24/24 green for new file. Plugin suite at 2150/2150 (2123 baseline + 8 from Phase 14 Task 1 + 7 from Task 3 + 24 from Task 2 − 12 net adjustments to existing tests/fixtures). Updated `validate-return.test.ts` TF-008 noun-whitelist test (removed `5 issues found` from rejection list since now accepted; kept `places`/`spots`/`things`; added positive assertion for new error-message-names-issues). Updated `dispatch-wrapper.fixtures.ts` `REGEX_SAMPLE_REASONS` array — added 6 new entries to keep parallel with the regex list (3 comment-marker samples + 3 ambiguous-noun-with-context samples).
+- [x] Step 5: Updated `GRAMMAR_INSTRUCTION` prelude inside `dispatch-wrapper.ts` — now lists the expanded noun whitelist verbatim and updates the rejection examples (`5 issues found` removed; `7 places`/`4 spots`/`3 widgets` retained).
 
 **Acceptance Criteria:**
-- [ ] Test file exists and passes; new positive + negative cases covered.
-- [ ] Existing deferral-detection tests still pass (no false-negatives introduced).
-- [ ] `Closes AUDIT-20260529-13` in the commit subject.
+- [x] Test file exists and passes; new positive + negative cases covered.
+- [x] Existing deferral-detection tests still pass (no false-negatives introduced).
+- [x] `Closes AUDIT-20260529-13` in the commit subject.
+
+**Notes:**
+- Status flip on AUDIT-20260529-13 follows in a separate commit (Phase 13 Task 4 not built yet).
+- Forbidden-phrase contract is now: PHRASES = unambiguous-deferral substrings only; REGEXES = context-aware patterns for ambiguous words. Project-supplied overrides at `.dw-lifecycle/scope-discovery/forbidden-deferral-phrases.yaml` still REPLACE the built-in lists (the existing override test continues to pass).
 
 ### Task 3: Accept `--response-file -` (stdin) on validate-return (fix-finding-AUDIT-20260529-14)
 
