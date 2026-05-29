@@ -1873,11 +1873,11 @@ GitHub tracking issues:
 
 - [x] Review the graphical-entries PRD + workplan + scope-manifest on `feature/graphical-entries` and the live branch state (code-explorer dispatch via `/dwi`). graphical-entries Phases 1–6 are DONE on-branch (pipeline templates + lanes + template-aware verbs + swimlane dashboard); Phases 7–12 (groups, annotation extension, graphical review surface) not started.
 - [x] Classify each at-risk issue (HIGH/MEDIUM/LOW overlap) against live branch state. Report: [`38-0-blast-radius-review.md`](38-0-blast-radius-review.md). Counts: **16 HIGH (block) · 12 MEDIUM (coordinate) · 38 LOW (proceed)** across 66 issues.
-- [ ] Mark HIGH/MEDIUM-overlap issues **Blocked** (GitHub label + #301 comment). **PENDING operator go-ahead** (outward-facing: 16 HIGH + 12 MEDIUM issues). Block list in the report.
+- [x] GitHub Blocked-labeling **HELD by operator decision (2026-05-28)**: block list lives in [`38-0-blast-radius-review.md`](38-0-blast-radius-review.md) only; no labels applied to the 16 HIGH / 12 MEDIUM issues. Revisit labeling later if needed.
 - [x] LOW-overlap unblocked work set confirmed (20 core + 18 studio); see report. Safe starting point for 38b/38c (+ the non-dashboard studio quick-fixes #71/#233/#229).
-- [ ] **38a verdict: reassign #246/#230 to #301 coordination (option b), NOT Phase 38.** graphical-entries' `approveEntryStage` is a complete on-branch rewrite using `preTerminalLinearStage(template)`; the #246 fix belongs at `graphical-entries/packages/core/src/entry/approve.ts:109-115`. A Phase-38 edit to `deskwork-plugin/.../approve.ts:61-63` would be throwaway. **PENDING operator decision.**
+- [x] **38a verdict CONFIRMED by operator (2026-05-28): #246/#230 reassigned to #301; removed from Phase 38 scope.** graphical-entries' `approveEntryStage` is a complete on-branch rewrite using `preTerminalLinearStage(template)`; the #246 fix belongs at `graphical-entries/packages/core/src/entry/approve.ts:109-115`. A Phase-38 edit would be throwaway.
 
-**Sub-phase 38a — Verb-model unification (#246 + #230) [REASSIGNED to #301 coordination per 38·0 — pending operator confirmation]:**
+**Sub-phase 38a — REMOVED from Phase 38 (reassigned to #301 per 38·0).** The verb-model unification (#246) + studio Publish affordance (#230) land on `feature/graphical-entries` as part of its template-aware verb rewrite. Tracked there, not here.
 
 - [ ] `nextStage('Final')` returns `'Published'` (`packages/core/src/schema/entry.ts`); update `entry.test.ts` assertions.
 - [ ] `approveEntryStage` handles `Final → Published` with uniform mechanics + `datePublished` + artifact check; extend `ApproveResult` ([#246](https://github.com/audiocontrol-org/deskwork/issues/246)).
