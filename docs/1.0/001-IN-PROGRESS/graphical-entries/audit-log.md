@@ -2657,3 +2657,70 @@ Resolution:
     member's event carries `cascadeFrom`.
 
 Core test count: 759 → 764 (+5 cascadeFrom contract cases).
+
+### AUDIT-20260529-28 — Step 7.2.8 review pass — Track 2 + Track 3 findings consolidated (informational, no actionable items)
+
+Finding-ID: AUDIT-20260529-28
+Status:     informational
+Severity:   informational
+Surface:    `e311698` (Step 7.2.8 commit, closes #359)
+
+Per-commit Track 2 (spec compliance) + Track 3 (code quality)
+review pass on Step 7.2.8 produced ZERO blocking findings and ZERO
+fix-now or defer-to-issue items. Track 2 confirmed all 12
+acceptance-criteria checkpoints pass (schema delta typed correctly
+with `.passthrough()`, cascade populates `metadata.cascadeFrom` on
+cascaded members, non-cascade does not populate, top-level
+originator semantic verified via the recursive-cascade test's
+`.not.toBe(nestedGroup)` assertion, docblock restored on group-*
+events, workplan + audit-log updated, no IOU markers, no
+attribution).
+
+Track 3 surfaced six informational observations; all dispositioned
+acknowledge:
+
+1. **No compile-time test that public `CancelOptions` rejects
+   `cascadeFrom`** — low. `WalkerOptions` (private, internal)
+   extends `CancelOptions` with the field; not exported. External
+   callers cannot pass it through `cancelEntry()` in practice. No
+   type-level test guards against a future export-widening refactor,
+   but the boundary is structurally enforced today.
+
+2. **`journal-events.test.ts` has no passthrough fixture** — low.
+   The schema delta tightens `metadata` from a free-form record to
+   `z.object({ cascadeFrom: ... }).passthrough().optional()`. The
+   cancel-cascade test exercises write→read→parse round-trip for
+   the new field; the unit-level schema test does not include an
+   arbitrary-unknown-metadata-key fixture. No on-disk legacy events
+   exist (no prior code path wrote metadata to stage-transition
+   events), so no failures today; adding a passthrough fixture would
+   lock the forward-compat contract.
+
+3. **`cascadeFrom` UUID validation could over-constrain future
+   non-entry cascade sources** — informational. `z.string().uuid()`
+   is correct for v1 (only group entries cascade). Future
+   cascade sources (project-level cascades, lane-level cascades,
+   batch-by-query) would need either a schema relaxation
+   (`z.string().min(1)`) or a tagged-union shape. Docblock matches
+   the schema's current contract.
+
+4. **Recursive originator threading verified correct** —
+   informational. `opts.cascadeFrom ?? sidecar.uuid` at the
+   recursive call preserves the top-level UUID across transitive
+   cascades. Implementation matches the documented "single-hop audit
+   trail" intent.
+
+5. **Empty-members group as a cascaded member correctly handled** —
+   informational. The cascade-iteration condition short-circuits
+   members-empty re-iteration; the walker still fires on it as a
+   member, so its own event carries `cascadeFrom`. Matches intent.
+
+6. **Schema `.passthrough()` is forward-compatible** —
+   informational. Future metadata keys can be added without schema
+   churn. Pattern consistent with `LaneMigrationEvent.details`'s
+   free-form record.
+
+Disposition: review pass complete; no commit needed to address
+findings. Recording the consolidated observation for the
+release-time close-shipped scanner and for future readers tracing
+the review trail of Step 7.2.8.
