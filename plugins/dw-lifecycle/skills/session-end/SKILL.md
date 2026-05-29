@@ -22,7 +22,7 @@ Wrap up a session. Append a structured journal entry (with hygiene observations 
 dw-lifecycle session-end-hygiene --slug <feature-slug> [--target-version <vN.N>] [--session-start-sha <sha>]
 ```
 
-   Captures (a) commit subjects in the session range mentioning TBD / defer / follow-up / wontfix / keep-with-reason / `[debt: #NNN]`, (b) bare TBD markers introduced into the feature workplan during the session, (c) issues filed this session by the current GitHub user. Prints a two-section markdown block:
+   Captures (a) commit subjects in the session range mentioning TBD / defer / follow-up / wontfix / keep-with-reason / `[debt: #NNN]`, (b) bare TBD markers INTRODUCED BY THE SESSION DIFF in the feature workplan (`git diff --unified=0 <boundarySha>..HEAD -- <workplan>` — pre-existing prose stops re-firing every session), (c) issues actually touched by the session — derived from `#NNN` references in `git log <boundarySha>..HEAD` commit subjects + bodies, then `gh issue view <N>` per unique number, (d) stale worktrees flagged by the Phase 11 scan. The session-boundary SHA fallback is priority-ordered: `--session-start-sha` → merge-base with `origin/main` → `HEAD~10`. When no boundary is resolvable (greenfield repos / fixtures), the workplan-TBD step falls back to a whole-file scan and the issue step emits zero observations + a one-line stderr diagnostic naming which fallbacks were tried. Prints a two-section markdown block:
 
    - `### Hygiene observations` — what surfaced this session.
    - `### Next session recommendation (hygiene)` — Resume / Triage / Address TBD lines, operator-editable before commit.

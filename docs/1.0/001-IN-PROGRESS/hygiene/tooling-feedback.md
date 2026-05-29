@@ -22,6 +22,7 @@ Running log of friction surfaces in scope-discovery + dispatch-wrapper tooling, 
 | TF | Status | Closing commit |
 |---|---|---|
 | TF-001 | Open | — |
+| TF-002 | Promoted → #364 | (fix landed on branch this session — see #364 for SHA) |
 
 ---
 
@@ -55,3 +56,31 @@ The repro can be reduced further: a dispatch that exists purely as "register new
 **Cross-references:**
 - The relevant cue logic lives in `plugins/dw-lifecycle/src/scope-discovery/dispatch-wrapper.ts` (substring scan of response text against `REFACTOR_CONTEXT_MARKERS`).
 - Project rule: `.claude/rules/agent-discipline.md` § "scope-discovery v1 — dogfood feedback via tooling-feedback.md" mandates filing this here rather than batching at feature-end.
+
+## TF-002 · MISC · high · `archive-branch` preflight false-fails "tag-exists" when composed inside `dismantle-worktrees apply` (runGit-contract mismatch)
+
+**Status:** Promoted to [#364](https://github.com/audiocontrol-org/deskwork/issues/364) (2026-05-29) — architectural runGit-contract bug that broke the Phase 11 dogfood pass. Fix landed on `feature/hygiene` this session.
+
+**Repro:** Phase 11 Task 6 dogfood — operator ran `dw-lifecycle dismantle-worktrees apply` against a 4-item proposal (3 × `archive-then-dismantle` + 1 × `skip`). The skip ran cleanly. All three archive-then-dismantle items failed with:
+
+```
+failed: /Users/orion/work/deskwork-work/<slug> —
+  Tag archived/feature-<slug>-2026-05-29 already exists.
+  Either delete the existing tag (git tag -d ...) or use a different date.
+```
+
+The tags did NOT actually exist (`git tag --list archived/*` was empty before the run; `git ls-remote --tags origin | grep archived` was empty too).
+
+**Root cause:** `archive-branch/preflight.ts:assertTagDoesNotExist` ran `runGit(['rev-parse', '--verify', 'refs/tags/<tagName>'])` and assumed a THROWING runGit contract (exception on non-zero exit = tag absent). The standalone `archive-branch` subcommand wires that throwing shape correctly. But `dismantle-worktrees apply` calls `applyArchive` from the same module with `runGitStdout` from `subcommands/lib/process-probes.ts` — a SWALLOWING runner that catches `execFileSync` failures and returns `''` instead of throwing.
+
+Under the swallowing runner, every "tag absent" probe returns `''`, no exception fires, the preflight sets `exists = true`, and EVERY `archive-then-dismantle` decision false-fails before any tag is created. The worktree had already been removed (step 1 of the dismantle sequence), so the dogfood ended with 3 dangling local branches + no archive tags + no remote-branch cleanup.
+
+**Workaround used:** Recovered by running `dw-lifecycle archive-branch <branch>` standalone for each of the 3 affected branches once the preflight fix landed. All three archived successfully + remotes cleaned (where present); the recovery `restore: git checkout -b ...` instructions are in the per-branch CLI output.
+
+**Suggested fix:** *Applied (Light)* — preflight now checks the RETURNED value (`output.length > 0`) in addition to the try/catch. Works for both runGit contracts.
+
+The *Medium* fix would be to unify the two runGit contracts — either make `runGitStdout` throw on non-zero exits, or rename it to something that signals the swallow shape (e.g., `runGitOrEmpty`) and use throwing callers for hard-failure paths. The current fix is a localized armor against the specific preflight check; other consumers of `runGitStdout` that assume throw-on-failure may have similar latent bugs.
+
+**Cross-references:**
+- Fix: `plugins/dw-lifecycle/src/archive-branch/preflight.ts` (`assertTagDoesNotExist`) + regression test in `__tests__/archive-branch-preflight.test.ts`.
+- Audit-log entry: `AUDIT-20260529-07`.

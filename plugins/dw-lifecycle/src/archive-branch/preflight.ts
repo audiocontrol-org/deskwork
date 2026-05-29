@@ -105,15 +105,24 @@ function assertBranchNotCheckedOut(branch: string, runGit: RunGit): void {
 }
 
 function assertTagDoesNotExist(tagName: string, runGit: RunGit): void {
-  let exists = false;
+  // The check is robust against TWO different `runGit` contracts the
+  // archive-branch helper is called with:
+  //   - throw-on-failure (the standalone subcommand wires this shape).
+  //   - swallow-and-return-empty (`runGitStdout` in
+  //     subcommands/lib/process-probes.ts; used when archive-branch runs
+  //     COMPOSED inside `dismantle-worktrees apply`).
+  // The pre-Phase-12-dogfood version only checked the exception, which
+  // false-failed on the swallowing variant. Now we also check that
+  // rev-parse returned a non-empty SHA — that's the success signal even
+  // when the runner swallows the non-zero exit.
+  let output = '';
   try {
-    runGit(['rev-parse', '--verify', `refs/tags/${tagName}`]);
-    exists = true;
+    output = runGit(['rev-parse', '--verify', `refs/tags/${tagName}`]).trim();
   } catch {
-    // Tag absence is the desired state; rev-parse exits non-zero when the
-    // ref doesn't exist. Swallow.
+    // Tag absence is the desired state; the throwing variant exits here
+    // on non-zero. Output stays empty.
   }
-  if (exists) {
+  if (output.length > 0) {
     throw new ArchiveBranchPreflightError(
       'tag-exists',
       `Tag ${tagName} already exists. Either delete the existing tag (git tag -d ${tagName}) or use a different date.`,
