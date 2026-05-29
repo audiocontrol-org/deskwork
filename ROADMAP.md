@@ -116,6 +116,23 @@ Project-config knob `.dw-lifecycle/scope-discovery/audit-barrage-config.yaml` le
 
 **Cost:** the implementation is small (~300 lines of TS + tests + the prompt template + the SKILL.md). Most of the work is testing the subprocess orchestration against real CLI behavior.
 
+### Design A.5 — Phase 13 anti-deferral discipline + closure triad (SHIPPED)
+
+Phase 13 of scope-discovery ships the **anti-deferral mechanization layer** that pairs structurally with Design A. Where Design A produces audit findings (via the cross-model barrage), Design A.5 ensures every open finding gets worked through to completion without manual status-flip discipline:
+
+| Verb | Status transition | Spec |
+|---|---|---|
+| `/dw-lifecycle:promote-findings` | walks `Status: open`; default-and-only-agent-pickable disposition is "scope into workplan as TDD-first task". | Phase 13 Task 1. |
+| `dw-lifecycle check-open-findings` (implement-loop gate) | refuses `/dw-lifecycle:implement` task pickup while any open finding exists. No bypass flag. | Phase 13 Task 2. |
+| `dw-lifecycle check-fix-task-tdd` + `fix-task-tdd-discipline` doctor rule | refuses `Closes AUDIT-<id>` commits without a passing test cited by the matching workplan task block. | Phase 13 Task 3. |
+| `dw-lifecycle apply-audit-flips` | `open → fixed-<sha>` from commit `Closes AUDIT-<id>` references. | Phase 13 Task 4 Step 2. |
+| `dw-lifecycle close-shipped-audit-findings` | `fixed-<sha> → verified-<date>` via release-range SHA membership; default dry-run. | Phase 13 Task 4 Step 1. |
+| `/dw-lifecycle:re-audit-fixed-findings` | `fixed-<sha> → verified-<date>` via empirical re-audit non-surfacing; flags re-surfacing fixes. | Phase 13 Task 4 Step 3. |
+
+**Operator's framing (the anchor):** *"Filing a bug report isn't good enough. It MUST BE SCOPED INTO THE WORKPLAN, otherwise it won't get picked up by the implementation loop. (...) A broken implementation is not done — it's broken. And, along with the discipline to scope the fix, TDD principles should apply such that a test that exercises the bug is written before the fix is implemented."*
+
+Design B builds on this foundation. The auto-fire waypoints Design B adds will route findings through promote-findings → workplan → TDD-enforced implement loop → apply-audit-flips → close-shipped-audit-findings / re-audit-fixed-findings naturally, with no manual disposition steps. Design A.5 is the discipline layer; Design B is the cadence layer on top.
+
 ### Design B — lifecycle-triggered automation + meta-audit (NEXT)
 
 Design A's primitives (verb pair `audit-barrage-render` + `audit-barrage`, project-override paths, run-dir conventions, INDEX.md schema, model battery YAML) are the foundation Design B composes over. Design B is the next major architectural extension to the family — it adds (a) automatic firing tied to lifecycle waypoints and (b) a meta-audit synthesizer that compresses the N raw model outputs to a single ranked-findings summary the operator triages instead of the raw runs.

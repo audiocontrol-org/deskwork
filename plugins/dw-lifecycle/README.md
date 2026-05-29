@@ -206,6 +206,49 @@ dw-lifecycle archive-branch feature/studio-bridge --rationale "Security gap on a
 - Canonical rule the family mechanizes: [`.claude/rules/agent-discipline.md`](../../.claude/rules/agent-discipline.md) § "Just for now is bullshit."
 - Issue-closure rule the `close-shipped` verb honors: [`.claude/rules/agent-discipline.md`](../../.claude/rules/agent-discipline.md) § "Issue closure requires verification in a formally-installed release."
 
+## Audit-finding lifecycle — anti-deferral discipline + closure triad
+
+Phase 13 of scope-discovery ships the mechanization layer that makes audit findings unable to silently rot. Six verbs compose into a closed loop from "finding filed" to "finding verified post-release":
+
+| Verb | Phase 13 ref | Status transition |
+|---|---|---|
+| `/dw-lifecycle:promote-findings` | Task 1 | walks `Status: open`; default-and-only-agent-pickable disposition is "scope into workplan as TDD-first task block tagged `(fix-finding-AUDIT-<id>)`". |
+| `dw-lifecycle check-open-findings` (implement-loop gate) | Task 2 | refuses `/dw-lifecycle:implement` task pickup while any open finding exists on the feature. No bypass flag in v1. |
+| `dw-lifecycle check-fix-task-tdd` + `fix-task-tdd-discipline` doctor rule | Task 3 | refuses `Closes AUDIT-<id>` commits unless the cited workplan task block's test file exists, is non-empty, and (when not `--skip-vitest`) passes. |
+| `dw-lifecycle apply-audit-flips` | Task 4 Step 2 | parses `Closes AUDIT-<id>` (subject + comma-separated trailer); proposes `open → fixed-<sha>` flips. |
+| `dw-lifecycle close-shipped-audit-findings` | Task 4 Step 1 | walks `git rev-list <from>..<to>`; for each `fixed-<sha>` whose SHA prefix is in range, proposes `verified-<date>`. |
+| `/dw-lifecycle:re-audit-fixed-findings` | Task 4 Step 3 | cross-references a fresh audit-barrage run-dir against existing `fixed-<sha>` entries; proposes `verified-<date>` for entries that don't re-surface; flags re-surfacing entries as fix-did-not-actually-fix. |
+
+All verbs default to dry-run; `--apply` performs writes. The audit-log preservation rule is honored throughout (no entries deleted; status changes only; entry bodies preserved verbatim).
+
+### Operational pattern
+
+```bash
+# After review surfaces findings:
+dw-lifecycle promote-findings --feature my-feature --apply
+
+# After each fix commit (or batched):
+dw-lifecycle apply-audit-flips --feature my-feature --since main --apply
+
+# Optional: catch missing tests at commit time
+dw-lifecycle check-fix-task-tdd --commit-msg-file .git/COMMIT_EDITMSG
+
+# After release:
+dw-lifecycle close-shipped-audit-findings --feature my-feature \
+    --from v1.0.0 --to v1.1.0 --apply
+
+# Empirical re-audit (post-release):
+dw-lifecycle audit-barrage --feature my-feature --prompt-file <prompt>
+dw-lifecycle re-audit-fixed-findings --feature my-feature \
+    --run-dir .dw-lifecycle/scope-discovery/audit-runs/<ts>-my-feature --apply
+```
+
+### Cross-references
+
+- Discipline rule: [`.claude/rules/agent-discipline.md`](../../.claude/rules/agent-discipline.md) § "Audit findings: scope-don't-defer + TDD enforcement".
+- Sibling discipline: § "Just for now is bullshit" (implementation-side IOU pathology).
+- Closure rule honored: § "Issue closure requires verification in a formally-installed release".
+
 ## Audit-barrage — multi-model parallel auditing
 
 The `/dw-lifecycle:audit-barrage` skill fires N installed CLI audit tools (`claude`, `codex`, `gemini`, plus whatever else the operator configures) in parallel against a uniform audit prompt and captures each tool's stdout to a per-run directory under `.dw-lifecycle/scope-discovery/audit-runs/`. Cross-model genetic diversity surfaces failure modes single-model audits miss; per the Phase 12 self-dogfood (parent [#353](https://github.com/audiocontrol-org/deskwork/issues/353)), one full barrage against an in-flight feature caught 4 cross-model HIGH-confidence findings + 7 single-model findings that the in-band self-audit + the SDD review cycle missed entirely.
