@@ -1,4 +1,4 @@
-generated_at: 2026-05-29T06:56:33.403Z
+generated_at: 2026-05-29T09:27:34.867Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -696,6 +696,34 @@ clones:
       - plugins/dw-lifecycle/src/triage-issues/propose.ts:204:224
     disposition: keep-with-reason
     reason: "Hygiene Phase 3 protocol-mirror with Phase 2: promote-deferrals reuses the triage-issues batched-proposal shape on purpose. The propose-step finale (proposal-file shape construction, defaultOutputPath ISO-stamp computation, output-path collision check, JSON write) is canonical batched-proposal protocol surface shared across both hygiene skills; promotion to a shared module is tracked at #335 once Phase 4-5 reveal the durable abstraction shape."
+  - id: 394213e6df18
+    lines: 11
+    members:
+      - plugins/dw-lifecycle/src/promote-deferrals/substantive-reason.ts:112:122
+      - plugins/dw-lifecycle/src/scope-discovery/promote-findings/substantive-reason-validator.ts:113:123
+    disposition: keep-with-reason
+    reason: Phase 13 promote-findings validator deliberately owns its banned-phrase list as a module-local contract per Task 1 brief; cross-skill import would couple dw-lifecycle hygiene canon to scope-discovery anti-deferral contract.
+  - id: e894df0cc21f
+    lines: 18
+    members:
+      - plugins/dw-lifecycle/src/promote-deferrals/substantive-reason.ts:38:55
+      - plugins/dw-lifecycle/src/scope-discovery/promote-findings/substantive-reason-validator.ts:54:71
+    disposition: pending
+    reason: null
+  - id: 2781f314de77
+    lines: 7
+    members:
+      - plugins/dw-lifecycle/src/promote-deferrals/substantive-reason.ts:77:83
+      - plugins/dw-lifecycle/src/scope-discovery/promote-findings/substantive-reason-validator.ts:79:85
+    disposition: keep-with-reason
+    reason: Phase 13 promote-findings validator deliberately owns its banned-phrase list as a module-local contract per Task 1 brief; cross-skill import would couple dw-lifecycle hygiene canon to scope-discovery anti-deferral contract.
+  - id: 24dde2d5a138
+    lines: 11
+    members:
+      - plugins/dw-lifecycle/src/promote-deferrals/substantive-reason.ts:88:98
+      - plugins/dw-lifecycle/src/scope-discovery/promote-findings/substantive-reason-validator.ts:95:105
+    disposition: keep-with-reason
+    reason: Phase 13 promote-findings validator deliberately owns its banned-phrase list as a module-local contract per Task 1 brief; cross-skill import would couple dw-lifecycle hygiene canon to scope-discovery anti-deferral contract.
   - id: 1801f1b7dd0b
     lines: 8
     members:
@@ -1083,14 +1111,15 @@ clones:
       - plugins/dw-lifecycle/src/subcommands/orchestrator-turn.ts:81:88
     disposition: ignore-with-justification
     reason: CLI-subcommand boilerplate (flag-parse loop + exit-2-on-usage-error + readFile-then-parse-then-validate). The shape is the convention each subcommand follows; extracting to a shared primitive would couple new subcommands to a helper contract for marginal LOC savings while obscuring per-subcommand flag sets + tailored error messages.
-  - id: 1b9d015c3741
+  - id: 352c9e64fad0
     lines: 8
     members:
       - plugins/dw-lifecycle/src/subcommands/audit-barrage-render.ts:112:119
       - plugins/dw-lifecycle/src/subcommands/audit-barrage.ts:124:131
       - plugins/dw-lifecycle/src/subcommands/orchestrator-turn.ts:100:107
-    disposition: ignore-with-justification
-    reason: CLI-subcommand boilerplate (flag-parse loop + exit-2-on-usage-error + readFile-then-parse-then-validate). The shape is the convention each subcommand follows; extracting to a shared primitive would couple new subcommands to a helper contract for marginal LOC savings while obscuring per-subcommand flag sets + tailored error messages.
+      - plugins/dw-lifecycle/src/subcommands/promote-findings.ts:122:129
+    disposition: pending
+    reason: null
   - id: 05782de08529
     lines: 7
     members:

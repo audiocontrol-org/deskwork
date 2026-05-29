@@ -21,7 +21,7 @@ export interface SchemeMapping {
   entries(): ReadonlyArray<readonly [string, string]>;
 }
 
-// The 18 lifecycle commands that get shortcut shims. The plugin also
+// The 19 lifecycle commands that get shortcut shims. The plugin also
 // ships `install-shortcuts` and `uninstall-shortcuts` as meta-commands;
 // those are intentionally excluded here — they bootstrap and roll back
 // the shim install itself, so giving them shims would be a chicken-and-
@@ -33,6 +33,11 @@ export interface SchemeMapping {
 // SDD two-reviewer cycle). It's an operator-triggered skill the
 // implementation team invokes during a feature's lifecycle, so it
 // earns a shim slot — same posture as `audit` and `review`.
+//
+// `promote-findings` is the Phase 13 audit-finding-to-workplan bridge.
+// It's an operator-triggered skill the implementation team invokes
+// after every audit cycle (in-band, SDD review, audit-barrage), so it
+// earns a shim slot — same posture as `audit-barrage` and `review`.
 export const COMMANDS = [
   'audit',
   'audit-barrage',
@@ -46,6 +51,7 @@ export const COMMANDS = [
   'install',
   'issues',
   'pickup',
+  'promote-findings',
   'review',
   'session-end',
   'session-start',
@@ -85,6 +91,7 @@ const SCHEME_A_ENTRIES = [
   ['install', 'dwin'],
   ['issues', 'dwis'],
   ['pickup', 'dwp'],
+  ['promote-findings', 'dwpf'],
   ['review', 'dwr'],
   ['teardown', 'dwt'],
 ] as const satisfies ReadonlyArray<readonly [Command, string]>;
@@ -106,6 +113,7 @@ const SCHEME_B_ENTRIES = [
   ['install', 'dw-in'],
   ['issues', 'dw-is'],
   ['pickup', 'dw-pi'],
+  ['promote-findings', 'dw-pf'],
   ['review', 'dw-re'],
   ['teardown', 'dw-te'],
 ] as const satisfies ReadonlyArray<readonly [Command, string]>;

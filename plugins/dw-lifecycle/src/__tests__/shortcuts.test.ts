@@ -35,6 +35,7 @@ const SCHEME_A_TABLE: ReadonlyArray<readonly [string, string]> = [
   ['install', 'dwin'],
   ['issues', 'dwis'],
   ['pickup', 'dwp'],
+  ['promote-findings', 'dwpf'],
   ['review', 'dwr'],
   ['teardown', 'dwt'],
 ];
@@ -56,12 +57,13 @@ const SCHEME_B_TABLE: ReadonlyArray<readonly [string, string]> = [
   ['install', 'dw-in'],
   ['issues', 'dw-is'],
   ['pickup', 'dw-pi'],
+  ['promote-findings', 'dw-pf'],
   ['review', 'dw-re'],
   ['teardown', 'dw-te'],
 ];
 
 // Meta-commands intentionally excluded from COMMANDS: the shortcuts
-// skills install shortcuts FOR the 18 lifecycle commands; they are
+// skills install shortcuts FOR the 19 lifecycle commands; they are
 // themselves invoked via the namespaced `/dw-lifecycle:` form (the
 // chicken-and-egg moment), so they get no shim of their own. The
 // scope-discovery verbs (and the install commands that scaffold their
@@ -109,8 +111,8 @@ describe('COMMANDS canonical list', () => {
     expect(expected).toEqual(onDisk);
   });
 
-  it('contains exactly 18 commands (meta-commands tracked separately)', () => {
-    expect(COMMANDS.length).toBe(18);
+  it('contains exactly 19 commands (meta-commands tracked separately)', () => {
+    expect(COMMANDS.length).toBe(19);
     for (const meta of META_COMMANDS) {
       expect(COMMANDS).not.toContain(meta);
     }
@@ -156,13 +158,13 @@ describe('no-duplicates invariant per scheme', () => {
       const scheme = getScheme(sid);
       const entries = scheme.entries();
 
-      it('produces exactly 18 entries', () => {
-        expect(entries.length).toBe(18);
+      it('produces exactly 19 entries', () => {
+        expect(entries.length).toBe(19);
       });
 
-      it('has 18 unique commands', () => {
+      it('has 19 unique commands', () => {
         const commands = new Set(entries.map(([cmd]) => cmd));
-        expect(commands.size).toBe(18);
+        expect(commands.size).toBe(19);
       });
 
       it('entry command set equals the canonical COMMANDS set', () => {
@@ -170,9 +172,9 @@ describe('no-duplicates invariant per scheme', () => {
         expect(entryCommands).toEqual(new Set(COMMANDS));
       });
 
-      it('has 18 unique shim names', () => {
+      it('has 19 unique shim names', () => {
         const shims = new Set(entries.map(([, shim]) => shim));
-        expect(shims.size).toBe(18);
+        expect(shims.size).toBe(19);
       });
     });
   }

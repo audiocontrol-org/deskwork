@@ -756,9 +756,9 @@ Phase 13 is the operator-discipline-displacement counterpart to Phase 12. Phase 
 
 NEW skill + CLI verb that walks `audit-log.md` for `Status: open` entries on the current feature, surfaces them in a batched-proposal cycle (same shape as hygiene's `promote-deferrals` + `triage-issues`), and applies workplan edits + optional `acknowledged-<ref>` / `informational` status flips on operator confirmation.
 
-- [ ] Step 1: NEW `plugins/dw-lifecycle/src/scope-discovery/promote-findings/types.ts` — `OpenFinding`, `PromotionProposal`, `WorkplanInsertion`, `DeferralRecord`, `InformationalRecord` interfaces.
-- [ ] Step 2: NEW `plugins/dw-lifecycle/src/scope-discovery/promote-findings/audit-log-walker.ts` — parses `audit-log.md` for entries with `Status: open` (reusing the existing `audit-log-parser.ts` from the orchestrator-loop); returns the list of open findings on the named feature.
-- [ ] Step 3: NEW `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts` — generates the TDD-first task block for a finding:
+- [x] Step 1: NEW `plugins/dw-lifecycle/src/scope-discovery/promote-findings/types.ts` — `OpenFinding`, `PromotionProposal`, `WorkplanInsertion`, `DeferralRecord`, `InformationalRecord` interfaces.
+- [x] Step 2: NEW `plugins/dw-lifecycle/src/scope-discovery/promote-findings/audit-log-walker.ts` — parses `audit-log.md` for entries with `Status: open` (reusing the existing `audit-log-parser.ts` from the orchestrator-loop); returns the list of open findings on the named feature.
+- [x] Step 3: NEW `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-task-renderer.ts` — generates the TDD-first task block for a finding:
   ```
   ### Task N.M (fix-finding-AUDIT-<YYYYMMDD>-<NN>): <one-line finding title>
 
@@ -775,12 +775,12 @@ NEW skill + CLI verb that walks `audit-log.md` for `Status: open` entries on the
   - [ ] `npx vitest run <test-file-path>` exits 0 (passes against the fix)
   - [ ] Audit-log Status flipped to `fixed-<sha>` via the close-shipped-audit-findings step
   ```
-- [ ] Step 4: NEW `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-editor.ts` — applies the rendered task block to the named feature's `workplan.md` at the operator-chosen position (under existing phase OR as new phase). Preserves file structure; appends at the chosen anchor.
-- [ ] Step 5: NEW `plugins/dw-lifecycle/src/scope-discovery/promote-findings/substantive-reason-validator.ts` — for the `acknowledged-<ref>` deferral path. Mirrors hygiene's promote-deferrals validator: ≥40 chars; rejects gaming-phrase list (`for now`, `will fix later`, `non-trivial`, `future work`, `deferred to vN`, `not in scope`, `TODO`, `come back to`); requires explicit upstream-blocker reference OR documented scope-cut citation.
-- [ ] Step 6: NEW `plugins/dw-lifecycle/src/scope-discovery/promote-findings/audit-log-editor.ts` — flips audit-log entry `Status` from `open` to `acknowledged-<ref>` or `informational`. Preserves audit trail; the original entry stays + the status change is the only mutation.
-- [ ] Step 7: NEW `plugins/dw-lifecycle/src/subcommands/promote-findings.ts` — CLI verb. Flags: `--feature <slug>` (REQUIRED); `--repo-root <path>` (default cwd); `--bucket <name>` (default `open`; future: `acknowledged` to walk deferred findings periodically); `--limit <N>` (default 10 per batch); `--help`. Registers `'promote-findings'` in `cli.ts`.
-- [ ] Step 8: NEW `plugins/dw-lifecycle/skills/promote-findings/SKILL.md` — adopter-facing prose. Names the default-is-promote shape, the deferral path's substantive-reason validator, the informational disposition's tight contract. Adds `/dwpf` shortcut.
-- [ ] Step 9: Tests under `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/` covering: open-finding extraction; workplan task rendering (TDD-first shape); substantive-reason validator (accept + reject); workplan-edit application (atomic; no partial state); audit-log status flips (preserves entry body); batched-proposal flow (mock operator confirmation; partial-batch).
+- [x] Step 4: NEW `plugins/dw-lifecycle/src/scope-discovery/promote-findings/workplan-editor.ts` — applies the rendered task block to the named feature's `workplan.md` at the operator-chosen position (under existing phase OR as new phase). Preserves file structure; appends at the chosen anchor.
+- [x] Step 5: NEW `plugins/dw-lifecycle/src/scope-discovery/promote-findings/substantive-reason-validator.ts` — for the `acknowledged-<ref>` deferral path. Mirrors hygiene's promote-deferrals validator: ≥40 chars; rejects gaming-phrase list (`for now`, `will fix later`, `non-trivial`, `future work`, `deferred to vN`, `not in scope`, `TODO`, `come back to`); requires explicit upstream-blocker reference OR documented scope-cut citation.
+- [x] Step 6: NEW `plugins/dw-lifecycle/src/scope-discovery/promote-findings/audit-log-editor.ts` — flips audit-log entry `Status` from `open` to `acknowledged-<ref>` or `informational`. Preserves audit trail; the original entry stays + the status change is the only mutation.
+- [x] Step 7: NEW `plugins/dw-lifecycle/src/subcommands/promote-findings.ts` — CLI verb. Flags: `--feature <slug>` (REQUIRED); `--repo-root <path>` (default cwd); `--bucket <name>` (default `open`; future: `acknowledged` to walk deferred findings periodically); `--limit <N>` (default 10 per batch); `--help`. Registers `'promote-findings'` in `cli.ts`.
+- [x] Step 8: NEW `plugins/dw-lifecycle/skills/promote-findings/SKILL.md` — adopter-facing prose. Names the default-is-promote shape, the deferral path's substantive-reason validator, the informational disposition's tight contract. Adds `/dwpf` shortcut.
+- [x] Step 9: Tests under `plugins/dw-lifecycle/src/__tests__/scope-discovery/promote-findings/` covering: open-finding extraction; workplan task rendering (TDD-first shape); substantive-reason validator (accept + reject); workplan-edit application (atomic; no partial state); audit-log status flips (preserves entry body); batched-proposal flow (mock operator confirmation; partial-batch).
 
 **Acceptance Criteria:**
 - [ ] `/dw-lifecycle:promote-findings --feature <slug>` walks the feature's `audit-log.md` for `Status: open` entries.
