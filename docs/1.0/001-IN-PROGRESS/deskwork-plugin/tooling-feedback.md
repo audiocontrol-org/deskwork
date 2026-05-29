@@ -31,7 +31,7 @@ Running log of friction, pathologies, and improvement opportunities in the scope
 
 | TF | Status | Closing commit |
 |---|---|---|
-| TF-001 | Open | — |
+| TF-001 | Promoted → #361 | — |
 | TF-002 | Open | — |
 | TF-003 | Open | — |
 | TF-004 | Open | — |
@@ -40,6 +40,8 @@ Running log of friction, pathologies, and improvement opportunities in the scope
 ---
 
 ## TF-001 · MISC · medium · `session-end-hygiene` "issues filed this session" conflates merge-range / same-user issues with the actual session
+
+**Status:** Promoted to [#361](https://github.com/audiocontrol-org/deskwork/issues/361) (2026-05-29) — recurring cross-session pattern, needs explicit triage. Stays in this log per the append-only contract.
 
 **Repro:** `dw-lifecycle session-end-hygiene --slug deskwork-plugin --session-start-sha e6af429` (2026-05-29 session-end). The "issues filed this session" block listed #355/#356/#359/#360 alongside the two I actually filed (#357/#358). #355/#356 are scope-discovery/Phase-11/13 issues and #359/#360 are graphical-entries perf issues — none were filed by this session's work. The detector appears to key on (GitHub user + a time/commit window) and sweeps in issues authored from other branches/sessions. This is the same #340-shaped scoping bug the prior session's journal flagged — it recurred.
 
