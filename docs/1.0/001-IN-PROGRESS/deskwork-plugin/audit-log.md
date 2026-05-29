@@ -60,3 +60,76 @@ practical risk is low (the documented adopter pattern is a committed
 (`clone-detector.gitignore.test.ts`) and the workplan 38·1 entry. If a
 recurrence ever happens via a non-`.gitignore` mechanism, the disposition is
 to add the path to the committed `.gitignore` (not to change jscpd config).
+
+---
+
+## 2026-05-29 — Phase 38 sub-phase 38b (core quick fixes), commits d6d3032 (+ already-landed 4009be1, 935ba39)
+
+**Sub-phase outcome:** of the four 38b issues, only #256 needed new code this
+session; #221 and #198 were already fixed on-branch in prior commits and are
+open only pending release-verification; #232 is an architecture fork escalated
+to the operator (see AUDIT-20260529-03).
+
+**Track 1 (independent verification, controller re-run):**
+- #256: `packages/cli/test/version.test.ts` 3/3 pass (built `dist/cli.js`); `node dist/cli.js --version` prints `@deskwork/cli 0.26.5` + `@deskwork/core 0.26.5`, exit 0; `npm --workspace @deskwork/cli run typecheck` clean.
+- #221: `packages/core/test/ingest.test.ts` dot-slug cases 4/4 pass (`v0.16.0` → `v0-16-0`; explicit `--slug` NOT sanitized).
+- #198: `packages/cli/test/iterate-entry-centric-dispositions.test.ts` 12/12 pass (longform + outline dispositions mint address annotations).
+
+**Tracks 2+3 (#256 — dispatched `feature-dev:code-reviewer`, return-grammar validated):** no blocking/high findings; change is sound. Confirmed: version intercept fires before the subcommand parser + `injectProjectRoot` (no shadowing — `version` is not a SUBCOMMANDS key); `import.meta.url`-relative `../package.json` correct from both `dist/` and `src/`; core resolved via its `./package.json` export; no `any`/`as`/`@ts-ignore`; `readPackageVersion` throws on bad input (no fallback). #221/#198 were reviewed when they originally landed; not re-reviewed here.
+
+---
+
+Finding-ID: AUDIT-20260529-02
+Status:     fixed-d6d3032
+Severity:   low
+Surface:    packages/cli/src/cli.ts (CLI dispatcher)
+
+#256: `deskwork --version` / `-v` / `version` returned "unknown subcommand"
+(exit 2). Fixed by intercepting all three forms before the subcommand parser
+and printing `@deskwork/cli` + `@deskwork/core` versions, exit 0. Reviewer
+pass found the change sound. NOT verified-in-release — stays open until the
+fix ships and is walked against the installed artifact (project closure rule).
+
+The issue's "ideally also @deskwork/studio" is intentionally NOT done: studio
+is not a dependency of @deskwork/cli, so it is not reachable through the CLI's
+dispatch. The issue's "same change to deskwork-studio and dw-lifecycle bin
+shims for consistency" is out of this commit's scope (filed symptom was the
+@deskwork/cli dispatcher); a separate parity pass would cover the sibling
+binaries.
+
+---
+
+Finding-ID: AUDIT-20260529-03
+Status:     open
+Severity:   medium
+Surface:    packages/core/src/calendar/regenerate.ts:45, packages/core/src/doctor/repair.ts:123
+
+#232: `regenerateCalendar(projectRoot)` and `doctor/repair` write the
+hardcoded `.deskwork/calendar.md`, ignoring per-site `siteConfig(config,
+site).calendarPath`. Confirmed divergence: `ingest` reads/writes the per-site
+`resolveCalendarPath(projectRoot, config, site)` (`ingest.ts:114,211`), as do
+`rename-slug`, `review/workflow-paths`, and `doctor/runner` — but the
+entry-centric pipeline (approve/publish/block/cancel/induct via
+`regenerateCalendar`) writes the hardcoded path. For an adopter whose config
+sets a custom `calendarPath`, ingest writes one file and approve writes
+another; they diverge (this is also #234's approve-side).
+
+This is an ARCHITECTURE FORK, not a quick fix — the issue itself escalates it
+("Two questions for the operator", "needs design clarification before code
+lands"). It was misclassified into 38b. Two coherent resolutions:
+
+- (a) `.deskwork/calendar.md` is the canonical post-Phase-30 entry-centric
+  surface; per-site `calendarPath` becomes legacy. Requires pointing the
+  remaining readers at `.deskwork/calendar.md` AND deprecating/repurposing the
+  `calendarPath` config key (currently a REQUIRED key, config.ts:93) — an
+  adopter-facing change.
+- (b) Honor per-site `calendarPath`: thread `config` + `site` into
+  `regenerateCalendar` (5 entry-helper callers) + `repair.ts`, writing to
+  `resolveCalendarPath(...)`. Non-destructive; matches what ingest already
+  does; resolves #234's approve-side.
+
+Controller recommendation: (b) — non-destructive, deprecates nothing, makes the
+pipeline consistent with ingest, and honors the contract implied by
+`calendarPath` being a REQUIRED config key. NOT implemented unilaterally:
+deprecating-vs-keeping a required adopter config surface is an operator
+decision (Operator-owns-scope rule). Awaiting operator pick before code lands.

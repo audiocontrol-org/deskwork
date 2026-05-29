@@ -1885,6 +1885,11 @@ GitHub tracking issues:
 
 **Sub-phase 38b — Core quick fixes:** #256, #221, #232, #198.
 
+- [x] **#256** (CLI `--version`/`-v`/`version`) — fixed this session, commit `d6d3032`. Intercepts all three forms before the subcommand parser; prints `@deskwork/cli` + `@deskwork/core` versions, exit 0. Reviewed (no blocking/high). Open pending release-verification. (studio omitted — not a CLI dep; sibling-bin parity out of scope.)
+- [x] **#221** (dotted path-derived slug rejection) — ALREADY fixed on-branch in commit `4009be1` ("sanitize dots in path-derived slugs"); `packages/core/test/ingest.test.ts` 4/4 dot-slug cases green (`v0.16.0` → `v0-16-0`; explicit `--slug` left strict). No new work; open pending release-verification.
+- [x] **#198** (`iterate --dispositions` rejected for longform/outline) — ALREADY fixed on-branch in commit `935ba39`; `packages/cli/test/iterate-entry-centric-dispositions.test.ts` 12/12 green (longform + outline mint address annotations). No new work; open pending release-verification.
+- [ ] **#232** (approve/doctor write hardcoded `.deskwork/calendar.md`, ignore per-site `calendarPath`) — **NOT a quick fix; reclassified as operator-decision gate.** The issue itself escalates an architecture fork ("Two questions for the operator", "needs design clarification before code lands"). Confirmed divergence: ingest honors per-site `calendarPath` (`ingest.ts:114,211`) but the entry-centric pipeline + `doctor/repair` write the hardcoded path. Options (a) make `.deskwork/calendar.md` canonical + deprecate the REQUIRED `calendarPath` key vs (b) honor per-site `calendarPath` (thread config+site through the 5 entry helpers + repair; matches ingest; resolves #234's approve-side). Controller recommends (b) (non-destructive); held for operator pick. Tracked in audit-log `AUDIT-20260529-03`.
+
 **Sub-phase 38c — Core doctor-rule family + ingest/approve mediums:** #219+#300+#65 (shared gate), #218, #223+#234, #267, #226, #62, #64, #58, #59, #215.
 
 **Sub-phase 38d — Studio quick fixes:** #68, #98, #71, #233, #229, #177.
