@@ -303,11 +303,11 @@ The picked design **pivots away from the PRD's original "per-lane tab strip" fra
 
 ### Task 6.2: `/deskwork:pipeline` skill family
 
-- [ ] Step 6.2.1: Author SKILL.md at `plugins/deskwork/skills/pipeline/SKILL.md` documenting subcommands: `list`, `show <id>`, `create <id> --shape <linear-stages-spec>` (from-scratch authoring), `update <id> --add-stage <name> [--position N]` / `--rename-stage <from> <to>` / `--remove-stage <name>` / `--set-locked <stages>` / `--set-off-pipeline <stages>`, `delete <id>` (refused if any lane references it; force with `--reassign-lanes-to <other-id>`).
-- [ ] Step 6.2.2: CLI implementation at `packages/cli/src/commands/pipeline.ts`.
-- [ ] Step 6.2.3: Update / delete operations honor the existing `/deskwork:customize pipeline <preset-id>` start-from-preset path (the customize skill becomes a convenience wrapper around `pipeline create`).
-- [ ] Step 6.2.4: Stage rename migration: when an operator renames a stage in a template, doctor surfaces affected entries with a remediation (manual induct, automatic rename via `doctor --apply`, etc.); a `pipeline-renames.json` migration file may live alongside the template per PRD § Pipeline template lifecycle.
-- [ ] Step 6.2.5: Unit tests.
+- [x] Step 6.2.1: Author SKILL.md at `plugins/deskwork/skills/pipeline/SKILL.md` documenting subcommands: `list`, `show <id>`, `create <id> --shape <linear-stages-spec>` (from-scratch authoring), `update <id> --add-stage <name> [--position N]` / `--rename-stage <from> <to>` / `--remove-stage <name>` / `--set-locked <stages>` / `--set-off-pipeline <stages>`, `delete <id>` (refused if any lane references it; force with `--reassign-lanes-to <other-id>`). (Implemented as `--rename-stage <from> --to-stage <to>` due to single-value-per-flag argv parser; deliberate, documented divergence.)
+- [x] Step 6.2.2: CLI implementation at `packages/cli/src/commands/pipeline.ts`.
+- [x] Step 6.2.3: Update / delete operations honor the existing `/deskwork:customize pipeline <preset-id>` start-from-preset path (the customize skill becomes a convenience wrapper around `pipeline create`).
+- [x] Step 6.2.4: Stage rename migration: a `pipeline-renames.json` migration file lives at `.deskwork/pipelines/migrations/<id>.json` (sibling subdir to keep `list` enumeration safe). Each `--rename-stage` invocation appends a `{from, to, at}` entry. Doctor consumer is Phase 6 Task 6.5 (out of scope for Task 6.2; this task only writes the file).
+- [x] Step 6.2.5: Unit tests. (64 pipeline CLI tests + 14 journal-events tests; covers path-traversal, malformed-migration recovery, lockedStages rename, delete-orphan-cleanup, etc.)
 
 ### Task 6.3: Studio lane-management page
 

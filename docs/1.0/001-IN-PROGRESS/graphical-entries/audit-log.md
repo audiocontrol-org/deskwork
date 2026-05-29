@@ -1430,3 +1430,224 @@ consideration.
 - Builds: `@deskwork/core` exit 0; `@deskwork/cli` exit 0.
 - Pre-existing CLI test failures verified unrelated to 5941c00/c2be222 by checkout-parent-and-rerun: `test/publish-entry-centric.test.ts:139`, `test/approve-entry-centric.test.ts:129`.
 - AUDIT-40 (security) was the highest-value finding — closed a real attack surface the operator-facing CLI exposed unintentionally.
+
+## Phase 6 Task 6.2 — `/deskwork:pipeline` skill family — review cycle (2026-05-28)
+
+Task 6.2 shipped at `ae0549d` (feat) + `0a9ca59` (review followups). The
+SDD discipline ran spec-compliance + code-quality reviews. Spec-review
+came back SPEC-COMPLIANT WITH NON-BLOCKING OBSERVATIONS; quality-review
+came back QUALITY-REJECTED with 3 BLOCKING findings + 8 NON-BLOCKING +
+3 OBSERVATION. The orchestrator triaged: applied 3 BLOCKING + 6
+NON-BLOCKING; declined 2 NON-BLOCKING with documented reasoning; left
+3 observations alone.
+
+### AUDIT-20260528-49 — pipeline list breaks after rename (BLOCKING)
+
+Finding-ID: AUDIT-20260528-49
+Status:     fixed-0a9ca59
+Severity:   blocking
+Surface:    `packages/core/src/pipelines/loader.ts:232` (`listJsonBasenames`),
+            `packages/core/src/pipelines/operations/update.ts:407` (`appendRenameMigration`)
+
+Original ae0549d wrote the rename migration sidecar at
+`.deskwork/pipelines/<id>-renames.json` — same directory as pipeline
+templates. `listJsonBasenames` enumerated it as a pipeline id; the
+subsequent `loadPipelineTemplate('editorial-renames', ...)` Zod-failed
+because the sidecar shape `{pipelineId, renames}` lacks `linearStages`.
+Every `pipeline list` invocation after any `--rename-stage` call would
+have thrown.
+
+Fix: extracted `rename-migration.ts` (124 lines); relocated migration
+files to `<projectRoot>/.deskwork/pipelines/migrations/<id>.json`
+(sibling subdir not enumerated by the loader). All readers / writers
+updated. Regression test asserts `pipeline list` exit 0 after rename.
+
+### AUDIT-20260528-50 — pipeline delete path-traversal (BLOCKING)
+
+Finding-ID: AUDIT-20260528-50
+Status:     fixed-0a9ca59
+Severity:   blocking (security)
+Surface:    `packages/core/src/pipelines/operations/delete.ts:55`
+
+`deletePipeline` resolved `opts.id` to a filesystem path via
+`pipelineOverridePath` without validating against `assertSafePipelineId`.
+An id like `'../../etc/foo'` would have resolved outside the override
+directory; `unlinkSync(path)` would have deleted the traversed file.
+Same shape as the lane exposure Task 6.1 c2be222 closed.
+
+Fix: added `assertSafePipelineId(projectRoot, opts.id)` and a
+matching check on `opts.reassignLanesTo` as the first lines of
+`deletePipeline`. Regression test covers both charset (`'FOO'`) and
+traversal (`'../../etc/foo'`) refusals.
+
+### AUDIT-20260528-51 — orphan rename sidecar on pipeline delete (BLOCKING)
+
+Finding-ID: AUDIT-20260528-51
+Status:     fixed-0a9ca59
+Severity:   blocking (combined with AUDIT-49)
+Surface:    `packages/core/src/pipelines/operations/delete.ts:162-169`
+
+`pipeline delete <id>` unlinked the pipeline JSON but left the rename
+sidecar on disk. Combined with AUDIT-49's pre-fix shape, the orphan
+would have permanently broken `pipeline list` for the project. Post
+AUDIT-49 fix (migrations/ subdir), the orphan would have inherited
+into a subsequent `pipeline create <same-id>`, surfacing stale rename
+history.
+
+Fix: `deletePipeline` now unlinks the migrations sidecar at the new
+path (guarded by existsSync). Regression test: rename → delete →
+assert migrations sidecar gone.
+
+### AUDIT-20260528-52 — malformed rename sidecar silent reset
+
+Finding-ID: AUDIT-20260528-52
+Status:     fixed-0a9ca59
+Severity:   non-blocking (data preservation)
+Surface:    `packages/core/src/pipelines/operations/update.ts:418-435`
+            (now `rename-migration.ts`)
+
+When the renames file was malformed, the code silently reset to an
+empty shape and overwrote — losing the prior audit trail.
+
+Fix: malformed files are now renamed to `<id>.malformed-<timestamp>.json`
+before reset; stderr warning identifies the path. Preserves the data
+the operator may want to recover.
+
+### AUDIT-20260528-53 — delete-and-reassign partial-failure recovery
+
+Finding-ID: AUDIT-20260528-53
+Status:     fixed-0a9ca59
+Severity:   non-blocking (doc)
+Surface:    `packages/core/src/pipelines/operations/delete.ts` (header),
+            `plugins/deskwork/skills/pipeline/SKILL.md`
+
+Order of operations (validate replacement → reassign each dependent
+lane → unlink pipeline → journal-append) can fail partway. The
+reassign step is data-idempotent (commitLaneConfig writes same content
+on re-run), so the recovery story is "re-run the same command."
+
+Fix: documented in delete.ts header and in SKILL.md delete subsection.
+No behavioral change.
+
+### AUDIT-20260528-54 — applyRemoveStage blank-stage guard
+
+Finding-ID: AUDIT-20260528-54
+Status:     fixed-0a9ca59
+Severity:   non-blocking (DX)
+Surface:    `packages/core/src/pipelines/operations/update.ts:255-282`
+
+Sibling `applyAddStage` / `applySetLocked` / `applySetOffPipeline`
+all validate `stage.trim().length === 0`; `applyRemoveStage` didn't.
+Blank input fell through to a less actionable "stage not found"
+error.
+
+Fix: mirrored the trim-check; specific error message.
+
+### AUDIT-20260528-55 — rename-stage lockedStages coverage gap
+
+Finding-ID: AUDIT-20260528-55
+Status:     fixed-0a9ca59
+Severity:   non-blocking (test coverage)
+Surface:    `packages/cli/test/pipeline/update.test.ts:93-182`
+
+Tests covered renaming in linearStages and offPipelineStages but not
+in lockedStages. Implementation handles all three; a regression that
+dropped the locked branch would have been undetected.
+
+Fix: added one regression test.
+
+### AUDIT-20260528-56 — customize wrapper id-validation defense-in-depth
+
+Finding-ID: AUDIT-20260528-56
+Status:     fixed-0a9ca59
+Severity:   non-blocking (defense-in-depth)
+Surface:    `packages/cli/src/commands/customize.ts:137-152, 202-207`
+
+When `category === 'pipeline'`, customize wrote to
+`<projectRoot>/.deskwork/pipelines/<name>.json`. The `name` was
+validated by the upstream source-existence check (which happens to
+enforce charset because built-in preset names are charset-conforming).
+A future preset with a non-conforming name would bypass charset
+validation.
+
+Fix: explicit `assertSafePipelineId(projectRoot, name)` for the
+pipeline category. Same belt-and-suspenders rationale as the loader.
+
+### AUDIT-20260528-57 — updatePipeline early-refusal path leak
+
+Finding-ID: AUDIT-20260528-57
+Status:     fixed-0a9ca59
+Severity:   non-blocking (info disclosure)
+Surface:    `packages/core/src/pipelines/operations/update.ts:96-114`
+
+With a traversed id, the early `isPluginPresetPipeline` /
+`hasPipelineOverride` checks ran before `loadPipelineTemplate`'s
+implicit `assertSafePipelineId`. The error message leaked the
+traversed path.
+
+Fix: moved `assertSafePipelineId(projectRoot, opts.id)` to the top of
+`updatePipeline` (parallel to `createPipeline`). Unified diagnostics.
+
+### AUDIT-20260528-58 — rename-sidecar race condition (DECLINED)
+
+Finding-ID: AUDIT-20260528-58
+Status:     declined-single-operator-assumption-documented
+Severity:   non-blocking
+Surface:    `packages/core/src/pipelines/operations/rename-migration.ts` (header)
+
+Two concurrent `--rename-stage` operations against the same sidecar
+race; the second writer wins; the first rename's migration entry is
+lost. The PRD documents deskwork as operator-driven at-rest.
+
+Declined: documented the single-operator assumption in the
+rename-migration.ts module header. Concurrency-safe writers (file
+locks, CAS) are a significant addition; not warranted given the
+operator-driven usage profile. Recorded as deliberate orchestrator
+choice for the audit trail.
+
+### AUDIT-20260528-59 — non-atomic journal-event append (DECLINED)
+
+Finding-ID: AUDIT-20260528-59
+Status:     declined-matches-lanes-precedent
+Severity:   non-blocking
+Surface:    `packages/core/src/pipelines/operations/update.ts:130-153` (header)
+
+Order: commitPipelineTemplate → appendRenameMigration → appendJournalEvent.
+If the journal append fails after the first two succeed, the journal
+lacks the event. Same pattern as the existing lane operations where
+the same shape was accepted (Phase 6 Task 6.1).
+
+Declined: documented in module header. Matches lanes precedent;
+harmonization is a separate concern.
+
+### AUDIT-20260528-60 — clone-disposition appropriateness
+
+Finding-ID: AUDIT-20260528-60
+Status:     observation (12 new clones dispositioned keep-with-reason)
+Severity:   observation
+Surface:    `.dw-lifecycle/scope-discovery/clones.yaml:124-194`
+
+The Task 6.2 implementation triggered 12 NEW clone-detector findings,
+all dispositioned `keep-with-reason` for pipeline-vs-lane symmetry:
+- 4 pipeline.ts ↔ lane.ts CLI dispatcher / banner shapes
+- 1 intra-file handleCreate vs handleDelete envelope
+- 5 test-fixture helpers (pipeline/helpers.ts ↔ lane/helpers.ts)
+- 1 atomic write helper (lanes/operations/commit.ts ↔ pipelines/operations/commit.ts)
+- 1 intra-file applySetLocked vs applySetOffPipeline (inverse-invariant validation)
+Plus 2 line-number realignments in pre-existing dispositions.
+
+Spec-reviewer triaged each as genuine parallel-domain symmetry. The
+lanes-vs-pipelines lifecycles are diverging (lanes have
+archive/restore/move/purge; pipelines have rename-stage-with-migration);
+keeping them parallel keeps each independently evolveable. Recorded as
+deliberate orchestrator choice.
+
+### Task 6.2 closing summary
+
+- Spec-compliance review: SPEC-COMPLIANT WITH NON-BLOCKING OBSERVATIONS (6 OBS items).
+- Code-quality review: QUALITY-REJECTED (3 BLOCKING + 8 NON-BLOCKING + 3 OBSERVATION). Triage: 3 BLOCKING + 6 NON-BLOCKING applied at 0a9ca59; 2 declined-with-reasoning documented in module headers; 3 observations left alone.
+- Test deltas: CLI pipeline suite 0 → 64 (net-new); core 711 throughout; journal-events 11 → 14 (+3); CLI customize 12 → 17 (+5).
+- Builds: `@deskwork/core` exit 0; `@deskwork/cli` exit 0.
+- Pre-existing CLI test failures (`publish-entry-centric:139`, `approve-entry-centric:129`) remain pre-existing — zero diff in `ae0549d` or `0a9ca59`.
+- AUDIT-49 + AUDIT-50 + AUDIT-51 (all BLOCKING) were the highest-value findings. AUDIT-49 was a real "pipeline list permanently breaks after rename" data-integrity bug; AUDIT-50 was a path-traversal regression of the Task 6.1 hardening; AUDIT-51 compounded the orphan-sidecar problem with AUDIT-49. All three closed before merge.
+- Quality-review pushback (REJECTED verdict) validated the value of the review pass — three production-quality bugs caught at review time rather than post-release.
