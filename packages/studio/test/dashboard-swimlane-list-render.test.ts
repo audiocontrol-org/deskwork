@@ -62,15 +62,17 @@ describe('dashboard swimlane Task 5.1B — view-toggle + list-body (render + CSS
   it('Task 5.1B: each `.view-toggle` carries two real <button class="vt-cell"> cells with role="radio"', async () => {
     const r = await getHtml(app, '/dev/editorial-studio');
     expect(r.status).toBe(200);
-    // Three lanes × 2 cells = 6 cell buttons.
+    // Three lanes × 2 cells × 2 viewport variants (desktop swim +
+    // mobile lane-stack, per AUDIT-20260528-10) = 12 cell buttons
+    // total across both DOM trees.
     const kanbanCells = r.html.match(
       /<button class="vt-cell vt-cell--kanban[^"]*"[^>]*type="button"[^>]*role="radio"/g,
     ) ?? [];
-    expect(kanbanCells.length).toBe(3);
+    expect(kanbanCells.length).toBe(6);
     const listCells = r.html.match(
-      /<button class="vt-cell vt-cell--list"[^>]*type="button"[^>]*role="radio"/g,
+      /<button class="vt-cell vt-cell--list[^"]*"[^>]*type="button"[^>]*role="radio"/g,
     ) ?? [];
-    expect(listCells.length).toBe(3);
+    expect(listCells.length).toBe(6);
     // Server-default selection: kanban cell is aria-checked="true"
     // + carries `.active`; list cell is aria-checked="false".
     const editorialBlock = extractLaneSection(r.html, 'default');
@@ -100,8 +102,13 @@ describe('dashboard swimlane Task 5.1B — view-toggle + list-body (render + CSS
     const grids = r.html.match(/<div class="stage-grid"/g) ?? [];
     const lists = r.html.match(/<div class="list-body"/g) ?? [];
     expect(grids.length).toBe(3);
-    expect(lists.length).toBe(3);
-    // Each lane has both bodies inside its swim.
+    // AUDIT-20260528-10: mobile lane-stack reuses the list-body
+    // renderer to emit list-mode markup inside each `<article
+    // class="lane-section">`, doubling the page-wide `.list-body`
+    // count. The desktop swim still emits exactly one list-body
+    // per lane (asserted below via per-lane scoping).
+    expect(lists.length).toBe(6);
+    // Each desktop swim has both bodies inside it.
     for (const id of ['default', 'mockups', 'qa']) {
       const block = extractLaneSection(r.html, id);
       expect(block).toMatch(/<div class="stage-grid"/);

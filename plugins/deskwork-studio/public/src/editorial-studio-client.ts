@@ -16,6 +16,7 @@ import { initSwimlaneCompose } from './dashboard/swimlane-compose.ts';
 import { initSwimlaneMobileSheet } from './dashboard/swimlane-mobile-sheet.ts';
 import { initSwimlaneDrag } from './dashboard/swimlane-drag.ts';
 import { initSwimlanePresets } from './dashboard/swimlane-presets.ts';
+import { initLaneStack } from './dashboard/lane-stack.ts';
 import { initMastheadPopover } from './mobile-shell/masthead-popover.ts';
 import { initLanesPage } from './lanes/lanes-page.ts';
 import { initPipelinesPage } from './pipelines/pipelines-page.ts';
@@ -528,6 +529,11 @@ function init(): void {
   initSwimlaneCompose();
   initSwimlaneMobileSheet();
   initSwimlaneDrag();
+  // AUDIT-20260528-10: lane-stack accordion controller wires the
+  // mobile lane-stack's `<header class="lane-head">` ↔ `<div
+  // class="lane-body">` accordion contract. Idempotent — no-op when
+  // the lane-stack is absent (non-dashboard pages).
+  initLaneStack();
   // Task 5.5: must run AFTER initSwimlane / initSwimlaneCollapse /
   // initSwimlaneViewToggle — the preset controller's deep-link
   // apply path calls their `reapply*FromStorage` exports, which

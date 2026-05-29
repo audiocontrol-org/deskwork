@@ -62,14 +62,16 @@ describe('dashboard swimlane Task 5.1A — collapse chevrons (render + CSS)', ()
     expect(r.status).toBe(200);
     // One per-stage chevron per `(lane, stage)` pair in the kanban
     // body. Editorial=8, Visual=7, QA=7 — 22 in total. Task 5.1B
-    // adds a sibling chevron per `lb-group` in the list-body — same
-    // count, mirroring the kanban shape — so the total over both
-    // bodies is 44. The kanban-only count is asserted by scoping to
-    // the stage-grid section.
+    // adds a sibling chevron per `lb-group` in the desktop list-
+    // body — same count, mirroring the kanban shape — so the
+    // desktop total is 44. AUDIT-20260528-10 adds the mobile lane-
+    // stack which renders a third copy via its own list-body so
+    // the page-wide total is 66. The kanban-only count is asserted
+    // by scoping to the stage-grid section.
     const stageChevs = r.html.match(
       /<button class="collapse-chev"[^>]*data-collapse-target="stage"/g,
     ) ?? [];
-    expect(stageChevs.length).toBe(44);
+    expect(stageChevs.length).toBe(66);
     // Kanban-scoped count (the original Task 5.1A invariant): walk
     // each lane's stage-grid section and count.
     let kanbanStageChevCount = 0;

@@ -1,4 +1,4 @@
-generated_at: 2026-05-29T07:57:05.864Z
+generated_at: 2026-05-29T08:21:06.570Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -465,7 +465,7 @@ clones:
   - id: feecb3d2c71e
     lines: 8
     members:
-      - packages/studio/src/pages/dashboard/swimlane-shell.ts:76:83
+      - packages/studio/src/pages/dashboard/swimlane-shell.ts:77:84
       - plugins/deskwork-studio/public/src/dashboard/swimlane.ts:109:116
     disposition: keep-with-reason
     reason: "wire-format symmetry: server parseFocusCsv + client parseCsvNonEmpty parse the same focus CSV on opposite ends of the request boundary; consolidating would require a shared vendored module since server and client bundles are independent"
@@ -646,32 +646,39 @@ clones:
       - packages/studio/test/dashboard-swimlane-integration-fixture.ts:94:100
     disposition: keep-with-reason
     reason: "AUDIT-20260528-14 split: __helpers/dashboard-swimlane-fixture.ts ships the 1-entry-per-lane fixture for the per-feature render-tests split from dashboard-swimlane.test.ts. dashboard-swimlane-integration-fixture.ts ships the parallel 2-entries-per-lane fixture (with locked stages) for the Task 5.6 dual node-env/jsdom-env integration tests. Trivial shape (makeConfig/makeEntry/writeLane) is intrinsic to on-disk sidecar fixtures."
+  - id: 49e020702bf0
+    lines: 12
+    members:
+      - plugins/deskwork-studio/public/src/dashboard/lane-stack.ts:94:105
+      - plugins/deskwork-studio/public/src/dashboard/swimlane-collapse.ts:138:150
+    disposition: keep-with-reason
+    reason: "parallel-domain symmetry: lane-stack accordion mirrors swimlane-collapse aria-expanded/aria-label toggle pattern intentionally so both controllers expose the same WAI-ARIA disclosure-widget contract on different DOM trees (.swim vs .lane-section); abstracting would couple two independent affordances"
   - id: 14579dae3bdf
     lines: 20
     members:
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:115:127
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:147:166
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:116:128
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:148:167
     disposition: pending
     reason: null
   - id: 8a46fe453209
     lines: 17
     members:
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:116:127
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:480:496
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:117:128
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:481:497
     disposition: pending
     reason: null
   - id: 82d6dc44c67e
     lines: 11
     members:
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:117:127
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:201:211
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:118:128
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:202:212
     disposition: pending
     reason: null
   - id: f0e04e87d0e2
     lines: 7
     members:
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:168:174
-      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:89:95
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:169:175
+      - plugins/deskwork-studio/public/src/editorial-studio-client.ts:90:96
     disposition: pending
     reason: null
   - id: 7c1800068cfe

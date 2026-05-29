@@ -43,6 +43,7 @@ import { projectKeyHash } from './project-key.ts';
 import { renderRail, type LaneRailRow } from './swimlane-rail.ts';
 import { renderFocusStrip } from './swimlane-focus-strip.ts';
 import { renderSwimlane, renderSwimStub } from './swimlane-card.ts';
+import { renderLaneStack } from './lane-stack-card.ts';
 import type { LaneBucket, LaneBucketsResult } from './lane-data.ts';
 
 export interface SwimlaneShellInput {
@@ -244,6 +245,13 @@ export function renderSwimlanesShell(input: SwimlaneShellInput): RawHtml {
     + ' aria-controls="lane-sheet"'
     + ' aria-label="Show lane visibility sheet">Lanes &#x25BE;</button>';
 
+  // AUDIT-20260528-10 — the brief contracts a vertical lane-stack of
+  // accordion sections on mobile. The lane-stack is server-rendered
+  // alongside the desktop bay-shell body; CSS gates which one paints
+  // at any given viewport. The bay-head (focus strip, sheet trigger)
+  // remains the cross-viewport chrome — both shells share it.
+  const laneStackRaw = renderLaneStack(lanes.byLane, focused, defaultSite).__raw;
+
   return unsafe(html`
     <section class="bay-shell" data-bay-shell
       data-project-key="${projectKey}"
@@ -258,7 +266,8 @@ export function renderSwimlanesShell(input: SwimlaneShellInput): RawHtml {
           </div>
           ${unsafe(focusStripRaw)}
         </div>
-        ${unsafe(bodyRaw)}
+        <div class="bay-body" data-bay-body>${unsafe(bodyRaw)}</div>
+        ${unsafe(laneStackRaw)}
       </main>
     </section>`);
 }

@@ -177,6 +177,7 @@ export async function renderDashboard(
       '/static/css/dashboard-swimlane-compose.css',
       '/static/css/dashboard-swimlane-drag.css',
       '/static/css/dashboard-swimlane-mobile.css',
+      '/static/css/dashboard-lane-stack.css',
       '/static/css/mobile-shell.css',
     ],
     bodyAttrs: 'data-review-ui="studio"',
