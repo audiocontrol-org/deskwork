@@ -723,7 +723,7 @@ Confirm the three CLIs are installed + authenticated on the operator's machine. 
 
 ## Phase 13: Audit-finding lifecycle — anti-deferral discipline + workplan promotion
 
-**Parent issue:** (TBD — file via `/dw-lifecycle:issues` after this phase iterates through deskwork)
+**Parent issue:** [#355](https://github.com/audiocontrol-org/deskwork/issues/355)
 **Source:** Operator design conversation 2026-05-29 surfacing the gap between audit-log findings (Phase 12 audit-barrage's output) and the workplan (the implementation loop's input). Phase 12 self-dogfood demonstrated the failure mode in-session — agent went from "findings lifted" straight to "fix dispatch" without scoping the fixes into the workplan, then a parallel session shipped the fixes ad-hoc.
 
 **Problem the phase addresses (captured exhaustively per capture-mode rule; scoping is a separate pass):**
