@@ -3288,3 +3288,79 @@ The `dw-lifecycle session-end-hygiene` helper output is noisy due to the #339 sc
 - **Branch-base staleness (per #347):** before continuing, consider `git rebase origin/main` to bring v0.24.0 → v0.25.0 in. The current branch base is `e053e85` from 2026-05-25 (pre-v0.24.0). The graphical-entries Phase 6 work is fully self-contained — the rebase should land cleanly. If skipped, another stale-branch-re-derivation incident is more likely.
 - **Triage:** [#347](https://github.com/audiocontrol-org/deskwork/issues/347) — the operator may want to pick one of the 3 candidate mitigations to scope as an immediate scope-discovery feature (or push the rebase recommendation to a `/dw-lifecycle:session-start` warning).
 - **Address TBD markers:** line 379 of workplan is the only marker found; it's an explicit scope-decision rather than a deferral and likely needs no action.
+
+## 2026-05-29: Phase 6 Tasks 6.5/6.6 + closeout + audit-log sweep (12 fixes + 9 observations closed + AUDIT-10 dual-viewport verification)
+
+### Feature: graphical-entries
+### Worktree: graphical-entries
+
+**Goal:** finish Phase 6 (Tasks 6.5/6.6 + acceptance criteria + README closeout); then, per operator's "if it's broken, it's not done" directive, walk every open audit-log entry to a terminal status — fixing real defects, closing observations that don't meet the broken bar.
+
+**Accomplished:**
+
+- **89-commit rebase onto `origin/main`.** 6 conflicts resolved: hooks-installed.json deleted per main; package-lock.json fast-forwarded; 2 DEV-NOTES journal-appends merged chronologically; 3 clones.yaml `generated_at` collisions taken at the newer timestamp. `git rerere` enabled mid-rebase but didn't help (each conflict had a different timestamp pair).
+- **Bug-scoping inventory** (operator: "scope each bug fix explicitly into the workplan"): confirmed all graphical-entries-scoped bugs (#247, #299, #300) are already named in workplan tasks with auto-close commit markers. Three of the six remaining issues touching the slug (#347 stale-branch, #297 scope-discovery test flake, #349 dogfood feedback) belong in other features. **Net: no workplan edits needed.**
+- **`c4019ef` chore: sync package-lock.json to v0.26.5 post-rebase** — fixed pre-existing main-side drift (lockfile said 0.24.2 while package.json said 0.26.5).
+- **Phase 6 Task 6.5 — doctor rule `lane-config-missing-template` shipped** (`f341ecb`). 391-line rule + 4 test scenarios + `LaneConfigRepairEvent` schema extension + runner registration. First-site-gated project-wide scan; prompt-plan with set-template-per-resolvable-template + delete-lane; entry-binding pre-flight refusal on delete.
+- **Phase 6 Task 6.6 — custom-pipeline + lane lifecycle integration test shipped** (`295b803`). End-to-end CLI subprocess scenario: pipeline create → lane create → 2-sidecar write → archive → restore → purge refusal → byte-equivalent state-intact verification.
+- **Phase 6 closeout** (`1e78a5e`). All Phase 6 acceptance criteria checked off in workplan; README status row updated In progress → Done.
+- **Audit-log sweep — 21 open entries closed.** Operator's "fix everything" directive triggered a full walk. Triaged 12 actionable bugs (need real code fixes) + 9 observations (already self-disposed, trajectory notes, defensible defaults). Dispatched in 4 waves:
+  - **Wave 1** (2 parallel agents): AUDIT-06 (rail-row keydown skips interactive descendants) `653bc2b`; AUDIT-07 (stage DOM ids via `stageNameToFilesystemToken`) `a281ea7`; AUDIT-08 (list-row overflow span decorative) `e309f00`; AUDIT-09 (All chip idempotent) `9eff7af`; AUDIT-25 (drop unused exports) `73c8359`; AUDIT-20260529-08 (doctor filter through `loadPipelineTemplate` at plan time) `a031183`.
+  - **Wave 2** (2 parallel agents): AUDIT-38 (preset view-mode reads effective DOM state) `a5ba0b8`; AUDIT-37 (F2 copy-deep-link button + F4/F5 doc-comments + F6 type narrowing with read-time migration) `3ed2532`; AUDIT-31 (per-row keyboard move-up/down buttons; new `swimlane-reorder.ts` factor) `3aeea2e`.
+  - **Wave 3** (2 parallel agents): AUDIT-14 file-cap splits — 1834-line CSS → 9 per-section files; 1444-line `dashboard-swimlane.test.ts` + 6 other over-cap test files → 23 sibling test files + 4 shared fixtures. Studio test count preserved end-to-end (12 commits `2cfebad..3c5228a`). AUDIT-39 high (`/deskwork:add` accepts `--lane`+`--stage`+`--kind` across SKILL.md + CLI + core + integration test) `a9214b7`.
+  - **Wave 4** (1 agent): AUDIT-10 mobile lane-stack accordion variant per the D3 Press Bay brief `e228e26`. New `lane-stack-card.ts` server-renderer + `lane-stack.ts` client controller + `dashboard-lane-stack.css`; desktop swim and mobile lane-stack both emitted server-side, CSS at 720px breakpoint gates which renders; compose chip + view-toggle reuse existing data-attr-bound controllers transparently.
+  - **Wave 5** (in-thread audit-log edits): 9 observations closed — 4 wontfix-observation (polyfill edge case, test infra heuristic, disclosure-widget convention, pre-existing schema variation); 2 wontfix-trajectory (files under cap); 1 closed-as-documented (inline doc-comment IS the disposition); 1 addressed-by-3aeea2e (file already split during a separate fix); 1 wontfix-observation for the AUDIT-39 informational duplicate.
+- **AUDIT-10 dual-viewport verification** per `.claude/rules/ui-verification.md`. Booted `node_modules/.bin/deskwork-studio` against this worktree; Playwright probe at 1920×1080 + 390×844. Every brief-contracted aspect verified: matchMedia gate flips correctly, lane-stack ↔ bay-body visibility inversion, `.lane-section > .lane-head + .lane-body` structure matches, accordion `aria-expanded` + `[hidden]` toggle, list-default rendering on mobile, compose-chip clipboard write `/deskwork:add <SLUG> --lane default --stage Ideas`.
+- **AUDIT-20260529-10 surfaced + fixed in the same pass** (`e4529ab`). The mobile lane-head's view-toggle cells measured 18×24 / 19×24 — under WCAG 2.2 SC 2.5.8 AA's 24×24 hit-target minimum. CSS `min-width: 24px; min-height: 24px;` floor added to the shrunken-cell rule; container grew 39×26 → 50×26; cells 24×24 each. Sha backfill in `59dbfb5`.
+- **AUDIT-20260529-11 observation** records the end-to-end dual-viewport verification ran; the verification gap noted in `e228e26`'s body is closed.
+
+**Didn't Work:**
+
+- **`.git-commit-msg.tmp` race — twice.** First, the presets-cluster agent (Wave 2) left its commit-message text in the file; my next commit used that text. Second, the file-split agent (Wave 3) did the same. In both cases the Write tool's "file modified since read" error fired but `git commit -F` still consumed the (stale) file. Recovered via `git reset --soft HEAD~1` + Write-fresh + recommit. Lesson: write to `.git-commit-msg.tmp` immediately before `git commit -F`, with no other tool calls between Write and Bash. Or use `mktemp` per agent.
+- **AUDIT-39 agent flagged `customize-skill.test.ts` as pre-existing failure attributed to the concurrent AUDIT-14 file-split agent.** It was a transient state during the file-split agent's mid-stream work; once AUDIT-14 settled, the test passed cleanly (12/12). Not a real defect.
+- **Hygiene helper's "issues filed this session" filter is calendar-date scoped, not session-range scoped.** It picked up #349-356 from the prior session (filed earlier today) as "filed this session." Manually excluded in the journal entry's hygiene block.
+- **Sub-agent reported "browser-driven viewport probe not possible in this sandbox" for AUDIT-10.** Accepted the gap initially; operator pushed back ("do the audit-10 verification"). Playwright probe from MY sandbox worked fine — sub-agent sandbox limit was real but I had the tools to close it. Lesson: when a sub-agent flags a verification gap, check if I can close it myself before accepting the gap as a residual.
+
+**Course Corrections:**
+
+- **[PROCESS]** *"commit the audit log, then we have to fix everything. If it's broken, it's not done"* — operator's framing when I surfaced the uncommitted "Phase 6 closeout audit" block + asked whether to /dw-lifecycle:review. The "fix everything" was the right move: the audit-log's 21 open entries had been carrying forward across sessions as informal debt. Closing each one to a terminal status (fixed-`<sha>` or wontfix-observation) gave the audit-log a clean baseline.
+- **[PROCESS]** *"do the audit-10 verification"* — operator's response to my "browser-driven verification is the remaining manual step" close-out. Closing that step caught a real defect (WCAG hit-target violation). Verification IS the missing complement to jsdom tests for responsive UI; don't leave it as a manual follow-up when I have the tools to run it now.
+- **[PROCESS]** *"actually, rebase, then scope each bug fix explicitly into the workplan"* — operator amended the plan mid-flight after my initial "rebase, then resume Task 6.5" framing. The bug-scoping pass revealed that the workplan was already correct — most of the 15 open issues touching this slug were phase-tracking parents, not unscoped bugs.
+
+**Quantitative:**
+
+- Commits this session: ~35 substantive (plus 89 from rebase replay). Span `e9f7cb6..59dbfb5`.
+- Sub-agent dispatches: 7 typescript-pro implementers (Wave 1A swimlane cluster, Wave 1B doctor filter, Wave 2 presets cluster, Wave 2 drag a11y, Wave 3 file-split, Wave 3 add-lane support, Wave 4 mobile lane-stack).
+- Wrapper rejections: 0 (no validate-return failures).
+- Test deltas: core 715 → 716 (+1, AUDIT-20260529-08); CLI 320 → 327 (+7, AUDIT-39's +6 + Task 6.6's +1); studio 893 → 933 (+40 across Wave 1/2/4 + AUDIT-10's lane-stack tests).
+- Build state: exit 0 workspace-wide throughout.
+- Audit-log entries: 21 open → 0; +2 new (`AUDIT-20260529-10` fixed, `AUDIT-20260529-11` observation).
+- Conflicts during rebase: 6 (1 modify/delete, 1 lockfile, 2 journal-append, 2 clones.yaml timestamp).
+- New clone-group dispositions: 1 (the lane-config-missing-template apply boilerplate matching orphan-frontmatter-id; kept as parallel-domain symmetry).
+- Files split for the cap (AUDIT-14): 1 CSS (1834 → 9 files) + 6 test files (1444 + 741 + 603 + 589 + 536 + 511).
+
+**Insights:**
+
+- **"Fix everything" was tractable once enumerated.** Twenty-one open audit-log entries sounded daunting until I broke them into actionable-vs-observation buckets. The 12 real fixes parallelized cleanly across 4 waves of typescript-pro dispatches; the 9 observations took 10 minutes of audit-log edits.
+- **Wave 4's verification caught a defect the unit tests couldn't.** The mobile lane-stack's view-toggle hit-target violation only manifested at the 390px viewport; jsdom doesn't render layout, so the unit tests couldn't see it. Playwright + `getBoundingClientRect` measurements are the right shape for responsive UI verification — `.claude/rules/ui-verification.md`'s dual-viewport protocol is load-bearing.
+- **The dispatch grammar + wrapper machinery scaled to 7 parallel agents without a single rejection.** Each agent's prompt was tight + included the audit finding body verbatim + the project conventions. The grammar gotchas (Searched-count noun whitelist, Excluded line numbers, deferral-phrase substring matches) bit zero times this session — the prompts now bake in the gotchas list explicitly.
+- **The audit-log AS the durable cross-pass channel.** Wave 1 fixes referenced AUDIT-NN; Wave 4 verification referenced the SAME audit-log entries' Status fields; the `fixed-<sha>` markers tie every commit to its underlying finding. Future close-shipped scanner runs will resolve these end-to-end. The audit-log's open-count metric (currently 0) is the clean baseline for the next release cycle.
+- **The `.git-commit-msg.tmp` race is a class of bug.** Two parallel agents using the same temp file means whoever Wrote last wins. Either mktemp per agent, OR every commit Writes the message file immediately before `git commit -F` with no intervening tool calls. The post-commit message-amend recovery via `git reset --soft HEAD~1` is safe (project rules permit it; it's not destructive) but adds two commits of churn per race. Worth a rule in `.claude/rules/file-handling.md` if it recurs.
+
+### Hygiene observations
+
+- commit 59865839834a — `follow-up` in subject: fix(graphical-entries): Phase 5 Task 5.1C a11y follow-up + audit-log + TF-011/012 *(pre-session-rebase commit; carried forward)*
+- commit 9086894fd720 — `TBD` in subject: fix(dw-lifecycle): workplan-TBD scanner — closes #339 false positives *(pre-session-rebase commit)*
+- commit 62d3965d3936 — `TBD, wontfix` in subject: feat(dw-lifecycle): promote-deferrals — workplan-TBD promotion + inline-wontfix (hygiene Phase 3) *(pre-session-rebase commit)*
+- workplan `docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:379` — markers: out-of-scope — `Step 7.5.1: \`group-recursive\` rule: a group has a member whose \`members\` array is non-empty → refuse (recursive groups out of scope per v1)`. (Pre-existing; explicit Phase 7 scope-decision.)
+- Issues filed this session: **none** (the helper picked up #349-356, but those were filed in the prior 2026-05-29 session before this one started — calendar-date filter rather than session-range filter).
+- AUDIT-20260529-10 + AUDIT-20260529-11 added to audit-log this session; both already at terminal status. Audit-log open-count remains **0**.
+- Uncommitted state on disk at session-end: `.deskwork/lanes/default.json` (Phase 3 auto-bootstrap migration result created by the studio boot during AUDIT-10 verification) + one `.deskwork/review-journal/history/<ts>-<uuid>.json` snapshot. Both are real project state, not session debris; left dirty for the operator to dispose explicitly.
+
+### Next session recommendation (hygiene)
+
+- **Resume: Phase 7** — Groups (members[] field + CRUD + review surface + multi-lane composition). Parent issue [#308](https://github.com/audiocontrol-org/deskwork/issues/308). First task is 7.1: schema delta — `members[]` on entry. Workplan begins at `docs/1.0/001-IN-PROGRESS/graphical-entries/workplan.md:345`.
+- **Triage at next start:** decide whether to commit the uncommitted `.deskwork/lanes/default.json` migration result + the review-journal history file. The lane bootstrap is one-time canonical project state; the review-journal snapshot is per-render and likely belongs in `.gitignore` if it isn't already.
+- **Do NOT triage:** #349-356 — those issues belong to other features (scope-discovery + dw-lifecycle hygiene), tracked there.
+- **Address TBD markers:** line 379 of workplan is the only marker found; it's an explicit Phase 7 scope-decision rather than a deferral and needs no action.
+- **Note for release-time:** the close-shipped scanner (when it runs against the next release tag) will see 12 `fixed-<sha>` markers in audit-log.md from this session — all should attach to commits in the `e9f7cb6..HEAD` range.
