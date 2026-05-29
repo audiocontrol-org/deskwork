@@ -593,7 +593,7 @@ These items are filed for tracking but don't block any scope-discovery acceptanc
 
 ## Phase 12: Multi-model audit barrage
 
-**Parent issue:** (TBD — file via `/dw-lifecycle:issues` after this phase iterates through deskwork)
+**Parent issue:** [#353](https://github.com/audiocontrol-org/deskwork/issues/353).
 **Source:** ROADMAP.md § "Audit-barrage feature shape"; operator design conversation 2026-05-29; canary [#349](https://github.com/audiocontrol-org/deskwork/issues/349) §2 "operator-discipline cost" framing.
 
 **Problem the phase addresses (captured exhaustively per capture-mode rule; scoping is a separate pass):**
