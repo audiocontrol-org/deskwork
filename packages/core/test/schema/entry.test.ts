@@ -56,8 +56,11 @@ describe('EntrySchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('parses a valid Drafting entry with reviewState', () => {
-    const valid: Entry = {
+  it('accepts a legacy Drafting entry carrying reviewState (schema drops it — Commandment III)', () => {
+    // NOT typed as Entry: reviewState is retired from the type. This input
+    // models a legacy on-disk sidecar; EntrySchema must parse it cleanly
+    // (zod's default strips the unknown reviewState key).
+    const legacyInput = {
       uuid: '550e8400-e29b-41d4-a716-446655440001',
       slug: 'my-second-article',
       title: 'My Second',
@@ -69,7 +72,12 @@ describe('EntrySchema', () => {
       createdAt: '2026-04-30T10:00:00.000Z',
       updatedAt: '2026-04-30T11:00:00.000Z',
     };
-    expect(EntrySchema.safeParse(valid).success).toBe(true);
+    const parsed = EntrySchema.safeParse(legacyInput);
+    expect(parsed.success).toBe(true);
+    // The retired field is dropped, not preserved.
+    if (parsed.success) {
+      expect('reviewState' in parsed.data).toBe(false);
+    }
   });
 
   it('rejects an entry with unknown stage', () => {
