@@ -1871,13 +1871,13 @@ GitHub tracking issues:
 
 **Sub-phase 38·0 — Blast-radius review against `feature/graphical-entries` (#301) [GATING — runs first]:**
 
-- [ ] Review the graphical-entries PRD + workplan + scope-manifest on `feature/graphical-entries` to identify which core+studio burndown issues its work supersedes or contradicts.
-- [ ] Classify each at-risk issue (HIGH/MEDIUM/LOW overlap) per the PRD's Coordination subsection; validate the initial assessment against the live branch state.
-- [ ] Mark HIGH/MEDIUM-overlap issues **Blocked**: add a GitHub label + comment referencing #301. Candidates from the initial assessment — pipeline/stage: #246, #266, #56, #60, #72, #61; dashboard: #68, #98, #177, #114, #262, #263; review surface/annotations: #154, #161, #179, #180, #54, #299, #204, #85; scrapbook: #191, #202, #186, #245.
-- [ ] Confirm the LOW-overlap unblocked work set (core CLI/doctor/ingest + studio non-dashboard/non-review fixes) is genuinely safe; these are the starting point for 38b/38c/38d.
-- [ ] **38a is reclassified: gated on #301 coordination, NOT first.** Coordinate the `SUCCESSOR`/`nextStage` change with graphical-entries' pipeline-template generalization before implementing.
+- [x] Review the graphical-entries PRD + workplan + scope-manifest on `feature/graphical-entries` and the live branch state (code-explorer dispatch via `/dwi`). graphical-entries Phases 1–6 are DONE on-branch (pipeline templates + lanes + template-aware verbs + swimlane dashboard); Phases 7–12 (groups, annotation extension, graphical review surface) not started.
+- [x] Classify each at-risk issue (HIGH/MEDIUM/LOW overlap) against live branch state. Report: [`38-0-blast-radius-review.md`](38-0-blast-radius-review.md). Counts: **16 HIGH (block) · 12 MEDIUM (coordinate) · 38 LOW (proceed)** across 66 issues.
+- [ ] Mark HIGH/MEDIUM-overlap issues **Blocked** (GitHub label + #301 comment). **PENDING operator go-ahead** (outward-facing: 16 HIGH + 12 MEDIUM issues). Block list in the report.
+- [x] LOW-overlap unblocked work set confirmed (20 core + 18 studio); see report. Safe starting point for 38b/38c (+ the non-dashboard studio quick-fixes #71/#233/#229).
+- [ ] **38a verdict: reassign #246/#230 to #301 coordination (option b), NOT Phase 38.** graphical-entries' `approveEntryStage` is a complete on-branch rewrite using `preTerminalLinearStage(template)`; the #246 fix belongs at `graphical-entries/packages/core/src/entry/approve.ts:109-115`. A Phase-38 edit to `deskwork-plugin/.../approve.ts:61-63` would be throwaway. **PENDING operator decision.**
 
-**Sub-phase 38a — Verb-model unification (#246 + #230) [GATED on 38·0 / #301 coordination]:**
+**Sub-phase 38a — Verb-model unification (#246 + #230) [REASSIGNED to #301 coordination per 38·0 — pending operator confirmation]:**
 
 - [ ] `nextStage('Final')` returns `'Published'` (`packages/core/src/schema/entry.ts`); update `entry.test.ts` assertions.
 - [ ] `approveEntryStage` handles `Final → Published` with uniform mechanics + `datePublished` + artifact check; extend `ApproveResult` ([#246](https://github.com/audiocontrol-org/deskwork/issues/246)).
