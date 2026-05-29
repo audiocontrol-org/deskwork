@@ -164,7 +164,12 @@ describe('checkPreconditions', () => {
   });
 });
 
-import { verifyNpmStatus, DESKWORK_PACKAGES, type NpmViewer } from '../lib/release-helpers.js';
+import {
+  verifyNpmStatus,
+  verifyNpmStatusUntilPublished,
+  DESKWORK_PACKAGES,
+  type NpmViewer,
+} from '../lib/release-helpers.js';
 
 describe('verifyNpmStatus', () => {
   it('reports all unpublished when viewer returns false for every spec', () => {
@@ -201,6 +206,79 @@ describe('verifyNpmStatus', () => {
       '@deskwork/cli@0.9.6',
       '@deskwork/studio@0.9.6',
     ]);
+  });
+});
+
+describe('verifyNpmStatusUntilPublished', () => {
+  it('returns on the first attempt when every spec is already visible', async () => {
+    const viewer: NpmViewer = () => true;
+    const sleeps: number[] = [];
+    const sleep = (ms: number) => {
+      sleeps.push(ms);
+      return Promise.resolve();
+    };
+    const r = await verifyNpmStatusUntilPublished('0.26.5', { viewer, sleep });
+    expect(r.unpublished).toEqual([]);
+    expect(r.published).toEqual([...DESKWORK_PACKAGES]);
+    expect(sleeps).toEqual([]);
+  });
+
+  it('retries with exponential backoff until every spec becomes visible', async () => {
+    // Simulates CDN propagation: studio first visible on the 3rd probe.
+    let probes = 0;
+    const viewer: NpmViewer = (spec) => {
+      if (spec.startsWith('@deskwork/studio@')) {
+        probes += 1;
+        return probes >= 3;
+      }
+      return true;
+    };
+    const sleeps: number[] = [];
+    const sleep = (ms: number) => {
+      sleeps.push(ms);
+      return Promise.resolve();
+    };
+    const r = await verifyNpmStatusUntilPublished('0.26.5', {
+      viewer,
+      sleep,
+      initialBackoffMs: 100,
+      maxBackoffMs: 1000,
+    });
+    expect(r.unpublished).toEqual([]);
+    // First probe sees studio unpublished; sleep(100) → second probe sees
+    // studio unpublished; sleep(200) → third probe sees studio published.
+    expect(sleeps).toEqual([100, 200]);
+  });
+
+  it('caps backoff at maxBackoffMs', async () => {
+    const viewer: NpmViewer = () => false;
+    const sleeps: number[] = [];
+    const sleep = (ms: number) => {
+      sleeps.push(ms);
+      return Promise.resolve();
+    };
+    await verifyNpmStatusUntilPublished('0.26.5', {
+      viewer,
+      sleep,
+      maxAttempts: 6,
+      initialBackoffMs: 100,
+      maxBackoffMs: 300,
+    });
+    // 5 backoffs between 6 attempts: 100, 200, 300 (capped), 300, 300.
+    expect(sleeps).toEqual([100, 200, 300, 300, 300]);
+  });
+
+  it('returns the final report (unpublished still set) when budget exhausts', async () => {
+    const viewer: NpmViewer = () => false;
+    const sleep = () => Promise.resolve();
+    const r = await verifyNpmStatusUntilPublished('0.26.5', {
+      viewer,
+      sleep,
+      maxAttempts: 3,
+      initialBackoffMs: 10,
+    });
+    expect(r.unpublished).toEqual([...DESKWORK_PACKAGES]);
+    expect(r.published).toEqual([]);
   });
 });
 
