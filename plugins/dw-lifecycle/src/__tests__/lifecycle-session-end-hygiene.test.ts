@@ -186,6 +186,43 @@ describe('captureSessionEndHygiene', () => {
     expect(report.recommendation.resumeTask).toContain('Task 1');
   });
 
+  it('degrades gracefully when the supplied sessionStartSha is dangling (F1 review fix)', () => {
+    // Track 3 review surfaced an asymmetry: `scanIssuesThisSession` already
+    // handled an invalid SHA via `resolveSessionBoundarySha`'s try-git
+    // probe, but `readCommits` passed the SHA straight into `git log` and
+    // would crash the entire hygiene pass on a dangling ref. The fix wraps
+    // `readCommits` in a try/catch with a HEAD~10 fallback. This test stubs
+    // `runGit` so the requested range throws but the fallback range works.
+    const logCalls: string[][] = [];
+    const runGit = (args: readonly string[]): string => {
+      if (args[0] === 'log') {
+        logCalls.push([...args]);
+        // The bad-range call throws; the HEAD~10 fallback returns clean.
+        if ((args[2] ?? '').includes('dangling-sha-from-old-session..HEAD')) {
+          throw new Error('fatal: bad revision');
+        }
+        return '';
+      }
+      return '';
+    };
+    expect(() =>
+      captureSessionEndHygiene({
+        projectRoot: fx.root,
+        featureSlug: 'hygiene',
+        targetVersion: '1.0',
+        inProgressDirName: '001-IN-PROGRESS',
+        sessionStartSha: 'dangling-sha-from-old-session',
+        runGit,
+        runGh: stubGh('[]'),
+        now: new Date('2026-05-28T00:00:00Z'),
+      }),
+    ).not.toThrow();
+    // Two log calls: the failing range + the HEAD~10 fallback.
+    expect(logCalls).toHaveLength(2);
+    expect(logCalls[0]?.[2]).toBe('dangling-sha-from-old-session..HEAD');
+    expect(logCalls[1]?.[2]).toBe('-10');
+  });
+
   it('handles an empty session range gracefully', () => {
     const runGit = () => '';
     const report = captureSessionEndHygiene({

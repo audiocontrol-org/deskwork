@@ -88,7 +88,24 @@ function range(
 }
 
 function readCommits(runGit: RunGit, sessionStartSha: string | null): readonly CommitRow[] {
-  const out = runGit(['log', '--format=%H%x09%s', ...range(sessionStartSha)]);
+  // Defensive posture matches `scanIssuesThisSession`: if the supplied SHA
+  // is dangling (force-push / rebase / stale SHA from a prior session on a
+  // different branch), `git log <bad-sha>..HEAD` exits non-zero and the
+  // exception would crash the entire `captureSessionEndHygiene` pass. Try
+  // the requested range first; on failure, retry with the `HEAD~10`
+  // fallback. If THAT also fails (truly broken repo), surface zero rows
+  // instead of throwing.
+  let out: string;
+  try {
+    out = runGit(['log', '--format=%H%x09%s', ...range(sessionStartSha)]);
+  } catch {
+    if (sessionStartSha === null) return [];
+    try {
+      out = runGit(['log', '--format=%H%x09%s', ...range(null)]);
+    } catch {
+      return [];
+    }
+  }
   const rows: CommitRow[] = [];
   for (const line of out.split('\n')) {
     if (line.length === 0) continue;

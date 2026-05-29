@@ -159,7 +159,7 @@ export function parentTimeline(
   // on every source succeeding. A one-line stderr breadcrumb names the
   // failure mode so the operator can tell silent backfill apart from a
   // genuinely-empty timeline; the diagnostic pattern mirrors
-  // session-end-hygiene.ts's resolveSessionBoundaryIso error handling.
+  // session-range.ts's `tryGit` failure-reason-carrying shape.
   let raw: string;
   try {
     raw = args.runGh(ghArgs);

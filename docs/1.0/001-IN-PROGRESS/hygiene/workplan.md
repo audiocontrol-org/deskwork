@@ -421,5 +421,5 @@ Operator decisions (locked in during definition):
 
 - Surfaced via the `deskwork-plugin` tooling-feedback log: `docs/1.0/001-IN-PROGRESS/deskwork-plugin/tooling-feedback.md` TF-001 (recurring across two deskwork-plugin sessions).
 - Promoted to [#361](https://github.com/audiocontrol-org/deskwork/issues/361) per the agent-discipline rule's "recurring cross-session pattern → promote" trigger.
-- Code path: `session-end-hygiene.ts:282–334` (gh query + observation builder); the no-SHA fallback path lives in `resolveSessionBoundaryIso` and stays as-is.
+- Code path: `session-end-hygiene.ts` `scanIssuesThisSession` (commit-range walker + per-issue `gh issue view`) + `session-range.ts` `resolveSessionBoundarySha` (priority-ordered SHA fallback). The pre-Phase-12 `resolveSessionBoundaryIso` is deleted; the boundary is now the SHA itself, not a committer-date detour.
 - Adjacent infrastructure friction surfaced in the same dogfood (TF-003 + TF-004, promoted to [#362](https://github.com/audiocontrol-org/deskwork/issues/362) — `wrap-prompt` / `validate-return` round-trip ergonomics) is dw-lifecycle infra, not hygiene-feature work; not in scope for this phase.
