@@ -1,9 +1,9 @@
-generated_at: 2026-05-29T04:20:08.985Z
+generated_at: 2026-05-29T07:15:23.069Z
 clones:
   - id: 014b49040fe1
     lines: 13
     members:
-      - packages/cli/src/commands/add.ts:45:57
+      - packages/cli/src/commands/add.ts:78:90
       - packages/cli/src/commands/ingest.ts:104:115
     disposition: pending
     reason: null
@@ -247,7 +247,7 @@ clones:
   - id: e1b16a900b51
     lines: 18
     members:
-      - packages/core/src/doctor/rules/lane-config-missing-template.ts:232:249
+      - packages/core/src/doctor/rules/lane-config-missing-template.ts:241:258
       - packages/core/src/doctor/rules/orphan-frontmatter-id.ts:158:174
     disposition: keep-with-reason
     reason: Doctor rule contract boilerplate (end of plan choices array + apply()'s plan.kind guard + payload coercion); each rule independently implements the DoctorRule interface against the same contract, so shape similarity is interface-driven not duplication; extracting a base class would violate composition-over-inheritance
@@ -569,6 +569,27 @@ clones:
       - packages/studio/src/server.ts:415:424
     disposition: pending
     reason: null
+  - id: 6c6c2b4096e5
+    lines: 18
+    members:
+      - packages/studio/test/__helpers/dashboard-swimlane-fixture.ts:30:47
+      - packages/studio/test/dashboard-swimlane-integration-fixture.ts:44:61
+    disposition: keep-with-reason
+    reason: "AUDIT-20260528-14 split: __helpers/dashboard-swimlane-fixture.ts ships the 1-entry-per-lane fixture for the per-feature render-tests split from dashboard-swimlane.test.ts. dashboard-swimlane-integration-fixture.ts ships the parallel 2-entries-per-lane fixture (with locked stages) for the Task 5.6 dual node-env/jsdom-env integration tests. Trivial shape (makeConfig/makeEntry/writeLane) is intrinsic to on-disk sidecar fixtures."
+  - id: b07f9968c8cd
+    lines: 19
+    members:
+      - packages/studio/test/__helpers/dashboard-swimlane-fixture.ts:60:74
+      - packages/studio/test/dashboard-swimlane-integration-fixture.ts:74:92
+    disposition: keep-with-reason
+    reason: "AUDIT-20260528-14 split: __helpers/dashboard-swimlane-fixture.ts ships the 1-entry-per-lane fixture for the per-feature render-tests split from dashboard-swimlane.test.ts. dashboard-swimlane-integration-fixture.ts ships the parallel 2-entries-per-lane fixture (with locked stages) for the Task 5.6 dual node-env/jsdom-env integration tests. Trivial shape (makeConfig/makeEntry/writeLane) is intrinsic to on-disk sidecar fixtures."
+  - id: f5105894d009
+    lines: 7
+    members:
+      - packages/studio/test/__helpers/dashboard-swimlane-fixture.ts:94:102
+      - packages/studio/test/dashboard-swimlane-integration-fixture.ts:94:100
+    disposition: keep-with-reason
+    reason: "AUDIT-20260528-14 split: __helpers/dashboard-swimlane-fixture.ts ships the 1-entry-per-lane fixture for the per-feature render-tests split from dashboard-swimlane.test.ts. dashboard-swimlane-integration-fixture.ts ships the parallel 2-entries-per-lane fixture (with locked stages) for the Task 5.6 dual node-env/jsdom-env integration tests. Trivial shape (makeConfig/makeEntry/writeLane) is intrinsic to on-disk sidecar fixtures."
   - id: 14579dae3bdf
     lines: 20
     members:
