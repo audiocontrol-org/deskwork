@@ -1,4 +1,4 @@
-generated_at: 2026-05-29T07:51:49.509Z
+generated_at: 2026-05-29T07:57:05.864Z
 clones:
   - id: 014b49040fe1
     lines: 13
@@ -569,6 +569,48 @@ clones:
       - packages/studio/src/server.ts:415:424
     disposition: pending
     reason: null
+  - id: 22fbdfa51c64
+    lines: 6
+    members:
+      - packages/studio/test/__helpers/dashboard-swimlane-client-fixture.ts:14:19
+      - packages/studio/test/__helpers/dashboard-swimlane-presets-fixture.ts:86:91
+    disposition: keep-with-reason
+    reason: "AUDIT-20260528-14 split: the new __helpers/dashboard-swimlane-client-fixture.ts shares minimum-viable jsdom setup (CSS.escape shim, eye-button + rail-row scaffold) with the pre-existing dashboard-swimlane-integration-dom-builder.ts and the sibling __helpers/dashboard-swimlane-{drag,presets}-fixture.ts files. The duplication is the unavoidable jsdom prelude every dashboard-swimlane client surface needs; collapsing it would re-couple unrelated test surfaces around a generic super-fixture none of them own."
+  - id: 1db0f09202ed
+    lines: 9
+    members:
+      - packages/studio/test/__helpers/dashboard-swimlane-client-fixture.ts:24:32
+      - packages/studio/test/__helpers/dashboard-swimlane-presets-fixture.ts:116:125
+    disposition: keep-with-reason
+    reason: "AUDIT-20260528-14 split: the new __helpers/dashboard-swimlane-client-fixture.ts shares minimum-viable jsdom setup (CSS.escape shim, eye-button + rail-row scaffold) with the pre-existing dashboard-swimlane-integration-dom-builder.ts and the sibling __helpers/dashboard-swimlane-{drag,presets}-fixture.ts files. The duplication is the unavoidable jsdom prelude every dashboard-swimlane client surface needs; collapsing it would re-couple unrelated test surfaces around a generic super-fixture none of them own."
+  - id: fa27eef7f052
+    lines: 14
+    members:
+      - packages/studio/test/__helpers/dashboard-swimlane-client-fixture.ts:39:52
+      - packages/studio/test/dashboard-swimlane-integration-dom-builder.ts:307:320
+    disposition: keep-with-reason
+    reason: "AUDIT-20260528-14 split: the new __helpers/dashboard-swimlane-client-fixture.ts shares minimum-viable jsdom setup (CSS.escape shim, eye-button + rail-row scaffold) with the pre-existing dashboard-swimlane-integration-dom-builder.ts and the sibling __helpers/dashboard-swimlane-{drag,presets}-fixture.ts files. The duplication is the unavoidable jsdom prelude every dashboard-swimlane client surface needs; collapsing it would re-couple unrelated test surfaces around a generic super-fixture none of them own."
+  - id: bec01e62d047
+    lines: 10
+    members:
+      - packages/studio/test/__helpers/dashboard-swimlane-client-fixture.ts:58:67
+      - packages/studio/test/__helpers/dashboard-swimlane-presets-fixture.ts:137:146
+    disposition: keep-with-reason
+    reason: "AUDIT-20260528-14 split: the new __helpers/dashboard-swimlane-client-fixture.ts shares minimum-viable jsdom setup (CSS.escape shim, eye-button + rail-row scaffold) with the pre-existing dashboard-swimlane-integration-dom-builder.ts and the sibling __helpers/dashboard-swimlane-{drag,presets}-fixture.ts files. The duplication is the unavoidable jsdom prelude every dashboard-swimlane client surface needs; collapsing it would re-couple unrelated test surfaces around a generic super-fixture none of them own."
+  - id: 3718d183b082
+    lines: 12
+    members:
+      - packages/studio/test/__helpers/dashboard-swimlane-client-fixture.ts:81:92
+      - packages/studio/test/__helpers/dashboard-swimlane-presets-fixture.ts:196:208
+    disposition: keep-with-reason
+    reason: "AUDIT-20260528-14 split: the new __helpers/dashboard-swimlane-client-fixture.ts shares minimum-viable jsdom setup (CSS.escape shim, eye-button + rail-row scaffold) with the pre-existing dashboard-swimlane-integration-dom-builder.ts and the sibling __helpers/dashboard-swimlane-{drag,presets}-fixture.ts files. The duplication is the unavoidable jsdom prelude every dashboard-swimlane client surface needs; collapsing it would re-couple unrelated test surfaces around a generic super-fixture none of them own."
+  - id: b1271e553839
+    lines: 6
+    members:
+      - packages/studio/test/__helpers/dashboard-swimlane-client-fixture.ts:96:101
+      - packages/studio/test/__helpers/dashboard-swimlane-presets-fixture.ts:23:28
+    disposition: keep-with-reason
+    reason: "AUDIT-20260528-14 split: the new __helpers/dashboard-swimlane-client-fixture.ts shares minimum-viable jsdom setup (CSS.escape shim, eye-button + rail-row scaffold) with the pre-existing dashboard-swimlane-integration-dom-builder.ts and the sibling __helpers/dashboard-swimlane-{drag,presets}-fixture.ts files. The duplication is the unavoidable jsdom prelude every dashboard-swimlane client surface needs; collapsing it would re-couple unrelated test surfaces around a generic super-fixture none of them own."
   - id: db7bf2f695f3
     lines: 8
     members:
